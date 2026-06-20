@@ -3,11 +3,14 @@
 // that nesting in JS (exactly as RN's own ScrollView.js does), so the rest of the
 // stack only ever sees the two host intrinsics the host config already maps.
 //
-// Two props are translated here, not passed through native: contentContainerStyle
-// becomes the inner content node's style, and `horizontal` injects
-// flexDirection:'row' into that same style (on iOS horizontal is realized by the
-// content's main axis, not a native bool). decelerationRate's string aliases map
-// to their float values before they reach native.
+// contentContainerStyle becomes the inner content node's style. `horizontal` does
+// TWO things, both required: it injects flexDirection:'row' into the content style
+// (so children lay out in a row) AND it is forwarded to the native RCTScrollView as
+// a bool (BaseScrollViewProps.horizontal) — the ScrollView shadow node reads it to
+// leave the content's WIDTH unbounded, so the row can grow past the frame and the
+// UIScrollView actually scrolls horizontally. Sending only flexDirection pins the
+// content to the frame width and the row is clipped, not scrollable.
+// decelerationRate's string aliases map to their float values before native.
 
 import { createElement, type FC, type ReactElement, type ReactNode } from 'react'
 import { dlog, type SymbioteEvent } from '@symbiote/shared'
@@ -62,6 +65,7 @@ export const ScrollView: FC<ScrollViewProps> = (props) => {
   if (horizontal === true) contentStyle.flexDirection = 'row'
 
   const outerProps: Record<string, unknown> = { ...outer, style }
+  if (horizontal !== undefined) outerProps.horizontal = horizontal
   if (decelerationRate !== undefined) {
     outerProps.decelerationRate = resolveDecelerationRate(decelerationRate)
   }

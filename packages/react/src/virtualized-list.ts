@@ -408,9 +408,17 @@ export function VirtualizedList<ItemT>(
   // unknown props straight onto the outer RCTScrollView node, where the shared
   // node-prop scanner turns onLayout into a direct `layout` listener. Type the
   // extra prop explicitly rather than widening ScrollViewProps from here.
+  // A horizontal list must pin the content container to the full row width. The
+  // content view otherwise stretches to the ScrollView's frame width (the default
+  // cross-axis stretch), so the row is clipped and nothing overflows for iOS to
+  // scroll. The vertical axis needs no pinning — stacked children grow it naturally.
+  const resolvedContentContainerStyle: ViewStyle = horizontal
+    ? { ...contentContainerStyle, width: total }
+    : { ...contentContainerStyle }
+
   const scrollProps: ScrollViewProps & { onLayout: (event: SymbioteEvent) => void } = {
     style,
-    contentContainerStyle,
+    contentContainerStyle: resolvedContentContainerStyle,
     horizontal,
     onScroll,
     onLayout: onViewportLayout,

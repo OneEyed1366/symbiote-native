@@ -121,6 +121,11 @@ if (!outer) throw new Error('no RCTScrollView was created')
 if ('padding' in outer.props || 'flexDirection' in outer.props) {
   throw new Error(`outer node leaked content style, got ${JSON.stringify(outer.props)}`)
 }
+// horizontal must reach the native scroll view as a bool — the shadow node needs it
+// to leave content width unbounded, else the row is pinned to the frame and clipped.
+if (outer.props.horizontal !== true) {
+  throw new Error(`horizontal must reach RCTScrollView, got ${JSON.stringify(outer.props.horizontal)}`)
+}
 
 if (!eventHandler) throw new Error('no event handler was registered')
 const payload = {
