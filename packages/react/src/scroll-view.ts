@@ -9,7 +9,7 @@
 // content's main axis, not a native bool). decelerationRate's string aliases map
 // to their float values before they reach native.
 
-import { createElement, type FC, type ReactNode } from 'react'
+import { createElement, type FC, type ReactElement, type ReactNode } from 'react'
 import { dlog, type SymbioteEvent } from '@symbiote/shared'
 import type { ViewStyle } from './styles'
 
@@ -33,6 +33,7 @@ export interface ScrollViewProps {
   scrollEventThrottle?: number
   contentInset?: { top?: number; left?: number; bottom?: number; right?: number }
   contentOffset?: { x: number; y: number }
+  refreshControl?: ReactElement
   onScroll?: ScrollHandler
   onScrollBeginDrag?: ScrollHandler
   onScrollEndDrag?: ScrollHandler
@@ -52,6 +53,7 @@ export const ScrollView: FC<ScrollViewProps> = (props) => {
     contentContainerStyle,
     horizontal,
     decelerationRate,
+    refreshControl,
     children,
     ...outer
   } = props
@@ -66,9 +68,18 @@ export const ScrollView: FC<ScrollViewProps> = (props) => {
 
   dlog('ScrollView -> RCTScrollView(RCTScrollContentView)')
 
-  return createElement(
-    'symbiote-scroll-view',
-    outerProps,
-    createElement('symbiote-scroll-content', { style: contentStyle }, children),
+  const content = createElement(
+    'symbiote-scroll-content',
+    { style: contentStyle },
+    children,
   )
+
+  // On iOS the RefreshControl is a child of the ScrollView, rendered as a sibling
+  // BEFORE the content container (see RN ScrollView.js: {refreshControl} then
+  // {contentContainer}).
+  if (refreshControl !== undefined) {
+    dlog('ScrollView injecting refreshControl as first child (before content)')
+    return createElement('symbiote-scroll-view', outerProps, refreshControl, content)
+  }
+  return createElement('symbiote-scroll-view', outerProps, content)
 }
