@@ -16,4 +16,6 @@ DerivedData/
 
 # misc
 .DS_Store
-.docs/
+
+# hidden folders are local-only (.docs, .claude, .notes, .vendors, …); dotfiles stay tracked
+.*/
