@@ -64,10 +64,12 @@ export interface ModalProps {
 }
 
 // The full-screen box RN anchors the modal content in (Modal.js styles.container:
-// [side]:0, top:0, flex:1, backgroundColor:'white'). The backdrop color is layered
-// on at render time so the transparent/backdropColor overrides can win.
+// [side]:0, top:0, flex:1, backgroundColor:'white'). It is NOT position:absolute —
+// it is a flex child that fills the ModalHostView, whose shadow node self-sizes to
+// the screen (ModalHostViewComponentDescriptor sets the node size to screenSize).
+// An absolute container with only top/left would collapse to its content instead.
+// The backdrop color is layered on at render time so transparent/backdropColor win.
 const CONTAINER_STYLE: Readonly<ViewStyle> = {
-  position: 'absolute',
   left: 0,
   top: 0,
   flex: 1,
