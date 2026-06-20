@@ -6,7 +6,7 @@
 
 **Pre-alpha** · iOS-first · one native core, N framework adapters
 
-[Architecture](.docs/architecture.md) · [Decision records](.docs/README.md) · [Milestones](#milestones) · [Prior art](./wolf-tui)
+[Architecture](#how-it-works) · [Design decisions](#design-decisions) · [Milestones](#milestones) · [Prior art](https://github.com/OneEyed1366/wolf-tui)
 
 </div>
 
@@ -29,7 +29,7 @@ the slot from your own renderer instead. **The native core is never touched.**
 symbiote extracts that native stack and puts a tiny seam in front of it, so **any** UI
 framework can drive real native views. One native core, N thin adapters.
 
-> If you've used [wolf-tui](./wolf-tui) — shared retained-tree + a thin per-framework
+> If you've used [wolf-tui](https://github.com/OneEyed1366/wolf-tui) — shared retained-tree + a thin per-framework
 > reconciler, already shipping across five frameworks against a native layout engine —
 > you already know the shape. symbiote retargets it from ANSI terminal output to native
 > iOS/Android views.
@@ -79,8 +79,7 @@ the initial child set.
 
 **What stays stock RN.** Fabric C++, JSI, Yoga, the iOS/Android host, `RCTFabricSurface`,
 native modules. None of it is forked or patched — `react-native` is an ordinary dependency.
-The only thing symbiote replaces is the JS renderer. See
-[decision 0003](.docs/decisions/0003-native-source-stock-rn-swap-renderer.md).
+The only thing symbiote replaces is the JS renderer (decision record 0003).
 
 </details>
 
@@ -147,8 +146,8 @@ Fabric — no React Native renderer in the path.
 > React Native feature parity.
 
 **Done:** the native pipe, bootstrap, and `@symbiote/shared`'s mutation→clone-on-write engine
-are proven on a real iOS 26 simulator via the React canary (R1 + R2 + R3 — see
-[decision 0009](.docs/decisions/0009-react-canary-shipped.md)).
+are proven on a real iOS 26 simulator via the React canary (R1 + R2 + R3 — decision
+record 0009).
 
 **In progress:** building `@symbiote/react` out toward React Native feature parity. Primitives
 already wired include `View` · `Text` · `Image` · `ImageBackground` · `ScrollView` ·
@@ -181,7 +180,7 @@ Android apps the same way React Native does today, off one untouched native core
 default platform target is a possible later pass.
 
 Each adapter is built in layers (static paint → reactive update → event) so a break is
-localizable. See [decision 0007](.docs/decisions/0007-first-milestone-vue-vertical-slice.md).
+localizable (decision record 0007).
 
 ---
 
@@ -238,7 +237,7 @@ bundle, changing it requires restarting Metro with `--reset-cache`.
 
 ## Design Decisions
 
-Every load-bearing choice is a decision record in [`.docs/`](.docs/README.md), with its
+Every load-bearing choice is a decision record in `.docs/` (kept local to the repo), with its
 context, the option taken, the rationale, and — importantly — what it explicitly rules out.
 Read the relevant ADR before proposing an architectural change; if your change contradicts
 one, write a superseding record rather than drifting silently.
@@ -253,7 +252,7 @@ A few invariants are non-negotiable without a new decision record:
   handling are all shared.
 - **Layout is stock Yoga.** Taffy is out of scope — touching the C++ layout node
   turns "free RN upstream merges" into a permanent fork tax for an unmeasured
-  benchmark win ([decision 0004](.docs/decisions/0004-layout-yoga-not-taffy.md)).
+  benchmark win (decision record 0004).
 
 ---
 
