@@ -140,6 +140,11 @@ let layoutPayload: unknown
 routeProp(sibling, 'onLayout', (event: SymbioteEvent) => {
   layoutPayload = event.nativeEvent.layout
 })
+// Fabric only emits layout events when the node is flagged: a layout listener must
+// also raise the onLayout prop (RN's validAttribute), else native never measures.
+if (sibling.props.onLayout !== true) {
+  throw new Error('a layout listener must raise the onLayout flag prop for Fabric')
+}
 const frame = { x: 0, y: 0, width: 100, height: 40 }
 fire(sibling, 'topLayout', { layout: frame })
 if (layoutPayload !== frame) throw new Error('layout listener did not receive the layout payload')

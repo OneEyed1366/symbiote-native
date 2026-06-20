@@ -82,11 +82,21 @@ export function setProp(node: SymbioteNode, key: string, value: unknown): void {
   }
 }
 
+// Fabric gates layout events behind a boolean prop (BaseViewProps.onLayout): unlike
+// scroll / touch / change, which the native component emits unconditionally, a
+// layout event fires only when the shadow node is flagged. So a `layout` listener
+// must also raise that prop, mirroring RN's `onLayout: true` validAttribute —
+// otherwise onLayout never fires and anything measuring its own box (VirtualizedList
+// viewport) stays at zero.
+const LAYOUT_EVENT = 'layout'
+const LAYOUT_FLAG_PROP = 'onLayout'
+
 // The explicit event channel. Structural adapters (Svelte addEventListener, Angular
 // Renderer2.listen) call this directly with an already-known event name; flat-bag
 // adapters reach it through routeProp. A non-function value clears the listener.
 export function setEventListener(node: SymbioteNode, name: string, value: unknown): void {
-  if (typeof value === 'function') {
+  const isHandler = typeof value === 'function'
+  if (isHandler) {
     const handler = value
     const listeners = (node.listeners ??= new Map())
     listeners.set(name, (event: SymbioteEvent) => {
@@ -95,6 +105,7 @@ export function setEventListener(node: SymbioteNode, name: string, value: unknow
   } else {
     node.listeners?.delete(name)
   }
+  if (name === LAYOUT_EVENT) setProp(node, LAYOUT_FLAG_PROP, isHandler ? true : undefined)
 }
 
 const ON_PREFIX = /^on[A-Z]/
