@@ -79,7 +79,7 @@ the initial child set.
 
 **What stays stock RN.** Fabric C++, JSI, Yoga, the iOS/Android host, `RCTFabricSurface`,
 native modules. None of it is forked or patched — `react-native` is an ordinary dependency.
-The only thing symbiote replaces is the JS renderer (decision record 0003).
+The only thing symbiote replaces is the JS renderer.
 
 </details>
 
@@ -180,7 +180,7 @@ Android apps the same way React Native does today, off one untouched native core
 default platform target is a possible later pass.
 
 Each adapter is built in layers (static paint → reactive update → event) so a break is
-localizable (decision record 0007).
+localizable.
 
 ---
 
@@ -193,8 +193,6 @@ packages/
 examples/
   canary/      stock RN 0.86 app whose entry drives symbiote on the iOS simulator
   headless/    fake-slot smoke tests — the engine runs green in Node, no simulator
-.docs/         decision records (ADRs) — read before proposing architectural changes
-.vendors/      stock react-native + react sources, for reference only (never forked)
 ```
 
 ---
@@ -237,12 +235,8 @@ bundle, changing it requires restarting Metro with `--reset-cache`.
 
 ## Design Decisions
 
-Every load-bearing choice is a decision record in `.docs/` (kept local to the repo), with its
-context, the option taken, the rationale, and — importantly — what it explicitly rules out.
-Read the relevant ADR before proposing an architectural change; if your change contradicts
-one, write a superseding record rather than drifting silently.
-
-A few invariants are non-negotiable without a new decision record:
+A few invariants hold the architecture together. Changing any of them is a deliberate
+decision, not a drift:
 
 - **The native core is never forked.** `react-native` is a dependency; only the JS renderer
   is replaced.
@@ -252,7 +246,7 @@ A few invariants are non-negotiable without a new decision record:
   handling are all shared.
 - **Layout is stock Yoga.** Taffy is out of scope — touching the C++ layout node
   turns "free RN upstream merges" into a permanent fork tax for an unmeasured
-  benchmark win (decision record 0004).
+  benchmark win.
 
 ---
 
