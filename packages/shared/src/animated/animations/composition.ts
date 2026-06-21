@@ -6,6 +6,8 @@
 // every native-loop branch are dropped.
 
 import type { EndCallback, EndResult } from '../animation'
+import { dlog } from '../../debug'
+import { isNativeAnimatedAvailable } from '../native/native-animated'
 import { AnimatedNode } from '../graph'
 import { AnimatedValue } from '../value'
 import { AnimatedTracking } from './tracking'
@@ -20,6 +22,19 @@ export interface CompositeAnimation {
   start(callback?: EndCallback, isLooping?: boolean): void
   stop(): void
   reset(): void
+  // Offload an N-iteration loop to the native driver: a single native animation
+  // carries `iterations` in its config, so native runs the whole loop with ZERO JS
+  // per cycle. Returns true when it took over. Present only on drivers that CAN
+  // offload (a single timing/spring) — a sequence/parallel has no native loop, so
+  // loop() falls back to JS restart. Internal (loop()'s use only).
+  _nativeLoop?(iterations: number, callback?: EndCallback): boolean
+}
+
+// A loop offloads to native only when the driver was asked for the native path AND
+// the module is present; otherwise the JS-restart loop must run (a JS timing runs
+// once, it does not loop itself).
+function canOffloadLoop(config: { useNativeDriver?: boolean }): boolean {
+  return config.useNativeDriver === true && isNativeAnimatedAvailable()
 }
 
 interface WithOnComplete {
@@ -72,6 +87,17 @@ export function timing(value: AnimatedValue, config: TimingConfig): CompositeAni
     reset(): void {
       value.resetAnimation()
     },
+    _nativeLoop(iterations: number, callback?: EndCallback): boolean {
+      const target = config.toValue
+      if (target instanceof AnimatedNode || !canOffloadLoop(config)) return false
+      // One native animation carrying `iterations` runs the loop in native; the
+      // completion callback only fires when the count exhausts (never for -1).
+      value.animate(
+        new TimingAnimation({ ...config, toValue: target, iterations }),
+        combineCallbacks(callback, config),
+      )
+      return true
+    },
   }
 }
 
@@ -87,6 +113,15 @@ export function spring(value: AnimatedValue, config: SpringConfig): CompositeAni
       } else {
         value.animate(new SpringAnimation({ ...config, toValue: target }), onEnd)
       }
+    },
+    _nativeLoop(iterations: number, callback?: EndCallback): boolean {
+      const target = config.toValue
+      if (target instanceof AnimatedNode || !canOffloadLoop(config)) return false
+      value.animate(
+        new SpringAnimation({ ...config, toValue: target, iterations }),
+        combineCallbacks(callback, config),
+      )
+      return true
     },
     stop(): void {
       value.stopAnimation()
@@ -238,6 +273,17 @@ export function loop(
   let iterationsSoFar = 0
   return {
     start(callback?: EndCallback): void {
+      if (iterations === 0) {
+        callback?.({ finished: true })
+        return
+      }
+      // Prefer the native loop: a single native animation runs all iterations in
+      // native with zero JS per cycle. Only a single timing/spring offers it; a
+      // sequence/parallel returns false (no _nativeLoop) and falls back to JS.
+      if (animation._nativeLoop?.(iterations, callback) === true) {
+        dlog(`loop: offloaded ${iterations} iterations to native`)
+        return
+      }
       const restart = (result: EndResult = { finished: true }): void => {
         if (isFinished || iterationsSoFar === iterations || result.finished === false) {
           callback?.(result)
@@ -247,11 +293,7 @@ export function loop(
           animation.start(restart, iterations === -1)
         }
       }
-      if (iterations === 0) {
-        callback?.({ finished: true })
-      } else {
-        restart()
-      }
+      restart()
     },
 
     stop(): void {
