@@ -17,6 +17,17 @@ export {
 } from './node'
 export { isEventFor } from './view-config'
 export { registerComponent, setNativeViewConfigSource } from './registry'
+// InteractionManager — pure JS (timers + emitter), framework-agnostic, so it lives
+// here; every adapter re-exports it.
+export { InteractionManager, Events as InteractionManagerEvents } from './interaction-manager'
+export type {
+  InteractionEvent,
+  SimpleTask,
+  PromiseTask,
+  Task,
+  Handle,
+  Cancellable,
+} from './interaction-manager'
 export type {
   ComponentRegistration,
   NativeEventBinding,
