@@ -157,4 +157,31 @@ export type {
 export { InteractionManager } from '@symbiote/shared'
 export type { InteractionEvent, SimpleTask, PromiseTask, Task, Handle } from '@symbiote/shared'
 
+// Android-only surface (the second-platform pass). Each is a thin JS shim over an
+// Android native module / Fabric view, inert on iOS (no module → graceful no-op,
+// no native view → degrade to a plain container). Native module names are
+// device-verify-pending — see .docs/native-module-platform-routing.md.
+export { BackHandler } from './back-handler'
+export type { BackPressEventName, BackPressHandler } from './back-handler'
+export { ToastAndroid } from './toast-android'
+export { PermissionsAndroid, PERMISSIONS, RESULTS } from './permissions-android'
+export type { Permission, PermissionStatus, Rationale } from './permissions-android'
+export { TouchableNativeFeedback } from './touchable-native-feedback'
+export type {
+  TouchableNativeFeedbackProps,
+  NativeFeedbackBackground,
+  ThemeAttrBackground,
+  RippleBackground,
+} from './touchable-native-feedback'
+export { DrawerLayoutAndroid } from './drawer-layout-android'
+export type {
+  DrawerLayoutAndroidProps,
+  DrawerLayoutAndroidHandle,
+  DrawerPosition,
+  DrawerLockMode,
+  KeyboardDismissMode,
+  DrawerState,
+  DrawerSlideEvent,
+} from './drawer-layout-android'
+
 export type { SymbioteEvent } from '@symbiote/shared'

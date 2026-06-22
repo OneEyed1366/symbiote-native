@@ -110,7 +110,10 @@ function idiomEquals(idiom: string): boolean {
 }
 
 export interface PlatformStatic {
-  readonly OS: 'ios'
+  // The interface spans all targets (RN's own Platform type does too); the concrete
+  // iOS object below pins OS to 'ios'. A platform.android.ts will pin 'android' when
+  // the Android host lands. Widened so Android-only modules can branch on OS.
+  readonly OS: PlatformOSType
   readonly Version: string
   readonly constants: PlatformConstantsIOS | undefined
   readonly isPad: boolean
