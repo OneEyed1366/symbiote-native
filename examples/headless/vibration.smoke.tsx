@@ -1,15 +1,17 @@
-// Headless proof of the Vibration module — JS->native only, no simulator. A fake
-// __turboModuleProxy returns a Vibration module that records vibrate /
-// vibrateByPattern / cancel calls. We assert both platform branches:
-//   - iOS (default): a number dispatches to native vibrate, and an array drives the
-//     JS setTimeout scheduler (its first segment buzzes via native vibrate).
-//   - Android (Platform.OS flipped): an array dispatches to native vibrateByPattern
-//     with the correct repeat arg.
-// Plus cancel reaches native cancel, and a missing module is a silent no-op.
+// Headless proof of the Vibration module — JS->native only, no simulator. Per ADR 0019
+// the platform builds are separate files (vibration.ios.ts / vibration.android.ts), so
+// this imports each DIRECTLY — no Metro, no runtime Platform.OS toggle. A fake
+// __turboModuleProxy returns a Vibration module that records vibrate / vibrateByPattern /
+// cancel calls. We assert:
+//   - iOS: a number dispatches to native vibrate, and an array drives the JS setTimeout
+//     scheduler (its first segment buzzes via native vibrate, NOT vibrateByPattern).
+//   - Android: an array dispatches to native vibrateByPattern with the correct repeat arg.
+//   - cancel reaches native cancel; a missing module is a silent no-op.
 // A failure here is in JS, not native.
 
-import { Platform } from '@symbiote/shared'
-import { Vibration } from '../../packages/react/src/vibration'
+import { Vibration as IosVibration } from '../../packages/react/src/vibration.ios'
+import { Vibration as AndroidVibration } from '../../packages/react/src/vibration.android'
+import { createVibration } from '../../packages/react/src/vibration-shared'
 
 // ---- fake native module --------------------------------------------------
 
@@ -46,72 +48,70 @@ function isType<T>(value: unknown): value is T {
   return value !== null && value !== undefined
 }
 
-// ---- iOS branch (default Platform.OS) ------------------------------------
+// ---- iOS build — single number + JS scheduler ----------------------------
 
 // Default (number) -> native vibrate.
-Vibration.vibrate()
+IosVibration.vibrate()
 if (vibrateArg !== 400) {
-  throw new Error(`vibrate() should call native vibrate(400), got ${String(vibrateArg)}`)
+  throw new Error(`iOS vibrate() should call native vibrate(400), got ${String(vibrateArg)}`)
 }
 
-// Array on iOS -> JS setTimeout scheduler, NOT vibrateByPattern. A leading 0 buzzes
-// the first segment immediately via native vibrate(400); native vibrateByPattern
-// must stay untouched.
+// Array on iOS -> JS setTimeout scheduler, NOT vibrateByPattern. A leading 0 buzzes the
+// first segment immediately via native vibrate(400); native vibrateByPattern must stay
+// untouched.
 vibrateArg = undefined
-Vibration.vibrate([0, 100, 200])
+IosVibration.vibrate([0, 100, 200])
 if (vibrateArg !== 400) {
-  throw new Error(`vibrate(array) on iOS should buzz the first segment via vibrate(400), got ${String(vibrateArg)}`)
+  throw new Error(`iOS vibrate(array) should buzz the first segment via vibrate(400), got ${String(vibrateArg)}`)
 }
 if (patternArg !== undefined) {
-  throw new Error('vibrate(array) on iOS must NOT call native vibrateByPattern (JS scheduler owns the pattern)')
+  throw new Error('iOS vibrate(array) must NOT call native vibrateByPattern (JS scheduler owns the pattern)')
 }
 
 // Cancel stops the iOS scheduler and reaches native cancel.
-Vibration.cancel()
-if (!canceled) throw new Error('cancel() should call native cancel()')
+IosVibration.cancel()
+if (!canceled) throw new Error('iOS cancel() should call native cancel()')
 
-// ---- Android branch (Platform.OS flipped) --------------------------------
-
-// Platform.OS is a runtime const object; defineProperty rewrites it without a cast.
-Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
+// ---- Android build — native vibrateByPattern -----------------------------
 
 // Array on Android, no repeat -> native vibrateByPattern(pattern, -1).
 patternArg = undefined
 patternRepeatArg = undefined
-Vibration.vibrate([0, 100, 200])
+AndroidVibration.vibrate([0, 100, 200])
 if (patternArg === undefined || patternArg.join(',') !== '0,100,200') {
-  throw new Error(`vibrate(array) on Android should call vibrateByPattern with the pattern, got ${String(patternArg)}`)
+  throw new Error(`Android vibrate(array) should call vibrateByPattern with the pattern, got ${String(patternArg)}`)
 }
 if (patternRepeatArg !== -1) {
-  throw new Error(`vibrate(array) without repeat should pass -1, got ${String(patternRepeatArg)}`)
+  throw new Error(`Android vibrate(array) without repeat should pass -1, got ${String(patternRepeatArg)}`)
 }
 
 // Array on Android, repeat=true -> native vibrateByPattern(pattern, 0).
 patternRepeatArg = undefined
-Vibration.vibrate([0, 100, 200], true)
+AndroidVibration.vibrate([0, 100, 200], true)
 if (patternRepeatArg !== 0) {
-  throw new Error(`vibrate(array, true) should pass repeat 0, got ${String(patternRepeatArg)}`)
+  throw new Error(`Android vibrate(array, true) should pass repeat 0, got ${String(patternRepeatArg)}`)
 }
 
-// Restore the default platform so later smokes see iOS.
-Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
+// Android cancel reaches native cancel too.
+canceled = false
+AndroidVibration.cancel()
+if (!canceled) throw new Error('Android cancel() should call native cancel()')
 
 // ---- missing module -> silent no-op --------------------------------------
 
-// An empty proxy + a fresh module instance exercises the null path independently of
-// the cached one. None of these may throw with the module absent.
+// A fresh Vibration built under a null proxy exercises the absent-module path. None of
+// these may throw with the module gone, and the pattern strategy must never run.
 Object.assign(globalThis, {
   __turboModuleProxy: <T,>(_name: string): T | null => null,
 })
-
-const fresh = await import(`../../packages/react/src/vibration?nomodule=${Date.now()}`)
-const vibration: unknown = fresh.Vibration
-if (!isType<typeof Vibration>(vibration)) {
-  throw new Error('fresh import did not expose Vibration')
-}
-vibration.vibrate(50)
-vibration.vibrate([0, 100])
-vibration.cancel()
+const nullProxyVibration = createVibration({
+  vibratePattern: () => {
+    throw new Error('vibratePattern must not run when the native module is absent')
+  },
+})
+nullProxyVibration.vibrate(50)
+nullProxyVibration.vibrate([0, 100])
+nullProxyVibration.cancel()
 
 console.log('vibration.smoke OK')
 

@@ -1,25 +1,24 @@
-// Headless proof of the Alert imperative module across BOTH native backends. Fake
-// native modules (installed via the New-Architecture `__turboModuleProxy` global, the
-// same global getNativeModule reads) stand in for the host:
+// Headless proof of the Alert imperative module across BOTH native backends and both
+// platform builds, no simulator. Per ADR 0019 the platform builds are separate files
+// (alert.ios.ts / alert.android.ts), so this imports each DIRECTLY — no Metro, no runtime
+// Platform.OS toggle. Fake native modules (installed via the New-Architecture
+// `__turboModuleProxy` global, the same global getNativeModule reads) stand in for the host:
 //
-//   iOS (default)  → fake AlertManager records the args and immediately invokes the
-//                    native callback with the id of the SECOND button; we assert the
-//                    args carry both buttons and the id->onPress dispatch fired the
-//                    second button's onPress.
-//   Android        → flip Platform.OS to 'android' (runtime defineProperty, restored
-//                    after), fake DialogManagerAndroid with getConstants() + showAlert;
-//                    we assert the config maps the buttons onto positive/negative/
-//                    neutral and onAction(buttonClicked, buttonPositive) fires the
-//                    positive button's onPress.
+//   iOS build      → fake AlertManager records the args and immediately invokes the native
+//                    callback with the id of the SECOND button; we assert the args carry
+//                    both buttons and the id->onPress dispatch fired the second button's
+//                    onPress.
+//   Android build  → fake DialogManagerAndroid with getConstants() + showAlert; we assert
+//                    the config maps the buttons onto positive/negative/neutral and
+//                    onAction(buttonClicked, buttonPositive) fires the positive button's
+//                    onPress.
 //
 // A failure here is in JS, not native — no simulator needed.
 
-import { Platform } from '@symbiote/shared'
-// Alert isn't on the barrel yet (the parent wires exports), so reach the source
-// directly — the headless harness has no built dist.
-import { Alert } from '../../packages/react/src/alert'
+import { Alert as IosAlert } from '../../packages/react/src/alert.ios'
+import { Alert as AndroidAlert } from '../../packages/react/src/alert.android'
 
-// ---- fake AlertManager native module ------------------------------------
+// ---- fake AlertManager native module (iOS) ------------------------------
 
 interface CapturedArgs {
   title: string
@@ -76,8 +75,8 @@ const fakeDialogManagerAndroid = {
   },
 }
 
-// Install the JSI proxy getNativeModule resolves against. Both fakes are served by
-// name; anything else returns null (the absent-module path).
+// Install the JSI proxy getNativeModule resolves against. Both fakes are served by name;
+// anything else returns null (the absent-module path).
 Object.assign(globalThis, {
   __turboModuleProxy: (name: string): unknown => {
     if (name === 'AlertManager') return fakeAlertManager
@@ -86,11 +85,11 @@ Object.assign(globalThis, {
   },
 })
 
-// ---- run ----------------------------------------------------------------
+// ---- iOS build — routes to AlertManager ---------------------------------
 
 let okPressed = false
 
-Alert.alert('t', 'm', [
+IosAlert.alert('t', 'm', [
   { text: 'Cancel' },
   {
     text: 'OK',
@@ -100,16 +99,12 @@ Alert.alert('t', 'm', [
   },
 ])
 
-// ---- assertions ---------------------------------------------------------
-
 if (captured === null) {
   throw new Error('AlertManager.alertWithArgs was never called')
 }
-
 if (captured.title !== 't' || captured.message !== 'm') {
   throw new Error(`args title/message wrong: ${JSON.stringify(captured)}`)
 }
-
 // Both buttons must reach native as { [index]: label } entries.
 if (captured.buttons.length !== 2) {
   throw new Error(`expected 2 buttons in args, got ${JSON.stringify(captured.buttons)}`)
@@ -117,55 +112,46 @@ if (captured.buttons.length !== 2) {
 if (captured.buttons[0][0] !== 'Cancel' || captured.buttons[1][1] !== 'OK') {
   throw new Error(`button labels/ids wrong: ${JSON.stringify(captured.buttons)}`)
 }
-
-// The id->onPress dispatch: native returned id=1, so the second button's onPress
-// must have fired.
+// The id->onPress dispatch: native returned id=1, so the second button's onPress must
+// have fired.
 if (!okPressed) {
   throw new Error('id->onPress dispatch failed: OK button onPress did not fire on callback id=1')
 }
 
-// ---- Android branch -----------------------------------------------------
-// Flip Platform.OS to 'android' so Alert.alert routes to DialogManagerAndroid. The
-// last button maps to positive; onAction(buttonClicked, buttonPositive) must fire it.
-
-const originalOS = Platform.OS
-Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
+// ---- Android build — routes to DialogManagerAndroid ---------------------
+// The last button maps to positive; onAction(buttonClicked, buttonPositive) must fire it.
 
 let androidPositivePressed = false
 let androidNeutralPressed = false
 
-try {
-  Alert.alert('androidTitle', 'androidMsg', [
-    { text: 'Neutral', onPress: () => { androidNeutralPressed = true } },
-    { text: 'Cancel' },
-    { text: 'OK', onPress: () => { androidPositivePressed = true } },
-  ])
+AndroidAlert.alert('androidTitle', 'androidMsg', [
+  { text: 'Neutral', onPress: () => { androidNeutralPressed = true } },
+  { text: 'Cancel' },
+  { text: 'OK', onPress: () => { androidPositivePressed = true } },
+])
 
-  if (capturedConfig === null) {
-    throw new Error('DialogManagerAndroid.showAlert was never called')
-  }
-  if (capturedConfig.title !== 'androidTitle' || capturedConfig.message !== 'androidMsg') {
-    throw new Error(`android config title/message wrong: ${JSON.stringify(capturedConfig)}`)
-  }
-  // last button -> positive, middle -> negative, first -> neutral.
-  if (capturedConfig.buttonPositive !== 'OK') {
-    throw new Error(`android buttonPositive should be 'OK', got ${JSON.stringify(capturedConfig.buttonPositive)}`)
-  }
-  if (capturedConfig.buttonNegative !== 'Cancel') {
-    throw new Error(`android buttonNegative should be 'Cancel', got ${JSON.stringify(capturedConfig.buttonNegative)}`)
-  }
-  if (capturedConfig.buttonNeutral !== 'Neutral') {
-    throw new Error(`android buttonNeutral should be 'Neutral', got ${JSON.stringify(capturedConfig.buttonNeutral)}`)
-  }
-  // onAction fired buttonPositive, so OK's onPress must have run — and only it.
-  if (!androidPositivePressed) {
-    throw new Error('android onAction dispatch failed: positive onPress did not fire on buttonPositive')
-  }
-  if (androidNeutralPressed) {
-    throw new Error('android onAction mis-dispatched: neutral onPress fired on a buttonPositive action')
-  }
-} finally {
-  Object.defineProperty(Platform, 'OS', { value: originalOS, configurable: true })
+if (capturedConfig === null) {
+  throw new Error('DialogManagerAndroid.showAlert was never called')
+}
+if (capturedConfig.title !== 'androidTitle' || capturedConfig.message !== 'androidMsg') {
+  throw new Error(`android config title/message wrong: ${JSON.stringify(capturedConfig)}`)
+}
+// last button -> positive, middle -> negative, first -> neutral.
+if (capturedConfig.buttonPositive !== 'OK') {
+  throw new Error(`android buttonPositive should be 'OK', got ${JSON.stringify(capturedConfig.buttonPositive)}`)
+}
+if (capturedConfig.buttonNegative !== 'Cancel') {
+  throw new Error(`android buttonNegative should be 'Cancel', got ${JSON.stringify(capturedConfig.buttonNegative)}`)
+}
+if (capturedConfig.buttonNeutral !== 'Neutral') {
+  throw new Error(`android buttonNeutral should be 'Neutral', got ${JSON.stringify(capturedConfig.buttonNeutral)}`)
+}
+// onAction fired buttonPositive, so OK's onPress must have run — and only it.
+if (!androidPositivePressed) {
+  throw new Error('android onAction dispatch failed: positive onPress did not fire on buttonPositive')
+}
+if (androidNeutralPressed) {
+  throw new Error('android onAction mis-dispatched: neutral onPress fired on a buttonPositive action')
 }
 
 console.log('alert.smoke OK')

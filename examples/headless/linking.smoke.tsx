@@ -1,14 +1,15 @@
 // Headless proof of the Linking module — both directions of the bridge and both
-// platform branches, no simulator. JS->native: a fake __turboModuleProxy returns a
+// platform builds, no simulator. Per ADR 0019 the platform builds are separate files
+// (linking.ios.ts / linking.android.ts), so this imports each DIRECTLY — no Metro, no
+// runtime Platform.OS toggle. JS->native: a fake __turboModuleProxy returns a
 // LinkingManager (iOS) and an IntentAndroid (Android) whose canOpenURL resolves true
 // and whose openURL records the url. native->JS: a fake RN$registerCallableModule
-// captures the device hub, and we play "native" by emitting the `url` deep-link
-// event, asserting the addEventListener callback receives { url }. The Android branch
-// also exercises sendIntent (forwards to IntentAndroid) and asserts sendIntent rejects
-// off Android. A failure here is in JS, not native.
+// captures the device hub, and we play "native" by emitting the `url` deep-link event.
+// The Android build also exercises sendIntent (forwards to IntentAndroid); the iOS build
+// asserts sendIntent rejects (Unsupported). A failure here is in JS, not native.
 
-import { Platform } from '@symbiote/shared'
-import { Linking } from '../../packages/react/src/linking'
+import { Linking as IosLinking } from '../../packages/react/src/linking.ios'
+import { Linking as AndroidLinking } from '../../packages/react/src/linking.android'
 
 // ---- fake native-module + device-hub globals ----------------------------
 
@@ -26,7 +27,7 @@ const fakeLinkingManager = {
 }
 
 // Android routes to IntentAndroid instead, and adds sendIntent. Separate record state
-// so the test can prove the Android branch hit IntentAndroid, not LinkingManager.
+// so the test can prove the Android build hit IntentAndroid, not LinkingManager.
 let androidOpenedUrl: string | undefined
 let sentIntent: { action: string; extras?: unknown } | undefined
 const fakeIntentAndroid = {
@@ -79,24 +80,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // ---- the smoke ----------------------------------------------------------
 
 async function main(): Promise<void> {
-  // === iOS branch (default Platform.OS) — routes to LinkingManager ===
+  // === iOS build — routes to LinkingManager ===
 
-  // JS->native: canOpenURL resolves through the native module.
-  const can = await Linking.canOpenURL('https://x')
+  const can = await IosLinking.canOpenURL('https://x')
   if (can !== true) throw new Error(`canOpenURL should resolve true, got ${String(can)}`)
 
-  // JS->native: openURL reaches LinkingManager, which records the url.
-  await Linking.openURL('https://x')
+  await IosLinking.openURL('https://x')
   if (openedUrl !== 'https://x') {
     throw new Error(`iOS openURL should pass the url to LinkingManager, got ${String(openedUrl)}`)
   }
 
-  // getInitialURL routes to the iOS module too.
-  await Linking.getInitialURL()
+  await IosLinking.getInitialURL()
 
   // sendIntent has no iOS counterpart: it must reject, not reach native.
   let iosSendIntentRejected = false
-  await Linking.sendIntent('android.intent.action.VIEW').catch(() => {
+  await IosLinking.sendIntent('android.intent.action.VIEW').catch(() => {
     iosSendIntentRejected = true
   })
   if (!iosSendIntentRejected) throw new Error('iOS sendIntent should reject (Unsupported)')
@@ -104,7 +102,7 @@ async function main(): Promise<void> {
 
   // native->JS: subscribe, then play native by emitting the `url` deep-link event.
   let received: unknown
-  const sub = Linking.addEventListener('url', (event) => {
+  const sub = IosLinking.addEventListener('url', (event) => {
     received = event
   })
   if (deviceHub === undefined) {
@@ -116,35 +114,25 @@ async function main(): Promise<void> {
   }
   sub.remove()
 
-  // === Android branch — flip Platform.OS, reset the cache, route to IntentAndroid ===
-  // Platform.OS is a runtime const object; defineProperty rewrites it without a type
-  // cast. Restore it after so the toggle doesn't leak into other smokes.
-  const originalOS = Platform.OS
-  Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
-  try {
-    // Linking caches the resolved module from the iOS run; re-import a fresh copy so
-    // the lazy getModule re-resolves under the Android platform.
-    const androidLinking = (await import('../../packages/react/src/linking?android')).Linking
+  // === Android build — routes to IntentAndroid, adds sendIntent ===
 
-    const canAndroid = await androidLinking.canOpenURL('https://a')
-    if (canAndroid !== true) throw new Error(`Android canOpenURL should resolve true, got ${String(canAndroid)}`)
+  const canAndroid = await AndroidLinking.canOpenURL('https://a')
+  if (canAndroid !== true) {
+    throw new Error(`Android canOpenURL should resolve true, got ${String(canAndroid)}`)
+  }
 
-    await androidLinking.openURL('intent://a')
-    if (androidOpenedUrl !== 'intent://a') {
-      throw new Error(`Android openURL should route to IntentAndroid, got ${String(androidOpenedUrl)}`)
-    }
+  await AndroidLinking.openURL('intent://a')
+  if (androidOpenedUrl !== 'intent://a') {
+    throw new Error(`Android openURL should route to IntentAndroid, got ${String(androidOpenedUrl)}`)
+  }
 
-    // sendIntent forwards action + extras to IntentAndroid on Android.
-    const extras = [{ key: 'foo', value: 'bar' }]
-    await androidLinking.sendIntent('android.intent.action.VIEW', extras)
-    if (sentIntent === undefined || sentIntent.action !== 'android.intent.action.VIEW') {
-      throw new Error(`Android sendIntent should forward action, got ${JSON.stringify(sentIntent)}`)
-    }
-    if (JSON.stringify(sentIntent.extras) !== JSON.stringify(extras)) {
-      throw new Error(`Android sendIntent should forward extras, got ${JSON.stringify(sentIntent?.extras)}`)
-    }
-  } finally {
-    Object.defineProperty(Platform, 'OS', { value: originalOS, configurable: true })
+  const extras = [{ key: 'foo', value: 'bar' }]
+  await AndroidLinking.sendIntent('android.intent.action.VIEW', extras)
+  if (sentIntent === undefined || sentIntent.action !== 'android.intent.action.VIEW') {
+    throw new Error(`Android sendIntent should forward action, got ${JSON.stringify(sentIntent)}`)
+  }
+  if (JSON.stringify(sentIntent.extras) !== JSON.stringify(extras)) {
+    throw new Error(`Android sendIntent should forward extras, got ${JSON.stringify(sentIntent.extras)}`)
   }
 
   console.log('linking.smoke OK')
