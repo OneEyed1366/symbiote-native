@@ -195,6 +195,21 @@ function childrenIdentical(node: SymbioteNode, committed: readonly SymbioteNode[
   return node.children.every((child, index) => child === committed[index])
 }
 
+// Diagnostic seam (gated): a ScrollView on Android must hold exactly ONE direct
+// child (its content container), or the native mount aborts with "ScrollView can
+// host only one direct child". Logged after children reconcile so each child's
+// committed tag/view-name is resolved — a `MULTI!!` line names the exact extra
+// node (tag + view-name) that pushed the scroll view past one child.
+function logScrollChildren(node: SymbioteNode, viewName: string, selfTag: number | string): void {
+  if (!viewName.includes('Scroll') || viewName.includes('Content')) return
+  const kids = node.children.map((child) => {
+    const committed = mirror.get(child)
+    return `${committed?.viewName ?? child.component}#${committed?.tag ?? 'NEW'}`
+  })
+  const flag = kids.length === 1 ? 'OK' : 'MULTI!!'
+  dlog(`SCROLL-${flag} ${viewName} tag=${selfTag} children(${kids.length})=[${kids.join(',')}]`)
+}
+
 function reconcile(
   slot: ReturnType<typeof getSlot>,
   node: SymbioteNode,
@@ -216,6 +231,7 @@ function reconcile(
     for (const child of node.children) {
       slot.appendChild(handle, reconcile(slot, child, rootTag, childInText).handle)
     }
+    logScrollChildren(node, viewName, tag)
     mirror.set(node, { handle, tag, rootTag, props, children: node.children.slice(), viewName })
     return { handle, changed: true }
   }
@@ -229,6 +245,7 @@ function reconcile(
     childHandles.push(result.handle)
     if (result.changed) descendantChanged = true
   }
+  logScrollChildren(node, viewName, committed.tag)
 
   const childrenChanged = !childrenIdentical(node, committed.children) || descendantChanged
   const propsChanged = !propsEqual(committed.props, props)

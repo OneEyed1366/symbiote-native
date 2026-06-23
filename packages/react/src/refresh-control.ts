@@ -4,7 +4,7 @@
 // and pushes it down each commit; native reports the gesture via the direct
 // `topRefresh` event, which shared routes to the `refresh` listener (onRefresh).
 
-import { createElement, type FC } from 'react'
+import { createElement, type FC, type ReactNode } from 'react'
 import { dlog } from '@symbiote/shared'
 
 export interface RefreshControlProps {
@@ -20,12 +20,16 @@ export interface RefreshControlProps {
   // before spreading to PullToRefreshView, so iOS native never receives it. We
   // target PullToRefreshView (iOS-first), so it is stripped below, not forwarded.
   enabled?: boolean
+  // On Android the RefreshControl WRAPS the ScrollView (ADR 0020), so it receives the
+  // scroll view as its child via cloneElement. On iOS it is a childless sibling, so this
+  // is undefined there — passing it through is harmless.
+  children?: ReactNode
 }
 
 export const RefreshControl: FC<RefreshControlProps> = (props) => {
-  const { enabled: _enabled, ...nativeProps } = props
+  const { enabled: _enabled, children, ...nativeProps } = props
   dlog('RefreshControl -> PullToRefreshView')
   dlog(`RefreshControl refreshing=${String(props.refreshing)}`)
   if (props.onRefresh !== undefined) dlog('RefreshControl onRefresh listener wired')
-  return createElement('symbiote-refresh-control', { ...nativeProps })
+  return createElement('symbiote-refresh-control', { ...nativeProps }, children)
 }
