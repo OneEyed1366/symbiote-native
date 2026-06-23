@@ -200,6 +200,12 @@ feature parity on the framework-agnostic core — then add one framework at a ti
 that's already validated. A break in a new adapter is then a break in *that adapter*, not in
 the native pipe or the commit engine.
 
+There are **two orthogonal axes** here, not one line: the **framework** axis (React → Vue →
+Angular → Svelte → Solid) and the **platform** axis (iOS, Android). They are independent — the
+React adapter already drives both iOS and Android off the same core. So M7 below is not a
+sequential phase that waits for Solid; it is the platform axis, already underway on React,
+that each further adapter inherits as it lands.
+
 | # | Milestone | What it proves | Status |
 |---|-----------|----------------|--------|
 | **M0** | Monorepo scaffold | pnpm workspaces, `shared` + `react` packages, headless harness | ✅ done |
@@ -215,7 +221,7 @@ the native pipe or the commit engine.
 | **M4** | Angular adapter | a second mutation-oriented framework, template/renderer seam | ⏳ planned |
 | **M5** | Svelte adapter | compiled-output framework driving the shared mutation API | ⏳ planned |
 | **M6** | Solid adapter | fine-grained reactivity driving the shared mutation API | ⏳ planned |
-| **M7** | Android | every adapter renders native Android, same code path as iOS | 🚧 React canary verified on emulator (full demo); host shims in `@symbiote/android` |
+| **M7** | Android *(platform axis)* | each adapter renders native Android off the same core as iOS — orthogonal to M3–M6, not after them | 🚧 React: full canary verified on emulator (`@symbiote/android` host shims). Other adapters inherit it as they land |
 | **M8** | Web *(stretch)* | the same trees rendered to the web as a default platform target | 💭 maybe |
 
 **End goal:** each framework — Vue, Angular, Svelte, Solid, React — can render native iOS and
