@@ -42,6 +42,56 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
+// Diagnostic (gated): Fabric serializes props to folly::dynamic, which rejects a JS
+// Symbol or function with "JS Symbols are not convertible to dynamic" — a hard native
+// throw deep in cloneNode*. Walk a props payload and return the dotted path of the
+// first non-serializable leaf (Symbol / function), or undefined when clean, so the
+// offending key is named in logcat instead of a bare stack at the JSI boundary.
+//
+// Bounded on purpose: a real Fabric prop tree is shallow (style/transform ~depth 3) and
+// a leaked React element trips at depth 2 (`children` -> element -> $$typeof). `seen`
+// breaks reference cycles and DEPTH caps runaway nesting, so the diagnostic itself can
+// never overflow the stack on cyclic props (an event-carrying handler, a self-referential
+// style) — a crashing guard would be worse than the bug it hunts.
+const NON_SERIALIZABLE_SCAN_DEPTH = 6
+function firstNonSerializablePath(
+  value: unknown,
+  path: string,
+  depth: number,
+  seen: WeakSet<object>,
+): string | undefined {
+  const kind = typeof value
+  if (kind === 'symbol' || kind === 'function') return `${path}=<${kind}>`
+  if (depth >= NON_SERIALIZABLE_SCAN_DEPTH) return undefined
+  if (Array.isArray(value)) {
+    if (seen.has(value)) return undefined
+    seen.add(value)
+    for (let index = 0; index < value.length; index += 1) {
+      const found = firstNonSerializablePath(value[index], `${path}[${index}]`, depth + 1, seen)
+      if (found !== undefined) return found
+    }
+    return undefined
+  }
+  if (isRecord(value)) {
+    if (seen.has(value)) return undefined
+    seen.add(value)
+    for (const key of Object.keys(value)) {
+      const next = path === '' ? key : `${path}.${key}`
+      const found = firstNonSerializablePath(value[key], next, depth + 1, seen)
+      if (found !== undefined) return found
+    }
+  }
+  return undefined
+}
+
+// Name the offending prop before the JSI boundary throws. Gated, so the deep walk only
+// runs while debugging; in production the clone proceeds straight to native.
+function guardSerializable(propsDiff: FabricProps, viewName: string, tag: number): void {
+  if (!isDebug()) return
+  const bad = firstNonSerializablePath(propsDiff, '', 0, new WeakSet())
+  if (bad !== undefined) dlog(`NON-SERIALIZABLE prop on ${viewName}#${tag}: ${bad}`)
+}
+
 // Color props must reach Fabric as platform ints, not CSS strings — Fabric's C++
 // color parser silently drops strings. The actual conversion (processColor) is
 // RN-platform-specific, so it is injected here rather than imported, keeping
@@ -132,14 +182,20 @@ function fabricProps(node: SymbioteNode): FabricProps {
   return out
 }
 
-// Fabric's clone*WithNewProps MERGES the raw payload onto the node's existing
-// props, so a prop that simply disappears between commits (e.g. `opacity` when a
-// pressed style is released, or any conditionally-applied style key) would keep its
-// stale value. Mirror React's diffProperties: carry every current key, and send any
-// key the node held last time but no longer has as `null` so Fabric resets it to its
-// default. Only matters for clones — a fresh createNode starts from nothing.
+// Fabric's clone*WithNewProps MERGES the raw payload onto the node's existing props,
+// so the payload must be a MINIMAL diff — only the keys that actually changed, plus any
+// key the node held last time but no longer has, sent as `null` so Fabric resets it to
+// default (e.g. `opacity` when a pressed style releases). Mirror React's diffProperties
+// exactly: re-sending an UNCHANGED key is not a no-op — it re-invokes that prop's native
+// setter, and some ViewManagers rebuild on any set. AndroidProgressBar's `styleAttr`
+// setter recreates the whole ProgressBar via setStyle(), so re-sending it on an
+// animating-only toggle dropped and rebuilt the spinner each time, and it never came
+// back. Only matters for clones — a fresh createNode starts from nothing.
 function diffProps(previous: FabricProps, next: FabricProps): FabricProps {
-  const out: Record<string, unknown> = { ...next }
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(next)) {
+    if (!jsonEqual(previous[key], next[key])) out[key] = next[key]
+  }
   for (const key of Object.keys(previous)) {
     if (!(key in next)) out[key] = null
   }
@@ -258,15 +314,21 @@ function reconcile(
   let handle: FabricNode
   if (childrenChanged) {
     stats.cloneChildren += 1
-    handle = propsChanged
-      ? slot.cloneNodeWithNewChildrenAndProps(committed.handle, diffProps(committed.props, props))
-      : slot.cloneNodeWithNewChildren(committed.handle)
+    if (propsChanged) {
+      const propsDiff = diffProps(committed.props, props)
+      guardSerializable(propsDiff, viewName, committed.tag)
+      handle = slot.cloneNodeWithNewChildrenAndProps(committed.handle, propsDiff)
+    } else {
+      handle = slot.cloneNodeWithNewChildren(committed.handle)
+    }
     for (const childHandle of childHandles) {
       slot.appendChild(handle, childHandle)
     }
   } else {
     stats.cloneProps += 1
-    handle = slot.cloneNodeWithNewProps(committed.handle, diffProps(committed.props, props))
+    const propsDiff = diffProps(committed.props, props)
+    guardSerializable(propsDiff, viewName, committed.tag)
+    handle = slot.cloneNodeWithNewProps(committed.handle, propsDiff)
   }
 
   // The clone keeps the node's family, so its reactTag is unchanged — carry it.
@@ -336,7 +398,16 @@ function commitContainer(rootTag: RootTag): void {
   stats.cloneProps = 0
   stats.cloneChildren = 0
   stats.reused = 0
+  // Entry seam: brackets reconcile with the `reconciled` line below. If `start` prints
+  // but `reconciled` never does, the stall is inside reconcile (a JS loop/cycle in the
+  // tree walk); if `start` itself never prints, the stall is upstream — React's commit
+  // phase or the mutation ops before we are even called.
+  dlog(`commit root=${rootTag} start children=${container.children.length}`)
   const result = reconcile(slot, container, rootTag, false)
+  // Boundary seam: prints once reconcile returns. If a commit hangs and this line
+  // never appears, the stall is inside reconcile (JS); if it appears but the
+  // post-completeRoot line below never does, the stall is inside the native commit.
+  dlog(`commit root=${rootTag} reconciled changed=${result.changed}`)
 
   // The container's identity is stable, so its un-cloned flag is the no-op signal:
   // an over-scheduled commit that touched nothing makes zero native calls.
@@ -347,6 +418,7 @@ function commitContainer(rootTag: RootTag): void {
 
   const childSet = slot.createChildSet(rootTag)
   slot.appendChildToSet(childSet, result.handle)
+  dlog(`commit root=${rootTag} pre-completeRoot`)
   slot.completeRoot(rootTag, childSet)
 
   if (isDebug()) {
