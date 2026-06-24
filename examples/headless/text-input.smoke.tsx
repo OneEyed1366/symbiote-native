@@ -194,4 +194,32 @@ mount(14, <TextInput value="focus me" />)
   }
 }
 
+// ---- case 6: modern W3C aliases fold to their legacy native props --------
+// RN translates inputMode/enterKeyHint/readOnly/selectionColor in JS before they reach the
+// native input; symbiote must do the same and must not leak the raw aliases to Fabric.
+
+reset()
+mount(15, <TextInput inputMode="numeric" enterKeyHint="done" readOnly selectionColor="#ff0000" />)
+
+{
+  const node = inputNode(SINGLELINE)
+  if (node.props.keyboardType !== 'number-pad') {
+    throw new Error(`inputMode="numeric" should fold to keyboardType "number-pad", got ${JSON.stringify(node.props.keyboardType)}`)
+  }
+  if (node.props.returnKeyType !== 'done') {
+    throw new Error(`enterKeyHint="done" should fold to returnKeyType "done", got ${JSON.stringify(node.props.returnKeyType)}`)
+  }
+  if (node.props.editable !== false) {
+    throw new Error(`readOnly should fold to editable:false, got ${JSON.stringify(node.props.editable)}`)
+  }
+  if (node.props.cursorColor !== '#ff0000') {
+    throw new Error(`selectionColor should default cursorColor, got ${JSON.stringify(node.props.cursorColor)}`)
+  }
+  for (const raw of ['inputMode', 'enterKeyHint', 'readOnly']) {
+    if (raw in node.props) {
+      throw new Error(`raw alias "${raw}" must not reach Fabric, found ${JSON.stringify(node.props[raw])}`)
+    }
+  }
+}
+
 console.log('text-input.smoke OK')

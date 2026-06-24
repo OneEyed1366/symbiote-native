@@ -22,6 +22,52 @@ import type { TextStyle } from './styles'
 
 type EventHandler = (event: SymbioteEvent) => void
 
+type InputMode = 'none' | 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url'
+type EnterKeyHint = 'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send'
+type SubmitBehavior = 'submit' | 'blurAndSubmit' | 'newline'
+
+// RN's inputMode -> keyboardType map (TextInput.js:815). `search` is platform-split
+// (iOS 'web-search', else 'default'); we use the Android/default branch since the
+// folded prop is forwarded verbatim and the simulator target is iOS-first only for
+// the canary — the safe default avoids an unknown keyboardType on Android.
+const inputModeToKeyboardType: Record<InputMode, string> = {
+  decimal: 'decimal-pad',
+  email: 'email-address',
+  none: 'default',
+  numeric: 'number-pad',
+  search: 'default',
+  tel: 'phone-pad',
+  text: 'default',
+  url: 'url',
+}
+
+// RN's enterKeyHint -> returnKeyType map (TextInput.js:805). Note `enter` -> 'default'.
+const enterKeyHintToReturnKeyType: Record<EnterKeyHint, string> = {
+  done: 'done',
+  enter: 'default',
+  go: 'go',
+  next: 'next',
+  previous: 'previous',
+  search: 'search',
+  send: 'send',
+}
+
+// RN's submitBehavior reconciliation (TextInput.js:559). Explicit submitBehavior
+// wins (with single-line 'newline' coerced to 'blurAndSubmit'); else it is derived
+// from the legacy blurOnSubmit per multiline.
+function foldSubmitBehavior(
+  submitBehavior: SubmitBehavior | undefined,
+  blurOnSubmit: boolean | undefined,
+  multiline: boolean,
+): SubmitBehavior {
+  if (submitBehavior !== undefined) {
+    if (!multiline && submitBehavior === 'newline') return 'blurAndSubmit'
+    return submitBehavior
+  }
+  if (multiline) return blurOnSubmit === true ? 'blurAndSubmit' : 'newline'
+  return blurOnSubmit !== false ? 'blurAndSubmit' : 'submit'
+}
+
 export interface TextInputProps extends AccessibilityProps, AriaProps {
   value?: string
   defaultValue?: string
@@ -45,6 +91,16 @@ export interface TextInputProps extends AccessibilityProps, AriaProps {
   numberOfLines?: number
   textAlign?: 'left' | 'center' | 'right'
   blurOnSubmit?: boolean
+  // Modern W3C-aligned aliases. RN folds each to its legacy native prop in JS
+  // before reaching Fabric (TextInput.js) — the raw aliases are inert at the
+  // native layer, so we fold them here and forward only the legacy value.
+  inputMode?: InputMode
+  enterKeyHint?: EnterKeyHint
+  readOnly?: boolean
+  submitBehavior?: SubmitBehavior
+  cursorColor?: string
+  selectionColor?: string
+  selectionHandleColor?: string
   // Pairs this input with an InputAccessoryView whose nativeID matches; native docks
   // that view above the keyboard while the input is focused. Forwarded via ...rest.
   inputAccessoryViewID?: string
@@ -92,8 +148,44 @@ function eventCountFromChange(event: SymbioteEvent): number | undefined {
 export const TextInput = forwardRef<TextInputHandle, TextInputProps>((rawProps, forwardedRef) => {
   // TextInput is its own host element (not a View wrapper), so it folds aria/role here.
   const props = resolveAccessibilityProps(rawProps)
-  const { value, defaultValue, multiline, selection, onChange, onChangeText, onFocus, onBlur, ...rest } =
-    props
+  // Pull out the modern W3C aliases so they don't reach Fabric raw (RN strips them
+  // in JS) — each is folded to its legacy native prop below.
+  const {
+    value,
+    defaultValue,
+    multiline,
+    selection,
+    onChange,
+    onChangeText,
+    onFocus,
+    onBlur,
+    inputMode,
+    enterKeyHint,
+    readOnly,
+    submitBehavior,
+    blurOnSubmit,
+    cursorColor,
+    selectionColor,
+    selectionHandleColor,
+    keyboardType,
+    returnKeyType,
+    editable,
+    ...rest
+  } = props
+
+  const isMultiline = multiline === true
+  // inputMode wins over keyboardType; enterKeyHint over returnKeyType; readOnly
+  // over editable (inverted). RN does each fold in TextInput.js:928-934.
+  const foldedKeyboardType = inputMode !== undefined ? inputModeToKeyboardType[inputMode] : keyboardType
+  const foldedReturnKeyType =
+    enterKeyHint !== undefined ? enterKeyHintToReturnKeyType[enterKeyHint] : returnKeyType
+  const foldedEditable = readOnly !== undefined ? !readOnly : editable
+  const foldedSubmitBehavior = foldSubmitBehavior(submitBehavior, blurOnSubmit, isMultiline)
+  // RN defaults the cursor/selection-handle color from selectionColor when unset
+  // (TextInput.js:747) for iOS↔Android consistency.
+  const foldedCursorColor = cursorColor !== undefined ? cursorColor : selectionColor
+  const foldedSelectionHandleColor =
+    selectionHandleColor !== undefined ? selectionHandleColor : selectionColor
 
   const ref = useRef<SymbioteNode | null>(null)
   // JS-side focus state, mirrored from the focus/blur events for isFocused(). RN's
@@ -199,7 +291,7 @@ export const TextInput = forwardRef<TextInputHandle, TextInputProps>((rawProps, 
     [mostRecentEventCount],
   )
 
-  const intrinsic = multiline === true ? 'symbiote-text-input-multiline' : 'symbiote-text-input'
+  const intrinsic = isMultiline ? 'symbiote-text-input-multiline' : 'symbiote-text-input'
 
   return createElement(intrinsic, {
     ...rest,
@@ -207,6 +299,13 @@ export const TextInput = forwardRef<TextInputHandle, TextInputProps>((rawProps, 
     text,
     mostRecentEventCount,
     selection,
+    keyboardType: foldedKeyboardType,
+    returnKeyType: foldedReturnKeyType,
+    editable: foldedEditable,
+    submitBehavior: foldedSubmitBehavior,
+    selectionColor,
+    cursorColor: foldedCursorColor,
+    selectionHandleColor: foldedSelectionHandleColor,
     onChange: handleChange,
     onFocus: handleFocus,
     onBlur: handleBlur,
