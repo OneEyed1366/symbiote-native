@@ -66,6 +66,10 @@ export const Pressable: FC<PressableProps> = (props) => {
   // Holds the in-flight long-press timer between pressIn and pressOut/press; a
   // ref (not state) so arming/disarming it never triggers a re-render.
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // True once the long-press timer fired, until the next pressIn rearms. RN skips
+  // onPress when a long press fired (Pressability.js: isPressCanceledByLongPress);
+  // without this flag a completed hold would emit a spurious onPress on release.
+  const longPressFired = useRef(false)
 
   const handlers = useMemo(() => {
     function clearLongPress(): void {
@@ -79,9 +83,11 @@ export const Pressable: FC<PressableProps> = (props) => {
       handlePressIn(event: SymbioteEvent): void {
         dlog('Pressable pressIn')
         setPressed(true)
+        longPressFired.current = false
         if (onLongPress) {
           longPressTimer.current = setTimeout(() => {
             longPressTimer.current = undefined
+            longPressFired.current = true
             dlog('Pressable longPress timer fired')
             onLongPress(event)
           }, delayLongPress)
@@ -97,6 +103,12 @@ export const Pressable: FC<PressableProps> = (props) => {
       handlePress(event: SymbioteEvent): void {
         dlog('Pressable press')
         clearLongPress()
+        // A fired long press cancels the tap — reset the flag and suppress onPress.
+        if (longPressFired.current) {
+          longPressFired.current = false
+          dlog('Pressable press suppressed by prior longPress')
+          return
+        }
         onPress?.(event)
       },
     }

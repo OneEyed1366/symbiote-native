@@ -249,8 +249,11 @@ installFakeTimers()
   }
 }
 
-// ---- case 4: a long hold synthesizes onLongPress ------------------------
-// pressIn arms the timer; advancing past delayLongPress fires onLongPress.
+// ---- case 4: a long hold fires onLongPress once and suppresses the tap ----
+// pressIn arms the timer; advancing past delayLongPress fires onLongPress. On
+// release RN cancels the tap when a long press fired (Pressability.js:
+// isPressCanceledByLongPress), so onPress must stay at zero. A second quick tap
+// after the hold must still fire — proving the suppression flag reset.
 
 {
   reset()
@@ -267,14 +270,31 @@ installFakeTimers()
   )
 
   const handle = responderHandle()
+
+  // (a) full hold cycle: long press fires once, the release does NOT count a tap.
   fire(handle, TOUCH_START)
   advanceTimers(DELAY)
   if (longPresses !== 1) {
     throw new Error(`onLongPress should fire after the hold, fired ${longPresses}`)
   }
-  // The held gesture still ends; that should not also count a tap-press here
-  // (RN fires press on touchEnd regardless, so we only assert long-press fired).
   fire(handle, TOUCH_END)
+  if (presses !== 0) {
+    throw new Error(`a fired longPress must suppress the tap on release, onPress fired ${presses}`)
+  }
+  if (longPresses !== 1) {
+    throw new Error(`onLongPress must not re-fire on release, fired ${longPresses}`)
+  }
+
+  // (b) a second quick tap (released before DELAY) still fires onPress — the
+  // suppression flag was rearmed on the new pressIn, not stuck on from the hold.
+  fire(handle, TOUCH_START)
+  fire(handle, TOUCH_END)
+  if (presses !== 1) {
+    throw new Error(`a quick tap after a long press must fire onPress, fired ${presses}`)
+  }
+  if (longPresses !== 1) {
+    throw new Error(`the quick tap must not long-press, fired ${longPresses}`)
+  }
 }
 
 // ---- case 5: releasing before the delay does NOT long-press -------------
