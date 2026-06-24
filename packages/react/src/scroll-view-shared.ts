@@ -6,13 +6,32 @@
 // (AndroidSwipeRefreshLayout is the parent, ScrollView nested inside). So the .ios/.android
 // files assemble the final element; the filename selects, no Platform.OS read.
 
-import { createElement, type ReactElement, type ReactNode, type RefObject } from 'react'
-import { dispatchViewCommand, dlog, type SymbioteEvent, type SymbioteNode } from '@symbiote/shared'
+import { createElement, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
+import {
+  AnimatedValue,
+  dispatchViewCommand,
+  dlog,
+  event as animatedEvent,
+  type SymbioteEvent,
+  type SymbioteNode,
+} from '@symbiote/shared'
 import { resolveAccessibilityProps, type AccessibilityProps, type AriaProps } from './accessibility-props'
 import type { SymbioteIntrinsic } from './component-names-shared'
 import type { ViewStyle } from './styles'
+import { wrapStickyHeaders, type StickyHeaderComponentType } from './scroll-view-sticky-header'
 
 type ScrollHandler = (event: SymbioteEvent) => void
+type LayoutHandler = (event: SymbioteEvent) => void
+
+// Pull a numeric field out of an onLayout event's nativeEvent.layout without a cast:
+// SymbioteEvent.nativeEvent is Record<string, unknown>, so the layout box and its
+// width/height are narrowed at runtime. A malformed event yields undefined (no-op).
+function readLayoutDimension(event: SymbioteEvent, key: 'width' | 'height'): number | undefined {
+  const layout = event.nativeEvent.layout
+  if (typeof layout !== 'object' || layout === null) return undefined
+  const value = Reflect.get(layout, key)
+  return typeof value === 'number' ? value : undefined
+}
 
 const DECELERATION_RATE: Readonly<Record<string, number>> = {
   normal: 0.998,
@@ -44,6 +63,10 @@ export interface ScrollViewProps extends AccessibilityProps, AriaProps {
   contentOffset?: { x: number; y: number }
   refreshControl?: ReactElement<ClonableRefreshControl>
   removeClippedSubviews?: boolean
+  // Fired when the content container's size changes. RN synthesizes this in JS by
+  // putting an onLayout on the inner content view (ScrollView.js _handleContentOnLayout):
+  // the native scroll view has no such event of its own. (width, height) in points.
+  onContentSizeChange?: (width: number, height: number) => void
   // Snap / paging family — forwarded to the native scroll view via ...rest; the native
   // ViewManager reads them directly, no extra JS wiring (RN ScrollView passes the same
   // props straight through to RCTScrollView / the Android manager).
@@ -53,8 +76,17 @@ export interface ScrollViewProps extends AccessibilityProps, AriaProps {
   snapToStart?: boolean
   snapToEnd?: boolean
   disableIntervalMomentum?: boolean
-  // Sticky headers and keyboard interaction — native reads these directly.
+  // Sticky headers: RN implements stickiness PURELY IN JS (ScrollView.js wraps each
+  // flagged child in ScrollViewStickyHeader, driven by the scroll offset). The native
+  // scroll view does NOT honor an index array, so we wrap the children here too rather
+  // than forward `stickyHeaderIndices` to native (that would be a silent no-op). The
+  // keyboard props below ARE read by native directly.
   stickyHeaderIndices?: number[]
+  // Stick to the BOTTOM instead of the top (RN invertStickyHeaders) — used by inverted lists.
+  invertStickyHeaders?: boolean
+  // Override the wrapper component for sticky headers (RN StickyHeaderComponent), e.g. a
+  // SectionList header. Defaults to the built-in sticky header.
+  StickyHeaderComponent?: StickyHeaderComponentType
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive'
   keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled'
   maintainVisibleContentPosition?: {
@@ -82,6 +114,9 @@ export interface ScrollViewProps extends AccessibilityProps, AriaProps {
   fadingEdgeLength?: number
   persistentScrollbar?: boolean
   endFillColor?: string
+  // The scroll view's own frame layout (RN ScrollView _handleLayout). Sticky headers
+  // need the viewport height when inverted; also a generally-valid ScrollView prop.
+  onLayout?: LayoutHandler
   onScroll?: ScrollHandler
   onScrollBeginDrag?: ScrollHandler
   onScrollEndDrag?: ScrollHandler
@@ -216,10 +251,45 @@ export function prepareScrollView(rawProps: ScrollViewProps): PreparedScrollView
     decelerationRate,
     refreshControl,
     children,
+    onContentSizeChange,
+    stickyHeaderIndices,
+    invertStickyHeaders,
+    StickyHeaderComponent,
+    onLayout,
+    onScroll,
+    scrollEventThrottle,
     ...outer
   } = props
 
   const isHorizontal = horizontal === true
+  const hasStickyHeaders = stickyHeaderIndices !== undefined && stickyHeaderIndices.length > 0
+
+  // A single AnimatedValue tracks the scroll offset and drives every sticky header's
+  // translateY (RN's _scrollAnimatedValue). Stable across renders via a ref so the headers'
+  // bindings survive re-renders. Allocated even when no sticky headers are present (hooks
+  // run unconditionally — prepareScrollView is always called at the top of the render body).
+  const scrollAnimatedValueRef = useRef<AnimatedValue | null>(null)
+  if (scrollAnimatedValueRef.current === null) scrollAnimatedValueRef.current = new AnimatedValue(0)
+  const scrollAnimatedValue = scrollAnimatedValueRef.current
+  // Inverted sticky headers stick to the BOTTOM, so they need the viewport height (RN reads
+  // it in _handleLayout). Tracked here and fed back into the wrapped headers.
+  const [viewportHeight, setViewportHeight] = useState<number | undefined>(undefined)
+
+  // Sticky-header cross-talk (RN ScrollView.js _headerLayoutYs, line 754): a child-index→measured-y
+  // map the parent keeps so each header can learn where the NEXT sticky header starts (its push-off
+  // collision point). The map lives in a ref (mutated imperatively from each header's onLayout, like
+  // RN's _onStickyHeaderLayout), and a state bump forces the re-render that feeds the freshly-recorded
+  // y forward into the previous header's nextHeaderLayoutY prop.
+  const headerLayoutYsRef = useRef<Map<number, number> | null>(null)
+  if (headerLayoutYsRef.current === null) headerLayoutYsRef.current = new Map()
+  const headerLayoutYs = headerLayoutYsRef.current
+  const [, bumpHeaderLayout] = useState(0)
+  const onHeaderLayoutY = (index: number, y: number): void => {
+    if (headerLayoutYs.get(index) === y) return
+    headerLayoutYs.set(index, y)
+    dlog(`ScrollView sticky-header layoutY index=${index} y=${y}`)
+    bumpHeaderLayout((tick) => tick + 1)
+  }
 
   // Horizontal scroll resolves to a different native component on Android (its own
   // ViewManager, not RCTScrollView+flag); on iOS both intrinsics map back to RCTScrollView.
@@ -243,7 +313,68 @@ export function prepareScrollView(rawProps: ScrollViewProps): PreparedScrollView
     outerProps.decelerationRate = resolveDecelerationRate(decelerationRate)
   }
 
-  dlog(`ScrollView -> ${scrollViewIntrinsic} (horizontal=${isHorizontal})`)
+  // onScroll: when sticky headers are active, the offset must reach the AnimatedValue, so
+  // we wrap the user's handler with Animated.event (it fires the listener passthrough). RN
+  // does the same with _scrollAnimatedValueAttachment. Without sticky headers, forward as-is.
+  if (hasStickyHeaders) {
+    outerProps.onScroll = animatedEvent(
+      [{ nativeEvent: { contentOffset: { y: scrollAnimatedValue } } }],
+      onScroll === undefined ? undefined : { listener: (...args) => forwardScrollEvent(onScroll, args) },
+    )
+    // Animated.event needs to fire often enough to drive the headers smoothly; default to
+    // every frame when the caller didn't ask for a coarser throttle.
+    outerProps.scrollEventThrottle = scrollEventThrottle ?? 16
+  } else {
+    if (onScroll !== undefined) outerProps.onScroll = onScroll
+    if (scrollEventThrottle !== undefined) outerProps.scrollEventThrottle = scrollEventThrottle
+  }
+
+  // onLayout on the scroll-view node: capture the viewport height for inverted sticky headers
+  // (RN _handleLayout), then call the user's handler. Pass through unchanged otherwise.
+  if (hasStickyHeaders && invertStickyHeaders === true) {
+    outerProps.onLayout = (layoutEvent: SymbioteEvent): void => {
+      const height = readLayoutDimension(layoutEvent, 'height')
+      if (height !== undefined) setViewportHeight(height)
+      onLayout?.(layoutEvent)
+    }
+  } else if (onLayout !== undefined) {
+    outerProps.onLayout = onLayout
+  }
+
+  dlog(`ScrollView -> ${scrollViewIntrinsic} (horizontal=${isHorizontal} sticky=${hasStickyHeaders})`)
+
+  // onContentSizeChange is synthesized from the content view's own onLayout (RN
+  // _handleContentOnLayout): read width/height off nativeEvent.layout and fire only when the
+  // size actually changed (dedupe via a ref, like RN). Composed with any content onLayout.
+  const lastContentSizeRef = useRef<{ width: number; height: number } | null>(null)
+  const contentProps: Record<string, unknown> = { style: contentStyle, collapsable: false }
+  if (onContentSizeChange !== undefined) {
+    contentProps.onLayout = (layoutEvent: SymbioteEvent): void => {
+      const width = readLayoutDimension(layoutEvent, 'width')
+      const height = readLayoutDimension(layoutEvent, 'height')
+      if (width === undefined || height === undefined) return
+      const last = lastContentSizeRef.current
+      if (last !== null && last.width === width && last.height === height) return
+      lastContentSizeRef.current = { width, height }
+      dlog(`ScrollView onContentSizeChange ${width}x${height}`)
+      onContentSizeChange(width, height)
+    }
+  }
+
+  // Sticky headers are a pure-JS layer (the native scroll view ignores stickyHeaderIndices);
+  // wrap the flagged children so they pin to the scroll offset. No-op when none are flagged.
+  const contentChildren = hasStickyHeaders
+    ? wrapStickyHeaders(
+        children,
+        stickyHeaderIndices,
+        scrollAnimatedValue,
+        invertStickyHeaders,
+        viewportHeight,
+        StickyHeaderComponent,
+        headerLayoutYs,
+        onHeaderLayoutY,
+      )
+    : children
 
   // `collapsable: false` is load-bearing on Android. The content container is a
   // layout-only View, which Android Fabric view-flattens away — hoisting the cells
@@ -252,13 +383,23 @@ export function prepareScrollView(rawProps: ScrollViewProps): PreparedScrollView
   // its own NativeScrollContentView the same way (ScrollView.js, collapsable={false};
   // ReactScrollView.java: "the 'content' View … non-collapsable so it will never be
   // View-flattened away"). iOS doesn't flatten, so this is a no-op there.
-  const content = createElement(
-    contentIntrinsic,
-    { style: contentStyle, collapsable: false },
-    children,
-  )
+  const content = createElement(contentIntrinsic, contentProps, contentChildren)
 
   return { scrollViewIntrinsic, scrollViewBaseStyle, outerProps, style, content, refreshControl }
+}
+
+// Forward a wrapped scroll event to the user's ScrollHandler. The Animated.event listener
+// hands raw args; the first is the original SymbioteEvent, which we narrow with a runtime
+// guard (no cast) and pass through unchanged so the user sees the same event RN would deliver.
+function forwardScrollEvent(handler: ScrollHandler, args: readonly unknown[]): void {
+  const first = args[0]
+  if (isSymbioteEvent(first)) handler(first)
+}
+
+function isSymbioteEvent(value: unknown): value is SymbioteEvent {
+  if (typeof value !== 'object' || value === null) return false
+  const nativeEvent = Reflect.get(value, 'nativeEvent')
+  return typeof nativeEvent === 'object' && nativeEvent !== null
 }
 
 // The imperative handle is identical across platforms — every method dispatches a view

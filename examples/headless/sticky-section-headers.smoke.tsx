@@ -1,10 +1,12 @@
 /** @jsxRuntime automatic */
-// Headless proof that VirtualizedSectionList routes its section-header positions to the
-// ScrollView's native stickyHeaderIndices. A fake slot records every created node; we
-// mount two small sections (all entries inside the initial window) and assert the
-// RCTScrollView carries stickyHeaderIndices for the two header child positions — and
-// that stickySectionHeadersEnabled={false} drops the prop. No simulator; the visual
-// stick is native, but the index plumbing is JS and proven here.
+// Headless proof that VirtualizedSectionList sticks its section headers. Stickiness is a
+// JS layer (ScrollView wraps each flagged child in a ScrollViewStickyHeader — an
+// Animated.View with collapsable:false and a translateY transform driven by the scroll
+// offset; the native scroll view does NOT honor a bare index array). A fake slot records
+// every created node; we mount two small sections (all entries inside the initial window)
+// and assert the two section headers each get wrapped in a transform-bearing sticky
+// wrapper — and that stickySectionHeadersEnabled={false} wraps nothing. This exercises the
+// full VirtualizedSectionList -> ScrollView -> wrapStickyHeaders path.
 
 import { createElement, type ReactElement } from 'react'
 import { mount } from '@symbiote/react'
@@ -68,11 +70,10 @@ function reset(): void {
   allCreated.length = 0
 }
 
-// The outer scroll view is the one carrying the sticky-header prop.
-function scrollView(): FakeNode {
-  const node = allCreated.find((n) => n.viewName === 'RCTScrollView')
-  if (!node) throw new Error('no RCTScrollView was created')
-  return node
+// A sticky-header wrapper is the only node carrying a `transform` (its translateY); regular
+// cells and the content container don't. So transform-bearing nodes count the wrapped headers.
+function stickyWrappers(): FakeNode[] {
+  return allCreated.filter((n) => Array.isArray(n.props.transform))
 }
 
 function renderSection(props: {
@@ -87,31 +88,33 @@ function renderSection(props: {
   })
 }
 
-// ---- case 1: headers in the window forward as stickyHeaderIndices ----------
+// ---- case 1: the two section headers each get a sticky wrapper -------------
 // Flattened: [0]=header A, [1..2]=items, [3]=footer A, [4]=header B, [5..6]=items,
 // [7]=footer B. No separators, no list header -> child positions equal entry indices,
-// so the two headers land at child 0 and 4.
+// so the two headers land at child 0 and 4 and get wrapped.
 
 {
   reset()
   mount(51, renderSection({ sections: SECTIONS }))
-  const indices = scrollView().props.stickyHeaderIndices
-  if (!Array.isArray(indices)) {
-    throw new Error(`expected stickyHeaderIndices array, got ${JSON.stringify(indices)}`)
+  const wrappers = stickyWrappers()
+  if (wrappers.length !== 2) {
+    throw new Error(`expected 2 sticky-header wrappers (one per section header), got ${wrappers.length}`)
   }
-  if (indices.length !== 2 || indices[0] !== 0 || indices[1] !== 4) {
-    throw new Error(`stickyHeaderIndices should be [0, 4], got ${JSON.stringify(indices)}`)
+  for (const wrapper of wrappers) {
+    if (wrapper.props.collapsable !== false) {
+      throw new Error(`sticky wrapper must be collapsable:false, got ${JSON.stringify(wrapper.props.collapsable)}`)
+    }
   }
 }
 
-// ---- case 2: stickySectionHeadersEnabled={false} drops the prop -------------
+// ---- case 2: stickySectionHeadersEnabled={false} wraps nothing -------------
 
 {
   reset()
   mount(52, renderSection({ sections: SECTIONS, stickySectionHeadersEnabled: false }))
-  const indices = scrollView().props.stickyHeaderIndices
-  if (indices !== undefined) {
-    throw new Error(`disabled sticky headers must not set stickyHeaderIndices, got ${JSON.stringify(indices)}`)
+  const wrappers = stickyWrappers()
+  if (wrappers.length !== 0) {
+    throw new Error(`disabled sticky headers must wrap no header, got ${wrappers.length}`)
   }
 }
 
