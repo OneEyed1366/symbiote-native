@@ -123,12 +123,13 @@ export const Modal: FC<ModalProps> = (rawProps) => {
   } = props
 
   // RN keeps the modal mounted through its exit animation (Modal.js
-  // _shouldShowModal: visible===true || state.isRendered===true) so onDismiss can
-  // fire. isRendered tracks visibility; on the visible->hidden transition we
-  // deliver onDismiss and tear the keep-alive down. (RN routes onDismiss through
-  // the native modalDismissed event, which fires when the native exit animation
-  // ends — that native timing is what we defer; the JS-observable transition and
-  // the callback contract are preserved.)
+  // _shouldShowModal: visible===true || state.isRendered===true) so the native
+  // onDismiss event can arrive before the node unmounts. isRendered is PURELY that
+  // keep-alive — it never itself calls onDismiss. On Fabric, onDismiss is a real
+  // native DirectEvent (topDismiss -> 'dismiss'), routed by MODAL_EVENTS and
+  // delivered via the node-prop onDismiss below; RN never simulates it in JS
+  // (Modal.js ~318-339; the modalDismissed emitter path is old-renderer iOS-only).
+  // The keep-alive only holds the node mounted through the exit transition.
   const [isRendered, setIsRendered] = useState(visible === true)
 
   useEffect(() => {
@@ -137,14 +138,15 @@ export const Modal: FC<ModalProps> = (rawProps) => {
       if (!isRendered) setIsRendered(true)
       return
     }
-    // visible->hidden while still rendered: deliver onDismiss and drop the
-    // keep-alive (Modal.js render onDismiss + setState isRendered:false).
+    // visible->hidden while still rendered: drop the keep-alive so the node can
+    // unmount after the native exit transition. onDismiss is NOT fired here — the
+    // native topDismiss event is its single source (Modal.js render setState
+    // isRendered:false; no JS onDismiss call).
     if (isRendered) {
-      dlog('Modal isRendered transition -> false (visible->hidden); firing onDismiss')
+      dlog('Modal isRendered transition -> false (visible->hidden); keep-alive dropped')
       setIsRendered(false)
-      onDismiss?.()
     }
-  }, [visible, isRendered, onDismiss])
+  }, [visible, isRendered])
 
   // The visible gate with iOS keep-alive: a fully hidden modal (not visible and no
   // longer rendered) contributes no node, exactly as RN's render returns null when
