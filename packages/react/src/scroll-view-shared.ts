@@ -98,18 +98,85 @@ function resolveDecelerationRate(rate: 'normal' | 'fast' | number): number {
 }
 
 // RN applies a base style to the scroll-view NODE itself, per axis (ScrollView.js
-// styles.baseHorizontal/baseVertical). For horizontal, `flexDirection: 'row'` is
-// load-bearing: it makes the single content child a MAIN-axis item, so Yoga sizes it to
-// its content width (the sum of the row's children) and the view overflows and scrolls.
-// Without it the scroll view defaults to `column`, the content child is a CROSS-axis item,
-// and its width is stretched/clamped to the viewport — leaving nothing to scroll. Vertical
-// gets the equivalent for free (column is the default direction), so only the horizontal
-// base is needed here.
+// styles.baseHorizontal/baseVertical). Two parts carry weight:
+//   - `overflow: 'scroll'` — clips content to the scroll view's frame. On iOS Fabric the
+//     node only clips when this is set; without it a fixed-height ScrollView lets its
+//     content bleed out over siblings (Android's native ViewGroup clips regardless, which
+//     is why the bug showed only on iOS). RN sets it on BOTH axes, so we do too.
+//   - `flexDirection: 'row'` (horizontal only) — makes the single content child a MAIN-axis
+//     item, so Yoga sizes it to its content width and the view overflows and scrolls.
+//     Without it the content is a CROSS-axis item, stretched to the viewport, nothing to
+//     scroll. Vertical keeps the default `column`.
+// Both axes match RN's baseHorizontal/baseVertical exactly. Composed UNDER the user style,
+// so an explicit value still wins.
 const SCROLL_VIEW_BASE_HORIZONTAL: ViewStyle = {
   flexGrow: 1,
   flexShrink: 1,
   flexDirection: 'row',
   overflow: 'scroll',
+}
+const SCROLL_VIEW_BASE_VERTICAL: ViewStyle = {
+  flexGrow: 1,
+  flexShrink: 1,
+  flexDirection: 'column',
+  overflow: 'scroll',
+}
+
+// RN's splitLayoutProps key partition (StyleSheet/splitLayoutProps.js): the LAYOUT keys
+// that belong on the OUTER box when a layout-affecting wrapper sits between the laid-out
+// frame and the visual content. Everything NOT in this set (background*, padding*, border*,
+// opacity, overflow, …) is VISUAL and stays on the inner view. Replicated exactly from RN's
+// switch cases so the Android RefreshControl wrap routes style the way RN does.
+const LAYOUT_KEYS: ReadonlySet<string> = new Set([
+  'margin',
+  'marginHorizontal',
+  'marginVertical',
+  'marginBottom',
+  'marginTop',
+  'marginLeft',
+  'marginRight',
+  'flex',
+  'flexGrow',
+  'flexShrink',
+  'flexBasis',
+  'alignSelf',
+  'height',
+  'minHeight',
+  'maxHeight',
+  'width',
+  'minWidth',
+  'maxWidth',
+  'position',
+  'left',
+  'right',
+  'bottom',
+  'top',
+  'transform',
+  'transformOrigin',
+  'rowGap',
+  'columnGap',
+  'gap',
+])
+
+// Split a flattened style into the LAYOUT props that drive the outer wrapper's frame and the
+// VISUAL props that paint the inner content — RN's splitLayoutProps. The Android build uses
+// this when a RefreshControl wraps the scroll view: layout (margin/flex/size/position/…) goes
+// on the AndroidSwipeRefreshLayout wrapper, visual (background/padding/border/…) stays on the
+// inner scroll view, instead of dumping the whole style on the wrapper and hardcoding flex:1.
+export function splitLayoutProps(style: ViewStyle | undefined): {
+  outer: Record<string, unknown>
+  inner: Record<string, unknown>
+} {
+  const outer: Record<string, unknown> = {}
+  const inner: Record<string, unknown> = {}
+  if (style !== undefined) {
+    for (const key of Object.keys(style)) {
+      const value = Reflect.get(style, key)
+      if (LAYOUT_KEYS.has(key)) outer[key] = value
+      else inner[key] = value
+    }
+  }
+  return { outer, inner }
 }
 
 // The shape the Android build clones onto a RefreshControl when wrapping the scroll view:
@@ -163,7 +230,7 @@ export function prepareScrollView(rawProps: ScrollViewProps): PreparedScrollView
   const contentIntrinsic: SymbioteIntrinsic = isHorizontal
     ? 'symbiote-horizontal-scroll-content'
     : 'symbiote-scroll-content'
-  const scrollViewBaseStyle = isHorizontal ? SCROLL_VIEW_BASE_HORIZONTAL : undefined
+  const scrollViewBaseStyle = isHorizontal ? SCROLL_VIEW_BASE_HORIZONTAL : SCROLL_VIEW_BASE_VERTICAL
 
   const contentStyle: ViewStyle = { ...contentContainerStyle }
   if (isHorizontal) contentStyle.flexDirection = 'row'

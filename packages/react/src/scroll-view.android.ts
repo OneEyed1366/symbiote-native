@@ -14,13 +14,11 @@ import { dlog, type SymbioteNode } from '@symbiote/shared'
 import {
   buildScrollViewHandle,
   prepareScrollView,
+  splitLayoutProps,
   type ScrollViewHandle,
   type ScrollViewProps,
 } from './scroll-view-shared'
 export type { ScrollViewProps, ScrollViewHandle } from './scroll-view-shared'
-
-// The scroll view fills its RefreshControl wrapper; the layout style moved to the wrapper.
-const INNER_FILL_STYLE = { flex: 1 }
 
 export const ScrollView = forwardRef<ScrollViewHandle, ScrollViewProps>((props, forwardedRef) => {
   const { scrollViewIntrinsic, scrollViewBaseStyle, outerProps, style, content, refreshControl } =
@@ -38,20 +36,20 @@ export const ScrollView = forwardRef<ScrollViewHandle, ScrollViewProps>((props, 
     return createElement(scrollViewIntrinsic, { ...outerProps, style: scrollStyle, ref }, content)
   }
 
-  // The style goes on the outer RefreshControl (the laid-out box); the inner scroll view
-  // fills it. RN splits layout vs visual style across the two; placing the full style on
-  // the wrapper plus flex:1 inside is the close-enough shape that keeps the background and
-  // sizing correct for the common case. The scroll view still needs its base (flexDirection)
-  // to size content along the scroll axis, so compose it under the fill style.
-  const innerStyle = scrollViewBaseStyle
-    ? { ...scrollViewBaseStyle, ...INNER_FILL_STYLE }
-    : INNER_FILL_STYLE
+  // RN splits the flattened style across the two boxes (ScrollView.js android branch):
+  // LAYOUT props (margin/flex/size/position/transform/gap/…) drive the outer
+  // AndroidSwipeRefreshLayout frame; VISUAL props (background/padding/border/opacity/…) paint
+  // the inner scroll view. So the wrapper carries `outer`, and the inner scroll view its base
+  // (flexDirection/overflow) plus the visual `inner` composed over it — NOT a hardcoded flex:1
+  // that would override an explicit user height/width.
+  const { outer: outerStyle, inner: innerStyle } = splitLayoutProps(style)
+  const scrollStyle = scrollViewBaseStyle ? { ...scrollViewBaseStyle, ...innerStyle } : innerStyle
   const scrollView = createElement(
     scrollViewIntrinsic,
-    { ...outerProps, style: innerStyle, nestedScrollEnabled: true, ref },
+    { ...outerProps, style: scrollStyle, nestedScrollEnabled: true, ref },
     content,
   )
-  return cloneElement(refreshControl, { style }, scrollView)
+  return cloneElement(refreshControl, { style: outerStyle }, scrollView)
 })
 
 ScrollView.displayName = 'ScrollView'
