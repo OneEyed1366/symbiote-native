@@ -11,6 +11,8 @@ import {
   installDeviceEventHub,
   NativeEventEmitter,
   getNativeModule,
+  isSymbioteNode,
+  sendAccessibilityEvent as sharedSendAccessibilityEvent,
   type EventEmitterModule,
   type EventSubscription,
   dlog,
@@ -24,7 +26,6 @@ import {
   type AccessibilityEventType,
   type AccessibilityHandle,
 } from './accessibility-info-shared'
-import { findNodeHandle } from './host-instance'
 export type {
   AccessibilityChangeEvent,
   AccessibilityChangeEventName,
@@ -57,8 +58,8 @@ type StateCallback = (enabled: boolean) => void
 
 // The Android AccessibilityInfo native module: single-callback boolean getters, announce,
 // and the recommended-timeout query. Optional methods guard older hosts. No error callback
-// and no setAccessibilityFocus (focus goes through UIManager.sendAccessibilityEvent, which
-// symbiote does not expose — see sendAccessibilityEvent below).
+// and no setAccessibilityFocus — focus is a 'focus' accessibility event routed through the
+// Fabric slot (see sendAccessibilityEvent below).
 interface NativeAccessibilityInfoAndroid extends EventEmitterModule {
   isTouchExplorationEnabled(onSuccess: StateCallback): void
   isReduceMotionEnabled(onSuccess: StateCallback): void
@@ -169,14 +170,12 @@ class AccessibilityInfoAndroid implements AccessibilityInfoStatic {
     this.announceForAccessibility(announcement)
   }
 
-  // Focus on Android goes through UIManager.sendAccessibilityEvent(reactTag, ...), which
-  // symbiote does not expose from JS. DEFERRED — see sendAccessibilityEvent. No-op so the
-  // unified surface stays non-throwing.
+  // Deprecated focus-by-tag entry. The Fabric slot keys on a node's committed handle, and a
+  // bare reactTag can't be resolved back to its SymbioteNode (the mirror is node-keyed), so
+  // this best-effort path is a logged no-op. Callers should use sendAccessibilityEvent(node,
+  // 'focus') with a host ref, which routes a real node through the slot.
   setAccessibilityFocus(reactTag: number): void {
-    dlog(
-      `AccessibilityInfo(android).setAccessibilityFocus(${reactTag}) -> DEFERRED ` +
-        '(needs UIManager.sendAccessibilityEvent, not exposed)',
-    )
+    dlog(`AccessibilityInfo(android).setAccessibilityFocus(${reactTag}) -> tag-only, no node to route (no-op)`)
   }
 
   // Recommended UI-change timeout for this user. Resolves the original when the module or
@@ -192,22 +191,18 @@ class AccessibilityInfoAndroid implements AccessibilityInfoStatic {
     })
   }
 
-  // RN routes this through UIManager.sendAccessibilityEvent(reactTag, eventType). symbiote can
-  // now resolve the handle to a tag (findNodeHandle), but exposes no UIManager.sendAccessibilityEvent
-  // path to deliver it — so the native dispatch stays DEFERRED on Android (focus included).
+  // Emit a named accessibility event at a view through the Fabric slot. RN's Fabric path
+  // hands the public-instance handle to nativeFabricUIManager.sendAccessibilityEvent with the
+  // STRING eventType; the C++ side maps it to the platform's AccessibilityEvent kind. The
+  // handle here IS the SymbioteNode (symbiote augments the node in place as its public
+  // instance), so resolve it with the runtime guard and route through shared.
   sendAccessibilityEvent(handle: AccessibilityHandle, eventType: AccessibilityEventType): void {
-    if (eventType === 'focus') {
-      const reactTag = findNodeHandle(handle)
-      dlog(
-        `AccessibilityInfo(android).sendAccessibilityEvent("focus") -> tag ${String(reactTag)} ` +
-          'DEFERRED (needs UIManager.sendAccessibilityEvent, not exposed)',
-      )
+    if (!isSymbioteNode(handle)) {
+      dlog(`AccessibilityInfo(android).sendAccessibilityEvent("${eventType}") -> handle is not a node (no-op)`)
       return
     }
-    dlog(
-      `AccessibilityInfo(android).sendAccessibilityEvent("${eventType}") -> DEFERRED ` +
-        '(needs UIManager.sendAccessibilityEvent, not exposed)',
-    )
+    dlog(`AccessibilityInfo(android).sendAccessibilityEvent("${eventType}") -> slot`)
+    sharedSendAccessibilityEvent(handle, eventType)
   }
 
   // Subscribe to an accessibility-state change. Android events all carry a bare boolean.

@@ -7,7 +7,57 @@
 // that remove() stops it and pings the module's removeListeners counter. A failure
 // here is in JS.
 
+import { type ReactElement } from 'react'
+import { mount, View } from '@symbiote/react'
 import { AccessibilityInfo } from '../../packages/react/src/accessibility-info'
+
+// ---- fake Fabric slot: records sendAccessibilityEvent(node, eventType) ----
+// iOS now routes non-'click' accessibility events through the Fabric slot (RN's Fabric
+// path), so case 6 needs a slot + a committed host ref, not just the native module.
+
+interface FakeNode {
+  tag: number
+  viewName: string
+  props: Record<string, unknown>
+  children: FakeNode[]
+}
+
+interface AccessibilityCall {
+  node: FakeNode
+  eventType: string
+}
+
+const a11yEvents: AccessibilityCall[] = []
+const slot = {
+  createNode: (
+    tag: number,
+    viewName: string,
+    _rootTag: number,
+    props: Record<string, unknown>,
+  ): FakeNode => ({ tag, viewName, props, children: [] }),
+  cloneNodeWithNewProps: (node: FakeNode, newProps: Record<string, unknown>): FakeNode => ({
+    ...node,
+    props: { ...node.props, ...newProps },
+  }),
+  cloneNodeWithNewChildren: (node: FakeNode): FakeNode => ({ ...node, children: [] }),
+  cloneNodeWithNewChildrenAndProps: (
+    node: FakeNode,
+    newProps: Record<string, unknown>,
+  ): FakeNode => ({ ...node, props: { ...node.props, ...newProps }, children: [] }),
+  createChildSet: (): FakeNode[] => [],
+  appendChild: (parent: FakeNode, child: FakeNode): FakeNode => {
+    parent.children.push(child)
+    return parent
+  },
+  appendChildToSet: (_childSet: FakeNode[], _child: FakeNode): void => {},
+  completeRoot: (): void => {},
+  registerEventHandler: (): void => {},
+  dispatchCommand: (): void => {},
+  sendAccessibilityEvent: (node: FakeNode, eventType: string): void => {
+    a11yEvents.push({ node, eventType })
+  },
+}
+Object.assign(globalThis, { nativeFabricUIManager: slot })
 
 // ---- fake native-module + device-hub globals ----------------------------
 
@@ -162,21 +212,29 @@ function isType<T>(value: unknown): value is T {
   if (timeout !== 3000) throw new Error(`getRecommendedTimeoutMillis should resolve the original, got ${String(timeout)}`)
 }
 
-// ---- case 6: sendAccessibilityEvent('focus') resolves the handle to a tag ----
+// ---- case 6: sendAccessibilityEvent routes a host ref through the Fabric slot ----
 
 {
-  // A numeric handle passes straight through findNodeHandle, so iOS routes it to the
-  // native setAccessibilityFocus — same path as case 4, driven from sendAccessibilityEvent.
-  focusedTag = undefined
-  AccessibilityInfo.sendAccessibilityEvent(99, 'focus')
-  if (focusedTag !== 99) {
-    throw new Error(`sendAccessibilityEvent('focus') should focus tag 99, got ${String(focusedTag)}`)
+  // Mount a View and capture its host ref — the public-instance handle RN's Fabric
+  // sendAccessibilityEvent expects. iOS routes every non-'click' event through the slot.
+  let box: unknown
+  function App(): ReactElement {
+    return <View ref={(instance) => { box = instance }} style={{ width: 10, height: 10 }} />
+  }
+  mount(11, <App />)
+  if (box == null) throw new Error('host ref handed back nothing')
+
+  AccessibilityInfo.sendAccessibilityEvent(box, 'focus')
+  const focus = a11yEvents[a11yEvents.length - 1]
+  if (!focus || focus.eventType !== 'focus') {
+    throw new Error(`sendAccessibilityEvent('focus') should route 'focus' through the slot, got ${JSON.stringify(focus)}`)
   }
 
-  // A non-'focus' event has no iOS native producer -> no-op, leaves the focus untouched.
-  AccessibilityInfo.sendAccessibilityEvent(7, 'click')
-  if (focusedTag !== 99) {
-    throw new Error(`non-focus sendAccessibilityEvent must not move focus, got ${String(focusedTag)}`)
+  // RN early-returns 'click' on iOS (VoiceOver has no click producer) -> nothing reaches the slot.
+  const before = a11yEvents.length
+  AccessibilityInfo.sendAccessibilityEvent(box, 'click')
+  if (a11yEvents.length !== before) {
+    throw new Error("sendAccessibilityEvent('click') must be a no-op on iOS (RN parity)")
   }
 }
 

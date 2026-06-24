@@ -104,7 +104,19 @@ const COLOR_PROPS: ReadonlySet<string> = new Set([
   'borderRightColor',
   'borderBottomColor',
   'borderLeftColor',
+  // Logical (writing-direction-relative) border colors + the block axis, all wired to
+  // processColor in RN's ReactNativeStyleAttributes. borderStartColor/borderEndColor are
+  // even publicly typed ColorValue, so they silently dropped on iOS / threw on Android.
+  'borderStartColor',
+  'borderEndColor',
+  'borderBlockColor',
+  'borderBlockStartColor',
+  'borderBlockEndColor',
   'shadowColor',
+  // Text shadow + the W3C `outline`/image `overlay` colors — also processColor in RN.
+  'textShadowColor',
+  'overlayColor',
+  'outlineColor',
   'tintColor',
   // TextInput color props. iOS's native input accepts a CSS string, but Android's
   // AndroidTextInput is strict ("ColorValue: the value must be a number or Object"),
@@ -488,6 +500,21 @@ export function dispatchViewCommand(
   }
   dlog(`dispatchViewCommand "${commandName}"`)
   getSlot().dispatchCommand(record.handle, commandName, args)
+}
+
+// Emit an accessibility event (focus/click/viewHoverEnter/windowStateChange) at a node's
+// CURRENT Fabric handle, routed through the slot exactly like dispatchViewCommand. RN's
+// Fabric path hands the public-instance handle to nativeFabricUIManager.sendAccessibilityEvent
+// with the STRING eventType; the C++ side maps it to the platform's accessibility-event kind.
+// A no-op (logged) until the node is committed — there is no handle yet.
+export function sendAccessibilityEvent(node: SymbioteNode, eventType: string): void {
+  const record = mirror.get(node)
+  if (record === undefined) {
+    dlog(`sendAccessibilityEvent "${eventType}" skipped: node not committed`)
+    return
+  }
+  dlog(`sendAccessibilityEvent "${eventType}"`)
+  getSlot().sendAccessibilityEvent(record.handle, eventType)
 }
 
 // Imperative measurement against a node's CURRENT Fabric handle (the public-instance

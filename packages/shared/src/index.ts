@@ -43,6 +43,7 @@ export {
   setColorProcessor,
   processColor,
   dispatchViewCommand,
+  sendAccessibilityEvent,
   setNativeProps,
   getNativeTag,
   getNativeNode,

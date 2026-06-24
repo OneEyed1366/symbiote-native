@@ -11,6 +11,8 @@ import {
   installDeviceEventHub,
   NativeEventEmitter,
   getNativeModule,
+  isSymbioteNode,
+  sendAccessibilityEvent as sharedSendAccessibilityEvent,
   type EventEmitterModule,
   type EventSubscription,
   dlog,
@@ -25,7 +27,6 @@ import {
   type AccessibilityEventType,
   type AccessibilityHandle,
 } from './accessibility-info-shared'
-import { findNodeHandle } from './host-instance'
 export type {
   AccessibilityChangeEvent,
   AccessibilityChangeEventName,
@@ -209,19 +210,24 @@ class AccessibilityInfoIOS implements AccessibilityInfoStatic {
     return Promise.resolve(originalTimeout)
   }
 
-  // RN's iOS legacySendAccessibilityEvent: resolve the handle to a native tag, and for a
-  // 'focus' event move accessibility focus there. findNodeHandle is symbiote's renderer-proxy
-  // equivalent (ref/instance -> committed reactTag; a number passes through). Non-'focus'
-  // events have no iOS native producer — RN ignores them on iOS too, so they stay a no-op.
+  // Emit an accessibility event at a view through the Fabric slot — RN's Fabric
+  // sendAccessibilityEvent hands the public-instance handle straight to
+  // nativeFabricUIManager.sendAccessibilityEvent with the STRING eventType, and the C++
+  // side maps it. The handle here IS the SymbioteNode (symbiote augments the node in place
+  // as its public instance), so resolve it with the runtime guard and route through shared.
+  // RN early-returns 'click' on iOS only (AccessibilityInfo.js) — VoiceOver has no click
+  // producer — so preserve that one no-op; every other event reaches the slot.
   sendAccessibilityEvent(handle: AccessibilityHandle, eventType: AccessibilityEventType): void {
-    if (eventType !== 'focus') {
-      dlog(`AccessibilityInfo(ios).sendAccessibilityEvent("${eventType}") -> no iOS producer (no-op)`)
+    if (eventType === 'click') {
+      dlog('AccessibilityInfo(ios).sendAccessibilityEvent("click") -> iOS no-op (RN parity)')
       return
     }
-    const reactTag = findNodeHandle(handle)
-    dlog(`AccessibilityInfo(ios).sendAccessibilityEvent("focus") -> tag ${String(reactTag)}`)
-    if (reactTag === null) return
-    this.setAccessibilityFocus(reactTag)
+    if (!isSymbioteNode(handle)) {
+      dlog(`AccessibilityInfo(ios).sendAccessibilityEvent("${eventType}") -> handle is not a node (no-op)`)
+      return
+    }
+    dlog(`AccessibilityInfo(ios).sendAccessibilityEvent("${eventType}") -> slot`)
+    sharedSendAccessibilityEvent(handle, eventType)
   }
 
   // Subscribe to an accessibility-state change. A handler for a boolean event receives a
