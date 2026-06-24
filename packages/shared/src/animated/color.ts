@@ -5,7 +5,7 @@
 // colors and platform (Native) colors are deferred (they need RN's full
 // normalizeColor / processColorObject, which live outside shared).
 
-import { AnimatedWithChildren } from './graph'
+import { AnimatedWithChildren, flushValue } from './graph'
 import { AnimatedValue } from './value'
 import type { NativeNodeConfig } from './native/native-animated'
 
@@ -111,14 +111,29 @@ export class AnimatedColor extends AnimatedWithChildren {
     return `rgba(${r}, ${g}, ${b}, ${a})`
   }
 
+  // Each per-channel setValue/setOffset flushes bound props and walks the graph
+  // up to this color node's listeners. Driving four channels in a row would
+  // otherwise commit the bound view four times and fire color listeners four
+  // times, each with an intermediate rgba() that never logically existed. So we
+  // suspend this node's listeners across all four writes, then do ONE flush and
+  // ONE listener fire with the final composed color (RN's _withSuspendedCallbacks
+  // pattern). flushValue dedupes by leaf identity, so a single flush rebuilds
+  // every bound prop once even though four channels changed.
   setValue(value: RgbaValue | string | number): void {
     const rgba = typeof value === 'object' ? value : normalizeColor(value) ?? DEFAULT_COLOR
-    this.r.setValue(rgba.r)
-    this.g.setValue(rgba.g)
-    this.b.setValue(rgba.b)
-    this.a.setValue(rgba.a)
+    this.withSuspendedCallbacks(() => {
+      this.r.setValue(rgba.r)
+      this.g.setValue(rgba.g)
+      this.b.setValue(rgba.b)
+      this.a.setValue(rgba.a)
+    })
+    flushValue(this)
+    this.__callListeners(this.__getValue())
   }
 
+  // setOffset / flattenOffset / extractOffset do NOT flush or fire listeners in
+  // symbiote's per-channel AnimatedValue (offset writes are silent), so there is
+  // no 4×-fire to suspend here — matching RN, where only setValue suspends.
   setOffset(offset: RgbaValue): void {
     this.r.setOffset(offset.r)
     this.g.setOffset(offset.g)
@@ -146,6 +161,15 @@ export class AnimatedColor extends AnimatedWithChildren {
     this.b.stopAnimation()
     this.a.stopAnimation()
     callback?.(this.__getValue())
+  }
+
+  // A color listener wants the composed rgba() string, not the bare channel number
+  // the child-walk arrives with. So we ignore the incoming value and re-pull
+  // __getValue(). super.__callListeners honors the suspend counter, so during
+  // setValue's four channel writes this is a no-op and the only fire is the
+  // explicit final one below.
+  override __callListeners(_value: number | string): void {
+    super.__callListeners(this.__getValue())
   }
 
   override __attach(): void {
