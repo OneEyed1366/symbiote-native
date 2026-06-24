@@ -8,6 +8,7 @@
 import { createElement, useMemo, useRef, useState, type FC, type ReactNode } from 'react'
 import { dlog, type SymbioteEvent } from '@symbiote/shared'
 import { View } from './components'
+import type { AccessibilityProps, AccessibilityStateValue, AriaProps } from './accessibility-props'
 import type { ViewStyle } from './styles'
 
 const DEFAULT_DELAY_LONG_PRESS_MS = 500
@@ -20,13 +21,7 @@ type PressHandler = (event: SymbioteEvent) => void
 type StyleProp = ViewStyle | ((state: PressState) => ViewStyle)
 type ChildrenProp = ReactNode | ((state: PressState) => ReactNode)
 
-// The accessibility state RN forwards to the native view. Only `disabled` is
-// modelled for now (View + Text scope); RN's full shape adds busy/checked/etc.
-export interface AccessibilityState {
-  disabled?: boolean
-}
-
-export interface PressableProps {
+export interface PressableProps extends AccessibilityProps, AriaProps {
   onPress?: PressHandler
   onPressIn?: PressHandler
   onPressOut?: PressHandler
@@ -34,10 +29,6 @@ export interface PressableProps {
   delayLongPress?: number
   disabled?: boolean
   hitSlop?: number | { top?: number; left?: number; bottom?: number; right?: number }
-  accessibilityLabel?: string
-  accessibilityRole?: string
-  accessibilityState?: AccessibilityState
-  accessible?: boolean
   testID?: string
   style?: StyleProp
   children?: ChildrenProp
@@ -62,13 +53,13 @@ export const Pressable: FC<PressableProps> = (props) => {
     delayLongPress = DEFAULT_DELAY_LONG_PRESS_MS,
     disabled,
     hitSlop,
-    accessibilityLabel,
-    accessibilityRole,
     accessibilityState,
-    accessible,
     testID,
     style,
     children,
+    // The remaining accessibility / aria props are forwarded to View untouched;
+    // View runs resolveAccessibilityProps, so aria/role fold there, once.
+    ...accessibilityRest
   } = props
 
   const [pressed, setPressed] = useState(false)
@@ -116,16 +107,14 @@ export const Pressable: FC<PressableProps> = (props) => {
   // RN merges `disabled` into the resolved accessibilityState so a disabled
   // Pressable reports the disabled state even if the caller passed none
   // (Pressable.js: `disabled != null ? {...state, disabled} : state`).
-  const resolvedAccessibilityState: AccessibilityState | undefined =
+  const resolvedAccessibilityState: AccessibilityStateValue | undefined =
     disabled !== undefined ? { ...accessibilityState, disabled } : accessibilityState
 
   const viewProps: Record<string, unknown> = {
+    ...accessibilityRest,
     style: resolveStyle(style, state),
     hitSlop,
-    accessibilityLabel,
-    accessibilityRole,
     accessibilityState: resolvedAccessibilityState,
-    accessible,
     testID,
   }
   // When disabled, leave the listeners off entirely — a press never fires and

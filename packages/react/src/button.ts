@@ -7,6 +7,7 @@ import { createElement, type FC } from 'react'
 import { Text } from './components'
 import { TouchableOpacity } from './touchable'
 import type { SymbioteEvent } from '@symbiote/shared'
+import type { AccessibilityProps, AriaProps } from './accessibility-props'
 import type { TextStyle } from './styles'
 
 const IOS_BUTTON_BLUE = '#007AFF'
@@ -23,16 +24,15 @@ const buttonTextStyle: TextStyle = {
 // accessibility enum value, fine inline.
 const BUTTON_ACCESSIBILITY_ROLE = 'button'
 
-export interface ButtonProps {
+export interface ButtonProps extends AccessibilityProps, AriaProps {
   title: string
   onPress?: (event: SymbioteEvent) => void
   color?: string
   disabled?: boolean
-  accessibilityLabel?: string
 }
 
 export const Button: FC<ButtonProps> = (props) => {
-  const { title, onPress, color, disabled, accessibilityLabel } = props
+  const { title, onPress, color, disabled, ...accessibilityRest } = props
 
   const textStyle: TextStyle = { ...buttonTextStyle }
   if (color !== undefined) textStyle.color = color
@@ -40,13 +40,15 @@ export const Button: FC<ButtonProps> = (props) => {
 
   // RN's Button sets role=button, is accessible, and propagates the disabled
   // accessibility state (Button.js: accessibilityRole="button",
-  // accessible={accessible}, accessibilityState={_accessibilityState}).
+  // accessible={accessible}, accessibilityState={_accessibilityState}). The
+  // caller's accessibility props pass through, but Button's fixed role / accessible
+  // / disabled-state win — applied after the spread.
   return createElement(
     TouchableOpacity,
     {
+      ...accessibilityRest,
       onPress,
       disabled,
-      accessibilityLabel,
       accessibilityRole: BUTTON_ACCESSIBILITY_ROLE,
       accessible: true,
       accessibilityState: { disabled },

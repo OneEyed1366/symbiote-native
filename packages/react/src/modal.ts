@@ -22,6 +22,7 @@
 
 import { createElement, useEffect, useState, type FC, type ReactNode } from 'react'
 import { dlog } from '@symbiote/shared'
+import { resolveAccessibilityProps, type AccessibilityProps, type AriaProps } from './accessibility-props'
 import type { ViewStyle } from './styles'
 
 export type ModalAnimationType = 'none' | 'slide' | 'fade'
@@ -43,7 +44,7 @@ export interface ModalOrientationChangeEvent {
   orientation: 'portrait' | 'landscape'
 }
 
-export interface ModalProps {
+export interface ModalProps extends AccessibilityProps, AriaProps {
   visible?: boolean
   transparent?: boolean
   backdropColor?: string
@@ -53,8 +54,6 @@ export interface ModalProps {
   hardwareAccelerated?: boolean
   statusBarTranslucent?: boolean
   testID?: string
-  accessible?: boolean
-  accessibilityLabel?: string
   onShow?: () => void
   onDismiss?: () => void
   onRequestClose?: () => void
@@ -104,7 +103,10 @@ function loggedEvent<TArgs extends ReadonlyArray<unknown>>(
   }
 }
 
-export const Modal: FC<ModalProps> = (props) => {
+export const Modal: FC<ModalProps> = (rawProps) => {
+  // Modal owns its host element (symbiote-modal), so it folds aria/role into
+  // accessibility* here; the resolved fields ride the host node via `...passthrough`.
+  const props = resolveAccessibilityProps(rawProps)
   const {
     visible,
     transparent,

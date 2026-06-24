@@ -16,11 +16,12 @@ import {
 import { dlog, type SymbioteEvent } from '@symbiote/shared'
 import { View, type ViewProps } from './components'
 import { Keyboard, KEYBOARD_EVENT } from './keyboard'
+import type { AccessibilityProps, AriaProps } from './accessibility-props'
 import type { ViewStyle } from './styles'
 
 export type KeyboardAvoidingBehavior = 'height' | 'position' | 'padding'
 
-export interface KeyboardAvoidingViewProps {
+export interface KeyboardAvoidingViewProps extends AccessibilityProps, AriaProps {
   behavior?: KeyboardAvoidingBehavior
   // Distance from the top of the screen to this view; subtracted from the inset
   // so a view that doesn't start at y=0 still clears the keyboard exactly.
@@ -78,6 +79,10 @@ export const KeyboardAvoidingView: FC<KeyboardAvoidingViewProps> = (props) => {
     style,
     children,
     onLayout,
+    // The wrapper is the View FC, which runs resolveAccessibilityProps itself, so
+    // the raw aria/role + accessibility* props pass through untouched here and fold
+    // there once.
+    ...accessibilityRest
   } = props
 
   const [inset, setInset] = useState(0)
@@ -140,6 +145,7 @@ export const KeyboardAvoidingView: FC<KeyboardAvoidingViewProps> = (props) => {
   // onLayout reaches the host without editing View's public type.
   function renderWrapper(wrapStyle: ViewStyle | undefined, content: ReactNode): ReactElement {
     const wrapperProps: ViewProps & { onLayout: (event: SymbioteEvent) => void } = {
+      ...accessibilityRest,
       style: wrapStyle,
       onLayout: handleLayout,
       children: content,

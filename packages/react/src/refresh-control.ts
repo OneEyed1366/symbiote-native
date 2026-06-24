@@ -6,8 +6,9 @@
 
 import { createElement, type FC, type ReactNode } from 'react'
 import { dlog } from '@symbiote/shared'
+import { resolveAccessibilityProps, type AccessibilityProps, type AriaProps } from './accessibility-props'
 
-export interface RefreshControlProps {
+export interface RefreshControlProps extends AccessibilityProps, AriaProps {
   refreshing: boolean
   // RN's onRefresh is `() => void | Promise<void>` — the handler may be async; the
   // promise is fire-and-forget (native already starts refreshing on the gesture).
@@ -26,7 +27,10 @@ export interface RefreshControlProps {
   children?: ReactNode
 }
 
-export const RefreshControl: FC<RefreshControlProps> = (props) => {
+export const RefreshControl: FC<RefreshControlProps> = (rawProps) => {
+  // Owns its host element (symbiote-refresh-control), so it folds aria/role here;
+  // the resolved accessibility* fields ride down via `...nativeProps`.
+  const props = resolveAccessibilityProps(rawProps)
   const { enabled: _enabled, children, ...nativeProps } = props
   dlog('RefreshControl -> PullToRefreshView')
   dlog(`RefreshControl refreshing=${String(props.refreshing)}`)

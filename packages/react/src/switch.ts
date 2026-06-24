@@ -21,6 +21,7 @@
 import { createElement, useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { FC } from 'react'
 import { dispatchViewCommand, dlog, type SymbioteEvent, type SymbioteNode } from '@symbiote/shared'
+import { resolveAccessibilityProps, type AccessibilityProps, type AriaProps } from './accessibility-props'
 import type { ViewStyle } from './styles'
 
 type EventHandler = (event: SymbioteEvent) => void
@@ -30,7 +31,7 @@ export interface SwitchTrackColor {
   true?: string
 }
 
-export interface SwitchProps {
+export interface SwitchProps extends AccessibilityProps, AriaProps {
   value?: boolean
   onValueChange?: (value: boolean) => void
   onChange?: EventHandler
@@ -57,8 +58,13 @@ function foldIosBackground(style: ViewStyle | undefined, color: string | undefin
   return { ...style, backgroundColor: color, borderRadius: IOS_BACKGROUND_BORDER_RADIUS }
 }
 
-export const Switch: FC<SwitchProps> = (props) => {
-  const { value, onValueChange, onChange, disabled, trackColor, thumbColor, ios_backgroundColor, style } = props
+export const Switch: FC<SwitchProps> = (rawProps) => {
+  // Switch owns its host element rather than rendering through a symbiote View, so
+  // it folds aria/role into accessibility* here (View does this once for components
+  // that wrap it). The resolved accessibility* fields ride down via `...rest`.
+  const props = resolveAccessibilityProps(rawProps)
+  const { value, onValueChange, onChange, disabled, trackColor, thumbColor, ios_backgroundColor, style, ...rest } =
+    props
 
   const ref = useRef<SymbioteNode | null>(null)
   // The value native last reported, wrapped so the layout-effect re-runs on every
@@ -101,6 +107,7 @@ export const Switch: FC<SwitchProps> = (props) => {
   }, [fabricValue, lastNativeReport])
 
   return createElement('symbiote-switch', {
+    ...rest,
     ref,
     value: fabricValue,
     disabled,
