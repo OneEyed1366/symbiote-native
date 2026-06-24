@@ -82,9 +82,9 @@ function handleFor(testID: string): unknown {
   return node.instanceHandle
 }
 
-function fire(handle: unknown, type: string): void {
+function fire(handle: unknown, type: string, nativeEvent: Record<string, unknown> = {}): void {
   if (!eventHandler) throw new Error('no event handler was registered')
-  eventHandler(handle, type, {})
+  eventHandler(handle, type, nativeEvent)
 }
 
 function reset(): void {
@@ -128,6 +128,10 @@ function expect(actual: number, want: number, label: string): void {
   expect(parentGrant, 1, 'capturing parent should be granted')
   expect(childBubble, 0, 'bubble must not run after capture wins')
   expect(childGrant, 0, 'child must not be granted')
+  // End the gesture so the held responder doesn't leak into the next case — a real
+  // touch always ends, and start negotiation is now LCA-scoped (a stale cross-tree
+  // responder would otherwise null the LCA and drop the next grant).
+  fire(handleFor('cap-child'), TOUCH_END)
 }
 
 // ---- case 2: grant / start / move / end / release lifecycle --------------
@@ -186,6 +190,7 @@ function expect(actual: number, want: number, label: string): void {
   fire(child, TOUCH_MOVE)
   expect(parentGrant, 1, 'holder must not be re-granted')
   expect(parentMove, 2, 'holder should keep getting moves')
+  fire(child, TOUCH_END)
 }
 
 // ---- case 4: transfer — incumbent consents, responder hands over ---------
@@ -217,6 +222,7 @@ function expect(actual: number, want: number, label: string): void {
   fire(child, TOUCH_MOVE)
   expect(childTerminate, 1, 'consenting child should terminate')
   expect(parentGrant, 1, 'parent should be granted on transfer')
+  fire(child, TOUCH_END)
 }
 
 // ---- case 5: transfer rejected — incumbent refuses, taker is rejected -----
@@ -246,6 +252,111 @@ function expect(actual: number, want: number, label: string): void {
   expect(childTerminate, 0, 'refusing child must keep responder')
   expect(parentGrant, 0, 'rejected parent must not be granted')
   expect(parentReject, 1, 'rejected taker should get onResponderReject')
+  fire(child, TOUCH_END)
+}
+
+// ---- case 6: LCA scoping — a node BELOW the responder can't steal mid-gesture ----
+// Parent grabs on start; its grandchild has onMoveShouldSetResponder. RN scopes the
+// move walk to the lowest common ancestor of responder+target upward, never below the
+// responder — so the grandchild is never consulted and the parent keeps the gesture.
+
+{
+  reset()
+  let parentGrant = 0
+  let parentMove = 0
+  let childMoveShouldSet = 0
+  let childGrant = 0
+  mount(
+    26,
+    <View
+      testID="lca-parent"
+      onStartShouldSetResponder={() => true}
+      onResponderGrant={() => { parentGrant++ }}
+      onResponderMove={() => { parentMove++ }}
+    >
+      <View testID="lca-mid">
+        <View
+          testID="lca-child"
+          onMoveShouldSetResponder={() => { childMoveShouldSet++; return true }}
+          onResponderGrant={() => { childGrant++ }}
+        />
+      </View>
+    </View>,
+  )
+  const child = handleFor('lca-child')
+  fire(child, TOUCH_START)
+  expect(parentGrant, 1, 'parent grabs on start (bubble)')
+  fire(child, TOUCH_MOVE)
+  expect(childMoveShouldSet, 0, 'a node below the responder is never asked on move')
+  expect(childGrant, 0, 'the grandchild must not steal the responder')
+  expect(parentMove, 1, 'the parent keeps the gesture and gets the move')
+  fire(child, TOUCH_END)
+}
+
+// ---- case 7: multi-touch — lifting one finger ends but does NOT release ----------
+// Two touches inside the responder. Lifting the first while the second (its target is
+// still the responder) remains down fires responderEnd but NOT responderRelease, and
+// keeps the responder; lifting the last one finally releases. (ResponderEventPlugin
+// responderEnd unconditional, responderRelease gated on noResponderTouches.)
+
+{
+  reset()
+  let grant = 0, end = 0, release = 0
+  mount(
+    27,
+    <View
+      testID="multi"
+      onStartShouldSetResponder={() => true}
+      onResponderGrant={() => { grant++ }}
+      onResponderEnd={() => { end++ }}
+      onResponderRelease={() => { release++ }}
+    />,
+  )
+  const h = handleFor('multi')
+  // Two fingers down on the responder.
+  fire(h, TOUCH_START)
+  fire(h, TOUCH_START)
+  expect(grant, 1, 'responder granted once on first touch')
+  // Lift the first finger; the second is still down with its target on the responder.
+  fire(h, TOUCH_END, { touches: [{ target: h }] })
+  expect(end, 1, 'responderEnd fires on the first finger-up')
+  expect(release, 0, 'responderRelease must NOT fire while a touch remains inside')
+  // Lift the last finger; no touches remain -> release.
+  fire(h, TOUCH_END, { touches: [] })
+  expect(end, 2, 'responderEnd fires again on the last finger-up')
+  expect(release, 1, 'responderRelease fires when the last responder touch lifts')
+}
+
+// ---- case 8: transfer ordering — taker is GRANTED before incumbent terminates -----
+// RN's setResponderAndExtractTransfer grants the taker before terminating the incumbent.
+// We assert the consent-path order grant -> terminate (the safe, RN-faithful ordering
+// change); the incumbent's terminationRequest still gates the outcome unchanged.
+
+{
+  reset()
+  const order: string[] = []
+  mount(
+    28,
+    <View
+      testID="ord-parent"
+      onMoveShouldSetResponder={() => true}
+      onResponderGrant={() => { order.push('grant') }}
+    >
+      <View
+        testID="ord-child"
+        onStartShouldSetResponder={() => true}
+        onResponderTerminationRequest={() => true}
+        onResponderTerminate={() => { order.push('terminate') }}
+      />
+    </View>,
+  )
+  const child = handleFor('ord-child')
+  fire(child, TOUCH_START)
+  fire(child, TOUCH_MOVE)
+  const expectedOrder = 'grant,terminate'
+  if (order.join(',') !== expectedOrder)
+    throw new Error(`transfer order: got ${order.join(',')}, want ${expectedOrder}`)
+  fire(child, TOUCH_END)
 }
 
 console.log('responder-negotiation.smoke OK')

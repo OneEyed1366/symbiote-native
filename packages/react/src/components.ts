@@ -36,8 +36,8 @@ export interface ViewProps extends AccessibilityProps, AriaProps, ResponderProps
 export interface TextProps extends AccessibilityProps, AriaProps {
   style?: TextStyle
   onPress?: (event: SymbioteEvent) => void
-  // Synthesized from a long touch hold — NOT yet wired (no `longPress` synthesis in
-  // shared/events.ts); declared so call sites type-check. See SHARED CHANGES NEEDED.
+  // Synthesized from a long touch hold by shared/events.ts (a hold timer armed on
+  // touch start, fired after 500ms, suppressing the tap on release) — like RN's Text.
   onLongPress?: (event: SymbioteEvent) => void
   // Fires after glyph layout with per-line frames — wired as a direct event (RCTText).
   onTextLayout?: (event: SymbioteEvent) => void

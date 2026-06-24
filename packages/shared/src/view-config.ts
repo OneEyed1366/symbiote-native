@@ -24,10 +24,17 @@ const A11Y_EVENTS: readonly string[] = [
   'accessibilityEscape',
 ]
 
-// Events every view can emit — RN's base ViewConfig. `press`/`pressIn`/`pressOut`
-// are synthesized from the touch stream (see events.ts); `layout` is universal;
-// the accessibility events are base too, so they reach every component.
-const BASE_EVENTS: readonly string[] = ['press', 'pressIn', 'pressOut', 'layout', ...A11Y_EVENTS]
+// Events every view can emit — RN's base ViewConfig. `press`/`pressIn`/`pressOut`/
+// `longPress` are synthesized from the touch stream (see events.ts); `layout` is
+// universal; the accessibility events are base too, so they reach every component.
+const BASE_EVENTS: readonly string[] = [
+  'press',
+  'pressIn',
+  'pressOut',
+  'longPress',
+  'layout',
+  ...A11Y_EVENTS,
+]
 
 // An event set is platform-invariant — a text input emits `change` on iOS and Android
 // alike; only the native component NAME differs (iOS RCTSinglelineTextInputView vs
