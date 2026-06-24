@@ -59,10 +59,10 @@ export interface VirtualizedSectionListProps<ItemT> extends AccessibilityProps, 
   // next section's header). Mirrors RN's SectionSeparatorComponent.
   SectionSeparatorComponent?: ComponentType<Record<string, never>> | ReactElement
   keyExtractor?: (item: ItemT, index: number) => string
-  // Accepted for API parity; true sticky headers need the ScrollView's
-  // stickyHeaderIndices, which is not yet routed through shared — so this is a
-  // no-op today (see SHARED CHANGES NEEDED). Defaults to RN's true on iOS but we
-  // leave the visual behavior unchanged until the native prop lands.
+  // Stick each section header to the top as the next section scrolls up. Routed to
+  // the inner VirtualizedList's stickyHeaderIndices (the section-header flat indices),
+  // which forwards the in-window ones to the ScrollView's native stickyHeaderIndices.
+  // Defaults to RN's true; pass false to scroll headers away with their section.
   stickySectionHeadersEnabled?: boolean
   extraData?: unknown
   ItemSeparatorComponent?: ComponentType<Record<string, never>>
@@ -124,19 +124,19 @@ export function VirtualizedSectionList<ItemT>(
     renderSectionFooter,
     SectionSeparatorComponent,
     keyExtractor,
-    // Consumed for parity; not forwarded to VirtualizedList (no native effect yet).
     stickySectionHeadersEnabled,
     ...rest
   } = props
-
-  // stickySectionHeadersEnabled is read so it is not flagged unused; honoring it
-  // needs ScrollView.stickyHeaderIndices routing (SHARED CHANGES NEEDED).
-  void stickySectionHeadersEnabled
 
   const { entries, headerIndices } = flattenSections(
     sections,
     SectionSeparatorComponent !== undefined,
   )
+
+  // RN sticks section headers unless explicitly disabled. headerIndices are the flat
+  // positions of every section header; VirtualizedList forwards the in-window ones to
+  // the ScrollView's native stickyHeaderIndices.
+  const stickyHeaderIndices = stickySectionHeadersEnabled === false ? undefined : headerIndices
 
   // The handle reaches into the inner VirtualizedList to drive scrollToIndex.
   const listRef = useRef<VirtualizedListHandle | null>(null)
@@ -205,6 +205,7 @@ export function VirtualizedSectionList<ItemT>(
     getItemCount: (): number => entries.length,
     renderItem: renderEntry,
     keyExtractor: entryKeyExtractor,
+    stickyHeaderIndices,
     ...rest,
   })
 }

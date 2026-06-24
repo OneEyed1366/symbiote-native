@@ -19,11 +19,12 @@
 // back layout.
 //
 // Imperative scrolling (scrollToIndex / scrollToOffset / scrollToItem /
-// scrollToEnd) is driven by pushing a new `contentOffset` prop down to the
-// ScrollView — the only path available without a native ref into the inner
-// RCTScrollView node (which lives behind the ScrollView FC). A bumped
-// contentOffset re-commits the scroll position; animated scrolling is a deferred
-// device-only nicety (see SHARED CHANGES NEEDED).
+// scrollToEnd) resolves to an offset and rides the ScrollView's native scrollTo
+// command via its handle ref — animated by default (RN animates unless told
+// otherwise), instant when animated: false. Same path on both platforms, like RN.
+// The `contentOffset` prop is only a fallback for the pre-mount window (handle not yet
+// attached): pushing it post-mount scrolls on Android but iOS honors it only as an
+// initial value.
 
 import {
   createElement,
@@ -39,7 +40,7 @@ import {
   type Ref,
 } from 'react'
 import { dlog, type SymbioteEvent } from '@symbiote/shared'
-import { ScrollView, type ScrollViewProps } from './scroll-view'
+import { ScrollView, type ScrollViewHandle, type ScrollViewProps } from './scroll-view'
 import type { AccessibilityProps, AriaProps } from './accessibility-props'
 import type { ViewStyle } from './styles'
 
@@ -96,8 +97,10 @@ export interface ViewableItemsChangedInfo<ItemT> {
 
 // Viewability tuning, mirroring RN's ViewabilityConfig. Either a coverage
 // percentage OR a minimum visible pixel height qualifies a cell as viewable;
-// itemVisiblePercentThreshold is the common one. waitForInteraction is a
-// device-only nicety we do not honor (see SHARED CHANGES NEEDED).
+// itemVisiblePercentThreshold is the common one. waitForInteraction gates a
+// config so nothing is reported viewable until the first scroll interaction has
+// happened (RN's ViewabilityHelper: `waitForInteraction && !_hasInteracted`
+// returns no viewable items until recordInteraction, which RN calls on scroll).
 export interface ViewabilityConfig {
   minimumViewTime?: number
   viewAreaCoveragePercentThreshold?: number
@@ -156,6 +159,13 @@ export interface VirtualizedListProps<ItemT> extends AccessibilityProps, AriaPro
   maxToRenderPerBatch?: number
   updateCellsBatchingPeriod?: number
   windowSize?: number
+  // Data indices (into the item stream) that should stick to the top as they scroll
+  // off — VirtualizedSectionList passes its section-header indices here. We forward the
+  // ones currently in the render window to the ScrollView's native stickyHeaderIndices,
+  // mapped to their child position. A header collapsed into a spacer (far outside the
+  // window) can't stick until it re-enters; with the default ~10-screen window that
+  // edge is rarely hit. Headerless lists leave this undefined (no sticky behavior).
+  stickyHeaderIndices?: number[]
   style?: ViewStyle
   contentContainerStyle?: ViewStyle
 }
@@ -346,6 +356,7 @@ export function VirtualizedList<ItemT>(
     maxToRenderPerBatch = DEFAULT_MAX_TO_RENDER_PER_BATCH,
     updateCellsBatchingPeriod = DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
     windowSize = DEFAULT_WINDOW_SIZE,
+    stickyHeaderIndices,
     style,
     contentContainerStyle,
     // The accessibility surface rides down to the underlying ScrollView, which runs
@@ -366,6 +377,9 @@ export function VirtualizedList<ItemT>(
   const [commandedOffset, setCommandedOffset] = useState<{ x: number; y: number } | undefined>(
     undefined,
   )
+  // The underlying ScrollView's imperative handle, so an animated scroll can go through
+  // its native scrollTo command (smooth) rather than an instant contentOffset push.
+  const scrollViewRef = useRef<ScrollViewHandle>(null)
   // Measured cell lengths by index. A ref-backed Map mutated in place plus a
   // version counter to request a re-render only when a NEW measurement lands,
   // so steady-state scrolling doesn't thrash on already-known cells.
@@ -386,6 +400,10 @@ export function VirtualizedList<ItemT>(
   // cell key, so we only fire when the set changes (RN dedups the same way) and
   // can build the newly-hidden delta without rescanning all N items.
   const lastViewableRef = useRef<Map<string, ViewToken<ItemT>>>(new Map())
+  // Flips true on the first scroll, mirroring RN's ViewabilityHelper._hasInteracted
+  // (set by recordInteraction, which RN calls on scroll). A config with
+  // waitForInteraction reports NO viewable items until this is true.
+  const hasInteractedRef = useRef(false)
   // initialScrollIndex is applied once, after the first layout gives us a
   // viewport and offsets to resolve the index into a pixel offset.
   const appliedInitialScrollRef = useRef(false)
@@ -452,6 +470,8 @@ export function VirtualizedList<ItemT>(
       const offset = readScrollOffset(event, horizontal)
       if (offset === undefined) return
       dlog(`VirtualizedList onScroll offset=${offset}`)
+      // First scroll is the interaction that ungates waitForInteraction configs.
+      hasInteractedRef.current = true
       setScrollOffset(offset)
       // A real user/native scroll supersedes any pending commanded offset, so
       // clearing it avoids re-pushing a stale target on the next render.
@@ -525,9 +545,14 @@ export function VirtualizedList<ItemT>(
       const key = keyExtractor ? keyExtractor(item, index) : String(index)
       // The viewable flag is per-config; we compute the geometry once and let
       // each config classify it. A cell counts as viewable if ANY config says so
-      // (RN's broadest classification for the viewable/changed arrays).
+      // (RN's broadest classification for the viewable/changed arrays). A config
+      // with waitForInteraction classifies nothing until the first scroll has
+      // happened (RN's _hasInteracted gate), so it is skipped until then.
       let anyViewable = false
       for (const pair of viewabilityPairs) {
+        if (pair.viewabilityConfig.waitForInteraction === true && !hasInteractedRef.current) {
+          continue
+        }
         if (isCellViewable(percent, pair.viewabilityConfig)) {
           anyViewable = true
           break
@@ -624,10 +649,21 @@ export function VirtualizedList<ItemT>(
   )
 
   const scrollToPixel = useCallback(
-    (offset: number): void => {
+    (offset: number, animated: boolean): void => {
       const clamped = Math.max(EMPTY_OFFSET, offset)
-      dlog(`VirtualizedList scrollTo offset=${clamped} (horizontal=${horizontal})`)
-      setCommandedOffset(horizontal ? { x: clamped, y: EMPTY_OFFSET } : { x: EMPTY_OFFSET, y: clamped })
+      const target = horizontal ? { x: clamped, y: EMPTY_OFFSET } : { x: EMPTY_OFFSET, y: clamped }
+      // Both animated and instant scrolls ride the ScrollView's native scrollTo command
+      // (the animated flag goes along) — exactly like RN's VirtualizedList. Pushing
+      // contentOffset as a prop scrolls on Android but NOT on iOS post-mount, where iOS
+      // honors contentOffset only as an initial value. The prop path stays as a fallback
+      // for the pre-mount window, when the handle hasn't attached yet.
+      if (scrollViewRef.current !== null) {
+        dlog(`VirtualizedList scrollTo offset=${clamped} animated=${animated} (horizontal=${horizontal})`)
+        scrollViewRef.current.scrollTo({ x: target.x, y: target.y, animated })
+        return
+      }
+      dlog(`VirtualizedList scrollTo offset=${clamped} pending-ref (horizontal=${horizontal})`)
+      setCommandedOffset(target)
     },
     [horizontal],
   )
@@ -635,8 +671,9 @@ export function VirtualizedList<ItemT>(
   useImperativeHandle(
     forwardedRef ?? null,
     () => ({
+      // RN animates every imperative scroll unless the caller passes animated: false.
       scrollToOffset: (params: { offset: number; animated?: boolean }): void => {
-        scrollToPixel(params.offset)
+        scrollToPixel(params.offset, params.animated ?? true)
       },
       scrollToIndex: (params: {
         index: number
@@ -644,19 +681,25 @@ export function VirtualizedList<ItemT>(
         viewOffset?: number
         viewPosition?: number
       }): void => {
-        scrollToPixel(offsetForIndex(params.index, params.viewPosition ?? FIRST_INDEX, params.viewOffset ?? EMPTY_OFFSET))
+        scrollToPixel(
+          offsetForIndex(params.index, params.viewPosition ?? FIRST_INDEX, params.viewOffset ?? EMPTY_OFFSET),
+          params.animated ?? true,
+        )
       },
       scrollToItem: (params: { item: unknown; animated?: boolean; viewPosition?: number }): void => {
         for (let index = FIRST_INDEX; index < count; index += 1) {
           if (getItem(data, index) === params.item) {
-            scrollToPixel(offsetForIndex(index, params.viewPosition ?? FIRST_INDEX, EMPTY_OFFSET))
+            scrollToPixel(
+              offsetForIndex(index, params.viewPosition ?? FIRST_INDEX, EMPTY_OFFSET),
+              params.animated ?? true,
+            )
             return
           }
         }
         dlog('VirtualizedList scrollToItem: item not found')
       },
-      scrollToEnd: (): void => {
-        scrollToPixel(Math.max(EMPTY_OFFSET, total - viewportLength))
+      scrollToEnd: (params?: { animated?: boolean }): void => {
+        scrollToPixel(Math.max(EMPTY_OFFSET, total - viewportLength), params?.animated ?? true)
       },
     }),
     [scrollToPixel, offsetForIndex, count, data, getItem, total, viewportLength],
@@ -668,7 +711,8 @@ export function VirtualizedList<ItemT>(
     if (initialScrollIndex === undefined || appliedInitialScrollRef.current) return
     if (viewportLength <= EMPTY_OFFSET || count === FIRST_INDEX) return
     appliedInitialScrollRef.current = true
-    scrollToPixel(offsetForIndex(initialScrollIndex, FIRST_INDEX, EMPTY_OFFSET))
+    // The initial jump is instant (RN doesn't animate initialScrollIndex).
+    scrollToPixel(offsetForIndex(initialScrollIndex, FIRST_INDEX, EMPTY_OFFSET), false)
   }, [initialScrollIndex, viewportLength, count, scrollToPixel, offsetForIndex])
 
   // ---- assemble the windowed child list ----------------------------------
@@ -680,6 +724,11 @@ export function VirtualizedList<ItemT>(
   void extraData
 
   const children: ReactNode[] = []
+  // Sticky data indices we still need to place, and the ScrollView child positions of
+  // the ones that landed in the window — filled as cells are pushed so the position
+  // accounts for the list header, leading spacer, and separators automatically.
+  const stickySet = stickyHeaderIndices !== undefined ? new Set(stickyHeaderIndices) : undefined
+  const renderedStickyIndices: number[] = []
 
   const header = resolveElement(ListHeaderComponent)
   if (header !== undefined) {
@@ -707,6 +756,8 @@ export function VirtualizedList<ItemT>(
       const item = getItem(data, index)
       const key = keyExtractor ? keyExtractor(item, index) : String(index)
       const cell = renderItem({ item, index })
+      // Record this cell's child position before pushing it, if it is a sticky header.
+      if (stickySet?.has(index) === true) renderedStickyIndices.push(children.length)
       // Wrap each cell in a measuring View. onLayout is a direct event the
       // shared node-prop scanner picks up automatically; getItemLayout short-
       // circuits measurement (makeCellMeasure returns early when fixedLayout).
@@ -758,13 +809,15 @@ export function VirtualizedList<ItemT>(
   // content view otherwise stretches to the ScrollView's frame width (the default
   // cross-axis stretch), so the row is clipped and nothing overflows for iOS to
   // scroll. The vertical axis needs no pinning — stacked children grow it naturally.
-  // inverted flips the whole content container along the scroll axis; each cell
-  // counter-flips (INVERTED_X/Y_STYLE in the loop above) so content stays upright
-  // but the list grows bottom-to-top, matching RN's transform-based inversion.
-  const resolvedContentContainerStyle: ViewStyle = {
-    ...(horizontal ? { ...contentContainerStyle, width: total } : { ...contentContainerStyle }),
-    ...(inverted ? (horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE) : {}),
-  }
+  // The inversion flip rides ONLY the outer ScrollView style and each cell — never
+  // the content container. RN composes inversionStyle onto the ScrollView `style`
+  // and each cell wrapper, but the content view gets only contentContainerStyle
+  // (VirtualizedList.js ~L918 cell, ~L1108 ScrollView style; the content view is
+  // unflipped). Flipping the content container too would cancel the ScrollView flip
+  // — the list reads upright while each cell still flips, rendering cells upside-down.
+  const resolvedContentContainerStyle: ViewStyle = horizontal
+    ? { ...contentContainerStyle, width: total }
+    : { ...contentContainerStyle }
   const resolvedStyle: ViewStyle | undefined = inverted
     ? { ...style, ...(horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE) }
     : style
@@ -784,6 +837,9 @@ export function VirtualizedList<ItemT>(
   // object identity each push guarantees the commit path re-applies it even when
   // the numeric value repeats.
   if (commandedOffset !== undefined) scrollProps.contentOffset = commandedOffset
+  // Headers in the window stick natively; an empty list leaves the prop off entirely.
+  if (renderedStickyIndices.length > 0) scrollProps.stickyHeaderIndices = renderedStickyIndices
 
-  return createElement(ScrollView, scrollProps, ...children)
+  // The ScrollView handle (ref) backs animated imperative scrolls via its native command.
+  return createElement(ScrollView, { ...scrollProps, ref: scrollViewRef }, ...children)
 }
