@@ -22,6 +22,11 @@ import {
   NoEventPriority,
 } from './reconciler-constants'
 import { toPublicInstance, type HostInstance } from './host-instance'
+// Intrinsic JSX type -> Fabric component name. The name is platform-specific, so the
+// table is Metro-split (component-names.ios/.android.ts + base); the filename selects,
+// no Platform.OS read (ADR 0020). Adding a primitive is one entry in each name table
+// plus its thin component in components.ts — no host-config logic per primitive.
+import { COMPONENT_DESCRIPTORS, type ComponentDescriptor } from './component-names'
 
 type Props = Record<string, unknown>
 
@@ -29,35 +34,8 @@ interface HostContext {
   isInsideText: boolean
 }
 
-// Intrinsic JSX type -> Fabric component. Adding a primitive is one entry here
-// plus its thin component in components.ts — no host-config logic per primitive.
-interface ComponentDescriptor {
-  component: string
-  isText: boolean
-}
-const COMPONENTS: Readonly<Record<string, ComponentDescriptor>> = {
-  'symbiote-view': { component: 'RCTView', isText: false },
-  'symbiote-text': { component: 'RCTText', isText: true },
-  'symbiote-image': { component: 'RCTImageView', isText: false },
-  'symbiote-scroll-view': { component: 'RCTScrollView', isText: false },
-  'symbiote-scroll-content': { component: 'RCTScrollContentView', isText: false },
-  'symbiote-text-input': { component: 'RCTSinglelineTextInputView', isText: false },
-  'symbiote-text-input-multiline': {
-    component: 'RCTMultilineTextInputView',
-    isText: false,
-  },
-  // Fabric component names are the codegen spec's first arg (the new-arch
-  // registered name), not the legacy paperComponentName (RCTSwitch, …).
-  'symbiote-switch': { component: 'Switch', isText: false },
-  'symbiote-activity-indicator': { component: 'ActivityIndicatorView', isText: false },
-  'symbiote-safe-area-view': { component: 'SafeAreaView', isText: false },
-  'symbiote-modal': { component: 'ModalHostView', isText: false },
-  'symbiote-refresh-control': { component: 'PullToRefreshView', isText: false },
-  'symbiote-input-accessory-view': { component: 'RCTInputAccessoryView', isText: false },
-}
-
 function descriptorFor(type: string): ComponentDescriptor {
-  const descriptor = COMPONENTS[type]
+  const descriptor = COMPONENT_DESCRIPTORS[type]
   if (descriptor !== undefined) return descriptor
   // A `symbiote-*` type with no entry is a typo in our own code — surface it.
   if (type.startsWith('symbiote-')) {
@@ -70,20 +48,30 @@ function descriptorFor(type: string): ComponentDescriptor {
   return { component: type, isText: false }
 }
 
+// React-reserved prop keys that must never reach Fabric. `children` is the element
+// tree (handled via appendChild). `ref`/`key` are React 19 plain props: the reconciler
+// reads `props.ref` for commitAttachRef but does NOT strip it from the props it hands a
+// host config, so `ref.current` (the public instance — a bag of methods like measure /
+// focus) would serialize into folly::dynamic and throw "not convertible to dynamic" on
+// Android. Stripping here is the host config's job, exactly as RN's own renderer does.
+function isReservedProp(key: string): boolean {
+  return key === 'children' || key === 'ref' || key === 'key'
+}
+
 function applyProps(node: SymbioteNode, props: Props): void {
   for (const [key, value] of Object.entries(props)) {
-    if (key === 'children') continue
+    if (isReservedProp(key)) continue
     routeProp(node, key, value)
   }
 }
 
 function applyUpdate(node: SymbioteNode, oldProps: Props, newProps: Props): void {
   for (const key of Object.keys(oldProps)) {
-    if (key === 'children') continue
+    if (isReservedProp(key)) continue
     if (!Object.hasOwn(newProps, key)) routeProp(node, key, undefined)
   }
   for (const [key, value] of Object.entries(newProps)) {
-    if (key === 'children') continue
+    if (isReservedProp(key)) continue
     if (value !== oldProps[key]) routeProp(node, key, value)
   }
 }

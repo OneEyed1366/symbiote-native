@@ -68,6 +68,10 @@ export type { ViewStyle, TextStyle, FlexAlign, FlexJustify } from './styles'
 export { mount } from './render'
 export { findNodeHandle } from './host-instance'
 export type { HostInstance } from './host-instance'
+// AppRegistry — RN's app entry point over `mount`. setHostRegistrar wires RN's own
+// registrar so the native Fabric host finds our runnable by app key.
+export { AppRegistry, setHostRegistrar } from './app-registry'
+export type { ComponentProvider, AppParameters, Runnable, HostRegistrar } from './app-registry'
 
 // Animated bridge: createAnimatedComponent + Animated.View/Text/Image, driving the
 // shared JS Animated engine (ADR 0016). Imperative timing/spring drivers merge into
@@ -77,6 +81,11 @@ export { Animated, createAnimatedComponent } from './animated'
 // Framework-agnostic runtime utilities live in shared; the adapter re-exports them
 // so app code names only @symbiote/react (RN's surface, one import root).
 export { Platform, StyleSheet } from '@symbiote/shared'
+// Color utilities: PlatformColor / DynamicColorIOS build opaque platform colors;
+// processColor runs a color through the injected platform processor. All pure /
+// seam-backed, so they live in shared and the adapter re-exports them.
+export { PlatformColor, DynamicColorIOS, processColor } from '@symbiote/shared'
+export type { ColorValue, OpaqueColorValue, DynamicColorIOSTuple } from '@symbiote/shared'
 // Wired once by the app entry on a real host (like setColorProcessor): hands shared
 // RN's ViewConfig registry so third-party Fabric views auto-derive their metadata —
 //   setNativeViewConfigSource(name => ReactNativeViewConfigRegistry.get(name))
@@ -86,6 +95,7 @@ export type {
   PlatformStatic,
   PlatformOSType,
   PlatformConstantsIOS,
+  PlatformConstantsAndroid,
   PlatformSelectSpec,
 } from '@symbiote/shared'
 
@@ -147,5 +157,32 @@ export type {
 // names only @symbiote/react (RN's single import root).
 export { InteractionManager } from '@symbiote/shared'
 export type { InteractionEvent, SimpleTask, PromiseTask, Task, Handle } from '@symbiote/shared'
+
+// Android-only surface (the second-platform pass). Each is a thin JS shim over an
+// Android native module / Fabric view, inert on iOS (no module → graceful no-op,
+// no native view → degrade to a plain container). Native module names are
+// device-verify-pending — see .docs/native-module-platform-routing.md.
+export { BackHandler } from './back-handler'
+export type { BackPressEventName, BackPressHandler } from './back-handler'
+export { ToastAndroid } from './toast-android'
+export { PermissionsAndroid, PERMISSIONS, RESULTS } from './permissions-android'
+export type { Permission, PermissionStatus, Rationale } from './permissions-android'
+export { TouchableNativeFeedback } from './touchable-native-feedback'
+export type {
+  TouchableNativeFeedbackProps,
+  NativeFeedbackBackground,
+  ThemeAttrBackground,
+  RippleBackground,
+} from './touchable-native-feedback'
+export { DrawerLayoutAndroid } from './drawer-layout-android'
+export type {
+  DrawerLayoutAndroidProps,
+  DrawerLayoutAndroidHandle,
+  DrawerPosition,
+  DrawerLockMode,
+  KeyboardDismissMode,
+  DrawerState,
+  DrawerSlideEvent,
+} from './drawer-layout-android'
 
 export type { SymbioteEvent } from '@symbiote/shared'

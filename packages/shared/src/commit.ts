@@ -32,6 +32,7 @@ import { dlog, isDebug } from './debug'
 import { flattenStyle } from './style'
 import { registeredProcessor } from './registry'
 import { nextTag } from './tags'
+import { isOpaqueColorValue, type ColorValue } from './platform-color'
 
 // Per-commit work counters, surfaced via dlog so a device run can prove the
 // engine is incremental (created=0 with clones after the first mount).
@@ -39,6 +40,56 @@ const stats = { created: 0, cloneProps: 0, cloneChildren: 0, reused: 0 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+// Diagnostic (gated): Fabric serializes props to folly::dynamic, which rejects a JS
+// Symbol or function with "JS Symbols are not convertible to dynamic" — a hard native
+// throw deep in cloneNode*. Walk a props payload and return the dotted path of the
+// first non-serializable leaf (Symbol / function), or undefined when clean, so the
+// offending key is named in logcat instead of a bare stack at the JSI boundary.
+//
+// Bounded on purpose: a real Fabric prop tree is shallow (style/transform ~depth 3) and
+// a leaked React element trips at depth 2 (`children` -> element -> $$typeof). `seen`
+// breaks reference cycles and DEPTH caps runaway nesting, so the diagnostic itself can
+// never overflow the stack on cyclic props (an event-carrying handler, a self-referential
+// style) — a crashing guard would be worse than the bug it hunts.
+const NON_SERIALIZABLE_SCAN_DEPTH = 6
+function firstNonSerializablePath(
+  value: unknown,
+  path: string,
+  depth: number,
+  seen: WeakSet<object>,
+): string | undefined {
+  const kind = typeof value
+  if (kind === 'symbol' || kind === 'function') return `${path}=<${kind}>`
+  if (depth >= NON_SERIALIZABLE_SCAN_DEPTH) return undefined
+  if (Array.isArray(value)) {
+    if (seen.has(value)) return undefined
+    seen.add(value)
+    for (let index = 0; index < value.length; index += 1) {
+      const found = firstNonSerializablePath(value[index], `${path}[${index}]`, depth + 1, seen)
+      if (found !== undefined) return found
+    }
+    return undefined
+  }
+  if (isRecord(value)) {
+    if (seen.has(value)) return undefined
+    seen.add(value)
+    for (const key of Object.keys(value)) {
+      const next = path === '' ? key : `${path}.${key}`
+      const found = firstNonSerializablePath(value[key], next, depth + 1, seen)
+      if (found !== undefined) return found
+    }
+  }
+  return undefined
+}
+
+// Name the offending prop before the JSI boundary throws. Gated, so the deep walk only
+// runs while debugging; in production the clone proceeds straight to native.
+function guardSerializable(propsDiff: FabricProps, viewName: string, tag: number): void {
+  if (!isDebug()) return
+  const bad = firstNonSerializablePath(propsDiff, '', 0, new WeakSet())
+  if (bad !== undefined) dlog(`NON-SERIALIZABLE prop on ${viewName}#${tag}: ${bad}`)
 }
 
 // Color props must reach Fabric as platform ints, not CSS strings — Fabric's C++
@@ -55,12 +106,38 @@ const COLOR_PROPS: ReadonlySet<string> = new Set([
   'borderLeftColor',
   'shadowColor',
   'tintColor',
+  // TextInput color props. iOS's native input accepts a CSS string, but Android's
+  // AndroidTextInput is strict ("ColorValue: the value must be a number or Object"),
+  // so these must be processColor'd here too — same as any other color reaching Fabric.
+  'placeholderTextColor',
+  'selectionColor',
+  'cursorColor',
+  'underlineColorAndroid',
+  'selectionHandleColor',
 ])
 
-let colorProcessor: (value: string) => unknown = (value) => value
+// Accepts a CSS string or an opaque PlatformColor / DynamicColorIOS object — RN's
+// processColor (the value the canary injects) handles both, resolving the opaque
+// shapes to the platform ints/dicts iOS UIColor expects.
+let colorProcessor: (value: ColorValue) => unknown = (value) => value
 
-export function setColorProcessor(process: (value: string) => unknown): void {
+export function setColorProcessor(process: (value: ColorValue) => unknown): void {
   colorProcessor = process
+}
+
+// Public mirror of RN's processColor: run a color through the injected platform
+// processor (the canary wires RN's own). Off a real host it resolves CSS strings
+// and opaque PlatformColor objects to the platform ints Fabric expects; headless
+// (no processor wired) it is the identity, so smokes see the input unchanged.
+export function processColor(color: ColorValue): unknown {
+  return colorProcessor(color)
+}
+
+// A color-keyed value the platform processor must convert before Fabric: a CSS
+// string, or an opaque PlatformColor / DynamicColorIOS object. Numbers (already
+// platform ints) and undefined are left untouched.
+function isProcessableColor(value: unknown): value is ColorValue {
+  return typeof value === 'string' || isOpaqueColorValue(value)
 }
 
 // Convert a prop to the shape Fabric's C++ expects. A third-party view contributes
@@ -72,7 +149,7 @@ export function setColorProcessor(process: (value: string) => unknown): void {
 function processValue(component: string, key: string, value: unknown): unknown {
   const processor = registeredProcessor(component, key)
   if (processor !== undefined) return processor(value)
-  if (typeof value === 'string' && COLOR_PROPS.has(key)) return colorProcessor(value)
+  if (COLOR_PROPS.has(key) && isProcessableColor(value)) return colorProcessor(value)
   return value
 }
 
@@ -105,14 +182,20 @@ function fabricProps(node: SymbioteNode): FabricProps {
   return out
 }
 
-// Fabric's clone*WithNewProps MERGES the raw payload onto the node's existing
-// props, so a prop that simply disappears between commits (e.g. `opacity` when a
-// pressed style is released, or any conditionally-applied style key) would keep its
-// stale value. Mirror React's diffProperties: carry every current key, and send any
-// key the node held last time but no longer has as `null` so Fabric resets it to its
-// default. Only matters for clones — a fresh createNode starts from nothing.
+// Fabric's clone*WithNewProps MERGES the raw payload onto the node's existing props,
+// so the payload must be a MINIMAL diff — only the keys that actually changed, plus any
+// key the node held last time but no longer has, sent as `null` so Fabric resets it to
+// default (e.g. `opacity` when a pressed style releases). Mirror React's diffProperties
+// exactly: re-sending an UNCHANGED key is not a no-op — it re-invokes that prop's native
+// setter, and some ViewManagers rebuild on any set. AndroidProgressBar's `styleAttr`
+// setter recreates the whole ProgressBar via setStyle(), so re-sending it on an
+// animating-only toggle dropped and rebuilt the spinner each time, and it never came
+// back. Only matters for clones — a fresh createNode starts from nothing.
 function diffProps(previous: FabricProps, next: FabricProps): FabricProps {
-  const out: Record<string, unknown> = { ...next }
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(next)) {
+    if (!jsonEqual(previous[key], next[key])) out[key] = next[key]
+  }
   for (const key of Object.keys(previous)) {
     if (!(key in next)) out[key] = null
   }
@@ -168,6 +251,21 @@ function childrenIdentical(node: SymbioteNode, committed: readonly SymbioteNode[
   return node.children.every((child, index) => child === committed[index])
 }
 
+// Diagnostic seam (gated): a ScrollView on Android must hold exactly ONE direct
+// child (its content container), or the native mount aborts with "ScrollView can
+// host only one direct child". Logged after children reconcile so each child's
+// committed tag/view-name is resolved — a `MULTI!!` line names the exact extra
+// node (tag + view-name) that pushed the scroll view past one child.
+function logScrollChildren(node: SymbioteNode, viewName: string, selfTag: number | string): void {
+  if (!viewName.includes('Scroll') || viewName.includes('Content')) return
+  const kids = node.children.map((child) => {
+    const committed = mirror.get(child)
+    return `${committed?.viewName ?? child.component}#${committed?.tag ?? 'NEW'}`
+  })
+  const flag = kids.length === 1 ? 'OK' : 'MULTI!!'
+  dlog(`SCROLL-${flag} ${viewName} tag=${selfTag} children(${kids.length})=[${kids.join(',')}]`)
+}
+
 function reconcile(
   slot: ReturnType<typeof getSlot>,
   node: SymbioteNode,
@@ -189,6 +287,7 @@ function reconcile(
     for (const child of node.children) {
       slot.appendChild(handle, reconcile(slot, child, rootTag, childInText).handle)
     }
+    logScrollChildren(node, viewName, tag)
     mirror.set(node, { handle, tag, rootTag, props, children: node.children.slice(), viewName })
     return { handle, changed: true }
   }
@@ -202,6 +301,7 @@ function reconcile(
     childHandles.push(result.handle)
     if (result.changed) descendantChanged = true
   }
+  logScrollChildren(node, viewName, committed.tag)
 
   const childrenChanged = !childrenIdentical(node, committed.children) || descendantChanged
   const propsChanged = !propsEqual(committed.props, props)
@@ -214,15 +314,21 @@ function reconcile(
   let handle: FabricNode
   if (childrenChanged) {
     stats.cloneChildren += 1
-    handle = propsChanged
-      ? slot.cloneNodeWithNewChildrenAndProps(committed.handle, diffProps(committed.props, props))
-      : slot.cloneNodeWithNewChildren(committed.handle)
+    if (propsChanged) {
+      const propsDiff = diffProps(committed.props, props)
+      guardSerializable(propsDiff, viewName, committed.tag)
+      handle = slot.cloneNodeWithNewChildrenAndProps(committed.handle, propsDiff)
+    } else {
+      handle = slot.cloneNodeWithNewChildren(committed.handle)
+    }
     for (const childHandle of childHandles) {
       slot.appendChild(handle, childHandle)
     }
   } else {
     stats.cloneProps += 1
-    handle = slot.cloneNodeWithNewProps(committed.handle, diffProps(committed.props, props))
+    const propsDiff = diffProps(committed.props, props)
+    guardSerializable(propsDiff, viewName, committed.tag)
+    handle = slot.cloneNodeWithNewProps(committed.handle, propsDiff)
   }
 
   // The clone keeps the node's family, so its reactTag is unchanged — carry it.
@@ -264,6 +370,16 @@ function rootContainerFor(rootTag: RootTag): SymbioteNode {
   return container
 }
 
+// Drop a surface's persistent root container so the NEXT mount on this rootTag starts
+// from scratch (fresh tags, fresh mirror) instead of cloning handles that belonged to a
+// now-stopped surface. Called from stopSurface: the bridgeless host stops then restarts a
+// surface (Fast Refresh, focus/lifecycle) reusing the same rootTag, and a stale root
+// container would re-clone dead handles into the new surface → a blank screen. The old
+// container's descendants fall out of every reference and their mirror entries GC.
+export function disposeRoot(rootTag: RootTag): void {
+  if (rootContainers.delete(rootTag)) dlog(`root container disposed root=${rootTag}`)
+}
+
 export function commitChildren(rootTag: RootTag, children: readonly SymbioteNode[]): void {
   // The wrapper holds the surface's top-level children; reconcile walks from it so the
   // whole tree, synthetic root included, goes through the same clone-on-write path.
@@ -282,7 +398,16 @@ function commitContainer(rootTag: RootTag): void {
   stats.cloneProps = 0
   stats.cloneChildren = 0
   stats.reused = 0
+  // Entry seam: brackets reconcile with the `reconciled` line below. If `start` prints
+  // but `reconciled` never does, the stall is inside reconcile (a JS loop/cycle in the
+  // tree walk); if `start` itself never prints, the stall is upstream — React's commit
+  // phase or the mutation ops before we are even called.
+  dlog(`commit root=${rootTag} start children=${container.children.length}`)
   const result = reconcile(slot, container, rootTag, false)
+  // Boundary seam: prints once reconcile returns. If a commit hangs and this line
+  // never appears, the stall is inside reconcile (JS); if it appears but the
+  // post-completeRoot line below never does, the stall is inside the native commit.
+  dlog(`commit root=${rootTag} reconciled changed=${result.changed}`)
 
   // The container's identity is stable, so its un-cloned flag is the no-op signal:
   // an over-scheduled commit that touched nothing makes zero native calls.
@@ -293,6 +418,7 @@ function commitContainer(rootTag: RootTag): void {
 
   const childSet = slot.createChildSet(rootTag)
   slot.appendChildToSet(childSet, result.handle)
+  dlog(`commit root=${rootTag} pre-completeRoot`)
   slot.completeRoot(rootTag, childSet)
 
   if (isDebug()) {

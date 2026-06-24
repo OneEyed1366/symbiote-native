@@ -4,7 +4,7 @@
 
 ### Want to ship a real native iOS/Android app, but you don't write React? Today you can't.
 
-**Pre-alpha** · iOS-first · one native core, N framework adapters
+**Pre-alpha** · iOS + Android · one native core, N framework adapters
 
 [Architecture](#how-it-works) · [Design decisions](#design-decisions) · [Milestones](#milestones) · [Prior art](https://github.com/OneEyed1366/wolf-tui)
 
@@ -93,7 +93,8 @@ The only thing symbiote replaces is the JS renderer.
 The canary ([`examples/canary/App.tsx`](./examples/canary/App.tsx)) runs a full demo on the
 iOS simulator — every primitive, the runtime-module layer, `Animated` on both drivers, and a
 third-party native slider, all committing through `@symbiote/shared` while React Native's own
-renderer is never involved. The smallest slice of it is a tap→increment counter:
+renderer is never involved. The same canary now also boots on an Android emulator through the
+same core. The smallest slice of it is a tap→increment counter:
 
 The native entry registers a low-level *runnable* instead of a React component:
 
@@ -145,10 +146,11 @@ Fabric — no React Native renderer in the path.
 ## Status
 
 > [!WARNING]
-> **Pre-alpha. Not published to npm, no stable API, iOS-only.** This is a research project
-> proving an architecture, not a product you can build an app on yet. Watch the
-> [milestones](#milestones) — the README will say "alpha" when the React adapter reaches
-> React Native feature parity.
+> **Pre-alpha. Not published to npm, no stable API.** iOS is the reference surface (most
+> real-hardware time, widest prop-edge coverage); the full canary demo is also verified on an
+> Android emulator through the same core. This is a research project proving an architecture,
+> not a product you can build an app on yet. Watch the [milestones](#milestones) — the README
+> will say "alpha" when the React adapter reaches React Native feature parity.
 
 **Done:** the native pipe, bootstrap, and `@symbiote/shared`'s mutation→clone-on-write engine
 are proven on a real iOS 26 simulator via the React canary (R1 + R2 + R3 — decision
@@ -170,8 +172,24 @@ commits through `@symbiote/shared` into Fabric, with React Native's renderer nev
   package with zero symbiote metadata; shared derives its events and prop processors from the
   library's own ViewConfig at runtime — the "install the package, use its component" path.
 
+**Android — the full canary, verified on an emulator.** The same React canary runs on an
+Android emulator through the same `@symbiote/shared` core, RN's renderer still never in the
+path — every block of the demo confirmed on device: all primitives (`View`/`Text`/`ScrollView`
+vertical *and* horizontal/`TextInput`/`Switch`/`Modal`/`FlatList`/`Image`+`prefetch`), the
+runtime modules (`Platform` at the real OS/API level, `StatusBar`, `Keyboard`, `Settings`
+persistence, `Alert`/`Share`/`Vibration`/`Linking`), `Animated` on both drivers, `PanResponder`
+gestures, `PlatformColor`, the ref API (`measure`/`setNativeProps`), and the third-party native
+slider through runtime ViewConfig derivation. Two signals RN ties to a view host symbiote
+bypasses — or never shipped on Android — are re-supplied by a small `@symbiote/android` native
+package (`KeyboardObserver` host shim; `SettingsManager` → `SharedPreferences`). `Platform` and
+the component-name map are Metro-split per OS (`.ios`/`.android`), no `Platform.OS` runtime
+branch. iOS stays the reference surface (more real-hardware time, wider prop-edge coverage);
+`ActionSheetIOS` is iOS-only by design, and `Vibration` needs the app to declare the `VIBRATE`
+permission (RN's standard requirement, owned by the future scaffolder).
+
 **In progress:** building `@symbiote/react` the rest of the way to full React Native feature
-parity (gestures, remaining components and prop edges).
+parity (gestures, remaining components and prop edges) and bringing Android up to the iOS
+surface.
 
 ---
 
@@ -197,7 +215,7 @@ the native pipe or the commit engine.
 | **M4** | Angular adapter | a second mutation-oriented framework, template/renderer seam | ⏳ planned |
 | **M5** | Svelte adapter | compiled-output framework driving the shared mutation API | ⏳ planned |
 | **M6** | Solid adapter | fine-grained reactivity driving the shared mutation API | ⏳ planned |
-| **M7** | Android | every adapter renders native Android, same code path as iOS | ⏳ planned |
+| **M7** | Android | every adapter renders native Android, same code path as iOS | 🚧 React canary verified on emulator (full demo); host shims in `@symbiote/android` |
 | **M8** | Web *(stretch)* | the same trees rendered to the web as a default platform target | 💭 maybe |
 
 **End goal:** each framework — Vue, Angular, Svelte, Solid, React — can render native iOS and
@@ -213,8 +231,9 @@ localizable.
 
 ```
 packages/
-  shared/      @symbiote/shared — retained tree + clone-on-write commit engine + events
-  react/       @symbiote/react  — react-reconciler host config (mutation mode) + primitives
+  shared/      @symbiote/shared  — retained tree + clone-on-write commit engine + events
+  react/       @symbiote/react   — react-reconciler host config (mutation mode) + primitives
+  android/     @symbiote/android — autolinked native host shims (keyboard, settings) for Android
 examples/
   canary/      stock RN 0.86 app whose entry drives symbiote on the iOS simulator
   headless/    fake-slot smoke tests — the engine runs green in Node, no simulator
@@ -245,8 +264,9 @@ bundle exec pod install        # (cd ios && pod install) — fetch native pods
 # terminal 1 — Metro. DEBUG=1 turns on diagnostic logs (Babel inlines it).
 DEBUG=1 npm start --reset-cache
 
-# terminal 2 — build + launch on the iOS simulator
-npm run ios                    # npm run android for Android (M7, not yet wired)
+# terminal 2 — build + launch on a simulator/emulator
+npm run ios                    # iOS simulator (full surface)
+npm run android                # Android emulator (manual-links @symbiote/android)
 ```
 
 Press <kbd>R</kbd> in the simulator to reload. Because `DEBUG` is Babel-inlined into the
@@ -284,8 +304,9 @@ its native C++/Obj-C++/JNI sources are never touched. symbiote replaces only the
 it to validate the native pipe and the commit engine first means that when Vue/Svelte/Solid/
 Angular break, the failure isolates to *that adapter* — not the native stack underneath it.
 
-**Can I use it today?** Not for a real app — it's pre-alpha and iOS-only. You can read the
-architecture, run the headless smokes, and follow the milestones.
+**Can I use it today?** Not for a real app — it's pre-alpha. iOS is the reference surface; the
+full canary demo is also verified on an Android emulator through the same core. You can read
+the architecture, run the headless smokes, and follow the milestones.
 
 ---
 

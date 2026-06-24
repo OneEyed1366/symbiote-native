@@ -23,10 +23,18 @@ const HAIRLINE_LOGICAL_FACTOR = 0.4
 const HAIRLINE_FALLBACK = 1
 
 // The shape we read off DeviceInfo's constants — RN's source of truth for screen
-// scale (NativeDeviceInfo.getConstants().Dimensions.window.scale). Only the one
-// field we need, narrowed at the native trust boundary by getNativeModule<T>.
+// scale. The key is platform-specific: iOS ships it under Dimensions.window, Android
+// under Dimensions.windowPhysicalPixels (the same scale value — toPointSpace divides
+// width/height, never scale). Both optional so a missing/renamed key degrades to the
+// hairline fallback instead of throwing mid-render. Narrowed at the native trust
+// boundary by getNativeModule<T>.
+interface DisplayMetrics {
+  scale?: number
+}
 interface DeviceInfoModule {
-  getConstants(): { Dimensions: { window: { scale: number } } }
+  getConstants(): {
+    Dimensions: { window?: DisplayMetrics; windowPhysicalPixels?: DisplayMetrics }
+  }
 }
 
 // Resolve the screen pixel scale lazily from native, or null when unavailable.
@@ -38,7 +46,8 @@ function resolveScreenScale(): number | null {
     dlog('StyleSheet: DeviceInfo not resolvable — hairlineWidth falls back')
     return null
   }
-  const scale = deviceInfo.getConstants().Dimensions.window.scale
+  const dimensions = deviceInfo.getConstants().Dimensions
+  const scale = dimensions.window?.scale ?? dimensions.windowPhysicalPixels?.scale
   // A non-positive scale would make the round/divide nonsensical; treat as missing.
   if (typeof scale !== 'number' || scale <= 0) {
     dlog(`StyleSheet: DeviceInfo scale invalid (${String(scale)}) — hairlineWidth falls back`)

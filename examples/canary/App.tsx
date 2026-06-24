@@ -41,6 +41,8 @@ import {
   PanResponder,
   I18nManager,
   Settings,
+  PlatformColor,
+  DynamicColorIOS,
   findNodeHandle,
   type HostInstance,
 } from '@symbiote/react'
@@ -489,6 +491,50 @@ function RefApiDemo() {
   )
 }
 
+// PlatformColor / DynamicColorIOS resolve on the native side: 'systemBlue' / 'label'
+// become iOS UIColor selectors, and the dynamic tuple flips with the system
+// appearance. The opaque color objects flow through the same color seam as CSS
+// strings (processColor), so no special handling reaches Fabric. Name resolution is
+// device-only — a wrong name silently falls back, so this is verified on simulator.
+function PlatformColorDemo() {
+  const scheme = useColorScheme()
+  return (
+    <View style={{ gap: 12 }}>
+      <Text style={{ color: '#41506a', fontSize: 13 }}>
+        {`PlatformColor · semantic + DynamicColorIOS (${scheme ?? 'unknown'})`}
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View
+          style={{
+            flex: 1,
+            height: 56,
+            borderRadius: 12,
+            backgroundColor: PlatformColor('systemBlue'),
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: 'bold' }}>systemBlue</Text>
+        </View>
+        <View
+          style={{
+            flex: 1,
+            height: 56,
+            borderRadius: 12,
+            backgroundColor: DynamicColorIOS({ light: '#dbeafe', dark: '#13243a' }),
+            borderWidth: 1,
+            borderColor: PlatformColor('separator'),
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Text style={{ color: PlatformColor('label'), fontSize: 13, fontWeight: 'bold' }}>
+            dynamic
+          </Text>
+        </View>
+      </View>
+    </View>
+  )
+}
+
 function App() {
   const [count, setCount] = useState(0)
   const [name, setName] = useState('')
@@ -612,7 +658,7 @@ function App() {
         }}>
         {`${Platform.OS} ${Platform.Version}` +
           `${Platform.isPad ? ' · iPad' : ''}` +
-          ` · ${Platform.select({ ios: 'native ios', default: '?' })}` +
+          ` · ${Platform.select({ ios: 'native ios', android: 'native android', default: '?' })}` +
           ` · hairline ${StyleSheet.hairlineWidth.toFixed(3)}`}
       </Text>
       {/* Tier B runtime modules, live. Real w×h@scale proves Dimensions + PixelRatio;
@@ -645,9 +691,13 @@ function App() {
         <View style={{ flex: 1 }}>
           <Button title="Alert" onPress={onAlert} color="#7fb5ff" />
         </View>
-        <View style={{ flex: 1 }}>
-          <Button title="Action sheet" onPress={onActionSheet} color="#7fb5ff" />
-        </View>
+        {/* ActionSheetIOS drives the iOS-only ActionSheetManager — no Android native
+            module exists, so the control is iOS-only by design (not a gap). */}
+        {Platform.OS !== 'android' && (
+          <View style={{ flex: 1 }}>
+            <Button title="Action sheet" onPress={onActionSheet} color="#7fb5ff" />
+          </View>
+        )}
       </View>
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
@@ -764,6 +814,9 @@ function App() {
 
       {/* Imperative host-ref API — measure / setNativeProps / findNodeHandle */}
       <RefApiDemo />
+
+      {/* PlatformColor / DynamicColorIOS — native semantic + appearance-aware colors */}
+      <PlatformColorDemo />
 
       {/* Button opens a Modal */}
       <Button title="Open modal" onPress={() => setModalVisible(true)} color="#7fb5ff" />

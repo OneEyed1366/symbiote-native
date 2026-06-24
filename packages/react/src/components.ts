@@ -11,6 +11,9 @@ import type { TextStyle, ViewStyle } from './styles'
 export interface ViewProps {
   style?: ViewStyle
   onPress?: (event: SymbioteEvent) => void
+  // Gate touch handling without changing layout: 'none' lets touches fall through,
+  // 'box-none' makes the view itself transparent to touches but not its children.
+  pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only'
   // A host ref hands back the public instance (measure / setNativeProps / focus).
   ref?: Ref<HostInstance>
   children?: ReactNode
