@@ -13,6 +13,7 @@ export type {
   AccessibilityValue,
   AccessibilityActionInfo,
 } from './accessibility-props'
+export type { ResponderProps } from './responder-props'
 export { Image, setImageSourceResolver } from './image'
 export type {
   ImageProps,

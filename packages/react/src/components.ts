@@ -7,9 +7,10 @@ import { createElement, type FC, type Ref, type ReactNode } from 'react'
 import type { SymbioteEvent } from '@symbiote/shared'
 import type { HostInstance } from './host-instance'
 import { resolveAccessibilityProps, type AccessibilityProps, type AriaProps } from './accessibility-props'
+import type { ResponderProps } from './responder-props'
 import type { TextStyle, ViewStyle } from './styles'
 
-export interface ViewProps extends AccessibilityProps, AriaProps {
+export interface ViewProps extends AccessibilityProps, AriaProps, ResponderProps {
   style?: ViewStyle
   onPress?: (event: SymbioteEvent) => void
   // Gate touch handling without changing layout: 'none' lets touches fall through,
