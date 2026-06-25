@@ -8,10 +8,12 @@
   },
   "dependencies": {
     "@symbiote/react": "workspace:*",
-    "@symbiote/shared": "workspace:*",
+    "@symbiote/vue": "workspace:*",
+    "@symbiote/engine": "workspace:*",
     "react": "^19.1.0"
   },
   "devDependencies": {
+    "@vue/runtime-core": "^3.5.13",
     "tsx": "^4.19.2"
   }
 }
