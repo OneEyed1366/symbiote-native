@@ -697,15 +697,45 @@ function endsWithin(endTarget: SymbioteNode, start: SymbioteNode): boolean {
   return false
 }
 
-// True bubbling: walk target -> root, invoking each ancestor's listener for this
-// event name in order, until the chain ends or a listener stops propagation.
-// `target` stays the original node; `currentTarget` tracks whose listener runs.
+// Two-phase delivery, mirroring RN's accumulateTwoPhaseDispatches (legacy-events/
+// EventPropagators): CAPTURE root -> target first, invoking each node's
+// `<EventName>Capture` listener, then BUBBLE target -> root invoking the plain
+// listener. The same event object semantics apply to both passes; a stopPropagation
+// in capture halts before bubble ever runs. `target` stays the original node;
+// `currentTarget` tracks whose listener runs.
 function bubble(
   target: SymbioteNode,
   listenerName: string,
   nativeEvent: Record<string, unknown>,
 ): void {
   let stopped = false
+  const stopPropagation = (): void => {
+    stopped = true
+  }
+
+  // Capture phase: root -> target. RN gathers captured listeners first (the
+  // `<EventName>Capture` registration), so on*Capture handlers fire ahead of the
+  // bubble pass. The path is built target -> root, then walked in reverse to get
+  // root -> target without a second allocation.
+  const captureName = `${listenerName}Capture`
+  const path = pathToRoot(target)
+  for (let i = path.length - 1; i >= 0; i--) {
+    const node = path[i]
+    const listener = node.listeners?.get(captureName)
+    if (listener) {
+      dlog(`event ${listenerName} capture on ${node.component}`)
+      listener({
+        type: listenerName,
+        target,
+        currentTarget: node,
+        nativeEvent,
+        stopPropagation,
+      })
+      if (stopped) return
+    }
+  }
+
+  // Bubble phase: target -> root, invoking each ancestor's plain listener.
   let node: SymbioteNode | undefined = target
   while (node) {
     const listener = node.listeners?.get(listenerName)
@@ -716,9 +746,7 @@ function bubble(
         target,
         currentTarget: node,
         nativeEvent,
-        stopPropagation: () => {
-          stopped = true
-        },
+        stopPropagation,
       }
       listener(event)
       if (stopped) return
