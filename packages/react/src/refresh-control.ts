@@ -17,9 +17,19 @@ export interface RefreshControlProps extends AccessibilityProps, AriaProps {
   title?: string
   titleColor?: string
   progressViewOffset?: number
-  // Android-only. RN's iOS RefreshControl.render() destructures `enabled` OUT
-  // before spreading to PullToRefreshView, so iOS native never receives it. We
-  // target PullToRefreshView (iOS-first), so it is stripped below, not forwarded.
+  // Android-only spinner styling (RN RefreshControlPropsAndroid, RefreshControl.js:44-55):
+  // `colors` are the indicator's animated stroke colors (at least one),
+  // `progressBackgroundColor` the disc behind it, `size` the diameter preset. The Android
+  // AndroidSwipeRefreshLayout manager reads them directly; PullToRefreshView on iOS ignores
+  // unknown props, so forwarding them through `...nativeProps` is harmless on iOS.
+  colors?: readonly string[]
+  progressBackgroundColor?: string
+  size?: 'default' | 'large'
+  // Android-only native prop. RN's Android branch (RefreshControl.js:174) strips only
+  // {tintColor,titleColor,title} and forwards `enabled` to AndroidSwipeRefreshLayout, so
+  // it must ride down via `...nativeProps`. RN's iOS branch (RefreshControl.js:165)
+  // destructures `enabled` OUT before spreading to PullToRefreshView, so iOS native never
+  // reads it — forwarding it is harmless there, like the other Android-only props above.
   enabled?: boolean
   // On Android the RefreshControl WRAPS the ScrollView (ADR 0020), so it receives the
   // scroll view as its child via cloneElement. On iOS it is a childless sibling, so this
@@ -31,9 +41,10 @@ export const RefreshControl: FC<RefreshControlProps> = (rawProps) => {
   // Owns its host element (symbiote-refresh-control), so it folds aria/role here;
   // the resolved accessibility* fields ride down via `...nativeProps`.
   const props = resolveAccessibilityProps(rawProps)
-  const { enabled: _enabled, children, ...nativeProps } = props
+  const { children, ...nativeProps } = props
   dlog('RefreshControl -> PullToRefreshView')
   dlog(`RefreshControl refreshing=${String(props.refreshing)}`)
+  if (props.enabled !== undefined) dlog(`RefreshControl enabled=${String(props.enabled)} (Android-only)`)
   if (props.onRefresh !== undefined) dlog('RefreshControl onRefresh listener wired')
   return createElement('symbiote-refresh-control', { ...nativeProps }, children)
 }
