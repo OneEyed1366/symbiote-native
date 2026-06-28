@@ -66,6 +66,9 @@ yarn-error.log
 # testing
 /coverage
 
+# Detox e2e (decision 0025) — run artifacts (screenshots, logs, recordings)
+/artifacts
+
 # Yarn
 .yarn/*
 !.yarn/patches
@@ -73,3 +76,6 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Emulator / device logs
+*.log
