@@ -113,6 +113,15 @@ export interface IEventEmitterModule {
 // not ours). Mirrors how FabricEventHandler hands back a raw native event.
 export type INativeEventListener = (payload: unknown) => void;
 
+// True only when the module actually carries both observe-counter methods. A
+// resolved TurboModule whose spec omits addListener/removeListeners (or a host where
+// the module isn't a real event emitter) leaves them undefined, so calling through
+// would throw "undefined is not a function" — the `?.` guards the module, not a
+// missing method. Mirrors RN's NativeEventEmitter constructor probe.
+function hasObserveCounters(module: IEventEmitterModule): boolean {
+  return typeof module.addListener === 'function' && typeof module.removeListeners === 'function';
+}
+
 // Subscribe to events for one native module. Mirrors RN's NativeEventEmitter: each
 // `addListener` also pings the module's `addListener` counter, and removal pings
 // `removeListeners`, so native observes only while someone is listening.
@@ -120,7 +129,16 @@ export class NativeEventEmitter {
   private readonly module?: IEventEmitterModule;
 
   constructor(module?: IEventEmitterModule) {
-    this.module = module;
+    // Keep the module ONLY if it has both counter methods, exactly like RN: a
+    // module missing them stays unset, so the `this.module?.` calls below no-op
+    // instead of crashing on `undefined(...)`.
+    if (module !== undefined && hasObserveCounters(module)) {
+      this.module = module;
+    } else if (module !== undefined) {
+      dlog(
+        'NativeEventEmitter: module lacks addListener/removeListeners; dropping it (counter pings become no-ops)',
+      );
+    }
   }
 
   addListener(eventType: string, listener: INativeEventListener): IEventSubscription {

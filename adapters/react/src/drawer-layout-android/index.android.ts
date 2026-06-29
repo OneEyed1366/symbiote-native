@@ -16,7 +16,13 @@
 // mirroring Switch's dispatchViewCommand path (Commands.openDrawer/closeDrawer in
 // AndroidDrawerLayoutNativeComponent).
 //
-// Metro picks this file on an Android host; off Android the base drawer-layout-android.ts
+// The platform-invariant math — the host prop bag + the content/navigation wrapper styles, the
+// slide/state event normalization, the imperative open/close handle, and the view/command NAMES —
+// lives in @symbiote/components, shared verbatim with the Vue adapter; here React supplies only the
+// lifecycle: a ref holds the host node, a `drawerOpened` state gates the navigation wrapper's
+// pointerEvents, and useImperativeHandle wires the imperative handle.
+//
+// Metro picks this file on an Android host; off Android the base index.ts
 // renders the fallback. No Platform.OS read; the filename is the selector (ADR 0019).
 // device-verify-pending: the `AndroidDrawerLayout` name + the openDrawer/closeDrawer
 // commands are RN-source-confirmed, not yet exercised on a real Android host.
@@ -29,21 +35,17 @@ import {
   useRef,
   useState,
 } from 'react';
+import { dlog, type ISymbioteEvent, type ISymbioteNode } from '@symbiote/engine';
 import {
-  dispatchViewCommand,
-  dlog,
-  type ISymbioteEvent,
-  type ISymbioteNode,
-} from '@symbiote/engine';
+  buildDrawerHandle,
+  DEFAULT_DRAWER_POSITION,
+  offsetFromSlide,
+  resolveAccessibilityProps,
+  resolveDrawerLayout,
+  stateFromChange,
+} from '@symbiote/components';
 import { View } from '../components';
-import { resolveAccessibilityProps } from '@symbiote/components';
-import type { IViewStyle } from '../styles';
-import type {
-  IDrawerLayoutAndroidHandle,
-  IDrawerLayoutAndroidProps,
-  IDrawerPosition,
-  IDrawerState,
-} from './shared';
+import type { IDrawerLayoutAndroidHandle, IDrawerLayoutAndroidProps } from './shared';
 
 export type {
   IDrawerPosition,
@@ -55,68 +57,6 @@ export type {
   IDrawerLayoutAndroidHandle,
 } from './shared';
 
-// The native view name registered by AndroidDrawerLayoutNativeComponent's
-// codegenNativeComponent('AndroidDrawerLayout'): the derive-by-default name.
-const DRAWER_VIEW_NAME = 'AndroidDrawerLayout';
-
-const OPEN_DRAWER_COMMAND = 'openDrawer';
-const CLOSE_DRAWER_COMMAND = 'closeDrawer';
-
-// RN's drawerState int -> string mapping (android: DRAWER_STATES indexed by the native
-// drawerState). 0=Idle, 1=Dragging, 2=Settling.
-const DRAWER_STATES: ReadonlyArray<IDrawerState> = ['Idle', 'Dragging', 'Settling'];
-
-const DEFAULT_DRAWER_BACKGROUND_COLOR = 'white';
-const DEFAULT_DRAWER_POSITION: IDrawerPosition = 'left';
-
-// RN styles.base on the host: flex:1 plus the Android drop-shadow that floats the
-// drawer over content (android styles.base { flex:1, elevation:16 }).
-const HOST_STYLE: Readonly<IViewStyle> = {
-  flex: 1,
-  elevation: 16,
-};
-
-// RN styles.mainSubview: the content wrapper fills the host (absolute, all edges 0).
-const MAIN_SUBVIEW_STYLE: Readonly<IViewStyle> = {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-};
-
-// RN styles.drawerSubview: the navigation wrapper is absolute and full-height; its
-// width comes from drawerWidth and its background from drawerBackgroundColor.
-const DRAWER_SUBVIEW_STYLE: Readonly<IViewStyle> = {
-  position: 'absolute',
-  top: 0,
-  bottom: 0,
-};
-
-function offsetFromSlide(event: ISymbioteEvent): number {
-  const offset = event.nativeEvent.offset;
-  return typeof offset === 'number' ? offset : 0;
-}
-
-function stateFromChange(event: ISymbioteEvent): IDrawerState {
-  const index = event.nativeEvent.drawerState;
-  if (typeof index === 'number' && index >= 0 && index < DRAWER_STATES.length) {
-    return DRAWER_STATES[index];
-  }
-  return 'Idle';
-}
-
-// Issue a drawer command against the committed host node, or log a silent no-op when
-// there is no node yet (the first render has not committed).
-function dispatchDrawerCommand(node: ISymbioteNode | null, command: string): void {
-  if (node === null) {
-    dlog(`DrawerLayoutAndroid ${command} no-op: no committed host node`);
-    return;
-  }
-  dlog(`DrawerLayoutAndroid dispatch ${command}`);
-  dispatchViewCommand(node, command, []);
-}
-
 export const DrawerLayoutAndroid = forwardRef<
   IDrawerLayoutAndroidHandle,
   IDrawerLayoutAndroidProps
@@ -126,7 +66,7 @@ export const DrawerLayoutAndroid = forwardRef<
     drawerPosition,
     drawerLockMode,
     keyboardDismissMode,
-    drawerBackgroundColor = DEFAULT_DRAWER_BACKGROUND_COLOR,
+    drawerBackgroundColor,
     statusBarBackgroundColor,
     onDrawerOpen,
     onDrawerClose,
@@ -141,17 +81,13 @@ export const DrawerLayoutAndroid = forwardRef<
   const node = useRef<ISymbioteNode | null>(null);
   // RN tracks drawerOpened to gate the navigation view's pointerEvents (android
   // _onDrawerOpen/_onDrawerClose setState). Closed -> 'none' so the off-screen drawer
-  // never intercepts touches; open -> 'auto'.
+  // never intercepts touches; open -> 'auto' (folded in by resolveDrawerLayout).
   const [drawerOpened, setDrawerOpened] = useState(false);
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      openDrawer: () => dispatchDrawerCommand(node.current, OPEN_DRAWER_COMMAND),
-      closeDrawer: () => dispatchDrawerCommand(node.current, CLOSE_DRAWER_COMMAND),
-    }),
-    [],
-  );
+  // The imperative handle reads the node through a LAZY getter (() => node.current), not the node
+  // captured once: it is null until the element commits. The React twin of Vue's
+  // expose(buildDrawerHandle(…)).
+  useImperativeHandle(ref, () => buildDrawerHandle(() => node.current), []);
 
   const handleDrawerOpen = useCallback((): void => {
     dlog('DrawerLayoutAndroid onDrawerOpen');
@@ -179,20 +115,30 @@ export const DrawerLayoutAndroid = forwardRef<
     [onDrawerStateChanged],
   );
 
+  const resolved = resolveDrawerLayout({
+    drawerWidth,
+    drawerPosition,
+    drawerLockMode,
+    keyboardDismissMode,
+    drawerBackgroundColor,
+    statusBarBackgroundColor,
+    drawerOpened,
+    style,
+    // The drawer renders a raw host node (not the View FC), so unlike View-backed components nothing
+    // else resolves aria-*/role — fold them into accessibility* here before passing through.
+    passthrough: resolveAccessibilityProps(passthrough),
+  });
+
   // RN's mainSubview: content wrapped in an absolute box.
-  const contentWrapper = createElement(View, { style: MAIN_SUBVIEW_STYLE }, children);
+  const contentWrapper = createElement(View, { style: resolved.contentWrapperStyle }, children);
 
   // RN's drawerSubview: the navigation view wrapped, drawerWidth-wide, painted with
   // drawerBackgroundColor, untouchable until opened.
   const navigationWrapper = createElement(
     View,
     {
-      style: {
-        ...DRAWER_SUBVIEW_STYLE,
-        width: drawerWidth,
-        backgroundColor: drawerBackgroundColor,
-      },
-      pointerEvents: drawerOpened ? 'auto' : 'none',
+      style: resolved.navigationWrapperStyle,
+      pointerEvents: resolved.navigationPointerEvents,
     },
     renderNavigationView(),
   );
@@ -204,20 +150,11 @@ export const DrawerLayoutAndroid = forwardRef<
 
   // Child order matches RN exactly: content FIRST, navigation SECOND
   // (android render emits {childrenWrapper}{drawerViewWrapper}).
-  // Fold aria-*/role into accessibility* here: the drawer renders a raw host node
-  // (not the View FC), so unlike View-backed components nothing else resolves them.
   return createElement(
-    DRAWER_VIEW_NAME,
+    resolved.viewName,
     {
-      ...resolveAccessibilityProps(passthrough),
+      ...resolved.hostProps,
       ref: node,
-      drawerWidth,
-      drawerPosition: drawerPosition ?? DEFAULT_DRAWER_POSITION,
-      drawerLockMode,
-      keyboardDismissMode,
-      drawerBackgroundColor,
-      statusBarBackgroundColor,
-      style: [HOST_STYLE, style],
       onDrawerOpen: handleDrawerOpen,
       onDrawerClose: handleDrawerClose,
       onDrawerSlide: handleDrawerSlide,

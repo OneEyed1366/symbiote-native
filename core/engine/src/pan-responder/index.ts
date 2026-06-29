@@ -12,7 +12,8 @@
 // changed ones on `changedTouches`), so the centroid/velocity math here reads
 // those directly while keeping RN's accumulate-deltas-over-time behavior.
 
-import { dlog, type ISymbioteEvent } from '@symbiote/engine';
+import { dlog } from '../debug';
+import type { ISymbioteEvent } from '../node';
 
 // gestureState fields the caller reads; `stateID` is a stable per-gesture id and
 // `_accountsForMovesUpTo` is the timestamp every field has been advanced through.

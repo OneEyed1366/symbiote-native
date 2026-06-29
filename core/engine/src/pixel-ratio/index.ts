@@ -5,7 +5,7 @@
 // helpers snap layout sizes (dp) onto the physical pixel grid. iOS-only
 // startDetecting() is a no-op, kept for API parity.
 
-import { Dimensions } from './dimensions';
+import { Dimensions } from '../dimensions';
 
 export interface IPixelRatioStatic {
   get(): number;

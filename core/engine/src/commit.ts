@@ -35,6 +35,7 @@ import { registeredProcessor } from './registry';
 import { nextTag } from './tags';
 import { isOpaqueColorValue, type IColorValue } from './platform-color';
 import { processBoxShadow } from './process-box-shadow';
+import { registerPostCommit, runPostCommitHooks } from './post-commit';
 import { processFilter } from './process-filter';
 import { processTransformOrigin } from './process-transform-origin';
 import { processTransform } from './process-transform';
@@ -539,6 +540,11 @@ function commitContainer(rootTag: IRootTag): void {
   dlog(`commit root=${rootTag} pre-completeRoot`);
   slot.completeRoot(rootTag, childSet);
 
+  // Fresh Fabric tags are now assigned: let any consumer that needed a committed tag
+  // and ran too early (the Animated native driver binding a props node to a view under
+  // an async-batched commit) retry now. No-op when nothing is pending.
+  runPostCommitHooks();
+
   if (isDebug()) {
     const mode = stats.created > 0 && stats.reused === 0 ? 'full' : 'incremental';
     dlog(
@@ -581,6 +587,33 @@ export function setNativeProps(node: ISymbioteNode, partial: Record<string, unkn
 // node has been committed at least once.
 export function getNativeTag(node: ISymbioteNode): number | undefined {
   return mirror.get(node)?.tag;
+}
+
+// Actions waiting for their node's first commit. An adapter that wires an imperative/native call at
+// lifecycle time (autoFocus, a native Animated.event attach) can run BEFORE completeRoot under an
+// async-batched commit (Vue/Svelte schedule it on a microtask), so the node has no tag yet and the
+// call silently no-ops. Each waiter retries after a commit may have assigned the tag and is dropped
+// once it runs. React commits synchronously, so its actions run inline and never land here.
+const pendingCommitWaiters = new Set<() => boolean>();
+registerPostCommit(() => {
+  for (const waiter of pendingCommitWaiters) {
+    if (waiter()) pendingCommitWaiters.delete(waiter);
+  }
+});
+
+// Run `action` once `node` has a committed Fabric tag — immediately if it already does, else after
+// the commit that assigns it. The canonical fix for the Vue async-commit race: defer instead of
+// silently no-opping. Returns a cancel fn (drop the pending retry, e.g. on unmount).
+export function whenCommitted(node: ISymbioteNode, action: () => void): () => void {
+  const attempt = (): boolean => {
+    if (mirror.get(node) === undefined) return false;
+    action();
+    return true;
+  };
+  if (!attempt()) pendingCommitWaiters.add(attempt);
+  return () => {
+    pendingCommitWaiters.delete(attempt);
+  };
 }
 
 // The node's current Fabric handle (the createNode/clone return value), identical in

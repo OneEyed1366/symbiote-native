@@ -14,6 +14,7 @@ import {
   removeChild,
   routeProp,
   setText,
+  toPublicInstance,
   RAW_TEXT_COMPONENT,
   SymbioteSurface,
   type ISymbioteNode,
@@ -41,7 +42,15 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
   const options: RendererOptions<IHostNode, IHostElement> = {
     createElement(type) {
       const descriptor = descriptorFor(type);
-      return createElement(descriptor.component, descriptor.isText);
+      const node = createElement(descriptor.component, descriptor.isText);
+      // Graft the imperative public-instance API (measure / setNativeProps / focus / …) onto
+      // the raw node so a template/function ref to a host element exposes it exactly like
+      // React's getPublicInstance. toPublicInstance mutates in place and returns the SAME node
+      // identity, so the engine commit mirror (keyed on the raw node) still resolves it — the
+      // ref must keep holding this raw node by identity (shallowRef), never a deep ref. See the
+      // vue-adapter-reactivity skill.
+      dlog(`vue createElement ${descriptor.component} -> public instance`);
+      return toPublicInstance(node);
     },
 
     createText(text) {

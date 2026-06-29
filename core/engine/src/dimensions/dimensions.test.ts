@@ -3,10 +3,10 @@
 // whose getConstants() ships known window metrics; a fake RN$registerCallableModule captures
 // the device hub so the test can play "native" and emit 'didUpdateDimensions'.
 //
-// PixelRatio and useWindowDimensions still live in the React adapter (they depend on the
-// Dimensions singleton and, for the hook, React). There is no engine-side twin yet, so they
-// are imported across the boundary to preserve the smoke's coverage. They resolve the SAME
-// Dimensions singleton via `@symbiote/engine`, so the fake seeds both.
+// PixelRatio now lives in the engine alongside Dimensions; useWindowDimensions still lives in
+// the React adapter (it depends on React) and is imported across the boundary to preserve the
+// smoke's coverage. Both resolve the SAME Dimensions singleton via `@symbiote/engine`, so the
+// fake seeds them all.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,7 +23,7 @@ interface IWindowMetrics {
 const INITIAL_WINDOW: IWindowMetrics = { width: 400, height: 800, scale: 3, fontScale: 2 };
 
 let Dimensions: typeof import('@symbiote/engine').Dimensions;
-let PixelRatio: typeof import('../../../../adapters/react/src/pixel-ratio').PixelRatio;
+let PixelRatio: typeof import('@symbiote/engine').PixelRatio;
 let useWindowDimensions: typeof import('../../../../adapters/react/src/use-window-dimensions').useWindowDimensions;
 
 let deviceHub: IDeviceHub | undefined;
@@ -47,8 +47,7 @@ beforeEach(async () => {
   };
 
   vi.resetModules();
-  ({ Dimensions } = await import('@symbiote/engine'));
-  ({ PixelRatio } = await import('../../../../adapters/react/src/pixel-ratio'));
+  ({ Dimensions, PixelRatio } = await import('@symbiote/engine'));
   ({ useWindowDimensions } = await import('../../../../adapters/react/src/use-window-dimensions'));
 });
 

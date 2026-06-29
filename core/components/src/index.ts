@@ -232,3 +232,106 @@ export type {
 } from './state/text-input';
 export { renderTextInput } from './view/render-text-input';
 export type { ITextInputViewProps } from './view/render-text-input';
+
+// VirtualizedList family: the framework-agnostic windowing engine + data shapes. Lists
+// have NO view/render-*.ts (the cell content is the framework's own children, so there is
+// no Descriptor render fn) — the shared layer for lists is this STATE/logic, reused
+// verbatim by React and Vue. See core/components/.docs-note-lists.md.
+export {
+  DEFAULT_WINDOW_SIZE,
+  DEFAULT_INITIAL_NUM_TO_RENDER,
+  DEFAULT_END_REACHED_THRESHOLD,
+  DEFAULT_MAX_TO_RENDER_PER_BATCH,
+  DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
+  DEFAULT_VIEW_AREA_COVERAGE_PERCENT_THRESHOLD,
+  DEFAULT_START_REACHED_THRESHOLD,
+  FIRST_INDEX,
+  EMPTY_OFFSET,
+  NO_INDEX,
+  NO_CONTENT_LENGTH_SENT,
+  INVERTED_Y_STYLE,
+  INVERTED_X_STYLE,
+  readScrollOffset,
+  readLayoutLength,
+  buildOffsets,
+  computeWindow,
+  throttleWindow,
+  visiblePercent,
+  isCellViewable,
+  offsetForIndex,
+  averageMeasuredLength,
+  highestMeasuredIndex,
+  computeEndReached,
+  computeStartReached,
+  buildViewabilityPairs,
+  computeViewableSet,
+  diffViewable,
+  maxMinimumViewTime,
+  buildListPlan,
+} from './state/virtualized-list';
+export type {
+  ICellLayout,
+  ISeparators,
+  ISeparatorProps,
+  IViewToken,
+  IViewableItemsChangedInfo,
+  IViewabilityConfig,
+  IViewabilityConfigCallbackPair,
+  IVirtualizedListHandle,
+  IViewableSetParams,
+  IListCellPlan,
+  IListPlan,
+  IListPlanParams,
+} from './state/virtualized-list';
+
+export {
+  SINGLE_COLUMN,
+  chunkIntoRows,
+  rowKeyExtractor,
+  expandRowToken,
+  expandRowViewability,
+  lastItemOfRow,
+  firstItemOfRow,
+} from './state/flat-list';
+export type { IRow } from './state/flat-list';
+
+export {
+  flattenSections,
+  unwrapEntryItem,
+  sectionEntryKey,
+  scrollLocationToFlatIndex,
+} from './state/section-list';
+export type { ISection, ISectionEntry, IVirtualizedSectionListHandle } from './state/section-list';
+
+// DrawerLayoutAndroid (Android-only). The agnostic half: types, the AndroidDrawerLayout
+// view/command names, slide/state event normalization, the imperative handle builder, and
+// the host/subview style resolution. Both adapters drive their lifecycle off this.
+export {
+  DRAWER_VIEW_NAME,
+  OPEN_DRAWER_COMMAND,
+  CLOSE_DRAWER_COMMAND,
+  DRAWER_STATES,
+  DEFAULT_DRAWER_BACKGROUND_COLOR,
+  DEFAULT_DRAWER_POSITION,
+  offsetFromSlide,
+  stateFromChange,
+  dispatchDrawerCommand,
+  buildDrawerHandle,
+} from './state/drawer-layout-android';
+export type {
+  IDrawerPosition,
+  IDrawerLockMode,
+  IKeyboardDismissMode,
+  IDrawerState,
+  IDrawerSlideEvent,
+  IDrawerLayoutAndroidHandle,
+} from './state/drawer-layout-android';
+export {
+  resolveDrawerLayout,
+  DRAWER_HOST_STYLE,
+  DRAWER_MAIN_SUBVIEW_STYLE,
+} from './view/render-drawer-layout-android';
+export type {
+  IDrawerLayoutResolveInput,
+  IDrawerLayoutResolved,
+} from './view/render-drawer-layout-android';

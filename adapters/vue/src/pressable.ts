@@ -248,9 +248,14 @@ export const Pressable = defineComponent({
       const ripple = isRecord(attrs.android_ripple)
         ? rippleProps(asRippleConfig(attrs.android_ripple) ?? {})
         : undefined;
-      const inner = ripple !== undefined ? [h(View, ripple, content)] : content;
+      const inner = ripple !== undefined ? [h(View, ripple, () => content)] : content;
 
-      return h(View, viewProps, inner);
+      // Children go to the host View as a FUNCTION slot, never a raw array: View is a
+      // functional component, and an array child makes Vue normalize it to a default
+      // slot with a dev warn ("Prefer function slots"). Benign under SFC, but in JSX the
+      // warn's trace formats the __self/__source dev props (native HostObjects) and that
+      // read throws, unwinding the whole mount → blank screen. A function slot skips it.
+      return h(View, viewProps, () => inner);
     };
   },
 });

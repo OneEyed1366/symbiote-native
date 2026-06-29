@@ -139,7 +139,7 @@ export const TouchableOpacity = defineComponent({
         onPressOut: handlePressOut,
       };
       const children: VNode[] = slots.default !== undefined ? slots.default() : [];
-      const feedback = h(Animated.View, { style: [style, { opacity }] }, children);
+      const feedback = h(Animated.View, { style: [style, { opacity }] }, () => children);
       return h(Pressable, pressableProps, { default: () => [feedback] });
     };
   },

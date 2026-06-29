@@ -82,7 +82,7 @@ const TouchableNativeFeedbackImpl = defineComponent({
 
       const nativeProps = backgroundProps(resolved, useForeground);
       const children: VNode[] = slots.default !== undefined ? slots.default() : [];
-      const feedback = h(View, nativeProps, children);
+      const feedback = h(View, nativeProps, () => children);
       return h(Pressable, { ...forwardAttrs(attrs) }, { default: () => [feedback] });
     };
   },

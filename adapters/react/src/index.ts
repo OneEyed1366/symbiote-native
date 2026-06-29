@@ -145,8 +145,8 @@ export type {
   IDimensionsChangeListener,
   IDimensionsStatic,
 } from './dimensions';
-export { PixelRatio } from './pixel-ratio';
-export type { IPixelRatioStatic } from './pixel-ratio';
+export { PixelRatio } from '@symbiote/engine';
+export type { IPixelRatioStatic } from '@symbiote/engine';
 export { useWindowDimensions } from './use-window-dimensions';
 export { Appearance } from './appearance';
 export type { IColorSchemeName, IColorSchemePreference } from './appearance';
@@ -186,13 +186,13 @@ export type { II18nManagerConstants } from './i18n-manager';
 export { Settings } from './settings';
 
 // Interaction subsystems: gestures, deferred work, and layout transitions.
-export { default as PanResponder } from './pan-responder';
+export { PanResponder } from '@symbiote/engine';
 export type {
   IPanResponderGestureState,
   IPanResponderCallbacks,
   IGestureResponderHandlers,
   IPanResponderInstance,
-} from './pan-responder';
+} from '@symbiote/engine';
 export { LayoutAnimation } from './layout-animation';
 export type {
   ILayoutAnimationType,

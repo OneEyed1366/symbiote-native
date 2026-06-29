@@ -4,6 +4,11 @@
 
 export { mount, unmount } from './render';
 export { View, Text } from './components';
+// findNodeHandle: RN's ref -> native reactTag lookup, the Vue twin of the React adapter's
+// host-instance resolution. IHostInstance is the raw engine node (Vue host refs fall
+// through to it; imperative methods live on each component's expose() handle).
+export { findNodeHandle } from './host-instance';
+export type { IHostInstance } from './host-instance';
 // Image. Full parity with React: source/src/srcSet resolution, the width/height → style fold,
 // alt → accessibility, and the Image statics (getSize / prefetch / queryCache / …) are shared
 // verbatim from @symbiote/components via renderImage; Vue supplies only the functional bridge.
@@ -43,6 +48,45 @@ export type {
   IRippleBackground,
 } from './touchable-native-feedback';
 export { Button } from './button';
+// TextInput. Full parity with React (the 3-layer split): the value/selection folds + the
+// controlled-write predicate live in @symbiote/components; Vue supplies the reactivity
+// (shallowRef host node, post-flush watch) + the imperative handle via expose().
+export { TextInput } from './text-input';
+export type { ITextInputProps, ITextInputHandle } from '@symbiote/components';
+// VirtualizedList family. Full parity with React: the windowing math (visible range, cell
+// keys, viewability token diffing, edge-reached, the list plan) is shared in
+// @symbiote/components; Vue supplies the reactive lifecycle + the per-cell element.
+export { VirtualizedList } from './virtualized-list';
+export type {
+  IVirtualizedListProps,
+  IVirtualizedListHandle,
+  ISeparators,
+  ISeparatorProps,
+  IViewToken,
+  IViewableItemsChangedInfo,
+  IViewabilityConfig,
+  IViewabilityConfigCallbackPair,
+  ICellLayout,
+} from './virtualized-list';
+export { FlatList } from './flat-list';
+export type { IFlatListProps, IFlatListHandle } from './flat-list';
+export { VirtualizedSectionList } from './virtualized-section-list';
+export type { IVirtualizedSectionListHandle } from './virtualized-section-list';
+export { SectionList } from './section-list';
+export type { ISection, ISectionListHandle } from './section-list';
+// DrawerLayoutAndroid (Android-only; iOS degrades to a plain container). Shared logic
+// (types, command names, slide/state normalization, the imperative handle) in
+// @symbiote/components; Vue supplies the platform-split lifecycle + the slots.
+export { DrawerLayoutAndroid } from './drawer-layout-android';
+export type {
+  IDrawerLayoutAndroidProps,
+  IDrawerLayoutAndroidHandle,
+  IDrawerPosition,
+  IDrawerLockMode,
+  IKeyboardDismissMode,
+  IDrawerState,
+  IDrawerSlideEvent,
+} from './drawer-layout-android';
 // Phase 2 (ADR 0024): SafeAreaView + RefreshControl, wired into ScrollView with the iOS-sibling /
 // Android-wrap platform split. RefreshControl hosts the wrapped scroll view via its default slot.
 export { SafeAreaView } from './safe-area-view';
@@ -54,7 +98,7 @@ export { createSymbioteRenderer } from './renderer';
 // Animated (ADR 0024 Phase 3a): Animated.View/Text/Image + the lazy Animated.ScrollView over the
 // Vue primitives, with the value graph / easing / drivers spread from @symbiote/engine. The wrap
 // mechanism (createAnimatedComponent) is the Vue twin of React's; the pure leaves live in the
-// engine. FlatList/SectionList are omitted until those base components exist.
+// engine.
 export { Animated, createAnimatedComponent } from './animated';
 
 // Visual components off the shared @symbiote/components layer (wave: simple-visual).
@@ -157,3 +201,27 @@ export {
   isDebug,
 } from '@symbiote/engine';
 export type { ISymbioteEvent, ISymbioteNode, IRootTag } from '@symbiote/engine';
+// Pure utilities that moved to the engine (single source, both adapters re-export):
+// PixelRatio + PanResponder, plus the color builders and the interaction scheduler.
+export {
+  PixelRatio,
+  PanResponder,
+  PlatformColor,
+  DynamicColorIOS,
+  InteractionManager,
+} from '@symbiote/engine';
+export type { IPixelRatioStatic } from '@symbiote/engine';
+export type {
+  IPanResponderGestureState,
+  IPanResponderCallbacks,
+  IGestureResponderHandlers,
+  IPanResponderInstance,
+} from '@symbiote/engine';
+export type { IColorValue, IOpaqueColorValue, IDynamicColorIOSTuple } from '@symbiote/engine';
+export type {
+  IInteractionEvent,
+  ISimpleTask,
+  IPromiseTask,
+  ITask,
+  IHandle,
+} from '@symbiote/engine';

@@ -31,6 +31,15 @@ export type {
   IHandle,
   ICancellable,
 } from './interaction-manager';
+// PanResponder: pure JS gesture recognition over the View responder props,
+// framework-agnostic, so it lives here; every adapter re-exports it.
+export { default as PanResponder } from './pan-responder';
+export type {
+  IPanResponderGestureState,
+  IPanResponderCallbacks,
+  IGestureResponderHandlers,
+  IPanResponderInstance,
+} from './pan-responder';
 export type {
   IComponentRegistration,
   INativeEventBinding,
@@ -50,11 +59,17 @@ export {
   setNativeProps,
   getNativeTag,
   getNativeNode,
+  whenCommitted,
   measure,
   measureInWindow,
   measureLayout,
   disposeRoot,
 } from './commit';
+// The public instance grafted onto a host node by every adapter (React's getPublicInstance,
+// the Vue renderer's createElement): the imperative measure/setNativeProps/focus API. Lives
+// here because it depends only on engine internals, so all adapters inherit it identically.
+export { toPublicInstance } from './host-instance';
+export type { IHostInstance } from './host-instance';
 export { PlatformColor, DynamicColorIOS, isOpaqueColorValue } from './platform-color';
 export type { IColorValue, IOpaqueColorValue, IDynamicColorIOSTuple } from './platform-color';
 // CSS-style processors (boxShadow/filter): RN parses these in JS before native because
@@ -234,6 +249,10 @@ export type {
   IDimensionsChangeListener,
   IDimensionsStatic,
 } from './dimensions';
+// PixelRatio: derives from the Dimensions singleton, framework-agnostic, so it lives
+// here; every adapter re-exports it.
+export { PixelRatio } from './pixel-ratio';
+export type { IPixelRatioStatic } from './pixel-ratio';
 export { Appearance } from './appearance';
 export type { IColorSchemeName, IColorSchemePreference } from './appearance';
 export { AppState } from './app-state';
