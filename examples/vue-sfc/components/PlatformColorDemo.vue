@@ -12,7 +12,7 @@ const scheme = useColorScheme()
 
 const styles = StyleSheet.create({
   section: { gap: 12 },
-  sectionLabel: { color: '#41506a', fontSize: 13 },
+  sectionLabel: { color: '#3b5266', fontSize: 13 },
   row: { flexDirection: 'row', gap: 12 },
   colorTile: { flex: 1, height: 56, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   colorTileBordered: { flex: 1, height: 56, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
@@ -28,7 +28,7 @@ const styles = StyleSheet.create({
       <View :style="[styles.colorTile, { backgroundColor: PlatformColor('systemBlue') }]">
         <Text :style="styles.tileLabel">systemBlue</Text>
       </View>
-      <View :style="[styles.colorTileBordered, { backgroundColor: DynamicColorIOS({ light: '#dbeafe', dark: '#13243a' }), borderColor: PlatformColor('separator') }]">
+      <View :style="[styles.colorTileBordered, { backgroundColor: DynamicColorIOS({ light: '#dcf3e8', dark: '#2c3e50' }), borderColor: PlatformColor('separator') }]">
         <Text :style="[styles.boldLabel, { color: PlatformColor('label') }]">dynamic</Text>
       </View>
     </View>

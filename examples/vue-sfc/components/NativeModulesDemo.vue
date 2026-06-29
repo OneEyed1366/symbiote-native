@@ -8,11 +8,11 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { View, Text, Image, Button, I18nManager, Settings, StyleSheet } from '@symbiote/vue'
 
-const LOGO_URI = 'https://reactnative.dev/img/tiny_logo.png'
+const LOGO_URI = 'https://vuejs.org/images/logo.png'
 // A distinct cache key for the prefetch demo: same asset, different URL (query
 // string), so nothing has loaded it yet. The cache starts cold and the button
 // visibly warms it, unlike LOGO_URI, which getSize + the <Image> already pulled in.
-const PREFETCH_URI = 'https://reactnative.dev/img/tiny_logo.png?warm=symbiote'
+const PREFETCH_URI = 'https://vuejs.org/images/logo.png?warm=symbiote'
 const TAP_KEY = 'symbiote.tapCount'
 
 // I18nManager: RTL constants, read once at setup. A non-throwing read proves the
@@ -67,10 +67,10 @@ const prefetchLogo = (): void => {
 
 const styles = StyleSheet.create({
   section: { gap: 12 },
-  sectionLabel: { color: '#41506a', fontSize: 13 },
+  sectionLabel: { color: '#3b5266', fontSize: 13 },
   infoText: { color: '#cbd5e1', fontSize: 14 },
   rowAlignCenter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logoThumb: { width: 48, height: 48, borderRadius: 8, backgroundColor: '#0f1e30' },
+  logoThumb: { width: 48, height: 48, borderRadius: 8, backgroundColor: '#22323f' },
   infoTextFlex: { color: '#cbd5e1', fontSize: 14, flex: 1 },
 })
 </script>
@@ -84,12 +84,12 @@ const styles = StyleSheet.create({
     <Button
       :title="rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'"
       @press="() => I18nManager.forceRTL(!rtl.isRTL)"
-      color="#7fb5ff"
+      color="#42b883"
     />
 
     <!-- Settings: counter persisted to NSUserDefaults, survives a relaunch -->
     <Text testID="persist-count" :style="styles.infoText">{{ `persisted taps: ${persisted} · survives relaunch` }}</Text>
-    <Button testID="persist-btn" title="Persist a tap" @press="persistTap" color="#7fb5ff" />
+    <Button testID="persist-btn" title="Persist a tap" @press="persistTap" color="#42b883" />
 
     <!-- Image statics: the rendered asset + getSize's measurement of it -->
     <View :style="styles.rowAlignCenter">
@@ -98,6 +98,6 @@ const styles = StyleSheet.create({
     </View>
     <!-- prefetch warms a cold url: not cached → (tap) → cached -->
     <Text :style="styles.infoText">{{ `prefetch cache: ${cacheState}` }}</Text>
-    <Button title="Prefetch logo" @press="prefetchLogo" color="#7fb5ff" />
+    <Button title="Prefetch logo" @press="prefetchLogo" color="#42b883" />
   </View>
 </template>

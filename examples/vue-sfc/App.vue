@@ -172,7 +172,7 @@ const onRefresh = (): void => {
 // The RefreshControl as an element-valued prop — Vue templates can't inline an element into a
 // prop, so build the VNode in script and bind it; recomputes when `refreshing` flips.
 const refreshControl = computed(() =>
-  h(RefreshControl, { refreshing: refreshing.value, onRefresh, tintColor: '#7fb5ff' }),
+  h(RefreshControl, { refreshing: refreshing.value, onRefresh, tintColor: '#42b883' }),
 )
 
 // Tier A runtime modules, read live. A non-empty Version proves PlatformConstants resolved; a
@@ -196,7 +196,7 @@ const dimensionsText = computed(
 const onToggleStatusBarRed = (): void => {
   const next = !statusBarRed.value
   statusBarRed.value = next
-  StatusBar.setBackgroundColor(next ? '#ff0000' : '#101a2c', true)
+  StatusBar.setBackgroundColor(next ? '#ff0000' : '#22323f', true)
 }
 const onToggleStatusBarTranslucent = (): void => {
   const next = !statusBarTranslucent.value
@@ -234,13 +234,13 @@ const onOpenUrl = (): void => {
 const pressableStyle = ({ pressed }: { pressed: boolean }) => [
   styles.pressableCard,
   {
-    backgroundColor: pressed ? '#13243a' : '#0f1e30',
-    borderColor: pressed ? '#7fb5ff' : '#2b6cb0',
+    backgroundColor: pressed ? '#2c3e50' : '#22323f',
+    borderColor: pressed ? '#42b883' : '#369870',
   },
 ]
 const retentionStyle = ({ pressed }: { pressed: boolean }) => [
   styles.retentionCard,
-  { backgroundColor: pressed ? '#2b6cb0' : '#13243a' },
+  { backgroundColor: pressed ? '#369870' : '#2c3e50' },
 ]
 const onRetentionMove = (event: ISymbioteEvent): void => {
   retentionMove.value = {
@@ -288,12 +288,12 @@ const freezeJs3s = (): void => {
 // StyleSheet.hairlineWidth) stay at the use site, composed via :style="[styles.x, { …dynamic }]".
 const styles = StyleSheet.create({
   // shared / common
-  screen: { flex: 1, backgroundColor: '#0b1622' },
+  screen: { flex: 1, backgroundColor: '#1b2a36' },
   scrollContent: { paddingVertical: 64, paddingHorizontal: 24, alignItems: 'stretch', gap: 28 },
   sectionTight: { gap: 8 },
   row: { flexDirection: 'row', gap: 12 },
   flex1: { flex: 1 },
-  sectionLabel: { color: '#41506a', fontSize: 13 },
+  sectionLabel: { color: '#3b5266', fontSize: 13 },
   infoText: { color: '#cbd5e1', fontSize: 14 },
   noteText: { color: '#cbd5e1', fontSize: 13 },
   switchLabel: { color: '#cbd5e1', fontSize: 16 },
@@ -303,40 +303,40 @@ const styles = StyleSheet.create({
   badge: { color: '#34d399', fontSize: 14, letterSpacing: 2, textAlign: 'center' },
 
   // App
-  title: { color: '#7fb5ff', fontSize: 16, textAlign: 'center' },
-  headerNote: { color: '#7fb5ff', fontSize: 13, textAlign: 'center' },
-  hairlineNote: { color: '#7fb5ff', fontSize: 13, textAlign: 'center', paddingTop: 8, borderTopColor: '#2b6cb0' },
+  title: { color: '#42b883', fontSize: 16, textAlign: 'center' },
+  headerNote: { color: '#42b883', fontSize: 13, textAlign: 'center' },
+  hairlineNote: { color: '#42b883', fontSize: 13, textAlign: 'center', paddingTop: 8, borderTopColor: '#369870' },
   refreshRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  accentNote: { color: '#7fb5ff', fontSize: 13 },
-  mutedCenter: { color: '#41506a', fontSize: 13, textAlign: 'center' },
-  counterCard: { paddingVertical: 18, borderRadius: 16, backgroundColor: '#2b6cb0', alignItems: 'center' },
+  accentNote: { color: '#42b883', fontSize: 13 },
+  mutedCenter: { color: '#3b5266', fontSize: 13, textAlign: 'center' },
+  counterCard: { paddingVertical: 18, borderRadius: 16, backgroundColor: '#369870', alignItems: 'center' },
   counterText: { color: '#ffffff', fontSize: 24, fontWeight: 'bold' },
-  textInput: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#2b6cb0', paddingHorizontal: 14, color: '#ffffff', fontSize: 18, backgroundColor: '#0f1e30' },
+  textInput: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#369870', paddingHorizontal: 14, color: '#ffffff', fontSize: 18, backgroundColor: '#22323f' },
   greeting: { color: '#ffffff', fontSize: 20, textAlign: 'center' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
   pressableCard: { paddingVertical: 16, borderRadius: 14, alignItems: 'center', borderWidth: 1 },
   pressableLabel: { fontSize: 15 },
   chipList: { height: 84 },
   chipCard: { width: CHIP_WIDTH, height: 72, marginRight: CHIP_GAP, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  chipNumber: { color: '#0b1622', fontSize: 18, fontWeight: 'bold' },
+  chipNumber: { color: '#1b2a36', fontSize: 18, fontWeight: 'bold' },
   retentionCard: { height: 64, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  boxList160: { height: 160, borderRadius: 12, backgroundColor: '#0f1e30' },
+  boxList160: { height: 160, borderRadius: 12, backgroundColor: '#22323f' },
   mvcpRow: { paddingVertical: 10, paddingHorizontal: 14 },
-  parityHeader: { backgroundColor: '#2b6cb0', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  parityHeader: { backgroundColor: '#369870', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   parityHeaderText: { color: '#ffffff', fontSize: 15, fontWeight: 'bold' },
   scrollDemoRow: { height: 80, justifyContent: 'center', paddingHorizontal: 14 },
-  tinyCenter: { color: '#41506a', fontSize: 12, textAlign: 'center' },
-  shadowCard: { height: 64, borderRadius: 12, backgroundColor: '#13243a', alignItems: 'center', justifyContent: 'center', boxShadow: '0px 0px 22px 3px rgba(127,181,255,0.85)' },
-  filterTile: { flex: 1, height: 64, borderRadius: 12, backgroundColor: '#2b6cb0', alignItems: 'center', justifyContent: 'center' },
+  tinyCenter: { color: '#3b5266', fontSize: 12, textAlign: 'center' },
+  shadowCard: { height: 64, borderRadius: 12, backgroundColor: '#2c3e50', alignItems: 'center', justifyContent: 'center', boxShadow: '0px 0px 22px 3px rgba(127,181,255,0.85)' },
+  filterTile: { flex: 1, height: 64, borderRadius: 12, backgroundColor: '#369870', alignItems: 'center', justifyContent: 'center' },
   dim: { filter: [{ brightness: 0.5 }] },
   tileText: { color: '#ffffff', fontSize: 13 },
-  rotatedCard: { height: 64, borderRadius: 12, backgroundColor: '#2b6cb0', alignItems: 'center', justifyContent: 'center', transformOrigin: 'top left', transform: [{ rotate: '4deg' }] },
+  rotatedCard: { height: 64, borderRadius: 12, backgroundColor: '#369870', alignItems: 'center', justifyContent: 'center', transformOrigin: 'top left', transform: [{ rotate: '4deg' }] },
   webImage: { borderRadius: 8, alignSelf: 'center' },
   logoImage: { width: 64, height: 64, borderRadius: 12, alignSelf: 'center' },
-  bottomCard: { height: 200, borderRadius: 16, backgroundColor: '#13243a', alignItems: 'center', justifyContent: 'center' },
-  bottomText: { color: '#7fb5ff', fontSize: 16 },
+  bottomCard: { height: 200, borderRadius: 16, backgroundColor: '#2c3e50', alignItems: 'center', justifyContent: 'center' },
+  bottomText: { color: '#42b883', fontSize: 16 },
   modalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)' },
-  modalCard: { width: 280, padding: 24, borderRadius: 20, backgroundColor: '#0f1e30', alignItems: 'center', gap: 16 },
+  modalCard: { width: 280, padding: 24, borderRadius: 20, backgroundColor: '#22323f', alignItems: 'center', gap: 16 },
   modalTitle: { color: '#ffffff', fontSize: 20, fontWeight: 'bold' },
   modalBody: { color: '#cbd5e1', fontSize: 14, textAlign: 'center' },
 })
@@ -371,14 +371,14 @@ const styles = StyleSheet.create({
           <Button
             :title="statusBarHidden ? 'Show status bar' : 'Hide status bar'"
             @press="() => { statusBarHidden = !statusBarHidden }"
-            color="#7fb5ff"
+            color="#42b883"
           />
         </View>
         <View :style="styles.flex1">
           <Button
             :title="darkStatusBar ? 'Light text' : 'Dark text'"
             @press="() => { darkStatusBar = !darkStatusBar }"
-            color="#7fb5ff"
+            color="#42b883"
           />
         </View>
       </View>
@@ -386,36 +386,36 @@ const styles = StyleSheet.create({
            red / goes translucent and the app STAYS rendered. -->
       <View v-if="Platform.OS === 'android'" :style="styles.row">
         <View :style="styles.flex1">
-          <Button :title="statusBarRed ? 'BG default' : 'BG red'" @press="onToggleStatusBarRed" color="#7fb5ff" />
+          <Button :title="statusBarRed ? 'BG default' : 'BG red'" @press="onToggleStatusBarRed" color="#42b883" />
         </View>
         <View :style="styles.flex1">
-          <Button :title="statusBarTranslucent ? 'Opaque' : 'Translucent'" @press="onToggleStatusBarTranslucent" color="#7fb5ff" />
+          <Button :title="statusBarTranslucent ? 'Opaque' : 'Translucent'" @press="onToggleStatusBarTranslucent" color="#42b883" />
         </View>
       </View>
       <!-- JS->native imperative modules: tap to fire the real native UI / haptics. -->
       <View :style="styles.row">
         <View :style="styles.flex1">
-          <Button title="Alert" @press="onAlert" color="#7fb5ff" />
+          <Button title="Alert" @press="onAlert" color="#42b883" />
         </View>
         <!-- ActionSheetIOS is iOS-only by design (no Android native module exists). -->
         <View v-if="Platform.OS !== 'android'" :style="styles.flex1">
-          <Button title="Action sheet" @press="onActionSheet" color="#7fb5ff" />
+          <Button title="Action sheet" @press="onActionSheet" color="#42b883" />
         </View>
       </View>
       <View :style="styles.row">
         <View :style="styles.flex1">
-          <Button title="Share" @press="onShare" color="#7fb5ff" />
+          <Button title="Share" @press="onShare" color="#42b883" />
         </View>
         <View :style="styles.flex1">
-          <Button title="Vibrate" @press="() => Vibration.vibrate()" color="#7fb5ff" />
+          <Button title="Vibrate" @press="() => Vibration.vibrate()" color="#42b883" />
         </View>
       </View>
-      <Button title="Open reactnative.dev" @press="onOpenUrl" color="#7fb5ff" />
+      <Button title="Open reactnative.dev" @press="onOpenUrl" color="#42b883" />
 
       <!-- The native UIRefreshControl spinner only shows while iOS holds the pull-down; our full
            re-commit snaps the offset back, so we drive our OWN indicator from `refreshing`. -->
       <View v-if="refreshing" :style="styles.refreshRow">
-        <ActivityIndicator color="#7fb5ff" />
+        <ActivityIndicator color="#42b883" />
         <Text :style="styles.accentNote">Refreshing…</Text>
       </View>
       <Text v-else :style="styles.mutedCenter">{{ `pull to refresh · refreshed ${refreshes}×` }}</Text>
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
         :value="name"
         @change-text="(text) => { name = text }"
         placeholder="type your name…"
-        placeholder-text-color="#41506a"
+        placeholder-text-color="#3b5266"
         :style="styles.textInput"
       />
       <Text testID="greeting-output" :style="styles.greeting">{{ name ? `Hello, ${name}` : 'Hello, stranger' }}</Text>
@@ -439,9 +439,9 @@ const styles = StyleSheet.create({
       <!-- Switch drives the ActivityIndicator -->
       <View :style="styles.switchRow">
         <Text :style="styles.switchLabel">spinner</Text>
-        <Switch testID="spinner-switch" :value="spinning" @value-change="(next) => { spinning = next }" :track-color="{ false: '#334155', true: '#2b6cb0' }" />
+        <Switch testID="spinner-switch" :value="spinning" @value-change="(next) => { spinning = next }" :track-color="{ false: '#334155', true: '#369870' }" />
       </View>
-      <ActivityIndicator testID="spinner-indicator" :animating="spinning" color="#7fb5ff" size="large" />
+      <ActivityIndicator testID="spinner-indicator" :animating="spinning" color="#42b883" size="large" />
 
       <!-- Animated: JS driver vs native driver, side by side -->
       <AnimatedDemo />
@@ -468,12 +468,12 @@ const styles = StyleSheet.create({
       <ParityDemo />
 
       <!-- Button opens a Modal -->
-      <Button testID="modal-open" title="Open modal" @press="() => { modalVisible = true }" color="#7fb5ff" />
+      <Button testID="modal-open" title="Open modal" @press="() => { modalVisible = true }" color="#42b883" />
 
       <!-- Pressable card with pressed-state feedback (children take press state via a scoped slot) -->
       <Pressable @press="count += 1" :style="pressableStyle">
         <template #default="{ pressed }">
-          <Text :style="[styles.pressableLabel, { color: pressed ? '#7fb5ff' : '#cbd5e1' }]">{{ pressed ? 'holding…' : 'press me (also +1)' }}</Text>
+          <Text :style="[styles.pressableLabel, { color: pressed ? '#42b883' : '#cbd5e1' }]">{{ pressed ? 'holding…' : 'press me (also +1)' }}</Text>
         </template>
       </Pressable>
 
@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
         :style="styles.boxList160"
         :render-item="mvcpRenderItem"
       />
-      <Button title="Prepend 5" color="#7fb5ff" @press="onPrepend" />
+      <Button title="Prepend 5" color="#42b883" @press="onPrepend" />
 
       <!-- Animated.ScrollView scroll-driven header (native driver). PASS: drag INSIDE the box
            below: the bright bar above SMOOTHLY fades to near-invisible and lifts, on the UI
@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
       <!-- Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
            width/height→style); a screen reader reads "React logo" (alt→accessibilityLabel). -->
       <Image
-        src="https://reactnative.dev/img/tiny_logo.png"
+        src="https://vuejs.org/images/logo.png"
         alt="React logo"
         :width="48"
         :height="48"
@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
            above the keyboard AND the keyboard is the email layout. -->
       <View :style="styles.switchRow">
         <Text :style="styles.switchLabel">avoid keyboard</Text>
-        <Switch :value="kavEnabled" @value-change="(next) => { kavEnabled = next }" :track-color="{ false: '#334155', true: '#2b6cb0' }" />
+        <Switch :value="kavEnabled" @value-change="(next) => { kavEnabled = next }" :track-color="{ false: '#334155', true: '#369870' }" />
       </View>
       <KeyboardAvoidingView :behavior="Platform.OS === 'ios' ? 'padding' : 'height'" :enabled="kavEnabled">
         <TextInput
@@ -570,12 +570,12 @@ const styles = StyleSheet.create({
           input-mode="email"
           enter-key-hint="done"
           placeholder="email — focus me near the bottom…"
-          placeholder-text-color="#41506a"
+          placeholder-text-color="#3b5266"
           :style="styles.textInput"
         />
       </KeyboardAvoidingView>
 
-      <Image :source="{ uri: 'https://reactnative.dev/img/tiny_logo.png' }" :style="styles.logoImage" />
+      <Image :source="{ uri: 'https://vuejs.org/images/logo.png' }" :style="styles.logoImage" />
 
       <View :style="styles.bottomCard">
         <Text :style="styles.bottomText">↑ you scrolled to the bottom</Text>
@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
           <View testID="modal-card" :style="styles.modalCard">
             <Text :style="styles.modalTitle">It's a Modal</Text>
             <Text :style="styles.modalBody">Rendered through ModalHostView — its own native window, same Fabric tree.</Text>
-            <Button testID="modal-close" title="Close" @press="() => { modalVisible = false }" color="#7fb5ff" />
+            <Button testID="modal-close" title="Close" @press="() => { modalVisible = false }" color="#42b883" />
           </View>
         </View>
       </Modal>

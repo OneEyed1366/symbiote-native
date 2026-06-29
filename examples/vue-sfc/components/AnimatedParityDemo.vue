@@ -71,14 +71,14 @@ const scrollBy = (delta: number): void => {
 
 const styles = StyleSheet.create({
   section: { gap: 12 },
-  sectionLabel: { color: '#41506a', fontSize: 13 },
+  sectionLabel: { color: '#3b5266', fontSize: 13 },
   rowTight: { flexDirection: 'row', gap: 8 },
   flex1: { flex: 1 },
   dragHint: { color: '#718096', fontSize: 11 },
-  xyFrame: { width: XY_SPAN + 36, height: XY_SPAN + 36, borderRadius: 12, backgroundColor: '#eef2f9', padding: 6 },
+  xyFrame: { width: XY_SPAN + 36, height: XY_SPAN + 36, borderRadius: 12, backgroundColor: '#eef7f2', padding: 6 },
   xyBox: { width: 36, height: 36, borderRadius: 8, backgroundColor: '#9f7aea' },
   trackRow: { height: 30, justifyContent: 'center' },
-  leadDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#4299e1' },
+  leadDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#42b883' },
   followDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#f6ad55' },
   collapseFrame: { height: HEADER_COLLAPSE + 24, overflow: 'hidden', justifyContent: 'flex-start' },
   collapseHeader: { height: HEADER_COLLAPSE, borderRadius: 8, backgroundColor: '#38b2ac', alignItems: 'center', justifyContent: 'center' },
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     <View :style="styles.trackRow">
       <AnimatedView testID="follow-dot" :style="[styles.followDot, { transform: [{ translateX: follow }] }]" />
     </View>
-    <Button testID="track-btn" title="Move target (follower chases)" @press="moveLead" color="#4299e1" />
+    <Button testID="track-btn" title="Move target (follower chases)" @press="moveLead" color="#42b883" />
 
     <!-- diffClamp collapsing header -->
     <View :style="styles.collapseFrame">

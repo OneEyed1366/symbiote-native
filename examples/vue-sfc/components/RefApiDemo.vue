@@ -35,17 +35,17 @@ const onFlash = (): void => {
   const box = boxRef.value
   if (box === null) return
   flashed = !flashed
-  box.setNativeProps({ style: { backgroundColor: flashed ? '#f6ad55' : '#7fb5ff' } })
+  box.setNativeProps({ style: { backgroundColor: flashed ? '#f6ad55' : '#42b883' } })
 }
 
 const styles = StyleSheet.create({
   section: { gap: 12 },
-  sectionLabel: { color: '#41506a', fontSize: 13 },
+  sectionLabel: { color: '#3b5266', fontSize: 13 },
   infoText: { color: '#cbd5e1', fontSize: 14 },
   row: { flexDirection: 'row', gap: 12 },
   flex1: { flex: 1 },
-  refBox: { height: 56, borderRadius: 12, backgroundColor: '#7fb5ff', alignItems: 'center', justifyContent: 'center' },
-  refBoxText: { color: '#0b1622', fontSize: 14, fontWeight: 'bold' },
+  refBox: { height: 56, borderRadius: 12, backgroundColor: '#42b883', alignItems: 'center', justifyContent: 'center' },
+  refBoxText: { color: '#1b2a36', fontSize: 14, fontWeight: 'bold' },
 })
 </script>
 
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     <Text testID="measure-frame" :style="styles.infoText">{{ `frame: ${frame}` }}</Text>
     <View :style="styles.row">
       <View :style="styles.flex1">
-        <Button testID="measure-btn" title="Measure" @press="onMeasure" color="#7fb5ff" />
+        <Button testID="measure-btn" title="Measure" @press="onMeasure" color="#42b883" />
       </View>
       <View :style="styles.flex1">
         <Button title="Flash (setNativeProps)" @press="onFlash" color="#f6ad55" />

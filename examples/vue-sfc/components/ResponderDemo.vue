@@ -79,12 +79,12 @@ const onChipRelease = (index: number): void => {
 
 const styles = StyleSheet.create({
   sectionTight: { gap: 8 },
-  sectionLabel: { color: '#41506a', fontSize: 13 },
+  sectionLabel: { color: '#3b5266', fontSize: 13 },
   infoText: { color: '#cbd5e1', fontSize: 14 },
   rowTight: { flexDirection: 'row', gap: 8 },
   transferText: { fontSize: 13 },
-  stripBox: { padding: 12, borderRadius: 12, backgroundColor: '#13243a' },
-  chip: { width: 56, height: 48, borderRadius: 8, backgroundColor: '#2b6cb0', borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  stripBox: { padding: 12, borderRadius: 12, backgroundColor: '#2c3e50' },
+  chip: { width: 56, height: 48, borderRadius: 8, backgroundColor: '#369870', borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   chipText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
 })
 </script>
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     <Text :style="styles.sectionLabel">Responder · drag a chip vs hand-off to the strip</Text>
     <Text :style="styles.infoText">{{ status }}</Text>
     <!-- the separate transfer indicator, lit only when the strip steals the gesture -->
-    <Text :style="[styles.transferText, { color: transfer ? '#f6ad55' : '#41506a' }]">{{ transfer || 'transfer: —' }}</Text>
+    <Text :style="[styles.transferText, { color: transfer ? '#f6ad55' : '#3b5266' }]">{{ transfer || 'transfer: —' }}</Text>
     <View
       @move-should-set-responder="onStripMoveShouldSet"
       @responder-grant="onStripGrant"
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
           @responder-termination-request="onChipTerminationRequest"
           @responder-terminate="onChipTerminate"
           @responder-release="() => onChipRelease(index)"
-          :style="[styles.chip, { borderColor: activeChip === index ? '#7fb5ff' : 'transparent', transform: [{ translateX: activeChip === index ? chipDx : 0 }] }]">
+          :style="[styles.chip, { borderColor: activeChip === index ? '#42b883' : 'transparent', transform: [{ translateX: activeChip === index ? chipDx : 0 }] }]">
           <Text :style="styles.chipText">{{ index }}</Text>
         </View>
       </View>

@@ -23,9 +23,9 @@ onMounted(() => {
 
 const styles = StyleSheet.create({
   section: { gap: 12 },
-  sectionLabel: { color: '#41506a', fontSize: 13 },
+  sectionLabel: { color: '#3b5266', fontSize: 13 },
   infoText: { color: '#cbd5e1', fontSize: 14 },
-  a11yCard: { padding: 12, borderRadius: 10, backgroundColor: '#13243a' },
+  a11yCard: { padding: 12, borderRadius: 10, backgroundColor: '#2c3e50' },
 })
 </script>
 

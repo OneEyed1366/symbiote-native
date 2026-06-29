@@ -64,17 +64,17 @@ const focusTitle = (): void => {
 
 const styles = StyleSheet.create({
   section: { gap: 12 },
-  sectionLabel: { color: '#41506a', fontSize: 13 },
+  sectionLabel: { color: '#3b5266', fontSize: 13 },
   infoText: { color: '#cbd5e1', fontSize: 14 },
   noteText: { color: '#cbd5e1', fontSize: 13 },
   row: { flexDirection: 'row', gap: 12 },
   flex1: { flex: 1 },
-  longPressRow: { color: '#cbd5e1', fontSize: 15, padding: 12, borderRadius: 10, backgroundColor: '#13243a' },
-  focusInput: { color: '#e2e8f0', padding: 12, borderRadius: 10, backgroundColor: '#0f1e30', borderWidth: 1, borderColor: '#2b6cb0' },
-  parityList: { height: 120, borderRadius: 10, backgroundColor: '#0f1e30' },
+  longPressRow: { color: '#cbd5e1', fontSize: 15, padding: 12, borderRadius: 10, backgroundColor: '#2c3e50' },
+  focusInput: { color: '#e2e8f0', padding: 12, borderRadius: 10, backgroundColor: '#22323f', borderWidth: 1, borderColor: '#369870' },
+  parityList: { height: 120, borderRadius: 10, backgroundColor: '#22323f' },
   parityRow: { height: PARITY_ROW_H, justifyContent: 'center', paddingHorizontal: 12 },
-  sectionList: { height: 200, borderRadius: 10, backgroundColor: '#0f1e30' },
-  sectionHeader: { color: '#0b1622', fontSize: 13, fontWeight: 'bold', paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#7fb5ff' },
+  sectionList: { height: 200, borderRadius: 10, backgroundColor: '#22323f' },
+  sectionHeader: { color: '#1b2a36', fontSize: 13, fontWeight: 'bold', paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#42b883' },
 })
 </script>
 
@@ -91,13 +91,13 @@ const styles = StyleSheet.create({
     <!-- #15 Keyboard.dismiss: blurs whatever input holds focus without needing a ref -->
     <TextInput
       placeholder="focus me…"
-      placeholder-text-color="#41506a"
+      placeholder-text-color="#3b5266"
       @focus="() => { dismissMsg = 'keyboard up — tap Hide keyboard' }"
       @blur="() => { dismissMsg = 'blurred (keyboard down)' }"
       :style="styles.focusInput"
     />
     <Text :style="styles.noteText">{{ dismissMsg }}</Text>
-    <Button title="Hide keyboard" @press="() => Keyboard.dismiss()" color="#7fb5ff" />
+    <Button title="Hide keyboard" @press="() => Keyboard.dismiss()" color="#42b883" />
 
     <!-- #12 animated VirtualizedList scroll: smooth (native command) vs instant.
          A fixed height with no wrapper: the vertical ScrollView clips to its own
@@ -113,10 +113,10 @@ const styles = StyleSheet.create({
     />
     <View :style="styles.row">
       <View :style="styles.flex1">
-        <Button title="Scroll ▼ animated" @press="scrollDown" color="#7fb5ff" />
+        <Button title="Scroll ▼ animated" @press="scrollDown" color="#42b883" />
       </View>
       <View :style="styles.flex1">
-        <Button title="Top · instant" @press="scrollTop" color="#7fb5ff" />
+        <Button title="Top · instant" @press="scrollTop" color="#42b883" />
       </View>
     </View>
 
@@ -136,6 +136,6 @@ const styles = StyleSheet.create({
 
     <!-- #14 a11y focus: node-based sendAccessibilityEvent routes through the Fabric
          slot on both platforms (enable TalkBack/VoiceOver to feel the focus jump) -->
-    <Button title="Focus the panel title (a11y)" @press="focusTitle" color="#7fb5ff" />
+    <Button title="Focus the panel title (a11y)" @press="focusTitle" color="#42b883" />
   </View>
 </template>

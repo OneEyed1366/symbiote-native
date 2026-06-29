@@ -263,7 +263,7 @@ const AnimatedParityDemo = defineComponent({
             style={[styles.followDot, { transform: [{ translateX: follow }] }]}
           />
         </View>
-        <Button testID="track-btn" title="Move target (follower chases)" onPress={moveLead} color="#4299e1" />
+        <Button testID="track-btn" title="Move target (follower chases)" onPress={moveLead} color="#42b883" />
 
         {/* diffClamp collapsing header */}
         <View style={styles.collapseFrame}>
@@ -290,11 +290,11 @@ const AnimatedParityDemo = defineComponent({
 // real host: I18nManager (RTL layout constants), Settings (a value round-tripped
 // through iOS NSUserDefaults via SettingsManager), and Image's static methods
 // (getSize / queryCache / prefetch, which hit the ImageLoader native module).
-const LOGO_URI = 'https://reactnative.dev/img/tiny_logo.png'
+const LOGO_URI = 'https://vuejs.org/images/logo.png'
 // A distinct cache key for the prefetch demo: same asset, different URL (query
 // string), so nothing has loaded it yet. The cache starts cold and the button
 // visibly warms it, unlike LOGO_URI, which getSize + the <Image> already pulled in.
-const PREFETCH_URI = 'https://reactnative.dev/img/tiny_logo.png?warm=symbiote'
+const PREFETCH_URI = 'https://vuejs.org/images/logo.png?warm=symbiote'
 const TAP_KEY = 'symbiote.tapCount'
 
 const NativeModulesDemo = defineComponent({
@@ -363,14 +363,14 @@ const NativeModulesDemo = defineComponent({
         <Button
           title={rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'}
           onPress={() => I18nManager.forceRTL(!rtl.isRTL)}
-          color="#7fb5ff"
+          color="#42b883"
         />
 
         {/* Settings: counter persisted to NSUserDefaults, survives a relaunch */}
         <Text testID="persist-count" style={styles.infoText}>
           {`persisted taps: ${persisted.value} · survives relaunch`}
         </Text>
-        <Button testID="persist-btn" title="Persist a tap" onPress={persistTap} color="#7fb5ff" />
+        <Button testID="persist-btn" title="Persist a tap" onPress={persistTap} color="#42b883" />
 
         {/* Image statics: the rendered asset + getSize's measurement of it */}
         <View style={styles.rowAlignCenter}>
@@ -384,7 +384,7 @@ const NativeModulesDemo = defineComponent({
         </View>
         {/* prefetch warms a cold url: not cached → (tap) → cached */}
         <Text style={styles.infoText}>{`prefetch cache: ${cacheState.value}`}</Text>
-        <Button title="Prefetch logo" onPress={prefetchLogo} color="#7fb5ff" />
+        <Button title="Prefetch logo" onPress={prefetchLogo} color="#42b883" />
       </View>
     )
   },
@@ -424,7 +424,7 @@ const RefApiDemo = defineComponent({
       const box = boxRef.value
       if (box === null) return
       flashed = !flashed
-      box.setNativeProps({ style: { backgroundColor: flashed ? '#f6ad55' : '#7fb5ff' } })
+      box.setNativeProps({ style: { backgroundColor: flashed ? '#f6ad55' : '#42b883' } })
     }
 
     return () => (
@@ -443,7 +443,7 @@ const RefApiDemo = defineComponent({
         <Text testID="measure-frame" style={styles.infoText}>{`frame: ${frame.value}`}</Text>
         <View style={styles.row}>
           <View style={styles.flex1}>
-            <Button testID="measure-btn" title="Measure" onPress={onMeasure} color="#7fb5ff" />
+            <Button testID="measure-btn" title="Measure" onPress={onMeasure} color="#42b883" />
           </View>
           <View style={styles.flex1}>
             <Button title="Flash (setNativeProps)" onPress={onFlash} color="#f6ad55" />
@@ -477,7 +477,7 @@ const PlatformColorDemo = defineComponent({
             style={[
               styles.colorTileBordered,
               {
-                backgroundColor: DynamicColorIOS({ light: '#dbeafe', dark: '#13243a' }),
+                backgroundColor: DynamicColorIOS({ light: '#dcf3e8', dark: '#2c3e50' }),
                 borderColor: PlatformColor('separator'),
               },
             ]}>
@@ -542,7 +542,7 @@ const ResponderDemo = defineComponent({
         </Text>
         <Text style={styles.infoText}>{status.value}</Text>
         {/* the separate transfer indicator, lit only when the strip steals the gesture */}
-        <Text style={[styles.transferText, { color: transfer.value ? '#f6ad55' : '#41506a' }]}>
+        <Text style={[styles.transferText, { color: transfer.value ? '#f6ad55' : '#3b5266' }]}>
           {transfer.value || 'transfer: —'}
         </Text>
         <View
@@ -590,7 +590,7 @@ const ResponderDemo = defineComponent({
                 style={[
                   styles.chip,
                   {
-                    borderColor: activeChip.value === index ? '#7fb5ff' : 'transparent',
+                    borderColor: activeChip.value === index ? '#42b883' : 'transparent',
                     transform: [{ translateX: activeChip.value === index ? chipDx.value : 0 }],
                   },
                 ]}>
@@ -703,13 +703,13 @@ const ParityDemo = defineComponent({
         {/* #15 Keyboard.dismiss: blurs whatever input holds focus without needing a ref */}
         <TextInput
           placeholder="focus me…"
-          placeholderTextColor="#41506a"
+          placeholderTextColor="#3b5266"
           onFocus={() => { dismissMsg.value = 'keyboard up — tap Hide keyboard' }}
           onBlur={() => { dismissMsg.value = 'blurred (keyboard down)' }}
           style={styles.focusInput}
         />
         <Text style={styles.noteText}>{dismissMsg.value}</Text>
-        <Button title="Hide keyboard" onPress={() => Keyboard.dismiss()} color="#7fb5ff" />
+        <Button title="Hide keyboard" onPress={() => Keyboard.dismiss()} color="#42b883" />
 
         {/* #12 animated VirtualizedList scroll: smooth (native command) vs instant.
             A fixed height with no wrapper: the vertical ScrollView clips to its own
@@ -729,10 +729,10 @@ const ParityDemo = defineComponent({
         />
         <View style={styles.row}>
           <View style={styles.flex1}>
-            <Button title="Scroll ▼ animated" onPress={() => listRef.value?.scrollToOffset({ offset: 20 * PARITY_ROW_H, animated: true })} color="#7fb5ff" />
+            <Button title="Scroll ▼ animated" onPress={() => listRef.value?.scrollToOffset({ offset: 20 * PARITY_ROW_H, animated: true })} color="#42b883" />
           </View>
           <View style={styles.flex1}>
-            <Button title="Top · instant" onPress={() => listRef.value?.scrollToOffset({ offset: 0, animated: false })} color="#7fb5ff" />
+            <Button title="Top · instant" onPress={() => listRef.value?.scrollToOffset({ offset: 0, animated: false })} color="#42b883" />
           </View>
         </View>
 
@@ -767,7 +767,7 @@ const ParityDemo = defineComponent({
               AccessibilityInfo.sendAccessibilityEvent(titleRef.value, 'focus')
             }
           }}
-          color="#7fb5ff"
+          color="#42b883"
         />
       </View>
     )
@@ -895,7 +895,7 @@ const App = defineComponent({
         style={styles.screen}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing.value} onRefresh={onRefresh} tintColor="#7fb5ff" />
+          <RefreshControl refreshing={refreshing.value} onRefresh={onRefresh} tintColor="#42b883" />
         }>
         {/* JS->native: StatusBar renders nothing; it drives the iOS status bar
             (the top strip: clock, wi-fi, battery) imperatively from these props. */}
@@ -935,14 +935,14 @@ const App = defineComponent({
             <Button
               title={statusBarHidden.value ? 'Show status bar' : 'Hide status bar'}
               onPress={() => { statusBarHidden.value = !statusBarHidden.value }}
-              color="#7fb5ff"
+              color="#42b883"
             />
           </View>
           <View style={styles.flex1}>
             <Button
               title={darkStatusBar.value ? 'Light text' : 'Dark text'}
               onPress={() => { darkStatusBar.value = !darkStatusBar.value }}
-              color="#7fb5ff"
+              color="#42b883"
             />
           </View>
         </View>
@@ -957,9 +957,9 @@ const App = defineComponent({
                 onPress={() => {
                   const next = !statusBarRed.value
                   statusBarRed.value = next
-                  StatusBar.setBackgroundColor(next ? '#ff0000' : '#101a2c', true)
+                  StatusBar.setBackgroundColor(next ? '#ff0000' : '#22323f', true)
                 }}
-                color="#7fb5ff"
+                color="#42b883"
               />
             </View>
             <View style={styles.flex1}>
@@ -970,7 +970,7 @@ const App = defineComponent({
                   statusBarTranslucent.value = next
                   StatusBar.setTranslucent(next)
                 }}
-                color="#7fb5ff"
+                color="#42b883"
               />
             </View>
           </View>
@@ -979,32 +979,32 @@ const App = defineComponent({
             Each working button proves its module name resolved on the bridgeless host. */}
         <View style={styles.row}>
           <View style={styles.flex1}>
-            <Button title="Alert" onPress={onAlert} color="#7fb5ff" />
+            <Button title="Alert" onPress={onAlert} color="#42b883" />
           </View>
           {/* ActionSheetIOS drives the iOS-only ActionSheetManager; no Android native
               module exists, so the control is iOS-only by design (not a gap). */}
           {Platform.OS !== 'android' && (
             <View style={styles.flex1}>
-              <Button title="Action sheet" onPress={onActionSheet} color="#7fb5ff" />
+              <Button title="Action sheet" onPress={onActionSheet} color="#42b883" />
             </View>
           )}
         </View>
         <View style={styles.row}>
           <View style={styles.flex1}>
-            <Button title="Share" onPress={onShare} color="#7fb5ff" />
+            <Button title="Share" onPress={onShare} color="#42b883" />
           </View>
           <View style={styles.flex1}>
-            <Button title="Vibrate" onPress={() => Vibration.vibrate()} color="#7fb5ff" />
+            <Button title="Vibrate" onPress={() => Vibration.vibrate()} color="#42b883" />
           </View>
         </View>
-        <Button title="Open reactnative.dev" onPress={onOpenUrl} color="#7fb5ff" />
+        <Button title="Open reactnative.dev" onPress={onOpenUrl} color="#42b883" />
 
         {/* The native UIRefreshControl spinner only shows while iOS holds the scroll
             view pulled-down; our full re-commit snaps the offset back, so we drive
             our OWN indicator from the same `refreshing` flag, guaranteed visible. */}
         {refreshing.value ? (
           <View style={styles.refreshRow}>
-            <ActivityIndicator color="#7fb5ff" />
+            <ActivityIndicator color="#42b883" />
             <Text style={styles.accentNote}>Refreshing…</Text>
           </View>
         ) : (
@@ -1029,7 +1029,7 @@ const App = defineComponent({
           value={name.value}
           onChangeText={(text: string) => { name.value = text }}
           placeholder="type your name…"
-          placeholderTextColor="#41506a"
+          placeholderTextColor="#3b5266"
           style={styles.textInput}
         />
         <Text testID="greeting-output" style={styles.greeting}>
@@ -1043,10 +1043,10 @@ const App = defineComponent({
             testID="spinner-switch"
             value={spinning.value}
             onValueChange={(next: boolean) => { spinning.value = next }}
-            trackColor={{ false: '#334155', true: '#2b6cb0' }}
+            trackColor={{ false: '#334155', true: '#369870' }}
           />
         </View>
-        <ActivityIndicator testID="spinner-indicator" animating={spinning.value} color="#7fb5ff" size="large" />
+        <ActivityIndicator testID="spinner-indicator" animating={spinning.value} color="#42b883" size="large" />
 
         {/* Animated: JS driver vs native driver, side by side */}
         <AnimatedDemo />
@@ -1073,7 +1073,7 @@ const App = defineComponent({
         <ParityDemo />
 
         {/* Button opens a Modal */}
-        <Button testID="modal-open" title="Open modal" onPress={() => { modalVisible.value = true }} color="#7fb5ff" />
+        <Button testID="modal-open" title="Open modal" onPress={() => { modalVisible.value = true }} color="#42b883" />
 
         {/* Pressable card with pressed-state feedback */}
         <Pressable
@@ -1081,12 +1081,12 @@ const App = defineComponent({
           style={({ pressed }: { pressed: boolean }) => [
             styles.pressableCard,
             {
-              backgroundColor: pressed ? '#13243a' : '#0f1e30',
-              borderColor: pressed ? '#7fb5ff' : '#2b6cb0',
+              backgroundColor: pressed ? '#2c3e50' : '#22323f',
+              borderColor: pressed ? '#42b883' : '#369870',
             },
           ]}>
           {({ pressed }: { pressed: boolean }) => (
-            <Text style={[styles.pressableLabel, { color: pressed ? '#7fb5ff' : '#cbd5e1' }]}>
+            <Text style={[styles.pressableLabel, { color: pressed ? '#42b883' : '#cbd5e1' }]}>
               {pressed ? 'holding…' : 'press me (also +1)'}
             </Text>
           )}
@@ -1131,7 +1131,7 @@ const App = defineComponent({
           }}
           style={({ pressed }: { pressed: boolean }) => [
             styles.retentionCard,
-            { backgroundColor: pressed ? '#2b6cb0' : '#13243a' },
+            { backgroundColor: pressed ? '#369870' : '#2c3e50' },
           ]}>
           <Text style={styles.infoText}>
             {`drag me · dx ${retentionMove.value.dx} · dy ${retentionMove.value.dy}`}
@@ -1155,7 +1155,7 @@ const App = defineComponent({
         />
         <Button
           title="Prepend 5"
-          color="#7fb5ff"
+          color="#42b883"
           onPress={() => {
             mvcpHead -= 5
             const head = mvcpHead
@@ -1241,7 +1241,7 @@ const App = defineComponent({
         {/* Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
             width/height→style); a screen reader reads "React logo" (alt→accessibilityLabel). */}
         <Image
-          src="https://reactnative.dev/img/tiny_logo.png"
+          src="https://vuejs.org/images/logo.png"
           alt="React logo"
           width={48}
           height={48}
@@ -1256,7 +1256,7 @@ const App = defineComponent({
           <Switch
             value={kavEnabled.value}
             onValueChange={(next: boolean) => { kavEnabled.value = next }}
-            trackColor={{ false: '#334155', true: '#2b6cb0' }}
+            trackColor={{ false: '#334155', true: '#369870' }}
           />
         </View>
         <KeyboardAvoidingView
@@ -1267,13 +1267,13 @@ const App = defineComponent({
             inputMode="email"
             enterKeyHint="done"
             placeholder="email — focus me near the bottom…"
-            placeholderTextColor="#41506a"
+            placeholderTextColor="#3b5266"
             style={styles.textInput}
           />
         </KeyboardAvoidingView>
 
         <Image
-          source={{ uri: 'https://reactnative.dev/img/tiny_logo.png' }}
+          source={{ uri: 'https://vuejs.org/images/logo.png' }}
           style={styles.logoImage}
         />
 
@@ -1296,7 +1296,7 @@ const App = defineComponent({
               <Text style={styles.modalBody}>
                 Rendered through ModalHostView — its own native window, same Fabric tree.
               </Text>
-              <Button testID="modal-close" title="Close" onPress={() => { modalVisible.value = false }} color="#7fb5ff" />
+              <Button testID="modal-close" title="Close" onPress={() => { modalVisible.value = false }} color="#42b883" />
             </View>
           </View>
         </Modal>
@@ -1313,35 +1313,35 @@ const App = defineComponent({
 // initialized before StyleSheet.create runs at module load.
 const styles = StyleSheet.create({
   // shared / common
-  screen: { flex: 1, backgroundColor: '#0b1622' },
+  screen: { flex: 1, backgroundColor: '#1b2a36' },
   scrollContent: { paddingVertical: 64, paddingHorizontal: 24, alignItems: 'stretch', gap: 28 },
   section: { gap: 12 },
   sectionTight: { gap: 8 },
   row: { flexDirection: 'row', gap: 12 },
   rowTight: { flexDirection: 'row', gap: 8 },
   flex1: { flex: 1 },
-  sectionLabel: { color: '#41506a', fontSize: 13 },
+  sectionLabel: { color: '#3b5266', fontSize: 13 },
   infoText: { color: '#cbd5e1', fontSize: 14 },
   noteText: { color: '#cbd5e1', fontSize: 13 },
   switchLabel: { color: '#cbd5e1', fontSize: 16 },
   listRowText: { color: '#cbd5e1', fontSize: 15 },
 
   // the one allowed difference vs the React canary
-  badge: { color: '#60a5fa', fontSize: 14, letterSpacing: 2, textAlign: 'center' },
+  badge: { color: '#5fcf9b', fontSize: 14, letterSpacing: 2, textAlign: 'center' },
 
   // AnimatedDemo
   pulseFrame: { height: 64, alignItems: 'center', justifyContent: 'center' },
-  pulseDot: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#7fb5ff' },
+  pulseDot: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#42b883' },
   slideTrack: { height: 36, justifyContent: 'center' },
   jsSlideDot: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#f6ad55' },
   nativeSlideDot: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#68d391' },
 
   // AnimatedParityDemo
   dragHint: { color: '#718096', fontSize: 11 },
-  xyFrame: { width: XY_SPAN + 36, height: XY_SPAN + 36, borderRadius: 12, backgroundColor: '#eef2f9', padding: 6 },
+  xyFrame: { width: XY_SPAN + 36, height: XY_SPAN + 36, borderRadius: 12, backgroundColor: '#eef7f2', padding: 6 },
   xyBox: { width: 36, height: 36, borderRadius: 8, backgroundColor: '#9f7aea' },
   trackRow: { height: 30, justifyContent: 'center' },
-  leadDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#4299e1' },
+  leadDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#42b883' },
   followDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#f6ad55' },
   collapseFrame: { height: HEADER_COLLAPSE + 24, overflow: 'hidden', justifyContent: 'flex-start' },
   collapseHeader: { height: HEADER_COLLAPSE, borderRadius: 8, backgroundColor: '#38b2ac', alignItems: 'center', justifyContent: 'center' },
@@ -1349,12 +1349,12 @@ const styles = StyleSheet.create({
 
   // NativeModulesDemo
   rowAlignCenter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logoThumb: { width: 48, height: 48, borderRadius: 8, backgroundColor: '#0f1e30' },
+  logoThumb: { width: 48, height: 48, borderRadius: 8, backgroundColor: '#22323f' },
   infoTextFlex: { color: '#cbd5e1', fontSize: 14, flex: 1 },
 
   // RefApiDemo
-  refBox: { height: 56, borderRadius: 12, backgroundColor: '#7fb5ff', alignItems: 'center', justifyContent: 'center' },
-  refBoxText: { color: '#0b1622', fontSize: 14, fontWeight: 'bold' },
+  refBox: { height: 56, borderRadius: 12, backgroundColor: '#42b883', alignItems: 'center', justifyContent: 'center' },
+  refBoxText: { color: '#1b2a36', fontSize: 14, fontWeight: 'bold' },
 
   // PlatformColorDemo
   colorTile: { flex: 1, height: 56, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
@@ -1364,56 +1364,56 @@ const styles = StyleSheet.create({
 
   // ResponderDemo
   transferText: { fontSize: 13 },
-  stripBox: { padding: 12, borderRadius: 12, backgroundColor: '#13243a' },
-  chip: { width: 56, height: 48, borderRadius: 8, backgroundColor: '#2b6cb0', borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  stripBox: { padding: 12, borderRadius: 12, backgroundColor: '#2c3e50' },
+  chip: { width: 56, height: 48, borderRadius: 8, backgroundColor: '#369870', borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   chipText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
 
   // AccessibilityDemo
-  a11yCard: { padding: 12, borderRadius: 10, backgroundColor: '#13243a' },
+  a11yCard: { padding: 12, borderRadius: 10, backgroundColor: '#2c3e50' },
 
   // ParityDemo
-  longPressRow: { color: '#cbd5e1', fontSize: 15, padding: 12, borderRadius: 10, backgroundColor: '#13243a' },
-  focusInput: { color: '#e2e8f0', padding: 12, borderRadius: 10, backgroundColor: '#0f1e30', borderWidth: 1, borderColor: '#2b6cb0' },
-  parityList: { height: 120, borderRadius: 10, backgroundColor: '#0f1e30' },
+  longPressRow: { color: '#cbd5e1', fontSize: 15, padding: 12, borderRadius: 10, backgroundColor: '#2c3e50' },
+  focusInput: { color: '#e2e8f0', padding: 12, borderRadius: 10, backgroundColor: '#22323f', borderWidth: 1, borderColor: '#369870' },
+  parityList: { height: 120, borderRadius: 10, backgroundColor: '#22323f' },
   parityRow: { height: PARITY_ROW_H, justifyContent: 'center', paddingHorizontal: 12 },
-  sectionList: { height: 200, borderRadius: 10, backgroundColor: '#0f1e30' },
-  sectionHeader: { color: '#0b1622', fontSize: 13, fontWeight: 'bold', paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#7fb5ff' },
+  sectionList: { height: 200, borderRadius: 10, backgroundColor: '#22323f' },
+  sectionHeader: { color: '#1b2a36', fontSize: 13, fontWeight: 'bold', paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#42b883' },
 
   // App
-  title: { color: '#7fb5ff', fontSize: 16, textAlign: 'center' },
-  headerNote: { color: '#7fb5ff', fontSize: 13, textAlign: 'center' },
-  hairlineNote: { color: '#7fb5ff', fontSize: 13, textAlign: 'center', paddingTop: 8, borderTopColor: '#2b6cb0' },
+  title: { color: '#42b883', fontSize: 16, textAlign: 'center' },
+  headerNote: { color: '#42b883', fontSize: 13, textAlign: 'center' },
+  hairlineNote: { color: '#42b883', fontSize: 13, textAlign: 'center', paddingTop: 8, borderTopColor: '#369870' },
   refreshRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  accentNote: { color: '#7fb5ff', fontSize: 13 },
-  mutedCenter: { color: '#41506a', fontSize: 13, textAlign: 'center' },
-  counterCard: { paddingVertical: 18, borderRadius: 16, backgroundColor: '#2b6cb0', alignItems: 'center' },
+  accentNote: { color: '#42b883', fontSize: 13 },
+  mutedCenter: { color: '#3b5266', fontSize: 13, textAlign: 'center' },
+  counterCard: { paddingVertical: 18, borderRadius: 16, backgroundColor: '#369870', alignItems: 'center' },
   counterText: { color: '#ffffff', fontSize: 24, fontWeight: 'bold' },
-  textInput: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#2b6cb0', paddingHorizontal: 14, color: '#ffffff', fontSize: 18, backgroundColor: '#0f1e30' },
+  textInput: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#369870', paddingHorizontal: 14, color: '#ffffff', fontSize: 18, backgroundColor: '#22323f' },
   greeting: { color: '#ffffff', fontSize: 20, textAlign: 'center' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
   pressableCard: { paddingVertical: 16, borderRadius: 14, alignItems: 'center', borderWidth: 1 },
   pressableLabel: { fontSize: 15 },
   chipList: { height: 84 },
   chipCard: { width: CHIP_WIDTH, height: 72, marginRight: CHIP_GAP, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  chipNumber: { color: '#0b1622', fontSize: 18, fontWeight: 'bold' },
+  chipNumber: { color: '#1b2a36', fontSize: 18, fontWeight: 'bold' },
   retentionCard: { height: 64, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  boxList160: { height: 160, borderRadius: 12, backgroundColor: '#0f1e30' },
+  boxList160: { height: 160, borderRadius: 12, backgroundColor: '#22323f' },
   mvcpRow: { paddingVertical: 10, paddingHorizontal: 14 },
-  parityHeader: { backgroundColor: '#2b6cb0', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  parityHeader: { backgroundColor: '#369870', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   parityHeaderText: { color: '#ffffff', fontSize: 15, fontWeight: 'bold' },
   scrollDemoRow: { height: 80, justifyContent: 'center', paddingHorizontal: 14 },
-  tinyCenter: { color: '#41506a', fontSize: 12, textAlign: 'center' },
-  shadowCard: { height: 64, borderRadius: 12, backgroundColor: '#13243a', alignItems: 'center', justifyContent: 'center', boxShadow: '0px 0px 22px 3px rgba(127,181,255,0.85)' },
-  filterTile: { flex: 1, height: 64, borderRadius: 12, backgroundColor: '#2b6cb0', alignItems: 'center', justifyContent: 'center' },
+  tinyCenter: { color: '#3b5266', fontSize: 12, textAlign: 'center' },
+  shadowCard: { height: 64, borderRadius: 12, backgroundColor: '#2c3e50', alignItems: 'center', justifyContent: 'center', boxShadow: '0px 0px 22px 3px rgba(127,181,255,0.85)' },
+  filterTile: { flex: 1, height: 64, borderRadius: 12, backgroundColor: '#369870', alignItems: 'center', justifyContent: 'center' },
   dim: { filter: [{ brightness: 0.5 }] },
   tileText: { color: '#ffffff', fontSize: 13 },
-  rotatedCard: { height: 64, borderRadius: 12, backgroundColor: '#2b6cb0', alignItems: 'center', justifyContent: 'center', transformOrigin: 'top left', transform: [{ rotate: '4deg' }] },
+  rotatedCard: { height: 64, borderRadius: 12, backgroundColor: '#369870', alignItems: 'center', justifyContent: 'center', transformOrigin: 'top left', transform: [{ rotate: '4deg' }] },
   webImage: { borderRadius: 8, alignSelf: 'center' },
   logoImage: { width: 64, height: 64, borderRadius: 12, alignSelf: 'center' },
-  bottomCard: { height: 200, borderRadius: 16, backgroundColor: '#13243a', alignItems: 'center', justifyContent: 'center' },
-  bottomText: { color: '#7fb5ff', fontSize: 16 },
+  bottomCard: { height: 200, borderRadius: 16, backgroundColor: '#2c3e50', alignItems: 'center', justifyContent: 'center' },
+  bottomText: { color: '#42b883', fontSize: 16 },
   modalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)' },
-  modalCard: { width: 280, padding: 24, borderRadius: 20, backgroundColor: '#0f1e30', alignItems: 'center', gap: 16 },
+  modalCard: { width: 280, padding: 24, borderRadius: 20, backgroundColor: '#22323f', alignItems: 'center', gap: 16 },
   modalTitle: { color: '#ffffff', fontSize: 20, fontWeight: 'bold' },
   modalBody: { color: '#cbd5e1', fontSize: 14, textAlign: 'center' },
 })

@@ -65,9 +65,9 @@ const freezeJs = (): void => {
 
 const styles = StyleSheet.create({
   section: { gap: 12 },
-  sectionLabel: { color: '#41506a', fontSize: 13 },
+  sectionLabel: { color: '#3b5266', fontSize: 13 },
   pulseFrame: { height: 64, alignItems: 'center', justifyContent: 'center' },
-  pulseDot: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#7fb5ff' },
+  pulseDot: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#42b883' },
   slideTrack: { height: 36, justifyContent: 'center' },
   jsSlideDot: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#f6ad55' },
   nativeSlideDot: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#68d391' },
