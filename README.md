@@ -90,12 +90,21 @@ The only thing symbiote replaces is the JS renderer.
 
 ## See It Work
 
-The Vue 3 canary, running on the iOS simulator — real native views, driven from Vue through
-`@symbiote/engine`, with React Native's own renderer never in the path:
+The *same* native app — same `@symbiote/engine`, same stock Fabric core — driven by two different
+frameworks on the iOS simulator. React Native's own renderer is never in the path of either:
 
 <div align="center">
 
-![Vue 3 driving real native iOS views through symbiote](./assets/vue-demo.gif)
+<table>
+<tr>
+<td align="center"><b>React</b></td>
+<td align="center"><b>Vue 3</b></td>
+</tr>
+<tr>
+<td><img src="./assets/react-demo.gif" width="300" alt="React driving real native iOS views through symbiote"></td>
+<td><img src="./assets/vue-demo.gif" width="300" alt="Vue 3 driving real native iOS views through symbiote"></td>
+</tr>
+</table>
 
 </div>
 
