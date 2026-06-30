@@ -8,10 +8,16 @@
 // async, so each driving step is followed by a macrotask `tick` that drains the engine's
 // coalesced commit and the post-flush watchers before the assert reads the committed tree.
 
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount, type IFlatListHandle } from '@symbiote/vue';
 import { installFabric, type IFakeNode } from '@symbiote/test-utils';
+
+// FlatList (over the generic VirtualizedList) is a GENERIC component, so its value is a generic
+// construct signature that h()'s overloads can't resolve. These are runtime pipeline tests, not type
+// tests, so drive it through a loose functional-component handle (sanctioned cast — generic-component
+// limitation, test-only).
+const FlatListHost = FlatList as unknown as FunctionalComponent<Record<string, unknown>>;
 
 type ICommandCall = {
   name: string;
@@ -92,21 +98,30 @@ afterEach(() => unmount(ROOT_TAG));
 
 const listRef = ref<IFlatListHandle | null>(null);
 
-function makeList(extra: Record<string, unknown>): ReturnType<typeof defineComponent> {
+function makeList(
+  extra: Record<string, unknown>,
+  extraSlots: Record<string, unknown> = {},
+): ReturnType<typeof defineComponent> {
   return defineComponent({
     setup: () => () =>
-      h(FlatList, {
-        ref: listRef,
-        data: DATA,
-        keyExtractor: (item: IRow) => `k-${item.id}`,
-        getItemLayout: (_data: unknown, index: number) => ({
-          length: ITEM_HEIGHT,
-          offset: ITEM_HEIGHT * index,
-          index,
-        }),
-        renderItem: ({ item }: { item: IRow }) => h('symbiote-text', {}, item.label),
-        ...extra,
-      }),
+      h(
+        FlatListHost,
+        {
+          ref: listRef,
+          data: DATA,
+          keyExtractor: (item: IRow) => `k-${item.id}`,
+          getItemLayout: (_data: unknown, index: number) => ({
+            length: ITEM_HEIGHT,
+            offset: ITEM_HEIGHT * index,
+            index,
+          }),
+          ...extra,
+        },
+        {
+          item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)],
+          ...extraSlots,
+        },
+      ),
   });
 }
 
@@ -192,8 +207,11 @@ async function mountWithComponent(
   return scrollView;
 }
 
-async function mountWithViewport(extra: Record<string, unknown> = {}): Promise<IFakeNode> {
-  return mountWithComponent(makeList(extra));
+async function mountWithViewport(
+  extra: Record<string, unknown> = {},
+  extraSlots: Record<string, unknown> = {},
+): Promise<IFakeNode> {
+  return mountWithComponent(makeList(extra, extraSlots));
 }
 
 describe('Vue VirtualizedList virtualization on the engine', () => {
@@ -276,17 +294,20 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
 function makeMvcpList(): ReturnType<typeof defineComponent> {
   return defineComponent({
     setup: () => () =>
-      h(FlatList, {
-        data: mvcpData.value,
-        keyExtractor: (item: IRow) => `k-${item.id}`,
-        getItemLayout: (_data: unknown, index: number) => ({
-          length: ITEM_HEIGHT,
-          offset: ITEM_HEIGHT * index,
-          index,
-        }),
-        renderItem: ({ item }: { item: IRow }) => h('symbiote-text', {}, item.label),
-        maintainVisibleContentPosition: { minIndexForVisible: 0 },
-      }),
+      h(
+        FlatListHost,
+        {
+          data: mvcpData.value,
+          keyExtractor: (item: IRow) => `k-${item.id}`,
+          getItemLayout: (_data: unknown, index: number) => ({
+            length: ITEM_HEIGHT,
+            offset: ITEM_HEIGHT * index,
+            index,
+          }),
+          maintainVisibleContentPosition: { minIndexForVisible: 0 },
+        },
+        { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+      ),
   });
 }
 
@@ -294,23 +315,26 @@ function makeMvcpList(): ReturnType<typeof defineComponent> {
 function makeFailList(): ReturnType<typeof defineComponent> {
   return defineComponent({
     setup: () => () =>
-      h(FlatList, {
-        ref: listRef,
-        data: FAIL_DATA,
-        keyExtractor: (item: IRow) => `k-${item.id}`,
-        renderItem: ({ item }: { item: IRow }) => h('symbiote-text', {}, item.label),
-        onScrollToIndexFailed: (info: IScrollToIndexFailure) => failures.push(info),
-      }),
+      h(
+        FlatListHost,
+        {
+          ref: listRef,
+          data: FAIL_DATA,
+          keyExtractor: (item: IRow) => `k-${item.id}`,
+          onScrollToIndexFailed: (info: IScrollToIndexFailure) => failures.push(info),
+        },
+        { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+      ),
   });
 }
 
 describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex failure', () => {
   it('forwards maintainVisibleContentPosition to the scroll view, bumping minIndexForVisible for the header', async () => {
-    await mountWithViewport({
-      // A header occupies child 0, so RN bumps minIndexForVisible by 1 (1 -> 2).
-      ListHeaderComponent: () => h('symbiote-text', {}, 'header'),
-      maintainVisibleContentPosition: { minIndexForVisible: 1, autoscrollToTopThreshold: 10 },
-    });
+    await mountWithViewport(
+      { maintainVisibleContentPosition: { minIndexForVisible: 1, autoscrollToTopThreshold: 10 } },
+      // A #header slot occupies child 0, so RN bumps minIndexForVisible by 1 (1 -> 2).
+      { header: () => [h('symbiote-text', {}, 'header')] },
+    );
 
     // Read from the COMMITTED tree (the clones): fabric.find returns the createNode node whose props
     // can be stale after clone-on-write; the latest maintainVisibleContentPosition rides the clone.

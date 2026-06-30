@@ -13,13 +13,14 @@
 // the forward-only rest (events, blurRadius, capInsets, testID, accessibility*) is typed as the
 // a11y intersection so resolveAccessibilityProps folds aria-* into accessibility* over it.
 
-import { type FunctionalComponent } from '@vue/runtime-core';
+import type { FunctionalComponent } from '@vue/runtime-core';
 import {
   imageStatics,
   renderImage,
   resolveAccessibilityProps,
   type IAccessibilityProps,
   type IAriaProps,
+  type IImageProps,
   type IImageSourceProp,
   type IImageStatics,
   type IResizeMode,
@@ -108,7 +109,7 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
   return result;
 }
 
-const ImageComponent: FunctionalComponent = (_props, { attrs: rawAttrs }) => {
+const ImageComponent: FunctionalComponent<IImageProps> = (_props, { attrs: rawAttrs }) => {
   const attrs = normalizeVueAttrs(rawAttrs);
   return descriptorToVue(
     renderImage({
@@ -134,7 +135,7 @@ ImageComponent.inheritAttrs = false;
 
 // Statics attached like RN (Image.getSize / prefetch / …), shared verbatim with React via
 // the engine-resolved imageStatics. The component value doubles as the statics namespace.
-export const Image: FunctionalComponent & IImageStatics = Object.assign(
+export const Image: FunctionalComponent<IImageProps> & IImageStatics = Object.assign(
   ImageComponent,
   imageStatics,
 );

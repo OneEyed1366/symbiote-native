@@ -6,10 +6,18 @@
 // row width, and an imperative scrollToOffset lands as the native scrollTo view command. Vue
 // reactivity is async, so each driving step is followed by a macrotask `tick`.
 
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount, type IFlatListHandle } from '@symbiote/vue';
 import { installFabric, type IFakeNode } from '@symbiote/test-utils';
+
+// FlatList is a GENERIC component (its setup is `<ItemT,>(props, ctx)`), so its value is a generic
+// construct signature. JSX infers ItemT from `data` (proven in examples/vue-tsx/App.tsx), but the
+// imperative `h(FlatListHost, …)` overloads can't resolve that signature. These are runtime pipeline
+// tests, not type tests, so drive the component through a loose functional-component handle.
+// (Sanctioned cast — generic-component limitation, test-only; the type surface is proven in the
+// JSX example.)
+const FlatListHost = FlatList as unknown as FunctionalComponent<Record<string, unknown>>;
 
 type ICommandCall = {
   name: string;
@@ -85,16 +93,19 @@ describe('Vue FlatList on the engine', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h(FlatList, {
-            data,
-            keyExtractor: (item: IRow) => `k-${item.id}`,
-            getItemLayout: (_data: unknown, index: number) => ({
-              length: ITEM_HEIGHT,
-              offset: ITEM_HEIGHT * index,
-              index,
-            }),
-            renderItem: ({ item }: { item: IRow }) => h('symbiote-text', {}, item.label),
-          }),
+          h(
+            FlatListHost,
+            {
+              data,
+              keyExtractor: (item: IRow) => `k-${item.id}`,
+              getItemLayout: (_data: unknown, index: number) => ({
+                length: ITEM_HEIGHT,
+                offset: ITEM_HEIGHT * index,
+                index,
+              }),
+            },
+            { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+          ),
       }),
     );
     await tick();
@@ -120,12 +131,15 @@ describe('Vue FlatList on the engine', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h(FlatList, {
-            data,
-            numColumns: 2,
-            keyExtractor: (item: IRow) => `k-${item.id}`,
-            renderItem: ({ item }: { item: IRow }) => h('symbiote-text', {}, item.label),
-          }),
+          h(
+            FlatListHost,
+            {
+              data,
+              numColumns: 2,
+              keyExtractor: (item: IRow) => `k-${item.id}`,
+            },
+            { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+          ),
       }),
     );
     await tick();
@@ -146,20 +160,26 @@ describe('Vue FlatList on the engine', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h(FlatList, {
-            data,
-            horizontal: true,
-            keyExtractor: (item: IRow) => `k-${item.id}`,
-            getItemLayout: (_data: unknown, index: number) => ({
-              length: ITEM_WIDTH,
-              offset: ITEM_WIDTH * index,
-              index,
-            }),
-            renderItem: ({ item }: { item: IRow }) =>
-              h('symbiote-view', { style: { width: ITEM_WIDTH, height: 40 } }, [
-                h('symbiote-text', {}, item.label),
-              ]),
-          }),
+          h(
+            FlatListHost,
+            {
+              data,
+              horizontal: true,
+              keyExtractor: (item: IRow) => `k-${item.id}`,
+              getItemLayout: (_data: unknown, index: number) => ({
+                length: ITEM_WIDTH,
+                offset: ITEM_WIDTH * index,
+                index,
+              }),
+            },
+            {
+              item: ({ item }: { item: IRow }) => [
+                h('symbiote-view', { style: { width: ITEM_WIDTH, height: 40 } }, [
+                  h('symbiote-text', {}, item.label),
+                ]),
+              ],
+            },
+          ),
       }),
     );
     await tick();
@@ -169,6 +189,62 @@ describe('Vue FlatList on the engine', () => {
     // Pinned to the full row width (not the frame width) so the row overflows and scrolls.
     expect(content.props.width).toBe(TOTAL_WIDTH);
     expect(content.props.flexDirection).toBe('row');
+  });
+
+  it('gates RefreshControl on a @refresh listener (the emit bridge wires onRefresh only when listened)', async () => {
+    const data: IRow[] = Array.from({ length: 4 }, (_unused, index) => ({
+      id: index,
+      label: `row-${index}`,
+    }));
+    // With a refresh listener, FlatList bridges onRefresh onto VirtualizedList, which builds the
+    // RefreshControl (iOS PullToRefreshView). This proves both the listener detection and the bridge.
+    mount(
+      ROOT_TAG,
+      defineComponent({
+        setup: () => () =>
+          h(
+            FlatListHost,
+            {
+              data,
+              refreshing: false,
+              onRefresh: () => undefined,
+              keyExtractor: (item: IRow) => `k-${item.id}`,
+            },
+            { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+          ),
+      }),
+    );
+    await tick();
+    expect(
+      fabric.find(node => node.viewName === 'PullToRefreshView'),
+      'RefreshControl built when @refresh is listened',
+    ).toBeDefined();
+
+    unmount(ROOT_TAG);
+    fabric.reset();
+
+    // Without a listener, the bridge stays undefined, so VirtualizedList builds no RefreshControl
+    // (gating preserved — no parasitic control for an unlistened event).
+    mount(
+      ROOT_TAG,
+      defineComponent({
+        setup: () => () =>
+          h(
+            FlatListHost,
+            {
+              data,
+              refreshing: false,
+              keyExtractor: (item: IRow) => `k-${item.id}`,
+            },
+            { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+          ),
+      }),
+    );
+    await tick();
+    expect(
+      fabric.find(node => node.viewName === 'PullToRefreshView'),
+      'no RefreshControl without a @refresh listener',
+    ).toBeUndefined();
   });
 
   it('routes an imperative scrollToOffset through the native scrollTo command', async () => {
@@ -181,17 +257,20 @@ describe('Vue FlatList on the engine', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h(FlatList, {
-            ref: listRef,
-            data,
-            keyExtractor: (item: IRow) => `k-${item.id}`,
-            getItemLayout: (_data: unknown, index: number) => ({
-              length: ITEM_HEIGHT,
-              offset: ITEM_HEIGHT * index,
-              index,
-            }),
-            renderItem: ({ item }: { item: IRow }) => h('symbiote-text', {}, item.label),
-          }),
+          h(
+            FlatListHost,
+            {
+              ref: listRef,
+              data,
+              keyExtractor: (item: IRow) => `k-${item.id}`,
+              getItemLayout: (_data: unknown, index: number) => ({
+                length: ITEM_HEIGHT,
+                offset: ITEM_HEIGHT * index,
+                index,
+              }),
+            },
+            { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+          ),
       }),
     );
     await tick();

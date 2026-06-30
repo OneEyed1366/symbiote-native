@@ -3,8 +3,13 @@
 // shared in @symbiote/components/view; here Vue only composes its TouchableOpacity + Text and
 // forwards the native-only props. The Vue twin of the React adapter's Button.
 
-import { defineComponent, h, type SetupContext } from '@vue/runtime-core';
-import { BUTTON_ACCESSIBILITY_ROLE, resolveButtonTextStyle } from '@symbiote/components';
+import { defineComponent, h } from '@vue/runtime-core';
+import {
+  BUTTON_ACCESSIBILITY_ROLE,
+  resolveButtonTextStyle,
+  type IButtonProps as ICoreButtonProps,
+} from '@symbiote/components';
+import type { ISymbioteEvent } from '@symbiote/engine';
 import { Text } from '../components';
 import { TouchableOpacity } from './touchable';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
@@ -29,10 +34,14 @@ function forwardAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
   return result;
 }
 
-export const Button = defineComponent({
-  name: 'Button',
-  inheritAttrs: false,
-  setup(_props, { attrs: rawAttrs }: SetupContext) {
+export type IButtonProps = Omit<ICoreButtonProps, 'onPress'>;
+
+type IButtonEmits = {
+  press: (event: ISymbioteEvent) => boolean;
+};
+
+export const Button = defineComponent<IButtonProps, IButtonEmits>(
+  (_props, { attrs: rawAttrs, emit }) => {
     return () => {
       const attrs = normalizeVueAttrs(rawAttrs);
       const title = typeof attrs.title === 'string' ? attrs.title : '';
@@ -52,10 +61,18 @@ export const Button = defineComponent({
         accessibilityRole: BUTTON_ACCESSIBILITY_ROLE,
         accessible: true,
         accessibilityState: { disabled },
+        onPress: (event: ISymbioteEvent) => emit('press', event),
       };
       return h(TouchableOpacity, touchableProps, {
-        default: () => [h(Text, { style: textStyle }, title)],
+        default: () => [h(Text, { style: textStyle }, () => title)],
       });
     };
   },
-});
+  {
+    name: 'Button',
+    inheritAttrs: false,
+    emits: {
+      press: (_event: ISymbioteEvent): boolean => true,
+    },
+  },
+);

@@ -10,15 +10,7 @@
 // rawAttrs runs through normalizeVueAttrs (kebab→camel) so a template `:keyboard-vertical-offset`
 // and `:content-container-style` resolve; aria-*/data-* are preserved and forwarded to the host.
 
-import {
-  defineComponent,
-  h,
-  ref,
-  onMounted,
-  onUnmounted,
-  type SetupContext,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, h, ref, onMounted, onUnmounted, type VNode } from '@vue/runtime-core';
 import {
   Keyboard,
   KEYBOARD_EVENT,
@@ -42,11 +34,20 @@ import {
 } from '@symbiote/components';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
-type IUnknownHandler = (...args: readonly unknown[]) => void;
-
-function isHandler(value: unknown): value is IUnknownHandler {
-  return typeof value === 'function';
+// The Vue-facing prop surface. layout is NOT here: it is a typed Vue emit (@layout), wrapper-composed
+// from the wrapper's own onLayout (which the component already intercepts to measure the frame).
+export interface IKeyboardAvoidingViewProps extends IAccessibilityProps, IAriaProps {
+  behavior?: IKeyboardAvoidingBehavior;
+  enabled?: boolean;
+  keyboardVerticalOffset?: number;
+  contentContainerStyle?: IStyleProp<IViewStyle>;
+  style?: IStyleProp<IViewStyle>;
+  testID?: string;
 }
+
+export type IKeyboardAvoidingViewEmits = {
+  layout: (event: ISymbioteEvent) => boolean;
+};
 
 // A style prop is an object (a style record) or an array of them; numbers/strings/null degrade
 // to undefined (the engine flattens what it gets). A runtime guard, not a cast.
@@ -84,10 +85,11 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
 
 export type { IKeyboardAvoidingBehavior } from '@symbiote/components';
 
-export const KeyboardAvoidingView = defineComponent({
-  name: 'KeyboardAvoidingView',
-  inheritAttrs: false,
-  setup(_props, { attrs: rawAttrs, slots }: SetupContext) {
+export const KeyboardAvoidingView = defineComponent<
+  IKeyboardAvoidingViewProps,
+  IKeyboardAvoidingViewEmits
+>(
+  (_props, { attrs: rawAttrs, slots, emit }) => {
     // The inset is a number (plain data), so a plain ref is correct; no engine node is held here
     // (onLayout delivers the frame, so no imperative measure / host-node capture is needed).
     const inset = ref(0);
@@ -131,8 +133,7 @@ export const KeyboardAvoidingView = defineComponent({
         frame = measured;
         if (initialHeight === undefined) initialHeight = measured.height;
       }
-      const onLayout = rawAttrs.onLayout;
-      if (isHandler(onLayout)) onLayout(event);
+      emit('layout', event);
     };
 
     return (): VNode => {
@@ -169,4 +170,11 @@ export const KeyboardAvoidingView = defineComponent({
       return h('symbiote-view', wrapperProps, childNodes);
     };
   },
-});
+  {
+    name: 'KeyboardAvoidingView',
+    inheritAttrs: false,
+    emits: {
+      layout: (_event: ISymbioteEvent): boolean => true,
+    },
+  },
+);

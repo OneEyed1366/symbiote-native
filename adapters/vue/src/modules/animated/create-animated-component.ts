@@ -50,7 +50,7 @@ function baseName(component: Component): string {
   return 'Anonymous';
 }
 
-export function createAnimatedComponent(Component: Component): Component {
+export function createAnimatedComponent(Component: Component) {
   return defineComponent({
     name: `Animated(${baseName(Component)})`,
     inheritAttrs: false,

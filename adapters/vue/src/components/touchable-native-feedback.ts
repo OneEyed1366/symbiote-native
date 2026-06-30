@@ -4,7 +4,7 @@
 // the Pressable; on iOS they are inert. The static factories + background mapping are shared in
 // @symbiote/components/view; Vue only attaches them onto the component value and nests the View.
 
-import { defineComponent, h, type SetupContext, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, type VNode } from '@vue/runtime-core';
 import {
   backgroundProps,
   canUseNativeForeground,
@@ -15,7 +15,13 @@ import {
 } from '@symbiote/components';
 import { dlog } from '@symbiote/engine';
 import { View } from '../components';
-import { Pressable } from './pressable';
+import {
+  Pressable,
+  emitPressableEvents,
+  PRESSABLE_EMITS,
+  type IPressableEmits,
+  type IPressableProps,
+} from './pressable';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
 export type {
@@ -23,6 +29,11 @@ export type {
   IThemeAttrBackground,
   IRippleBackground,
 } from '@symbiote/components';
+
+export type ITouchableNativeFeedbackProps = Omit<IPressableProps, 'style'> & {
+  background?: INativeFeedbackBackground;
+  useForeground?: boolean;
+};
 
 const HANDLED = ['background', 'useForeground'];
 
@@ -66,12 +77,8 @@ function asBackground(value: unknown): INativeFeedbackBackground | undefined {
   return undefined;
 }
 
-// The static factories live on the component value so callers reach TouchableNativeFeedback.Ripple(…)
-// exactly like RN. Object.assign onto the defineComponent return (a plain object) keeps the typing.
-const TouchableNativeFeedbackImpl = defineComponent({
-  name: 'TouchableNativeFeedback',
-  inheritAttrs: false,
-  setup(_props, { slots, attrs: rawAttrs }: SetupContext) {
+const TouchableNativeFeedbackImpl = defineComponent<ITouchableNativeFeedbackProps, IPressableEmits>(
+  (_props, { slots, attrs: rawAttrs, emit }) => {
     return () => {
       const attrs = normalizeVueAttrs(rawAttrs);
       const useForeground = attrs.useForeground === true;
@@ -83,11 +90,22 @@ const TouchableNativeFeedbackImpl = defineComponent({
       const nativeProps = backgroundProps(resolved, useForeground);
       const children: VNode[] = slots.default !== undefined ? slots.default() : [];
       const feedback = h(View, nativeProps, () => children);
-      return h(Pressable, { ...forwardAttrs(attrs) }, { default: () => [feedback] });
+      return h(
+        Pressable,
+        { ...forwardAttrs(attrs), ...emitPressableEvents(emit) },
+        { default: () => [feedback] },
+      );
     };
   },
-});
+  {
+    name: 'TouchableNativeFeedback',
+    inheritAttrs: false,
+    emits: PRESSABLE_EMITS,
+  },
+);
 
+// The static factories live on the component value so callers reach TouchableNativeFeedback.Ripple(…)
+// exactly like RN. Object.assign onto the defineComponent return (a plain object) keeps the typing.
 export const TouchableNativeFeedback = Object.assign(TouchableNativeFeedbackImpl, {
   SelectableBackground: selectableBackground,
   SelectableBackgroundBorderless: selectableBackgroundBorderless,

@@ -7,9 +7,11 @@
 // imperative handle. This is the Vue twin of the React adapter's useRef + buildScrollViewHandle.
 //
 // Inputs arrive as attrs (untyped), so each is narrowed with a runtime guard rather than a cast.
-// onContentSizeChange MUST be consumed (it is NOT a ViewConfig event; forwarding a function prop
-// would reach Fabric and crash Android's folly::dynamic). Scroll events (onScroll/onLayout/…) ARE
-// ViewConfig events, so they forward raw and routeProp turns them into listeners.
+// contentSizeChange is synthesized as a typed Vue emit from the content onLayout. The legacy
+// onContentSizeChange callback key MUST be consumed if it arrives (it is NOT a ViewConfig event;
+// forwarding a function prop would reach Fabric and crash Android's folly::dynamic). Scroll events
+// (onScroll/onLayout/…) ARE ViewConfig events, so they forward raw and routeProp turns them into
+// listeners.
 //
 // Phase 2 (ADR 0024 §4): RefreshControl is wired through the platform assemble (iOS sibling /
 // Android wrap). Phase 3 (§5): sticky headers are real. The scroll AnimatedValue (markRaw, held by
@@ -27,7 +29,6 @@ import {
   shallowRef,
   watch,
   type Component,
-  type SetupContext,
   type VNode,
 } from '@vue/runtime-core';
 import {
@@ -61,7 +62,6 @@ import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 export type { IScrollViewHandle } from '@symbiote/components';
 
 type IScrollHandler = (event: ISymbioteEvent) => void;
-type IContentSizeHandler = (width: number, height: number) => void;
 
 // The Vue-facing prop surface. React's ScrollViewProps is React-coupled (ReactNode children,
 // ReactElement refreshControl); Vue takes children via slots, so this mirrors the same
@@ -84,9 +84,7 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   // re-invokes its type to wrap the scroll view (ADR 0024 Phase 2).
   refreshControl?: VNode;
   removeClippedSubviews?: boolean;
-  // Fired when the content container's size changes, synthesized in JS from the inner content
-  // view's onLayout (RN _handleContentOnLayout); the native scroll view has no such event.
-  onContentSizeChange?: IContentSizeHandler;
+  // contentSizeChange is an adapter-synthesized Vue emit, not a native prop.
   // Snap / paging family: forwarded straight to the native scroll view.
   snapToInterval?: number;
   snapToOffsets?: number[];
@@ -139,6 +137,10 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   // iOS-only: user tapped the status bar to scroll to top. Inert on Android.
   onScrollToTop?: IScrollHandler;
 }
+
+export type IScrollViewEmits = {
+  contentSizeChange: (width: number, height: number) => boolean;
+};
 
 // The platform piece: how the .ios/.android files assemble the final element. The RefreshControl
 // integration diverges by platform (ADR 0020/0024): iOS places it as a SIBLING before content,
@@ -230,10 +232,8 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
 }
 
 export function createScrollView(platform: IScrollViewPlatform) {
-  return defineComponent({
-    name: 'ScrollView',
-    inheritAttrs: false,
-    setup(_props, { slots, attrs: rawAttrs, expose }: SetupContext) {
+  return defineComponent<IScrollViewProps, IScrollViewEmits>(
+    (_props, { slots, attrs: rawAttrs, expose, emit }) => {
       // shallowRef, NOT ref: the engine node must be held by IDENTITY. A plain ref() runs the
       // node through Vue's toReactive(), handing back a reactive Proxy, a different object than
       // the raw node the engine's mirror (a WeakMap) is keyed on, so dispatchViewCommand would
@@ -251,8 +251,8 @@ export function createScrollView(platform: IScrollViewPlatform) {
       expose(buildScrollViewHandle(() => nodeRef.value));
 
       // The last-seen content size, kept here (setup scope, persists across renders) to dedupe
-      // onContentSizeChange: RN fires the content onLayout on every layout pass; only real size
-      // changes reach the user handler (didContentSizeChange).
+      // contentSizeChange: RN fires the content onLayout on every layout pass; only real size
+      // changes emit to the user (didContentSizeChange).
       let lastContentSize: IContentSize | null = null;
 
       // A single AnimatedValue tracks the scroll offset and drives every sticky header's translateY
@@ -402,22 +402,18 @@ export function createScrollView(platform: IScrollViewPlatform) {
         ) {
           contentProps.collapsableChildren = false;
         }
-        // onContentSizeChange is synthesized from the content view's own onLayout (RN
-        // _handleContentOnLayout): read width/height, fire only on a real size change (dedupe via
-        // the setup-scope lastContentSize). The handler reads onContentSizeChange off attrs LIVE so
-        // a re-supplied handler is honored.
-        if (isHandler(attrs.onContentSizeChange)) {
-          contentProps.onLayout = (event: ISymbioteEvent): void => {
-            const width = readLayoutDimension(event, 'width');
-            const height = readLayoutDimension(event, 'height');
-            if (width === undefined || height === undefined) return;
-            if (!didContentSizeChange(lastContentSize, { width, height })) return;
-            lastContentSize = { width, height };
-            dlog(`Vue ScrollView onContentSizeChange ${width}x${height}`);
-            const handler = attrs.onContentSizeChange;
-            if (isHandler(handler)) handler(width, height);
-          };
-        }
+        // contentSizeChange is synthesized from the content view's own onLayout (RN
+        // _handleContentOnLayout): read width/height and emit only on a real size change (dedupe via
+        // the setup-scope lastContentSize).
+        contentProps.onLayout = (event: ISymbioteEvent): void => {
+          const width = readLayoutDimension(event, 'width');
+          const height = readLayoutDimension(event, 'height');
+          if (width === undefined || height === undefined) return;
+          if (!didContentSizeChange(lastContentSize, { width, height })) return;
+          lastContentSize = { width, height };
+          dlog(`Vue ScrollView contentSizeChange ${width}x${height}`);
+          emit('contentSizeChange', width, height);
+        };
 
         // Sticky headers are a pure-JS layer (the native scroll view ignores stickyHeaderIndices);
         // wrap the flagged children so they pin to the scroll offset. No-op when none are flagged.
@@ -462,5 +458,12 @@ export function createScrollView(platform: IScrollViewPlatform) {
         });
       };
     },
-  });
+    {
+      name: 'ScrollView',
+      inheritAttrs: false,
+      emits: {
+        contentSizeChange: (_width: number, _height: number): boolean => true,
+      },
+    },
+  );
 }

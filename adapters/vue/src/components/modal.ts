@@ -11,7 +11,7 @@
 // events (onShow/onDismiss/onRequestClose/onOrientationChange) are real ViewConfig DirectEvents,
 // so, unlike Switch's pure-JS onValueChange, they forward to the host raw via passthrough.
 
-import { defineComponent, h, ref, watch, type SetupContext } from '@vue/runtime-core';
+import { defineComponent, h, ref, watch } from '@vue/runtime-core';
 import {
   createInitialModalState,
   modalReducer,
@@ -49,12 +49,15 @@ export interface IModalProps extends IAccessibilityProps, IAriaProps {
   statusBarTranslucent?: boolean;
   navigationBarTranslucent?: boolean;
   allowSwipeDismissal?: boolean;
-  onShow?: () => void;
-  onDismiss?: () => void;
-  onRequestClose?: () => void;
-  onOrientationChange?: (event: IModalOrientationChangeEvent) => void;
   style?: IStyleProp<IViewStyle>;
 }
+
+export type IModalEmits = {
+  show: () => boolean;
+  dismiss: () => boolean;
+  requestClose: () => boolean;
+  orientationChange: (event: IModalOrientationChangeEvent) => boolean;
+};
 
 function asBoolean(value: unknown): boolean | undefined {
   return typeof value === 'boolean' ? value : undefined;
@@ -100,8 +103,8 @@ function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
   return typeof value === 'object' && value !== null;
 }
 
-// The typed fields the render consumes and re-emits onto the host; everything else (the events,
-// accessibility, testID) forwards via passthrough.
+// The typed fields the render consumes and re-emits onto the host; everything else
+// (accessibility, testID, raw native passthrough) forwards via passthrough.
 const HANDLED_ATTRS = [
   'visible',
   'transparent',
@@ -126,10 +129,8 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
   return result;
 }
 
-export const Modal = defineComponent({
-  name: 'Modal',
-  inheritAttrs: false,
-  setup(_props, { attrs: rawAttrs, slots }: SetupContext) {
+export const Modal = defineComponent<IModalProps, IModalEmits>(
+  (_props, { attrs: rawAttrs, slots, emit }) => {
     const state = ref<IModalState>(createInitialModalState(rawAttrs.visible === true));
 
     // POST-flush so the transition fires AFTER the render that used the OLD state: on visible→hidden
@@ -172,9 +173,29 @@ export const Modal = defineComponent({
       const [container] = root.children;
       if (typeof container === 'string') return null;
       const slotChildren = slots.default !== undefined ? slots.default() : [];
-      return h(root.type, { ...root.props, key: root.key }, [
-        h(container.type, { ...container.props, key: container.key }, slotChildren),
-      ]);
+      return h(
+        root.type,
+        {
+          ...root.props,
+          key: root.key,
+          onShow: (): void => emit('show'),
+          onDismiss: (): void => emit('dismiss'),
+          onRequestClose: (): void => emit('requestClose'),
+          onOrientationChange: (event: IModalOrientationChangeEvent): void =>
+            emit('orientationChange', event),
+        },
+        [h(container.type, { ...container.props, key: container.key }, slotChildren)],
+      );
     };
   },
-});
+  {
+    name: 'Modal',
+    inheritAttrs: false,
+    emits: {
+      show: (): boolean => true,
+      dismiss: (): boolean => true,
+      requestClose: (): boolean => true,
+      orientationChange: (_event: IModalOrientationChangeEvent): boolean => true,
+    },
+  },
+);

@@ -9,7 +9,7 @@
 // cast. onValueChange MUST be stripped from the forwarded attrs: it is not a ViewConfig event,
 // so leaking it would reach Fabric as a function prop and crash Android's folly::dynamic.
 
-import { defineComponent, ref, shallowRef, watch, type SetupContext } from '@vue/runtime-core';
+import { defineComponent, ref, shallowRef, watch } from '@vue/runtime-core';
 import {
   renderSwitch,
   switchReducer,
@@ -17,6 +17,7 @@ import {
   shouldSnapBack,
   valueFromChange,
   type ISwitchPlatform,
+  type ISwitchProps as ISwitchBaseProps,
   type ISwitchState,
   type ISwitchTrackColor,
 } from '@symbiote/components';
@@ -35,14 +36,16 @@ import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 // command name. Supplied whole by switch.ios.ts / switch.android.ts (Metro filename-selected).
 type ISwitchHostPlatform = ISwitchPlatform & { snapBackCommand: string };
 
-type IUnknownHandler = (...args: readonly unknown[]) => void;
+export type ISwitchProps = Omit<ISwitchBaseProps, 'onChange' | 'onValueChange'>;
+export type { ISwitchTrackColor };
+
+type ISwitchEmits = {
+  change: (event: ISymbioteEvent) => boolean;
+  valueChange: (value: boolean) => boolean;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isHandler(value: unknown): value is IUnknownHandler {
-  return typeof value === 'function';
 }
 
 function asString(value: unknown): string | undefined {
@@ -87,10 +90,8 @@ function forwardAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
 }
 
 export function createSwitch(platform: ISwitchHostPlatform) {
-  return defineComponent({
-    name: 'Switch',
-    inheritAttrs: false,
-    setup(_props, { attrs: rawAttrs }: SetupContext) {
+  return defineComponent<ISwitchProps, ISwitchEmits>(
+    (_props, { attrs: rawAttrs, emit }) => {
       // shallowRef, NOT ref: the engine node must be held by IDENTITY. A plain ref() runs the
       // assigned object through Vue's toReactive(), so reading nodeRef.value back yields a
       // reactive Proxy, a different object than the raw node. The engine's mirror is a WeakMap
@@ -107,17 +108,15 @@ export function createSwitch(platform: ISwitchHostPlatform) {
       };
 
       const handleChange = (event: ISymbioteEvent): void => {
-        // onChange (raw escape hatch) fires first with the full event, read live from attrs. These
-        // handler keys are dash-free / Vue-folded (onChange / onValueChange), so raw attrs is correct.
-        const onChange = rawAttrs.onChange;
-        if (isHandler(onChange)) onChange(event);
+        // Vue-facing events are emitted here; the host still receives this internal onChange
+        // handler so the controlled snap-back state stays synchronized with native.
+        emit('change', event);
         const next = valueFromChange(event);
         dlog(
           `Switch onChange value=${String(next)} eventCount=${String(event.nativeEvent.eventCount)}`,
         );
         if (next === undefined) return;
-        const onValueChange = rawAttrs.onValueChange;
-        if (isHandler(onValueChange)) onValueChange(next);
+        emit('valueChange', next);
         state.value = switchReducer(state.value, { type: 'native-reported', value: next });
       };
 
@@ -163,5 +162,13 @@ export function createSwitch(platform: ISwitchHostPlatform) {
         );
       };
     },
-  });
+    {
+      name: 'Switch',
+      inheritAttrs: false,
+      emits: {
+        change: (_event: ISymbioteEvent): boolean => true,
+        valueChange: (_value: boolean): boolean => true,
+      },
+    },
+  );
 }

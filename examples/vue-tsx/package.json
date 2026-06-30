@@ -6,6 +6,7 @@
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "lint": "eslint .",
+    "dev": "react-native start --reset-cache",
     "start": "react-native start",
     "test": "vitest run",
     "e2e:build:ios": "detox build --configuration ios.sim.debug",
@@ -14,17 +15,15 @@
     "e2e:test:android": "detox test --configuration android.emu.debug"
   },
   "dependencies": {
-    "@symbiote/vue": "workspace:*",
-    "@symbiote/slider": "workspace:*",
-    "@symbiote/engine": "workspace:*",
     "@symbiote/components": "workspace:*",
+    "@symbiote/engine": "workspace:*",
+    "@symbiote/slider": "workspace:*",
+    "@symbiote/vue": "workspace:*",
     "@vue/runtime-core": "catalog:",
     "react": "catalog:",
     "react-native": "catalog:"
   },
   "devDependencies": {
-    "@symbiote/test-utils": "workspace:*",
-    "vitest": "catalog:",
     "@babel/core": "catalog:",
     "@babel/preset-env": "catalog:",
     "@babel/runtime": "catalog:",
@@ -35,15 +34,17 @@
     "@react-native/eslint-config": "catalog:",
     "@react-native/metro-config": "catalog:",
     "@react-native/typescript-config": "catalog:",
-    "@vue/babel-plugin-jsx": "catalog:",
+    "@symbiote/test-utils": "workspace:*",
     "@types/jest": "catalog:",
+    "@vue/babel-plugin-jsx": "catalog:",
     "detox": "catalog:",
     "eslint": "catalog:rn-app",
     "jest": "catalog:",
     "jest-circus": "catalog:",
-    "ts-jest": "catalog:",
     "prettier": "catalog:",
-    "typescript": "catalog:"
+    "ts-jest": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">= 22.11.0"

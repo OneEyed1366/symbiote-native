@@ -5,11 +5,11 @@
   Each leaves a dlog seam (DEBUG=1 -> logcat) and a visible effect, so a real host
   confirms what the headless smokes prove in JS.
 
-  FlatList/SectionList take renderItem/renderSectionHeader as PROP functions returning a
-  VNode (the adapter has no render slot), so those are built with h() in script and bound.
+  FlatList/SectionList render via Vue scoped slots — #item / #sectionHeader — the idiomatic
+  Vue surface (the adapter maps them onto the renderItem family internally).
 -->
 <script setup lang="ts">
-import { ref, shallowRef, h } from 'vue'
+import { ref, shallowRef } from 'vue'
 import {
   View,
   Text,
@@ -45,14 +45,7 @@ const dismissMsg = ref('focus the field, then Hide keyboard')
 const keyExtractor = (item: { id: string; n: number }): string => item.id
 const getItemLayout = (_data: unknown, index: number): { length: number; offset: number; index: number } =>
   ({ length: PARITY_ROW_H, offset: PARITY_ROW_H * index, index })
-const parityRenderItem = ({ item }: { item: { id: string; n: number } }) =>
-  h(View, { style: styles.parityRow }, [h(Text, { style: styles.infoText }, `row ${item.n}`)])
-
 const sectionKeyExtractor = (item: { id: string; label: string }): string => item.id
-const renderSectionHeader = ({ section }: { section: { title: string } }) =>
-  h(Text, { style: styles.sectionHeader }, section.title)
-const sectionRenderItem = ({ item }: { item: { id: string; label: string } }) =>
-  h(View, { style: styles.parityRow }, [h(Text, { style: styles.infoText }, item.label)])
 
 const scrollDown = (): void => { listRef.value?.scrollToOffset({ offset: 20 * PARITY_ROW_H, animated: true }) }
 const scrollTop = (): void => { listRef.value?.scrollToOffset({ offset: 0, animated: false }) }
@@ -109,8 +102,13 @@ const styles = StyleSheet.create({
       :key-extractor="keyExtractor"
       :get-item-layout="getItemLayout"
       :style="styles.parityList"
-      :render-item="parityRenderItem"
-    />
+    >
+      <template #item="{ item }">
+        <View :style="styles.parityRow">
+          <Text :style="styles.infoText">row {{ item.n }}</Text>
+        </View>
+      </template>
+    </FlatList>
     <View :style="styles.row">
       <View :style="styles.flex1">
         <Button title="Scroll ▼ animated" @press="scrollDown" color="#42b883" />
@@ -130,9 +128,16 @@ const styles = StyleSheet.create({
       :key-extractor="sectionKeyExtractor"
       :sticky-section-headers-enabled="true"
       :style="styles.sectionList"
-      :render-section-header="renderSectionHeader"
-      :render-item="sectionRenderItem"
-    />
+    >
+      <template #sectionHeader="{ section }">
+        <Text :style="styles.sectionHeader">{{ section.title }}</Text>
+      </template>
+      <template #item="{ item }">
+        <View :style="styles.parityRow">
+          <Text :style="styles.infoText">{{ item.label }}</Text>
+        </View>
+      </template>
+    </SectionList>
 
     <!-- #14 a11y focus: node-based sendAccessibilityEvent routes through the Fabric
          slot on both platforms (enable TalkBack/VoiceOver to feel the focus jump) -->

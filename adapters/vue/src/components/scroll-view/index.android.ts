@@ -17,7 +17,7 @@ import { h, isVNode, type Component, type VNode } from '@vue/runtime-core';
 import { dlog } from '@symbiote/engine';
 import { splitLayoutProps } from '@symbiote/components';
 import { createScrollView } from './shared';
-export type { IScrollViewProps, IScrollViewHandle } from './shared';
+export type { IScrollViewProps, IScrollViewEmits, IScrollViewHandle } from './shared';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

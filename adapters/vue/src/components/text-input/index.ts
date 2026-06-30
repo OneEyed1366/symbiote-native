@@ -13,14 +13,7 @@
 // Android's folly::dynamic. The imperative module (blurTextInput / setInput*) is imported from
 // @symbiote/engine, the same framework-agnostic singleton both adapters share.
 
-import {
-  defineComponent,
-  onBeforeUnmount,
-  ref,
-  shallowRef,
-  watch,
-  type SetupContext,
-} from '@vue/runtime-core';
+import { defineComponent, onBeforeUnmount, ref, shallowRef, watch } from '@vue/runtime-core';
 import {
   resolveAccessibilityProps,
   resolveTextInputProps,
@@ -31,6 +24,8 @@ import {
   shouldCommandText,
   INITIAL_EVENT_COUNT,
   SELECTION_NONE,
+  type ITextInputProps as ITextInputBaseProps,
+  type ITextInputHandle,
   type ITextInputSelection,
 } from '@symbiote/components';
 import {
@@ -47,16 +42,21 @@ import {
 import { descriptorToVue } from '../../descriptor-to-vue';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 
-export type { ITextInputProps, ITextInputHandle } from '@symbiote/components';
+export type ITextInputProps = Omit<
+  ITextInputBaseProps,
+  'onChangeText' | 'onChange' | 'onFocus' | 'onBlur'
+>;
+export type { ITextInputHandle };
 
-type IUnknownHandler = (...args: readonly unknown[]) => void;
+type ITextInputEmits = {
+  changeText: (text: string) => boolean;
+  change: (event: ISymbioteEvent) => boolean;
+  focus: (event: ISymbioteEvent) => boolean;
+  blur: (event: ISymbioteEvent) => boolean;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isHandler(value: unknown): value is IUnknownHandler {
-  return typeof value === 'function';
 }
 
 function asString(value: unknown): string | undefined {
@@ -115,10 +115,8 @@ function forwardAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
   return result;
 }
 
-export const TextInput = defineComponent({
-  name: 'TextInput',
-  inheritAttrs: false,
-  setup(_props, { attrs: rawAttrs, expose }: SetupContext) {
+export const TextInput = defineComponent<ITextInputProps, ITextInputEmits>(
+  (_props, { attrs: rawAttrs, emit, expose }) => {
     // shallowRef, NOT ref: the engine node must be held by IDENTITY. A plain ref() runs the node
     // through Vue's toReactive(), handing back a reactive Proxy, a different object than the raw
     // node the engine's WeakMap mirror is keyed on, so every imperative command
@@ -156,13 +154,11 @@ export const TextInput = defineComponent({
         // Record the text first, then the count, so the count never runs ahead of the text it
         // stands for.
         lastNativeText = text;
-        const onChangeText = rawAttrs.onChangeText;
-        if (isHandler(onChangeText)) onChangeText(text);
+        emit('changeText', text);
       }
       const count = eventCountFromChange(event);
       if (count !== undefined) mostRecentEventCount.value = count;
-      const onChange = rawAttrs.onChange;
-      if (isHandler(onChange)) onChange(event);
+      emit('change', event);
     };
 
     const handleFocus = (event: ISymbioteEvent): void => {
@@ -170,16 +166,14 @@ export const TextInput = defineComponent({
       // Track focus app-wide so Keyboard.dismiss can blur this input without a ref.
       const node = nodeRef.value;
       if (node !== null) setInputFocused(node);
-      const onFocus = rawAttrs.onFocus;
-      if (isHandler(onFocus)) onFocus(event);
+      emit('focus', event);
     };
 
     const handleBlur = (event: ISymbioteEvent): void => {
       focused = false;
       const node = nodeRef.value;
       if (node !== null) setInputBlurred(node);
-      const onBlur = rawAttrs.onBlur;
-      if (isHandler(onBlur)) onBlur(event);
+      emit('blur', event);
     };
 
     // Controlled write: when JS-side `value` diverges from what native reported, command the new
@@ -301,4 +295,14 @@ export const TextInput = defineComponent({
       );
     };
   },
-});
+  {
+    name: 'TextInput',
+    inheritAttrs: false,
+    emits: {
+      changeText: (_text: string): boolean => true,
+      change: (_event: ISymbioteEvent): boolean => true,
+      focus: (_event: ISymbioteEvent): boolean => true,
+      blur: (_event: ISymbioteEvent): boolean => true,
+    },
+  },
+);

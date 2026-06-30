@@ -6,7 +6,7 @@
 // native scrollTo command. Vue reactivity is async, so each driving step is followed by a
 // macrotask `tick`.
 
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   VirtualizedSectionList,
@@ -15,6 +15,12 @@ import {
   type IVirtualizedSectionListHandle,
 } from '@symbiote/vue';
 import { installFabric, type IFakeNode } from '@symbiote/test-utils';
+
+// VirtualizedSectionList is a generic component (generic construct signature), which h()'s overloads
+// can't resolve. Drive it through a loose functional-component handle (generic-component h() limit).
+const VirtualizedSectionListHost = VirtualizedSectionList as unknown as FunctionalComponent<
+  Record<string, unknown>
+>;
 
 type ICommandCall = {
   name: string;
@@ -99,16 +105,23 @@ function findScrollView(): IFakeNode {
 function sectionList(extra: Record<string, unknown>): ReturnType<typeof defineComponent> {
   return defineComponent({
     setup: () => () =>
-      h(VirtualizedSectionList, {
-        sections: SECTIONS,
-        keyExtractor: (item: IRow) => `k-${item.id}`,
-        renderSectionHeader: ({ section }: { section: ISectionShape }) =>
-          h('symbiote-text', {}, `header:${section.title}`),
-        renderSectionFooter: ({ section }: { section: ISectionShape }) =>
-          h('symbiote-text', {}, `footer:${section.title}`),
-        renderItem: ({ item }: { item: IRow }) => h('symbiote-text', {}, item.label),
-        ...extra,
-      }),
+      h(
+        VirtualizedSectionListHost,
+        {
+          sections: SECTIONS,
+          keyExtractor: (item: IRow) => `k-${item.id}`,
+          ...extra,
+        },
+        {
+          sectionHeader: ({ section }: { section: ISectionShape }) => [
+            h('symbiote-text', {}, `header:${section.title}`),
+          ],
+          sectionFooter: ({ section }: { section: ISectionShape }) => [
+            h('symbiote-text', {}, `footer:${section.title}`),
+          ],
+          item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)],
+        },
+      ),
   });
 }
 

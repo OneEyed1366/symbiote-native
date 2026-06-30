@@ -8,6 +8,16 @@
 // useState/useRef/useEffect over the same shared functions. It drives the Vue ScrollView,
 // exactly as the React list drives the React ScrollView.
 //
+// Typed-emits generic component (mirrors FlatList): a GENERIC setup function
+// `<ItemT,>(props: IVirtualizedListProps<ItemT>, ctx: ICtx<IVirtualizedListEmits<ItemT>>)` so the
+// five adapter-synthesized events emit with ItemT-typed payloads (`@viewable-items-changed` carries
+// ItemT, not unknown). For that to infer at the call site, the generic INPUTS (data/getItem/
+// renderItem/…) are read from typed `props`, declared in the runtime `props` array; the raw native
+// scroll events (onScroll/onScrollBeginDrag/…) + any unknown attrs ride through `$attrs` onto the
+// inner ScrollView. RefreshControl + viewability stay GATED on listener presence, so each emit
+// bridge is wired ONLY when the consumer actually listens (read off the instance vnode props),
+// keeping behavior identical to the prop-callback era.
+//
 // Lists have no Descriptor render fn (the cell content is the framework's own children); see
 // core/components/.docs-note-lists.md. Cells/spacers are built with h() directly off the plan.
 //
@@ -18,6 +28,7 @@
 import {
   computed,
   defineComponent,
+  getCurrentInstance,
   h,
   isVNode,
   onBeforeUnmount,
@@ -25,7 +36,6 @@ import {
   shallowRef,
   watch,
   type Component,
-  type SetupContext,
   type VNode,
 } from '@vue/runtime-core';
 import {
@@ -75,6 +85,8 @@ import {
 import { ScrollView } from '../scroll-view';
 import { RefreshControl } from '../refresh-control';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
+import { componentFromSlot } from '../../utils/slots-to-render-props';
+import type { ICtx } from '../../utils/component-helpers';
 
 // Re-export the shared list types so flat-list / virtualized-section-list keep importing them
 // from '../virtualized-list', exactly as the React adapter re-exports them. One source of truth.
@@ -93,40 +105,30 @@ type IRenderItem<ItemT> = (info: {
   item: ItemT;
   index: number;
   separators: ISeparators;
-}) => VNode | undefined;
+}) => VNode | VNode[] | undefined;
 
 export interface IVirtualizedListProps<ItemT> {
   data: unknown;
   getItem: (data: unknown, index: number) => ItemT;
   getItemCount: (data: unknown) => number;
-  renderItem: IRenderItem<ItemT>;
+  // The cell renderer + separator / header / footer / empty are the Vue idiom — scoped slots
+  // (#item / #separator / #header / #footer / #empty), typed by IVirtualizedListSlots. React's
+  // renderItem / ItemSeparatorComponent prop family is deliberately NOT on the Vue contract (no
+  // duality); the slot→render-fn bridge lives in utils/slots-to-render-props.
   keyExtractor?: (item: ItemT, index: number) => string;
   getItemLayout?: (
     data: unknown,
     index: number,
   ) => { length: number; offset: number; index: number };
-  ItemSeparatorComponent?: Component;
-  ListHeaderComponent?: Component | VNode;
-  ListFooterComponent?: Component | VNode;
-  ListEmptyComponent?: Component | VNode;
   horizontal?: boolean;
   inverted?: boolean;
   extraData?: unknown;
-  onEndReached?: (info: { distanceFromEnd: number }) => void;
   onEndReachedThreshold?: number;
-  onStartReached?: (info: { distanceFromStart: number }) => void;
   onStartReachedThreshold?: number;
-  onRefresh?: () => void;
   refreshing?: boolean | null;
   progressViewOffset?: number;
-  onViewableItemsChanged?: (info: IViewableItemsChangedInfo<ItemT>) => void;
   viewabilityConfig?: IViewabilityConfig;
   viewabilityConfigCallbackPairs?: IViewabilityConfigCallbackPair<ItemT>[];
-  onScrollToIndexFailed?: (info: {
-    index: number;
-    highestMeasuredFrameIndex: number;
-    averageItemLength: number;
-  }) => void;
   initialNumToRender?: number;
   initialScrollIndex?: number;
   maxToRenderPerBatch?: number;
@@ -137,6 +139,9 @@ export interface IVirtualizedListProps<ItemT> {
     minIndexForVisible: number;
     autoscrollToTopThreshold?: number;
   };
+  // Raw native scroll passthrough: NOT emits (skill Rule 5), they ride through $attrs onto the
+  // inner ScrollView untouched. onScroll is additionally intercepted for the windowing offset, then
+  // the user's onScroll is composed (never clobbered).
   onScroll?: (event: ISymbioteEvent) => void;
   onScrollBeginDrag?: (event: ISymbioteEvent) => void;
   onScrollEndDrag?: (event: ISymbioteEvent) => void;
@@ -147,20 +152,95 @@ export interface IVirtualizedListProps<ItemT> {
   keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
+  // The remaining passthrough tail (raw scroll above, keyboard, accessibility, testID, …) is
+  // loosely typed so it forwards onto the inner ScrollView without redeclaring every prop.
+  [key: string]: unknown;
 }
+
+// The Vue cell/chrome surface — scoped slots, the idiomatic twin of React's renderItem /
+// ItemSeparatorComponent / List*Component. ItemT flows in from `data`, so #item is typed without
+// any annotation at the call site. Slots return VNode[] (Vue scoped-slot contract); the
+// slots-to-render-props bridge folds them into the single-VNode render-fns the windowing layer wants.
+export type IVirtualizedListSlots<ItemT> = {
+  item: (info: { item: ItemT; index: number; separators: ISeparators }) => VNode[] | VNode;
+  separator?: (props: ISeparatorProps<ItemT>) => VNode[] | VNode;
+  header?: () => VNode[] | VNode;
+  footer?: () => VNode[] | VNode;
+  empty?: () => VNode[] | VNode;
+};
+
+// The adapter-synthesized list events, emitted with ItemT-typed payloads. The raw native scroll
+// events stay raw $attrs passthrough (see IVirtualizedListProps), NOT emits.
+export type IVirtualizedListEmits<ItemT> = {
+  viewableItemsChanged: (info: IViewableItemsChangedInfo<ItemT>) => void;
+  endReached: (info: { distanceFromEnd: number }) => void;
+  startReached: (info: { distanceFromStart: number }) => void;
+  refresh: () => void;
+  scrollToIndexFailed: (info: {
+    index: number;
+    highestMeasuredFrameIndex: number;
+    averageItemLength: number;
+  }) => void;
+};
+
+// The typed inputs VirtualizedList reads off `props`; everything else (raw scroll, keyboard*,
+// accessibility, testID, …) falls through $attrs onto the inner ScrollView. Listed for the runtime
+// `props` declaration (keyof can't derive it: the index signature widens keyof to `string`). The
+// five raw-scroll events and the five emit events are deliberately absent.
+const PROP_KEYS = [
+  'data',
+  'getItem',
+  'getItemCount',
+  'keyExtractor',
+  'getItemLayout',
+  'viewabilityConfig',
+  'viewabilityConfigCallbackPairs',
+  'extraData',
+  'horizontal',
+  'inverted',
+  'onEndReachedThreshold',
+  'onStartReachedThreshold',
+  'refreshing',
+  'progressViewOffset',
+  'initialNumToRender',
+  'initialScrollIndex',
+  'maxToRenderPerBatch',
+  'updateCellsBatchingPeriod',
+  'windowSize',
+  'stickyHeaderIndices',
+  'maintainVisibleContentPosition',
+  'style',
+  'contentContainerStyle',
+  'keyboardShouldPersistTaps',
+  'keyboardDismissMode',
+];
+
+const EMIT_KEYS = [
+  'viewableItemsChanged',
+  'endReached',
+  'startReached',
+  'refresh',
+  'scrollToIndexFailed',
+];
 
 type IScrollHandler = (event: ISymbioteEvent) => void;
 
-// The narrowed snapshot the lifecycle works against. Attrs arrive untyped (Vue $attrs), so each
-// field is narrowed with a runtime guard rather than a cast. ItemT is `unknown` at runtime: Vue
-// $attrs carry no generic, the exported IVirtualizedListProps documents the surface for consumers.
-interface INarrowedProps {
+// The narrowed snapshot the lifecycle works against. The generic inputs come typed from `props`
+// (defaults applied here); the raw-scroll passthrough + unknown attrs ride through `forwarded`; the
+// five adapter-synthesized events are gated emit bridges (each wired only when the consumer listens,
+// so VL keeps building RefreshControl / computing viewability strictly on demand).
+interface INarrowedProps<ItemT> {
   data: unknown;
-  getItem: (data: unknown, index: number) => unknown;
+  getItem: (data: unknown, index: number) => ItemT;
   getItemCount: (data: unknown) => number;
-  renderItem: IRenderItem<unknown>;
-  keyExtractor?: (item: unknown, index: number) => string;
-  getItemLayout?: (data: unknown, index: number) => { length: number; offset: number };
+  // Optional: derived from the #item slot, absent when the consumer supplied none (a usage error
+  // RN would also hit). The render guards it and logs rather than throwing.
+  renderItem?: IRenderItem<ItemT>;
+  keyExtractor?: (item: ItemT, index: number) => string;
+  getItemLayout?: (
+    data: unknown,
+    index: number,
+  ) => { length: number; offset: number; index: number };
   itemSeparatorComponent?: Component;
   listHeaderComponent?: unknown;
   listFooterComponent?: unknown;
@@ -174,9 +254,9 @@ interface INarrowedProps {
   onRefresh?: () => void;
   refreshing: boolean;
   progressViewOffset?: number;
-  onViewableItemsChanged?: (info: IViewableItemsChangedInfo<unknown>) => void;
+  onViewableItemsChanged?: (info: IViewableItemsChangedInfo<ItemT>) => void;
   viewabilityConfig?: IViewabilityConfig;
-  viewabilityConfigCallbackPairs?: IViewabilityConfigCallbackPair<unknown>[];
+  viewabilityConfigCallbackPairs?: IViewabilityConfigCallbackPair<ItemT>[];
   onScrollToIndexFailed?: (info: {
     index: number;
     highestMeasuredFrameIndex: number;
@@ -195,8 +275,10 @@ interface INarrowedProps {
   userOnScroll?: IScrollHandler;
   style?: IStyleProp<IViewStyle>;
   contentContainerStyle?: IStyleProp<IViewStyle>;
-  // The remaining attrs (scroll-lifecycle callbacks, keyboard, accessibility, testID, …) that ride
-  // straight onto the inner ScrollView.
+  keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
+  keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
+  // The remaining attrs (raw scroll-lifecycle callbacks, scrollEventThrottle, accessibility,
+  // testID, …) that ride straight onto the inner ScrollView.
   forwarded: Record<string, unknown>;
 }
 
@@ -208,12 +290,6 @@ function isHandler(value: unknown): value is IUnknownHandler {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
-  return typeof value === 'object' && value !== null;
-}
-function isNumberArray(value: unknown): value is number[] {
-  return Array.isArray(value) && value.every(entry => typeof entry === 'number');
-}
 function isComponent(value: unknown): value is Component {
   return typeof value === 'function' || (typeof value === 'object' && value !== null);
 }
@@ -221,103 +297,10 @@ function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' ? value : fallback;
 }
 
-function noopGetItem(_data: unknown, _index: number): unknown {
-  return undefined;
-}
-function zeroCount(): number {
-  return 0;
-}
-function noopRender(): undefined {
-  return undefined;
-}
-
-// trackColor-style narrowing for the viewability config: keep only the numeric/boolean fields.
-function normalizeViewabilityConfig(value: unknown): IViewabilityConfig | undefined {
-  if (!isRecord(value)) return undefined;
-  const config: IViewabilityConfig = {};
-  if (typeof value.minimumViewTime === 'number') config.minimumViewTime = value.minimumViewTime;
-  if (typeof value.viewAreaCoveragePercentThreshold === 'number') {
-    config.viewAreaCoveragePercentThreshold = value.viewAreaCoveragePercentThreshold;
-  }
-  if (typeof value.itemVisiblePercentThreshold === 'number') {
-    config.itemVisiblePercentThreshold = value.itemVisiblePercentThreshold;
-  }
-  if (typeof value.waitForInteraction === 'boolean') {
-    config.waitForInteraction = value.waitForInteraction;
-  }
-  return config;
-}
-
-function normalizePairs(value: unknown): IViewabilityConfigCallbackPair<unknown>[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const pairs: IViewabilityConfigCallbackPair<unknown>[] = [];
-  for (const entry of value) {
-    if (!isRecord(entry)) continue;
-    const callback = entry.onViewableItemsChanged;
-    if (!isHandler(callback)) continue;
-    pairs.push({
-      viewabilityConfig: normalizeViewabilityConfig(entry.viewabilityConfig) ?? {},
-      onViewableItemsChanged: callback,
-    });
-  }
-  return pairs;
-}
-
-function normalizeMaintainVisible(
-  value: unknown,
-): { minIndexForVisible: number; autoscrollToTopThreshold?: number } | undefined {
-  if (!isRecord(value)) return undefined;
-  if (typeof value.minIndexForVisible !== 'number') return undefined;
-  const result: { minIndexForVisible: number; autoscrollToTopThreshold?: number } = {
-    minIndexForVisible: value.minIndexForVisible,
-  };
-  if (typeof value.autoscrollToTopThreshold === 'number') {
-    result.autoscrollToTopThreshold = value.autoscrollToTopThreshold;
-  }
-  return result;
-}
-
-// The prop keys the lifecycle consumes or reconstructs itself; everything else forwards onto the
-// inner ScrollView. The pass-through scroll-lifecycle / keyboard / accessibility props are NOT
-// listed (they ride straight through). onLayout is omitted from forwarding by being re-set
-// explicitly on the scroll props (the viewport measure), mirroring the React assembly.
-const HANDLED_ATTRS = [
-  'data',
-  'getItem',
-  'getItemCount',
-  'renderItem',
-  'keyExtractor',
-  'getItemLayout',
-  'ItemSeparatorComponent',
-  'ListHeaderComponent',
-  'ListFooterComponent',
-  'ListEmptyComponent',
-  'horizontal',
-  'inverted',
-  'extraData',
-  'onEndReached',
-  'onEndReachedThreshold',
-  'onStartReached',
-  'onStartReachedThreshold',
-  'onRefresh',
-  'refreshing',
-  'progressViewOffset',
-  'onViewableItemsChanged',
-  'viewabilityConfig',
-  'viewabilityConfigCallbackPairs',
-  'onScrollToIndexFailed',
-  'initialNumToRender',
-  'initialScrollIndex',
-  'maxToRenderPerBatch',
-  'updateCellsBatchingPeriod',
-  'windowSize',
-  'stickyHeaderIndices',
-  'maintainVisibleContentPosition',
-  'onScroll',
-  'style',
-  'contentContainerStyle',
-  'onLayout',
-];
+// The attrs that arrive via $attrs but must NOT be forwarded raw onto the inner ScrollView: VL
+// composes its own onScroll (windowing offset + the user's onScroll) and its own onLayout (viewport
+// measure), so a consumer-passed one is dropped here and re-set explicitly on the scroll props.
+const HANDLED_ATTRS = ['onScroll', 'onLayout'];
 
 function forwardAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
@@ -325,98 +308,6 @@ function forwardAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
     if (!HANDLED_ATTRS.includes(key)) result[key] = attrs[key];
   }
   return result;
-}
-
-function narrowProps(raw: Record<string, unknown>): INarrowedProps {
-  const attrs = normalizeVueAttrs(raw);
-  const getItemLayoutRaw = attrs.getItemLayout;
-  const getItemLayout = isHandler(getItemLayoutRaw)
-    ? (data: unknown, index: number): { length: number; offset: number } => {
-        const layout = getItemLayoutRaw(data, index);
-        return isRecord(layout)
-          ? {
-              length: typeof layout.length === 'number' ? layout.length : EMPTY_OFFSET,
-              offset: typeof layout.offset === 'number' ? layout.offset : EMPTY_OFFSET,
-            }
-          : { length: EMPTY_OFFSET, offset: EMPTY_OFFSET };
-      }
-    : undefined;
-
-  // getItemCount/renderItem/keyExtractor return non-void (number / VNode / string), so they are
-  // wrapped to coerce the untyped handler's return into the typed shape (no cast).
-  const getItemCountRaw = attrs.getItemCount;
-  const renderItemRaw = attrs.renderItem;
-  const keyExtractorRaw = attrs.keyExtractor;
-
-  return {
-    data: attrs.data,
-    getItem: isHandler(attrs.getItem) ? attrs.getItem : noopGetItem,
-    getItemCount: isHandler(getItemCountRaw)
-      ? (data: unknown): number => {
-          const count = getItemCountRaw(data);
-          return typeof count === 'number' ? count : EMPTY_OFFSET;
-        }
-      : zeroCount,
-    renderItem: isHandler(renderItemRaw)
-      ? (info): VNode | undefined => {
-          const node = renderItemRaw(info);
-          return isVNode(node) ? node : undefined;
-        }
-      : noopRender,
-    keyExtractor: isHandler(keyExtractorRaw)
-      ? (item: unknown, index: number): string => {
-          const key = keyExtractorRaw(item, index);
-          return typeof key === 'string' ? key : String(index);
-        }
-      : undefined,
-    getItemLayout,
-    itemSeparatorComponent: isComponent(attrs.ItemSeparatorComponent)
-      ? attrs.ItemSeparatorComponent
-      : undefined,
-    listHeaderComponent: attrs.ListHeaderComponent,
-    listFooterComponent: attrs.ListFooterComponent,
-    listEmptyComponent: attrs.ListEmptyComponent,
-    horizontal: attrs.horizontal === true,
-    inverted: attrs.inverted === true,
-    onEndReached: isHandler(attrs.onEndReached) ? attrs.onEndReached : undefined,
-    onEndReachedThreshold: asNumber(attrs.onEndReachedThreshold, DEFAULT_END_REACHED_THRESHOLD),
-    onStartReached: isHandler(attrs.onStartReached) ? attrs.onStartReached : undefined,
-    onStartReachedThreshold: asNumber(
-      attrs.onStartReachedThreshold,
-      DEFAULT_START_REACHED_THRESHOLD,
-    ),
-    onRefresh: isHandler(attrs.onRefresh) ? attrs.onRefresh : undefined,
-    refreshing: attrs.refreshing === true,
-    progressViewOffset:
-      typeof attrs.progressViewOffset === 'number' ? attrs.progressViewOffset : undefined,
-    onViewableItemsChanged: isHandler(attrs.onViewableItemsChanged)
-      ? attrs.onViewableItemsChanged
-      : undefined,
-    viewabilityConfig: normalizeViewabilityConfig(attrs.viewabilityConfig),
-    viewabilityConfigCallbackPairs: normalizePairs(attrs.viewabilityConfigCallbackPairs),
-    onScrollToIndexFailed: isHandler(attrs.onScrollToIndexFailed)
-      ? attrs.onScrollToIndexFailed
-      : undefined,
-    initialNumToRender: asNumber(attrs.initialNumToRender, DEFAULT_INITIAL_NUM_TO_RENDER),
-    initialScrollIndex:
-      typeof attrs.initialScrollIndex === 'number' ? attrs.initialScrollIndex : undefined,
-    maxToRenderPerBatch: asNumber(attrs.maxToRenderPerBatch, DEFAULT_MAX_TO_RENDER_PER_BATCH),
-    updateCellsBatchingPeriod: asNumber(
-      attrs.updateCellsBatchingPeriod,
-      DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
-    ),
-    windowSize: asNumber(attrs.windowSize, DEFAULT_WINDOW_SIZE),
-    stickyHeaderIndices: isNumberArray(attrs.stickyHeaderIndices)
-      ? attrs.stickyHeaderIndices
-      : undefined,
-    maintainVisibleContentPosition: normalizeMaintainVisible(attrs.maintainVisibleContentPosition),
-    userOnScroll: isHandler(attrs.onScroll) ? attrs.onScroll : undefined,
-    style: isStyleProp(attrs.style) ? attrs.style : undefined,
-    contentContainerStyle: isStyleProp(attrs.contentContainerStyle)
-      ? attrs.contentContainerStyle
-      : undefined,
-    forwarded: forwardAttrs(attrs),
-  };
 }
 
 // A list component element (ListHeaderComponent / ListEmptyComponent / ListFooterComponent) is
@@ -449,10 +340,16 @@ function isScrollViewHandle(value: unknown): value is IScrollViewHandle {
   return isRecord(value) && typeof value.scrollTo === 'function';
 }
 
-export const VirtualizedList = defineComponent({
-  name: 'VirtualizedList',
-  inheritAttrs: false,
-  setup(_props, { attrs: rawAttrs, slots: _slots, expose }: SetupContext) {
+export const VirtualizedList = defineComponent(
+  <ItemT>(
+    props: IVirtualizedListProps<ItemT>,
+    {
+      attrs,
+      expose,
+      emit,
+      slots,
+    }: ICtx<IVirtualizedListEmits<ItemT>, IVirtualizedListSlots<ItemT>>,
+  ) => {
     // Reactive lifecycle state (the Vue twin of React's useState): a change in any of these
     // re-runs the windowing `computed` and the render fn.
     const scrollOffset = ref(EMPTY_OFFSET);
@@ -474,6 +371,16 @@ export const VirtualizedList = defineComponent({
       scrollHandle.value = isScrollViewHandle(instance) ? instance : null;
     };
 
+    // The five list events are emits, so Vue strips their onX listeners from $attrs. Detect listener
+    // presence off the instance's own vnode props (what the parent passed), exactly like FlatList, so
+    // an emit bridge is wired ONLY when the consumer actually listens (preserving the RefreshControl /
+    // viewability gating of the prop-callback era).
+    const instance = getCurrentInstance();
+    const listens = (onName: string): boolean => {
+      const vnodeProps = instance?.vnode.props;
+      return vnodeProps != null && typeof vnodeProps[onName] === 'function';
+    };
+
     // Non-reactive setup-scope state (the Vue twin of React's refs that never trigger a render):
     const measured = new Map<number, number>();
     // The previously committed window, so throttleWindow grows it by at most maxToRenderPerBatch
@@ -481,7 +388,7 @@ export const VirtualizedList = defineComponent({
     let committedWindow: { first: number; last: number } = { first: FIRST_INDEX, last: -1 };
     let sentEndForContentLength = NO_CONTENT_LENGTH_SENT;
     let sentStartForContentLength = NO_CONTENT_LENGTH_SENT;
-    let lastViewable = new Map<string, IViewToken<unknown>>();
+    let lastViewable = new Map<string, IViewToken<ItemT>>();
     let viewableTimer: ReturnType<typeof setTimeout> | null = null;
     let batchTimer: ReturnType<typeof setTimeout> | null = null;
     let hasInteracted = false;
@@ -489,10 +396,75 @@ export const VirtualizedList = defineComponent({
     let appliedInitialScroll = false;
     let firstVisibleKey: string | null = null;
 
-    const props = computed<INarrowedProps>(() => narrowProps(rawAttrs));
+    const narrowed = computed<INarrowedProps<ItemT>>(() => {
+      // extraData has no field of its own; reading it tracks it so a change forces a re-render
+      // (RN's extraData contract).
+      void props.extraData;
+      const folded = normalizeVueAttrs(attrs);
+      return {
+        data: props.data,
+        getItem: props.getItem,
+        getItemCount: props.getItemCount,
+        // Cell + chrome come from scoped slots. #item IS the render fn (a slot fn returning
+        // VNode|VNode[], which the cell wrapper accepts directly). #separator carries scope props
+        // (h(component, props)) so it goes through componentFromSlot; #header/#footer/#empty are
+        // scopeless, so the bare slot fn is handed to resolveElement (its isComponent branch).
+        renderItem: slots.item,
+        keyExtractor: props.keyExtractor,
+        getItemLayout: props.getItemLayout,
+        itemSeparatorComponent: componentFromSlot(slots.separator),
+        listHeaderComponent: slots.header,
+        listFooterComponent: slots.footer,
+        listEmptyComponent: slots.empty,
+        horizontal: props.horizontal === true,
+        inverted: props.inverted === true,
+        onEndReached: listens('onEndReached')
+          ? (info: { distanceFromEnd: number }): void => emit('endReached', info)
+          : undefined,
+        onEndReachedThreshold: asNumber(props.onEndReachedThreshold, DEFAULT_END_REACHED_THRESHOLD),
+        onStartReached: listens('onStartReached')
+          ? (info: { distanceFromStart: number }): void => emit('startReached', info)
+          : undefined,
+        onStartReachedThreshold: asNumber(
+          props.onStartReachedThreshold,
+          DEFAULT_START_REACHED_THRESHOLD,
+        ),
+        onRefresh: listens('onRefresh') ? (): void => emit('refresh') : undefined,
+        refreshing: props.refreshing === true,
+        progressViewOffset: props.progressViewOffset,
+        onViewableItemsChanged: listens('onViewableItemsChanged')
+          ? (info: IViewableItemsChangedInfo<ItemT>): void => emit('viewableItemsChanged', info)
+          : undefined,
+        viewabilityConfig: props.viewabilityConfig,
+        viewabilityConfigCallbackPairs: props.viewabilityConfigCallbackPairs,
+        onScrollToIndexFailed: listens('onScrollToIndexFailed')
+          ? (info: {
+              index: number;
+              highestMeasuredFrameIndex: number;
+              averageItemLength: number;
+            }): void => emit('scrollToIndexFailed', info)
+          : undefined,
+        initialNumToRender: asNumber(props.initialNumToRender, DEFAULT_INITIAL_NUM_TO_RENDER),
+        initialScrollIndex: props.initialScrollIndex,
+        maxToRenderPerBatch: asNumber(props.maxToRenderPerBatch, DEFAULT_MAX_TO_RENDER_PER_BATCH),
+        updateCellsBatchingPeriod: asNumber(
+          props.updateCellsBatchingPeriod,
+          DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
+        ),
+        windowSize: asNumber(props.windowSize, DEFAULT_WINDOW_SIZE),
+        stickyHeaderIndices: props.stickyHeaderIndices,
+        maintainVisibleContentPosition: props.maintainVisibleContentPosition,
+        userOnScroll: isHandler(folded.onScroll) ? folded.onScroll : undefined,
+        style: props.style,
+        contentContainerStyle: props.contentContainerStyle,
+        keyboardShouldPersistTaps: props.keyboardShouldPersistTaps,
+        keyboardDismissMode: props.keyboardDismissMode,
+        forwarded: forwardAttrs(folded),
+      };
+    });
 
     const keyFor = (index: number): string => {
-      const p = props.value;
+      const p = narrowed.value;
       const item = p.getItem(p.data, index);
       return p.keyExtractor ? p.keyExtractor(item, index) : String(index);
     };
@@ -501,7 +473,7 @@ export const VirtualizedList = defineComponent({
     // non-reactive committedWindow as it throttles (the controlled side effect React runs during
     // render): committedWindow is plain state, so the write triggers no reactivity loop.
     const metrics = computed(() => {
-      const p = props.value;
+      const p = narrowed.value;
       void measureVersion.value;
       const count = p.getItemCount(p.data);
       const gil = p.getItemLayout;
@@ -545,7 +517,7 @@ export const VirtualizedList = defineComponent({
     });
 
     const scrollToPixel = (offset: number, animated: boolean): void => {
-      const p = props.value;
+      const p = narrowed.value;
       const clamped = Math.max(EMPTY_OFFSET, offset);
       const targetOffset = p.horizontal
         ? { x: clamped, y: EMPTY_OFFSET }
@@ -580,7 +552,7 @@ export const VirtualizedList = defineComponent({
     };
 
     const onScroll = (event: ISymbioteEvent): void => {
-      const p = props.value;
+      const p = narrowed.value;
       const offset = readScrollOffset(event, p.horizontal);
       if (offset === undefined) return;
       dlog(`Vue VirtualizedList onScroll offset=${offset}`);
@@ -594,7 +566,7 @@ export const VirtualizedList = defineComponent({
     };
 
     const onViewportLayout = (event: ISymbioteEvent): void => {
-      const length = readLayoutLength(event, props.value.horizontal);
+      const length = readLayoutLength(event, narrowed.value.horizontal);
       if (length === undefined) return;
       dlog(`Vue VirtualizedList onLayout viewport=${length}`);
       viewportLength.value = length;
@@ -603,7 +575,7 @@ export const VirtualizedList = defineComponent({
     const makeCellMeasure =
       (index: number) =>
       (event: ISymbioteEvent): void => {
-        const p = props.value;
+        const p = narrowed.value;
         if (p.getItemLayout !== undefined) return;
         const length = readLayoutLength(event, p.horizontal);
         if (length === undefined) return;
@@ -642,7 +614,7 @@ export const VirtualizedList = defineComponent({
         scrollToPixel(params.offset, params.animated ?? true);
       },
       scrollToIndex: (params): void => {
-        const p = props.value;
+        const p = narrowed.value;
         const m = metrics.value;
         // No getItemLayout AND the target is past the last measured cell: report the failure
         // instead of scrolling to a fabricated estimate (RN VirtualizedList.js:179-195).
@@ -668,7 +640,7 @@ export const VirtualizedList = defineComponent({
         );
       },
       scrollToItem: (params): void => {
-        const p = props.value;
+        const p = narrowed.value;
         const count = metrics.value.count;
         for (let index = FIRST_INDEX; index < count; index += 1) {
           if (p.getItem(p.data, index) === params.item) {
@@ -715,7 +687,7 @@ export const VirtualizedList = defineComponent({
         batchTimer = setTimeout(() => {
           batchTimer = null;
           measureVersion.value += 1;
-        }, props.value.updateCellsBatchingPeriod);
+        }, narrowed.value.updateCellsBatchingPeriod);
       },
       { flush: 'post' },
     );
@@ -723,9 +695,9 @@ export const VirtualizedList = defineComponent({
     // onEndReached: fire only when the actual last cell is rendered AND within threshold; dedup by
     // content length; re-arm on scroll away from the end (RN _maybeCallOnEdgeReached).
     watch(
-      () => [props.value, scrollOffset.value, viewportLength.value, metrics.value],
+      () => [narrowed.value, scrollOffset.value, viewportLength.value, metrics.value],
       () => {
-        const p = props.value;
+        const p = narrowed.value;
         if (p.onEndReached === undefined || viewportLength.value <= EMPTY_OFFSET) return;
         const m = metrics.value;
         const { distanceFromEnd, withinThreshold } = computeEndReached(
@@ -750,9 +722,9 @@ export const VirtualizedList = defineComponent({
 
     // onStartReached: the top-edge twin of onEndReached.
     watch(
-      () => [props.value, scrollOffset.value, viewportLength.value, metrics.value],
+      () => [narrowed.value, scrollOffset.value, viewportLength.value, metrics.value],
       () => {
-        const p = props.value;
+        const p = narrowed.value;
         if (p.onStartReached === undefined || viewportLength.value <= EMPTY_OFFSET) return;
         const m = metrics.value;
         const { distanceFromStart, withinThreshold } = computeStartReached(
@@ -777,9 +749,9 @@ export const VirtualizedList = defineComponent({
     // Viewability: recompute which rendered cells clear the threshold and, if the viewable set
     // changed, fire onViewableItemsChanged + every config/callback pair, honoring minimumViewTime.
     watch(
-      () => [props.value, scrollOffset.value, viewportLength.value, metrics.value],
+      () => [narrowed.value, scrollOffset.value, viewportLength.value, metrics.value],
       () => {
-        const p = props.value;
+        const p = narrowed.value;
         const m = metrics.value;
         const pairs = buildViewabilityPairs(
           p.onViewableItemsChanged,
@@ -812,7 +784,7 @@ export const VirtualizedList = defineComponent({
             `Vue VirtualizedList viewable=${tokens.length} changed=${diff.changed.length} ` +
               `(window [${m.first}, ${m.last}])`,
           );
-          const info: IViewableItemsChangedInfo<unknown> = {
+          const info: IViewableItemsChangedInfo<ItemT> = {
             viewableItems: tokens,
             changed: diff.changed,
           };
@@ -841,9 +813,9 @@ export const VirtualizedList = defineComponent({
 
     // initialScrollIndex: once the first viewport is known, jump to that index a single time.
     watch(
-      () => [props.value, viewportLength.value, metrics.value],
+      () => [narrowed.value, viewportLength.value, metrics.value],
       () => {
-        const p = props.value;
+        const p = narrowed.value;
         if (p.initialScrollIndex === undefined || appliedInitialScroll) return;
         if (viewportLength.value <= EMPTY_OFFSET || metrics.value.count === FIRST_INDEX) return;
         appliedInitialScroll = true;
@@ -858,9 +830,9 @@ export const VirtualizedList = defineComponent({
     // SPACER (the off-window items native MVCP cannot see) to scrollOffset so the anchored item
     // does not jump (RN getDerivedStateFromProps). Runs post-flush so the correction lands fast.
     watch(
-      () => [props.value, metrics.value, scrollOffset.value],
+      () => [narrowed.value, metrics.value, scrollOffset.value],
       () => {
-        const p = props.value;
+        const p = narrowed.value;
         const m = metrics.value;
         if (p.maintainVisibleContentPosition === undefined || m.count === FIRST_INDEX) {
           firstVisibleKey = null;
@@ -914,10 +886,13 @@ export const VirtualizedList = defineComponent({
     });
 
     return () => {
-      const p = props.value;
+      const p = narrowed.value;
       const m = metrics.value;
       // Read the version refs so a separator/measurement bump re-renders.
       void separatorVersion.value;
+
+      if (p.renderItem === undefined)
+        dlog('Vue VirtualizedList: no #item slot provided — cells render empty');
 
       dlog(
         `Vue VirtualizedList window [${m.first}, ${m.last}] of ${m.count} ` +
@@ -972,7 +947,7 @@ export const VirtualizedList = defineComponent({
         for (let cellPos = 0; cellPos < plan.cells.length; cellPos += 1) {
           const cell = plan.cells[cellPos];
           const item = p.getItem(p.data, cell.index);
-          const content = p.renderItem({
+          const content = p.renderItem?.({
             item,
             index: cell.index,
             separators: makeSeparators(cell.index),
@@ -1034,8 +1009,15 @@ export const VirtualizedList = defineComponent({
         onLayout: onViewportLayout,
         ref: setScrollHandle,
       };
-      // The scroll-lifecycle callbacks (onScrollBeginDrag/…), scrollEventThrottle, and the
-      // keyboard props are NOT in HANDLED_ATTRS, so they already ride through via ...p.forwarded.
+      // The raw scroll-lifecycle callbacks (onScrollBeginDrag/…) and scrollEventThrottle are NOT in
+      // PROP_KEYS, so they already ride through via ...p.forwarded. The keyboard props come from
+      // typed props (PROP_KEYS), so re-set them explicitly here (only when provided).
+      if (p.keyboardShouldPersistTaps !== undefined) {
+        scrollProps.keyboardShouldPersistTaps = p.keyboardShouldPersistTaps;
+      }
+      if (p.keyboardDismissMode !== undefined) {
+        scrollProps.keyboardDismissMode = p.keyboardDismissMode;
+      }
       // A pending imperative/initial scroll rides down as contentOffset (fallback for the
       // pre-mount window before the handle attaches).
       if (commandedOffset.value !== undefined) scrollProps.contentOffset = commandedOffset.value;
@@ -1050,10 +1032,11 @@ export const VirtualizedList = defineComponent({
             p.maintainVisibleContentPosition.minIndexForVisible + (header !== undefined ? 1 : 0),
         };
       }
-      // Pull-to-refresh: when onRefresh is set, build a RefreshControl for the ScrollView's
-      // refreshControl prop (iOS sibling / Android wrap, owned by ScrollView).
+      // Pull-to-refresh: when a @refresh listener is present, build a RefreshControl for the
+      // ScrollView's refreshControl prop (iOS sibling / Android wrap, owned by ScrollView). The
+      // onRefresh bridge is gated on the listener, so an unlistened list builds no control.
       if (p.onRefresh !== undefined) {
-        dlog('Vue VirtualizedList wiring RefreshControl (onRefresh provided)');
+        dlog('Vue VirtualizedList wiring RefreshControl (@refresh listened)');
         scrollProps.refreshControl = h(RefreshControl, {
           refreshing: p.refreshing,
           onRefresh: p.onRefresh,
@@ -1064,4 +1047,10 @@ export const VirtualizedList = defineComponent({
       return h(ScrollView, scrollProps, { default: () => children });
     };
   },
-});
+  {
+    name: 'VirtualizedList',
+    inheritAttrs: false,
+    props: PROP_KEYS,
+    emits: EMIT_KEYS,
+  } as unknown as undefined,
+);

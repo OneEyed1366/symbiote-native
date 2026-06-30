@@ -6,10 +6,14 @@
 // (sectionIndex, itemIndex) onto the correct flat offset, landing as the native scrollTo command.
 // Vue reactivity is async, so each driving step is followed by a macrotask `tick`.
 
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SectionList, mount, unmount, type ISectionListHandle } from '@symbiote/vue';
 import { installFabric, type IFakeNode } from '@symbiote/test-utils';
+
+// SectionList is a generic component (generic construct signature), which h()'s overloads can't
+// resolve. Drive it through a loose functional-component handle (generic-component h() limitation).
+const SectionListHost = SectionList as unknown as FunctionalComponent<Record<string, unknown>>;
 
 type ICommandCall = {
   name: string;
@@ -84,13 +88,19 @@ describe('Vue SectionList on the engine', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h(SectionList, {
-            sections: SECTIONS,
-            keyExtractor: (item: IRow) => `k-${item.id}`,
-            renderSectionHeader: ({ section }: { section: ISectionShape }) =>
-              h('symbiote-text', {}, `header:${section.title}`),
-            renderItem: ({ item }: { item: IRow }) => h('symbiote-text', {}, item.label),
-          }),
+          h(
+            SectionListHost,
+            {
+              sections: SECTIONS,
+              keyExtractor: (item: IRow) => `k-${item.id}`,
+            },
+            {
+              sectionHeader: ({ section }: { section: ISectionShape }) => [
+                h('symbiote-text', {}, `header:${section.title}`),
+              ],
+              item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)],
+            },
+          ),
       }),
     );
     await tick();
@@ -106,13 +116,19 @@ describe('Vue SectionList on the engine', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h(SectionList, {
-            sections: SECTIONS,
-            stickySectionHeadersEnabled: true,
-            renderSectionHeader: ({ section }: { section: ISectionShape }) =>
-              h('symbiote-text', {}, section.title),
-            renderItem: ({ item }: { item: IRow }) => h('symbiote-text', {}, `row-${item.id}`),
-          }),
+          h(
+            SectionListHost,
+            {
+              sections: SECTIONS,
+              stickySectionHeadersEnabled: true,
+            },
+            {
+              sectionHeader: ({ section }: { section: ISectionShape }) => [
+                h('symbiote-text', {}, section.title),
+              ],
+              item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, `row-${item.id}`)],
+            },
+          ),
       }),
     );
     await tick();
@@ -129,13 +145,19 @@ describe('Vue SectionList on the engine', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h(SectionList, {
-            sections: SECTIONS,
-            stickySectionHeadersEnabled: false,
-            renderSectionHeader: ({ section }: { section: ISectionShape }) =>
-              h('symbiote-text', {}, section.title),
-            renderItem: ({ item }: { item: IRow }) => h('symbiote-text', {}, `row-${item.id}`),
-          }),
+          h(
+            SectionListHost,
+            {
+              sections: SECTIONS,
+              stickySectionHeadersEnabled: false,
+            },
+            {
+              sectionHeader: ({ section }: { section: ISectionShape }) => [
+                h('symbiote-text', {}, section.title),
+              ],
+              item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, `row-${item.id}`)],
+            },
+          ),
       }),
     );
     await tick();
@@ -149,19 +171,25 @@ describe('Vue SectionList on the engine', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h(SectionList, {
-            ref: listRef,
-            sections: SECTIONS,
-            stickySectionHeadersEnabled: false,
-            getItemLayout: (_data: unknown, index: number) => ({
-              length: ITEM_HEIGHT,
-              offset: ITEM_HEIGHT * index,
-              index,
-            }),
-            renderSectionHeader: ({ section }: { section: ISectionShape }) =>
-              h('symbiote-text', {}, `header:${section.title}`),
-            renderItem: ({ item }: { item: IRow }) => h('symbiote-text', {}, item.label),
-          }),
+          h(
+            SectionListHost,
+            {
+              ref: listRef,
+              sections: SECTIONS,
+              stickySectionHeadersEnabled: false,
+              getItemLayout: (_data: unknown, index: number) => ({
+                length: ITEM_HEIGHT,
+                offset: ITEM_HEIGHT * index,
+                index,
+              }),
+            },
+            {
+              sectionHeader: ({ section }: { section: ISectionShape }) => [
+                h('symbiote-text', {}, `header:${section.title}`),
+              ],
+              item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)],
+            },
+          ),
       }),
     );
     await tick();

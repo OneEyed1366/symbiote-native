@@ -6,7 +6,7 @@
 
 import { h } from '@vue/runtime-core';
 import { createScrollView } from './shared';
-export type { IScrollViewProps, IScrollViewHandle } from './shared';
+export type { IScrollViewProps, IScrollViewEmits, IScrollViewHandle } from './shared';
 
 export const ScrollView = createScrollView({
   assemble: input => {

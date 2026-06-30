@@ -47,6 +47,12 @@ const slide = (
   forward.value = !forward.value
 }
 
+// Template refs auto-unwrap, so the buttons can't pass `jsForward`/`nativeForward` (they'd arrive
+// as bare booleans, not the Ref `slide` needs). Wrap the calls in script handlers that close over
+// the real refs.
+const slideJsDriver = (): void => slide(jsSlide, jsForward, false)
+const slideNativeDriver = (): void => slide(nativeSlide, nativeForward, true)
+
 const jsX = jsSlide.interpolate({ inputRange: [0, 1], outputRange: [0, SLIDE_DISTANCE] })
 const nativeX = nativeSlide.interpolate({ inputRange: [0, 1], outputRange: [0, SLIDE_DISTANCE] })
 
@@ -87,13 +93,13 @@ const styles = StyleSheet.create({
     <View :style="styles.slideTrack">
       <AnimatedView testID="slide-js-dot" :style="[styles.jsSlideDot, { transform: [{ translateX: jsX }] }]" />
     </View>
-    <Button testID="slide-js-btn" title="Slide (JS driver)" @press="() => slide(jsSlide, jsForward, false)" color="#f6ad55" />
+    <Button testID="slide-js-btn" title="Slide (JS driver)" @press="slideJsDriver" color="#f6ad55" />
 
     <!-- native-driven slide: offloaded, zero JS frames -->
     <View :style="styles.slideTrack">
       <AnimatedView testID="slide-native-dot" :style="[styles.nativeSlideDot, { transform: [{ translateX: nativeX }] }]" />
     </View>
-    <Button testID="slide-native-btn" title="Slide (native driver)" @press="() => slide(nativeSlide, nativeForward, true)" color="#68d391" />
+    <Button testID="slide-native-btn" title="Slide (native driver)" @press="slideNativeDriver" color="#68d391" />
 
     <!-- Freeze the JS thread 1.5s: native (pulse + green) keep moving, JS (orange) stalls -->
     <Button title="Freeze JS 1.5s" @press="freezeJs" color="#fc8181" />

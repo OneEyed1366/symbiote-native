@@ -13,14 +13,7 @@
 // where routeProp turns press/pressIn/pressOut + the responder events into listeners). Children
 // arrive as a (scoped) default slot so `v-slot="{ pressed }"` mirrors React's children-as-function.
 
-import {
-  defineComponent,
-  h,
-  ref,
-  shallowRef,
-  type SetupContext,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, h, ref, shallowRef, type EmitFn, type VNode } from '@vue/runtime-core';
 import {
   createPressHandlers,
   createPressRuntime,
@@ -32,7 +25,6 @@ import {
   DEFAULT_DELAY_LONG_PRESS_MS,
   type IPressHost,
   type IPressState,
-  type IPressHandler,
   type IRectOffset,
   type IPressMachineConfig,
   type IPressableAndroidRippleConfig,
@@ -43,23 +35,60 @@ import {
 import {
   measure,
   isSymbioteNode,
+  type ISymbioteEvent,
   type ISymbioteNode,
   type IStyleProp,
   type IViewStyle,
 } from '@symbiote/engine';
 import { View } from '../components';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
+import type { ICtx } from '../utils/component-helpers';
 
 export type { IPressState, IPressableAndroidRippleConfig } from '@symbiote/components';
 
-// The Vue-facing prop surface (mirrors React's IPressableProps minus children, which Vue takes via
-// a scoped slot). style may be a plain style or a function of the press state, exactly as React.
+export type IPressableEmits = {
+  press: (event: ISymbioteEvent) => boolean;
+  pressIn: (event: ISymbioteEvent) => boolean;
+  pressOut: (event: ISymbioteEvent) => boolean;
+  pressMove: (event: ISymbioteEvent) => boolean;
+  longPress: (event: ISymbioteEvent) => boolean;
+  hoverIn: (event: ISymbioteEvent) => boolean;
+  hoverOut: (event: ISymbioteEvent) => boolean;
+};
+
+// The emits-options validator for the full press surface. Reused verbatim as the `emits` of every
+// Touchable* wrapper (they expose the same events), so the runtime list lives in exactly one place.
+export const PRESSABLE_EMITS = {
+  press: (_event: ISymbioteEvent): boolean => true,
+  pressIn: (_event: ISymbioteEvent): boolean => true,
+  pressOut: (_event: ISymbioteEvent): boolean => true,
+  pressMove: (_event: ISymbioteEvent): boolean => true,
+  longPress: (_event: ISymbioteEvent): boolean => true,
+  hoverIn: (_event: ISymbioteEvent): boolean => true,
+  hoverOut: (_event: ISymbioteEvent): boolean => true,
+};
+
+// Bridge the whole press surface onto a child Pressable: each host onX callback re-emits the
+// matching event on the wrapper. Every Touchable* wraps Pressable, so spread this onto the child's
+// props. A wrapper that intercepts an event for its own state (e.g. TouchableOpacity's opacity
+// animation on press-in/out) overrides that one key AFTER the spread.
+export function emitPressableEvents(
+  emit: EmitFn<IPressableEmits>,
+): Record<string, (event: ISymbioteEvent) => void> {
+  return {
+    onPress: event => emit('press', event),
+    onPressIn: event => emit('pressIn', event),
+    onPressOut: event => emit('pressOut', event),
+    onPressMove: event => emit('pressMove', event),
+    onLongPress: event => emit('longPress', event),
+    onHoverIn: event => emit('hoverIn', event),
+    onHoverOut: event => emit('hoverOut', event),
+  };
+}
+
+// The Vue-facing prop surface (mirrors React's IPressableProps minus children/callback props, which
+// Vue takes via slots/emits). style may be a plain style or a function of the press state.
 export interface IPressableProps extends IAccessibilityProps, IAriaProps {
-  onPress?: IPressHandler;
-  onPressIn?: IPressHandler;
-  onPressOut?: IPressHandler;
-  onPressMove?: IPressHandler;
-  onLongPress?: IPressHandler;
   delayLongPress?: number;
   disabled?: boolean;
   cancelable?: boolean;
@@ -68,20 +97,20 @@ export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   unstable_pressDelay?: number;
   android_ripple?: IPressableAndroidRippleConfig;
   android_disableSound?: boolean;
-  onHoverIn?: IPressHandler;
-  onHoverOut?: IPressHandler;
   delayHoverIn?: number;
   delayHoverOut?: number;
   testID?: string;
   style?: IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
 }
 
+// The scoped default slot mirrors React's children-as-function: it receives the press state, so a
+// consumer's `v-slot="{ pressed }"` / `#default="{ pressed }"` is typed (not any).
+export type IPressableSlots = {
+  default?: (state: IPressState) => VNode[] | VNode;
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isPressHandler(value: unknown): value is IPressHandler {
-  return typeof value === 'function';
 }
 
 function isStyleFn(value: unknown): value is (state: IPressState) => IStyleProp<IViewStyle> {
@@ -166,10 +195,11 @@ function forwardAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
   return result;
 }
 
-export const Pressable = defineComponent({
-  name: 'Pressable',
-  inheritAttrs: false,
-  setup(_props, { slots, attrs: rawAttrs }: SetupContext) {
+export const Pressable = defineComponent(
+  (
+    _props: IPressableProps,
+    { slots, attrs: rawAttrs, emit }: ICtx<IPressableEmits, IPressableSlots>,
+  ) => {
     const pressed = ref(false);
     // The mutable press runtime (timers, suppression flags, measured region). A plain setup-scope
     // object, never a ref: it is mutated by the machine, never reactively read.
@@ -204,11 +234,11 @@ export const Pressable = defineComponent({
       const cancelable = typeof attrs.cancelable === 'boolean' ? attrs.cancelable : undefined;
 
       const config: IPressMachineConfig = {
-        onPress: isPressHandler(attrs.onPress) ? attrs.onPress : undefined,
-        onPressIn: isPressHandler(attrs.onPressIn) ? attrs.onPressIn : undefined,
-        onPressOut: isPressHandler(attrs.onPressOut) ? attrs.onPressOut : undefined,
-        onPressMove: isPressHandler(attrs.onPressMove) ? attrs.onPressMove : undefined,
-        onLongPress: isPressHandler(attrs.onLongPress) ? attrs.onLongPress : undefined,
+        onPress: event => emit('press', event),
+        onPressIn: event => emit('pressIn', event),
+        onPressOut: event => emit('pressOut', event),
+        onPressMove: event => emit('pressMove', event),
+        onLongPress: event => emit('longPress', event),
         delayLongPress: numberOr(attrs.delayLongPress, DEFAULT_DELAY_LONG_PRESS_MS),
         unstable_pressDelay: numberOr(attrs.unstable_pressDelay, 0),
         hitSlop: asRectOffset(attrs.hitSlop),
@@ -216,7 +246,7 @@ export const Pressable = defineComponent({
       };
       const handlers = createPressHandlers(config, runtime, host);
 
-      noteHoverNoop(attrs.onHoverIn, attrs.onHoverOut);
+      noteHoverNoop(undefined, undefined);
 
       const state: IPressState = { pressed: pressed.value };
 
@@ -241,7 +271,7 @@ export const Pressable = defineComponent({
 
       // Children come from the (scoped) default slot, receiving the press state so a render-prop
       // child (`v-slot="{ pressed }"`) mirrors React's children-as-function.
-      const content: VNode[] = slots.default !== undefined ? slots.default(state) : [];
+      const content: VNode[] | VNode = slots.default !== undefined ? slots.default(state) : [];
 
       // android_ripple rides a dedicated inner View; on iOS the prop is undefined, so the child
       // renders unwrapped, no extra node. Mirrors the React Pressable + touchable-native-feedback.
@@ -258,4 +288,9 @@ export const Pressable = defineComponent({
       return h(View, viewProps, () => inner);
     };
   },
-});
+  {
+    name: 'Pressable',
+    inheritAttrs: false,
+    emits: PRESSABLE_EMITS,
+  },
+);

@@ -17,7 +17,7 @@
 // device-verify-pending: the AndroidDrawerLayout name + openDrawer/closeDrawer commands are
 // RN-source-confirmed, not yet exercised on a real Android host.
 
-import { defineComponent, h, ref, shallowRef, type SetupContext } from '@vue/runtime-core';
+import { defineComponent, h, ref, shallowRef } from '@vue/runtime-core';
 import {
   buildDrawerHandle,
   offsetFromSlide,
@@ -40,6 +40,7 @@ import {
 } from '@symbiote/engine';
 import { View } from '../../components';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
+import type { IDrawerLayoutAndroidEmits, IDrawerLayoutAndroidProps } from './shared';
 
 export type {
   IDrawerPosition,
@@ -47,6 +48,7 @@ export type {
   IKeyboardDismissMode,
   IDrawerState,
   IDrawerSlideEvent,
+  IDrawerLayoutAndroidEmits,
   IDrawerLayoutAndroidProps,
   IDrawerLayoutAndroidHandle,
 } from './shared';
@@ -77,12 +79,6 @@ function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
   return typeof value === 'object' && value !== null;
 }
 
-type IUnknownHandler = (...args: readonly unknown[]) => void;
-
-function isHandler(value: unknown): value is IUnknownHandler {
-  return typeof value === 'function';
-}
-
 // The typed fields the lifecycle consumes/re-emits (resolveDrawerLayout folds the drawer* props onto
 // the host) and the onDrawer* handlers (wrapped here, never forwarded raw); everything else (testID,
 // accessibility, aria-*) forwards onto the host via passthrough.
@@ -110,10 +106,11 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
   return result;
 }
 
-export const DrawerLayoutAndroid = defineComponent({
-  name: 'DrawerLayoutAndroid',
-  inheritAttrs: false,
-  setup(_props, { slots, attrs: rawAttrs, expose }: SetupContext) {
+export const DrawerLayoutAndroid = defineComponent<
+  IDrawerLayoutAndroidProps,
+  IDrawerLayoutAndroidEmits
+>(
+  (_props, { slots, attrs: rawAttrs, expose, emit }) => {
     // shallowRef, NOT ref: the engine node must be held by IDENTITY. A plain ref() runs the node
     // through Vue's toReactive(), handing back a reactive Proxy the engine's mirror (a WeakMap keyed
     // on the raw node) can't resolve, so openDrawer/closeDrawer would silently no-op. Same rule as
@@ -136,29 +133,22 @@ export const DrawerLayoutAndroid = defineComponent({
     return () => {
       const attrs = normalizeVueAttrs(rawAttrs);
 
-      const onDrawerOpenUser = isHandler(attrs.onDrawerOpen) ? attrs.onDrawerOpen : undefined;
-      const onDrawerCloseUser = isHandler(attrs.onDrawerClose) ? attrs.onDrawerClose : undefined;
-      const onDrawerSlideUser = isHandler(attrs.onDrawerSlide) ? attrs.onDrawerSlide : undefined;
-      const onDrawerStateChangedUser = isHandler(attrs.onDrawerStateChanged)
-        ? attrs.onDrawerStateChanged
-        : undefined;
-
       const handleDrawerOpen = (): void => {
         dlog('Vue DrawerLayoutAndroid onDrawerOpen');
         drawerOpened.value = true;
-        onDrawerOpenUser?.();
+        emit('drawerOpen');
       };
       const handleDrawerClose = (): void => {
         dlog('Vue DrawerLayoutAndroid onDrawerClose');
         drawerOpened.value = false;
-        onDrawerCloseUser?.();
+        emit('drawerClose');
       };
       const handleDrawerSlide = (event: ISymbioteEvent): void => {
         dlog('Vue DrawerLayoutAndroid onDrawerSlide');
-        onDrawerSlideUser?.({ offset: offsetFromSlide(event) });
+        emit('drawerSlide', { offset: offsetFromSlide(event) });
       };
       const handleDrawerStateChanged = (event: ISymbioteEvent): void => {
-        onDrawerStateChangedUser?.(stateFromChange(event));
+        emit('drawerStateChanged', stateFromChange(event));
       };
 
       const resolved = resolveDrawerLayout({
@@ -174,9 +164,7 @@ export const DrawerLayoutAndroid = defineComponent({
       });
 
       // RN's mainSubview: content wrapped in an absolute full-screen box (the default slot).
-      const content = h(
-        View,
-        { style: resolved.contentWrapperStyle },
+      const content = h(View, { style: resolved.contentWrapperStyle }, () =>
         slots.default !== undefined ? slots.default() : [],
       );
       // RN's drawerSubview: the navigation view (the `navigationView` slot) wrapped, drawerWidth-wide,
@@ -187,7 +175,7 @@ export const DrawerLayoutAndroid = defineComponent({
           style: resolved.navigationWrapperStyle,
           pointerEvents: resolved.navigationPointerEvents,
         },
-        slots.navigationView !== undefined ? slots.navigationView() : [],
+        () => (slots.navigationView !== undefined ? slots.navigationView() : []),
       );
 
       dlog(
@@ -210,4 +198,14 @@ export const DrawerLayoutAndroid = defineComponent({
       );
     };
   },
-});
+  {
+    name: 'DrawerLayoutAndroid',
+    inheritAttrs: false,
+    emits: {
+      drawerOpen: (): boolean => true,
+      drawerClose: (): boolean => true,
+      drawerSlide: (_event): boolean => true,
+      drawerStateChanged: (_state): boolean => true,
+    },
+  },
+);

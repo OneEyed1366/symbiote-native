@@ -11,7 +11,7 @@
 // Inputs arrive as attrs (untyped), narrowed with runtime guards. The handlers read attrs LIVE
 // (they fire on events, not render) so a re-supplied callback / timing is always honored.
 
-import { defineComponent, h, type SetupContext, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, type VNode } from '@vue/runtime-core';
 import {
   computePressOutWait,
   DEFAULT_ACTIVE_OPACITY,
@@ -22,15 +22,34 @@ import {
   OPACITY_INACTIVE_DURATION_MS,
   RESTING_OPACITY,
   type IPressState,
+  type IPressTimingProps,
 } from '@symbiote/components';
-import { dlog, type ISymbioteEvent, type IViewStyle } from '@symbiote/engine';
-import { Pressable } from './pressable';
+import { dlog, type ISymbioteEvent, type IStyleProp, type IViewStyle } from '@symbiote/engine';
+import {
+  Pressable,
+  emitPressableEvents,
+  PRESSABLE_EMITS,
+  type IPressableEmits,
+  type IPressableProps,
+} from './pressable';
 import { Animated } from '../modules/animated';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
-function isHandler(value: unknown): value is (event: ISymbioteEvent) => void {
-  return typeof value === 'function';
+type ITouchableBaseProps = Omit<IPressableProps, 'style'> &
+  IPressTimingProps & {
+    style?: IStyleProp<IViewStyle>;
+  };
+
+export interface ITouchableOpacityProps extends ITouchableBaseProps {
+  activeOpacity?: number;
 }
+
+export interface ITouchableHighlightProps extends ITouchableBaseProps {
+  activeOpacity?: number;
+  underlayColor?: string;
+}
+
+export type ITouchableWithoutFeedbackProps = ITouchableBaseProps;
 
 function numberOr(value: unknown, fallback: number): number {
   return typeof value === 'number' ? value : fallback;
@@ -57,10 +76,8 @@ const TOUCHABLE_OPACITY_HANDLED = [
   'minPressDuration',
 ];
 
-export const TouchableOpacity = defineComponent({
-  name: 'TouchableOpacity',
-  inheritAttrs: false,
-  setup(_props, { slots, attrs: rawAttrs }: SetupContext) {
+export const TouchableOpacity = defineComponent<ITouchableOpacityProps, IPressableEmits>(
+  (_props, { slots, attrs: rawAttrs, emit }) => {
     // One Animated.Value per mount, resting at full opacity. Held by identity in setup scope (an
     // engine object, never a reactive ref). The Animated.View leaf commits it every frame.
     const opacity = new Animated.Value(RESTING_OPACITY);
@@ -89,13 +106,13 @@ export const TouchableOpacity = defineComponent({
         numberOr(rawAttrs.activeOpacity, DEFAULT_ACTIVE_OPACITY),
         OPACITY_ACTIVE_DURATION_MS,
       );
-      if (isHandler(rawAttrs.onPressIn)) rawAttrs.onPressIn(event);
+      emit('pressIn', event);
     }
 
     function deactivate(event: ISymbioteEvent): void {
       activatedAt = undefined;
       setOpacityTo(RESTING_OPACITY, OPACITY_INACTIVE_DURATION_MS);
-      if (isHandler(rawAttrs.onPressOut)) rawAttrs.onPressOut(event);
+      emit('pressOut', event);
     }
 
     function handlePressIn(event: ISymbioteEvent): void {
@@ -135,6 +152,7 @@ export const TouchableOpacity = defineComponent({
       const style = attrs.style;
       const pressableProps: Record<string, unknown> = {
         ...forwardExcept(attrs, TOUCHABLE_OPACITY_HANDLED),
+        ...emitPressableEvents(emit),
         onPressIn: handlePressIn,
         onPressOut: handlePressOut,
       };
@@ -143,14 +161,17 @@ export const TouchableOpacity = defineComponent({
       return h(Pressable, pressableProps, { default: () => [feedback] });
     };
   },
-});
+  {
+    name: 'TouchableOpacity',
+    inheritAttrs: false,
+    emits: PRESSABLE_EMITS,
+  },
+);
 
 const TOUCHABLE_HIGHLIGHT_HANDLED = ['activeOpacity', 'underlayColor', 'style'];
 
-export const TouchableHighlight = defineComponent({
-  name: 'TouchableHighlight',
-  inheritAttrs: false,
-  setup(_props, { slots, attrs: rawAttrs }: SetupContext) {
+export const TouchableHighlight = defineComponent<ITouchableHighlightProps, IPressableEmits>(
+  (_props, { slots, attrs: rawAttrs, emit }) => {
     return () => {
       const attrs = normalizeVueAttrs(rawAttrs);
       const activeOpacity = numberOr(attrs.activeOpacity, DEFAULT_HIGHLIGHT_CHILD_OPACITY);
@@ -166,22 +187,34 @@ export const TouchableHighlight = defineComponent({
 
       const pressableProps: Record<string, unknown> = {
         ...forwardExcept(attrs, TOUCHABLE_HIGHLIGHT_HANDLED),
+        ...emitPressableEvents(emit),
         style: pressedStyle,
       };
       const children: VNode[] = slots.default !== undefined ? slots.default() : [];
       return h(Pressable, pressableProps, { default: () => children });
     };
   },
-});
+  {
+    name: 'TouchableHighlight',
+    inheritAttrs: false,
+    emits: PRESSABLE_EMITS,
+  },
+);
 
-export const TouchableWithoutFeedback = defineComponent({
-  name: 'TouchableWithoutFeedback',
-  inheritAttrs: false,
-  setup(_props, { slots, attrs: rawAttrs }: SetupContext) {
+export const TouchableWithoutFeedback = defineComponent<
+  ITouchableWithoutFeedbackProps,
+  IPressableEmits
+>(
+  (_props, { slots, attrs: rawAttrs, emit }) => {
     return () => {
       const attrs = normalizeVueAttrs(rawAttrs);
       const children: VNode[] = slots.default !== undefined ? slots.default() : [];
-      return h(Pressable, { ...attrs }, { default: () => children });
+      return h(Pressable, { ...attrs, ...emitPressableEvents(emit) }, { default: () => children });
     };
   },
-});
+  {
+    name: 'TouchableWithoutFeedback',
+    inheritAttrs: false,
+    emits: PRESSABLE_EMITS,
+  },
+);

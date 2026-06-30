@@ -6,11 +6,12 @@
 // barrel imports './drawer-layout-android', which resolves here under tsx/tsc and to the .android
 // file under Metro. See ADR 0019.
 
-import { defineComponent, h, type SetupContext } from '@vue/runtime-core';
+import { defineComponent, h } from '@vue/runtime-core';
 import { dlog, type IStyleProp, type IViewStyle } from '@symbiote/engine';
 import type { IDrawerLayoutAndroidHandle } from '@symbiote/components';
 import { View } from '../../components';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
+import type { IDrawerLayoutAndroidEmits, IDrawerLayoutAndroidProps } from './shared';
 
 export type {
   IDrawerPosition,
@@ -18,6 +19,7 @@ export type {
   IKeyboardDismissMode,
   IDrawerState,
   IDrawerSlideEvent,
+  IDrawerLayoutAndroidEmits,
   IDrawerLayoutAndroidProps,
   IDrawerLayoutAndroidHandle,
 } from './shared';
@@ -26,10 +28,11 @@ function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
   return typeof value === 'object' && value !== null;
 }
 
-export const DrawerLayoutAndroid = defineComponent({
-  name: 'DrawerLayoutAndroid',
-  inheritAttrs: false,
-  setup(_props, { slots, attrs, expose }: SetupContext) {
+export const DrawerLayoutAndroid = defineComponent<
+  IDrawerLayoutAndroidProps,
+  IDrawerLayoutAndroidEmits
+>(
+  (_props, { slots, attrs, expose }) => {
     const handle: IDrawerLayoutAndroidHandle = {
       openDrawer: (): void => dlog('Vue DrawerLayoutAndroid.openDrawer no-op: off Android'),
       closeDrawer: (): void => dlog('Vue DrawerLayoutAndroid.closeDrawer no-op: off Android'),
@@ -43,4 +46,14 @@ export const DrawerLayoutAndroid = defineComponent({
       return h(View, { style }, () => (slots.default !== undefined ? slots.default() : []));
     };
   },
-});
+  {
+    name: 'DrawerLayoutAndroid',
+    inheritAttrs: false,
+    emits: {
+      drawerOpen: (): boolean => true,
+      drawerClose: (): boolean => true,
+      drawerSlide: (_event): boolean => true,
+      drawerStateChanged: (_state): boolean => true,
+    },
+  },
+);

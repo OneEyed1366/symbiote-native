@@ -42,7 +42,7 @@ export type { IActivityIndicatorProps } from '@symbiote/components';
 // First component to bring the state half into Vue (the lastNativeReport reducer + the
 // snap-back watch); render shared verbatim with React, Vue supplies the reactive lifecycle.
 export { Switch } from './components/switch';
-export type { ISwitchProps, ISwitchTrackColor } from '@symbiote/components';
+export type { ISwitchProps, ISwitchTrackColor } from './components/switch';
 // ScrollView. Full parity (ADR 0024): vertical + horizontal, every pass-through prop, the
 // synthesized onContentSizeChange, the imperative handle via expose() + shallowRef, RefreshControl
 // (iOS sibling / Android wrap, Phase 2), and sticky headers (Phase 3: the scroll AnimatedValue,
@@ -50,12 +50,17 @@ export type { ISwitchProps, ISwitchTrackColor } from '@symbiote/components';
 // decelerationRate, content-size dedupe, the handle, the sticky interpolation) is shared verbatim
 // with React from @symbiote/components.
 export { ScrollView } from './components/scroll-view';
-export type { IScrollViewProps, IScrollViewHandle } from './components/scroll-view';
+export type {
+  IScrollViewProps,
+  IScrollViewEmits,
+  IScrollViewHandle,
+} from './components/scroll-view';
 // Pressable family. Full parity with React (the 3-layer split): the press state machine + render
 // decisions are shared in @symbiote/components; Vue supplies the reactivity + descriptor bridge.
 export { Pressable } from './components/pressable';
 export type {
   IPressableProps,
+  IPressableSlots,
   IPressState,
   IPressableAndroidRippleConfig,
 } from './components/pressable';
@@ -64,25 +69,33 @@ export {
   TouchableHighlight,
   TouchableWithoutFeedback,
 } from './components/touchable';
+export type {
+  ITouchableOpacityProps,
+  ITouchableHighlightProps,
+  ITouchableWithoutFeedbackProps,
+} from './components/touchable';
 export { TouchableNativeFeedback } from './components/touchable-native-feedback';
 export type {
   INativeFeedbackBackground,
   IThemeAttrBackground,
   IRippleBackground,
+  ITouchableNativeFeedbackProps,
 } from './components/touchable-native-feedback';
 export { Button } from './components/button';
-export type { IButtonProps } from '@symbiote/components';
+export type { IButtonProps } from './components/button';
 // TextInput. Full parity with React (the 3-layer split): the value/selection folds + the
 // controlled-write predicate live in @symbiote/components; Vue supplies the reactivity
 // (shallowRef host node, post-flush watch) + the imperative handle via expose().
 export { TextInput } from './components/text-input';
-export type { ITextInputProps, ITextInputHandle } from '@symbiote/components';
+export type { ITextInputProps, ITextInputHandle } from './components/text-input';
 // VirtualizedList family. Full parity with React: the windowing math (visible range, cell
 // keys, viewability token diffing, edge-reached, the list plan) is shared in
 // @symbiote/components; Vue supplies the reactive lifecycle + the per-cell element.
 export { VirtualizedList } from './components/virtualized-list';
 export type {
   IVirtualizedListProps,
+  IVirtualizedListSlots,
+  IVirtualizedListEmits,
   IVirtualizedListHandle,
   ISeparators,
   ISeparatorProps,
@@ -93,17 +106,34 @@ export type {
   ICellLayout,
 } from './components/virtualized-list';
 export { FlatList } from './components/flat-list';
-export type { IFlatListProps, IFlatListHandle } from './components/flat-list';
+export type {
+  IFlatListProps,
+  IFlatListSlots,
+  IFlatListEmits,
+  IFlatListHandle,
+} from './components/flat-list';
 export { VirtualizedSectionList } from './components/virtualized-section-list';
-export type { IVirtualizedSectionListHandle } from './components/virtualized-section-list';
+export type {
+  IVirtualizedSectionListProps,
+  IVirtualizedSectionListSlots,
+  IVirtualizedSectionListEmits,
+  IVirtualizedSectionListHandle,
+} from './components/virtualized-section-list';
 export { SectionList } from './components/section-list';
-export type { ISection, ISectionListHandle } from './components/section-list';
+export type {
+  ISection,
+  ISectionListProps,
+  ISectionListSlots,
+  ISectionListEmits,
+  ISectionListHandle,
+} from './components/section-list';
 // DrawerLayoutAndroid (Android-only; iOS degrades to a plain container). Shared logic
 // (types, command names, slide/state normalization, the imperative handle) in
 // @symbiote/components; Vue supplies the platform-split lifecycle + the slots.
 export { DrawerLayoutAndroid } from './components/drawer-layout-android';
 export type {
   IDrawerLayoutAndroidProps,
+  IDrawerLayoutAndroidEmits,
   IDrawerLayoutAndroidHandle,
   IDrawerPosition,
   IDrawerLockMode,
@@ -116,7 +146,7 @@ export type {
 export { SafeAreaView } from './components/safe-area-view';
 export type { ISafeAreaViewProps } from './components/safe-area-view';
 export { RefreshControl } from './components/refresh-control';
-export type { IRefreshControlProps } from './components/refresh-control';
+export type { IRefreshControlProps, IRefreshControlEmits } from './components/refresh-control';
 export { descriptorToVue } from './descriptor-to-vue';
 // normalizeVueAttrs: the kebab→camel attr fold every component applies at entry. Exported so an
 // external wrapper package (e.g. @symbiote/slider/vue over a third-party native view) can fold
@@ -137,6 +167,7 @@ export type { IInputAccessoryViewProps } from './components/input-accessory-view
 export { Modal } from './components/modal';
 export type {
   IModalProps,
+  IModalEmits,
   IModalAnimationType,
   IModalPresentationStyle,
   IModalOrientation,
@@ -144,7 +175,11 @@ export type {
 } from './components/modal';
 // KeyboardAvoidingView: full parity via the shared inset math; Vue owns the Keyboard subscription.
 export { KeyboardAvoidingView } from './components/keyboard-avoiding-view';
-export type { IKeyboardAvoidingBehavior } from './components/keyboard-avoiding-view';
+export type {
+  IKeyboardAvoidingBehavior,
+  IKeyboardAvoidingViewProps,
+  IKeyboardAvoidingViewEmits,
+} from './components/keyboard-avoiding-view';
 // StatusBar: declarative component + the shared imperative API.
 export { StatusBar } from './modules/status-bar';
 export type { IStatusBarProps, IStatusBarStyle } from './modules/status-bar';

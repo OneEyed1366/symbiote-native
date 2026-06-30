@@ -9,14 +9,60 @@
 // stateful component's ref would resolve to a useless component proxy, which is why
 // createAnimatedComponent (which captures the host node via that ref) needs the fall-through.
 
-import { h, type FunctionalComponent } from '@vue/runtime-core';
+import { h, type FunctionalComponent, type VNodeRef } from '@vue/runtime-core';
+import type { ISymbioteEvent, IStyleProp, ITextStyle, IViewStyle } from '@symbiote/engine';
+import type { IAccessibilityProps, IAriaProps, IResponderProps } from '@symbiote/components';
 import { normalizeVueAttrs } from './utils/normalize-attrs';
 
-function hostComponent(intrinsic: string, name: string): FunctionalComponent {
+export interface IViewProps extends IAccessibilityProps, IAriaProps, IResponderProps {
+  style?: IStyleProp<IViewStyle>;
+  onPress?: (event: ISymbioteEvent) => void;
+  onPressIn?: (event: ISymbioteEvent) => void;
+  onPressOut?: (event: ISymbioteEvent) => void;
+  onLayout?: (event: ISymbioteEvent) => void;
+  onFocus?: (event: ISymbioteEvent) => void;
+  onBlur?: (event: ISymbioteEvent) => void;
+  pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
+  hitSlop?: number | { top?: number; left?: number; bottom?: number; right?: number };
+  id?: string;
+  focusable?: boolean;
+  collapsable?: boolean;
+  removeClippedSubviews?: boolean;
+  renderToHardwareTextureAndroid?: boolean;
+  shouldRasterizeIOS?: boolean;
+  needsOffscreenAlphaCompositing?: boolean;
+  ref?: VNodeRef;
+  key?: string | number | symbol;
+}
+
+export interface ITextProps extends IAccessibilityProps, IAriaProps {
+  style?: IStyleProp<ITextStyle>;
+  onPress?: (event: ISymbioteEvent) => void;
+  onLongPress?: (event: ISymbioteEvent) => void;
+  onPressIn?: (event: ISymbioteEvent) => void;
+  onPressOut?: (event: ISymbioteEvent) => void;
+  onLayout?: (event: ISymbioteEvent) => void;
+  onTextLayout?: (event: ISymbioteEvent) => void;
+  numberOfLines?: number;
+  ellipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
+  selectable?: boolean;
+  adjustsFontSizeToFit?: boolean;
+  minimumFontScale?: number;
+  allowFontScaling?: boolean;
+  maxFontSizeMultiplier?: number | null;
+  selectionColor?: string;
+  ref?: VNodeRef;
+  key?: string | number | symbol;
+}
+
+function hostComponent<Props extends object>(
+  intrinsic: string,
+  name: string,
+): FunctionalComponent<Props> {
   // A functional component's ctx is Omit<SetupContext, 'expose'> (no instance to expose); let the
   // FunctionalComponent target infer the param types rather than annotate SetupContext.
   // normalizeVueAttrs folds kebab template props (:accessibility-label) to the RN camelCase contract.
-  const component: FunctionalComponent = (_props, { slots, attrs }) =>
+  const component: FunctionalComponent<Props> = (_props, { slots, attrs }) =>
     h(
       intrinsic,
       normalizeVueAttrs(attrs),
@@ -27,8 +73,8 @@ function hostComponent(intrinsic: string, name: string): FunctionalComponent {
   return component;
 }
 
-export const View = hostComponent('symbiote-view', 'View');
-export const Text = hostComponent('symbiote-text', 'Text');
+export const View = hostComponent<IViewProps>('symbiote-view', 'View');
+export const Text = hostComponent<ITextProps>('symbiote-text', 'Text');
 // Image is NOT a bare host primitive: it needs the shared fold (source/src/srcSet resolution,
 // width/height → style, alt → accessibility) + the Image statics, so it lives in ./image as a
 // functional component over renderImage. View/Text stay bare; they forward attrs verbatim.

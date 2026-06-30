@@ -7,11 +7,12 @@
 // props onto the symbiote-refresh-control host node.
 //
 // `refreshing` is a controlled prop: the parent owns it and pushes it down each commit; native
-// reports the gesture via the direct `topRefresh` event, which the engine routes to the `refresh`
-// listener (onRefresh). Inputs arrive as attrs (untyped), so the forwarded bag is BUILT at the
-// a11y-intersection type (a genuine narrowing, not a cast) before the aria fold.
+// reports the gesture via the direct `topRefresh` event, which the engine routes to the host
+// onRefresh prop; the adapter turns that into the typed Vue `refresh` emit. Inputs arrive as attrs
+// (untyped), so the forwarded bag is BUILT at the a11y-intersection type (a genuine narrowing, not
+// a cast) before the aria fold.
 
-import { defineComponent, h, type SetupContext } from '@vue/runtime-core';
+import { defineComponent, h } from '@vue/runtime-core';
 import { dlog } from '@symbiote/engine';
 import {
   resolveAccessibilityProps,
@@ -27,9 +28,7 @@ import { normalizeVueAttrs } from '../utils/normalize-attrs';
 // the rest, so the Android-only and iOS-only families ride down harmlessly on both.
 export interface IRefreshControlProps extends IAccessibilityProps, IAriaProps {
   refreshing: boolean;
-  // RN's onRefresh is `() => void | Promise<void>`: the handler may be async; the promise is
-  // fire-and-forget (native already starts refreshing on the gesture).
-  onRefresh?: () => void | Promise<void>;
+  // refresh is adapter-synthesized from the native topRefresh event; use @refresh / onRefresh.
   tintColor?: string;
   title?: string;
   titleColor?: string;
@@ -44,36 +43,52 @@ export interface IRefreshControlProps extends IAccessibilityProps, IAriaProps {
   enabled?: boolean;
 }
 
+export type IRefreshControlEmits = {
+  refresh: () => boolean;
+};
+
 type IForwardBag = IAccessibilityProps & IAriaProps & Record<string, unknown>;
 
-// Copy every attr into a bag typed as the a11y intersection (the accumulator is BUILT at that type,
-// a real narrowing, not a cast), then fold aria-*/role into the canonical accessibility* props.
-// Children cross via slots, never attrs, so nothing is stripped here. When the Android wrap
-// re-invokes this component, the injected `style` (the outer/layout half) rides through too.
+// Copy every non-consumed attr into a bag typed as the a11y intersection (the accumulator is BUILT
+// at that type, a real narrowing, not a cast), then fold aria-*/role into the canonical
+// accessibility* props. Children cross via slots, never attrs. When the Android wrap re-invokes
+// this component, the injected `style` (the outer/layout half) rides through too.
 function foldAttrs(attrs: Record<string, unknown>): IForwardBag {
   const bag: IForwardBag = {};
-  for (const key of Object.keys(attrs)) bag[key] = attrs[key];
+  for (const key of Object.keys(attrs)) {
+    if (key !== 'onRefresh') bag[key] = attrs[key];
+  }
   return resolveAccessibilityProps(bag);
 }
 
-export const RefreshControl = defineComponent({
-  name: 'RefreshControl',
-  inheritAttrs: false,
-  setup(_props, { attrs: rawAttrs, slots }: SetupContext) {
+export const RefreshControl = defineComponent<IRefreshControlProps, IRefreshControlEmits>(
+  (_props, { attrs: rawAttrs, emit, slots }) => {
     return () => {
       const nativeProps = foldAttrs(normalizeVueAttrs(rawAttrs));
       dlog('RefreshControl -> PullToRefreshView');
       dlog(`RefreshControl refreshing=${String(nativeProps.refreshing)}`);
       if (nativeProps.enabled !== undefined)
         dlog(`RefreshControl enabled=${String(nativeProps.enabled)} (Android-only)`);
-      if (nativeProps.onRefresh !== undefined) dlog('RefreshControl onRefresh listener wired');
+      dlog('RefreshControl refresh emit wired');
       // The default slot is the seam: empty on iOS (childless sibling), but the Android scroll-view
       // wrap re-invokes this component with the scroll view as its default slot, so it hosts it.
       return h(
         'symbiote-refresh-control',
-        nativeProps,
+        {
+          ...nativeProps,
+          onRefresh: (): void => {
+            emit('refresh');
+          },
+        },
         slots.default !== undefined ? slots.default() : undefined,
       );
     };
   },
-});
+  {
+    name: 'RefreshControl',
+    inheritAttrs: false,
+    emits: {
+      refresh: (): boolean => true,
+    },
+  },
+);

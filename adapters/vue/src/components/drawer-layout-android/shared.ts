@@ -36,9 +36,12 @@ export interface IDrawerLayoutAndroidProps extends IAccessibilityProps, IAriaPro
   keyboardDismissMode?: IKeyboardDismissMode;
   drawerBackgroundColor?: string;
   statusBarBackgroundColor?: string;
-  onDrawerOpen?: () => void;
-  onDrawerClose?: () => void;
-  onDrawerSlide?: (event: IDrawerSlideEvent) => void;
-  onDrawerStateChanged?: (state: IDrawerState) => void;
   style?: IStyleProp<IViewStyle>;
 }
+
+export type IDrawerLayoutAndroidEmits = {
+  drawerOpen: () => boolean;
+  drawerClose: () => boolean;
+  drawerSlide: (event: IDrawerSlideEvent) => boolean;
+  drawerStateChanged: (state: IDrawerState) => boolean;
+};
