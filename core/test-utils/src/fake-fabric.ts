@@ -26,6 +26,8 @@ export interface IFabricRecorder {
   committed: IFakeNode[];
   /** Every node ever `createNode`'d this run (clones excluded). */
   created: IFakeNode[];
+  /** Every imperative command dispatched at a committed Fabric node. */
+  commands: Array<{ node: IFakeNode; commandName: string; args: readonly unknown[] }>;
   /** Call counters, for tests that assert "exactly N native nodes were created". */
   counts: { createNode: number; completeRoot: number };
   /**
@@ -47,6 +49,7 @@ export interface IFabricRecorder {
 export function installFabric(): IFabricRecorder {
   let committed: IFakeNode[] = [];
   const created: IFakeNode[] = [];
+  const commands: Array<{ node: IFakeNode; commandName: string; args: readonly unknown[] }> = [];
   const counts = { createNode: 0, completeRoot: 0 };
   let eventHandler: IEventHandler | undefined;
 
@@ -87,6 +90,9 @@ export function installFabric(): IFabricRecorder {
     registerEventHandler(handler: IEventHandler): void {
       eventHandler = handler;
     },
+    dispatchCommand(node: IFakeNode, commandName: string, args: readonly unknown[]): void {
+      commands.push({ node, commandName, args });
+    },
   };
 
   Object.assign(globalThis, { nativeFabricUIManager: slot });
@@ -102,6 +108,7 @@ export function installFabric(): IFabricRecorder {
       return committed;
     },
     created,
+    commands,
     counts,
     appRoot(): IFakeNode {
       const root = committed[0];
@@ -125,6 +132,7 @@ export function installFabric(): IFabricRecorder {
     reset(): void {
       committed = [];
       created.length = 0;
+      commands.length = 0;
       counts.createNode = 0;
       counts.completeRoot = 0;
     },

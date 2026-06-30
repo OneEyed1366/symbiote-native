@@ -7,6 +7,7 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
+    "dev": "react-native start --reset-cache",
     "test": "vitest run",
     "e2e:build:ios": "detox build --configuration ios.sim.debug",
     "e2e:test:ios": "detox test --configuration ios.sim.debug",

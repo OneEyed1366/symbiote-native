@@ -350,13 +350,19 @@ interface IReconciled {
 }
 
 function renderableChildren(node: ISymbioteNode): readonly ISymbioteNode[] {
-  // Anchor nodes (Vue fragment/v-if/v-for placeholders) live in the retained tree for
-  // sibling ordering but never become Fabric views, so drop them before emitting the child
-  // set. Fast path: no anchors (every React tree, most Vue subtrees) reuses the array, so
-  // the common case allocates nothing.
-  return node.children.some(isAnchor)
-    ? node.children.filter(child => !isAnchor(child))
-    : node.children;
+  // Anchor nodes (Vue fragment/v-if/v-for placeholders, Angular component hosts that should
+  // not paint) live in the retained tree for sibling ordering but never become Fabric views.
+  // When an anchor owns children, flatten them into the parent's renderable list: this lets a
+  // DOM-less framework use an anchor as a fragment/component host without adding a native
+  // wrapper node. Fast path: no anchors reuses the array, so the common case allocates nothing.
+  if (!node.children.some(isAnchor)) return node.children;
+
+  const children: ISymbioteNode[] = [];
+  for (const child of node.children) {
+    if (isAnchor(child)) children.push(...renderableChildren(child));
+    else children.push(child);
+  }
+  return children;
 }
 
 function childrenIdentical(
