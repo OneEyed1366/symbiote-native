@@ -1,0 +1,47 @@
+{
+  "name": "@symbiote/angular",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./build/angular/index.d.ts",
+      "react-native": "./build/angular/index.js",
+      "default": "./src/index.ts"
+    },
+    "./metro-css-parser": "./metro-css-parser.cjs"
+  },
+  "files": [
+    "src",
+    "build",
+    "metro-css-parser.cjs"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepare": "pnpm run ng:build",
+    "ng:build": "ngc -p tsconfig.angular.json",
+    "typecheck": "tsc --build",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "@symbiote/components": "workspace:*",
+    "@symbiote/css-parser": "workspace:*",
+    "@symbiote/engine": "workspace:*"
+  },
+  "peerDependencies": {
+    "@angular/core": ">=20",
+    "react-native": ">=0.86"
+  },
+  "devDependencies": {
+    "@angular/compiler": "catalog:",
+    "@angular/compiler-cli": "catalog:",
+    "@angular/core": "catalog:",
+    "@symbiote/test-utils": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

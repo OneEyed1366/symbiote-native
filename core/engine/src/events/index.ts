@@ -9,7 +9,7 @@
 import { dlog } from '../debug';
 import { runWrapped } from '../dispatch';
 import { getSlot } from '../fabric';
-import { isSymbioteNode, type ISymbioteEvent, type ISymbioteNode } from '../node';
+import { isAnchor, isSymbioteNode, type ISymbioteEvent, type ISymbioteNode } from '../node';
 import { registeredNativeEvent } from '../registry';
 
 // Raw Fabric event name -> listener name. Generic bubbling events live here; press
@@ -719,7 +719,12 @@ function bubble(
   const path = pathToRoot(target);
   for (let i = path.length - 1; i >= 0; i--) {
     const node = path[i];
-    const listener = node.listeners?.get(captureName);
+    // Anchors (Angular's #anchor component hosts) never paint and have no native view — a
+    // listener registered on one only exists because a framework's own output-binding
+    // machinery (already delivered directly, e.g. Angular's EventEmitter.subscribe) also
+    // registered it through Renderer2.listen. Bubbling into it would refire that same
+    // callback a second time, so anchors are transparent to listener lookup, not just paint.
+    const listener = isAnchor(node) ? undefined : node.listeners?.get(captureName);
     if (listener) {
       dlog(`event ${listenerName} capture on ${node.component}`);
       listener({
@@ -733,10 +738,11 @@ function bubble(
     }
   }
 
-  // Bubble phase: target -> root, invoking each ancestor's plain listener.
+  // Bubble phase: target -> root, invoking each ancestor's plain listener. Anchors are
+  // transparent here too (see the capture-phase comment above) — same event, same reason.
   let node: ISymbioteNode | undefined = target;
   while (node) {
-    const listener = node.listeners?.get(listenerName);
+    const listener = isAnchor(node) ? undefined : node.listeners?.get(listenerName);
     if (listener) {
       // engine owner adds currentTarget + stopPropagation to SymbioteEvent
       const event: ISymbioteEvent = {

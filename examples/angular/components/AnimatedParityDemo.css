@@ -1,0 +1,69 @@
+/* AnimatedParityDemo — static look lives here, compiled at build time by @symbiote/css-parser
+   into RN style objects, resolved at runtime through the shared style registry (see App.css /
+   symbiote-sfc-style-compiler skill). Every style key below was fully static in the original
+   StyleSheet.create block; the 4 keys that also carry an Animated transform keep that transform
+   composed at the use site via [style], alongside this class for the static half. */
+
+.section {
+  gap: 12px;
+}
+.section-label {
+  color: #3b5266;
+  font-size: 13px;
+}
+.drag-hint {
+  color: #718096;
+  font-size: 11px;
+}
+.xy-frame {
+  width: 132px;
+  height: 132px;
+  border-radius: 12px;
+  background-color: #eef2f9;
+  padding: 6px;
+}
+.xy-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background-color: #9f7aea;
+}
+.track-row {
+  height: 30px;
+  justify-content: center;
+}
+.lead-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background-color: #4299e1;
+}
+.follow-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background-color: #f6ad55;
+}
+.collapse-frame {
+  height: 84px;
+  overflow: hidden;
+  justify-content: flex-start;
+}
+.collapse-header {
+  height: 60px;
+  border-radius: 8px;
+  background-color: #38b2ac;
+  align-items: center;
+  justify-content: center;
+}
+.collapse-header-text {
+  color: white;
+  font-size: 12px;
+}
+.row-tight {
+  flex-direction: row;
+  gap: 8px;
+}
+.flex-1 {
+  flex: 1;
+}

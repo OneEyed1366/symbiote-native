@@ -1,0 +1,332 @@
+/* symbiote Angular canary — static look lives here, compiled at build time by
+   @symbiote/css-parser into the same RN style objects StyleSheet.create used to produce
+   (symbiote-sfc-style-compiler skill), resolved at runtime through the shared style registry
+   via Ivy's per-token addClass/removeClass (angular-adapter skill §1). What stays in App.ts
+   is ONLY what a CSS class truly cannot express:
+     - a value computed at runtime (an Animated interpolation, a pressed-state ternary, a
+       script-level const like CHIP_WIDTH/CHIP_GAP) — composed at the use site via [style],
+       alongside the element's own class for its static half.
+     - `boxShadow` / `filter` / `transform` / `transformOrigin` — core/css-parser/src/
+       properties.ts has no mapping for RN's array-of-operations shape yet (documented gap). */
+
+.screen {
+  flex: 1;
+  background-color: #111827;
+}
+.scroll-content {
+  gap: 18px;
+  padding: 24px;
+  padding-bottom: 40px;
+}
+.hero-card {
+  align-items: center;
+  background-color: #181f33;
+  border-color: #dd0031;
+  border-radius: 22px;
+  border-width: 1px;
+  flex-direction: row;
+  gap: 16px;
+  padding: 18px;
+}
+.logo {
+  height: 56px;
+  width: 56px;
+}
+.hero-copy {
+  flex: 1;
+}
+.badge {
+  color: #ff6b8a;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.title {
+  color: #f9fafb;
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.body {
+  color: #d1d5db;
+  font-size: 16px;
+  line-height: 24px;
+}
+.header-note {
+  color: #9ca3af;
+  font-size: 13px;
+}
+.info-text {
+  color: #9ca3af;
+  font-size: 14px;
+}
+.note-text {
+  color: #d1d5db;
+  font-size: 13px;
+}
+/* borderTopWidth stays dynamic — StyleSheet.hairlineWidth is a runtime constant, composed at
+   the use site via platformHairlineStyle in App.ts */
+.hairline-note {
+  border-color: #374151;
+  color: #9ca3af;
+  font-size: 13px;
+  padding-top: 8px;
+}
+.row {
+  flex-direction: row;
+  gap: 12px;
+}
+.flex-1 {
+  flex: 1;
+}
+.counter-card {
+  align-items: center;
+  background-color: #181f33;
+  border-color: #dd0031;
+  border-radius: 16px;
+  border-width: 1px;
+  padding-left: 18px;
+  padding-right: 18px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.counter-text {
+  color: #f9fafb;
+  font-size: 18px;
+  font-weight: 700;
+}
+.text-input {
+  background-color: #0f172a;
+  border-color: #dd0031;
+  border-radius: 12px;
+  border-width: 1px;
+  color: #f9fafb;
+  font-size: 15px;
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.greeting {
+  color: #f9fafb;
+  font-size: 18px;
+}
+.switch-row {
+  align-items: center;
+  flex-direction: row;
+  gap: 12px;
+}
+.switch-label {
+  color: #f9fafb;
+  font-size: 16px;
+  font-weight: 700;
+}
+.native-row {
+  align-items: center;
+  flex-direction: row;
+  gap: 10px;
+}
+.spinner {
+  height: 20px;
+  width: 20px;
+}
+.native-row-text {
+  color: #9ca3af;
+  font-size: 14px;
+}
+/* pressableCard stays fully dynamic — Pressable's `style` is a FUNCTION of press state (RN's
+   own idiom); Angular's [class] binding only accepts a plain string/array/object, not a
+   callback, so it stays a full JS object in App.ts's pressableStyle rather than splitting a
+   class out (same reasoning as retentionCard below). */
+.pressable-label {
+  color: #f9fafb;
+  font-size: 16px;
+  font-weight: 700;
+}
+.section-label {
+  color: #f9fafb;
+  font-size: 16px;
+  font-weight: 700;
+}
+.chip-list {
+  height: 84px;
+}
+/* width / marginRight stay dynamic — they reference the CHIP_WIDTH/CHIP_GAP script consts,
+   which a CSS selector has no way to read (see chipStyle() in App.ts) */
+.chip-card {
+  align-items: center;
+  border-radius: 14px;
+  height: 72px;
+  justify-content: center;
+}
+.chip-number {
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+}
+/* no hyphen before the digit run: kebabToCamel only rewrites "-[a-z]", so ".box-list-160"
+   would parse to "boxList-160", not "boxList160" */
+.box-list160 {
+  height: 160px;
+  overflow: hidden;
+}
+.mvcp-row {
+  border-bottom-color: #253046;
+  border-bottom-width: 1px;
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.list-row-text {
+  color: #d1d5db;
+  font-size: 14px;
+}
+.modal-trigger {
+  align-self: flex-start;
+  background-color: #dd0031;
+  border-radius: 14px;
+  padding-left: 18px;
+  padding-right: 18px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.overlay-host {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  bottom: 0px;
+}
+.toast-card {
+  position: absolute;
+  bottom: 40px;
+  align-self: center;
+  padding: 16px;
+  border-radius: 14px;
+  background-color: #dd0031;
+  gap: 10px;
+}
+.toast-text {
+  color: #f9fafb;
+  font-size: 15px;
+  font-weight: bold;
+}
+.modal-card {
+  align-items: center;
+  background-color: rgba(17, 24, 39, 0.96);
+  flex: 1;
+  gap: 16px;
+  justify-content: center;
+  padding: 24px;
+}
+.image-background {
+  border-radius: 14px;
+  height: 90px;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+.image-background-label {
+  background-color: rgba(17, 24, 39, 0.72);
+  color: #f9fafb;
+  font-size: 13px;
+  padding: 10px;
+}
+.image-background-image {
+  border-radius: 14px;
+  opacity: 0.62;
+}
+.section-tight {
+  gap: 8px;
+}
+.slider {
+  height: 40px;
+  align-self: stretch;
+}
+/* retentionCard stays fully dynamic — same Pressable-style-is-a-function reasoning as
+   pressableCard above (App.ts's retentionStyle). */
+.parity-header {
+  background-color: #dd0031;
+  border-radius: 12px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  align-items: center;
+}
+.parity-header-text {
+  color: #f9fafb;
+  font-size: 15px;
+  font-weight: bold;
+}
+.scroll-demo-row {
+  height: 80px;
+  justify-content: center;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+.tiny-center {
+  color: #9ca3af;
+  font-size: 12px;
+  text-align: center;
+}
+.shadow-card {
+  height: 64px;
+  border-radius: 12px;
+  background-color: #181f33;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0px 0px 22px 3px rgba(221, 0, 49, 0.85);
+}
+.filter-tile {
+  flex: 1;
+  height: 64px;
+  border-radius: 12px;
+  background-color: #dd0031;
+  align-items: center;
+  justify-content: center;
+}
+/* modifier, combined with .filter-tile via class="filter-tile filter-tile-dim" */
+.filter-tile-dim {
+  filter: brightness(0.5);
+}
+.tile-text {
+  color: #ffffff;
+  font-size: 13px;
+}
+.rotated-card {
+  height: 64px;
+  border-radius: 12px;
+  background-color: #dd0031;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(4deg);
+  transform-origin: top left;
+}
+.gradient-card {
+  height: 64px;
+  border-radius: 12px;
+  background-image: linear-gradient(to right, #dd0031, #f6ad55);
+  align-items: center;
+  justify-content: center;
+}
+.web-image {
+  border-radius: 8px;
+  align-self: center;
+}
+.logo-image {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  align-self: center;
+}
+.bottom-card {
+  height: 200px;
+  border-radius: 16px;
+  background-color: #181f33;
+  align-items: center;
+  justify-content: center;
+}
+.bottom-text {
+  color: #f9fafb;
+  font-size: 16px;
+}

@@ -47,7 +47,7 @@ const BASE_EVENTS: readonly string[] = [
 // consulted by the resolved native name (SymbioteNode.component), and only one
 // platform's names ever exist at runtime, so the other platform's keys are inert (no
 // Platform.OS branch), the names simply coexist. Missing the Android keys is what made
-// onChangeText (and Switch/Modal/RefreshControl events) silently dead on Android: the
+// onValueChange (and Switch/Modal/RefreshControl events) silently dead on Android: the
 // onX prop failed isEventFor, fell to setProp, and no listener was ever registered.
 const TEXT_INPUT_EVENTS: readonly string[] = [
   'change',

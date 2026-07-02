@@ -1,0 +1,27 @@
+.section {
+  gap: 12px;
+}
+.section-label {
+  color: #3b5266;
+  font-size: 13px;
+}
+.info-text {
+  color: #cbd5e1;
+  font-size: 14px;
+}
+.row-align-center {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.logo-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background-color: #181f33;
+}
+.info-text-flex {
+  color: #cbd5e1;
+  font-size: 14px;
+  flex: 1;
+}

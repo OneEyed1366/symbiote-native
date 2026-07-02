@@ -1,0 +1,37 @@
+.section-tight {
+  gap: 8px;
+}
+.section-label {
+  color: #3b5266;
+  font-size: 13px;
+}
+.info-text {
+  color: #cbd5e1;
+  font-size: 14px;
+}
+.transfer-text {
+  font-size: 13px;
+}
+.strip-box {
+  padding: 12px;
+  border-radius: 12px;
+  background-color: #181f33;
+}
+.row-tight {
+  flex-direction: row;
+  gap: 8px;
+}
+.chip {
+  width: 56px;
+  height: 48px;
+  border-radius: 8px;
+  background-color: #dd0031;
+  border-width: 2px;
+  align-items: center;
+  justify-content: center;
+}
+.chip-text {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: bold;
+}

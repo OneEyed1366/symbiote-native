@@ -1,0 +1,30 @@
+.section {
+  gap: 12px;
+}
+.section-label {
+  color: #3b5266;
+  font-size: 13px;
+}
+.ref-box {
+  height: 56px;
+  border-radius: 12px;
+  background-color: #dd0031;
+  align-items: center;
+  justify-content: center;
+}
+.ref-box-text {
+  color: #111827;
+  font-size: 14px;
+  font-weight: bold;
+}
+.info-text {
+  color: #cbd5e1;
+  font-size: 14px;
+}
+.row {
+  flex-direction: row;
+  gap: 12px;
+}
+.flex-1 {
+  flex: 1;
+}

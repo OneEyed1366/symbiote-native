@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "rootDir": ".",
+    "outDir": "build/angular",
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "declaration": false,
+    "sourceMap": true,
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "ignoreDeprecations": "6.0",
+    "baseUrl": "."
+  },
+  "angularCompilerOptions": {
+    "compilationMode": "partial",
+    "strictTemplates": true
+  },
+  "files": ["App.ts", "css.d.ts"],
+  "exclude": ["build", "e2e", "**/node_modules", "**/Pods"]
+}

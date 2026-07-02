@@ -1,0 +1,42 @@
+.section {
+  gap: 12px;
+}
+.section-label {
+  color: #3b5266;
+  font-size: 13px;
+}
+.row {
+  flex-direction: row;
+  gap: 12px;
+}
+/* background-color stays dynamic — systemBlue is PlatformColor(...), an opaque runtime
+   value @symbiote/css-parser cannot express (App.ts's [style] binding) */
+.color-tile {
+  flex: 1;
+  height: 56px;
+  border-radius: 12px;
+  align-items: center;
+  justify-content: center;
+}
+/* background-color / border-color stay dynamic — dynamicBackground is DynamicColorIOS(...)
+   and separatorColor is PlatformColor(...), both opaque runtime values (App.ts's [style]
+   binding) */
+.color-tile-bordered {
+  flex: 1;
+  height: 56px;
+  border-radius: 12px;
+  border-width: 1px;
+  align-items: center;
+  justify-content: center;
+}
+.tile-label {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: bold;
+}
+/* color stays dynamic — labelColor is PlatformColor(...), an opaque runtime value
+   (App.ts's [style] binding) */
+.bold-label {
+  font-size: 13px;
+  font-weight: bold;
+}

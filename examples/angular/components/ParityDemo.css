@@ -1,0 +1,63 @@
+.section {
+  gap: 12px;
+}
+.section-label {
+  color: #3b5266;
+  font-size: 13px;
+}
+.info-text {
+  color: #cbd5e1;
+  font-size: 14px;
+}
+.row {
+  flex-direction: row;
+  gap: 12px;
+}
+.flex-1 {
+  flex: 1;
+}
+.note-text {
+  color: #cbd5e1;
+  font-size: 13px;
+}
+.long-press-row {
+  background-color: #181f33;
+  border-radius: 10px;
+  color: #cbd5e1;
+  font-size: 15px;
+  padding: 12px;
+}
+.focus-input {
+  background-color: #0f172a;
+  border-color: #dd0031;
+  border-radius: 10px;
+  border-width: 1px;
+  color: #f9fafb;
+  padding: 12px;
+}
+.parity-list {
+  background-color: #0f172a;
+  border-radius: 10px;
+  height: 120px;
+}
+.parity-row {
+  height: 30px;
+  justify-content: center;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.section-list {
+  background-color: #0f172a;
+  border-radius: 10px;
+  height: 200px;
+}
+.section-header {
+  background-color: #dd0031;
+  color: #111827;
+  font-size: 13px;
+  font-weight: bold;
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}

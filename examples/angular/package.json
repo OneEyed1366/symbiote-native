@@ -1,0 +1,54 @@
+{
+  "name": "angular-canary",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "android": "pnpm ng:build && react-native run-android",
+    "ios": "pnpm ng:build && react-native run-ios",
+    "lint": "eslint .",
+    "dev": "scripts/dev-with-watch.sh --reset-cache",
+    "start": "scripts/dev-with-watch.sh",
+    "ng:build": "ngc -p tsconfig.angular.json",
+    "ng:watch": "ngc -p tsconfig.angular.json --watch",
+    "e2e:build:ios": "pnpm ng:build && detox build --configuration ios.sim.debug",
+    "e2e:test:ios": "detox test --configuration ios.sim.debug",
+    "e2e:build:android": "pnpm ng:build && detox build --configuration android.emu.debug",
+    "e2e:test:android": "detox test --configuration android.emu.debug"
+  },
+  "dependencies": {
+    "@angular/core": "catalog:",
+    "@symbiote/angular": "workspace:*",
+    "@symbiote/components": "workspace:*",
+    "@symbiote/engine": "workspace:*",
+    "@symbiote/slider": "workspace:*",
+    "react": "catalog:",
+    "react-native": "catalog:"
+  },
+  "devDependencies": {
+    "@angular/compiler-cli": "catalog:",
+    "@babel/core": "catalog:",
+    "@babel/preset-env": "catalog:",
+    "@babel/runtime": "catalog:",
+    "@react-native-community/cli": "catalog:",
+    "@react-native-community/cli-platform-android": "catalog:",
+    "@react-native-community/cli-platform-ios": "catalog:",
+    "@react-native/gradle-plugin": "catalog:",
+    "@react-native/babel-preset": "catalog:",
+    "@react-native/eslint-config": "catalog:",
+    "@react-native/metro-config": "catalog:",
+    "@react-native/typescript-config": "catalog:",
+    "@symbiote/css-parser": "workspace:*",
+    "@types/jest": "catalog:",
+    "@types/node": "catalog:",
+    "detox": "catalog:",
+    "eslint": "catalog:rn-app",
+    "jest": "catalog:",
+    "jest-circus": "catalog:",
+    "prettier": "catalog:",
+    "ts-jest": "catalog:",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">= 22.11.0"
+  }
+}
