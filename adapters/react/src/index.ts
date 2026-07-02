@@ -235,15 +235,4 @@ export type {
   IThemeAttrBackground,
   IRippleBackground,
 } from './components/touchable-native-feedback';
-export { DrawerLayoutAndroid } from './components/drawer-layout-android';
-export type {
-  IDrawerLayoutAndroidProps,
-  IDrawerLayoutAndroidHandle,
-  IDrawerPosition,
-  IDrawerLockMode,
-  IKeyboardDismissMode,
-  IDrawerState,
-  IDrawerSlideEvent,
-} from './components/drawer-layout-android';
-
 export type { ISymbioteEvent } from '@symbiote/engine';

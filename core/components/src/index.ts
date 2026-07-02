@@ -312,36 +312,3 @@ export {
   scrollLocationToFlatIndex,
 } from './state/section-list';
 export type { ISection, ISectionEntry, IVirtualizedSectionListHandle } from './state/section-list';
-
-// DrawerLayoutAndroid (Android-only). The agnostic half: types, the AndroidDrawerLayout
-// view/command names, slide/state event normalization, the imperative handle builder, and
-// the host/subview style resolution. Both adapters drive their lifecycle off this.
-export {
-  DRAWER_VIEW_NAME,
-  OPEN_DRAWER_COMMAND,
-  CLOSE_DRAWER_COMMAND,
-  DRAWER_STATES,
-  DEFAULT_DRAWER_BACKGROUND_COLOR,
-  DEFAULT_DRAWER_POSITION,
-  offsetFromSlide,
-  stateFromChange,
-  dispatchDrawerCommand,
-  buildDrawerHandle,
-} from './state/drawer-layout-android';
-export type {
-  IDrawerPosition,
-  IDrawerLockMode,
-  IKeyboardDismissMode,
-  IDrawerState,
-  IDrawerSlideEvent,
-  IDrawerLayoutAndroidHandle,
-} from './state/drawer-layout-android';
-export {
-  resolveDrawerLayout,
-  DRAWER_HOST_STYLE,
-  DRAWER_MAIN_SUBVIEW_STYLE,
-} from './view/render-drawer-layout-android';
-export type {
-  IDrawerLayoutResolveInput,
-  IDrawerLayoutResolved,
-} from './view/render-drawer-layout-android';

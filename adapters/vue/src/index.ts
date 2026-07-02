@@ -127,20 +127,6 @@ export type {
   ISectionListEmits,
   ISectionListHandle,
 } from './components/section-list';
-// DrawerLayoutAndroid (Android-only; iOS degrades to a plain container). Shared logic
-// (types, command names, slide/state normalization, the imperative handle) in
-// @symbiote/components; Vue supplies the platform-split lifecycle + the slots.
-export { DrawerLayoutAndroid } from './components/drawer-layout-android';
-export type {
-  IDrawerLayoutAndroidProps,
-  IDrawerLayoutAndroidEmits,
-  IDrawerLayoutAndroidHandle,
-  IDrawerPosition,
-  IDrawerLockMode,
-  IKeyboardDismissMode,
-  IDrawerState,
-  IDrawerSlideEvent,
-} from './components/drawer-layout-android';
 // Phase 2 (ADR 0024): SafeAreaView + RefreshControl, wired into ScrollView with the iOS-sibling /
 // Android-wrap platform split. RefreshControl hosts the wrapped scroll view via its default slot.
 export { SafeAreaView } from './components/safe-area-view';
