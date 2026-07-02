@@ -32,3 +32,11 @@ DerivedData/
 !.changeset/
 !.husky/
 .husky/_/
+
+# ~/.gitignore_global has a bare `docs`/`docs/` rule (personal-scratch leftover, matches ANY
+# dir named "docs" at any depth) that would otherwise swallow the Astro Starlight content
+# collection below — re-include it explicitly for this repo. Note the collection has a
+# doubly-nested docs/docs/ (Starlight's collection root, then this repo's own "docs" section
+# folder inside it) — both levels match the bare rule independently and both need unignoring.
+!apps/docs-site/src/content/docs/
+!apps/docs-site/src/content/docs/docs/
