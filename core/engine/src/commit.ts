@@ -340,6 +340,7 @@ interface IMirror {
   props: IFabricProps;
   children: readonly ISymbioteNode[];
   viewName: string;
+  parent: ISymbioteNode | undefined;
 }
 
 const mirror = new WeakMap<ISymbioteNode, IMirror>();
@@ -393,6 +394,8 @@ function reconcile(
   node: ISymbioteNode,
   rootTag: IRootTag,
   hasTextAncestor: boolean,
+  renderableParent: ISymbioteNode | undefined,
+  forceFreshFamily: boolean,
 ): IReconciled {
   const viewName = viewNameFor(node, hasTextAncestor);
   const props = fabricProps(node);
@@ -405,15 +408,54 @@ function reconcile(
   // First mount, or the view kind flipped (RCTText <-> RCTVirtualText when a
   // <Text> moves in or out of another <Text>): a different native component
   // can't be cloned across, so create a fresh node from scratch.
-  if (committed === undefined || committed.viewName !== viewName) {
+  const parentChanged = committed !== undefined && committed.parent !== renderableParent;
+
+  if (
+    forceFreshFamily ||
+    committed === undefined ||
+    committed.viewName !== viewName ||
+    parentChanged
+  ) {
     stats.created += 1;
     const tag = nextTag();
+    const reason =
+      committed === undefined
+        ? 'mount'
+        : forceFreshFamily
+          ? 'fresh-parent'
+          : committed.viewName !== viewName
+            ? 'view-kind'
+            : 'reparent';
+    dlog(`commit root=${rootTag} createNode tag=${tag} view=${viewName} reason=${reason}`);
+    if (viewName === 'RCTView' || viewName === 'RCTText') {
+      dlog(
+        `commit root=${rootTag} colorProbe tag=${tag} view=${viewName} ` +
+          `bg=${JSON.stringify(props.backgroundColor)} color=${JSON.stringify(props.color)} ` +
+          `opacity=${JSON.stringify(props.opacity)}`,
+      );
+    }
+    if (viewName === 'AndroidSwipeRefreshLayout' || viewName === 'RCTScrollView') {
+      dlog(
+        `commit root=${rootTag} layoutProbe tag=${tag} view=${viewName} ` +
+          `flex=${JSON.stringify(props.flex)} height=${JSON.stringify(props.height)} ` +
+          `width=${JSON.stringify(props.width)} minHeight=${JSON.stringify(props.minHeight)} ` +
+          `flexGrow=${JSON.stringify(props.flexGrow)}`,
+      );
+    }
     const handle = slot.createNode(tag, viewName, rootTag, props, node);
     for (const child of kids) {
-      slot.appendChild(handle, reconcile(slot, child, rootTag, childInText).handle);
+      slot.appendChild(handle, reconcile(slot, child, rootTag, childInText, node, true).handle);
     }
     logScrollChildren(node, viewName, tag);
-    mirror.set(node, { handle, tag, rootTag, props, children: kids.slice(), viewName });
+    mirror.set(node, {
+      handle,
+      tag,
+      rootTag,
+      props,
+      children: kids.slice(),
+      viewName,
+      parent: renderableParent,
+    });
     return { handle, changed: true };
   }
 
@@ -422,7 +464,7 @@ function reconcile(
   const childHandles: IFabricNode[] = [];
   let descendantChanged = false;
   for (const child of kids) {
-    const result = reconcile(slot, child, rootTag, childInText);
+    const result = reconcile(slot, child, rootTag, childInText, node, false);
     childHandles.push(result.handle);
     if (result.changed) descendantChanged = true;
   }
@@ -462,8 +504,13 @@ function reconcile(
     tag: committed.tag,
     rootTag,
     props,
-    children: node.children.slice(),
+    // Store the same flattened child list we diffed against. Anchors are retained-tree
+    // bookkeeping only; keeping raw node.children here makes every anchored subtree look
+    // structurally changed on the next commit and can re-append already-parented Fabric
+    // ShadowNode families under a cloned parent.
+    children: kids.slice(),
     viewName,
+    parent: renderableParent,
   });
   return { handle, changed: true };
 }
@@ -528,7 +575,7 @@ function commitContainer(rootTag: IRootTag): void {
   // tree walk); if `start` itself never prints, the stall is upstream: React's commit
   // phase or the mutation ops before we are even called.
   dlog(`commit root=${rootTag} start children=${container.children.length}`);
-  const result = reconcile(slot, container, rootTag, false);
+  const result = reconcile(slot, container, rootTag, false, undefined, false);
   // Boundary seam: prints once reconcile returns. If a commit hangs and this line
   // never appears, the stall is inside reconcile (JS); if it appears but the
   // post-completeRoot line below never does, the stall is inside the native commit.

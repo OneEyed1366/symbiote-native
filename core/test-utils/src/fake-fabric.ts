@@ -17,6 +17,8 @@ export interface IFakeNode {
   props: Record<string, unknown>;
   children: IFakeNode[];
   instanceHandle: unknown;
+  /** Fabric family parent. Clones keep the same tag/family, so reparenting a family is illegal. */
+  parentFamilyTag?: number;
 }
 
 export type IEventHandler = (
@@ -91,6 +93,12 @@ export function installFabric(): IFabricRecorder {
     ): IFakeNode => ({ ...node, props: mergeFabricProps(node.props, newProps), children: [] }),
     createChildSet: (): IFakeNode[] => [],
     appendChild(parent: IFakeNode, child: IFakeNode): IFakeNode {
+      if (child.parentFamilyTag !== undefined && child.parentFamilyTag !== parent.tag) {
+        throw new Error(
+          `Fabric family reparent: child ${child.viewName}#${child.tag} already belongs to parent #${child.parentFamilyTag}, cannot append to ${parent.viewName}#${parent.tag}`,
+        );
+      }
+      child.parentFamilyTag = parent.tag;
       parent.children.push(child);
       return parent;
     },
