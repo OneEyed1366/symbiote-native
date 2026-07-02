@@ -70,7 +70,7 @@ reference canaries, standalone components, zoneless change detection.
 
 ---
 
-## Parity — and the two gaps
+## Parity — and the one gap
 
 Angular reaches the same 21+ primitives, runtime modules, `Animated` on both drivers, gestures,
 accessibility, and the `VirtualizedList` family as React and Vue. That parity is **structural, not
@@ -78,15 +78,15 @@ hand-copied**: the component logic (state machines + render functions) is writte
 `@symbiote/components`, and Angular supplies only its lifecycle (`Renderer2` + zoneless change
 detection + the descriptor→`createElement` bridge).
 
-Two deliberate gaps, both tracked, neither blocking the canary:
+One deliberate gap, tracked, not blocking the canary — **third-party React component packages**
+(`@react-native-community/slider`) run only under the React adapter: their body calls React hooks
+off the React dispatcher, which is null under Angular. `@symbiote/slider` (this repo's own
+wrapper) *does* ship a real Angular build, reachable through the same `createNode`-by-ViewConfig
+path Angular uses for its own primitives — that wrapper is what makes a third-party native view
+usable from a non-React adapter at all.
 
-- **Third-party React component packages** (`@react-native-community/slider`) run only under the
-  React adapter — their body calls React hooks off the React dispatcher, which is null under
-  Angular. `@symbiote/slider` (this repo's own wrapper) *does* ship a real Angular build, reachable
-  through the same `createNode`-by-ViewConfig path Angular uses for its own primitives — that
-  wrapper is what makes a third-party native view usable from a non-React adapter at all.
-- **Not yet on the docs site's live framework switcher.** React and Vue are; Angular's example app
-  and adapter are otherwise at full canary parity.
+Angular is on the docs site's live framework switcher alongside React and Vue — otherwise it's at
+full canary parity.
 
 ---
 
