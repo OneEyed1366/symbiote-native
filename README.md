@@ -201,6 +201,11 @@ isolates to *that adapter*, not the native pipe or the commit engine. The **fram
 (React → Vue → Angular → Svelte → Solid) and the **platform** axis (iOS, Android) are independent:
 React already drives both platforms, and each new adapter inherits the platform axis as it lands.
 
+Three frameworks now drive the core (React, Vue, Angular) — the *breadth* bet is proven. What they
+still lack is *depth*: a real app needs more than primitives and a canary, starting with navigation.
+That's why **M5 comes before Svelte/Solid** — porting the minimal third-party-library surface a real
+app can't ship without is a more urgent proof than a fourth/fifth framework adapter.
+
 | # | Milestone | What it proves | Status |
 |---|-----------|----------------|--------|
 | **M0** | Monorepo scaffold | pnpm workspaces, `engine` + `react` packages, headless harness | ✅ done |
@@ -217,14 +222,18 @@ React already drives both platforms, and each new adapter inherits the platform 
 | ↳ M3.2 | Shared component layer | `VirtualizedList` family + component logic extracted to `@symbiote/components`, inherited by React **and** Vue | ✅ done |
 | ↳ M3.3 | Test harness per adapter | colocated `vitest` (headless, fake Fabric slot) + `Detox` e2e mirrored across all three example apps | ✅ done |
 | **M4** | Angular adapter | `Renderer2`/`RendererFactory2` + DOM-less bootstrap on the validated core — second non-React framework, full canary component parity, on the live framework switcher | ✅ done |
-| **M5** | Svelte adapter | compiled-output framework driving the engine's mutation API | ⏳ planned |
-| **M6** | Solid adapter | fine-grained reactivity driving the engine's mutation API | ⏳ planned |
-| **M7** | Web *(stretch)* | the same trees rendered to the web as a default platform target | 💭 maybe |
+| **M5** | **App-ready ecosystem** | the minimal third-party surface a real app needs, built once against the agnostic core (like `@symbiote/slider`) rather than ported per-framework — starting with **navigation** | ⏳ planned |
+| ↳ M5.1 | Navigation | a framework-agnostic navigation core (stack/state) in `@symbiote/engine`/`@symbiote/components`, with a thin per-adapter screen/transition bridge — the `react-navigation` UI itself is React-only (`<third_party_rn_packages_are_react_only>`), so this can't be a wrapper, it's a genuine new shared component | ⏳ planned |
+| ↳ M5.2 | Remaining gaps | audit the rest of the "can't ship a real app without it" list (e.g. persistent storage, safe-area edge cases beyond `SafeAreaView`) once navigation lands | ⏳ planned |
+| **M6** | Svelte adapter | compiled-output framework driving the engine's mutation API | ⏳ planned |
+| **M7** | Solid adapter | fine-grained reactivity driving the engine's mutation API | ⏳ planned |
+| **M8** | Web *(stretch)* | the same trees rendered to the web as a default platform target | 💭 maybe |
 | **DX** | `create-symbiote` scaffolder | pins `react-native` + `react` at the app root so your app code imports only `@symbiote/*`, never `react-native` | ⏳ planned |
 
 **End goal:** each framework — Vue, Angular, Svelte, Solid, React — can render native iOS and
-Android apps the same way React Native does today, off one untouched native core. Web as a
-default platform target is a possible later pass.
+Android apps the same way React Native does today, off one untouched native core, **with the
+ecosystem depth (navigation and the rest) to actually build one.** Web as a default platform
+target is a possible later pass.
 
 Each adapter is built in layers (static paint → reactive update → event) so a break is
 localizable.
