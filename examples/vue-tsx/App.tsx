@@ -12,6 +12,7 @@
 // ONLY visual difference is the top badge line naming which one is rendering. Run with DEBUG=1 to
 // watch each interaction commit incrementally (only the touched branch clones) in Metro's logs.
 
+import './App.css';
 import {
   defineComponent,
   ref,
@@ -157,25 +158,24 @@ const AnimatedDemo = defineComponent({
     };
 
     return () => (
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Animated · JS vs native driver</Text>
+      <View class="section">
+        <Text class="section-label">Animated · JS vs native driver</Text>
 
         {/* native-driven perpetual pulse */}
-        <View style={styles.pulseFrame}>
+        <View class="pulse-frame">
           <Animated.View
             testID="pulse-dot"
-            style={[
-              styles.pulseDot,
-              { opacity: pulseOpacity, transform: [{ scale: pulseScale }] },
-            ]}
+            class="pulse-dot"
+            style={{ opacity: pulseOpacity, transform: [{ scale: pulseScale }] }}
           />
         </View>
 
         {/* JS-driven slide: a commit per frame */}
-        <View style={styles.slideTrack}>
+        <View class="slide-track">
           <Animated.View
             testID="slide-js-dot"
-            style={[styles.jsSlideDot, { transform: [{ translateX: jsX }] }]}
+            class="js-slide-dot"
+            style={{ transform: [{ translateX: jsX }] }}
           />
         </View>
         <Button
@@ -186,13 +186,11 @@ const AnimatedDemo = defineComponent({
         />
 
         {/* native-driven slide: offloaded, zero JS frames */}
-        <View style={styles.slideTrack}>
+        <View class="slide-track">
           <Animated.View
             testID="slide-native-dot"
-            style={[
-              styles.nativeSlideDot,
-              { transform: [{ translateX: nativeX }] },
-            ]}
+            class="native-slide-dot"
+            style={{ transform: [{ translateX: nativeX }] }}
           />
         </View>
         <Button
@@ -284,30 +282,34 @@ const AnimatedParityDemo = defineComponent({
     };
 
     return () => (
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>
+      <View class="section">
+        <Text class="section-label">
           Animated · ValueXY / tracking / diffClamp
         </Text>
 
         {/* ValueXY box you drag with a finger (PanResponder) */}
-        <Text style={styles.dragHint}>drag the purple box →</Text>
-        <View style={styles.xyFrame}>
+        <Text class="drag-hint">drag the purple box →</Text>
+        {/* width/height dynamic: XY_SPAN script const, a CSS selector has no way to read */}
+        <View class="xy-frame" style={{ width: XY_SPAN + 36, height: XY_SPAN + 36 }}>
           <Animated.View
             {...panResponder.panHandlers}
-            style={[styles.xyBox, { transform: xy.getTranslateTransform() }]}
+            class="xy-box"
+            style={{ transform: xy.getTranslateTransform() }}
           />
         </View>
 
         {/* Tracking: lead dot (blue) and follower (orange) that lags behind it */}
-        <View style={styles.trackRow}>
+        <View class="track-row">
           <Animated.View
-            style={[styles.leadDot, { transform: [{ translateX: lead }] }]}
+            class="lead-dot"
+            style={{ transform: [{ translateX: lead }] }}
           />
         </View>
-        <View style={styles.trackRow}>
+        <View class="track-row">
           <Animated.View
             testID="follow-dot"
-            style={[styles.followDot, { transform: [{ translateX: follow }] }]}
+            class="follow-dot"
+            style={{ transform: [{ translateX: follow }] }}
           />
         </View>
         <Button
@@ -318,25 +320,24 @@ const AnimatedParityDemo = defineComponent({
         />
 
         {/* diffClamp collapsing header */}
-        <View style={styles.collapseFrame}>
+        {/* height dynamic: HEADER_COLLAPSE script const */}
+        <View class="collapse-frame" style={{ height: HEADER_COLLAPSE + 24 }}>
           <Animated.View
-            style={[
-              styles.collapseHeader,
-              { transform: [{ translateY: headerOffset }] },
-            ]}
+            class="collapse-header"
+            style={{ height: HEADER_COLLAPSE, transform: [{ translateY: headerOffset }] }}
           >
-            <Text style={styles.collapseHeaderText}>collapsing header</Text>
+            <Text class="collapse-header-text">collapsing header</Text>
           </Animated.View>
         </View>
-        <View style={styles.rowTight}>
-          <View style={styles.flex1}>
+        <View class="row-tight">
+          <View class="flex1">
             <Button
               title="Scroll ↓"
               onPress={() => scrollBy(40)}
               color="#38b2ac"
             />
           </View>
-          <View style={styles.flex1}>
+          <View class="flex1">
             <Button
               title="Scroll ↑"
               onPress={() => scrollBy(-40)}
@@ -424,13 +425,13 @@ const NativeModulesDemo = defineComponent({
     };
 
     return () => (
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>
+      <View class="section">
+        <Text class="section-label">
           Runtime modules · I18nManager / Settings / Image statics
         </Text>
 
         {/* I18nManager: RTL layout constants, read live */}
-        <Text style={styles.infoText}>
+        <Text class="info-text">
           {`RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`}
         </Text>
         <Button
@@ -442,7 +443,7 @@ const NativeModulesDemo = defineComponent({
         />
 
         {/* Settings: counter persisted to NSUserDefaults, survives a relaunch */}
-        <Text testID="persist-count" style={styles.infoText}>
+        <Text testID="persist-count" class="info-text">
           {`persisted taps: ${persisted.value} · survives relaunch`}
         </Text>
         <Button
@@ -453,16 +454,14 @@ const NativeModulesDemo = defineComponent({
         />
 
         {/* Image statics: the rendered asset + getSize's measurement of it */}
-        <View style={styles.rowAlignCenter}>
-          <Image source={{ uri: LOGO_URI }} style={styles.logoThumb} />
-          <Text testID="logo-size" style={styles.infoTextFlex}>
+        <View class="row-align-center">
+          <Image source={{ uri: LOGO_URI }} class="logo-thumb" />
+          <Text testID="logo-size" class="info-text-flex">
             {`logo size: ${imageSize.value}`}
           </Text>
         </View>
         {/* prefetch warms a cold url: not cached → (tap) → cached */}
-        <Text
-          style={styles.infoText}
-        >{`prefetch cache: ${cacheState.value}`}</Text>
+        <Text class="info-text">{`prefetch cache: ${cacheState.value}`}</Text>
         <Button title="Prefetch logo" onPress={prefetchLogo} color="#42b883" />
       </View>
     );
@@ -509,21 +508,16 @@ const RefApiDemo = defineComponent({
     };
 
     return () => (
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>
+      <View class="section">
+        <Text class="section-label">
           Imperative ref · measure / setNativeProps / findNodeHandle
         </Text>
-        <View ref={boxRef} testID="ref-box" style={styles.refBox}>
-          <Text style={styles.refBoxText}>
-            {`native tag ${tag.value ?? '—'}`}
-          </Text>
+        <View ref={boxRef} testID="ref-box" class="ref-box">
+          <Text class="ref-box-text">{`native tag ${tag.value ?? '—'}`}</Text>
         </View>
-        <Text
-          testID="measure-frame"
-          style={styles.infoText}
-        >{`frame: ${frame.value}`}</Text>
-        <View style={styles.row}>
-          <View style={styles.flex1}>
+        <Text testID="measure-frame" class="info-text">{`frame: ${frame.value}`}</Text>
+        <View class="row">
+          <View class="flex1">
             <Button
               testID="measure-btn"
               title="Measure"
@@ -531,7 +525,7 @@ const RefApiDemo = defineComponent({
               color="#42b883"
             />
           </View>
-          <View style={styles.flex1}>
+          <View class="flex1">
             <Button
               title="Flash (setNativeProps)"
               onPress={onFlash}
@@ -554,32 +548,27 @@ const PlatformColorDemo = defineComponent({
   setup() {
     const scheme = useColorScheme();
     return () => (
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>
+      <View class="section">
+        <Text class="section-label">
           {`PlatformColor · semantic + DynamicColorIOS (${scheme.value ?? 'unknown'})`}
         </Text>
-        <View style={styles.row}>
-          <View
-            style={[
-              styles.colorTile,
-              { backgroundColor: PlatformColor('systemBlue') },
-            ]}
-          >
-            <Text style={styles.tileLabel}>systemBlue</Text>
+        <View class="row">
+          {/* backgroundColor stays dynamic (PlatformColor is a runtime-resolved opaque color object) */}
+          <View class="color-tile" style={{ backgroundColor: PlatformColor('systemBlue') }}>
+            <Text class="tile-label">systemBlue</Text>
           </View>
+          {/* backgroundColor / borderColor stay dynamic (DynamicColorIOS / PlatformColor) */}
           <View
-            style={[
-              styles.colorTileBordered,
-              {
-                backgroundColor: DynamicColorIOS({
-                  light: '#dcf3e8',
-                  dark: '#2c3e50',
-                }),
-                borderColor: PlatformColor('separator'),
-              },
-            ]}
+            class="color-tile-bordered"
+            style={{
+              backgroundColor: DynamicColorIOS({
+                light: '#dcf3e8',
+                dark: '#2c3e50',
+              }),
+              borderColor: PlatformColor('separator'),
+            }}
           >
-            <Text style={[styles.boldLabel, { color: PlatformColor('label') }]}>
+            <Text class="bold-label" style={{ color: PlatformColor('label') }}>
               dynamic
             </Text>
           </View>
@@ -636,17 +625,16 @@ const ResponderDemo = defineComponent({
     let grabbed: number | null = null;
 
     return () => (
-      <View style={styles.sectionTight}>
-        <Text style={styles.sectionLabel}>
+      <View class="section-tight">
+        <Text class="section-label">
           Responder · drag a chip vs hand-off to the strip
         </Text>
-        <Text style={styles.infoText}>{status.value}</Text>
-        {/* the separate transfer indicator, lit only when the strip steals the gesture */}
+        <Text class="info-text">{status.value}</Text>
+        {/* the separate transfer indicator, lit only when the strip steals the gesture;
+            color stays dynamic (transfer.value ? active : idle) */}
         <Text
-          style={[
-            styles.transferText,
-            { color: transfer.value ? '#f6ad55' : '#3b5266' },
-          ]}
+          class="transfer-text"
+          style={{ color: transfer.value ? '#f6ad55' : '#3b5266' }}
         >
           {transfer.value || 'transfer: —'}
         </Text>
@@ -674,14 +662,10 @@ const ResponderDemo = defineComponent({
           onResponderTerminate={() => {
             rowDx.value = 0;
           }}
-          style={styles.stripBox}
+          class="strip-box"
         >
-          <View
-            style={[
-              styles.rowTight,
-              { transform: [{ translateX: rowDx.value }] },
-            ]}
-          >
+          {/* transform stays dynamic (rowDx.value drives the strip pan) */}
+          <View class="row-tight" style={{ transform: [{ translateX: rowDx.value }] }}>
             {RESPONDER_CHIPS.map(index => (
               <View
                 key={index}
@@ -712,21 +696,19 @@ const ResponderDemo = defineComponent({
                   activeChip.value = null;
                   status.value = `chip ${index} released`;
                 }}
-                style={[
-                  styles.chip,
-                  {
-                    borderColor:
-                      activeChip.value === index ? '#42b883' : 'transparent',
-                    transform: [
-                      {
-                        translateX:
-                          activeChip.value === index ? chipDx.value : 0,
-                      },
-                    ],
-                  },
-                ]}
+                class="chip"
+                style={{
+                  borderColor:
+                    activeChip.value === index ? '#42b883' : 'transparent',
+                  transform: [
+                    {
+                      translateX:
+                        activeChip.value === index ? chipDx.value : 0,
+                    },
+                  ],
+                }}
               >
-                <Text style={styles.chipText}>{index}</Text>
+                <Text class="chip-text">{index}</Text>
               </View>
             ))}
           </View>
@@ -763,23 +745,21 @@ const AccessibilityDemo = defineComponent({
     });
 
     return () => (
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>
+      <View class="section">
+        <Text class="section-label">
           Accessibility · props → native · aria/role transform ·
           AccessibilityInfo
         </Text>
         {/* getter readout: 'off' (no screen reader) proves the module resolved */}
-        <Text
-          style={styles.infoText}
-        >{`screen reader: ${screenReader.value}`}</Text>
+        <Text class="info-text">{`screen reader: ${screenReader.value}`}</Text>
         {/* canonical accessibility*: content-desc 'a11y-canonical-label' + role=header */}
         <View
           accessible={true}
           accessibilityRole="header"
           accessibilityLabel="a11y-canonical-label"
-          style={styles.a11yCard}
+          class="a11y-card"
         >
-          <Text style={styles.infoText}>canonical label + role=header</Text>
+          <Text class="info-text">canonical label + role=header</Text>
         </View>
         {/* web aria and role aliases MUST fold: content-desc should be
             'a11y-aria-label', a raw aria-label attribute must not reach the native node */}
@@ -787,18 +767,18 @@ const AccessibilityDemo = defineComponent({
           accessible={true}
           role="button"
           aria-label="a11y-aria-label"
-          style={styles.a11yCard}
+          class="a11y-card"
         >
-          <Text style={styles.infoText}>aria-label + role=button</Text>
+          <Text class="info-text">aria-label + role=button</Text>
         </View>
         {/* accessibilityState: uiautomator shows enabled=false / selected=true */}
         <View
           accessible={true}
           accessibilityLabel="a11y-state"
           accessibilityState={{ disabled: true, selected: true }}
-          style={styles.a11yCard}
+          class="a11y-card"
         >
-          <Text style={styles.infoText}>state: disabled + selected</Text>
+          <Text class="info-text">state: disabled + selected</Text>
         </View>
       </View>
     );
@@ -840,8 +820,8 @@ const ParityDemo = defineComponent({
     const dismissMsg = ref('focus the field, then Hide keyboard');
 
     return () => (
-      <View style={styles.section}>
-        <Text ref={titleRef} style={styles.sectionLabel}>
+      <View class="section">
+        <Text ref={titleRef} class="section-label">
           Parity checks · longPress · dismiss · animated scroll · sticky · a11y
           focus
         </Text>
@@ -854,7 +834,7 @@ const ParityDemo = defineComponent({
           onPress={() => {
             longPressMsg.value = 'tap';
           }}
-          style={styles.longPressRow}
+          class="long-press-row"
         >
           {longPressMsg.value}
         </Text>
@@ -869,9 +849,9 @@ const ParityDemo = defineComponent({
           onBlur={() => {
             dismissMsg.value = 'blurred (keyboard down)';
           }}
-          style={styles.focusInput}
+          class="focus-input"
         />
-        <Text style={styles.noteText}>{dismissMsg.value}</Text>
+        <Text class="note-text">{dismissMsg.value}</Text>
         <Button
           title="Hide keyboard"
           onPress={() => Keyboard.dismiss()}
@@ -881,7 +861,7 @@ const ParityDemo = defineComponent({
         {/* #12 animated VirtualizedList scroll: smooth (native command) vs instant.
             A fixed height with no wrapper: the vertical ScrollView clips to its own
             frame (overflow:'scroll' base, like RN), so rows stay inside the box on iOS too. */}
-        <Text style={styles.sectionLabel}>
+        <Text class="section-label">
           FlatList · animated scrollToOffset
         </Text>
         <FlatList
@@ -896,7 +876,7 @@ const ParityDemo = defineComponent({
             offset: PARITY_ROW_H * index,
             index,
           })}
-          style={styles.parityList}
+          class="parity-list"
           onViewableItemsChanged={info => {
             dlog(`Vue FlatList viewable ${info.viewableItems.map(token => token.item.n).join(',')}`);
           }}
@@ -905,14 +885,15 @@ const ParityDemo = defineComponent({
               types the slot object and keeps item inferred as {id,n}. */}
           {{
             item: ({ item }) => (
-              <View style={styles.parityRow}>
-                <Text style={styles.infoText}>{`row ${item.n}`}</Text>
+              // height stays dynamic: PARITY_ROW_H script const
+              <View class="parity-row" style={{ height: PARITY_ROW_H }}>
+                <Text class="info-text">{`row ${item.n}`}</Text>
               </View>
             ),
           } satisfies IFlatListSlots<{ id: string; n: number }>}
         </FlatList>
-        <View style={styles.row}>
-          <View style={styles.flex1}>
+        <View class="row">
+          <View class="flex1">
             <Button
               title="Scroll ▼ animated"
               onPress={() =>
@@ -924,7 +905,7 @@ const ParityDemo = defineComponent({
               color="#42b883"
             />
           </View>
-          <View style={styles.flex1}>
+          <View class="flex1">
             <Button
               title="Top · instant"
               onPress={() =>
@@ -938,7 +919,7 @@ const ParityDemo = defineComponent({
         {/* #13 sticky section headers. Drag the inner list: each header pins at the top.
             Cross-talk check: as the NEXT header reaches the top it should PUSH the pinned
             one off (nextHeaderLayoutY not yet wired, watch push vs overlap). */}
-        <Text style={styles.sectionLabel}>
+        <Text class="section-label">
           SectionList · sticky (scroll: next header should push prev off)
         </Text>
         <SectionList
@@ -946,16 +927,17 @@ const ParityDemo = defineComponent({
           sections={paritySections}
           keyExtractor={(item: { id: string; label: string }) => item.id}
           stickySectionHeadersEnabled={true}
-          style={styles.sectionList}
+          class="section-list"
         >
           {/* #sectionHeader / #item scoped slots — `satisfies` keeps section & item typed. */}
           {{
             sectionHeader: ({ section }) => (
-              <Text style={styles.sectionHeader}>{section.title}</Text>
+              <Text class="section-header">{section.title}</Text>
             ),
             item: ({ item }) => (
-              <View style={styles.parityRow}>
-                <Text style={styles.infoText}>{item.label}</Text>
+              // height stays dynamic: PARITY_ROW_H script const
+              <View class="parity-row" style={{ height: PARITY_ROW_H }}>
+                <Text class="info-text">{item.label}</Text>
               </View>
             ),
           } satisfies ISectionListSlots<{ id: string; label: string }>}
@@ -1104,11 +1086,11 @@ const App = defineComponent({
     };
 
     return () => (
-      <SafeAreaView style={styles.screen}>
+      <SafeAreaView class="screen">
         <ScrollView
           testID="canary-scroll"
-          style={styles.screen}
-          contentContainerStyle={styles.scrollContent}
+          class="screen"
+          contentContainerStyle="scroll-content"
           refreshControl={
             <RefreshControl
               refreshing={refreshing.value}
@@ -1125,22 +1107,21 @@ const App = defineComponent({
             animated={true}
           />
           {/* The one allowed difference vs the React canary: a badge naming the renderer. */}
-          <Text style={styles.badge}>◆ RENDERED FROM .TSX (Vue JSX)</Text>
-          <Text style={styles.title}>symbiote · all primitives</Text>
+          <Text class="badge">◆ RENDERED FROM .TSX (Vue JSX)</Text>
+          <Text class="title">symbiote · all primitives</Text>
           {/* native->JS: keyboard height pushed from the device hub, read live */}
-          <Text style={styles.headerNote}>
+          <Text class="header-note">
             {keyboardHeight.value > 0
               ? `keyboard up · ${keyboardHeight.value}px`
               : 'keyboard down'}
           </Text>
           {/* Tier A runtime modules, read live from the real native side. A non-empty
             Version proves PlatformConstants resolved; a fractional hairline (e.g. 0.333
-            on @3x) proves DeviceInfo's scale resolved. The border below IS that hairline. */}
+            on @3x) proves DeviceInfo's scale resolved. The border below IS that hairline;
+            borderTopWidth stays dynamic (StyleSheet.hairlineWidth is a runtime constant). */}
           <Text
-            style={[
-              styles.hairlineNote,
-              { borderTopWidth: StyleSheet.hairlineWidth },
-            ]}
+            class="hairline-note"
+            style={{ borderTopWidth: StyleSheet.hairlineWidth }}
           >
             {`${Platform.OS} ${Platform.Version}` +
               `${Platform.isPad ? ' · iPad' : ''}` +
@@ -1150,13 +1131,13 @@ const App = defineComponent({
           {/* Tier B runtime modules, live. Real w×h@scale proves Dimensions + PixelRatio;
             a colorScheme proves Appearance; appState flips when you background the app
             (AppState's device events). */}
-          <Text style={styles.headerNote}>
+          <Text class="header-note">
             {`${Math.round(window.value.width)}×${Math.round(window.value.height)} @${PixelRatio.get()}x` +
               ` · ${colorScheme.value ?? 'no-scheme'} · ${appState.value}`}
           </Text>
           {/* JS->native StatusBar controls: watch the top strip react */}
-          <View style={styles.row}>
-            <View style={styles.flex1}>
+          <View class="row">
+            <View class="flex1">
               <Button
                 title={
                   statusBarHidden.value ? 'Show status bar' : 'Hide status bar'
@@ -1167,7 +1148,7 @@ const App = defineComponent({
                 color="#42b883"
               />
             </View>
-            <View style={styles.flex1}>
+            <View class="flex1">
               <Button
                 title={darkStatusBar.value ? 'Light text' : 'Dark text'}
                 onPress={() => {
@@ -1181,8 +1162,8 @@ const App = defineComponent({
             red / goes translucent and the app STAYS rendered. FAIL: the surface blanks
             (white screen); watch logcat for stopSurface / "reactInstance is null". */}
           {Platform.OS === 'android' && (
-            <View style={styles.row}>
-              <View style={styles.flex1}>
+            <View class="row">
+              <View class="flex1">
                 <Button
                   title={statusBarRed.value ? 'BG default' : 'BG red'}
                   onPress={() => {
@@ -1196,7 +1177,7 @@ const App = defineComponent({
                   color="#42b883"
                 />
               </View>
-              <View style={styles.flex1}>
+              <View class="flex1">
                 <Button
                   title={statusBarTranslucent.value ? 'Opaque' : 'Translucent'}
                   onPress={() => {
@@ -1211,14 +1192,14 @@ const App = defineComponent({
           )}
           {/* JS->native imperative modules: tap to fire the real native UI / haptics.
             Each working button proves its module name resolved on the bridgeless host. */}
-          <View style={styles.row}>
-            <View style={styles.flex1}>
+          <View class="row">
+            <View class="flex1">
               <Button title="Alert" onPress={onAlert} color="#42b883" />
             </View>
             {/* ActionSheetIOS drives the iOS-only ActionSheetManager; no Android native
               module exists, so the control is iOS-only by design (not a gap). */}
             {Platform.OS !== 'android' && (
-              <View style={styles.flex1}>
+              <View class="flex1">
                 <Button
                   title="Action sheet"
                   onPress={onActionSheet}
@@ -1227,11 +1208,11 @@ const App = defineComponent({
               </View>
             )}
           </View>
-          <View style={styles.row}>
-            <View style={styles.flex1}>
+          <View class="row">
+            <View class="flex1">
               <Button title="Share" onPress={onShare} color="#42b883" />
             </View>
-            <View style={styles.flex1}>
+            <View class="flex1">
               <Button
                 title="Vibrate"
                 onPress={() => Vibration.vibrate()}
@@ -1249,12 +1230,12 @@ const App = defineComponent({
             view pulled-down; our full re-commit snaps the offset back, so we drive
             our OWN indicator from the same `refreshing` flag, guaranteed visible. */}
           {refreshing.value ? (
-            <View style={styles.refreshRow}>
+            <View class="refresh-row">
               <ActivityIndicator color="#42b883" />
-              <Text style={styles.accentNote}>Refreshing…</Text>
+              <Text class="accent-note">Refreshing…</Text>
             </View>
           ) : (
-            <Text style={styles.mutedCenter}>
+            <Text class="muted-center">
               {`pull to refresh · refreshed ${refreshes.value}×`}
             </Text>
           )}
@@ -1265,9 +1246,9 @@ const App = defineComponent({
             onPress={() => {
               count.value += 1;
             }}
-            style={styles.counterCard}
+            class="counter-card"
           >
-            <Text testID="counter-value" style={styles.counterText}>
+            <Text testID="counter-value" class="counter-text">
               {`tapped ${count.value}×`}
             </Text>
           </View>
@@ -1276,20 +1257,20 @@ const App = defineComponent({
           <TextInput
             testID="greeting-input"
             value={name.value}
-            onChangeText={(text: string) => {
+            onValueChange={(text: string) => {
               name.value = text;
             }}
             placeholder="type your name…"
             placeholderTextColor="#3b5266"
-            style={styles.textInput}
+            class="text-input"
           />
-          <Text testID="greeting-output" style={styles.greeting}>
+          <Text testID="greeting-output" class="greeting">
             {name.value ? `Hello, ${name.value}` : 'Hello, stranger'}
           </Text>
 
           {/* Switch drives the ActivityIndicator */}
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>spinner</Text>
+          <View class="switch-row">
+            <Text class="switch-label">spinner</Text>
             <Switch
               testID="spinner-switch"
               value={spinning.value}
@@ -1309,8 +1290,8 @@ const App = defineComponent({
           {/* Slider: the @react-native-community/slider native view via @symbiote/slider/vue. Drag
             it — onValueChange streams live; the colored track proves the engine ran the tint
             processors it derived from the library's ViewConfig. Same wrapper as the React canary. */}
-          <View style={styles.sectionTight}>
-            <Text style={styles.switchLabel}>
+          <View class="section-tight">
+            <Text class="switch-label">
               {`volume · ${Math.round(volume.value * 100)}%`}
             </Text>
             <Slider
@@ -1325,7 +1306,7 @@ const App = defineComponent({
               minimumTrackTintColor="#42b883"
               maximumTrackTintColor="#334155"
               thumbTintColor="#ffffff"
-              style={styles.slider}
+              class="slider"
             />
           </View>
 
@@ -1368,20 +1349,17 @@ const App = defineComponent({
             onPress={() => {
               count.value += 1;
             }}
-            style={({ pressed }: { pressed: boolean }) => [
-              styles.pressableCard,
-              {
-                backgroundColor: pressed ? '#2c3e50' : '#22323f',
-                borderColor: pressed ? '#42b883' : '#369870',
-              },
-            ]}
+            class="pressable-card"
+            style={({ pressed }: { pressed: boolean }) => ({
+              backgroundColor: pressed ? '#2c3e50' : '#22323f',
+              borderColor: pressed ? '#42b883' : '#369870',
+            })}
           >
             {({ pressed }: { pressed: boolean }) => (
+              // color stays dynamic (pressed ? active : idle)
               <Text
-                style={[
-                  styles.pressableLabel,
-                  { color: pressed ? '#42b883' : '#cbd5e1' },
-                ]}
+                class="pressable-label"
+                style={{ color: pressed ? '#42b883' : '#cbd5e1' }}
               >
                 {pressed ? 'holding…' : 'press me (also +1)'}
               </Text>
@@ -1389,7 +1367,7 @@ const App = defineComponent({
           </Pressable>
 
           {/* Horizontal FlatList: real windowing */}
-          <Text style={styles.sectionLabel}>FlatList · 24 chips, windowed</Text>
+          <Text class="section-label">FlatList · 24 chips, windowed</Text>
           <FlatList
             testID="chips-list"
             data={chips}
@@ -1404,17 +1382,26 @@ const App = defineComponent({
               offset: (CHIP_WIDTH + CHIP_GAP) * index,
               index,
             })}
-            style={styles.chipList}
-            renderItem={({
-              item,
-            }: {
-              item: { id: string; index: number; color: string };
-            }) => (
-              <View style={[styles.chipCard, { backgroundColor: item.color }]}>
-                <Text style={styles.chipNumber}>{item.index}</Text>
-              </View>
-            )}
-          />
+            class="chip-list"
+          >
+            {/* The cell is the #item scoped slot — Vue's idiom (no renderItem prop). */}
+            {{
+              item: ({ item }) => (
+                // width / marginRight stay dynamic: CHIP_WIDTH/CHIP_GAP script consts;
+                // backgroundColor stays dynamic (item.color)
+                <View
+                  class="chip-card"
+                  style={{
+                    width: CHIP_WIDTH,
+                    marginRight: CHIP_GAP,
+                    backgroundColor: item.color,
+                  }}
+                >
+                  <Text class="chip-number">{item.index}</Text>
+                </View>
+              ),
+            } satisfies IFlatListSlots<{ id: string; index: number; color: string }>}
+          </FlatList>
 
           {/* ===== feature-parity device checks ===== */}
 
@@ -1431,12 +1418,12 @@ const App = defineComponent({
                 dy: Math.round(nativeNumber(event, 'locationY')),
               };
             }}
-            style={({ pressed }: { pressed: boolean }) => [
-              styles.retentionCard,
-              { backgroundColor: pressed ? '#369870' : '#2c3e50' },
-            ]}
+            class="retention-card"
+            style={({ pressed }: { pressed: boolean }) => ({
+              backgroundColor: pressed ? '#369870' : '#2c3e50',
+            })}
           >
-            <Text style={styles.infoText}>
+            <Text class="info-text">
               {`drag me · dx ${retentionMove.value.dx} · dy ${retentionMove.value.dy}`}
             </Text>
           </Pressable>
@@ -1444,18 +1431,22 @@ const App = defineComponent({
           {/* maintainVisibleContentPosition. PASS: scroll down a bit, tap Prepend: the rows
             you are looking at DO NOT jump; new items appear above without shifting the
             viewport. FAIL: the list jumps to the top. */}
-          <Text style={styles.sectionLabel}>MVCP · prepend without jump</Text>
+          <Text class="section-label">MVCP · prepend without jump</Text>
           <FlatList
             data={mvcpItems.value}
             keyExtractor={(item: { id: string; label: string }) => item.id}
             maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-            style={styles.boxList160}
-            renderItem={({ item }: { item: { id: string; label: string } }) => (
-              <View style={styles.mvcpRow}>
-                <Text style={styles.listRowText}>{item.label}</Text>
-              </View>
-            )}
-          />
+            class="box-list160"
+          >
+            {/* The cell is the #item scoped slot — Vue's idiom (no renderItem prop). */}
+            {{
+              item: ({ item }) => (
+                <View class="mvcp-row">
+                  <Text class="list-row-text">{item.label}</Text>
+                </View>
+              ),
+            } satisfies IFlatListSlots<{ id: string; label: string }>}
+          </FlatList>
           <Button
             title="Prepend 5"
             color="#42b883"
@@ -1474,33 +1465,30 @@ const App = defineComponent({
             box below (not the page): the bright bar above SMOOTHLY fades to near-invisible
             and lifts, on the UI thread (no jank, no per-frame JS). Proves Animated.ScrollView
             + Animated.event native attach. */}
+          {/* opacity / transform stay dynamic (the native-driver scroll interpolation) */}
           <Animated.View
-            style={[
-              styles.parityHeader,
-              {
-                opacity: parityHeaderOpacity,
-                transform: [{ translateY: parityHeaderTranslateY }],
-              },
-            ]}
+            class="parity-header"
+            style={{
+              opacity: parityHeaderOpacity,
+              transform: [{ translateY: parityHeaderTranslateY }],
+            }}
           >
-            <Text style={styles.parityHeaderText}>
+            <Text class="parity-header-text">
               HEADER — fades as you scroll ↓
             </Text>
           </Animated.View>
           <Animated.ScrollView
-            style={styles.boxList160}
+            class="box-list160"
             scrollEventThrottle={16}
             onScroll={onParityScroll}
           >
             {Array.from({ length: 6 }, (_value, index) => (
-              <View key={index} style={styles.scrollDemoRow}>
-                <Text
-                  style={styles.listRowText}
-                >{`scroll me · row ${index}`}</Text>
+              <View key={index} class="scroll-demo-row">
+                <Text class="list-row-text">{`scroll me · row ${index}`}</Text>
               </View>
             ))}
           </Animated.ScrollView>
-          <Text style={styles.tinyCenter}>
+          <Text class="tiny-center">
             ↑ drag inside the box — the bar above reacts
           </Text>
           {/* Native-driver proof for Animated.event: tap to JAM the JS thread 3s, then drag
@@ -1518,31 +1506,41 @@ const App = defineComponent({
               }
             }}
           />
-          <Text style={styles.tinyCenter}>
+          <Text class="tiny-center">
             tap Freeze, then immediately drag the box — bar should still move
           </Text>
 
           {/* Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect
-            is unmistakable on the dark theme. */}
+            is unmistakable on the dark theme. Kept as a dynamic style object here — the CSS
+            class form works equally well now (raw passthrough, 2026-07), see .gradient-card
+            below, this is just legacy demo wiring, not a remaining gap. */}
           {/* boxShadow: a BLUE glow (a black shadow is invisible on the near-black bg).
             PASS: a soft blue halo bleeds out around the panel. */}
-          <View style={styles.shadowCard}>
-            <Text style={styles.noteText}>boxShadow · blue glow</Text>
+          <View class="shadow-card" style={shadowCardExtra}>
+            <Text class="note-text">boxShadow · blue glow</Text>
           </View>
           {/* filter: same base colour both sides; the right one is darkened by
             brightness(0.5). PASS: the right panel is clearly darker than the left. */}
-          <View style={styles.row}>
-            <View style={styles.filterTile}>
-              <Text style={styles.tileText}>no filter</Text>
+          <View class="row">
+            <View class="filter-tile">
+              <Text class="tile-text">no filter</Text>
             </View>
-            <View style={[styles.filterTile, styles.dim]}>
-              <Text style={styles.tileText}>brightness 0.5</Text>
+            <View class="filter-tile" style={dimStyle}>
+              <Text class="tile-text">brightness 0.5</Text>
             </View>
           </View>
           {/* transformOrigin: the panel rotates around its TOP-LEFT corner, not its centre.
             PASS: the left edge stays put while the bottom-right swings down. */}
-          <View style={styles.rotatedCard}>
-            <Text style={styles.tileText}>transformOrigin · top-left</Text>
+          <View class="rotated-card" style={rotationStyle}>
+            <Text class="tile-text">transformOrigin · top-left</Text>
+          </View>
+
+          {/* background-image: a CSS `linear-gradient(...)` authored entirely in App.css
+            (.gradient-card), proving @symbiote/css-parser's `background-image` → RN's
+            `experimental_backgroundImage` raw passthrough works end to end.
+            PASS: the panel shows a blue-to-orange gradient sweeping left to right. */}
+          <View class="gradient-card">
+            <Text class="tile-text">background-image · linear-gradient</Text>
           </View>
 
           {/* Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
@@ -1552,14 +1550,14 @@ const App = defineComponent({
             alt="React logo"
             width={48}
             height={48}
-            style={styles.webImage}
+            class="web-image"
           />
 
           {/* KeyboardAvoidingView enabled toggle. PASS: with enabled ON, focusing the field
             lifts it above the keyboard AND the keyboard is the email layout (proves
             autoComplete/inputMode fold); with enabled OFF the keyboard covers the field. */}
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>avoid keyboard</Text>
+          <View class="switch-row">
+            <Text class="switch-label">avoid keyboard</Text>
             <Switch
               value={kavEnabled.value}
               onValueChange={(next: boolean) => {
@@ -1578,17 +1576,17 @@ const App = defineComponent({
               enterKeyHint="done"
               placeholder="email — focus me near the bottom…"
               placeholderTextColor="#3b5266"
-              style={styles.textInput}
+              class="text-input"
             />
           </KeyboardAvoidingView>
 
           <Image
             source={{ uri: 'https://vuejs.org/images/logo.png' }}
-            style={styles.logoImage}
+            class="logo-image"
           />
 
-          <View style={styles.bottomCard}>
-            <Text style={styles.bottomText}>↑ you scrolled to the bottom</Text>
+          <View class="bottom-card">
+            <Text class="bottom-text">↑ you scrolled to the bottom</Text>
           </View>
 
           {/* Modal overlays its own window */}
@@ -1601,10 +1599,10 @@ const App = defineComponent({
             }}
           >
             {/* transparent modal => paint our own dim layer (the RN pattern) */}
-            <View style={styles.modalOverlay}>
-              <View testID="modal-card" style={styles.modalCard}>
-                <Text style={styles.modalTitle}>It's a Modal</Text>
-                <Text style={styles.modalBody}>
+            <View class="modal-overlay">
+              <View testID="modal-card" class="modal-card">
+                <Text class="modal-title">It's a Modal</Text>
+                <Text class="modal-body">
                   Rendered through ModalHostView — its own native window, same
                   Fabric tree.
                 </Text>
@@ -1625,320 +1623,15 @@ const App = defineComponent({
   },
 });
 
-// Static styles, extracted from the inline props above. Dynamic values (interpolations,
-// pressed/active ternaries, PlatformColor, item.color, StyleSheet.hairlineWidth) stay at
-// the use site, composed via `style={[styles.x, { …dynamic }]}`. Placed after the module
-// consts it references (XY_SPAN / HEADER_COLLAPSE / PARITY_ROW_H / CHIP_*) so they're
-// initialized before StyleSheet.create runs at module load.
-const styles = StyleSheet.create({
-  // shared / common
-  screen: { flex: 1, backgroundColor: '#1b2a36' },
-  scrollContent: {
-    paddingVertical: 64,
-    paddingHorizontal: 24,
-    alignItems: 'stretch',
-    gap: 28,
-  },
-  section: { gap: 12 },
-  sectionTight: { gap: 8 },
-  slider: { height: 40, alignSelf: 'stretch' },
-  row: { flexDirection: 'row', gap: 12 },
-  rowTight: { flexDirection: 'row', gap: 8 },
-  flex1: { flex: 1 },
-  sectionLabel: { color: '#3b5266', fontSize: 13 },
-  infoText: { color: '#cbd5e1', fontSize: 14 },
-  noteText: { color: '#cbd5e1', fontSize: 13 },
-  switchLabel: { color: '#cbd5e1', fontSize: 16 },
-  listRowText: { color: '#cbd5e1', fontSize: 15 },
-
-  // the one allowed difference vs the React canary
-  badge: {
-    color: '#5fcf9b',
-    fontSize: 14,
-    letterSpacing: 2,
-    textAlign: 'center',
-  },
-
-  // AnimatedDemo
-  pulseFrame: { height: 64, alignItems: 'center', justifyContent: 'center' },
-  pulseDot: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#42b883',
-  },
-  slideTrack: { height: 36, justifyContent: 'center' },
-  jsSlideDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: '#f6ad55',
-  },
-  nativeSlideDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: '#68d391',
-  },
-
-  // AnimatedParityDemo
-  dragHint: { color: '#718096', fontSize: 11 },
-  xyFrame: {
-    width: XY_SPAN + 36,
-    height: XY_SPAN + 36,
-    borderRadius: 12,
-    backgroundColor: '#eef7f2',
-    padding: 6,
-  },
-  xyBox: { width: 36, height: 36, borderRadius: 8, backgroundColor: '#9f7aea' },
-  trackRow: { height: 30, justifyContent: 'center' },
-  leadDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#42b883',
-  },
-  followDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#f6ad55',
-  },
-  collapseFrame: {
-    height: HEADER_COLLAPSE + 24,
-    overflow: 'hidden',
-    justifyContent: 'flex-start',
-  },
-  collapseHeader: {
-    height: HEADER_COLLAPSE,
-    borderRadius: 8,
-    backgroundColor: '#38b2ac',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  collapseHeaderText: { color: 'white', fontSize: 12 },
-
-  // NativeModulesDemo
-  rowAlignCenter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logoThumb: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#22323f',
-  },
-  infoTextFlex: { color: '#cbd5e1', fontSize: 14, flex: 1 },
-
-  // RefApiDemo
-  refBox: {
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: '#42b883',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  refBoxText: { color: '#1b2a36', fontSize: 14, fontWeight: 'bold' },
-
-  // PlatformColorDemo
-  colorTile: {
-    flex: 1,
-    height: 56,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  colorTileBordered: {
-    flex: 1,
-    height: 56,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tileLabel: { color: '#ffffff', fontSize: 13, fontWeight: 'bold' },
-  boldLabel: { fontSize: 13, fontWeight: 'bold' },
-
-  // ResponderDemo
-  transferText: { fontSize: 13 },
-  stripBox: { padding: 12, borderRadius: 12, backgroundColor: '#2c3e50' },
-  chip: {
-    width: 56,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#369870',
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
-
-  // AccessibilityDemo
-  a11yCard: { padding: 12, borderRadius: 10, backgroundColor: '#2c3e50' },
-
-  // ParityDemo
-  longPressRow: {
-    color: '#cbd5e1',
-    fontSize: 15,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: '#2c3e50',
-  },
-  focusInput: {
-    color: '#e2e8f0',
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: '#22323f',
-    borderWidth: 1,
-    borderColor: '#369870',
-  },
-  parityList: { height: 120, borderRadius: 10, backgroundColor: '#22323f' },
-  parityRow: {
-    height: PARITY_ROW_H,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  sectionList: { height: 200, borderRadius: 10, backgroundColor: '#22323f' },
-  sectionHeader: {
-    color: '#1b2a36',
-    fontSize: 13,
-    fontWeight: 'bold',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: '#42b883',
-  },
-
-  // App
-  title: { color: '#42b883', fontSize: 16, textAlign: 'center' },
-  headerNote: { color: '#42b883', fontSize: 13, textAlign: 'center' },
-  hairlineNote: {
-    color: '#42b883',
-    fontSize: 13,
-    textAlign: 'center',
-    paddingTop: 8,
-    borderTopColor: '#369870',
-  },
-  refreshRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  accentNote: { color: '#42b883', fontSize: 13 },
-  mutedCenter: { color: '#3b5266', fontSize: 13, textAlign: 'center' },
-  counterCard: {
-    paddingVertical: 18,
-    borderRadius: 16,
-    backgroundColor: '#369870',
-    alignItems: 'center',
-  },
-  counterText: { color: '#ffffff', fontSize: 24, fontWeight: 'bold' },
-  textInput: {
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#369870',
-    paddingHorizontal: 14,
-    color: '#ffffff',
-    fontSize: 18,
-    backgroundColor: '#22323f',
-  },
-  greeting: { color: '#ffffff', fontSize: 20, textAlign: 'center' },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-  },
-  pressableCard: {
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  pressableLabel: { fontSize: 15 },
-  chipList: { height: 84 },
-  chipCard: {
-    width: CHIP_WIDTH,
-    height: 72,
-    marginRight: CHIP_GAP,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipNumber: { color: '#1b2a36', fontSize: 18, fontWeight: 'bold' },
-  retentionCard: {
-    height: 64,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  boxList160: { height: 160, borderRadius: 12, backgroundColor: '#22323f' },
-  mvcpRow: { paddingVertical: 10, paddingHorizontal: 14 },
-  parityHeader: {
-    backgroundColor: '#369870',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  parityHeaderText: { color: '#ffffff', fontSize: 15, fontWeight: 'bold' },
-  scrollDemoRow: {
-    height: 80,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  tinyCenter: { color: '#3b5266', fontSize: 12, textAlign: 'center' },
-  shadowCard: {
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: '#2c3e50',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 0px 22px 3px rgba(127,181,255,0.85)',
-  },
-  filterTile: {
-    flex: 1,
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: '#369870',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dim: { filter: [{ brightness: 0.5 }] },
-  tileText: { color: '#ffffff', fontSize: 13 },
-  rotatedCard: {
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: '#369870',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transformOrigin: 'top left',
-    transform: [{ rotate: '4deg' }],
-  },
-  webImage: { borderRadius: 8, alignSelf: 'center' },
-  logoImage: { width: 64, height: 64, borderRadius: 12, alignSelf: 'center' },
-  bottomCard: {
-    height: 200,
-    borderRadius: 16,
-    backgroundColor: '#2c3e50',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bottomText: { color: '#42b883', fontSize: 16 },
-  modalOverlay: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  modalCard: {
-    width: 280,
-    padding: 24,
-    borderRadius: 20,
-    backgroundColor: '#22323f',
-    alignItems: 'center',
-    gap: 16,
-  },
-  modalTitle: { color: '#ffffff', fontSize: 20, fontWeight: 'bold' },
-  modalBody: { color: '#cbd5e1', fontSize: 14, textAlign: 'center' },
-});
+// boxShadow / filter / transformOrigin+transform kept as plain style objects here (both forms
+// work — see .gradient-card in App.css for the CSS-class equivalent).
+const shadowCardExtra = {
+  boxShadow: '0px 0px 22px 3px rgba(127,181,255,0.85)',
+};
+const dimStyle = { filter: [{ brightness: 0.5 }] };
+const rotationStyle = {
+  transformOrigin: 'top left',
+  transform: [{ rotate: '4deg' }],
+};
 
 export default App;
