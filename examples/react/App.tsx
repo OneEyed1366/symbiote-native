@@ -58,6 +58,7 @@ import {
 // renders the native leaf through the engine, so the SAME slider works on Vue/Angular too. App
 // code and the app manifest name only @symbiote/slider; the native package is the wrapper's dep.
 import { Slider } from '@symbiote/slider/react';
+import './App.css';
 
 const CHIP_WIDTH = 72;
 const CHIP_GAP = 12;
@@ -145,25 +146,24 @@ function AnimatedDemo() {
   };
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>Animated · JS vs native driver</Text>
+    <View className="section">
+      <Text className="section-label">Animated · JS vs native driver</Text>
 
       {/* native-driven perpetual pulse */}
-      <View style={styles.pulseFrame}>
+      <View className="pulse-frame">
         <Animated.View
           testID="pulse-dot"
-          style={[
-            styles.pulseDot,
-            { opacity: pulseOpacity, transform: [{ scale: pulseScale }] },
-          ]}
+          className="pulse-dot"
+          style={{ opacity: pulseOpacity, transform: [{ scale: pulseScale }] }}
         />
       </View>
 
       {/* JS-driven slide: a commit per frame */}
-      <View style={styles.slideTrack}>
+      <View className="slide-track">
         <Animated.View
           testID="slide-js-dot"
-          style={[styles.jsSlideDot, { transform: [{ translateX: jsX }] }]}
+          className="js-slide-dot"
+          style={{ transform: [{ translateX: jsX }] }}
         />
       </View>
       <Button
@@ -174,13 +174,11 @@ function AnimatedDemo() {
       />
 
       {/* native-driven slide: offloaded, zero JS frames */}
-      <View style={styles.slideTrack}>
+      <View className="slide-track">
         <Animated.View
           testID="slide-native-dot"
-          style={[
-            styles.nativeSlideDot,
-            { transform: [{ translateX: nativeX }] },
-          ]}
+          className="native-slide-dot"
+          style={{ transform: [{ translateX: nativeX }] }}
         />
       </View>
       <Button
@@ -270,30 +268,33 @@ function AnimatedParityDemo() {
   };
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>
+    <View className="section">
+      <Text className="section-label">
         Animated · ValueXY / tracking / diffClamp
       </Text>
 
       {/* ValueXY box you drag with a finger (PanResponder) */}
-      <Text style={styles.dragHint}>drag the purple box →</Text>
-      <View style={styles.xyFrame}>
+      <Text className="drag-hint">drag the purple box →</Text>
+      <View className="xy-frame">
         <Animated.View
           {...panResponder.panHandlers}
-          style={[styles.xyBox, { transform: xy.getTranslateTransform() }]}
+          className="xy-box"
+          style={{ transform: xy.getTranslateTransform() }}
         />
       </View>
 
       {/* Tracking: lead dot (blue) and follower (orange) that lags behind it */}
-      <View style={styles.trackRow}>
+      <View className="track-row">
         <Animated.View
-          style={[styles.leadDot, { transform: [{ translateX: lead }] }]}
+          className="lead-dot"
+          style={{ transform: [{ translateX: lead }] }}
         />
       </View>
-      <View style={styles.trackRow}>
+      <View className="track-row">
         <Animated.View
           testID="follow-dot"
-          style={[styles.followDot, { transform: [{ translateX: follow }] }]}
+          className="follow-dot"
+          style={{ transform: [{ translateX: follow }] }}
         />
       </View>
       <Button
@@ -304,25 +305,23 @@ function AnimatedParityDemo() {
       />
 
       {/* diffClamp collapsing header */}
-      <View style={styles.collapseFrame}>
+      <View className="collapse-frame">
         <Animated.View
-          style={[
-            styles.collapseHeader,
-            { transform: [{ translateY: headerOffset }] },
-          ]}
+          className="collapse-header"
+          style={{ transform: [{ translateY: headerOffset }] }}
         >
-          <Text style={styles.collapseHeaderText}>collapsing header</Text>
+          <Text className="collapse-header-text">collapsing header</Text>
         </Animated.View>
       </View>
-      <View style={styles.rowTight}>
-        <View style={styles.flex1}>
+      <View className="row-tight">
+        <View className="flex1">
           <Button
             title="Scroll ↓"
             onPress={() => scrollBy(40)}
             color="#38b2ac"
           />
         </View>
-        <View style={styles.flex1}>
+        <View className="flex1">
           <Button
             title="Scroll ↑"
             onPress={() => scrollBy(-40)}
@@ -396,13 +395,13 @@ function NativeModulesDemo() {
   };
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>
+    <View className="section">
+      <Text className="section-label">
         Runtime modules · I18nManager / Settings / Image statics
       </Text>
 
       {/* I18nManager: RTL layout constants, read live */}
-      <Text style={styles.infoText}>
+      <Text className="info-text">
         {`RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`}
       </Text>
       <Button
@@ -414,7 +413,7 @@ function NativeModulesDemo() {
       />
 
       {/* Settings: counter persisted to NSUserDefaults, survives a relaunch */}
-      <Text testID="persist-count" style={styles.infoText}>
+      <Text testID="persist-count" className="info-text">
         {`persisted taps: ${persisted} · survives relaunch`}
       </Text>
       <Button
@@ -424,15 +423,15 @@ function NativeModulesDemo() {
         color="#7fb5ff"
       />
 
-      {/* Image statics: the rendered asset + getSize's measurement of it */}
-      <View style={styles.rowAlignCenter}>
-        <Image source={{ uri: LOGO_URI }} style={styles.logoThumb} />
-        <Text testID="logo-size" style={styles.infoTextFlex}>
+      {/* Image statics: the rendered asset + getSize's measurement of it. */}
+      <View className="row-align-center">
+        <Image source={{ uri: LOGO_URI }} className="logo-thumb" />
+        <Text testID="logo-size" className="info-text-flex">
           {`logo size: ${imageSize}`}
         </Text>
       </View>
       {/* prefetch warms a cold url: not cached → (tap) → cached */}
-      <Text style={styles.infoText}>{`prefetch cache: ${cacheState}`}</Text>
+      <Text className="info-text">{`prefetch cache: ${cacheState}`}</Text>
       <Button title="Prefetch logo" onPress={prefetchLogo} color="#7fb5ff" />
     </View>
   );
@@ -475,19 +474,19 @@ function RefApiDemo() {
   };
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>
+    <View className="section">
+      <Text className="section-label">
         Imperative ref · measure / setNativeProps / findNodeHandle
       </Text>
-      <View ref={boxRef} testID="ref-box" style={styles.refBox}>
-        <Text style={styles.refBoxText}>{`native tag ${tag ?? '—'}`}</Text>
+      <View ref={boxRef} testID="ref-box" className="ref-box">
+        <Text className="ref-box-text">{`native tag ${tag ?? '—'}`}</Text>
       </View>
       <Text
         testID="measure-frame"
-        style={styles.infoText}
+        className="info-text"
       >{`frame: ${frame}`}</Text>
-      <View style={styles.row}>
-        <View style={styles.flex1}>
+      <View className="row">
+        <View className="flex1">
           <Button
             testID="measure-btn"
             title="Measure"
@@ -495,7 +494,7 @@ function RefApiDemo() {
             color="#7fb5ff"
           />
         </View>
-        <View style={styles.flex1}>
+        <View className="flex1">
           <Button
             title="Flash (setNativeProps)"
             onPress={onFlash}
@@ -515,32 +514,31 @@ function RefApiDemo() {
 function PlatformColorDemo() {
   const scheme = useColorScheme();
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>
+    <View className="section">
+      <Text className="section-label">
         {`PlatformColor · semantic + DynamicColorIOS (${scheme ?? 'unknown'})`}
       </Text>
-      <View style={styles.row}>
+      <View className="row">
         <View
-          style={[
-            styles.colorTile,
-            { backgroundColor: PlatformColor('systemBlue') },
-          ]}
+          className="color-tile"
+          style={{ backgroundColor: PlatformColor('systemBlue') }}
         >
-          <Text style={styles.tileLabel}>systemBlue</Text>
+          <Text className="tile-label">systemBlue</Text>
         </View>
         <View
-          style={[
-            styles.colorTileBordered,
-            {
-              backgroundColor: DynamicColorIOS({
-                light: '#dbeafe',
-                dark: '#13243a',
-              }),
-              borderColor: PlatformColor('separator'),
-            },
-          ]}
+          className="color-tile-bordered"
+          style={{
+            backgroundColor: DynamicColorIOS({
+              light: '#dbeafe',
+              dark: '#13243a',
+            }),
+            borderColor: PlatformColor('separator'),
+          }}
         >
-          <Text style={[styles.boldLabel, { color: PlatformColor('label') }]}>
+          <Text
+            className="bold-label"
+            style={{ color: PlatformColor('label') }}
+          >
             dynamic
           </Text>
         </View>
@@ -594,17 +592,15 @@ function ResponderDemo() {
   const grabbed = useRef<number | null>(null);
 
   return (
-    <View style={styles.sectionTight}>
-      <Text style={styles.sectionLabel}>
+    <View className="section-tight">
+      <Text className="section-label">
         Responder · drag a chip vs hand-off to the strip
       </Text>
-      <Text style={styles.infoText}>{status}</Text>
+      <Text className="info-text">{status}</Text>
       {/* the separate transfer indicator, lit only when the strip steals the gesture */}
       <Text
-        style={[
-          styles.transferText,
-          { color: transfer ? '#f6ad55' : '#41506a' },
-        ]}
+        className="transfer-text"
+        style={{ color: transfer ? '#f6ad55' : '#41506a' }}
       >
         {transfer || 'transfer: —'}
       </Text>
@@ -632,9 +628,12 @@ function ResponderDemo() {
           setStatus('strip released');
         }}
         onResponderTerminate={() => setRowDx(0)}
-        style={styles.stripBox}
+        className="strip-box"
       >
-        <View style={[styles.rowTight, { transform: [{ translateX: rowDx }] }]}>
+        <View
+          className="row-tight"
+          style={{ transform: [{ translateX: rowDx }] }}
+        >
           {RESPONDER_CHIPS.map(index => (
             <View
               key={index}
@@ -665,17 +664,13 @@ function ResponderDemo() {
                 setActiveChip(null);
                 setStatus(`chip ${index} released`);
               }}
-              style={[
-                styles.chip,
-                {
-                  borderColor: activeChip === index ? '#7fb5ff' : 'transparent',
-                  transform: [
-                    { translateX: activeChip === index ? chipDx : 0 },
-                  ],
-                },
-              ]}
+              className="chip"
+              style={{
+                borderColor: activeChip === index ? '#7fb5ff' : 'transparent',
+                transform: [{ translateX: activeChip === index ? chipDx : 0 }],
+              }}
             >
-              <Text style={styles.chipText}>{index}</Text>
+              <Text className="chip-text">{index}</Text>
             </View>
           ))}
         </View>
@@ -703,20 +698,20 @@ function AccessibilityDemo() {
   }, []);
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>
+    <View className="section">
+      <Text className="section-label">
         Accessibility · props → native · aria/role transform · AccessibilityInfo
       </Text>
       {/* getter readout: 'off' (no screen reader) proves the module resolved */}
-      <Text style={styles.infoText}>{`screen reader: ${screenReader}`}</Text>
+      <Text className="info-text">{`screen reader: ${screenReader}`}</Text>
       {/* canonical accessibility*: content-desc 'a11y-canonical-label' + role=header */}
       <View
         accessible
         accessibilityRole="header"
         accessibilityLabel="a11y-canonical-label"
-        style={styles.a11yCard}
+        className="a11y-card"
       >
-        <Text style={styles.infoText}>canonical label + role=header</Text>
+        <Text className="info-text">canonical label + role=header</Text>
       </View>
       {/* web aria and role aliases MUST fold: content-desc should be
           'a11y-aria-label', a raw aria-label attribute must not reach the native node */}
@@ -724,18 +719,18 @@ function AccessibilityDemo() {
         accessible
         role="button"
         aria-label="a11y-aria-label"
-        style={styles.a11yCard}
+        className="a11y-card"
       >
-        <Text style={styles.infoText}>aria-label + role=button</Text>
+        <Text className="info-text">aria-label + role=button</Text>
       </View>
       {/* accessibilityState: uiautomator shows enabled=false / selected=true */}
       <View
         accessible
         accessibilityLabel="a11y-state"
         accessibilityState={{ disabled: true, selected: true }}
-        style={styles.a11yCard}
+        className="a11y-card"
       >
-        <Text style={styles.infoText}>state: disabled + selected</Text>
+        <Text className="info-text">state: disabled + selected</Text>
       </View>
     </View>
   );
@@ -778,8 +773,8 @@ function ParityDemo() {
   );
 
   return (
-    <View style={styles.section}>
-      <Text ref={titleRef} style={styles.sectionLabel}>
+    <View className="section">
+      <Text ref={titleRef} className="section-label">
         Parity checks · longPress · dismiss · animated scroll · sticky · a11y
         focus
       </Text>
@@ -788,20 +783,20 @@ function ParityDemo() {
       <Text
         onLongPress={() => setLongPressMsg('long press! (tap was suppressed)')}
         onPress={() => setLongPressMsg('tap')}
-        style={styles.longPressRow}
+        className="long-press-row"
       >
         {longPressMsg}
       </Text>
 
-      {/* #15 Keyboard.dismiss: blurs whatever input holds focus without needing a ref */}
+      {/* #15 Keyboard.dismiss: blurs whatever input holds focus without needing a ref. */}
       <TextInput
         placeholder="focus me…"
         placeholderTextColor="#41506a"
         onFocus={() => setDismissMsg('keyboard up — tap Hide keyboard')}
         onBlur={() => setDismissMsg('blurred (keyboard down)')}
-        style={styles.focusInput}
+        className="focus-input"
       />
-      <Text style={styles.noteText}>{dismissMsg}</Text>
+      <Text className="note-text">{dismissMsg}</Text>
       <Button
         title="Hide keyboard"
         onPress={() => Keyboard.dismiss()}
@@ -811,9 +806,7 @@ function ParityDemo() {
       {/* #12 animated VirtualizedList scroll: smooth (native command) vs instant.
           A fixed height with no wrapper: the vertical ScrollView clips to its own
           frame (overflow:'scroll' base, like RN), so rows stay inside the box on iOS too. */}
-      <Text style={styles.sectionLabel}>
-        FlatList · animated scrollToOffset
-      </Text>
+      <Text className="section-label">FlatList · animated scrollToOffset</Text>
       <FlatList
         ref={listRef}
         data={parityRows}
@@ -823,15 +816,18 @@ function ParityDemo() {
           offset: PARITY_ROW_H * index,
           index,
         })}
-        style={styles.parityList}
+        className="parity-list"
         renderItem={({ item }) => (
-          <View style={styles.parityRow}>
-            <Text style={styles.infoText}>{`row ${item.n}`}</Text>
+          // parityRow's height references the script const PARITY_ROW_H, which a
+          // CSS selector has no way to read — that one property stays dynamic
+          // alongside the static `className="parity-row"` for justifyContent/padding.
+          <View className="parity-row" style={{ height: PARITY_ROW_H }}>
+            <Text className="info-text">{`row ${item.n}`}</Text>
           </View>
         )}
       />
-      <View style={styles.row}>
-        <View style={styles.flex1}>
+      <View className="row">
+        <View className="flex1">
           <Button
             title="Scroll ▼ animated"
             onPress={() =>
@@ -843,7 +839,7 @@ function ParityDemo() {
             color="#7fb5ff"
           />
         </View>
-        <View style={styles.flex1}>
+        <View className="flex1">
           <Button
             title="Top · instant"
             onPress={() =>
@@ -857,7 +853,7 @@ function ParityDemo() {
       {/* #13 sticky section headers. Drag the inner list: each header pins at the top.
           Cross-talk check: as the NEXT header reaches the top it should PUSH the pinned
           one off (nextHeaderLayoutY not yet wired, watch push vs overlap). */}
-      <Text style={styles.sectionLabel}>
+      <Text className="section-label">
         SectionList · sticky (scroll: next header should push prev off)
       </Text>
       <SectionList
@@ -865,13 +861,13 @@ function ParityDemo() {
         sections={paritySections}
         keyExtractor={item => item.id}
         stickySectionHeadersEnabled
-        style={styles.sectionList}
+        className="section-list"
         renderSectionHeader={({ section }) => (
-          <Text style={styles.sectionHeader}>{section.title}</Text>
+          <Text className="section-header">{section.title}</Text>
         )}
         renderItem={({ item }) => (
-          <View style={styles.parityRow}>
-            <Text style={styles.infoText}>{item.label}</Text>
+          <View className="parity-row" style={{ height: PARITY_ROW_H }}>
+            <Text className="info-text">{item.label}</Text>
           </View>
         )}
       />
@@ -998,11 +994,11 @@ function App() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView className="screen">
       <ScrollView
         testID="canary-scroll"
-        style={styles.screen}
-        contentContainerStyle={styles.scrollContent}
+        className="screen"
+        contentContainerStyle="scroll-content"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -1018,21 +1014,20 @@ function App() {
           hidden={statusBarHidden}
           animated
         />
-        <Text style={styles.title}>symbiote · all primitives</Text>
+        <Text className="title">symbiote · all primitives</Text>
         {/* native->JS: keyboard height pushed from the device hub, read live */}
-        <Text style={styles.headerNote}>
+        <Text className="header-note">
           {keyboardHeight > 0
             ? `keyboard up · ${keyboardHeight}px`
             : 'keyboard down'}
         </Text>
         {/* Tier A runtime modules, read live from the real native side. A non-empty
           Version proves PlatformConstants resolved; a fractional hairline (e.g. 0.333
-          on @3x) proves DeviceInfo's scale resolved. The border below IS that hairline. */}
+          on @3x) proves DeviceInfo's scale resolved. The border below IS that hairline.
+          borderTopWidth stays dynamic (StyleSheet.hairlineWidth is a runtime constant). */}
         <Text
-          style={[
-            styles.hairlineNote,
-            { borderTopWidth: StyleSheet.hairlineWidth },
-          ]}
+          className="hairline-note"
+          style={{ borderTopWidth: StyleSheet.hairlineWidth }}
         >
           {`${Platform.OS} ${Platform.Version}` +
             `${Platform.isPad ? ' · iPad' : ''}` +
@@ -1042,20 +1037,20 @@ function App() {
         {/* Tier B runtime modules, live. Real w×h@scale proves Dimensions + PixelRatio;
           a colorScheme proves Appearance; appState flips when you background the app
           (AppState's device events). */}
-        <Text style={styles.headerNote}>
+        <Text className="header-note">
           {`${Math.round(window.width)}×${Math.round(window.height)} @${PixelRatio.get()}x` +
             ` · ${colorScheme ?? 'no-scheme'} · ${appState}`}
         </Text>
         {/* JS->native StatusBar controls: watch the top strip react */}
-        <View style={styles.row}>
-          <View style={styles.flex1}>
+        <View className="row">
+          <View className="flex1">
             <Button
               title={statusBarHidden ? 'Show status bar' : 'Hide status bar'}
               onPress={() => setStatusBarHidden(value => !value)}
               color="#7fb5ff"
             />
           </View>
-          <View style={styles.flex1}>
+          <View className="flex1">
             <Button
               title={darkStatusBar ? 'Light text' : 'Dark text'}
               onPress={() => setDarkStatusBar(value => !value)}
@@ -1067,8 +1062,8 @@ function App() {
           red / goes translucent and the app STAYS rendered. FAIL: the surface blanks
           (white screen); watch logcat for stopSurface / "reactInstance is null". */}
         {Platform.OS === 'android' && (
-          <View style={styles.row}>
-            <View style={styles.flex1}>
+          <View className="row">
+            <View className="flex1">
               <Button
                 title={statusBarRed ? 'BG default' : 'BG red'}
                 onPress={() => {
@@ -1082,7 +1077,7 @@ function App() {
                 color="#7fb5ff"
               />
             </View>
-            <View style={styles.flex1}>
+            <View className="flex1">
               <Button
                 title={statusBarTranslucent ? 'Opaque' : 'Translucent'}
                 onPress={() => {
@@ -1097,14 +1092,14 @@ function App() {
         )}
         {/* JS->native imperative modules: tap to fire the real native UI / haptics.
           Each working button proves its module name resolved on the bridgeless host. */}
-        <View style={styles.row}>
-          <View style={styles.flex1}>
+        <View className="row">
+          <View className="flex1">
             <Button title="Alert" onPress={onAlert} color="#7fb5ff" />
           </View>
           {/* ActionSheetIOS drives the iOS-only ActionSheetManager; no Android native
             module exists, so the control is iOS-only by design (not a gap). */}
           {Platform.OS !== 'android' && (
-            <View style={styles.flex1}>
+            <View className="flex1">
               <Button
                 title="Action sheet"
                 onPress={onActionSheet}
@@ -1113,11 +1108,11 @@ function App() {
             </View>
           )}
         </View>
-        <View style={styles.row}>
-          <View style={styles.flex1}>
+        <View className="row">
+          <View className="flex1">
             <Button title="Share" onPress={onShare} color="#7fb5ff" />
           </View>
-          <View style={styles.flex1}>
+          <View className="flex1">
             <Button
               title="Vibrate"
               onPress={() => Vibration.vibrate()}
@@ -1135,12 +1130,12 @@ function App() {
           view pulled-down; our full re-commit snaps the offset back, so we drive
           our OWN indicator from the same `refreshing` flag, guaranteed visible. */}
         {refreshing ? (
-          <View style={styles.refreshRow}>
+          <View className="refresh-row">
             <ActivityIndicator color="#7fb5ff" />
-            <Text style={styles.accentNote}>Refreshing…</Text>
+            <Text className="accent-note">Refreshing…</Text>
           </View>
         ) : (
-          <Text style={styles.mutedCenter}>
+          <Text className="muted-center">
             {`pull to refresh · refreshed ${refreshes}×`}
           </Text>
         )}
@@ -1149,29 +1144,29 @@ function App() {
         <View
           testID="counter-card"
           onPress={() => setCount(value => value + 1)}
-          style={styles.counterCard}
+          className="counter-card"
         >
-          <Text testID="counter-value" style={styles.counterText}>
+          <Text testID="counter-value" className="counter-text">
             {`tapped ${count}×`}
           </Text>
         </View>
 
-        {/* TextInput + greeting */}
+        {/* TextInput + greeting. text-input is shared with the KAV email field below. */}
         <TextInput
           testID="greeting-input"
           value={name}
-          onChangeText={setName}
+          onValueChange={setName}
           placeholder="type your name…"
           placeholderTextColor="#41506a"
-          style={styles.textInput}
+          className="text-input"
         />
-        <Text testID="greeting-output" style={styles.greeting}>
+        <Text testID="greeting-output" className="greeting">
           {name ? `Hello, ${name}` : 'Hello, stranger'}
         </Text>
 
         {/* Switch drives the ActivityIndicator */}
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>spinner</Text>
+        <View className="switch-row">
+          <Text className="switch-label">spinner</Text>
           <Switch
             testID="spinner-switch"
             value={spinning}
@@ -1190,8 +1185,8 @@ function App() {
           @symbiote/slider native-proxy wrapper. The engine derives the onValueChange event and
           the track/thumb tint processors from the library's own ViewConfig at runtime. Drag it:
           the value updates live; the colored track proves color derivation. */}
-        <View style={styles.sectionTight}>
-          <Text style={styles.switchLabel}>
+        <View className="section-tight">
+          <Text className="switch-label">
             {`volume · ${Math.round(volume * 100)}%`}
           </Text>
           <Slider
@@ -1204,7 +1199,7 @@ function App() {
             maximumTrackTintColor="#334155"
             thumbTintColor="#ffffff"
             // Pin a height so the native track always has room in the flex column.
-            style={styles.slider}
+            className="slider"
           />
         </View>
 
@@ -1240,31 +1235,28 @@ function App() {
           color="#7fb5ff"
         />
 
-        {/* Pressable card with pressed-state feedback */}
+        {/* Pressable's static look lives in .pressable-card; only the press-state-dependent
+          colors stay a style function. */}
         <Pressable
           onPress={() => setCount(value => value + 1)}
-          style={({ pressed }) => [
-            styles.pressableCard,
-            {
-              backgroundColor: pressed ? '#13243a' : '#0f1e30',
-              borderColor: pressed ? '#7fb5ff' : '#2b6cb0',
-            },
-          ]}
+          className="pressable-card"
+          style={({ pressed }) => ({
+            backgroundColor: pressed ? '#13243a' : '#0f1e30',
+            borderColor: pressed ? '#7fb5ff' : '#2b6cb0',
+          })}
         >
           {({ pressed }) => (
             <Text
-              style={[
-                styles.pressableLabel,
-                { color: pressed ? '#7fb5ff' : '#cbd5e1' },
-              ]}
+              className="pressable-label"
+              style={{ color: pressed ? '#7fb5ff' : '#cbd5e1' }}
             >
               {pressed ? 'holding…' : 'press me (also +1)'}
             </Text>
           )}
         </Pressable>
 
-        {/* Horizontal FlatList: real windowing */}
-        <Text style={styles.sectionLabel}>FlatList · 24 chips, windowed</Text>
+        {/* Horizontal FlatList: real windowing. */}
+        <Text className="section-label">FlatList · 24 chips, windowed</Text>
         <FlatList
           testID="chips-list"
           data={chips}
@@ -1275,10 +1267,20 @@ function App() {
             offset: (CHIP_WIDTH + CHIP_GAP) * index,
             index,
           })}
-          style={styles.chipList}
+          className="chip-list"
           renderItem={({ item }) => (
-            <View style={[styles.chipCard, { backgroundColor: item.color }]}>
-              <Text style={styles.chipNumber}>{item.index}</Text>
+            // width/marginRight stay dynamic — they reference the CHIP_WIDTH/CHIP_GAP
+            // script consts (also used by getItemLayout above), which a CSS selector
+            // has no way to read; backgroundColor is per-chip (item.color).
+            <View
+              className="chip-card"
+              style={{
+                width: CHIP_WIDTH,
+                marginRight: CHIP_GAP,
+                backgroundColor: item.color,
+              }}
+            >
+              <Text className="chip-number">{item.index}</Text>
             </View>
           )}
         />
@@ -1289,6 +1291,8 @@ function App() {
           STAYS highlighted (inside the measured rect + 80px bottom retention). Drag UP
           off the top: highlight drops. Proves measured-rect retention rather than a
           symmetric-radius approximation. The dx/dy readout tracks the move offset. */}
+        {/* Pressable's static look lives in .retention-card; only the press-state-dependent
+          background stays a style function. */}
         <Pressable
           hitSlop={{ top: 0, bottom: 40, left: 0, right: 0 }}
           pressRetentionOffset={{ top: 0, bottom: 80, left: 0, right: 0 }}
@@ -1298,28 +1302,29 @@ function App() {
               dy: Math.round(nativeNumber(event, 'locationY')),
             })
           }
-          style={({ pressed }) => [
-            styles.retentionCard,
-            { backgroundColor: pressed ? '#2b6cb0' : '#13243a' },
-          ]}
+          className="retention-card"
+          style={({ pressed }) => ({
+            backgroundColor: pressed ? '#2b6cb0' : '#13243a',
+          })}
         >
-          <Text style={styles.infoText}>
+          <Text className="info-text">
             {`drag me · dx ${retentionMove.dx} · dy ${retentionMove.dy}`}
           </Text>
         </Pressable>
 
         {/* maintainVisibleContentPosition. PASS: scroll down a bit, tap Prepend: the rows
           you are looking at DO NOT jump; new items appear above without shifting the
-          viewport. FAIL: the list jumps to the top. */}
-        <Text style={styles.sectionLabel}>MVCP · prepend without jump</Text>
+          viewport. FAIL: the list jumps to the top. box-list160 is shared with the
+          Animated.ScrollView below. */}
+        <Text className="section-label">MVCP · prepend without jump</Text>
         <FlatList
           data={mvcpItems}
           keyExtractor={item => item.id}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          style={styles.boxList160}
+          className="box-list160"
           renderItem={({ item }) => (
-            <View style={styles.mvcpRow}>
-              <Text style={styles.listRowText}>{item.label}</Text>
+            <View className="mvcp-row">
+              <Text className="list-row-text">{item.label}</Text>
             </View>
           )}
         />
@@ -1342,32 +1347,31 @@ function App() {
           and lifts, on the UI thread (no jank, no per-frame JS). Proves Animated.ScrollView
           + Animated.event native attach. */}
         <Animated.View
-          style={[
-            styles.parityHeader,
-            {
-              opacity: parityScrollY.interpolate({
-                inputRange: [0, 120],
-                outputRange: [1, 0.12],
-                extrapolate: 'clamp',
-              }),
-              transform: [
-                {
-                  translateY: parityScrollY.interpolate({
-                    inputRange: [0, 120],
-                    outputRange: [0, -16],
-                    extrapolate: 'clamp',
-                  }),
-                },
-              ],
-            },
-          ]}
+          className="parity-header"
+          style={{
+            opacity: parityScrollY.interpolate({
+              inputRange: [0, 120],
+              outputRange: [1, 0.12],
+              extrapolate: 'clamp',
+            }),
+            transform: [
+              {
+                translateY: parityScrollY.interpolate({
+                  inputRange: [0, 120],
+                  outputRange: [0, -16],
+                  extrapolate: 'clamp',
+                }),
+              },
+            ],
+          }}
         >
-          <Text style={styles.parityHeaderText}>
+          <Text className="parity-header-text">
             HEADER — fades as you scroll ↓
           </Text>
         </Animated.View>
+        {/* box-list160 is shared with the MVCP FlatList above. */}
         <Animated.ScrollView
-          style={styles.boxList160}
+          className="box-list160"
           scrollEventThrottle={16}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { y: parityScrollY } } }],
@@ -1375,14 +1379,12 @@ function App() {
           )}
         >
           {Array.from({ length: 6 }, (_value, index) => (
-            <View key={index} style={styles.scrollDemoRow}>
-              <Text
-                style={styles.listRowText}
-              >{`scroll me · row ${index}`}</Text>
+            <View key={index} className="scroll-demo-row">
+              <Text className="list-row-text">{`scroll me · row ${index}`}</Text>
             </View>
           ))}
         </Animated.ScrollView>
-        <Text style={styles.tinyCenter}>
+        <Text className="tiny-center">
           ↑ drag inside the box — the bar above reacts
         </Text>
         {/* Native-driver proof for Animated.event: tap to JAM the JS thread 3s, then drag
@@ -1400,31 +1402,56 @@ function App() {
             }
           }}
         />
-        <Text style={styles.tinyCenter}>
+        <Text className="tiny-center">
           tap Freeze, then immediately drag the box — bar should still move
         </Text>
 
         {/* Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect
-          is unmistakable on the dark theme. */}
+          is unmistakable on the dark theme. Kept as inline dynamic style here (not CSS)
+          only because these particular demos predate @symbiote/css-parser's `raw`
+          passthrough for transform/box-shadow/filter/transform-origin (2026-07) — the CSS
+          property itself now works identically (see .gradient-card below, which IS
+          authored via CSS) — this is just legacy demo wiring, not a remaining gap. */}
         {/* boxShadow: a BLUE glow (a black shadow is invisible on the near-black bg).
           PASS: a soft blue halo bleeds out around the panel. */}
-        <View style={styles.shadowCard}>
-          <Text style={styles.noteText}>boxShadow · blue glow</Text>
+        <View
+          className="shadow-card"
+          style={{ boxShadow: '0px 0px 22px 3px rgba(127,181,255,0.85)' }}
+        >
+          <Text className="note-text">boxShadow · blue glow</Text>
         </View>
         {/* filter: same base colour both sides; the right one is darkened by
           brightness(0.5). PASS: the right panel is clearly darker than the left. */}
-        <View style={styles.row}>
-          <View style={styles.filterTile}>
-            <Text style={styles.tileText}>no filter</Text>
+        <View className="row">
+          <View className="filter-tile">
+            <Text className="tile-text">no filter</Text>
           </View>
-          <View style={[styles.filterTile, styles.dim]}>
-            <Text style={styles.tileText}>brightness 0.5</Text>
+          <View
+            className="filter-tile"
+            style={{ filter: [{ brightness: 0.5 }] }}
+          >
+            <Text className="tile-text">brightness 0.5</Text>
           </View>
         </View>
         {/* transformOrigin: the panel rotates around its TOP-LEFT corner, not its centre.
           PASS: the left edge stays put while the bottom-right swings down. */}
-        <View style={styles.rotatedCard}>
-          <Text style={styles.tileText}>transformOrigin · top-left</Text>
+        <View
+          className="rotated-card"
+          style={{
+            transformOrigin: 'top left',
+            transform: [{ rotate: '4deg' }],
+          }}
+        >
+          <Text className="tile-text">transformOrigin · top-left</Text>
+        </View>
+
+        {/* background-image: a CSS `linear-gradient(...)` authored entirely in App.css
+          (.gradient-card), proving @symbiote/css-parser's `background-image` → RN's
+          `experimental_backgroundImage` raw passthrough works end to end (css-parser →
+          registerStyles → routeProp → core/engine/src/process-background-image → Fabric).
+          PASS: the panel shows a blue-to-orange gradient sweeping left to right. */}
+        <View className="gradient-card">
+          <Text className="tile-text">background-image · linear-gradient</Text>
         </View>
 
         {/* Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
@@ -1434,14 +1461,14 @@ function App() {
           alt="React logo"
           width={48}
           height={48}
-          style={styles.webImage}
+          className="web-image"
         />
 
         {/* KeyboardAvoidingView enabled toggle. PASS: with enabled ON, focusing the field
           lifts it above the keyboard AND the keyboard is the email layout (proves
           autoComplete/inputMode fold); with enabled OFF the keyboard covers the field. */}
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>avoid keyboard</Text>
+        <View className="switch-row">
+          <Text className="switch-label">avoid keyboard</Text>
           <Switch
             value={kavEnabled}
             onValueChange={setKavEnabled}
@@ -1458,17 +1485,17 @@ function App() {
             enterKeyHint="done"
             placeholder="email — focus me near the bottom…"
             placeholderTextColor="#41506a"
-            style={styles.textInput}
+            className="text-input"
           />
         </KeyboardAvoidingView>
 
         <Image
           source={{ uri: 'https://reactnative.dev/img/tiny_logo.png' }}
-          style={styles.logoImage}
+          className="logo-image"
         />
 
-        <View style={styles.bottomCard}>
-          <Text style={styles.bottomText}>↑ you scrolled to the bottom</Text>
+        <View className="bottom-card">
+          <Text className="bottom-text">↑ you scrolled to the bottom</Text>
         </View>
 
         {/* Modal overlays its own window */}
@@ -1479,10 +1506,10 @@ function App() {
           onRequestClose={() => setModalVisible(false)}
         >
           {/* transparent modal => paint our own dim layer (the RN pattern) */}
-          <View style={styles.modalOverlay}>
-            <View testID="modal-card" style={styles.modalCard}>
-              <Text style={styles.modalTitle}>It's a Modal</Text>
-              <Text style={styles.modalBody}>
+          <View className="modal-overlay">
+            <View testID="modal-card" className="modal-card">
+              <Text className="modal-title">It's a Modal</Text>
+              <Text className="modal-body">
                 Rendered through ModalHostView — its own native window, same
                 Fabric tree.
               </Text>
@@ -1499,313 +1526,5 @@ function App() {
     </SafeAreaView>
   );
 }
-
-// Static styles, extracted from the inline props above. Dynamic values (interpolations,
-// pressed/active ternaries, PlatformColor, item.color, StyleSheet.hairlineWidth) stay at
-// the use site, composed via `style={[styles.x, { …dynamic }]}`. Placed after the module
-// consts it references (XY_SPAN / HEADER_COLLAPSE / PARITY_ROW_H / CHIP_*) so they're
-// initialized before StyleSheet.create runs at module load.
-const styles = StyleSheet.create({
-  // shared / common
-  screen: { flex: 1, backgroundColor: '#0b1622' },
-  scrollContent: {
-    paddingVertical: 64,
-    paddingHorizontal: 24,
-    alignItems: 'stretch',
-    gap: 28,
-  },
-  section: { gap: 12 },
-  sectionTight: { gap: 8 },
-  row: { flexDirection: 'row', gap: 12 },
-  rowTight: { flexDirection: 'row', gap: 8 },
-  flex1: { flex: 1 },
-  sectionLabel: { color: '#41506a', fontSize: 13 },
-  infoText: { color: '#cbd5e1', fontSize: 14 },
-  noteText: { color: '#cbd5e1', fontSize: 13 },
-  switchLabel: { color: '#cbd5e1', fontSize: 16 },
-  listRowText: { color: '#cbd5e1', fontSize: 15 },
-
-  // AnimatedDemo
-  pulseFrame: { height: 64, alignItems: 'center', justifyContent: 'center' },
-  pulseDot: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#7fb5ff',
-  },
-  slideTrack: { height: 36, justifyContent: 'center' },
-  jsSlideDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: '#f6ad55',
-  },
-  nativeSlideDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: '#68d391',
-  },
-
-  // AnimatedParityDemo
-  dragHint: { color: '#718096', fontSize: 11 },
-  xyFrame: {
-    width: XY_SPAN + 36,
-    height: XY_SPAN + 36,
-    borderRadius: 12,
-    backgroundColor: '#eef2f9',
-    padding: 6,
-  },
-  xyBox: { width: 36, height: 36, borderRadius: 8, backgroundColor: '#9f7aea' },
-  trackRow: { height: 30, justifyContent: 'center' },
-  leadDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#4299e1',
-  },
-  followDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#f6ad55',
-  },
-  collapseFrame: {
-    height: HEADER_COLLAPSE + 24,
-    overflow: 'hidden',
-    justifyContent: 'flex-start',
-  },
-  collapseHeader: {
-    height: HEADER_COLLAPSE,
-    borderRadius: 8,
-    backgroundColor: '#38b2ac',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  collapseHeaderText: { color: 'white', fontSize: 12 },
-
-  // NativeModulesDemo
-  rowAlignCenter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logoThumb: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#0f1e30',
-  },
-  infoTextFlex: { color: '#cbd5e1', fontSize: 14, flex: 1 },
-
-  // RefApiDemo
-  refBox: {
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: '#7fb5ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  refBoxText: { color: '#0b1622', fontSize: 14, fontWeight: 'bold' },
-
-  // PlatformColorDemo
-  colorTile: {
-    flex: 1,
-    height: 56,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  colorTileBordered: {
-    flex: 1,
-    height: 56,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tileLabel: { color: '#ffffff', fontSize: 13, fontWeight: 'bold' },
-  boldLabel: { fontSize: 13, fontWeight: 'bold' },
-
-  // ResponderDemo
-  transferText: { fontSize: 13 },
-  stripBox: { padding: 12, borderRadius: 12, backgroundColor: '#13243a' },
-  chip: {
-    width: 56,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#2b6cb0',
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
-
-  // AccessibilityDemo
-  a11yCard: { padding: 12, borderRadius: 10, backgroundColor: '#13243a' },
-
-  // ParityDemo
-  longPressRow: {
-    color: '#cbd5e1',
-    fontSize: 15,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: '#13243a',
-  },
-  focusInput: {
-    color: '#e2e8f0',
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: '#0f1e30',
-    borderWidth: 1,
-    borderColor: '#2b6cb0',
-  },
-  parityList: { height: 120, borderRadius: 10, backgroundColor: '#0f1e30' },
-  parityRow: {
-    height: PARITY_ROW_H,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  sectionList: { height: 200, borderRadius: 10, backgroundColor: '#0f1e30' },
-  sectionHeader: {
-    color: '#0b1622',
-    fontSize: 13,
-    fontWeight: 'bold',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: '#7fb5ff',
-  },
-
-  // App
-  title: { color: '#7fb5ff', fontSize: 16, textAlign: 'center' },
-  headerNote: { color: '#7fb5ff', fontSize: 13, textAlign: 'center' },
-  hairlineNote: {
-    color: '#7fb5ff',
-    fontSize: 13,
-    textAlign: 'center',
-    paddingTop: 8,
-    borderTopColor: '#2b6cb0',
-  },
-  refreshRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  accentNote: { color: '#7fb5ff', fontSize: 13 },
-  mutedCenter: { color: '#41506a', fontSize: 13, textAlign: 'center' },
-  counterCard: {
-    paddingVertical: 18,
-    borderRadius: 16,
-    backgroundColor: '#2b6cb0',
-    alignItems: 'center',
-  },
-  counterText: { color: '#ffffff', fontSize: 24, fontWeight: 'bold' },
-  textInput: {
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#2b6cb0',
-    paddingHorizontal: 14,
-    color: '#ffffff',
-    fontSize: 18,
-    backgroundColor: '#0f1e30',
-  },
-  greeting: { color: '#ffffff', fontSize: 20, textAlign: 'center' },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-  },
-  slider: { height: 40, alignSelf: 'stretch' },
-  pressableCard: {
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  pressableLabel: { fontSize: 15 },
-  chipList: { height: 84 },
-  chipCard: {
-    width: CHIP_WIDTH,
-    height: 72,
-    marginRight: CHIP_GAP,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipNumber: { color: '#0b1622', fontSize: 18, fontWeight: 'bold' },
-  retentionCard: {
-    height: 64,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  boxList160: { height: 160, borderRadius: 12, backgroundColor: '#0f1e30' },
-  mvcpRow: { paddingVertical: 10, paddingHorizontal: 14 },
-  parityHeader: {
-    backgroundColor: '#2b6cb0',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  parityHeaderText: { color: '#ffffff', fontSize: 15, fontWeight: 'bold' },
-  scrollDemoRow: {
-    height: 80,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  tinyCenter: { color: '#41506a', fontSize: 12, textAlign: 'center' },
-  shadowCard: {
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: '#13243a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 0px 22px 3px rgba(127,181,255,0.85)',
-  },
-  filterTile: {
-    flex: 1,
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: '#2b6cb0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dim: { filter: [{ brightness: 0.5 }] },
-  tileText: { color: '#ffffff', fontSize: 13 },
-  rotatedCard: {
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: '#2b6cb0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transformOrigin: 'top left',
-    transform: [{ rotate: '4deg' }],
-  },
-  webImage: { borderRadius: 8, alignSelf: 'center' },
-  logoImage: { width: 64, height: 64, borderRadius: 12, alignSelf: 'center' },
-  bottomCard: {
-    height: 200,
-    borderRadius: 16,
-    backgroundColor: '#13243a',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bottomText: { color: '#7fb5ff', fontSize: 16 },
-  modalOverlay: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  modalCard: {
-    width: 280,
-    padding: 24,
-    borderRadius: 20,
-    backgroundColor: '#0f1e30',
-    alignItems: 'center',
-    gap: 16,
-  },
-  modalTitle: { color: '#ffffff', fontSize: 20, fontWeight: 'bold' },
-  modalBody: { color: '#cbd5e1', fontSize: 14, textAlign: 'center' },
-});
 
 export default App;
