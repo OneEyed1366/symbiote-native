@@ -1,15 +1,15 @@
 ---
-title: What is SymbioteJS?
+title: What is SymbioteNative?
 description: A framework-agnostic renderer that lets non-React frameworks drive real React Native Fabric views.
 ---
 
-SymbioteJS is a framework-agnostic renderer for real native iOS and Android apps.
+SymbioteNative is a framework-agnostic renderer for real native iOS and Android apps.
 It keeps React Native's native stack — Fabric, JSI, Yoga, Hermes, and the host
 platforms — and replaces only the JavaScript renderer that talks to Fabric.
 
 React is not privileged inside React Native's renderer. Fabric exposes a
 JSI-bound mutation surface through `global.nativeFabricUIManager`. React Native's
-React renderer is one client of that surface. SymbioteJS lets other framework
+React renderer is one client of that surface. SymbioteNative lets other framework
 adapters become clients too.
 
 ## The shortest version
@@ -26,7 +26,7 @@ nativeFabricUIManager
 stock React Native Fabric
 ```
 
-The output is still native Fabric views. SymbioteJS is not a WebView, not a React
+The output is still native Fabric views. SymbioteNative is not a WebView, not a React
 Native fork, and not a compatibility shim that pretends React components are
 framework-agnostic.
 
@@ -36,7 +36,7 @@ React Native has an excellent native runtime, but most of the ecosystem can only
 use it through React. If you write Vue, Svelte, Solid, or Angular, your choices
 usually collapse to a WebView, a rewrite, or a separate native abstraction.
 
-SymbioteJS opens the renderer seam that already exists in Fabric and gives each UI
+SymbioteNative opens the renderer seam that already exists in Fabric and gives each UI
 framework a thin adapter over one shared native engine.
 
 ## What works today

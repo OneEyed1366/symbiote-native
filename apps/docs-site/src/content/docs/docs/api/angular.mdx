@@ -9,7 +9,7 @@ Import app-facing APIs from `@symbiote-native/angular`:
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from '@symbiote-native/angular';
 ```
 
-Every SymbioteJS component is a `standalone: true` Angular component — add it to
+Every SymbioteNative component is a `standalone: true` Angular component — add it to
 the consuming component's `imports` array, there is no `NgModule` to register.
 
 ## Component shape
@@ -19,7 +19,7 @@ the consuming component's `imports` array, there is no `NgModule` to register.
 | Event callbacks | Real `@Output()` `EventEmitter`s everywhere (`(press)`, `(longPress)`, `(hoverIn)`, `(valueChange)`, `(accessibilityAction)`, …), except the scroll family (`onScroll`, `onScrollBeginDrag`, `onScrollEndDrag`, `onMomentumScrollBegin`, `onMomentumScrollEnd`), which stays a plain callback **input** (`[onScroll]`) permanently — it must accept an `Animated.event(...)` marker, not just a template listener. `TextInput` alone keeps a second output, `(change)`, for the raw native event alongside text-only `(valueChange)` |
 | Children        | `<ng-content></ng-content>` (projected content)                       |
 | Selectors       | Dual: PascalCase alias + `symbiote-*`, e.g. `Pressable, symbiote-pressable` |
-| Refs            | `@ViewChild('host', { read: ElementRef })`, `.nativeElement` is the SymbioteJS host node |
+| Refs            | `@ViewChild('host', { read: ElementRef })`, `.nativeElement` is the SymbioteNative host node |
 | Styles          | `[style]="styles.root"` with React Native-style objects                |
 
 ## Common events
@@ -229,7 +229,7 @@ bootstrap this DOM-less renderer does not use.
 
 A native event or `markForCheck()` still walks dirty flags up to every ancestor
 to the root, same as any zoneless Angular app — an unrelated press re-running
-the whole tree isn't a SymbioteJS quirk, it's why demo screens are split into
+the whole tree isn't a SymbioteNative quirk, it's why demo screens are split into
 real child components instead of `@if`/`@for` blocks, which always re-execute
 with their containing view.
 

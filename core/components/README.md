@@ -1,13 +1,13 @@
 # @symbiote-native/components
 
-The **framework-agnostic component layer** of [SymbioteJS](../../README.md) — pure state machines
+The **framework-agnostic component layer** of [SymbioteNative](../../README.md) — pure state machines
 and pure render functions for every visual component (`Switch`, `Modal`, `ScrollView`, the
 `FlatList`/`SectionList` family, …), written **once** and inherited by every framework adapter
 (`@symbiote-native/react`, `@symbiote-native/vue`, `@symbiote-native/angular`, and the ones after them). It
 exists so that "add component X to a new adapter" means writing a thin lifecycle + descriptor
 bridge, not re-implementing X's logic per framework.
 
-> New to SymbioteJS? The [root README](../../README.md) has the architecture. This package is
+> New to SymbioteNative? The [root README](../../README.md) has the architecture. This package is
 > "Workstream B" — the piece that makes cross-adapter feature parity **structural** instead of a
 > promise kept by hand.
 

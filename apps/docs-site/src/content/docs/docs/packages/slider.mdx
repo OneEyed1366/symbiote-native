@@ -7,7 +7,7 @@ import { Aside } from '@astrojs/starlight/components';
 
 `@symbiote-native/slider` wraps the `RNCSlider` native view from
 [`@react-native-community/slider`](https://github.com/callstack/react-native-slider) so every
-SymbioteJS adapter can render it — without importing that library's React component body. It is
+SymbioteNative adapter can render it — without importing that library's React component body. It is
 the reference implementation of the [third-party native-view wrapper](#how-the-wrapper-works)
 pattern: the recipe to follow for any future community RN view.
 
@@ -183,7 +183,7 @@ packages/slider/src/
 ```
 
 Both adapters import `../register` first (never the library's `Slider.tsx`), then call into the
-same `core` render — the same logic/view/lifecycle split as every other SymbioteJS component (see
+same `core` render — the same logic/view/lifecycle split as every other SymbioteNative component (see
 [how it works](/symbiote-native/docs/how-it-works/)). Wrapping a different third-party native view follows this
 exact recipe; see
 [decision 0027](https://github.com/OneEyed1366/symbiote-native/blob/main/.docs/decisions/0027-third-party-native-view-wrapper-package.md)

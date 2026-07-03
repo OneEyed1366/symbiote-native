@@ -1,6 +1,6 @@
 # @symbiote-native/engine
 
-The **retained shadow-tree engine** at the bottom of [SymbioteJS](../../README.md) — the one
+The **retained shadow-tree engine** at the bottom of [SymbioteNative](../../README.md) — the one
 package every framework adapter (`@symbiote-native/react`, `@symbiote-native/vue`, `@symbiote-native/angular`, …)
 drives, and the only place the mutation→clone-on-write translation into React Native's Fabric
 exists. It holds a retained, mutable tree of nodes that an adapter mutates cheaply
@@ -8,7 +8,7 @@ exists. It holds a retained, mutable tree of nodes that an adapter mutates cheap
 current one, clones only what changed, and calls `completeRoot` — the persistent, clone-on-write
 dance Fabric requires, done **once**, for every framework.
 
-> New to SymbioteJS? The [root README](../../README.md) has the architecture and the one fact it
+> New to SymbioteNative? The [root README](../../README.md) has the architecture and the one fact it
 > rests on — React is just *one client* of `nativeFabricUIManager`. This package is what sits
 > between every adapter and that native slot.
 

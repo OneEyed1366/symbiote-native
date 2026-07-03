@@ -8,7 +8,7 @@ export default defineConfig({
   base,
   integrations: [
     starlight({
-      title: 'SymbioteJS',
+      title: 'SymbioteNative',
       description: 'Framework-agnostic React Native renderer for real native iOS and Android apps.',
       favicon: '/symbiote.svg',
       logo: {
@@ -103,7 +103,7 @@ export default defineConfig({
         {
           label: 'Start here',
           items: [
-            { label: 'What is SymbioteJS?', slug: 'docs' },
+            { label: 'What is SymbioteNative?', slug: 'docs' },
             { label: 'Quick start', slug: 'docs/quick-start' },
             { label: 'How it works', slug: 'docs/how-it-works' },
           ],

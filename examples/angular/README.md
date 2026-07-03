@@ -1,4 +1,4 @@
-# SymbioteJS Angular canary
+# SymbioteNative Angular canary
 
 Minimal React Native host app that mounts an Angular standalone component through
 `@symbiote-native/angular`.

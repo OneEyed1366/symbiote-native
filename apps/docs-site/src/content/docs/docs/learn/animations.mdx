@@ -5,7 +5,7 @@ description: React Native's Animated API, ported framework-agnostic and shared b
 
 import { Aside } from '@astrojs/starlight/components';
 
-SymbioteJS ships a from-scratch, framework-agnostic port of React Native's
+SymbioteNative ships a from-scratch, framework-agnostic port of React Native's
 `Animated` API. The value graph, easing curves, interpolation, and composition
 helpers (`timing`, `spring`, `decay`, `parallel`, `sequence`, `stagger`,
 `loop`, `delay`) live once in `@symbiote-native/engine` — every adapter re-exports the
@@ -144,10 +144,10 @@ value (tracking), and a `diffClamp`-driven collapsing header.
 
 ## What is not built
 
-SymbioteJS's `Animated` is the RN `Animated` API, not Reanimated — there is no
+SymbioteNative's `Animated` is the RN `Animated` API, not Reanimated — there is no
 worklet system, no `useSharedValue`/`useAnimatedStyle`, and no gesture-handler
 integration beyond what `PanResponder` already provides. `react-native-reanimated`
-itself is not tested against SymbioteJS's engine; it hooks much deeper into RN's
+itself is not tested against SymbioteNative's engine; it hooks much deeper into RN's
 runtime than a plain native-view library does, so treat it as unverified
 rather than assuming it works the same way a
 [wrapped third-party native view](/symbiote-native/docs/howtos/third-party-views/) would.

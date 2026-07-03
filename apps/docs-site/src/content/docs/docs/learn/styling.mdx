@@ -1,9 +1,9 @@
 ---
 title: Styling
-description: Style SymbioteJS native views with CSS classes, CSS Modules, or StyleSheet.create.
+description: Style SymbioteNative native views with CSS classes, CSS Modules, or StyleSheet.create.
 ---
 
-SymbioteJS's preferred way to style a native view is ordinary CSS — a class
+SymbioteNative's preferred way to style a native view is ordinary CSS — a class
 string resolved through a shared runtime registry, compiled to native style
 objects at build time. Every current example app (React, Vue SFC, Vue TSX,
 Angular) styles this way. `StyleSheet.create` — React Native's own JS-object
@@ -348,7 +348,7 @@ needs any of the three.
 There is no DOM, so there is nothing for a browser selector to match —
 pseudo-classes (`:hover`, `:focus`, `:nth-child`), media queries, and
 `animation` have no RN target and are dropped at build time, not silently
-misapplied. Tailwind CSS and a Svelte adapter are not supported — SymbioteJS
+misapplied. Tailwind CSS and a Svelte adapter are not supported — SymbioteNative
 ships React, Vue, and Angular adapters today. Everything else — plain CSS
 (including `box-shadow`, `transform`, `filter`, `transform-origin`, and
 `background-image`), CSS Modules, and the SCSS/Less/Stylus preprocessors

@@ -86,7 +86,7 @@ config runs in persistent mode and never implements the mutation-mode
 container operations a portal needs. `@symbiote-native/react` is mutation-mode, so
 this works structurally where it never could in real RN.
 
-The target (`containerNodeOrRef`) must be an already-mounted SymbioteJS host
+The target (`containerNodeOrRef`) must be an already-mounted SymbioteNative host
 node or `SymbioteSurface` — typically a ref to a persistent "overlay host"
 `View` near the app root — not a CSS-selector-style string. **v1 scope:** the
 target must live in the *same* surface as the portal's call site; portaling

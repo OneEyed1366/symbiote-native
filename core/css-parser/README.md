@@ -1,13 +1,13 @@
 # @symbiote-native/css-parser
 
-The **build-time CSS compiler** of [SymbioteJS](../../README.md) — turns a Vue SFC `<style>` block,
+The **build-time CSS compiler** of [SymbioteNative](../../README.md) — turns a Vue SFC `<style>` block,
 or a standalone `.css`/`.module.css` file, into a React Native style object at build time, resolved
 back at render time through a class-name registry shared by every adapter (React's `className`,
 Vue's `class`/`:class`, Angular's `addClass`/`removeClass`). It also compiles SCSS/Sass, Less, and
 Stylus sources down to plain CSS before the same pipeline runs, so scoped styles, `:global()`, and
 CSS Modules all work identically regardless of source language.
 
-> New to SymbioteJS? The [root README](../../README.md) has the architecture. Styling with CSS
+> New to SymbioteNative? The [root README](../../README.md) has the architecture. Styling with CSS
 > classes (instead of `StyleSheet.create`) is the supported convention across every example app —
 > this package is what makes it work at build time; [`@symbiote-native/engine`](../engine)'s
 > `style-registry` is what resolves it at runtime.
@@ -107,7 +107,7 @@ import {
   not yet generate a typed `.d.ts` for an **inline** Vue `<style module>` block (only standalone
   `.module.css` files get the strict, no-index-signature type — Vue's own Volar plugin gives inline
   blocks a looser, typo-tolerant type for free) and has no Svelte support yet (no Svelte adapter
-  exists in SymbioteJS today).
+  exists in SymbioteNative today).
 
 ## Related packages
 

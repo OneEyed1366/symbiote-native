@@ -1,6 +1,6 @@
 # @symbiote-native/android
 
-Android host-shim native modules for [SymbioteJS](../../README.md), written in Kotlin. SymbioteJS
+Android host-shim native modules for [SymbioteNative](../../README.md), written in Kotlin. SymbioteNative
 drives Fabric directly and bypasses RN's own renderer, which means two signals that RN's stock
 Android host normally supplies for free — because they hang off `ReactRootView`, a class this
 project's surface never instantiates — go missing. iOS needs no equivalent package: its two

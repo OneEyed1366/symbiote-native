@@ -1,26 +1,26 @@
 ---
 title: FAQ
-description: Common SymbioteJS questions for app and wrapper authors.
+description: Common SymbioteNative questions for app and wrapper authors.
 ---
 
-## Is SymbioteJS a WebView?
+## Is SymbioteNative a WebView?
 
-No. SymbioteJS drives React Native Fabric and paints real native iOS and Android
+No. SymbioteNative drives React Native Fabric and paints real native iOS and Android
 views.
 
-## Does SymbioteJS fork React Native?
+## Does SymbioteNative fork React Native?
 
 No. The native stack stays stock React Native: Fabric, JSI, Yoga, Hermes, and the
-platform hosts remain ordinary dependencies. SymbioteJS replaces the JavaScript
+platform hosts remain ordinary dependencies. SymbioteNative replaces the JavaScript
 renderer path that talks to Fabric.
 
-## Does SymbioteJS support React Native's New Architecture?
+## Does SymbioteNative support React Native's New Architecture?
 
-It requires it — there is no other option. SymbioteJS's renderer talks directly
+It requires it — there is no other option. SymbioteNative's renderer talks directly
 to `global.nativeFabricUIManager`, the JSI-bound mutation API the New
 Architecture's Fabric renderer exposes (`createNode`, `cloneNodeWithNewProps`,
 `completeRoot`, …). That API doesn't exist under the legacy bridge, so there
-is no old-architecture fallback to support — SymbioteJS is built on Fabric from
+is no old-architecture fallback to support — SymbioteNative is built on Fabric from
 the ground up, not migrated onto it. Any React Native version and toolchain
 that runs Fabric (0.76+ with the New Architecture on by default, or an earlier
 version with it explicitly enabled) works; anything still on the legacy
@@ -29,7 +29,7 @@ renderer does not.
 ## Why does the app still depend on react-native?
 
 `react-native` is the native runtime singleton and Metro/native version anchor.
-Apps should pin it explicitly at the top level. SymbioteJS hides most imports from
+Apps should pin it explicitly at the top level. SymbioteNative hides most imports from
 app code, not the runtime dependency from the app manifest.
 
 ## Can Vue render any React Native package?

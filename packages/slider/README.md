@@ -1,11 +1,11 @@
 # @symbiote-native/slider
 
-A wrapper package for [SymbioteJS](../../README.md) that makes the third-party native
+A wrapper package for [SymbioteNative](../../README.md) that makes the third-party native
 `@react-native-community/slider` view usable from **every** adapter — React, Vue, and Angular —
 not just React. The library's default export is a React component (it calls hooks off the React
 dispatcher), so a non-React adapter renders it with a null dispatcher and it throws. This package
 reaches the native `RNCSlider` view directly through the engine's `createNode`-by-ViewConfig path
-instead of importing the library's React component — the same mechanism SymbioteJS uses for its
+instead of importing the library's React component — the same mechanism SymbioteNative uses for its
 own primitives. See the `symbiote-third-party-native-view` skill and ADR 0027 for the full
 mechanism and rationale.
 

@@ -20,7 +20,7 @@ You want to use a third-party RN library's native view (e.g.
 
 The engine already derives a view's events and prop processors from RN's
 `ReactNativeViewConfigRegistry` at runtime. A non-React adapter can drive any
-native view through the same `createNode`-by-ViewConfig path SymbioteJS uses
+native view through the same `createNode`-by-ViewConfig path SymbioteNative uses
 for its own primitives — you register the ViewConfig from the library's
 **codegen spec module**, not its default export:
 
@@ -31,7 +31,7 @@ import '@react-native-community/slider/dist/RNCSliderNativeComponent';
 
 Then each adapter gets its own thin entry that maps the friendly prop/event
 surface onto the native node — the same "one core, N adapters" shape used
-everywhere else in SymbioteJS.
+everywhere else in SymbioteNative.
 
 ## Reference implementation: `@symbiote-native/slider`
 

@@ -35,7 +35,7 @@ render.
 
 <Aside type="caution" title="Same-surface only, permanently">
   Stock React Native has no portal at all (Fabric's persistent host config
-  never implements the mutation-mode container ops it needs). SymbioteJS's React
+  never implements the mutation-mode container ops it needs). SymbioteNative's React
   adapter runs in mutation mode, so `createPortal` structurally works — but
   only within the surface that owns the commit. A target in a second,
   independently-mounted surface silently never repaints; this is not a gap to
