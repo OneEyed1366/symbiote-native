@@ -1,5 +1,5 @@
 {
-  "name": "@symbiotejs/docs-site",
+  "name": "@symbiote-native/docs-site",
   "version": "0.0.0",
   "private": true,
   "type": "module",

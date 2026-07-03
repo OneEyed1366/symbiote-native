@@ -5,9 +5,9 @@
 // and that a plain style object still works unchanged.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiotejs/engine';
-import { View, mount, unmount } from '@symbiotejs/react';
-import { installFabric } from '@symbiotejs/test-utils';
+import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { View, mount, unmount } from '@symbiote-native/react';
+import { installFabric } from '@symbiote-native/test-utils';
 import { ScrollView } from './index';
 
 const ROOT_TAG = 54;

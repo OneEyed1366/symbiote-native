@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const PACKAGE_NAME = '@symbiotejs/slider';
+const PACKAGE_NAME = '@symbiote-native/slider';
 const NATIVE_SLIDER_PACKAGE = '@react-native-community/slider';
 
 function findCliDependencyRoot() {

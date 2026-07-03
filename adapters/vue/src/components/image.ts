@@ -1,6 +1,6 @@
 // Image: the Vue lifecycle half. The full fold (source / src / srcSet resolution, the
 // width/height → style fold, resizeMode/tintColor, alt → accessibility, and the native source
-// array) lives framework-agnostic in @symbiotejs/components and is shared verbatim with React;
+// array) lives framework-agnostic in @symbiote-native/components and is shared verbatim with React;
 // here Vue only narrows the untyped attrs into renderImage's typed view, folds aria/role, bridges
 // the Descriptor to a vnode, and carries the Image statics (getSize / prefetch / queryCache / …).
 //
@@ -24,19 +24,19 @@ import {
   type IImageSourceProp,
   type IImageStatics,
   type IResizeMode,
-} from '@symbiotejs/components';
-import type { IClassNameValue, IStyleProp, IViewStyle } from '@symbiotejs/engine';
+} from '@symbiote-native/components';
+import type { IClassNameValue, IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import { descriptorToVue } from '../descriptor-to-vue';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
-export { setImageSourceResolver } from '@symbiotejs/components';
+export { setImageSourceResolver } from '@symbiote-native/components';
 export type {
   IImageSource,
   IImageSourceProp,
   IResizeMode,
   IImageSize,
   IImageCacheStatus,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 
 // Vue's own idiom for a registered class name (mirrors IViewProps.class) — a per-adapter field
 // per <prop_types_split_agnostic_vs_per_adapter>, not part of the shared agnostic base. Not in

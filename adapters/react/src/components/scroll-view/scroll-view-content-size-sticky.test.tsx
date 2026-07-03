@@ -10,10 +10,10 @@
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, Text, mount, unmount } from '@symbiotejs/react';
+import { View, Text, mount, unmount } from '@symbiote-native/react';
 import { ScrollView } from './index';
 import { ScrollViewStickyHeader, type IStickyHeaderComponentProps } from './sticky-header';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 53;
 

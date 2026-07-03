@@ -1,4 +1,4 @@
-# @symbiotejs/css-parser
+# @symbiote-native/css-parser
 
 The **build-time CSS compiler** of [SymbioteJS](../../README.md) — turns a Vue SFC `<style>` block,
 or a standalone `.css`/`.module.css` file, into a React Native style object at build time, resolved
@@ -9,7 +9,7 @@ CSS Modules all work identically regardless of source language.
 
 > New to SymbioteJS? The [root README](../../README.md) has the architecture. Styling with CSS
 > classes (instead of `StyleSheet.create`) is the supported convention across every example app —
-> this package is what makes it work at build time; [`@symbiotejs/engine`](../engine)'s
+> this package is what makes it work at build time; [`@symbiote-native/engine`](../engine)'s
 > `style-registry` is what resolves it at runtime.
 
 ---
@@ -18,13 +18,13 @@ CSS Modules all work identically regardless of source language.
 
 **An app never imports this package directly.** It runs only inside a Metro transformer, on the
 Node build machine — never shipped in the app's native JS bundle. Each adapter package
-(`@symbiotejs/react`, `@symbiotejs/vue`, `@symbiotejs/angular`) depends on `@symbiotejs/css-parser`
+(`@symbiote-native/react`, `@symbiote-native/vue`, `@symbiote-native/angular`) depends on `@symbiote-native/css-parser`
 as a regular dependency and re-exports it via its own `./metro-css-parser` subpath, so a consuming
 app's `metro.config.js` wires:
 
 ```js
 // metro-css-transformer.js, in the app
-const { createCssMetroTransformer } = require('@symbiotejs/react/metro-css-parser');
+const { createCssMetroTransformer } = require('@symbiote-native/react/metro-css-parser');
 module.exports = createCssMetroTransformer(require('@react-native/metro-babel-transformer'));
 ```
 
@@ -56,7 +56,7 @@ import './theme.css';                     // plain CSS — registers classes glo
 <style> CSS text / .css / .scss / .less / .styl        class="foo" / className / addClass
       │  (build time, Metro)                                       │  (runtime, all adapters)
       ▼                                                             ▼
-@symbiotejs/css-parser                              @symbiotejs/engine's style-registry
+@symbiote-native/css-parser                              @symbiote-native/engine's style-registry
   preprocessors.ts → parser.ts (parseCSS)            registerStyles() / resolveClassName()
 ```
 
@@ -74,7 +74,7 @@ import {
   compileScss, compileSass, compileLess, compileStylus, compile, detectLanguage, isStyleFile,
   classNamesToDtsSource, generateModuleDts,        // .d.ts generation for CSS Modules typing
   globalClassNamesIn, hashFilePath,
-} from '@symbiotejs/css-parser';
+} from '@symbiote-native/css-parser';
 ```
 
 - **`parseCSS(css, { filename? })`** — the compiler core: postcss AST walk, `var()`/`calc()`
@@ -98,7 +98,7 @@ import {
 ## What it does NOT do
 
 - It does not run at app runtime — it is a Node-only, Metro-build-time tool; the runtime half
-  (resolving a class name back into a style object) lives in `@symbiotejs/engine`'s
+  (resolving a class name back into a style object) lives in `@symbiote-native/engine`'s
   `style-registry`, not here.
 - It does not implement Tailwind CSS — that needs whole-project class scanning and JIT utility
   generation, a fundamentally different shape than "one source file reduces to CSS text", and is
@@ -111,11 +111,11 @@ import {
 
 ## Related packages
 
-- [`@symbiotejs/engine`](../engine) — owns the runtime `style-registry` (`registerStyles` /
+- [`@symbiote-native/engine`](../engine) — owns the runtime `style-registry` (`registerStyles` /
   `resolveClassName`) this package's compiled output resolves against, and the class+style merge
   used by every adapter.
-- [`@symbiotejs/react`](../../adapters/react) / [`@symbiotejs/vue`](../../adapters/vue) /
-  [`@symbiotejs/angular`](../../adapters/angular) — each depends on this package directly and
+- [`@symbiote-native/react`](../../adapters/react) / [`@symbiote-native/vue`](../../adapters/vue) /
+  [`@symbiote-native/angular`](../../adapters/angular) — each depends on this package directly and
   re-exports it via its own `./metro-css-parser` subpath, so a consuming app needs no extra install
   step.
 

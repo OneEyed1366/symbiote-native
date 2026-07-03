@@ -31,8 +31,8 @@ import {
   SectionList,
   VirtualizedList,
   Animated,
-} from '@symbiotejs/vue';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+} from '@symbiote-native/vue';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 // KeyboardAvoidingView subscribes to the native Keyboard hub in onMounted; without a device-event
 // hub that throws before the commit, so install the minimal fake hub + KeyboardObserver the

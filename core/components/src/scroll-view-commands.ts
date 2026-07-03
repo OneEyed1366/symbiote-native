@@ -14,7 +14,7 @@ import {
   type ISymbioteEvent,
   type ISymbioteNode,
   type IViewStyle,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 
 type IScrollHandler = (event: ISymbioteEvent) => void;
 

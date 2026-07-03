@@ -10,7 +10,7 @@ import {
   dlog,
   type IRootTag,
   type SymbioteSurface,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import reconciler, { withDiscretePriority } from './host-config';
 import { LegacyRoot } from './reconciler-constants';
 

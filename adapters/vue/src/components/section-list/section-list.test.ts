@@ -8,8 +8,8 @@
 
 import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SectionList, mount, unmount, type ISectionListHandle } from '@symbiotejs/vue';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+import { SectionList, mount, unmount, type ISectionListHandle } from '@symbiote-native/vue';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 // SectionList is a generic component (generic construct signature), which h()'s overloads can't
 // resolve. Drive it through a loose functional-component handle (generic-component h() limitation).

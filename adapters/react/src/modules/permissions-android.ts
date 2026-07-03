@@ -1,4 +1,4 @@
-// PermissionsAndroid moved to @symbiotejs/engine (a framework-agnostic device-state module
-// re-exported by every adapter). This thin re-export keeps @symbiotejs/react's surface identical.
-export { PermissionsAndroid, PERMISSIONS, RESULTS } from '@symbiotejs/engine';
-export type { IPermission, IPermissionStatus, IRationale } from '@symbiotejs/engine';
+// PermissionsAndroid moved to @symbiote-native/engine (a framework-agnostic device-state module
+// re-exported by every adapter). This thin re-export keeps @symbiote-native/react's surface identical.
+export { PermissionsAndroid, PERMISSIONS, RESULTS } from '@symbiote-native/engine';
+export type { IPermission, IPermissionStatus, IRationale } from '@symbiote-native/engine';

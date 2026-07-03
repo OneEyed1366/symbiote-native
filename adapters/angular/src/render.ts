@@ -14,8 +14,8 @@ import {
   type ISymbioteNode,
   type IRootTag,
   type SymbioteSurface,
-} from '@symbiotejs/engine';
-import { descriptorFor } from '@symbiotejs/components';
+} from '@symbiote-native/engine';
+import { descriptorFor } from '@symbiote-native/components';
 import {
   ApplicationRef,
   createComponent,

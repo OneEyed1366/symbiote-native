@@ -9,12 +9,12 @@
 // (a genuine narrowing, not a cast) before resolveAccessibilityProps folds aria-* into accessibility*.
 
 import { defineComponent, h, type SetupContext } from '@vue/runtime-core';
-import { dlog, type IClassNameValue } from '@symbiotejs/engine';
+import { dlog, type IClassNameValue } from '@symbiote-native/engine';
 import {
   resolveAccessibilityProps,
   type IAccessibilityProps,
   type IAriaProps,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
 // The Vue-facing prop surface. React's SafeAreaViewProps is React-coupled (ReactNode children,

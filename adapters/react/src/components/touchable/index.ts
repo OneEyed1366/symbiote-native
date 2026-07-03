@@ -1,6 +1,6 @@
 // The Touchable* family, all built on Pressable. RN realizes their feedback with Animated, and so
 // do we. The press-timing constants and the deactivation-floor math are shared with every adapter
-// (@symbiotejs/components/state/touchable); here React owns only the Animated wiring + the press
+// (@symbiote-native/components/state/touchable); here React owns only the Animated wiring + the press
 // scheduling refs:
 //   TouchableOpacity:   animate an Animated.Value opacity toward activeOpacity on press-in and
 //     back to 1 on press-out, driven imperatively from onPressIn/onPressOut.
@@ -9,7 +9,7 @@
 //   TouchableWithoutFeedback: no visual change, just the press wiring.
 
 import { createElement, useRef, type FC, type ReactNode } from 'react';
-import { dlog, type ISymbioteEvent } from '@symbiotejs/engine';
+import { dlog, type ISymbioteEvent } from '@symbiote-native/engine';
 import {
   computePressOutWait,
   DEFAULT_ACTIVE_OPACITY,
@@ -20,7 +20,7 @@ import {
   OPACITY_INACTIVE_DURATION_MS,
   RESTING_OPACITY,
   type IPressTimingProps,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import { Pressable, type IPressableProps, type IPressState } from '../pressable';
 import { Animated } from '../../modules/animated';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';

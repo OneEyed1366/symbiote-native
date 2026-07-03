@@ -1,6 +1,6 @@
-// LayoutAnimation moved to @symbiotejs/engine (a framework-agnostic native-bridge consumer
-// re-exported by every adapter). This thin re-export keeps @symbiotejs/react's surface identical.
-export { LayoutAnimation } from '@symbiotejs/engine';
+// LayoutAnimation moved to @symbiote-native/engine (a framework-agnostic native-bridge consumer
+// re-exported by every adapter). This thin re-export keeps @symbiote-native/react's surface identical.
+export { LayoutAnimation } from '@symbiote-native/engine';
 export type {
   ILayoutAnimationType,
   ILayoutAnimationProperty,
@@ -8,4 +8,4 @@ export type {
   ILayoutAnimationAnim,
   ILayoutAnimationTypes,
   ILayoutAnimationProperties,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';

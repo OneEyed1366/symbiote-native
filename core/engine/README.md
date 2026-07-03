@@ -1,7 +1,7 @@
-# @symbiotejs/engine
+# @symbiote-native/engine
 
 The **retained shadow-tree engine** at the bottom of [SymbioteJS](../../README.md) — the one
-package every framework adapter (`@symbiotejs/react`, `@symbiotejs/vue`, `@symbiotejs/angular`, …)
+package every framework adapter (`@symbiote-native/react`, `@symbiote-native/vue`, `@symbiote-native/angular`, …)
 drives, and the only place the mutation→clone-on-write translation into React Native's Fabric
 exists. It holds a retained, mutable tree of nodes that an adapter mutates cheaply
 (`appendChild` / `setProp` / `removeChild` …), then on commit diffs that tree against Fabric's
@@ -17,15 +17,15 @@ dance Fabric requires, done **once**, for every framework.
 ## Who calls this, directly vs. indirectly
 
 **Most consumers never import this package by name.** An app written against
-`@symbiotejs/react`/`@symbiotejs/vue`/`@symbiotejs/angular` never calls `createElement` or
+`@symbiote-native/react`/`@symbiote-native/vue`/`@symbiote-native/angular` never calls `createElement` or
 `setProp` itself — the adapter's reconciler does that on the app's behalf. You reach for
-`@symbiotejs/engine` directly only when:
+`@symbiote-native/engine` directly only when:
 
 - you are **writing or debugging a framework adapter** (a `react-reconciler` host config, a Vue
   `createRenderer`, an Angular `Renderer2`) — this is its primary audience;
 - you need one of the **framework-agnostic runtime modules** it re-exports (`Platform`,
   `StyleSheet`, `Dimensions`, `Alert`, `Animated`, …) — every adapter re-exports these verbatim, so
-  most apps still reach them through `@symbiotejs/react` etc., not this package.
+  most apps still reach them through `@symbiote-native/react` etc., not this package.
 
 The mutation API below is intentionally low-level and closely mirrors Fabric's own persistent
 semantics — it is an internal seam, not an app-facing API.
@@ -41,7 +41,7 @@ import {
   createElement, createRawText, createAnchor,
   appendChild, insertBefore, removeChild,
   routeProp, setEventListener, setProp, setText,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 
 const node = createElement('RCTView');          // component IS the Fabric view name
 const text = createRawText('Hello');
@@ -58,7 +58,7 @@ and calls `setEventListener` directly instead.
 ### Committing — `SymbioteSurface`
 
 ```ts
-import { createSurface } from '@symbiotejs/engine';
+import { createSurface } from '@symbiote-native/engine';
 
 const surface = createSurface(rootTag);
 surface.appendChild(root, node);
@@ -89,7 +89,7 @@ before a tag is guaranteed to exist.
   (`processBoxShadow`, `processFilter`, `processTransform`, `processTransformOrigin`,
   `processAspectRatio`, `processFontVariant`, `processBackgroundImage`), and the runtime
   **class-name registry** (`registerStyles` / `resolveClassName` / `scopeClassName`) that
-  `@symbiotejs/css-parser`'s build-time output resolves against — shared by every adapter's
+  `@symbiote-native/css-parser`'s build-time output resolves against — shared by every adapter's
   `class` / `className` / `addClass` prop path.
 - **`AppRegistry` core** (`createAppRegistry`) — registry bookkeeping + headless-task plumbing;
   each adapter supplies only its own `runnableFor`.
@@ -104,16 +104,16 @@ before a tag is guaranteed to exist.
   (`createNode` / `cloneNodeWithNewProps` / `appendChildToSet` / `completeRoot`), the same
   framework-agnostic seam React's own renderer uses.
 - It is not a component library — visual components (Switch, Modal, the lists, …) live in
-  [`@symbiotejs/components`](../components), built on top of this package's `Descriptor`-free
+  [`@symbiote-native/components`](../components), built on top of this package's `Descriptor`-free
   mutation API.
 
 ## Related packages
 
-- [`@symbiotejs/components`](../components) — the framework-agnostic component layer (state +
+- [`@symbiote-native/components`](../components) — the framework-agnostic component layer (state +
   render), built on this engine.
-- [`@symbiotejs/react`](../../adapters/react) / [`@symbiotejs/vue`](../../adapters/vue) /
-  [`@symbiotejs/angular`](../../adapters/angular) — the framework adapters that drive this API.
-- [`@symbiotejs/css-parser`](../css-parser) — compiles CSS into the style objects this package's
+- [`@symbiote-native/react`](../../adapters/react) / [`@symbiote-native/vue`](../../adapters/vue) /
+  [`@symbiote-native/angular`](../../adapters/angular) — the framework adapters that drive this API.
+- [`@symbiote-native/css-parser`](../css-parser) — compiles CSS into the style objects this package's
   `style-registry` resolves at runtime.
 
 ## Test it

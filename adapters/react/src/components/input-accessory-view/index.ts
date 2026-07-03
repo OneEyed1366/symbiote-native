@@ -1,6 +1,6 @@
 // InputAccessoryView: the React lifecycle half (iOS). The host-node assembly (nativeID /
 // backgroundColor / style / accessibility forwarding) lives framework-agnostic in
-// @symbiotejs/components/renderInputAccessoryView and is shared verbatim with Vue; here React only
+// @symbiote-native/components/renderInputAccessoryView and is shared verbatim with Vue; here React only
 // folds aria/role, bridges the Descriptor, and nests the user children under the host.
 
 import { createElement, type FC, type ReactNode } from 'react';
@@ -9,7 +9,7 @@ import {
   resolveAccessibilityProps,
   type IAccessibilityProps,
   type IAriaProps,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 
 export interface IInputAccessoryViewProps extends IAccessibilityProps, IAriaProps {

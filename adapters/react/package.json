@@ -1,15 +1,15 @@
 {
-  "name": "@symbiotejs/react",
+  "name": "@symbiote-native/react",
   "version": "0.1.0",
   "description": "SymbioteJS's React adapter — a react-reconciler host config (mutation mode) driving real native iOS/Android views through stock React Native Fabric.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OneEyed1366/symbiotejs.git",
+    "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
     "directory": "adapters/react"
   },
-  "homepage": "https://github.com/OneEyed1366/symbiotejs/tree/master/adapters/react#readme",
+  "homepage": "https://github.com/OneEyed1366/symbiote-native/tree/master/adapters/react#readme",
   "bugs": {
-    "url": "https://github.com/OneEyed1366/symbiotejs/issues"
+    "url": "https://github.com/OneEyed1366/symbiote-native/issues"
   },
   "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
   "type": "module",
@@ -42,9 +42,9 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
-    "@symbiotejs/components": "workspace:*",
-    "@symbiotejs/css-parser": "workspace:*",
-    "@symbiotejs/engine": "workspace:*",
+    "@symbiote-native/components": "workspace:*",
+    "@symbiote-native/css-parser": "workspace:*",
+    "@symbiote-native/engine": "workspace:*",
     "react-reconciler": "catalog:"
   },
   "peerDependencies": {
@@ -52,7 +52,7 @@
     "react-native": ">=0.86"
   },
   "devDependencies": {
-    "@symbiotejs/test-utils": "workspace:*",
+    "@symbiote-native/test-utils": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-reconciler": "catalog:",
     "react": "catalog:"

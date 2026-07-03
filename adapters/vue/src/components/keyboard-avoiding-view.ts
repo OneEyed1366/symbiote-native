@@ -1,5 +1,5 @@
 // KeyboardAvoidingView: the Vue lifecycle half. The inset math + the behavior → style/structure
-// decision live in @symbiotejs/components (render-keyboard-avoiding-view), shared verbatim with the
+// decision live in @symbiote-native/components (render-keyboard-avoiding-view), shared verbatim with the
 // React adapter; Vue supplies only the reactivity: a ref holds the inset, onMounted subscribes to
 // the now-core Keyboard module (show / changeFrame / hide), onUnmounted tears the subscriptions
 // down, and onLayout measures the wrapper frame that feeds the next event's inset. This is the Vue
@@ -20,7 +20,7 @@ import {
   type IClassNameValue,
   type IStyleProp,
   type IViewStyle,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import {
   computeInset,
   readKeyboardFrame,
@@ -32,7 +32,7 @@ import {
   type IAriaProps,
   type IKeyboardAvoidingBehavior,
   type IMeasuredFrame,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
 // The Vue-facing prop surface. layout is NOT here: it is a typed Vue emit (@layout), wrapper-composed
@@ -88,7 +88,7 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
   return result;
 }
 
-export type { IKeyboardAvoidingBehavior } from '@symbiotejs/components';
+export type { IKeyboardAvoidingBehavior } from '@symbiote-native/components';
 
 export const KeyboardAvoidingView = defineComponent<
   IKeyboardAvoidingViewProps,

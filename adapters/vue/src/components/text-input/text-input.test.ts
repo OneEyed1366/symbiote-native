@@ -12,8 +12,8 @@
 
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { TextInput, mount, unmount, type ITextInputHandle } from '@symbiotejs/vue';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+import { TextInput, mount, unmount, type ITextInputHandle } from '@symbiote-native/vue';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 type ICommandCall = {
   name: string;

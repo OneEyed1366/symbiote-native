@@ -5,8 +5,8 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { InputAccessoryView, Text, TextInput, View, mount, unmount } from '@symbiotejs/react';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+import { InputAccessoryView, Text, TextInput, View, mount, unmount } from '@symbiote-native/react';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const NATIVE_ID = 'accessory-1';
 const BACKGROUND_COLOR = '#eee';

@@ -28,7 +28,7 @@ file globally, from any adapter's own source file:
 
 ```tsx
 import './App.css';
-import { Text, View } from '@symbiotejs/react';
+import { Text, View } from '@symbiote-native/react';
 
 function Card() {
   return (
@@ -45,10 +45,10 @@ The same `import './App.css'` + `class="card"` shape works from a Vue
 look this way — see `App.css` (or the SFC `<style>` block below) in any of
 them for a full stylesheet running on device.
 
-A build-time-only compiler (`@symbiotejs/css-parser`) turns each rule into a
+A build-time-only compiler (`@symbiote-native/css-parser`) turns each rule into a
 plain style object; `class="card"` resolves it back at render time through a
 runtime registry (`registerStyles`/`resolveClassName`, exported from
-`@symbiotejs/engine`). This registry is shared by every adapter, not just Vue —
+`@symbiote-native/engine`). This registry is shared by every adapter, not just Vue —
 React's `className`, Vue's `class`/`:class`, and Angular's `class`/`[class]`
 all resolve through the same lookup.
 
@@ -87,7 +87,7 @@ same class name in two components never collides. `:global(...)` is the
 escape hatch back out — for a utility class meant to apply anywhere, exactly
 like real Vue's scoped-CSS semantics, minus the DOM underneath. See the
 `.row`/`.flex1` utility classes in
-[`examples/vue-sfc/App.vue`](https://github.com/OneEyed1366/symbiotejs/blob/master/examples/vue-sfc/App.vue)
+[`examples/vue-sfc/App.vue`](https://github.com/OneEyed1366/symbiote-native/blob/master/examples/vue-sfc/App.vue)
 for a real `scoped` stylesheet with a `:global()` escape running on device.
 
 `box-shadow`, `transform`, `filter`, `transform-origin`, and `background-image`
@@ -118,7 +118,7 @@ Inline, in the same SFC, exactly like real Vue:
 
 ```vue
 <script setup lang="ts">
-import { Text, View } from '@symbiotejs/vue';
+import { Text, View } from '@symbiote-native/vue';
 </script>
 
 <template>
@@ -166,7 +166,7 @@ the engine, not per adapter.
 ```
 
 ```tsx
-import { Text, View } from '@symbiotejs/react';
+import { Text, View } from '@symbiote-native/react';
 import styles from './Card.module.css';
 
 function Card() {
@@ -180,7 +180,7 @@ function Card() {
 
 ```vue
 <script setup lang="ts">
-import { Text, View } from '@symbiotejs/vue';
+import { Text, View } from '@symbiote-native/vue';
 import styles from './Card.module.css';
 </script>
 
@@ -193,7 +193,7 @@ import styles from './Card.module.css';
 
 ```ts
 import { Component } from '@angular/core';
-import { Text, View } from '@symbiotejs/angular';
+import { Text, View } from '@symbiote-native/angular';
 import styles from './card.module.css';
 
 @Component({
@@ -229,13 +229,13 @@ runtime instead of failing the build.
 
 ### Real key narrowing — `css-dts` and the TypeScript plugin
 
-`@symbiotejs/css-parser` ships two more pieces that close that gap for a
+`@symbiote-native/css-parser` ships two more pieces that close that gap for a
 standalone `.module.css`/`.module.scss`/`.module.less`/`.module.styl` file —
 add it as a direct `devDependency` of your app, alongside the ambient
 fallback above (it still covers any file the generator hasn't reached yet):
 
 ```sh
-pnpm add -D @symbiotejs/css-parser
+pnpm add -D @symbiote-native/css-parser
 ```
 
 ```json
@@ -254,7 +254,7 @@ pnpm add -D @symbiotejs/css-parser
   a `pretypecheck` script so it runs before every typecheck, local or CI,
   with no dependency on Metro or a dev server; `css-dts --watch <dir>`
   regenerates on save for a long-running local loop instead.
-- **`@symbiotejs/css-parser/typescript-plugin`** is a TypeScript language
+- **`@symbiote-native/css-parser/typescript-plugin`** is a TypeScript language
   service plugin for live in-editor autocomplete on `.module.css` (plain CSS
   Modules only — SCSS/Less/Stylus fall back to the loose ambient type in the
   editor, since a language-service plugin must resolve synchronously and
@@ -264,7 +264,7 @@ pnpm add -D @symbiotejs/css-parser
   ```json
   {
     "compilerOptions": {
-      "plugins": [{ "name": "@symbiotejs/css-parser/typescript-plugin" }]
+      "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
     }
   }
   ```
@@ -358,12 +358,12 @@ matching, and no extra runtime cost ships in the app bundle.
 ## StyleSheet.create — the alternative
 
 `StyleSheet` is React Native's own JS-object style model, re-exported from
-`@symbiotejs/engine` by every adapter. It's still fully supported — reach for
+`@symbiote-native/engine` by every adapter. It's still fully supported — reach for
 it for a value that's genuinely computed at runtime, or if you'd rather not
 introduce a CSS file at all:
 
 ```tsx
-import { StyleSheet, Text, View } from '@symbiotejs/react';
+import { StyleSheet, Text, View } from '@symbiote-native/react';
 
 function Card() {
   return (
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
 
 ```vue
 <script setup lang="ts">
-import { StyleSheet, Text, View } from '@symbiotejs/vue';
+import { StyleSheet, Text, View } from '@symbiote-native/vue';
 
 const styles = StyleSheet.create({
   card: { padding: 16, borderRadius: 12, backgroundColor: '#111827' },

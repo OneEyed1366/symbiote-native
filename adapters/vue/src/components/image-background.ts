@@ -1,6 +1,6 @@
 // ImageBackground: the Vue lifecycle half. The composition (the absolute-fill Image behind the
 // children, the dimension-proxy + style-merge math) lives framework-agnostic in
-// @symbiotejs/components/renderImageBackground and is shared verbatim with React; here Vue only
+// @symbiote-native/components/renderImageBackground and is shared verbatim with React; here Vue only
 // narrows the untyped attrs into the typed Image view, folds aria/role, bridges the Descriptor to
 // vnodes, and appends the slot children ON TOP of the inner image.
 //
@@ -18,13 +18,13 @@ import {
   type IImageProps,
   type IImageSourceProp,
   type IResizeMode,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import {
   resolveClassName,
   type IClassNameValue,
   type IStyleProp,
   type IViewStyle,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import { descriptorToVue } from '../descriptor-to-vue';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 

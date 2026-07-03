@@ -14,8 +14,8 @@
 // "addViewAt: failed to insert" crash.
 
 import { h, isVNode, type Component, type VNode } from '@vue/runtime-core';
-import { dlog } from '@symbiotejs/engine';
-import { splitLayoutProps } from '@symbiotejs/components';
+import { dlog } from '@symbiote-native/engine';
+import { splitLayoutProps } from '@symbiote-native/components';
 import { createScrollView } from './shared';
 export type { IScrollViewProps, IScrollViewEmits, IScrollViewHandle } from './shared';
 

@@ -1,15 +1,15 @@
 {
-  "name": "@symbiotejs/slider",
+  "name": "@symbiote-native/slider",
   "version": "0.1.0",
   "description": "Third-party native Slider view wrapped for SymbioteJS — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OneEyed1366/symbiotejs.git",
+    "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
     "directory": "packages/slider"
   },
-  "homepage": "https://github.com/OneEyed1366/symbiotejs/tree/master/packages/slider#readme",
+  "homepage": "https://github.com/OneEyed1366/symbiote-native/tree/master/packages/slider#readme",
   "bugs": {
-    "url": "https://github.com/OneEyed1366/symbiotejs/issues"
+    "url": "https://github.com/OneEyed1366/symbiote-native/issues"
   },
   "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
   "type": "module",
@@ -77,13 +77,13 @@
   },
   "dependencies": {
     "@react-native-community/slider": "catalog:",
-    "@symbiotejs/components": "workspace:*",
-    "@symbiotejs/engine": "workspace:*"
+    "@symbiote-native/components": "workspace:*",
+    "@symbiote-native/engine": "workspace:*"
   },
   "peerDependencies": {
-    "@symbiotejs/angular": "workspace:*",
-    "@symbiotejs/react": "workspace:*",
-    "@symbiotejs/vue": "workspace:*",
+    "@symbiote-native/angular": "workspace:*",
+    "@symbiote-native/react": "workspace:*",
+    "@symbiote-native/vue": "workspace:*",
     "@angular/core": ">=20",
     "@vue/runtime-core": "^3.5.13",
     "react": ">=19.0.0",
@@ -91,13 +91,13 @@
     "vue": ">=3.5.0"
   },
   "peerDependenciesMeta": {
-    "@symbiotejs/angular": {
+    "@symbiote-native/angular": {
       "optional": true
     },
-    "@symbiotejs/react": {
+    "@symbiote-native/react": {
       "optional": true
     },
-    "@symbiotejs/vue": {
+    "@symbiote-native/vue": {
       "optional": true
     },
     "@angular/core": {
@@ -117,10 +117,10 @@
     "@angular/compiler": "catalog:",
     "@angular/compiler-cli": "catalog:",
     "@angular/core": "catalog:",
-    "@symbiotejs/angular": "workspace:*",
-    "@symbiotejs/react": "workspace:*",
-    "@symbiotejs/test-utils": "workspace:*",
-    "@symbiotejs/vue": "workspace:*",
+    "@symbiote-native/angular": "workspace:*",
+    "@symbiote-native/react": "workspace:*",
+    "@symbiote-native/test-utils": "workspace:*",
+    "@symbiote-native/vue": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@vue/runtime-core": "catalog:",

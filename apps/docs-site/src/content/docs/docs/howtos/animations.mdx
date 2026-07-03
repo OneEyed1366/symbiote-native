@@ -9,7 +9,7 @@ without reaching for a third-party animation library.
 ## Every adapter — the same `Animated` namespace
 
 ```tsx
-import { Animated } from '@symbiotejs/react'; // or '@symbiotejs/vue' / '@symbiotejs/angular'
+import { Animated } from '@symbiote-native/react'; // or '@symbiote-native/vue' / '@symbiote-native/angular'
 
 const opacity = new Animated.Value(0);
 
@@ -23,7 +23,7 @@ Animated.timing(opacity, {
 Wrap the view you want to animate in `Animated.View` (React), an aliased
 `AnimatedView` const (Vue — templates can't parse a dotted tag name), or the
 named `AnimatedView` import (Angular — required by its AOT compiler, not
-optional). See the [Animations guide](/symbiotejs/docs/learn/animations/) for the full
+optional). See the [Animations guide](/symbiote-native/docs/learn/animations/) for the full
 per-adapter reasoning and the rest of the surface (`ValueXY`, tracking,
 `diffClamp`, `Animated.event`).
 
@@ -50,4 +50,4 @@ Compose several with `Animated.parallel([...])`, `Animated.sequence([...])`,
 For the full working reference — JS driver vs native driver side by side, a
 `PanResponder`-driven drag box, a tracking spring, and a `diffClamp`
 collapsing header — see `AnimatedDemo`/`AnimatedParityDemo` in
-[`examples/react/App.tsx`](https://github.com/OneEyed1366/symbiotejs/blob/master/examples/react/App.tsx).
+[`examples/react/App.tsx`](https://github.com/OneEyed1366/symbiote-native/blob/master/examples/react/App.tsx).

@@ -78,7 +78,7 @@ describe('parseCSS', () => {
       card: { color: 'red' },
     });
     expect(warn).toHaveBeenCalledWith(
-      '[@symbiotejs/css-parser] unsupported CSS property "animation" dropped',
+      '[@symbiote-native/css-parser] unsupported CSS property "animation" dropped',
     );
 
     warn.mockRestore();

@@ -6,9 +6,9 @@ import {
   Settings,
   Text,
   View,
-} from '@symbiotejs/angular';
+} from '@symbiote-native/angular';
 // Static look lives in NativeModulesDemo.css — compiled at build time by
-// @symbiotejs/css-parser and resolved at runtime through the shared style registry.
+// @symbiote-native/css-parser and resolved at runtime through the shared style registry.
 import './NativeModulesDemo.css';
 
 // Reuses the same Angular logo the canary already renders (see ANGULAR_LOGO_URI

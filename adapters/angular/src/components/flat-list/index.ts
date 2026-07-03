@@ -3,7 +3,7 @@
 // columns), so the virtualized stream is rows, not items (RN's FlatList). All windowing /
 // viewability / batching / imperative scrolling are inherited from VirtualizedList; the data
 // shaping (chunkIntoRows / rowKeyExtractor / expandRowViewability / row-separator unwrap) is shared
-// verbatim from @symbiotejs/components, exactly as the React and Vue FlatLists reuse it. This is the
+// verbatim from @symbiote-native/components, exactly as the React and Vue FlatLists reuse it. This is the
 // Angular twin of adapters/vue/src/components/flat-list/index.ts.
 //
 // TEMPLATE FORWARDING — both paths RE-STAMP; neither uses a bare `<ng-content>` passthrough.
@@ -61,7 +61,7 @@ import {
   type IViewabilityConfigCallbackPair,
   type IViewableItemsChangedInfo,
   type IVirtualizedListHandle,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import {
   dlog,
   flattenStyle,
@@ -69,7 +69,7 @@ import {
   type IStyleProp,
   type ISymbioteNode,
   type IViewStyle,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import {
   VirtualizedList,
   VListEmptyDirective,
@@ -123,7 +123,7 @@ export type {
   IViewableItemsChangedInfo,
   IViewabilityConfigCallbackPair,
   IVirtualizedListHandle,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 export {
   VListEmptyDirective,
   VListFooterDirective,

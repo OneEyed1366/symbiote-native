@@ -8,9 +8,9 @@
 
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiotejs/react';
-import { type ISymbioteEvent } from '@symbiotejs/engine';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/react';
+import { type ISymbioteEvent } from '@symbiote-native/engine';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 200;
 const SLIDER_VIEW = 'RNCSlider';

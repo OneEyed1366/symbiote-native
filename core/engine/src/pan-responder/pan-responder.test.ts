@@ -7,7 +7,7 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import PanResponder, { type IPanResponderGestureState } from './index';
-import { createElement, type ISymbioteEvent } from '@symbiotejs/engine';
+import { createElement, type ISymbioteEvent } from '@symbiote-native/engine';
 
 const TOUCH_IDENTIFIER = 1;
 const TARGET_TAG = 1;

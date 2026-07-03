@@ -8,8 +8,8 @@
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { VirtualizedSectionList, mount, unmount } from '@symbiotejs/react';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+import { VirtualizedSectionList, mount, unmount } from '@symbiote-native/react';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 33;
 const VIEWPORT_HEIGHT = 400;

@@ -8,8 +8,8 @@
 
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, Modal, mount, unmount } from '@symbiotejs/react';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+import { View, Modal, mount, unmount } from '@symbiote-native/react';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 220;
 

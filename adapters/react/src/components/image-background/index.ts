@@ -1,17 +1,17 @@
 // ImageBackground: the React lifecycle half. The composition (the absolute-fill Image behind
 // the children, the dimension-proxy + style-merge math) lives framework-agnostic in
-// @symbiotejs/components/renderImageBackground and is shared verbatim with Vue; here React only
+// @symbiote-native/components/renderImageBackground and is shared verbatim with Vue; here React only
 // folds aria/role, splits the typed Image transform fields from the forward-only rest, bridges
 // the Descriptor to elements, and appends the user children ON TOP of the inner image.
 
 import { createElement, type ReactElement, type ReactNode } from 'react';
-import { resolveClassName } from '@symbiotejs/engine';
+import { resolveClassName } from '@symbiote-native/engine';
 import {
   renderImageBackground,
   resolveAccessibilityProps,
   type IDescriptorChild,
   type IImageProps,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import { descriptorToReact } from '../../descriptor-to-react';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 

@@ -32,7 +32,7 @@ import {
   type IAccessibilityProps,
   type IAccessibilityStateValue,
   type IAriaProps,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import {
   dispatchViewCommand,
   dlog,
@@ -40,7 +40,7 @@ import {
   type IStyleProp,
   type ISymbioteEvent,
   type IViewStyle,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import { anchorHostStyle, RefreshControlHost, SymbioteHostPropsDirective } from '../primitives';
 
 // Record<string, unknown> already tolerates `style` holding the [anchorHostStyle, this.style]

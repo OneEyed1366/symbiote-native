@@ -15,7 +15,7 @@ import {
   type IDimensionValue,
   type IStyleProp,
   type IViewStyle,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import { el, type IDescriptor } from '../descriptor';
 import { renderImage, type IImageViewProps } from './render-image';
 

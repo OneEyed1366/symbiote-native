@@ -10,8 +10,8 @@
 // of the "addViewAt: failed to insert" crash.
 
 import { cloneElement, createElement, forwardRef, useImperativeHandle, useRef } from 'react';
-import { dlog, type ISymbioteNode } from '@symbiotejs/engine';
-import { buildScrollViewHandle, splitLayoutProps } from '@symbiotejs/components';
+import { dlog, type ISymbioteNode } from '@symbiote-native/engine';
+import { buildScrollViewHandle, splitLayoutProps } from '@symbiote-native/components';
 import {
   usePreparedScrollView,
   useNativeStickyScrollAttach,

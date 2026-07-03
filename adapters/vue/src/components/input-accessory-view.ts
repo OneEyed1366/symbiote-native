@@ -1,6 +1,6 @@
 // InputAccessoryView: the Vue lifecycle half (iOS). The host-node assembly (nativeID /
 // backgroundColor / style / accessibility forwarding) lives framework-agnostic in
-// @symbiotejs/components/renderInputAccessoryView and is shared verbatim with React; here Vue only
+// @symbiote-native/components/renderInputAccessoryView and is shared verbatim with React; here Vue only
 // narrows the untyped attrs, folds aria/role, bridges the Descriptor, and nests the slot children
 // under the host.
 //
@@ -14,8 +14,8 @@ import {
   resolveAccessibilityProps,
   type IAccessibilityProps,
   type IAriaProps,
-} from '@symbiotejs/components';
-import type { IClassNameValue, IStyleProp, IViewStyle } from '@symbiotejs/engine';
+} from '@symbiote-native/components';
+import type { IClassNameValue, IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
 // The Vue-facing prop surface (React's carries `children?: ReactNode`; Vue takes children via slots).

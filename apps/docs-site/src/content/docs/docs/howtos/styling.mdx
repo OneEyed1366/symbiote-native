@@ -14,14 +14,14 @@ is what every current example app (`examples/react`, `examples/vue-sfc`,
 
 ```tsx
 import './App.css';
-import { Text, View } from '@symbiotejs/react';
+import { Text, View } from '@symbiote-native/react';
 
 <View className="card">
   <Text>Native surface</Text>
 </View>;
 ```
 
-`@symbiotejs/css-parser` compiles the rule at build time; `className="card"`
+`@symbiote-native/css-parser` compiles the rule at build time; `className="card"`
 resolves it back at render time through a runtime class registry shared by
 every adapter. Plain CSS, CSS Modules, plus optional SCSS/Sass, Less, and
 Stylus preprocessing (`<style lang="scss">`, `.module.scss`, …) — no
@@ -49,12 +49,12 @@ engine exists:
 
 ## The alternative — `StyleSheet.create`
 
-Every adapter re-exports `StyleSheet` from `@symbiotejs/engine`. It's still
+Every adapter re-exports `StyleSheet` from `@symbiote-native/engine`. It's still
 fully supported and needs no build-time CSS step — reach for it for a value
 that's genuinely computed at runtime, or if you'd rather skip CSS entirely:
 
 ```tsx
-import { StyleSheet, Text, View } from '@symbiotejs/react';
+import { StyleSheet, Text, View } from '@symbiote-native/react';
 
 const styles = StyleSheet.create({
   card: { padding: 16, borderRadius: 12, backgroundColor: '#111827' },
@@ -73,10 +73,10 @@ CSS.
 ## Want typo-safe `.module.css` keys
 
 A bare `.module.css` import type-checks as `Record<string, string>` unless
-you wire two pieces from `@symbiotejs/css-parser` — add it as a devDependency:
+you wire two pieces from `@symbiote-native/css-parser` — add it as a devDependency:
 
 ```sh
-pnpm add -D @symbiotejs/css-parser
+pnpm add -D @symbiote-native/css-parser
 ```
 
 ```json
@@ -88,7 +88,7 @@ pnpm add -D @symbiotejs/css-parser
 // tsconfig.json
 {
   "compilerOptions": {
-    "plugins": [{ "name": "@symbiotejs/css-parser/typescript-plugin" }]
+    "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
   }
 }
 ```
@@ -96,7 +96,7 @@ pnpm add -D @symbiotejs/css-parser
 `pretypecheck`'s `css-dts .` writes a real, narrowed `.d.ts` next to every
 `.module.css` file so a typo fails `tsc`; the `typescript-plugin` gives you
 matching autocomplete live in the editor, no watch process needed. See the
-[Styling guide](/symbiotejs/docs/learn/styling/#real-key-narrowing-css-dts-and-the-typescript-plugin)
+[Styling guide](/symbiote-native/docs/learn/styling/#real-key-narrowing-css-dts-and-the-typescript-plugin)
 for what each piece covers.
 
 ## Choose based on your adapter
@@ -108,4 +108,4 @@ for what each piece covers.
   `StyleSheet.create` works identically on every adapter.
 
 For the full model (what compiles, what doesn't, the `:global()` escape
-hatch, CSS Modules status), see the [Styling guide](/symbiotejs/docs/learn/styling/).
+hatch, CSS Modules status), see the [Styling guide](/symbiote-native/docs/learn/styling/).

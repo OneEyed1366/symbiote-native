@@ -6,8 +6,8 @@
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from './render';
-import { clearGlobalStyles, registerStyles } from '@symbiotejs/engine';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 341;
 const VIEW = 'RCTView';

@@ -13,8 +13,8 @@ import {
   VSectionHeaderDirective,
   VSectionItemDirective,
   type ISection,
-} from '@symbiotejs/angular';
-// static look compiled at build time by @symbiotejs/css-parser (symbiote-sfc-style-compiler skill)
+} from '@symbiote-native/angular';
+// static look compiled at build time by @symbiote-native/css-parser (symbiote-sfc-style-compiler skill)
 import './ParityDemo.css';
 
 // Verification panel for five feature-parity behaviors: Text.onLongPress synthesis,

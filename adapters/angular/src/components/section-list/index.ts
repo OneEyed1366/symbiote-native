@@ -47,13 +47,13 @@ import type {
   IScrollViewHandle,
   ISection,
   IVirtualizedSectionListHandle,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import {
   type IStyleProp,
   type ISymbioteEvent,
   type ISymbioteNode,
   type IViewStyle,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import {
   VListEmptyDirective,
   VListFooterDirective,
@@ -84,11 +84,11 @@ function asItem<ItemT>(value: unknown): ItemT | undefined {
 
 // Re-export the shared section type + the imperative handle so app code (and any later layer) imports
 // them from SectionList, mirroring how the Vue twin re-exposes ISection + ISectionListHandle.
-export type { ISection } from '@symbiotejs/components';
+export type { ISection } from '@symbiote-native/components';
 export type ISectionListHandle = IVirtualizedSectionListHandle;
 
 // Re-export the section authoring directives + the list-level slot directives so app code importing
-// from '@symbiotejs/angular' gets the full `<ng-template vSection*>` / `vList*` authoring surface
+// from '@symbiote-native/angular' gets the full `<ng-template vSection*>` / `vList*` authoring surface
 // alongside SectionList (mirrors how virtualized-section-list/index re-exports the section ones and
 // FlatList re-exports the list-level ones).
 export {

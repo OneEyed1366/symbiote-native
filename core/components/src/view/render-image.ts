@@ -6,7 +6,7 @@ import {
   type IStyleProp,
   type ISymbioteEvent,
   type IViewStyle,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
 import { el, type IDescriptor } from '../descriptor';
 

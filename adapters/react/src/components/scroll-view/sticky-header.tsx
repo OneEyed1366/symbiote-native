@@ -7,7 +7,7 @@
 // its own. Forwarding `stickyHeaderIndices` to native is a silent no-op. So we replicate the
 // JS layer: subscribe each flagged child to the scroll offset and translate it to stay pinned.
 // The interpolation mirrors ScrollViewStickyHeader.js (non-inverted + inverted branches) and now
-// lives, framework-agnostic, in @symbiotejs/components (computeStickyInterpolation, ADR 0024); this
+// lives, framework-agnostic, in @symbiote-native/components (computeStickyInterpolation, ADR 0024); this
 // file holds the React component shell, the layout state, and the child-wrapping.
 
 import {
@@ -28,7 +28,7 @@ import {
   Platform,
   dlog,
   type ISymbioteEvent,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import {
   computeStickyInterpolation,
   nextStickyHeaderY,
@@ -36,7 +36,7 @@ import {
   stickyDebounceMs,
   STICKY_HEADER_Z_INDEX,
   type IStickyHeaderProps,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import { Animated } from '../../modules/animated';
 
 // The props RN passes a sticky header wrapper (ScrollViewStickyHeader.js): the framework-agnostic

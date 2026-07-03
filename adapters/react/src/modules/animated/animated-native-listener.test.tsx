@@ -8,9 +8,9 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, Animated } from '@symbiotejs/react';
-import { setDeviceEventSource } from '@symbiotejs/engine';
-import { installFabric } from '@symbiotejs/test-utils';
+import { mount, unmount, Animated } from '@symbiote-native/react';
+import { setDeviceEventSource } from '@symbiote-native/engine';
+import { installFabric } from '@symbiote-native/test-utils';
 
 // ---- injected device-event source (the app's RN DeviceEventEmitter stand-in) ----
 

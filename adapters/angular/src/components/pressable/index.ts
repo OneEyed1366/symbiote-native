@@ -27,7 +27,7 @@ import {
   type IPressRuntime,
   type IPressState,
   type IRectOffset,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import {
   dlog,
   isSymbioteNode,
@@ -36,10 +36,10 @@ import {
   type ISymbioteNode,
   type IStyleProp,
   type IViewStyle,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import { anchorHostStyle, SymbioteHostPropsDirective, ViewHost } from '../../primitives';
 
-export type { IPressState, IPressableAndroidRippleConfig } from '@symbiotejs/components';
+export type { IPressState, IPressableAndroidRippleConfig } from '@symbiote-native/components';
 
 // The full logical Pressable surface, callback-shaped press/hover events included. Touchable* and
 // TouchableNativeFeedback still take their OWN onPress/onPressIn/... as @Input() callbacks (that is

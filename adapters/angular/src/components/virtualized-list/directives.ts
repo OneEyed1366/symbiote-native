@@ -36,8 +36,8 @@ import {
   type OnDestroy,
   type SimpleChanges,
 } from '@angular/core';
-import { dlog } from '@symbiotejs/engine';
-import type { ISeparators } from '@symbiotejs/components';
+import { dlog } from '@symbiote-native/engine';
+import type { ISeparators } from '@symbiote-native/components';
 
 let vListOutletInstanceCounter = 0;
 

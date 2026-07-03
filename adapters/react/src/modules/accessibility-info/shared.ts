@@ -1,4 +1,4 @@
-// AccessibilityInfo shared contract moved to @symbiotejs/engine (framework-agnostic, no React
+// AccessibilityInfo shared contract moved to @symbiote-native/engine (framework-agnostic, no React
 // in the impl). This thin re-export keeps the adapter's local import path stable.
 export type {
   IAccessibilityChangeEventName,
@@ -9,4 +9,4 @@ export type {
   IAnnounceForAccessibilityOptions,
   IAccessibilityInfoStatic,
   IAccessibilityEventType,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';

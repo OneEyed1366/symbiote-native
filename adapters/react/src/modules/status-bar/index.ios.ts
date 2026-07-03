@@ -19,7 +19,7 @@ import {
   STATUS_BAR_MANAGER,
   STATIC_HIDE_TRANSITION,
   hideTransition,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import type { IStatusBarAnimation, IStatusBarComponent, IStatusBarStyle } from './shared';
 export type { IStatusBarProps, IStatusBarStyle } from './shared';
 

@@ -1,4 +1,4 @@
-# @symbiotejs/slider
+# @symbiote-native/slider
 
 A wrapper package for [SymbioteJS](../../README.md) that makes the third-party native
 `@react-native-community/slider` view usable from **every** adapter — React, Vue, and Angular —
@@ -19,9 +19,9 @@ src/core/       pure folds (value sanitation, limit/disabled resolution, step-in
                 + renderSlider/renderSliderNative → Descriptor, the agnostic ISliderProps
 src/register.ts side-effect import of RNCSlider's codegen spec — registers its ViewConfig
                 (never the library's React Slider.tsx)
-src/react/      @symbiotejs/slider/react — forwardRef FC + descriptorToReact
-src/vue/        @symbiotejs/slider/vue   — defineComponent + descriptorToVue
-src/angular/    @symbiotejs/slider/angular — Angular component + descriptorToAngular
+src/react/      @symbiote-native/slider/react — forwardRef FC + descriptorToReact
+src/vue/        @symbiote-native/slider/vue   — defineComponent + descriptorToVue
+src/angular/    @symbiote-native/slider/angular — Angular component + descriptorToAngular
 ```
 
 Each adapter entry imports `../register` first (so the ViewConfig is registered before the
@@ -32,20 +32,20 @@ but a Vue scoped slot).
 
 ## Packaging — one dependency, not two
 
-A consuming app depends on `@symbiotejs/slider` only — never on
-`@react-native-community/slider` directly. `@symbiotejs/slider` owns the native dependency and
+A consuming app depends on `@symbiote-native/slider` only — never on
+`@react-native-community/slider` directly. `@symbiote-native/slider` owns the native dependency and
 ships `react-native.config.cjs` (points RN's Android autolinking at the nested native lib's
 Android sources) and `symbiote-slider.podspec` (the iOS proxy pod), so RN autolinking discovers
-`@symbiotejs/slider` itself as the native package. Plain transitive native deps do **not**
+`@symbiote-native/slider` itself as the native package. Plain transitive native deps do **not**
 autolink; this proxy-package shape is the verified escape hatch (`npx react-native config` lists
-`@symbiotejs/slider` with iOS + Android config in `examples/react`, `examples/vue-sfc`,
+`@symbiote-native/slider` with iOS + Android config in `examples/react`, `examples/vue-sfc`,
 `examples/vue-tsx`, and `examples/angular`).
 
 ## Use it
 
 ```tsx
 // React — examples/react/App.tsx
-import { Slider } from '@symbiotejs/slider/react';
+import { Slider } from '@symbiote-native/slider/react';
 
 <Slider
   value={volume}
@@ -62,7 +62,7 @@ import { Slider } from '@symbiotejs/slider/react';
 ```vue
 <!-- Vue — examples/vue-sfc/App.vue -->
 <script setup lang="ts">
-import { Slider } from '@symbiotejs/slider/vue';
+import { Slider } from '@symbiote-native/slider/vue';
 </script>
 <template>
   <Slider
@@ -75,7 +75,7 @@ import { Slider } from '@symbiotejs/slider/vue';
 
 ```ts
 // Angular — examples/angular/App.ts
-import { Slider } from '@symbiotejs/slider/angular';
+import { Slider } from '@symbiote-native/slider/angular';
 // ... Slider added to the component's `imports`, used the same way in its template.
 ```
 

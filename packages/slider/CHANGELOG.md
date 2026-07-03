@@ -1,16 +1,16 @@
-# @symbiotejs/slider
+# @symbiote-native/slider
 
 ## 0.1.0
 
 ### Minor Changes
 
-- First public release under the @symbiotejs npm scope.
+- First public release under the @symbiote-native npm scope.
 
 ### Patch Changes
 
 - Updated dependencies
-  - @symbiotejs/engine@0.1.0
-  - @symbiotejs/components@0.1.0
-  - @symbiotejs/react@0.1.0
-  - @symbiotejs/vue@0.1.0
-  - @symbiotejs/angular@0.1.0
+  - @symbiote-native/engine@0.1.0
+  - @symbiote-native/components@0.1.0
+  - @symbiote-native/react@0.1.0
+  - @symbiote-native/vue@0.1.0
+  - @symbiote-native/angular@0.1.0

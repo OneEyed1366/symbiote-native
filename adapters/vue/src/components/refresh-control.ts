@@ -13,12 +13,12 @@
 // a cast) before the aria fold.
 
 import { defineComponent, h } from '@vue/runtime-core';
-import { dlog, type IClassNameValue } from '@symbiotejs/engine';
+import { dlog, type IClassNameValue } from '@symbiote-native/engine';
 import {
   resolveAccessibilityProps,
   type IAccessibilityProps,
   type IAriaProps,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
 // The Vue-facing prop surface. Mirrors React's RefreshControlProps (read it for the native prop

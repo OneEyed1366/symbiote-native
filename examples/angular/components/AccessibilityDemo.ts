@@ -9,9 +9,9 @@ import {
   SymbioteHostPropsDirective,
   Text,
   View,
-} from '@symbiotejs/angular';
+} from '@symbiote-native/angular';
 
-// Static look lives in AccessibilityDemo.css, compiled at build time by @symbiotejs/css-parser
+// Static look lives in AccessibilityDemo.css, compiled at build time by @symbiote-native/css-parser
 // (symbiote-sfc-style-compiler skill).
 import './AccessibilityDemo.css';
 

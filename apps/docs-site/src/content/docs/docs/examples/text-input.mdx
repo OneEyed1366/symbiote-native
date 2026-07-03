@@ -11,7 +11,7 @@ controlled write handshake is shared; the public event name is framework-shaped.
 ```tsx
 import './NameInput.css';
 import { useState } from 'react';
-import { Text, TextInput, View } from '@symbiotejs/react';
+import { Text, TextInput, View } from '@symbiote-native/react';
 
 export function NameInput() {
   const [name, setName] = useState('Symbiote');
@@ -36,7 +36,7 @@ export function NameInput() {
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Text, TextInput, View } from '@symbiotejs/vue';
+import { Text, TextInput, View } from '@symbiote-native/vue';
 
 const name = ref('Symbiote');
 </script>
@@ -62,7 +62,7 @@ arrives as `@value-change`'s second argument: `@value-change="(text, event) => �
 
 ```ts
 import { Component } from '@angular/core';
-import { Text, TextInput, View } from '@symbiotejs/angular';
+import { Text, TextInput, View } from '@symbiote-native/angular';
 import './name-input.css';
 
 @Component({
@@ -103,4 +103,4 @@ keep `[(value)]` working, and `(change)` exists purely for the raw event.
 | Imperative handle  | React `ref`                     | Vue template ref / exposed handle                | `@ViewChild(..., { read: ElementRef })`          |
 
 `StyleSheet.create` works identically to a CSS class if you'd rather keep
-style objects inline — see the [Styling guide](/symbiotejs/docs/learn/styling/).
+style objects inline — see the [Styling guide](/symbiote-native/docs/learn/styling/).

@@ -22,7 +22,7 @@ import {
   processColor,
   STATUS_BAR_MANAGER,
   type IColorValue,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import type { IStatusBarComponent } from './shared';
 export type { IStatusBarProps, IStatusBarStyle } from './shared';
 

@@ -8,7 +8,7 @@ import {
   dlog,
   type IRootTag,
   type SymbioteSurface,
-} from '@symbiotejs/engine';
+} from '@symbiote-native/engine';
 import type { App, Component } from '@vue/runtime-core';
 import { createSymbioteRenderer } from './renderer';
 

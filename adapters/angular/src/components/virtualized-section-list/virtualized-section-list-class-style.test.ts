@@ -6,9 +6,9 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiotejs/engine';
-import { installFabric } from '@symbiotejs/test-utils';
-import type { ISection } from '@symbiotejs/components';
+import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { installFabric } from '@symbiote-native/test-utils';
+import type { ISection } from '@symbiote-native/components';
 
 import { mount, unmount } from '../../render';
 import { VirtualizedSectionList, VSectionItemDirective } from './index';

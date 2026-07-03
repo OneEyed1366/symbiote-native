@@ -1,5 +1,5 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
-import { Dimensions, type IDimensionsSet, type IDisplayMetrics } from '@symbiotejs/engine';
+import { Dimensions, type IDimensionsSet, type IDisplayMetrics } from '@symbiote-native/engine';
 
 /**
  * Angular twin of React's `useWindowDimensions` and Vue's `useWindowDimensions` composable. The

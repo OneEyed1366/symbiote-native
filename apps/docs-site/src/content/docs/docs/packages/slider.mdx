@@ -5,7 +5,7 @@ description: A native slider wrapper over @react-native-community/slider, shared
 
 import { Aside } from '@astrojs/starlight/components';
 
-`@symbiotejs/slider` wraps the `RNCSlider` native view from
+`@symbiote-native/slider` wraps the `RNCSlider` native view from
 [`@react-native-community/slider`](https://github.com/callstack/react-native-slider) so every
 SymbioteJS adapter can render it — without importing that library's React component body. It is
 the reference implementation of the [third-party native-view wrapper](#how-the-wrapper-works)
@@ -28,14 +28,14 @@ pattern: the recipe to follow for any future community RN view.
 pnpm add @react-native-community/slider
 ```
 
-`@symbiotejs/slider` itself is a workspace package (`packages/slider`), not yet published — add it
+`@symbiote-native/slider` itself is a workspace package (`packages/slider`), not yet published — add it
 as a workspace dependency the same way the examples do.
 
 <Aside type="caution">
   `@react-native-community/slider` ships a React component (`Slider.tsx`) built on hooks. Never
   import that component directly in a non-React adapter — it throws with `Cannot read property
   'useState' of null` because the React dispatcher is absent. Always import from
-  `@symbiotejs/slider/react` or `@symbiotejs/slider/vue`, never from the community package itself.
+  `@symbiote-native/slider/react` or `@symbiote-native/slider/vue`, never from the community package itself.
 </Aside>
 
 ## Usage
@@ -49,7 +49,7 @@ as a workspace dependency the same way the examples do.
 
 ```tsx
 import { useState } from 'react';
-import { Slider } from '@symbiotejs/slider/react';
+import { Slider } from '@symbiote-native/slider/react';
 
 export default function VolumeControl() {
   const [volume, setVolume] = useState(0.5);
@@ -73,7 +73,7 @@ export default function VolumeControl() {
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Slider } from '@symbiotejs/slider/vue';
+import { Slider } from '@symbiote-native/slider/vue';
 
 const volume = ref(0.5);
 </script>
@@ -92,13 +92,13 @@ const volume = ref(0.5);
 
 `v-model` is sugar over the same `value`/`@value-change` pair — write
 `:value="volume" @value-change="volume = $event"` instead if you need the
-explicit form. See the [Vue API reference](/symbiotejs/docs/api/vue/#model-bindings-v-model).
+explicit form. See the [Vue API reference](/symbiote-native/docs/api/vue/#model-bindings-v-model).
 
 ### Angular
 
 ```ts
 import { Component, signal } from '@angular/core';
-import { Slider } from '@symbiotejs/slider/angular';
+import { Slider } from '@symbiote-native/slider/angular';
 
 @Component({
   standalone: true,
@@ -145,7 +145,7 @@ pass a `StepMarker` (React) or fill the `#stepMarker` scoped slot (Vue) — both
 
 Every prop below is framework-agnostic and shared verbatim by every adapter, **except**
 `StepMarker`, which is per-adapter because it returns a framework element (a React component vs
-a Vue scoped slot) — see [shared vs framework-specific](/symbiotejs/docs/api/components/#shared-vs-framework-specific).
+a Vue scoped slot) — see [shared vs framework-specific](/symbiote-native/docs/api/components/#shared-vs-framework-specific).
 
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
@@ -168,7 +168,7 @@ a Vue scoped slot) — see [shared vs framework-specific](/symbiotejs/docs/api/c
 
 ## How the wrapper works
 
-`@symbiotejs/slider` ships **zero runtime metadata** for `RNCSlider` — the engine derives its
+`@symbiote-native/slider` ships **zero runtime metadata** for `RNCSlider` — the engine derives its
 events and color/image processors from the library's own codegen `ViewConfig` at first commit
 (`setNativeViewConfigSource`). The package only supplies the pure JS folding the library's React
 wrapper normally does (value/limit sanitizing, the step-indicator layout) plus the native
@@ -184,7 +184,7 @@ packages/slider/src/
 
 Both adapters import `../register` first (never the library's `Slider.tsx`), then call into the
 same `core` render — the same logic/view/lifecycle split as every other SymbioteJS component (see
-[how it works](/symbiotejs/docs/how-it-works/)). Wrapping a different third-party native view follows this
+[how it works](/symbiote-native/docs/how-it-works/)). Wrapping a different third-party native view follows this
 exact recipe; see
-[decision 0027](https://github.com/OneEyed1366/symbiotejs/blob/main/.docs/decisions/0027-third-party-native-view-wrapper-package.md)
+[decision 0027](https://github.com/OneEyed1366/symbiote-native/blob/main/.docs/decisions/0027-third-party-native-view-wrapper-package.md)
 for the full rationale.

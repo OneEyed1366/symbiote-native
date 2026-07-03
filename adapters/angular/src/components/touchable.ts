@@ -1,6 +1,6 @@
 // The Touchable* family for Angular, all built on Pressable (the Angular twin of the React/Vue
 // adapter). The press-timing constants and the deactivation-floor math are shared with every
-// adapter (@symbiotejs/components/state/touchable); here Angular owns only the Animated wiring + the
+// adapter (@symbiote-native/components/state/touchable); here Angular owns only the Animated wiring + the
 // press scheduling state:
 //   TouchableOpacity:   animate an Animated.Value opacity toward activeOpacity on press-in and back
 //     to 1 on press-out, driven from Pressable's onPressIn/onPressOut. The opacity Value is held by
@@ -48,8 +48,13 @@ import {
   type IPressState,
   type IPressTimingProps,
   type IRectOffset,
-} from '@symbiotejs/components';
-import { dlog, type ISymbioteEvent, type IStyleProp, type IViewStyle } from '@symbiotejs/engine';
+} from '@symbiote-native/components';
+import {
+  dlog,
+  type ISymbioteEvent,
+  type IStyleProp,
+  type IViewStyle,
+} from '@symbiote-native/engine';
 import { anchorHostStyle, anchorStyleProp } from '../primitives';
 import { Pressable, type IAngularPressableInputs } from './pressable';
 import { Animated, AnimatedView } from '../modules/animated';

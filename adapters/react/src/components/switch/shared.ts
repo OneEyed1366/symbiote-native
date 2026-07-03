@@ -1,6 +1,6 @@
 // Switch is the React lifecycle half. The logic (the lastNativeReport reducer, valueFromChange,
-// the snap-back decision) lives in @symbiotejs/components/state, the render (value fold, track
-// colors, ios_backgroundColor) in @symbiotejs/components/view; here the adapter only owns the
+// the snap-back decision) lives in @symbiote-native/components/state, the render (value fold, track
+// colors, ios_backgroundColor) in @symbiote-native/components/view; here the adapter only owns the
 // hook: useReducer over the shared reducer, a ref for the imperative command, and the
 // useLayoutEffect that snaps native back when the parent rejects a toggle.
 //
@@ -18,21 +18,24 @@ import {
   createInitialSwitchState,
   shouldSnapBack,
   valueFromChange,
-} from '@symbiotejs/components';
-import type { ISwitchPlatform, ISwitchProps as ISwitchBaseProps } from '@symbiotejs/components';
+} from '@symbiote-native/components';
+import type {
+  ISwitchPlatform,
+  ISwitchProps as ISwitchBaseProps,
+} from '@symbiote-native/components';
 import {
   dispatchViewCommand,
   dlog,
   type ISymbioteEvent,
   type ISymbioteNode,
-} from '@symbiotejs/engine';
-import { resolveAccessibilityProps } from '@symbiotejs/components';
+} from '@symbiote-native/engine';
+import { resolveAccessibilityProps } from '@symbiote-native/components';
 import { descriptorToReact } from '../../descriptor-to-react';
 
 // ISwitchProps is otherwise framework-agnostic (the controlled value contract, no ref /
-// children), so its base lives in @symbiotejs/components; React supplies only the hook
+// children), so its base lives in @symbiote-native/components; React supplies only the hook
 // (useReducer + the snap-back useLayoutEffect) and the descriptor bridge.
-export type { ISwitchTrackColor } from '@symbiotejs/components';
+export type { ISwitchTrackColor } from '@symbiote-native/components';
 
 // className is React's own field per <prop_types_split_agnostic_vs_per_adapter>; not destructured
 // below, so it falls into `...passthrough` and lands on the single host node, like `style`.

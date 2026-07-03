@@ -6,9 +6,9 @@
 // so AnimatedValue's flush path doesn't throw; no view is attached.
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { AnimatedValue, Easing, parallel, sequence, spring, timing } from '@symbiotejs/engine';
-import type { IEndResult } from '@symbiotejs/engine';
-import { installFabric } from '@symbiotejs/test-utils';
+import { AnimatedValue, Easing, parallel, sequence, spring, timing } from '@symbiote-native/engine';
+import type { IEndResult } from '@symbiote-native/engine';
+import { installFabric } from '@symbiote-native/test-utils';
 
 installFabric();
 

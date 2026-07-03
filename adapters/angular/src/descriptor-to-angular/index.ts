@@ -15,7 +15,7 @@ import {
   type OnDestroy,
   type SimpleChanges,
 } from '@angular/core';
-import type { IDescriptor, IDescriptorChild } from '@symbiotejs/components';
+import type { IDescriptor, IDescriptorChild } from '@symbiote-native/components';
 
 type IRenderedChild = IRenderedElement | IRenderedText;
 

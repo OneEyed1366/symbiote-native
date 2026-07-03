@@ -2,7 +2,7 @@
 // contributes a header row, its item rows, then a footer row; the flattened sequence is fed to
 // VirtualizedList as a single tagged list, so headers, items, and footers are all windowed by the
 // same machinery. The flattening, entry keying, separator-item unwrap, and scrollToLocation
-// mapping are shared from @symbiotejs/components; this file wires React's lifecycle (refs +
+// mapping are shared from @symbiote-native/components; this file wires React's lifecycle (refs +
 // useImperativeHandle + the per-entry render dispatch). Lower layer in RN's
 // SectionList -> VirtualizedSectionList -> VirtualizedList stack.
 
@@ -15,7 +15,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { dlog, Platform, type ISymbioteEvent, type ISymbioteNode } from '@symbiotejs/engine';
+import { dlog, Platform, type ISymbioteEvent, type ISymbioteNode } from '@symbiote-native/engine';
 import {
   flattenSections,
   scrollLocationToFlatIndex,
@@ -24,7 +24,7 @@ import {
   type ISection,
   type ISectionEntry,
   type IVirtualizedSectionListHandle,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import {
   VirtualizedList,
   type ISeparators,
@@ -32,10 +32,10 @@ import {
   type IVirtualizedListHandle,
 } from '../virtualized-list';
 import type { IScrollViewHandle } from '../scroll-view';
-import type { IAccessibilityProps, IAriaProps } from '@symbiotejs/components';
+import type { IAccessibilityProps, IAriaProps } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 
-export type { ISection } from '@symbiotejs/components';
+export type { ISection } from '@symbiote-native/components';
 // Re-export the shared handle type so section-list imports it from '../virtualized-section-list'.
 export type { IVirtualizedSectionListHandle };
 

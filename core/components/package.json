@@ -1,15 +1,15 @@
 {
-  "name": "@symbiotejs/components",
+  "name": "@symbiote-native/components",
   "version": "0.1.0",
   "description": "Framework-agnostic component logic (state machines + render functions) for SymbioteJS — written once, inherited by every adapter (React, Vue, Angular, ...).",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OneEyed1366/symbiotejs.git",
+    "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
     "directory": "core/components"
   },
-  "homepage": "https://github.com/OneEyed1366/symbiotejs/tree/master/core/components#readme",
+  "homepage": "https://github.com/OneEyed1366/symbiote-native/tree/master/core/components#readme",
   "bugs": {
-    "url": "https://github.com/OneEyed1366/symbiotejs/issues"
+    "url": "https://github.com/OneEyed1366/symbiote-native/issues"
   },
   "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
   "type": "module",
@@ -39,6 +39,6 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
-    "@symbiotejs/engine": "workspace:*"
+    "@symbiote-native/engine": "workspace:*"
   }
 }

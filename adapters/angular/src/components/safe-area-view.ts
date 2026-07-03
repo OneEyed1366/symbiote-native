@@ -21,8 +21,8 @@ import {
   type IAccessibilityProps,
   type IAccessibilityStateValue,
   type IAriaProps,
-} from '@symbiotejs/components';
-import type { IStyleProp, ISymbioteEvent, IViewStyle } from '@symbiotejs/engine';
+} from '@symbiote-native/components';
+import type { IStyleProp, ISymbioteEvent, IViewStyle } from '@symbiote-native/engine';
 import { anchorHostStyle, SafeAreaViewHost, SymbioteHostPropsDirective } from '../primitives';
 
 // Angular infers an `(event)` binding's $event as the DOM Event for a custom-schema element,

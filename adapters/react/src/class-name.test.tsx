@@ -4,9 +4,9 @@
 // centralizing it was that React needed zero renderer changes, only the prop type.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiotejs/engine';
-import { mount, unmount, View } from '@symbiotejs/react';
-import { installFabric } from '@symbiotejs/test-utils';
+import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { mount, unmount, View } from '@symbiote-native/react';
+import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 909;
 const fabric = installFabric();

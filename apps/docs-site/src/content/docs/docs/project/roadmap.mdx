@@ -41,18 +41,18 @@ supports this where stock RN's persistent-mode renderer can't. Vue also
 gained `v-model` on controlled components and a working `v-show` directive;
 Angular's `[(value)]` two-way binding covers the same controlled-component
 case idiomatically. All three adapters now share one `AppRegistry` entry
-point over the same `@symbiotejs/engine` core.
+point over the same `@symbiote-native/engine` core.
 
 ## Styling / CSS compiler
 
-`@symbiotejs/css-parser` compiles plain CSS, CSS Modules, and SCSS/Sass, Less,
+`@symbiote-native/css-parser` compiles plain CSS, CSS Modules, and SCSS/Sass, Less,
 and Stylus preprocessor sources at build time into native style objects,
 resolved at runtime through a class registry shared by React, Vue, and
 Angular, including `box-shadow`, `transform`, `filter`, `transform-origin`,
 and `background-image` (gradients). It also ships type safety for
 `.module.css` imports: a `css-dts` CLI that generates a narrowed, typo-safe
 `.d.ts` next to each CSS Modules file, and a `typescript-plugin` for live
-in-editor autocomplete — see the [styling guide](/symbiotejs/docs/learn/styling/) for
+in-editor autocomplete — see the [styling guide](/symbiote-native/docs/learn/styling/) for
 setup. Svelte support and Tailwind CSS remain the open seams in this family.
 
 ## Component parity rule

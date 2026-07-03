@@ -1,10 +1,10 @@
 # SymbioteJS Angular canary
 
 Minimal React Native host app that mounts an Angular standalone component through
-`@symbiotejs/angular`.
+`@symbiote-native/angular`.
 
 The app imports its standalone host intrinsics and composed components from the public
-`@symbiotejs/angular` surface, then `ngc` compiles the app against the adapter's partial-Ivy
+`@symbiote-native/angular` surface, then `ngc` compiles the app against the adapter's partial-Ivy
 output.
 
 Angular uses the two-stage Variant 1 build pipeline:

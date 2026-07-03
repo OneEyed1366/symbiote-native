@@ -4,13 +4,13 @@
 // view names at commit.
 
 import { createElement, type FC, type Ref, type ReactNode } from 'react';
-import type { ISymbioteEvent } from '@symbiotejs/engine';
+import type { ISymbioteEvent } from '@symbiote-native/engine';
 import type { IHostInstance } from './host-instance';
 import {
   resolveAccessibilityProps,
   type IAccessibilityProps,
   type IAriaProps,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import type { IResponderProps } from './utils/responder-props';
 import type { IStyleProp, ITextStyle, IViewStyle } from './utils/styles';
 

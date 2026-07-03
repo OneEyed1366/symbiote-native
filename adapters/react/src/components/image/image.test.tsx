@@ -10,8 +10,8 @@ import {
   Image,
   setImageSourceResolver,
   type ISymbioteEvent,
-} from '@symbiotejs/react';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+} from '@symbiote-native/react';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const fabric = installFabric();
 const ROOT_TAG = 11;

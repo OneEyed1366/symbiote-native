@@ -1,4 +1,4 @@
-# @symbiotejs/android
+# @symbiote-native/android
 
 Android host-shim native modules for [SymbioteJS](../../README.md), written in Kotlin. SymbioteJS
 drives Fabric directly and bypasses RN's own renderer, which means two signals that RN's stock
@@ -16,7 +16,7 @@ observers RN already ships, independent of which renderer drives the view tree.
   `OnApplyWindowInsetsListener` on the activity's decor view, reading the IME inset directly
   (rather than `getRootWindowInsets()`, whose *consumed* insets read `0` under `adjustResize`
   while the keyboard is up) and emitting the same `keyboardDidShow`/`Hide` payload shape RN's JS
-  `Keyboard` module already listens for. `@symbiotejs/react`'s `Keyboard` resolves the
+  `Keyboard` module already listens for. `@symbiote-native/react`'s `Keyboard` resolves the
   `KeyboardObserver` module name on both iOS and Android, so the JS side stays platform-uniform
   and unchanged.
 - **`SettingsManagerModule`** (native module name `SettingsManager`) — RN's `Settings` API wraps
@@ -33,10 +33,10 @@ observers RN already ships, independent of which renderer drives the view tree.
 ## No JS/TS API of its own
 
 This package ships no JavaScript or TypeScript — it is pure native autolinking. A consuming
-Android app adds `@symbiotejs/android` as an ordinary dependency (`react-native.config.js`
+Android app adds `@symbiote-native/android` as an ordinary dependency (`react-native.config.js`
 declares its Android `sourceDir` and the `SymbioteAndroidPackage` import/instance), and RN's
 Gradle autolinking picks it up automatically. There is nothing to import from JS: the modules
-are consumed transparently through `@symbiotejs/react`'s existing `Keyboard` and `Settings`
+are consumed transparently through `@symbiote-native/react`'s existing `Keyboard` and `Settings`
 wrappers, which simply find a real native module on Android where they previously found none.
 
 ## Where it's wired

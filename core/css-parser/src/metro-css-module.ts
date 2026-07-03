@@ -52,7 +52,7 @@ export async function compileCssFile(
 
   if (!isCssModuleFile(filename)) {
     return {
-      code: `import { registerStyles } from '@symbiotejs/engine';\nregisterStyles(${JSON.stringify(parsed)});\n`,
+      code: `import { registerStyles } from '@symbiote-native/engine';\nregisterStyles(${JSON.stringify(parsed)});\n`,
     };
   }
 
@@ -76,7 +76,7 @@ export async function compileCssFile(
   return {
     code:
       [
-        `import { registerStyles } from '@symbiotejs/engine';`,
+        `import { registerStyles } from '@symbiote-native/engine';`,
         `registerStyles(${JSON.stringify(styles)});`,
         `export default ${JSON.stringify(classMap)};`,
       ].join('\n') + '\n',

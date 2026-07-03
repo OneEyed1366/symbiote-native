@@ -1,7 +1,7 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
-const base = '/symbiotejs';
+const base = '/symbiote-native';
 
 export default defineConfig({
   site: 'https://oneeyed1366.github.io',
@@ -96,7 +96,7 @@ export default defineConfig({
         {
           icon: 'github',
           label: 'GitHub',
-          href: 'https://github.com/OneEyed1366/symbiotejs',
+          href: 'https://github.com/OneEyed1366/symbiote-native',
         },
       ],
       sidebar: [

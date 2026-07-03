@@ -8,9 +8,9 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, View, findNodeHandle } from '@symbiotejs/react';
+import { mount, unmount, View, findNodeHandle } from '@symbiote-native/react';
 import { AccessibilityInfo } from '../../../../../core/engine/src/accessibility-info/index.android';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 interface IAccessibilityCall {
   node: IFakeNode;

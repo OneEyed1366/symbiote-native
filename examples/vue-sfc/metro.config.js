@@ -34,9 +34,9 @@ const config = {
     // (see core/css-parser/src/preprocessors.ts and the symbiote-sfc-style-compiler skill).
     sourceExts: [...defaultConfig.resolver.sourceExts, 'vue', 'css', 'scss', 'sass', 'less', 'styl'],
     extraNodeModules: {
-      '@symbiotejs/engine': enginePkg,
-      '@symbiotejs/components': componentsPkg,
-      '@symbiotejs/vue': vuePkg,
+      '@symbiote-native/engine': enginePkg,
+      '@symbiote-native/components': componentsPkg,
+      '@symbiote-native/vue': vuePkg,
       react: path.resolve(projectRoot, 'node_modules/react'),
       '@vue/runtime-core': path.resolve(projectRoot, 'node_modules/@vue/runtime-core'),
     },

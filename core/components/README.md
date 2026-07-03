@@ -1,9 +1,9 @@
-# @symbiotejs/components
+# @symbiote-native/components
 
 The **framework-agnostic component layer** of [SymbioteJS](../../README.md) — pure state machines
 and pure render functions for every visual component (`Switch`, `Modal`, `ScrollView`, the
 `FlatList`/`SectionList` family, …), written **once** and inherited by every framework adapter
-(`@symbiotejs/react`, `@symbiotejs/vue`, `@symbiotejs/angular`, and the ones after them). It
+(`@symbiote-native/react`, `@symbiote-native/vue`, `@symbiote-native/angular`, and the ones after them). It
 exists so that "add component X to a new adapter" means writing a thin lifecycle + descriptor
 bridge, not re-implementing X's logic per framework.
 
@@ -38,12 +38,12 @@ canonical render-only reference (no state machine needed).
 ## Usage
 
 Nearly every consumer reaches this package **through an adapter**, not directly — an app imports
-`Switch` from `@symbiotejs/react` (or `@symbiotejs/vue`), and that adapter re-exports the prop
+`Switch` from `@symbiote-native/react` (or `@symbiote-native/vue`), and that adapter re-exports the prop
 types and wires the reducer/render pair from here. Calling the render function directly is what an
 adapter itself does, to build its lifecycle wrapper:
 
 ```ts
-import { renderSwitch, createInitialSwitchState, switchReducer } from '@symbiotejs/components';
+import { renderSwitch, createInitialSwitchState, switchReducer } from '@symbiote-native/components';
 
 // inside an adapter's own hook/composable:
 const state = createInitialSwitchState();
@@ -87,20 +87,20 @@ host node untouched — the render function never names a framework type.
 ## What it does NOT do
 
 - It does not touch the DOM, Fabric, or any framework's reactivity system — it depends only on
-  `@symbiotejs/engine`'s agnostic types (`IStyleProp`, `ISymbioteEvent`, accessibility types).
+  `@symbiote-native/engine`'s agnostic types (`IStyleProp`, `ISymbioteEvent`, accessibility types).
 - It does not own `children`, refs, or render-callback props — a prop type with a framework
   element in it (`IViewProps`, `IPressableProps`, `renderItem`) is declared **per adapter**, over
   an agnostic base this package may still supply.
 - It is not itself renderable — a `Descriptor` tree only becomes native views once an adapter's
   `descriptorTo<Framework>` bridge turns it into a host element and the reconciler commits it
-  through `@symbiotejs/engine`.
+  through `@symbiote-native/engine`.
 
 ## Related packages
 
-- [`@symbiotejs/engine`](../engine) — the retained-tree/clone-on-write engine this package's
+- [`@symbiote-native/engine`](../engine) — the retained-tree/clone-on-write engine this package's
   render output ultimately commits through.
-- [`@symbiotejs/react`](../../adapters/react) / [`@symbiotejs/vue`](../../adapters/vue) /
-  [`@symbiotejs/angular`](../../adapters/angular) — the adapters that supply the lifecycle layer
+- [`@symbiote-native/react`](../../adapters/react) / [`@symbiote-native/vue`](../../adapters/vue) /
+  [`@symbiote-native/angular`](../../adapters/angular) — the adapters that supply the lifecycle layer
   over these state machines and render functions.
 
 ## Test it

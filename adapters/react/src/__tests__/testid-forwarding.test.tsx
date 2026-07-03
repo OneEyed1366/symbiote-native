@@ -30,8 +30,8 @@ import {
   SectionList,
   VirtualizedList,
   Animated,
-} from '@symbiotejs/react';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+} from '@symbiote-native/react';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 // KeyboardAvoidingView subscribes to the native Keyboard hub on mount; install the minimal fake
 // device-event hub + KeyboardObserver the dedicated keyboard tests use so it mounts headless.

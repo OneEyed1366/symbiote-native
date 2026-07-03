@@ -6,9 +6,9 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, mount, unmount } from '@symbiotejs/react';
-import { setColorProcessor } from '@symbiotejs/engine';
-import { installFabric } from '@symbiotejs/test-utils';
+import { View, mount, unmount } from '@symbiote-native/react';
+import { setColorProcessor } from '@symbiote-native/engine';
+import { installFabric } from '@symbiote-native/test-utils';
 
 // A real RN processColor turns 'red' into a platform int; this sentinel int proves the
 // key passed through processValue (COLOR_PROPS.has(key)) rather than reaching Fabric raw.

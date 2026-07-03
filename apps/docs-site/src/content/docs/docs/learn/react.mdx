@@ -12,7 +12,7 @@ SymbioteJS's shared engine instead of React Native's own Fabric host config.
 ```tsx
 import './App.css';
 import { useState } from 'react';
-import { Pressable, Text, View } from '@symbiotejs/react';
+import { Pressable, Text, View } from '@symbiote-native/react';
 
 export default function App() {
   const [count, setCount] = useState(0);
@@ -37,7 +37,7 @@ export default function App() {
 ```
 
 `StyleSheet.create` works identically if you'd rather keep style objects
-inline instead of a CSS file — see the [Styling guide](/symbiotejs/docs/learn/styling/)
+inline instead of a CSS file — see the [Styling guide](/symbiote-native/docs/learn/styling/)
 for both paths.
 
 ## React contract
@@ -51,13 +51,13 @@ React uses the React Native-style surface:
   `(state) => ReactNode`;
 - imperative APIs use React refs, for example `ref.current?.focus()` on
   `TextInput`;
-- app code imports from `@symbiotejs/react`, while the consuming app still pins
+- app code imports from `@symbiote-native/react`, while the consuming app still pins
   `react` and `react-native` at the top level.
 
 ## What SymbioteJS owns
 
 React still owns hooks, component state, and render scheduling. The adapter owns
-only the host bridge: it maps React reconciler mutations to `@symbiotejs/engine`.
+only the host bridge: it maps React reconciler mutations to `@symbiote-native/engine`.
 The engine then translates those mutations into Fabric's persistent commit model.
 
-Read the exact API surface in the [React API reference](/symbiotejs/docs/api/react/).
+Read the exact API surface in the [React API reference](/symbiote-native/docs/api/react/).

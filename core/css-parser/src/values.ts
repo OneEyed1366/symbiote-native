@@ -124,7 +124,7 @@ export function parseTextShadow(
     warnOnce(
       warned,
       'text-shadow:multiple',
-      '[@symbiotejs/css-parser] multiple text-shadow layers are not supported, only the first is applied',
+      '[@symbiote-native/css-parser] multiple text-shadow layers are not supported, only the first is applied',
     );
   }
 

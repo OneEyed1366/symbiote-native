@@ -5,9 +5,9 @@
 // numbers + the thumbImage on the current step). An adapter with a custom StepMarker slot
 // assembles the overlay itself from these same helpers, dropping its element into each mark.
 
-import { el, txt } from '@symbiotejs/components';
-import type { IDescriptor, IDescriptorChild } from '@symbiotejs/components';
-import type { IViewStyle, ITextStyle } from '@symbiotejs/engine';
+import { el, txt } from '@symbiote-native/components';
+import type { IDescriptor, IDescriptorChild } from '@symbiote-native/components';
+import type { IViewStyle, ITextStyle } from '@symbiote-native/engine';
 import {
   SLIDER_MARGIN_HORIZONTAL_PADDING,
   SLIDER_STEP_NUMBER_FONT_BIG,

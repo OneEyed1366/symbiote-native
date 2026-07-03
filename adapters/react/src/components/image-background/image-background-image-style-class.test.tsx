@@ -6,9 +6,9 @@
 // works unchanged.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiotejs/engine';
-import { ImageBackground, mount, unmount } from '@symbiotejs/react';
-import { installFabric } from '@symbiotejs/test-utils';
+import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { ImageBackground, mount, unmount } from '@symbiote-native/react';
+import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 15;
 const fabric = installFabric();

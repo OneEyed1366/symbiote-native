@@ -1,7 +1,7 @@
-# @symbiotejs/android
+# @symbiote-native/android
 
 ## 0.1.0
 
 ### Minor Changes
 
-- First public release under the @symbiotejs npm scope.
+- First public release under the @symbiote-native npm scope.

@@ -13,9 +13,9 @@
 // An uncommitted or unknown input surfaces as null.
 
 import { ElementRef } from '@angular/core';
-import { getNativeTag, isSymbioteNode, type ISymbioteNode } from '@symbiotejs/engine';
+import { getNativeTag, isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
 
-export type { IHostInstance } from '@symbiotejs/engine';
+export type { IHostInstance } from '@symbiote-native/engine';
 
 function resolveHostNode(candidate: unknown): ISymbioteNode | null {
   if (candidate === null || candidate === undefined) return null;

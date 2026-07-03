@@ -9,8 +9,8 @@
 
 import { defineComponent, Fragment, h, ref } from '@vue/runtime-core'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mount, unmount, View, Text } from '@symbiotejs/vue'
-import { installFabric } from '@symbiotejs/test-utils'
+import { mount, unmount, View, Text } from '@symbiote-native/vue'
+import { installFabric } from '@symbiote-native/test-utils'
 
 interface IRow {
   id: number

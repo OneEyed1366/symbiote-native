@@ -1,8 +1,8 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiotejs/test-utils';
-import { flattenStyle } from '@symbiotejs/engine';
+import { installFabric } from '@symbiote-native/test-utils';
+import { flattenStyle } from '@symbiote-native/engine';
 
 import { mount, unmount } from '../../render';
 import { FlatList } from './index';

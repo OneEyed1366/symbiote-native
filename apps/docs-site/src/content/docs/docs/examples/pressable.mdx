@@ -11,7 +11,7 @@ in Angular's case, that its press events are a real `@Output()`.
 
 ```tsx
 import './Pressable.css';
-import { Pressable, Text } from '@symbiotejs/react';
+import { Pressable, Text } from '@symbiote-native/react';
 
 export function PressableLabel() {
   return (
@@ -34,7 +34,7 @@ export function PressableLabel() {
 
 ```vue
 <script setup lang="ts">
-import { Pressable, Text } from '@symbiotejs/vue';
+import { Pressable, Text } from '@symbiote-native/vue';
 </script>
 
 <template>
@@ -55,7 +55,7 @@ import { Pressable, Text } from '@symbiotejs/vue';
 
 ```ts
 import { Component } from '@angular/core';
-import { Pressable, Text } from '@symbiotejs/angular';
+import { Pressable, Text } from '@symbiote-native/angular';
 import './pressable.css';
 
 @Component({
@@ -95,4 +95,4 @@ so a consumer tracks `pressed` itself off the real `(pressIn)`/`(pressOut)`
 `@Output()`s instead of receiving it from `Pressable` directly. All three read
 from the same shared press state machine underneath. `StyleSheet.create`
 works identically to a CSS class if you'd rather keep style objects inline —
-see the [Styling guide](/symbiotejs/docs/learn/styling/).
+see the [Styling guide](/symbiote-native/docs/learn/styling/).

@@ -35,7 +35,7 @@ import {
   type OnChanges,
   type OnDestroy,
 } from '@angular/core';
-import type { IStyleProp, IViewStyle } from '@symbiotejs/engine';
+import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import {
   anchorHostStyle,
   HorizontalScrollView,

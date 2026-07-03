@@ -7,8 +7,8 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Text, View, mount, unmount } from '@symbiotejs/react';
-import { installFabric } from '@symbiotejs/test-utils';
+import { Text, View, mount, unmount } from '@symbiote-native/react';
+import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 240;
 

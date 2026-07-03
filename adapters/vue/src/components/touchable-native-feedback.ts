@@ -2,7 +2,7 @@
 // like the rest of the family (the Vue twin of the React adapter). The native ripple props
 // (nativeBackgroundAndroid / nativeForegroundAndroid) ride a dedicated feedback View nested under
 // the Pressable; on iOS they are inert. The static factories + background mapping are shared in
-// @symbiotejs/components/view; Vue only attaches them onto the component value and nests the View.
+// @symbiote-native/components/view; Vue only attaches them onto the component value and nests the View.
 
 import { defineComponent, h, type VNode } from '@vue/runtime-core';
 import {
@@ -12,8 +12,8 @@ import {
   selectableBackground,
   selectableBackgroundBorderless,
   type INativeFeedbackBackground,
-} from '@symbiotejs/components';
-import { dlog } from '@symbiotejs/engine';
+} from '@symbiote-native/components';
+import { dlog } from '@symbiote-native/engine';
 import { View } from '../components';
 import {
   Pressable,
@@ -28,7 +28,7 @@ export type {
   INativeFeedbackBackground,
   IThemeAttrBackground,
   IRippleBackground,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 
 export type ITouchableNativeFeedbackProps = Omit<IPressableProps, 'style'> & {
   background?: INativeFeedbackBackground;

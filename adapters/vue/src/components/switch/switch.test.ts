@@ -9,8 +9,8 @@
 
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Switch, mount, unmount } from '@symbiotejs/vue';
-import { installFabric, type IFakeNode } from '@symbiotejs/test-utils';
+import { Switch, mount, unmount } from '@symbiote-native/vue';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 type ICommandCall = {
   name: string;

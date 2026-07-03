@@ -3,7 +3,7 @@
 // `numColumns` packs that many items into each row (a horizontal sub-View), so the virtualized
 // stream is rows, not items (RN's FlatList). All windowing, viewability, batching, and imperative
 // scrolling are inherited from VirtualizedList; the data shaping and the row/viewability/separator
-// transforms are shared from @symbiotejs/components. This file only adapts to React's lifecycle
+// transforms are shared from @symbiote-native/components. This file only adapts to React's lifecycle
 // (element creation + ref threading).
 
 import {
@@ -13,7 +13,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { dlog, resolveClassName, type ISymbioteEvent } from '@symbiotejs/engine';
+import { dlog, resolveClassName, type ISymbioteEvent } from '@symbiote-native/engine';
 import {
   SINGLE_COLUMN,
   chunkIntoRows,
@@ -22,7 +22,7 @@ import {
   lastItemOfRow,
   rowKeyExtractor,
   type IRow,
-} from '@symbiotejs/components';
+} from '@symbiote-native/components';
 import {
   VirtualizedList,
   type ISeparators,
@@ -32,7 +32,7 @@ import {
   type IViewableItemsChangedInfo,
   type IVirtualizedListHandle,
 } from '../virtualized-list';
-import type { IAccessibilityProps, IAriaProps } from '@symbiotejs/components';
+import type { IAccessibilityProps, IAriaProps } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 
 type IRenderItem<ItemT> = (info: {
