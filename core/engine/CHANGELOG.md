@@ -1,5 +1,11 @@
 # @symbiote-native/engine
 
+## 0.1.1
+
+### Patch Changes
+
+- Update package descriptions to the SymbioteNative brand name.
+
 ## 0.1.0
 
 ### Minor Changes
