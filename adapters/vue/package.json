@@ -18,6 +18,7 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./bootstrap": "./src/bootstrap.ts",
     "./runtime-helpers": "./src/runtime-helpers.ts",
     "./metro-css-parser": "./metro-css-parser.cjs"
   },
@@ -34,6 +35,10 @@
       ".": {
         "types": "./build/index.d.ts",
         "default": "./build/index.js"
+      },
+      "./bootstrap": {
+        "types": "./build/bootstrap.d.ts",
+        "default": "./build/bootstrap.js"
       },
       "./runtime-helpers": {
         "types": "./build/runtime-helpers.d.ts",

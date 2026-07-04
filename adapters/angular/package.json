@@ -22,6 +22,11 @@
       "react-native": "./build/angular/index.js",
       "default": "./src/index.ts"
     },
+    "./bootstrap": {
+      "types": "./build/angular/bootstrap.d.ts",
+      "react-native": "./build/angular/bootstrap.js",
+      "default": "./src/bootstrap.ts"
+    },
     "./metro-css-parser": "./metro-css-parser.cjs"
   },
   "files": [

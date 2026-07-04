@@ -18,6 +18,7 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./bootstrap": "./src/bootstrap.ts",
     "./metro-css-parser": "./metro-css-parser.cjs"
   },
   "files": [
@@ -33,6 +34,10 @@
       ".": {
         "types": "./build/index.d.ts",
         "default": "./build/index.js"
+      },
+      "./bootstrap": {
+        "types": "./build/bootstrap.d.ts",
+        "default": "./build/bootstrap.js"
       },
       "./metro-css-parser": "./metro-css-parser.cjs"
     }
