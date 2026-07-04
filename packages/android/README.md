@@ -7,6 +7,15 @@ project's surface never instantiates — go missing. iOS needs no equivalent pac
 counterparts (`RCTKeyboardObserver`, `RCTSettingsManager`/`NSUserDefaults`) are global native
 observers RN already ships, independent of which renderer drives the view tree.
 
+## Install
+
+```bash
+npm install @symbiote-native/android
+```
+
+Autolinked automatically by RN's Gradle plugin — see
+[No JS/TS API of its own](#no-jsts-api-of-its-own) below.
+
 ## What it re-provides
 
 - **`KeyboardObserverModule`** (native module name `KeyboardObserver`) — Android's only built-in

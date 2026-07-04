@@ -19,6 +19,19 @@ already-validated engine with zero changes to it.
 
 ---
 
+## Install
+
+```bash
+npm install @symbiote-native/angular react-native @angular/core
+```
+
+`react-native` and `@angular/core` (**>=20**, for stable zoneless change detection) stay your app's
+own top-level dependencies. There's no `create-symbiote` scaffolder yet, so the AOT pipeline
+(`ngc --watch` alongside Metro — see [Run it](#run-it)) and the Metro config come from
+[`examples/angular`](../../examples/angular) rather than a generator.
+
+---
+
 ## Use it
 
 The native entry reaches the *same* `registerRunnable` seam as React and Vue — only the adapter

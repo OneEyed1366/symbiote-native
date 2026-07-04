@@ -30,6 +30,16 @@ dance Fabric requires, done **once**, for every framework.
 The mutation API below is intentionally low-level and closely mirrors Fabric's own persistent
 semantics — it is an internal seam, not an app-facing API.
 
+### Install
+
+Most apps get this transitively, through an adapter (`@symbiote-native/react`,
+`@symbiote-native/vue`, `@symbiote-native/angular` all depend on it). Writing or debugging an
+adapter yourself:
+
+```bash
+npm install @symbiote-native/engine
+```
+
 ---
 
 ## The mutation API — `core/engine/src/node.ts`
