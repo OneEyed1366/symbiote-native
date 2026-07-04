@@ -33,6 +33,14 @@ supplies only the third:
 `Switch` is the canonical reference for a full three-layer component; `ActivityIndicator` is the
 canonical render-only reference (no state machine needed).
 
+### Install
+
+Nearly every consumer gets this transitively, through an adapter. Building a new adapter yourself:
+
+```bash
+npm install @symbiote-native/components
+```
+
 ---
 
 ## Usage

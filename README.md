@@ -142,15 +142,49 @@ live in the per-adapter READMEs:
 
 ---
 
+## Try It In Your Own App
+
+Every adapter is [published to npm](https://www.npmjs.com/org/symbiote-native) at `0.1.x`. Pick your framework and add it to an existing React Native app:
+
+```bash
+# React
+npm install @symbiote-native/react react-native react
+
+# Vue 3
+npm install @symbiote-native/vue react-native vue
+
+# Angular (>=20, for stable zoneless change detection)
+npm install @symbiote-native/angular react-native @angular/core
+```
+
+`react-native` (and `react`/`vue`/`@angular/core`) stay **your app's own top-level dependencies** —
+SymbioteNative never hides them, it only replaces the JS renderer that drives them. There's no
+`create-symbiote` scaffolder yet, so the Metro config and the `index.js` entry seam
+(`registerRunnable`, not `registerComponent`) aren't generated for you — copy them from the matching
+example app, per the adapter's own README:
+
+- **[`adapters/react`](./adapters/react)** — plain Metro, no extra build step.
+- **[`adapters/vue`](./adapters/vue)** — TSX needs nothing extra; SFC adds a Metro transformer for `.vue` files.
+- **[`adapters/angular`](./adapters/angular)** — needs `ngc --watch` running alongside Metro (AOT compiles separately from Metro).
+
+The third-party-view wrapper ([`@symbiote-native/slider`](./packages/slider)) and the Android
+host-shim package ([`@symbiote-native/android`](./packages/android)) are also on npm, installed the
+same way.
+
+---
+
 ## Status
 
 > [!WARNING]
-> **Beta. Not published to npm, no stable API yet.** The thesis is proven *three times over*: React
+> **Beta. Published to npm, no stable API yet.** The thesis is proven *three times over*: React
 > Native's renderer is extracted, and **three** frameworks — React, Vue 3, and Angular — drive the
 > same untouched framework-agnostic core on iOS + Android, with RN's own renderer never in the path.
-> It is not yet a product you can ship a real app on — APIs will still move, the long-tail prop
-> surface is hardening, automated device coverage is just coming online, and the `create-symbiote`
-> scaffolder doesn't exist yet. iOS stays the reference surface; Android is at canary parity.
+> Every adapter (and the shared core packages under it) ships to npm at `0.1.x`, so you can add one
+> to an existing RN app today — see [Try It In Your Own App](#try-it-in-your-own-app). It is not yet
+> a product you can ship a real app on unassisted — APIs will still move, the long-tail prop surface
+> is hardening, automated device coverage is just coming online, and the `create-symbiote` scaffolder
+> doesn't exist yet, so wiring Metro/CocoaPods follows the example apps rather than one command. iOS
+> stays the reference surface; Android is at canary parity.
 
 **Proven on device, both platforms, RN's renderer never in the path:** every primitive
 (`View` / `Text` / `Image` / `ScrollView` / `TextInput` / `Pressable` / `Switch` / `Modal` / the
@@ -317,11 +351,13 @@ its native C++/Obj-C++/JNI sources are never touched. SymbioteNative replaces on
 it to validate the native pipe and the commit engine first means that when Vue/Svelte/Solid/
 Angular break, the failure isolates to *that adapter* — not the native stack underneath it.
 
-**Can I use it today?** Not for a real app yet — it's beta: no stable API, no `create-symbiote`
-scaffolder. The thesis is proven, though — **three** frameworks (React, Vue 3, and Angular) drive
-the agnostic core on iOS + Android with RN's renderer never in the path. You can read the
-architecture, run the `vitest` suite and the `Detox` journeys, drive any of the four canaries, and
-follow the milestones.
+**Can I use it today?** The packages are on npm — you can `npm install @symbiote-native/react` (or
+`vue` / `angular`) into an existing RN app today, see [Try It In Your Own
+App](#try-it-in-your-own-app). It's still beta, though: no stable API yet, and no `create-symbiote`
+scaffolder, so Metro/CocoaPods wiring follows the example apps rather than one command. The thesis
+is proven — **three** frameworks (React, Vue 3, and Angular) drive the agnostic core on iOS +
+Android with RN's renderer never in the path. You can read the architecture, run the `vitest` suite
+and the `Detox` journeys, drive any of the four canaries, and follow the milestones.
 
 **Do I have to write tests from scratch?** No — and that's a feature of the design. Because a
 SymbioteNative app is a stock RN app underneath, RN's testing tools apply unchanged: a headless `vitest`

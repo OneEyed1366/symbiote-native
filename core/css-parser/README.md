@@ -14,6 +14,16 @@ CSS Modules all work identically regardless of source language.
 
 ---
 
+## Install
+
+Not installed directly by an app — each adapter package (`@symbiote-native/react`,
+`@symbiote-native/vue`, `@symbiote-native/angular`) already depends on it and re-exports it via its
+own `./metro-css-parser` subpath. Writing a Metro transformer for a new adapter yourself:
+
+```bash
+npm install @symbiote-native/css-parser
+```
+
 ## Who calls this, and how
 
 **An app never imports this package directly.** It runs only inside a Metro transformer, on the

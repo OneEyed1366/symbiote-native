@@ -9,6 +9,15 @@ instead of importing the library's React component — the same mechanism Symbio
 own primitives. See the `symbiote-third-party-native-view` skill and ADR 0027 for the full
 mechanism and rationale.
 
+## Install
+
+```bash
+npm install @symbiote-native/slider
+```
+
+Only this package — never `@react-native-community/slider` directly, see
+[Packaging](#packaging--one-dependency-not-two) below for why.
+
 ## Shape
 
 One framework-agnostic core, one thin entry per adapter, selected through the package's `exports`
