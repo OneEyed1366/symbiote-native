@@ -5,7 +5,7 @@ export { hashFilePath } from './file-scope-id.ts';
 export { compileCssFile, isCssModuleFile } from './metro-css-module.ts';
 export type { ICompiledCssFile } from './metro-css-module.ts';
 export { classNamesToDtsSource, generateModuleDts } from './generate-dts.ts';
-export { createCssMetroTransformer } from './metro-transformer.ts';
+export { createCssMetroTransformer, resolveUpstreamTransformer } from './metro-transformer.ts';
 export type { IMetroTransformer, IMetroTransformParams } from './metro-transformer.ts';
 export {
   compileScss,

@@ -17,6 +17,10 @@ export default defineConfig({
     include: [
       'core/**/src/**/*.test.{ts,tsx}',
       'adapters/**/src/**/*.test.{ts,tsx}',
+      // A Metro transformer must be a hand-authored, package-root .cjs (Metro requires() it
+      // directly; a compiled-from-src ESM file wouldn't load) — its co-located test lives at
+      // the same root level, not under src/. See adapters/vue/metro-vue-transformer.cjs.
+      'adapters/*/*.test.{ts,tsx}',
       'packages/**/src/**/*.test.{ts,tsx}',
       'examples/*/**/*.test.{ts,tsx}',
     ],

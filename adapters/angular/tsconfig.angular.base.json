@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "declaration": false,
+    "sourceMap": true,
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "ignoreDeprecations": "6.0",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true
+  },
+  "angularCompilerOptions": {
+    "compilationMode": "partial",
+    "strictTemplates": true
+  }
+}

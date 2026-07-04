@@ -1,12 +1,12 @@
 // A ready-made Metro babel transformer wrapper for .css/.scss/.sass/.less/.styl (+ their
-// .module.* twins) support, so a consuming app's own metro.config.js needs only a 3-line wiring
-// file instead of hand-rolling the "compile a style file, delegate everything else to upstream"
-// boilerplate three times (once per adapter's example, before this existed). @symbiote-native/css-parser
-// is a regular `dependency` of every adapter package (@symbiote-native/react, @symbiote-native/vue,
-// @symbiote-native/angular), so this is transitively resolvable from any app that already depends on one
-// of them — this repo's shamefully-hoist pnpm config (.npmrc) makes that resolvable without the
-// app adding @symbiote-native/css-parser to its own package.json. See the symbiote-sfc-style-compiler
-// skill.
+// .module.* twins) support, so a consuming app's own metro.config.js needs only
+// `babelTransformerPath: require.resolve('@symbiote-native/<adapter>/metro-css-parser')` instead of
+// hand-rolling the "compile a style file, delegate everything else to upstream" boilerplate once
+// per adapter's example. @symbiote-native/css-parser is a regular `dependency` of every adapter
+// package (@symbiote-native/react, @symbiote-native/vue, @symbiote-native/angular), so this is
+// transitively resolvable from any app that already depends on one of them — this repo's
+// shamefully-hoist pnpm config (.npmrc) makes that resolvable without the app adding
+// @symbiote-native/css-parser to its own package.json. See the symbiote-sfc-style-compiler skill.
 //
 // Sync vs async: `transform()` is async uniformly, for every recognized style extension
 // including plain `.css`. Metro's own `metro-transform-worker` already does
@@ -22,6 +22,7 @@
 // duplication. `return upstreamTransformer.transform(...)` as the last line of an async function
 // forwards whatever it returns (Promise or not) as this function's own resolved value with no
 // extra `await` needed; Metro awaits the whole chain regardless.
+import { createRequire } from 'node:module';
 import { compileCssFile } from './metro-css-module.ts';
 import { isStyleFile } from './preprocessors.ts';
 
@@ -38,8 +39,21 @@ export interface IMetroTransformer {
   getCacheKey?: (...args: unknown[]) => string;
 }
 
+// @react-native/metro-babel-transformer is a real `dependency` of this package (not merely a
+// peer/dev dep), so it lands in css-parser's OWN resolvable node_modules under pnpm — no
+// hoisting or `paths`-anchored require.resolve trick needed, unlike the app-local workaround
+// this replaces (formerly duplicated in every adapter's example metro-css-transformer.js).
+// Exported (not just used internally) so a per-framework Metro transformer that ALSO needs to
+// delegate to the upstream RN transformer (the Vue SFC transformer, for its non-.vue passthrough
+// branch) can reuse this instead of its own fragile direct `require('@react-native/metro-babel-
+// transformer')`, which would only resolve for an external install by accident of hoisting.
+export function resolveUpstreamTransformer(): IMetroTransformer {
+  const require = createRequire(import.meta.url);
+  return require('@react-native/metro-babel-transformer');
+}
+
 export function createCssMetroTransformer(
-  upstreamTransformer: IMetroTransformer,
+  upstreamTransformer: IMetroTransformer = resolveUpstreamTransformer(),
 ): IMetroTransformer {
   return {
     async transform(params) {

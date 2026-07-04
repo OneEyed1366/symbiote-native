@@ -54,6 +54,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
+    "@react-native/metro-babel-transformer": "catalog:",
     "postcss": "catalog:",
     "postcss-value-parser": "catalog:"
   },

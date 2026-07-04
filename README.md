@@ -301,7 +301,10 @@ example app for `Detox`) rather than gathered in one directory.
 
 ## Develop
 
-Requires Node ≥ 22.13 and pnpm 11.
+Requires Node ≥ 22.13, pnpm 11, and [watchman](https://facebook.github.io/watchman/docs/install)
+(macOS: `brew install watchman`) — without it, Metro's fallback file watcher opens one OS file
+handle per watched directory and reliably crashes with `EMFILE: too many open files` once it's
+watching a monorepo this size.
 
 ```bash
 pnpm install

@@ -27,13 +27,23 @@
       "react-native": "./build/angular/bootstrap.js",
       "default": "./src/bootstrap.ts"
     },
-    "./metro-css-parser": "./metro-css-parser.cjs"
+    "./metro-css-parser": "./metro-css-parser.cjs",
+    "./metro-config": "./metro-config.cjs",
+    "./babel-linker": "./babel-linker.cjs",
+    "./tsconfig.angular.base.json": "./tsconfig.angular.base.json"
   },
   "files": [
     "src",
     "build",
-    "metro-css-parser.cjs"
+    "bin",
+    "metro-css-parser.cjs",
+    "metro-config.cjs",
+    "babel-linker.cjs",
+    "tsconfig.angular.base.json"
   ],
+  "bin": {
+    "symbiote-angular-dev": "./bin/symbiote-angular-dev.cjs"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -44,6 +54,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
+    "@angular/compiler-cli": "catalog:",
     "@symbiote-native/components": "workspace:*",
     "@symbiote-native/css-parser": "workspace:*",
     "@symbiote-native/engine": "workspace:*"
@@ -54,7 +65,6 @@
   },
   "devDependencies": {
     "@angular/compiler": "catalog:",
-    "@angular/compiler-cli": "catalog:",
     "@angular/core": "catalog:",
     "@symbiote-native/test-utils": "workspace:*",
     "@types/node": "catalog:",

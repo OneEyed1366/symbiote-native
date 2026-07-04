@@ -20,11 +20,13 @@
     ".": "./src/index.ts",
     "./bootstrap": "./src/bootstrap.ts",
     "./runtime-helpers": "./src/runtime-helpers.ts",
-    "./metro-css-parser": "./metro-css-parser.cjs"
+    "./metro-css-parser": "./metro-css-parser.cjs",
+    "./metro-vue-transformer": "./metro-vue-transformer.cjs"
   },
   "files": [
     "build",
-    "metro-css-parser.cjs"
+    "metro-css-parser.cjs",
+    "metro-vue-transformer.cjs"
   ],
   "publishConfig": {
     "access": "public",
@@ -44,7 +46,8 @@
         "types": "./build/runtime-helpers.d.ts",
         "default": "./build/runtime-helpers.js"
       },
-      "./metro-css-parser": "./metro-css-parser.cjs"
+      "./metro-css-parser": "./metro-css-parser.cjs",
+      "./metro-vue-transformer": "./metro-vue-transformer.cjs"
     }
   },
   "scripts": {
@@ -55,6 +58,8 @@
     "@symbiote-native/components": "workspace:*",
     "@symbiote-native/css-parser": "workspace:*",
     "@symbiote-native/engine": "workspace:*",
+    "@vue/compiler-core": "catalog:",
+    "@vue/compiler-sfc": "catalog:",
     "@vue/runtime-core": "catalog:"
   },
   "peerDependencies": {

@@ -60,4 +60,13 @@ describe('createCssMetroTransformer', () => {
 
     expect(transformer.getCacheKey).toBe(upstream.getCacheKey);
   });
+
+  it('resolves @react-native/metro-babel-transformer itself when no upstream is given', () => {
+    // A real transform() call needs a full Metro transform-worker context (projectRoot, config…)
+    // that only Metro itself constructs — resolving without throwing is what this guards against
+    // the app-local `paths`-anchored require.resolve workaround this replaces.
+    const transformer = createCssMetroTransformer();
+
+    expect(typeof transformer.getCacheKey).toBe('function');
+  });
 });
