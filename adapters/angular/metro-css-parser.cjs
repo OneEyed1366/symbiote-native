@@ -8,4 +8,7 @@
 // the way a flat classic node_modules would). .cjs, not .js: this package is "type": "module",
 // and Metro's babelTransformerPath loading expects a require()-able module. See the
 // symbiote-sfc-style-compiler skill.
-module.exports = require('@symbiote-native/css-parser');
+// createCssMetroTransformer is a factory, not a ready transformer — Metro's
+// babelTransformerPath needs the actual {transform, getCacheKey} object it returns,
+// not the css-parser package barrel.
+module.exports = require('@symbiote-native/css-parser').createCssMetroTransformer();

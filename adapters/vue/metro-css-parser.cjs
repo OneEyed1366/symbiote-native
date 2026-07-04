@@ -6,7 +6,12 @@
 // requiring FILE's own location, so this indirection is what actually removes the extra install
 // step, not pnpm hoisting (which does not propagate this transitively across workspace packages
 // the way a flat classic node_modules would). .cjs, not .js: this package is "type": "module",
-// and Metro's babelTransformerPath loading expects a require()-able module. Used by
-// examples/vue-sfc/metro-vue-transformer.js for BOTH its inline <style> block compilation and
-// standalone .css/.module.css file imports. See the symbiote-sfc-style-compiler skill.
-module.exports = require('@symbiote-native/css-parser');
+// and Metro's babelTransformerPath loading expects a require()-able module. Used as
+// vue-tsx's babelTransformerPath for standalone .css/.module.css file imports —
+// metro-vue-transformer.cjs (the .vue SFC transformer) requires @symbiote-native/css-parser
+// directly instead, since it needs the individual parse/compile functions, not a Metro
+// transformer object. See the symbiote-sfc-style-compiler skill.
+// createCssMetroTransformer is a factory, not a ready transformer — Metro's
+// babelTransformerPath needs the actual {transform, getCacheKey} object it returns,
+// not the css-parser package barrel.
+module.exports = require('@symbiote-native/css-parser').createCssMetroTransformer();
