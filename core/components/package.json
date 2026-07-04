@@ -17,7 +17,8 @@
   "module": "src/index.ts",
   "types": "src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./bootstrap": "./src/bootstrap.ts"
   },
   "files": [
     "build"
@@ -31,6 +32,10 @@
       ".": {
         "types": "./build/index.d.ts",
         "default": "./build/index.js"
+      },
+      "./bootstrap": {
+        "types": "./build/bootstrap.d.ts",
+        "default": "./build/bootstrap.js"
       }
     }
   },
@@ -40,5 +45,11 @@
   },
   "dependencies": {
     "@symbiote-native/engine": "workspace:*"
+  },
+  "peerDependencies": {
+    "react-native": ">=0.86"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
   }
 }
