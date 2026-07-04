@@ -22,11 +22,11 @@ const runtimeCore = path.resolve(projectRoot, 'node_modules/@vue/runtime-core');
 const config = {
   // JSX is still compiled by @vue/babel-plugin-jsx via babel.config.js regardless of which
   // transformer runs it (unlike the SFC canary, which needs a Metro transformer to compile
-  // .vue) — the custom transformer below only adds standalone .css/.module.css compilation
-  // on top of the stock RN babel transformer, the same framework-agnostic path the React and
-  // Angular examples wire (see metro-css-transformer.js).
+  // .vue) — @symbiote-native/vue ships the standalone .css/.module.css transformer itself
+  // (same framework-agnostic path the React and Angular examples use via their own adapter's
+  // ./metro-css-parser export), so no local wiring file is needed here either.
   transformer: {
-    babelTransformerPath: require.resolve('./metro-css-transformer.js'),
+    babelTransformerPath: require.resolve('@symbiote-native/vue/metro-css-parser'),
   },
   // Watch the whole monorepo: examples/* are now pnpm-workspace packages whose deps
   // (react, @babel/runtime, …) are symlinked into the repo-root `.pnpm` store, so Metro

@@ -1,26 +1,19 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "@symbiote-native/angular/tsconfig.angular.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "Bundler",
-    "strict": true,
-    "skipLibCheck": true,
     "rootDir": ".",
     "outDir": "build/angular",
-    "noEmit": false,
-    "allowImportingTsExtensions": false,
-    "declaration": false,
-    "sourceMap": true,
-    "lib": ["ES2022", "DOM"],
-    "types": ["node"],
-    "ignoreDeprecations": "6.0",
     "baseUrl": "."
   },
-  "angularCompilerOptions": {
-    "compilationMode": "partial",
-    "strictTemplates": true
-  },
   "files": ["App.ts", "css.d.ts"],
-  "exclude": ["build", "e2e", "**/node_modules", "**/Pods"]
+  "exclude": ["build", "e2e", "**/node_modules", "**/Pods"],
+  // Editor tsserver honors this (and resolves it relative to THIS file, not the
+  // extended tsconfig.angular.base.json — microsoft/TypeScript#55656 — so it can't
+  // live in the shared base). `ngc --watch` itself does NOT: @angular/compiler-cli's
+  // watch mode calls chokidar directly (perform_watch.js) instead of TS's native
+  // watch host, so watchOptions has zero effect on it — see angular-adapter-build
+  // skill's gotchas table if ngc --watch hits EMFILE again.
+  "watchOptions": {
+    "excludeDirectories": ["**/node_modules", "../../node_modules", "**/.git", "**/build"]
+  }
 }

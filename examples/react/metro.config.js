@@ -18,11 +18,11 @@ const reactPkg = path.resolve(repoRoot, 'adapters/react');
 const defaultConfig = getDefaultConfig(projectRoot);
 
 const config = {
-  // Compile standalone .css/.module.css imports on the way into the bundle (see
-  // metro-css-transformer.js) — the framework-agnostic path, mirrored in the Vue and Angular
-  // examples' own metro configs.
+  // Compile standalone .css/.module.css imports on the way into the bundle —
+  // @symbiote-native/react ships this transformer itself, the framework-agnostic path
+  // mirrored by the Vue and Angular examples' own adapter's ./metro-css-parser export.
   transformer: {
-    babelTransformerPath: require.resolve('./metro-css-transformer.js'),
+    babelTransformerPath: require.resolve('@symbiote-native/react/metro-css-parser'),
   },
   // Watch the whole monorepo: examples/* are now pnpm-workspace packages whose deps
   // (react, @babel/runtime, …) are symlinked into the repo-root `.pnpm` store, so Metro

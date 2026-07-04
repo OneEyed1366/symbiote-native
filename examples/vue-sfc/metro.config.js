@@ -18,9 +18,10 @@ const defaultConfig = getDefaultConfig(projectRoot);
  * @type {import('@react-native/metro-config').MetroConfig}
  */
 const config = {
-  // Compile .vue SFCs on the way into the bundle (see metro-vue-transformer.js).
+  // Compile .vue SFCs on the way into the bundle — @symbiote-native/vue ships the transformer
+  // itself, so no local wiring file is needed (see adapters/vue/metro-vue-transformer.cjs).
   transformer: {
-    babelTransformerPath: require.resolve('./metro-vue-transformer.js'),
+    babelTransformerPath: require.resolve('@symbiote-native/vue/metro-vue-transformer'),
   },
   // Watch the whole monorepo: examples/* are now pnpm-workspace packages whose deps
   // (react, @babel/runtime, …) are symlinked into the repo-root `.pnpm` store, so Metro

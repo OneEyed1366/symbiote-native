@@ -38,8 +38,6 @@
     "@symbiote-native/css-parser": "catalog:",
     "@types/jest": "catalog:",
     "@types/node": "catalog:",
-    "@vue/compiler-core": "catalog:",
-    "@vue/compiler-sfc": "catalog:",
     "detox": "catalog:",
     "eslint": "catalog:rn-app",
     "jest": "catalog:",

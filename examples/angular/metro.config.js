@@ -1,6 +1,6 @@
-const fs = require('fs');
 const path = require('path');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+const { withSymbioteAngularMetroConfig } = require('@symbiote-native/angular/metro-config');
 
 const projectRoot = __dirname;
 const repoRoot = path.resolve(projectRoot, '../..');
@@ -22,45 +22,19 @@ const defaultConfig = getDefaultConfig(projectRoot);
  * @type {import('@react-native/metro-config').MetroConfig}
  */
 const config = {
-  // Compile standalone .css/.module.css imports on the way into the bundle (see
-  // metro-css-transformer.js) — the framework-agnostic path, mirrored in the React and Vue
-  // examples' own metro configs. Angular has no compiler-plugin conflict here: the ngc/linker
+  // Compile standalone .css/.module.css imports on the way into the bundle —
+  // @symbiote-native/angular ships the transformer itself, so no local wiring file is needed
+  // (same framework-agnostic path the React and Vue examples use via their own adapter's
+  // ./metro-css-parser export). Angular has no compiler-plugin conflict here: the ngc/linker
   // pipeline (see the block comment above) only ever sees .ts files, never .css.
   transformer: {
-    babelTransformerPath: require.resolve('./metro-css-transformer.js'),
+    babelTransformerPath: require.resolve('@symbiote-native/angular/metro-css-parser'),
   },
   watchFolders: [repoRoot],
   resolver: {
-    // Teach Metro that a style file is a source file (the transformer turns it into a module).
-    // scss/sass/less/styl are optional SCSS/Sass/Less/Stylus preprocessor sources — see
-    // core/css-parser/src/preprocessors.ts and the symbiote-sfc-style-compiler skill.
-    sourceExts: [...defaultConfig.resolver.sourceExts, 'css', 'scss', 'sass', 'less', 'styl'],
-    // ngc mirrors this app's whole source tree into build/angular (see the block comment above),
-    // but it only ever compiles .ts — a relative style import (`import './App.css'`) survives
-    // untouched in the compiled .js, still pointing at the ORIGINAL source location, which ngc
-    // never copies there. Metro resolves that relative specifier against the COMPILED file's own
-    // location (build/angular/...), so without this it 404s on a build/angular/App.css that was
-    // never created. Redirects such an import back to the real source file instead of copying it:
-    // a copy would need its own re-copy on every CSS edit during `ng:watch` (which only re-runs
-    // ngc on .ts changes), while this redirect lets Metro's own watchFolders — already covering
-    // the whole repo — pick up a source-file CSS edit for free. Applies identically to a release
-    // `react-native bundle`, which resolves through this same config.
-    resolveRequest: (context, moduleName, platform) => {
-      const isRelativeStyleImport =
-        /^\.\.?\//.test(moduleName) && /\.(css|scss|sass|less|styl)$/.test(moduleName);
-      if (isRelativeStyleImport) {
-        const buildRoot = path.join(projectRoot, 'build', 'angular');
-        const originDir = path.dirname(context.originModulePath);
-        if (originDir === buildRoot || originDir.startsWith(buildRoot + path.sep)) {
-          const sourceDir = path.join(projectRoot, path.relative(buildRoot, originDir));
-          const sourceFile = path.resolve(sourceDir, moduleName);
-          if (fs.existsSync(sourceFile)) {
-            return { type: 'sourceFile', filePath: sourceFile };
-          }
-        }
-      }
-      return context.resolveRequest(context, moduleName, platform);
-    },
+    // sourceExts + the ngc-outDir CSS-redirect resolveRequest — see
+    // adapters/angular/metro-config.cjs for the full mechanism.
+    ...withSymbioteAngularMetroConfig(defaultConfig, projectRoot).resolver,
     extraNodeModules: {
       '@symbiote-native/engine': enginePkg,
       '@symbiote-native/components': componentsPkg,
