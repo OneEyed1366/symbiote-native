@@ -1,5 +1,17 @@
 # @symbiote-native/slider
 
+## 2.0.1
+
+### Patch Changes
+
+- Updated dependencies [204901b]
+- Updated dependencies [c66082c]
+  - @symbiote-native/angular@0.3.1
+  - @symbiote-native/react@0.2.2
+  - @symbiote-native/vue@0.3.1
+  - @symbiote-native/engine@0.1.2
+  - @symbiote-native/components@0.2.1
+
 ## 2.0.0
 
 ### Patch Changes
