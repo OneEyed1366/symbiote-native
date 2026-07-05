@@ -1,5 +1,13 @@
 # @symbiote-native/components
 
+## 0.2.2
+
+### Patch Changes
+
+- 46a4f27: Documentation and code-comment cleanup: remove internal-only references and tighten wording. No runtime or API changes.
+- Updated dependencies [46a4f27]
+  - @symbiote-native/engine@0.1.3
+
 ## 0.2.1
 
 ### Patch Changes

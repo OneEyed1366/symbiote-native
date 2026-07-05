@@ -1,5 +1,11 @@
 # @symbiote-native/css-parser
 
+## 0.2.1
+
+### Patch Changes
+
+- 46a4f27: Documentation and code-comment cleanup: remove internal-only references and tighten wording. No runtime or API changes.
+
 ## 0.2.0
 
 ### Minor Changes
