@@ -1,5 +1,4 @@
-// Co-located integration test (ADR 0025), ported from the headless `animated-timing.smoke.ts`.
-// The JS-driven Animated drivers + composition (ADR 0016, Phase 2): timing / spring drive an
+// The JS-driven Animated drivers + composition: timing / spring drive an
 // AnimatedValue over real rAF frames; stop() cancels mid-flight; sequence / parallel compose.
 // A setTimeout polyfill stands in for the host's requestAnimationFrame so the drivers' frame
 // loops run under Node. We observe the value through addListener. The Fabric slot is only here

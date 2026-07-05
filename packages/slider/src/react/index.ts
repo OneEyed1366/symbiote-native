@@ -2,7 +2,7 @@
 // Importing this barrel first registers the native view's ViewConfig (../register, a side-effect
 // import of the codegen spec — never the library's React Slider component), then exposes the
 // platform-split Slider. The public prop type is the agnostic base plus React's StepMarker render
-// component (Vue takes the same marker as a scoped slot). See ADR 0027.
+// component (Vue takes the same marker as a scoped slot).
 
 import '../register';
 

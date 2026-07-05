@@ -1,4 +1,3 @@
-// Co-located React-driven test (ADR 0025), ported from the headless `image.smoke`.
 // Checks the two things only Image does: `source` reaches native as an ARRAY, and an opaque
 // require()-style number is expanded by the injected resolver before it gets there. Plus the W3C
 // aliases (`src` / `alt`) and the onLoad event round-trip. No simulator.

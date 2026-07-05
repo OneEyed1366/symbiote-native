@@ -5,7 +5,7 @@
 //
 // device-verify-pending: the `IntentAndroid` name and routing are confirmed from RN
 // source but not yet exercised on a real Android host; only a bridgeless resolution
-// log there can prove the name. See .docs/native-module-platform-routing.md.
+// log there can prove the name.
 
 import { createLinking } from './shared';
 

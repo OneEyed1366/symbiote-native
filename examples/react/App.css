@@ -1,7 +1,6 @@
 /* Symbiote canary app — static styles, compiled at build time by @symbiote-native/css-parser
-   into the same RN style objects StyleSheet.create used to produce (see the
-   symbiote-sfc-style-compiler skill). Referenced via className, now supported on every
-   component's public prop type. `transform`/`transformOrigin`/`filter`/`box-shadow`/
+   into the same RN style objects StyleSheet.create used to produce. Referenced via className,
+   now supported on every component's public prop type. `transform`/`transformOrigin`/`filter`/`box-shadow`/
    `background-image` ARE supported (raw CSS-text passthrough, 2026-07 — see .gradient-card
    below) — App.tsx's existing shadow-card/filter-tile/rotated-card demos just predate that
    and still use inline dynamic style, which is still valid, not a gap. What stays in

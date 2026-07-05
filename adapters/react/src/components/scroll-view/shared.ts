@@ -1,14 +1,14 @@
 // ScrollView: shared core. The Fabric tree is nested: the scroll view wraps a content
 // view that holds the children (RN's own ScrollView.js shape). Building that content
 // node, resolving decelerationRate, and the prop plumbing are platform-invariant and
-// live here. What diverges (ADR 0020) is how a RefreshControl integrates: on iOS it is a
+// live here. What diverges is how a RefreshControl integrates: on iOS it is a
 // CHILD of the scroll view (sibling of the content), on Android it WRAPS the scroll view
 // (AndroidSwipeRefreshLayout is the parent, ScrollView nested inside). So the .ios/.android
 // files assemble the final element; the filename selects, no Platform.OS read.
 //
 // The framework-agnostic pieces (decelerationRate, the per-axis intrinsics/base style, the
 // content-size dedupe, the imperative handle, splitLayoutProps, the sticky math, the native
-// scroll-attach) live in @symbiote-native/components (ADR 0024); this file holds only the React
+// scroll-attach) live in @symbiote-native/components; this file holds only the React
 // lifecycle (refs/state/effects) and the element assembly that consumes them.
 
 import {

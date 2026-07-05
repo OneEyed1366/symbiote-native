@@ -5,8 +5,7 @@
 //
 // device-verify-pending: the `Vibration` name and the `vibrateByPattern` routing are
 // confirmed from RN source but not yet exercised on a real Android host: only a
-// bridgeless resolution log there can prove the name. See
-// .docs/native-module-platform-routing.md.
+// bridgeless resolution log there can prove the name.
 
 import { createVibration } from './shared';
 

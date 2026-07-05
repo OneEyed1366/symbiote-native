@@ -1,5 +1,4 @@
-// Co-located React-driven test (ADR 0025), ported from the headless `animated-component.smoke`.
-// Proves the React Animated component bridge (Phase 2): mount <Animated.View style={{ opacity }}>,
+// React-driven test proving the React Animated component bridge: mount <Animated.View style={{ opacity }}>,
 // then drive the value by hand with setValue and assert the new opacity reached the committed view
 // through a scoped commit. The per-frame path under test is
 // value.setValue -> flushValue -> AnimatedProps.update() -> setNativeProps. No simulator.

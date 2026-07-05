@@ -2,7 +2,7 @@
 // `OS` is the static 'android'; `Version` is the numeric API level and the rest come
 // from the PlatformConstants native module (RN spec NativePlatformConstantsAndroid.js,
 // a different payload from iOS). Metro picks this on an Android host. The module name is
-// the same 'PlatformConstants'; only the shape differs. See .docs/decisions/0022.
+// the same 'PlatformConstants'; only the shape differs.
 
 import { createConstantsResolver, type IPlatformSelectSpec, type IPlatformStatic } from './shared';
 

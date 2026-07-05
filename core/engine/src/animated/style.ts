@@ -2,7 +2,7 @@
 // `transform` whose entries may themselves be AnimatedNodes. Ported from RN's
 // AnimatedStyle.js + AnimatedTransform.js, NUMERIC path only: the native-driver
 // config (__makeNative / __getNativeConfig / allowlist) and the web/string/color
-// branches are stripped (ADR 0016). On __getValue() each node re-pulls its
+// branches are stripped. On __getValue() each node re-pulls its
 // animated entries into a plain flat object the props leaf hoists onto the view.
 
 import { AnimatedNode, AnimatedWithChildren } from './graph';
@@ -96,7 +96,7 @@ export class AnimatedTransform extends AnimatedWithChildren {
   }
 
   // Native: one entry per transform, animated entries pointing at their value's
-  // native tag, static ones carrying the (angle-normalized) literal (ADR 0017).
+  // native tag, static ones carrying the (angle-normalized) literal.
   override __getNativeConfig(): INativeNodeConfig {
     const transforms: Record<string, unknown>[] = [];
     for (const entry of this.transforms) {
@@ -180,7 +180,7 @@ export class AnimatedStyle extends AnimatedWithChildren {
     super.__detach();
   }
 
-  // Native: map each animated style key to its value's native tag (ADR 0017).
+  // Native: map each animated style key to its value's native tag.
   // Static keys are not in the native style node. The view already carries them.
   override __getNativeConfig(): INativeNodeConfig {
     const style: Record<string, number> = {};

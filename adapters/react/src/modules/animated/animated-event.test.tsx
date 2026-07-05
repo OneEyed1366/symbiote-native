@@ -1,5 +1,5 @@
-// Co-located React-driven test (ADR 0025), ported from the headless `animated-event.smoke`.
-// Proves Animated.event: the JS path and its native attach wiring. The shared fake Fabric slot
+// React-driven test proving Animated.event: the JS path and its native attach wiring.
+// The shared fake Fabric slot
 // keeps each view's real reactTag so a scoped setNativeProps commit is observable; a fake
 // NativeAnimatedTurboModule records the native-event registration. No simulator.
 

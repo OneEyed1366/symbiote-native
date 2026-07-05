@@ -1,7 +1,6 @@
 // StatusBar on iOS drives the iOS `StatusBarManager` TurboModule from props (via
 // applyStatusBarProps) and from the static methods (statusBarImperative). The native
-// contract is RN's spec at
-// .vendors/react-native/.../src/private/specs_DEPRECATED/modules/NativeStatusBarManagerIOS.js:
+// contract mirrors RN's own NativeStatusBarManagerIOS spec:
 //   setStyle(statusBarStyle?: string, animated: boolean)
 //   setHidden(hidden: boolean, withAnimation: 'none' | 'fade' | 'slide')
 //   setNetworkActivityIndicatorVisible(visible: boolean)

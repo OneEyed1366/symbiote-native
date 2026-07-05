@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for the Appearance module. A fake __turboModuleProxy
+// Co-located unit test for the Appearance module. A fake __turboModuleProxy
 // returns an Appearance native module (getColorScheme -> 'light' plus observe-counters); a
 // fake RN$registerCallableModule captures the device hub so the test can play "native" and
 // emit `appearanceChanged`.

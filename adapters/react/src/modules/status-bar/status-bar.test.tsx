@@ -1,4 +1,3 @@
-// Co-located React-driven test (ADR 0025), ported from `status-bar.smoke.tsx`.
 // Proves the StatusBar primitive, the first JS->native consumer of the native-module
 // bridge. The shared fake-Fabric slot records the committed tree; a fake
 // __turboModuleProxy returns a StatusBarManager that records its calls. We mount

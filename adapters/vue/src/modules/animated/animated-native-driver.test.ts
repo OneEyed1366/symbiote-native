@@ -1,6 +1,6 @@
-// Co-located Vue-driven test (ADR 0025), the Vue twin of
+// Co-located Vue-driven test, the Vue twin of
 // adapters/react/src/animated/animated-native-driver.test.tsx. Proves the Animated NATIVE driver
-// wiring (ADR 0017) through the VUE lifecycle: a fake NativeAnimatedTurboModule records every call,
+// wiring through the VUE lifecycle: a fake NativeAnimatedTurboModule records every call,
 // so we assert (no simulator) that `useNativeDriver:true` mirrors the value graph into native,
 // wires it, binds the props node to the committed view's Fabric tag (connectAnimatedNodeToView),
 // hands the curve to native, keeps the JS view frozen while native drives, and syncs the JS value

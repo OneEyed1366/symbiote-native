@@ -22,10 +22,9 @@ import { getNativeModule } from '../native-modules';
 import { dlog } from '../debug';
 
 // The native module name RN registers this TurboModule under
-// (`TurboModuleRegistry.get<Spec>('PermissionsAndroid')`). NOTE: per the
-// symbiote invariant, a module name is only provable on a real host (a headless
-// fake answers to any name); this name is device-verify-pending. See
-// .docs/native-module-platform-routing.md.
+// (`TurboModuleRegistry.get<Spec>('PermissionsAndroid')`). NOTE: a module name is
+// only provable on a real host (a headless fake answers to any name); this name
+// is device-verify-pending.
 const PERMISSIONS_ANDROID_MODULE = 'PermissionsAndroid';
 
 // The runtime-permission result strings Android can return. Modeled as a frozen

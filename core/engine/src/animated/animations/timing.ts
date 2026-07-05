@@ -1,5 +1,5 @@
 // TimingAnimation: ported from RN's animations/TimingAnimation.js, JS path
-// only (ADR 0016). Walks a value from `fromValue` to `toValue` over `duration`
+// only. Walks a value from `fromValue` to `toValue` over `duration`
 // ms, shaping progress through an easing function. The native-frame export and
 // __startAnimationIfNative branch are dropped.
 

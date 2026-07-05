@@ -3,7 +3,7 @@
 // `showShareActionSheetWithOptions(options, failure, success)`. We validate content, map
 // options onto the native share options, and resolve the IShareAction from the success
 // callback. Metro picks this file on an iOS host; the base share.ts re-exports it for
-// web/headless. See ADR 0019.
+// web/headless.
 
 import { dlog } from '../debug';
 import { getNativeModule } from '../native-modules';

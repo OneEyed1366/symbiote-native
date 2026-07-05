@@ -2,14 +2,14 @@
 // TouchableOpacity wrapping a Text. The base text style, the role constant, and the color fold are
 // shared in @symbiote-native/components/view; here Angular only composes its TouchableOpacity + a
 // symbiote-text child and re-maps the few Button-owned props. The Angular twin of the React/Vue
-// adapter's Button. No JS-side platform branch, so this stays a flat single file (ADR 0026).
+// adapter's Button. No JS-side platform branch, so this stays a flat single file.
 //
 // RN's Button fixes accessibilityRole="button", marks the root accessible, and propagates `disabled`
 // into the accessibility state; those three win over any caller value. `title` becomes the Text
 // child; disabled forwards straight; touchSoundDisabled maps to the pressable's android_disableSound.
 // Every OTHER field of the shared IButtonProps (title, color, disabled, touchSoundDisabled, testID,
-// TV-focus, accessibility state) is agnostic and stays RE-EXPORTED from @symbiote-native/components verbatim
-// (<prop_types_split_agnostic_vs_per_adapter>). onPress and the four accessibility callbacks are the
+// TV-focus, accessibility state) is agnostic and stays RE-EXPORTED from @symbiote-native/components
+// verbatim. onPress and the four accessibility callbacks are the
 // exceptions: each is a real @Output() here (`press`, `accessibilityAction`, `accessibilityTap`,
 // `magicTap`, `accessibilityEscape`), mirroring the Vue adapter's Button, which forks the SAME onPress
 // field the same way (`Omit<ICoreButtonProps, 'onPress'>` + a `press` emit) — not a new precedent, the

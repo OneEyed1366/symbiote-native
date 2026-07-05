@@ -1,8 +1,8 @@
 // createPortal for @symbiote-native/angular — the Angular twin of the React/Vue same-surface portal
 // (create-portal.ts / Teleport in runtime-helpers.ts). Scope is identical: the target must be
-// an already-mounted location WITHIN THE SAME SURFACE as the portal's call site — see the
-// react-adapter-portal skill for why cross-surface targets are permanently out of scope
-// (createTunnel, create-tunnel.ts, is the answer for that case).
+// an already-mounted location WITHIN THE SAME SURFACE as the portal's call site — moving content
+// across independently-mounted surfaces has no safe host-level primitive to hook into, so
+// createTunnel (create-tunnel.ts) covers that cross-surface case instead.
 //
 // React/Vue implement this as a thin validating wrapper around a mechanism the FRAMEWORK
 // ITSELF already has (react-reconciler's Fiber-level HostPortal, Vue's own <Teleport>) — all

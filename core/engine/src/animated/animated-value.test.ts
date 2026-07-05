@@ -1,5 +1,4 @@
-// Co-located integration test (ADR 0025), ported from the headless `animated-value.smoke.ts`.
-// The JS-driven Animated engine (ADR 0016) end-to-end through the engine's clone-on-write
+// Integration test for the JS-driven Animated engine end-to-end through the engine's clone-on-write
 // commit: an AnimatedValue feeds an interpolation whose leaf flushes each frame via
 // setNativeProps, a single scoped completeRoot that re-clones only the animated node. We drive
 // the value by hand with setValue and assert the interpolated prop lands on the committed view.

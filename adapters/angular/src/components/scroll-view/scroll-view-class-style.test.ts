@@ -1,4 +1,4 @@
-// Regression test for the anchor/class bug (angular-adapter skill): a composed component's own
+// Regression test for the anchor/class bug: a composed component's own
 // use-site `class="..."` resolves through Angular's addClass/removeClass onto the component's
 // non-painting ANCHOR host (ANCHOR_HOST_COMPONENTS in renderer.ts), never onto the real Fabric
 // node its own template renders — so the resolved style was silently lost. Fixed via

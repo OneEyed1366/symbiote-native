@@ -1,5 +1,4 @@
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
-// `touchable-native-feedback.smoke`. Proves TouchableNativeFeedback: the pure static
+// Proves TouchableNativeFeedback: the pure static
 // factories (SelectableBackground / Ripple), that the native ripple drawable lands on
 // the underlying Pressable's committed node, that a press round-trips through that
 // Pressable, and that a missing background defaults to SelectableBackground. Android-only

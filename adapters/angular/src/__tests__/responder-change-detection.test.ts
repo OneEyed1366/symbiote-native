@@ -4,7 +4,7 @@
 // does nothing" bug, while React/Vue repainted the same demo. SymbioteHostPropsDirective now
 // calls `cdr.markForCheck()` after each such callback (flags the component + ancestors with
 // RefreshView and notifies the scheduler), so the mutation repaints. This is the flat-root case;
-// responder-nested-cd.test.ts covers the App→child nesting the real app has. See skill §17.
+// responder-nested-cd.test.ts covers the App→child nesting the real app has.
 
 import '@angular/compiler';
 import { Component } from '@angular/core';

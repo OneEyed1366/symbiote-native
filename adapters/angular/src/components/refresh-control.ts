@@ -1,12 +1,12 @@
 // RefreshControl, the Angular lifecycle half. On iOS this is the PullToRefreshView Fabric node that
 // lives INSIDE a ScrollView (a childless sibling before the content container); on Android it is
-// AndroidSwipeRefreshLayout and WRAPS the scroll view (ADR 0020), receiving it through <ng-content>.
+// AndroidSwipeRefreshLayout and WRAPS the scroll view, receiving it through <ng-content>.
 // The Angular twin of the React/Vue RefreshControl. There is no JS-side platform renaming and no
 // shared render fn — every prop forwards straight to the native node, which reads the ones it
 // understands and ignores the rest, so the Android-only and iOS-only families ride down harmlessly
 // on both. So this folds aria/role through the shared resolveAccessibilityProps and maps the native
 // props + a11y + onRefresh straight onto the symbiote-refresh-control host, children via <ng-content>.
-// No platform branch (one composed component both platforms), so this stays a flat single file (ADR 0026).
+// No platform branch (one composed component both platforms), so this stays a flat single file.
 //
 // `refreshing` is a controlled prop: the parent owns it and pushes it down each commit; native
 // reports the gesture via the direct `topRefresh` event, which the engine routes to the host's
@@ -54,8 +54,9 @@ function isSymbioteEvent(value: unknown): value is ISymbioteEvent {
 }
 
 // Mirrors React's IRefreshControlProps minus children (Angular takes the Android-wrapped scroll view
-// via <ng-content>), declared per-adapter over the shared a11y base per
-// <prop_types_split_agnostic_vs_per_adapter>. Read the React reference for the native prop names.
+// via <ng-content>), declared per-adapter over the shared accessibility base since the framework-specific
+// children slot keeps it from being fully shared across adapters. Read the React reference for the
+// native prop names.
 export interface IAngularRefreshControlProps extends IAccessibilityProps, IAriaProps {
   refreshing: boolean;
   // RN's onRefresh is `() => void | Promise<void>`, the handler may be async; the promise is

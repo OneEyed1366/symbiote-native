@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): the commit engine is INCREMENTAL, not a full rebuild. Driving
+// Co-located unit test: the commit engine is INCREMENTAL, not a full rebuild. Driving
 // the mutation API against the shared fake slot, a commit that changes one sibling re-clones only
 // that sibling; the untouched sibling's native handle is reused BY REFERENCE (its native view
 // state survives, the whole point of clone-on-write); no createNode happens after first mount;

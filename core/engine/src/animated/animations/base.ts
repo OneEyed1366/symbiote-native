@@ -1,5 +1,5 @@
 // Minimal driver base, ported from RN's animations/Animation.js with every
-// native path removed (ADR 0016): no NativeAnimatedHelper, no
+// native path removed: no NativeAnimatedHelper, no
 // __startAnimationIfNative, no shouldUseNativeDriver, no FeatureFlags. What
 // remains is the JS-only contract: hold the end callback, track whether the
 // animation is still active, and fire onEnd at most once.
@@ -24,7 +24,7 @@ import {
 export interface IAnimationConfig {
   isInteraction?: boolean;
   iterations?: number;
-  // ADR 0017: offload the curve to the stock native module (zero JS per frame).
+  // Offload the curve to the stock native module (zero JS per frame).
   // Honoured only when the module is present; otherwise the JS path runs.
   useNativeDriver?: boolean;
   // RN threads both into every native animation config (Animation.js:30-34): the
@@ -38,6 +38,7 @@ export abstract class BaseAnimation implements IAnimation {
   // `protected` so subclasses read it inside their rAF loop to decide whether to
   // schedule the next frame; cleared by stop().
   protected __active = false;
+
   protected __iterations: number;
   // RN's Animation holds `_platformConfig` / `__debugID` and folds them into the
   // native config (Animation.js:60-62). Subclasses read them via the protected
@@ -85,7 +86,7 @@ export abstract class BaseAnimation implements IAnimation {
   // If useNativeDriver was requested and the module is present, mirror the value
   // graph into native and hand the curve to native. The JS rAF loop is then
   // skipped entirely. Returns true when native took over. Falls back to JS (false)
-  // when the module is missing (ADR 0016 path), so an app without RCTAnimation
+  // when the module is missing, so an app without RCTAnimation
   // still animates.
   protected startNativeIfNeeded(animatedValue: AnimatedValue): boolean {
     if (!this.nativeDriverRequested) return false;

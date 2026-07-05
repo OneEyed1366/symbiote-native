@@ -1,4 +1,4 @@
-// Co-located Angular-driven test (ADR 0025) for the @symbiote-native/slider Angular wrapper. The native
+// Angular-driven test for the @symbiote-native/slider Angular wrapper. The native
 // RNCSlider carries no symbiote metadata — the engine DERIVES its events + tint processors from an
 // injected codegen-shaped ViewConfig (the same shape the React/Vue adapters' slider.test inject,
 // the same shape RN's ReactNativeViewConfigRegistry holds on a real host). We import the Slider
@@ -225,13 +225,12 @@ describe('Angular Slider wrapper', () => {
   });
 });
 
-// Regression test for the anchor/class bug (angular-adapter skill): Slider is its own
-// ANCHOR_HOST_COMPONENTS entry (renderer.ts) AND renders through DescriptorOutlet (itself also an
-// anchor entry) — a class= on <Slider> resolves onto Slider's OWN anchor, two levels up from the
-// real committed centering wrapper View the descriptor builds (see the "paints the raw RNCSlider
-// leaf inside a centering wrapper View" test above), and needs its OWN anchorHostStyle merge (see
-// shared.ts's `inputProps`). Mirrors the Angular adapter's pressable.test.ts "resolves a class="
-// case.
+// Regression test for the anchor/class resolution: Slider is its own ANCHOR_HOST_COMPONENTS entry
+// (renderer.ts) AND renders through DescriptorOutlet (itself also an anchor entry) — a class= on
+// <Slider> resolves onto Slider's OWN anchor, two levels up from the real committed centering
+// wrapper View the descriptor builds (see the "paints the raw RNCSlider leaf inside a centering
+// wrapper View" test above), and needs its OWN anchorHostStyle merge (see shared.ts's
+// `inputProps`). Mirrors the same case in the Angular pressable wrapper's tests.
 @Component({
   selector: 'symbiote-slider-class-host',
   standalone: true,

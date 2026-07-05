@@ -1,4 +1,4 @@
-// Co-located Vue-driven virtualization test (ADR 0025), the Vue twin of
+// Co-located Vue-driven virtualization test, the Vue twin of
 // adapters/react/src/virtualized-list/*.test.tsx. Drives a FlatList (the thin convenience over
 // VirtualizedList, exactly as the React twins do) on the shared fake Fabric slot and proves the
 // windowing core: only a bounded window of cells is committed (never the full data) with

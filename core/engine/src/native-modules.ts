@@ -7,7 +7,7 @@
 // This is first-party access, for symbiote's own modules (StatusBarManager,
 // KeyboardObserver, …). Third-party RN packages import `TurboModuleRegistry` from
 // `'react-native'` and read the same global themselves; they do not go through
-// here. See .docs/decisions/0012.
+// here.
 
 import { dlog } from './debug';
 

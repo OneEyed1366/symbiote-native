@@ -1,5 +1,4 @@
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
-// `slider.smoke`. Proves derive-by-default for a THIRD-PARTY native view exercised
+// Proves derive-by-default for a THIRD-PARTY native view exercised
 // through the RAW Fabric name with NO symbiote wrapper (the way a library's codegen
 // reaches us: it resolves to the string 'RNCSlider'). The engine is told nothing about
 // the slider; it DERIVES everything from an injected codegen-shaped ViewConfig: plain

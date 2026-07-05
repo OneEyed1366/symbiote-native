@@ -1,4 +1,4 @@
-// Regression test for the anchor/class bug (angular-adapter skill): FlatList is its own
+// Regression test for the anchor/class bug: FlatList is its own
 // ANCHOR_HOST_COMPONENTS entry, separate from the VirtualizedList/ScrollView anchors it wraps two
 // levels down — a class= on <FlatList> resolves onto FlatList's OWN anchor and needs its OWN
 // anchorHostStyle merge (see index.ts's ngOnChanges), it is NOT transitively fixed by

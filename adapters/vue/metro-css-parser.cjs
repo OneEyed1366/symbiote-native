@@ -10,7 +10,7 @@
 // vue-tsx's babelTransformerPath for standalone .css/.module.css file imports —
 // metro-vue-transformer.cjs (the .vue SFC transformer) requires @symbiote-native/css-parser
 // directly instead, since it needs the individual parse/compile functions, not a Metro
-// transformer object. See the symbiote-sfc-style-compiler skill.
+// transformer object.
 // createCssMetroTransformer is a factory, not a ready transformer — Metro's
 // babelTransformerPath needs the actual {transform, getCacheKey} object it returns,
 // not the css-parser package barrel.

@@ -1,4 +1,4 @@
-// Co-located headless test for the Angular renderer seam (ADR 0025). Drives SymbioteRenderer
+// Co-located headless test for the Angular renderer seam. Drives SymbioteRenderer
 // directly — no Angular runtime, no compiler — against the shared fake Fabric slot, proving
 // each Renderer2 method maps onto the engine mutation API and commits a correct Fabric tree.
 // The bootstrap (mount → createComponent) is validated separately on a real host / the AOT

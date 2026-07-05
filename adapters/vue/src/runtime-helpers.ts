@@ -9,8 +9,8 @@
 // the interception point: it supplies our OWN implementation under the same export name, so the
 // compiler's import keeps resolving and the directive actually does something.
 //
-// See the vue-adapter-directives skill for the full rationale and scope (what this does and does
-// NOT cover — native-element v-model is a separate, out-of-scope case).
+// Scope: this covers only Vue's own template directives (v-show, Teleport); native-element
+// v-model is a separate, out-of-scope case.
 
 export * from '@vue/runtime-core';
 
@@ -34,7 +34,7 @@ import {
 // whenCommitted, not a direct call: Vue's `mounted` hook fires synchronously during the patch
 // pass, but this renderer coalesces the actual Fabric commit onto a microtask
 // (surface.requestCommit()), so the node may have no committed tag yet — the same async-commit
-// race TextInput's autoFocus guards against (see vue-adapter-reactivity). A bare setNativeProps
+// race TextInput's autoFocus guards against. A bare setNativeProps
 // here would silently no-op with no retry on the very first mount.
 const pendingShowCommits = new WeakMap<ISymbioteNode, () => void>();
 

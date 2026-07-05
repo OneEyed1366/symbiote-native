@@ -1,4 +1,4 @@
-// Co-located React-driven test (ADR 0025), ported from `safe-area-view.smoke.tsx`.
+// Co-located React-driven test.
 // Proves the SafeAreaView primitive: its Fabric view name, the style passthrough,
 // children nesting, the standard ViewProps (testID/accessibilityLabel/accessible)
 // reaching the safe-area node, and onLayout routing as a real `topLayout` event.

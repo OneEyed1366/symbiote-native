@@ -39,9 +39,8 @@ export type {
 // The iOS native module name RN registers this under. NOTE: this is the name the iOS JS
 // wrapper (INativeAccessibilityManagerIOS) resolves via
 // `TurboModuleRegistry.get('AccessibilityManager')`, NOT the spec filename
-// `NativeAccessibilityManager`. Per the symbiote invariant, a module name is only provable
-// on a real host (a headless fake answers to any name); this iOS name is device-verified
-// (the pre-split file shipped it). See .docs/native-module-platform-routing.md.
+// `NativeAccessibilityManager`. A module name is only provable on a real host (a headless
+// fake answers to any name); this iOS name is device-verified (the pre-split file shipped it).
 const ACCESSIBILITY_MODULE = 'AccessibilityManager';
 
 // Public event name -> the iOS device event the native side emits. iOS keeps the names

@@ -1,4 +1,3 @@
-// Co-located React-driven test (ADR 0025), ported from `view-layout-id.smoke.tsx`.
 // Proves the View/Text event + alias props thread through to the committed Fabric node:
 //   1. <View onLayout> / <Text onLayout> raise the `layout` event, the listener flags
 //      onLayout:true on the node (Fabric only measures a flagged node).

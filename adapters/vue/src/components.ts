@@ -27,7 +27,7 @@ export interface IViewProps extends IAccessibilityProps, IAriaProps, IResponderP
   // registry by routeProp's centralized class+style merge (core/engine/src/node.ts). Scoped to
   // View/Text only for now, matching React's exact scope — extending it to every other
   // component (Image, ScrollView, Pressable, …) is real, deliberately deferred follow-up work,
-  // not silently thinner: see the symbiote-sfc-style-compiler skill.
+  // not a gap left by oversight.
   class?: IClassNameValue;
   onPress?: (event: ISymbioteEvent) => void;
   onPressIn?: (event: ISymbioteEvent) => void;

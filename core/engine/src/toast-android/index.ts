@@ -19,9 +19,9 @@ import { getNativeModule } from '../native-modules';
 
 // The native module name RN registers this under. NOTE: this is the name the spec
 // resolves via `TurboModuleRegistry.getEnforcing<Spec>('ToastAndroid')`, NOT the
-// spec filename `INativeToastAndroid`. Per the symbiote invariant, a module name is
-// only provable on a real host (a headless fake answers to any name); this Android
-// name is device-verify-pending. See .docs/native-module-platform-routing.md.
+// spec filename `INativeToastAndroid`. A module name is only provable on a real
+// host (a headless fake answers to any name); this Android name is confirmed from
+// RN source but not yet exercised on a device.
 const TOAST_MODULE = 'ToastAndroid';
 
 // Conventional RN values for SHORT/LONG/TOP/BOTTOM/CENTER. On a real device the

@@ -45,9 +45,9 @@ import { descriptorToReact } from '../../descriptor-to-react';
 export type { ITextInputHandle } from '@symbiote-native/components';
 
 // ITextInputProps is otherwise framework-agnostic, so its base lives in @symbiote-native/components;
-// className is React's own field per <prop_types_split_agnostic_vs_per_adapter>. Not destructured
-// below, so it falls into `...passthrough` and lands on the single host node, like `style` (also
-// left un-destructured, forwarded the same way).
+// className is React's own field (framework-specific, not part of the shared agnostic prop
+// base). Not destructured below, so it falls into `...passthrough` and lands on the single host
+// node, like `style` (also left un-destructured, forwarded the same way).
 export type ITextInputProps = ITextInputBaseProps & { className?: string };
 
 export const TextInput = forwardRef<ITextInputHandle, ITextInputProps>((rawProps, forwardedRef) => {

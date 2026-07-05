@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for the BackHandler module. A fake __turboModuleProxy
+// Co-located unit test for the BackHandler module. A fake __turboModuleProxy
 // returns a DeviceEventManager native module (invokeDefaultBackPressHandler, counted); a
 // fake RN$registerCallableModule captures the device hub so the test can play "native" and
 // emit `hardwareBackPress`.

@@ -1,6 +1,6 @@
-// Co-located unit test (ADR 0025): parseCSS compiles a plain CSS string into a
-// `{ className: RNStyleObject }` map. Behavior is ported from wolf-tui's css-parser suite,
-// retargeted to RN prop names/values instead of terminal-cell Styles.
+// Co-located unit test: parseCSS compiles a plain CSS string into a
+// `{ className: RNStyleObject }` map, mapping CSS properties and values onto their
+// React Native style prop names and values.
 
 import { describe, expect, it, vi } from 'vitest';
 import { parseCSS } from './parser';

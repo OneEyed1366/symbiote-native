@@ -5,17 +5,16 @@
 // `createVibration`. Mirrors RN's Libraries/Vibration/Vibration.js: a number is a single
 // buzz, an array is a pattern.
 //
-// Native module name is `Vibration` on BOTH iOS and Android (see
-// .docs/native-module-platform-routing.md), so unlike Linking the module name is shared,
-// not divergent. The TurboModule spec lives at specs_DEPRECATED/modules/INativeVibration.js:
+// Native module name is `Vibration` on BOTH iOS and Android, so unlike Linking the
+// module name is shared, not divergent. The TurboModule spec lives at
+// specs_DEPRECATED/modules/INativeVibration.js:
 //   vibrate(pattern: number)
 //   vibrateByPattern(pattern: number[], repeat: number)
 //   cancel()
 //
 // Metro selects the platform file on a real host (vibration.android.ts > vibration.ts);
 // the base vibration.ts re-exports the iOS build for web/headless. There is no runtime
-// `Platform.OS` read; the filename is the selector. See ADR 0019. No Fabric view,
-// pure JS->native.
+// `Platform.OS` read; the filename is the selector. No Fabric view, pure JS->native.
 
 import { dlog } from '../debug';
 import { getNativeModule } from '../native-modules';

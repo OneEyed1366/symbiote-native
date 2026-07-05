@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for InteractionManager: pure JS, no native. We drive it
+// Unit test for InteractionManager: pure JS, no native. We drive it
 // over real 0ms macrotasks (the same setImmediate/setTimeout it schedules on).
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';

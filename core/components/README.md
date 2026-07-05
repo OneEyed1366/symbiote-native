@@ -7,9 +7,9 @@ and pure render functions for every visual component (`Switch`, `Modal`, `Scroll
 exists so that "add component X to a new adapter" means writing a thin lifecycle + descriptor
 bridge, not re-implementing X's logic per framework.
 
-> New to SymbioteNative? The [root README](../../README.md) has the architecture. This package is
-> "Workstream B" — the piece that makes cross-adapter feature parity **structural** instead of a
-> promise kept by hand.
+> New to SymbioteNative? The [root README](../../README.md) has the architecture. This package
+> is the piece that makes cross-adapter feature parity **structural** instead of a promise kept
+> by hand.
 
 ---
 

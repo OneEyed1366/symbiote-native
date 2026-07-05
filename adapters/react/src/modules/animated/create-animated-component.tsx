@@ -1,7 +1,7 @@
 // createAnimatedComponent wraps a base component (View / Text / Image / any) so
 // it can take AnimatedNodes in its props. Reimplemented thin against symbiote's
 // shared primitive: NO native driver, NO scheduleUpdate fallback. A frame is the
-// scoped commit setNativeProps drives from the AnimatedProps leaf (ADR 0016). RN's
+// scoped commit setNativeProps drives from the AnimatedProps leaf. RN's
 // createAnimatedComponent + useAnimatedProps + createAnimatedPropsHook are the
 // structural reference, but their native helpers are deliberately not imported.
 //
@@ -97,7 +97,7 @@ export function createAnimatedComponent<P extends IAnimatableProps>(
       }
     }, [animatedProps]);
 
-    // Native-driver trigger (ADR 0017). Runs after attach: push the leaf -> style -> transform
+    // Native-driver trigger. Runs after attach: push the leaf -> style -> transform
     // -> interpolation -> value chain native so the props animate on the UI thread (no JS lag).
     // Cascades down to the source value; the scroll event attaches to that same value
     // (idempotent). __makeNative is idempotent, so re-firing on a leaf swap is safe.

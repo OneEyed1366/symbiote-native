@@ -21,8 +21,8 @@ const chips: IChip[] = Array.from({ length: 24 }, (_unused, index) => ({
 }));
 
 // Mirrors examples/angular/App.ts's "FlatList · 24 chips" demo end to end: a horizontal FlatList
-// with getItemLayout. Regression coverage for a bug fixed 2026-07 (see angular-adapter skill §18):
-// cell content used to land OUTSIDE the ScrollView's content view entirely — as top-level siblings
+// with getItemLayout. Regression coverage for a bug fixed 2026-07: cell content used to land
+// OUTSIDE the ScrollView's content view entirely — as top-level siblings
 // of the committed RCTScrollView node, instead of children of its RCTScrollContentView — which is
 // why the device screenshot showed full-width vertically-stacked chips instead of a small
 // horizontal row. Root cause was `<ng-content>` declared once per `@if`/`@else` branch in

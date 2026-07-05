@@ -1,7 +1,7 @@
 /**
  * @format
  *
- * Symbiote Vue canary entry (M3 / R4 on-device proof). createApp(App).mount(appName) wires the
+ * Symbiote Vue canary entry. createApp(App).mount(appName) wires the
  * native-host seams and RN's own AppRegistry, then mounts via @symbiote-native/engine — RN's own
  * renderer is never in the path.
  */

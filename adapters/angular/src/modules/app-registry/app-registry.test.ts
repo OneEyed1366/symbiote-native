@@ -1,4 +1,4 @@
-// Co-located Angular-driven test (ADR 0025), Angular twin of adapters/react/src/modules/
+// Co-located Angular-driven test, Angular twin of adapters/react/src/modules/
 // app-registry/app-registry.test.tsx. Proves the AppRegistry entry point:
 // `registerComponent(appKey, () => App)` stores a runnable that calls `mount` (driving
 // @symbiote-native/engine) AND bridges it to the host registrar (RN's own AppRegistry, injected via
@@ -19,8 +19,8 @@ const ROOT_TAG = 212;
 const WRAPPED_APP_KEY = 'canary-wrapped';
 const WRAPPED_ROOT_TAG = 213;
 
-// Angular's mount() batches change detection on a microtask (the `angular-adapter` skill's
-// whenCommitted-class gotcha), so assertions on the committed tree need one tick, same as Vue.
+// Angular's mount() batches change detection on a microtask, so a committed native tag isn't
+// available synchronously — assertions on the committed tree need one tick, same as Vue.
 const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
 
 class TestText {}

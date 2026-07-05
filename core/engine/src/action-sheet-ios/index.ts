@@ -3,8 +3,8 @@
 // passes options straight through and the native `callback(buttonIndex)` reports
 // the tapped row. We mirror RN faithfully.
 //
-// The native contract is confirmed from RN's TurboModule spec at
-// .vendors/react-native/.../src/private/specs_DEPRECATED/modules/INativeActionSheetManager.js:
+// The native contract is confirmed from RN's TurboModule spec for
+// `INativeActionSheetManager`:
 //   showActionSheetWithOptions(options, callback: (buttonIndex: number) => void)
 //   showShareActionSheetWithOptions(options, failureCallback, successCallback)
 //   dismissActionSheet?()

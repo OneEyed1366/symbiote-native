@@ -1,4 +1,4 @@
-// Co-located React-driven test (ADR 0025), ported from `app-registry.smoke.tsx`.
+// Co-located React-driven test, ported from `app-registry.smoke.tsx`.
 // Proves the AppRegistry entry point: `registerComponent(appKey, () => App)` stores a
 // runnable that calls `mount` (driving @symbiote-native/engine) AND bridges it to the host
 // registrar (RN's own AppRegistry, injected via `setHostRegistrar`) so native can find

@@ -5,8 +5,7 @@
 // bridge. The native RNCSlider view carries no symbiote metadata: the engine derives its events
 // and color processors from the library's ViewConfig at runtime. That ViewConfig is registered by
 // the side-effect import in ../register (pulled in by the package barrel, NOT here, so this module
-// and its tests stay free of the third-party spec). See CLAUDE.md
-// <third_party_rn_packages_are_react_only> and ADR 0027.
+// and its tests stay free of the third-party spec).
 
 import { defineComponent, h, ref, type SetupContext, type VNode } from '@vue/runtime-core';
 import {

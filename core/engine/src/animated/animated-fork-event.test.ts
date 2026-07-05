@@ -1,5 +1,4 @@
-// Co-located unit test (ADR 0025), ported from the headless `animated-fork-event.smoke.ts`.
-// forkEvent / unforkEvent (RN AnimatedImplementation.js ~519-538). Pure JS, no Fabric slot.
+// Unit test for forkEvent / unforkEvent (RN AnimatedImplementation.js ~519-538). Pure JS, no Fabric slot.
 
 import { describe, expect, it } from 'vitest';
 import { AnimatedValue, event, forkEvent, unforkEvent } from '@symbiote-native/engine';

@@ -77,9 +77,6 @@ As separate components, `Out`'s forced re-render never bounces back into
   always-on-top system surface) → `createTunnel`.
 
 Import both from your adapter's package (`@symbiote-native/react`, `@symbiote-native/vue`,
-`@symbiote-native/angular`). Full design rationale and the Angular directive-based
-twins (`*portal`, `*tunnelIn`, `<tunnel-out>`):
-[`react-adapter-portal`](https://github.com/OneEyed1366/symbiote-native/blob/master/.claude/skills/react-adapter-portal/SKILL.md),
-[`vue-adapter-directives`](https://github.com/OneEyed1366/symbiote-native/blob/master/.claude/skills/vue-adapter-directives/SKILL.md),
-and
-[`angular-adapter-portal`](https://github.com/OneEyed1366/symbiote-native/blob/master/.claude/skills/angular-adapter-portal/SKILL.md).
+`@symbiote-native/angular`). Angular exposes the same two mechanisms as
+directives instead of components/hooks: `*portal`/`*tunnelIn` and
+`<tunnel-out>`.

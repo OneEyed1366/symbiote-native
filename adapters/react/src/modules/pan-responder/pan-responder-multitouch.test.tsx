@@ -1,6 +1,6 @@
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
+// Co-located React-driven pipeline test, ported from the headless
 // `pan-responder-multitouch.smoke`. Proves PanResponder's dx/dy/vx/vy track the
-// touch-history bank (shared's ResponderTouchHistoryStore), not a grant-relative
+// touch-history bank (the engine's ResponderTouchHistoryStore), not a grant-relative
 // centroid of ALL live touches. Two fingers move, then one lifts: each touch's own
 // previous->current delta drives the gesture. Expected values cross-checked against a
 // faithful RN port; the inline notes mark what a naive single-centroid would report.

@@ -7,9 +7,9 @@
 // so the child still renders with working press wiring. The static factories + background mapping
 // are shared in @symbiote-native/components and reused verbatim — Angular only attaches them onto the
 // component class and nests the feedback view. No JS-side platform branch (one Fabric path both
-// platforms), so this stays a flat single file (ADR 0026), mirroring React/Vue.
+// platforms), so this stays a flat single file, mirroring React/Vue.
 //
-// This component's own press/hover events are now real @Output() EventEmitters too, matching
+// This component's own press/hover events are real @Output() EventEmitters too, matching
 // Pressable (which it wraps) — `(press)="press.emit($event)"`, never `[onPress]="onPress"`.
 // Non-event config (delayLongPress, hitSlop, ...) still rides down as plain @Input() bindings. The
 // a11y identity bag + the four a11y events live on the feedback view — the one host intrinsic here —
@@ -57,7 +57,7 @@ export type {
 // Mirrors React's ITouchableNativeFeedbackProps (Omit<IPressableProps, 'style'> + the native
 // feedback config) minus children (Angular takes children via <ng-content>) and minus the press/
 // hover events (declared as this component's OWN @Output()s below). Declared per-adapter over the
-// shared Pressable INPUT surface per <prop_types_split_agnostic_vs_per_adapter>.
+// shared Pressable INPUT surface.
 export type IAngularTouchableNativeFeedbackProps = Omit<IAngularPressableInputs, 'style'> & {
   background?: INativeFeedbackBackground;
   useForeground?: boolean;

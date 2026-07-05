@@ -11,8 +11,8 @@
   // extended tsconfig.angular.base.json — microsoft/TypeScript#55656 — so it can't
   // live in the shared base). `ngc --watch` itself does NOT: @angular/compiler-cli's
   // watch mode calls chokidar directly (perform_watch.js) instead of TS's native
-  // watch host, so watchOptions has zero effect on it — see angular-adapter-build
-  // skill's gotchas table if ngc --watch hits EMFILE again.
+  // watch host, so watchOptions has zero effect on it. Revisit this if
+  // `ngc --watch` hits EMFILE again.
   "watchOptions": {
     "excludeDirectories": ["**/node_modules", "../../node_modules", "**/.git", "**/build"]
   }

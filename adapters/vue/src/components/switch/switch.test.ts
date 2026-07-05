@@ -1,11 +1,11 @@
-// Co-located Vue-driven pipeline test (ADR 0025), the Vue twin of
+// Co-located Vue-driven pipeline test, the Vue twin of
 // adapters/react/src/components/switch/switch.test.tsx. Proves the Switch contract through Vue's
 // reactive lifecycle (shallowRef host node, post-flush snap-back watch): the value prop as a
 // strict boolean, the native onChange -> onValueChange derivation, the controlled snap-back (a rejected
 // toggle commands the JS value back down via setValue), and — the point this file exists to
 // guard — that v-model (modelValue/update:modelValue) drives BOTH the render AND the snap-back
-// watch identically to the plain value/onValueChange path (vue-adapter-events skill, Rule 6: a
-// second read site that misses resolveModelValue is a silent bug, not a build error).
+// watch identically to the plain value/onValueChange path: a second read site that misses
+// resolveModelValue is a silent bug, not a build error.
 
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

@@ -2,10 +2,10 @@
   The Vue canary, as a multi-file SFC. Metro compiles every .vue through metro-vue-transformer.js
   (parse → compileScript+inlineTemplate → 'vue'→@vue/runtime-core), so authoring is ordinary Vue —
   <template> + <script setup> — while every vnode still recommits through @symbiote-native/engine into
-  Fabric, React Native's renderer never in the path (M3 / R4).
+  Fabric, React Native's renderer never in the path.
 
   This is the FULL "all primitives" canary, the SFC twin of examples/vue-tsx/App.tsx and
-  examples/react/App.tsx (the ориентир): the root SafeAreaView → ScrollView composition lives here;
+  examples/react/App.tsx: the root SafeAreaView → ScrollView composition lives here;
   the 8 demos (Animated, AnimatedParity, NativeModules, RefApi, PlatformColor, Accessibility,
   Responder, Parity) are each their own SFC under ./components, composed below in the same order as
   the TSX root. Same engine, same components, same palette; the ONLY visual difference vs the React
@@ -91,15 +91,14 @@ const name = ref('');
 const spinning = ref(true);
 const volume = ref(0.5);
 const modalVisible = ref(false);
-// Teleport demo: shallowRef, not ref (vue-adapter-reactivity Gotcha 1) — a deep ref would wrap
-// the engine node in a reactive Proxy the engine's WeakMap mirror misses.
+// Teleport demo: shallowRef, not ref — a deep ref would wrap the engine node in a reactive
+// Proxy the engine's WeakMap mirror misses, breaking identity lookups.
 const overlayHost = shallowRef<IHostInstance | null>(null);
 const toastVisible = ref(false);
 // createTunnel demo: no ref, no target node at all — <TunnelIn>/<TunnelOut> register/read a
-// shared store, ordinary template markup, no h() (react-adapter-portal / vue-adapter-
-// directives skills, "createTunnel — the cross-surface answer"). Aliased to PascalCase tags
-// because Vue templates can't reference a dotted member (tunnelDemo.In) as a tag — same
-// reason AnimatedView/AnimatedScrollView are aliased below.
+// shared store, ordinary template markup, no h(). Aliased to PascalCase tags because Vue
+// templates can't reference a dotted member (tunnelDemo.In) as a tag — same reason
+// AnimatedView/AnimatedScrollView are aliased below.
 const TunnelIn = tunnelDemo.In;
 const TunnelOut = tunnelDemo.Out;
 const tunnelToastVisible = ref(false);
@@ -306,9 +305,8 @@ const freezeJs3s = (): void => {
 };
 
 // Every static look lives in the <style scoped> block below (compiled at build time by
-// @symbiote-native/css-parser into the same RN style objects StyleSheet.create used to produce —
-// see the symbiote-sfc-style-compiler skill). What stays here is ONLY what a CSS class
-// truly cannot express:
+// @symbiote-native/css-parser into the same RN style objects StyleSheet.create used to produce).
+// What stays here is ONLY what a CSS class truly cannot express:
 //   - a value computed at runtime (an Animated interpolation, item.color, a pressed/active
 //     ternary, StyleSheet.hairlineWidth) — composed at the use site via :style, alongside
 //     the element's own `class` for its static half (frontend-ux "style only for dynamics").
@@ -571,9 +569,9 @@ const rotationStyle = {
         />
       </View>
 
-      <!-- v-show: our runtime-helpers shim (vue-adapter-directives). Unlike the v-if/v-else
-           above, the banner stays mounted and toggles native display:none, so its state
-           survives a hide/show round-trip. -->
+      <!-- v-show: our runtime-helpers shim toggles native display:none directly. Unlike the
+           v-if/v-else above, the banner stays mounted, so its state survives a hide/show
+           round-trip. -->
       <View class="switch-row">
         <Text class="switch-label">show banner (v-show)</Text>
         <Switch
@@ -623,8 +621,8 @@ const rotationStyle = {
       />
 
       <!-- Teleport: moves the toast card OUT of this scroll content and INTO the overlayHost View
-           rendered as a sibling of ScrollView below (vue-adapter-directives skill) — same surface,
-           so it repaints on the ONE commit this tree already does. Unlike Modal (its own native
+           rendered as a sibling of ScrollView below — same surface, so it repaints on the ONE
+           commit this tree already does. Unlike Modal (its own native
            window), the toast stays a plain Fabric node, just relocated to sit above the scroll
            content. Our Teleport wrapper (compiler-injected, auto-retargeted by
            metro-vue-transformer.js) validates `to` before handing it to Vue's real Teleport. -->
@@ -655,9 +653,8 @@ const rotationStyle = {
       </Teleport>
 
       <!-- createTunnel: no ref, no target node — TunnelIn's default slot is ordinary template
-           markup (react-adapter-portal / vue-adapter-directives skills); TunnelOut (rendered in
-           the overlay host below) reads it back through its OWN normal render, wherever that
-           happens to be mounted, even a different surface entirely. -->
+           markup; TunnelOut (rendered in the overlay host below) reads it back through its OWN
+           normal render, wherever that happens to be mounted, even a different surface entirely. -->
       <Button
         testID="tunnel-toast-open"
         title="Show toast (createTunnel)"
@@ -1085,8 +1082,8 @@ const rotationStyle = {
   font-weight: bold;
 }
 /* no hyphen before the digit run: kebabToCamel only rewrites "-[a-z]", so ".box-list-160"
-     would parse to "boxList-160", not "boxList160" — a real trap the manual verification in
-     the symbiote-sfc-style-compiler skill exists to catch */
+     would parse to "boxList-160", not "boxList160" — a real trap to watch for when naming
+     a class that ends in a number */
 .box-list160 {
   height: 160px;
   border-radius: 12px;

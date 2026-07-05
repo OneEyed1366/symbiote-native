@@ -1,17 +1,16 @@
 import { readFileSync } from 'fs'
 import { by, device, element, expect, waitFor } from 'detox'
 
-// Canary user-journey e2e (ADR 0025). Detox attaches at the stock RN host BELOW the renderer
+// Canary user-journey e2e. Detox attaches at the stock RN host BELOW the renderer
 // symbiote replaces, so this exact spec is framework-agnostic: the identical file runs against the
-// React, Vue-TSX and Vue-SFC canaries — all three render the same surface with the same testIDs
-// (the testID contract in .docs/e2e-cases/feature-vue.e2e-cases.md). Each journey drives a real
-// native interaction AND asserts the observable outcome of ONE component, so a component that
-// mounts but MIS-behaves — e.g. a native-driver Animated view that renders frozen — fails HERE,
-// where a bare toBeVisible would pass.
+// React, Vue-TSX and Vue-SFC canaries — all three render the same surface with the same testIDs.
+// Each journey drives a real native interaction AND asserts the observable outcome of ONE
+// component, so a component that mounts but MIS-behaves — e.g. a native-driver Animated view
+// that renders frozen — fails HERE, where a bare toBeVisible would pass.
 //
 // Sync is OFF from the first launch: the canary runs a perpetual native Animated.loop heartbeat
-// (ADR 0017 offload proof) so the app never reports idle and launchApp would hang waiting for it;
-// detoxEnableSynchronization:0 via launchArgs is the same gate the attach probe uses.
+// (offloaded to the native driver) so the app never reports idle and launchApp would hang waiting
+// for it; detoxEnableSynchronization:0 via launchArgs is the same gate the attach probe uses.
 
 const launchOpts = { newInstance: true, launchArgs: { detoxEnableSynchronization: 0 } }
 

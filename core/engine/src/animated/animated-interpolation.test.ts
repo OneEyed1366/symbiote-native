@@ -1,5 +1,4 @@
-// Co-located unit test (ADR 0025), ported from the headless `animated-interpolation.smoke.tsx`.
-// AnimatedInterpolation's non-numeric output ranges: a value-with-units string range
+// Unit test for AnimatedInterpolation's non-numeric output ranges: a value-with-units string range
 // interpolates the number and re-appends the unit, a color range interpolates channel-wise
 // and emits an rgba() string in RN's format (r,g,b rounded, alpha continuous), and the scalar
 // number->number path stays untouched. Pure functions, so no Fabric slot.

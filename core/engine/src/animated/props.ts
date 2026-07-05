@@ -5,8 +5,8 @@
 // flushes to this leaf via its `update()` method, which re-pulls the current values
 // into a flat partial and pushes it through shared's scoped setNativeProps: one
 // targeted clone-on-write commit. Ported from RN's AnimatedProps.js, JS-driven path
-// only: native config (__makeNative / __getNativeConfig / connectAnimatedNodeToView,
-// ADR 0017) is stripped.
+// only: native config (__makeNative / __getNativeConfig / connectAnimatedNodeToView)
+// is stripped.
 //
 // `update` MUST be a method, not a class field: flushValue detects a leaf by reading
 // a `update` function off the node, and under useDefineForClassFields a field
@@ -76,7 +76,7 @@ export class AnimatedProps extends AnimatedWithChildren {
   // base component's public instance via setNativeView.
   private target: ISymbioteNode | null = null;
   // The Fabric view tag this leaf is bound to natively (null until connected).
-  // Kept so __detach can disconnect exactly what it connected (ADR 0017).
+  // Kept so __detach can disconnect exactly what it connected.
   private connectedViewTag: number | null = null;
 
   constructor(inputProps: Record<string, unknown>) {
@@ -144,7 +144,7 @@ export class AnimatedProps extends AnimatedWithChildren {
     super.__detach();
   }
 
-  // ---- native driver (ADR 0017) -------------------------------------------
+  // ---- native driver -------------------------------------------------------
 
   // Marking the leaf native binds it to the host view. The value->...->props edges
   // are wired by the upstream walk (AnimatedWithChildren.__makeNative); the one

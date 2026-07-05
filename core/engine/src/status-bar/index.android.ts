@@ -9,7 +9,7 @@
 // not installed" because RN installs global.RN$stopSurface from its own renderer, which we
 // replace. Now that render.ts installs RN$stopSurface and tears surfaces down cleanly, the
 // relayout survives and the bar updates without blanking (verified on device: show/hide +
-// light/dark text). See render.ts installStopSurfaceGlobal + native-module-platform-routing.
+// light/dark text). See render.ts's installStopSurfaceGlobal.
 
 import { getNativeModule } from '../native-modules';
 import { processColor } from '../commit';

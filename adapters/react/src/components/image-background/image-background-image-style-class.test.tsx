@@ -1,9 +1,8 @@
-// Co-located React-driven test (ADR 0025): imageStyle accepts a bare class-name string,
-// resolved through the SAME shared style registry as `className`, not the full
-// IClassNameValue union — see the widened IImageBackgroundProps type. Proves the resolved
-// style lands on the INNER RCTImageView, not the wrapper (mirrors the className fix, which
-// resolves onto the wrapper — the two must never cross), and that a plain style object still
-// works unchanged.
+// imageStyle accepts a bare class-name string, resolved through the SAME shared style
+// registry as `className`, not the full IClassNameValue union — see the widened
+// IImageBackgroundProps type. Proves the resolved style lands on the INNER RCTImageView, not
+// the wrapper (mirrors the className fix, which resolves onto the wrapper — the two must
+// never cross), and that a plain style object still works unchanged.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';

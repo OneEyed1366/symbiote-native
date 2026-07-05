@@ -1,5 +1,5 @@
 /** @jsxRuntime automatic */
-// Co-located React-driven test (ADR 0025), ported from the headless `smoke.tsx`. Proves that
+// Co-located React-driven test, ported from the headless `smoke.tsx`. Proves that
 // VirtualizedSectionList flattens sections into one windowed stream. The fake
 // nativeFabricUIManager records every committed node, so we mount two sections, give the list
 // a viewport via a topLayout event, and assert the flattened order: section-0 header -> its

@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for the ActionSheetIOS imperative module. A fake
+// Unit test for the ActionSheetIOS imperative module. A fake
 // ActionSheetManager native module records the options it receives and invokes the callback
 // with buttonIndex 1.
 

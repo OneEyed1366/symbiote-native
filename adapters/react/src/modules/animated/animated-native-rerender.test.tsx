@@ -1,6 +1,5 @@
-// Co-located regression test (ADR 0025), ported from the headless
-// `animated-native-rerender.smoke.tsx`. Device bug "press any button -> the native pulse stops
-// and never restarts": an unrelated re-render rebuilds the Animated.View's AnimatedProps leaf; if
+// Regression test for a device bug: "press any button -> the native pulse stops
+// and never restarts". An unrelated re-render rebuilds the Animated.View's AnimatedProps leaf; if
 // the swap detaches the old leaf BEFORE attaching the new one, the shared Value node momentarily
 // reaches zero children, self-detaches, and drops its native animation node, killing the running
 // native-driven loop. We mount a native-driven view, start a native animation on a Value, force a

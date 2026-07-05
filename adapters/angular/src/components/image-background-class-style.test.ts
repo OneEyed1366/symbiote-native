@@ -1,4 +1,4 @@
-// Regression test for the anchor/class bug (angular-adapter skill): ImageBackground is its own
+// Regression test for the anchor/class bug: ImageBackground is its own
 // ANCHOR_HOST_COMPONENTS entry, separate from the Image it composes internally — a class= on
 // <ImageBackground> resolves onto ImageBackground's OWN anchor and needs its OWN anchorHostStyle
 // merge onto its wrapper View (see image-background.ts's wrapperStyle getter), NOT onto its

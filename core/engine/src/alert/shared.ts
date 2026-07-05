@@ -3,7 +3,7 @@
 // constant defaults, and the button-normalization helper. The per-platform files
 // (alert.ios.ts / alert.android.ts) implement `alert()` fully against their own native
 // module (iOS keeps `prompt` too); the two native call shapes are too divergent to share
-// a factory. No native, no `Platform.OS` read here. See ADR 0019.
+// a factory. No native, no `Platform.OS` read here.
 
 // The alert `type` strings the spec documents (iOS), as a closed union so a typo can't
 // reach the native call. 'default' = no text input; the rest prompt.

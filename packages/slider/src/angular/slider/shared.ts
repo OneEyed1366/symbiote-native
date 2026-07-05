@@ -2,13 +2,15 @@
 // layout) and the native render live in @symbiote-native/slider core, shared verbatim with the Vue
 // adapter; here Angular supplies plain class fields (mirroring ActivityIndicatorBase/SwitchBase)
 // plus real @Output() EventEmitters for the four native callbacks, and renders through
-// DescriptorOutlet — the generic descriptorToAngular bridge (angular-adapter skill §6) — since
-// this component has no imperative-ref need the Descriptor prop bag can't carry. The native
-// RNCSlider view carries no symbiote metadata: the engine derives its events and color
-// processors from the library's ViewConfig at runtime, registered by the side-effect import in
-// ../../register (pulled in by the package barrel, NOT here, so this module and its tests stay
-// free of the third-party spec). See CLAUDE.md <third_party_rn_packages_are_react_only> and
-// ADR 0027.
+// DescriptorOutlet — the generic descriptor-to-Angular bridge — since this component has no
+// imperative-ref need the Descriptor prop bag can't carry. The native RNCSlider view carries no
+// symbiote metadata: the engine derives its events and color processors from the library's
+// ViewConfig at runtime, registered by the side-effect import in ../../register (pulled in by the
+// package barrel, NOT here, so this module and its tests stay free of the third-party spec). We
+// never import the library's own React Slider component here — that component calls React hooks
+// off the React dispatcher internally, which is null under Angular, so it would crash if rendered
+// directly; instead the engine derives the native view's events and prop processors from its
+// ViewConfig at runtime, keeping this wrapper framework-agnostic underneath.
 //
 // KNOWN GAP (deliberate, scoped by the task this module was built for): the custom `StepMarker`
 // render slot (a per-adapter overlay element — a React FC, a Vue scoped slot) has no Angular
@@ -202,10 +204,9 @@ export abstract class SliderBase implements ISliderProps, OnChanges {
   };
 
   // Native onLayout fires through the engine's event dispatch (Renderer2.listen), OUTSIDE
-  // Angular's zoneless change-detection notification — the same async-commit-timing shape the
-  // angular-adapter skill (§5) documents and the sticky-header component already works around
-  // (`ChangeDetectorRef.markForCheck()`). Mutating `width` alone would never repaint the step
-  // indicator, since nothing would tell the OnPush view it is dirty.
+  // Angular's zoneless change-detection notification, so mutating `width` alone would never
+  // repaint the step indicator — nothing would tell the OnPush view it is dirty. The explicit
+  // `markForCheck()` below is what actually schedules the repaint.
   protected readonly handleLayout = (event: ISymbioteEvent): void => {
     const layout = event.nativeEvent.layout;
     if (isRecord(layout) && typeof layout.width === 'number') {

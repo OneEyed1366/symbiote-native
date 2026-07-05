@@ -3,10 +3,9 @@
 // element (`descriptorToReact` → React.createElement, `descriptorToVue` → h()). The
 // adapter's host element then flows on through its reconciler → engine → Fabric.
 //
-// The wolf-tui twin is `internal/shared/src/wnode/types.ts` (`WNode` + `wbox`/`wtext`).
-// We diverge in one way: `type` is an open host-component string, not a closed two-member
-// union, because symbiote paints one host element PER native component
-// (`symbiote-activity-indicator`, `symbiote-switch`, …), not just box/text.
+// `type` is an open host-component string, not a closed two-member union, because
+// symbiote paints one host element PER native component (`symbiote-activity-indicator`,
+// `symbiote-switch`, …), not just a generic box/text pair.
 
 // The host component to paint. The three primitives (`symbiote-view` / `symbiote-text` /
 // `symbiote-image`) plus any native leaf a component emits, kept open as a string since
@@ -27,7 +26,6 @@ export type IDescriptor = {
 };
 
 // el(): a host element of any type. txt(): shorthand for the `symbiote-text` primitive.
-// Mirror wolf-tui's `wbox` / `wtext`.
 export function el(
   type: IDescriptorType,
   props: IDescriptorProps = {},

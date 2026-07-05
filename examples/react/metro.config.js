@@ -26,12 +26,12 @@ const config = {
   },
   // Watch the whole monorepo: examples/* are now pnpm-workspace packages whose deps
   // (react, @babel/runtime, …) are symlinked into the repo-root `.pnpm` store, so Metro
-  // must treat repoRoot as a watched root to follow those symlinks (ADR 0025 / 0026).
+  // must treat repoRoot as a watched root to follow those symlinks.
   watchFolders: [repoRoot],
   resolver: {
     // Teach Metro that a style file is a source file (the transformer turns it into a module).
-    // scss/sass/less/styl are optional SCSS/Sass/Less/Stylus preprocessor sources — see
-    // core/css-parser/src/preprocessors.ts and the symbiote-sfc-style-compiler skill.
+    // scss/sass/less/styl are optional SCSS/Sass/Less/Stylus preprocessor sources handled by
+    // core/css-parser/src/preprocessors.ts, which reduces each to plain CSS before compiling.
     sourceExts: [...defaultConfig.resolver.sourceExts, 'css', 'scss', 'sass', 'less', 'styl'],
     extraNodeModules: {
       '@symbiote-native/engine': enginePkg,

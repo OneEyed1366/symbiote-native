@@ -1,7 +1,7 @@
 // @symbiote-native/components: the framework-agnostic component layer. Pure state machines
 // (`state/`) and render functions (`view/`) that paint `Descriptor` trees; every adapter
 // wires state→render with ITS lifecycle (React hooks / Vue reactivity) and maps the
-// Descriptor onto its own element. See CLAUDE.md <components_split_logic_view_lifecycle>.
+// Descriptor onto its own element.
 
 export { el, txt } from './descriptor';
 export type {
@@ -12,7 +12,7 @@ export type {
 } from './descriptor';
 
 // Accessibility folding: the web-alias (aria-*/role) → canonical accessibility* transform
-// and its types. Framework-agnostic (ADR 0024), so React, Vue, and the next adapter all fold
+// and its types. Framework-agnostic, so React, Vue, and the next adapter all fold
 // identically; moved here from @symbiote-native/react. RefreshControl/SafeAreaView/ScrollView consume it.
 export { resolveAccessibilityProps } from './accessibility-props';
 export type {
@@ -27,7 +27,7 @@ export type {
 
 // Intrinsic (`symbiote-*`) → Fabric view-name resolution. Shared by every adapter so the
 // names CANNOT drift between them (one engine, one Fabric). The name tables are
-// Metro-split (.ios/.android, filename selects, no Platform.OS read, ADR 0020); the base
+// Metro-split (.ios/.android, filename selects, no Platform.OS read); the base
 // re-exports iOS for headless. descriptorFor is the per-platform-bound resolver.
 export { descriptorFor, COMPONENT_DESCRIPTORS } from './component-names';
 export { buildDescriptors, makeDescriptorFor } from './component-names/shared';
@@ -64,7 +64,7 @@ export type { ISwitchState, ISwitchAction } from './state/switch';
 
 // ScrollView: pure render/command helpers (no state machine, no 3-layer split). The adapter
 // owns the refs/effects/element assembly and the sticky-header component; these supply the
-// platform-invariant math and plumbing every adapter shares (ADR 0024).
+// platform-invariant math and plumbing every adapter shares.
 export {
   resolveDecelerationRate,
   selectScrollIntrinsics,
@@ -246,7 +246,7 @@ export type { ITextInputViewProps } from './view/render-text-input';
 // VirtualizedList family: the framework-agnostic windowing engine + data shapes. Lists
 // have NO view/render-*.ts (the cell content is the framework's own children, so there is
 // no Descriptor render fn) — the shared layer for lists is this STATE/logic, reused
-// verbatim by React and Vue. See core/components/.docs-note-lists.md.
+// verbatim by React and Vue.
 export {
   DEFAULT_WINDOW_SIZE,
   DEFAULT_INITIAL_NUM_TO_RENDER,

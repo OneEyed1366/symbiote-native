@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): the Platform API, no simulator. A fake PlatformConstants
+// Exercises the Platform API without a simulator. A fake PlatformConstants
 // native module sits behind BOTH bridge paths getNativeModule reads (__turboModuleProxy the
 // function, and nativeModuleProxy[name] the HostObject); Platform must mirror RN's iOS shape:
 // OS is the static 'ios', select follows ios -> native -> default precedence, and Version/isPad

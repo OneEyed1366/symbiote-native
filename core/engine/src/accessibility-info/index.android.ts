@@ -37,9 +37,8 @@ export type {
 
 // The Android native module name. This is the module the Android JS wrapper
 // (INativeAccessibilityInfoAndroid) resolves: the stock RN `AccessibilityInfo` Turbo/legacy
-// module. Per the symbiote invariant, a module name is only provable on a real host (a
-// headless fake answers to any name); this Android name is DEVICE-VERIFY-PENDING. See
-// .docs/native-module-platform-routing.md.
+// module. A module name is only provable on a real host (a headless fake answers to any
+// name); this Android name is DEVICE-VERIFY-PENDING.
 const ACCESSIBILITY_MODULE = 'AccessibilityInfo';
 
 // Public event name -> the Android device event the native side emits. Android renames

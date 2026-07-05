@@ -2,7 +2,7 @@
 // plain JS module — the framework-agnostic twin of a Vue SFC's inline <style>/<style module>
 // block (examples/vue-sfc/metro-vue-transformer.js), usable from ANY adapter's own source file:
 // `import styles from './Card.module.scss'` works the same from a React .tsx, a Vue <script>, or
-// an Angular .ts. See the symbiote-sfc-style-compiler skill.
+// an Angular .ts.
 //
 // A plain style file registers its classes globally, exactly like an unscoped Vue <style>
 // block — side-effect import only (`import './theme.scss'`), no default export. A `.module.*`

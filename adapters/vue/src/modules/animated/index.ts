@@ -1,7 +1,7 @@
 // The Animated namespace for @symbiote-native/vue: the Vue twin of adapters/react/src/animated/index.ts.
 // createAnimatedComponent applied to the Vue primitives gives Animated.View / Text / Image; the
 // value graph, easing and imperative drivers come from @symbiote-native/engine (framework-agnostic,
-// JS-driven, ADR 0016), spread in verbatim. Both halves meet here so the familiar surface,
+// JS-driven), spread in verbatim. Both halves meet here so the familiar surface,
 // `Animated.timing(new Animated.Value(0), …).start()`, works against the Vue-driven engine.
 
 import {

@@ -88,7 +88,7 @@ export interface IVirtualizedSectionListProps<ItemT> {
     minIndexForVisible: number;
     autoscrollToTopThreshold?: number;
   };
-  // Raw native scroll passthrough: NOT emits (skill Rule 5), they ride through $attrs onto the inner
+  // Raw native scroll passthrough: NOT emits, they ride through $attrs onto the inner
   // VirtualizedList (then its inner ScrollView) untouched.
   onScroll?: (event: ISymbioteEvent) => void;
   onScrollBeginDrag?: (event: ISymbioteEvent) => void;

@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from '@symbiote-native/angular';
-// static look lives in the compiled stylesheet (symbiote-sfc-style-compiler skill)
+// static look lives in the compiled stylesheet
 import './PlatformColorDemo.css';
 
 @Component({

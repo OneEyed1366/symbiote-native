@@ -6,8 +6,7 @@
 // requiring FILE's own location, so this indirection is what actually removes the extra install
 // step, not pnpm hoisting (which does not propagate this transitively across workspace packages
 // the way a flat classic node_modules would). .cjs, not .js: this package is "type": "module",
-// and Metro's babelTransformerPath loading expects a require()-able module. See the
-// symbiote-sfc-style-compiler skill.
+// and Metro's babelTransformerPath loading expects a require()-able module.
 // createCssMetroTransformer is a factory, not a ready transformer — Metro's
 // babelTransformerPath needs the actual {transform, getCacheKey} object it returns,
 // not the css-parser package barrel.

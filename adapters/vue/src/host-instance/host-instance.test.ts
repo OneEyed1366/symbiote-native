@@ -1,4 +1,4 @@
-// Co-located Vue-driven test for findNodeHandle (ADR 0025), the Vue twin of the React
+// Co-located Vue-driven test for findNodeHandle, the Vue twin of the React
 // adapter's host-instance resolution. Proves the RN ref -> reactTag lookup over the shared
 // fake Fabric slot: a function-ref-held host node (shallowRef, held by IDENTITY) resolves
 // to its committed native tag, the same via the Vue Ref directly (the isRef unwrap path), a

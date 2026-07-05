@@ -1,9 +1,9 @@
-// Proves createTunnel (create-tunnel.ts) actually solves the case Teleport's v1 scope
+// Proves createTunnel (create-tunnel.ts) actually solves the case Teleport's scope
 // explicitly does NOT cover: content registered by one surface painting on a GENUINELY
 // different, independently-mounted SymbioteSurface — the concrete "system overlay lives in
-// its own mount() call" scenario from the vue-adapter-directives skill. Unlike the Teleport
-// test (runtime-helpers.test.ts), there is no shared node/ref here at all — the two apps
-// below never touch each other's Fabric tree directly, only a plain shared reactive Map.
+// its own mount() call" scenario. Unlike the Teleport test (runtime-helpers.test.ts), there
+// is no shared node/ref here at all — the two apps below never touch each other's Fabric
+// tree directly, only a plain shared reactive Map.
 
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

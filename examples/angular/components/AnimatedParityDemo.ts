@@ -15,7 +15,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Animated, AnimatedView, Button, PanResponder, Text, View } from '@symbiote-native/angular';
 
-// static look compiled at build time by @symbiote-native/css-parser (symbiote-sfc-style-compiler skill)
+// static look compiled at build time by @symbiote-native/css-parser
 import './AnimatedParityDemo.css';
 
 const XY_SPAN = 96;

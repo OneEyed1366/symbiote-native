@@ -1,4 +1,4 @@
-// Regression test for the Android content-projection bug documented in angular-adapter skill §18:
+// Regression test for an Android content-projection bug:
 // ScrollView on Android picks a different native content view per axis (RCTView vs
 // AndroidHorizontalScrollContentView), which used to require a separate <ng-content> per
 // axis x refresh-control combination — and Angular only reliably projects into a component's

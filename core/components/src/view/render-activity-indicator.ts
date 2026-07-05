@@ -3,7 +3,7 @@
 // enum AND a fixed box style; a numeric size never reaches native (it sizes the spinner
 // via style only). That translation is platform-invariant and lives here.
 //
-// What IS platform-specific (ADR 0020, prop-level): Android's AndroidProgressBar needs
+// What IS platform-specific: Android's AndroidProgressBar needs
 // `styleAttr` (which triggers its setStyle(), without it the view throws "setStyle() not
 // called") plus `indeterminate: true`, and its default color is the theme (null), whereas
 // iOS's ActivityIndicatorView takes neither and defaults to GRAY. The adapter's per-host

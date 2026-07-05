@@ -1,4 +1,4 @@
-// Co-located test for findNodeHandle (ADR 0025), the Angular twin of adapters/vue/src/host-instance/host-instance.test.ts.
+// Co-located test for findNodeHandle, the Angular twin of adapters/vue/src/host-instance/host-instance.test.ts.
 // Proves the Angular adapter can resolve a raw engine node, an engine public instance, a bare
 // reactTag, and null/undefined to a native tag using the engine's getNativeTag.
 

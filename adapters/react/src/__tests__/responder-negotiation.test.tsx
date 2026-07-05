@@ -1,5 +1,4 @@
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
-// `responder-negotiation.smoke`. Proves the gesture-responder NEGOTIATION in the
+// Proves the gesture-responder NEGOTIATION in the
 // engine's events layer, driven over the fake Fabric slot with raw touch primitives:
 // capture beats bubble, the grant/start/move/end/release lifecycle, a mid-gesture claim
 // via onMoveShouldSetResponder, the transfer handoff (terminationRequest yes -> terminate

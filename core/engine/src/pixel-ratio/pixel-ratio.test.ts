@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): PixelRatio, pure JS, no mounting. PixelRatio derives
+// Co-located unit test: PixelRatio, pure JS, no mounting. PixelRatio derives
 // every value from the Dimensions singleton, so a fake __turboModuleProxy returns a
 // DeviceInfo module whose getConstants() ships known window metrics; PixelRatio is then
 // imported fresh (after vi.resetModules) so it resolves the seeded Dimensions.

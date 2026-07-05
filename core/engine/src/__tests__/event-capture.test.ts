@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): two-phase event delivery. The capture pass (root -> target)
+// Co-located unit test: two-phase event delivery. The capture pass (root -> target)
 // must fire each node's `<Event>Capture` listener BEFORE the bubble pass (target -> root),
 // mirroring RN's accumulateTwoPhaseDispatches. The shared fake Fabric captures the engine's event
 // handler (fabric.fireEvent drives it).

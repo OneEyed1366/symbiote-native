@@ -36,8 +36,7 @@ import {
  *
  * Skipping this call for a new `ANCHOR_HOST_COMPONENTS` entry compiles clean under `tsc` AND a
  * real `ngc` AOT build — no type error, no template error — it just silently drops `class="..."`
- * forever; only a device/simulator render (or a committed-node style assertion) catches it. See
- * the `angular-adapter` skill §21 for the device-confirmed incident and the full checklist.
+ * forever; only a device/simulator render (or a committed-node style assertion) catches it.
  */
 export function anchorHostStyle(elementRef: ElementRef<unknown>): unknown {
   const node = elementRef.nativeElement;
@@ -178,7 +177,7 @@ export class SymbioteHostPropsDirective {
   // so the next root tick repaints the mutation. It targets the directive's injecting view
   // (`_cdRefInjectingView`, i.e. the host component), unlike `detectChanges()` which acts on a
   // resolved `_lView` that is NOT the host component here. The Angular twin of what React/Vue get
-  // for free (setState / proxy reactivity). See the `angular-adapter` skill §17.
+  // for free (setState / proxy reactivity).
   private wrapCallback(key: string, value: unknown): unknown {
     if (!ON_PREFIX.test(key) || typeof value !== 'function') return value;
     const handler = value as (...args: unknown[]) => unknown;

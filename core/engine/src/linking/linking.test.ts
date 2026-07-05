@@ -1,5 +1,5 @@
-// Co-located unit test (ADR 0025) for the Linking module: both directions of the bridge
-// and both platform builds. Per ADR 0019 the platform builds are separate files
+// Co-located unit test for the Linking module: both directions of the bridge
+// and both platform builds. The platform builds are separate files
 // (linking/index.ios.ts / linking/index.android.ts), imported DIRECTLY. JS->native: a fake
 // __turboModuleProxy returns a LinkingManager (iOS) and an IntentAndroid (Android).
 // native->JS: a fake RN$registerCallableModule captures the device hub, and we play

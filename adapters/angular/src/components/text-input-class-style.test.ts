@@ -1,4 +1,4 @@
-// Regression test for the anchor/class bug (angular-adapter skill): TextInput is its own
+// Regression test for the anchor/class bug: TextInput is its own
 // ANCHOR_HOST_COMPONENTS entry — a class= on <TextInput> resolves onto TextInput's OWN anchor and
 // needs its OWN anchorHostStyle merge (see text-input.ts's buildPassthrough), for BOTH the
 // single-line and multiline host it renders through (`@if`/`@else` picks one at runtime). Mirrors

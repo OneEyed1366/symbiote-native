@@ -1,20 +1,17 @@
-// Runtime style registry, ported from wolf-tui's internal/shared/src/styles/registry.ts.
-// Side-effect CSS imports (compiled by the sibling CSS-to-style build package, not
-// this module) call registerStyles() with camelCase keys; components look them up
-// by resolveClassName(). No CSS parsing happens here — this is a Map<string, ...>
-// lookup, nothing more.
+// Runtime style registry. Side-effect CSS imports (compiled by the sibling CSS-to-style
+// build package, not this module) call registerStyles() with camelCase keys; components
+// look them up by resolveClassName(). No CSS parsing happens here — this is a
+// Map<string, ...> lookup, nothing more.
 //
-// Dropped vs the wolf-tui original: all Tailwind-utility detection (registerTailwind-
-// Metadata / isTailwindUtility / custom prefix-static sets) — this repo's style
-// surface has no Tailwind layer, so compound lookup below always runs for 2-4-part
-// class strings instead of being gated behind "no part looks like a utility class".
+// This registry has no Tailwind-utility detection layer — this repo's style surface has
+// no Tailwind layer, so the compound lookup below always runs for 2-4-part class strings
+// instead of being gated behind "no part looks like a utility class".
 //
 // kebab-case authoring: a CSS selector `.section-label` always registers under the
 // camelCase key `sectionLabel` (@symbiote-native/css-parser's extractClassName), so a template
 // can write EITHER `class="sectionLabel"` OR `class="section-label"` — resolveOne below
-// falls back to the kebab->camel form on a miss. Reinstated (wolf-tui had this, an
-// earlier port here dropped it on the assumption authors would always match the
-// camelCase key exactly) once that assumption proved wrong in practice.
+// falls back to the kebab->camel form on a miss. The fallback matters because assuming
+// authors would always match the camelCase key exactly proved wrong in practice.
 
 import type { IViewStyle, ITextStyle } from '../styles';
 
@@ -117,10 +114,9 @@ function generateKPermutations(parts: string[], size: number): string[] {
   return result;
 }
 
-// wolf-tui joins a compound permutation with '.' ("btn.primary") because its CSS
-// pipeline registers dot-joined selector strings. This repo's CSS-to-style compiler
-// emits plain camelCase keys for every class, single or compound, so "btn primary"
-// must resolve against a registered "btnPrimary" instead.
+// Compound permutations join as camelCase ("btn primary" -> "btnPrimary") because this
+// repo's CSS-to-style compiler emits plain camelCase keys for every class, single or
+// compound, so "btn primary" must resolve against a registered "btnPrimary".
 function toCompoundKey(parts: string[]): string {
   return parts.reduce((key, part, index) => (index === 0 ? part : key + capitalize(part)), '');
 }

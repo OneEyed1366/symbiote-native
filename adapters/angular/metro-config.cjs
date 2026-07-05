@@ -13,8 +13,7 @@
 // watchFolders/extraNodeModules are intentionally NOT included here — those are monorepo-only
 // pnpm-workspace concerns (deduping a single react/@angular/core copy across packages), not
 // relevant to an external app installing @symbiote-native/angular from npm; a consumer keeps
-// those local to their own metro.config.js if it needs them at all. See the
-// symbiote-sfc-style-compiler and angular-adapter-build skills.
+// those local to their own metro.config.js if it needs them at all.
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -24,8 +23,8 @@ function withSymbioteAngularMetroConfig(defaultConfig, projectRoot, { outDir = '
   return {
     resolver: {
       // Teach Metro that a style file is a source file (the transformer above turns it into a
-      // module). scss/sass/less/styl are optional preprocessor sources — see
-      // core/css-parser/src/preprocessors.ts.
+      // module). scss/sass/less/styl are optional preprocessor sources, reduced to plain CSS
+      // before the same transformer runs.
       sourceExts: [...defaultConfig.resolver.sourceExts, 'css', 'scss', 'sass', 'less', 'styl'],
       resolveRequest: (context, moduleName, platform) => {
         const isRelativeStyleImport =

@@ -1,7 +1,7 @@
 // AnimatedValue: the standard driving value. One value can drive many props in
 // sync but is driven by one mechanism at a time: a new mechanism (a fresh
 // animation, or setValue) stops the previous one. Ported from RN's
-// AnimatedValue.js with the native-driver branches removed (ADR 0016); tracking
+// AnimatedValue.js with the native-driver branches removed; tracking
 // (animating toward another animated node) is deferred.
 
 import type { IAnimation, IEndCallback } from './animation';

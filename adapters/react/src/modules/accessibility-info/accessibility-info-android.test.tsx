@@ -1,5 +1,5 @@
-// Co-located React-driven test (ADR 0025), ported from the headless `accessibility-info-android.smoke`.
-// Proves the Android AccessibilityInfo event dispatch, no emulator. The shared Fabric slot is
+// React-driven test proving the Android AccessibilityInfo event dispatch, no emulator needed.
+// The shared Fabric slot is
 // augmented to record sendAccessibilityEvent(handle, eventType); we mount a View, capture its host
 // ref, and assert AccessibilityInfo.sendAccessibilityEvent routes the node's COMMITTED Fabric handle
 // and the STRING eventType (focus / click / windowStateChange) through the slot, matching RN's

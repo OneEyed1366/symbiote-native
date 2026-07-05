@@ -1,4 +1,3 @@
-// Co-located React-driven test (ADR 0025), ported from `clone-prop-removal.smoke.tsx`.
 // Regression for a clone-on-write bug only a Fabric-FAITHFUL slot reveals: real Fabric's
 // `cloneNodeWithNewProps` MERGES the raw diff onto the node's existing props (a null value
 // resets a prop), so a prop that simply disappears between commits keeps its stale value

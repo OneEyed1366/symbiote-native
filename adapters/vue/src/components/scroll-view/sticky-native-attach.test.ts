@@ -1,4 +1,4 @@
-// Co-located Vue-driven test (ADR 0025): sticky-header NATIVE scroll attach. On a real host the
+// Co-located Vue-driven test: sticky-header NATIVE scroll attach. On a real host the
 // scroll offset must be driven on the UI thread so each sticky header's translateY interpolation
 // rides scroll natively (RN attachNativeEvent, ScrollView.js). symbiote wires that by attaching an
 // Animated.event to the COMMITTED scroll view's Fabric tag (addAnimatedEventToView). Under Vue's

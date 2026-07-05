@@ -131,7 +131,7 @@ export const TextInput = defineComponent<ITextInputProps, ITextInputEmits>(
     // through Vue's toReactive(), handing back a reactive Proxy, a different object than the raw
     // node the engine's WeakMap mirror is keyed on, so every imperative command
     // (dispatchViewCommand / focus / blur / setTextAndSelection) would miss and silently no-op.
-    // See .claude/skills/vue-adapter-reactivity. Same rule as the Switch / ScrollView host node.
+    // Same rule applies to the Switch / ScrollView host node.
     const nodeRef = shallowRef<ISymbioteNode | null>(null);
     const setNodeRef = (el: unknown): void => {
       nodeRef.value = isSymbioteNode(el) ? el : null;

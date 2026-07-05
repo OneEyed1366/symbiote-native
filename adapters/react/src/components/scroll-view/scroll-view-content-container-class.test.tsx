@@ -1,8 +1,7 @@
-// Co-located React-driven test (ADR 0025): contentContainerStyle accepts a bare class-name
-// string, resolved through the SAME shared style registry as `className` (routeProp's merge),
-// not the full IClassNameValue union — see the widened IScrollViewProps type. Proves the
-// resolved style lands on the CONTENT node (RCTScrollContentView), not the outer scroll view,
-// and that a plain style object still works unchanged.
+// contentContainerStyle accepts a bare class-name string, resolved through the SAME shared
+// style registry as `className` (routeProp's merge), not the full IClassNameValue union.
+// Proves the resolved style lands on the CONTENT node (RCTScrollContentView), not the outer
+// scroll view, and that a plain style object still works unchanged.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';

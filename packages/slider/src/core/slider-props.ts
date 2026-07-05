@@ -1,8 +1,9 @@
-// Slider prop types. Per CLAUDE.md <prop_types_split_agnostic_vs_per_adapter>: every field of
-// the slider's public surface is framework-agnostic EXCEPT the custom `StepMarker`, which is a
-// render component returning a framework element (React FC vs Vue slot) — so that one stays in
-// each adapter's own flavored prop type. ISliderProps here is the shared agnostic base every
-// adapter re-exports and extends; ISliderViewProps is the pre-resolved input the render fn paints.
+// Slider prop types. Every field of the slider's public surface is framework-agnostic EXCEPT the
+// custom `StepMarker`, which is a render component returning a framework element (React FC vs Vue
+// slot) — since that element type is framework-specific, it can't live in a shared type, so it
+// stays in each adapter's own flavored prop type. ISliderProps here is the shared agnostic base
+// every adapter re-exports and extends; ISliderViewProps is the pre-resolved input the render fn
+// paints.
 
 import type { IColorValue, IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import type {

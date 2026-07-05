@@ -132,7 +132,7 @@ function AnimatedDemo() {
     outputRange: [0, SLIDE_DISTANCE],
   });
 
-  // Proof of offload (ADR 0017): kick both slides, then jam the JS thread for 1.5s.
+  // Proof that native-driven animation runs off the JS thread: kick both slides, then jam the JS thread for 1.5s.
   // The native-driven pulse + green slide keep moving on the UI side through the
   // freeze; the JS-driven orange slide stalls until the thread is released. If the
   // "native" path had silently fallen back to JS, the pulse would freeze too.

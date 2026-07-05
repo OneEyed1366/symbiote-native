@@ -1,5 +1,4 @@
-// Co-located unit test (ADR 0025), ported from the headless `animated-value-xy.smoke.tsx`.
-// AnimatedValueXY is not a driving node. It multiplexes two ordinary AnimatedValues, so this
+// Unit test for AnimatedValueXY, which is not a driving node. It multiplexes two ordinary AnimatedValues, so this
 // is pure JS, no native module and no Fabric slot. We assert getLayout()/getTranslateTransform()
 // hand back the LIVE x/y values, setValue updates both axes, and a combined listener fires
 // with {x, y}.

@@ -12,8 +12,8 @@
 // `vListItem` template that @switch-es on the flattened entry's tag and stamps the matching app
 // template (captured via @ContentChild on the vSection* directives) through VListOutletDirective.
 // list-level header/footer/empty/item-separator reuse VirtualizedList's own directives, forwarded
-// the same way. This is the per-adapter children/render split of
-// <prop_types_split_agnostic_vs_per_adapter>: only the cell-AUTHORING shape is framework-specific.
+// the same way. Only the cell-AUTHORING shape is framework-specific; the rest of the surface
+// stays shared with React/Vue.
 //
 // Accessibility / aria props are forwarded unchanged to the inner VirtualizedList, which owns the
 // shared aria→accessibility* fold before the props reach the ScrollView host.
@@ -88,8 +88,8 @@ export type { IVSectionContext, IVSectionItemContext } from './directives';
 
 // The Angular VirtualizedSectionList prop surface. Mirrors React/Vue's IVirtualizedSectionListProps
 // MINUS the element-returning props (renderItem, renderSectionHeader/Footer, the *Component slots):
-// those are the per-adapter children/render fields and become `<ng-template>` directives in Angular
-// (<prop_types_split_agnostic_vs_per_adapter>). Everything agnostic is the SAME surface as the
+// those are the per-adapter children/render fields and become `<ng-template>` directives in Angular.
+// Everything agnostic is the SAME surface as the
 // React/Vue adapters, including the a11y/aria prop family forwarded through VirtualizedList.
 export interface IVirtualizedSectionListProps<ItemT> extends IAccessibilityProps, IAriaProps {
   sections: ReadonlyArray<ISection<ItemT>>;

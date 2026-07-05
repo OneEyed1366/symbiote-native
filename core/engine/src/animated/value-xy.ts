@@ -2,7 +2,7 @@
 // driving node itself: it multiplexes two ordinary AnimatedValues (x, y), so the
 // same clone-on-write and listener machinery that powers AnimatedValue applies
 // per-axis. Ported from RN's AnimatedValueXY.js with the native-driver and
-// platform-config branches removed (ADR 0016). The two child values carry their
+// platform-config branches removed. The two child values carry their
 // own native state if they are ever made native.
 
 import { AnimatedValue } from './value';

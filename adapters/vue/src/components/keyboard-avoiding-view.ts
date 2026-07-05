@@ -45,7 +45,7 @@ export interface IKeyboardAvoidingViewProps extends IAccessibilityProps, IAriaPr
   style?: IStyleProp<IViewStyle>;
   // Not in HANDLED_ATTRS below — passes through untouched onto the wrapper host, which already
   // resolves `class`. contentContainerStyle stays JS-only (a plain style-object prop, not
-  // `style`/`class` itself — see the symbiote-sfc-style-compiler skill).
+  // `style`/`class` itself).
   class?: IClassNameValue;
   testID?: string;
 }

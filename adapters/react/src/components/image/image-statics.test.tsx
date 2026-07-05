@@ -1,6 +1,6 @@
-// Co-located test (ADR 0025), ported from the headless `image-statics.smoke`. Image's static methods
-// delegate to the iOS `ImageLoader` native module (NativeImageLoaderIOS.js). The spec's getSize
-// resolves a `[width, height]` ARRAY, so the fake returns that; the static must normalize it to
+// Image's static methods delegate to the iOS `ImageLoader` native module
+// (NativeImageLoaderIOS.js). The spec's getSize resolves a `[width, height]` ARRAY, so the
+// fake returns that; the static must normalize it to
 // `{width, height}` AND fire the optional success callback with (width, height). prefetch resolves a
 // boolean. resolveAssetSource is pure JS: it runs the installed source resolver. No simulator, no
 // Fabric slot: these are imperative statics.

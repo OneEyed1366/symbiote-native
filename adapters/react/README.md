@@ -85,7 +85,7 @@ canary ([`App.tsx`](../../examples/react/App.tsx)) exercises every block of the 
 ## Surface — verified on device, iOS + Android
 
 Every interaction commits through `@symbiote-native/engine` into Fabric, with RN's renderer never in the
-path (R1 + R2 + R3 — decision record 0009):
+path:
 
 - **Primitives** — `View` · `Text` · `Image` · `ImageBackground` · `ScrollView` · `TextInput` ·
   `Pressable` · `Touchable*` · `Button` · `Switch` · `Modal` · `ActivityIndicator` ·
@@ -96,7 +96,7 @@ path (R1 + R2 + R3 — decision record 0009):
   bridgeless host.
 - **`Animated`, both drivers** — JS *and* native driver side by side (`timing` · `spring` · `loop` ·
   `interpolate` · `ValueXY` · tracking · `diffClamp`). Native offload is proven by jamming the JS
-  thread 1.5 s: the native-driven animations keep moving, the JS-driven one stalls (ADR 0016 · 0017).
+  thread 1.5 s: the native-driven animations keep moving, the JS-driven one stalls.
 - **Third-party native views** — `@react-native-community/slider` used straight from the package
   with zero SymbioteNative metadata; the engine derives its events and prop processors from the library's
   own ViewConfig at runtime — the "install the package, use its component" path.

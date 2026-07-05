@@ -1,8 +1,6 @@
-// CSS property → React Native ViewStyle/TextStyle prop mapping. Unlike wolf-tui's
-// `properties.ts` (which maps onto a terminal-cell `Styles` type with TUI-only concepts like
-// `borderStyle: 'round'`), RN's own style props already mirror CSS's shorthand model 1:1
-// (`margin`, `borderRadius`, `borderTopLeftRadius`, …), so this table is a flat kebab→camel
-// rename plus a value-conversion kind — no shorthand expansion is needed.
+// CSS property → React Native ViewStyle/TextStyle prop mapping. RN's own style props already
+// mirror CSS's shorthand model 1:1 (`margin`, `borderRadius`, `borderTopLeftRadius`, …), so this
+// table is a flat kebab→camel rename plus a value-conversion kind — no shorthand expansion is needed.
 
 import {
   parseNumeric,

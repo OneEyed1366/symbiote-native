@@ -4,7 +4,7 @@
 // so this folds aria/role through the shared resolveAccessibilityProps and maps style +
 // a11y + onLayout straight onto the symbiote-safe-area-view host, children via <ng-content>.
 // The Angular twin of the React/Vue SafeAreaView. No platform branch (one Fabric name both
-// platforms), so this stays a flat single file (ADR 0026).
+// platforms), so this stays a flat single file.
 
 import {
   CUSTOM_ELEMENTS_SCHEMA,
@@ -32,7 +32,8 @@ function isSymbioteEvent(value: unknown): value is ISymbioteEvent {
 }
 
 // Mirrors React's ISafeAreaViewProps minus children (Angular takes children via <ng-content>),
-// declared per-adapter over the shared a11y base per <prop_types_split_agnostic_vs_per_adapter>.
+// declared per-adapter over the shared accessibility base since the framework-specific children
+// slot keeps it from being fully shared across adapters.
 export interface IAngularSafeAreaViewProps extends IAccessibilityProps, IAriaProps {
   style?: IStyleProp<IViewStyle>;
   onLayout?: (event: ISymbioteEvent) => void;
@@ -73,8 +74,7 @@ export class SafeAreaView implements IAngularSafeAreaViewInputs {
   @Input() style?: IStyleProp<IViewStyle>;
   // Real @Output()s, not `[onX]="…"` callbacks. Safe to name `layout` the same as the native
   // `layout` event fired inside this component's own template — the engine's bubble() treats
-  // ANCHOR_HOST_COMPONENTS as transparent to listener lookup, so there is no double-fire
-  // (angular-adapter skill §7).
+  // ANCHOR_HOST_COMPONENTS as transparent to listener lookup, so there is no double-fire.
   @Output() readonly layout = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityAction = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
@@ -134,7 +134,7 @@ export class SafeAreaView implements IAngularSafeAreaViewInputs {
   // the host node never sees an aria-* key (native ignores them), same transform React's
   // SafeAreaView runs over its whole `rawProps`. The anchor's class-derived style goes FIRST, this
   // component's own explicit `style` @Input SECOND — flattenStyle's later-wins collapse keeps an
-  // explicit [style] winning over its ambient class (angular-adapter skill's anchorHostStyle doc).
+  // explicit [style] winning over its ambient class.
   get hostProps(): Record<string, unknown> {
     return resolveAccessibilityProps({
       style: [anchorHostStyle(this.elementRef), this.style],

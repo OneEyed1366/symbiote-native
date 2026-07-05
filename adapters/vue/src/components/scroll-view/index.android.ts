@@ -1,4 +1,4 @@
-// ScrollView on Android (ADR 0024 Phase 2). An Android ScrollView accepts only ONE child, so a
+// ScrollView on Android. An Android ScrollView accepts only ONE child, so a
 // RefreshControl can't be a sibling of the content the way iOS allows ("addViewAt: failed to insert
 // view ... at index 1"). Instead the RefreshControl (AndroidSwipeRefreshLayout) WRAPS the scroll
 // view, with the scroll view nested inside and nestedScrollEnabled so the inner scroll handles the

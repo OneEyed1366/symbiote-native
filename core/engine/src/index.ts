@@ -230,8 +230,8 @@ export type {
 
 // Imperative runtime modules: framework-agnostic native-bridge consumers (no visual, no
 // lifecycle), moved here from @symbiote-native/react so every adapter re-exports the SAME module.
-// Native module names are platform-selected and device-verified, not headless (CLAUDE.md
-// <native_module_name_is_platform_specific>).
+// The native module a JS API talks to is chosen per platform and can only be confirmed on a
+// real device or simulator, not headless (a headless fake resolves any module name).
 export { Alert } from './alert';
 export type {
   IAlertType,

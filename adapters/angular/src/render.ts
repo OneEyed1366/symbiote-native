@@ -3,7 +3,7 @@
 // (no DOM) — createEnvironmentInjector + createComponent over @angular/core only, with our
 // SymbioteRendererFactory provided so Angular drives the engine, which commits into
 // nativeFabricUIManager; RN's own renderer never in the path. Angular twin of
-// adapters/vue/src/render.ts. See the `angular-adapter` skill (§2 bootstrap).
+// adapters/vue/src/render.ts.
 
 import {
   createElement as createEngineElement,
@@ -143,8 +143,7 @@ export function mount(
       // behavior, true in every Angular app, not something this swap changes. What DOES
       // still protect a sibling branch from an unrelated press is a genuine child
       // `@Component` boundary — SignalView-compiled children are skip-eligible regardless of
-      // this scheduler (see the `angular-adapter` skill §20 for the full investigation,
-      // including the test that disproved the stronger claim before it shipped).
+      // this scheduler.
       ...provideZonelessChangeDetectionInternal(),
       ColorSchemeService,
       WindowDimensionsService,

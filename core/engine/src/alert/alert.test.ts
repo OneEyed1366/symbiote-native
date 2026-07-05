@@ -1,5 +1,5 @@
-// Co-located unit test (ADR 0025) for the Alert imperative module across BOTH native
-// backends and both platform builds. Per ADR 0019 the platform builds are separate files
+// Unit test for the Alert imperative module across BOTH native
+// backends and both platform builds. The platform builds are separate files
 // (alert/index.ios.ts / alert/index.android.ts), imported DIRECTLY here. Fake native
 // modules (installed via the New-Architecture `__turboModuleProxy` global, the same global
 // getNativeModule reads) stand in for the host.

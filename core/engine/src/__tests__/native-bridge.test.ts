@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): the native-module bridge primitives, both directions, no
+// Co-located unit test: the native-module bridge primitives, both directions, no
 // simulator. JS->native: a fake __turboModuleProxy returns fake modules; assert getNativeModule /
 // getEnforcingNativeModule. native->JS: a fake RN$registerCallableModule captures the hub
 // installDeviceEventHub registers; play "native" by calling hub.emit and assert NativeEventEmitter

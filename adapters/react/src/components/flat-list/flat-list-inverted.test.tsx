@@ -1,6 +1,5 @@
 /** @jsxRuntime automatic */
-// Co-located React-driven test (ADR 0025), ported from the headless smoke. Proves two
-// VirtualizedList parity fixes a simulator would otherwise be the only witness to:
+// Proves two VirtualizedList parity fixes a simulator would otherwise be the only witness to:
 //
 //   1. `inverted` flips exactly TWO tree levels (the outer scroll node and each cell),
 //      and NEVER the content container (flipping it cancels the scroll-node flip and

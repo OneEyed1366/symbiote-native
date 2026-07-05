@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): boxShadow/filter are JS-parsed before Fabric. RN registers
+// boxShadow/filter are JS-parsed before Fabric. RN registers
 // these behind enableNativeCSSParsing (default false), so a raw string is dropped on device.
 // processBoxShadow/processFilter restore RN's JS parse. Two coverage paths: ARRAY form (color
 // detection irrelevant) and STRING form (needs a realistic processColor classifying each arg).

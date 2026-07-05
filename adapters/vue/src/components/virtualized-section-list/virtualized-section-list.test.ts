@@ -1,4 +1,4 @@
-// Co-located Vue-driven pipeline test (ADR 0025), the Vue twin of
+// Co-located Vue-driven pipeline test, the Vue twin of
 // adapters/react/src/virtualized-section-list/virtualized-section-list.test.tsx. Proves that
 // VirtualizedSectionList flattens its sections into ONE windowed stream over VirtualizedList: the
 // committed text stream is the flattened order (per section: header -> items -> footer), and

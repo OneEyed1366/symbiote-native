@@ -2,18 +2,16 @@
 // Vue plugin (unplugin-vue ships vite/webpack/esbuild/rollup adapters, not Metro), so we do
 // the single-pass compile here: parse the SFC, compile <script setup> + <template> into one
 // component module, then hand the JS to RN's own babel transformer. This is the Metro twin
-// of what @vitejs/plugin-vue does for Vite; the 'vue'→runtime-core rewrite is wolf-tui's
-// pattern (a custom, non-DOM renderer needs the compiler helpers from @vue/runtime-core,
-// not from vue/runtime-dom).
+// of what @vitejs/plugin-vue does for Vite; the 'vue'→runtime-core rewrite is needed because
+// a custom, non-DOM renderer needs the compiler helpers from @vue/runtime-core, not from
+// vue/runtime-dom.
 //
 // Retargeted at @symbiote-native/vue/runtime-helpers rather than bare @vue/runtime-core: that shim
 // re-exports runtime-core verbatim PLUS supplies our own `vShow` (compiled v-show imports it by
-// name, and only @vue/runtime-dom's DOM-based version exists otherwise — see the
-// vue-adapter-directives skill).
+// name, and only @vue/runtime-dom's DOM-based version exists otherwise).
 //
 // Ships as a package-level export (`@symbiote-native/vue/metro-vue-transformer`) rather than living
-// in each consuming app: a consumer's own metro.config.js just points babelTransformerPath at it —
-// see the symbiote-sfc-style-compiler skill.
+// in each consuming app: a consumer's own metro.config.js just points babelTransformerPath at it.
 
 const { parse, compileScript } = require('@vue/compiler-sfc');
 const { createCompoundExpression } = require('@vue/compiler-core');
@@ -35,8 +33,8 @@ const upstreamTransformer = resolveUpstreamTransformer();
 
 // Rewrites a Vue template AST so every `class`/`:class` binding on an element resolves
 // against this file's scoped class names at the compiled call site, via @symbiote-native/engine's
-// scopeClassName(value, localNames, scopeId) — see the symbiote-sfc-style-compiler skill for
-// the full design (why AST-level, not a raw-text regex: Vue itself merges a static `class=`
+// scopeClassName(value, localNames, scopeId). This runs at the AST level rather than as a
+// raw-text regex: Vue itself merges a static `class=`
 // and a dynamic `:class=` on the same element into ONE codegen entry, and text substitution
 // can't reproduce that merge safely; letting Vue's own transformElement do the merge on our
 // already-rewritten nodes reuses that logic instead of reimplementing it).
@@ -147,7 +145,7 @@ async function compileSfc(src, filename) {
 
   // `descriptor.styles` is already parsed by @vue/compiler-sfc itself (one entry per <style>
   // block, `.content` pre-trimmed, `.scoped` already a plain boolean flag), so there's no need
-  // to re-extract style blocks with a regex the way wolf-tui's Vite plugin does.
+  // to re-extract style blocks with a regex.
   //
   // A scoped block's classes get their key SUFFIXED with this file's scopeId before
   // registration (`card` -> `card__data-v-xxxxxxxx`), so two components can each define their
@@ -167,8 +165,7 @@ async function compileSfc(src, filename) {
   // registerStyles() call, just under a suffixed key — the only new output is a plain name->
   // scopedName object (`$style` by default, or the block's `module="name"` value) emitted as a
   // preamble const, so `:class="$style.card"` passes the already-scoped string straight to
-  // resolveClassName's existing exact-match path (no registry changes needed, see the
-  // symbiote-sfc-style-compiler skill). Unlike `scoped`, a module block's classes are NEVER
+  // resolveClassName's existing exact-match path (no registry changes needed). Unlike `scoped`, a module block's classes are NEVER
   // auto-applied to a literal class="..." attribute — CSS Modules is opt-in per usage via
   // `$style.x`, so module classes are kept out of `localScopedNames` (the nodeTransform only
   // rewrites literal class strings for `scoped` blocks). The registry key gets an extra
@@ -280,8 +277,8 @@ module.exports.compileSfc = compileSfc;
 // preprocessor: compileSfc() itself is async now (a scss/sass/less/stylus <style> block awaits
 // preprocessors.ts's compile()), and Metro's own metro-transform-worker already
 // `await transformer.transform(...)` before touching the result (confirmed by reading the
-// installed metro-transform-worker source — see metro-transformer.ts for the fuller writeup),
-// so returning a Promise here is a supported, exercised shape, not a hack. A sync fast-path for
+// installed metro-transform-worker source), so returning a Promise here is a supported,
+// exercised shape, not a hack. A sync fast-path for
 // the no-preprocessor branches would fork this function into two shapes to save a single
 // microtask on a call that only ever runs at Metro build time, content-hash-cached — not worth
 // the duplication.
@@ -299,8 +296,7 @@ module.exports.transform = async function transform(params) {
   // A standalone style file (as opposed to a `.vue` file's own inline <style> block above) —
   // the framework-agnostic path (core/css-parser's compileCssFile), usable from this example's
   // .vue files exactly like from any other adapter's example. isStyleFile recognizes
-  // .css/.scss/.sass/.less/.styl/.stylus (+ each .module.* twin) — see the
-  // symbiote-sfc-style-compiler skill.
+  // .css/.scss/.sass/.less/.styl/.stylus (+ each .module.* twin).
   if (isStyleFile(params.filename)) {
     const { code } = await compileCssFile(params.src, params.filename);
     return upstreamTransformer.transform({ ...params, src: code, filename: params.filename + '.js' });

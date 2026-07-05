@@ -18,12 +18,12 @@
 // bridge is wired ONLY when the consumer actually listens (read off the instance vnode props),
 // keeping behavior identical to the prop-callback era.
 //
-// Lists have no Descriptor render fn (the cell content is the framework's own children); see
-// core/components/.docs-note-lists.md. Cells/spacers are built with h() directly off the plan.
+// Lists have no Descriptor render fn (the cell content is the framework's own children).
+// Cells/spacers are built with h() directly off the plan.
 //
-// Reactivity gotcha (.claude/skills/vue-adapter-reactivity): the ScrollView's exposed handle
-// is held in a shallowRef so the engine node it closes over is reached by identity; a deep
-// ref would proxy it and the imperative scroll commands would silently no-op.
+// Reactivity gotcha: the ScrollView's exposed handle is held in a shallowRef so the engine
+// node it closes over is reached by identity; a deep ref would proxy it and the imperative
+// scroll commands would silently no-op.
 
 import {
   computed,
@@ -139,7 +139,7 @@ export interface IVirtualizedListProps<ItemT> {
     minIndexForVisible: number;
     autoscrollToTopThreshold?: number;
   };
-  // Raw native scroll passthrough: NOT emits (skill Rule 5), they ride through $attrs onto the
+  // Raw native scroll passthrough: NOT emits, they ride through $attrs onto the
   // inner ScrollView untouched. onScroll is additionally intercepted for the windowing offset, then
   // the user's onScroll is composed (never clobbered).
   onScroll?: (event: ISymbioteEvent) => void;
@@ -364,8 +364,7 @@ export const VirtualizedList = defineComponent(
 
     // shallowRef, NOT ref: the ScrollView handle closes over the engine scroll node, reached by
     // identity through the engine's WeakMap mirror. A deep ref would proxy the object and every
-    // imperative scroll (scrollToOffset/Index/…) would miss the node and silently no-op. See
-    // .claude/skills/vue-adapter-reactivity.
+    // imperative scroll (scrollToOffset/Index/…) would miss the node and silently no-op.
     const scrollHandle = shallowRef<IScrollViewHandle | null>(null);
     const setScrollHandle = (instance: unknown): void => {
       scrollHandle.value = isScrollViewHandle(instance) ? instance : null;

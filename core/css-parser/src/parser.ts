@@ -1,10 +1,8 @@
-// CSS → React Native style-object compiler. Ported from wolf-tui's
-// `internal/css-parser/src/parser.ts`: `extractClassName` and the CSS-custom-property/`var()`
-// resolution machinery are framework/target-agnostic and carry over near-verbatim. `evaluateCalc`
-// drops wolf-tui's terminal-cell scaling (`1rem = 4 cells`, `4px = 1 cell`) — RN has no cell grid,
-// so `px` is identity and `rem`/`em` use the same {@link REM_TO_PX} constant as a bare value
-// (see values.ts). `mapCSSProperty` (properties.ts) targets RN's `ViewStyle`/`TextStyle` instead
-// of wolfie's `Styles`.
+// CSS → React Native style-object compiler. `extractClassName` and the CSS-custom-property/
+// `var()` resolution machinery are framework/target-agnostic. `evaluateCalc` treats `px` as
+// identity (RN has no cell grid to scale against) and `rem`/`em` as scaled by the same
+// {@link REM_TO_PX} constant as a bare value (see values.ts). `mapCSSProperty` (properties.ts)
+// targets RN's `ViewStyle`/`TextStyle`.
 
 import postcss from 'postcss';
 import valueParser from 'postcss-value-parser';
@@ -167,9 +165,9 @@ const CALC_TERM_PATTERN = /calc\(([^)]+)\)/g;
 const NUMBER_WITH_UNIT_PATTERN = /(-?\d+(?:\.\d+)?)(rem|em|px)?/g;
 
 /**
- * Evaluates the narrow shape of `calc()` wolf-tui supported (a single multiplication, or the
- * first numeric term as a fallback) — ported verbatim minus the terminal-cell unit scale.
- * `px` is identity; `rem`/`em` scale by {@link REM_TO_PX}, matching a bare dimension value.
+ * Evaluates a narrow shape of `calc()`: a single multiplication, or the first numeric term
+ * as a fallback. `px` is identity; `rem`/`em` scale by {@link REM_TO_PX}, matching a bare
+ * dimension value.
  */
 function evaluateCalc(value: string): string {
   if (!value.includes('calc(')) return value;

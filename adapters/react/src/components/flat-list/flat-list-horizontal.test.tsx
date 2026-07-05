@@ -1,8 +1,7 @@
-// Co-located React-driven test (ADR 0025), ported from the headless `smoke.tsx`. Proves the
-// horizontal-FlatList fix. On iOS the scroll axis is decided by content overflow, so a
-// horizontal list must (1) forward `horizontal` to the native RCTScrollView and (2) pin the
-// content view to the full row width, else the content stays at the frame width, the row is
-// clipped, and nothing scrolls. We assert both against the fake Fabric slot.
+// On iOS the scroll axis is decided by content overflow, so a horizontal list must
+// (1) forward `horizontal` to the native RCTScrollView and (2) pin the content view to
+// the full row width, else the content stays at the frame width, the row is clipped, and
+// nothing scrolls. We assert both against the fake Fabric slot.
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

@@ -1,7 +1,7 @@
 // The Animated namespace for @symbiote-native/react. createAnimatedComponent applied to
 // the adapter's primitives gives Animated.View / Text / Image; the value graph,
 // easing and imperative drivers come from @symbiote-native/engine (framework-agnostic,
-// JS-driven, ADR 0016). Both halves meet here in one `Animated` object so the
+// JS-driven). Both halves meet here in one `Animated` object so the
 // familiar surface (`Animated.timing(new Animated.Value(0), …).start()`) works.
 
 import {
@@ -53,7 +53,7 @@ const AnimatedImage = createAnimatedComponent(Image);
 // back, and a static `createAnimatedComponent(ScrollView)` at init would read ScrollView
 // inside its own TDZ. A memoized getter defers the wrap past module init, so the
 // cycle never fires. The wrappers carry no per-component animation logic; they only
-// add animated-prop support, so the adapter stays thin (invariant adapters_stay_thin).
+// add animated-prop support, keeping the adapter a thin layer over the engine.
 // The native scroll-event attach (Animated.event onto contentOffset) is owned by
 // ScrollView itself.
 let animatedScrollView: ReturnType<typeof createAnimatedComponent> | undefined;

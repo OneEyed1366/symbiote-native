@@ -1,11 +1,11 @@
-// ScrollView on Android (ADR 0024 Phase 2). An Android ScrollView accepts only ONE child, so a
+// ScrollView on Android. An Android ScrollView accepts only ONE child, so a
 // RefreshControl can't be a sibling of the content the way iOS allows ("addViewAt: failed to insert
 // view ... at index 1"). RN solves this by having the RefreshControl (AndroidSwipeRefreshLayout)
 // WRAP the scroll view (cloneElement(refreshControl, {style}, scrollView)). Angular mirrors that
 // shape by querying a projected <RefreshControl>, re-rendering its native prop surface as the outer
 // wrapper, and projecting every non-RefreshControl child into the inner scroll content.
 //
-// FIXED (angular-adapter skill §18, 2026-07): Android genuinely needs a different Fabric view per
+// Android genuinely needs a different Fabric view per
 // axis for BOTH the outer scroll container (RCTScrollView is vertical-only; AndroidHorizontalScrollView
 // is a dedicated ViewManager) AND the inner content view (vertical content is a plain Android View,
 // horizontal content is AndroidHorizontalScrollContentView, which carries its own ShadowNode::

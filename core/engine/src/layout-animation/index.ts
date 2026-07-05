@@ -16,8 +16,7 @@ import { dlog } from '../debug';
 // DEVICE-VERIFY-PENDING: on bridgeless Fabric the layout-animation configure call
 // is exposed by RN through the UIManager surface (RN's non-Fabric path calls
 // `UIManager.configureNextLayoutAnimation`; the Fabric path routes the same args
-// onto `global.nativeFabricUIManager.configureNextLayoutAnimation`). Per
-// .docs/decisions/0012 and .docs/native-module-platform-routing.md the native
+// onto `global.nativeFabricUIManager.configureNextLayoutAnimation`). The native
 // MODULE NAME is platform-specific and a headless fake answers to ANY name, so
 // the name below is the most plausible bridgeless candidate, NOT proven. Only the
 // simulator/device resolution log can confirm it; the fallback list is tried in

@@ -1,6 +1,7 @@
-// createTunnel — the Vue twin of the React adapter's create-tunnel.ts (see its header, plus
-// the react-adapter-portal / vue-adapter-directives skills, for the full "why not just
-// extend Teleport across surfaces" rationale). `Out` lives in whichever component should
+// createTunnel — the Vue twin of the React adapter's create-tunnel.ts. Teleport only moves
+// content within a single surface's own tree, so sharing content ACROSS two independently
+// mounted surfaces needs a different mechanism: a plain shared reactive registry instead of
+// a Fabric-tree relocation. `Out` lives in whichever component should
 // PAINT the content; its own reactive read makes THAT surface's normal render/commit pick it
 // up — no cross-surface reach-in, no rootTag lookup, works whether In and Out share a
 // surface or not.

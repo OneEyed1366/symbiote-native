@@ -1,4 +1,4 @@
-// Co-located Vue-driven test (ADR 0025): TextInput autoFocus. autoFocus is a JS-driven imperative
+// Co-located Vue-driven test: TextInput autoFocus. autoFocus is a JS-driven imperative
 // `focus` view command fired once the node first commits (RN TextInputState.focusInput). The Vue
 // adapter wires it from a watch(nodeRef, …, flush:'post'), but under the async-batched commit the
 // node has no Fabric tag at post-flush time, so a naive dispatchViewCommand is skipped (node not

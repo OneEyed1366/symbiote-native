@@ -35,7 +35,7 @@ export interface IRefreshControlProps extends IAccessibilityProps, IAriaProps {
   // destructures `enabled` OUT before spreading to PullToRefreshView, so iOS native never
   // reads it; forwarding it is harmless there, like the other Android-only props above.
   enabled?: boolean;
-  // On Android the RefreshControl WRAPS the ScrollView (ADR 0020), so it receives the
+  // On Android the RefreshControl WRAPS the ScrollView, so it receives the
   // scroll view as its child via cloneElement. On iOS it is a childless sibling, so this
   // is undefined there; passing it through is harmless.
   children?: ReactNode;

@@ -5,15 +5,15 @@
 // neutral, last-to-first as RN does. Everything platform-agnostic is the shared core.
 // Metro picks this file on an Android host.
 //
-// The native contract is confirmed from RN's TurboModule spec:
-//   .vendors/.../specs_DEPRECATED/modules/INativeDialogManagerAndroid.js
-//     getConstants(): { buttonClicked, dismissed, buttonPositive, buttonNegative,
-//                       buttonNeutral }
-//     showAlert(config, onError: (msg) => void, onAction: (action, buttonKey?) => void)
+// The native contract is confirmed from RN's TurboModule spec for
+// `INativeDialogManagerAndroid`:
+//   getConstants(): { buttonClicked, dismissed, buttonPositive, buttonNegative,
+//                     buttonNeutral }
+//   showAlert(config, onError: (msg) => void, onAction: (action, buttonKey?) => void)
 //
 // device-verify-pending: the `DialogManagerAndroid` name and routing are confirmed from RN
 // source but not yet exercised on a real Android host; only a bridgeless resolution log
-// there can prove the name. See .docs/native-module-platform-routing.md.
+// there can prove the name.
 //
 // Non-throwing, like StatusBar: a missing native module is a no-op, never a crash.
 

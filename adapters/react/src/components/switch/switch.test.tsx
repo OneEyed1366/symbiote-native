@@ -1,5 +1,4 @@
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
-// `switch.smoke`. Proves the Switch primitive: the Fabric view name `Switch`, the
+// Proves the Switch primitive: the Fabric view name `Switch`, the
 // `value` prop as a strict boolean, the trackColor/thumbColor/ios_backgroundColor ->
 // native prop mapping, onValueChange's (value, event) derivation from nativeEvent.value,
 // and the controlled snap-back: a rejected toggle commands the JS value back down via

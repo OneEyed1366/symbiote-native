@@ -3,8 +3,7 @@
 // lives in the engine, shared with every other adapter. App code names only @symbiote-native/angular.
 //
 // SEAM SCAFFOLD: mount/unmount + the renderer seam + host intrinsic selectors. Full RN-like
-// composed components still flow through the shared @symbiote-native/components bridge — see the
-// `angular-adapter` skill (§6 descriptorToAngular, the layered milestones).
+// composed components still flow through the shared @symbiote-native/components bridge.
 
 export {
   ActivityIndicator,
@@ -49,8 +48,8 @@ export {
 } from './components';
 export { Animated } from './modules/animated';
 // Also exposed as named top-level symbols (not just Animated.View/.Text/...): ngtsc's partial-mode
-// static evaluator (real AOT, see angular-adapter skill §4) can't trace a component class through
-// property access on an external namespace object, only through a direct named import binding —
+// static evaluator can't trace a component class through property access on an external
+// namespace object, only through a direct named import binding —
 // so `<AnimatedView>` in a template requires `import { AnimatedView } from '@symbiote-native/angular'`,
 // not `const AnimatedView = Animated.View`. Plain tsc/vitest don't catch this; only a real ngc run does.
 export {
@@ -123,8 +122,8 @@ export type {
 } from './components';
 export { setImageSourceResolver } from './components';
 export { mount, unmount } from './render';
-// The generic Descriptor→Angular bridge (§6 of the angular-adapter skill), the twin of
-// descriptorToReact/descriptorToVue. Exported so a component defined OUTSIDE this package (e.g.
+// The generic Descriptor→Angular bridge, the twin of descriptorToReact/descriptorToVue.
+// Exported so a component defined OUTSIDE this package (e.g.
 // @symbiote-native/slider) can render a shared @symbiote-native/components/@symbiote-native/slider Descriptor tree
 // without hand-writing its own Renderer2 walker.
 export { DescriptorOutlet } from './descriptor-to-angular';
@@ -133,7 +132,7 @@ export { DescriptorOutlet } from './descriptor-to-angular';
 // Angular can't synthesize components at runtime (no JIT under Metro/Hermes), so both are
 // static, pre-authored structural directives (`*portal`/`*tunnelIn`, the `*ngIf`/`*ngFor`
 // idiom) parameterized by an `@Input()`, rather than a factory returning fresh components per
-// call — see the react-adapter-portal / angular-adapter skills.
+// call.
 export { PortalDirective, PortalOutletDirective } from './create-portal';
 export { createTunnel, TunnelInDirective, TunnelOut, type ITunnelStore } from './create-tunnel';
 export { SymbioteRenderer, SymbioteRendererFactory } from './renderer';

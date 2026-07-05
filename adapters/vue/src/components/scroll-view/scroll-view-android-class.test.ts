@@ -4,9 +4,8 @@
 // wrapper — only `:style` did — so the wrapper collapsed to nothing and the whole scroll content
 // became invisible on a real device (iOS was unaffected, no such wrapper exists there). Root
 // cause and fix: shared.ts's `layoutSplitStyle` (userStyle merged with the resolved `class`
-// style) now feeds splitLayoutProps instead of userStyle alone. See the symbiote-sfc-style-
-// compiler skill for the full incident. Explicit `.android` import: Vitest has no Metro-style
-// platform-extension resolution, unlike the app build.
+// style) now feeds splitLayoutProps instead of userStyle alone. Explicit `.android` import:
+// Vitest has no Metro-style platform-extension resolution, unlike the app build.
 
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

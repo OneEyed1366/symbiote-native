@@ -1,4 +1,4 @@
-// Co-located React-driven test (ADR 0025) for the @symbiote-native/slider React wrapper. Mirrors the Vue
+// Co-located React-driven test for the @symbiote-native/slider React wrapper. Mirrors the Vue
 // wrapper test against the SAME injected codegen-shaped ViewConfig, proving the shared core drives
 // React identically: the native RNCSlider leaf paints inside the centering View, value/disabled/
 // limits fold faithfully to the library, tints process, and the native value/sliding events map

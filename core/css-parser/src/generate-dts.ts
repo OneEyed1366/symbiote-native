@@ -1,6 +1,6 @@
 // Generates a real on-disk `.d.ts` for a `.module.css` (or `.module.scss`/`.module.less`/
-// `.module.styl`) file — the follow-up the symbiote-sfc-style-compiler skill records as
-// deliberately deferred when CSS Modules shipped. Unlike Volar's built-in `<style module>`
+// `.module.styl`) file, giving CSS Modules imports real compile-time type checking.
+// Unlike Volar's built-in `<style module>`
 // typing for inline Vue SFC blocks (which synthesizes `Record<string, string> & {known keys}` —
 // an index signature that still accepts any key, so it never catches a typo), the type emitted
 // here has NO index signature: a typo in `styles.typo` is a genuine `error TS2339` under `tsc`/

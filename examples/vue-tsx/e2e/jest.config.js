@@ -1,5 +1,5 @@
 /**
- * Jest config for the Detox e2e layer (decision 0025). Detox's runners are jest/mocha (no vitest),
+ * Jest config for the Detox e2e layer. Detox's runners are jest/mocha (no vitest),
  * so jest returns here, scoped to e2e/ only. The root vitest.config.ts excludes **\/e2e\/** so the
  * two runners never collect each other's files.
  * @type {import('jest').Config}

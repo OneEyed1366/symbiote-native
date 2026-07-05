@@ -3,7 +3,7 @@
 // decelerationRate, picking the per-axis intrinsics/base style, reading layout dimensions, and
 // the content-size dedupe are all platform- and framework-invariant, so they live here. The
 // adapter owns the lifecycle (refs/state/effects) and the element assembly; it calls these pure
-// helpers from prepareScrollView. What diverges per platform (ADR 0020), how a RefreshControl
+// helpers from prepareScrollView. What diverges per platform, and how a RefreshControl
 // integrates, stays in the adapter's .ios/.android files.
 
 import { Platform } from '@symbiote-native/engine';

@@ -5,7 +5,7 @@ Vue, on the *same* untouched core as React, with React Native's own renderer nev
 is a `@vue/runtime-core` `createRenderer` whose nodeOps map each mutation onto the engine's
 four-call API; `@symbiote-native/engine` does the clone-on-write commit into Fabric.
 
-Vue is the **proof the core is genuinely framework-agnostic** (milestone R4): a second, non-React,
+Vue is the **proof the core is genuinely framework-agnostic**: a second, non-React,
 mutation-oriented framework driving the already-validated engine.
 
 <div align="center">
@@ -114,8 +114,8 @@ React doesn't hit this because `react-reconciler` commits synchronously.
 
 The fix lives in the engine: `whenCommitted(node, action)` runs `action` now if the node already
 has a tag, else after the commit that assigns it. Any native/imperative call wired at Vue lifecycle
-time must go through it. This is the only place the Vue adapter's timing differs from React's — see
-the `vue-adapter-reactivity` notes and `core/engine/src/post-commit.ts`.
+time must go through it. This is the only place the Vue adapter's timing differs from React's; the
+implementation is in `core/engine/src/post-commit.ts`.
 
 ---
 

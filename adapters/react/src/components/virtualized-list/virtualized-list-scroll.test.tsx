@@ -1,5 +1,5 @@
 /** @jsxRuntime automatic */
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
+// Co-located React-driven pipeline test, ported from the headless
 // `virtualized-list-scroll.smoke.tsx`. Proves that an ANIMATED imperative scroll rides the
 // ScrollView's native scrollTo command (not an instant contentOffset push): we mount a
 // FlatList with a ref, then assert that scrollToOffset({animated:true}) dispatches

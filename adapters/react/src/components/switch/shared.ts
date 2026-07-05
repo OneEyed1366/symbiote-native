@@ -37,8 +37,9 @@ import { descriptorToReact } from '../../descriptor-to-react';
 // (useReducer + the snap-back useLayoutEffect) and the descriptor bridge.
 export type { ISwitchTrackColor } from '@symbiote-native/components';
 
-// className is React's own field per <prop_types_split_agnostic_vs_per_adapter>; not destructured
-// below, so it falls into `...passthrough` and lands on the single host node, like `style`.
+// className is React's own field (framework-specific, not part of the shared agnostic prop
+// base); not destructured below, so it falls into `...passthrough` and lands on the single
+// host node, like `style`.
 export type ISwitchProps = ISwitchBaseProps & { className?: string };
 
 // The platform piece: the view's track-color name mapping plus the lifecycle's snap-back

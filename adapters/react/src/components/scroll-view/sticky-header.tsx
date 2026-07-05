@@ -7,7 +7,7 @@
 // its own. Forwarding `stickyHeaderIndices` to native is a silent no-op. So we replicate the
 // JS layer: subscribe each flagged child to the scroll offset and translate it to stay pinned.
 // The interpolation mirrors ScrollViewStickyHeader.js (non-inverted + inverted branches) and now
-// lives, framework-agnostic, in @symbiote-native/components (computeStickyInterpolation, ADR 0024); this
+// lives, framework-agnostic, in @symbiote-native/components (computeStickyInterpolation); this
 // file holds the React component shell, the layout state, and the child-wrapping.
 
 import {

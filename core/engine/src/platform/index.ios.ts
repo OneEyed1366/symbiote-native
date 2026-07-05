@@ -2,7 +2,7 @@
 // is the static 'ios'; everything else derives from the PlatformConstants native module
 // (RN spec NativePlatformConstantsIOS.js), read lazily and cached via the shared
 // resolver. Metro picks this on an iOS host; it is also the base re-export target
-// (platform.ts) so tsc / tsx / web (no Metro) land here too. See .docs/decisions/0022.
+// (platform.ts) so tsc / tsx / web (no Metro) land here too.
 
 import {
   createConstantsResolver,

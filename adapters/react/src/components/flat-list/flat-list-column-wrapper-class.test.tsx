@@ -1,8 +1,7 @@
-// Co-located React-driven test (ADR 0025): columnWrapperStyle accepts a bare class-name
-// string, resolved through the SAME shared style registry as `className`, not the full
-// IClassNameValue union — see the widened IFlatListProps type. Proves the resolved style
-// lands on the auto-generated flex-row ROW view (numColumns > 1), and that a plain style
-// object still works unchanged.
+// columnWrapperStyle accepts a bare class-name string, resolved through the SAME shared
+// style registry as `className`, not the full IClassNameValue union — see the widened
+// IFlatListProps type. Proves the resolved style lands on the auto-generated flex-row ROW
+// view (numColumns > 1), and that a plain style object still works unchanged.
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

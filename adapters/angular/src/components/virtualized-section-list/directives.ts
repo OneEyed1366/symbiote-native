@@ -3,8 +3,7 @@
 // React/Vue pass element-returning callbacks; that does NOT translate to Angular, where per-cell
 // content is a TEMPLATE. So the app supplies each section slot as an `<ng-template>` carrying one
 // of these structural directives, and VirtualizedSectionList stamps the windowed slice through
-// them. This is the per-adapter children/render split of <prop_types_split_agnostic_vs_per_adapter>:
-// the shared flatten/window surface stays in @symbiote-native/components, only the cell-AUTHORING shape is
+// them. The shared flatten/window surface stays in @symbiote-native/components, only the cell-AUTHORING shape is
 // framework-specific. SectionList (the next layer) reuses these same directives verbatim.
 //
 // Authoring API (what the app imports and what SectionList builds on):

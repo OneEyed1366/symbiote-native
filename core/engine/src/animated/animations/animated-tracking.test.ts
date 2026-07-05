@@ -1,4 +1,3 @@
-// Co-located unit test (ADR 0025), ported from the headless `animated-tracking.smoke.tsx`.
 // Tracking: Animated.timing/spring with `toValue: anotherValue` makes a value CHASE a moving
 // target. (A) public API wiring: timing(f, { toValue: t }).start() attaches a tracking node as a
 // child of the target, and stop() tears it down. (B) mechanism: driving an AnimatedTracking with

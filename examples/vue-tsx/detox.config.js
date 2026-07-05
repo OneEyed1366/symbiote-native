@@ -1,5 +1,5 @@
 /**
- * Detox e2e config for the Vue-TSX canary (decision 0025; plan: .docs/detox-bring-up-plan.md).
+ * Detox e2e config for the Vue-TSX canary.
  * Detox attaches at the stock RN host, below the renderer symbiote replaces, so this is the
  * same wiring any RN app uses. Two configurations: ios.sim.debug (the short go/no-go loop) and
  * android.emu.debug. The test JS runs on the host machine; the app side is native-only.

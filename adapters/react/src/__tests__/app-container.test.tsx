@@ -1,4 +1,3 @@
-// Co-located React-driven test (ADR 0025), ported from `app-container.smoke.tsx`.
 // Proves the synthetic root container, symbiote's equivalent of RN's AppContainer
 // (`renderApplication` wraps the app in `<View style={{flex:1}} pointerEvents="box-none">`):
 // every commit puts a single box-none, flex:1 RCTView at the top of the child set,

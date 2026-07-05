@@ -1,6 +1,6 @@
-// @symbiote-native/engine/animated: the framework-agnostic, JS-driven Animated engine
-// (ADR 0016). The value graph, easing, interpolation and (Phase 2) drivers are
-// pure JS with no React and no native dependency; every adapter re-exports them.
+// @symbiote-native/engine/animated: the framework-agnostic, JS-driven Animated engine.
+// The value graph, easing, interpolation and drivers are pure JS with no React
+// and no native dependency; every adapter re-exports them.
 
 export { AnimatedNode, AnimatedWithChildren, flushValue, type IValueListener } from './graph';
 export { AnimatedValue } from './value';
@@ -62,7 +62,7 @@ export {
   type IParallelConfig,
   type ILoopAnimationConfig,
 } from './animations/composition';
-// The native-driver bridge (ADR 0017). Adapters need it to connect a props leaf to
+// The native-driver bridge. Adapters need it to connect a props leaf to
 // a host view tag and to restore default values on disconnect.
 export {
   nativeAnimated,
@@ -74,7 +74,7 @@ export {
 } from './native/native-animated';
 // The pure graph leaves and the mock, framework-agnostic (extend AnimatedWithChildren,
 // no React/Vue). They live here with the rest of the graph; every adapter's
-// createAnimatedComponent + Animated namespace re-exports them (ADR 0016/0017).
+// createAnimatedComponent + Animated namespace re-exports them.
 export { AnimatedProps } from './props';
 export { AnimatedStyle, AnimatedTransform } from './style';
 export { AnimatedMock } from './mock';

@@ -1,6 +1,5 @@
 /** @jsxRuntime automatic */
-// Co-located React-driven test (ADR 0025), ported from the headless smoke. Proves a
-// FlatList threads pull-to-refresh down to its inner ScrollView: RN's VirtualizedList
+// Proves a FlatList threads pull-to-refresh down to its inner ScrollView: RN's VirtualizedList
 // renders a <RefreshControl> into the ScrollView's `refreshControl` prop whenever
 // `onRefresh` is set, and omits it otherwise.
 

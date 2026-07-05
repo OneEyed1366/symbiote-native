@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): the device-state modules (Dimensions / AppState / Appearance,
+// Co-located unit test: the device-state modules (Dimensions / AppState / Appearance,
 // in @symbiote-native/engine) plus the pure KeyboardAvoidingView math (in @symbiote-native/components). A fake
 // __turboModuleProxy returns the native modules; a fake RN$registerCallableModule captures the
 // device hub so the test plays "native" and emits didUpdateDimensions / appStateDidChange /

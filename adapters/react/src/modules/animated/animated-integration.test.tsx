@@ -1,5 +1,4 @@
-// Co-located React-driven test (ADR 0025), ported from the headless `animated-integration.smoke`.
-// End-to-end proof of the whole Animated stack (Phase 2 integration): a real driver
+// React-driven end-to-end proof of the whole Animated stack: a real driver
 // (Animated.timing) moves an Animated.Value, whose frames flow through the component bridge's
 // AnimatedProps leaf into the engine's setNativeProps (a scoped commit per frame), landing on the
 // committed view. No simulator.

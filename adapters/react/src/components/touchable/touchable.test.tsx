@@ -1,4 +1,4 @@
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
+// Co-located React-driven pipeline test, ported from the headless
 // `touchable.smoke`. Proves TouchableOpacity drives press feedback through the Animated
 // engine (not a static style toggle): pressing in runs Animated.timing toward
 // activeOpacity, pressing out animates back to 1. The frames flow through the

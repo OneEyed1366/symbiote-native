@@ -6,7 +6,7 @@
 // it to the top (or bottom, inverted) until the next header collides with it. The native Fabric
 // scroll view does NOT honor `stickyHeaderIndices` on its own. The load-bearing top/inverted
 // interpolation math (computeStickyInterpolation) lives framework-agnostic in @symbiote-native/components
-// (ADR 0024); this file holds the Angular component shell, the layout state, and the interpolation
+// this file holds the Angular component shell, the layout state, and the interpolation
 // build, sharing the math verbatim with React/Vue. Angular supplies only the lifecycle (inputs +
 // manual change detection instead of useState/useEffect or refs/watch).
 //

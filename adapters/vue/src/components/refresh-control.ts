@@ -1,4 +1,4 @@
-// RefreshControl, the Vue lifecycle half (ADR 0024 Phase 2). On iOS this is the PullToRefreshView
+// RefreshControl, the Vue lifecycle half. On iOS this is the PullToRefreshView
 // Fabric node that lives INSIDE a ScrollView (a sibling before the content container); on Android it
 // is AndroidSwipeRefreshLayout and WRAPS the scroll view (a ScrollView there hosts one child). The
 // Vue twin of the React adapter's RefreshControl. Vue takes the wrapped child via its DEFAULT SLOT

@@ -1,6 +1,6 @@
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless `smoke.tsx`.
-// Proves the engine's mutation->clone-on-write commit (R2), the React mutation host config,
-// and the tap->recommit round-trip against the fake Fabric slot, no simulator.
+// React-driven pipeline test, run against a fake Fabric slot instead of a simulator.
+// Proves the engine's mutation->clone-on-write commit, the React mutation host config,
+// and the tap->recommit round-trip.
 
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

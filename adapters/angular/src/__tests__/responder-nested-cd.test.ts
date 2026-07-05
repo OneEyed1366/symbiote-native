@@ -4,7 +4,7 @@
 // flat-bag responder callback does NOT dirty the child's reactive consumer, and the scheduler's
 // root detectChanges() will NOT descend into it — the child's {{status}} used to stay stale
 // ("pan does nothing"). SymbioteHostPropsDirective now refreshes its own host component's view
-// right after the callback runs, so the nested child repaints. See angular-adapter skill §17.
+// right after the callback runs, so the nested child repaints.
 
 import '@angular/compiler';
 import { Component } from '@angular/core';

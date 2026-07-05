@@ -1,5 +1,5 @@
-// DecayAnimation: ported from RN's animations/DecayAnimation.js, JS path only
-// (ADR 0016). Models momentum bleeding off under friction: an initial velocity
+// DecayAnimation: ported from RN's animations/DecayAnimation.js, JS path only.
+// Models momentum bleeding off under friction: an initial velocity
 // decays exponentially toward a resting value. Ends when consecutive frames
 // move less than 0.1.
 

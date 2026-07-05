@@ -90,8 +90,8 @@ function isSymbioteEvent(value: unknown): value is ISymbioteEvent {
 }
 
 // Mirrors React's ITextInputProps minus nothing (TextInput has no children) — declared
-// per-adapter over the shared a11y base per <prop_types_split_agnostic_vs_per_adapter>, because
-// Angular's input surface aliases the aria-* keys to camelCase @Inputs.
+// per-adapter over the shared accessibility base because Angular's input surface aliases the
+// aria-* keys to camelCase @Inputs, unlike the plain agnostic fields shared across adapters.
 export interface IAngularTextInputProps extends IAccessibilityProps, IAriaProps {
   value?: string;
   defaultValue?: string;

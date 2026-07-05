@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for the PermissionsAndroid module: it resolves the native
+// Co-located unit test for the PermissionsAndroid module: it resolves the native
 // module lazily and routes check / request / requestMultiple / shouldShowRequestPermission-
 // Rationale to it, narrowing each native return at the trust boundary, and exposes the frozen
 // PERMISSIONS / RESULTS maps. It MUST degrade gracefully (Android-only, symbiote is

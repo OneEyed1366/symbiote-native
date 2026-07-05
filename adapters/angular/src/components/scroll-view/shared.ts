@@ -1,4 +1,4 @@
-// ScrollView, the Angular lifecycle half (ADR 0024). The Fabric tree is nested: a scroll view
+// ScrollView, the Angular lifecycle half. The Fabric tree is nested: a scroll view
 // wraps a content view that holds the children (RN's ScrollView.js shape). The platform-invariant
 // math (decelerationRate, the per-axis intrinsics/base style, the content-size dedupe, the
 // imperative handle, the native sticky scroll-attach, the aria/role fold) lives in
@@ -8,7 +8,7 @@
 // flashScrollIndicators), the content-size dedupe, and the native sticky scroll-attach wired
 // through whenCommitted. This is the Angular twin of the React useRef + Vue shallowRef host.
 //
-// What diverges per platform (ADR 0020/0024), how a RefreshControl integrates, stays in the
+// What diverges per platform, how a RefreshControl integrates, stays in the
 // .ios/.android files (Metro filename-selected): iOS renders the RefreshControl as a SIBLING
 // before the content container; on Android an AndroidSwipeRefreshLayout WRAPS the scroll view.
 //
@@ -160,8 +160,8 @@ export const SCROLL_VIEW_INPUTS = [
 // The Angular-facing prop surface. React's IScrollViewProps is React-coupled (ReactNode children,
 // ReactElement refreshControl); Angular takes children via <ng-content> and composes the
 // RefreshControl through projection / an outer wrap, so this mirrors the same pass-through surface
-// minus those, declared per-adapter over the shared a11y base per
-// <prop_types_split_agnostic_vs_per_adapter>. Every prop is accepted and typed against the full
+// minus those, declared per-adapter over the shared accessibility base since a framework element/ref
+// field can't live in a shared agnostic type. Every prop is accepted and typed against the full
 // React surface so app code type-checks against parity now.
 export interface IAngularScrollViewProps extends IAccessibilityProps, IAriaProps {
   style?: IStyleProp<IViewStyle>;
@@ -734,7 +734,7 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
 
   // The imperative API a parent reaches via @ViewChild(ScrollView). buildScrollViewHandle is the
   // shared, proven handle (React/Vue use it verbatim); it reads the node through the LAZY getter on
-  // every call, so a command before commit no-ops rather than freezing a null node (ADR 0024 §3).
+  // every call, so a command before commit no-ops rather than freezing a null node.
   private readonly handle: IScrollViewHandle = buildScrollViewHandle(() => this.hostNode);
 
   scrollTo(options?: { x?: number; y?: number; animated?: boolean }): void {

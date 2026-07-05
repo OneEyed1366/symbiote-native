@@ -1,6 +1,6 @@
 /* Static styles for examples/vue-tsx/App.tsx, compiled at build time by @symbiote-native/css-parser
-   into the same RN style objects StyleSheet.create used to produce (see the
-   symbiote-sfc-style-compiler skill). This app has no .vue SFC files (JSX/TSX only via
+   into the same RN style objects StyleSheet.create would produce. This app has no .vue SFC
+   files (JSX/TSX only via
    @vue/babel-plugin-jsx), so it has no inline <style> block option — this standalone .css file,
    imported with `import './App.css'`, is the framework-agnostic mechanism for it.
 
@@ -409,8 +409,7 @@
   justify-content: center;
 }
 /* no hyphen before the digit run: kebabToCamel only rewrites "-[a-z]", so ".box-list-160"
-   would parse to "boxList-160", not "boxList160" — the same trap the symbiote-sfc-style-
-   compiler skill documents catching in the vue-sfc canary */
+   would parse to "boxList-160", not "boxList160" — the same trap caught in the vue-sfc canary */
 .box-list160 {
   height: 160px;
   border-radius: 12px;

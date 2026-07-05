@@ -1,8 +1,7 @@
-/* symbiote Angular canary — static look lives here, compiled at build time by
-   @symbiote-native/css-parser into the same RN style objects StyleSheet.create used to produce
-   (symbiote-sfc-style-compiler skill), resolved at runtime through the shared style registry
-   via Ivy's per-token addClass/removeClass (angular-adapter skill §1). What stays in App.ts
-   is ONLY what a CSS class truly cannot express:
+/* Angular canary — static look lives here, compiled at build time by
+   @symbiote-native/css-parser into the same RN style objects StyleSheet.create used to produce,
+   resolved at runtime through the shared style registry via Ivy's per-token addClass/removeClass.
+   What stays in App.ts is ONLY what a CSS class truly cannot express:
      - a value computed at runtime (an Animated interpolation, a pressed-state ternary, a
        script-level const like CHIP_WIDTH/CHIP_GAP) — composed at the use site via [style],
        alongside the element's own class for its static half.

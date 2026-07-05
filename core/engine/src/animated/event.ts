@@ -29,10 +29,10 @@ export interface IEventConfig {
   // RN parity: real apps pass `useNativeDriver` on Animated.event (RN effectively
   // requires it). Accepted for source-compatibility but NOT consumed here; event()
   // always returns the JS handler, so the mapped value is driven per-event on the JS
-  // thread (ADR 0016's per-frame commit). True UI-thread scroll driving does exist,
-  // but via the separate imperative attachNativeEvent path (ScrollView wires it
-  // internally), never through this flag. Unlike animation configs (animations/base.ts),
-  // where useNativeDriver IS honored (ADR 0017), here it is currently inert.
+  // thread. True UI-thread scroll driving does exist, but via the separate imperative
+  // attachNativeEvent path (ScrollView wires it internally), never through this flag.
+  // Unlike animation configs (animations/base.ts), where useNativeDriver IS honored,
+  // here it is currently inert.
   readonly useNativeDriver?: boolean;
 }
 

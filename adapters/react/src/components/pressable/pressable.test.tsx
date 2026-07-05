@@ -1,5 +1,5 @@
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
-// `pressable.smoke`. Drives the real touch primitives the way native would
+// Co-located React-driven pipeline test.
+// Drives the real touch primitives the way native would
 // (topTouchStart/Move/End on the responder node's instanceHandle) and asserts the
 // synthesized press, disabled suppression, the JS-synthesized onLongPress timer,
 // pressRetentionOffset (radius and measured per-edge rect), unstable_pressDelay,

@@ -54,10 +54,10 @@ const focusTitle = (): void => {
   }
 }
 
-// Every static look lives in the <style scoped> block below (symbiote-sfc-style-compiler
-// skill). `parityRow`'s height references the script const PARITY_ROW_H, which a CSS
-// selector has no way to read — that one property stays dynamic via :style alongside the
-// static `class="parity-row"` for justifyContent/padding.
+// Every static look lives in the <style scoped> block below. `parityRow`'s height
+// references the script const PARITY_ROW_H, which a CSS selector has no way to read —
+// that one property stays dynamic via :style alongside the static `class="parity-row"`
+// for justifyContent/padding.
 const parityRowHeightStyle = { height: PARITY_ROW_H }
 </script>
 

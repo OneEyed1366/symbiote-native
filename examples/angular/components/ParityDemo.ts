@@ -14,7 +14,7 @@ import {
   VSectionItemDirective,
   type ISection,
 } from '@symbiote-native/angular';
-// static look compiled at build time by @symbiote-native/css-parser (symbiote-sfc-style-compiler skill)
+// static look compiled at build time by @symbiote-native/css-parser
 import './ParityDemo.css';
 
 // Verification panel for five feature-parity behaviors: Text.onLongPress synthesis,

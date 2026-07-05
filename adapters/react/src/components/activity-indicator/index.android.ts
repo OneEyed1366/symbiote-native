@@ -2,7 +2,7 @@
 // ProgressBar's setStyle(); without it the view throws "setStyle() not called") and
 // `indeterminate: true`, and its default color is the theme (null), per RN's
 // ActivityIndicator.js android branch ({styleAttr:'Normal', indeterminate:true}). Metro
-// picks this on an Android host; no Platform.OS read. See ADR 0020.
+// picks this on an Android host; no Platform.OS read.
 // device-verify-pending: prop names mirror RN's AndroidProgressBar, proven on a real
 // host by the absence of the "setStyle() not called" red box.
 

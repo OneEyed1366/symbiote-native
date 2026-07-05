@@ -1,5 +1,4 @@
-// Co-located React-driven test (ADR 0025), ported from the headless `animated-native-driver.smoke`.
-// Proves the Animated NATIVE driver wiring (ADR 0017): a fake NativeAnimatedTurboModule on the JSI
+// React-driven test proving the Animated NATIVE driver wiring: a fake NativeAnimatedTurboModule on the JSI
 // module proxy records every call, so we assert (no simulator) that `useNativeDriver:true` mirrors
 // the value graph into native (createAnimatedNode value/style/props), wires it
 // (connectAnimatedNodes), binds the props node to the committed view's Fabric tag

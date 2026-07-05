@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for the ToastAndroid module: JS->native only. A fake
+// Co-located unit test for the ToastAndroid module: JS->native only. A fake
 // __turboModuleProxy returns a ToastAndroid module that records show / showWithGravity /
 // showWithGravityAndOffset and exposes getConstants. The module resolves its native module +
 // constants at load time, so the fake is installed BEFORE the (fresh) import.

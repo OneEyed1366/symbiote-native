@@ -1,4 +1,4 @@
-// Android Fabric component names. Metro picks this file on an Android host. See ADR 0020.
+// Android Fabric component names. Metro picks this file on an Android host.
 // Each name is the ViewManager's REACT_CLASS in react-native/ReactAndroid/.../views/**.
 // device-verify-pending: source-confirmed from RN's Android ViewManagers, proven on a
 // real host by the absence of a "Can't find ViewManager '<name>'" red box.

@@ -1,8 +1,8 @@
 // Angular descriptor outlet. The React/Vue bridges can return framework elements directly
 // (`descriptorToReact` / `descriptorToVue`); Angular needs a tiny standalone component that
-// consumes a Descriptor tree and drives Renderer2 imperatively. This mirrors wolf-tui's
-// WNodeOutlet, but patches same type/key nodes instead of clearing and recreating the subtree so
-// Symbiote keeps retained-node identity and Fabric stays on the clone-on-write path.
+// consumes a Descriptor tree and drives Renderer2 imperatively, patching same type/key nodes
+// instead of clearing and recreating the subtree so it keeps retained-node identity and Fabric
+// stays on the clone-on-write path.
 
 import {
   ChangeDetectionStrategy,

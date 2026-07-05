@@ -1,5 +1,5 @@
-// Co-located React-driven test (ADR 0025), ported from the headless `accessibility-info.smoke`.
-// Proves the iOS AccessibilityInfo module, no simulator. A fake __turboModuleProxy returns an
+// React-driven test proving the iOS AccessibilityInfo module, no simulator needed.
+// A fake __turboModuleProxy returns an
 // AccessibilityManager native module (state getters that invoke their success callback with known
 // values, plus observe-counters); a fake RN$registerCallableModule captures the device hub so the
 // test can play "native" and emit `screenReaderChanged`. iOS routes non-'click' accessibility events

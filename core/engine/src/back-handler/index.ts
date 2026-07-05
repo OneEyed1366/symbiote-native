@@ -19,9 +19,8 @@ import { dlog } from '../debug';
 // The native module name RN registers this under. NOTE: this is the name the
 // INativeDeviceEventManager spec resolves via
 // `TurboModuleRegistry.get('DeviceEventManager')`, NOT the spec filename
-// `INativeDeviceEventManager`. Per the symbiote invariant, a module name is only
-// provable on a real host (a headless fake answers to any name); this name is
-// device-verify-pending (Android). See .docs/native-module-platform-routing.md.
+// `INativeDeviceEventManager`. A module name is only provable on a real host (a
+// headless fake answers to any name); this name is device-verify-pending (Android).
 const DEVICE_EVENT_MANAGER_MODULE = 'DeviceEventManager';
 
 // The device event native emits when the hardware back button is pressed.

@@ -1,4 +1,4 @@
-// Co-located Vue-driven pipeline test (ADR 0025), the Vue twin of
+// Co-located Vue-driven pipeline test, the Vue twin of
 // adapters/react/src/flat-list/*.test.tsx (flat-list + flat-list-horizontal + the imperative
 // scroll). Proves FlatList's data-shaping over the shared VirtualizedList windowing: a
 // single-column window stays bounded, numColumns packs items into flex-row rows, a horizontal

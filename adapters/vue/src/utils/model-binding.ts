@@ -2,8 +2,7 @@
 // `v-model="x"` compiles to prop `modelValue` + emit `update:modelValue`; named `v-model:value="x"`
 // compiles to prop `value` + emit `update:value`. These are independent compiler targets, not
 // alternatives, so a component accepts either input and fires both update events rather than
-// picking one. The RN-parity `value` prop/emit pair is untouched either way. See the
-// vue-adapter-events skill (Rule 6) for the read-every-site gotcha this exists to solve.
+// picking one. The RN-parity `value` prop/emit pair is untouched either way.
 
 export function resolveModelValue<T>(
   attrs: Record<string, unknown>,

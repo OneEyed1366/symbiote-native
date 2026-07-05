@@ -41,7 +41,7 @@ import { anchorHostStyle, ViewHost } from '../primitives';
 
 // Mirrors React's IImageBackgroundProps minus children (Angular takes children via <ng-content>):
 // every forwarding Image prop flows onto the inner image; `style` is the WRAPPER View style and
-// `imageStyle` the inner image's, per <prop_types_split_agnostic_vs_per_adapter>.
+// `imageStyle` the inner image's.
 export interface IAngularImageBackgroundProps extends Omit<IImageProps, 'style'> {
   style?: IStyleProp<IViewStyle>;
   // A bare string resolves through the shared style registry, like `class` on the wrapper.

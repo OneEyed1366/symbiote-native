@@ -141,7 +141,7 @@ export class AnimatedDemo implements OnInit, OnDestroy {
     );
   };
 
-  // Proof of offload (ADR 0017): kick both slides, then jam the JS thread for 1.5s. The
+  // Proof of offload: kick both slides, then jam the JS thread for 1.5s. The
   // native-driven pulse + green slide keep moving on the UI side through the freeze; the
   // JS-driven orange slide stalls until the thread is released.
   readonly freezeJs = (): void => {

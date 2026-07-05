@@ -55,7 +55,7 @@ import { RefApiDemo } from './components/RefApiDemo';
 import { ResponderDemo } from './components/ResponderDemo';
 // Static look lives in App.css — a plain global .css file, compiled at build time by
 // @symbiote-native/css-parser and resolved at runtime through the shared style registry every
-// adapter's class/className/addClass path shares (symbiote-sfc-style-compiler skill).
+// adapter's class/className/addClass path shares.
 import './App.css';
 
 const ANGULAR_LOGO_URI =
@@ -538,10 +538,10 @@ const overlayTunnel = createTunnel();
         </Modal>
 
         <!-- createPortal: moves the toast card OUT of this scroll content and INTO the
-            overlay-host View rendered as a sibling of ScrollView below (angular-adapter
-            skill) — same surface, so it repaints on the ONE change-detection pass this tree
-            already runs. *portal is a structural directive, same idiom as *ngIf: it sits
-            directly on the content, no separate <ng-template>/[content] indirection. -->
+            overlay-host View rendered as a sibling of ScrollView below — same surface, so it
+            repaints on the ONE change-detection pass this tree already runs. *portal is a
+            structural directive, same idiom as *ngIf: it sits directly on the content, no
+            separate <ng-template>/[content] indirection. -->
         <Pressable
           testID="angular-toast-open"
           (press)="showToast()"
@@ -688,9 +688,9 @@ export class AppComponent implements OnDestroy {
   // [animatedProps]="panResponder.panHandlers". A fresh object literal written directly in the
   // template re-evaluates to a new reference on every change-detection pass of this root
   // component (which every press anywhere in the app triggers via markForCheck bubbling to
-  // root — angular-adapter-change-detection skill §3), so the Animated wrapper's ngOnChanges
-  // fired constantly, tearing down and re-attaching its native binding on every unrelated
-  // interaction elsewhere in the app instead of only reacting to the scroll itself.
+  // root), so the Animated wrapper's ngOnChanges fired constantly, tearing down and
+  // re-attaching its native binding on every unrelated interaction elsewhere in the app
+  // instead of only reacting to the scroll itself.
   readonly parityHeaderStyle = {
     opacity: this.parityHeaderOpacity,
     transform: [{ translateY: this.parityHeaderTranslateY }],

@@ -16,10 +16,8 @@ import { dlog } from '../debug';
 
 // The iOS native module name RN registers this under. NOTE: this is the name the
 // iOS JS wrapper resolves via `TurboModuleRegistry.getEnforcing('SettingsManager')`.
-// The spec filename is `INativeSettingsManager`. Per the symbiote invariant, a
-// module name is only provable on a real host (a headless fake answers to any
-// name); this iOS name is device-verify-pending.
-// See .docs/native-module-platform-routing.md.
+// The spec filename is `INativeSettingsManager`. A module name is only provable on a
+// real host (a headless fake answers to any name); this iOS name is device-verify-pending.
 const SETTINGS_MODULE = 'SettingsManager';
 
 // The device event native emits when the app's defaults change out from under JS

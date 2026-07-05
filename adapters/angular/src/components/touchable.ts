@@ -17,9 +17,9 @@
 // (`(accessibilityAction)="accessibilityAction.emit($event)"`); accessibility STATE folds the web
 // aria-*/role aliases and merges `disabled` into the a11y state on Pressable's own host — no re-fold
 // here (the a11y host is Pressable's view, mirroring React's `...rest` -> Pressable). No JS-side
-// platform branch, so this stays a flat single file (see the
-// symbiote-file-layout skill), mirroring React/Vue. Each Touchable forwards the Angular Pressable
-// surface verbatim; parity is against that surface, exactly as React's Touchable parity is against
+// platform branch, so this stays a flat single file, mirroring React/Vue. Each Touchable
+// forwards the Angular Pressable surface verbatim; parity is against that surface, exactly as
+// React's Touchable parity is against
 // the React Pressable surface.
 
 import {
@@ -62,8 +62,8 @@ import { Animated, AnimatedView } from '../modules/animated';
 // The shared field base for all three: the Pressable INPUT surface (minus style, which each
 // Touchable routes differently, and minus the press/hover events, which each Touchable declares as
 // its OWN @Output()s below) + RN's press-timing config + the public style. Mirrors React/Vue's
-// ITouchableBaseProps. Declared per-adapter over the Angular Pressable surface per
-// <prop_types_split_agnostic_vs_per_adapter> (children ride <ng-content>, so they are not a field).
+// ITouchableBaseProps. Declared per-adapter over the Angular Pressable surface, since children
+// ride <ng-content> here rather than a field, unlike React/Vue's element-returning props.
 type IAngularTouchableBaseProps = Omit<IAngularPressableInputs, 'style'> &
   IPressTimingProps & {
     style?: IStyleProp<IViewStyle>;

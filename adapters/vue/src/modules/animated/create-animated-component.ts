@@ -1,7 +1,7 @@
 // createAnimatedComponent: the Vue twin of the React wrapper. It wraps a base component
 // (View / Text / Image / ScrollView / any) so it accepts AnimatedNodes in its props.
 // Same JS-driven path, NO native driver in the hot loop: a frame is the scoped commit
-// setNativeProps drives from the AnimatedProps leaf (ADR 0016). The framework-agnostic
+// setNativeProps drives from the AnimatedProps leaf. The framework-agnostic
 // pieces (reduceProps / readPassthroughStyle / resolveHostNode / isAnimatedNode + the
 // AnimatedProps leaf itself) live in @symbiote-native/engine, shared verbatim with React; here
 // Vue supplies only the lifecycle.
@@ -58,7 +58,7 @@ export function createAnimatedComponent(Component: Component) {
       // The committed host node, held by IDENTITY in a shallowRef (the reactivity rule: a deep
       // ref() would run it through toReactive() and hand back a Proxy, so AnimatedProps.setNativeView
       // / attachNativeEventHandler would miss the engine's WeakMap mirror, keyed on the raw node).
-      // See .claude/skills/vue-adapter-reactivity. Same rule as Switch / ScrollView host nodes.
+      // Same rule as Switch / ScrollView host nodes.
       const nodeRef = shallowRef<unknown>(null);
       // The base component's public instance (a ScrollView handle, or the host node for View).
       // Forwarded to a parent ref via expose(). shallowRef: it may itself BE an engine node.

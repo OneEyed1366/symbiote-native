@@ -1,4 +1,4 @@
-// ScrollView on iOS (ADR 0024 Phase 2). The RefreshControl is a CHILD of the scroll view, rendered
+// ScrollView on iOS. The RefreshControl is a CHILD of the scroll view, rendered
 // as a SIBLING BEFORE the content container (RN ScrollView.js: {refreshControl}{contentContainer}).
 // The developer composes it as a projected child of <ScrollView>; this template selects it into the
 // sibling slot before the scroll-content. Also the base (index.ts re-exports it) for headless /
@@ -13,8 +13,8 @@
 // FIRST (`@if`) branch never receives Angular's native catch-up placement, only the SECOND
 // (`@else`) branch does (angular/angular#53310, #54840 — Angular's own docs: "You should not
 // conditionally include <ng-content> with @if, @for, or @switch"). Symptom here was axis-specific:
-// a horizontal FlatList's cells landed outside the ScrollView entirely. See angular-adapter skill
-// §18 for the full investigation. Fix: single unconditional `<ng-content>` call site.
+// a horizontal FlatList's cells landed outside the ScrollView entirely. Fix: single unconditional
+// `<ng-content>` call site.
 
 import {
   CUSTOM_ELEMENTS_SCHEMA,

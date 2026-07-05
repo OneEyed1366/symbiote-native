@@ -1,5 +1,4 @@
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
-// `responder.smoke`. Proves the responder system end-to-end: a View carrying
+// Proves the responder system end-to-end: a View carrying
 // PanResponder's panHandlers, driven through the REAL event layer
 // (topTouchStart/Move/End on the node's instanceHandle, exactly how Fabric delivers
 // touches). The negotiation grants the responder, routes a move with the correct

@@ -1,5 +1,5 @@
 // iOS Fabric component names. Metro picks this file on an iOS host; it is also the base
-// (component-names.ts re-exports it) for headless tsx / tsc / web fallback. See ADR 0020.
+// (component-names.ts re-exports it) for headless tsx / tsc / web fallback.
 // Fabric names are the codegen spec's registered name (the new-arch name), not the legacy
 // paperComponentName (RCTSwitch, …).
 

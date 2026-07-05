@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for the Keyboard module's secondary surface. A fake
+// Co-located unit test for the Keyboard module's secondary surface. A fake
 // __turboModuleProxy returns a KeyboardObserver (observe-counters only); a fake
 // RN$registerCallableModule captures the device hub so the test can play "native" and emit
 // keyboardDidShow / keyboardDidHide.

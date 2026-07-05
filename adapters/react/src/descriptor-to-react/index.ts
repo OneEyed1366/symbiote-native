@@ -2,7 +2,7 @@
 // framework-agnostic `Descriptor` tree; this maps it onto React elements. The resulting
 // host element (`symbiote-view`, `symbiote-activity-indicator`, …) flows on through the
 // react-reconciler host config → engine → Fabric, exactly like a hand-written JSX host
-// element. The wolf-tui twin is `packages/react/src/wnode/wnode-to-react.tsx`.
+// element.
 
 import { createElement } from 'react';
 import type { ReactElement } from 'react';

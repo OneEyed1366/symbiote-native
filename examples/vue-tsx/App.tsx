@@ -2,7 +2,7 @@
 // ориентир), every primitive and demo it carries, on the same engine and palette. @vue/babel-
 // plugin-jsx compiles the JSX in each setup()'s render fn to @vue/runtime-core createVNode calls
 // (Metro aliases 'vue' → @vue/runtime-core), so every vnode recommits through @symbiote-native/engine into
-// Fabric, with React Native's renderer never in the path (M3 / R4). Same engine, same components,
+// Fabric, with React Native's own renderer never in the path. Same engine, same components,
 // same palette as the React and SFC canaries; only the authoring differs — the proof the whole
 // component surface is template-agnostic.
 //
@@ -144,7 +144,7 @@ const AnimatedDemo = defineComponent({
       outputRange: [0, SLIDE_DISTANCE],
     });
 
-    // Proof of offload (ADR 0017): kick both slides, then jam the JS thread for 1.5s.
+    // Proof of offload: kick both slides, then jam the JS thread for 1.5s.
     // The native-driven pulse + green slide keep moving on the UI side through the
     // freeze; the JS-driven orange slide stalls until the thread is released. If the
     // "native" path had silently fallen back to JS, the pulse would freeze too.

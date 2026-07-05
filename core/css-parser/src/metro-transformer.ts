@@ -6,7 +6,7 @@
 // package (@symbiote-native/react, @symbiote-native/vue, @symbiote-native/angular), so this is
 // transitively resolvable from any app that already depends on one of them — this repo's
 // shamefully-hoist pnpm config (.npmrc) makes that resolvable without the app adding
-// @symbiote-native/css-parser to its own package.json. See the symbiote-sfc-style-compiler skill.
+// @symbiote-native/css-parser to its own package.json.
 //
 // Sync vs async: `transform()` is async uniformly, for every recognized style extension
 // including plain `.css`. Metro's own `metro-transform-worker` already does

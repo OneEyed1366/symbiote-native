@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): the @symbiote-native/components seam through the React bridge.
+// Co-located unit test: the @symbiote-native/components seam through the React bridge.
 // el()/txt() build a Descriptor, descriptorToReact maps it to React elements, and
 // renderActivityIndicator emits the expected Descriptor (size enum + color omission). No native,
 // no engine commit, this isolates the render-fn -> Descriptor -> element bridge every component

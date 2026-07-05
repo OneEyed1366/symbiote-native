@@ -5,7 +5,7 @@ from Angular, on the *same* untouched core as React and Vue, with React Native's
 never in the path. It is a `Renderer2`/`RendererFactory2` whose calls map onto the engine's
 four-call mutation API; `@symbiote-native/engine` does the clone-on-write commit into Fabric.
 
-Angular is the **second proof the core is genuinely framework-agnostic** (milestone M4): a third
+Angular is the **second proof the core is genuinely framework-agnostic**: a third
 framework, with its own change-detection model and AOT compilation pipeline, driving the
 already-validated engine with zero changes to it.
 
@@ -117,9 +117,6 @@ can't sit behind a process manager that owns stdin itself).
 Angular also requires **zoneless change detection** (`provideZonelessChangeDetection`,
 `@angular/core >=20`) — zone.js fights Hermes, and versions before 20 don't offer a stable
 zoneless API. This is the version floor for the whole adapter, not a suggestion.
-
-The full seam map, bootstrap sequence, and AOT pipeline live in the `angular-adapter` project
-skill — read it before touching adapter internals.
 
 ---
 

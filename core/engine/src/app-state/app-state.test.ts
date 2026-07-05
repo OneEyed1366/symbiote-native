@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for the AppState module. A fake __turboModuleProxy returns
+// Co-located unit test for the AppState module. A fake __turboModuleProxy returns
 // an AppState native module (getConstants -> { initialAppState: 'active' } plus
 // observe-counters); a fake RN$registerCallableModule captures the device hub so the test can
 // play "native" and emit `appStateDidChange`.

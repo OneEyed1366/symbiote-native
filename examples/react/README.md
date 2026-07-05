@@ -1,6 +1,6 @@
 # React canary (`@symbiote-native/react` on device)
 
-The **reference canary** — the M1/M2 proof on a real host: a React app driving the
+The **reference canary**: a React app driving the
 framework-agnostic `@symbiote-native/engine` core through `@symbiote-native/react`'s
 `react-reconciler` host config, with React Native's own renderer never in the path. Every other
 example ([`vue-tsx`](../vue-tsx), [`vue-sfc`](../vue-sfc), [`angular`](../angular)) targets the same

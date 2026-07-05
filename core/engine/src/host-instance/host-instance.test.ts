@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for toPublicInstance, the framework-agnostic graft every
+// Unit test for toPublicInstance, the framework-agnostic graft every
 // adapter applies to its host nodes. Proves it attaches the six imperative methods onto the
 // retained node, returns the SAME node identity (it mutates in place, so the engine commit
 // mirror keyed on the raw node still resolves it), and is idempotent across repeated calls.

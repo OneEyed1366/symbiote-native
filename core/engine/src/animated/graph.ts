@@ -2,8 +2,7 @@
 // sits ABOVE symbiote's shadow tree. Ported from React Native's AnimatedNode.js
 // + AnimatedWithChildren.js, with every native-driver path
 // (NativeAnimatedHelper / __isNative / __makeNative / __getNativeConfig) removed:
-// this is the JS-driven engine (ADR 0016). The native driver re-introduces those
-// hooks separately (ADR 0017).
+// this is a JS-driven engine. A native driver re-introduces those hooks separately.
 //
 // Two phases drive an update:
 //   A) top-down: when a Value changes, walk children to the leaf nodes (the
@@ -44,7 +43,7 @@ export class AnimatedNode {
   // AnimatedColor._suspendCallbacks.
   private suspendCallbacks = 0;
 
-  // Native-driver state (ADR 0017). Off until a useNativeDriver animation marks
+  // Native-driver state. Off until a useNativeDriver animation marks
   // the graph native; `nativeTag` is the node's identity in the native module,
   // allocated lazily on first reference (which also creates the native node).
   protected isNative = false;

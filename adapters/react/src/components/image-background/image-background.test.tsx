@@ -1,4 +1,3 @@
-// Co-located React-driven test (ADR 0025), ported from the headless `image-background.smoke`.
 // ImageBackground is pure JS composition: an outer RCTView (gets the wrapper style) wrapping an
 // absolute-fill RCTImageView, with the children painted ON TOP, i.e. after the image in the
 // wrapper's child order. This asserts that shape. No simulator.

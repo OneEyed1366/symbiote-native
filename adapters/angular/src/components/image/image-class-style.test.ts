@@ -1,4 +1,4 @@
-// Regression test for the anchor/class bug (angular-adapter skill): Image is its own
+// Regression test for the anchor/class bug: Image is its own
 // ANCHOR_HOST_COMPONENTS entry — a class= on <Image> resolves onto Image's OWN anchor and needs
 // its OWN anchorHostStyle merge (see index.ios.ts/index.android.ts's imageProps override), not
 // transitively fixed by anything else. Mirrors pressable.test.ts's "resolves a class=" case.

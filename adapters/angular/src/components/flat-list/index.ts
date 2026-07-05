@@ -31,8 +31,7 @@
 // surface; FlatList re-exposes it by delegating to the inner VirtualizedList (@ViewChild). The
 // element-returning props (renderItem / ItemSeparatorComponent / List{Header,Footer,Empty}Component)
 // are templates in Angular, so they are absent from IFlatListProps, per the per-adapter
-// children/render split of <prop_types_split_agnostic_vs_per_adapter>; everything agnostic mirrors
-// IVirtualizedListProps.
+// children/render prop split; everything agnostic mirrors IVirtualizedListProps.
 
 import {
   CUSTOM_ELEMENTS_SCHEMA,

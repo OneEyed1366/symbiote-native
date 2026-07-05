@@ -5,9 +5,9 @@
 // AlertManager path RN uses. Metro picks this file on an iOS host; the base alert.ts
 // re-exports it for web/headless.
 //
-// The native contract is confirmed from RN's TurboModule spec:
-//   .vendors/.../specs_DEPRECATED/modules/INativeAlertManager.js
-//     alertWithArgs(args: Args, callback: (id: number, value: string) => void)
+// The native contract is confirmed from RN's TurboModule spec for
+// `INativeAlertManager`:
+//   alertWithArgs(args: Args, callback: (id: number, value: string) => void)
 //
 // Non-throwing, like StatusBar: a missing native module is a no-op, never a crash (on a
 // device the module may be absent).

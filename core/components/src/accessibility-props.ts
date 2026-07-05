@@ -7,7 +7,7 @@
 // own View.js transform. Types are kept in sync with RN's ViewAccessibility.js.
 //
 // Framework-agnostic (imports only @symbiote-native/engine), so every adapter (React,
-// Vue, and the next) folds aria/role into accessibility* identically (ADR 0024).
+// Vue, and the next) folds aria/role into accessibility* identically.
 
 import { dlog, type ISymbioteEvent } from '@symbiote-native/engine';
 

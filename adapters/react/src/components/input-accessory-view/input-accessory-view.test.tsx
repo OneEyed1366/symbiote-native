@@ -1,4 +1,4 @@
-// Co-located React-driven test (ADR 0025), ported from `input-accessory-view.smoke.tsx`.
+// Co-located React-driven test.
 // Proves the InputAccessoryView primitive: the RCTInputAccessoryView Fabric view name,
 // nativeID/backgroundColor/style reaching the node, children nesting under it, and a
 // TextInput carrying inputAccessoryViewID.

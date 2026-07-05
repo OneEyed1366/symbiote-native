@@ -1,5 +1,5 @@
-// Co-located regression of the CONTROLLED refresh path (ADR 0025), ported from the headless
-// `refresh-flip.smoke.tsx`. When onRefresh fires and the parent flips refreshing -> true,
+// Co-located regression of the CONTROLLED refresh path.
+// When onRefresh fires and the parent flips refreshing -> true,
 // that true must reach the committed PullToRefreshView node, or native's UIRefreshControl is
 // never told to keep spinning. The sibling refresh-control test covers the static
 // refreshing:false mount; this covers the false->true flip. We fire the real `topRefresh`

@@ -3,8 +3,7 @@
 // mechanism (capture the host node, build an AnimatedProps leaf, reduce animated
 // props to their current values, override with the passthrough style) is pure JS,
 // identical across frameworks. Only `assignRef` is framework-ref-specific and stays
-// per-adapter; everything here is shared. Extracted from the React wrapper (ADR
-// 0016/0017) so a new adapter reuses it verbatim.
+// per-adapter; everything here is shared so a new adapter reuses it verbatim.
 
 import { AnimatedNode } from './graph';
 import { AnimatedStyle } from './style';

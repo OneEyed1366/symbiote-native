@@ -1,4 +1,4 @@
-// Co-located Vue-driven test (ADR 0025), Vue twin of adapters/react/src/modules/app-registry/
+// Co-located Vue-driven test, Vue twin of adapters/react/src/modules/app-registry/
 // app-registry.test.tsx. Proves the AppRegistry entry point: `registerComponent(appKey, () =>
 // App)` stores a runnable that calls `mount` (driving @symbiote-native/engine) AND bridges it to the
 // host registrar (RN's own AppRegistry, injected via `setHostRegistrar`) so native can find it

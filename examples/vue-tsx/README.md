@@ -1,6 +1,6 @@
 # Vue canary — JSX/TSX (`@symbiote-native/vue` on device)
 
-The **M3 / R4 proof on a real host**, authored in **Vue JSX** instead of an SFC: a Vue 3 app
+Authored in **Vue JSX** instead of an SFC: a Vue 3 app
 driving the framework-agnostic `@symbiote-native/engine` core on the iOS simulator / Android emulator,
 with React Native's own renderer never in the path. It is the [`examples/vue-sfc`](../vue-sfc)
 app rewritten JSX-for-template — **same native shell, same engine, same components, only the

@@ -1,5 +1,4 @@
-// Co-located unit test (ADR 0025), ported from the headless `animated-operators.smoke.tsx`.
-// The Animated arithmetic / operator nodes (add, subtract, multiply, divide, modulo,
+// Unit test for the Animated arithmetic / operator nodes (add, subtract, multiply, divide, modulo,
 // diffClamp). The JS path is the contract that MUST hold: arithmetic is exact, diffClamp
 // accumulates the input's delta and clamps the running total to its band, modulo wraps
 // Euclidean. The native path installs a fake NativeAnimatedTurboModule and asserts each

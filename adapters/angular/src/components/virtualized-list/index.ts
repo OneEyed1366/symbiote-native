@@ -1,7 +1,7 @@
 // VirtualizedList, the Angular lifecycle half. The windowing engine (offset table, window
 // compute, batch throttle, viewability, edge-reached, the child PLAN, the imperative-handle
 // geometry) lives in @symbiote-native/components/state, shared verbatim with the React and Vue adapters
-// (<adapters_reach_full_feature_parity>). Here Angular supplies only the lifecycle: plain fields
+// so every adapter keeps the same feature surface. Here Angular supplies only the lifecycle: plain fields
 // for scroll offset / viewport / measurement bumps, a once-per-CD metrics + view recompute in
 // ngDoCheck (the Angular twin of React render / Vue `computed` — it owns the controlled
 // committedWindow throttle and assembles the windowed cells before the template bindings are read),
@@ -19,11 +19,10 @@
 // (a core-only NgTemplateOutlet twin — @angular/common is not a dependency). See ./directives.ts.
 // Every React/Vue behavior is present (windowing, onEndReached, viewability, headers/footers/empty/
 // separators, refresh, imperative scroll, horizontal, inverted, MVCP); only the cell AUTHORING
-// shape differs, per the per-adapter children/render split of
-// <prop_types_split_agnostic_vs_per_adapter>.
+// shape differs, since a callback prop returning an element has no Angular equivalent.
 //
-// Lists have no Descriptor render fn (the cell content is the framework's own children); see
-// core/components/.docs-note-lists.md. Cells/spacers are plain symbiote-view host elements.
+// Lists have no Descriptor render fn — the cell content is the framework's own children.
+// Cells/spacers are plain symbiote-view host elements.
 
 import {
   CUSTOM_ELEMENTS_SCHEMA,
@@ -127,8 +126,8 @@ export type { IVListItemContext, IVListSeparatorContext } from './directives';
 
 // The Angular VirtualizedList prop surface. Mirrors React/Vue's IVirtualizedListProps MINUS the
 // element-returning props (renderItem, ListHeader/Footer/Empty Component, ItemSeparatorComponent):
-// those are the per-adapter children/render fields and become `<ng-template>` directives in Angular
-// (<prop_types_split_agnostic_vs_per_adapter>). Everything agnostic is the SAME surface.
+// those are the per-adapter children/render fields and become `<ng-template>` directives in Angular.
+// Everything agnostic is the SAME surface.
 export interface IVirtualizedListProps<ItemT> extends IAccessibilityProps, IAriaProps {
   data: unknown;
   getItem: (data: unknown, index: number) => ItemT;

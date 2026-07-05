@@ -1,5 +1,4 @@
-// Co-located test (ADR 0025), ported from the headless smoke. Proves two ScrollView gaps
-// closed in JS (no native support needed):
+// Proves two ScrollView gaps closed in JS (no native support needed):
 //   1. onContentSizeChange, synthesized from an onLayout on the inner content node
 //      (RN ScrollView.js _handleContentOnLayout). Fires (width, height) only when the size
 //      actually changed (dedupe).

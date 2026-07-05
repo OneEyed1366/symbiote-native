@@ -5,8 +5,7 @@
 // event whose payload IS a fresh IDimensionsPayload. We cache the metrics and notify
 // 'change' listeners on each update, exactly as RN does.
 //
-// The native contract is confirmed from RN's TurboModule spec at
-// .vendors/.../specs_DEPRECATED/modules/INativeDeviceInfo.js:
+// The native contract mirrors React Native's TurboModule spec for DeviceInfo:
 //   getConstants(): { Dimensions: { window?, screen?, windowPhysicalPixels?,
 //                     screenPhysicalPixels? } }
 // We resolve it through the same generic native-module bridge as Platform

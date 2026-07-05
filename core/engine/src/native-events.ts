@@ -6,7 +6,7 @@
 // second registration is a silent no-op. So we do NOT register our own hub on a
 // real host: the app injects RN's DeviceEventEmitter (the bus native actually
 // calls) via `setDeviceEventSource`, exactly like setColorProcessor. The built-in
-// hub below stays as the fallback bus for headless/non-RN runs. See .docs/decisions/0012.
+// hub below stays as the fallback bus for headless/non-RN runs.
 
 import { dlog } from './debug';
 import { runWrapped } from './dispatch';

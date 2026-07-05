@@ -1,9 +1,7 @@
 // Optional SCSS/Sass, Less, and Stylus preprocessor support. Each compiler here only ever reduces
 // its own syntax down to plain CSS text — parser.ts's `parseCSS()` is the single, UNCHANGED
-// downstream consumer of that text, exactly as it always was for a plain `.css` file. Ported from
-// wolf-tui's `internal/css-parser/src/preprocessors.ts` (the SCSS/Less/Stylus shape only — that
-// file's Tailwind branch is a separate, out-of-scope concern here, see the
-// symbiote-sfc-style-compiler skill).
+// downstream consumer of that text, exactly as it always was for a plain `.css` file. Tailwind
+// is a separate, out-of-scope concern and has no branch here.
 //
 // `sass`/`less`/`stylus` are lazy `import()`ed, never a top-level import, and are
 // devDependencies of THIS package ONLY (never a `dependency`, see package.json) — a project that

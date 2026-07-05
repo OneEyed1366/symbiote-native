@@ -1,7 +1,7 @@
 // createAnimatedComponent for @symbiote-native/angular: the Angular twin of the React/Vue
 // wrapper. React/Vue have a runtime HOC (`createAnimatedComponent(Component)` builds a
 // fresh wrapped component on the fly). Angular has NO such idiom AND it cannot have one:
-// the AOT-under-Metro build (angular-adapter skill §4) compiles every @Component at build
+// the AOT-under-Metro build compiles every @Component at build
 // time and ships NO JIT compiler to Hermes, so a runtime `Component({...})(class)` would
 // throw. The idiomatic, AOT-safe equivalent is therefore an EXPLICIT set of standalone
 // components — AnimatedView / AnimatedText / AnimatedImage / AnimatedScrollView — each a
@@ -13,7 +13,7 @@
 //
 // The framework-agnostic half (reduceProps / readPassthroughStyle / resolveHostNode /
 // AnimatedProps / attachNativeEventHandler / isNativeAnimatedAvailable) comes from
-// @symbiote-native/engine, shared verbatim with React and Vue (ADR 0016/0017). Angular supplies
+// @symbiote-native/engine, shared verbatim with React and Vue. Angular supplies
 // only the lifecycle wiring. The per-frame path NEVER goes through Angular change
 // detection: value.setValue / animation -> flushValue -> AnimatedProps.update() ->
 // setNativeProps(node), exactly as on the other adapters.

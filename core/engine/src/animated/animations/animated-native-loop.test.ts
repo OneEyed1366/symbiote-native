@@ -1,4 +1,3 @@
-// Co-located unit test (ADR 0025), ported from the headless `animated-native-loop.smoke.tsx`.
 // Native loop offload: Animated.loop over a SINGLE native-driver timing must hand the whole loop
 // to native (one startAnimatingNode carrying `iterations`), so zero JS runs per cycle. A finite
 // loop passes its count; an infinite loop passes -1. A loop over a SEQUENCE can't offload and

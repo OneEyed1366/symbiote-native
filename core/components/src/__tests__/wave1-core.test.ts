@@ -1,6 +1,6 @@
-// Co-located unit test (ADR 0025): wave-1 component core logic (ImageBackground /
-// InputAccessoryView / Modal). Exercises the shared render fns + Modal state machine alone; no
-// adapter, no Fabric slot. Ported from the headless `wave1-core.smoke.ts`.
+// Unit test for wave-1 component core logic (ImageBackground / InputAccessoryView / Modal).
+// Exercises the shared render fns + Modal state machine alone; no adapter, no Fabric slot.
+// Ported from the headless `wave1-core.smoke.ts`.
 
 import { describe, expect, it } from 'vitest';
 import { flattenStyle } from '@symbiote-native/engine';

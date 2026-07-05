@@ -1,6 +1,6 @@
 # Angular canary (`@symbiote-native/angular` on device)
 
-The **M4 proof on a real host**: an Angular app driving the framework-agnostic
+An Angular app driving the framework-agnostic
 `@symbiote-native/engine` core through `@symbiote-native/angular`'s `Renderer2`/`RendererFactory2`,
 with React Native's own renderer never in the path. It targets the same canary surface as
 [`examples/react`](../react) and the Vue examples, standalone components, zoneless change
@@ -9,7 +9,7 @@ AOT pipeline this build script drives.
 
 The app imports its standalone host intrinsics and composed components from the public
 `@symbiote-native/angular` surface, then `ngc` compiles the app against the adapter's partial-Ivy
-output. Angular uses the two-stage Variant 1 build pipeline:
+output. Angular uses a two-stage build pipeline:
 
 1. `pnpm ng:build` runs `ngc -p tsconfig.angular.json` and emits partial-Ivy JS to
    `build/angular/`.

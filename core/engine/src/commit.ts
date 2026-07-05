@@ -341,8 +341,8 @@ function jsonEqual(a: unknown, b: unknown): boolean {
 // What Fabric currently holds for a node. The retained node carries the *desired*
 // state (props/children); the mirror carries the *committed* state we diff against.
 // `tag` is the reactTag we minted at first create, stable across clone-on-write
-// (the clone keeps the family). Kept so the Animated native driver can bind to it
-// (ADR 0017). `rootTag` lets a targeted re-commit (setNativeProps) find the surface.
+// (the clone keeps the family). Kept so the native-driven Animated path can bind to
+// it directly. `rootTag` lets a targeted re-commit (setNativeProps) find the surface.
 interface IMirror {
   handle: IFabricNode;
   tag: number;
@@ -618,13 +618,13 @@ function commitContainer(rootTag: IRootTag): void {
   }
 }
 
-// Targeted per-frame prop write for the JS-driven Animated path (ADR 0016). RN
-// flushes an animation frame with an in-place `instance.setNativeProps(...)`; we have
-// no in-place mutation (Fabric is persistent), so a frame is one scoped commit: mutate
+// Targeted per-frame prop write for the JS-driven Animated path. RN flushes an
+// animation frame with an in-place `instance.setNativeProps(...)`; we have no
+// in-place mutation (Fabric is persistent), so a frame is one scoped commit: mutate
 // the node's desired props, then re-reconcile its surface. The engine clones only this
 // node (props differ), bubbles the re-clone to the root, reuses every sibling subtree
 // by reference, and emits a single completeRoot. This is the "slow tier", viable for a
-// single shallow animation; the native driver (ADR 0017) is the answer for scale.
+// single shallow animation; driving the animation natively is the answer for scale.
 export function setNativeProps(node: ISymbioteNode, partial: Record<string, unknown>): void {
   const record = mirror.get(node);
   if (record === undefined) {
@@ -646,8 +646,8 @@ export function setNativeProps(node: ISymbioteNode, partial: Record<string, unkn
 }
 
 // The committed reactTag of a node (stable across clone-on-write), for binding the
-// Animated native driver via connectAnimatedNodeToView (ADR 0017). Undefined until the
-// node has been committed at least once.
+// native Animated driver via connectAnimatedNodeToView. Undefined until the node
+// has been committed at least once.
 export function getNativeTag(node: ISymbioteNode): number | undefined {
   return mirror.get(node)?.tag;
 }

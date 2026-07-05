@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): transformOrigin/aspectRatio/fontVariant are JS-parsed before
+// transformOrigin/aspectRatio/fontVariant are JS-parsed before
 // Fabric (enableNativeCSSParsing defaults to false, so the processor runs in JS). A raw
 // `transformOrigin: 'top left'` string reaching Android native crashed casting String to
 // ReadableArray. These processors restore RN's JS parse. Expected outputs are RN-exact.

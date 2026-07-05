@@ -1,13 +1,13 @@
 // tsc --build emits build/**/*.js with moduleResolution:"Bundler" semantics: relative imports
 // keep whatever extension (usually none) the .ts source used. That's correct for Metro/Vitest
-// resolving src/*.ts directly (main/exports point there in-repo — see symbiote-release-publishing
-// skill), but it's invalid ESM once the compiled build/ output is consumed by Node's own loader
+// resolving src/*.ts directly (main/exports point there in-repo), but it's invalid ESM once
+// the compiled build/ output is consumed by Node's own loader
 // (no bundler in between) — Node requires an explicit extension on every relative specifier.
 //
 // The fix can't live in src/*.ts: Metro's resolver treats a given extension as literal (only
 // layering .ios/.android/.native suffixes on top of it) rather than mapping .js back to .ts the
 // way tsc/Node's own resolution does, so writing '.js' in the TypeScript source breaks Metro's
-// dev-mode resolution of the unbuilt source (verified directly — .examples/vue-tsx failed to
+// dev-mode resolution of the unbuilt source (verified directly — a local example app failed to
 // resolve adapters/vue/src/modules/app-registry/index.js). So this runs ONLY over already-compiled
 // build/**/*.js output, once, after `tsc --build` — src/*.ts is never touched.
 import fs from 'node:fs';

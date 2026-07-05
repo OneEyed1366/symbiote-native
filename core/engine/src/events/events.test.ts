@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): the event layer. The shared fake Fabric captures the single
+// Unit test for the event layer. The shared fake Fabric captures the single
 // handler the engine registers (fabric.fireEvent drives it); we assert press correlation,
 // bubbling + stopPropagation, currentTarget/target tracking, direct layout delivery, and the
 // ViewConfig gate that keeps a non-event onX as a prop.

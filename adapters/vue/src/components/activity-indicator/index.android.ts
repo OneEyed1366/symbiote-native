@@ -1,7 +1,7 @@
 // ActivityIndicator on Android: AndroidProgressBar needs `styleAttr` (it drives the
 // ProgressBar's setStyle(); without it the view throws "setStyle() not called") and
 // `indeterminate: true`, and its default color is the theme (null). Metro picks this on an
-// Android host; no Platform.OS read. Mirrors the React adapter's Android binding. See ADR 0020.
+// Android host; no Platform.OS read. Mirrors the React adapter's Android binding.
 
 import { createActivityIndicator } from './shared';
 export type { IActivityIndicatorProps } from './shared';

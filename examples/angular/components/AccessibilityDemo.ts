@@ -11,8 +11,7 @@ import {
   View,
 } from '@symbiote-native/angular';
 
-// Static look lives in AccessibilityDemo.css, compiled at build time by @symbiote-native/css-parser
-// (symbiote-sfc-style-compiler skill).
+// Static look lives in AccessibilityDemo.css, compiled at build time by @symbiote-native/css-parser.
 import './AccessibilityDemo.css';
 
 // View's own primitive host only declares `style` as a real Angular @Input() (see

@@ -246,10 +246,9 @@ type INativeImageLoader = {
 };
 
 // The iOS native module name RN registers this under (NativeImageLoaderIOS.js
-// resolves `TurboModuleRegistry.getEnforcing<Spec>('ImageLoader')`). Per the
-// symbiote invariant, a module name is only provable on a real host (a headless
-// fake answers to any name); this iOS name is device-verify-pending. See
-// .docs/native-module-platform-routing.md.
+// resolves `TurboModuleRegistry.getEnforcing<Spec>('ImageLoader')`). A module
+// name like this is only provable on a real host — a headless fake answers to
+// any name — so this iOS name is device-verify-pending.
 const IMAGE_LOADER_MODULE = 'ImageLoader';
 
 let imageLoaderModule: INativeImageLoader | null | undefined;

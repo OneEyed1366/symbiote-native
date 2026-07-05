@@ -5,7 +5,7 @@
 // scroll handles the gesture before the refresh parent, which mirrors RN's ScrollView.js
 // android branch (cloneElement(refreshControl, {style}, <ScrollView nestedScrollEnabled
 // style={flex:1}>{content}</ScrollView>)). Metro picks this on an Android host; no
-// Platform.OS read. See ADR 0020.
+// Platform.OS read.
 // device-verify-pending: the wrap shape mirrors RN, proven on a real host by the absence
 // of the "addViewAt: failed to insert" crash.
 
@@ -36,7 +36,7 @@ export const ScrollView = forwardRef<IScrollViewHandle, IScrollViewProps>((props
   // (the wrap shape leaves the scroll view as the command target, not the RefreshControl).
   const ref = useRef<ISymbioteNode | null>(null);
   // Lazy getter, not the ref itself: the node is null until the element commits, so the handle
-  // must read ref.current on each command (ADR 0024 §3), an eager capture would freeze null.
+  // must read ref.current on each command, an eager capture would freeze null.
   useImperativeHandle(forwardedRef, () => buildScrollViewHandle(() => ref.current), []);
   // Drive the sticky scroll value on the native UI thread (RN attachNativeEvent). No-op on a
   // host without the native animated module. The JS sticky path stays in effect.

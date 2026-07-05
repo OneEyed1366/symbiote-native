@@ -8,7 +8,7 @@
 
 **Beta** · iOS + Android · React + Vue + Angular · one native core, N framework adapters
 
-[Architecture](#how-it-works) · [Testing](#testing) · [Milestones](#milestones) · [React adapter](./adapters/react) · [Vue adapter](./adapters/vue) · [Angular adapter](./adapters/angular) · [Prior art](https://github.com/OneEyed1366/wolf-tui)
+[Architecture](#how-it-works) · [Testing](#testing) · [Milestones](#milestones) · [React adapter](./adapters/react) · [Vue adapter](./adapters/vue) · [Angular adapter](./adapters/angular)
 
 </div>
 
@@ -34,10 +34,9 @@ tiny seam in front of it, and lets **any** UI framework drive real native views 
 The rendering layer is React Native's; React the framework is just one client. One native
 core, N thin adapters.
 
-> If you've used [wolf-tui](https://github.com/OneEyed1366/wolf-tui) — shared retained-tree + a thin per-framework
-> reconciler, already shipping across five frameworks against a native layout engine —
-> you already know the shape. SymbioteNative retargets it from ANSI terminal output to native
-> iOS/Android views.
+> The shape is a shared retained tree plus a thin per-framework reconciler — the same pattern
+> that already drives a terminal layout engine across five UI frameworks, retargeted here from
+> ANSI terminal output to native iOS/Android views.
 
 ---
 
@@ -58,9 +57,8 @@ stock react-native : Fabric C++ · JSI · Yoga · RCTFabricSurface       ← nev
 The hard part is that Vue/Svelte/Solid/Angular **mutate** nodes in place
 (`el.setAttribute`), while Fabric is **persistent** — every change clones the node with
 new props and atomically commits a new child set. That mutation→clone-on-write translation
-is the entire engineering substance of the project, and it lives **once** in
-`@symbiote-native/engine`. Adapters see only a four-call mutation API. A persistence bug is fixed
-once, for every framework.
+lives **once**, in `@symbiote-native/engine` — adapters see only a four-call mutation API, and
+a persistence bug is fixed once, for every framework.
 
 <details>
 <summary><b>Details</b> — data flow, events, bootstrap, what stays stock</summary>
@@ -243,15 +241,15 @@ app can't ship without is a more urgent proof than a fourth/fifth framework adap
 | # | Milestone | What it proves | Status |
 |---|-----------|----------------|--------|
 | **M0** | Monorepo scaffold | pnpm workspaces, `engine` + `react` packages, headless harness | ✅ done |
-| **M1** | React canary on iOS | native pipe (R1) + clone-on-write engine (R2) + event→recommit (R3) | ✅ done |
+| **M1** | React canary on iOS | native pipe, clone-on-write engine, and event→recommit | ✅ done |
 | **M2** | **React → React Native parity (canary surface)** | the canary's full primitive + prop + event surface on the agnostic core — green on iOS + Android | ✅ done |
 | ↳ M2.1 | Primitive surface | `View`/`Text`/`ScrollView`/`TextInput`/`Modal`/`FlatList`/… all driven through the engine, on device | ✅ done |
 | ↳ M2.2 | Runtime modules | `Platform`/`StyleSheet`/`Dimensions`/`Appearance`/`AppState` + imperative `Alert`/`ActionSheetIOS`/`Share`/`Linking`/`Vibration`/`Keyboard`/`StatusBar` | ✅ done |
-| ↳ M2.3 | `Animated`, both drivers | JS + native driver (`ValueXY`/tracking/`diffClamp`); native offload proven by a JS-thread freeze (ADR 0016 · 0017) | ✅ done |
+| ↳ M2.3 | `Animated`, both drivers | JS + native driver (`ValueXY`/tracking/`diffClamp`); native offload proven by a JS-thread freeze | ✅ done |
 | ↳ M2.4 | Third-party native views | `@react-native-community/slider` via runtime ViewConfig derivation — zero SymbioteNative metadata | ✅ done |
 | ↳ M2.5 | Gestures & events | responder lifecycle, capture→bubble phases, `Pressable`/`Touchable*`/`PanResponder`, a11y prop layer | ✅ done |
 | ↳ M2.6 | Long-tail prop edges | continuous hardening of remaining components and per-prop edges as the canary surface widens — not a gate on M2 | 🔁 ongoing |
-| **M3** | **Vue adapter (R4)** | `createRenderer` + nodeOps on the validated core — first non-React framework, same canary surface | ✅ done |
+| **M3** | **Vue adapter** | `createRenderer` + nodeOps on the validated core — first non-React framework, same canary surface | ✅ done |
 | ↳ M3.1 | Vue canary parity | `examples/vue-tsx` (TSX) + `examples/vue-sfc` (SFC) render the React canary's surface, minus React-only third-party components | ✅ done |
 | ↳ M3.2 | Shared component layer | `VirtualizedList` family + component logic extracted to `@symbiote-native/components`, inherited by React **and** Vue | ✅ done |
 | ↳ M3.3 | Test harness per adapter | colocated `vitest` (headless, fake Fabric slot) + `Detox` e2e mirrored across all three example apps | ✅ done |

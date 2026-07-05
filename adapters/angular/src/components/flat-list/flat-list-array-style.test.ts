@@ -33,7 +33,7 @@ const chips: IChip[] = Array.from({ length: 24 }, (_unused, index) => ({
 // it reaches a `[style]=` binding — required of app authors (see App.ts) AND of every adapter
 // component that forwards its own `style` @Input() onward (see the `resolvedStyle` getters/fields
 // in virtualized-list, section-list, virtualized-section-list — flat-list's own `rowStyle` had the
-// identical landmine, always assigning an array). See the angular-adapter skill for the full story.
+// identical landmine, always assigning an array).
 @Component({
   selector: 'symbiote-chip-list-host',
   standalone: true,

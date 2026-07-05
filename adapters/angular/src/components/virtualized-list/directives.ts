@@ -3,8 +3,7 @@
 // `ItemSeparatorComponent`. React/Vue pass an element-returning callback; that does NOT
 // translate to Angular, where per-item content is a TEMPLATE. So the app supplies each
 // slot as an `<ng-template>` carrying one of these structural directives, and the list
-// stamps the windowed slice through them. This is the per-adapter children/render split of
-// <prop_types_split_agnostic_vs_per_adapter>: the agnostic windowing surface stays shared,
+// stamps the windowed slice through them. The agnostic windowing surface stays shared,
 // only the cell-AUTHORING shape is framework-specific.
 //
 // Authoring API (what FlatList / SectionList build on, and what the app imports):

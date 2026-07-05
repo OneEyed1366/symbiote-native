@@ -1,5 +1,5 @@
-// Co-located test (ADR 0025) for the ANDROID ScrollView RefreshControl WRAP style routing,
-// ported from the headless smoke. On Android a RefreshControl WRAPS the scroll view
+// Co-located test for the ANDROID ScrollView RefreshControl WRAP style routing.
+// On Android a RefreshControl WRAPS the scroll view
 // (AndroidSwipeRefreshLayout is the parent). RN splits the user `style` (splitLayoutProps):
 // LAYOUT -> wrapper, VISUAL -> inner scroll view. We assert that split.
 //

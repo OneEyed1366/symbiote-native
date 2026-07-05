@@ -1,6 +1,6 @@
 // ActivityIndicator on iOS: RCTActivityIndicatorView takes the size enum + a GRAY default
 // color and no extra native props. Also the base (activity-indicator.ts re-exports it) for
-// headless / web. Mirrors the React adapter's iOS binding. See ADR 0020.
+// headless / web. Mirrors the React adapter's iOS binding.
 
 import { createActivityIndicator } from './shared';
 export type { IActivityIndicatorProps } from './shared';

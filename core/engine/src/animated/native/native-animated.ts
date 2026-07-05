@@ -1,4 +1,4 @@
-// The native-driver bridge (ADR 0017). When an animation runs with
+// The native-driver bridge. When an animation runs with
 // useNativeDriver:true, the whole value graph is mirrored into native "animated
 // nodes" and the curve is handed to the stock NativeAnimated TurboModule, which
 // then mutates the bound shadow node every frame with ZERO JS per frame.
@@ -6,7 +6,7 @@
 // We consume the module that ships in stock react-native, no native fork. On
 // iOS bridgeless it registers as `NativeAnimatedTurboModule`; we fall back to the
 // legacy `NativeAnimatedModule` name. Resolution goes through the same JSI seam as
-// every other native module (getNativeModule), consistent with ADR 0012. The
+// every other native module (getNativeModule). The
 // module is resolved lazily on first use, so importing this file headless (no
 // native host) is inert until a native-driven animation actually starts.
 
@@ -95,7 +95,7 @@ function module(): INativeAnimatedSpec | null {
 
 // True when the stock native module is present in the binary: the gate the
 // drivers consult before honouring useNativeDriver:true (else they fall back to
-// the JS-driven path of ADR 0016).
+// the JS-driven path).
 export function isNativeAnimatedAvailable(): boolean {
   return module() !== null;
 }

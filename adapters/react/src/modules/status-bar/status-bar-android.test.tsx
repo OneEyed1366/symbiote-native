@@ -1,4 +1,3 @@
-// Co-located React-driven test (ADR 0025), ported from `status-bar-android.smoke.tsx`.
 // The Android StatusBar native module is a DIFFERENT shape from iOS
 // (setColor(int, animated) / setTranslucent), so it imports status-bar/index.android
 // directly (Metro's .android picker isn't active under vitest). The shared fake-Fabric

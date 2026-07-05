@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): the StyleSheet API. create/flatten/compose/absoluteFill run
+// Unit test for the StyleSheet API. create/flatten/compose/absoluteFill run
 // against plain objects; for hairlineWidth we install a fake __turboModuleProxy so
 // getNativeModule('DeviceInfo') returns a known screen scale, then assert the width matches RN's
 // formula for that scale.

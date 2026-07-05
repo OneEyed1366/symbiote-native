@@ -1,7 +1,7 @@
 // A Vue 3 custom renderer over @symbiote-native/engine. Each RendererOptions method maps onto
 // the engine's tiny mutation API; the engine owns all Fabric clone-on-write, so Vue
 // drives the exact same retained tree React does: the proof the core is framework-
-// agnostic (M3 / R4).
+// agnostic.
 
 import { createRenderer, type RendererOptions } from '@vue/runtime-core';
 import {
@@ -47,8 +47,7 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       // the raw node so a template/function ref to a host element exposes it exactly like
       // React's getPublicInstance. toPublicInstance mutates in place and returns the SAME node
       // identity, so the engine commit mirror (keyed on the raw node) still resolves it — the
-      // ref must keep holding this raw node by identity (shallowRef), never a deep ref. See the
-      // vue-adapter-reactivity skill.
+      // ref must keep holding this raw node by identity (shallowRef), never a deep ref.
       dlog(`vue createElement ${descriptor.component} -> public instance`);
       return toPublicInstance(node);
     },
@@ -65,8 +64,8 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
 
     // Fragment / v-if / v-for placeholder. A real retained node so insert/nextSibling/
     // parentNode ordering stays correct, but the engine's commit walk skips it: no
-    // native view is ever created. (wolf-tui fakes a comment with an empty text node;
-    // here an empty RCTRawText would actually paint, so an anchor is the right call.)
+    // native view is ever created. (A comment can't just be an empty text node here —
+    // an empty RCTRawText would actually paint, so an anchor is the right call.)
     createComment() {
       return createAnchor();
     },

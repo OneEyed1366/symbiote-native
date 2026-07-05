@@ -1,10 +1,10 @@
-// Proves the v-show shim (vue-adapter-directives skill): the compiled `v-show` directive
+// Proves the v-show shim: the compiled `v-show` directive
 // resolves to a real implementation (not the DOM-only @vue/runtime-dom one), toggles the
 // committed node's style.display without clobbering other declarative style props, and survives
 // the async-commit race on the very first mount — Vue's `mounted` hook fires synchronously
 // during the patch pass, but this renderer coalesces the actual Fabric commit onto a microtask
 // (surface.requestCommit()), so a bare setNativeProps call here would silently no-op on mount
-// without the whenCommitted guard (see vue-adapter-reactivity). The directive's effect is always
+// without the whenCommitted guard. The directive's effect is always
 // a targeted follow-up clone on top of the render's own commit (setNativeProps re-commits, it
 // doesn't mutate in place), so assertions read the LATEST committed tree (`fabric.committed`),
 // not the original `createNode`'d node (`fabric.find`), which never reflects a later clone.
@@ -96,7 +96,7 @@ describe('vShow runtime-helpers shim', () => {
   });
 });
 
-// Proves our Teleport wrapper (vue-adapter-directives skill): content moves under an already-
+// Proves our Teleport wrapper: content moves under an already-
 // mounted host node OUTSIDE its own template position (same surface), and the guard rejects a
 // target that isn't a real host node instead of silently corrupting the retained tree.
 function findByTestId(testId: string): IFakeNode | undefined {

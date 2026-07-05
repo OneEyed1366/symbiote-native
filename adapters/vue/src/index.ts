@@ -4,7 +4,7 @@
 
 export { mount, unmount } from './render';
 // createTunnel: cross-surface content sharing (Teleport stays same-surface-only by design —
-// see create-tunnel.ts and the vue-adapter-directives skill for why).
+// see create-tunnel.ts for why).
 export { createTunnel, type ITunnel } from './create-tunnel';
 export { View, Text } from './components';
 // Accessibility / ARIA prop types: framework-agnostic, shared verbatim from
@@ -46,9 +46,9 @@ export type { IActivityIndicatorProps } from './components/activity-indicator';
 // snap-back watch); render shared verbatim with React, Vue supplies the reactive lifecycle.
 export { Switch } from './components/switch';
 export type { ISwitchProps, ISwitchTrackColor } from './components/switch';
-// ScrollView. Full parity (ADR 0024): vertical + horizontal, every pass-through prop, the
+// ScrollView. Full parity: vertical + horizontal, every pass-through prop, the
 // synthesized onContentSizeChange, the imperative handle via expose() + shallowRef, RefreshControl
-// (iOS sibling / Android wrap, Phase 2), and sticky headers (Phase 3: the scroll AnimatedValue,
+// (iOS sibling / Android wrap), and sticky headers (the scroll AnimatedValue,
 // the headerLayoutYs cross-talk, and the per-header Animated.View wrap). The pure math (intrinsics,
 // decelerationRate, content-size dedupe, the handle, the sticky interpolation) is shared verbatim
 // with React from @symbiote-native/components.
@@ -130,7 +130,7 @@ export type {
   ISectionListEmits,
   ISectionListHandle,
 } from './components/section-list';
-// Phase 2 (ADR 0024): SafeAreaView + RefreshControl, wired into ScrollView with the iOS-sibling /
+// SafeAreaView + RefreshControl, wired into ScrollView with the iOS-sibling /
 // Android-wrap platform split. RefreshControl hosts the wrapped scroll view via its default slot.
 export { SafeAreaView } from './components/safe-area-view';
 export type { ISafeAreaViewProps } from './components/safe-area-view';
@@ -141,12 +141,12 @@ export { descriptorToVue } from './descriptor-to-vue';
 // external wrapper package (e.g. @symbiote-native/slider/vue over a third-party native view) can fold
 // its incoming attrs through the SAME transform rather than reimplementing it.
 export { normalizeVueAttrs } from './utils/normalize-attrs';
-// resolveModelValue/emitModelUpdate: the v-model (Rule 6, vue-adapter-events skill) helper every
+// resolveModelValue/emitModelUpdate: the v-model helper every
 // controlled-value component uses. Exported for the same external-package reason as
 // normalizeVueAttrs above (e.g. @symbiote-native/slider/vue).
 export { resolveModelValue, emitModelUpdate } from './utils/model-binding';
 export { createSymbioteRenderer } from './renderer';
-// Animated (ADR 0024 Phase 3a): Animated.View/Text/Image + the lazy Animated.ScrollView over the
+// Animated: Animated.View/Text/Image + the lazy Animated.ScrollView over the
 // Vue primitives, with the value graph / easing / drivers spread from @symbiote-native/engine. The wrap
 // mechanism (createAnimatedComponent) is the Vue twin of React's; the pure leaves live in the
 // engine.

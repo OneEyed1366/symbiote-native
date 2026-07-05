@@ -1,5 +1,4 @@
 /** @jsxRuntime automatic */
-// Co-located React-driven virtualization test (ADR 0025), ported from the headless smoke.
 // A FlatList over 1000 items with a FIXED getItemLayout (no measurement needed) is driven
 // by firing the inner ScrollView's onLayout/onScroll directly, asserting the core claim:
 // only a window's worth of item nodes is ever committed (never all 1000), and that window

@@ -1,5 +1,5 @@
 // The driver factory + composition API, ported from RN's
-// AnimatedImplementation.js, JS orchestration only (ADR 0016). `timing` /
+// AnimatedImplementation.js, JS orchestration only. `timing` /
 // `spring` / `decay` wrap a value with a fresh driver and return a
 // CompositeAnimation; `parallel` / `sequence` / `stagger` / `loop` / `delay`
 // orchestrate those. Vector (XY/Color) handling, tracking, AnimatedEvent and

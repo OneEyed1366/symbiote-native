@@ -1,4 +1,4 @@
-// Co-located Vue-driven pipeline test (ADR 0025), the Vue twin of
+// Co-located Vue-driven pipeline test, the Vue twin of
 // adapters/react/src/text-input/text-input.test.tsx. Proves the TextInput contract through Vue's
 // reactive lifecycle (shallowRef host node, post-flush controlled-write watch, expose() handle)
 // over the shared fake Fabric slot: the controlled value -> private `text` fold + the
@@ -163,8 +163,8 @@ describe('Vue TextInput on the engine', () => {
   });
 
   it('commands setTextAndSelection on a v-model divergence, not just the value prop', async () => {
-    // Regression case for the read-every-site gotcha (vue-adapter-events skill, Rule 6): the
-    // controlled-write watch must also resolve modelValue, not only the raw `value` attr.
+    // Regression case for the read-every-site gotcha: the controlled-write watch must also
+    // resolve modelValue, not only the raw `value` attr.
     const Forced = defineComponent({
       setup() {
         const value = ref('');

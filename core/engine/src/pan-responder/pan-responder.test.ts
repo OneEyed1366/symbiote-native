@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): PanResponder gesture math, pure JS, no mounting.
+// Co-located unit test: PanResponder gesture math, pure JS, no mounting.
 // PanResponder.create produces panHandlers (responder props); we call them directly with
 // synthetic touch events (the shape the engine synthesizes onto event.nativeEvent), driving one
 // finger through grant -> moves -> release, and assert the gestureState: dx/dy is the total delta

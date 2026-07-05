@@ -1,4 +1,3 @@
-// Co-located React-driven test (ADR 0025), ported from `text-input.smoke.tsx`.
 // Proves the TextInput primitive, the controlled-value / event-count handshake, over a
 // fake Fabric slot. This file keeps a PURPOSE-BUILT slot rather than the shared
 // `installFabric()` harness because TextInput drives a `dispatchCommand`

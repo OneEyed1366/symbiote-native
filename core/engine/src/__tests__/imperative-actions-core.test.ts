@@ -1,7 +1,7 @@
-// Co-located unit test (ADR 0025): the imperative-action modules (Alert / Linking / Vibration)
+// Co-located unit test: the imperative-action modules (Alert / Linking / Vibration)
 // reach the native bridge correctly. A fake __turboModuleProxy captures each native call; native
-// module NAMES are NOT verified here: a headless fake answers to any name (symbiote invariant);
-// this proves only the JS path.
+// module NAMES are NOT verified here: a headless fake answers to any name — this proves only the
+// JS path.
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Alert } from '../alert';

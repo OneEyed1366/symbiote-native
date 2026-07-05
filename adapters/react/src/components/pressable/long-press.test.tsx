@@ -1,5 +1,5 @@
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
-// `long-press.smoke`. Proves the long-press SYNTHESIS in the engine's events layer:
+// Co-located React-driven pipeline test.
+// Proves the long-press SYNTHESIS in the engine's events layer:
 // there is no native longPress event. The engine arms a hold timer on topTouchStart
 // when a node in the press path listens for it, fires a bubbling `longPress` after the
 // delay, and suppresses the tap on release. The 500ms delay is RN's Touchable default;

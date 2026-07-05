@@ -1,8 +1,9 @@
 // The retained shadow-tree. Adapters mutate this cheap in-memory tree through a
 // tiny API; the commit engine (commit.ts) later walks it and translates the
 // whole thing into Fabric's clone-on-write child sets. Keeping the retained
-// tree mutable while the Fabric mirror stays persistent is the core R2 trick,
-// and it lives here in shared so no adapter re-implements it.
+// tree mutable while the Fabric mirror stays persistent lets every adapter mutate
+// freely without touching Fabric's clone-on-write protocol directly, and it
+// lives here in shared so no adapter re-implements it.
 
 import { isEventFor } from './view-config';
 import { isClassNameValue, resolveClassName } from './style-registry';

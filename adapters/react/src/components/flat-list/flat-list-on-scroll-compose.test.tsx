@@ -1,6 +1,5 @@
 /** @jsxRuntime automatic */
-// Co-located React-driven test (ADR 0025), ported from the headless `smoke.tsx`. Proves a
-// user-supplied onScroll on a FlatList COMPOSES with the list's internal windowing handler
+// Proves a user-supplied onScroll on a FlatList COMPOSES with the list's internal windowing handler
 // instead of overwriting it. RN's _onScroll runs its own bookkeeping AND calls
 // this.props.onScroll(e) (VirtualizedList.js:1695-1697); before the fix our list dropped the
 // user handler because it arrived raw via the rest spread and was clobbered by the internal

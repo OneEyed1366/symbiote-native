@@ -17,9 +17,8 @@ import { dlog } from '../debug';
 import { getNativeModule } from '../native-modules';
 
 // The iOS native module name RN registers this under (the same name on both
-// platforms). NOTE: per the symbiote invariant, a module name is only provable on
-// a real host (a headless fake answers to any name); this name is
-// device-verify-pending. See .docs/native-module-platform-routing.md.
+// platforms). A module name is only provable on a real host — a headless fake
+// answers to any name — so this name is still pending verification on device.
 const I18N_MANAGER_MODULE = 'I18nManager';
 
 export type II18nManagerConstants = {

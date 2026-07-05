@@ -4,7 +4,6 @@
 // owns only what genuinely differs: the OS literal, the constants shape + guard, the
 // select precedence, and the device-class getters. The filename is the selector (Metro
 // picks platform.ios / platform.android by host); no Platform.OS read lives here.
-// See .docs/decisions/0022 (and 0020 for the same split on component names).
 
 import { dlog } from '../debug';
 import { getNativeModule } from '../native-modules';

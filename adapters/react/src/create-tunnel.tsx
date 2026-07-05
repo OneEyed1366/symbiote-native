@@ -1,5 +1,5 @@
-// createTunnel — the cross-surface answer to createPortal's same-surface-only v1 scope
-// (react-adapter-portal skill). Prior art: pmndrs/tunnel-rat exists precisely because a real
+// createTunnel — the cross-surface answer to createPortal's same-surface-only scope.
+// Prior art: pmndrs/tunnel-rat exists precisely because a real
 // createPortal cannot reach across two genuinely separate reconciler roots — see
 // github.com/facebook/react/issues/17147 ("react-reconciler & portals: missing root
 // instance"). The fix is the one the ecosystem already settled on: don't reach into a

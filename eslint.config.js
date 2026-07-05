@@ -54,9 +54,10 @@ export default defineConfig(
   },
 
   // Vue: reactivity discipline lives here. Engine/native nodes must be held by identity
-  // (shallowRef / markRaw), never wrapped in a deep reactive ref (see the
-  // vue-adapter-reactivity invariant). No off-the-shelf plugin enforces that yet; add
-  // project-specific no-restricted-syntax rules in this block as the surface grows.
+  // (shallowRef / markRaw), never wrapped in a deep reactive ref — a plain `ref` wraps
+  // the object in a reactive Proxy that breaks identity lookups against the engine's
+  // node registry. No off-the-shelf plugin enforces that yet; add project-specific
+  // no-restricted-syntax rules in this block as the surface grows.
   {
     files: ['adapters/vue/**/*.ts'],
     rules: {},

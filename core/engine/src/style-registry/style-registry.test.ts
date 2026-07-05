@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): the style registry. Each test registers its own
+// Unit test for the style registry. Each test registers its own
 // styles and clearGlobalStyles() in beforeEach isolates them from one another.
 
 import { beforeEach, describe, expect, it } from 'vitest';

@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): `processTransform` is pure: a STRING transform is
+// Unit test: `processTransform` is pure: a STRING transform is
 // JS-parsed before Fabric (RN's stock path, enableNativeCSSParsing defaults to false) and an
 // ARRAY transform passes through UNCHANGED by reference (the animated / sticky-header hot
 // path). Expected string outputs are RN-exact.

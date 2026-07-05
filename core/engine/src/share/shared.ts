@@ -6,7 +6,7 @@
 //
 // Metro selects the platform file on a real host (share.android.ts > share.ts); the base
 // share.ts re-exports the iOS build for web/headless. There is no runtime `Platform.OS`
-// read: the filename is the selector. See ADR 0019.
+// read: the filename is the selector.
 
 // RN's IShareContent: a url OR a message is required (title always optional).
 export type IShareContent =

@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): experimental_backgroundImage is JS-parsed before Fabric, same
+// experimental_backgroundImage is JS-parsed before Fabric, same
 // root cause as boxShadow/transform/filter (enableNativeCSSParsing defaults false). Two coverage
 // paths: STRING form (the CSS gradient syntax authors actually write) and ARRAY form (the
 // structured/animated hot path, color detection irrelevant there).

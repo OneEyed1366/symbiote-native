@@ -1,5 +1,5 @@
 // SpringAnimation: ported from RN's animations/SpringAnimation.js, JS path
-// only (ADR 0016). Integrates the closed form of a damped harmonic oscillator
+// only. Integrates the closed form of a damped harmonic oscillator
 // each frame and rests once both velocity and displacement fall below their
 // thresholds. A spring chained after a previous spring inherits its
 // position/velocity/time (getInternalState) so retargeting mid-flight stays

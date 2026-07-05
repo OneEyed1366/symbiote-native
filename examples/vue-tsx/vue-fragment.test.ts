@@ -1,4 +1,4 @@
-// Co-located Vue-driven pipeline test (ADR 0025), ported from the headless `vue-fragment.smoke.ts`,
+// Co-located Vue-driven pipeline test, ported from the headless `vue-fragment.smoke.ts`,
 // proving the SAME fake-Fabric harness carries a non-React framework.
 //
 // Regression it guards: Vue brackets a Fragment (what `v-for` / list-`v-if` compile to) with

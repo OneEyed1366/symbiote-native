@@ -1,5 +1,5 @@
-// Co-located React-driven test (ADR 0025), ported from the headless `animated-native-listener.smoke`.
-// Proves that a JS listener on a NATIVE-driven value still fires. While native owns the frames the
+// React-driven test proving that a JS listener on a NATIVE-driven value still fires.
+// While native owns the frames the
 // JS value never changes per-frame, so addListener on a native value must ask native to stream
 // updates back (onAnimatedValueUpdate on the device bus) and route them to the JS listener. We
 // inject a device-event source (exactly how a real app wires RN's DeviceEventEmitter), make a value

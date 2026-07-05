@@ -1,10 +1,10 @@
-// Co-located unit test for the SCSS/Sass, Less, and Stylus preprocessor layer. Each "real
+// Unit test for the SCSS/Sass, Less, and Stylus preprocessor layer. Each "real
 // compile" case below drives the ACTUAL installed sass/less/stylus package (all three are
-// devDependencies of this package, see package.json) rather than a mock, on purpose — this
-// project has been burned before by table-driven ported logic passing green against a mock while
-// silently diverging from the real target's semantics (see the pseudo-class bug documented in the
-// symbiote-sfc-style-compiler skill), so nesting/variables/mixins are verified against the real
-// compiler output, then through the real (unmodified) parseCSS.
+// devDependencies of this package, see package.json) rather than a mock, on purpose — a
+// hand-ported mock of the compiler's output can pass while silently diverging from the real
+// compiler's semantics (a pseudo-class edge case slipped through exactly that way once), so
+// nesting/variables/mixins are verified against the real compiler output, then through the
+// real (unmodified) parseCSS.
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { parseCSS } from './parser.ts';
 import {

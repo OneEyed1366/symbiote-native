@@ -139,9 +139,9 @@ describe('Angular mount', () => {
 
     expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 1×"');
     // UnrelatedSiblingChild has no dirty descendant of its own, so it must not be re-checked
-    // just because CounterChild (a completely separate branch) got pressed. See the
-    // `angular-adapter` skill §20 for the full investigation, including what this test does
-    // NOT prove (the root's own template still re-runs on every press — see render.ts).
+    // just because CounterChild (a completely separate branch) got pressed. This does NOT prove
+    // the root's own template stays untouched — the root's template still re-runs on every
+    // press (see render.ts).
     expect(unrelatedRenderCount).toBe(afterFirstPaint);
   });
 });

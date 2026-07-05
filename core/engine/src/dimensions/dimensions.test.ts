@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for the screen-metrics modules: Dimensions (engine),
+// Unit test for the screen-metrics modules: Dimensions (engine),
 // PixelRatio and useWindowDimensions. A fake __turboModuleProxy returns a DeviceInfo module
 // whose getConstants() ships known window metrics; a fake RN$registerCallableModule captures
 // the device hub so the test can play "native" and emit 'didUpdateDimensions'.

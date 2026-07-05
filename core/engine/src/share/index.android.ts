@@ -2,12 +2,11 @@
 // `share(content, dialogTitle?) -> Promise<{ action }>`. We validate content, build the
 // content dict (title/message), forward the dialog title, and map the resolved action
 // onto the shared IShareAction shape; Android has no dismiss path, so RN fills the
-// missing activityType with null. Metro picks this file on an Android host. See ADR 0019.
+// missing activityType with null. Metro picks this file on an Android host.
 //
 // device-verify-pending: the `ShareModule` name matches NativeShareModule's
 // TurboModuleRegistry.get('ShareModule') from RN source, but headless fakes resolve any
 // name, so it is only proven on a real Android host (a bridgeless resolution log there).
-// See .docs/native-module-platform-routing.md, ADR 0012.
 
 import { dlog } from '../debug';
 import { getNativeModule } from '../native-modules';

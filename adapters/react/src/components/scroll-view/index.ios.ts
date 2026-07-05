@@ -1,6 +1,6 @@
 // ScrollView on iOS: the RefreshControl is a CHILD of the scroll view, rendered as a
 // sibling BEFORE the content container (RN ScrollView.js: {refreshControl}{contentContainer}).
-// Also the base (scroll-view.ts re-exports it) for headless / web. See ADR 0020.
+// Also the base (scroll-view.ts re-exports it) for headless / web.
 
 import { createElement, forwardRef, useImperativeHandle, useRef } from 'react';
 import type { ISymbioteNode } from '@symbiote-native/engine';
@@ -28,7 +28,7 @@ export const ScrollView = forwardRef<IScrollViewHandle, IScrollViewProps>((props
   // (passing `ref` through createElement props binds it to the SymbioteNode, as TextInput does).
   const ref = useRef<ISymbioteNode | null>(null);
   // Lazy getter, not the ref itself: the node is null until the element commits, so the handle
-  // must read ref.current on each command (ADR 0024 §3), an eager capture would freeze null.
+  // must read ref.current on each command, an eager capture would freeze null.
   useImperativeHandle(forwardedRef, () => buildScrollViewHandle(() => ref.current), []);
   // Drive the sticky scroll value on the native UI thread (RN attachNativeEvent). No-op on a
   // host without the native animated module. The JS sticky path stays in effect.

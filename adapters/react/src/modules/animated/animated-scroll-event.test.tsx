@@ -1,5 +1,4 @@
-// Co-located React-driven test (ADR 0025), ported from the headless `animated-scroll-event.smoke`.
-// Proves the canonical scroll-driven animation:
+// React-driven test proving the canonical scroll-driven animation:
 //   onScroll={Animated.event([{nativeEvent:{contentOffset:{y: scrollY}}}])} on an
 //   Animated.ScrollView, with a sibling Animated.View whose translateY binds scrollY.
 // The shared fake Fabric slot keeps each view's real props so the committed transform is

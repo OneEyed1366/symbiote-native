@@ -7,11 +7,9 @@ import {
 } from '@angular/core';
 import { Button, Text, View, findNodeHandle } from '@symbiote-native/angular';
 
-// Static look lives in RefApiDemo.css, compiled at build time by @symbiote-native/css-parser
-// (symbiote-sfc-style-compiler skill).
+// Static look lives in RefApiDemo.css, compiled at build time by @symbiote-native/css-parser.
 import './RefApiDemo.css';
 
-// The Angular twin of examples/vue-sfc/components/RefApiDemo.vue and React's RefApiDemo.
 // @ViewChild gives back the real ViewHost component instance directly (no reactive-proxy
 // wrapping to worry about, unlike Vue's shallowRef requirement) — its `nativeElement`
 // getter (SymbiotePrimitiveHost) is the engine host node measure/setNativeProps run on.

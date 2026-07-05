@@ -25,14 +25,14 @@ const config = {
   },
   // Watch the whole monorepo: examples/* are now pnpm-workspace packages whose deps
   // (react, @babel/runtime, …) are symlinked into the repo-root `.pnpm` store, so Metro
-  // must treat repoRoot as a watched root to follow those symlinks (ADR 0025 / 0026).
+  // must treat repoRoot as a watched root to follow those symlinks.
   watchFolders: [repoRoot],
   resolver: {
     // Teach Metro that .vue and every style extension are source files (the transformer turns
     // each into a module) — css/scss/sass/less/styl is the framework-agnostic standalone
     // stylesheet/CSS-Modules path, shared with the React and Angular examples (see
     // metro-css-transformer.js there); scss/sass/less/styl are optional preprocessor sources
-    // (see core/css-parser/src/preprocessors.ts and the symbiote-sfc-style-compiler skill).
+    // (see core/css-parser/src/preprocessors.ts).
     sourceExts: [...defaultConfig.resolver.sourceExts, 'vue', 'css', 'scss', 'sass', 'less', 'styl'],
     extraNodeModules: {
       '@symbiote-native/engine': enginePkg,

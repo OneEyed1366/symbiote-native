@@ -19,7 +19,7 @@ import { descriptorToReact } from '../../descriptor-to-react';
 // the lifecycle (render-only here) + the descriptor bridge.
 export type { IActivityIndicatorPlatform } from '@symbiote-native/components';
 
-// className is React's own field per <prop_types_split_agnostic_vs_per_adapter>; not destructured
+// className is React's own field, not part of the shared agnostic prop type; not destructured
 // below, so it falls into `...passthrough` and lands on the centering wrapper View, like `style`.
 export type IActivityIndicatorProps = IActivityIndicatorBaseProps & { className?: string };
 

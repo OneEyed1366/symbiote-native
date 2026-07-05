@@ -1,4 +1,4 @@
-// ScrollView on iOS (ADR 0024 Phase 2). The RefreshControl is a CHILD of the scroll view, rendered
+// ScrollView on iOS. The RefreshControl is a CHILD of the scroll view, rendered
 // as a SIBLING BEFORE the content container (RN ScrollView.js: {refreshControl}{contentContainer}).
 // The user's RefreshControl VNode renders as-is; its default slot is empty on iOS, so it is a
 // childless sibling. Also the base (scroll-view.ts re-exports it) for headless / web. Metro picks

@@ -1,4 +1,4 @@
-// Co-located React-driven test (ADR 0025), ported from `keyboard-avoiding-view.smoke.tsx`.
+// Co-located React-driven test.
 // Keyboard + KeyboardAvoidingView are the first consumers of the native->JS event bridge.
 // The shared fake-Fabric slot records the committed tree; a fake __turboModuleProxy returns
 // a KeyboardObserver with observe-counters; a fake RN$registerCallableModule captures the

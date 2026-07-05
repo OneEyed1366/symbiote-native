@@ -1,5 +1,5 @@
 /** @jsxRuntime automatic */
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
+// Co-located React-driven pipeline test, ported from the headless
 // `virtualized-list-mvcp.smoke.tsx`. Proves two VirtualizedList feature-parity fixes:
 //   1. maintainVisibleContentPosition (MVCP) is forwarded to the inner ScrollView node, so
 //      Fabric anchors the visible cells. We walk the committed tree for the scroll view and

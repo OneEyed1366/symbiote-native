@@ -1,4 +1,4 @@
-// Co-located Vue-driven pipeline test (ADR 0025), the Vue twin of
+// Co-located Vue-driven pipeline test, the Vue twin of
 // adapters/react/src/section-list/sticky-section-headers.test.tsx (plus the public SectionList
 // surface). Proves SectionList over the shared section-flatten + VirtualizedList windowing: every
 // section header and item renders, sticky section headers wrap each header in a transform-bearing

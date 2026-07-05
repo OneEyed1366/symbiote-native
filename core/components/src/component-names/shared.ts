@@ -1,6 +1,6 @@
 // The intrinsic JSX types symbiote's host config maps to Fabric components, plus the
 // machinery to turn a platform name table into the descriptors the host config reads.
-// Per ADR 0020 the Fabric NAME of a primitive is platform-specific (iOS 'Switch' vs
+// The Fabric NAME of a primitive is platform-specific (iOS 'Switch' vs
 // Android 'AndroidSwitch'), so the name tables live in component-names.ios.ts /
 // .android.ts and the filename selects, no Platform.OS read. The isText flag is
 // platform-invariant, so it lives here once and both tables share it.
@@ -15,7 +15,7 @@ export type ISymbioteIntrinsic =
   | 'symbiote-scroll-content'
   // Horizontal scroll is a SEPARATE native ViewManager on Android (AndroidHorizontalScrollView),
   // not RCTScrollView with a flag, so it needs its own intrinsic. On iOS both map back to
-  // RCTScrollView (one view; the `horizontal` prop flips its axis). See ADR 0020.
+  // RCTScrollView (one view; the `horizontal` prop flips its axis).
   | 'symbiote-horizontal-scroll-view'
   | 'symbiote-horizontal-scroll-content'
   | 'symbiote-text-input'

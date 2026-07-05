@@ -10,10 +10,9 @@ import { BUTTON_ACCESSIBILITY_ROLE, resolveButtonTextStyle } from '@symbiote-nat
 import type { IButtonProps as IButtonBaseProps } from '@symbiote-native/components';
 
 // IButtonProps is otherwise framework-agnostic (it takes a `title` string, no children / ref), so
-// its base lives in @symbiote-native/components; className is React's own field per
-// <prop_types_split_agnostic_vs_per_adapter>, not destructured below so it falls into
-// `...accessibilityRest` and forwards onto the outer TouchableOpacity, like every other RN adapter's
-// className field.
+// its base lives in @symbiote-native/components; className is React's own field, not part of the
+// shared agnostic prop type, so it is not destructured below — it falls into `...accessibilityRest`
+// and forwards onto the outer TouchableOpacity, like every other RN adapter's className field.
 export type IButtonProps = IButtonBaseProps & { className?: string };
 
 export const Button: FC<IButtonProps> = props => {

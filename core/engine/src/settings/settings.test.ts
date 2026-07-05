@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for the Settings module: the snapshot seeds from native
+// Unit test for the Settings module: the snapshot seeds from native
 // getConstants().settings, `set` writes through to native setValues AND updates the snapshot,
 // and a `watchKeys` watcher fires only when its key's value actually changes. A fake
 // nativeModuleProxy (bridgeless host-object form) provides SettingsManager; a fake

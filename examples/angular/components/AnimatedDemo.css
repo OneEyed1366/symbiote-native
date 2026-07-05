@@ -1,6 +1,6 @@
-/* Static look lives here, compiled at build time by @symbiote-native/css-parser (symbiote-sfc-style-
-   compiler skill). opacity/transform stay dynamic — Animated-driven values composed at the use
-   site via [style] in AnimatedDemo.ts, alongside each dot's class for its static half. */
+/* Static look lives here, compiled at build time by @symbiote-native/css-parser. opacity/transform
+   stay dynamic — Animated-driven values composed at the use site via [style] in AnimatedDemo.ts,
+   alongside each dot's class for its static half. */
 
 .section {
   gap: 12px;

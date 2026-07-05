@@ -1,4 +1,4 @@
-// Co-located Vue-driven test (ADR 0025): a NATIVE Animated.event on an Animated component. When a
+// Co-located Vue-driven test: a NATIVE Animated.event on an Animated component. When a
 // prop like onScroll={Animated.event([…], {useNativeDriver:true})} rides an Animated.View, the
 // wrapper attaches it to the committed view on the UI thread (addAnimatedEventToView). The attach
 // runs in createAnimatedComponent's post-commit reconcile (onMounted); under Vue's async-batched

@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): `flattenStyle` is pure, so the test is just `expect`
+// Co-located unit test: `flattenStyle` is pure, so the test is just `expect`
 // against its output: array merge (later wins), nested-array recursion, falsy skipping,
 // array/object values passed through untouched, non-object -> {}.
 

@@ -1,7 +1,7 @@
-// Proves createTunnel (create-tunnel.tsx) actually solves the case createPortal's v1 scope
-// explicitly does NOT cover: content registered by one surface painting on a GENUINELY
-// different, independently-mounted SymbioteSurface — the concrete "system overlay lives in
-// its own mount() call" scenario from the react-adapter-portal skill. Unlike the portal test
+// Proves createTunnel (create-tunnel.tsx) actually solves the case createPortal's
+// same-surface scope does NOT cover: content registered by one surface painting on a
+// GENUINELY different, independently-mounted SymbioteSurface — the concrete "system
+// overlay lives in its own mount() call" scenario. Unlike the portal test
 // (create-portal.test.tsx), there is no shared node/ref here at all — the two apps below
 // never touch each other's Fabric tree directly, only a plain shared store.
 

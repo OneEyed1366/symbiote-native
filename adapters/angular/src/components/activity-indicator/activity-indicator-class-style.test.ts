@@ -1,4 +1,4 @@
-// Regression test for the anchor/class bug (angular-adapter skill): ActivityIndicator is its own
+// Regression test for the anchor/class bug: ActivityIndicator is its own
 // ANCHOR_HOST_COMPONENTS entry AND renders through DescriptorOutlet (`symbiote-descriptor-outlet`,
 // itself also an anchor entry) — a class= on <ActivityIndicator> resolves onto ActivityIndicator's
 // OWN anchor, two levels up from the real committed wrapper View the descriptor builds, and needs

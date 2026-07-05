@@ -1,5 +1,4 @@
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
-// `imperative-ref.smoke`. Proves the imperative host-component ref API libraries like
+// Proves the imperative host-component ref API libraries like
 // reanimated / gesture-handler reach through: ref.current.measure / measureInWindow /
 // measureLayout / setNativeProps, plus findNodeHandle(ref). A host ref hands back the
 // public instance; its methods route to the slot's measure family (keyed by the node's

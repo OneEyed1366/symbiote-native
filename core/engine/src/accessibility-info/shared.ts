@@ -6,7 +6,8 @@
 // event maps to (iOS `screenReaderChanged` vs Android `touchExplorationDidChange`).
 // So the .ios/.android files own the native calls and per-platform event-name map;
 // the public types + the shared method surface live here. Filename selects, no
-// Platform.OS read (see ADR 0012 + native_module_name_is_platform_specific). Mirrors
+// Platform.OS read: the native module name is resolved per platform inside those
+// files, not derived from this file's name. Mirrors
 // RN's Libraries/Components/AccessibilityInfo/AccessibilityInfo.js.
 
 import type { ISymbioteNode } from '../node';

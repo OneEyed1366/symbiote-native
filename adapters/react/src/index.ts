@@ -1,6 +1,6 @@
 // @symbiote-native/react: a react-reconciler host config (mutation mode) over
 // @symbiote-native/engine. React is a known-good driver: it proves the native pipe
-// (R1) and shared's clone-on-write engine (R2) before any non-React adapter.
+// and the shared clone-on-write engine before any non-React adapter has to.
 
 export { View, Text } from './components';
 export type { IViewProps, ITextProps } from './components';
@@ -97,8 +97,10 @@ export { mount, unmount } from './render';
 // mutation-mode (unlike stock RN's persistent-mode Fabric renderer, which doesn't support it —
 // see create-portal.ts). v1 scope: target must be an already-mounted node in the SAME surface.
 export { createPortal, type IPortalContainer } from './create-portal';
-// createTunnel: cross-surface content sharing (createPortal/Teleport stay same-surface-only
-// by design — see create-tunnel.tsx and the react-adapter-portal skill for why).
+// createTunnel: cross-surface content sharing. createPortal/Teleport stay same-surface-only
+// by design — a real React portal can't reach across two separate reconciler roots either
+// (see github.com/facebook/react/issues/17147), so reaching a different surface means letting
+// that surface commit its own content by reading from a shared store instead.
 export { createTunnel, type ITunnel } from './create-tunnel';
 // descriptorToReact: the @symbiote-native/components Descriptor → React.createElement bridge. Exported so
 // an external wrapper package (e.g. @symbiote-native/slider/react over a third-party native view) can map
@@ -123,8 +125,8 @@ export type {
 } from './modules/app-registry';
 
 // Animated bridge: createAnimatedComponent + Animated.View/Text/Image, driving the
-// shared JS Animated engine (ADR 0016). Imperative timing/spring drivers merge into
-// this namespace once they land in shared.
+// shared JS Animated engine. Imperative timing/spring drivers merge into this
+// namespace once they land in shared.
 export { Animated, createAnimatedComponent } from './modules/animated';
 
 // Framework-agnostic runtime utilities live in shared; the adapter re-exports them
@@ -232,8 +234,8 @@ export type {
 
 // Android-only surface (the second-platform pass). Each is a thin JS shim over an
 // Android native module / Fabric view, inert on iOS (no module → graceful no-op,
-// no native view → degrade to a plain container). Native module names are
-// device-verify-pending; see .docs/native-module-platform-routing.md.
+// no native view → degrade to a plain container). Native module name correctness
+// can only be confirmed on a real device/simulator, not headless tests.
 export { BackHandler } from './modules/back-handler';
 export type { IBackPressEventName, IBackPressHandler } from './modules/back-handler';
 export { ToastAndroid } from './modules/toast-android';

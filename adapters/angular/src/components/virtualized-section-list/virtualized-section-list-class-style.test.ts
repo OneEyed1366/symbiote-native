@@ -1,4 +1,4 @@
-// Regression test for the anchor/class bug (angular-adapter skill): VirtualizedSectionList is its
+// Regression test for the anchor/class bug: VirtualizedSectionList is its
 // own ANCHOR_HOST_COMPONENTS entry — a class= on <VirtualizedSectionList> resolves onto its OWN
 // anchor and needs its OWN anchorHostStyle merge (see index.ts's resolvedStyle getter), it is NOT
 // transitively fixed by VirtualizedList's/ScrollView's own fixes further down. Mirrors

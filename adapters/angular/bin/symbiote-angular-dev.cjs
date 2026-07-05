@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Cross-platform replacement for the old per-app dev-with-watch.sh: Angular needs a pre-Metro
-// AOT compile (ngc), kept in sync via `ngc --watch` while developing (see the angular-adapter
-// skill, §4). Metro itself must stay the FOREGROUND process — it reads raw keypresses
+// AOT compile (ngc), kept in sync via `ngc --watch` while developing. Metro itself must stay
+// the FOREGROUND process — it reads raw keypresses
 // (r/j/d/...) straight off stdin, and any wrapper that pipes stdin through itself
 // (concurrently, npm-run-all, ...) breaks that raw-mode read. So ngc runs as a plain background
 // child process, never a stdin-owning process manager. `shell: true` resolves `ngc`/

@@ -1,6 +1,5 @@
 // Co-located unit test for the .d.ts generator (see generate-dts.ts's file-header comment for
-// why this exists — the deferred type-safety follow-up from the symbiote-sfc-style-compiler
-// skill). The key thing under test is the ABSENCE of an index signature: unlike Volar's
+// why this exists). The key thing under test is the ABSENCE of an index signature: unlike Volar's
 // `Record<string, string> & {known keys}` for inline `<style module>` blocks, an unknown key
 // here must not type-check at all.
 

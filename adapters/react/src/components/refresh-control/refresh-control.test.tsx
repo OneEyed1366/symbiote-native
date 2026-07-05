@@ -1,5 +1,5 @@
-// Co-located proof of the RefreshControl primitive wired into ScrollView (ADR 0025),
-// ported from the headless `refresh-control.smoke.tsx`. Asserts the iOS nesting
+// Co-located proof of the RefreshControl primitive wired into ScrollView.
+// Asserts the iOS nesting
 // (PullToRefreshView is a child of RCTScrollView, a sibling BEFORE RCTScrollContentView),
 // that `refreshing` passes through as a real Fabric prop, that the Android-only `enabled`
 // prop forwards to native, and that firing topRefresh on the refresh-control node calls

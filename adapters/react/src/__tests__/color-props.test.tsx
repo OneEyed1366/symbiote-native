@@ -1,4 +1,3 @@
-// Co-located React-driven test (ADR 0025), ported from `color-props.smoke.tsx`.
 // Proves the COLOR_PROPS set runs every RN color style key through the injected platform
 // processor before Fabric. Fabric's C++ color parser silently drops CSS strings, so a
 // color key MUST reach the slot as a processed value (an int here), never the raw 'red'.

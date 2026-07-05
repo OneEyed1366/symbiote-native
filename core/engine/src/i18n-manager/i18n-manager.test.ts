@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for the I18nManager module: it reads the native RTL
+// Unit test for the I18nManager module: it reads the native RTL
 // constants eagerly at module load, exposes them via getConstants() and the plain `isRTL` /
 // `doLeftAndRightSwapInRTL` fields, and routes the allow/force/swap setters straight to the
 // native module. Constants are read at import time, so the fake native module is installed

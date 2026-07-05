@@ -1,4 +1,4 @@
-// Co-located Vue-driven test (ADR 0025) for the @symbiote-native/slider Vue wrapper. The native RNCSlider
+// Co-located Vue-driven test for the @symbiote-native/slider Vue wrapper. The native RNCSlider
 // carries no symbiote metadata — the engine DERIVES its events + tint processors from an injected
 // codegen-shaped ViewConfig (the same shape the React adapter's slider.test injects, the same shape
 // RN's ReactNativeViewConfigRegistry holds on a real host). We import the Slider component from '.'

@@ -4,9 +4,9 @@ packages:
   - 'packages/*'
   - 'examples/*'
   - 'apps/*'
-  # Gitignored dev harness (symbiote-dev-examples skill) — listing it lets pnpm manage it as
-  # a real workspace project (bin-linking, .pnpm-store symlinks) instead of the ad-hoc
-  # node_modules it otherwise ends up with.
+  # Gitignored dev harness — listing it lets pnpm manage it as a real workspace project
+  # (bin-linking, .pnpm-store symlinks) instead of the ad-hoc node_modules it otherwise
+  # ends up with.
   - '.examples/*'
 allowBuilds:
   '@parcel/watcher': true
@@ -71,7 +71,7 @@ catalog:
   postcss: ^8.4.49
   postcss-value-parser: ^4.2.0
   # optional CSS preprocessors — devDependencies of core/css-parser ONLY, never a dependency of
-  # that package or any consuming app (see the symbiote-sfc-style-compiler skill)
+  # that package or any consuming app
   sass: ^1.101.0
   less: ^4.6.7
   stylus: ^0.64.0

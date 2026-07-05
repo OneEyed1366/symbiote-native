@@ -1,6 +1,6 @@
-// Co-located unit test (ADR 0025) for the Share module: JS->native only. Per ADR 0019 the
-// platform builds are separate files (share/index.ios.ts / share/index.android.ts), imported
-// DIRECTLY. The native module is platform-specific: the iOS build drives
+// Unit test for the Share module: JS->native only. The platform builds are separate files
+// (share/index.ios.ts / share/index.android.ts), imported DIRECTLY. The native module is
+// platform-specific: the iOS build drives
 // ActionSheetManager.showShareActionSheetWithOptions (there is NO ShareModule on iOS); the
 // Android build drives ShareModule.share.
 

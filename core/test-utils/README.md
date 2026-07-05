@@ -1,6 +1,6 @@
 # @symbiote-native/test-utils
 
-The **shared fake-Fabric test harness** of [SymbioteNative](../../README.md) (ADR 0025) — one
+The **shared fake-Fabric test harness** of [SymbioteNative](../../README.md) — one
 `installFabric()` that puts a fresh, faithful fake `nativeFabricUIManager` on `globalThis` and
 returns a handle to inspect what a renderer committed. It replaces the per-file fake slot every
 headless test used to copy-paste (×65 across the repo) with one implementation, shared by the
@@ -44,7 +44,7 @@ otherwise leak state into the next one.
 ## What `installFabric()` gives you
 
 - **`committed`** — the child set from the most recent `completeRoot`, and **`appRoot()`** — unwraps
-  RN's synthetic `box-none` AppContainer root (ADR 0015) so a test doesn't re-check that invariant by
+  RN's synthetic `box-none` AppContainer root so a test doesn't re-check that invariant by
   hand.
 - **`created`** and **`find(predicate)`** — every node ever `createNode`'d this run (clones
   excluded), and a lookup by predicate (e.g. "the app's own `View` with this `testID`").

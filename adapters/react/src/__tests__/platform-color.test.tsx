@@ -1,4 +1,3 @@
-// Co-located React-driven test (ADR 0025), ported from `platform-color.smoke.tsx`.
 // Proves PlatformColor / DynamicColorIOS reach the platform color processor. RN's
 // processColor (wired via setColorProcessor) resolves CSS strings AND the opaque
 // { semantic } / { dynamic } objects to the platform values iOS expects. The shared

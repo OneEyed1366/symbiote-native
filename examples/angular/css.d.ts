@@ -1,7 +1,6 @@
 // Ambient module for a plain, side-effect-only `.css` import (`import './App.css'`) —
 // @symbiote-native/css-parser compiles it at build time (Metro's babelTransformerPath, see
 // metro-css-transformer.js) into a registerStyles() call; there's no runtime export to type.
-// See the symbiote-sfc-style-compiler skill.
 declare module '*.css';
 
 // Generic (non-literal) fallback for a `.module.css` import — used by `tsc` outside a file that

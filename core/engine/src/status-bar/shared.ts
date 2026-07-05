@@ -6,7 +6,7 @@
 // flags from our bridgeless surface blanks it (a window-insets relayout detaches the Fabric
 // surface). So the .ios/.android files own the native calls (applyStatusBarProps +
 // statusBarImperative); the types + the framework-agnostic imperative surface live here.
-// Filename selects, no Platform.OS read (see ADR 0012 + native_module_name_is_platform_specific).
+// Filename selects, no Platform.OS read.
 //
 // This is the engine half: pure types + the imperative API. Each adapter wraps it with a
 // per-framework declarative component (React FC + useEffect, Vue defineComponent + watchEffect)

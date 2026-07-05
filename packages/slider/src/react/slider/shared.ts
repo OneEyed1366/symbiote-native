@@ -6,7 +6,8 @@
 // native RNCSlider carries no symbiote metadata: the engine derives its events and color/image
 // processors from the library's ViewConfig, registered by ../register (the package barrel pulls
 // it). This is the React twin of the Vue wrapper; both drive the engine, NEITHER imports the
-// library's React Slider component. See CLAUDE.md <third_party_rn_packages_are_react_only>, ADR 0027.
+// library's React Slider component — that component internally calls React hooks off the React
+// dispatcher, so a non-React adapter rendering it directly would crash on a null dispatcher.
 
 import { createElement, forwardRef, useCallback, useEffect, useState } from 'react';
 import type {
@@ -58,9 +59,9 @@ import {
 } from '../../core';
 
 // React's flavored prop type: the agnostic base plus the per-adapter StepMarker — a render
-// component returning a React element, which (per CLAUDE.md <prop_types_split_agnostic_vs_per_adapter>)
-// cannot live in the shared layer. Same name as the agnostic base by the split convention (cf.
-// IPressableProps declared per-adapter); Vue takes the same marker as a `#stepMarker` scoped slot.
+// component returning a React element, which is framework-specific and so cannot live in the
+// shared layer. Same name as the agnostic base by convention (cf. IPressableProps declared
+// per-adapter); Vue takes the same marker as a `#stepMarker` scoped slot.
 export interface ISliderProps extends ISliderBaseProps {
   StepMarker?: FC<IStepMarkerProps>;
   // Forwarded onto the OUTER wrapper View, like `style` (resolveSliderWrapperStyle) — resolves

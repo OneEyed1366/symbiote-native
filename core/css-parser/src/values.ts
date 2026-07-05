@@ -1,6 +1,5 @@
 // CSS → React Native value conversion. RN style props take plain numbers for `px` / unitless
-// values (there is no terminal-cell or DP grid to scale onto, unlike wolf-tui's TUI target), so
-// unlike wolf-tui's `values.ts` there is no unit-to-cell division here — `px` is identity.
+// values, so there is no unit conversion needed here beyond scaling `rem`/`em` — `px` is identity.
 
 import valueParser from 'postcss-value-parser';
 

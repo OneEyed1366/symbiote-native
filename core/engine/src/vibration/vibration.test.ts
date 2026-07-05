@@ -1,6 +1,6 @@
-// Co-located unit test (ADR 0025) for the Vibration module: JS->native only. Per ADR 0019
-// the platform builds are separate files (vibration/index.ios.ts / vibration/index.android.ts),
-// imported DIRECTLY. A fake __turboModuleProxy returns a Vibration module that records
+// Co-located unit test for the Vibration module: JS->native only. The platform builds
+// are separate files (vibration/index.ios.ts / vibration/index.android.ts), imported
+// DIRECTLY. A fake __turboModuleProxy returns a Vibration module that records
 // vibrate / vibrateByPattern / cancel.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

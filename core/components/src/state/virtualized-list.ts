@@ -1,9 +1,9 @@
 // VirtualizedList logic: the framework-agnostic windowing engine. Every adapter
 // (React hooks, Vue reactivity) drives the SAME math from here, so a windowing /
-// viewability / edge-reached bug is fixed once for all adapters
-// (<adapters_reach_full_feature_parity>). The adapter supplies only its lifecycle
-// (refs/state/effects), the imperative handle wiring, and the per-cell element
-// creation (createElement / h) — never the geometry.
+// viewability / edge-reached bug is fixed once for all adapters. The adapter
+// supplies only its lifecycle (refs/state/effects), the imperative handle
+// wiring, and the per-cell element creation (createElement / h) — never the
+// geometry.
 //
 // What lives here:
 //   - the RN-matching defaults + sentinels,
@@ -18,7 +18,7 @@
 // What stays in the adapter (genuinely framework-bound): the cell CONTENT is the
 // framework's own children (renderItem -> ReactNode / VNode), so there is no
 // Descriptor render fn for a list — the shared layer for lists is this STATE/logic
-// module, not a view/render-*.ts. See core/components/.docs-note-lists.md.
+// module, not a view/render-*.ts.
 
 import type { IViewStyle } from '@symbiote-native/engine';
 import type { ISymbioteEvent, ISymbioteNode } from '@symbiote-native/engine';

@@ -25,8 +25,7 @@ export function findNodeHandle(componentOrHandle: unknown): number | null {
   if (candidate === null || candidate === undefined) return null;
   if (typeof candidate === 'number') return candidate;
   // A plain ref() would have wrapped the node in a reactive Proxy; the engine mirror is
-  // keyed on the RAW node, so recover it before the lookup or getNativeTag misses. See
-  // the vue-adapter-reactivity skill.
+  // keyed on the RAW node, so recover it before the lookup or getNativeTag misses.
   const node = toRaw(candidate);
   if (isSymbioteNode(node)) {
     const tag = getNativeTag(node) ?? null;

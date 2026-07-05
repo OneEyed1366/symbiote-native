@@ -10,7 +10,7 @@
 // viewability bug is fixed once for all adapters (<adapters_reach_full_feature_parity>).
 // React supplies only its lifecycle (state/refs/effects), the imperative-handle wiring,
 // and the per-cell element creation (createElement). Lists have no Descriptor render fn
-// (the cell content is React's own children); see core/components/.docs-note-lists.md.
+// (the cell content is React's own children).
 //
 // Imperative scrolling (scrollToIndex / scrollToOffset / scrollToItem / scrollToEnd)
 // resolves to an offset and rides the ScrollView's native scrollTo command via its handle

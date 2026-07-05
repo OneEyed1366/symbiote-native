@@ -1,5 +1,4 @@
-// Co-located unit test (ADR 0025), ported from the headless `animated-mock.smoke.ts`.
-// AnimatedMock (RN's AnimatedMock.js): when the host reports Platform.isDisableAnimations,
+// Unit test for AnimatedMock (RN's AnimatedMock.js): when the host reports Platform.isDisableAnimations,
 // react/animated swaps the live drivers for this mock: every animation jumps straight to its
 // final value and fires the end callback SYNCHRONOUSLY (no frames). The Fabric slot is only here
 // so setValue's flush path doesn't throw; no view is attached.

@@ -1,4 +1,4 @@
-// One shared fake `nativeFabricUIManager` for the unit suite (ADR 0025). `installFabric()`
+// One shared fake `nativeFabricUIManager` for the unit suite. `installFabric()`
 // puts a fresh recording slot on `globalThis` and returns a handle to inspect what the
 // renderer committed. It replaces the per-file slot the smokes each copy-pasted (×65).
 //
@@ -9,7 +9,7 @@
 // key arrives as literal `null` and is kept as `null`, not deleted, so a test can still see
 // "explicitly reset" distinct from "never set"); the `*Children` variants reset children
 // (the engine re-appends). A persistence bug in the fake is now fixed once, here, for every
-// test, mirroring `clone_on_write_lives_in_engine`.
+// test, matching how the real engine's clone-on-write commit path behaves.
 
 export interface IFakeNode {
   tag: number;
@@ -37,7 +37,7 @@ export interface IFabricRecorder {
   /** Call counters, for tests that assert "exactly N native nodes were created". */
   counts: { createNode: number; completeRoot: number };
   /**
-   * RN wraps every commit in a synthetic `box-none` AppContainer root (ADR 0015).
+   * RN wraps every commit in a synthetic `box-none` AppContainer root.
    * Returns it, asserting it is the single expected root, so each test unwraps the
    * AppContainer the same way instead of re-checking the invariant by hand.
    */

@@ -1,6 +1,5 @@
 /** @jsxRuntime automatic */
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
-// `sticky-section-headers.smoke.tsx`. Proves that VirtualizedSectionList sticks its section
+// Proves that VirtualizedSectionList sticks its section
 // headers. Stickiness is a JS layer (ScrollView wraps each flagged child in a
 // ScrollViewStickyHeader, an Animated.View with collapsable:false and a translateY
 // transform driven by the scroll offset; the native scroll view does NOT honor a bare index

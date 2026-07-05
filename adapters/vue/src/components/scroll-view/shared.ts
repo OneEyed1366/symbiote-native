@@ -1,4 +1,4 @@
-// ScrollView, the Vue lifecycle half (Phase 1: base, ADR 0024). The Fabric tree is nested:
+// ScrollView, the Vue lifecycle half. The Fabric tree is nested:
 // a scroll view wraps a content view that holds the children (RN's ScrollView.js shape). The
 // platform-invariant math (decelerationRate, the per-axis intrinsics/base style, the
 // content-size dedupe, the imperative handle, the aria/role fold) lives in @symbiote-native/components,
@@ -13,8 +13,8 @@
 // (onScroll/onLayout/…) ARE ViewConfig events, so they forward raw and routeProp turns them into
 // listeners.
 //
-// Phase 2 (ADR 0024 §4): RefreshControl is wired through the platform assemble (iOS sibling /
-// Android wrap). Phase 3 (§5): sticky headers are real. The scroll AnimatedValue (markRaw, held by
+// RefreshControl is wired through the platform assemble (iOS sibling /
+// Android wrap). Sticky headers are real. The scroll AnimatedValue (markRaw, held by
 // identity), the headerLayoutYs cross-talk map + bump, the viewport-height capture, and the
 // onScroll composition (native attach vs Animated.event) all live here; the per-header component and
 // the children wrap live in scroll-view-sticky-header.ts (the Vue twin of the React file).
@@ -86,7 +86,7 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   contentInset?: { top?: number; left?: number; bottom?: number; right?: number };
   contentOffset?: { x: number; y: number };
   // The RefreshControl element (Vue VNode). iOS renders it as a sibling before content; Android
-  // re-invokes its type to wrap the scroll view (ADR 0024 Phase 2).
+  // re-invokes its type to wrap the scroll view.
   refreshControl?: VNode;
   removeClippedSubviews?: boolean;
   // Forwarded onto the scroll-view node like `style` (see isClassNameProp below) — resolves
@@ -153,7 +153,7 @@ export type IScrollViewEmits = {
 };
 
 // The platform piece: how the .ios/.android files assemble the final element. The RefreshControl
-// integration diverges by platform (ADR 0020/0024): iOS places it as a SIBLING before content,
+// integration diverges by platform: iOS places it as a SIBLING before content,
 // Android WRAPS the scroll view with it (+ splitLayoutProps style routing). Supplied whole by
 // scroll-view.ios.ts / scroll-view.android.ts (Metro filename-selected).
 export interface IScrollViewAssembleInput {
@@ -201,8 +201,7 @@ function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
 // the renderer's own patchProp — fine for the single-node Phase 1 path. But the Android
 // RefreshControl wrap (index.android.ts) reads userStyle alone to splitLayoutProps() the outer
 // wrapper's layout style, BEFORE that later resolution ever runs, so a class-only layout prop
-// (flex, height, gap, …) never reaches the wrapper and it collapses to nothing. See the
-// symbiote-sfc-style-compiler skill for the failure this caused on a real Android device.
+// (flex, height, gap, …) never reaches the wrapper and it collapses to nothing.
 // isClassNameProp is @symbiote-native/engine's own isClassNameValue guard (shared, not redeclared —
 // routeProp's centralized class+style merge needs the identical narrowing).
 const isClassNameProp = isClassNameValue;
@@ -263,8 +262,8 @@ export function createScrollView(platform: IScrollViewPlatform) {
       // shallowRef, NOT ref: the engine node must be held by IDENTITY. A plain ref() runs the
       // node through Vue's toReactive(), handing back a reactive Proxy, a different object than
       // the raw node the engine's mirror (a WeakMap) is keyed on, so dispatchViewCommand would
-      // miss and every scrollTo/scrollToEnd/flashScrollIndicators silently no-op. See
-      // .claude/skills/vue-adapter-reactivity. This is the same rule as the Switch host node.
+      // miss and every scrollTo/scrollToEnd/flashScrollIndicators silently no-op. This is the
+      // same rule as the Switch host node.
       const nodeRef = shallowRef<ISymbioteNode | null>(null);
       const setNodeRef = (el: unknown): void => {
         nodeRef.value = isSymbioteNode(el) ? el : null;
@@ -272,7 +271,7 @@ export function createScrollView(platform: IScrollViewPlatform) {
 
       // The imperative handle reads the node through a LAZY getter (() => nodeRef.value), not the
       // node captured once: it is null until the element commits, so an eager capture would freeze
-      // null and every command would no-op (ADR 0024 §3). expose() makes it the value a parent ref
+      // null and every command would no-op. expose() makes it the value a parent ref
       // sees: the Vue twin of React's useImperativeHandle(forwardedRef, buildScrollViewHandle(…)).
       expose(buildScrollViewHandle(() => nodeRef.value));
 
@@ -352,7 +351,7 @@ export function createScrollView(platform: IScrollViewPlatform) {
               ? attrs.contentContainerStyle
               : undefined;
 
-        // Sticky headers (Phase 3, ADR 0024): a pure-JS layer; the native scroll view ignores
+        // Sticky headers are a pure-JS layer; the native scroll view ignores
         // stickyHeaderIndices, so we wrap the flagged children below and drive their translateY off
         // the scroll offset. invertStickyHeaders narrows to the inverted (stick-to-bottom) branch.
         const stickyHeaderIndices = isNumberArray(attrs.stickyHeaderIndices)

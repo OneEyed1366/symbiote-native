@@ -1,14 +1,14 @@
 import { by, device, element, waitFor } from 'detox'
 
-// The go/no-go probe (decision 0025; .docs/detox-bring-up-plan.md). It proves Detox attaches to a
-// symbiote-driven tree at the stock RN host: launchApp() must complete the New-Arch startup sync
-// (the #4506 bridgeless-deadlock gate), then a symbiote-rendered native view carrying the canary's
-// existing testID={`resp-chip-${index}`} must be visible, and survive a recommit from a native tap.
+// The go/no-go probe. It proves Detox attaches to a symbiote-driven tree at the stock RN host:
+// launchApp() must complete the New-Arch startup sync (the #4506 bridgeless-deadlock gate), then
+// a symbiote-rendered native view carrying the canary's existing testID={`resp-chip-${index}`}
+// must be visible, and survive a recommit from a native tap.
 describe('symbiote attach probe', () => {
   beforeAll(async () => {
-    // The canary runs a perpetual native-driven Animated.loop heartbeat (App.tsx, ADR 0017 offload
-    // proof), so the app never reports idle. Detox cannot sync against an infinite animation (true
-    // on stock RN too). launchApp itself waits for idle, so sync must be off from the FIRST launch
+    // The canary runs a perpetual native-driven Animated.loop heartbeat (App.tsx), so the app never
+    // reports idle. Detox cannot sync against an infinite animation (true on stock RN too).
+    // launchApp itself waits for idle, so sync must be off from the FIRST launch
     // via launchArgs (disableSynchronization() after launch is both too late and undone by the
     // new-instance re-enable). This probe verifies attach + visibility, not quiescence.
     await device.launchApp({ newInstance: true, launchArgs: { detoxEnableSynchronization: 0 } }) // ← the go/no-go gate

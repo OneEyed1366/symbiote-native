@@ -1,5 +1,4 @@
-// Co-located unit test (ADR 0025), ported from the headless `animated-color.smoke.tsx`.
-// AnimatedColor: input forms parse to r/g/b/a channels, __getValue() is the rgba() string the
+// Unit test for AnimatedColor: input forms parse to r/g/b/a channels, __getValue() is the rgba() string the
 // commit color path expects, driving a channel re-pulls it, setValue fires listeners ONCE with
 // the FINAL color and commits each bound leaf ONCE, and useNativeDriver mirrors a `color` node
 // referencing the four channel tags. A fake native module records the native config.

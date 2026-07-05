@@ -2,8 +2,8 @@
 // DOM directly — every paint goes through Renderer2 (created per-component by
 // RendererFactory2). We provide OUR factory, so each Renderer2 method maps onto the
 // engine's tiny mutation API; the engine owns all Fabric clone-on-write, shared with
-// every other adapter. This is the Angular twin of adapters/vue/src/renderer.ts and the
-// proof the core is framework-agnostic (R4). See the `angular-adapter` skill.
+// every other adapter. This is the Angular twin of adapters/vue/src/renderer.ts — proof
+// that the same engine mutation API drives both frameworks.
 
 import {
   appendChild,
@@ -150,8 +150,7 @@ function assertTextPlacement(child: ISymbioteNode, parent: IHostElement): void {
 
 // One renderer per mounted surface. Every mutation asks the surface to (microtask-
 // coalesced) recommit — the same seam Vue uses; a burst of Angular change-detection
-// mutations collapses into one completeRoot. wolf-tui likewise reuses a single renderer
-// instance for all components.
+// mutations collapses into one completeRoot.
 export class SymbioteRenderer implements Renderer2 {
   readonly data: Record<string, unknown> = {};
   // Angular calls destroyNode per-node only when this is non-null; teardown happens in
@@ -313,8 +312,7 @@ export class SymbioteRenderer implements Renderer2 {
   }
 
   // Ivy compiles every class= / [class.foo] / [ngClass] form down to per-token addClass/
-  // removeClass calls (never a single setAttribute('class', ...) — confirmed against the
-  // vendored Ivy sources, see the symbiote-sfc-style-compiler skill), so a per-node token set
+  // removeClass calls (never a single setAttribute('class', ...) call), so a per-node token set
   // is accumulated here and re-joined into one string on every change, then handed to
   // routeProp('class', ...) exactly like Vue's template `class="..."` and React's JSX
   // `className="..."` — all three resolve through the SAME centralized class+style merge in

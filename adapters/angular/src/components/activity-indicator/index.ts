@@ -1,4 +1,4 @@
 // Base/default ActivityIndicator. Re-exports the iOS build; Metro picks index.ios.ts /
-// index.android.ts in platform bundles. See ADR 0020.
+// index.android.ts in platform bundles.
 
 export * from './index.ios';

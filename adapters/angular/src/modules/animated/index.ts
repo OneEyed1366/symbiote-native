@@ -2,7 +2,7 @@
 // animated/index.ts. The animated COMPONENTS (View / Text / Image / ScrollView) are explicit
 // standalone components (Angular has no runtime HOC — see create-animated-component.ts); the
 // value graph, easing and imperative drivers come from @symbiote-native/engine (framework-agnostic,
-// JS-driven, ADR 0016), spread in verbatim. Both halves meet here so the familiar surface,
+// JS-driven), spread in verbatim. Both halves meet here so the familiar surface,
 // `Animated.timing(new Animated.Value(0), …).start()`, works against the Angular-driven engine.
 
 import {

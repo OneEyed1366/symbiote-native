@@ -6,7 +6,7 @@
 //
 // Metro selects the platform file on a real host (linking.android.ts > linking.ts);
 // the base linking.ts re-exports the iOS build for web/headless. There is no runtime
-// `Platform.OS` read; the filename is the selector. See ADR 0019.
+// `Platform.OS` read; the filename is the selector.
 
 import {
   installDeviceEventHub,

@@ -1,4 +1,3 @@
-// Co-located React-driven test (ADR 0025), ported from the headless `activity-indicator.smoke`.
 // Asserts the RCTView > ActivityIndicatorView wrapper shape, the animating/color/hidesWhenStopped
 // passthrough, the size translation (string sizes map to the native enum + fixed box; a numeric
 // size sizes via style and emits no native `size`), plus the standard ViewProps

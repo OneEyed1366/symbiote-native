@@ -6,7 +6,7 @@
 // Angular twin of React's setState / Vue's reactive ref), ngOnDestroy tears the subscriptions down,
 // and the wrapper's onLayout measures the frame that feeds the next event's inset. The user
 // children nest under the wrapper (or, for 'position', an inner View) via <ng-content>. No native
-// host of its own — it wraps symbiote-view — so this stays a flat single file (ADR 0026).
+// host of its own — it wraps symbiote-view — so this stays a flat single file.
 //
 // Full parity: behavior 'height'|'position'|'padding', enabled, keyboardVerticalOffset,
 // contentContainerStyle, onLayout, plus the full a11y/aria surface every View carries.
@@ -58,8 +58,8 @@ function isSymbioteEvent(value: unknown): value is ISymbioteEvent {
 }
 
 // Mirrors React's IKeyboardAvoidingViewProps minus children (Angular takes children via
-// <ng-content>), declared per-adapter over the shared a11y base per
-// <prop_types_split_agnostic_vs_per_adapter>.
+// <ng-content>), declared per-adapter over the shared accessibility base since a framework-specific
+// children field keeps it from being fully shared across adapters.
 export interface IAngularKeyboardAvoidingViewProps extends IAccessibilityProps, IAriaProps {
   behavior?: IKeyboardAvoidingBehavior;
   enabled?: boolean;
@@ -118,7 +118,7 @@ export class KeyboardAvoidingView implements IAngularKeyboardAvoidingViewInputs,
   // The wrapper's onLayout is a real @Output(): `(layout)="…"`, not `[onLayout]="…"`. Safe to
   // name it the same as the native `layout` event fired inside this component's own template
   // (see the class's `handleLayout`) — the engine's bubble() treats ANCHOR_HOST_COMPONENTS as
-  // transparent to listener lookup, so there is no double-fire (angular-adapter skill §7).
+  // transparent to listener lookup, so there is no double-fire.
   @Output() readonly layout = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityAction = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();

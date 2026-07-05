@@ -1,5 +1,5 @@
-// Co-located React-driven pipeline test (ADR 0025), ported from the headless
-// `modal.smoke`. Proves the Modal primitive: a visible modal commits a ModalHostView
+// Co-located React-driven pipeline test.
+// Proves the Modal primitive: a visible modal commits a ModalHostView
 // with its children nested under it (one childSet, not a second root); a hidden modal
 // commits no modal node (the visible gate); the direct events round-trip back to JS;
 // and the RN-faithful style/lifecycle behavior: backdrop-wins precedence, the

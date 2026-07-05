@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025): RN's babel preset in dev runs transform-react-jsx-self /
+// Co-located unit test: RN's babel preset in dev runs transform-react-jsx-self /
 // -source, annotating every JSX element with __self (the component instance) and __source
 // ({ fileName, lineNumber, columnNumber }). A JSX-based adapter carries them onto the vnode as
 // ordinary props; routeProp must drop them so they never reach Fabric. __self carries a

@@ -1,4 +1,3 @@
-// Co-located React-driven ScrollView test (ADR 0025), ported from the headless smoke.
 // Proves the nested RCTScrollView > RCTScrollContentView shape, the contentContainerStyle /
 // horizontal -> content-node mapping, the base clip styles on both axes, and the onScroll
 // round-trip, against the fake Fabric slot, no simulator.

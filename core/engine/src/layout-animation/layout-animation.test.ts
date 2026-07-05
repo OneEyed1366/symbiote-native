@@ -1,10 +1,10 @@
-// Co-located unit test (ADR 0025) for the LayoutAnimation module: JS surface plus that
+// Co-located unit test for the LayoutAnimation module: JS surface plus that
 // configureNext ships its config to the native UIManager. A fake native module (installed via
 // __turboModuleProxy) records configureNextLayoutAnimation calls.
 //
 // IMPORTANT: this only proves the JS surface and the dispatch. Whether the chosen native
 // module NAME is the real one on a given platform is verified on-device, never headless (a
-// headless fake answers to any name). See .docs/native-module-platform-routing.md.
+// headless fake answers to any name).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ILayoutAnimationConfig } from './index';

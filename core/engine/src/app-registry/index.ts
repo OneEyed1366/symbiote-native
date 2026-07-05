@@ -60,8 +60,8 @@ export interface IHostRegistrar {
 
 // The native module backing headless tasks. RN registers it under the name
 // "HeadlessJsTaskSupport" (the spec's TurboModuleRegistry.get<Spec>(...) name in
-// INativeHeadlessJsTaskSupport.js); per .docs/decisions/0012 the module name is
-// platform-specific, but this spec uses the same name on both platforms. A
+// INativeHeadlessJsTaskSupport.js); a native module's registered name is
+// platform-specific in general, but this spec uses the same name on both platforms. A
 // headless fake answers to any name, so on-device resolution is the only proof.
 interface INativeHeadlessJsTaskSupport {
   notifyTaskFinished?(taskId: number): void;

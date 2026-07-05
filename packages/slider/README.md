@@ -6,8 +6,7 @@ not just React. The library's default export is a React component (it calls hook
 dispatcher), so a non-React adapter renders it with a null dispatcher and it throws. This package
 reaches the native `RNCSlider` view directly through the engine's `createNode`-by-ViewConfig path
 instead of importing the library's React component — the same mechanism SymbioteNative uses for its
-own primitives. See the `symbiote-third-party-native-view` skill and ADR 0027 for the full
-mechanism and rationale.
+own primitives.
 
 ## Install
 

@@ -8,7 +8,7 @@
 // `stickyHeaderIndices` to native is a silent no-op. So we replicate the JS layer: subscribe each
 // flagged child to the scroll offset and translate it to stay pinned. The interpolation mirrors
 // ScrollViewStickyHeader.js (non-inverted + inverted branches) and lives, framework-agnostic, in
-// @symbiote-native/components (computeStickyInterpolation, ADR 0024); this file holds the Vue component
+// @symbiote-native/components (computeStickyInterpolation); this file holds the Vue component
 // shell, the layout state, and the child-wrapping. Render shared verbatim with React via the math.
 // Vue supplies only the reactive lifecycle (refs/watch instead of useState/useEffect).
 
@@ -94,7 +94,7 @@ export const ScrollViewStickyHeader = defineComponent({
     // The animated node that drives the transform (RN's animatedTranslateY). When the scroll value
     // is native (attachStickyScroll), this interpolation runs on the UI thread: the smooth pin.
     // Engine node → shallowRef (held by identity, the reactivity rule); the un-measured identity
-    // stub until the effect below rebuilds it. See .claude/skills/vue-adapter-reactivity.
+    // stub until the effect below rebuilds it.
     const animatedTranslateY = shallowRef<AnimatedInterpolation>(
       scrollAnimatedValue.interpolate({ inputRange: [-1, 0], outputRange: [0, 0] }),
     );

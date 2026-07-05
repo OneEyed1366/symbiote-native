@@ -3,8 +3,8 @@
 // (#item / #separator / #header / #footer / #empty / #sectionHeader / #sectionFooter /
 // #sectionSeparator) — the idiomatic Vue surface; React's twin is the renderItem /
 // ItemSeparatorComponent prop family. This is the ONE place that translation lives, so a list's
-// own body reads a single source (its slots), never a renderItem prop. Vue-only lifecycle glue,
-// so it belongs in the adapter (adapters_stay_thin): the shared windowing math is untouched.
+// own body reads a single source (its slots), never a renderItem prop. This is Vue-only lifecycle
+// glue, so it belongs in the adapter, not the shared layer: the windowing math itself is untouched.
 
 import { type Component, type VNode } from '@vue/runtime-core';
 

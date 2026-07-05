@@ -1,7 +1,7 @@
 // Exercises the plugin's actual host-override wiring against a fake tsserver host — real
 // integration (does VS Code load it) can't be driven headlessly, but this proves getScriptSnapshot
-// synthesizes the right literal-key .d.ts, the mtime-based cache invalidates on edit (the bug fixed
-// vs wolf-tui's version), and camelCasing matches the runtime key parseCSS/generate-dts.ts produce.
+// synthesizes the right literal-key .d.ts, the mtime-based cache invalidates on edit, and camelCasing
+// matches the runtime key parseCSS/generate-dts.ts produce.
 // The plugin itself is hand-written CommonJS at the package root (../typescript-plugin.cjs, not
 // under src/ — matches each adapter's metro-css-parser.cjs shim convention), so it's required here
 // rather than imported as a typed module.
@@ -68,7 +68,7 @@ describe('typescript-plugin', () => {
     expect(dts).not.toContain('[key: string]');
   });
 
-  it("invalidates its cache when the file changes on disk (mtime-keyed, unlike wolf-tui's sticky cache)", async () => {
+  it('invalidates its cache when the file changes on disk (mtime-keyed)', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'symbiote-ts-plugin-'));
     const cssPath = path.join(dir, 'Card.module.css');
     fs.writeFileSync(cssPath, '.card { padding: 10px; }');

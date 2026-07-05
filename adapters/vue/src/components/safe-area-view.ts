@@ -1,4 +1,4 @@
-// SafeAreaView, the Vue lifecycle half (ADR 0024 Phase 2). A plain view whose native side
+// SafeAreaView, the Vue lifecycle half. A plain view whose native side
 // insets its children to the safe area (notch, rounded corners, system bars); there is no
 // JS-side translation, so this maps style + children straight onto the intrinsic. The Vue twin
 // of the React adapter's SafeAreaView. Vue takes children via slots, folds aria/role through
