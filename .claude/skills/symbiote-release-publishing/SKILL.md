@@ -1,6 +1,6 @@
 ---
 name: symbiote-release-publishing
-description: "Symbiote npm publishing & versioning — read before touching .changeset/**, a publishable package's `publishConfig`/`files`/`exports`, .github/workflows/release.yml, or running `pnpm changeset`/`pnpm run release`. Versioning is Changesets (`pnpm changeset` → PR → 'Version Packages' PR → merge → CI publishes). Core trick: `main`/`exports` keep pointing at `src/index.ts` for in-repo dev (Metro/tsc resolve live TS, unchanged) — `publishConfig` overrides those to `build/` ONLY inside the tarball, never touching local resolution. No new bundler: `tsc --build` already emits `build/`, so `typecheck` IS the build. `@symbiote-native/angular`/`@symbiote-native/slider`'s `./angular` entry predate this, use a DIFFERENT mechanism (conditional `exports`, AOT build) — don't convert or copy that onto plain packages. Covers the mechanism table, the `files`-mandatory gotcha (`.gitignore` excludes `build/`), changeset ignore list, release scripts, CI workflow. Trigger: 'publish npm', 'release', 'changeset', 'version bump', 'publishConfig'."
+description: "Symbiote npm publishing & versioning — read before touching .changeset/**, a publishable package's `publishConfig`/`files`/`exports`, .github/workflows/release.yml, or running `pnpm changeset`/`pnpm run release`. Versioning is Changesets (`pnpm changeset` → PR → 'Version Packages' PR → merge → CI publishes). Core trick: `main`/`exports` keep pointing at `src/index.ts` for in-repo dev (Metro/tsc resolve live TS, unchanged) — `publishConfig` overrides those to `build/` ONLY inside the tarball, never touching local resolution. No new bundler: `tsc --build` already emits `build/`, so `typecheck` IS the build. `@symbiote-native/angular`/`@symbiote-native/slider`'s `./angular` entry predate this, use a DIFFERENT mechanism (conditional `exports`, AOT build) — don't convert or copy that onto plain packages. Covers the mechanism table, the `files`-mandatory gotcha (`.gitignore` excludes `build/`), the `fix-esm-extensions` argument-list gotcha (a package missing from it ships an unimportable `build/` for every real npm consumer, invisible in-repo), changeset ignore list, release scripts, the `checks.yml` reusable-workflow CI gate (`ci.yml` + `release.yml` both call it, sequencing publish after lint/typecheck/test), and the manual canary release flow via pkg.pr.new (`workflow_dispatch` on `release.yml`, one checkbox per package, publishes a real packed tarball WITHOUT ever touching the npm registry — for e2e-testing packaging before the real release). Trigger: 'publish npm', 'release', 'changeset', 'version bump', 'publishConfig', 'canary release', 'CI publish', 'pkg.pr.new'."
 ---
 
 # Symbiote npm publishing & versioning
@@ -118,6 +118,28 @@ rule:
 pattern that "obviously" only means local scratch dirs can silently net a
 real one too.
 
+## Gotcha (found 2026-07 via the canary-release CI work): `fix-esm-extensions` must list EVERY publishable package's `build/`
+
+`fix-esm-extensions` (see `scripts/fix-esm-extensions.mjs`'s own header
+comment for why it exists at all — `tsc --build` emits relative imports with
+no extension, which Node's own ESM loader rejects outside a bundler) only
+rewrites the `build/` directories passed to it as CLI args in the root
+`fix-esm-extensions` script. `core/test-utils/build` was missing from that
+argument list since the package was first published — every published
+version (0.1.1 through 0.1.3) shipped a `build/index.js` doing
+`export * from './fake-fabric'` (no `.js`), which fails at import time for
+any REAL npm consumer (`Cannot find module '.../build/fake-fabric'`) while
+looking completely fine in-repo, because Metro/Vitest resolve `src/*.ts`
+directly and never touch `build/` at all. Caught only because adding a
+`test` job to CI (running `pnpm run test` against `examples/*`'s real
+`catalog:`-installed `@symbiote-native/test-utils`) turned it from
+"invisible" to "one failing suite, 833/834 passing." **When adding a new
+publishable package with its own `build/` output, add it to the
+`fix-esm-extensions` script's argument list in the SAME change** — it is not
+inferred from `files`/`publishConfig`, it's a flat, easy-to-forget list.
+Fixed by adding `core/test-utils/build` to the list; see the
+`test-utils-esm-extension` changeset for the republish.
+
 ## Changesets config (`.changeset/config.json`)
 
 ```jsonc
@@ -126,12 +148,16 @@ real one too.
   "baseBranch": "master",
   "updateInternalDependencies": "patch",
   "ignore": [
-    "@symbiote-native/test-utils",   // internal test double, never published
     "@symbiote-native/docs-site",    // apps/*, private
     "Canary", "vue-sfc-canary", "vue-tsx-canary", "angular-canary"  // examples/*
   ]
 }
 ```
+
+`@symbiote-native/test-utils` used to be in this `ignore` list (it started as
+an internal-only test double) but was published for real in a later session —
+it is now a normal publishable package like the other 7 and must NOT be
+re-added to `ignore`.
 
 `@changesets/cli` itself is catalogued (`pnpm-workspace.yaml` → `catalog:`
 under "workspace tooling"), like every other dev tool in this repo — see
@@ -140,24 +166,112 @@ under "workspace tooling"), like every other dev tool in this repo — see
 ## Root scripts
 
 ```jsonc
+"typecheck": "tsc --build",
+"prepublish-build": "pnpm run typecheck && pnpm run fix-esm-extensions && pnpm --filter @symbiote-native/angular --filter @symbiote-native/slider run ng:build",
+"build": "pnpm run prepublish-build && pnpm run docs:build",
 "changeset": "changeset",                 // pnpm changeset — author a changeset for a PR
 "version-packages": "changeset version",  // bump versions + changelogs from pending changesets
-"release": "pnpm run typecheck && pnpm --filter @symbiote-native/angular --filter @symbiote-native/slider run ng:build && changeset publish"
+"release": "pnpm run build && changeset publish",
+"trust:publishers": "node scripts/trust-publishers.mjs"
 ```
 
-`release` explicitly re-runs BOTH build mechanisms before publishing (the base
-`tsc --build` via `typecheck`, and the two packages' AOT `ng:build`) rather than
-trusting `prepare` ran recently — publishing must be idempotent from a cold
-checkout.
+`release` explicitly re-runs the full build (typecheck → ESM-extension fix →
+Angular/slider AOT → docs) before publishing rather than trusting `prepare`
+ran recently — publishing must be idempotent from a cold checkout.
+`prepublish-build` is split out from `build` specifically so the canary flow
+below can reuse the package-relevant steps without also building the
+unrelated docs site.
 
-## CI (`.github/workflows/release.yml`)
+`pnpm run trust:publishers` (`scripts/trust-publishers.mjs`) configures npm's
+GitHub-OIDC trusted publishing for every publishable package in one loop —
+run once per package after its first manual authenticated publish, needs an
+interactive OTP/browser confirm so it can't run from CI. It hardcodes
+`--file .github/workflows/release.yml`: npm's OIDC trust is scoped to that
+exact workflow FILE (not job), so both the `release` job and the
+`publish-canary` job below can publish under it — a NEW workflow file would
+need its own `trust:publishers`-style re-registration first, or every publish
+from it 404s (npm returns 404, not 403, for an identity with no trust config).
 
-Push to `master` → `changesets/action@v1` either opens/updates a
-`chore: version packages` PR (when unreleased changesets exist) or, once that
-PR is merged, runs `pnpm run release` and publishes. Needs a repo secret
-`NPM_TOKEN` (mapped to `NODE_AUTH_TOKEN`, which `actions/setup-node`'s
-`registry-url` reads); without it the version-PR step still works, only the
-actual `npm publish` call fails.
+## CI (`.github/workflows/release.yml` + `checks.yml`)
+
+`checks.yml` is a `workflow_call`-only reusable workflow holding the three
+gate jobs (`lint`, `typecheck`, `test`). Both `ci.yml` (fast PR feedback on
+every `pull_request`/`push`) and `release.yml` (the hard gate before
+publishing) call it via `uses: ./.github/workflows/checks.yml` — GitHub
+Actions has no cross-workflow `needs:`, so the only way to make one
+workflow's publish job wait on another workflow's checks is to re-run the
+same job definitions inside the publishing workflow itself; the reusable
+workflow keeps them defined once instead of duplicated.
+
+`release.yml` has two `needs: checks` jobs gated by `if:`, mutually exclusive
+by trigger:
+- **`release`** (`if: github.event_name == 'push'`) — push to `master` →
+  `changesets/action@v1` either opens/updates a `chore: version packages` PR
+  (when unreleased changesets exist) or, once that PR is merged, runs
+  `pnpm run release` and publishes. Needs a repo secret `NPM_TOKEN` (mapped to
+  `NODE_AUTH_TOKEN`, which `actions/setup-node`'s `registry-url` reads) OR the
+  OIDC trusted-publisher config above; without either the version-PR step
+  still works, only the actual `npm publish` call fails.
+- **`publish-canary`** (`if: github.event_name == 'workflow_dispatch'`, one
+  boolean input per publishable package) — see "Canary releases" below.
+
+## Canary releases (manual, via pkg.pr.new — never touches the real npm registry)
+
+**Deliberately does NOT use npm/changesets at all.** An earlier version of
+this mechanism used `changeset version --snapshot` + `npm publish --tag` —
+rejected because every snapshot version, however obscure the tag, stays
+forever visible on the real npmjs.com registry (immutable, un-deletable).
+[pkg.pr.new](https://github.com/stackblitz-labs/pkg.pr.new) solves the same
+problem (install a real packed tarball to e2e-test packaging, not a
+`workspace:*` link) via its own npm-COMPATIBLE URLs — nothing is ever
+published to npmjs.com, so there's nothing to see there, no dist-tag, no
+version bump, nothing to clean up. Requires the pkg.pr.new GitHub App
+installed on this repo once (github.com/apps/pkg-pr-new); `pkg-pr-new` itself
+is a normal catalogued devDependency (installed from the lockfile, run via
+`pnpm exec` — its own README explicitly warns against `npx`/`pnpm dlx` in CI
+for supply-chain reasons).
+
+Trigger `release.yml` manually ("Run workflow" in the Actions UI / `gh
+workflow run release.yml --ref <branch>`). Each publishable package has its
+OWN checkbox input (`android`, `angular`, `components`, `css-parser`,
+`engine`, `react`, `slider`, `splash-screen`, `test-utils`, `vue`) — all
+default `false`, so you deliberately tick only the ones you want (a canary
+run is normally about one changed package, not a rebuild-and-republish-
+everything sweep). A run with nothing ticked fails fast with a clear message
+instead of silently doing nothing.
+
+Mechanism:
+1. **`Determine selected packages`** step (`actions/github-script`) reads
+   `context.payload.inputs` generically — filters to keys whose value is
+   `'true'` — so adding an 11th package later means adding its
+   workflow_dispatch input, NOT touching this step's logic.
+2. `pnpm run prepublish-build`.
+3. **`scripts/pack-canary-tarballs.mjs`** (+ `scripts/lib/publishable-
+   packages.mjs`'s `publishablePackageEntries()`, same package-discovery loop
+   `trust-publishers.mjs` uses) — filters to the selected short names (env
+   `CANARY_PACKAGES`, comma-separated) and runs `pnpm pack --pack-destination
+   <tmp dir>` per package into ONE shared throwaway directory. Deliberately
+   `pnpm pack`, not `npm pack` or letting pkg.pr.new pack it internally:
+   **plain `npm pack` does NOT apply a package's `publishConfig` override**
+   (only pnpm does — verified via `tar -xzf` on the resulting tarball and
+   inspecting `package.json`), and this repo's entire publish mechanism (see
+   "The mechanism" at the top of this doc) depends on that swap happening.
+   Getting this wrong would silently ship a tarball whose `main`/`exports`
+   still point at `src/index.ts` — installable, but broken for any consumer
+   without a TS-aware bundler.
+4. `pnpm exec pkg-pr-new publish "<tmp dir>/*.tgz"` — pkg.pr.new's
+   documented **prebuilt-tarball mode**: tarballs passed this way are
+   "uploaded as-is: pkg.pr.new will not repack them," which is exactly what
+   we need since step 3 already produced the correct one.
+
+Install a canary with `pnpm add https://pkg.pr.new/OneEyed1366/symbiote-native/@symbiote-native/<pkg>@<commit-sha>`
+(URL printed by the workflow run / posted as a PR comment if the branch has
+an open PR) in `.examples/*`/`examples/*`.
+
+Nothing here is committed or pushed — the version bump and the generated
+changeset file live only in that one ephemeral CI checkout. Re-running the
+workflow against the SAME branch just re-publishes over the same dist-tag
+with a fresh timestamp; nothing to clean up between runs.
 
 ## The actual release workflow (day to day)
 
