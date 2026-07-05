@@ -4,6 +4,11 @@ build-ngc/
 dist/
 *.tsbuildinfo
 
+# Native source vendored into a package's proxy podspec at pod-install time (CocoaPods'
+# Dir.glob never crosses a symlink, so a pnpm .pnpm-store symlink breaks pointing
+# source_files at the nested lib in place — see symbiote-third-party-native-view skill).
+packages/*/.rn-*
+
 # iOS
 ios/Pods/
 ios/build/
