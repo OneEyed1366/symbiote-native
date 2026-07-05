@@ -1,5 +1,11 @@
 # @symbiote-native/test-utils
 
+## 0.1.3
+
+### Patch Changes
+
+- 46a4f27: Documentation and code-comment cleanup: remove internal-only references and tighten wording. No runtime or API changes.
+
 ## 0.1.2
 
 ### Patch Changes
