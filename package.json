@@ -26,7 +26,8 @@
     "prepare": "husky",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "pnpm run build && changeset publish"
+    "release": "pnpm run build && changeset publish",
+    "trust:publishers": "node scripts/trust-publishers.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "catalog:",
