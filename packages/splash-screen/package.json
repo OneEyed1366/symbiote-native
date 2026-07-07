@@ -33,6 +33,7 @@
     "src",
     "build",
     "build-ngc",
+    "codegen-specs",
     "cli.cjs",
     "react-native.config.cjs",
     "symbiote-splash-screen.podspec"
@@ -65,13 +66,13 @@
   "codegenConfig": {
     "name": "RNBootSplashSpec",
     "type": "modules",
-    "jsSrcsDir": "node_modules/react-native-bootsplash/src/specs",
+    "jsSrcsDir": "codegen-specs",
     "android": {
       "javaPackageName": "com.zoontek.rnbootsplash"
     }
   },
   "scripts": {
-    "prepare": "pnpm run ng:build",
+    "prepare": "node vendor-codegen-specs.cjs && pnpm run ng:build",
     "typecheck": "tsc --build",
     "ng:build": "ngc -p tsconfig.angular.json",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""

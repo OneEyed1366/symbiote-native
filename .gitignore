@@ -9,6 +9,11 @@ dist/
 # source_files at the nested lib in place — see symbiote-third-party-native-view skill).
 packages/*/.rn-*
 
+# Codegen spec files vendored at `prepare` time from a wrapped native module (jsSrcsDir
+# must be a literal path react-native codegen can lstat directly — pnpm never nests a
+# dependency inside its dependent's own node_modules, so the source has to be copied in).
+packages/*/codegen-specs/
+
 # iOS
 ios/Pods/
 ios/build/
