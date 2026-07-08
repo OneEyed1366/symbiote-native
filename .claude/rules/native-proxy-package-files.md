@@ -29,3 +29,9 @@ add `"codegen-specs"` to `files`. Precedent: `packages/splash-screen` and
 `packages/slider` both do this (twin of the podspec's `.rn-slider` vendoring — same
 pnpm-symlink root cause, different consumer). Full detail: the
 `symbiote-third-party-native-view` skill.
+
+The vendored `codegen-specs/**` is third-party source copied verbatim — it does NOT
+follow our lint rules (it carries `@ts-ignore`, `require()`, `.web.tsx`, etc.), so it
+MUST be in eslint's `ignores` (`eslint.config.js`), same as `build/`. typecheck/test/
+build are already safe because they scope to `src` and the vendored dir lives outside
+it — only eslint's wider glob (`{core,adapters,packages}/**/*.{ts,tsx}`) sweeps it in.
