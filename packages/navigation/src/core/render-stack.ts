@@ -1,16 +1,16 @@
 // Navigator: the render half (framework-agnostic). Unlike the slider (one native leaf), a
-// screen's content is an arbitrary framework subtree the adapter owns — so, mirroring the
+// screen's content is an arbitrary framework subtree the adapter owns. So, mirroring the
 // custom-StepMarker-overlay precedent (assembled per-adapter at the element level), these
 // resolvers hand back PLAIN PROPS OBJECTS for the RNSScreen/RNSScreenStack leaves the adapter
 // builds itself with real children, and one full Descriptor for the header config. The header
 // config Descriptor never takes FRAMEWORK children (headerLeftBarButtonItems/
 // headerRightBarButtonItems are native config arrays, already native-shaped by screen-options.ts,
-// not elements) — but it does optionally nest one RNSSearchBar leaf, wrapped in an
+// not elements), but it does optionally nest one RNSSearchBar leaf, wrapped in an
 // RNSScreenStackHeaderSubview(type: 'searchBar'), matching how react-native-screens' own JS
 // component (ScreenStackHeaderSearchBarView) mounts it. RNSScreenStackHeaderConfig.mm's
-// mountChildComponentView requires EVERY child to be an RNSScreenStackHeaderSubview instance —
+// mountChildComponentView requires EVERY child to be an RNSScreenStackHeaderSubview instance:
 // a bare RNSSearchBar child is rejected natively ("ScreenStackHeader only accepts children of
-// type ScreenStackHeaderSubview") — and its header-building code then reads the search bar back
+// type ScreenStackHeaderSubview"), and its header-building code then reads the search bar back
 // out via `subview.subviews[0]`, i.e. one level inside the subview wrapper, not the subview itself.
 
 import { el } from '@symbiote-native/components';
@@ -35,17 +35,17 @@ import type {
 } from './navigator-props';
 
 // Mirrors react-native-screens' own ScreenStackItem.tsx (getPositioningStyle): a formSheet's
-// content wrapper does NOT get `flex: 1` — RNSScreen.mm's updateBounds pushes the sheet's live
+// content wrapper does NOT get `flex: 1`. RNSScreen.mm's updateBounds pushes the sheet's live
 // native size into Fabric's shadow STATE on every frame of a detent drag, and a `bottom: 0`-pinned
 // (i.e. `flex: 1`) wrapper forces React to set a strict frame on every one of those updates,
 // which is exactly the visible flicker PR #1870 fixed by switching to `absoluteWithNoBottom`
 // instead (RNSScreen.mm's own comment: "to mitigate view flickering... we do not set `bottom: 0`
 // in JS for wrapper of the screen content, causing React to not set strict frame every time the
 // sheet size is updated"). The tradeoff this accepts: content shorter than the sheet's current
-// detent leaves a plain-background gap below it — react-native-screens' own native fix for THAT
+// detent leaves a plain-background gap below it. react-native-screens' own native fix for THAT
 // (RNSScreenContentWrapper.mm's coerceChildScrollViewComponentSizeToSize) only kicks in for a
 // screen whose content is a ScrollView, which it resizes directly to the sheet's real frame,
-// bypassing Yoga/flex entirely — not a style choice available from here.
+// bypassing Yoga/flex entirely, not a style choice available from here.
 const SCREEN_CONTENT_WRAPPER_FLEX_STYLE = { flex: 1 };
 const SHEET_CONTENT_WRAPPER_STYLE = {
   position: 'absolute',
