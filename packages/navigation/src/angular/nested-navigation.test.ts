@@ -2,7 +2,7 @@
 // the ambient (parent-scope) instance via `@Optional() @SkipSelf() inject(...)` in its own
 // constructor (navigation-context.service.ts) BEFORE NavigationScopeDirective re-provides a fresh
 // one for its own content, so when one navigator's screen renders ANOTHER navigator (here, a Stack
-// screen renders a Tab), a screen deep inside the nested Tab can call useNavigation().getParent()
+// screen renders a Tab), a screen deep inside the nested Tab can call injectNavigation().getParent()
 // to reach the enclosing Stack's handle — with ZERO manual threading (unlike react/
 // nested-navigation.test.tsx, which needs an explicit `ambientContext` read + re-provide in every
 // navigator; Angular's own hierarchical DI does this automatically, see navigation-context.
@@ -21,7 +21,7 @@ import { ScreenDirective } from './screen.directive';
 import { Tab } from './tabs';
 import type { ITabNavigatorHandle } from './tabs';
 import { TabScreenDirective } from './tab-screen.directive';
-import { useNavigation } from './hooks';
+import { injectNavigation } from './injectors';
 import type { IAnyNavigatorHandle } from './navigation-context.service';
 import type { IRoute } from '../core';
 
@@ -104,7 +104,7 @@ class RootGetParentScreenComponent {
   @Input() navigation!: INavigatorHandle;
 
   constructor() {
-    capturedParent = useNavigation().getParent();
+    capturedParent = injectNavigation().getParent();
     getParentCalled = true;
   }
 }
@@ -120,7 +120,7 @@ class NestedTabHomeScreenComponent {
   @Input() navigation!: ITabNavigatorHandle;
 
   constructor() {
-    capturedParent = useNavigation().getParent();
+    capturedParent = injectNavigation().getParent();
   }
 }
 
@@ -170,7 +170,7 @@ class NestedTestHost {
 }
 
 describe('Angular nested navigators (DI parent chain)', () => {
-  it("a root Stack screen's useNavigation().getParent() is undefined (no ambient navigator above it)", async () => {
+  it("a root Stack screen's injectNavigation().getParent() is undefined (no ambient navigator above it)", async () => {
     capturedParent = undefined;
     getParentCalled = false;
     capturedHost = undefined;
@@ -183,7 +183,7 @@ describe('Angular nested navigators (DI parent chain)', () => {
     expect(capturedParent).toBeUndefined();
   });
 
-  it('useNavigation().getParent() from inside a Tab screen nested in a Stack screen reaches the enclosing Stack, and pushing through it adds a Stack route', async () => {
+  it('injectNavigation().getParent() from inside a Tab screen nested in a Stack screen reaches the enclosing Stack, and pushing through it adds a Stack route', async () => {
     capturedParent = undefined;
     capturedHost = undefined;
     mount(ROOT_TAG, NestedTestHost, {
@@ -202,6 +202,6 @@ describe('Angular nested navigators (DI parent chain)', () => {
     await tick();
 
     expect(findAllText(fabric.committed)).toContain('stack-details');
-    expect(capturedHost!.nav.handle.canGoBack()).toBe(true);
+    expect(capturedHost!.nav.canGoBack()).toBe(true);
   });
 });

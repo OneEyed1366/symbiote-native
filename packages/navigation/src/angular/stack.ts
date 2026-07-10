@@ -1,10 +1,12 @@
 // Stack, the Angular lifecycle half. The route-stack transitions (navigator-state) and the
 // options/props folds (screen-options, render-stack) live in @symbiote-native/navigation core,
 // shared verbatim with the React/Vue adapters; here Angular supplies the lifecycle — a signal for
-// the pushed-route stack, a per-instance counter for route-key generation, `handle` as a plain
-// object of methods (no `useImperativeHandle`/forwardRef equivalent needed: an Angular component
-// instance IS its own "ref", reached via a template reference variable, e.g. `<Stack #nav>` then
-// `nav.handle.push(...)`)  — plus the descriptor bridge for the header config leaf via the raw
+// the pushed-route stack, a per-instance counter for route-key generation, push/pop/replace/... as
+// plain public methods directly on the class (no `useImperativeHandle`/forwardRef equivalent
+// needed: an Angular component instance IS its own "ref", same shape as MatDrawer.open(), reached
+// via a template reference variable, e.g. `<Stack #nav>` then `nav.push(...)`; `Stack implements
+// INavigatorHandle` so the instance itself is what gets handed to a screen's `navigation` input and
+// to NavigationContextService) - plus the descriptor bridge for the header config leaf via the raw
 // native-view element tags below. Pushing/popping a route is an ordinary child render/removal:
 // RNSScreenStack diffs its RNSScreen children natively, so no imperative native command is needed
 // here at all. Neither this nor ScreenDirective imports react-native-screens' own React components
@@ -190,7 +192,7 @@ let stackInstanceCounter = 0;
       <RNSScreenContentWrapper [symbioteHostProps]="contentWrapperProps(route)">
         <ng-container
           [symbioteNavigationScope]="route"
-          [navigation]="handle"
+          [navigation]="this"
           [emitter]="emitterFor(route.key)"
         >
           <ng-container
@@ -201,7 +203,7 @@ let stackInstanceCounter = 0;
     </ng-template>
   `,
 })
-export class Stack implements AfterContentInit, OnDestroy {
+export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
   @ContentChildren(ScreenDirective) private readonly screenChildren!: QueryList<ScreenDirective>;
 
   @Input() initialRouteName?: string;
@@ -225,17 +227,18 @@ export class Stack implements AfterContentInit, OnDestroy {
   private readonly stateSignal = signal<INavigatorState | undefined>(undefined);
   readonly state = this.stateSignal.asReadonly();
 
-  readonly handle: INavigatorHandle = {
-    push: (name, params) => this.dispatch({ type: 'push', route: this.createRoute(name, params) }),
-    pop: count => this.dispatch({ type: 'pop', count }),
-    popToTop: () => this.dispatch({ type: 'popToTop' }),
-    popTo: key => this.dispatch({ type: 'popTo', key }),
-    replace: (name, params) =>
-      this.dispatch({ type: 'replace', route: this.createRoute(name, params) }),
-    setParams: (params, key) => this.dispatch({ type: 'setParams', key, params }),
-    reset: nextState => this.dispatch({ type: 'reset', state: nextState }),
-    canGoBack: () => (this.stateSignal()?.routes.length ?? 0) > 1,
-  };
+  readonly push = (name: string, params?: unknown): void =>
+    this.dispatch({ type: 'push', route: this.createRoute(name, params) });
+  readonly pop = (count?: number): void => this.dispatch({ type: 'pop', count });
+  readonly popToTop = (): void => this.dispatch({ type: 'popToTop' });
+  readonly popTo = (key: string): void => this.dispatch({ type: 'popTo', key });
+  readonly replace = (name: string, params?: unknown): void =>
+    this.dispatch({ type: 'replace', route: this.createRoute(name, params) });
+  readonly setParams = (params: unknown, key?: string): void =>
+    this.dispatch({ type: 'setParams', key, params });
+  readonly reset = (nextState: INavigatorState): void =>
+    this.dispatch({ type: 'reset', state: nextState });
+  readonly canGoBack = (): boolean => (this.stateSignal()?.routes.length ?? 0) > 1;
 
   ngAfterContentInit(): void {
     this.rebuildRegistry();
@@ -302,7 +305,7 @@ export class Stack implements AfterContentInit, OnDestroy {
 
   private mergedOptionsFor(route: IRoute<unknown>): IAngularScreenOptions {
     const entry = this.registry.get(route.name);
-    const screenComponentProps: IScreenComponentProps = { route, navigation: this.handle };
+    const screenComponentProps: IScreenComponentProps = { route, navigation: this };
     const own =
       entry === undefined
         ? undefined
@@ -317,7 +320,7 @@ export class Stack implements AfterContentInit, OnDestroy {
   }
 
   screenComponentInputs(route: IRoute<unknown>): IScreenComponentProps {
-    return { route, navigation: this.handle };
+    return { route, navigation: this };
   }
 
   stackHostProps(): Record<string, unknown> {

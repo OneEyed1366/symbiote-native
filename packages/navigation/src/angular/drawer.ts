@@ -6,10 +6,11 @@
 // state at call time, no ref-mirroring dance needed the way react/drawer.ts's `useRef`s are: a
 // class instance already gives every callback a live view of current state, closing the exact gap
 // React's own hook rules force it to work around), an Animated.Value driving the slide/opacity
-// transforms via the real `AnimatedView` component (`@symbiote-native/angular`), and `handle` as a
-// plain object of methods — mirroring tabs.ts's shape (Tab is the closer sibling: both are
-// fixed-route-list, no-react-native-screens navigators; Stack's push/pop + native-screen bridging
-// don't apply here).
+// transforms via the real `AnimatedView` component (`@symbiote-native/angular`), and
+// `openDrawer`/`closeDrawer`/`toggleDrawer`/`jumpTo` as plain public methods directly on the class,
+// mirroring tabs.ts's shape (Tab is the closer sibling: both are fixed-route-list,
+// no-react-native-screens navigators; Stack's push/pop + native-screen bridging don't apply here;
+// `Drawer implements IDrawerNavigatorHandle`).
 //
 // FEASIBILITY NOTE (mirrors react/drawer.ts's own header): the REAL @react-navigation/drawer is
 // built on react-native-gesture-handler + react-native-reanimated, neither of which this codebase
@@ -171,11 +172,11 @@ let drawerInstanceCounter = 0;
                   @if (componentForRoute(route); as component) {
                     <ng-container
                       [symbioteNavigationScope]="route"
-                      [navigation]="handle"
+                      [navigation]="this"
                       [emitter]="focusedRouteEmitter()"
                     >
                       <ng-container
-                        *ngComponentOutlet="component; inputs: { route: route, navigation: handle }"
+                        *ngComponentOutlet="component; inputs: { route: route, navigation: this }"
                       />
                     </ng-container>
                   }
@@ -206,7 +207,7 @@ let drawerInstanceCounter = 0;
     }
   `,
 })
-export class Drawer implements AfterContentInit, OnDestroy {
+export class Drawer implements AfterContentInit, OnDestroy, IDrawerNavigatorHandle {
   @ContentChildren(DrawerScreenDirective)
   private readonly drawerScreenChildren!: QueryList<DrawerScreenDirective>;
   @ContentChild('drawerContent', { read: TemplateRef })
@@ -244,23 +245,21 @@ export class Drawer implements AfterContentInit, OnDestroy {
   // matching field for why).
   private dragStartProgress = 0;
 
-  readonly handle: IDrawerNavigatorHandle = {
-    openDrawer: () => {
-      this.animateProgressTo(true);
-      this.dispatch({ type: 'openDrawer' });
-    },
-    closeDrawer: () => {
-      this.animateProgressTo(false);
-      this.dispatch({ type: 'closeDrawer' });
-    },
-    toggleDrawer: () => {
-      this.animateProgressTo(!(this.stateSignal()?.isOpen ?? false));
-      this.dispatch({ type: 'toggleDrawer' });
-    },
-    jumpTo: name => {
-      this.dispatch({ type: 'jumpTo', name });
-      if (this.stateSignal()?.isOpen) this.animateProgressTo(false);
-    },
+  readonly openDrawer = (): void => {
+    this.animateProgressTo(true);
+    this.dispatch({ type: 'openDrawer' });
+  };
+  readonly closeDrawer = (): void => {
+    this.animateProgressTo(false);
+    this.dispatch({ type: 'closeDrawer' });
+  };
+  readonly toggleDrawer = (): void => {
+    this.animateProgressTo(!(this.stateSignal()?.isOpen ?? false));
+    this.dispatch({ type: 'toggleDrawer' });
+  };
+  readonly jumpTo = (name: string): void => {
+    this.dispatch({ type: 'jumpTo', name });
+    if (this.stateSignal()?.isOpen) this.animateProgressTo(false);
   };
 
   readonly panResponder = PanResponder.create({
@@ -528,7 +527,7 @@ export class Drawer implements AfterContentInit, OnDestroy {
     route: IRoute<unknown>,
   ): IDrawerScreenOptions {
     if (typeof entry.options === 'function') {
-      const props: IDrawerScreenComponentProps = { route, navigation: this.handle };
+      const props: IDrawerScreenComponentProps = { route, navigation: this };
       return (entry.options as IDrawerScreenOptionsResolver)(props);
     }
     return entry.options ?? {};
@@ -556,9 +555,9 @@ export class Drawer implements AfterContentInit, OnDestroy {
       if (entry === undefined) continue;
       descriptors[route.key] = {
         options: this.resolveDrawerScreenOptions(entry, route),
-        navigation: this.handle,
+        navigation: this,
       };
     }
-    return { $implicit: { state: currentState, descriptors, navigation: this.handle } };
+    return { $implicit: { state: currentState, descriptors, navigation: this } };
   }
 }

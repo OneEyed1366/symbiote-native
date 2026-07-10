@@ -148,7 +148,7 @@ async function mountDrawer(): Promise<IDrawerNavigatorHandle> {
   await tick();
   const host = capturedHost;
   if (!host) throw new Error('DrawerTestHost never mounted');
-  return host.nav.handle;
+  return host.nav;
 }
 
 describe('Angular Drawer navigator', () => {

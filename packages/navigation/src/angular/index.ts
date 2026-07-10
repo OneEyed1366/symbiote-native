@@ -17,13 +17,19 @@ export type {
 } from './screen.directive';
 export type { IScreenOptions, IStackAnimation, IStackPresentation } from '../core';
 
-export { useNavigation, useRoute, useIsFocused, useFocusEffect, useNavigationState } from './hooks';
-export type { INavigationHandle, IFocusEffectCallback } from './hooks';
+export {
+  injectNavigation,
+  injectRoute,
+  injectIsFocused,
+  injectFocusEffect,
+  injectNavigationState,
+} from './injectors';
+export type { INavigationHandle, IFocusEffectCallback } from './injectors';
 export { NavigationContextService } from './navigation-context.service';
 export type { IAnyNavigatorHandle } from './navigation-context.service';
 export { NavigationScopeDirective } from './navigation-scope.directive';
 
-export { useLinkingIntegration } from './linking';
+export { injectLinkingIntegration } from './linking';
 export type { ILinkingConfig, IScreenLinkingConfig } from '../core';
 
 // Tab: the bottom-tabs navigator, a PURE-JS UI (no react-native-screens views involved, so no

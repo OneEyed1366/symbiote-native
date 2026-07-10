@@ -35,8 +35,9 @@ export class NavigationContextService {
   // `route` is the one field that legitimately changes over a mounted screen's lifetime (a
   // setParams call swaps in a new route OBJECT with the same key/name) while the screen itself
   // stays mounted — a plain field would go stale the moment a consumer reads it once (e.g. in a
-  // constructor, the natural `inject()` call site). A signal lets `useRoute()` (./hooks/use-route)
-  // hand back a live, reactive value with zero per-consumer subscription plumbing, matching this
+  // constructor, the natural `inject()` call site). A signal lets `injectRoute()`
+  // (./injectors/inject-route) hand back a live, reactive value with zero per-consumer
+  // subscription plumbing, matching this
   // package's zoneless/signals-first convention. `navigation`/`emitter` are stable for a screen's
   // whole lifetime, so they stay plain fields — no reactivity needed there.
   private readonly routeSignal = signal<IRoute<unknown> | undefined>(undefined);

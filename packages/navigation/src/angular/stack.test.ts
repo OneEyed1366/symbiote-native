@@ -181,7 +181,7 @@ async function mountStack(): Promise<INavigatorHandle> {
   await tick();
   const host = capturedHost;
   if (!host) throw new Error('StackTestHost never mounted');
-  return host.nav.handle;
+  return host.nav;
 }
 
 // Dedicated hosts (fixed component wiring declared up front, mirroring react/stack.test.tsx's
@@ -228,7 +228,7 @@ async function mountParamsStack(): Promise<INavigatorHandle> {
   await tick();
   const host = capturedParamsHost;
   if (!host) throw new Error('ParamsStackTestHost never mounted');
-  return host.nav.handle;
+  return host.nav;
 }
 
 @Component({

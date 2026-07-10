@@ -99,7 +99,7 @@ async function mountTab(): Promise<ITabNavigatorHandle> {
   await tick();
   const host = capturedHost;
   if (!host) throw new Error('TabTestHost never mounted');
-  return host.nav.handle;
+  return host.nav;
 }
 
 function tabItemNodes(): IFakeNode[] {

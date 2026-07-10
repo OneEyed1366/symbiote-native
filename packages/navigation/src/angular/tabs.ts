@@ -1,10 +1,11 @@
 // Tab, the Angular lifecycle half. The focused-index router (tab-router-state) and the tab-bar
 // Descriptor builder (render-tabs) live in @symbiote-native/navigation core, shared verbatim with
 // the React/Vue adapters; here Angular supplies the lifecycle — a signal for the focused index, a
-// per-instance counter for route-key generation, `handle` as a plain object of methods (no ref
-// forwarding needed — see stack.ts's header) — plus the descriptor bridge
-// (`symbiote-descriptor-outlet`, `@symbiote-native/angular`) for the tab-bar leaf, exactly like
-// Stack bridges its header config. Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints
+// per-instance counter for route-key generation, `jumpTo`/`setParams` as plain public methods
+// directly on the class (no ref forwarding needed, see stack.ts's header, same reasoning: `Tab
+// implements ITabNavigatorHandle`) - plus the descriptor bridge (`symbiote-descriptor-outlet`,
+// `@symbiote-native/angular`) for the tab-bar leaf, exactly like Stack bridges its header config.
+// Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints
 // ordinary `symbiote-view`/`symbiote-text` primitives via the shared render fn, so there is no
 // react-native-screens ViewConfig to register — Tab needs no `../register` import. Every tag this
 // template names (`View`, `symbiote-descriptor-outlet`) is a REAL imported Angular component (no
@@ -73,11 +74,11 @@ let tabInstanceCounter = 0;
           @if (componentForRoute(route); as component) {
             <ng-container
               [symbioteNavigationScope]="route"
-              [navigation]="handle"
+              [navigation]="this"
               [emitter]="focusedRouteEmitter()"
             >
               <ng-container
-                *ngComponentOutlet="component; inputs: { route: route, navigation: handle }"
+                *ngComponentOutlet="component; inputs: { route: route, navigation: this }"
               />
             </ng-container>
           }
@@ -87,7 +88,7 @@ let tabInstanceCounter = 0;
     </View>
   `,
 })
-export class Tab implements AfterContentInit, OnDestroy {
+export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
   @ContentChildren(TabScreenDirective)
   private readonly tabScreenChildren!: QueryList<TabScreenDirective>;
 
@@ -109,10 +110,10 @@ export class Tab implements AfterContentInit, OnDestroy {
   private currentEmitterKey: string | undefined;
   private currentEmitter: INavigationEmitter | undefined;
 
-  readonly handle: ITabNavigatorHandle = {
-    jumpTo: (name, params) => this.dispatch({ type: 'jumpTo', name, params }),
-    setParams: (key, params) => this.dispatch({ type: 'setParams', key, params }),
-  };
+  readonly jumpTo = (name: string, params?: unknown): void =>
+    this.dispatch({ type: 'jumpTo', name, params });
+  readonly setParams = (key: string, params: unknown): void =>
+    this.dispatch({ type: 'setParams', key, params });
 
   ngAfterContentInit(): void {
     this.rebuildRegistry();
@@ -156,7 +157,7 @@ export class Tab implements AfterContentInit, OnDestroy {
   }
 
   private resolveTabOptions(entry: TabScreenDirective, route: IRoute<unknown>): ITabOptions {
-    const props: ITabScreenComponentProps = { route, navigation: this.handle };
+    const props: ITabScreenComponentProps = { route, navigation: this };
     const own =
       typeof entry.options === 'function'
         ? (entry.options as ITabScreenOptionsResolver)(props)
@@ -216,7 +217,7 @@ export class Tab implements AfterContentInit, OnDestroy {
         activeTintColor: options.tabBarActiveTintColor,
         inactiveTintColor: options.tabBarInactiveTintColor,
         passthrough: {
-          onPress: () => this.handle.jumpTo(route.name),
+          onPress: () => this.jumpTo(route.name),
           accessibilityRole: 'tab',
           accessibilityState: { selected: focused },
         },

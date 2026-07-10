@@ -1,10 +1,9 @@
-// Co-located Angular-driven test for the navigation hooks layer (./index). Mirrors
+// Co-located Angular-driven test for the navigation injectors layer (./index). Mirrors
 // ../stack.test.ts's fixture (an injected codegen-shaped RNSScreen ViewConfig exposing
-// onAppear/onDisappear) and drives the same native events stack.ts wires to emit 'focus'/'blur' —
-// proving the hooks react to the real RNS lifecycle, not to a synthetic shortcut. Each hook is
-// `inject()`-based, so it is called once per screen component's own constructor (the natural
-// Angular injection-context call site, the twin of "only call a React hook at the top of a
-// component").
+// onAppear/onDisappear) and drives the same native events stack.ts wires to emit 'focus'/'blur' -
+// proving the injectors react to the real RNS lifecycle, not to a synthetic shortcut. Each
+// injector calls `inject()`, so it is called once per screen component's own constructor (the
+// natural Angular injection-context call site).
 
 import '@angular/compiler';
 import {
@@ -23,7 +22,13 @@ import { Stack } from '../stack';
 import type { INavigatorHandle } from '../stack';
 import { ScreenDirective } from '../screen.directive';
 import type { IRoute, INavigatorState } from '../../core';
-import { useFocusEffect, useIsFocused, useNavigation, useNavigationState, useRoute } from './index';
+import {
+  injectFocusEffect,
+  injectIsFocused,
+  injectNavigation,
+  injectNavigationState,
+  injectRoute,
+} from './index';
 import type { INavigationHandle } from './index';
 
 const ROOT_TAG = 5130;
@@ -91,7 +96,7 @@ class IsFocusedScreenComponent {
   @Input() navigation!: INavigatorHandle;
 
   constructor() {
-    capturedIsFocused = useIsFocused();
+    capturedIsFocused = injectIsFocused();
   }
 }
 
@@ -108,7 +113,7 @@ class FocusEffectScreenComponent {
   @Input() navigation!: INavigatorHandle;
 
   constructor() {
-    useFocusEffect(() => {
+    injectFocusEffect(() => {
       focusEffectEvents.push('effect');
       return () => focusEffectEvents.push('cleanup');
     });
@@ -130,8 +135,8 @@ class NavigationRouteScreenComponent {
   @Input() navigation!: INavigatorHandle;
 
   constructor() {
-    capturedNavigation = useNavigation();
-    capturedRoute = useRoute();
+    capturedNavigation = injectNavigation();
+    capturedRoute = injectRoute();
     capturedNavigation.addListener('focus', () => focusListenerEvents.push('focus'));
   }
 }
@@ -149,14 +154,14 @@ class NavigationStateScreenComponent {
   @Input() navigation!: INavigatorHandle;
 
   constructor() {
-    capturedRouteCount = useNavigationState((state: INavigatorState) => state.routes.length);
+    capturedRouteCount = injectNavigationState((state: INavigatorState) => state.routes.length);
   }
 }
 
-let capturedHost: HooksTestHost | undefined;
+let capturedHost: InjectorsTestHost | undefined;
 
 @Component({
-  selector: 'hooks-test-host',
+  selector: 'injectors-test-host',
   standalone: true,
   imports: [Stack, ScreenDirective],
   template: `
@@ -166,7 +171,7 @@ let capturedHost: HooksTestHost | undefined;
     </Stack>
   `,
 })
-class HooksTestHost {
+class InjectorsTestHost {
   @ViewChild('nav') nav!: Stack;
 
   @Input() homeComponent: Type<unknown> = PlainScreenComponent;
@@ -178,11 +183,11 @@ class HooksTestHost {
   }
 }
 
-describe('Angular navigation hooks', () => {
-  it("useIsFocused reflects the route's native appear/disappear events", async () => {
+describe('Angular navigation injectors', () => {
+  it("injectIsFocused reflects the route's native appear/disappear events", async () => {
     capturedIsFocused = undefined;
     capturedHost = undefined;
-    mount(ROOT_TAG, HooksTestHost, {
+    mount(ROOT_TAG, InjectorsTestHost, {
       initialProps: { homeComponent: IsFocusedScreenComponent },
     });
     await tick();
@@ -198,10 +203,10 @@ describe('Angular navigation hooks', () => {
     expect(capturedIsFocused?.()).toBe(false);
   });
 
-  it('useFocusEffect runs its effect on focus and its cleanup on blur', async () => {
+  it('injectFocusEffect runs its effect on focus and its cleanup on blur', async () => {
     focusEffectEvents.length = 0;
     capturedHost = undefined;
-    mount(ROOT_TAG, HooksTestHost, {
+    mount(ROOT_TAG, InjectorsTestHost, {
       initialProps: { homeComponent: FocusEffectScreenComponent },
     });
     await tick();
@@ -217,17 +222,17 @@ describe('Angular navigation hooks', () => {
     expect(focusEffectEvents).toEqual(['effect', 'cleanup']);
   });
 
-  it('useNavigation().addListener fires on focus and useRoute exposes name/params', async () => {
+  it('injectNavigation().addListener fires on focus and injectRoute exposes name/params', async () => {
     capturedNavigation = undefined;
     capturedRoute = undefined;
     focusListenerEvents.length = 0;
     capturedHost = undefined;
-    mount(ROOT_TAG, HooksTestHost, {
+    mount(ROOT_TAG, InjectorsTestHost, {
       initialProps: { detailsComponent: NavigationRouteScreenComponent },
     });
     await tick();
 
-    capturedHost!.nav.handle.push('Details', { id: 7 });
+    capturedHost!.nav.push('Details', { id: 7 });
     await tick();
     expect(capturedRoute?.().name).toBe('Details');
     expect(capturedRoute?.().params).toEqual({ id: 7 });
@@ -238,20 +243,20 @@ describe('Angular navigation hooks', () => {
     expect(focusListenerEvents).toEqual(['focus']);
   });
 
-  it('useNavigationState reflects the route stack growing/shrinking across push/pop', async () => {
+  it('injectNavigationState reflects the route stack growing/shrinking across push/pop', async () => {
     capturedRouteCount = undefined;
     capturedHost = undefined;
-    mount(ROOT_TAG, HooksTestHost, {
+    mount(ROOT_TAG, InjectorsTestHost, {
       initialProps: { homeComponent: NavigationStateScreenComponent },
     });
     await tick();
     expect(capturedRouteCount?.()).toBe(1);
 
-    capturedHost!.nav.handle.push('Details');
+    capturedHost!.nav.push('Details');
     await tick();
     expect(capturedRouteCount?.()).toBe(2);
 
-    capturedHost!.nav.handle.pop();
+    capturedHost!.nav.pop();
     await tick();
     expect(capturedRouteCount?.()).toBe(1);
   });
