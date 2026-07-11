@@ -10,15 +10,10 @@
 import { onMounted, onUnmounted, ref } from '@vue/runtime-core';
 import type { Ref } from '@vue/runtime-core';
 import { NAVIGATION_EVENT_BLUR, NAVIGATION_EVENT_FOCUS } from '../../core';
-import { injectNavigationScope } from '../navigation-context';
+import { requireNavigationScope } from '../navigation-context';
 
 export function useIsFocused(): Ref<boolean> {
-  const scope = injectNavigationScope();
-  if (scope === undefined) {
-    throw new Error(
-      'useIsFocused must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>',
-    );
-  }
+  const scope = requireNavigationScope('useIsFocused');
   const isFocused = ref(false);
   let unsubscribeFocus: (() => void) | undefined;
   let unsubscribeBlur: (() => void) | undefined;

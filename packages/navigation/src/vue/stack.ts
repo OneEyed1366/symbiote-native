@@ -10,11 +10,10 @@
 // non-React adapter); the native views are driven directly through the ViewConfig ../register
 // registers. See CLAUDE.md <third_party_rn_packages_are_react_only>.
 
-import { defineComponent, h, ref, useId } from '@vue/runtime-core';
+import { defineComponent, h, shallowRef, useId } from '@vue/runtime-core';
 import type { VNode } from '@vue/runtime-core';
 import { descriptorToVue, normalizeVueAttrs } from '@symbiote-native/vue';
 import { Platform, debugNodeId, dlog, isSymbioteNode } from '@symbiote-native/engine';
-import type { ISymbioteEvent } from '@symbiote-native/engine';
 import {
   NAVIGATION_EVENT_BLUR,
   NAVIGATION_EVENT_FOCUS,
@@ -28,47 +27,29 @@ import {
   SCREEN_ON_HEADER_BACK_BUTTON_CLICKED,
   SCREEN_ON_WILL_APPEAR,
   SCREEN_ON_WILL_DISAPPEAR,
-  SEARCH_BAR_ON_BLUR,
-  SEARCH_BAR_ON_CANCEL_BUTTON_PRESS,
-  SEARCH_BAR_ON_CHANGE_TEXT,
-  SEARCH_BAR_ON_CLOSE,
-  SEARCH_BAR_ON_FOCUS,
-  SEARCH_BAR_ON_OPEN,
-  SEARCH_BAR_ON_SEARCH_BUTTON_PRESS,
   STACK_ON_FINISH_TRANSITIONING,
   buildSearchBarHandle,
+  buildSearchBarPassthrough,
   computeActivityState,
   createInitialNavigatorState,
   createNavigationEmitter,
-  isHeaderInModal,
+  isRecord,
   navigatorReducer,
-  renderHeaderConfig,
-  resolveHeaderConfigView,
-  resolveHeaderInModalScreenStyle,
-  resolveHeaderInModalStackStyle,
-  resolveScreenContentWrapperStyle,
-  resolveScreenProps,
-  resolveScreenView,
-  resolveScreenViewName,
-  resolveSearchBarProps,
-  resolveSearchBarView,
+  resolveScreenRenderPlan,
   resolveStackProps,
 } from '../core';
-import type { INavigationEmitter, INavigatorPlatform, INavigatorState, IRoute } from '../core';
+import type {
+  INavigationEmitter,
+  INavigatorHandle,
+  INavigatorPlatform,
+  INavigatorState,
+  IRoute,
+} from '../core';
 import { NavigationScope, injectNavigationScope } from './navigation-context';
 import { Screen } from './screen';
 import type { IScreenComponentProps, IScreenProps, IVueScreenOptions } from './screen';
 
-export type INavigatorHandle = {
-  push: (name: string, params?: unknown) => void;
-  pop: (count?: number) => void;
-  popToTop: () => void;
-  popTo: (key: string) => void;
-  replace: (name: string, params?: unknown) => void;
-  setParams: (params: unknown, key?: string) => void;
-  reset: (state: INavigatorState) => void;
-  canGoBack: () => boolean;
-};
+export type { INavigatorHandle } from '../core';
 
 // React's `children?: ReactNode` becomes Vue's default slot instead (registered screens, read via
 // collectRegistry below) — same split Modal's IModalProps documents.
@@ -87,10 +68,6 @@ type IScreenRegistryEntry = {
   options: IScreenProps['options'];
   initialParams: unknown;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
@@ -194,7 +171,7 @@ const StackImpl = defineComponent<IStackProps>(
       );
     }
 
-    const state = ref<INavigatorState>(initialState);
+    const state = shallowRef<INavigatorState>(initialState);
 
     function dispatch(action: Parameters<typeof navigatorReducer>[1]): void {
       state.value = navigatorReducer(state.value, action);
@@ -264,8 +241,15 @@ const StackImpl = defineComponent<IStackProps>(
 
         const routeEmitter = emitterFor(route.key);
 
-        const screenProps = resolveScreenProps(
-          resolveScreenView(route.key, activityState, mergedOptions, {
+        const searchBarOptions = mergedOptions.headerSearchBarOptions;
+        const plan = resolveScreenRenderPlan({
+          screenId: route.key,
+          index,
+          routeCount: state.value.routes.length,
+          options: mergedOptions,
+          platform: NAVIGATOR_PLATFORM,
+          isAndroid: Platform.OS === 'android',
+          screenPassthrough: {
             [SCREEN_ON_DISMISSED]: () => dispatch({ type: 'pop', count: 1 }),
             [SCREEN_ON_HEADER_BACK_BUTTON_CLICKED]: () => dispatch({ type: 'pop', count: 1 }),
             // onAppear/onDisappear are the definitive visibility boundary (post-transition-
@@ -284,57 +268,12 @@ const StackImpl = defineComponent<IStackProps>(
               dlog(`Stack: route "${route.name}" disappeared (blur) at t=${Date.now()}`);
               routeEmitter.emit(NAVIGATION_EVENT_BLUR);
             },
-          }),
-        );
-        // Investigation instrumentation (flicker-on-focus bug): the actual timing/z-order-relevant
-        // values resolved onto the native RNSScreen, once per route.key (not every render) —
-        // rules a stackAnimation/transitionDuration mismatch against react-native-screens' own
-        // native default in or out. Kept behind DEBUG, never removed.
-        if (!loggedScreenPropKeys.has(route.key)) {
-          loggedScreenPropKeys.add(route.key);
-          dlog(
-            `Stack: route "${route.name}" resolved screen props ` +
-              `stackAnimation=${String(screenProps.stackAnimation)} ` +
-              `stackPresentation=${String(screenProps.stackPresentation)} ` +
-              `transitionDuration=${String(screenProps.transitionDuration)} ` +
-              `gestureEnabled=${String(screenProps.gestureEnabled)} at t=${Date.now()}`,
-          );
-        }
-        const searchBarProps = mergedOptions.headerSearchBarOptions
-          ? resolveSearchBarProps(
-              resolveSearchBarView(mergedOptions.headerSearchBarOptions, {
-                [SEARCH_BAR_ON_FOCUS]: () => {
-                  dlog(`Stack: route "${route.name}" search bar focused`);
-                  mergedOptions.headerSearchBarOptions?.onFocus?.();
-                },
-                [SEARCH_BAR_ON_BLUR]: () => {
-                  dlog(`Stack: route "${route.name}" search bar blurred`);
-                  mergedOptions.headerSearchBarOptions?.onBlur?.();
-                },
-                [SEARCH_BAR_ON_CHANGE_TEXT]: (event: ISymbioteEvent) => {
-                  const { text } = event.nativeEvent;
-                  const changedText = typeof text === 'string' ? text : '';
-                  dlog(`Stack: route "${route.name}" search text changed: ${changedText}`);
-                  mergedOptions.headerSearchBarOptions?.onChangeText?.(changedText);
-                },
-                [SEARCH_BAR_ON_SEARCH_BUTTON_PRESS]: (event: ISymbioteEvent) => {
-                  const { text } = event.nativeEvent;
-                  const pressedText = typeof text === 'string' ? text : '';
-                  dlog(`Stack: route "${route.name}" search button pressed: ${pressedText}`);
-                  mergedOptions.headerSearchBarOptions?.onSearchButtonPress?.(pressedText);
-                },
-                [SEARCH_BAR_ON_CANCEL_BUTTON_PRESS]: () => {
-                  dlog(`Stack: route "${route.name}" search bar cancel pressed`);
-                  mergedOptions.headerSearchBarOptions?.onCancelButtonPress?.();
-                },
-                [SEARCH_BAR_ON_CLOSE]: () => {
-                  dlog(`Stack: route "${route.name}" search bar closed`);
-                  mergedOptions.headerSearchBarOptions?.onClose?.();
-                },
-                [SEARCH_BAR_ON_OPEN]: () => {
-                  dlog(`Stack: route "${route.name}" search bar opened`);
-                  mergedOptions.headerSearchBarOptions?.onOpen?.();
-                },
+          },
+          searchBarPassthrough: searchBarOptions
+            ? {
+                ...buildSearchBarPassthrough(searchBarOptions, message =>
+                  dlog(`Stack: route "${route.name}" ${message}`),
+                ),
                 // The imperative ref (SearchBarCommands): a function ref attached straight to the
                 // RNSSearchBar host element via `passthrough.ref` — descriptorToVue's h() call
                 // hands the raw engine node to a plain function ref same as Switch/TextInput's
@@ -351,56 +290,48 @@ const StackImpl = defineComponent<IStackProps>(
                   dlog(
                     `Stack: search bar ref callback, node=${node === null ? 'null' : debugNodeId(node)} at t=${Date.now()}`,
                   );
-                  const appRef = mergedOptions.headerSearchBarOptions?.ref;
+                  const appRef = searchBarOptions.ref;
                   if (appRef === undefined) return;
                   appRef.value = node === null ? null : buildSearchBarHandle(() => node);
                 },
-              }),
-            )
-          : undefined;
-        const headerConfig = renderHeaderConfig(
-          resolveHeaderConfigView(mergedOptions, NAVIGATOR_PLATFORM),
-          searchBarProps,
-        );
+              }
+            : undefined,
+        });
+        // Investigation instrumentation (flicker-on-focus bug): the actual timing/z-order-relevant
+        // values resolved onto the native RNSScreen, once per route.key (not every render) —
+        // rules a stackAnimation/transitionDuration mismatch against react-native-screens' own
+        // native default in or out. Kept behind DEBUG, never removed.
+        if (!loggedScreenPropKeys.has(route.key)) {
+          loggedScreenPropKeys.add(route.key);
+          dlog(
+            `Stack: route "${route.name}" resolved screen props ` +
+              `stackAnimation=${String(plan.screenProps.stackAnimation)} ` +
+              `stackPresentation=${String(plan.screenProps.stackPresentation)} ` +
+              `transitionDuration=${String(plan.screenProps.transitionDuration)} ` +
+              `gestureEnabled=${String(plan.screenProps.gestureEnabled)} at t=${Date.now()}`,
+          );
+        }
 
         // Must not be flattened away (collapsable: false) — react-native-screens' native side
         // finds THIS specific view type by class check to register a formSheet's content for
         // sizing (see RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME's comment in core/constants.ts). A
         // `push` screen doesn't need it, but a `formSheet` one is otherwise left with no content
         // ever attached natively.
-        const content = h(
-          RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME,
-          {
-            style: resolveScreenContentWrapperStyle(
-              mergedOptions.stackPresentation,
-              mergedOptions.headerShown === false,
-              mergedOptions.headerTranslucent,
-              Platform.OS === 'android',
-            ),
-            collapsable: false,
-          },
-          [
-            h(
-              NavigationScope,
-              {
-                value: {
-                  route,
-                  navigation: handle,
-                  emitter: routeEmitter,
-                  parent: ambientScopeRef?.value,
-                },
+        const content = h(RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME, plan.contentWrapperProps, [
+          h(
+            NavigationScope,
+            {
+              value: {
+                route,
+                navigation: handle,
+                emitter: routeEmitter,
+                parent: ambientScopeRef?.value,
               },
-              () => h(entry.component, screenComponentProps),
-            ),
-          ],
-        );
+            },
+            () => h(entry.component, screenComponentProps),
+          ),
+        ]);
 
-        const isAndroid = Platform.OS === 'android';
-        const inModal = isHeaderInModal(
-          mergedOptions.stackPresentation,
-          mergedOptions.headerShown === false,
-          isAndroid,
-        );
         // react-native-screens' own Screen.tsx swaps in a DIFFERENT Fabric component
         // ('RNSModalScreen') for a modally-presented screen — its native updateLayoutMetrics:
         // relies on this exact class to know it must NOT apply Yoga's computed frame (see
@@ -408,32 +339,28 @@ const StackImpl = defineComponent<IStackProps>(
         // isHeaderInModal adds below is always plain 'RNSScreen': react-native-screens' own inner
         // Screen never carries a presentation prop either, since it exists purely to host the
         // header, not to be modally presented itself.
-        const outerScreenViewName = resolveScreenViewName(
-          mergedOptions.stackPresentation,
-          isAndroid,
-        );
 
         // A modal/formSheet screen has no UINavigationController of its own on iOS — nest an
         // inner RNSScreenStack/RNSScreen purely to host the native header bar (see
         // isHeaderInModal's comment in core/render-stack.ts). Skipping this leaves
         // RNSScreenStackHeaderConfig with no navigation controller to attach to, so the header
         // silently never renders.
-        return inModal
-          ? h(outerScreenViewName, { key: route.key, ...screenProps }, [
-              h(RNS_SCREEN_STACK_VIEW_NAME, { style: resolveHeaderInModalStackStyle() }, [
+        return plan.inModal
+          ? h(plan.screenViewName, { key: route.key, ...plan.screenProps }, [
+              h(RNS_SCREEN_STACK_VIEW_NAME, { style: plan.innerStackStyle }, [
                 h(
                   RNS_SCREEN_VIEW_NAME,
                   // activityState mirrors the outer Screen's own value — react-native-screens'
                   // RNSScreen.mm treats an unset/inactive nested screen as not yet pushed,
                   // leaving it parked at its pre-push transition position (off past the bottom
                   // edge) instead of its real, presented frame.
-                  { style: resolveHeaderInModalScreenStyle(), activityState },
-                  [descriptorToVue(headerConfig), content],
+                  { style: plan.innerScreenStyle, activityState: plan.activityState },
+                  [descriptorToVue(plan.headerConfig), content],
                 ),
               ]),
             ])
-          : h(outerScreenViewName, { key: route.key, ...screenProps }, [
-              descriptorToVue(headerConfig),
+          : h(plan.screenViewName, { key: route.key, ...plan.screenProps }, [
+              descriptorToVue(plan.headerConfig),
               content,
             ]);
       });

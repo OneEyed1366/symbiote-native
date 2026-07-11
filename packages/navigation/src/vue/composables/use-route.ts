@@ -6,14 +6,9 @@
 import { computed } from '@vue/runtime-core';
 import type { ComputedRef } from '@vue/runtime-core';
 import type { IRoute } from '../../core';
-import { injectNavigationScope } from '../navigation-context';
+import { requireNavigationScope } from '../navigation-context';
 
 export function useRoute(): ComputedRef<IRoute<unknown>> {
-  const scope = injectNavigationScope();
-  if (scope === undefined) {
-    throw new Error(
-      'useRoute must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>',
-    );
-  }
+  const scope = requireNavigationScope('useRoute');
   return computed(() => scope.value.route);
 }

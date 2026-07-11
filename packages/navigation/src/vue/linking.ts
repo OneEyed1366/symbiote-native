@@ -21,8 +21,7 @@ import type { Ref } from '@vue/runtime-core';
 import { Linking, dlog } from '@symbiote-native/engine';
 import type { IEventSubscription, IUrlEvent } from '@symbiote-native/engine';
 import { resolveRouteFromUrl } from '../core';
-import type { ILinkingConfig } from '../core';
-import type { INavigatorHandle } from './stack';
+import type { ILinkingConfig, INavigatorHandle } from '../core';
 
 export function useLinkingIntegration(
   config: ILinkingConfig,

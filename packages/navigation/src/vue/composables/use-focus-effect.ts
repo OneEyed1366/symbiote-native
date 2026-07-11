@@ -8,15 +8,10 @@
 
 import { onMounted, onUnmounted } from '@vue/runtime-core';
 import { NAVIGATION_EVENT_BLUR, NAVIGATION_EVENT_FOCUS } from '../../core';
-import { injectNavigationScope } from '../navigation-context';
+import { requireNavigationScope } from '../navigation-context';
 
 export function useFocusEffect(effect: () => (() => void) | void): void {
-  const scope = injectNavigationScope();
-  if (scope === undefined) {
-    throw new Error(
-      'useFocusEffect must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>',
-    );
-  }
+  const scope = requireNavigationScope('useFocusEffect');
 
   let cleanup: (() => void) | void;
   let unsubscribeFocus: (() => void) | undefined;

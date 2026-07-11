@@ -9,7 +9,7 @@
 import { computed } from '@vue/runtime-core';
 import type { ComputedRef } from '@vue/runtime-core';
 import type { INavigationEventListener, INavigationEventName } from '../../core';
-import { injectNavigationScope } from '../navigation-context';
+import { requireNavigationScope } from '../navigation-context';
 import type { IAnyNavigatorHandle } from '../navigation-context';
 
 export type INavigationHandle = IAnyNavigatorHandle & {
@@ -25,12 +25,7 @@ export type INavigationHandle = IAnyNavigatorHandle & {
 };
 
 export function useNavigation(): ComputedRef<INavigationHandle> {
-  const scope = injectNavigationScope();
-  if (scope === undefined) {
-    throw new Error(
-      'useNavigation must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>',
-    );
-  }
+  const scope = requireNavigationScope('useNavigation');
   return computed(() => {
     const { navigation, emitter, parent } = scope.value;
     return { ...navigation, addListener: emitter.addListener, getParent: () => parent?.navigation };

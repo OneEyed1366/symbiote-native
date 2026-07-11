@@ -11,15 +11,11 @@
 // selector reading e.g. `state.routes.at(-1)?.name` still resolves correctly on first paint for
 // the common single-route case, closing the same async gap useIsFocused documents.
 
-import { onMounted, onUnmounted, ref } from '@vue/runtime-core';
-import type { Ref } from '@vue/runtime-core';
+import { onMounted, onUnmounted, shallowRef } from '@vue/runtime-core';
+import type { ShallowRef } from '@vue/runtime-core';
 import type { INavigatorState } from '../../core';
-import { NAVIGATION_EVENT_STATE } from '../../core';
-import { injectNavigationScope } from '../navigation-context';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
+import { NAVIGATION_EVENT_STATE, isRecord } from '../../core';
+import { requireNavigationScope } from '../navigation-context';
 
 function isNavigatorState(value: unknown): value is INavigatorState {
   return isRecord(value) && Array.isArray(value.routes);
@@ -27,14 +23,9 @@ function isNavigatorState(value: unknown): value is INavigatorState {
 
 export function useNavigationState<TResult>(
   selector: (state: INavigatorState) => TResult,
-): Ref<TResult> {
-  const scope = injectNavigationScope();
-  if (scope === undefined) {
-    throw new Error(
-      'useNavigationState must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>',
-    );
-  }
-  const result = ref(selector({ routes: [scope.value.route] })) as Ref<TResult>;
+): ShallowRef<TResult> {
+  const scope = requireNavigationScope('useNavigationState');
+  const result = shallowRef<TResult>(selector({ routes: [scope.value.route] }));
   let unsubscribe: (() => void) | undefined;
 
   onMounted(() => {

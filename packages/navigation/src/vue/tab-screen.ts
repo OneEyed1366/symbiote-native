@@ -7,8 +7,7 @@
 
 import { defineComponent } from '@vue/runtime-core';
 import type { Component } from '@vue/runtime-core';
-import type { IRoute, ITabOptions } from '../core';
-import type { ITabNavigatorHandle } from './tabs';
+import type { IRoute, ITabOptions, ITabNavigatorHandle } from '../core';
 
 export type ITabScreenComponentProps = {
   route: IRoute<unknown>;

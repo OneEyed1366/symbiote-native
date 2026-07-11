@@ -9,8 +9,12 @@
 import { defineComponent } from '@vue/runtime-core';
 import type { Component, Ref } from '@vue/runtime-core';
 import type { IRoute } from '../core';
-import type { ISearchBarCommands, ISearchBarOptions, IScreenOptions } from '../core';
-import type { INavigatorHandle } from './stack';
+import type {
+  ISearchBarCommands,
+  ISearchBarOptions,
+  IScreenOptions,
+  INavigatorHandle,
+} from '../core';
 
 export type IScreenComponentProps = {
   route: IRoute<unknown>;

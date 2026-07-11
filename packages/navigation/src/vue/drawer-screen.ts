@@ -8,8 +8,7 @@
 
 import { defineComponent } from '@vue/runtime-core';
 import type { Component } from '@vue/runtime-core';
-import type { IDrawerScreenOptions, IRoute } from '../core';
-import type { IDrawerNavigatorHandle } from './drawer';
+import type { IDrawerScreenOptions, IRoute, IDrawerNavigatorHandle } from '../core';
 
 export type IDrawerScreenComponentProps = {
   route: IRoute<unknown>;

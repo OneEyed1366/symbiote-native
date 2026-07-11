@@ -13,7 +13,7 @@ import {
   nextTick,
   onMounted,
   onUnmounted,
-  ref,
+  shallowRef,
   useId,
   watch,
 } from '@vue/runtime-core';
@@ -25,19 +25,24 @@ import {
   NAVIGATION_EVENT_FOCUS,
   createInitialTabState,
   createNavigationEmitter,
+  diffFocusedRoute,
   isFocusedRoute,
+  isRecord,
   renderTabBar,
   tabRouterReducer,
 } from '../core';
-import type { INavigationEmitter, IRoute, ITabBarItemView, ITabOptions } from '../core';
+import type {
+  INavigationEmitter,
+  IRoute,
+  ITabBarItemView,
+  ITabNavigatorHandle,
+  ITabOptions,
+} from '../core';
 import { NavigationScope, injectNavigationScope } from './navigation-context';
 import { TabScreen } from './tab-screen';
 import type { ITabScreenComponentProps, ITabScreenProps } from './tab-screen';
 
-export type ITabNavigatorHandle = {
-  jumpTo: (name: string, params?: unknown) => void;
-  setParams: (key: string, params: unknown) => void;
-};
+export type { ITabNavigatorHandle } from '../core';
 
 // React's `children?: ReactNode` becomes Vue's default slot instead (registered screens, read via
 // collectRegistry below).
@@ -51,10 +56,6 @@ type ITabRegistryEntry = {
   options: ITabScreenProps['options'];
   initialParams: unknown;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
@@ -129,7 +130,9 @@ const TabImpl = defineComponent<ITabProps>(
     const initialRoutes = buildRoutes(initialRegistry);
     if (initialRoutes.length === 0) dlog('Tab: no <Tab.Screen> children registered');
 
-    const state = ref(createInitialTabState(initialRoutes, asString(attrs.initialRouteName)));
+    const state = shallowRef(
+      createInitialTabState(initialRoutes, asString(attrs.initialRouteName)),
+    );
 
     function dispatch(action: Parameters<typeof tabRouterReducer>[1]): void {
       state.value = tabRouterReducer(state.value, action);
@@ -137,7 +140,7 @@ const TabImpl = defineComponent<ITabProps>(
 
     const jumpTo = (name: string, params?: unknown): void =>
       dispatch({ type: 'jumpTo', name, params });
-    const setParams = (key: string, params: unknown): void =>
+    const setParams = (params: unknown, key: string): void =>
       dispatch({ type: 'setParams', key, params });
 
     const handle: ITabNavigatorHandle = { jumpTo, setParams };
@@ -198,17 +201,17 @@ const TabImpl = defineComponent<ITabProps>(
     watch(
       () => focusedKeyOf(state.value),
       nextKey => {
-        if (nextKey === focusedRouteKey) return;
-        const previousKey = focusedRouteKey;
+        const { blurKey, focusKey } = diffFocusedRoute(focusedRouteKey, nextKey);
+        if (blurKey === undefined && focusKey === undefined) return;
         focusedRouteKey = nextKey;
         nextTick(() => {
-          if (previousKey !== undefined) {
-            dlog(`Tab: route "${previousKey}" blurred at t=${Date.now()}`);
-            emitterFor(previousKey).emit(NAVIGATION_EVENT_BLUR);
+          if (blurKey !== undefined) {
+            dlog(`Tab: route "${blurKey}" blurred at t=${Date.now()}`);
+            emitterFor(blurKey).emit(NAVIGATION_EVENT_BLUR);
           }
-          if (nextKey !== undefined) {
-            dlog(`Tab: route "${nextKey}" focused at t=${Date.now()}`);
-            emitterFor(nextKey).emit(NAVIGATION_EVENT_FOCUS);
+          if (focusKey !== undefined) {
+            dlog(`Tab: route "${focusKey}" focused at t=${Date.now()}`);
+            emitterFor(focusKey).emit(NAVIGATION_EVENT_FOCUS);
           }
         });
       },

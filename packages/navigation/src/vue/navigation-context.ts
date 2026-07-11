@@ -29,17 +29,8 @@
 
 import { defineComponent, inject, provide, shallowRef } from '@vue/runtime-core';
 import type { InjectionKey, ShallowRef } from '@vue/runtime-core';
-import type { INavigationEmitter, IRoute } from '../core';
-import type { INavigatorHandle } from './stack';
-import type { ITabNavigatorHandle } from './tabs';
-import type { IDrawerNavigatorHandle } from './drawer';
-
-// Every navigator kind a screen might be rendered under. A nested navigator (e.g. a Tab rendered
-// as a Stack screen's content) means a screen's OWN navigation prop and its PARENT's handle can be
-// different navigator kinds, so the provided value's `navigation` field can't stay Stack-specific.
-// Consumers narrow the union themselves (e.g. `'push' in handle` picks out a Stack handle) — no
-// `as` casts.
-export type IAnyNavigatorHandle = INavigatorHandle | ITabNavigatorHandle | IDrawerNavigatorHandle;
+import type { INavigationEmitter, IRoute, IAnyNavigatorHandle } from '../core';
+export type { IAnyNavigatorHandle };
 
 export type INavigationScopeValue = {
   route: IRoute<unknown>;
@@ -63,6 +54,20 @@ function provideNavigationScope(value: ShallowRef<INavigationScopeValue>): void 
 // nesting root) rather than an error — callers that require one throw their own message.
 export function injectNavigationScope(): ShallowRef<INavigationScopeValue> | undefined {
   return inject(NAVIGATION_SCOPE_KEY, undefined);
+}
+
+// The "throw if missing" half every composable in ./composables needs (useNavigation, useRoute,
+// useIsFocused, useFocusEffect, useNavigationState) — they all called injectNavigationScope() and
+// threw the same shaped error, differing only in which hook name the message names. Centralized
+// here so a wording change lands once instead of five times.
+export function requireNavigationScope(hookName: string): ShallowRef<INavigationScopeValue> {
+  const scope = injectNavigationScope();
+  if (scope === undefined) {
+    throw new Error(
+      `${hookName} must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>`,
+    );
+  }
+  return scope;
 }
 
 // The setup-boundary component described above. `props: ['value']` is a REQUIRED runtime

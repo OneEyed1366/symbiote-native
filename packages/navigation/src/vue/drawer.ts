@@ -24,7 +24,7 @@ import {
   nextTick,
   onMounted,
   onUnmounted,
-  ref,
+  shallowRef,
   useId,
   watch,
 } from '@vue/runtime-core';
@@ -41,23 +41,25 @@ import { dlog } from '@symbiote-native/engine';
 import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import {
   DRAWER_DEFAULT_OVERLAY_COLOR,
-  DRAWER_DEFAULT_SWIPE_ENABLED,
   NAVIGATION_EVENT_BLUR,
   NAVIGATION_EVENT_FOCUS,
   createInitialDrawerRouterState,
   createNavigationEmitter,
+  diffFocusedRoute,
   drawerChildOrder,
   drawerRouterReducer,
   isDrawerAnimated,
-  isHorizontalDrag,
-  isSwipeStartInEdge,
+  isRecord,
   renderDrawer,
+  resolveDragProgress,
   resolveDrawerGeometry,
-  resolveDrawerPosition,
-  resolveDrawerWidth,
+  resolveDrawerSlotInterpolation,
   resolveSwipeIntent,
+  shouldClaimDrawerSwipe,
 } from '../core';
 import type {
+  IDrawerDescriptorMap,
+  IDrawerNavigatorHandle,
   IDrawerOptions,
   IDrawerPosition,
   IDrawerRouterState,
@@ -71,22 +73,10 @@ import { NavigationScope, injectNavigationScope } from './navigation-context';
 import { DrawerScreen } from './drawer-screen';
 import type { IDrawerScreenComponentProps, IDrawerScreenProps } from './drawer-screen';
 
-export type IDrawerNavigatorHandle = {
-  openDrawer: () => void;
-  closeDrawer: () => void;
-  toggleDrawer: () => void;
-  jumpTo: (name: string) => void;
-};
+export type { IDrawerNavigatorHandle, IDrawerDescriptorMap } from '../core';
 
-// Keyed by route.key, mirroring @react-navigation/drawer's own `descriptors` prop shape — the
-// options the app's `drawerContent` scoped slot reads to label its menu entries (Drawer ships no
-// built-in menu UI, matching react-native-drawer-layout's Drawer primitive; see this file's
-// header). React's `renderDrawerContent` render-PROP becomes a scoped SLOT here, mirroring
-// Pressable's own `slots.default(state)` scoped-slot precedent in this codebase.
-export type IDrawerDescriptorMap = Record<
-  string,
-  { options: IDrawerScreenOptions; navigation: IDrawerNavigatorHandle }
->;
+// React's `renderDrawerContent` render-PROP becomes a scoped SLOT here, mirroring Pressable's own
+// `slots.default(state)` scoped-slot precedent in this codebase.
 
 export type IDrawerContentSlotProps = {
   state: IDrawerRouterState;
@@ -107,10 +97,6 @@ type IDrawerRegistryEntry = {
   initialParams: unknown;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
@@ -124,7 +110,7 @@ function asBoolean(value: unknown): boolean | undefined {
 }
 
 function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
-  return typeof value === 'object' && value !== null;
+  return isRecord(value);
 }
 
 const DRAWER_TYPES: ReadonlyArray<IDrawerType> = ['front', 'back', 'slide', 'permanent'];
@@ -187,28 +173,6 @@ function resolveDrawerScreenOptions(
   return entry.options ?? {};
 }
 
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value));
-}
-
-function toFiniteNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
-// The touch's real starting page-X, read off the raw event rather than gestureState.x0: the
-// engine's capture phase resets gestureState before the bubble-phase
-// onStartShouldSetPanResponder/onMoveShouldSetPanResponder callbacks below run, so x0 is only
-// populated later, inside onResponderGrant. Mirrors react/drawer.ts's startPageXOf verbatim — pure
-// JS, no framework dependency.
-function startPageXOf(event: ISymbioteEvent): number | undefined {
-  const { nativeEvent } = event;
-  const direct = toFiniteNumber(nativeEvent.pageX);
-  if (direct !== undefined) return direct;
-  const touches = nativeEvent.touches;
-  if (Array.isArray(touches) && isRecord(touches[0])) return toFiniteNumber(touches[0].pageX);
-  return undefined;
-}
-
 const DRAWER_SNAP_DURATION = 250;
 
 const DrawerImpl = defineComponent<IDrawerProps>(
@@ -251,7 +215,7 @@ const DrawerImpl = defineComponent<IDrawerProps>(
     const initialRoutes = buildRoutes(initialRegistry);
     if (initialRoutes.length === 0) dlog('Drawer: no <Drawer.Screen> children registered');
 
-    const state = ref(
+    const state = shallowRef(
       createInitialDrawerRouterState(initialRoutes, asString(attrs.initialRouteName)),
     );
 
@@ -314,36 +278,27 @@ const DrawerImpl = defineComponent<IDrawerProps>(
       onStartShouldSetPanResponder: (
         event: ISymbioteEvent,
         gestureState: IPanResponderGestureState,
-      ): boolean => {
-        const options = currentOptions();
-        if ((options.swipeEnabled ?? DRAWER_DEFAULT_SWIPE_ENABLED) === false) return false;
-        if (!isDrawerAnimated(options)) return false;
-        return isSwipeStartInEdge(
-          startPageXOf(event) ?? gestureState.x0,
+      ): boolean =>
+        shouldClaimDrawerSwipe(
+          event,
+          gestureState,
           windowDimensions.value.width,
           state.value.isOpen,
-          options,
-        );
-      },
+          currentOptions(),
+          'start',
+        ),
       onMoveShouldSetPanResponder: (
         event: ISymbioteEvent,
         gestureState: IPanResponderGestureState,
-      ): boolean => {
-        const options = currentOptions();
-        if ((options.swipeEnabled ?? DRAWER_DEFAULT_SWIPE_ENABLED) === false) return false;
-        if (!isDrawerAnimated(options)) return false;
-        if (
-          !isSwipeStartInEdge(
-            startPageXOf(event) ?? gestureState.x0,
-            windowDimensions.value.width,
-            state.value.isOpen,
-            options,
-          )
-        ) {
-          return false;
-        }
-        return isHorizontalDrag(gestureState);
-      },
+      ): boolean =>
+        shouldClaimDrawerSwipe(
+          event,
+          gestureState,
+          windowDimensions.value.width,
+          state.value.isOpen,
+          currentOptions(),
+          'move',
+        ),
       onPanResponderGrant: (): void => {
         dlog('Drawer: gesture grant');
         dragStartProgress = state.value.isOpen ? 1 : 0;
@@ -352,11 +307,7 @@ const DrawerImpl = defineComponent<IDrawerProps>(
         _event: ISymbioteEvent,
         gestureState: IPanResponderGestureState,
       ): void => {
-        const options = currentOptions();
-        const width = resolveDrawerWidth(options);
-        const sign = resolveDrawerPosition(options) === 'right' ? -1 : 1;
-        const delta = (sign * gestureState.dx) / width;
-        progress.setValue(clamp01(dragStartProgress + delta));
+        progress.setValue(resolveDragProgress(gestureState, dragStartProgress, currentOptions()));
       },
       onPanResponderRelease: (
         _event: ISymbioteEvent,
@@ -415,17 +366,17 @@ const DrawerImpl = defineComponent<IDrawerProps>(
     watch(
       () => focusedKeyOf(state.value),
       nextKey => {
-        if (nextKey === focusedRouteKey) return;
-        const previousKey = focusedRouteKey;
+        const { blurKey, focusKey } = diffFocusedRoute(focusedRouteKey, nextKey);
+        if (blurKey === undefined && focusKey === undefined) return;
         focusedRouteKey = nextKey;
         nextTick(() => {
-          if (previousKey !== undefined) {
-            dlog(`Drawer: route "${previousKey}" blurred at t=${Date.now()}`);
-            emitterFor(previousKey).emit(NAVIGATION_EVENT_BLUR);
+          if (blurKey !== undefined) {
+            dlog(`Drawer: route "${blurKey}" blurred at t=${Date.now()}`);
+            emitterFor(blurKey).emit(NAVIGATION_EVENT_BLUR);
           }
-          if (nextKey !== undefined) {
-            dlog(`Drawer: route "${nextKey}" focused at t=${Date.now()}`);
-            emitterFor(nextKey).emit(NAVIGATION_EVENT_FOCUS);
+          if (focusKey !== undefined) {
+            dlog(`Drawer: route "${focusKey}" focused at t=${Date.now()}`);
+            emitterFor(focusKey).emit(NAVIGATION_EVENT_FOCUS);
           }
         });
       },
@@ -445,33 +396,25 @@ const DrawerImpl = defineComponent<IDrawerProps>(
       const geometry = resolveDrawerGeometry(options);
 
       const panelTranslateX = animated
-        ? progress.interpolate({
-            inputRange: [0, 1],
-            outputRange: [geometry.panelTranslateXClosed, geometry.panelTranslateXOpen],
-          })
+        ? progress.interpolate(resolveDrawerSlotInterpolation(geometry, 'panel').translateX)
         : undefined;
       const contentTranslateX = animated
-        ? progress.interpolate({
-            inputRange: [0, 1],
-            outputRange: [geometry.contentTranslateXClosed, geometry.contentTranslateXOpen],
-          })
-        : undefined;
-      const overlayOpacity = animated
-        ? progress.interpolate({
-            inputRange: [0, 1],
-            outputRange: [geometry.overlayOpacityClosed, geometry.overlayOpacityOpen],
-          })
+        ? progress.interpolate(resolveDrawerSlotInterpolation(geometry, 'content').translateX)
         : undefined;
       // The overlay is a full-screen absolutely-positioned sibling BELOW content in paint order
       // (see render-drawer.ts's drawerChildOrder) — for 'front' that's fine since content never
       // moves, but for 'slide' content itself translates away by contentTranslateX, and without
-      // following it the overlay stays pinned full-screen. Tying overlay to the SAME translateX
-      // as content keeps it registered exactly under content, wherever content actually is.
-      const overlayTranslateX = animated
-        ? progress.interpolate({
-            inputRange: [0, 1],
-            outputRange: [geometry.contentTranslateXClosed, geometry.contentTranslateXOpen],
-          })
+      // following it the overlay stays pinned full-screen. resolveDrawerSlotInterpolation's
+      // 'overlay' branch ties its translateX to the SAME range as content's for exactly this
+      // reason, so overlayOpacity and overlayTranslateX below share one resolved config.
+      const overlayInterpolation = animated
+        ? resolveDrawerSlotInterpolation(geometry, 'overlay')
+        : undefined;
+      const overlayOpacity = overlayInterpolation
+        ? progress.interpolate(overlayInterpolation.opacity)
+        : undefined;
+      const overlayTranslateX = overlayInterpolation
+        ? progress.interpolate(overlayInterpolation.translateX)
         : undefined;
 
       const focusedRoute = state.value.routes[state.value.index];
