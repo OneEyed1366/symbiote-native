@@ -14,7 +14,6 @@ import {
   Animated,
   AnimatedView,
   Button,
-  registerComposedComponent,
   Text,
   View,
 } from '@symbiote-native/angular';
@@ -25,11 +24,6 @@ const PULSE_DURATION_MS = 1400;
 const SLIDE_DURATION_MS = 600;
 const SLIDE_DISTANCE = 220;
 const FREEZE_MS = 1500;
-
-// Used as a plain <AnimatedDemo> composed child in App.ts's template; self-register it as an
-// anchor host so its Angular host element doesn't paint a raw Fabric view (the adapter's
-// ANCHOR_HOST_COMPONENTS Set only knows adapter-owned selectors).
-registerComposedComponent('AnimatedDemo');
 
 @Component({
   selector: 'AnimatedDemo',

@@ -4,7 +4,6 @@ import {
   Button,
   FlatList,
   Keyboard,
-  registerComposedComponent,
   SectionList,
   SymbioteHostPropsDirective,
   Text,
@@ -59,11 +58,6 @@ const paritySections: ISection<ISectionEntry>[] = [
   { title: 'Tools', data: sectionData('t', 'hammer') },
   { title: 'Cities', data: sectionData('c', 'porto') },
 ];
-
-// Used as a plain <ParityDemo> composed child in App.ts's template; self-register it as an
-// anchor host so its Angular host element doesn't paint a raw Fabric view (the adapter's
-// ANCHOR_HOST_COMPONENTS Set only knows adapter-owned selectors).
-registerComposedComponent('ParityDemo');
 
 @Component({
   selector: 'ParityDemo',
