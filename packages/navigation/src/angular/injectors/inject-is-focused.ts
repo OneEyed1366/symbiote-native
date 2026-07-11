@@ -6,15 +6,10 @@
 
 import { DestroyRef, inject, signal, type Signal } from '@angular/core';
 import { NAVIGATION_EVENT_BLUR, NAVIGATION_EVENT_FOCUS } from '../../core';
-import { NavigationContextService } from '../navigation-context.service';
+import { requireNavigationContext } from '../navigation-context.service';
 
 export function injectIsFocused(): Signal<boolean> {
-  const context = inject(NavigationContextService, { optional: true });
-  if (!context) {
-    throw new Error(
-      'injectIsFocused must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>',
-    );
-  }
+  const context = requireNavigationContext('injectIsFocused');
   const destroyRef = inject(DestroyRef);
   const isFocused = signal(false);
 

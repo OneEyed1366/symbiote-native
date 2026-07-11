@@ -53,7 +53,6 @@ import {
 import { NgComponentOutlet, NgTemplateOutlet } from '@angular/common';
 import { SymbioteHostPropsDirective } from '@symbiote-native/angular';
 import { Platform, dlog } from '@symbiote-native/engine';
-import type { ISymbioteEvent } from '@symbiote-native/engine';
 import {
   NAVIGATION_EVENT_BLUR,
   NAVIGATION_EVENT_FOCUS,
@@ -63,54 +62,31 @@ import {
   SCREEN_ON_DISAPPEAR,
   SCREEN_ON_DISMISSED,
   SCREEN_ON_HEADER_BACK_BUTTON_CLICKED,
-  SEARCH_BAR_ON_BLUR,
-  SEARCH_BAR_ON_CANCEL_BUTTON_PRESS,
-  SEARCH_BAR_ON_CHANGE_TEXT,
-  SEARCH_BAR_ON_CLOSE,
-  SEARCH_BAR_ON_FOCUS,
-  SEARCH_BAR_ON_OPEN,
-  SEARCH_BAR_ON_SEARCH_BUTTON_PRESS,
   STACK_ON_FINISH_TRANSITIONING,
-  computeActivityState,
+  buildSearchBarPassthrough,
   createInitialNavigatorState,
   createNavigationEmitter,
-  isHeaderInModal,
   navigatorReducer,
-  renderHeaderConfig,
-  resolveHeaderConfigView,
-  resolveHeaderInModalScreenStyle,
   resolveHeaderInModalStackStyle,
-  resolveScreenContentWrapperStyle,
-  resolveScreenProps,
-  resolveScreenView,
-  resolveScreenViewName,
-  resolveSearchBarProps,
-  resolveSearchBarView,
+  resolveScreenRenderPlan,
   resolveStackProps,
 } from '../core';
 import type {
   INavigationEmitter,
+  INavigatorHandle,
   INavigatorPlatform,
   INavigatorState,
   INavigatorAction,
   IRoute,
   ISearchBarCommands,
+  IScreenRenderPlan,
 } from '../core';
 import { NavigationScopeDirective } from './navigation-scope.directive';
 import { SearchBarRefDirective } from './search-bar-ref.directive';
 import { ScreenDirective } from './screen.directive';
 import type { IAngularScreenOptions, IScreenComponentProps } from './screen.directive';
 
-export type INavigatorHandle = {
-  push: (name: string, params?: unknown) => void;
-  pop: (count?: number) => void;
-  popToTop: () => void;
-  popTo: (key: string) => void;
-  replace: (name: string, params?: unknown) => void;
-  setParams: (params: unknown, key?: string) => void;
-  reset: (state: INavigatorState) => void;
-  canGoBack: () => boolean;
-};
+export type { INavigatorHandle } from '../core';
 
 // backTitleVisible defaults to `true` on both platforms per the codegen spec's own default — no
 // ios/android divergence in v1 scope (mirrors react/stack.ts's own constant exactly).
@@ -143,7 +119,7 @@ let stackInstanceCounter = 0;
     }
 
     <ng-template #screenTpl let-route let-index="index">
-      @if (outerScreenIsModal(route)) {
+      @if (outerScreenIsModal(route, index)) {
         <RNSModalScreen [symbioteHostProps]="screenHostProps(route, index)">
           <ng-container
             [ngTemplateOutlet]="innerTpl"
@@ -161,35 +137,35 @@ let stackInstanceCounter = 0;
     </ng-template>
 
     <ng-template #innerTpl let-route let-index="index">
-      @if (isInModal(route)) {
+      @if (isInModal(route, index)) {
         <RNSScreenStack [symbioteHostProps]="innerStackProps()">
           <RNSScreen [symbioteHostProps]="innerScreenProps(route, index)">
             <ng-container
               [ngTemplateOutlet]="headerAndContentTpl"
-              [ngTemplateOutletContext]="{ $implicit: route }"
+              [ngTemplateOutletContext]="{ $implicit: route, index: index }"
             />
           </RNSScreen>
         </RNSScreenStack>
       } @else {
         <ng-container
           [ngTemplateOutlet]="headerAndContentTpl"
-          [ngTemplateOutletContext]="{ $implicit: route }"
+          [ngTemplateOutletContext]="{ $implicit: route, index: index }"
         />
       }
     </ng-template>
 
-    <ng-template #headerAndContentTpl let-route>
-      <RNSScreenStackHeaderConfig [symbioteHostProps]="headerConfigProps(route)">
+    <ng-template #headerAndContentTpl let-route let-index="index">
+      <RNSScreenStackHeaderConfig [symbioteHostProps]="headerConfigProps(route, index)">
         @if (hasSearchBar(route)) {
           <RNSScreenStackHeaderSubview [symbioteHostProps]="headerSubviewProps">
             <RNSSearchBar
               [symbioteSearchBarRef]="searchBarRef(route)"
-              [symbioteHostProps]="searchBarProps(route)"
+              [symbioteHostProps]="searchBarProps(route, index)"
             />
           </RNSScreenStackHeaderSubview>
         }
       </RNSScreenStackHeaderConfig>
-      <RNSScreenContentWrapper [symbioteHostProps]="contentWrapperProps(route)">
+      <RNSScreenContentWrapper [symbioteHostProps]="contentWrapperProps(route, index)">
         <ng-container
           [symbioteNavigationScope]="route"
           [navigation]="this"
@@ -221,6 +197,11 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
   // directive instance means Angular's own ordinary Input binding keeps every field live for free.
   private readonly registry = new Map<string, ScreenDirective>();
   private readonly emitters = new Map<string, INavigationEmitter>();
+  // Keyed by `${route.key}:${index}`, cleared on every dispatch: the ~7 template-bound
+  // accessors below (outerScreenIsModal/isInModal/screenHostProps/...) all resolve the SAME
+  // route+index through planFor per change-detection cycle, so caching here turns ~7 runs of
+  // the 14-step resolveScreenRenderPlan chain into 1 per actual state change.
+  private readonly planCache = new Map<string, IScreenRenderPlan>();
   private routeSequence = 0;
   private screenChildrenSubscription: { unsubscribe: () => void } | undefined;
 
@@ -285,12 +266,14 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
     const current = this.stateSignal();
     if (current === undefined) return;
     const next = navigatorReducer(current, action);
+    this.planCache.clear();
     this.stateSignal.set(next);
+    const liveRouteKeys = new Set(next.routes.map(route => route.key));
     for (const route of next.routes) {
       this.emitterFor(route.key).emit(NAVIGATION_EVENT_STATE, next);
     }
     for (const routeKey of this.emitters.keys()) {
-      if (!next.routes.some(route => route.key === routeKey)) this.emitters.delete(routeKey);
+      if (!liveRouteKeys.has(routeKey)) this.emitters.delete(routeKey);
     }
   }
 
@@ -332,28 +315,30 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
     });
   }
 
-  outerScreenIsModal(route: IRoute<unknown>): boolean {
-    const stackPresentation = this.mergedOptionsFor(route).stackPresentation;
-    return (
-      resolveScreenViewName(stackPresentation, Platform.OS === 'android') ===
-      RNS_MODAL_SCREEN_VIEW_NAME
-    );
-  }
-
-  isInModal(route: IRoute<unknown>): boolean {
+  // Threads a route's merged options through the shared ~14-call resolver sequence (see
+  // core/render-stack.ts's resolveScreenRenderPlan) every per-route template method below picks
+  // its one field from. Angular has no per-route closure scope the way React's `.map`/Vue's render
+  // loop do, so each template-bound method calls this per change-detection cycle — cached below
+  // by `${route.key}:${index}` so the ~7 accessors that share a route+index resolve the plan once
+  // per actual state change instead of once per template read; `dispatch` clears the cache before
+  // recomputing so no stale entry survives a state transition. Screen appear/disappear stay
+  // adapter-owned (close over `this.dispatch`/`this.emitterFor`); the search bar passthrough
+  // carries no dlog wrapper, unlike React/Vue (see this file's own review notes) — its imperative
+  // ref rides a separate directive (searchBarRef/[symbioteSearchBarRef]), not this passthrough map.
+  private planFor(route: IRoute<unknown>, index: number): IScreenRenderPlan {
+    const cacheKey = `${route.key}:${index}`;
+    const cached = this.planCache.get(cacheKey);
+    if (cached) return cached;
     const mergedOptions = this.mergedOptionsFor(route);
-    return isHeaderInModal(
-      mergedOptions.stackPresentation,
-      mergedOptions.headerShown === false,
-      Platform.OS === 'android',
-    );
-  }
-
-  screenHostProps(route: IRoute<unknown>, index: number): Record<string, unknown> {
-    const mergedOptions = this.mergedOptionsFor(route);
-    const activityState = computeActivityState(index, this.stateSignal()?.routes.length ?? 1);
-    return resolveScreenProps(
-      resolveScreenView(route.key, activityState, mergedOptions, {
+    const searchBarOptions = mergedOptions.headerSearchBarOptions;
+    const plan = resolveScreenRenderPlan({
+      screenId: route.key,
+      index,
+      routeCount: this.stateSignal()?.routes.length ?? 1,
+      options: mergedOptions,
+      platform: NAVIGATOR_PLATFORM,
+      isAndroid: Platform.OS === 'android',
+      screenPassthrough: {
         [SCREEN_ON_DISMISSED]: () => this.dispatch({ type: 'pop', count: 1 }),
         [SCREEN_ON_HEADER_BACK_BUTTON_CLICKED]: () => this.dispatch({ type: 'pop', count: 1 }),
         [SCREEN_ON_APPEAR]: () => {
@@ -364,8 +349,25 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
           dlog(`Stack: route "${route.name}" disappeared (blur)`);
           this.emitterFor(route.key).emit(NAVIGATION_EVENT_BLUR);
         },
-      }),
-    );
+      },
+      searchBarPassthrough: searchBarOptions
+        ? buildSearchBarPassthrough(searchBarOptions)
+        : undefined,
+    });
+    this.planCache.set(cacheKey, plan);
+    return plan;
+  }
+
+  outerScreenIsModal(route: IRoute<unknown>, index: number): boolean {
+    return this.planFor(route, index).screenViewName === RNS_MODAL_SCREEN_VIEW_NAME;
+  }
+
+  isInModal(route: IRoute<unknown>, index: number): boolean {
+    return this.planFor(route, index).inModal;
+  }
+
+  screenHostProps(route: IRoute<unknown>, index: number): Record<string, unknown> {
+    return this.planFor(route, index).screenProps;
   }
 
   innerStackProps(): Record<string, unknown> {
@@ -373,28 +375,16 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
   }
 
   innerScreenProps(route: IRoute<unknown>, index: number): Record<string, unknown> {
-    return {
-      style: resolveHeaderInModalScreenStyle(),
-      activityState: computeActivityState(index, this.stateSignal()?.routes.length ?? 1),
-    };
+    const plan = this.planFor(route, index);
+    return { style: plan.innerScreenStyle, activityState: plan.activityState };
   }
 
-  contentWrapperProps(route: IRoute<unknown>): Record<string, unknown> {
-    const mergedOptions = this.mergedOptionsFor(route);
-    return {
-      style: resolveScreenContentWrapperStyle(
-        mergedOptions.stackPresentation,
-        mergedOptions.headerShown === false,
-        mergedOptions.headerTranslucent,
-        Platform.OS === 'android',
-      ),
-      collapsable: false,
-    };
+  contentWrapperProps(route: IRoute<unknown>, index: number): Record<string, unknown> {
+    return this.planFor(route, index).contentWrapperProps;
   }
 
-  headerConfigProps(route: IRoute<unknown>): Record<string, unknown> {
-    const mergedOptions = this.mergedOptionsFor(route);
-    return renderHeaderConfig(resolveHeaderConfigView(mergedOptions, NAVIGATOR_PLATFORM)).props;
+  headerConfigProps(route: IRoute<unknown>, index: number): Record<string, unknown> {
+    return this.planFor(route, index).headerConfig.props;
   }
 
   hasSearchBar(route: IRoute<unknown>): boolean {
@@ -405,25 +395,7 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
     return this.mergedOptionsFor(route).headerSearchBarOptions?.ref;
   }
 
-  searchBarProps(route: IRoute<unknown>): Record<string, unknown> {
-    const options = this.mergedOptionsFor(route).headerSearchBarOptions;
-    if (!options) return {};
-    return resolveSearchBarProps(
-      resolveSearchBarView(options, {
-        [SEARCH_BAR_ON_FOCUS]: () => options.onFocus?.(),
-        [SEARCH_BAR_ON_BLUR]: () => options.onBlur?.(),
-        [SEARCH_BAR_ON_CHANGE_TEXT]: (event: ISymbioteEvent) => {
-          const { text } = event.nativeEvent;
-          options.onChangeText?.(typeof text === 'string' ? text : '');
-        },
-        [SEARCH_BAR_ON_SEARCH_BUTTON_PRESS]: (event: ISymbioteEvent) => {
-          const { text } = event.nativeEvent;
-          options.onSearchButtonPress?.(typeof text === 'string' ? text : '');
-        },
-        [SEARCH_BAR_ON_CANCEL_BUTTON_PRESS]: () => options.onCancelButtonPress?.(),
-        [SEARCH_BAR_ON_CLOSE]: () => options.onClose?.(),
-        [SEARCH_BAR_ON_OPEN]: () => options.onOpen?.(),
-      }),
-    );
+  searchBarProps(route: IRoute<unknown>, index: number): Record<string, unknown> {
+    return this.planFor(route, index).searchBarProps ?? {};
   }
 }

@@ -8,7 +8,7 @@
 
 import { Directive, Input, type Type } from '@angular/core';
 import type { ISearchBarCommands, ISearchBarOptions, IScreenOptions, IRoute } from '../core';
-import type { INavigatorHandle } from './stack';
+import type { INavigatorHandle } from '../core';
 
 export type IScreenComponentProps = {
   route: IRoute<unknown>;

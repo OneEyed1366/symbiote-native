@@ -23,6 +23,7 @@ import {
   Input,
   QueryList,
   signal,
+  untracked,
   type AfterContentInit,
   type OnDestroy,
   type Type,
@@ -36,6 +37,7 @@ import {
   NAVIGATION_EVENT_FOCUS,
   createInitialTabState,
   createNavigationEmitter,
+  diffFocusedRoute,
   isFocusedRoute,
   renderTabBar,
   tabRouterReducer,
@@ -44,18 +46,16 @@ import type {
   INavigationEmitter,
   IRoute,
   ITabBarItemView,
+  ITabNavigatorHandle,
   ITabOptions,
   ITabRouterAction,
   ITabRouterState,
 } from '../core';
 import { NavigationScopeDirective } from './navigation-scope.directive';
 import { TabScreenDirective } from './tab-screen.directive';
-import type { ITabScreenComponentProps, ITabScreenOptionsResolver } from './tab-screen.directive';
+import type { ITabScreenComponentProps } from './tab-screen.directive';
 
-export type ITabNavigatorHandle = {
-  jumpTo: (name: string, params?: unknown) => void;
-  setParams: (key: string, params: unknown) => void;
-};
+export type { ITabNavigatorHandle } from '../core';
 
 const TAB_ROOT_STYLE = { flex: 1 };
 const TAB_CONTENT_STYLE = { flex: 1 };
@@ -112,7 +112,7 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
 
   readonly jumpTo = (name: string, params?: unknown): void =>
     this.dispatch({ type: 'jumpTo', name, params });
-  readonly setParams = (key: string, params: unknown): void =>
+  readonly setParams = (params: unknown, key: string): void =>
     this.dispatch({ type: 'setParams', key, params });
 
   ngAfterContentInit(): void {
@@ -158,10 +158,7 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
 
   private resolveTabOptions(entry: TabScreenDirective, route: IRoute<unknown>): ITabOptions {
     const props: ITabScreenComponentProps = { route, navigation: this };
-    const own =
-      typeof entry.options === 'function'
-        ? (entry.options as ITabScreenOptionsResolver)(props)
-        : entry.options;
+    const own = typeof entry.options === 'function' ? entry.options(props) : entry.options;
     return { ...this.screenOptions, ...own };
   }
 
@@ -179,20 +176,43 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
   // focus/blur is synthesized here exactly like react/tabs.ts's own useEffect does, just idempotent
   // per read (called repeatedly with the same key during one CD pass) instead of dependency-array
   // gated. Keyed on the route KEY, not the object, so a setParams-only change doesn't re-fire.
+  //
+  // Called from the template ([emitter]="focusedRouteEmitter()"), which runs inside Angular's
+  // reactive-read tracking context for the current CD pass — unlike React's useEffect, which runs
+  // in a separate post-commit phase. Two consequences of that, both fixed below:
+  //
+  // 1. Writing a signal from inside a tracked template read throws Angular's NG600 ("signal write
+  //    during a template execution") — untracked() opts this whole synthesis out of that tracking
+  //    context, matching what the post-commit useEffect phase gives React for free.
+  // 2. The NEW route's screen component (injectIsFocused's listener source) is created by
+  //    *ngComponentOutlet AFTER this binding is evaluated, but still within the SAME synchronous
+  //    template refresh — so emitting FOCUS right here fires to zero listeners and is silently
+  //    lost forever (isFocused stays false permanently, even for the very first-focused screen).
+  //    queueMicrotask defers the FOCUS emit past the end of the current synchronous refresh
+  //    (which includes the new screen's construction), guaranteeing its injectIsFocused()
+  //    listener is already attached by the time it fires. BLUR doesn't need this: the outgoing
+  //    screen's listener was already attached on an earlier tick, so it's safe to fire now.
   focusedRouteEmitter(): INavigationEmitter {
     const key = this.focusedRoute()?.key;
-    if (key === this.currentEmitterKey && this.currentEmitter) return this.currentEmitter;
-    if (this.currentEmitter) {
-      dlog('Tab: previous route blurred');
-      this.currentEmitter.emit(NAVIGATION_EVENT_BLUR);
-    }
-    this.currentEmitter = createNavigationEmitter();
-    this.currentEmitterKey = key;
-    if (key !== undefined) {
-      dlog(`Tab: route "${this.focusedRoute()?.name}" focused`);
-      this.currentEmitter.emit(NAVIGATION_EVENT_FOCUS);
-    }
-    return this.currentEmitter;
+    return untracked(() => {
+      if (key === this.currentEmitterKey && this.currentEmitter) return this.currentEmitter;
+      const { blurKey, focusKey } = diffFocusedRoute(this.currentEmitterKey, key);
+      if (blurKey !== undefined && this.currentEmitter) {
+        dlog('Tab: previous route blurred');
+        this.currentEmitter.emit(NAVIGATION_EVENT_BLUR);
+      }
+      const emitter = createNavigationEmitter();
+      this.currentEmitter = emitter;
+      this.currentEmitterKey = key;
+      if (focusKey !== undefined) {
+        queueMicrotask(() => {
+          if (this.currentEmitter !== emitter) return; // superseded by a later switch
+          dlog(`Tab: route "${this.focusedRoute()?.name}" focused`);
+          emitter.emit(NAVIGATION_EVENT_FOCUS);
+        });
+      }
+      return emitter;
+    });
   }
 
   tabBarDescriptor(): IDescriptor {

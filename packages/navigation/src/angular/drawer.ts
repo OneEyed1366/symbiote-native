@@ -39,9 +39,12 @@ import {
   Input,
   QueryList,
   TemplateRef,
+  computed,
   inject,
   signal,
+  untracked,
   type AfterContentInit,
+  type OnChanges,
   type OnDestroy,
   type Type,
 } from '@angular/core';
@@ -65,23 +68,24 @@ import {
 import type { IDescriptor, IDescriptorChild } from '@symbiote-native/components';
 import {
   DRAWER_DEFAULT_OVERLAY_COLOR,
-  DRAWER_DEFAULT_SWIPE_ENABLED,
   NAVIGATION_EVENT_BLUR,
   NAVIGATION_EVENT_FOCUS,
   createInitialDrawerRouterState,
   createNavigationEmitter,
+  diffFocusedRoute,
   drawerChildOrder,
   drawerRouterReducer,
   isDrawerAnimated,
-  isHorizontalDrag,
-  isSwipeStartInEdge,
   renderDrawer,
+  resolveDragProgress,
   resolveDrawerGeometry,
-  resolveDrawerPosition,
-  resolveDrawerWidth,
+  resolveDrawerSlotInterpolation,
   resolveSwipeIntent,
+  shouldClaimDrawerSwipe,
 } from '../core';
 import type {
+  IDrawerDescriptorMap,
+  IDrawerNavigatorHandle,
   IDrawerOptions,
   IDrawerPosition,
   IDrawerRouterAction,
@@ -94,25 +98,9 @@ import type {
 } from '../core';
 import { NavigationScopeDirective } from './navigation-scope.directive';
 import { DrawerScreenDirective } from './drawer-screen.directive';
-import type {
-  IDrawerScreenComponentProps,
-  IDrawerScreenOptionsResolver,
-} from './drawer-screen.directive';
+import type { IDrawerScreenComponentProps } from './drawer-screen.directive';
 
-export type IDrawerNavigatorHandle = {
-  openDrawer: () => void;
-  closeDrawer: () => void;
-  toggleDrawer: () => void;
-  jumpTo: (name: string) => void;
-};
-
-// Keyed by route.key, mirroring @react-navigation/drawer's own `descriptors` prop shape — the
-// options a caller's `<ng-template #drawerContent>` reads to label its menu entries (Drawer ships
-// no built-in menu UI, matching react/drawer.ts's own IDrawerDescriptorMap).
-export type IDrawerDescriptorMap = Record<
-  string,
-  { options: IDrawerScreenOptions; navigation: IDrawerNavigatorHandle }
->;
+export type { IDrawerNavigatorHandle, IDrawerDescriptorMap } from '../core';
 
 export type IDrawerContentContext = {
   $implicit: {
@@ -121,29 +109,6 @@ export type IDrawerContentContext = {
     navigation: IDrawerNavigatorHandle;
   };
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function toFiniteNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
-// The touch's real starting page-X — mirrors react/drawer.ts's identical helper (see its comment
-// for why gestureState.x0 alone isn't populated early enough for the SET-gates below).
-function startPageXOf(event: ISymbioteEvent): number | undefined {
-  const { nativeEvent } = event;
-  const direct = toFiniteNumber(nativeEvent.pageX);
-  if (direct !== undefined) return direct;
-  const touches = nativeEvent.touches;
-  if (Array.isArray(touches) && isRecord(touches[0])) return toFiniteNumber(touches[0].pageX);
-  return undefined;
-}
-
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value));
-}
 
 const DRAWER_SNAP_DURATION = 250;
 
@@ -207,7 +172,7 @@ let drawerInstanceCounter = 0;
     }
   `,
 })
-export class Drawer implements AfterContentInit, OnDestroy, IDrawerNavigatorHandle {
+export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNavigatorHandle {
   @ContentChildren(DrawerScreenDirective)
   private readonly drawerScreenChildren!: QueryList<DrawerScreenDirective>;
   @ContentChild('drawerContent', { read: TemplateRef })
@@ -266,46 +231,35 @@ export class Drawer implements AfterContentInit, OnDestroy, IDrawerNavigatorHand
     onStartShouldSetPanResponder: (
       event: ISymbioteEvent,
       gestureState: IPanResponderGestureState,
-    ): boolean => {
-      const options = this.optionsSnapshot();
-      if ((options.swipeEnabled ?? DRAWER_DEFAULT_SWIPE_ENABLED) === false) return false;
-      if (!isDrawerAnimated(options)) return false;
-      return isSwipeStartInEdge(
-        startPageXOf(event) ?? gestureState.x0,
+    ): boolean =>
+      shouldClaimDrawerSwipe(
+        event,
+        gestureState,
         this.windowDimensions().width,
         this.stateSignal()?.isOpen ?? false,
-        options,
-      );
-    },
+        this.optionsSnapshot(),
+        'start',
+      ),
     onMoveShouldSetPanResponder: (
       event: ISymbioteEvent,
       gestureState: IPanResponderGestureState,
-    ): boolean => {
-      const options = this.optionsSnapshot();
-      if ((options.swipeEnabled ?? DRAWER_DEFAULT_SWIPE_ENABLED) === false) return false;
-      if (!isDrawerAnimated(options)) return false;
-      if (
-        !isSwipeStartInEdge(
-          startPageXOf(event) ?? gestureState.x0,
-          this.windowDimensions().width,
-          this.stateSignal()?.isOpen ?? false,
-          options,
-        )
-      ) {
-        return false;
-      }
-      return isHorizontalDrag(gestureState);
-    },
+    ): boolean =>
+      shouldClaimDrawerSwipe(
+        event,
+        gestureState,
+        this.windowDimensions().width,
+        this.stateSignal()?.isOpen ?? false,
+        this.optionsSnapshot(),
+        'move',
+      ),
     onPanResponderGrant: (): void => {
       dlog('Drawer: gesture grant');
       this.dragStartProgress = (this.stateSignal()?.isOpen ?? false) ? 1 : 0;
     },
     onPanResponderMove: (_event: ISymbioteEvent, gestureState: IPanResponderGestureState): void => {
-      const options = this.optionsSnapshot();
-      const width = resolveDrawerWidth(options);
-      const sign = resolveDrawerPosition(options) === 'right' ? -1 : 1;
-      const delta = (sign * gestureState.dx) / width;
-      this.progress.setValue(clamp01(this.dragStartProgress + delta));
+      this.progress.setValue(
+        resolveDragProgress(gestureState, this.dragStartProgress, this.optionsSnapshot()),
+      );
     },
     onPanResponderRelease: (
       _event: ISymbioteEvent,
@@ -379,7 +333,23 @@ export class Drawer implements AfterContentInit, OnDestroy, IDrawerNavigatorHand
     }).start();
   }
 
-  private optionsSnapshot(): IDrawerOptions {
+  // A plain writable signal, not a computed() — it mirrors @Input() properties, which are ordinary
+  // mutable fields Angular assigns directly rather than signals, so a computed() reading them would
+  // never register them as a tracked dependency and would go stale after its first evaluation.
+  // ngOnChanges (below) pushes every input change in here instead, which drawerRoot/slotsMap CAN
+  // track correctly since reading a signal (unlike a plain field) IS visible to computed()'s
+  // dependency collection.
+  private readonly optionsSnapshot = signal<IDrawerOptions>(this.buildOptionsSnapshot());
+  private readonly drawerStyleSnapshot = signal<IStyleProp<IViewStyle> | undefined>(
+    this.drawerStyle,
+  );
+
+  ngOnChanges(): void {
+    this.optionsSnapshot.set(this.buildOptionsSnapshot());
+    this.drawerStyleSnapshot.set(this.drawerStyle);
+  }
+
+  private buildOptionsSnapshot(): IDrawerOptions {
     return {
       drawerType: this.drawerType,
       drawerPosition: this.drawerPosition,
@@ -403,20 +373,24 @@ export class Drawer implements AfterContentInit, OnDestroy, IDrawerNavigatorHand
     };
   }
 
-  private drawerRoot(): IDescriptor {
-    return renderDrawer(
+  // Recomputed only when a dependency signal actually changes, so every template read within a
+  // single change-detection pass (rootStyle, plus slotStyle/slotAnimatedProps once per @for slot —
+  // 6-7 reads total) shares one cached descriptor tree instead of re-running renderDrawer /
+  // drawerChildOrder on each read.
+  private readonly drawerRoot = computed<IDescriptor>(() =>
+    renderDrawer(
       {
-        overlayColor: this.overlayColor ?? DRAWER_DEFAULT_OVERLAY_COLOR,
-        drawerStyle: this.drawerStyle,
+        overlayColor: this.optionsSnapshot().overlayColor ?? DRAWER_DEFAULT_OVERLAY_COLOR,
+        drawerStyle: this.drawerStyleSnapshot(),
         contentPassthrough: {},
         overlayPassthrough: this.isAnimated() ? this.overlayResponderPassthrough() : {},
         panelPassthrough: {},
       },
       this.optionsSnapshot(),
-    );
-  }
+    ),
+  );
 
-  private slotsMap(): Map<IDrawerSlot, IDescriptor> {
+  private readonly slotsMap = computed<Map<IDrawerSlot, IDescriptor>>(() => {
     const root = this.drawerRoot();
     const order = drawerChildOrder(this.optionsSnapshot());
     const map = new Map<IDrawerSlot, IDescriptor>();
@@ -425,7 +399,7 @@ export class Drawer implements AfterContentInit, OnDestroy, IDrawerNavigatorHand
       if (child !== undefined && typeof child !== 'string') map.set(slot, child);
     });
     return map;
-  }
+  });
 
   isAnimated(): boolean {
     return isDrawerAnimated(this.optionsSnapshot());
@@ -461,15 +435,9 @@ export class Drawer implements AfterContentInit, OnDestroy, IDrawerNavigatorHand
   contentStyle(): Record<string, unknown> {
     return this.slotStyle('content', () => {
       const g = resolveDrawerGeometry(this.optionsSnapshot());
+      const { translateX } = resolveDrawerSlotInterpolation(g, 'content');
       return {
-        transform: [
-          {
-            translateX: this.progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [g.contentTranslateXClosed, g.contentTranslateXOpen],
-            }),
-          },
-        ],
+        transform: [{ translateX: this.progress.interpolate(translateX) }],
       };
     });
   }
@@ -480,19 +448,10 @@ export class Drawer implements AfterContentInit, OnDestroy, IDrawerNavigatorHand
   overlayStyle(): Record<string, unknown> {
     return this.slotStyle('overlay', () => {
       const g = resolveDrawerGeometry(this.optionsSnapshot());
+      const { opacity, translateX } = resolveDrawerSlotInterpolation(g, 'overlay');
       return {
-        opacity: this.progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [g.overlayOpacityClosed, g.overlayOpacityOpen],
-        }),
-        transform: [
-          {
-            translateX: this.progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [g.contentTranslateXClosed, g.contentTranslateXOpen],
-            }),
-          },
-        ],
+        opacity: this.progress.interpolate(opacity),
+        transform: [{ translateX: this.progress.interpolate(translateX) }],
       };
     });
   }
@@ -500,15 +459,9 @@ export class Drawer implements AfterContentInit, OnDestroy, IDrawerNavigatorHand
   panelStyle(): Record<string, unknown> {
     return this.slotStyle('panel', () => {
       const g = resolveDrawerGeometry(this.optionsSnapshot());
+      const { translateX } = resolveDrawerSlotInterpolation(g, 'panel');
       return {
-        transform: [
-          {
-            translateX: this.progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [g.panelTranslateXClosed, g.panelTranslateXOpen],
-            }),
-          },
-        ],
+        transform: [{ translateX: this.progress.interpolate(translateX) }],
       };
     });
   }
@@ -528,7 +481,7 @@ export class Drawer implements AfterContentInit, OnDestroy, IDrawerNavigatorHand
   ): IDrawerScreenOptions {
     if (typeof entry.options === 'function') {
       const props: IDrawerScreenComponentProps = { route, navigation: this };
-      return (entry.options as IDrawerScreenOptionsResolver)(props);
+      return entry.options(props);
     }
     return entry.options ?? {};
   }
@@ -538,14 +491,42 @@ export class Drawer implements AfterContentInit, OnDestroy, IDrawerNavigatorHand
   // focus/blur is synthesized here exactly like react/drawer.ts's own useEffect does, just
   // idempotent per read instead of dependency-array gated. Keyed on the route KEY, not the object,
   // so a no-op re-focus of the already-focused route doesn't spuriously re-fire.
+  //
+  // Called from the template ([emitter]="focusedRouteEmitter()"), which runs inside Angular's
+  // reactive-read tracking context for the current CD pass — unlike React's useEffect, which runs
+  // in a separate post-commit phase. Two consequences of that, both fixed below (see tabs.ts's
+  // identical fix for the full mechanism):
+  //
+  // 1. Writing a signal from inside a tracked template read throws Angular's NG600 ("signal write
+  //    during a template execution") — untracked() opts this whole synthesis out of that
+  //    tracking context.
+  // 2. The NEW route's screen component (injectIsFocused's listener source) is created by
+  //    *ngComponentOutlet AFTER this binding is evaluated but still within the SAME synchronous
+  //    template refresh — emitting FOCUS right here fires to zero listeners and is silently lost
+  //    forever. queueMicrotask defers the FOCUS emit past the end of the current refresh
+  //    (including the new screen's construction). BLUR doesn't need this: the outgoing screen's
+  //    listener was already attached on an earlier tick.
   focusedRouteEmitter(): INavigationEmitter {
     const key = this.focusedRoute()?.key;
-    if (key === this.currentEmitterKey && this.currentEmitter) return this.currentEmitter;
-    if (this.currentEmitter) this.currentEmitter.emit(NAVIGATION_EVENT_BLUR);
-    this.currentEmitter = createNavigationEmitter();
-    this.currentEmitterKey = key;
-    if (key !== undefined) this.currentEmitter.emit(NAVIGATION_EVENT_FOCUS);
-    return this.currentEmitter;
+    return untracked(() => {
+      if (key === this.currentEmitterKey && this.currentEmitter) return this.currentEmitter;
+      const { blurKey, focusKey } = diffFocusedRoute(this.currentEmitterKey, key);
+      if (blurKey !== undefined && this.currentEmitter) {
+        dlog('Drawer: previous route blurred');
+        this.currentEmitter.emit(NAVIGATION_EVENT_BLUR);
+      }
+      const emitter = createNavigationEmitter();
+      this.currentEmitter = emitter;
+      this.currentEmitterKey = key;
+      if (focusKey !== undefined) {
+        queueMicrotask(() => {
+          if (this.currentEmitter !== emitter) return; // superseded by a later switch
+          dlog(`Drawer: route "${this.focusedRoute()?.name}" focused`);
+          emitter.emit(NAVIGATION_EVENT_FOCUS);
+        });
+      }
+      return emitter;
+    });
   }
 
   drawerContentContext(currentState: IDrawerRouterState): IDrawerContentContext {

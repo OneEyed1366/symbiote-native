@@ -6,9 +6,8 @@
 // surface. All pub/sub logic lives in ../../core/navigation-events; this function only reads
 // NavigationContextService and binds identity.
 
-import { inject } from '@angular/core';
 import type { INavigationEventListener, INavigationEventName } from '../../core';
-import { NavigationContextService, type IAnyNavigatorHandle } from '../navigation-context.service';
+import { requireNavigationContext, type IAnyNavigatorHandle } from '../navigation-context.service';
 
 export type INavigationHandle = IAnyNavigatorHandle & {
   addListener: (event: INavigationEventName, listener: INavigationEventListener) => () => void;
@@ -18,12 +17,7 @@ export type INavigationHandle = IAnyNavigatorHandle & {
 };
 
 export function injectNavigation(): INavigationHandle {
-  const context = inject(NavigationContextService, { optional: true });
-  if (!context) {
-    throw new Error(
-      'injectNavigation must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>',
-    );
-  }
+  const context = requireNavigationContext('injectNavigation');
   return {
     ...context.navigation,
     addListener: context.emitter.addListener,

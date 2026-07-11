@@ -6,13 +6,14 @@
 // so ../register never loads headless — Drawer needs no react-native-screens ViewConfig at all.
 
 import '@angular/compiler';
-import { Component, CUSTOM_ELEMENTS_SCHEMA, Input, ViewChild } from '@angular/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, Input, ViewChild, type Signal } from '@angular/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount, Dimensions } from '@symbiote-native/angular';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Drawer } from './drawer';
 import type { IDrawerNavigatorHandle } from './drawer';
 import { DrawerScreenDirective } from './drawer-screen.directive';
+import { injectIsFocused } from './injectors/inject-is-focused';
 import type { IRoute } from '../core';
 
 const ROOT_TAG = 5122;
@@ -61,6 +62,8 @@ beforeEach(() => {
   pendingFrames.clear();
   nextFrameId = 1;
   installRequestAnimationFrame();
+  capturedHomeInstance = undefined;
+  capturedSettingsInstance = undefined;
 });
 afterEach(() => {
   unmount(ROOT_TAG);
@@ -80,6 +83,9 @@ function findInTree(
   return undefined;
 }
 
+let capturedHomeInstance: HomeDrawerScreenComponent | undefined;
+let capturedSettingsInstance: SettingsDrawerScreenComponent | undefined;
+
 @Component({
   selector: 'home-drawer-screen',
   standalone: true,
@@ -89,6 +95,14 @@ function findInTree(
 class HomeDrawerScreenComponent {
   @Input() route!: IRoute<unknown>;
   @Input() navigation!: IDrawerNavigatorHandle;
+  // Real screens (e.g. .examples/angular's DrawerHomeScreen) call injectIsFocused() — see the
+  // regression test below for why this matters.
+  readonly isFocused: Signal<boolean> = injectIsFocused();
+
+  constructor() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    capturedHomeInstance = this;
+  }
 }
 
 @Component({
@@ -100,6 +114,12 @@ class HomeDrawerScreenComponent {
 class SettingsDrawerScreenComponent {
   @Input() route!: IRoute<unknown>;
   @Input() navigation!: IDrawerNavigatorHandle;
+  readonly isFocused: Signal<boolean> = injectIsFocused();
+
+  constructor() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    capturedSettingsInstance = this;
+  }
 }
 
 let capturedHost: DrawerTestHost | undefined;
@@ -202,5 +222,51 @@ describe('Angular Drawer navigator', () => {
     expect(
       findInTree(n => n.viewName === 'RCTRawText' && n.props.text === '2 routes, focused index 0'),
     ).toBeDefined();
+  });
+
+  // Regression test: focusedRouteEmitter() runs as a TEMPLATE EXPRESSION
+  // ([emitter]="focusedRouteEmitter()"), inside Angular's reactive-read tracking context for the
+  // current CD pass. It synchronously calls emitter.emit(FOCUS/BLUR), fan-out-calling every
+  // listener on that route's emitter synchronously too — including injectIsFocused()'s
+  // `isFocused.set(...)`, since every real screen calls injectIsFocused(). Angular throws NG600
+  // ("signal write during a template execution") the instant that set() runs inside a tracked
+  // read. jumpTo() is exactly what tapping a drawer menu item fires. tabs.ts's
+  // focusedRouteEmitter() has the identical shape and its own regression test in tabs.test.ts.
+  it('switching the focused screen does not throw when it calls injectIsFocused()', async () => {
+    const handle = await mountDrawer();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      handle.jumpTo('Settings');
+      await tick();
+      handle.jumpTo('Home');
+      await tick();
+    } finally {
+      expect(errorSpy).not.toHaveBeenCalled();
+      errorSpy.mockRestore();
+    }
+  });
+
+  // injectIsFocused() reads context.emitter at CALL time (during the screen's own constructor),
+  // which runs as part of *ngComponentOutlet creating the screen — nested INSIDE the same
+  // <ng-container [emitter]="focusedRouteEmitter()"> whose input evaluation is what actually
+  // fires the FOCUS emit. If Angular evaluates the ng-container's OWN inputs (calling
+  // focusedRouteEmitter(), firing FOCUS) before creating/refreshing the nested ngComponentOutlet
+  // child (running the screen's constructor, registering the injectIsFocused() listener), the
+  // FOCUS event fires to zero listeners and is lost forever — isFocused stays false permanently.
+  it('the initially-focused screen actually observes isFocused() becoming true', async () => {
+    await mountDrawer();
+    await tick();
+    expect(capturedHomeInstance).toBeDefined();
+    expect(capturedHomeInstance?.isFocused()).toBe(true);
+  });
+
+  it('switching screens toggles isFocused() true/false on the exiting/entering screens', async () => {
+    const handle = await mountDrawer();
+    await tick();
+    handle.jumpTo('Settings');
+    await tick();
+    expect(capturedHomeInstance?.isFocused()).toBe(false);
+    expect(capturedSettingsInstance).toBeDefined();
+    expect(capturedSettingsInstance?.isFocused()).toBe(true);
   });
 });

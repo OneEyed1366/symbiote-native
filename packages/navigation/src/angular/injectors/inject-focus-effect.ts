@@ -8,17 +8,12 @@
 
 import { DestroyRef, inject } from '@angular/core';
 import { NAVIGATION_EVENT_BLUR, NAVIGATION_EVENT_FOCUS } from '../../core';
-import { NavigationContextService } from '../navigation-context.service';
+import { requireNavigationContext } from '../navigation-context.service';
 
 export type IFocusEffectCallback = () => (() => void) | void;
 
 export function injectFocusEffect(effect: IFocusEffectCallback): void {
-  const context = inject(NavigationContextService, { optional: true });
-  if (!context) {
-    throw new Error(
-      'injectFocusEffect must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>',
-    );
-  }
+  const context = requireNavigationContext('injectFocusEffect');
   const destroyRef = inject(DestroyRef);
 
   let cleanup: ReturnType<IFocusEffectCallback>;

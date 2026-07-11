@@ -12,7 +12,7 @@
 import { DestroyRef, inject, signal, type Signal } from '@angular/core';
 import { NAVIGATION_EVENT_STATE } from '../../core';
 import type { INavigatorState } from '../../core';
-import { NavigationContextService } from '../navigation-context.service';
+import { requireNavigationContext } from '../navigation-context.service';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -25,12 +25,7 @@ function isNavigatorState(value: unknown): value is INavigatorState {
 export function injectNavigationState<TResult>(
   selector: (state: INavigatorState) => TResult,
 ): Signal<TResult> {
-  const context = inject(NavigationContextService, { optional: true });
-  if (!context) {
-    throw new Error(
-      'injectNavigationState must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>',
-    );
-  }
+  const context = requireNavigationContext('injectNavigationState');
   const destroyRef = inject(DestroyRef);
   const route = context.route();
   if (route === undefined) {

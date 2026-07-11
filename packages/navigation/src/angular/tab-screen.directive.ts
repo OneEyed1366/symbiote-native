@@ -5,7 +5,7 @@
 
 import { Directive, Input, type Type } from '@angular/core';
 import type { IRoute, ITabOptions } from '../core';
-import type { ITabNavigatorHandle } from './tabs';
+import type { ITabNavigatorHandle } from '../core';
 
 export type ITabScreenComponentProps = {
   route: IRoute<unknown>;

@@ -5,13 +5,14 @@
 // Tab needs no react-native-screens ViewConfig at all (pure-JS UI).
 
 import '@angular/compiler';
-import { Component, CUSTOM_ELEMENTS_SCHEMA, Input, ViewChild } from '@angular/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, Input, ViewChild, type Signal } from '@angular/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/angular';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Tab } from './tabs';
 import type { ITabNavigatorHandle } from './tabs';
 import { TabScreenDirective } from './tab-screen.directive';
+import { injectIsFocused } from './injectors/inject-is-focused';
 import type { IRoute } from '../core';
 
 const ROOT_TAG = 5121;
@@ -19,7 +20,11 @@ const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0))
 
 const fabric = installFabric();
 
-beforeEach(() => fabric.reset());
+beforeEach(() => {
+  fabric.reset();
+  capturedFeedInstance = undefined;
+  capturedProfileInstance = undefined;
+});
 afterEach(() => unmount(ROOT_TAG));
 
 function findInTree(
@@ -34,6 +39,9 @@ function findInTree(
   return undefined;
 }
 
+let capturedFeedInstance: FeedScreenComponent | undefined;
+let capturedProfileInstance: ProfileScreenComponent | undefined;
+
 @Component({
   selector: 'feed-screen',
   standalone: true,
@@ -43,6 +51,14 @@ function findInTree(
 class FeedScreenComponent {
   @Input() route!: IRoute<unknown>;
   @Input() navigation!: ITabNavigatorHandle;
+  // Real screens (e.g. .examples/angular's TabHomeScreen) call injectIsFocused() — see the
+  // regression test below for why this matters.
+  readonly isFocused: Signal<boolean> = injectIsFocused();
+
+  constructor() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    capturedFeedInstance = this;
+  }
 }
 
 @Component({
@@ -54,6 +70,12 @@ class FeedScreenComponent {
 class ProfileScreenComponent {
   @Input() route!: IRoute<unknown>;
   @Input() navigation!: ITabNavigatorHandle;
+  readonly isFocused: Signal<boolean> = injectIsFocused();
+
+  constructor() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    capturedProfileInstance = this;
+  }
 }
 
 let capturedHost: TabTestHost | undefined;
@@ -172,5 +194,55 @@ describe('Angular Tab navigator', () => {
     expect(
       findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'profile'),
     ).toBeDefined();
+  });
+
+  // Regression test: focusedRouteEmitter() runs as a TEMPLATE EXPRESSION
+  // ([emitter]="focusedRouteEmitter()"), evaluated inside Angular's reactive-read tracking
+  // context for the current CD pass. It synchronously calls emitter.emit(FOCUS/BLUR), which
+  // fan-out-calls every listener on that route's emitter synchronously too — including
+  // injectIsFocused()'s `isFocused.set(...)`, since every real screen (TabHomeScreen,
+  // TabSearchScreen, TabProfileScreen in .examples/angular) calls injectIsFocused(). Angular
+  // throws NG600 ("signal write during a template execution") the instant that set() runs
+  // inside a tracked read — not gated behind ngDevMode, so this reproduces in every build,
+  // not just dev. jumpTo() is exactly what a tab-bar tap fires (see the test above), so this
+  // threw on literally every tab switch. drawer.ts's focusedRouteEmitter() has the identical
+  // shape and its own regression test in drawer.test.ts.
+  it('switching tabs does not throw when the newly-focused screen calls injectIsFocused()', async () => {
+    const handle = await mountTab();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      handle.jumpTo('Profile');
+      await tick();
+      handle.jumpTo('Feed');
+      await tick();
+    } finally {
+      expect(errorSpy).not.toHaveBeenCalled();
+      errorSpy.mockRestore();
+    }
+  });
+
+  // injectIsFocused() reads context.emitter at CALL time (during the screen's own constructor),
+  // which runs as part of *ngComponentOutlet creating the screen — nested INSIDE the same
+  // <ng-container [emitter]="focusedRouteEmitter()"> whose input evaluation is what actually
+  // fires the FOCUS emit. If Angular evaluates the ng-container's OWN inputs (calling
+  // focusedRouteEmitter(), firing FOCUS) before creating/refreshing the nested ngComponentOutlet
+  // child (running the screen's constructor, registering the injectIsFocused() listener), the
+  // FOCUS event fires to zero listeners and is lost forever — isFocused stays false permanently,
+  // exactly as reported ("focused: false", never changes, even after switching tabs back to it).
+  it('the initially-focused screen actually observes isFocused() becoming true', async () => {
+    await mountTab();
+    await tick();
+    expect(capturedFeedInstance).toBeDefined();
+    expect(capturedFeedInstance?.isFocused()).toBe(true);
+  });
+
+  it('switching tabs toggles isFocused() true/false on the exiting/entering screens', async () => {
+    const handle = await mountTab();
+    await tick();
+    handle.jumpTo('Profile');
+    await tick();
+    expect(capturedFeedInstance?.isFocused()).toBe(false);
+    expect(capturedProfileInstance).toBeDefined();
+    expect(capturedProfileInstance?.isFocused()).toBe(true);
   });
 });

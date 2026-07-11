@@ -5,7 +5,7 @@
 
 import { Directive, Input, type Type } from '@angular/core';
 import type { IDrawerScreenOptions, IRoute } from '../core';
-import type { IDrawerNavigatorHandle } from './drawer';
+import type { IDrawerNavigatorHandle } from '../core';
 
 export type IDrawerScreenComponentProps = {
   route: IRoute<unknown>;

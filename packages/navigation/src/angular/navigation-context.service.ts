@@ -15,12 +15,9 @@
 // type-only imports below, erased at compile time).
 
 import { Injectable, inject, signal, type Signal } from '@angular/core';
-import type { INavigationEmitter, IRoute } from '../core';
-import type { INavigatorHandle } from './stack';
-import type { ITabNavigatorHandle } from './tabs';
-import type { IDrawerNavigatorHandle } from './drawer';
+import type { INavigationEmitter, IRoute, IAnyNavigatorHandle } from '../core';
 
-export type IAnyNavigatorHandle = INavigatorHandle | ITabNavigatorHandle | IDrawerNavigatorHandle;
+export type { IAnyNavigatorHandle } from '../core';
 
 // NOT `providedIn: 'root'` — deliberately component-scoped (see CLAUDE.md's design note for this
 // package): every NavigationScopeDirective usage re-provides this token, so DI naturally mints one
@@ -53,4 +50,19 @@ export class NavigationContextService {
   setRoute(route: IRoute<unknown>): void {
     this.routeSignal.set(route);
   }
+}
+
+// Every injectX function (./injectors/*) opens with the same optional-inject-then-throw guard;
+// this centralizes it so the "must be used within a screen rendered by..." message stays
+// identical everywhere instead of six independently-typed copies. Must be called from an
+// injection context, same requirement `inject()` itself has - every call site is the first line
+// of an injectX function, which callers already only invoke from their own injection context.
+export function requireNavigationContext(injectorName: string): NavigationContextService {
+  const context = inject(NavigationContextService, { optional: true });
+  if (!context) {
+    throw new Error(
+      `${injectorName} must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>`,
+    );
+  }
+  return context;
 }
