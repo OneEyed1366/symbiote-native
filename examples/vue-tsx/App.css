@@ -606,6 +606,20 @@
   font-size: 14px;
   text-align: center;
 }
+/* the Teleport/createTunnel overlay target (CanaryScreen.tsx's overlay-host) — must cover the
+   full screen as a fixed sibling of the ScrollView, or its ported content lays out in-flow
+   instead and collapses to a near-zero hit area (see the Angular App.css precedent). Centered
+   the same way .modal-overlay is, or the ported card sits at Yoga's default flex-start corner
+   instead of mid-screen. */
+.overlay-host {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  bottom: 0px;
+  align-items: center;
+  justify-content: center;
+}
 
 /* MenuScreen hero */
 .menu-hero {

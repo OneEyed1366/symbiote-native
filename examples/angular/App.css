@@ -393,15 +393,18 @@
 }
 /* the createPortal/createTunnel overlay target (CanaryScreen.ts's angular-overlay-host) — must
    cover the full screen as a fixed sibling of the ScrollView, or its ported content lays out
-   in-flow instead and collapses to a near-zero hit area. Missing from this file (present in
-   examples/angular/App.css) was the root cause of the tunnel-toast dismiss button being
-   unhittable — see canary-overlays.test.ts. */
+   in-flow instead and collapses to a near-zero hit area — this class's earlier absence was the
+   root cause of the tunnel-toast dismiss button being unhittable, see canary-overlays.test.ts.
+   Centered the same way .modal-overlay is, or the ported card sits at Yoga's default
+   flex-start corner instead of mid-screen. */
 .overlay-host {
   position: absolute;
   top: 0px;
   left: 0px;
   right: 0px;
   bottom: 0px;
+  align-items: center;
+  justify-content: center;
 }
 
 /* MenuScreen hero */
