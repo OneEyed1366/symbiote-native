@@ -8,7 +8,7 @@
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, ViewChild, type Signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, Dimensions } from '@symbiote-native/angular';
+import { mount, unmount, Dimensions, registerComposedComponent } from '@symbiote-native/angular';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Drawer } from './index';
 import type { IDrawerNavigatorHandle } from './index';
@@ -23,6 +23,13 @@ const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0))
 // same cached value (Dimensions is a module-level singleton). Mirrors
 // react/drawer.test.tsx's identical setup.
 Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
+
+// On a real Metro build, adapters/angular's babel-register-composed.cjs auto-registers `Drawer`
+// as an anchor host by scanning the AOT-compiled @Component's selector — vitest never runs that
+// pipeline, so this test drives the same self-registration entry point by hand (mirrors
+// renderer.test.ts's 'RefApiDemo' convention). Without it, `<Drawer>` falls through to a raw
+// Fabric createNode('Drawer') call instead of a non-painting anchor.
+registerComposedComponent('Drawer');
 
 // rAF is not a Node global; Animated.timing (driven by every openDrawer/closeDrawer/toggleDrawer
 // call) reads it at .start() time. Ported verbatim from react/drawer.test.tsx's own polyfill — no

@@ -9,7 +9,12 @@
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, Input, ViewChild, type Signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/angular';
+import {
+  mount,
+  unmount,
+  registerComposedComponent,
+  setNativeViewConfigSource,
+} from '@symbiote-native/angular';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from './index';
@@ -68,6 +73,12 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
+// On a real Metro build, adapters/angular's babel-register-composed.cjs auto-registers `Stack`
+// as an anchor host by scanning the AOT-compiled @Component's selector — vitest never runs that
+// pipeline, so this test drives the same self-registration entry point by hand (mirrors
+// renderer.test.ts's 'RefApiDemo' convention). Without it, `<Stack>` falls through to a raw
+// Fabric createNode('Stack') call instead of a non-painting anchor.
+registerComposedComponent('Stack');
 
 const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
 

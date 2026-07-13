@@ -7,7 +7,7 @@
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, ViewChild, type Signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount } from '@symbiote-native/angular';
+import { mount, unmount, registerComposedComponent } from '@symbiote-native/angular';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Tab } from './index';
 import type { ITabNavigatorHandle } from './index';
@@ -18,6 +18,12 @@ const ROOT_TAG = 5121;
 const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
 
 const fabric = installFabric();
+// On a real Metro build, adapters/angular's babel-register-composed.cjs auto-registers `Tab`
+// as an anchor host by scanning the AOT-compiled @Component's selector — vitest never runs that
+// pipeline, so this test drives the same self-registration entry point by hand (mirrors
+// renderer.test.ts's 'RefApiDemo' convention). Without it, `<Tab>` falls through to a raw
+// Fabric createNode('Tab') call instead of a non-painting anchor.
+registerComposedComponent('Tab');
 
 beforeEach(() => {
   fabric.reset();

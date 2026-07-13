@@ -30,15 +30,19 @@
 // unknown-property binding.
 //
 // RESOLVED: `Stack` itself (like `Tab`/`Drawer`) is a composed Angular `@Component` used as a
-// plain `<Stack>` tag by consuming app code. `adapters/angular/src/renderer.ts`'s
-// `ANCHOR_HOST_COMPONENTS` allowlist lists `'Stack'`/`'Tab'`/`'Drawer'` — plus every
-// `.examples/angular` navigation-demo screen/component that hits the same "composed @Component
-// used as a plain tag" case, mounted either statically or via `NgComponentOutlet` — so a real
-// device build paints correctly (unlisted, `createElement('Stack')` falls through to a real
-// `createNode` call and RN paints its own "Unimplemented component" fallback instead) — the same
-// allowlist `@symbiote-native/slider`'s `Slider` needed. Every raw react-native-screens tag above
-// is correctly EXEMPT from that allowlist (they must fall through to a real `createNode` to paint
-// at all).
+// plain `<Stack>` tag by consuming app code. It is NOT hardcoded into `adapters/angular/src/
+// renderer/index.ts`'s `ANCHOR_HOST_COMPONENTS` Set — as an app/package-owned selector it
+// self-registers instead: `adapters/angular/babel-register-composed.cjs` (a Metro babel preset
+// applied bundle-wide, not scoped to adapters/angular) scans this package's own AOT-compiled
+// (`ngc`) `ɵɵngDeclareComponent({selector: 'Stack', ...})` output and auto-calls
+// `registerComposedComponent('Stack')` at bundle time — same mechanism `.examples/angular`
+// navigation-demo screens and `@symbiote-native/slider`'s `Slider` rely on for their own composed
+// components mounted statically or via `NgComponentOutlet`. Unregistered, `createElement('Stack')`
+// falls through to a real `createNode` call and RN paints its own "Unimplemented component"
+// fallback instead. vitest never runs that Metro/babel pipeline, so `stack.test.ts` calls
+// `registerComposedComponent('Stack')` itself. Every raw react-native-screens tag above is
+// correctly EXEMPT from this mechanism (they must fall through to a real `createNode` to paint at
+// all).
 
 import {
   ChangeDetectionStrategy,
