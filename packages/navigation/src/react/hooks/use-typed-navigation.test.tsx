@@ -1,5 +1,5 @@
 // Co-located React-driven test (ADR 0025) for useStackNavigation/useTabNavigation/
-// useDrawerNavigation — the narrowed twins of useNavigation() that hide the union guard.
+// useDrawerNavigation - the narrowed twins of useNavigation() that hide the union guard.
 
 import { act, createElement, createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -43,7 +43,7 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 
 // Drawer reads the screen width off useWindowDimensions() to resolve its swipe edge zone;
 // headless has no DeviceInfo native module, so seed a concrete width once (Dimensions is a
-// module-level singleton) — same fixture as drawer.test.tsx.
+// module-level singleton) - same fixture as drawer.test.tsx.
 Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
 const fabric = installFabric();

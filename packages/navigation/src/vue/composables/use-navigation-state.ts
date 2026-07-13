@@ -1,15 +1,12 @@
-// Thin selector wrapper: subscribes to the router's `state` broadcast (stack.ts's/tabs.ts's/
-// drawer.ts's render loop re-emits the full router state to every route's emitter after each
-// commit) and returns `selector(state)`, updating reactively only when the emitted state changes —
-// mirrors @react-navigation's useNavigationState. The reducer/dispatch machinery it selects over
-// lives in core/navigator-state.ts (and tab-router-state.ts/drawer-router-state.ts for the other
-// two navigators); this composable only wires the subscription. The Vue twin of
-// react/hooks/use-navigation-state.ts.
+// Mirrors @react-navigation's useNavigationState; Vue twin of react/hooks/use-navigation-state.ts.
+// The reducer/dispatch machinery lives in core/navigator-state.ts (tab-router-state.ts /
+// drawer-router-state.ts for the other two navigators) - this composable only wires the
+// subscription to the `state` broadcast each render loop re-emits after commit.
 //
 // Seeded from a single-route snapshot ({ routes: [route] }) rather than left undefined: the real
 // broadcast lands after mount (Stack's render loop; tabs.ts/drawer.ts emit on focus), so a
 // selector reading e.g. `state.routes.at(-1)?.name` still resolves correctly on first paint for
-// the common single-route case, closing the same async gap useIsFocused documents.
+// the common single-route case - the same async gap useIsFocused documents.
 
 import { onMounted, onUnmounted, shallowRef } from '@vue/runtime-core';
 import type { ShallowRef } from '@vue/runtime-core';

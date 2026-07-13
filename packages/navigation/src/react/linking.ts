@@ -1,6 +1,6 @@
 // useLinkingIntegration: wires the framework-agnostic linking config (../core's
 // resolveRouteFromUrl) onto an existing Stack ref's INavigatorHandle. Deliberately NOT called
-// from inside stack.ts — app code owns the wiring (a <Stack ref={...}> plus this hook alongside
+// from inside stack.ts - app code owns the wiring (a <Stack ref={...}> plus this hook alongside
 // it), the same top-level-prop shape @react-navigation keeps `linking` in on NavigationContainer
 // rather than baking it into the router itself.
 

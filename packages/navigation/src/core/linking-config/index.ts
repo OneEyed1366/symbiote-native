@@ -1,22 +1,22 @@
 // Linking config: the piece @react-navigation's `NavigationContainer`'s `linking` prop provides
-// on top of the framework-agnostic `Linking` module (core/engine/src/linking) — resolving a URL
+// on top of the framework-agnostic `Linking` module (core/engine/src/linking) - resolving a URL
 // ('myapp://user/42', '/user/42') to a route, and a route back to a URL. This is OUR OWN type,
 // not imported from react-navigation, kept close to its shape (`prefixes` + `config.screens`)
 // only so the DX is familiar.
 //
 // Why hand-rolled matching instead of react-router's `matchPath`/`generatePath` (evaluated per
 // task): react-router 8's package has no subpath export for the pure `lib/router/utils.ts`
-// matcher — its only general entry point (`.`) eagerly imports `./lib/dom/*`
+// matcher - its only general entry point (`.`) eagerly imports `./lib/dom/*`
 // (BrowserRouter/ScrollRestoration/cookies) and `./lib/server-runtime/*`, code that assumes DOM
 // and Node globals a Metro/Hermes RN bundle doesn't have; its `peerDependencies` also pin
 // `react-dom`, which this DOM-free monorepo never installs (see CLAUDE.md
-// react_native_is_an_explicit_top_level_peer — no foreign runtime singleton gets smuggled in).
+// react_native_is_an_explicit_top_level_peer - no foreign runtime singleton gets smuggled in).
 // On top of the bundling risk, `matchPath`'s/`generatePath`'s param-name extraction is a
 // template-literal-type trick that only fires for a compile-time LITERAL path string; our
 // patterns come from a runtime config object (`Path` widens to plain `string`), so the generic
-// degrades to an empty params type and using the result would force an `as` cast — forbidden by
+// degrades to an empty params type and using the result would force an `as` cast - forbidden by
 // this project's TS conventions. A minimal `:param`-segment matcher sidesteps both problems and
-// is the right size for a single flat Stack (no optional/splat segments — no nested-navigator use
+// is the right size for a single flat Stack (no optional/splat segments - no nested-navigator use
 // for them yet).
 
 import { dlog } from '@symbiote-native/engine';
@@ -55,7 +55,7 @@ function joinPath(parent: string, child: string): string {
 
 // Walks `screens` recursively, accumulating the path down to each LEAF screen. Unlike
 // react-navigation (which resolves nested config into nested navigation state), our navigator is
-// a single flat Stack — a `screens` group with no `path` of its own is transparent (consumes no
+// a single flat Stack - a `screens` group with no `path` of its own is transparent (consumes no
 // URL segment); a group WITH a `path` but no nested `screens` is itself a leaf using that path.
 function flattenScreens(
   screens: Record<string, IScreenLinkingConfig>,
@@ -124,7 +124,7 @@ function stripQueryAndHash(url: string): string {
 // Resolves a full URL down to the bare path segment string ('user/42', no leading slash) by
 // stripping the longest matching configured prefix, falling back to treating the URL as an
 // already-bare path when it starts with '/' (the task's second example form). Returns null when
-// neither applies — an unrecognized scheme/host, not "no route matched".
+// neither applies - an unrecognized scheme/host, not "no route matched".
 function extractPathname(config: ILinkingConfig, url: string): string | null {
   const withoutQuery = stripQueryAndHash(url);
   const sortedPrefixes = [...config.prefixes].sort((a, b) => b.length - a.length);
@@ -149,7 +149,7 @@ export function resolveRouteFromUrl(config: ILinkingConfig, url: string): IRoute
     const params = matchPattern(candidate.pattern, pathname);
     if (params !== null) {
       dlog(`linking-config: resolved "${url}" -> ${candidate.name}`);
-      // `key` is not real route identity here — the navigator mints its own on push/replace
+      // `key` is not real route identity here - the navigator mints its own on push/replace
       // (stack.ts's createRoute); `name` is a stable enough placeholder to satisfy IRoute's shape.
       return {
         key: candidate.name,
@@ -165,7 +165,7 @@ export function resolveRouteFromUrl(config: ILinkingConfig, url: string): IRoute
 
 // The inverse of matchPattern: fills a pattern's ':param' segments from `params`, or returns
 // null when a required param is missing (mirrors react-router's generatePath throwing, minus the
-// throw — a resolver returning null reads more naturally at the call site here).
+// throw - a resolver returning null reads more naturally at the call site here).
 function fillPattern(pattern: string, params: unknown): string | null {
   if (pattern.length === 0) return '';
   const source = isRecord(params) ? params : {};
@@ -203,7 +203,7 @@ export function resolveUrlFromRoute(config: ILinkingConfig, route: IRoute<unknow
   if (prefix === undefined) return path.length > 0 ? `/${path}` : '/';
 
   // A prefix already carrying its own trailing separator ('myapp://') must not be truncated to
-  // 'myapp:/' by naively slicing one char off — only add a '/' when the prefix doesn't have one.
+  // 'myapp:/' by naively slicing one char off - only add a '/' when the prefix doesn't have one.
   if (path.length === 0) return prefix;
   return prefix.endsWith('/') ? `${prefix}${path}` : `${prefix}/${path}`;
 }

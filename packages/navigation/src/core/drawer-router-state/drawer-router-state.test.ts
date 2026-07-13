@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for the pure drawer router reducer — sibling to
+// Co-located unit test (ADR 0025) for the pure drawer router reducer - sibling to
 // navigator-state.test.ts (stack). Unlike the stack's push/pop array, the drawer's route list
 // never changes shape (see drawer-router-state.ts's header): only which route is focused
 // (`index`) and whether the panel is open (`isOpen`) can change, so every action here is a
@@ -54,7 +54,7 @@ describe('drawerRouterReducer — jumpTo', () => {
   });
 
   it('closes an open drawer even when jumping to the already-focused route', () => {
-    // Selecting a destination is itself the dismissal gesture (the reducer's own comment) —
+    // Selecting a destination is itself the dismissal gesture (the reducer's own comment) -
     // that still holds when the destination is the one already on screen.
     const state = openState(0);
     const next = drawerRouterReducer(state, { type: 'jumpTo', name: 'Home' });

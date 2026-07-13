@@ -1,7 +1,7 @@
 // DrawerRouter: the logic half (framework-agnostic, zero render), sibling to navigator-state.ts
 // and tab-router-state.ts. Unlike the stack's push/pop route array, a drawer's route list is
 // FIXED at mount (one entry per declared <Drawer.Screen>, collected by the adapter exactly like
-// Stack's/Tab's collectRegistry) — the reducer only tracks which one is focused (`index`) and
+// Stack's/Tab's collectRegistry) - the reducer only tracks which one is focused (`index`) and
 // whether the drawer panel is open. Route identity/shape is `IRoute`, reused verbatim from
 // navigator-state.ts (same convention tab-router-state.ts follows) so all three navigators share
 // one route shape.
@@ -38,7 +38,7 @@ export function createInitialDrawerRouterState(
 }
 
 // Mirrors @react-navigation/drawer's DrawerActions: jumpTo focuses a route by NAME (TabRouter's
-// own convention, not the stack's by-key popTo) AND closes the drawer — selecting a destination
+// own convention, not the stack's by-key popTo) AND closes the drawer - selecting a destination
 // is itself the dismissal gesture, so a plain focus without also closing would leave the panel
 // covering the just-selected screen.
 export function drawerRouterReducer(

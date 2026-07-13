@@ -1,8 +1,8 @@
-// @symbiote-native/navigation (core): the framework-agnostic half of the native stack navigator —
+// @symbiote-native/navigation (core): the framework-agnostic half of the native stack navigator -
 // a pure route-stack reducer plus the react-native-screens prop folds and native-leaf prop
 // resolvers. symbiote ships zero runtime metadata for RNSScreen/RNSScreenStack/
-// RNSScreenStackHeaderConfig — the engine derives their events and color processors from
-// react-native-screens' own ViewConfig — so this layer is the pure JS every adapter reuses
+// RNSScreenStackHeaderConfig - the engine derives their events and color processors from
+// react-native-screens' own ViewConfig - so this layer is the pure JS every adapter reuses
 // verbatim, supplying only its lifecycle (route-key generation, useReducer/reactive state) and
 // the descriptor bridge.
 
@@ -83,11 +83,11 @@ export type {
 } from './navigation-events';
 
 // Runtime guards shared across core (and re-exported for adapters narrowing their own untyped
-// inputs — vnode props, gesture/event data, persisted JSON) — see guards.ts's header for which
+// inputs - vnode props, gesture/event data, persisted JSON) - see guards.ts's header for which
 // call sites this consolidates and why array-exclusion is the right default everywhere it's used.
 export { isRecord } from './guards';
 
-// Bottom-tabs navigator: a FOCUSED-INDEX router (not a stack — see tab-router-state.ts) driving
+// Bottom-tabs navigator: a FOCUSED-INDEX router (not a stack - see tab-router-state.ts) driving
 // a pure-JS tab bar render, framework-agnostic and shared verbatim by every adapter.
 export { createInitialTabState, tabRouterReducer, isFocusedRoute } from './tab-router-state';
 export type { ITabRouterState, ITabRouterAction } from './tab-router-state';
@@ -104,7 +104,7 @@ export type { ILinkingConfig, IScreenLinkingConfig } from './linking-config';
 
 // Drawer navigator: an OPEN/CLOSED-flag router over a fixed route list (see
 // drawer-router-state.ts's header for why it isn't a push/pop stack), a pure swipe/geometry math
-// module, and a Descriptor render fn — all framework-agnostic, shared verbatim by every adapter.
+// module, and a Descriptor render fn - all framework-agnostic, shared verbatim by every adapter.
 export {
   createInitialDrawerRouterState,
   drawerRouterReducer,

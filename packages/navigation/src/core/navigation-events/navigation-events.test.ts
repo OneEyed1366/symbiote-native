@@ -1,4 +1,4 @@
-// Pure unit coverage for the framework-agnostic pub/sub emitter — zero React, so no fabric/mount
+// Pure unit coverage for the framework-agnostic pub/sub emitter - zero React, so no fabric/mount
 // scaffolding needed (mirrors navigator-state.test.ts's plain reducer coverage, once that lands).
 
 import { describe, expect, it, vi } from 'vitest';

@@ -1,7 +1,7 @@
 // Co-located unit test (ADR 0025) for the pure route-stack reducer, covering setParams and reset
 // (the react-navigation StackRouter parity pieces) alongside the existing action shapes they sit
 // next to. Push/pop/popToTop/popTo/replace are exercised end-to-end through the React lifecycle
-// in stack.test.tsx already — this file targets navigatorReducer directly, framework-free.
+// in stack.test.tsx already - this file targets navigatorReducer directly, framework-free.
 
 import { describe, expect, it } from 'vitest';
 import { navigatorReducer } from './index';

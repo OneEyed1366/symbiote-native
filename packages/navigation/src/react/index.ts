@@ -1,6 +1,6 @@
 // @symbiote-native/navigation/react: the React native-stack navigator over react-native-screens'
 // native view primitives. Importing this barrel first registers the native views' ViewConfigs
-// (../register, a side-effect import of the three codegen specs — never react-native-screens' own
+// (../register, a side-effect import of the three codegen specs - never react-native-screens' own
 // React components), then exposes Stack (with Stack.Screen attached) and the navigator handle.
 
 import '../register';

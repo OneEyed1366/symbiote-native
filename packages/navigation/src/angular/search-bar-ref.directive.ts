@@ -1,8 +1,8 @@
-// Assigns the app-supplied `headerSearchBarOptions.ref` (a plain `{ current }` cell — see
+// Assigns the app-supplied `headerSearchBarOptions.ref` (a plain `{ current }` cell - see
 // screen.directive.ts's IAngularSearchBarOptions) once the RNSSearchBar native node exists.
 // Angular's twin of react/stack.ts's callback `ref` prop on the RNSSearchBar element: a directive
 // applied directly onto the raw `<RNSSearchBar>` tag can `inject(ElementRef)` the same way
-// SymbioteHostPropsDirective does (primitives/shared.ts's own pattern) — ElementRef.nativeElement
+// SymbioteHostPropsDirective does (primitives/shared.ts's own pattern) - ElementRef.nativeElement
 // is the real engine node the moment the element is created (synchronous, no whenCommitted wait
 // needed here: buildSearchBarHandle's own methods are already a LAZY getter over the node,
 // tolerant of the node existing-but-not-yet-committed, same contract every adapter shares).

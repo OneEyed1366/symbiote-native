@@ -1,13 +1,13 @@
 // Tab, the Angular lifecycle half. The focused-index router (tab-router-state) and the tab-bar
 // Descriptor builder (render-tabs) live in @symbiote-native/navigation core, shared verbatim with
-// the React/Vue adapters; here Angular supplies the lifecycle — a signal for the focused index, a
+// the React/Vue adapters; here Angular supplies the lifecycle - a signal for the focused index, a
 // per-instance counter for route-key generation, `jumpTo`/`setParams` as plain public methods
 // directly on the class (no ref forwarding needed, see stack.ts's header, same reasoning: `Tab
 // implements ITabNavigatorHandle`) - plus the descriptor bridge (`symbiote-descriptor-outlet`,
 // `@symbiote-native/angular`) for the tab-bar leaf, exactly like Stack bridges its header config.
 // Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints
 // ordinary `symbiote-view`/`symbiote-text` primitives via the shared render fn, so there is no
-// react-native-screens ViewConfig to register — Tab needs no `../register` import. Every tag this
+// react-native-screens ViewConfig to register - Tab needs no `../register` import. Every tag this
 // template names (`View`, `symbiote-descriptor-outlet`) is a REAL imported Angular component (no
 // raw non-dashed native tag names the way stack.ts needs `NO_ERRORS_SCHEMA` for), so no loosened
 // schema is needed here at all.
@@ -97,7 +97,7 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
   readonly contentStyle = TAB_CONTENT_STYLE;
 
   private readonly routeIdPrefix = `tab-${(tabInstanceCounter += 1)}`;
-  // Keyed by name -> the LIVE TabScreenDirective instance — see stack.ts's matching comment for
+  // Keyed by name -> the LIVE TabScreenDirective instance - see stack.ts's matching comment for
   // why a snapshot copy would go stale on an in-place `[options]`/`[component]` change.
   private readonly registry = new Map<string, TabScreenDirective>();
   private tabScreenChildrenSubscription: { unsubscribe: () => void } | undefined;
@@ -169,22 +169,22 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
     return this.registry.get(route.name)?.component ?? null;
   }
 
-  // Lazily creates/replaces the focused route's emitter and synthesizes focus/blur — Tab paints
+  // Lazily creates/replaces the focused route's emitter and synthesizes focus/blur - Tab paints
   // its own bar in pure JS (no native onAppear/onDisappear the way Stack's RNSScreen has), so
   // focus/blur is synthesized here exactly like react/tabs.ts's own useEffect does, just idempotent
   // per read (called repeatedly with the same key during one CD pass) instead of dependency-array
   // gated. Keyed on the route KEY, not the object, so a setParams-only change doesn't re-fire.
   //
   // Called from the template ([emitter]="focusedRouteEmitter()"), which runs inside Angular's
-  // reactive-read tracking context for the current CD pass — unlike React's useEffect, which runs
+  // reactive-read tracking context for the current CD pass - unlike React's useEffect, which runs
   // in a separate post-commit phase. Two consequences of that, both fixed below:
   //
   // 1. Writing a signal from inside a tracked template read throws Angular's NG600 ("signal write
-  //    during a template execution") — untracked() opts this whole synthesis out of that tracking
+  //    during a template execution") - untracked() opts this whole synthesis out of that tracking
   //    context, matching what the post-commit useEffect phase gives React for free.
   // 2. The NEW route's screen component (injectIsFocused's listener source) is created by
   //    *ngComponentOutlet AFTER this binding is evaluated, but still within the SAME synchronous
-  //    template refresh — so emitting FOCUS right here fires to zero listeners and is silently
+  //    template refresh - so emitting FOCUS right here fires to zero listeners and is silently
   //    lost forever (isFocused stays false permanently, even for the very first-focused screen).
   //    queueMicrotask defers the FOCUS emit past the end of the current synchronous refresh
   //    (which includes the new screen's construction), guaranteeing its injectIsFocused()

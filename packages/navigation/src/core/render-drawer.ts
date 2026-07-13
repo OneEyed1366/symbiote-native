@@ -1,17 +1,17 @@
 // Drawer: the render half (framework-agnostic). Like render-stack.ts's screen content, both the
 // drawer panel's content (renderDrawerContent) and the wrapped screen content are arbitrary
-// framework subtrees the adapter owns — so, mirroring render-modal.ts's container-slot precedent,
+// framework subtrees the adapter owns - so, mirroring render-modal.ts's container-slot precedent,
 // renderDrawer hands back one root Descriptor whose structural children are EMPTY placeholder
 // nodes (`content` / `overlay?` / `panel`) that the adapter fills with real framework children.
 // Paint order (and therefore which slot is present) is drawerType-dependent, so `drawerChildOrder`
 // is exported alongside renderDrawer as the single source of truth the adapter zips its own
-// children against — no adapter re-derives the ordering itself.
+// children against - no adapter re-derives the ordering itself.
 //
-// All positioning here is STATIC (position/top/bottom/side/width) — the animated slide transform
+// All positioning here is STATIC (position/top/bottom/side/width) - the animated slide transform
 // and overlay opacity are NOT baked into this Descriptor. They are computed once per drawerType
 // via drawer-options.ts's resolveDrawerGeometry() and then driven per-frame by the adapter's own
 // Animated value (Animated.View), because "how to animate a style" is a framework-lifecycle
-// concern (React: Animated.View; a future Vue adapter: a reactive style binding) — see
+// concern (React: Animated.View; a future Vue adapter: a reactive style binding) - see
 // CLAUDE.md <adapters_stay_thin>.
 
 import { el, type IDescriptor } from '@symbiote-native/components';
@@ -27,11 +27,11 @@ import {
 export type IDrawerSlot = 'content' | 'overlay' | 'panel';
 
 // front: content, overlay (dims it), panel (paints on top, last-sibling-on-top).
-// back: panel (stationary, behind), content (slides away to reveal it) — no overlay. Both are
+// back: panel (stationary, behind), content (slides away to reveal it) - no overlay. Both are
 // absolutely positioned, so sibling order here only decides z-stacking, not screen side.
 // slide: panel, overlay, content (both panel and content animate; content stays visually on top).
 // permanent: NOT absolutely positioned (an ordinary flexDirection:'row' sidebar), so sibling
-// order IS the left-to-right screen position — it must follow drawerPosition.
+// order IS the left-to-right screen position - it must follow drawerPosition.
 export function drawerChildOrder(options: IDrawerOptions): readonly IDrawerSlot[] {
   const type = resolveDrawerType(options);
   switch (type) {

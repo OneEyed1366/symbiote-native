@@ -1,11 +1,11 @@
 // Tab, the Vue lifecycle half. The focused-index router (tab-router-state) and the tab-bar
 // Descriptor builder (render-tabs) live in @symbiote-native/navigation core, shared verbatim with
-// the React/Angular adapters; here Vue supplies the lifecycle — a plain ref for the focused index
+// the React/Angular adapters; here Vue supplies the lifecycle - a plain ref for the focused index
 // (Vue's twin of useReducer), useId for route-key generation, expose() for the jumpTo/setParams
-// handle — plus the descriptor bridge for the tab-bar leaf, exactly like Stack bridges its header
+// handle - plus the descriptor bridge for the tab-bar leaf, exactly like Stack bridges its header
 // config (stack.ts). Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints ordinary
 // `symbiote-view`/`symbiote-text` primitives via the shared render fn, so there is no
-// react-native-screens ViewConfig to register here — Tab needs no `../register` import.
+// react-native-screens ViewConfig to register here - Tab needs no `../register` import.
 
 import {
   defineComponent,
@@ -67,7 +67,7 @@ function asComponent(value: unknown): ITabScreenProps['component'] | undefined {
 }
 
 // ITabOptions carries a handful of independently-optional fields forwarded wholesale into the
-// shared render fn below — same "narrow the object-ness, cast at the exact I/O edge" rationale
+// shared render fn below - same "narrow the object-ness, cast at the exact I/O edge" rationale
 // stack.ts's asScreenOptions documents (CLAUDE.md's ts-js rule).
 function asTabOptions(value: unknown): ITabOptions | undefined {
   return isRecord(value) ? (value as ITabOptions) : undefined;
@@ -111,7 +111,7 @@ const TabImpl = defineComponent<ITabProps>(
   (_props, { attrs: rawAttrs, slots, expose }) => {
     const attrs = normalizeVueAttrs(rawAttrs);
 
-    // Read BEFORE this Tab establishes its own per-screen NavigationScope below — becomes the
+    // Read BEFORE this Tab establishes its own per-screen NavigationScope below - becomes the
     // `parent` link a nested screen's useNavigation().getParent() walks (e.g. this Tab rendered
     // as a Stack screen's content reaches that Stack via this value). undefined when this Tab is
     // the nesting root.
@@ -146,22 +146,22 @@ const TabImpl = defineComponent<ITabProps>(
     const handle: ITabNavigatorHandle = { jumpTo, setParams };
     expose(handle);
 
-    // Tab paints its own bar in pure JS — there is no native onAppear/onDisappear to hook (unlike
+    // Tab paints its own bar in pure JS - there is no native onAppear/onDisappear to hook (unlike
     // Stack's RNSScreen), so focus/blur is synthesized here: emit 'focus' once the newly-focused
     // route's content has mounted, 'blur' when it's about to be replaced or Tab itself unmounts.
     // Keyed on the route KEY (not the route object) so a setParams-only change (new route object,
-    // same key) doesn't spuriously re-fire focus/blur — mirrors tabs.ts's React twin exactly,
+    // same key) doesn't spuriously re-fire focus/blur - mirrors tabs.ts's React twin exactly,
     // just expressed as a `watch` over the focused key instead of a useEffect dependency array.
     function focusedKeyOf(current: typeof state.value): string | undefined {
       return current.routes[current.index]?.key;
     }
 
-    // One emitter per route.key, created lazily and cached for the navigator's whole lifetime —
+    // One emitter per route.key, created lazily and cached for the navigator's whole lifetime -
     // mirrors stack.ts's own `emitters` map. This decouples emitter IDENTITY (stable, looked up
     // by key, read by the render closure below when it builds a route's NavigationScope) from
     // emit TIMING (must wait until the focused screen has actually mounted and subscribed): a
     // scheme that instead tried to recreate/swap `routeEmitter` synchronously on each focus
-    // change raced Vue's own render/mount cycle no matter which watch `flush` timing it used —
+    // change raced Vue's own render/mount cycle no matter which watch `flush` timing it used -
     // 'pre' emits before the new screen's onMounted subscribes, 'post' emits AFTER the render
     // closure already needed the (still up-to-date) emitter to build that screen's NavigationScope
     // in the FIRST place. A stable per-key lookup sidesteps the race entirely.
@@ -175,11 +175,11 @@ const TabImpl = defineComponent<ITabProps>(
       return emitter;
     }
 
-    // Tab paints its own bar in pure JS — there is no native onAppear/onDisappear to hook (unlike
+    // Tab paints its own bar in pure JS - there is no native onAppear/onDisappear to hook (unlike
     // Stack's RNSScreen), so focus/blur is synthesized here: emit 'focus' once the newly-focused
     // route's content has mounted, 'blur' when it's about to be replaced or Tab itself unmounts.
     // Keyed on the route KEY (not the route object) so a setParams-only change (new route object,
-    // same key) doesn't spuriously re-fire focus/blur — mirrors tabs.ts's React twin exactly,
+    // same key) doesn't spuriously re-fire focus/blur - mirrors tabs.ts's React twin exactly,
     // just expressed as a `watch` over the focused key instead of a useEffect dependency array.
     let focusedRouteKey = focusedKeyOf(state.value);
 
@@ -192,11 +192,11 @@ const TabImpl = defineComponent<ITabProps>(
 
     // The bookkeeping (which key is focused) updates immediately so the render closure below
     // always reads the right route; the actual emit is deferred to nextTick(), which resolves
-    // only after the CURRENT flush cycle fully drains — including the newly-focused screen's own
+    // only after the CURRENT flush cycle fully drains - including the newly-focused screen's own
     // onMounted (subscribing its useIsFocused/useFocusEffect listeners). flush:'post' alone is
     // NOT enough here: it only guarantees this callback runs after THIS component's own render
     // effect, not after an arbitrary sibling post-flush job (a just-mounted child's onMounted)
-    // that may be queued after it in the same batch — nextTick is the one API that waits for the
+    // that may be queued after it in the same batch - nextTick is the one API that waits for the
     // WHOLE cycle, not just this watcher's own slot in it.
     watch(
       () => focusedKeyOf(state.value),
@@ -269,7 +269,7 @@ const TabImpl = defineComponent<ITabProps>(
       );
 
       // Only the focused route's screen is ever mounted (unlike Stack, which keeps every pushed
-      // route alive), so a fresh NavigationScope per focus change is sufficient — the previous
+      // route alive), so a fresh NavigationScope per focus change is sufficient - the previous
       // screen's whole subtree (and any listeners it registered) is torn down by an ordinary Vue
       // unmount when focus moves on.
       const content =

@@ -1,9 +1,9 @@
 // Co-located React-driven test (ADR 0025) for the @symbiote-native/navigation React Tab
 // navigator. Unlike Stack (which drives real native RNSScreen views and needs an injected
-// codegen-shaped ViewConfig — see stack.test.tsx), the tab bar is a PURE-JS UI painted from
+// codegen-shaped ViewConfig - see stack.test.tsx), the tab bar is a PURE-JS UI painted from
 // ordinary `symbiote-view`/`symbiote-text` primitives, so no ViewConfig source is needed here at
 // all. Proves: only the focused route's screen mounts, jumpTo() moves focus, a tap (synthesized
-// by the engine from a topTouchStart/topTouchEnd pair — core/engine/src/events/index.ts — on the
+// by the engine from a topTouchStart/topTouchEnd pair - core/engine/src/events/index.ts - on the
 // tab button) drives the same jumpTo, and per-tab options (label/badge/tint) reach the tab bar.
 
 import { act, createElement, createRef, useCallback } from 'react';
@@ -37,7 +37,7 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
 }
 
 // The tab bar row: the second child of Tab's root `symbiote-view` (content wrapper first, bar
-// second — see react/tabs.ts's final createElement).
+// second - see react/tabs.ts's final createElement).
 function tabBarRow(): IFakeNode {
   const root = fabric.appRoot();
   const tabRoot = root.children[0];
@@ -180,7 +180,7 @@ describe('React Tab navigator', () => {
 
   // Before this fix, Tab never wrapped its focused screen in NavigationContext.Provider at all,
   // so every one of these hooks threw "must be used within a screen rendered by <Stack>" the
-  // moment a Tab screen called them — a real gap, not just a nesting concern (see this package's
+  // moment a Tab screen called them - a real gap, not just a nesting concern (see this package's
   // task notes). These cases prove the context is now provided and the focus semantics are wired.
   it('useNavigation()/useRoute() are usable inside a Tab screen, and useIsFocused() reflects the focused tab', () => {
     let homeIsFocused: boolean | undefined;
@@ -203,7 +203,7 @@ describe('React Tab navigator', () => {
 
     const ref = createRef<ITabNavigatorHandle>();
     // Tab's own focus-emitting effect runs in the same commit as the initial mount, but the
-    // setIsFocused(true) it triggers inside useIsFocused's listener lands in a follow-up render —
+    // setIsFocused(true) it triggers inside useIsFocused's listener lands in a follow-up render -
     // act() is what drains that cascade synchronously (mirrors every other state-changing call in
     // this file already being act()-wrapped).
     act(() => {
@@ -246,7 +246,7 @@ describe('React Tab navigator', () => {
         createElement(Tab.Screen, { name: 'Profile', component: ProfileScreen }),
       ),
     );
-    // Tab paints no native RNSScreen (unlike Stack), so there is no onAppear to wait for — the
+    // Tab paints no native RNSScreen (unlike Stack), so there is no onAppear to wait for - the
     // focused screen's useFocusEffect runs as soon as it mounts.
     expect(events).toEqual(['effect']);
 

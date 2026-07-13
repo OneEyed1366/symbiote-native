@@ -1,4 +1,4 @@
-// [symbioteTabScreen]: Tab's twin of screen.directive.ts's ScreenDirective — a declarative marker
+// [symbioteTabScreen]: Tab's twin of screen.directive.ts's ScreenDirective - a declarative marker
 // read via @ContentChildren to build the static name -> {component, options} registry, then Tab
 // mounts the FOCUSED route's component itself. Mirrors react/tab-screen.ts's TabScreen minus the
 // stack-only concepts (no push/pop lifecycle events to wire).

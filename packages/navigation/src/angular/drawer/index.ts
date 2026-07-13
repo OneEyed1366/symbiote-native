@@ -1,8 +1,8 @@
 // Drawer, the Angular lifecycle half. The open/closed + focused-route router
 // (drawer-router-state) and the pure swipe/geometry math (drawer-options) live in
 // @symbiote-native/navigation core, shared verbatim with the React/Vue adapters; here Angular
-// supplies the lifecycle — a signal-backed router, a PanResponder (RN's own idiom, framework-
-// agnostic per `@symbiote-native/engine` — built ONCE as a class field, callbacks read LIVE `this`
+// supplies the lifecycle - a signal-backed router, a PanResponder (RN's own idiom, framework-
+// agnostic per `@symbiote-native/engine` - built ONCE as a class field, callbacks read LIVE `this`
 // state at call time, no ref-mirroring dance needed the way react/drawer.ts's `useRef`s are: a
 // class instance already gives every callback a live view of current state, closing the exact gap
 // React's own hook rules force it to work around), an Animated.Value driving the slide/opacity
@@ -15,7 +15,7 @@
 // FEASIBILITY NOTE (mirrors react/drawer.ts's own header): the REAL @react-navigation/drawer is
 // built on react-native-gesture-handler + react-native-reanimated, neither of which this codebase
 // depends on. This reaches the same swipe-to-open/close + front/back/slide/permanent behavior with
-// only PanResponder + Animated, sufficient for a solid drawer but NOT byte-for-byte parity — same
+// only PanResponder + Animated, sufficient for a solid drawer but NOT byte-for-byte parity - same
 // explicit gap list as react/drawer.ts's tail comment (not repeated here, nothing Angular-specific
 // changes it).
 //
@@ -24,7 +24,7 @@
 // as a nested tag. `View`/`AnimatedView`, imported below, were already anchor-hosted.
 //
 // DRAWER CONTENT PROJECTION: react/drawer.ts's `renderDrawerContent` is a render-PROP callback
-// (`(props) => ReactNode`) — per CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter>, a
+// (`(props) => ReactNode`) - per CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter>, a
 // render-callback returning a framework element is inherently per-adapter. Angular's own idiom for
 // "a caller-supplied template that needs live data" is a `TemplateRef` + `NgTemplateOutlet` with a
 // context object, NOT a callback @Input(): `<Drawer><ng-template #drawerContent let-ctx>...
@@ -190,7 +190,7 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
   private readonly windowDimensions = inject(WindowDimensionsService).dimensions;
 
   private readonly routeIdPrefix = `drawer-${(drawerInstanceCounter += 1)}`;
-  // Keyed by name -> the LIVE DrawerScreenDirective instance — see stack.ts's matching comment
+  // Keyed by name -> the LIVE DrawerScreenDirective instance - see stack.ts's matching comment
   // for why a snapshot copy would go stale on an in-place `[options]`/`[component]` change.
   private readonly registry = new Map<string, DrawerScreenDirective>();
   private drawerScreenChildrenSubscription: { unsubscribe: () => void } | undefined;
@@ -202,9 +202,9 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
   private currentEmitter: INavigationEmitter | undefined;
 
   // progress: 0 closed -> 1 open. Always starts closed (createInitialDrawerRouterState's own
-  // contract), so a plain field initializer is safe — no dependency on `state` existing yet.
+  // contract), so a plain field initializer is safe - no dependency on `state` existing yet.
   private readonly progress = new Animated.Value(0);
-  // Where a drag STARTS from, in progress units — always exactly 0 or 1 (see react/drawer.ts's
+  // Where a drag STARTS from, in progress units - always exactly 0 or 1 (see react/drawer.ts's
   // matching field for why).
   private dragStartProgress = 0;
 
@@ -326,12 +326,12 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
     Animated.timing(this.progress, {
       toValue: open ? 1 : 0,
       duration: DRAWER_SNAP_DURATION,
-      // Native-driver wiring is deferred for v1 — mirrors react/drawer.ts's own scope note.
+      // Native-driver wiring is deferred for v1 - mirrors react/drawer.ts's own scope note.
       useNativeDriver: false,
     }).start();
   }
 
-  // A plain writable signal, not a computed() — it mirrors @Input() properties, which are ordinary
+  // A plain writable signal, not a computed() - it mirrors @Input() properties, which are ordinary
   // mutable fields Angular assigns directly rather than signals, so a computed() reading them would
   // never register them as a tracked dependency and would go stale after its first evaluation.
   // ngOnChanges (below) pushes every input change in here instead, which drawerRoot/slotsMap CAN
@@ -372,7 +372,7 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
   }
 
   // Recomputed only when a dependency signal actually changes, so every template read within a
-  // single change-detection pass (rootStyle, plus slotStyle/slotAnimatedProps once per @for slot —
+  // single change-detection pass (rootStyle, plus slotStyle/slotAnimatedProps once per @for slot -
   // 6-7 reads total) shares one cached descriptor tree instead of re-running renderDrawer /
   // drawerChildOrder on each read.
   private readonly drawerRoot = computed<IDescriptor>(() =>
@@ -484,23 +484,23 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
     return entry.options ?? {};
   }
 
-  // Lazily creates/replaces the focused route's emitter and synthesizes focus/blur — Drawer paints
+  // Lazily creates/replaces the focused route's emitter and synthesizes focus/blur - Drawer paints
   // its own panel in pure JS (no native onAppear/onDisappear the way Stack's RNSScreen has), so
   // focus/blur is synthesized here exactly like react/drawer.ts's own useEffect does, just
   // idempotent per read instead of dependency-array gated. Keyed on the route KEY, not the object,
   // so a no-op re-focus of the already-focused route doesn't spuriously re-fire.
   //
   // Called from the template ([emitter]="focusedRouteEmitter()"), which runs inside Angular's
-  // reactive-read tracking context for the current CD pass — unlike React's useEffect, which runs
+  // reactive-read tracking context for the current CD pass - unlike React's useEffect, which runs
   // in a separate post-commit phase. Two consequences of that, both fixed below (see tabs.ts's
   // identical fix for the full mechanism):
   //
   // 1. Writing a signal from inside a tracked template read throws Angular's NG600 ("signal write
-  //    during a template execution") — untracked() opts this whole synthesis out of that
+  //    during a template execution") - untracked() opts this whole synthesis out of that
   //    tracking context.
   // 2. The NEW route's screen component (injectIsFocused's listener source) is created by
   //    *ngComponentOutlet AFTER this binding is evaluated but still within the SAME synchronous
-  //    template refresh — emitting FOCUS right here fires to zero listeners and is silently lost
+  //    template refresh - emitting FOCUS right here fires to zero listeners and is silently lost
   //    forever. queueMicrotask defers the FOCUS emit past the end of the current refresh
   //    (including the new screen's construction). BLUR doesn't need this: the outgoing screen's
   //    listener was already attached on an earlier tick.

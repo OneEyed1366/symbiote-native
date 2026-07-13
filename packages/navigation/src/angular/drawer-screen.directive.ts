@@ -1,7 +1,7 @@
-// [symbioteDrawerScreen]: Drawer's twin of screen.directive.ts's ScreenDirective — a declarative
+// [symbioteDrawerScreen]: Drawer's twin of screen.directive.ts's ScreenDirective - a declarative
 // marker read via @ContentChildren to build the static name -> {component, options} registry, then
 // Drawer mounts the FOCUSED route's component. Mirrors react/drawer-screen.ts (Drawer's twin) and
-// tab-screen.directive.ts (the closer sibling — both are fixed-route-list, no-push navigators).
+// tab-screen.directive.ts (the closer sibling - both are fixed-route-list, no-push navigators).
 
 import { Directive, Input, type Type } from '@angular/core';
 import type { IDrawerScreenOptions, IRoute } from '../core';

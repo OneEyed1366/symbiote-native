@@ -173,7 +173,7 @@ describe('React Stack navigator', () => {
     expect(screens).toHaveLength(2);
     // Both stay FOCUSED (2): react-native-screens' native RNSScreen asserts an already-mounted
     // NativeStack screen's activityState can never decrease, and @react-navigation/native-stack's
-    // real algorithm never demotes a route below the focused index to anything but 0 — see
+    // real algorithm never demotes a route below the focused index to anything but 0 - see
     // computeActivityState's comment in navigator-state.ts.
     expect(screens[0].props.activityState).toBe(2);
     expect(screens[1].props.activityState).toBe(2);

@@ -1,12 +1,12 @@
 // Stack, the Angular lifecycle half. The route-stack transitions (navigator-state) and the
 // options/props folds (screen-options, render-stack) live in @symbiote-native/navigation core,
-// shared verbatim with the React/Vue adapters; here Angular supplies the lifecycle — a signal for
+// shared verbatim with the React/Vue adapters; here Angular supplies the lifecycle - a signal for
 // the pushed-route stack, a per-instance counter for route-key generation, push/pop/replace/... as
 // plain public methods directly on the class (no `useImperativeHandle`/forwardRef equivalent
 // needed: an Angular component instance IS its own "ref", same shape as MatDrawer.open(), reached
 // via a template reference variable, e.g. `<Stack #nav>` then `nav.push(...)`; `Stack implements
 // INavigatorHandle` so the instance itself is what NavigationScopeDirective hands to
-// NavigationContextService — the DI scope every mounted screen reads its navigation/route from via
+// NavigationContextService - the DI scope every mounted screen reads its navigation/route from via
 // injectStackNavigation()/injectRoute(), never a component input) - plus the descriptor bridge for
 // the header config leaf via the raw
 // native-view element tags below. Pushing/popping a route is an ordinary child render/removal:
@@ -17,13 +17,13 @@
 //
 // RAW NATIVE TAGS + NO_ERRORS_SCHEMA: RNSScreenStack/RNSScreen/RNSModalScreen/
 // RNSScreenContentWrapper/RNSScreenStackHeaderConfig/RNSScreenStackHeaderSubview/RNSSearchBar are
-// react-native-screens' native Fabric views, not Angular components — core's render-stack.ts
+// react-native-screens' native Fabric views, not Angular components - core's render-stack.ts
 // deliberately hands back PLAIN PROPS OBJECTS for the leaves this adapter builds itself with real
 // framework children (see its header comment), the same split react/stack.ts's `createElement`
 // calls implement. A non-dashed raw tag name only satisfies Angular's DOM element schema check
 // under `NO_ERRORS_SCHEMA` (`CUSTOM_ELEMENTS_SCHEMA` only relaxes tags containing a "-", confirmed
 // against `.vendors/angular/packages/compiler/src/schema/dom_element_schema_registry.ts`'s
-// `hasElement`) — every other Angular component in this codebase only ever names dashed
+// `hasElement`) - every other Angular component in this codebase only ever names dashed
 // `symbiote-*` primitives or real `@Component` selectors, so this is the first legitimate need for
 // the looser schema in this codebase; every prop still routes through the real, declared
 // `[symbioteHostProps]` input (primitives/shared.ts, `@symbiote-native/angular`), never a bare
@@ -31,11 +31,11 @@
 //
 // RESOLVED: `Stack` itself (like `Tab`/`Drawer`) is a composed Angular `@Component` used as a
 // plain `<Stack>` tag by consuming app code. It is NOT hardcoded into `adapters/angular/src/
-// renderer/index.ts`'s `ANCHOR_HOST_COMPONENTS` Set — as an app/package-owned selector it
+// renderer/index.ts`'s `ANCHOR_HOST_COMPONENTS` Set - as an app/package-owned selector it
 // self-registers instead: `adapters/angular/babel-register-composed.cjs` (a Metro babel preset
 // applied bundle-wide, not scoped to adapters/angular) scans this package's own AOT-compiled
 // (`ngc`) `ɵɵngDeclareComponent({selector: 'Stack', ...})` output and auto-calls
-// `registerComposedComponent('Stack')` at bundle time — same mechanism `.examples/angular`
+// `registerComposedComponent('Stack')` at bundle time - same mechanism `.examples/angular`
 // navigation-demo screens and `@symbiote-native/slider`'s `Slider` rely on for their own composed
 // components mounted statically or via `NgComponentOutlet`. Unregistered, `createElement('Stack')`
 // falls through to a real `createNode` call and RN paints its own "Unimplemented component"
@@ -94,7 +94,7 @@ import type { IAngularScreenOptions, IScreenOptionsArgs } from '../screen.direct
 
 export type { INavigatorHandle } from '../../core';
 
-// backTitleVisible defaults to `true` on both platforms per the codegen spec's own default — no
+// backTitleVisible defaults to `true` on both platforms per the codegen spec's own default - no
 // ios/android divergence in v1 scope (mirrors react/stack.ts's own constant exactly).
 const NAVIGATOR_PLATFORM: INavigatorPlatform = { defaultHeaderBackTitleVisible: true };
 
@@ -195,7 +195,7 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
   // Keyed by name -> the LIVE ScreenDirective instance, not a snapshot copy of its fields:
   // @ContentChildren's `changes` Observable only fires on a STRUCTURAL change to the query
   // results (screens added/removed/reordered), never when an already-matched instance's own
-  // `[options]`/`[component]` binding is merely reassigned a new value — a snapshot copy taken at
+  // `[options]`/`[component]` binding is merely reassigned a new value - a snapshot copy taken at
   // rebuild time would go stale the instant an app changes e.g. `[options]` on an existing
   // `<ng-template symbioteScreen>` without also adding/removing one. Reading straight off the
   // directive instance means Angular's own ordinary Input binding keeps every field live for free.
@@ -318,12 +318,12 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
   // Threads a route's merged options through the shared ~14-call resolver sequence (see
   // core/render-stack.ts's resolveScreenRenderPlan) every per-route template method below picks
   // its one field from. Angular has no per-route closure scope the way React's `.map`/Vue's render
-  // loop do, so each template-bound method calls this per change-detection cycle — cached below
+  // loop do, so each template-bound method calls this per change-detection cycle - cached below
   // by `${route.key}:${index}` so the ~7 accessors that share a route+index resolve the plan once
   // per actual state change instead of once per template read; `dispatch` clears the cache before
   // recomputing so no stale entry survives a state transition. Screen appear/disappear stay
   // adapter-owned (close over `this.dispatch`/`this.emitterFor`); the search bar passthrough
-  // carries no dlog wrapper, unlike React/Vue (see this file's own review notes) — its imperative
+  // carries no dlog wrapper, unlike React/Vue (see this file's own review notes) - its imperative
   // ref rides a separate directive (searchBarRef/[symbioteSearchBarRef]), not this passthrough map.
   private planFor(route: IRoute<unknown>, index: number): IScreenRenderPlan {
     const cacheKey = `${route.key}:${index}`;

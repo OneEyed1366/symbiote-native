@@ -83,7 +83,7 @@ describe('nested navigators (scope parent chain)', () => {
   it("a root Stack screen's useNavigation().getParent() is undefined (no ambient navigator above it)", async () => {
     let capturedParent: IAnyNavigatorHandle | undefined;
     let getParentCalled = false;
-    // Plain functions used as `component:` are stateless functional components — Vue calls them
+    // Plain functions used as `component:` are stateless functional components - Vue calls them
     // fresh on every render and treats their return value as vnodes directly, NOT as a "setup
     // returns a render fn" component. A screen calling a composable needs a real setup-based
     // component, hence defineComponent here instead of a bare function.

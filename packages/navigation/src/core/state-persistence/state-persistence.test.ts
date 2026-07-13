@@ -1,5 +1,5 @@
 // Co-located unit test (ADR 0025) for the pure serialize/deserialize passthrough. No framework,
-// no wiring — just the JSON-safe round trip and the deserialize-side runtime guard rejecting
+// no wiring - just the JSON-safe round trip and the deserialize-side runtime guard rejecting
 // malformed persisted data (a corrupted AsyncStorage entry, a schema change across app versions).
 
 import { describe, expect, it } from 'vitest';

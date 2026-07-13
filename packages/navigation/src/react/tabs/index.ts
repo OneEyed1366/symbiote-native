@@ -1,11 +1,11 @@
 // Tab, the React lifecycle half. The focused-index router (tab-router-state) and the tab-bar
 // Descriptor builder (render-tabs) live in @symbiote-native/navigation core, shared verbatim
-// with the Vue/Angular adapters; here React supplies the lifecycle — useReducer for the focused
-// index, useId for route-key generation, useImperativeHandle for the jumpTo/setParams handle —
+// with the Vue/Angular adapters; here React supplies the lifecycle - useReducer for the focused
+// index, useId for route-key generation, useImperativeHandle for the jumpTo/setParams handle -
 // plus the descriptor bridge for the tab-bar leaf, exactly like Stack bridges its header config
 // (react/stack.ts). Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints ordinary
 // `symbiote-view`/`symbiote-text` primitives via the shared render fn, so there is no
-// react-native-screens ViewConfig to register here — Tab needs no `../register` import.
+// react-native-screens ViewConfig to register here - Tab needs no `../register` import.
 
 import {
   createElement,
@@ -64,7 +64,7 @@ const TAB_CONTENT_STYLE = { flex: 1 };
 const TAB_ROOT_STYLE = { flex: 1 };
 
 const TabImpl = forwardRef<ITabNavigatorHandle, ITabProps>((props, forwardedRef) => {
-  // Read BEFORE establishing this Tab's own Context value below — becomes the `parent` link a
+  // Read BEFORE establishing this Tab's own Context value below - becomes the `parent` link a
   // nested screen's useNavigation().getParent() walks (e.g. this Tab rendered as a Stack screen's
   // content reaches that Stack via this value). undefined when this Tab is the nesting root.
   const ambientContext = useContext(NavigationContext);
@@ -151,7 +151,7 @@ const TabImpl = forwardRef<ITabNavigatorHandle, ITabProps>((props, forwardedRef)
   );
 
   // Only the focused route's screen is ever mounted (unlike Stack, which keeps every pushed route
-  // alive), so a fresh emitter per focus change is sufficient — no per-route emitter map to prune,
+  // alive), so a fresh emitter per focus change is sufficient - no per-route emitter map to prune,
   // because the previous screen's whole subtree (and any listeners it registered) is torn down by
   // an ordinary React unmount when focus moves on. Keyed on the route KEY rather than the route
   // object so a setParams-only change (new route object, same key) doesn't spuriously re-fire
@@ -159,9 +159,9 @@ const TabImpl = forwardRef<ITabNavigatorHandle, ITabProps>((props, forwardedRef)
   const focusedRouteKey = focusedRoute?.key;
   const routeEmitter = useMemo(() => createNavigationEmitter(), [focusedRouteKey]);
 
-  // Tab paints its own bar in pure JS — there is no native onAppear/onDisappear to hook (unlike
+  // Tab paints its own bar in pure JS - there is no native onAppear/onDisappear to hook (unlike
   // Stack's RNSScreen), so focus/blur is synthesized here: mount = focus, cleanup = blur, exactly
-  // what an effect keyed on focusedRouteKey already encodes — no diffFocusedRoute indirection
+  // what an effect keyed on focusedRouteKey already encodes - no diffFocusedRoute indirection
   // needed (unlike Vue/Angular, which diff real prev/next keys inside an imperative watch/CD
   // callback that has no mount/cleanup pairing of its own).
   useEffect(() => {
@@ -173,7 +173,7 @@ const TabImpl = forwardRef<ITabNavigatorHandle, ITabProps>((props, forwardedRef)
       routeEmitter.emit(NAVIGATION_EVENT_BLUR);
     };
     // focusedRoute omitted deliberately: only its .key (tracked via focusedRouteKey) should
-    // re-run this effect — see the comment above on focusedRouteKey.
+    // re-run this effect - see the comment above on focusedRouteKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeEmitter, focusedRouteKey]);
 

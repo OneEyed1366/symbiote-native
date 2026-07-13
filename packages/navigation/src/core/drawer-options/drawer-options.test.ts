@@ -1,4 +1,4 @@
-// Co-located unit test (ADR 0025) for the pure drawer geometry/swipe math — sibling to
+// Co-located unit test (ADR 0025) for the pure drawer geometry/swipe math - sibling to
 // drawer-router-state.test.ts. Everything here is a plain predicate/fold over numbers and the
 // IDrawerOptions surface, so the full matrix (4 drawerTypes x 2 drawerPositions for the geometry,
 // both edges for the swipe gates) is exercised directly, without the fake-touch-event plumbing
@@ -21,7 +21,7 @@ import {
 import type { IDrawerOptions } from './index';
 
 // A real branded RCTView node so no cast is needed (mirrors
-// core/engine/src/pan-responder/pan-responder.test.ts's own targetNode) — the gesture math here
+// core/engine/src/pan-responder/pan-responder.test.ts's own targetNode) - the gesture math here
 // never reads target/currentTarget, only nativeEvent.
 const fakeTarget = createElement('RCTView');
 
@@ -122,10 +122,10 @@ describe('resolveDrawerGeometry', () => {
   });
 
   // The file's own header comment claims "permanent: static, all zero", but the switch falls
-  // through to the SAME branch as 'front' — panelTranslateXClosed/overlayOpacityOpen are NOT
+  // through to the SAME branch as 'front' - panelTranslateXClosed/overlayOpacityOpen are NOT
   // zero here. Harmless at runtime only because every call site (react/drawer.ts) gates the
   // animated interpolation behind isDrawerAnimated() and never reads these numbers for
-  // 'permanent' — but the comment is inaccurate about what this function itself returns.
+  // 'permanent' - but the comment is inaccurate about what this function itself returns.
   it('permanent + left: falls through to front\'s non-zero offsets, not "all zero"', () => {
     expect(resolveDrawerGeometry({ drawerType: 'permanent', drawerPosition: 'left' })).toEqual({
       panelTranslateXClosed: -WIDTH,
@@ -223,7 +223,7 @@ describe('resolveSwipeIntent', () => {
 
   it('velocity past its threshold overrides a short reverse-direction drag', () => {
     // dx alone (-10) is both too short and points the wrong way, but a fast flick (vx clears
-    // swipeMinVelocity) still opens — matches the source comment's "a fast flick can reverse a
+    // swipeMinVelocity) still opens - matches the source comment's "a fast flick can reverse a
     // short drag".
     const intent = resolveSwipeIntent(gestureState({ dx: -10, vx: 1 }), false, {
       drawerPosition: 'left',

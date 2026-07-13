@@ -1,7 +1,7 @@
 // Co-located React-driven test (ADR 0025) for the focus/event hooks layer. Mirrors
 // ../stack.test.tsx's fixture (an injected codegen-shaped RNSScreen ViewConfig exposing
 // onAppear/onDisappear/onWillAppear/onWillDisappear) and drives the same native events stack.ts
-// wires to emit 'focus'/'blur' — proving the hooks react to the real RNS lifecycle, not to a
+// wires to emit 'focus'/'blur' - proving the hooks react to the real RNS lifecycle, not to a
 // synthetic shortcut.
 
 import { act, createElement, createRef, useCallback, useEffect } from 'react';

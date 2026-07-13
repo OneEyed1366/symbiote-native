@@ -1,6 +1,6 @@
 // Thin useEffect wrapper: runs `effect` while the route is focused and runs its own returned
-// cleanup on blur — exactly React.useEffect's contract, just re-armed on every focus/blur pair
-// instead of once on mount — mirrors @react-navigation's useFocusEffect. Callers should memoize
+// cleanup on blur - exactly React.useEffect's contract, just re-armed on every focus/blur pair
+// instead of once on mount - mirrors @react-navigation's useFocusEffect. Callers should memoize
 // `effect` (React.useCallback), same requirement the upstream hook documents, since a new
 // `effect` identity re-subscribes here like any other useEffect dependency change.
 

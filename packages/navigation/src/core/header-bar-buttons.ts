@@ -2,7 +2,7 @@
 // `headerRightBarButtonItems` fold react-native-screens' own ScreenStackHeaderConfig component
 // would send down, plus the buttonId/menuId -> onPress lookup that answers RNSScreenStackHeader-
 // Config's `onPressHeaderBarButtonItem`/`onPressHeaderBarButtonMenuItem` events. Self-contained:
-// only `resolveHeaderConfigView` (screen-options.ts) calls into this file, as a black box — the
+// only `resolveHeaderConfigView` (screen-options.ts) calls into this file, as a black box - the
 // id-tagging scheme below is this cluster's own internal invariant, never a cross-file contract.
 
 import { imageStatics } from '@symbiote-native/components';
@@ -18,7 +18,7 @@ import type {
 } from './navigator-props';
 
 // RNS flattens `icon` into sfSymbolName/xcassetName/imageSource/templateSource at native-payload
-// time (both the structured `icon` field AND the flat native keys reach native — RNS's own
+// time (both the structured `icon` field AND the flat native keys reach native - RNS's own
 // prepareHeaderBarButtonItems keeps both), and resolves image assets through the same resolver
 // the Image component uses.
 function prepareIcon(icon: IHeaderBarButtonIcon | undefined): Record<string, unknown> {
@@ -38,7 +38,7 @@ function prepareIcon(icon: IHeaderBarButtonIcon | undefined): Record<string, unk
 type ISharedItem = IHeaderBarButtonItemAction | IHeaderBarButtonItemMenu;
 
 // The one id algorithm both the payload tagger (prepareMenuItems/prepareHeaderBarButtonItems)
-// and the dispatch-lookup builder (collectMenuHandlers/collectBarButtonHandlers) call — so a
+// and the dispatch-lookup builder (collectMenuHandlers/collectBarButtonHandlers) call - so a
 // change to the id scheme genuinely can't desync payload tagging from dispatch lookup.
 function buildMenuId(path: string, index: number, side: 'left' | 'right'): string {
   return `${path}-${index}-${side}`;
@@ -78,7 +78,7 @@ function prepareBadge(badge: ISharedItem['badge']): Record<string, unknown> | un
 // onPress is captured separately into the buttonId/menuId -> handler map (collectMenuHandlers/
 // collectBarButtonHandlers below) and must never reach native: a function value fails Fabric's
 // dynamic-value serialization, which silently drops the WHOLE headerLeftBarButtonItems/
-// headerRightBarButtonItems array it's nested in — not just the one bad field — so bar buttons and
+// headerRightBarButtonItems array it's nested in - not just the one bad field - so bar buttons and
 // menu actions never reached native at all, despite the buttonId/menuId dispatch wiring itself
 // being entirely correct.
 function excludeOnPress<T extends { onPress: unknown }>(item: T): Omit<T, 'onPress'> {
@@ -86,7 +86,7 @@ function excludeOnPress<T extends { onPress: unknown }>(item: T): Omit<T, 'onPre
   return rest;
 }
 
-// Shared fields common to the 'button' and 'menu' item variants (title/icon/tint/badge/…) — the
+// Shared fields common to the 'button' and 'menu' item variants (title/icon/tint/badge/...) - the
 // 'spacing' variant carries none of these and passes through untouched.
 function prepareSharedFields(
   item: IHeaderBarButtonItem & { type: 'button' | 'menu' },
@@ -103,7 +103,7 @@ function prepareSharedFields(
 type IMenuLike = { items: (IHeaderBarButtonMenuAction | IHeaderBarButtonSubmenu)[] };
 
 // Recursively tags every menu action with a `menuId` derived from its tree position
-// (`${path}-${index}-${side}`), mirroring RNS's own prepareMenu exactly — the id must match what
+// (`${path}-${index}-${side}`), mirroring RNS's own prepareMenu exactly - the id must match what
 // buildHeaderBarButtonDispatch computes below, or a press silently no-ops.
 function prepareMenuItems<T extends IMenuLike>(
   menuLike: T,
@@ -129,7 +129,7 @@ function prepareMenuItems<T extends IMenuLike>(
 }
 
 // Builds the native-shaped payload react-native-screens' own ScreenStackHeaderConfig component
-// would send down (buttonId/menuId-tagged, colors processColor'd) — this is what
+// would send down (buttonId/menuId-tagged, colors processColor'd) - this is what
 // IHeaderConfigViewProps.headerLeftBarButtonItems/headerRightBarButtonItems actually carry.
 export function prepareHeaderBarButtonItems(
   items: IHeaderBarButtonItem[] | undefined,
@@ -188,7 +188,7 @@ type IHeaderBarButtonDispatch = {
 
 // The buttonId/menuId → onPress lookup is built independently from prepareHeaderBarButtonItems'
 // native payload (rather than re-parsing it back out of the `unknown[]` result), over the
-// ORIGINAL typed items — but both sides call the same buildMenuId/buildButtonId, so the id
+// ORIGINAL typed items - but both sides call the same buildMenuId/buildButtonId, so the id
 // scheme lives in one place and can't desync payload tagging from dispatch lookup.
 export function buildHeaderBarButtonDispatch(
   leftItems: IHeaderBarButtonItem[] | undefined,

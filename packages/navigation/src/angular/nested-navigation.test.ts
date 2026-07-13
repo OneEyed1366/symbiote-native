@@ -3,7 +3,7 @@
 // constructor (navigation-context.service.ts) BEFORE NavigationScopeDirective re-provides a fresh
 // one for its own content, so when one navigator's screen renders ANOTHER navigator (here, a Stack
 // screen renders a Tab), a screen deep inside the nested Tab can call injectNavigation().getParent()
-// to reach the enclosing Stack's handle — with ZERO manual threading (unlike react/
+// to reach the enclosing Stack's handle - with ZERO manual threading (unlike react/
 // nested-navigation.test.tsx, which needs an explicit `ambientContext` read + re-provide in every
 // navigator; Angular's own hierarchical DI does this automatically, see navigation-context.
 // service.ts's header comment). Mirrors stack.test.ts's fixture since a real Stack is part of
@@ -111,7 +111,7 @@ class NestedTabHomeScreenComponent {
 
 // The Stack screen's own content: a Tab navigator, nested exactly the way a real app composes
 // navigators (a Stack screen's content IS another navigator). Angular's DI naturally threads the
-// `parent` chain — this component does NOT need to read or forward any ambient context itself.
+// `parent` chain - this component does NOT need to read or forward any ambient context itself.
 @Component({
   selector: 'root-renders-tab-screen',
   standalone: true,

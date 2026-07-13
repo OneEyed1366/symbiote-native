@@ -3,7 +3,7 @@
 // closeDrawer/toggleDrawer driving the isOpen state and the panel/overlay geometry reuse from
 // core (drawerChildOrder/resolveDrawerGeometry), and drawer content projection via the
 // `#drawerContent` TemplateRef. Drawer is imported from its own module (NOT the package barrel)
-// so ../register never loads headless — Drawer needs no react-native-screens ViewConfig at all.
+// so ../register never loads headless - Drawer needs no react-native-screens ViewConfig at all.
 
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, ViewChild, type Signal } from '@angular/core';
@@ -18,21 +18,21 @@ import { injectIsFocused } from '../injectors/inject-is-focused';
 const ROOT_TAG = 5122;
 const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
 
-// Drawer reads the screen width off WindowDimensionsService (isSwipeStartInEdge) — headless has
+// Drawer reads the screen width off WindowDimensionsService (isSwipeStartInEdge) - headless has
 // no DeviceInfo native module, so seed a concrete width once; every mount in this file reads this
 // same cached value (Dimensions is a module-level singleton). Mirrors
 // react/drawer.test.tsx's identical setup.
 Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
 // On a real Metro build, adapters/angular's babel-register-composed.cjs auto-registers `Drawer`
-// as an anchor host by scanning the AOT-compiled @Component's selector — vitest never runs that
+// as an anchor host by scanning the AOT-compiled @Component's selector - vitest never runs that
 // pipeline, so this test drives the same self-registration entry point by hand (mirrors
 // renderer.test.ts's 'RefApiDemo' convention). Without it, `<Drawer>` falls through to a raw
 // Fabric createNode('Drawer') call instead of a non-painting anchor.
 registerComposedComponent('Drawer');
 
 // rAF is not a Node global; Animated.timing (driven by every openDrawer/closeDrawer/toggleDrawer
-// call) reads it at .start() time. Ported verbatim from react/drawer.test.tsx's own polyfill — no
+// call) reads it at .start() time. Ported verbatim from react/drawer.test.tsx's own polyfill - no
 // frame is ever awaited here since these tests assert on state-derived content, not animated
 // frame values.
 let frameClock = 0;
@@ -99,7 +99,7 @@ let capturedSettingsInstance: SettingsDrawerScreenComponent | undefined;
   template: `<symbiote-text>home</symbiote-text>`,
 })
 class HomeDrawerScreenComponent {
-  // Real screens (e.g. .examples/angular's DrawerHomeScreen) call injectIsFocused() — see the
+  // Real screens (e.g. .examples/angular's DrawerHomeScreen) call injectIsFocused() - see the
   // regression test below for why this matters.
   readonly isFocused: Signal<boolean> = injectIsFocused();
 
@@ -203,7 +203,7 @@ describe('Angular Drawer navigator', () => {
     await tick();
     handle.toggleDrawer();
     await tick();
-    // No public isOpen getter on the handle (mirrors react's IDrawerNavigatorHandle) — proven
+    // No public isOpen getter on the handle (mirrors react's IDrawerNavigatorHandle) - proven
     // indirectly via the drawer content projection below, which reads live router state.
     void handle;
   });
@@ -217,8 +217,8 @@ describe('Angular Drawer navigator', () => {
 
   it('reuses core geometry: content/overlay/panel slots paint in front-type order (content, overlay, panel)', async () => {
     await mountDrawer();
-    // 'front' (the default drawerType) paints content, then overlay (absent while closed — see
-    // isDrawerOverlayVisible), then panel — proven by both home content and the drawer-content
+    // 'front' (the default drawerType) paints content, then overlay (absent while closed - see
+    // isDrawerOverlayVisible), then panel - proven by both home content and the drawer-content
     // template text (panel) being present simultaneously in the committed tree.
     expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
     expect(
@@ -229,7 +229,7 @@ describe('Angular Drawer navigator', () => {
   // Regression test: focusedRouteEmitter() runs as a TEMPLATE EXPRESSION
   // ([emitter]="focusedRouteEmitter()"), inside Angular's reactive-read tracking context for the
   // current CD pass. It synchronously calls emitter.emit(FOCUS/BLUR), fan-out-calling every
-  // listener on that route's emitter synchronously too — including injectIsFocused()'s
+  // listener on that route's emitter synchronously too - including injectIsFocused()'s
   // `isFocused.set(...)`, since every real screen calls injectIsFocused(). Angular throws NG600
   // ("signal write during a template execution") the instant that set() runs inside a tracked
   // read. jumpTo() is exactly what tapping a drawer menu item fires. tabs.ts's
@@ -249,12 +249,12 @@ describe('Angular Drawer navigator', () => {
   });
 
   // injectIsFocused() reads context.emitter at CALL time (during the screen's own constructor),
-  // which runs as part of *ngComponentOutlet creating the screen — nested INSIDE the same
+  // which runs as part of *ngComponentOutlet creating the screen - nested INSIDE the same
   // <ng-container [emitter]="focusedRouteEmitter()"> whose input evaluation is what actually
   // fires the FOCUS emit. If Angular evaluates the ng-container's OWN inputs (calling
   // focusedRouteEmitter(), firing FOCUS) before creating/refreshing the nested ngComponentOutlet
   // child (running the screen's constructor, registering the injectIsFocused() listener), the
-  // FOCUS event fires to zero listeners and is lost forever — isFocused stays false permanently.
+  // FOCUS event fires to zero listeners and is lost forever - isFocused stays false permanently.
   it('the initially-focused screen actually observes isFocused() becoming true', async () => {
     await mountDrawer();
     await tick();

@@ -1,5 +1,5 @@
 // Co-located Vue-driven pipeline test, the Vue twin of react/tabs.test.tsx. Unlike Stack (which
-// drives real native RNSScreen views and needs an injected codegen-shaped ViewConfig — see
+// drives real native RNSScreen views and needs an injected codegen-shaped ViewConfig - see
 // stack.test.ts), the tab bar is a PURE-JS UI painted from ordinary `symbiote-view`/`symbiote-text`
 // primitives, so no ViewConfig source is needed here at all. Proves: only the focused route's
 // screen mounts, jumpTo() moves focus, a tap (synthesized by the engine from a
@@ -38,7 +38,7 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
 }
 
 // The tab bar row: the second child of Tab's root `symbiote-view` (content wrapper first, bar
-// second — see tabs.ts's final h() call).
+// second - see tabs.ts's final h() call).
 function tabBarRow(): IFakeNode {
   const root = fabric.appRoot();
   const tabRoot = root.children[0];
@@ -201,7 +201,7 @@ describe('Vue Tab navigator', () => {
     let homeRouteName: string | undefined;
     let profileIsFocused: boolean | undefined;
 
-    // Plain functions used as `component:` are stateless functional components — Vue calls them
+    // Plain functions used as `component:` are stateless functional components - Vue calls them
     // fresh on every render and treats their return value as vnodes directly, NOT as a "setup
     // returns a render fn" component. A screen calling a composable needs a real setup-based
     // component (onMounted/inject require a persistent instance across renders), hence
@@ -267,7 +267,7 @@ describe('Vue Tab navigator', () => {
       }),
     );
     await tick();
-    // Tab paints no native RNSScreen (unlike Stack), so there is no onAppear to wait for — the
+    // Tab paints no native RNSScreen (unlike Stack), so there is no onAppear to wait for - the
     // focused screen's useFocusEffect runs as soon as it mounts.
     expect(events).toEqual(['effect']);
 

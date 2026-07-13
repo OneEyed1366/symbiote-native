@@ -3,7 +3,7 @@
 // every adapter. Mirrors react-navigation's Drawer prop surface (confirmed against the current
 // @react-navigation/drawer docs): drawerType 'front'/'back'/'slide'/'permanent', drawerPosition,
 // drawerWidth, overlayColor, swipeEnabled + the three swipe-tuning knobs. What is NOT ported:
-// `configureGestureHandler` — a react-native-gesture-handler-specific escape hatch with no
+// `configureGestureHandler` - a react-native-gesture-handler-specific escape hatch with no
 // PanResponder equivalent (see packages/navigation's README / the drawer feasibility note for the
 // full gap list).
 
@@ -30,7 +30,7 @@ export interface IDrawerOptions {
   swipeMinVelocity?: number;
 }
 
-// Per-screen options a caller's own renderDrawerContent reads to label its menu entries — the
+// Per-screen options a caller's own renderDrawerContent reads to label its menu entries - the
 // drawer navigator has no built-in menu UI (matching react-native-drawer-layout's Drawer
 // primitive, which the underlying @react-navigation/drawer itself builds its DrawerItemList on
 // top of), so this stays deliberately small next to IScreenOptions's header surface.
@@ -153,13 +153,13 @@ const DRAWER_PROGRESS_INPUT_RANGE: readonly [number, number] = [0, 1];
 // The pure `{inputRange, outputRange}` half of each slot's `progress.interpolate(...)` call,
 // factored out of react/vue/angular drawer.ts (the same literal config recomputed inline in all
 // three, including three near-identical spots within angular/drawer.ts's own content/overlay/
-// panel style getters) — the adapter still owns the actual `Animated.Value.interpolate()` call
+// panel style getters) - the adapter still owns the actual `Animated.Value.interpolate()` call
 // (the `Animated.Value` instance is adapter-lifecycle-held per CLAUDE.md
 // <adapters_stay_thin>), this only computes what to feed it.
 //
 // The three slots are NOT symmetric: content and panel each drive only their own translateX, but
 // overlay drives BOTH its own opacity AND a translateX that deliberately tracks CONTENT's delta,
-// not its own — see render-drawer.ts's `drawerChildOrder` header: for `slide`, content itself
+// not its own - see render-drawer.ts's `drawerChildOrder` header: for `slide`, content itself
 // slides away, and an overlay that didn't follow it would stay pinned full-screen instead of
 // dimming just the content it's meant to cover. The overload set below reflects that asymmetry in
 // the return type per slot, instead of forcing one shape that would leave 'content'/'panel'

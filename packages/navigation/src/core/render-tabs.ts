@@ -1,11 +1,11 @@
-// TabBar: the render half (framework-agnostic). A bottom-tabs bar is a PURE-JS UI — unlike
+// TabBar: the render half (framework-agnostic). A bottom-tabs bar is a PURE-JS UI - unlike
 // Stack, which drives real native RNSScreen/RNSScreenStack views, this paints ordinary
 // `symbiote-view`/`symbiote-text` primitives, so it needs no react-native-screens ViewConfig
 // work at all (see the task brief in packages/navigation's skill notes). Mirrors renderSwitch's
 // shape: pure prop-driven functions building a `Descriptor` tree from pre-resolved view props;
 // the adapter supplies focus state, tint-color resolution inputs, and the press wiring via
 // `passthrough` (exactly like Stack wires onDismissed/onHeaderBackButtonClicked into
-// resolveScreenView's passthrough) — this layer never invents an onPress/responder pair itself.
+// resolveScreenView's passthrough) - this layer never invents an onPress/responder pair itself.
 
 import { el, txt } from '@symbiote-native/components';
 import type { IDescriptor } from '@symbiote-native/components';
@@ -13,7 +13,7 @@ import type { IColorValue, IViewStyle, ITextStyle, IStyleProp } from '@symbiote-
 import type { ITabBarIcon } from './tab-options';
 
 // react-navigation's own bottom-tabs default to the surrounding theme's primary/text colors;
-// symbiote's navigation package has no app-level theme yet, so these are placeholder defaults —
+// symbiote's navigation package has no app-level theme yet, so these are placeholder defaults -
 // the same iOS-system-blue/neutral-grey pair render-button.ts already uses for its default
 // tint/disabled colors, reused here rather than inventing a third pair (no shared semantic color
 // tokens exist yet in @symbiote-native/engine as of this writing).
@@ -33,8 +33,8 @@ const BADGE_OFFSET_RIGHT = -8;
 // One tab item's pre-resolved paint inputs. `label`/`icon`/`badge`/tint colors are already
 // folded from the route's ITabOptions by the adapter (same split as IScreenViewProps); `focused`
 // decides which tint applies. `passthrough` carries the tap wiring (a plain `onPress`, which the
-// engine synthesizes from a touchStart/touchEnd pair on the node — core/engine/src/events/index.ts
-// — no responder-negotiation props needed) plus accessibility/testID.
+// engine synthesizes from a touchStart/touchEnd pair on the node - core/engine/src/events/index.ts
+// - no responder-negotiation props needed) plus accessibility/testID.
 export type ITabBarItemView = {
   key: string;
   focused: boolean;
@@ -92,7 +92,7 @@ function resolveTintColor(item: ITabBarItemView): IColorValue {
   return item.inactiveTintColor ?? DEFAULT_INACTIVE_TINT_COLOR;
 }
 
-// A string icon paints as a glyph (an emoji/ligature font name — same convention a caller uses
+// A string icon paints as a glyph (an emoji/ligature font name - same convention a caller uses
 // for a vector-icon-font label); an IDescriptor icon (an <Image>/vector-icon element the adapter
 // already resolved) is spliced in verbatim, exactly like renderHeaderConfig treats a pre-built
 // Descriptor child.

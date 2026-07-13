@@ -5,7 +5,7 @@
 // actually opens/closes the drawer, plus a rAF polyfill (every openDrawer/closeDrawer/
 // toggleDrawer call and a gesture release schedules a real requestAnimationFrame via
 // Animated.timing, which is not a Node global). Drawer is imported from './index' (NOT the
-// package barrel) so the third-party native-spec side-effect (../register) never loads headless —
+// package barrel) so the third-party native-spec side-effect (../register) never loads headless -
 // matching stack.test.ts/tabs.test.ts, even though Drawer itself needs no injected ViewConfig
 // (PanResponder + Animated are pure JS, like Tab's bar).
 
@@ -24,7 +24,7 @@ const TOUCH_END = 'topTouchEnd';
 const TOUCH_ID = 1;
 
 // Drawer reads the screen width off useWindowDimensions() to resolve the swipe edge zone
-// (isSwipeStartInEdge) — headless has no DeviceInfo native module, so seed a concrete width once;
+// (isSwipeStartInEdge) - headless has no DeviceInfo native module, so seed a concrete width once;
 // every mount in this file reads this same cached value (Dimensions is a module-level singleton).
 Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
@@ -92,13 +92,13 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   return found;
 }
 
-// Drawer's own root view (holds panResponder.panHandlers) — first child under the AppContainer.
+// Drawer's own root view (holds panResponder.panHandlers) - first child under the AppContainer.
 function drawerRoot(): IFakeNode {
   return fabric.appRoot().children[0];
 }
 
 // Default drawerType ('front') paints [content, overlay, panel] in that sibling order
-// (render-drawer.ts's drawerChildOrder) — the overlay's pointerEvents prop ('auto' while open,
+// (render-drawer.ts's drawerChildOrder) - the overlay's pointerEvents prop ('auto' while open,
 // 'none' while closed) is the one stable, non-animated signal of state.isOpen this file reads,
 // since the slide/opacity transforms themselves are driven by a real (unawaited) Animated.timing.
 function overlayNode(): IFakeNode {
@@ -368,7 +368,7 @@ describe('Vue Drawer navigator', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          // Passed as a literal 'drawer-position' key, not 'drawerPosition' — mirroring what a
+          // Passed as a literal 'drawer-position' key, not 'drawerPosition' - mirroring what a
           // template's `:drawer-position="right"` binding actually lands in $attrs as (Vue never
           // camelCases attrs). Without normalizeVueAttrs, currentOptions() would read
           // attrs.drawerPosition as undefined and fall back to the 'left' default, so the swipe
@@ -391,7 +391,7 @@ describe('Vue Drawer navigator', () => {
     let homeRouteName: string | undefined;
     let profileIsFocused: boolean | undefined;
 
-    // Plain functions used as `component:` are stateless functional components — see tabs.test.ts's
+    // Plain functions used as `component:` are stateless functional components - see tabs.test.ts's
     // matching comment; a screen calling a composable needs a real setup-based defineComponent.
     const TrackedHomeScreen = defineComponent(() => {
       const navigation = useNavigation();

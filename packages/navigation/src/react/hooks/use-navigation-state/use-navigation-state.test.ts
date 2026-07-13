@@ -1,6 +1,6 @@
 // Co-located React-driven test (ADR 0025) for useNavigationState's subscription lifecycle.
 // hooks.test.tsx already exercises the hook's OBSERVABLE behavior (state.routes.length tracking a
-// real Stack push/pop) — this file targets a narrower, easy-to-miss regression: the call site's
+// real Stack push/pop) - this file targets a narrower, easy-to-miss regression: the call site's
 // selector is typically an inline arrow (`useNavigationState(s => s.routes.length)`), a fresh
 // function identity every render, so an effect keyed on `selector` unsubscribes/resubscribes on
 // every parent re-render instead of once. A fake emitter (rather than a real Stack) isolates
@@ -56,7 +56,7 @@ describe('useNavigationState subscription lifecycle', () => {
     let triggerRerender: (() => void) | undefined;
 
     function Child(): null {
-      // Deliberately a fresh inline selector on every render — the exact call-site shape
+      // Deliberately a fresh inline selector on every render - the exact call-site shape
       // (`useNavigationState(s => ...)`) that causes the churn this test guards against.
       useNavigationState(state => state.routes.length);
       return null;

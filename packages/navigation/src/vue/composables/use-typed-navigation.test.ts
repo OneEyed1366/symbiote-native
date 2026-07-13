@@ -1,4 +1,4 @@
-// Co-located Vue-driven test for useStackNavigation/useTabNavigation/useDrawerNavigation — the
+// Co-located Vue-driven test for useStackNavigation/useTabNavigation/useDrawerNavigation - the
 // narrowed twins of useNavigation() that hide the union guard. Vue twin of
 // react/hooks/use-typed-navigation.test.tsx.
 
@@ -42,7 +42,7 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 };
 
 // Drawer reads the screen width off useWindowDimensions() to resolve its swipe edge zone;
-// headless has no DeviceInfo native module, so seed a concrete width once — same fixture as
+// headless has no DeviceInfo native module, so seed a concrete width once - same fixture as
 // drawer.test.ts.
 Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 

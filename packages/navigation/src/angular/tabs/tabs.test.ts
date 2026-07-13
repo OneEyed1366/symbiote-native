@@ -1,7 +1,7 @@
 // Co-located Angular-driven test for the @symbiote-native/navigation Angular Tab navigator.
 // Proves: registry building from @ContentChildren, tab switching via jumpTo, focus/blur
 // synthesis, tab bar item painting (label/icon/badge/tint), and press wiring. Tab is imported from
-// its own module (NOT the package barrel) so the ../register side-effect never loads headless —
+// its own module (NOT the package barrel) so the ../register side-effect never loads headless -
 // Tab needs no react-native-screens ViewConfig at all (pure-JS UI).
 
 import '@angular/compiler';
@@ -19,7 +19,7 @@ const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0))
 
 const fabric = installFabric();
 // On a real Metro build, adapters/angular's babel-register-composed.cjs auto-registers `Tab`
-// as an anchor host by scanning the AOT-compiled @Component's selector — vitest never runs that
+// as an anchor host by scanning the AOT-compiled @Component's selector - vitest never runs that
 // pipeline, so this test drives the same self-registration entry point by hand (mirrors
 // renderer.test.ts's 'RefApiDemo' convention). Without it, `<Tab>` falls through to a raw
 // Fabric createNode('Tab') call instead of a non-painting anchor.
@@ -54,7 +54,7 @@ let capturedProfileInstance: ProfileScreenComponent | undefined;
   template: `<symbiote-text>feed</symbiote-text>`,
 })
 class FeedScreenComponent {
-  // Real screens (e.g. .examples/angular's TabHomeScreen) call injectIsFocused() — see the
+  // Real screens (e.g. .examples/angular's TabHomeScreen) call injectIsFocused() - see the
   // regression test below for why this matters.
   readonly isFocused: Signal<boolean> = injectIsFocused();
 
@@ -176,7 +176,7 @@ describe('Angular Tab navigator', () => {
 
   it('tapping a tab bar item calls jumpTo via the wired onPress passthrough', async () => {
     // onPress is synthesized by the engine from a touchStart/touchEnd pair on the node (no direct
-    // native 'press' event — see render-tabs.ts's own comment on ITabBarItemView.passthrough).
+    // native 'press' event - see render-tabs.ts's own comment on ITabBarItemView.passthrough).
     await mountTab();
     const items = tabItemNodes();
     const profileItem = items[1];
@@ -200,11 +200,11 @@ describe('Angular Tab navigator', () => {
   // Regression test: focusedRouteEmitter() runs as a TEMPLATE EXPRESSION
   // ([emitter]="focusedRouteEmitter()"), evaluated inside Angular's reactive-read tracking
   // context for the current CD pass. It synchronously calls emitter.emit(FOCUS/BLUR), which
-  // fan-out-calls every listener on that route's emitter synchronously too — including
+  // fan-out-calls every listener on that route's emitter synchronously too - including
   // injectIsFocused()'s `isFocused.set(...)`, since every real screen (TabHomeScreen,
   // TabSearchScreen, TabProfileScreen in .examples/angular) calls injectIsFocused(). Angular
   // throws NG600 ("signal write during a template execution") the instant that set() runs
-  // inside a tracked read — not gated behind ngDevMode, so this reproduces in every build,
+  // inside a tracked read - not gated behind ngDevMode, so this reproduces in every build,
   // not just dev. jumpTo() is exactly what a tab-bar tap fires (see the test above), so this
   // threw on literally every tab switch. drawer.ts's focusedRouteEmitter() has the identical
   // shape and its own regression test in drawer.test.ts.
@@ -223,12 +223,12 @@ describe('Angular Tab navigator', () => {
   });
 
   // injectIsFocused() reads context.emitter at CALL time (during the screen's own constructor),
-  // which runs as part of *ngComponentOutlet creating the screen — nested INSIDE the same
+  // which runs as part of *ngComponentOutlet creating the screen - nested INSIDE the same
   // <ng-container [emitter]="focusedRouteEmitter()"> whose input evaluation is what actually
   // fires the FOCUS emit. If Angular evaluates the ng-container's OWN inputs (calling
   // focusedRouteEmitter(), firing FOCUS) before creating/refreshing the nested ngComponentOutlet
   // child (running the screen's constructor, registering the injectIsFocused() listener), the
-  // FOCUS event fires to zero listeners and is lost forever — isFocused stays false permanently,
+  // FOCUS event fires to zero listeners and is lost forever - isFocused stays false permanently,
   // exactly as reported ("focused: false", never changes, even after switching tabs back to it).
   it('the initially-focused screen actually observes isFocused() becoming true', async () => {
     await mountTab();

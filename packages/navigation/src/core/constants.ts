@@ -1,13 +1,13 @@
 // Framework-agnostic constants for the react-native-screens native stack primitives. symbiote
-// ships zero ViewConfig metadata for these views at runtime — the engine derives events and
-// color processors from react-native-screens' own codegen ViewConfig — this file only names the
+// ships zero ViewConfig metadata for these views at runtime - the engine derives events and
+// color processors from react-native-screens' own codegen ViewConfig - this file only names the
 // Fabric view names and event prop keys every adapter binds against, plus the RNS activityState
 // convention (mirrors @react-navigation/native-stack's internal screen focus signaling).
 
 // The Fabric view names react-native-screens' codegen components register. descriptorFor passes
 // any non-`symbiote-` string through as a raw Fabric name, so the render fns emit these directly.
 export const RNS_SCREEN_VIEW_NAME = 'RNSScreen';
-// The modal-presentation twin of RNSScreen — see resolveScreenViewName's comment in
+// The modal-presentation twin of RNSScreen - see resolveScreenViewName's comment in
 // render-stack.ts for why a formSheet/modal screen MUST use this different Fabric name.
 export const RNS_MODAL_SCREEN_VIEW_NAME = 'RNSModalScreen';
 export const RNS_SCREEN_STACK_VIEW_NAME = 'RNSScreenStack';
@@ -22,7 +22,7 @@ export const RNS_SEARCH_BAR_VIEW_NAME = 'RNSSearchBar';
 // ALWAYS wraps a screen's content in this native view, `collapsable: false` so Fabric can never
 // flatten it away. RNSScreen.mm's `registerContentWrapper:contentHeightErrata:` is a no-op for
 // `push` (early-returns NO), but for `formSheet` it's how the native side ever learns the
-// content's real size — RNSScreenContentWrapper's `willMoveToWindow` walks up to the ancestor
+// content's real size - RNSScreenContentWrapper's `willMoveToWindow` walks up to the ancestor
 // RNSScreen and registers itself, and its `receivedReactFrame:` delegate callback is what feeds
 // the sheet's own height/detent machinery. Skipping this wrapper is harmless for `push` (why it
 // went unnoticed) but leaves a formSheet screen's native side with nothing to attach to at all.
@@ -57,7 +57,7 @@ export const SEARCH_BAR_ON_OPEN = 'onOpen';
 
 // activityState RNS reads to decide which screen is attached to the native hierarchy. Per
 // react-native-screens' native RNSScreen.mm (maybeAssertActivityStateProgressionOldValue), an
-// already-mounted NativeStack screen's activityState can never DECREASE via a plain prop update —
+// already-mounted NativeStack screen's activityState can never DECREASE via a plain prop update -
 // only 0 (detached) and 2 (attached + focused) are used; there is no "1 = transitioning" value in
 // @react-navigation/native-stack's actual algorithm (NativeStackView.native.tsx computes
 // `activityState={isInactive ? 0 : 2}`, never 1). See computeActivityState for the full rationale.

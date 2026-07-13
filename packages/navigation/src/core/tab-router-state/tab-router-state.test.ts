@@ -1,5 +1,5 @@
 // Co-located unit test (ADR 0025) for the pure tab-router reducer, targeting the params-merge
-// behavior of jumpTo/setParams directly, framework-free — twin of navigator-state.test.ts's
+// behavior of jumpTo/setParams directly, framework-free - twin of navigator-state.test.ts's
 // setParams coverage.
 
 import { describe, expect, it } from 'vitest';

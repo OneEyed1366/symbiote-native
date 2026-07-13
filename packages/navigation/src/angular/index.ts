@@ -1,6 +1,6 @@
 // @symbiote-native/navigation/angular: the Angular native-stack navigator over
 // react-native-screens' native view primitives. Importing this barrel first registers the native
-// views' ViewConfigs (../register, a side-effect import of the three codegen specs — never
+// views' ViewConfigs (../register, a side-effect import of the three codegen specs - never
 // react-native-screens' own React components), then exposes Stack/Tab/Drawer with their Screen
 // directives and navigator handles. Mirrors react/index.ts's barrel shape.
 

@@ -1,7 +1,7 @@
 // Co-located Vue-driven test, the Vue twin of react/hooks/hooks.test.tsx. Mirrors
 // ../stack.test.ts's fixture (an injected codegen-shaped RNSScreen ViewConfig exposing
 // onAppear/onDisappear/onWillAppear/onWillDisappear) and drives the same native events stack.ts
-// wires to emit 'focus'/'blur' — proving the composables react to the real RNS lifecycle, not to a
+// wires to emit 'focus'/'blur', proving the composables react to the real RNS lifecycle, not to a
 // synthetic shortcut.
 
 import { defineComponent, h, ref } from '@vue/runtime-core';
@@ -81,7 +81,7 @@ function DetailsScreen() {
 describe('navigation composables', () => {
   it("useIsFocused reflects the route's native appear/disappear events", async () => {
     let latestIsFocused: boolean | undefined;
-    // Plain functions used as `component:` are stateless functional components — Vue calls them
+    // Plain functions used as `component:` are stateless functional components - Vue calls them
     // fresh on every render and treats their return value as vnodes directly, NOT as a "setup
     // returns a render fn" component. A screen calling a composable needs a real setup-based
     // component, hence defineComponent here instead of a bare function.

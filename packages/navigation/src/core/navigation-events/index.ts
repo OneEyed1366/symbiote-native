@@ -1,6 +1,6 @@
 // The framework-agnostic half of what @react-navigation exposes as `navigation.addListener` /
 // `useFocusEffect` / `useIsFocused` / `useNavigationState`: a plain pub/sub emitter, zero React.
-// addListener is NOT React-specific there either — React's hooks are thin useEffect wrappers
+// addListener is NOT React-specific there either - React's hooks are thin useEffect wrappers
 // around exactly this subscribe/unsubscribe shape (confirmed against the 8.x docs: `const
 // unsubscribe = navigation.addListener('focus', cb); return unsubscribe;` inside a bare
 // `useEffect`). One emitter per route (created by the adapter, e.g. stack.ts's per-route
@@ -11,7 +11,7 @@
 // diffFocusedRoute below centralizes the "which route lost focus, which gained it" comparison
 // that tabs.ts and drawer.ts independently reimplemented in all three adapters (each watching its
 // own router state for the focused index/key changing, then manually emitting BLUR to the old key
-// and FOCUS to the new one, plus an initial FOCUS seed on first mount) — the diff is pure and
+// and FOCUS to the new one, plus an initial FOCUS seed on first mount) - the diff is pure and
 // identical everywhere; only WHEN to run it differs per framework (a `useEffect` dependency array,
 // a Vue `watch`, an idempotent-per-read Angular method), so that half stays adapter-owned.
 
@@ -70,12 +70,12 @@ export function createNavigationEmitter(): INavigationEmitter {
 }
 
 // The keys, if any, that should be blurred/focused when the focused route's key changes from
-// `prevKey` to `nextKey` — a pure comparison, no emitter, no timing. Covers all three shapes every
+// `prevKey` to `nextKey` - a pure comparison, no emitter, no timing. Covers all three shapes every
 // adapter's lifecycle trigger needs: first mount (`prevKey` undefined -> `focusKey` only, no
 // blur), unmount/no-longer-focused (`nextKey` undefined -> `blurKey` only), an ordinary focus
 // change (both), and a no-op re-run with the same key (neither field set, e.g. a setParams-only
 // change that leaves the focused key untouched). The caller looks up (or lazily creates) each
-// key's own emitter and calls `.emit(NAVIGATION_EVENT_BLUR)` / `.emit(NAVIGATION_EVENT_FOCUS)` —
+// key's own emitter and calls `.emit(NAVIGATION_EVENT_BLUR)` / `.emit(NAVIGATION_EVENT_FOCUS)` -
 // this function only decides WHICH keys, never WHEN or on WHICH emitter.
 export type IFocusTransition = {
   blurKey?: string;

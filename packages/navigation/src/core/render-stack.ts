@@ -85,7 +85,7 @@ const ANDROID_HEADER_TOOLBAR_HEIGHT = 56;
 // screen ('RNSModalScreen' instead of plain 'RNSScreen') because "there is a need for different
 // shadow nodes" (its own comment). RNSScreen.mm's updateLayoutMetrics only skips applying Yoga's
 // computed frame for `[self isKindOfClass:RNSModalScreen.class]` ("the available space is most
-// likely restricted & differs from what Yoga resolves during first layout — we want to rely on
+// likely restricted & differs from what Yoga resolves during first layout - we want to rely on
 // native layout here"). Emitting plain 'RNSScreen' for a formSheet/modal means that check never
 // matches, so Yoga's frame (computed as an ordinary push-stack sibling) applies uncorrected,
 // shifting the modal down by one full screen height (see register.ts's incident note). Mirrors
@@ -361,7 +361,7 @@ export type IScreenRenderPlan = {
   // undefined when the screen has no search bar.
   searchBarProps: Record<string, unknown> | undefined;
   // Always includes `collapsable: false` (see RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME's rationale in
-  // core/constants.ts) — every adapter passed this exact pair together, never the style alone.
+  // core/constants.ts) - every adapter passed this exact pair together, never the style alone.
   contentWrapperProps: Record<string, unknown>;
   inModal: boolean;
   innerStackStyle: Record<string, unknown>;

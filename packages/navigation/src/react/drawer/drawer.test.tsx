@@ -6,7 +6,7 @@
 // polyfill from animated-integration.test.tsx (every openDrawer/closeDrawer/toggleDrawer call and
 // a gesture release schedules a real requestAnimationFrame via Animated.timing, which is not a
 // Node global). Drawer is imported from './drawer' (NOT the package barrel) so the third-party
-// native-spec side-effect (../register) never loads headless — matching stack.test.tsx/
+// native-spec side-effect (../register) never loads headless - matching stack.test.tsx/
 // tabs.test.tsx, even though Drawer itself needs no injected ViewConfig (PanResponder + Animated
 // are pure JS, like Tab's bar).
 
@@ -25,13 +25,13 @@ const TOUCH_END = 'topTouchEnd';
 const TOUCH_ID = 1;
 
 // Drawer reads the screen width off useWindowDimensions() to resolve the swipe edge zone
-// (isSwipeStartInEdge) — headless has no DeviceInfo native module, so seed a concrete width once;
+// (isSwipeStartInEdge) - headless has no DeviceInfo native module, so seed a concrete width once;
 // every mount in this file reads this same cached value (Dimensions is a module-level singleton).
 Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
 // rAF is not a Node global; Animated.timing (driven by every openDrawer/closeDrawer/toggleDrawer
 // call and by a gesture release) reads it at .start() time. Ported verbatim from
-// animated-integration.test.tsx's setTimeout-based polyfill — no frame is ever awaited here since
+// animated-integration.test.tsx's setTimeout-based polyfill - no frame is ever awaited here since
 // these tests assert on state.isOpen-derived props, not the animated frame values.
 let frameClock = 0;
 const pendingFrames = new Map<number, (time: number) => void>();
@@ -94,14 +94,14 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   return found;
 }
 
-// Drawer's own root view (holds panResponder.panHandlers) — first child under the AppContainer,
+// Drawer's own root view (holds panResponder.panHandlers) - first child under the AppContainer,
 // mirroring pan-responder-multitouch.test.tsx's `viewNode`.
 function drawerRoot(): IFakeNode {
   return fabric.appRoot().children[0];
 }
 
 // Default drawerType ('front') paints [content, overlay, panel] in that sibling order
-// (render-drawer.ts's drawerChildOrder) — the overlay's pointerEvents prop ('auto' while open,
+// (render-drawer.ts's drawerChildOrder) - the overlay's pointerEvents prop ('auto' while open,
 // 'none' while closed) is the one stable, non-animated signal of state.isOpen this file reads,
 // since the slide/opacity transforms themselves are driven by a real (unawaited) Animated.timing.
 function overlayNode(): IFakeNode {
@@ -118,7 +118,7 @@ type ITouchFrame = { x: number; y: number; t: number };
 
 // Fires a start -> N moves -> end sequence at the drawer root, mirroring the fake-Fabric touch
 // technique from pan-responder-multitouch.test.tsx (touches carry their own `target`, matching
-// how the engine resolves touch ancestry — plain {identifier,pageX,pageY} like tabs.test.tsx's
+// how the engine resolves touch ancestry - plain {identifier,pageX,pageY} like tabs.test.tsx's
 // simple tap is not enough for a multi-frame drag). Wrapped in one `act()` (tabs.test.tsx's
 // tapItem convention) since a release can dispatch a router action and re-render.
 function swipe(path: readonly ITouchFrame[]): void {
@@ -148,7 +148,7 @@ function swipe(path: readonly ITouchFrame[]): void {
   });
 }
 
-// Clears the default swipeEdgeWidth (32) and swipeMinDistance (60) at position 'left' — a start
+// Clears the default swipeEdgeWidth (32) and swipeMinDistance (60) at position 'left' - a start
 // near x=10 followed by a large horizontal move.
 const OPEN_SWIPE: readonly ITouchFrame[] = [
   { x: 10, y: 400, t: 1_000 },
@@ -336,7 +336,7 @@ describe('React Drawer navigator', () => {
         createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
       ),
     );
-    // Same geometry as the passing OPEN_SWIPE case above — the only variable is swipeEnabled.
+    // Same geometry as the passing OPEN_SWIPE case above - the only variable is swipeEnabled.
     swipe(OPEN_SWIPE);
     expect(isOpenByOverlay()).toBe(false);
   });
@@ -383,7 +383,7 @@ describe('React Drawer navigator', () => {
       const navigation = useNavigation();
       homeIsFocused = useIsFocused();
       homeRouteName = useRoute().name;
-      // Merely proving the handle is a real IDrawerNavigatorHandle (openDrawer/jumpTo/…), not
+      // Merely proving the handle is a real IDrawerNavigatorHandle (openDrawer/jumpTo/...), not
       // the Stack-only shape this Context value was hard-typed to before the widened union.
       expect(typeof navigation.jumpTo).toBe('function');
       return createElement('symbiote-text', {}, 'home');
@@ -395,7 +395,7 @@ describe('React Drawer navigator', () => {
 
     const ref = createRef<IDrawerNavigatorHandle>();
     // Drawer's own focus-emitting effect runs in the same commit as the initial mount, but the
-    // setIsFocused(true) it triggers inside useIsFocused's listener lands in a follow-up render —
+    // setIsFocused(true) it triggers inside useIsFocused's listener lands in a follow-up render -
     // act() is what drains that cascade synchronously (mirrors every other state-changing call in
     // this file already being act()-wrapped).
     act(() => {
@@ -462,7 +462,7 @@ describe('React Drawer navigator', () => {
         createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
       ),
     );
-    // Drawer paints no native RNSScreen (unlike Stack), so there is no onAppear to wait for — the
+    // Drawer paints no native RNSScreen (unlike Stack), so there is no onAppear to wait for - the
     // focused screen's useFocusEffect runs as soon as it mounts.
     expect(events).toEqual(['effect']);
 

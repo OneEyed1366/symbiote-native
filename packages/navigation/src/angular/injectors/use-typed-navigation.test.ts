@@ -1,5 +1,5 @@
 // Co-located Angular-driven test for injectStackNavigation/injectTabNavigation/
-// injectDrawerNavigation — the narrowed twins of injectNavigation() that hide the union guard.
+// injectDrawerNavigation - the narrowed twins of injectNavigation() that hide the union guard.
 // Angular twin of react/hooks/use-typed-navigation.test.tsx.
 
 import '@angular/compiler';
@@ -32,7 +32,7 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 };
 
 // Drawer reads the screen width off WindowDimensionsService; headless has no DeviceInfo native
-// module, so seed a concrete width once — same fixture as drawer.test.ts.
+// module, so seed a concrete width once - same fixture as drawer.test.ts.
 Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
 const fabric = installFabric();

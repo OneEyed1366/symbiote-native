@@ -1,7 +1,7 @@
 // The Angular twin of react/navigation-context.ts's `NavigationContext.Provider` usage in
 // stack.ts/tabs.ts/drawer.ts's render loops: one directive instance = one fresh scope. Applying
 // `[symbioteNavigationScope]` to an element re-`providers: [NavigationContextService]`
-// (component/directive-level DI), so every usage mints its OWN service instance — the DI twin of
+// (component/directive-level DI), so every usage mints its OWN service instance - the DI twin of
 // `createElement(NavigationContext.Provider, { value }, content)`. Descendants (a screen's own
 // component tree, reached through `*ngComponentOutlet`) call `inject(NavigationContextService)`
 // and resolve to the NEAREST enclosing instance, exactly like `useContext(NavigationContext)`

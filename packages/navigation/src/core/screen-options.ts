@@ -1,11 +1,11 @@
 // Pure folds from a route's agnostic IScreenOptions into the native view-props shapes
 // (RNSScreen + RNSScreenStackHeaderConfig + RNSSearchBar paint from). Framework-agnostic and
-// shared verbatim by every adapter — the adapter's own job is only wiring identity (screenId),
+// shared verbatim by every adapter - the adapter's own job is only wiring identity (screenId),
 // position (activityState via computeActivityState) and the lifecycle event handlers into
 // `passthrough`.
 //
 // The header bar-button payload+dispatch cluster (id-tagging, onPress lookup) lives in
-// header-bar-buttons.ts — self-contained, consumed here only as a black box by
+// header-bar-buttons.ts - self-contained, consumed here only as a black box by
 // resolveHeaderConfigView.
 
 import type {
@@ -22,7 +22,7 @@ import type {
 } from './navigator-props';
 import { buildHeaderBarButtonDispatch, prepareHeaderBarButtonItems } from './header-bar-buttons';
 
-// These sentinels must be kept in sync with react-native-screens' native side — they are RNS's
+// These sentinels must be kept in sync with react-native-screens' native side - they are RNS's
 // own compat values for the 'fitToContents'/'large'/'medium'/'all' legacy presets, replicated
 // here because we drive RNSScreen directly (no react-native-screens JS component in the path).
 const SHEET_FIT_TO_CONTENTS: number[] = [-1];
@@ -152,7 +152,7 @@ export function resolveScreenView(
 }
 
 // RNSSearchBar is a standalone Fabric leaf (react-native-screens mounts it as a header-subview
-// child in its own JS component) — resolveSearchBarView only folds the static config surface;
+// child in its own JS component) - resolveSearchBarView only folds the static config surface;
 // where/how the adapter mounts the resulting leaf in the header tree is an adapter concern.
 export function resolveSearchBarView(
   options: ISearchBarOptions | undefined,

@@ -1,12 +1,12 @@
 // Drawer, the Vue lifecycle half. The open/closed + focused-route router (drawer-router-state)
 // and the pure swipe/geometry math (drawer-options) live in @symbiote-native/navigation core,
-// shared verbatim with the React/Angular adapters; here Vue supplies the lifecycle — a plain ref
+// shared verbatim with the React/Angular adapters; here Vue supplies the lifecycle - a plain ref
 // for the router (Vue's twin of useReducer), a PanResponder for the swipe gesture (built ONCE in
 // setup, its callbacks reading options/window-width/isOpen LIVE off Vue's own reactive `attrs` /
-// composable refs at gesture time — Vue's reactivity already gives every gesture callback the
+// composable refs at gesture time - Vue's reactivity already gives every gesture callback the
 // CURRENT value with no ref-mirroring dance, unlike React's useRef(value); value = X every
 // render), an Animated.Value driving the slide/opacity transforms, and expose() for the
-// open/close/toggle/jumpTo handle — mirroring tabs.ts's shape (Tab is the closer sibling: both are
+// open/close/toggle/jumpTo handle - mirroring tabs.ts's shape (Tab is the closer sibling: both are
 // fixed-route-list, no-react-native-screens navigators; Stack's push/pop + native-screen bridging
 // don't apply here).
 //
@@ -15,8 +15,8 @@
 // react-native-reanimated, neither of which this codebase depends on. What's built here reaches
 // the same swipe-to-open/close + front/back/slide/permanent behavior using only PanResponder +
 // Animated (both already in @symbiote-native/engine), which is sufficient for a solid drawer but
-// NOT byte-for-byte parity — see the explicit gap list at the bottom of this file (verbatim from
-// the React twin — the gaps are architectural, not adapter-specific).
+// NOT byte-for-byte parity - see the explicit gap list at the bottom of this file (verbatim from
+// the React twin - the gaps are architectural, not adapter-specific).
 
 import {
   defineComponent,
@@ -114,7 +114,7 @@ function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
 }
 
 const DRAWER_TYPES: ReadonlyArray<IDrawerType> = ['front', 'back', 'slide', 'permanent'];
-// .some() itself doesn't narrow `value`'s type back at the call site — the `value is IDrawerType`
+// .some() itself doesn't narrow `value`'s type back at the call site - the `value is IDrawerType`
 // predicate on THIS function is what lets asDrawerType's ternary return `value` typed, mirroring
 // Modal's isOrientation guard (adapters/vue/src/components/modal.ts).
 function isDrawerType(value: unknown): value is IDrawerType {
@@ -137,7 +137,7 @@ function asComponent(value: unknown): IDrawerScreenProps['component'] | undefine
   return isRecord(value) ? (value as IDrawerScreenProps['component']) : undefined;
 }
 
-// IDrawerScreenOptions carries only `title`/`drawerLabel`, small enough for direct field guards —
+// IDrawerScreenOptions carries only `title`/`drawerLabel`, small enough for direct field guards -
 // kept as a single cast-at-the-edge helper anyway for symmetry with stack.ts/tabs.ts's
 // asScreenOptions/asTabOptions (same CLAUDE.md-sanctioned I/O-edge narrowing).
 function asDrawerScreenOptions(value: unknown): IDrawerScreenOptions | undefined {
@@ -179,7 +179,7 @@ const DrawerImpl = defineComponent<IDrawerProps>(
   (_props, { attrs: rawAttrs, slots, expose }) => {
     const attrs = normalizeVueAttrs(rawAttrs);
 
-    // Read BEFORE this Drawer establishes its own per-screen NavigationScope below — becomes the
+    // Read BEFORE this Drawer establishes its own per-screen NavigationScope below - becomes the
     // `parent` link a nested screen's useNavigation().getParent() walks. undefined when this
     // Drawer is the nesting root.
     const ambientScopeRef = injectNavigationScope();
@@ -239,7 +239,7 @@ const DrawerImpl = defineComponent<IDrawerProps>(
       Animated.timing(progress, {
         toValue: open ? 1 : 0,
         duration: DRAWER_SNAP_DURATION,
-        // Native-driver wiring is deferred for v1 — see this file's header feasibility note. The
+        // Native-driver wiring is deferred for v1 - see this file's header feasibility note. The
         // JS timing loop still drives every frame, same as any other non-native-driven
         // Animated.timing in this codebase.
         useNativeDriver: false,
@@ -265,7 +265,7 @@ const DrawerImpl = defineComponent<IDrawerProps>(
       jumpTo: (name: string) => {
         // Captured BEFORE dispatch: unlike React's isOpenRef (only refreshed at the TOP of the
         // next render, so it still holds the pre-dispatch value here since React batches the
-        // re-render asynchronously), this ref's `.value` mutates SYNCHRONOUSLY inside dispatch —
+        // re-render asynchronously), this ref's `.value` mutates SYNCHRONOUSLY inside dispatch -
         // reading it after dispatch would already see the reducer's own isOpen: false.
         const wasOpen = state.value.isOpen;
         dispatch({ type: 'jumpTo', name });
@@ -327,7 +327,7 @@ const DrawerImpl = defineComponent<IDrawerProps>(
 
     // Only the focused route's screen is ever mounted (like Tab, unlike Stack which keeps every
     // pushed route alive). One emitter per route.key, created lazily and cached for the
-    // navigator's whole lifetime (mirrors stack.ts's own `emitters` map) — see tabs.ts's matching
+    // navigator's whole lifetime (mirrors stack.ts's own `emitters` map) - see tabs.ts's matching
     // comment for why a stable per-key lookup, not a recreate-on-change scheme, is what actually
     // avoids racing Vue's own render/mount cycle regardless of which watch `flush` timing is used.
     function focusedKeyOf(current: IDrawerRouterState): string | undefined {
@@ -345,7 +345,7 @@ const DrawerImpl = defineComponent<IDrawerProps>(
     }
 
     // Emitted from onMounted (NOT from inside the render closure below, which runs before the
-    // focused screen's own component ever mounts — an emit there always has zero subscribers).
+    // focused screen's own component ever mounts - an emit there always has zero subscribers).
     let focusedRouteKey = focusedKeyOf(state.value);
 
     onMounted(() => {
@@ -357,11 +357,11 @@ const DrawerImpl = defineComponent<IDrawerProps>(
 
     // The bookkeeping (which key is focused) updates immediately so the render closure below
     // always reads the right route; the actual emit is deferred to nextTick(), which resolves
-    // only after the CURRENT flush cycle fully drains — including the newly-focused screen's own
+    // only after the CURRENT flush cycle fully drains - including the newly-focused screen's own
     // onMounted (subscribing its useIsFocused/useFocusEffect listeners). flush:'post' alone is
     // NOT enough here: it only guarantees this callback runs after THIS component's own render
     // effect, not after an arbitrary sibling post-flush job (a just-mounted child's onMounted)
-    // that may be queued after it in the same batch — nextTick is the one API that waits for the
+    // that may be queued after it in the same batch - nextTick is the one API that waits for the
     // WHOLE cycle, not just this watcher's own slot in it.
     watch(
       () => focusedKeyOf(state.value),
@@ -402,7 +402,7 @@ const DrawerImpl = defineComponent<IDrawerProps>(
         ? progress.interpolate(resolveDrawerSlotInterpolation(geometry, 'content').translateX)
         : undefined;
       // The overlay is a full-screen absolutely-positioned sibling BELOW content in paint order
-      // (see render-drawer.ts's drawerChildOrder) — for 'front' that's fine since content never
+      // (see render-drawer.ts's drawerChildOrder) - for 'front' that's fine since content never
       // moves, but for 'slide' content itself translates away by contentTranslateX, and without
       // following it the overlay stays pinned full-screen. resolveDrawerSlotInterpolation's
       // 'overlay' branch ties its translateX to the SAME range as content's for exactly this
@@ -486,7 +486,7 @@ const DrawerImpl = defineComponent<IDrawerProps>(
         overlay: null,
         panel: drawerContent,
       };
-      // Each animated style holds an AnimatedInterpolation node, not a plain number/color — it
+      // Each animated style holds an AnimatedInterpolation node, not a plain number/color - it
       // feeds only Animated.View's deliberately permissive `style?: unknown`, never the plain-
       // IViewStyle branch below, so this stays untyped rather than widening IViewStyle.
       const slotAnimatedStyle: Record<IDrawerSlot, unknown> = {
@@ -534,17 +534,17 @@ export const Drawer = Object.assign(DrawerImpl, { Screen: DrawerScreen });
 
 // --- Explicit gap list vs the real react-native-gesture-handler + react-native-reanimated
 // @react-navigation/drawer (confirmed against its current docs, mirrored verbatim from the React
-// twin — the gaps are architectural, not adapter-specific) ---
-// 1. `configureGestureHandler` — a raw react-native-gesture-handler `Gesture` object escape
+// twin - the gaps are architectural, not adapter-specific) ---
+// 1. `configureGestureHandler` - a raw react-native-gesture-handler `Gesture` object escape
 //    hatch. No PanResponder equivalent exists; not ported.
 // 2. Simultaneous/failure gesture RELATIONSHIPS (gesture-handler's declarative composition vs a
-//    nested ScrollView, another PanResponder, etc.) — PanResponder only offers negotiation via the
+//    nested ScrollView, another PanResponder, etc.) - PanResponder only offers negotiation via the
 //    should-set boolean gates used here (edge-start + dominant-axis), which is more prone to an
 //    accidental hijack of a nested horizontal ScrollView/Swiper than gesture-handler's system.
-// 3. `useDrawerProgress` — a Reanimated SharedValue read on the UI thread. `progress` here is a
+// 3. `useDrawerProgress` - a Reanimated SharedValue read on the UI thread. `progress` here is a
 //    JS-thread AnimatedValue; interpolating it for consumer-facing content animation works, but
 //    without native-driver wiring (gap noted above) it does not carry the same synchronous
 //    UI-thread guarantee under JS-thread load.
-// 4. `hideStatusBarOnOpen` / `keyboardDismissMode` / `statusBarAnimation` / `overlayStyle` — not
+// 4. `hideStatusBarOnOpen` / `keyboardDismissMode` / `statusBarAnimation` / `overlayStyle` - not
 //    wired in this pass; straightforward additions once StatusBar/Keyboard module wiring is
 //    needed here (not a PanResponder/Animated limitation, just unscoped for v1).

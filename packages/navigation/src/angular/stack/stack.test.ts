@@ -1,7 +1,7 @@
 // Co-located Angular-driven test (ADR 0025) for the @symbiote-native/navigation Angular Stack.
 // Proves the shared core drives Angular correctly against an INJECTED codegen-shaped ViewConfig
 // (mirrors packages/navigation/src/react/stack.test.tsx and
-// adapters/angular/src/components/switch/switch.test.ts's mount/unmount harness — this codebase's
+// adapters/angular/src/components/switch/switch.test.ts's mount/unmount harness - this codebase's
 // Angular tests drive the real renderer via `mount`/`unmount`, not TestBed). Stack/ScreenDirective
 // are imported from their own modules (NOT the package barrel, './index') so the third-party
 // native-spec side-effect (../register) never loads headless.
@@ -74,7 +74,7 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 // On a real Metro build, adapters/angular's babel-register-composed.cjs auto-registers `Stack`
-// as an anchor host by scanning the AOT-compiled @Component's selector — vitest never runs that
+// as an anchor host by scanning the AOT-compiled @Component's selector - vitest never runs that
 // pipeline, so this test drives the same self-registration entry point by hand (mirrors
 // renderer.test.ts's 'RefApiDemo' convention). Without it, `<Stack>` falls through to a raw
 // Fabric createNode('Stack') call instead of a non-painting anchor.
@@ -131,8 +131,8 @@ class HomeScreenComponent {}
 })
 class DetailsScreenComponent {}
 
-// Each mounted instance captures its own live route Signal (injectRoute) in order — index 0 is
-// Home, index 1 the pushed Details — so a test reads params/key straight off the screen's DI-
+// Each mounted instance captures its own live route Signal (injectRoute) in order - index 0 is
+// Home, index 1 the pushed Details - so a test reads params/key straight off the screen's DI-
 // provided route instead of a former @Input, and a setParams still updates it reactively.
 const capturedParamRoutes: Signal<IRoute<unknown>>[] = [];
 
@@ -189,7 +189,7 @@ async function mountStack(): Promise<INavigatorHandle> {
 }
 
 // Dedicated hosts (fixed component wiring declared up front, mirroring react/stack.test.tsx's
-// per-test `createElement(...)` calls) for the params/setParams/search-bar scenarios below —
+// per-test `createElement(...)` calls) for the params/setParams/search-bar scenarios below -
 // swapping a `[component]`/`[options]` binding value on an already-mounted host AFTER `mount()`
 // is a real but separate correctness question (does a bare, non-signal field write on the host
 // get picked up by the next CD pass at all); sidestepped here by declaring the desired wiring

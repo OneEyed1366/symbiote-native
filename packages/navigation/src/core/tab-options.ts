@@ -4,7 +4,7 @@
 // per <prop_types_split_agnostic_vs_per_adapter> a render-callback-returning-a-framework-element
 // field can't live in the shared agnostic type, so here it is EITHER a pre-built `IDescriptor`
 // (an adapter can bridge any host node it already resolved, image or vector icon) or a bare icon
-// NAME string the renderer paints as a label-style glyph — both framework-agnostic. An adapter
+// NAME string the renderer paints as a label-style glyph - both framework-agnostic. An adapter
 // wanting a `(props) => ReactNode`-style callback resolves it to one of these two forms itself,
 // same split as IPressableProps's per-adapter children.
 

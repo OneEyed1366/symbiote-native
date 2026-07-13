@@ -1,10 +1,10 @@
 // Drawer, the React lifecycle half. The open/closed + focused-route router (drawer-router-state)
 // and the pure swipe/geometry math (drawer-options) live in @symbiote-native/navigation core,
-// shared verbatim with the Vue/Angular adapters; here React supplies the lifecycle — useReducer
+// shared verbatim with the Vue/Angular adapters; here React supplies the lifecycle - useReducer
 // for the router, a PanResponder for the swipe gesture (RN's own idiom: build it ONCE via
 // useRef, let its callbacks read current values off refs rather than rebuilding it every render),
 // an Animated.Value driving the slide/opacity transforms, and useImperativeHandle for the
-// open/close/toggle/jumpTo handle — mirroring react/tabs.ts's shape (Tab is the closer sibling:
+// open/close/toggle/jumpTo handle - mirroring react/tabs.ts's shape (Tab is the closer sibling:
 // both are fixed-route-list, no-react-native-screens navigators; Stack's push/pop + native-screen
 // bridging don't apply here).
 //
@@ -12,7 +12,7 @@
 // @react-navigation/drawer is built on react-native-gesture-handler + react-native-reanimated,
 // neither of which this codebase depends on. What's built here reaches the same swipe-to-open/
 // close + front/back/slide/permanent behavior using only PanResponder + Animated (both already in
-// @symbiote-native/engine), which is sufficient for a solid drawer but NOT byte-for-byte parity —
+// @symbiote-native/engine), which is sufficient for a solid drawer but NOT byte-for-byte parity -
 // see the explicit gap list at the bottom of this file.
 
 import {
@@ -95,7 +95,7 @@ function resolveDrawerScreenOptions(
 const DRAWER_SNAP_DURATION = 250;
 
 const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forwardedRef) => {
-  // Read BEFORE establishing this Drawer's own Context value below — becomes the `parent` link a
+  // Read BEFORE establishing this Drawer's own Context value below - becomes the `parent` link a
   // nested screen's useNavigation().getParent() walks (e.g. this Drawer rendered as a Stack
   // screen's content reaches that Stack via this value). undefined when this Drawer is the
   // nesting root.
@@ -156,7 +156,7 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
   // another grant can fire.
   const dragStartProgress = useRef(0);
 
-  // Refs so the PanResponder's callbacks — built ONCE below, RN's own idiom — always read the
+  // Refs so the PanResponder's callbacks - built ONCE below, RN's own idiom - always read the
   // CURRENT render's values without forcing a new PanResponder identity on every state/prop
   // change (recreating panHandlers mid-gesture would drop the in-flight touch).
   const optionsRef = useRef(options);
@@ -171,7 +171,7 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
       // Investigation instrumentation (Drawer openDrawer-no-op / toggleDrawer-no-animation bug):
       // every imperative caller (openDrawer/closeDrawer/toggleDrawer/jumpTo) funnels through here,
       // so this single seam proves whether Animated.timing is actually being started at all, and
-      // with what toValue — a live-only failure (e.g. a stale progress ref, or Animated.timing
+      // with what toValue - a live-only failure (e.g. a stale progress ref, or Animated.timing
       // silently short-circuiting) would show up as this log firing with no visible motion. Kept
       // behind DEBUG per <keep_logs_gate_behind_DEBUG>, never removed.
       dlog(`Drawer: animateProgressTo(open=${open}) starting at t=${Date.now()}`);
@@ -179,7 +179,7 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
         toValue: open ? 1 : 0,
         duration: DRAWER_SNAP_DURATION,
         // Native-driver wiring (the AnimatedComponent passthrough opt-in ADR 0017 defines) is
-        // deferred for v1 — see this file's header feasibility note. The JS timing loop still
+        // deferred for v1 - see this file's header feasibility note. The JS timing loop still
         // drives every frame, same as any other non-native-driven Animated.timing in this codebase.
         useNativeDriver: false,
       }).start();
@@ -286,7 +286,7 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
   const contentTranslateX = contentSlot ? progress.interpolate(contentSlot.translateX) : undefined;
   const overlayOpacity = overlaySlot ? progress.interpolate(overlaySlot.opacity) : undefined;
   // The overlay is a full-screen absolutely-positioned sibling BELOW content in paint order
-  // (see render-drawer.ts's drawerChildOrder) — for 'front' that's fine since content never moves,
+  // (see render-drawer.ts's drawerChildOrder) - for 'front' that's fine since content never moves,
   // but for 'slide' content itself translates away by contentTranslateX, and without following it
   // the overlay stays pinned full-screen, dimming (and touch-capturing) the now-revealed panel
   // underneath instead of just the content sliver it's meant to dim. Tying overlay to the SAME
@@ -301,16 +301,16 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
   }
 
   // Only the focused route's screen is ever mounted (like Tab, unlike Stack which keeps every
-  // pushed route alive), so a fresh emitter per focus change is sufficient — see tabs.ts's
+  // pushed route alive), so a fresh emitter per focus change is sufficient - see tabs.ts's
   // matching comment for why no per-route emitter map is needed. Keyed on the route KEY, not the
   // route object, so a jumpTo-with-no-params re-focus of the ALREADY-focused route (a no-op in
   // drawerRouterReducer) and any future params merge don't spuriously re-fire focus/blur.
   const focusedRouteKey = focusedRoute?.key;
   const routeEmitter = useMemo(() => createNavigationEmitter(), [focusedRouteKey]);
 
-  // Drawer paints its own panel in pure JS — there is no native onAppear/onDisappear to hook
+  // Drawer paints its own panel in pure JS - there is no native onAppear/onDisappear to hook
   // (unlike Stack's RNSScreen), so focus/blur is synthesized here: mount = focus, cleanup = blur,
-  // exactly what an effect keyed on focusedRouteKey already encodes — no diffFocusedRoute
+  // exactly what an effect keyed on focusedRouteKey already encodes - no diffFocusedRoute
   // indirection needed (unlike Vue/Angular, which diff real prev/next keys inside an imperative
   // watch/CD callback that has no mount/cleanup pairing of its own).
   useEffect(() => {
@@ -322,7 +322,7 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
       routeEmitter.emit(NAVIGATION_EVENT_BLUR);
     };
     // focusedRoute omitted deliberately: only its .key (tracked via focusedRouteKey) should
-    // re-run this effect — see the comment above on focusedRouteKey.
+    // re-run this effect - see the comment above on focusedRouteKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeEmitter, focusedRouteKey]);
 
@@ -386,7 +386,7 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
     overlay: null,
     panel: drawerContent,
   };
-  // Each animated style holds an AnimatedInterpolation node, not a plain number/color — it feeds
+  // Each animated style holds an AnimatedInterpolation node, not a plain number/color - it feeds
   // only Animated.View's deliberately permissive `style?: unknown` (see create-animated-component.tsx),
   // never the plain-IViewStyle branch below, so this stays untyped rather than widening IViewStyle.
   const slotAnimatedStyle: Record<IDrawerSlot, unknown> = {
@@ -436,16 +436,16 @@ export const Drawer = Object.assign(DrawerImpl, { Screen: DrawerScreen });
 
 // --- Explicit gap list vs the real react-native-gesture-handler + react-native-reanimated
 // @react-navigation/drawer (confirmed against its current docs) ---
-// 1. `configureGestureHandler` — a raw react-native-gesture-handler `Gesture` object escape
+// 1. `configureGestureHandler` - a raw react-native-gesture-handler `Gesture` object escape
 //    hatch. No PanResponder equivalent exists; not ported.
 // 2. Simultaneous/failure gesture RELATIONSHIPS (gesture-handler's declarative composition vs a
-//    nested ScrollView, another PanResponder, etc.) — PanResponder only offers negotiation via the
+//    nested ScrollView, another PanResponder, etc.) - PanResponder only offers negotiation via the
 //    should-set boolean gates used here (edge-start + dominant-axis), which is more prone to an
 //    accidental hijack of a nested horizontal ScrollView/Swiper than gesture-handler's system.
-// 3. `useDrawerProgress` — a Reanimated SharedValue read on the UI thread. `progress` here is a
+// 3. `useDrawerProgress` - a Reanimated SharedValue read on the UI thread. `progress` here is a
 //    JS-thread AnimatedValue; interpolating it for consumer-facing content animation works, but
 //    without native-driver wiring (gap noted above) it does not carry the same synchronous
 //    UI-thread guarantee under JS-thread load.
-// 4. `hideStatusBarOnOpen` / `keyboardDismissMode` / `statusBarAnimation` / `overlayStyle` — not
+// 4. `hideStatusBarOnOpen` / `keyboardDismissMode` / `statusBarAnimation` / `overlayStyle` - not
 //    wired in this pass; straightforward additions once StatusBar/Keyboard module wiring is
 //    needed here (not a PanResponder/Animated limitation, just unscoped for v1).
