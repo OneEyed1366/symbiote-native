@@ -8,16 +8,19 @@ import type { FC, ReactElement } from 'react';
 import type { IRoute, ITabOptions } from '../core';
 import type { ITabNavigatorHandle } from '../core';
 
-export type ITabScreenComponentProps = {
+// The options resolver runs INSIDE Tab while it computes a screen's tab-bar options, closing over
+// the live navigator handle — not the mounted screen component (that reads navigation/route via
+// the hooks). See react/screen.ts's IScreenOptionsArgs for the same distinction.
+export type ITabScreenOptionsArgs = {
   route: IRoute<unknown>;
   navigation: ITabNavigatorHandle;
 };
 
-export type ITabScreenOptionsResolver = (props: ITabScreenComponentProps) => ITabOptions;
+export type ITabScreenOptionsResolver = (args: ITabScreenOptionsArgs) => ITabOptions;
 
 export type ITabScreenProps = {
   name: string;
-  component: FC<ITabScreenComponentProps>;
+  component: FC;
   options?: ITabOptions | ITabScreenOptionsResolver;
   initialParams?: unknown;
 };

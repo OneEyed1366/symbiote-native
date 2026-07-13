@@ -9,12 +9,12 @@ import { defineComponent } from '@vue/runtime-core';
 import type { Component } from '@vue/runtime-core';
 import type { IRoute, ITabOptions, ITabNavigatorHandle } from '../core';
 
-export type ITabScreenComponentProps = {
+export type ITabScreenOptionsArgs = {
   route: IRoute<unknown>;
   navigation: ITabNavigatorHandle;
 };
 
-export type ITabScreenOptionsResolver = (props: ITabScreenComponentProps) => ITabOptions;
+export type ITabScreenOptionsResolver = (props: ITabScreenOptionsArgs) => ITabOptions;
 
 export type ITabScreenProps = {
   name: string;

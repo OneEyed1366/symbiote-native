@@ -7,12 +7,12 @@ import { Directive, Input, type Type } from '@angular/core';
 import type { IRoute, ITabOptions } from '../core';
 import type { ITabNavigatorHandle } from '../core';
 
-export type ITabScreenComponentProps = {
+export type ITabScreenOptionsArgs = {
   route: IRoute<unknown>;
   navigation: ITabNavigatorHandle;
 };
 
-export type ITabScreenOptionsResolver = (props: ITabScreenComponentProps) => ITabOptions;
+export type ITabScreenOptionsResolver = (props: ITabScreenOptionsArgs) => ITabOptions;
 
 @Directive({
   selector: 'ng-template[symbioteTabScreen]',

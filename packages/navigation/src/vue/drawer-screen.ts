@@ -10,13 +10,13 @@ import { defineComponent } from '@vue/runtime-core';
 import type { Component } from '@vue/runtime-core';
 import type { IDrawerScreenOptions, IRoute, IDrawerNavigatorHandle } from '../core';
 
-export type IDrawerScreenComponentProps = {
+export type IDrawerScreenOptionsArgs = {
   route: IRoute<unknown>;
   navigation: IDrawerNavigatorHandle;
 };
 
 export type IDrawerScreenOptionsResolver = (
-  props: IDrawerScreenComponentProps,
+  props: IDrawerScreenOptionsArgs,
 ) => IDrawerScreenOptions;
 
 export type IDrawerScreenProps = {

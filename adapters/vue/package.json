@@ -19,7 +19,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./bootstrap": "./src/bootstrap.ts",
-    "./runtime-helpers": "./src/runtime-helpers.ts",
+    "./runtime-helpers": "./src/runtime-helpers/index.ts",
     "./metro-css-parser": "./metro-css-parser.cjs",
     "./metro-vue-transformer": "./metro-vue-transformer.cjs"
   },
@@ -43,8 +43,8 @@
         "default": "./build/bootstrap.js"
       },
       "./runtime-helpers": {
-        "types": "./build/runtime-helpers.d.ts",
-        "default": "./build/runtime-helpers.js"
+        "types": "./build/runtime-helpers/index.d.ts",
+        "default": "./build/runtime-helpers/index.js"
       },
       "./metro-css-parser": "./metro-css-parser.cjs",
       "./metro-vue-transformer": "./metro-vue-transformer.cjs"

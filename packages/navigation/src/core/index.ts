@@ -163,3 +163,8 @@ export type {
   IDrawerDescriptorMap,
   IAnyNavigatorHandle,
 } from './navigator-handles';
+export {
+  isStackNavigatorHandle,
+  isTabNavigatorHandle,
+  isDrawerNavigatorHandle,
+} from './navigator-handles';

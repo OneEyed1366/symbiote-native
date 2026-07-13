@@ -7,18 +7,19 @@
 import type { FC, ReactElement } from 'react';
 import type { IDrawerNavigatorHandle, IDrawerScreenOptions, IRoute } from '../core';
 
-export type IDrawerScreenComponentProps = {
+// The options resolver runs INSIDE Drawer while it computes a screen's options, closing over the
+// live navigator handle — not the mounted screen component (that reads navigation/route via the
+// hooks). See react/screen.ts's IScreenOptionsArgs for the same distinction.
+export type IDrawerScreenOptionsArgs = {
   route: IRoute<unknown>;
   navigation: IDrawerNavigatorHandle;
 };
 
-export type IDrawerScreenOptionsResolver = (
-  props: IDrawerScreenComponentProps,
-) => IDrawerScreenOptions;
+export type IDrawerScreenOptionsResolver = (args: IDrawerScreenOptionsArgs) => IDrawerScreenOptions;
 
 export type IDrawerScreenProps = {
   name: string;
-  component: FC<IDrawerScreenComponentProps>;
+  component: FC;
   options?: IDrawerScreenOptions | IDrawerScreenOptionsResolver;
   initialParams?: unknown;
 };

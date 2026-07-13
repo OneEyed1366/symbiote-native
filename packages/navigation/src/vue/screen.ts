@@ -16,11 +16,6 @@ import type {
   INavigatorHandle,
 } from '../core';
 
-export type IScreenComponentProps = {
-  route: IRoute<unknown>;
-  navigation: INavigatorHandle;
-};
-
 // The imperative ref (focus/blur/clearText/setText/cancelSearch/toggleCancelButton) carries a Vue
 // ref type, so — per CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter> — it cannot live in
 // the shared, agnostic ISearchBarOptions (core/navigator-props.ts). This adapter-only overlay adds
@@ -34,7 +29,15 @@ export type IVueScreenOptions = Omit<IScreenOptions, 'headerSearchBarOptions'> &
   headerSearchBarOptions?: IVueSearchBarOptions;
 };
 
-export type IScreenOptionsResolver = (props: IScreenComponentProps) => IVueScreenOptions;
+// The options resolver runs OUTSIDE render (during the options fold), so it still receives the
+// route + navigator handle explicitly — screens read those through composables, but a resolver has
+// no component scope to inject from.
+export type IScreenOptionsArgs = {
+  route: IRoute<unknown>;
+  navigation: INavigatorHandle;
+};
+
+export type IScreenOptionsResolver = (args: IScreenOptionsArgs) => IVueScreenOptions;
 
 export type IScreenProps = {
   name: string;

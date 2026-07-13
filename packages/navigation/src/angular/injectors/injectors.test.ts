@@ -19,7 +19,6 @@ import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/angu
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
-import type { INavigatorHandle } from '../stack';
 import { ScreenDirective } from '../screen.directive';
 import type { IRoute, INavigatorState } from '../../core';
 import {
@@ -78,10 +77,7 @@ function screenNodes(): IFakeNode[] {
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `<symbiote-text>plain</symbiote-text>`,
 })
-class PlainScreenComponent {
-  @Input() route!: IRoute<unknown>;
-  @Input() navigation!: INavigatorHandle;
-}
+class PlainScreenComponent {}
 
 let capturedIsFocused: Signal<boolean> | undefined;
 
@@ -92,9 +88,6 @@ let capturedIsFocused: Signal<boolean> | undefined;
   template: `<symbiote-text>home</symbiote-text>`,
 })
 class IsFocusedScreenComponent {
-  @Input() route!: IRoute<unknown>;
-  @Input() navigation!: INavigatorHandle;
-
   constructor() {
     capturedIsFocused = injectIsFocused();
   }
@@ -109,9 +102,6 @@ const focusEffectEvents: string[] = [];
   template: `<symbiote-text>home</symbiote-text>`,
 })
 class FocusEffectScreenComponent {
-  @Input() route!: IRoute<unknown>;
-  @Input() navigation!: INavigatorHandle;
-
   constructor() {
     injectFocusEffect(() => {
       focusEffectEvents.push('effect');
@@ -131,9 +121,6 @@ const focusListenerEvents: string[] = [];
   template: `<symbiote-text>details</symbiote-text>`,
 })
 class NavigationRouteScreenComponent {
-  @Input() route!: IRoute<unknown>;
-  @Input() navigation!: INavigatorHandle;
-
   constructor() {
     capturedNavigation = injectNavigation();
     capturedRoute = injectRoute();
@@ -150,9 +137,6 @@ let capturedRouteCount: Signal<number> | undefined;
   template: `<symbiote-text>home</symbiote-text>`,
 })
 class NavigationStateScreenComponent {
-  @Input() route!: IRoute<unknown>;
-  @Input() navigation!: INavigatorHandle;
-
   constructor() {
     capturedRouteCount = injectNavigationState((state: INavigatorState) => state.routes.length);
   }

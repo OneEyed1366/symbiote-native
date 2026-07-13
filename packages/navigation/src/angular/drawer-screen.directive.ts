@@ -7,13 +7,13 @@ import { Directive, Input, type Type } from '@angular/core';
 import type { IDrawerScreenOptions, IRoute } from '../core';
 import type { IDrawerNavigatorHandle } from '../core';
 
-export type IDrawerScreenComponentProps = {
+export type IDrawerScreenOptionsArgs = {
   route: IRoute<unknown>;
   navigation: IDrawerNavigatorHandle;
 };
 
 export type IDrawerScreenOptionsResolver = (
-  props: IDrawerScreenComponentProps,
+  props: IDrawerScreenOptionsArgs,
 ) => IDrawerScreenOptions;
 
 @Directive({

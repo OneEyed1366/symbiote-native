@@ -1,5 +1,11 @@
 export { injectNavigation } from './inject-navigation';
 export type { INavigationHandle } from './inject-navigation';
+export { injectStackNavigation } from './inject-stack-navigation';
+export type { IStackNavigationHandle } from './inject-stack-navigation';
+export { injectTabNavigation } from './inject-tab-navigation';
+export type { ITabNavigationHandle } from './inject-tab-navigation';
+export { injectDrawerNavigation } from './inject-drawer-navigation';
+export type { IDrawerNavigationHandle } from './inject-drawer-navigation';
 export { injectRoute } from './inject-route';
 export { injectIsFocused } from './inject-is-focused';
 export { injectFocusEffect } from './inject-focus-effect';

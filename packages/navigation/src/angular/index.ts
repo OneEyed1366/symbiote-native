@@ -12,19 +12,28 @@ export { ScreenDirective } from './screen.directive';
 export type {
   IAngularScreenOptions,
   IAngularSearchBarOptions,
-  IScreenComponentProps,
+  IScreenOptionsArgs,
   IScreenOptionsResolver,
 } from './screen.directive';
 export type { IScreenOptions, IStackAnimation, IStackPresentation } from '../core';
 
 export {
   injectNavigation,
+  injectStackNavigation,
+  injectTabNavigation,
+  injectDrawerNavigation,
   injectRoute,
   injectIsFocused,
   injectFocusEffect,
   injectNavigationState,
 } from './injectors';
-export type { INavigationHandle, IFocusEffectCallback } from './injectors';
+export type {
+  INavigationHandle,
+  IStackNavigationHandle,
+  ITabNavigationHandle,
+  IDrawerNavigationHandle,
+  IFocusEffectCallback,
+} from './injectors';
 export { NavigationContextService } from './navigation-context.service';
 export type { IAnyNavigatorHandle } from './navigation-context.service';
 export { NavigationScopeDirective } from './navigation-scope.directive';
@@ -37,7 +46,7 @@ export type { ILinkingConfig, IScreenLinkingConfig } from '../core';
 export { Tab } from './tabs';
 export type { ITabNavigatorHandle } from './tabs';
 export { TabScreenDirective } from './tab-screen.directive';
-export type { ITabScreenComponentProps, ITabScreenOptionsResolver } from './tab-screen.directive';
+export type { ITabScreenOptionsArgs, ITabScreenOptionsResolver } from './tab-screen.directive';
 export type { ITabOptions, ITabBarIcon } from '../core';
 
 // Drawer: the swipeable drawer navigator, a PURE-JS UI (PanResponder + Animated, no
@@ -48,7 +57,7 @@ export { Drawer } from './drawer';
 export type { IDrawerNavigatorHandle, IDrawerDescriptorMap, IDrawerContentContext } from './drawer';
 export { DrawerScreenDirective } from './drawer-screen.directive';
 export type {
-  IDrawerScreenComponentProps,
+  IDrawerScreenOptionsArgs,
   IDrawerScreenOptionsResolver,
 } from './drawer-screen.directive';
 export type { IDrawerOptions, IDrawerScreenOptions, IDrawerType, IDrawerPosition } from '../core';

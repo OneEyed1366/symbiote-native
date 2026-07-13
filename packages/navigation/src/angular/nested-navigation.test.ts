@@ -16,14 +16,11 @@ import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/angu
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from './stack';
-import type { INavigatorHandle } from './stack';
 import { ScreenDirective } from './screen.directive';
 import { Tab } from './tabs';
-import type { ITabNavigatorHandle } from './tabs';
 import { TabScreenDirective } from './tab-screen.directive';
 import { injectNavigation } from './injectors';
 import type { IAnyNavigatorHandle } from './navigation-context.service';
-import type { IRoute } from '../core';
 
 const ROOT_TAG = 5140;
 const SCREEN_VIEW = 'RNSScreen';
@@ -74,10 +71,7 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `<symbiote-text>root</symbiote-text>`,
 })
-class RootPlainScreenComponent {
-  @Input() route!: IRoute<unknown>;
-  @Input() navigation!: INavigatorHandle;
-}
+class RootPlainScreenComponent {}
 
 @Component({
   selector: 'stack-details-screen',
@@ -85,10 +79,7 @@ class RootPlainScreenComponent {
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `<symbiote-text>stack-details</symbiote-text>`,
 })
-class StackDetailsScreenComponent {
-  @Input() route!: IRoute<unknown>;
-  @Input() navigation!: INavigatorHandle;
-}
+class StackDetailsScreenComponent {}
 
 let capturedParent: IAnyNavigatorHandle | undefined;
 let getParentCalled = false;
@@ -100,9 +91,6 @@ let getParentCalled = false;
   template: `<symbiote-text>root</symbiote-text>`,
 })
 class RootGetParentScreenComponent {
-  @Input() route!: IRoute<unknown>;
-  @Input() navigation!: INavigatorHandle;
-
   constructor() {
     capturedParent = injectNavigation().getParent();
     getParentCalled = true;
@@ -116,9 +104,6 @@ class RootGetParentScreenComponent {
   template: `<symbiote-text>tab-home</symbiote-text>`,
 })
 class NestedTabHomeScreenComponent {
-  @Input() route!: IRoute<unknown>;
-  @Input() navigation!: ITabNavigatorHandle;
-
   constructor() {
     capturedParent = injectNavigation().getParent();
   }
@@ -138,9 +123,6 @@ class NestedTabHomeScreenComponent {
   `,
 })
 class RootRendersTabScreenComponent {
-  @Input() route!: IRoute<unknown>;
-  @Input() navigation!: INavigatorHandle;
-
   tabHomeComponent = NestedTabHomeScreenComponent;
 }
 

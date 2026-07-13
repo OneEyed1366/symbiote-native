@@ -10,11 +10,6 @@ import { Directive, Input, type Type } from '@angular/core';
 import type { ISearchBarCommands, ISearchBarOptions, IScreenOptions, IRoute } from '../core';
 import type { INavigatorHandle } from '../core';
 
-export type IScreenComponentProps = {
-  route: IRoute<unknown>;
-  navigation: INavigatorHandle;
-};
-
 // The imperative ref (focus/blur/clearText/setText/cancelSearch/toggleCancelButton) carries a
 // framework ref type, so — per CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter> — it cannot
 // live in the shared, agnostic ISearchBarOptions (core/navigator-props.ts). Angular has no
@@ -30,7 +25,16 @@ export type IAngularScreenOptions = Omit<IScreenOptions, 'headerSearchBarOptions
   headerSearchBarOptions?: IAngularSearchBarOptions;
 };
 
-export type IScreenOptionsResolver = (props: IScreenComponentProps) => IAngularScreenOptions;
+// A screen's options can be a plain object or a resolver run OUTSIDE the render lifecycle (when
+// Stack folds a route's options): its `navigation` argument is a live navigator handle a bar-button
+// onPress closes over, so this is NOT the props-based navigation the screen body reads via inject —
+// it's a deliberate escape hatch that stays.
+export type IScreenOptionsArgs = {
+  route: IRoute<unknown>;
+  navigation: INavigatorHandle;
+};
+
+export type IScreenOptionsResolver = (args: IScreenOptionsArgs) => IAngularScreenOptions;
 
 @Directive({
   selector: 'ng-template[symbioteScreen]',

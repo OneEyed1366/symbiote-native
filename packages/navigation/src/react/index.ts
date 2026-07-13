@@ -8,11 +8,17 @@ import '../register';
 export { Stack } from './stack';
 export type { INavigatorHandle, IStackProps } from './stack';
 export { Screen } from './screen';
-export type { IScreenComponentProps, IScreenOptionsResolver, IScreenProps } from './screen';
+export type { IScreenOptionsArgs, IScreenOptionsResolver, IScreenProps } from './screen';
 export type { IScreenOptions, IStackAnimation, IStackPresentation } from '../core';
 
 export { useNavigation, useRoute, useIsFocused, useFocusEffect, useNavigationState } from './hooks';
 export type { INavigationHandle } from './hooks';
+export { useStackNavigation, useTabNavigation, useDrawerNavigation } from './hooks';
+export type {
+  IStackNavigationHandle,
+  ITabNavigationHandle,
+  IDrawerNavigationHandle,
+} from './hooks';
 export { NavigationContext } from './navigation-context';
 export type { INavigationContextValue, IAnyNavigatorHandle } from './navigation-context';
 
@@ -25,7 +31,7 @@ export { Tab } from './tabs';
 export type { ITabNavigatorHandle, ITabProps } from './tabs';
 export { TabScreen } from './tab-screen';
 export type {
-  ITabScreenComponentProps,
+  ITabScreenOptionsArgs,
   ITabScreenOptionsResolver,
   ITabScreenProps,
 } from './tab-screen';
@@ -39,7 +45,7 @@ export { Drawer } from './drawer';
 export type { IDrawerNavigatorHandle, IDrawerProps, IDrawerDescriptorMap } from './drawer';
 export { DrawerScreen } from './drawer-screen';
 export type {
-  IDrawerScreenComponentProps,
+  IDrawerScreenOptionsArgs,
   IDrawerScreenOptionsResolver,
   IDrawerScreenProps,
 } from './drawer-screen';

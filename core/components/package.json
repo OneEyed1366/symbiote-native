@@ -18,7 +18,7 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./bootstrap": "./src/bootstrap.ts"
+    "./bootstrap": "./src/bootstrap/index.ts"
   },
   "files": [
     "build"
@@ -34,8 +34,8 @@
         "default": "./build/index.js"
       },
       "./bootstrap": {
-        "types": "./build/bootstrap.d.ts",
-        "default": "./build/bootstrap.js"
+        "types": "./build/bootstrap/index.d.ts",
+        "default": "./build/bootstrap/index.js"
       }
     }
   },

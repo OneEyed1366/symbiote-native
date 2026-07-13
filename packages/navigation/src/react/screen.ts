@@ -8,11 +8,6 @@ import type { IRoute } from '../core';
 import type { ISearchBarCommands, ISearchBarOptions, IScreenOptions } from '../core';
 import type { INavigatorHandle } from '../core';
 
-export type IScreenComponentProps = {
-  route: IRoute<unknown>;
-  navigation: INavigatorHandle;
-};
-
 // The imperative ref (focus/blur/clearText/setText/cancelSearch/toggleCancelButton) carries a
 // React ref type, so — per CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter> — it cannot
 // live in the shared, agnostic ISearchBarOptions (core/navigator-props.ts). This adapter-only
@@ -26,11 +21,20 @@ export type IReactScreenOptions = Omit<IScreenOptions, 'headerSearchBarOptions'>
   headerSearchBarOptions?: IReactSearchBarOptions;
 };
 
-export type IScreenOptionsResolver = (props: IScreenComponentProps) => IReactScreenOptions;
+// The options resolver runs INSIDE the Stack while it computes a screen's options — its
+// bar-button/menu onPress handlers close over the live navigator handle. This is NOT the mounted
+// screen component (that one reads navigation/route via the hooks); it's a config callback with no
+// lifecycle, so hooks aren't available to it and the handle arrives as an argument instead.
+export type IScreenOptionsArgs = {
+  route: IRoute<unknown>;
+  navigation: INavigatorHandle;
+};
+
+export type IScreenOptionsResolver = (args: IScreenOptionsArgs) => IReactScreenOptions;
 
 export type IScreenProps = {
   name: string;
-  component: FC<IScreenComponentProps>;
+  component: FC;
   options?: IReactScreenOptions | IScreenOptionsResolver;
   initialParams?: unknown;
 };
