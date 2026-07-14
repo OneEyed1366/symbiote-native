@@ -133,10 +133,29 @@ catalog:
   '@react-native-community/cli': 20.1.0
   '@react-native-community/cli-platform-android': 20.1.0
   '@react-native-community/cli-platform-ios': 20.1.0
-  '@react-native-community/slider': ^5.2.0
-  react-native-bootsplash: ^7.3.2
+  # Exact pins, not caret ranges — same reason as react-native-screens below: packages/slider and
+  # packages/splash-screen vendor these libraries' codegen JS specs into a published
+  # codegen-specs/ snapshot (scripts/vendor-codegen-specs.cjs), and a caret range lets a
+  # standalone examples/* consumer's own npm install silently drift its NATIVE side ahead of
+  # that snapshot. No drift observed yet (both examples/* and this workspace currently resolve
+  # the same 5.2.0/7.3.2), but the class of failure is proven (react-native-screens, 2026-07-15)
+  # and silent at both ends until a real device/simulator build — pin here to close it off before
+  # it happens, not after.
+  '@react-native-community/slider': 5.2.0
+  react-native-bootsplash: 7.3.2
   react-native-is-edge-to-edge: ^1.3.1
-  react-native-screens: ^4.25.2
+  # Exact pin, not a caret range: @symbiote-native/navigation vendors this library's codegen JS
+  # specs into its own published codegen-specs/ at prepare time (see
+  # scripts/vendor-codegen-specs.cjs) — a floating range let a standalone `npm install` consumer
+  # (examples/*, outside this pnpm workspace) resolve a NEWER react-native-screens than whatever
+  # this workspace last vendored from, so the consumer's native .rn-screens (podspec-vendored
+  # fresh from THEIR install) referenced codegen types (e.g. RNSSplitHostColorScheme, added in
+  # 4.26.0) that our stale 4.25.2-vendored codegen-specs never generated Props.h entries for —
+  # `error: no type named 'RNSSplitHostColorScheme' in namespace 'facebook::react'` at pod-install
+  # time, with zero warning at either version's own install. An exact pin here + republishing
+  # @symbiote-native/navigation on every bump keeps codegen-specs and any consumer's native source
+  # permanently in lockstep — see .claude/rules/native-proxy-package-files.md.
+  react-native-screens: 4.26.0
   react-native-safe-area-context: ^5.5.2
   '@babel/core': ^7.25.2
   '@types/babel__core': ^7.20.5

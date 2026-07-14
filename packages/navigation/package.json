@@ -66,14 +66,85 @@
       "javaPackageName": "com.swmansion.rnscreens"
     },
     "ios": {
-      "componentProvider": {
-        "RNSScreen": "RNSScreenView",
-        "RNSScreenStack": "RNSScreenStackView",
-        "RNSScreenStackHeaderConfig": "RNSScreenStackHeaderConfig",
-        "RNSScreenStackHeaderSubview": "RNSScreenStackHeaderSubview",
-        "RNSSearchBar": "RNSSearchBar",
-        "RNSScreenContentWrapper": "RNSScreenContentWrapper",
-        "RNSModalScreen": "RNSModalScreen"
+      "components": {
+        "RNSFullWindowOverlay": {
+          "className": "RNSFullWindowOverlay"
+        },
+        "RNSModalScreen": {
+          "className": "RNSModalScreen"
+        },
+        "RNSScreenContainer": {
+          "className": "RNSScreenContainerView"
+        },
+        "RNSScreenContentWrapper": {
+          "className": "RNSScreenContentWrapper"
+        },
+        "RNSScreenFooter": {
+          "className": "RNSScreenFooter"
+        },
+        "RNSScreen": {
+          "className": "RNSScreenView"
+        },
+        "RNSScreenNavigationContainer": {
+          "className": "RNSScreenNavigationContainerView"
+        },
+        "RNSScreenStackHeaderConfig": {
+          "className": "RNSScreenStackHeaderConfig"
+        },
+        "RNSScreenStackHeaderSubview": {
+          "className": "RNSScreenStackHeaderSubview"
+        },
+        "RNSScreenStack": {
+          "className": "RNSScreenStackView"
+        },
+        "RNSSearchBar": {
+          "className": "RNSSearchBar"
+        },
+        "RNSStackScreen": {
+          "className": "RNSStackScreenComponentView"
+        },
+        "RNSStackHost": {
+          "className": "RNSStackHostComponentView"
+        },
+        "RNSStackHeaderConfigIOS": {
+          "className": "RNSStackHeaderConfigComponentView"
+        },
+        "RNSStackHeaderItemIOS": {
+          "className": "RNSStackHeaderItemComponentView"
+        },
+        "RNSStackHeaderItemSpacerIOS": {
+          "className": "RNSStackHeaderItemSpacerComponentView"
+        },
+        "RNSTabsScreenIOS": {
+          "className": "RNSTabsScreenComponentView"
+        },
+        "RNSTabsHostIOS": {
+          "className": "RNSTabsHostComponentView"
+        },
+        "RNSTabsBottomAccessory": {
+          "className": "RNSTabsBottomAccessoryComponentView"
+        },
+        "RNSTabsBottomAccessoryContent": {
+          "className": "RNSTabsBottomAccessoryContentComponentView"
+        },
+        "RNSSplitHost": {
+          "className": "RNSSplitHostComponentView"
+        },
+        "RNSSplitScreen": {
+          "className": "RNSSplitScreenComponentView"
+        },
+        "RNSSafeAreaView": {
+          "className": "RNSSafeAreaViewComponentView"
+        },
+        "RNSScrollViewMarker": {
+          "className": "RNSScrollViewMarkerComponentView"
+        },
+        "RNSFormSheetHost": {
+          "className": "RNSFormSheetHostComponentView"
+        },
+        "RNSFormSheetContentWrapper": {
+          "className": "RNSFormSheetContentWrapperComponentView"
+        }
       }
     }
   },

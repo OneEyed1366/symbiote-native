@@ -38,3 +38,26 @@ follow our lint rules (it carries `@ts-ignore`, `require()`, `.web.tsx`, etc.), 
 MUST be in eslint's `ignores` (`eslint.config.js`), same as `build/`. typecheck/test/
 build are already safe because they scope to `src` and the vendored dir lives outside
 it — only eslint's wider glob (`{core,adapters,packages}/**/*.{ts,tsx}`) sweeps it in.
+
+## The wrapped native dep's catalog entry MUST be an exact version, never a caret range
+
+`codegen-specs/` is a FROZEN SNAPSHOT baked once, at this workspace's own `prepare` time,
+from whatever version the workspace's own `pnpm-workspace.yaml` catalog resolves — it never
+re-syncs itself. If that catalog entry is a caret range (`^4.25.2`), a standalone consumer
+outside the pnpm workspace (`examples/*`, its own `npm install`, its own lockfile) can
+legitimately resolve a NEWER patch/minor of the same wrapped library for its *native* side
+(CocoaPods vendors that consumer's own `node_modules/<lib>` fresh on every `pod install`,
+independent of anything baked into our published tarball). The two silently drift: our
+vendored JS specs are missing a prop the consumer's native `.mm` unconditionally references,
+producing `error: no type named 'RNS...' in namespace 'facebook::react'` at `pod install`/
+`xcodebuild` time — with ZERO warning at either version's own install, since neither side's
+tooling has any way to know about the other. Root-caused for `react-native-screens`
+(`^4.25.2` in this workspace vs. `4.26.0` in `examples/vue-tsx`, missing `RNSSplitHostColorScheme`
+— a prop added between those two versions) — 2026-07-15, `.changeset/navigation-ship-native-proxy-files.md`.
+Fix: pin the wrapped library's catalog entry to an EXACT version (no `^`/`~`) — `pnpm publish`
+bakes that exact version into the published `dependencies` field too (`catalog:` is rewritten
+to a concrete version string at pack/publish time), so every consumer, no matter when they
+install, resolves the SAME version our vendored `codegen-specs/` was baked from. Bumping the
+wrapped library therefore means: bump the catalog pin, re-run `prepare` to re-vendor, and
+republish the native-proxy package — never just bump the catalog and assume old vendored specs
+still match.
