@@ -18,7 +18,6 @@ packages:
   - 'core/*'
   - 'adapters/*'
   - 'packages/*'
-  - 'examples/*'
   - 'apps/*'
   # Gitignored dev harness — listing it lets pnpm manage it as a real workspace project
   # (bin-linking, .pnpm-store symlinks) instead of the ad-hoc node_modules it otherwise
@@ -102,11 +101,12 @@ catalog:
   '@astrojs/starlight': ^0.41.1
   '@astrojs/check': ^0.9.9
 
-  # Published @symbiote-native/* packages, consumed by examples/* from the real npm
-  # registry (catalog:, not workspace:*) — kept in lock-step with each package's own
-  # release train in one place. @symbiote-native/navigation stays workspace:* directly
-  # in examples/react (not published yet); internal cross-package deps between
-  # core/adapters/packages also stay workspace:* (see .syncpackrc.json).
+  # Published @symbiote-native/* packages. examples/* left the pnpm workspace (2026-07) to
+  # become standalone `npm install`-able apps free of pnpm's blockExoticSubdeps guard — its
+  # package.json files now carry literal versions/pkg.pr.new URLs directly, not `catalog:`.
+  # These entries remain for .examples/angular's own css-parser dep and stay in lock-step
+  # with each package's release train; internal cross-package deps between
+  # core/adapters/packages stay workspace:* (see .syncpackrc.json).
   '@symbiote-native/react': latest
   '@symbiote-native/vue': latest
   '@symbiote-native/angular': latest
@@ -117,7 +117,9 @@ catalog:
   '@symbiote-native/splash-screen': latest
   '@symbiote-native/test-utils': latest
 
-  # React Native app toolchain — single-versioned, used only by examples/*
+  # React Native app toolchain — single-versioned. examples/* left the workspace (see above);
+  # entries here stay for @react-native/metro-babel-transformer (a real dependency of
+  # @symbiote-native/css-parser itself) and anything else the remaining workspace still needs.
   '@react-native/babel-preset': 0.86.0
   '@react-native/metro-config': 0.86.0
   # Real dependency of @symbiote-native/css-parser (createCssMetroTransformer resolves it itself),
