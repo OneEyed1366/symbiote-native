@@ -30,6 +30,7 @@
     "src",
     "build",
     "build-ngc",
+    "codegen-specs",
     "react-native.config.cjs",
     "symbiote-navigation.podspec"
   ],
@@ -60,7 +61,7 @@
   "codegenConfig": {
     "name": "rnscreens",
     "type": "all",
-    "jsSrcsDir": "node_modules/react-native-screens/src/fabric",
+    "jsSrcsDir": "codegen-specs",
     "android": {
       "javaPackageName": "com.swmansion.rnscreens"
     },
@@ -77,7 +78,7 @@
     }
   },
   "scripts": {
-    "prepare": "pnpm run ng:build",
+    "prepare": "node ../../scripts/vendor-codegen-specs.cjs react-native-screens src/fabric && pnpm run ng:build",
     "ng:build": "ngc -p tsconfig.angular.json",
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""

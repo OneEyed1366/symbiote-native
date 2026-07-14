@@ -14,7 +14,7 @@ import prettier from 'eslint-config-prettier';
 export default defineConfig(
   {
     // `codegen-specs/**` is third-party native-component source vendored verbatim at prepare
-    // time (see packages/*/vendor-codegen-specs.cjs) — generated, gitignored, not ours to lint.
+    // time (see scripts/vendor-codegen-specs.cjs) — generated, gitignored, not ours to lint.
     ignores: [
       '**/dist/**',
       '**/build/**',

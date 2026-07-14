@@ -22,13 +22,16 @@ native-proxy package must NOT point it at `node_modules/@x/native-lib/src` — p
 isolated store never nests the wrapped dep inside the wrapper's own `node_modules`
 (it sits as a symlinked SIBLING in the `.pnpm` store dir), so that path doesn't
 exist → `pod install` dies with `ENOENT … /src` in the codegen step and an
-`Invalid Podfile file` error. Fix: a `vendor-codegen-specs.cjs` that
-`require.resolve`s the native lib and copies its spec `src` into a package-local,
-gitignored `codegen-specs/` at `prepare` time; set `jsSrcsDir: "codegen-specs"` and
-add `"codegen-specs"` to `files`. Precedent: `packages/splash-screen` and
-`packages/slider` both do this (twin of the podspec's `.rn-slider` vendoring — same
-pnpm-symlink root cause, different consumer). Full detail: the
-`symbiote-third-party-native-view` skill.
+`Invalid Podfile file` error. Fix: `prepare` calls the SHARED
+`scripts/vendor-codegen-specs.cjs <native-package-name> <specs-subdir>` (one script,
+not a per-package copy — the vendoring logic is identical everywhere, only those two
+args differ), which `require.resolve`s the native lib from the CALLING package's own
+cwd and copies its specs subdir into a package-local, gitignored `codegen-specs/`;
+set `jsSrcsDir: "codegen-specs"` and add `"codegen-specs"` to `files`. Precedent:
+`packages/splash-screen`, `packages/slider`, and `packages/navigation` all call it
+(twin of the podspec's `.rn-slider`/`.rn-screens` vendoring — same pnpm-symlink root
+cause, different consumer). Full detail: the `symbiote-third-party-native-view`
+skill.
 
 The vendored `codegen-specs/**` is third-party source copied verbatim — it does NOT
 follow our lint rules (it carries `@ts-ignore`, `require()`, `.web.tsx`, etc.), so it

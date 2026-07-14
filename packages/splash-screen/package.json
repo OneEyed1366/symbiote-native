@@ -72,7 +72,7 @@
     }
   },
   "scripts": {
-    "prepare": "node vendor-codegen-specs.cjs && pnpm run ng:build",
+    "prepare": "node ../../scripts/vendor-codegen-specs.cjs react-native-bootsplash src/specs && pnpm run ng:build",
     "typecheck": "tsc --build",
     "ng:build": "ngc -p tsconfig.angular.json",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
