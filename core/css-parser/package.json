@@ -2,6 +2,7 @@
   "name": "@symbiote-native/css-parser",
   "version": "0.2.2",
   "description": "Build-time CSS/SCSS/Less/Stylus compiler for SymbioteNative — compiles stylesheets to React Native style objects, resolved at runtime via a cross-adapter class-name registry.",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OneEyed1366/symbiote-native.git",

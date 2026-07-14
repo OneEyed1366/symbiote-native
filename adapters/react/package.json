@@ -2,6 +2,7 @@
   "name": "@symbiote-native/react",
   "version": "0.2.6",
   "description": "SymbioteNative's React adapter — a react-reconciler host config (mutation mode) driving real native iOS/Android views through stock React Native Fabric.",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
