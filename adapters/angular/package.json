@@ -59,17 +59,18 @@
     "@angular/compiler-cli": "catalog:",
     "@react-native/typescript-config": "catalog:",
     "@symbiote-native/components": "workspace:*",
-    "@symbiote-native/css-parser": "workspace:*",
-    "@symbiote-native/engine": "workspace:*"
+    "@symbiote-native/css-parser": "workspace:*"
   },
   "peerDependencies": {
     "@angular/core": ">=20",
+    "@symbiote-native/engine": ">=0.1.0",
     "react-native": ">=0.86"
   },
   "devDependencies": {
     "@angular/compiler": "catalog:",
     "@angular/core": "catalog:",
     "@babel/core": "catalog:",
+    "@symbiote-native/engine": "workspace:*",
     "@symbiote-native/test-utils": "workspace:*",
     "@types/babel__core": "catalog:",
     "@types/node": "catalog:",

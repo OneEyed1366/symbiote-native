@@ -43,13 +43,12 @@
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
-  "dependencies": {
-    "@symbiote-native/engine": "workspace:*"
-  },
   "peerDependencies": {
+    "@symbiote-native/engine": ">=0.1.0",
     "react-native": ">=0.86"
   },
   "devDependencies": {
+    "@symbiote-native/engine": "workspace:*",
     "@types/node": "catalog:"
   }
 }

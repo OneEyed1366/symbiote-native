@@ -80,11 +80,11 @@
   "dependencies": {
     "react-native-bootsplash": "catalog:",
     "react-native-is-edge-to-edge": "catalog:",
-    "@symbiote-native/components": "workspace:*",
-    "@symbiote-native/engine": "workspace:*"
+    "@symbiote-native/components": "workspace:*"
   },
   "peerDependencies": {
     "@symbiote-native/angular": "workspace:*",
+    "@symbiote-native/engine": ">=0.1.0",
     "@symbiote-native/react": "workspace:*",
     "@symbiote-native/vue": "workspace:*",
     "@angular/core": ">=20",
@@ -121,6 +121,7 @@
     "@angular/compiler-cli": "catalog:",
     "@angular/core": "catalog:",
     "@symbiote-native/angular": "workspace:*",
+    "@symbiote-native/engine": "workspace:*",
     "@symbiote-native/react": "workspace:*",
     "@symbiote-native/test-utils": "workspace:*",
     "@symbiote-native/vue": "workspace:*",

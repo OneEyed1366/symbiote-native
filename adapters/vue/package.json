@@ -57,17 +57,18 @@
   "dependencies": {
     "@symbiote-native/components": "workspace:*",
     "@symbiote-native/css-parser": "workspace:*",
-    "@symbiote-native/engine": "workspace:*",
     "@vue/compiler-core": "catalog:",
     "@vue/compiler-sfc": "catalog:",
     "@vue/runtime-core": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {
+    "@symbiote-native/engine": ">=0.1.0",
     "vue": ">=3.5.0",
     "react-native": ">=0.86"
   },
   "devDependencies": {
+    "@symbiote-native/engine": "workspace:*",
     "@symbiote-native/test-utils": "workspace:*"
   }
 }

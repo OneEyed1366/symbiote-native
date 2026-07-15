@@ -694,9 +694,6 @@ importers:
       '@symbiote-native/css-parser':
         specifier: workspace:*
         version: link:../../core/css-parser
-      '@symbiote-native/engine':
-        specifier: workspace:*
-        version: link:../../core/engine
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
@@ -710,6 +707,9 @@ importers:
       '@babel/core':
         specifier: 'catalog:'
         version: 7.29.7
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -731,9 +731,6 @@ importers:
       '@symbiote-native/css-parser':
         specifier: workspace:*
         version: link:../../core/css-parser
-      '@symbiote-native/engine':
-        specifier: workspace:*
-        version: link:../../core/engine
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
@@ -741,6 +738,9 @@ importers:
         specifier: 'catalog:'
         version: 0.33.0(react@19.2.3)
     devDependencies:
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -762,9 +762,6 @@ importers:
       '@symbiote-native/css-parser':
         specifier: workspace:*
         version: link:../../core/css-parser
-      '@symbiote-native/engine':
-        specifier: workspace:*
-        version: link:../../core/engine
       '@vue/compiler-core':
         specifier: 'catalog:'
         version: 3.5.39
@@ -784,6 +781,9 @@ importers:
         specifier: '>=3.5.0'
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -806,13 +806,13 @@ importers:
 
   core/components:
     dependencies:
-      '@symbiote-native/engine':
-        specifier: workspace:*
-        version: link:../engine
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
     devDependencies:
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../engine
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.0
@@ -871,9 +871,6 @@ importers:
       '@symbiote-native/components':
         specifier: workspace:*
         version: link:../../core/components
-      '@symbiote-native/engine':
-        specifier: workspace:*
-        version: link:../../core/engine
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
@@ -899,6 +896,9 @@ importers:
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
@@ -932,9 +932,6 @@ importers:
       '@symbiote-native/components':
         specifier: workspace:*
         version: link:../../core/components
-      '@symbiote-native/engine':
-        specifier: workspace:*
-        version: link:../../core/engine
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
@@ -954,6 +951,9 @@ importers:
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
@@ -984,9 +984,6 @@ importers:
       '@symbiote-native/components':
         specifier: workspace:*
         version: link:../../core/components
-      '@symbiote-native/engine':
-        specifier: workspace:*
-        version: link:../../core/engine
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
@@ -1012,6 +1009,9 @@ importers:
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
