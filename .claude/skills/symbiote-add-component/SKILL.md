@@ -15,6 +15,91 @@ descriptor bridge.
 
 **Switch is the canonical reference.** Mirror it file-for-file.
 
+## 0. Mental model — when a component gets a render fn (read this first)
+
+The core truth, and the whole point of RN: **JS is a higher-level, more
+declarative language over the native stack — never a replacement for it.** A
+`renderX()` IS that language; the native side executes. Every boundary below is
+where the declarative language stops and native execution begins — none is a "gap"
+or a "todo".
+
+**Three categories of a component's logic — only category 1 becomes a render fn:**
+
+```
+1. view = f(props), assembled in ONE shot     → renderX() → Descriptor in core
+   (the whole frame derives from values)         Switch, Modal, Image, InputAccessoryView, ActivityIndicator
+
+2. pure logic, injected at DIFFERENT points   → helpers in core + assembly in the adapter
+   of the adapter lifecycle (style here,         ScrollView math (selectScrollIntrinsics, didContentSizeChange),
+   intrinsic there, dedup in an effect,          list virtualization (buildListPlan, computeWindow),
+   window in the scroll handler)                 press machine (createPressRuntime)
+   → CANNOT be one renderX() (not one tree in one moment) but IS still in core → reused
+     free by every adapter. This is NOT a per-adapter re-implementation.
+
+3. binding to the runtime / native node       → adapter only (the three seams below)
+   (refs, effects, sticky-wrapping children,
+    RefreshControl element, imperative handle)
+```
+
+**The render-fn criterion.** A render fn moves to core ⟺ every input, after the
+framework brings it to life, is a framework-agnostic VALUE (scalar / prop / style —
+identical on every framework). It stays in the adapter ⟺ any input is a live
+SUBTREE of the user's components (`children`, or a render-prop like `renderItem`):
+reducing that subtree to primitives is the framework's own reconciler,
+framework-specific by definition.
+
+Key: user `children` are **never converted back into a Descriptor**. Two
+independent streams reach the engine and meet only at the reconciler:
+
+```
+our core components:  values → renderX() → Descriptor → descriptorTo<Fw> → framework element ─┐
+                                                                                             ├→ reconciler → engine
+user JSX (renderItem): <ProductCard/> → [framework runs it: hooks / context / nested comps] ──┘
+```
+
+The runtime is already there (we are inside a React/Vue/Angular app), so we don't
+run the subtree — we **pass it through**. A render fn is a *generator of view from
+values*; a user subtree has nothing to generate (the user already wrote it), so a
+render fn there isn't restricted — it's absent by definition.
+
+**Three "animators" of what core describes.** The model is "core describes, the
+runtime animates" — and "the runtime" is plural:
+
+```
+JS reactivity of the framework  → Switch value, list data       (JS OWNS the state)
+native driver (UI thread)       → Animated.event scroll-driven  (declared once in core, native runs it per frame)
+imperative command              → scrollTo / focus / measure    (one-shot, off the render cycle)
+```
+
+**Three seams that live in the adapter by design (not a gap):**
+
+```
+1. WHEN an effect / commit fires  — framework timing (useLayoutEffect vs watch flush:'post' vs zoneless CD).
+                                    The framework's idiom → correctly in the adapter.
+                                    (vue-adapter-reactivity, angular-adapter-change-detection)
+2. state whose source of truth    — scroll position, focus, measured layout. The native node owns and drives it
+   is NATIVE                        60fps past JS (freeze JS 3s and the scroll still moves — CanaryScreen's
+                                    Freeze-JS button proves it). JS may COMMAND (scrollTo), DECLARE a native-driver
+                                    binding (Animated.event), or OBSERVE throttled (onScroll) — but never OWN it
+                                    per-frame; per-frame ownership over the bridge = jank.
+3. user children                  — the right-hand stream above; passed through as-is.
+```
+
+**The guarantee this buys** (the reason to keep the split clean): write reducer +
+render in core, and the adapter is subscribe + dispatch + bridge. Then "wrote it in
+core, wired the lifecycle, called the render fn → it works" is TRUE — and when it
+doesn't, the bug is either in the core reducer (shared by every adapter) or in ONE
+of the three named seams. There is no fourth "somewhere in the smeared assembly"
+place to hunt.
+
+**Wrong first approximations (this took 9 passes to pin down — don't re-derive them):**
+- ❌ "intertwined with lifecycle" — no: the adapter can feed measurements / refs INTO a render fn as inputs.
+- ❌ "it has to crack the children box" — no: you could crack it if children were Descriptors.
+- ❌ "needs a framework runtime inside" — refined: not "needs a runtime" but "must ANIMATE a subtree vs a value".
+- ❌ "imperative channel = just scrollTo" — refined: the seam is "source of truth is native"; scrollTo is one face of it.
+- ❌ "describe effects declaratively in core" — unnecessary: the effect stays imperative in the adapter (its timing
+     is the framework's idiom); only its BRAIN (the reducer) is in core, and its result flows back as props.
+
 ## 1. The P0 rule — parity is structural, not copied
 
 ```
@@ -177,7 +262,8 @@ Adding a component to a brand-new adapter that has no renderer yet? Do
 - Descriptor model + `el()`/`txt()`: `core/components/src/descriptor.ts`.
 - Bridges: `adapters/react/src/descriptor-to-react/`, `adapters/vue/src/descriptor-to-vue.ts`.
 - Other fully-split references: ActivityIndicator (render-only), TextInput, Modal.
-  Partial (no view layer — cells are framework children): the VirtualizedList family.
+  No view layer BY DESIGN (cells are user children — the pass-through stream of §0,
+  category 2/3, not a gap): the VirtualizedList family.
 - Layout / prop-split rules: `symbiote-file-layout`. Vue lifecycle landmines:
   `vue-adapter-reactivity`. Vue scoped slots + slot typing: `vue-adapter-slots`. Finishing gate:
   `symbiote-parity-check`.
