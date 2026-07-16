@@ -92,6 +92,16 @@ doesn't, the bug is either in the core reducer (shared by every adapter) or in O
 of the three named seams. There is no fourth "somewhere in the smeared assembly"
 place to hunt.
 
+**Extraction surfaces adapter drift — a feature, not a surprise.** Pulling a
+triplicated pattern into core routinely reveals the three copies had quietly
+diverged: one adapter carried a guard or fix the others lacked. Real case (2026-07,
+VirtualizedList): extracting `resolveAverageLength` exposed that React averaged cell
+lengths WITHOUT Vue/Angular's `count > 0` guard, so `data=[] + getItemLayout`
+dereferenced a non-existent cell. Unifying in core applied the safe behavior to all
+three at once. So when adapters "look identical", extract anyway — the diff between
+the copies is exactly where a latent bug hides, and structural parity is what closes
+it for good.
+
 **Wrong first approximations (this took 9 passes to pin down — don't re-derive them):**
 - ❌ "intertwined with lifecycle" — no: the adapter can feed measurements / refs INTO a render fn as inputs.
 - ❌ "it has to crack the children box" — no: you could crack it if children were Descriptors.
