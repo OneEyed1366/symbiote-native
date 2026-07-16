@@ -1,6 +1,6 @@
 ---
 name: symbiote-dev-examples
-description: "Symbiote examples/ vs .examples/ split — read BEFORE wiring up, smoke-testing, or demoing ANY new component/adapter/package/third-party wrapper in an example app, or before editing any example app's package.json dependency versions, metro.config.js, or react-native.config.js. `examples/{react,vue-sfc,vue-tsx,angular}` are PUBLIC canary apps and, since 2026-07-14, are OUTSIDE the pnpm workspace entirely (removed from pnpm-workspace.yaml's `packages:`) — a standalone npm-installable tree with NO `catalog:`/`workspace:*` specifiers (those only resolve inside a pnpm workspace); every dependency is a literal version, and every `@symbiote-native/*` is a pkg.pr.new canary URL until each package has a real npm release. Install with plain `npm install` INSIDE the example directory, never `pnpm install` from repo root. `.examples/{react,vue-sfc,vue-tsx,angular}` (dot-prefixed, gitignored) is UNCHANGED — the ONLY place package/feature/adapter development happens, still inside the pnpm workspace on `workspace:*` for live local-source edits. Covers WHY examples/* left the workspace (pnpm 10.26+'s `blockExoticSubdeps` blocks any transitive URL/git subdependency in a shared pnpm lockfile — a pkg.pr.new preview's own internal @symbiote-native/* cross-deps are URL-based, so a pkg.pr.new dependency anywhere in examples/* poisoned .examples/*'s install too via the single shared lockfile), the metro.config.js/react-native.config.js implications (no more watchFolders/extraNodeModules reaching into monorepo source — @symbiote-native/* resolve from the app's own node_modules like a real consumer; react-native.config.js's manual @symbiote-native/android monorepo-path link is gone now that android is a real npm dep), and the diagnostic for confirming an app's actual dependency source. Trigger on 'add a new example app', 'where do I test/demo this component', 'workspace vs catalog in examples', 'is this app on published or local deps', 'pkg.pr.new canary testing', 'blockExoticSubdeps', or any symbiote-add-component/symbiote-new-adapter/symbiote-third-party-native-view task's verify step."
+description: "Symbiote examples/ vs .examples/ split — read BEFORE wiring up, smoke-testing, or demoing ANY new component/adapter/package/third-party wrapper in an example app, or before editing any example app's package.json dependency versions, metro.config.js, or react-native.config.js. `examples/{react,vue-sfc,vue-tsx,angular}` are PUBLIC canary apps and, since 2026-07-14, are OUTSIDE the pnpm workspace entirely (removed from pnpm-workspace.yaml's `packages:`) — a standalone npm-installable tree with NO `catalog:`/`workspace:*` specifiers (those only resolve inside a pnpm workspace); every dependency is a literal version, and every `@symbiote-native/*` is a pkg.pr.new canary URL until each package has a real npm release. Install with plain `npm install` INSIDE the example directory, never `pnpm install` from repo root. `.examples/{react,vue-sfc,vue-tsx,angular}` (dot-prefixed, gitignored) is UNCHANGED — the ONLY place package/feature/adapter development happens, still inside the pnpm workspace on `workspace:*` for live local-source edits. Covers WHY examples/* left the workspace (pnpm 10.26+'s `blockExoticSubdeps` blocks any transitive URL/git subdependency in a shared pnpm lockfile — a pkg.pr.new preview's own internal @symbiote-native/* cross-deps are URL-based, so a pkg.pr.new dependency anywhere in examples/* poisoned .examples/*'s install too via the single shared lockfile), the metro.config.js/react-native.config.js implications (no more watchFolders/extraNodeModules reaching into monorepo source — @symbiote-native/* resolve from the app's own node_modules like a real consumer; react-native.config.js's manual @symbiote-native/android monorepo-path link is gone now that android is a real npm dep), and the diagnostic for confirming an app's actual dependency source. Also covers a distinct gotcha (§5b): `.examples/*`'s own `metro.config.js` files are themselves stale copies of the public template and lack `watchFolders`/`resolver.unstable_enableSymlinks`/`resolver.nodeModulesPaths` — switching a dep to `workspace:*` there then breaks Metro with 'Unable to resolve module @babel/runtime/helpers/interopRequireDefault' even though the file exists on disk. Trigger on 'add a new example app', 'where do I test/demo this component', 'workspace vs catalog in examples', 'is this app on published or local deps', 'pkg.pr.new canary testing', 'blockExoticSubdeps', 'unable to resolve module @babel/runtime', 'switched .examples dep to workspace:* and metro broke', or any symbiote-add-component/symbiote-new-adapter/symbiote-third-party-native-view task's verify step."
 ---
 
 # Symbiote examples/ vs .examples/ — public canary vs dev harness
@@ -145,6 +145,89 @@ it's on an in-flight canary; a bare semver range means a real npm release.
 
 Run the `.examples/*` readlink check FIRST whenever that app doesn't pick up a
 fresh local change.
+
+## 5b. `.examples/*`'s own `metro.config.js` is a stale copy — read this before flipping any dep to `workspace:*`
+
+All four `.examples/*/metro.config.js` (confirmed for react/vue-sfc/angular; vue-tsx
+presumed identical, unverified) are byte-for-byte descendants of the public
+`examples/*` template, INCLUDING its comment claiming "examples/\* is a standalone
+npm install, decoupled from the monorepo's pnpm workspace" — backwards for `.examples/*`,
+which is the opposite (the `workspace:*`-linked harness). None of the four has
+`watchFolders`, `resolver.unstable_enableSymlinks`, or `resolver.nodeModulesPaths`.
+
+This stayed invisible because, as of 2026-07-16, all four `.examples/*` apps'
+`@symbiote-native/*` deps had drifted to caret ranges (`^0.2.6`) resolving to
+PUBLISHED packages in the pnpm store — the §5 readlink check above was failing
+("WRONG, published copy") on every one of them, so nobody was actually exercising
+live local-source linking through `.examples/*` when this was last touched.
+
+**Symptom, the moment you fix a dep to `workspace:*` and reload:**
+
+```
+ERROR  Unable to resolve module @babel/runtime/helpers/interopRequireDefault
+from .examples/<app>/index.js: … could not be found within the project or in
+these directories: node_modules ../../node_modules …
+```
+
+— even though that exact file exists on disk (`.examples/<app>/node_modules/@babel/runtime/…`,
+a real pnpm symlink). Two compounding causes:
+
+1. Metro doesn't watch or resolve outside `projectRoot` by default, so once
+   `@symbiote-native/react` resolves to real source at `adapters/react` (outside
+   `.examples/react`), Metro can't see files under `adapters/react/src/` at all.
+2. A PUBLISHED package ships pre-built JS with `@babel/runtime` already a resolved
+   sibling dependency inside its OWN `.pnpm` store entry (its package.json declares
+   it). Raw workspace SOURCE has no such `node_modules` of its own — a library's
+   source never needs its own babel-runtime helper, only whoever transpiles it does
+   — and `adapters/react` is not an ancestor directory of `.examples/react`, so
+   Metro's ordinary upward `node_modules` climb from the source file's real
+   location never reaches `.examples/react/node_modules`.
+
+**Fix** (as of 2026-07-16 applied to ALL FOUR — react/vue-sfc/vue-tsx/angular — each merged into
+that app's OWN existing config, preserving its adapter-specific `babelTransformerPath`: react →
+`@symbiote-native/react/metro-css-parser`, vue-sfc → `@symbiote-native/vue/metro-vue-transformer`,
+vue-tsx → `@symbiote-native/vue/metro-css-parser`, angular → `@symbiote-native/angular/metro-css-parser`
+with the new resolver keys placed AFTER the `withSymbioteAngularMetroConfig(...).resolver` spread so
+the AOT `resolveRequest` is not clobbered. All four also relinked to `workspace:*` + `pnpm install` →
+readlink confirms LOCAL source. Syntax-verified; a full Metro bundle run was NOT yet done, so the
+`@babel/runtime` symptom is defended-against by construction but not yet re-proven on device):
+
+```js
+const path = require('path');
+const repoRoot = path.resolve(projectRoot, '../..');
+// merged into the exported config:
+watchFolders: [repoRoot],
+resolver: {
+  unstable_enableSymlinks: true,
+  nodeModulesPaths: [
+    path.resolve(projectRoot, 'node_modules'),
+    path.resolve(repoRoot, 'node_modules'),
+  ],
+  // …existing resolver keys (sourceExts, babelTransformerPath, etc.) stay
+},
+```
+
+This exact `watchFolders`/`nodeModulesPaths` shape already existed in
+`examples/react/metro.config.js` before the 2026-07-14 split (`git show 40f5ded`
+shows it removed from the public app) — it just never got carried over into
+`.examples/react` when the split happened, since `.examples/*` wasn't actually
+being exercised on `workspace:*` at the time. `extraNodeModules` from that old
+config is NOT needed here — real workspace symlinks already resolve
+`@symbiote-native/*` correctly; only the `@babel/runtime` fallback-root piece is.
+
+## 5c. `.examples/angular`'s adapter dep is inverted (found 2026-07-16)
+
+`.examples/angular/package.json` declares `@symbiote-native/react` (which the app imports ZERO
+times — a copy-paste leftover from the react example) but does NOT declare `@symbiote-native/angular`
+(which app source imports ~30 times: the bare package plus `/bootstrap`, `/metro-config`,
+`/metro-css-parser`, `/typescript-plugin`, `/babel-linker`, `/babel-register-composed`). It resolves
+today only via pnpm workspace hoisting from the repo-root `node_modules` (kept alive by the §5b
+`nodeModulesPaths: [repoRoot/node_modules]`), so there was no direct `.examples/angular/node_modules/
+@symbiote-native/angular` symlink — fragile. FIXED 2026-07-16: swapped them — added
+`@symbiote-native/angular: workspace:*`, dropped the unused `@symbiote-native/react`; `pnpm install`
+now gives a direct `adapters/angular` symlink. (Recorded so a future session doesn't re-flag it as
+still-broken; the deeper lesson is the general one — an `.examples/*` app can import a package it never
+declares and limp along on workspace hoisting, invisible until the hoist path changes.)
 
 ## Reference
 
