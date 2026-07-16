@@ -1,7 +1,7 @@
 {
   "name": "@symbiote-native/sensors",
   "version": "0.1.0",
-  "description": "expo-sensors wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. Pilot: Accelerometer only.",
+  "description": "expo-sensors wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. Accelerometer, Barometer, DeviceMotion, Gyroscope, LightSensor, Magnetometer, MagnetometerUncalibrated, Pedometer.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
