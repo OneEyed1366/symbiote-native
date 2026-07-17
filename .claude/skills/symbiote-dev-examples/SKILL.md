@@ -229,6 +229,75 @@ now gives a direct `adapters/angular` symlink. (Recorded so a future session doe
 still-broken; the deeper lesson is the general one — an `.examples/*` app can import a package it never
 declares and limp along on workspace hoisting, invisible until the hoist path changes.)
 
+**The PUBLIC `examples/angular` has the SAME inversion (found 2026-07-16 installing canaries):** its
+tracked `package.json` listed `@symbiote-native/react` (unused) and omitted `@symbiote-native/angular`
+(imported ~30×). Under npm's flat install it had no workspace hoist to limp on, so it would simply fail to
+resolve `@symbiote-native/angular`. Fixed the same way — add `@symbiote-native/angular`, drop the unused
+`@symbiote-native/react`. When canary-testing an Angular change, install via pkg.pr.new URLs
+(`https://pkg.pr.new/@symbiote-native/<pkg>@<build>`, same build number across all packages) into
+`examples/angular` with plain `npm install` inside the dir, and confirm the build carries the change (e.g.
+`grep reduceSticky node_modules/@symbiote-native/components/build/index.js`). Canary URLs in
+`examples/*/package.json` are TEMPORARY test state — do not commit them; the tracked form is a literal
+published version (see `symbiote-release-publishing`).
+
+## 5d. `pod install` "path name contains null byte" — a stale-install artifact, cure with a clean reinstall (found 2026-07-16)
+
+Running `pod install` in `.examples/angular/ios` (or any `.examples/*/ios`) can die with
+`ArgumentError - path name contains null byte` deep in CocoaPods
+(`file_references_installer.rb` -> `group_for_path_in_group` -> `Pathname#realdirpath`). This is
+CocoaPods issue #12866 ("pnpm monorepo … pod install raises pathname contains null byte error
+SOMETIMES") — flaky, driven by a corrupt/stale install tree, NOT by the podspecs. The three native
+packages' podspecs (`symbiote-navigation`/`-slider`/`-splash-screen`) already vendor their RN source
+into a real downward `.rn-screens`/`.rn-slider`/`.rn-bootsplash` copy (`FileUtils.cp_r`), so their own
+`source_files` never glob through a symlink — they are NOT the cause.
+
+**Fix (proven 2026-07-16):** delete `node_modules` + the lockfile in the example app and reinstall,
+then `pod install` again — the stale state clears and it succeeds. It is a stale-install artifact,
+not a `workspace:*` symlink defect: a first, wrong hypothesis was that flipping the native packages
+to `workspace:*` (symlinking `packages/*` with their nested pnpm `node_modules` under the pod root)
+caused CocoaPods' `Dir.glob(root + '**/*')` to trip on a symlink — reverting the native packages to
+published was NOT needed and NOT the fix. Do not chase the podspecs or the dep specifiers; reinstall
+first. (Keep the native packages on `workspace:*` per §1/the P0 rule — the clean reinstall keeps that
+intact.)
+
+## 5e. `.examples/angular` composed components rendered blank / redboxed — root cause was STALE ngc build artifacts, not workspace symlinks (found 2026-07-16, root-caused + fixed 2026-07-17)
+
+Symptom: on `.examples/angular` (`workspace:*`), an app-authored composed screen (`MenuScreen`, mounted via
+`NgComponentOutlet`) did NOT anchor-host — `createElement menuscreen -> menuscreen` (raw native path) instead
+of `-> anchor host`, so the screen body was blank white under a working native header on iOS, and a
+`Can't find ViewManager 'menuscreen'`/`'Stack'` redbox on Android. ONLY the pnpm `workspace:*` harness; the
+public npm-installed `examples/angular` (fresh build) worked. **That very divergence was the clue: canary
+builds `build/` from a clean pack, the workspace reuses a LOCAL `build/` that ngc had polluted** — it was never
+a symlink-resolution bug at all.
+
+Root cause (proven by `react-native bundle` + grep, NOT theorized): `ngc -p tsconfig.angular.json` never
+deletes orphaned outputs. When the adapter renderer moved `src/renderer.ts` → `src/renderer/index.ts`
+(folder-as-module), ngc left the orphaned `build/angular/renderer.js` behind, and **a file beats a folder in
+Node/Metro resolution**, so the barrel's `export … from './renderer'` loaded the STALE flat `renderer.js` (own
+inline `ANCHOR_HOST_COMPONENTS` Set). The bundle then had TWO registry modules — `grep -c 'function
+isAnchorHostComponent'` = 1 but `grep -c 'function registerComposedComponent'` = 2, and
+`node -e "require.resolve('./build/angular/renderer')"` → `…/renderer.js` not `…/renderer/index.js`.
+Registrations wrote one Set, `createElement` read the stale other. After `rm -rf build && ngc` the bundle had
+exactly ONE registry.
+
+**The headless-bundle diagnostic (reuse it):** `ngc` the app, `react-native bundle --platform ios --dev true
+--reset-cache --bundle-output <tmp>.js`, then grep the output for `function isAnchorHostComponent` (should be
+1) vs `function registerComposedComponent` (should be 1) vs `ANCHOR_HOST_COMPONENTS = new Set` (should be 1).
+More than one of any = a duplicate/stale registry. This reproduces the split WITHOUT a device.
+
+Fix: every Angular-shipping package (`adapters/angular`, `packages/{slider,navigation,splash-screen}`) now has
+`"clean": "rm -rf build"` + `"ng:build": "pnpm run clean && ngc …"`, so a stale output can never shadow again.
+(The registry was also moved into a dependency-free leaf `adapters/angular/src/anchor-host-registry.ts` — cheap
+cycle-safety hygiene, reached by ONE relative route; the earlier require-cycle theory was never confirmed and
+may have been a misdiagnosis of this stale shadow. A subpath-injected variant of the leaf briefly made it WORSE
+by splitting the Set two ways under symlinks — see `angular-adapter` §11c. Metro realpath-dedup `resolveRequest`
+is a NO-OP, do not re-attempt.)
+
+**Device-verified 2026-07-17** on `.examples/angular` with Metro `--reset-cache` (both the build and the
+injected transform changed; a warm Metro serves a stale mix): composed selectors log `createElement <selector>
+-> anchor host` and paint on iOS + Android. Full adapter-side record: `angular-adapter` §11c; changeset
+`.changeset/angular-anchor-host-leaf-module.md`.
+
 ## Reference
 
 - `symbiote-dependency-catalog` — the `catalog:`/`workspace:*` mechanics `.examples/*` still
