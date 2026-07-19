@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/angular",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "SymbioteNative's Angular adapter — a Renderer2/RendererFactory2 with DOM-less bootstrap driving real native iOS/Android views through the same engine as the other adapters.",
   "license": "MIT",
   "repository": {
@@ -52,7 +52,8 @@
   },
   "scripts": {
     "prepare": "pnpm run ng:build",
-    "ng:build": "ngc -p tsconfig.angular.json",
+    "clean": "rm -rf build",
+    "ng:build": "pnpm run clean && ngc -p tsconfig.angular.json",
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
