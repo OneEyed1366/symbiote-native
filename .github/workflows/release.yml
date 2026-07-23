@@ -152,7 +152,7 @@ jobs:
       (github.event_name == 'workflow_run' &&
         github.event.workflow_run.event == 'pull_request' &&
         github.event.workflow_run.conclusion == 'success' &&
-        fromJSON(github.event.workflow_run.pull_requests)[0] != null) ||
+        github.event.workflow_run.pull_requests[0] != null) ||
       (github.event_name == 'workflow_dispatch' && inputs.canary-packages != '')
     runs-on: ubuntu-latest
     environment: canary-publish
@@ -183,7 +183,7 @@ jobs:
         id: dirs-auto
         if: github.event_name == 'workflow_run'
         env:
-          CANARY_BASE_SHA: ${{ fromJSON(github.event.workflow_run.pull_requests)[0].base.sha }}
+          CANARY_BASE_SHA: ${{ github.event.workflow_run.pull_requests[0].base.sha }}
           CANARY_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: node scripts/select-canary-dirs.mjs
 
