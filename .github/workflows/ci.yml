@@ -1,10 +1,14 @@
 name: CI
 
 on:
+  # develop is a real PR base in this repo (roughly half of past PRs target
+  # it, not just master) — branches:[master]-only silently gave zero CI to
+  # every one of them; this filter matches the PR's BASE ref, so widening it
+  # here is the actual fix, not a workaround in publish-canary/workflow_run.
   pull_request:
-    branches: [master]
+    branches: [master, develop]
   push:
-    branches: [master]
+    branches: [master, develop]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
