@@ -44,6 +44,7 @@ minimumReleaseAgeExclude:
   - expo-modules-core@57.0.5
   - expo-modules-jsi@57.0.3
   - expo-sensors@57.0.2
+  - expo-modules-autolinking@57.0.8
 
 # Single source of truth for dependency versions (pnpm catalogs).
 # A package references a version with `catalog:` (default) or `catalog:<name>`
@@ -172,6 +173,11 @@ catalog:
   # origin/sdk-57).
   expo-sensors: 57.0.2
   expo-modules-core: 57.0.5
+  # Autolinking CLI only (never resolved via the `expo` package) — each native host app needs
+  # it as a direct devDependency so its Podfile/settings.gradle can `require.resolve` it; see
+  # apps/docs-site's expo-native-module-setup howto. Version verified against .vendors/expo at
+  # origin/sdk-57.
+  expo-modules-autolinking: 57.0.8
   '@babel/core': ^7.25.2
   '@types/babel__core': ^7.20.5
   '@babel/preset-env': ^7.25.3
