@@ -4,65 +4,17 @@ on:
   push:
     branches:
       - master
+  # Drives publish-canary below — every PR gets a real npm canary publish of
+  # whichever publishable package(s) it touches, gated by the canary-publish
+  # environment's required reviewers before anything actually hits the registry.
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       cut-release:
         description: 'Cut a release: open a version-bump PR from this branch into master (run this dispatched from develop)'
         type: boolean
         default: false
-      # BEGIN GENERATED CANARY PACKAGE INPUTS — do not edit by hand, run
-      # `pnpm run sync:release-config` (derives this list from
-      # publishablePackageEntries(), the same package discovery
-      # `select-canary-dirs.mjs`/`trust-publishers.mjs` use).
-      android:
-        description: '@symbiote-native/android'
-        type: boolean
-        default: false
-      angular:
-        description: '@symbiote-native/angular'
-        type: boolean
-        default: false
-      components:
-        description: '@symbiote-native/components'
-        type: boolean
-        default: false
-      css-parser:
-        description: '@symbiote-native/css-parser'
-        type: boolean
-        default: false
-      engine:
-        description: '@symbiote-native/engine'
-        type: boolean
-        default: false
-      navigation:
-        description: '@symbiote-native/navigation'
-        type: boolean
-        default: false
-      react:
-        description: '@symbiote-native/react'
-        type: boolean
-        default: false
-      sensors:
-        description: '@symbiote-native/sensors'
-        type: boolean
-        default: false
-      slider:
-        description: '@symbiote-native/slider'
-        type: boolean
-        default: false
-      splash-screen:
-        description: '@symbiote-native/splash-screen'
-        type: boolean
-        default: false
-      test-utils:
-        description: '@symbiote-native/test-utils'
-        type: boolean
-        default: false
-      vue:
-        description: '@symbiote-native/vue'
-        type: boolean
-        default: false
-      # END GENERATED CANARY PACKAGE INPUTS
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -171,60 +123,52 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Manual, on-demand preview publish of whichever @symbiote-native/*
-  # packages you tick (whichever branch you run this workflow against),
-  # WITHOUT touching the real npm registry at all — pkg.pr.new hosts its own
-  # npm-compatible URLs, so nothing here is ever visible on npmjs.com, no
-  # dist-tag, no version bump, nothing to clean up. Installable in
-  # .examples/*/examples/* to e2e-test the REAL packed tarball (catches
-  # "files" allowlist bugs etc. that workspace:* linking can't reproduce)
-  # without touching the real release line. Requires the pkg.pr.new GitHub
-  # App installed on this repo (github.com/apps/pkg-pr-new).
+  # Automatic, real npm publish (dist-tag `canary`) of whichever @symbiote-native/*
+  # package(s) a PR actually touches — replaces the old manual pkg.pr.new checkbox
+  # flow so examples/*/package.json can commit a literal, git-tracked
+  # `"@symbiote-native/<pkg>": "canary"` dependency that always resolves live,
+  # something pkg.pr.new's ephemeral per-commit URLs couldn't give us. Gated by the
+  # `canary-publish` GitHub Environment (required reviewers configured on the
+  # environment itself) since this is a real, OIDC-trusted publish to the real
+  # registry triggered by any contributor's PR.
   publish-canary:
     needs: checks
-    if: github.event_name == 'workflow_dispatch' && inputs.cut-release != true
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    environment: canary-publish
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          registry-url: https://registry.npmjs.org
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
-      # Reads every ticked checkbox generically (no hardcoded package list to
-      # keep in sync) so a new per-package input just works.
-      - name: Determine selected packages
-        id: selected
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const inputs = context.payload.inputs || {};
-            const selected = Object.entries(inputs)
-              .filter(([, value]) => value === 'true' || value === true)
-              .map(([key]) => key);
-            if (selected.length === 0) {
-              core.setFailed('No package checkbox was ticked — select at least one package to publish a canary for.');
-              return;
-            }
-            core.setOutput('packages', selected.join(','));
-
       - run: pnpm run prepublish-build
 
-      # pkg-pr-new@0.0.75 has no prebuilt-tarball mode yet (that's an unreleased main-branch
-      # feature) — its own glob only matches directories, and it packs them itself, defaulting
-      # to `npm pack` unless told otherwise. `--pnpm` makes it use `pnpm pack`, which — unlike
-      # `npm pack` — resolves each package's `publishConfig` override (ships `build/`, not the
-      # in-repo `src/*.ts` entry).
-      - name: Resolve selected package directories
+      # Auto-detects which publishable package(s) this PR touches instead of a
+      # human ticking checkboxes — fails fast if the PR touches none.
+      - name: Resolve changed publishable packages
         id: dirs
         env:
-          CANARY_PACKAGES: ${{ steps.selected.outputs.packages }}
+          CANARY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CANARY_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node scripts/select-canary-dirs.mjs
 
-      - name: Publish canary (pkg.pr.new)
-        run: pnpm exec pkg-pr-new publish --pnpm ${{ steps.dirs.outputs.dirs }}
+      # npm's OIDC trust (`npm trust github`, see trust-publishers.mjs) can only be
+      # registered for a package that already exists on the registry — refuse to
+      # let a never-published package reach `changeset publish` and 404 there.
+      - name: Preflight — verify npm trust for selected packages
+        env:
+          CANARY_PACKAGES: ${{ steps.dirs.outputs.packages }}
+        run: node scripts/check-canary-trust.mjs
+
+      - name: Publish canary (npm, tag canary)
+        run: pnpm run release:canary

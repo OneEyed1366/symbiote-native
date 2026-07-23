@@ -13,8 +13,6 @@
     "prepublish-build": "pnpm run typecheck && pnpm run fix-esm-extensions && pnpm --filter './{core,adapters,packages}/*' --if-present run ng:build",
     "build": "pnpm run prepublish-build && pnpm run docs:build",
     "fix-esm-extensions": "node scripts/fix-esm-extensions.mjs",
-    "sync:release-config": "node scripts/sync-release-config.mjs",
-    "sync:release-config:check": "node scripts/sync-release-config.mjs --check",
     "test": "vitest run",
     "test:watch": "vitest",
     "docs:dev": "pnpm --filter @symbiote-native/docs-site dev",
@@ -30,6 +28,7 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm run build && changeset publish",
+    "release:canary": "changeset version --snapshot canary && changeset publish --tag canary",
     "trust:publishers": "node scripts/trust-publishers.mjs"
   },
   "devDependencies": {
@@ -41,7 +40,6 @@
     "globals": "catalog:",
     "husky": "catalog:",
     "lint-staged": "catalog:",
-    "pkg-pr-new": "catalog:",
     "prettier": "catalog:",
     "syncpack": "catalog:",
     "typescript": "catalog:",
