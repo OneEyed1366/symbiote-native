@@ -99,6 +99,9 @@ catalogs:
     lint-staged:
       specifier: ^17.0.8
       version: 17.0.8
+    pkg-pr-new:
+      specifier: ^0.0.75
+      version: 0.0.75
     postcss:
       specifier: ^8.4.49
       version: 8.5.16
@@ -170,6 +173,9 @@ importers:
       lint-staged:
         specifier: 'catalog:'
         version: 17.0.8
+      pkg-pr-new:
+        specifier: 'catalog:'
+        version: 0.0.75
       prettier:
         specifier: 'catalog:'
         version: 3.9.4
@@ -6768,6 +6774,10 @@ packages:
   pkg-dir@4.2.0:
     resolution: {integrity: sha512-HRDzbaKjC+AOWVXxAU/x54COGeIv9eb+6CkDSQoNTt4XyWoIJvuPsXizxu/Fr23EiekbtZwmh1IcIG/l/a10GQ==}
     engines: {node: '>=8'}
+
+  pkg-pr-new@0.0.75:
+    resolution: {integrity: sha512-u9mdErTewKSMsr+ceCt8VcNuNP0ro5AXiPXhUVApuEyqr2Zlvt+DdCFBcm+yGWN8mhOdZJ27meIDbnoZgfzpOw==}
+    hasBin: true
 
   plist@3.1.1:
     resolution: {integrity: sha512-ZIfcLJC+7E7FBFnDxm9MPmt7D+DidyQ26lewieO75AdhA2ayMtsJSES0iWzqJQbcVRSrTufQoy0DR94xHue0oA==}
@@ -16030,6 +16040,8 @@ snapshots:
   pkg-dir@4.2.0:
     dependencies:
       find-up: 4.1.0
+
+  pkg-pr-new@0.0.75: {}
 
   plist@3.1.1:
     dependencies:
