@@ -68,6 +68,22 @@ for (const { name } of entries) console.log(`  - ${name}`);
 
 if (listOnly) process.exit(0);
 
+// npm login sessions expire fairly quickly; catching a stale session here
+// gives one clear login prompt instead of every package in the loop below
+// failing on the same raw npm auth error.
+try {
+  execFileSync('npm', ['whoami'], { stdio: 'pipe' });
+} catch {
+  console.log('No active npm session — running npm login...');
+  execFileSync('npm', ['login'], { stdio: 'inherit' });
+  try {
+    execFileSync('npm', ['whoami'], { stdio: 'pipe' });
+  } catch {
+    console.error('npm login did not produce an authenticated session — aborting.');
+    process.exit(1);
+  }
+}
+
 console.log('\nEach never-published package needs a one-off `pnpm publish`, then every');
 console.log('package needs `npm trust github` — both are interactive (OTP/browser).\n');
 

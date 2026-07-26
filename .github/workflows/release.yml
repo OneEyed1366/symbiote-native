@@ -4,65 +4,27 @@ on:
   push:
     branches:
       - master
+  # Drives publish-canary below — reacts to the CI workflow's own completion
+  # instead of re-declaring `pull_request` here, which would call checks.yml
+  # a second time for every PR push (ci.yml already covers pull_request; there
+  # is no cross-workflow `needs:` to gate on its run directly, so workflow_run
+  # is the mechanism that avoids running lint/typecheck/test twice per push).
+  # Caveat: workflow_run only fires from the copy of this trigger present on
+  # the repo's DEFAULT branch — a PR from a non-default branch won't exercise
+  # this path until the change is merged.
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
   workflow_dispatch:
     inputs:
       cut-release:
         description: 'Cut a release: open a version-bump PR from this branch into master (run this dispatched from develop)'
         type: boolean
         default: false
-      # BEGIN GENERATED CANARY PACKAGE INPUTS — do not edit by hand, run
-      # `pnpm run sync:release-config` (derives this list from
-      # publishablePackageEntries(), the same package discovery
-      # `select-canary-dirs.mjs`/`trust-publishers.mjs` use).
-      android:
-        description: '@symbiote-native/android'
+      publish-canary:
+        description: 'Manually publish a pkg.pr.new preview build of every publishable package on this branch'
         type: boolean
         default: false
-      angular:
-        description: '@symbiote-native/angular'
-        type: boolean
-        default: false
-      components:
-        description: '@symbiote-native/components'
-        type: boolean
-        default: false
-      css-parser:
-        description: '@symbiote-native/css-parser'
-        type: boolean
-        default: false
-      engine:
-        description: '@symbiote-native/engine'
-        type: boolean
-        default: false
-      navigation:
-        description: '@symbiote-native/navigation'
-        type: boolean
-        default: false
-      react:
-        description: '@symbiote-native/react'
-        type: boolean
-        default: false
-      sensors:
-        description: '@symbiote-native/sensors'
-        type: boolean
-        default: false
-      slider:
-        description: '@symbiote-native/slider'
-        type: boolean
-        default: false
-      splash-screen:
-        description: '@symbiote-native/splash-screen'
-        type: boolean
-        default: false
-      test-utils:
-        description: '@symbiote-native/test-utils'
-        type: boolean
-        default: false
-      vue:
-        description: '@symbiote-native/vue'
-        type: boolean
-        default: false
-      # END GENERATED CANARY PACKAGE INPUTS
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -73,11 +35,15 @@ permissions:
 
 jobs:
   # Same three jobs ci.yml runs for fast PR feedback, re-run here so `needs:
-  # checks` below is a real gate on THIS workflow run — GitHub Actions has no
-  # cross-workflow `needs`, so gating release/publish-canary on ci.yml's own
-  # run isn't possible; calling the shared workflow again is the mechanism.
+  # checks` below is a real gate for `release`/`cut-release` (push /
+  # workflow_dispatch only — those events never went through ci.yml, so this
+  # is genuinely the first and only checks.yml run for them). Restricted to
+  # those two events so it does NOT also fire on workflow_run — publish-canary
+  # below gates on ci.yml's own conclusion instead of needing this job, which
+  # is the whole point of using workflow_run rather than a local `needs:`.
   checks:
     name: Checks
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/checks.yml
 
   release:
@@ -171,21 +137,51 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Manual, on-demand preview publish of whichever @symbiote-native/*
-  # packages you tick (whichever branch you run this workflow against),
-  # WITHOUT touching the real npm registry at all — pkg.pr.new hosts its own
-  # npm-compatible URLs, so nothing here is ever visible on npmjs.com, no
-  # dist-tag, no version bump, nothing to clean up. Installable in
-  # .examples/*/examples/* to e2e-test the REAL packed tarball (catches
-  # "files" allowlist bugs etc. that workspace:* linking can't reproduce)
-  # without touching the real release line. Requires the pkg.pr.new GitHub
-  # App installed on this repo (github.com/apps/pkg-pr-new).
+  # Preview publish of every publishable package via pkg.pr.new — WITHOUT touching the real npm
+  # registry at all. pkg.pr.new hosts its own npm-compatible per-commit URLs, so nothing here is
+  # ever visible on npmjs.com: no dist-tag, no version bump, nothing to clean up. That last point
+  # is load-bearing, not incidental — an earlier version of this job published real npm snapshots
+  # under a `canary` dist-tag instead, which turned out to be a dead end: real npm's `unpublish`
+  # and `deprecate` both require an interactive OTP that a headless CI job can never supply, and
+  # this holds even for a granular access token with "bypass 2FA" enabled — that bypass only ever
+  # covers `npm publish`, never `unpublish`/`deprecate` (confirmed empirically, not just from
+  # docs, against this repo's own packages on 2026-07-24). So real npm snapshots would have
+  # accumulated on the registry forever with no working automated cleanup. pkg.pr.new sidesteps
+  # the whole problem by never touching the real registry in the first place.
+  #
+  # Publishes ALL publishable packages every time rather than a hand-picked subset: unlike a real
+  # npm publish, pkg.pr.new never mutates shared registry state (no dist-tag to move, no cascade
+  # via `updateInternalDependencies` to reason about), so there's no staleness/cascade risk a
+  # selection would need to guard against — publishing everything is simply the cheapest, always-
+  # accurate option. Requires the pkg.pr.new GitHub App installed on this repo
+  # (github.com/apps/pkg-pr-new).
+  #
+  # Two ways in: automatic (workflow_run, gated on `CI` having passed for the PR) or manual
+  # (workflow_dispatch with publish-canary: true, for a branch with no open PR, or to retry).
+  #
+  # `needs: checks` gates the workflow_dispatch path on Lint/Typecheck/Test — without it, a manual
+  # dispatch would publish regardless of whether those passed. The `checks` job's own `if:` never
+  # runs it for workflow_run (ci.yml already covered that PR push), so its result there is
+  # 'skipped', not 'success' — the explicit needs.checks.result check below tolerates that instead
+  # of the implicit success()-only gate `needs:` alone would apply, which would silently skip this
+  # job on every workflow_run.
   publish-canary:
     needs: checks
-    if: github.event_name == 'workflow_dispatch' && inputs.cut-release != true
+    if: >-
+      (needs.checks.result == 'success' || needs.checks.result == 'skipped') &&
+      (
+        (github.event_name == 'workflow_run' &&
+          github.event.workflow_run.event == 'pull_request' &&
+          github.event.workflow_run.conclusion == 'success') ||
+        (github.event_name == 'workflow_dispatch' && inputs.publish-canary == true)
+      )
     runs-on: ubuntu-latest
+    environment: canary-publish
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -196,34 +192,14 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Reads every ticked checkbox generically (no hardcoded package list to
-      # keep in sync) so a new per-package input just works.
-      - name: Determine selected packages
-        id: selected
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const inputs = context.payload.inputs || {};
-            const selected = Object.entries(inputs)
-              .filter(([, value]) => value === 'true' || value === true)
-              .map(([key]) => key);
-            if (selected.length === 0) {
-              core.setFailed('No package checkbox was ticked — select at least one package to publish a canary for.');
-              return;
-            }
-            core.setOutput('packages', selected.join(','));
-
       - run: pnpm run prepublish-build
 
-      # pkg-pr-new@0.0.75 has no prebuilt-tarball mode yet (that's an unreleased main-branch
-      # feature) — its own glob only matches directories, and it packs them itself, defaulting
-      # to `npm pack` unless told otherwise. `--pnpm` makes it use `pnpm pack`, which — unlike
-      # `npm pack` — resolves each package's `publishConfig` override (ships `build/`, not the
-      # in-repo `src/*.ts` entry).
-      - name: Resolve selected package directories
+      # pkg-pr-new's own glob resolution only matches directories, and it packs them itself,
+      # defaulting to `npm pack` unless told otherwise. `--pnpm` makes it use `pnpm pack`, which
+      # — unlike `npm pack` — resolves each package's `publishConfig` override (ships `build/`,
+      # not the in-repo `src/*.ts` entry).
+      - name: Resolve publishable package directories
         id: dirs
-        env:
-          CANARY_PACKAGES: ${{ steps.selected.outputs.packages }}
         run: node scripts/select-canary-dirs.mjs
 
       - name: Publish canary (pkg.pr.new)
