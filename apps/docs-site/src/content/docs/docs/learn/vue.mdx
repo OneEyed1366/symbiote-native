@@ -15,11 +15,17 @@ compile down to the exact same `@vue/runtime-core` vnode tree, so both drive
 the identical adapter, the identical component surface, and the identical
 native output. Neither is a reduced mode of the other.
 
-<img src={`${import.meta.env.BASE_URL}/vue-demo.gif`} alt="Vue SFC driving a native SymbioteNative demo" width="260" />
+<video poster={`${import.meta.env.BASE_URL}/vue-demo.webp`} aria-label="Vue SFC driving a native SymbioteNative demo" width="260" height="564" preload="none" autoplay muted loop playsinline>
+  <source src={`${import.meta.env.BASE_URL}/vue-demo.mp4`} type="video/mp4" />
+  <source src={`${import.meta.env.BASE_URL}/vue-demo.webm`} type="video/webm" />
+</video>
 
 *Vue SFC (`.vue`) — the reference canary at `examples/vue-sfc`.*
 
-<img src={`${import.meta.env.BASE_URL}/vue-tsx-demo.gif`} alt="Vue TSX driving a native SymbioteNative demo" width="260" />
+<video poster={`${import.meta.env.BASE_URL}/vue-tsx-demo.webp`} aria-label="Vue TSX driving a native SymbioteNative demo" width="260" height="564" preload="none" autoplay muted loop playsinline>
+  <source src={`${import.meta.env.BASE_URL}/vue-tsx-demo.mp4`} type="video/mp4" />
+  <source src={`${import.meta.env.BASE_URL}/vue-tsx-demo.webm`} type="video/webm" />
+</video>
 
 *Vue JSX/TSX (`.tsx`) — the same canary, authored render-function-first at
 `examples/vue-tsx`, proving the component surface is template-agnostic.*

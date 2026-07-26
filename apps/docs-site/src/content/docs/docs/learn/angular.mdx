@@ -26,7 +26,10 @@ framework-agnostic rendering seam. Bootstrap is DOM-less: no
 `platform-browser`, no zone.js. Angular renderer operations become engine
 mutations, then Fabric commits real native views.
 
-<img src={`${import.meta.env.BASE_URL}/angular-demo.gif`} alt="Angular driving a native SymbioteNative demo" width="260" />
+<video poster={`${import.meta.env.BASE_URL}/angular-demo.webp`} aria-label="Angular driving a native SymbioteNative demo" width="260" height="564" preload="none" autoplay muted loop playsinline>
+  <source src={`${import.meta.env.BASE_URL}/angular-demo.mp4`} type="video/mp4" />
+  <source src={`${import.meta.env.BASE_URL}/angular-demo.webm`} type="video/webm" />
+</video>
 
 *The `examples/angular` canary — the same component surface and engine as
 the React and Vue canaries, driven through `Renderer2` instead.*
