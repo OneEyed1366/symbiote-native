@@ -28,6 +28,19 @@
   --gradient: linear-gradient(135deg, var(--accent), var(--accent-2));
 }
 
+/* Starlight docs pages set [data-theme] on <html>; the landing page never does
+   (it only sets [data-symbiote]), so this block is scoped to docs only and
+   can't affect the always-dark landing. --core-line/--surface/--surface-2 are
+   white-based overlays meant to read against the dark --core-bg — on light
+   theme's white background they'd be almost invisible, so give light theme
+   its own ink-based equivalents. (--core-bg/--core-text etc. are handled
+   separately in starlight.css's :root[data-theme='light'] block.) */
+:root[data-theme='light'] {
+  --core-line: rgba(10, 12, 20, 0.12);
+  --surface: rgba(10, 12, 20, 0.035);
+  --surface-2: rgba(10, 12, 20, 0.06);
+}
+
 /* ── symbiote skins ─────────────────────────────────────────── */
 [data-symbiote='react'] {
   --accent: #61dafb;
