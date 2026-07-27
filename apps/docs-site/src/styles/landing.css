@@ -371,14 +371,24 @@ h1 {
   animation: chomp 2.4s ease-in-out infinite;
 }
 
-/* the native device the symbiote rewrites — structure fixed, screen follows the skin.
-   The drop shadow lives here rather than on the whole <svg>: on the root it would
-   wrap the animating limbs too, and a filter over moving content re-rasterises on
-   every frame. This subtree never moves, so the filter is rasterised once. */
-.phone {
-  filter: drop-shadow(0 22px 46px rgba(0, 0, 0, 0.45));
-}
+/*
+  The native device the symbiote rewrites — structure fixed, screen follows the skin.
 
+  NO drop shadow here, deliberately. The original carried one on the whole <svg>,
+  where it shadowed the finished composite and so could never show a step inside
+  the creature. Moving it onto this group instead — to keep the filter off the
+  animating limbs — quietly changed what it shadows: the mass and tendrils are
+  drawn BEFORE the phone and got darkened, the grips are drawn AFTER it and did
+  not, leaving a hard brightness step along every grip outline. That was the seam,
+  and it was loudest on the Angular skin, whose crimson→purple ramp shows a tonal
+  break the low-contrast React blues hide.
+
+  Putting it back on the root would re-filter moving content every frame, which is
+  the whole thing this rewrite removed. And on a near-black page an outer shadow
+  contributes almost nothing anyway — its only visible effect here WAS the
+  darkening that caused the artifact. So it simply goes. Depth comes from the
+  frame's own accent stroke and the glow behind the creature.
+*/
 .phone-frame {
   fill: #0b0c12;
   stroke: color-mix(in srgb, var(--accent) 38%, rgba(255, 255, 255, 0.14));
