@@ -45,6 +45,9 @@ catalogs:
     '@types/babel__core':
       specifier: ^7.20.5
       version: 7.20.5
+    '@types/invariant':
+      specifier: ^2.2.37
+      version: 2.2.37
     '@types/less':
       specifier: ^3.0.8
       version: 3.0.8
@@ -81,6 +84,9 @@ catalogs:
     eslint-plugin-react-hooks:
       specifier: ^7.1.1
       version: 7.1.1
+    expo-local-authentication:
+      specifier: 57.0.2
+      version: 57.0.2
     expo-modules-core:
       specifier: 57.0.5
       version: 57.0.5
@@ -93,6 +99,9 @@ catalogs:
     husky:
       specifier: ^9.1.7
       version: 9.1.7
+    invariant:
+      specifier: ^2.2.4
+      version: 2.2.4
     less:
       specifier: ^4.6.7
       version: 4.6.7
@@ -377,6 +386,67 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
+
+  packages/local-auth:
+    dependencies:
+      expo-local-authentication:
+        specifier: 'catalog:'
+        version: 57.0.2(expo@57.0.4)
+      expo-modules-core:
+        specifier: 'catalog:'
+        version: 57.0.5(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
+      invariant:
+        specifier: 'catalog:'
+        version: 2.2.4
+      react-native:
+        specifier: '>=0.86'
+        version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
+      vue:
+        specifier: '>=3.5.0'
+        version: 3.5.39(typescript@6.0.3)
+    devDependencies:
+      '@angular/compiler':
+        specifier: 'catalog:'
+        version: 22.0.5
+      '@angular/compiler-cli':
+        specifier: 'catalog:'
+        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+      '@angular/core':
+        specifier: 'catalog:'
+        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+      '@symbiote-native/angular':
+        specifier: workspace:*
+        version: link:../../adapters/angular
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
+      '@symbiote-native/react':
+        specifier: workspace:*
+        version: link:../../adapters/react
+      '@symbiote-native/test-utils':
+        specifier: workspace:*
+        version: link:../../core/test-utils
+      '@symbiote-native/vue':
+        specifier: workspace:*
+        version: link:../../adapters/vue
+      '@types/invariant':
+        specifier: 'catalog:'
+        version: 2.2.37
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.1.0
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.17
+      '@vue/runtime-core':
+        specifier: 'catalog:'
+        version: 3.5.39
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   packages/navigation:
     dependencies:
@@ -2370,6 +2440,9 @@ packages:
   '@types/hast@3.0.4':
     resolution: {integrity: sha512-WPs+bbQw5aCj+x6laNGWLH3wviHtoCv/P3+otBhbOhJgG8qtpdAMlTCxLtsTWA7LH1Oh/bFCHsBn0TPS5m30EQ==}
 
+  '@types/invariant@2.2.37':
+    resolution: {integrity: sha512-IwpIMieE55oGWiXkQPSBY1nw1nFs6bsKXTFskNY8sdS17K24vyEBRQZEwlRS7ZmXCWnJcQtbxWzly+cODWGs2A==}
+
   '@types/istanbul-lib-coverage@2.0.6':
     resolution: {integrity: sha512-2QF/t/auWm0lsy8XtKVPG19v3sSOQlJe/YHZgfjb/KBBHOGSV+J2q/S671rcq9uTBrLAXmZpqJiaQbMT+zNU1w==}
 
@@ -3492,6 +3565,11 @@ packages:
     peerDependencies:
       expo: '*'
       react: 19.2.3
+
+  expo-local-authentication@57.0.2:
+    resolution: {integrity: sha512-8K4zcrQ5wZkRS1rwEWY8qHbeGVMNh35e9D1VTVKlMHz1O47itW+pW6iBVuqwGFLozN4fRBeEDQH8hu9Gt58YuQ==}
+    peerDependencies:
+      expo: '*'
 
   expo-modules-autolinking@57.0.8:
     resolution: {integrity: sha512-YBDgbJHlhhhr3JaKErW6znsIL8zQsh206LaDpWrLHV/WluRwhYfZuF/fhkVN7b/DsRxIu0UeCPExaEPMxlC2Hw==}
@@ -8547,6 +8625,8 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
 
+  '@types/invariant@2.2.37': {}
+
   '@types/istanbul-lib-coverage@2.0.6': {}
 
   '@types/istanbul-lib-report@3.0.3':
@@ -9901,6 +9981,11 @@ snapshots:
     dependencies:
       expo: 57.0.4(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
       react: 19.2.3
+
+  expo-local-authentication@57.0.2(expo@57.0.4):
+    dependencies:
+      expo: 57.0.4(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
+      invariant: 2.2.4
 
   expo-modules-autolinking@57.0.8(typescript@6.0.3):
     dependencies:

@@ -11,6 +11,7 @@
     { "path": "packages/slider" },
     { "path": "packages/splash-screen" },
     { "path": "packages/navigation" },
-    { "path": "packages/sensors" }
+    { "path": "packages/sensors" },
+    { "path": "packages/local-auth" }
   ]
 }
