@@ -321,7 +321,7 @@ h1 {
 .mass {
   transform-box: view-box;
   transform-origin: 150px 148px;
-  animation: mass-breathe 7.5s ease-in-out infinite alternate;
+  animation: mass-breathe 1.25s ease-in-out infinite alternate;
 }
 
 @keyframes mass-breathe {

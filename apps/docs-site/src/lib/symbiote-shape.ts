@@ -526,7 +526,7 @@ function buildTendrils(): IRootedLimb[] {
     /* The whole limb swings around the body centre and reaches in and out along
        its own axis. Two keyframes of `transform` is the entire animation — no
        geometry is ever touched again after build. */
-    const sweep = between(2.4, 5.6);
+    const sweep = between(3.4, 5.6);
     const reach = between(0.03, 0.075);
 
     const spine = limbSpine(angle, root, length, curl, drift);
@@ -536,7 +536,7 @@ function buildTendrils(): IRootedLimb[] {
         d: limbPath(spine, width / 2),
         ox: CX,
         oy: CY,
-        dur: `${between(3.6, 7.4).toFixed(2)}s`,
+        dur: `${between(0.6, 1.4).toFixed(2)}s`,
         delay: `-${between(0, 6).toFixed(2)}s`,
         rotA: `${(-sweep).toFixed(2)}deg`,
         rotB: `${sweep.toFixed(2)}deg`,
