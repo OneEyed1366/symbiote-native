@@ -6,7 +6,6 @@
 export const ROUTE_NAME = {
   Menu: 'Menu',
   Canary: 'Canary',
-  Sensors: 'Sensors',
   Details: 'Details',
   HeaderOptions: 'HeaderOptions',
   SheetDemo: 'SheetDemo',
