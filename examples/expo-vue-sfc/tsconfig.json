@@ -1,0 +1,9 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "types": [],
+    "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
+  },
+  "include": ["**/*.ts", "**/*.tsx", "**/*.vue"],
+  "exclude": ["**/node_modules", "**/Pods"]
+}

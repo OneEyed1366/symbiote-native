@@ -1,0 +1,347 @@
+/* Symbiote canary app — static styles, compiled at build time by @symbiote-native/css-parser
+   into the same RN style objects StyleSheet.create used to produce (see the
+   symbiote-sfc-style-compiler skill). Referenced via `class` across every screen under ./screens
+   (and ./components/ActionButton.vue) — a genuinely GLOBAL stylesheet. Imported once via a plain
+   `import './App.css'` in App.vue's <script setup> (see the `symbiote-sfc-style-compiler`
+   skill's "standalone .css import" note) — the class-name registry it populates is shared by
+   every adapter file that renders a `class` prop, not scoped to App.vue itself, so every screen
+   under ./screens resolves these classes without importing this file again. */
+
+:root {
+  /* app-wide surface/text tokens — same values already used ad hoc across this file; named here
+     so the navigation-demo classes below reference them instead of repeating hex literals. */
+  --ink: #0b1622;
+  --paper: #13243a;
+  --mist: #41506a;
+  --chalk: #cbd5e1;
+  --chalk-bright: #ffffff;
+
+  /* wayfinding line system — the Expo-package demo suite's signature. Each tour screen (MenuScreen's
+     rows) carries its own line color through a 2-letter badge, a matching hint tint, and (where a
+     screen's own native header/tab bar takes a tint) the OS chrome itself. Kept in sync by hand with
+     navigation-lines.ts's LINE_COLOR (CSS custom properties and that module are different runtimes
+     with no shared import path). */
+  --line-sensors: #f6ad55;
+  --line-local-auth: #ef4444;
+
+  /* Decoupled "good/live" state color — was borrowed from --line-structure back when the
+     navigation demo suite's Structure line still existed in this app; now its own token so
+     .sensor-status-badge-live/.auth-status-badge-yes/.auth-result-success don't depend on a line
+     token that no longer exists. */
+  --positive: #4fd1a5;
+}
+
+.info-text {
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+/* ActionButton — every demo screen's tappable action, replacing RN's stock unstyled <Button>.
+   borderColor/color stay dynamic (ActionButton's own `color` prop, one per call site — the
+   per-feature color-coding a class can't parametrize), everything else is the shared chrome. */
+.action-button {
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border-width: 1.5px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  padding-left: 16px;
+  padding-right: 16px;
+  background-color: var(--paper);
+}
+.action-button-text {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+/* Hero card — the "you've arrived" intro every tour screen leads with, mirroring MenuScreen's
+   hero + the per-line badge language already used for its row/line-tag. */
+.hero-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.hero-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  align-items: center;
+  justify-content: center;
+}
+.hero-badge-text {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: bold;
+}
+.hero-copy {
+  flex: 1;
+  gap: 4px;
+}
+.hero-title {
+  color: var(--chalk-bright);
+  font-size: 18px;
+  font-weight: bold;
+}
+.hero-body {
+  color: var(--chalk);
+  font-size: 13px;
+}
+
+/* App — retokenized onto the shared --ink/--paper/--mist/--chalk palette. */
+.screen {
+  flex: 1;
+  background-color: var(--ink);
+}
+.scroll-content {
+  padding-top: 24px;
+  padding-bottom: 40px;
+  padding-left: 24px;
+  padding-right: 24px;
+  align-items: stretch;
+  gap: 20px;
+}
+
+/* MenuScreen hero */
+.menu-hero {
+  gap: 6px;
+  padding-bottom: 8px;
+}
+.menu-eyebrow {
+  color: var(--mist);
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+.menu-hero-title {
+  color: var(--chalk-bright);
+  font-size: 26px;
+  font-weight: bold;
+}
+.menu-hero-subtitle {
+  color: var(--chalk);
+  font-size: 14px;
+}
+
+/* line tag — the "you are here" pill each demo screen carries, matching its MenuScreen row */
+.line-tag {
+  align-self: flex-start;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+.line-tag-sensors {
+  background-color: var(--line-sensors);
+}
+.line-tag-local-auth {
+  background-color: var(--line-local-auth);
+}
+.line-tag-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+/* MenuScreen rows */
+.menu-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  background-color: var(--paper);
+}
+.menu-row-sensors {
+  border-left-width: 3px;
+  border-left-color: var(--line-sensors);
+}
+.menu-row-local-auth {
+  border-left-width: 3px;
+  border-left-color: var(--line-local-auth);
+}
+
+.menu-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+}
+.menu-badge-sensors {
+  background-color: var(--line-sensors);
+}
+.menu-badge-local-auth {
+  background-color: var(--line-local-auth);
+}
+.menu-badge-text {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.menu-row-copy {
+  flex: 1;
+  gap: 4px;
+}
+.menu-row-label {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.menu-row-hint {
+  font-size: 12px;
+}
+.menu-row-hint-sensors {
+  color: var(--line-sensors);
+}
+.menu-row-hint-local-auth {
+  color: var(--line-local-auth);
+}
+
+/* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own
+   checking/unavailable/waiting/live state distinctly (see the sensor-status-* badges below). */
+.sensor-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.sensor-card-header {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.sensor-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.sensor-status-badge {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+/* still resolving isAvailableAsync() */
+.sensor-status-badge-checking {
+  background-color: var(--mist);
+}
+/* isAvailableAsync() resolved false — a real state, not an error (the iOS Simulator reports
+   this for every CoreMotion/CMPedometer-backed sensor, see the symbiote-expo-native-module
+   skill) */
+.sensor-status-badge-unavailable {
+  background-color: #6b4a4a;
+}
+/* available, subscribed, no reading has arrived yet */
+.sensor-status-badge-waiting {
+  background-color: var(--line-sensors);
+}
+/* at least one live reading rendered below */
+.sensor-status-badge-live {
+  background-color: var(--positive);
+}
+.sensor-status-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+.sensor-reading-row {
+  flex-direction: row;
+  gap: 8px;
+}
+.sensor-reading-chip {
+  flex: 1;
+  align-items: center;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-radius: 10px;
+  background-color: var(--ink);
+}
+.sensor-reading-label {
+  color: var(--mist);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+.sensor-reading-value {
+  color: var(--chalk-bright);
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* LocalAuthScreen — capabilities card + authenticate card. Reuses --positive for the "good"
+   states, same as .sensor-status-badge-live above. */
+.auth-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.auth-card-header {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.auth-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.auth-capability-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.auth-capability-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.auth-status-badge {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+.auth-status-badge-checking {
+  background-color: var(--mist);
+}
+.auth-status-badge-no {
+  background-color: #6b4a4a;
+}
+.auth-status-badge-yes {
+  background-color: var(--positive);
+}
+.auth-status-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+.auth-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+.auth-result {
+  padding: 10px;
+  border-radius: 10px;
+}
+.auth-result-success {
+  background-color: var(--positive);
+}
+.auth-result-error {
+  background-color: #6b4a4a;
+}
+.auth-result-text {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: bold;
+}

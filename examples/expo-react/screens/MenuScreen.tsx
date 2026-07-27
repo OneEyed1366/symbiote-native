@@ -1,0 +1,58 @@
+import { Pressable, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import { useStackNavigation } from '@symbiote-native/navigation/react';
+import { ROUTE_NAME } from '../routes';
+import type { ITourRouteName } from '../navigation-lines';
+import { ROUTE_LINE_INFO } from '../navigation-lines';
+
+type IMenuItem = {
+  label: string;
+  route: ITourRouteName;
+  hint: string;
+};
+
+const MENU_ITEMS: readonly IMenuItem[] = [
+  { label: 'Sensors', route: ROUTE_NAME.Sensors, hint: '@symbiote-native/sensors — accelerometer, gyroscope, magnetometer, device motion, pedometer' },
+  { label: 'Local auth', route: ROUTE_NAME.LocalAuth, hint: '@symbiote-native/local-auth — FaceID/TouchID/fingerprint' },
+];
+
+/**
+ * Root menu for the Expo-modules-core demo surface: one row per Expo-SDK-ported
+ * @symbiote-native package, each pushing its own dedicated demo screen onto the same root Stack.
+ * Rows are grouped into thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
+ * 2-letter badge per line, carried through onto each demo screen's own line tag.
+ */
+export function MenuScreen() {
+  const navigation = useStackNavigation();
+  return (
+    <SafeAreaView className="screen">
+      <ScrollView testID="menu-scroll" className="screen" contentContainerStyle="scroll-content">
+        <View className="menu-hero">
+          <Text className="menu-eyebrow">EXPO MODULES DEMOS</Text>
+          <Text className="menu-hero-title">Expo-SDK ports on a real native stack</Text>
+          <Text className="menu-hero-subtitle">
+            Each row below demos a different @symbiote-native package built on expo-modules-core.
+          </Text>
+        </View>
+        {MENU_ITEMS.map(item => {
+          const lineInfo = ROUTE_LINE_INFO[item.route];
+          return (
+            <Pressable
+              key={item.route}
+              testID={`menu-row-${item.route}`}
+              className={`menu-row menu-row-${lineInfo.line}`}
+              onPress={() => navigation.push(item.route)}
+            >
+              <View className={`menu-badge menu-badge-${lineInfo.line}`}>
+                <Text className="menu-badge-text">{lineInfo.code}</Text>
+              </View>
+              <View className="menu-row-copy">
+                <Text className="menu-row-label">{item.label}</Text>
+                <Text className={`menu-row-hint menu-row-hint-${lineInfo.line}`}>{item.hint}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
