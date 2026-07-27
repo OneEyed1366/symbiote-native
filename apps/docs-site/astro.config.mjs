@@ -224,6 +224,7 @@ export default defineConfig({
             { label: 'Slider', slug: 'docs/packages/slider' },
             { label: 'Splash screen', slug: 'docs/packages/splash-screen' },
             { label: 'Sensors', slug: 'docs/packages/sensors' },
+            { label: 'Local auth', slug: 'docs/packages/local-auth' },
           ],
         },
         {
