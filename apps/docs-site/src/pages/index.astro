@@ -1,5 +1,26 @@
 ---
 import '../styles/landing.css';
+import { buildSymbioteShape } from '../lib/symbiote-shape';
+
+// The creature's whole silhouette, contoured once at build time. Nothing about
+// the symbiote's geometry is computed in the browser any more — see the header
+// comment in src/lib/symbiote-shape.ts for why that mattered.
+const symbiote = buildSymbioteShape();
+
+// One inline custom-property bag per limb: the pivot it swings around plus its
+// own timing, so thirteen tendrils share a single CSS keyframe rule and still
+// never move in step.
+const limbVars = (limb: (typeof symbiote.tendrils)[number]) =>
+  [
+    `--ox:${limb.ox}px`,
+    `--oy:${limb.oy}px`,
+    `--dur:${limb.dur}`,
+    `--delay:${limb.delay}`,
+    `--rot-a:${limb.rotA}`,
+    `--rot-b:${limb.rotB}`,
+    `--sc-a:${limb.scaleA}`,
+    `--sc-b:${limb.scaleB}`,
+  ].join(';');
 
 // ~150 chars, leads with the value prop and names every shipping adapter —
 // meta descriptions truncate around 160, and this feeds og:/twitter: too.
@@ -136,52 +157,41 @@ const symbiotes = [
         <div class="host" aria-hidden="true">
           <svg class="symbiote" viewBox="0 0 300 330" role="img">
             <defs>
-              <!-- one gradient across the whole mass (not per-circle) so the goo reads as smooth ooze;
-                   coords are in the creature's LOCAL space (the body group carries a transform) -->
+              <!-- one gradient across the whole mass (not per-limb) so the creature reads as
+                   one smooth ooze rather than a pile of separate shapes -->
               <linearGradient
                 id="symGrad"
                 gradientUnits="userSpaceOnUse"
-                x1="44"
-                y1="44"
-                x2="156"
-                y2="200"
+                x1={symbiote.gradient.x1}
+                y1={symbiote.gradient.y1}
+                x2={symbiote.gradient.x2}
+                y2={symbiote.gradient.y2}
               >
                 <stop offset="0" stop-color="var(--accent)" />
                 <stop offset="1" stop-color="var(--accent-2)" />
               </linearGradient>
-              <!-- metaball goo: nearby blobs fuse into one liquid mass -->
-              <filter id="goo" x="-40%" y="-30%" width="180%" height="170%">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b" />
-                <feColorMatrix
-                  in="b"
-                  type="matrix"
-                  values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"
-                  result="g"
-                />
-                <feBlend in="SourceGraphic" in2="g" />
-              </filter>
               <clipPath id="screenClip">
                 <rect x="112" y="92" width="76" height="170" rx="11" />
               </clipPath>
             </defs>
 
-            <!-- SYMBIOTE BODY — the living mass coiled BEHIND the device.
-                 Drawn in the creature's own 100,120-centred space; the group transform
-                 parks that centre behind the phone, so the JS below stays unchanged. -->
-            <g
-              class="goo goo-back"
-              filter="url(#goo)"
-              fill="url(#symGrad)"
-              transform="translate(32,6) scale(1.18)"
-            >
-              <!-- core mass; JS appends + animates tendril circles each frame -->
-              <circle class="core" cx="100" cy="118" r="50" />
-              <circle class="core" cx="84" cy="104" r="30" />
-              <circle class="core" cx="120" cy="110" r="32" />
-              <circle class="core" cx="98" cy="146" r="34" />
-              <!-- head cap — bulges up over the device's top edge so the face has a body -->
-              <circle class="core" cx="92" cy="46" r="33" />
-              <circle class="core" cx="110" cy="42" r="23" />
+            <!-- SYMBIOTE LIMBS — the writhing crown, BEHIND the body so every blunt
+                 root edge is covered by the mass and each limb reads as growing out
+                 of it. Each one is a static outline that only ever gets a CSS
+                 transform, which is why there is no animation script any more. -->
+            <g class="tendrils" fill="url(#symGrad)">
+              {
+                symbiote.tendrils.map((limb) => (
+                  <path class="limb" d={limb.d} style={limbVars(limb)} />
+                ))
+              }
+            </g>
+
+            <!-- SYMBIOTE BODY — the living mass coiled behind the device, contoured
+                 at build time out of the same metaball field the runtime filter used
+                 to resolve on every single frame. -->
+            <g class="mass" fill="url(#symGrad)">
+              {symbiote.mass.map((d) => <path d={d} />)}
             </g>
 
             <!-- NATIVE CORE — the one fixed device the symbiote rewrites.
@@ -203,9 +213,15 @@ const symbiotes = [
               <rect class="phone-home" x="134" y="276" width="32" height="4" rx="2" />
             </g>
 
-            <!-- SYMBIOTE GRIP — tendrils that wrap OVER the front edges of the device
-                 (filled + animated by JS). Sits in front of the phone, hugging the rim. -->
-            <g class="goo goo-front" filter="url(#goo)" fill="url(#symGrad)"></g>
+            <!-- SYMBIOTE GRIP — limbs that wrap OVER the front edges of the device.
+                 Sits in front of the phone, hugging the rim. -->
+            <g class="grips">
+              {
+                symbiote.grips.map((limb) => (
+                  <path class="limb" d={limb.d} style={limbVars(limb)} />
+                ))
+              }
+            </g>
 
             <!-- wet sheen + the looming head, peeking over the top of the device -->
             <ellipse class="sheen" cx="150" cy="42" rx="16" ry="9" transform="rotate(-24 150 42)" />
@@ -389,19 +405,46 @@ const symbiotes = [
             the same stock Fabric host.
           </p>
         </div>
+        <!--
+          These were three 4.5 MB animated GIFs, all decoding at once. A GIF has no
+          hardware decode path and no way to pause, so the browser holds every frame
+          of all three in memory forever — survivable on a desktop, fatal on a phone.
+          They are H.264 now (~0.6 MB each, hardware-decoded), and `data-src` keeps
+          even that off the wire until the section scrolls into view, at which point
+          only the bonded framework's clip loads.
+        -->
         <div class="demo-grid">
-          <figure data-fw="react" class="is-active">
-            <img src={`${base}/react-demo.gif`} alt="React driving a native SymbioteNative counter demo" />
-            <figcaption><span class="dot" data-fw="react"></span>React · live adapter</figcaption>
-          </figure>
-          <figure data-fw="vue">
-            <img src={`${base}/vue-demo.gif`} alt="Vue 3 driving a native SymbioteNative counter demo" />
-            <figcaption><span class="dot" data-fw="vue"></span>Vue · live adapter</figcaption>
-          </figure>
-          <figure data-fw="angular">
-            <img src={`${base}/angular-demo.gif`} alt="Angular driving a native SymbioteNative counter demo" />
-            <figcaption><span class="dot" data-fw="angular"></span>Angular · live adapter</figcaption>
-          </figure>
+          {
+            [
+              { id: 'react', label: 'React', file: 'react-demo' },
+              { id: 'vue', label: 'Vue', file: 'vue-demo' },
+              { id: 'angular', label: 'Angular', file: 'angular-demo' },
+            ].map((demo) => (
+              <figure data-fw={demo.id} class={demo.id === 'react' ? 'is-active' : undefined}>
+                <video
+                  poster={`${base}/${demo.file}.webp`}
+                  width="260"
+                  height="564"
+                  preload="none"
+                  muted
+                  loop
+                  playsinline
+                  disablepictureinpicture
+                  aria-label={`${demo.label} driving a native SymbioteNative counter demo`}
+                >
+                  {/* H.264 first so Safari lands on the hardware decoder; WebM
+                      catches the Chromium and Firefox builds that ship without
+                      proprietary codecs, which would otherwise sit on the poster. */}
+                  <source data-src={`${base}/${demo.file}.mp4`} type="video/mp4" />
+                  <source data-src={`${base}/${demo.file}.webm`} type="video/webm" />
+                </video>
+                <figcaption>
+                  <span class="dot" data-fw={demo.id} />
+                  {demo.label} · live adapter
+                </figcaption>
+              </figure>
+            ))
+          }
         </div>
       </section>
 
@@ -508,6 +551,41 @@ const symbiotes = [
       const faviconLink = document.querySelector('link[rel="icon"]');
       const reduce = matchMedia('(prefers-reduced-motion: reduce)');
 
+      // Flipped by the observer below once the demo section is actually visible.
+      // Until then no clip is fetched at all, whichever symbiote is bonded.
+      let demoVisible = false;
+
+      // Exactly one clip decodes at a time: the bonded one. The rest stay paused
+      // on their poster frame, so switching symbiote costs one small download and
+      // never leaves a second decoder running in the background.
+      function syncDemos(id) {
+        figures.forEach((figure) => {
+          const video = figure.querySelector('video');
+          if (!video) return;
+
+          if (figure.dataset.fw !== id) {
+            video.pause();
+            return;
+          }
+          if (!demoVisible) return;
+
+          // `data-src` on each <source> is what keeps the clip off the wire; the
+          // browser only starts picking a source once they carry a real src.
+          const sources = video.querySelectorAll('source[data-src]');
+          if (sources.length) {
+            sources.forEach((s) => {
+              s.src = s.dataset.src;
+              s.removeAttribute('data-src');
+            });
+            video.load();
+          }
+          // Autoplay is allowed for muted+playsinline, but a rejected promise
+          // (low power mode, data saver) must not surface as an unhandled error.
+          const played = video.play();
+          if (played) played.catch(() => {});
+        });
+      }
+
       function apply(id) {
         if (!LIVE_SYMBIOTES.includes(id)) id = 'react';
         root.dataset.symbiote = id;
@@ -519,6 +597,20 @@ const symbiotes = [
         );
         statusRows.forEach((r) => r.classList.toggle('is-active', r.dataset.fw === id));
         figures.forEach((f) => f.classList.toggle('is-active', f.dataset.fw === id));
+        syncDemos(id);
+      }
+
+      const demoSection = document.querySelector('.demo-grid');
+      if (demoSection && 'IntersectionObserver' in window) {
+        new IntersectionObserver(
+          ([entry]) => {
+            demoVisible = entry.isIntersecting;
+            syncDemos(root.dataset.symbiote);
+          },
+          { rootMargin: '200px' },
+        ).observe(demoSection);
+      } else {
+        demoVisible = true;
       }
 
       // the on-device app looks alive — bonds tick up like a running native counter
@@ -528,6 +620,12 @@ const symbiotes = [
           screenNum.textContent = String((bonds += 1));
         }, 1500);
       }
+
+      // The ripple's fixed 100px base size is what makes it cheap: animating
+      // width/height would re-run layout and paint on every frame of the wave,
+      // which is exactly the kind of tap-time jank a phone can't absorb. Scale
+      // and opacity both run on the compositor instead.
+      const WAVE_BASE = 100;
 
       function wave(x, y, color) {
         if (reduce.matches) return;
@@ -543,8 +641,11 @@ const symbiotes = [
         );
         const anim = w.animate(
           [
-            { width: '0px', height: '0px', opacity: 0.45 },
-            { width: max * 2 + 'px', height: max * 2 + 'px', opacity: 0 },
+            { transform: 'translate(-50%, -50%) scale(0)', opacity: 0.45 },
+            {
+              transform: 'translate(-50%, -50%) scale(' + (max * 2) / WAVE_BASE + ')',
+              opacity: 0,
+            },
           ],
           { duration: 640, easing: 'cubic-bezier(.22,.61,.36,1)' },
         );
@@ -575,178 +676,5 @@ const symbiotes = [
       apply(root.dataset.symbiote || 'react');
     </script>
 
-    <!-- live symbiote: a churning goo mass driven every frame, fused by #goo -->
-    <script is:inline>
-      (function () {
-        const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
-        const svg = document.querySelector('.symbiote');
-        if (!svg) return;
-        const goo = svg.querySelector('.goo-back');
-        const grip = svg.querySelector('.goo-front');
-        const face = svg.querySelector('.face');
-        const NS = 'http://www.w3.org/2000/svg';
-        const CX = 100;
-        const CY = 120;
-        const rand = (a, b) => a + Math.random() * (b - a);
-
-        function tendrilPath() {
-          const p = document.createElementNS(NS, 'path');
-          goo.insertBefore(p, goo.firstChild); // behind the body lumps
-          return p;
-        }
-
-        // wandering body lumps (already in the markup)
-        const core = Array.from(goo.querySelectorAll('.core')).map((el) => ({
-          el,
-          ox: +el.getAttribute('cx') - CX,
-          oy: +el.getAttribute('cy') - CY,
-          ax: rand(3, 9),
-          ay: rand(3, 9),
-          s: rand(0.5, 0.95),
-          p: rand(0, 6.28),
-        }));
-
-        // tendrils — each is ONE tapering path rooted in the body, so it stays
-        // a connected limb (never a string of bubbles) while it reaches and curls
-        const TENDRILS = 13;
-        const tendrils = [];
-        for (let i = 0; i < TENDRILS; i++) {
-          // interleave long primary limbs with shorter secondary ones → a dense, writhing crown
-          const primary = i % 2 === 0;
-          tendrils.push({
-            el: tendrilPath(),
-            ang: (i / TENDRILS) * Math.PI * 2 + rand(-0.26, 0.26),
-            root: rand(26, 36),
-            len: primary ? rand(92, 132) : rand(46, 82),
-            amp: primary ? rand(18, 32) : rand(10, 20),
-            width: primary ? rand(18, 27) : rand(10, 17),
-            curl: rand(0.3, 0.7),
-            sweep: rand(0.18, 0.42),
-            wob: rand(0.5, 1.2),
-            speed: rand(0.5, 1.05),
-            phase: rand(0, 6.28),
-          });
-        }
-
-        // grip tendrils — rooted on the body's visible side FLANKS (so they read as one
-        // continuous limb, not a floating leaf) and curling over the front corners (global coords)
-        const grips = [
-          { el: document.createElementNS(NS, 'path'), bx: 102, by: 152, tx: 134, ty: 118, width: 42, speed: 0.7, phase: 0.4 },
-          { el: document.createElementNS(NS, 'path'), bx: 198, by: 152, tx: 166, ty: 118, width: 44, speed: 0.64, phase: 2.3 },
-        ];
-        grips.forEach((g) => grip.appendChild(g.el));
-
-        // how agitated each symbiote is — its personality in motion
-        const MOOD = { react: 0.72, vue: 0.6, svelte: 1.3, solid: 0.66, angular: 1.35 };
-
-        // Safari's feGaussianBlur re-rasterizes the whole #goo filter region on every
-        // geometry change underneath it (unlike Chrome/Firefox, which are cheap here —
-        // see webkit bug 283156). requestAnimationFrame keeps running at 60fps even
-        // while this section is scrolled out of view or the page is mid-scroll, so we
-        // gate the expensive part: only touch the goo geometry when the creature is
-        // actually on screen, not mid-scroll, and at most ~30 times a second.
-        let onScreen = true;
-        new IntersectionObserver(([entry]) => (onScreen = entry.isIntersecting), {
-          threshold: 0,
-        }).observe(svg);
-
-        let scrolling = false;
-        let scrollEndTimer;
-        addEventListener(
-          'scroll',
-          () => {
-            scrolling = true;
-            clearTimeout(scrollEndTimer);
-            scrollEndTimer = setTimeout(() => (scrolling = false), 150);
-          },
-          { passive: true },
-        );
-
-        const STEP = 1 / 30;
-        let t = 0;
-        let last = 0;
-        let acc = 0;
-        function frame(now) {
-          const dtReal = last ? Math.min((now - last) / 1000, 0.05) : 0.016;
-          last = now;
-
-          if (onScreen && !scrolling) {
-            acc += dtReal;
-          }
-          if (acc >= STEP) {
-            const mood = MOOD[document.documentElement.dataset.symbiote] || 0.8;
-            t += acc * mood;
-            acc = 0;
-            update(t, mood);
-          }
-
-          if (!reduceMotion.matches) requestAnimationFrame(frame);
-        }
-
-        function update(t, mood) {
-          let fx = 0;
-          let fy = 0;
-          core.forEach((n) => {
-            const x = CX + n.ox + Math.cos(t * n.s + n.p) * n.ax;
-            const y = CY + n.oy + Math.sin(t * n.s * 1.3 + n.p) * n.ay;
-            n.el.setAttribute('cx', x.toFixed(1));
-            n.el.setAttribute('cy', y.toFixed(1));
-            fx += x - (CX + n.ox);
-            fy += y - (CY + n.oy);
-          });
-          // the face rides the churning mass
-          face.setAttribute(
-            'transform',
-            'translate(' + (fx / core.length).toFixed(2) + ' ' + (fy / core.length).toFixed(2) + ')',
-          );
-
-          tendrils.forEach((td) => {
-            const L = td.len + td.amp * Math.sin(t * td.speed + td.phase);
-            const ang = td.ang + Math.sin(t * td.wob + td.phase) * td.sweep * (0.6 + mood);
-            // base sits inside the body so the limb fuses to the mass; tip tapers to a point
-            const bx = CX + Math.cos(td.ang) * td.root;
-            const by = CY + Math.sin(td.ang) * td.root;
-            const tx = CX + Math.cos(ang) * L;
-            const ty = CY + Math.sin(ang) * L;
-            // perpendicular to the root direction gives the limb its width
-            const px = -Math.sin(td.ang);
-            const py = Math.cos(td.ang);
-            const hw = td.width / 2;
-            // a curling control point bends the limb mid-way
-            const bend = L * td.curl * Math.sin(t * td.speed * 1.3 + td.phase);
-            const mAng = (td.ang + ang) / 2;
-            const mx = (bx + tx) / 2 + Math.cos(mAng + Math.PI / 2) * bend;
-            const my = (by + ty) / 2 + Math.sin(mAng + Math.PI / 2) * bend;
-            td.el.setAttribute(
-              'd',
-              'M' + (bx + px * hw).toFixed(1) + ',' + (by + py * hw).toFixed(1) +
-                ' Q' + mx.toFixed(1) + ',' + my.toFixed(1) + ' ' + tx.toFixed(1) + ',' + ty.toFixed(1) +
-                ' Q' + mx.toFixed(1) + ',' + my.toFixed(1) + ' ' + (bx - px * hw).toFixed(1) + ',' + (by - py * hw).toFixed(1) +
-                ' Z',
-            );
-          });
-
-          // grip tendrils clamp over the device's front corners. Base is a WIDE vertical
-          // root sitting on the visible flank (fuses to the body); it tapers to a curling claw.
-          grips.forEach((g) => {
-            const sway = Math.sin(t * g.speed + g.phase);
-            const tx = g.tx + sway * 9; // claw tip wanders
-            const ty = g.ty + Math.cos(t * g.speed * 0.9 + g.phase) * 6;
-            const hw = g.width / 2;
-            // bow the limb upward so it reads as a finger curling over the shoulder
-            const mx = (g.bx + tx) / 2 + sway * 10;
-            const my = (g.by + ty) / 2 - 16;
-            g.el.setAttribute(
-              'd',
-              'M' + g.bx.toFixed(1) + ',' + (g.by - hw).toFixed(1) +
-                ' Q' + mx.toFixed(1) + ',' + my.toFixed(1) + ' ' + tx.toFixed(1) + ',' + ty.toFixed(1) +
-                ' Q' + mx.toFixed(1) + ',' + my.toFixed(1) + ' ' + g.bx.toFixed(1) + ',' + (g.by + hw).toFixed(1) +
-                ' Z',
-            );
-          });
-        }
-        requestAnimationFrame(frame);
-      })();
-    </script>
   </body>
 </html>
