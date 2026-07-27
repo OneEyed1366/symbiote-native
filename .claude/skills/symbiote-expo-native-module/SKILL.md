@@ -136,11 +136,18 @@ Required, once per native host app (not per wrapped package):
 | `ios/*/AppDelegate.swift` | minimal Expo bootstrap hook |
 | `android/.../MainApplication.kt` | minimal Expo bootstrap hook |
 
-Per this repo's convention, wire this into `.examples/<app>` only, never the public
-`examples/<app>` — see `symbiote-dev-examples`. Once wired once at the app level, any *future*
-expo-modules-core-based package is auto-discovered with zero further app changes — unlike the
-per-package `react-native.config.cjs`/podspec proxy the native-view skill requires for every
-new RN-CLI-autolinked wrapper.
+Per this repo's stated convention, wire this into `.examples/<app>` only, never the public
+`examples/<app>` — see `symbiote-dev-examples`. **Correction (2026-07-27, verified by reading
+both trees directly): the accelerometer bring-up documented below actually landed in the public
+`examples/react` (undotted), not `.examples/react`.** `.examples/react` currently exists only as
+a bare, unwired RN scaffold (no `use_expo_modules!`, no Gradle fallback, doesn't even depend on
+`@symbiote-native/sensors`) — every `.examples/react` path in the narrative below describes
+where the work *should* live per convention, not where it *does* live on disk today. Before
+repeating any step below, `grep -n -i expo` the Podfile of whichever tree you intend to use to
+confirm which one actually has the wiring — don't assume the convention held. Once wired once at
+the app level, any *future* expo-modules-core-based package is auto-discovered with zero further
+app changes — unlike the per-package `react-native.config.cjs`/podspec proxy the native-view
+skill requires for every new RN-CLI-autolinked wrapper.
 
 **iOS — done and verified end-to-end (2026-07, accelerometer pilot).** Three separate hard
 requirements surfaced that the original plan didn't anticipate; all three are reproduced
@@ -610,6 +617,25 @@ unpatched native module — no `pnpm patch`, no native fork. It renders both `in
   `expo-sensors` or in this project's wrapper. A consumer that wants to display it defensively
   can check `Number.isNaN(...)`; there is nothing to fix natively.
 
+### Android emulator quirk — LocalAuthentication `not_enrolled` is device state, not a permission bug
+
+`authenticateAsync()` failing with `Failed: not_enrolled (KeyguardManager#isDeviceSecure()
+returned false)` on Android looks like a missing-permission bug (it reads like an
+authorization failure) but isn't one. Verified by reading the actual upstream source
+(`expo-local-authentication`'s `LocalAuthenticationModule.kt`): `authenticateAsync` checks
+`keyguardManager.isDeviceSecure` — a pure `KeyguardManager` device-state query, no permission
+involved — before ever touching `BiometricPrompt`, and resolves this exact error+warning pair
+if it's `false`. `USE_BIOMETRIC`/`USE_FINGERPRINT` are normal (non-dangerous) manifest
+permissions merged in automatically from the library's own `AndroidManifest.xml` at build
+time; grepping the whole module confirms zero `requestPermissions` calls anywhere in this
+code path — there is no runtime permission request to be missing.
+
+The actual cause: the emulator/device has no secure lock screen configured at all — no PIN,
+pattern, password, or enrolled fingerprint in Android Settings. Fix is entirely
+device-side, not code: Settings → Security → Screen lock → set a PIN/pattern (and, for an
+AVD, Extended Controls → Fingerprint → enroll one to test the biometric path specifically).
+Same shape as the iOS-Simulator quirks below — hardware/OS state masquerading as an app bug.
+
 ## Still-open execution checklist (nothing below has shipped yet)
 
 1. `packages/sensors/package.json` + `tsconfig.json`; add to root `tsconfig.json` references
@@ -630,6 +656,10 @@ unpatched native module — no `pnpm patch`, no native fork. It renders both `in
 
 ## References
 
+- `symbiote-new-package-skeleton` — read FIRST if the package doesn't exist yet at all: resolves
+  whether a brand-new package should start as a bare-skeleton (reserve-the-npm-name only, no
+  functional code — see `packages/local-auth`), core-only, or the full parity this skill
+  otherwise assumes.
 - `symbiote-third-party-native-view` — the native-VIEW sibling skill; read it first if the
   package you're wrapping has a `codegenNativeComponent`. The `.rn-<lib>` vendoring recipe and
   the CocoaPods symlink-glob gotcha it documents do **not** apply to expo-modules-core-based

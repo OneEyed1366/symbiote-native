@@ -355,6 +355,9 @@ forwards a native ref via `forwardRef` → the host node.
 
 ## References
 
+- `symbiote-new-package-skeleton` — read FIRST if the package doesn't exist yet at all: resolves
+  whether a brand-new package should start as a bare-skeleton (reserve-the-npm-name only, no
+  functional code), core-only, or the full parity this skill otherwise assumes.
 - `packages/slider/**` — the reference implementation (core + vue + react + register + native
   proxy config/podspec + tests).
 - `.docs/decisions/0027-third-party-native-view-wrapper-package.md` — the decision + autolinking

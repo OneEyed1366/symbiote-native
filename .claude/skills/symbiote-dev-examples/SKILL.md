@@ -1,6 +1,13 @@
 ---
 name: symbiote-dev-examples
-description: "Symbiote examples/ vs .examples/ split — read BEFORE wiring up, smoke-testing, or demoing ANY new component/adapter/package/third-party wrapper in an example app, or before editing any example app's package.json dependency versions, metro.config.js, or react-native.config.js. `examples/{react,vue-sfc,vue-tsx,angular}` are PUBLIC canary apps and, since 2026-07-14, are OUTSIDE the pnpm workspace entirely (removed from pnpm-workspace.yaml's `packages:`) — a standalone npm-installable tree with NO `catalog:`/`workspace:*` specifiers (those only resolve inside a pnpm workspace); every dependency is a literal version, and every `@symbiote-native/*` is a pkg.pr.new canary URL until each package has a real npm release. Install with plain `npm install` INSIDE the example directory, never `pnpm install` from repo root; run its scripts with plain `npm run` too. `.examples/{react,vue-sfc,vue-tsx,angular}` (dot-prefixed, gitignored) is UNCHANGED — the ONLY place package/feature/adapter development happens, still inside the pnpm workspace on `workspace:*` for live local-source edits — same split applies to running scripts, not just install: `pnpm --filter <app-name> run <script>`, never bare `npm run`. Covers WHY examples/* left the workspace (pnpm 10.26+'s `blockExoticSubdeps` blocks any transitive URL/git subdependency in a shared pnpm lockfile — a pkg.pr.new preview's own internal @symbiote-native/* cross-deps are URL-based, so a pkg.pr.new dependency anywhere in examples/* poisoned .examples/*'s install too via the single shared lockfile), the metro.config.js/react-native.config.js implications (no more watchFolders/extraNodeModules reaching into monorepo source — @symbiote-native/* resolve from the app's own node_modules like a real consumer; react-native.config.js's manual @symbiote-native/android monorepo-path link is gone now that android is a real npm dep), and the diagnostic for confirming an app's actual dependency source. Trigger on 'add a new example app', 'where do I test/demo this component', 'workspace vs catalog in examples', 'is this app on published or local deps', 'pkg.pr.new canary testing', 'blockExoticSubdeps', or any symbiote-add-component/symbiote-new-adapter/symbiote-third-party-native-view task's verify step."
+description: "Symbiote examples/ vs .examples/ split — read BEFORE wiring up, smoke-testing, or demoing ANY new component/adapter/package/third-party wrapper in an example app, or before editing any example app's package.json dependency versions, metro.config.js, or react-native.config.js. `examples/{react,vue-sfc,vue-tsx,angular}` are PUBLIC canary apps and, since 2026-07-14, are OUTSIDE the pnpm workspace entirely (removed from pnpm-workspace.yaml's `packages:`) — a standalone npm-installable tree with NO `catalog:`/`workspace:*` specifiers (those only resolve inside a pnpm workspace); every dependency is a literal version, and every `@symbiote-native/*` is a pkg.pr.new canary URL until each package has a real npm release. Install with plain `npm install` INSIDE the example directory, never `pnpm install` from repo root; run its scripts with plain `npm run` too. `.examples/{react,vue-sfc,vue-tsx,angular}` (dot-prefixed, gitignored) is UNCHANGED — the ONLY place package/feature/adapter development happens, still inside the pnpm workspace on `workspace:*` for live local-source edits — same split applies to running scripts, not just install: `pnpm --filter <app-name> run <script>`, never bare `npm run`. Covers WHY examples/* left the workspace (pnpm 10.26+'s `blockExoticSubdeps` blocks any transitive URL/git subdependency in a shared pnpm lockfile — a pkg.pr.new preview's own internal @symbiote-native/* cross-deps are URL-based, so a pkg.pr.new dependency anywhere in examples/* poisoned .examples/*'s install too via the single shared lockfile), the metro.config.js/react-native.config.js implications (no more watchFolders/extraNodeModules reaching into monorepo source — @symbiote-native/* resolve from the app's own node_modules like a real consumer; react-native.config.js's manual @symbiote-native/android monorepo-path link is gone now that android is a real npm dep), and the diagnostic for confirming an app's actual dependency source. Also covers testing a brand-new, never-published `@symbiote-native/*` package in `examples/*` via a
+local `pnpm pack` tarball (never `npm pack` — it skips the `publishConfig` swap and leaves
+`workspace:*` in `peerDependencies`, which crashes a standalone `npm install` with
+EUNSUPPORTEDPROTOCOL) as a zero-network alternative to a pkg.pr.new canary. Trigger on 'add a new
+example app', 'where do I test/demo this component', 'workspace vs catalog in examples', 'is this
+app on published or local deps', 'pkg.pr.new canary testing', 'blockExoticSubdeps', 'build and
+install this package locally', 'test an unpublished package in examples', 'pnpm pack vs npm pack',
+or any symbiote-add-component/symbiote-new-adapter/symbiote-third-party-native-view task's verify step."
 ---
 
 # Symbiote examples/ vs .examples/ — public canary vs dev harness
@@ -253,7 +260,48 @@ resolve `@symbiote-native/angular`. Fixed the same way — add `@symbiote-native
 `examples/angular` with plain `npm install` inside the dir, and confirm the build carries the change (e.g.
 `grep reduceSticky node_modules/@symbiote-native/components/build/index.js`). Canary URLs in
 `examples/*/package.json` are TEMPORARY test state — do not commit them; the tracked form is a literal
-published version (see `symbiote-release-publishing`).
+published version (see `symbiote-release-publishing`). If the package has no pkg.pr.new build at all yet
+(brand new, never published), §5c-bis's local `pnpm pack` tarball is the zero-network alternative.
+
+## 5c-bis. Local `pnpm pack` tarball — a zero-network alternative to pkg.pr.new for testing an UNPUBLISHED package in `examples/*` (found 2026-07-27)
+
+§5c's pkg.pr.new canary is one way to get an unpublished/pre-release `@symbiote-native/*` package
+into a standalone `examples/*` app. When you want to test RIGHT NOW, locally, with zero network/
+publish action at all (nothing pushed to pkg.pr.new or any third party), pack and install a real
+tarball instead:
+
+1. Build the package for real: `npx tsc --build packages/<pkg>` (emits `build/{core,react,vue,...}`
+   per its own `typecheck` script), then `npm run ng:build` inside the package if it has an Angular
+   entry point (emits `build-ngc/angular`).
+2. **`pnpm pack` inside the package dir — never `npm pack`.** Verified by running both and diffing
+   the tarball's `package.json`: `npm pack` does NOT apply `publishConfig` at all (the packed
+   `main`/`exports` still point at raw `src/*.ts`) AND leaves literal `workspace:*` in
+   `peerDependencies` — installing that tarball with plain `npm install <tarball>` in a standalone
+   app then hard-fails with `npm error code EUNSUPPORTEDPROTOCOL — Unsupported URL Type
+   "workspace:": workspace:*` (npm doesn't understand the `workspace:` protocol even inside
+   `peerDependencies`, which are only parsed/validated, never installed). `pnpm pack` DOES apply
+   `publishConfig` (swaps to the built `./build/...` paths — the real "what would actually get
+   published" shape) AND rewrites every `workspace:*`/`workspace:^`/`workspace:~` peerDependency to
+   that sibling's actual current real published version (e.g. → `"0.2.8"` for
+   `@symbiote-native/react`) — a genuine pnpm-only publish-time feature `npm pack`/`npm publish`
+   doesn't have.
+3. Install the resulting tarball with a real relative-path install:
+   `npm install ../../packages/<pkg>/<pkg-tarball-name>.tgz` inside the target `examples/<app>` —
+   not a `file:` link to the raw source directory; the tarball is what actually exercises the
+   built/publishConfig-swapped shape, closer to a real consumer than a bare source link.
+4. Verify with `npx tsc --noEmit` in the app. If a native module is involved, confirm autolinking
+   still discovers it even though it lands NESTED (not hoisted) inside the scoped package's own
+   `node_modules/@symbiote-native/<pkg>/node_modules/<native-dep>/` — e.g.
+   `node ./node_modules/expo-modules-autolinking/bin/expo-modules-autolinking.js resolve --platform ios --json`
+   confirmed the resolver does its own deep filesystem walk regardless of hoisting depth; a
+   non-hoisted nested native dep is not a problem for this workflow.
+5. `*.tgz` is in the root `.gitignore` — a pack tarball is always a local build artifact.
+
+**This is a TEMPORARY dev-testing wiring, not a final state.** The app's `package.json` will show
+`"@symbiote-native/<pkg>": "file:../../packages/<pkg>/<tarball>.tgz"` instead of the literal npm
+version every other dependency in that file uses — swap it to a real npm version (or a pkg.pr.new
+canary, §5c) once the package actually ships a real release. Don't let it look like a normal,
+permanent dependency entry.
 
 ## 5d. `pod install` "path name contains null byte" — a stale-install artifact, cure with a clean reinstall (found 2026-07-16)
 
