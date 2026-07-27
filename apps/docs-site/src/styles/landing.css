@@ -333,13 +333,14 @@ h1 {
   }
 }
 
-.grips {
-  /* grip limbs render past the body gradient's range, so they'd clamp to a darker
-     tone and seam against the brighter flank. Pin them to the body's mid-gradient
-     colour (~the tone the flank shows where they root) so the join is invisible. */
-  fill: color-mix(in srgb, var(--accent) 64%, var(--accent-2));
-  transition: fill var(--bond-ms) ease;
-}
+/*
+  The grips take the body's own gradient, NOT a flat mid-tone. The flat fill is a
+  leftover from when they were a separately filtered group whose gradient would
+  have clamped; in one shared coordinate space they can reference the real thing,
+  and anything else puts a visible colour step exactly where they leave the body.
+  Fill lives in the markup (`fill="url(#symGrad)"`) for the same reason it does on
+  the mass — one paint source for the whole creature.
+*/
 
 /* the face rides the churning mass — this used to be a per-frame JS translate
    derived from the lump positions, now it just drifts on its own */
