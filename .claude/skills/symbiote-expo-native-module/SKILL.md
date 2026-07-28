@@ -447,6 +447,51 @@ device. Any demo/smoke screen for a sensor should render the availability check 
 state, not conflate it with "no reading yet" (see `frontend-ux-best-practices`'s "render every
 async state" rule) — otherwise a real bug and this simulator limitation look identical.
 
+## 7. `settings.gradle` allow-list → exclude-list — the pattern that scales past 2 packages
+
+§4's Android recipe (filter the `expo-modules-autolinking resolve` JSON to "exactly
+`expo-modules-core` + `expo-sensors`") was written for the two-package pilot and is an
+ALLOW-list — every future package needs a new name added to that filter by hand. Confirmed
+this doesn't scale past a handful of packages (2026-07-28, adding `expo-haptics`/
+`expo-clipboard`/`expo-battery` to all four `examples/expo-*` canaries — the public,
+tarball-installed app family, not `.examples/react`): the allow-list fix alone left the new
+packages silently unlinked (project simply not included), a different symptom from the
+runtime "Cannot find native module" error below but with the same root cause — a filter that
+must be told about every new package by name.
+
+**Superseded pattern:** flip the filter to an EXCLUDE-list of the known phantom npm-peer
+packages, mirroring the iOS Podfile's own `use_expo_modules!(exclude: [...])` (§`Accepted side
+effect` above) instead of allow-listing the packages you actually want:
+
+```groovy
+def unwantedExpoModules = [
+  "expo", "expo-asset", "expo-constants", "expo-file-system",
+  "expo-font", "expo-keep-awake", "@expo/dom-webview", "@expo/log-box",
+]
+def wantedExpoModules = resolvedExpoModules.modules
+  .findAll { !unwantedExpoModules.contains(it.packageName) }
+```
+
+A genuinely new expo-modules-core package (real native code, not a phantom `auto-install-
+peers` peer) is then auto-discovered by `settings.gradle` with **zero further edits to this
+file** — verified by simulating the filter against real `resolve --platform android --json`
+output and confirming it yields exactly the wanted 6-package set with no manual per-package
+entry. Use the exclude-list form for any app with 2+ expo-modules-core packages already wired;
+the allow-list form in §4 is fine only for a from-scratch single/two-package pilot.
+
+**This does NOT remove the other two registration points** — `app/build.gradle`'s
+`implementation project(':expo-<pkg>')` and `MainApplication.kt`'s hand-maintained
+`ExpoModulesProvider` map (§4's `SensorsModulesProvider` under its later, more generic name)
+still need one new line each per package, exactly as documented above; `settings.gradle`'s
+job is only "is this Gradle subproject included at all," a necessary but insufficient
+condition for either compiling against it or resolving it at runtime. Confirmed by hitting
+both remaining gaps for real while adding these three packages: skipping the `app/build.gradle`
+entry fails `:app:compileDebugKotlin` with `Unresolved reference '<pkg>'`; skipping the
+`MainApplication.kt` map entry compiles and installs fine but crashes at first use with
+`Cannot find native module '<Name>'` — the exact symptom in the paragraph above, reproduced
+identically for a second, unrelated set of packages, confirming it's a general property of
+this Android wiring shape and not an accelerometer-specific quirk.
+
 ## 7. Package shape — mirrors `splash-screen`, not `slider`
 
 Both `splash-screen` and an Expo-native-module wrapper are non-view wrappers; `slider` is a
