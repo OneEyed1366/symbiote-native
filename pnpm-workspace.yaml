@@ -46,6 +46,9 @@ minimumReleaseAgeExclude:
   - expo-sensors@57.0.2
   - expo-modules-autolinking@57.0.8
   - expo-local-authentication@57.0.2
+  - expo-haptics@57.0.1
+  - expo-clipboard@57.0.1
+  - expo-battery@57.0.1
 
 # Single source of truth for dependency versions (pnpm catalogs).
 # A package references a version with `catalog:` (default) or `catalog:<name>`
@@ -179,6 +182,14 @@ catalog:
   # own core). Version verified against .vendors/expo at origin/sdk-57 — matches the version
   # already published to npm (57.0.2), same expo-modules-core 57.0.5 peer/runtime as sensors.
   expo-local-authentication: 57.0.2
+  # Same exact-pin reasoning again: packages/haptics, packages/clipboard, packages/battery each
+  # depend on their matching expo-* package ONLY for its native ios/android folders (JS
+  # hand-ported into our own core). Versions are the real npm-published `latest` as of 2026-07-28
+  # (registry.npmjs.org, not a guess from the .vendors/expo snapshot, which is pinned to an older
+  # 55.0.8 for these three specific packages) — same expo-modules-core 57.0.5 peer/runtime line.
+  expo-haptics: 57.0.1
+  expo-clipboard: 57.0.1
+  expo-battery: 57.0.1
   # Autolinking CLI only (never resolved via the `expo` package) — each native host app needs
   # it as a direct devDependency so its Podfile/settings.gradle can `require.resolve` it; see
   # apps/docs-site's expo-native-module-setup howto. Version verified against .vendors/expo at

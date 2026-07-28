@@ -84,6 +84,15 @@ catalogs:
     eslint-plugin-react-hooks:
       specifier: ^7.1.1
       version: 7.1.1
+    expo-battery:
+      specifier: 57.0.1
+      version: 57.0.1
+    expo-clipboard:
+      specifier: 57.0.1
+      version: 57.0.1
+    expo-haptics:
+      specifier: 57.0.1
+      version: 57.0.1
     expo-local-authentication:
       specifier: 57.0.2
       version: 57.0.2
@@ -386,6 +395,171 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
+
+  packages/battery:
+    dependencies:
+      expo-battery:
+        specifier: 'catalog:'
+        version: 57.0.1(expo@57.0.4)(react@19.2.3)
+      expo-modules-core:
+        specifier: 'catalog:'
+        version: 57.0.5(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
+      react-native:
+        specifier: '>=0.86'
+        version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
+      vue:
+        specifier: '>=3.5.0'
+        version: 3.5.39(typescript@6.0.3)
+    devDependencies:
+      '@angular/compiler':
+        specifier: 'catalog:'
+        version: 22.0.5
+      '@angular/compiler-cli':
+        specifier: 'catalog:'
+        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+      '@angular/core':
+        specifier: 'catalog:'
+        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+      '@symbiote-native/angular':
+        specifier: workspace:*
+        version: link:../../adapters/angular
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
+      '@symbiote-native/react':
+        specifier: workspace:*
+        version: link:../../adapters/react
+      '@symbiote-native/test-utils':
+        specifier: workspace:*
+        version: link:../../core/test-utils
+      '@symbiote-native/vue':
+        specifier: workspace:*
+        version: link:../../adapters/vue
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.1.0
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.17
+      '@vue/runtime-core':
+        specifier: 'catalog:'
+        version: 3.5.39
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/clipboard:
+    dependencies:
+      expo-clipboard:
+        specifier: 'catalog:'
+        version: 57.0.1(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
+      expo-modules-core:
+        specifier: 'catalog:'
+        version: 57.0.5(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
+      react-native:
+        specifier: '>=0.86'
+        version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
+      vue:
+        specifier: '>=3.5.0'
+        version: 3.5.39(typescript@6.0.3)
+    devDependencies:
+      '@angular/compiler':
+        specifier: 'catalog:'
+        version: 22.0.5
+      '@angular/compiler-cli':
+        specifier: 'catalog:'
+        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+      '@angular/core':
+        specifier: 'catalog:'
+        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+      '@symbiote-native/angular':
+        specifier: workspace:*
+        version: link:../../adapters/angular
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
+      '@symbiote-native/react':
+        specifier: workspace:*
+        version: link:../../adapters/react
+      '@symbiote-native/test-utils':
+        specifier: workspace:*
+        version: link:../../core/test-utils
+      '@symbiote-native/vue':
+        specifier: workspace:*
+        version: link:../../adapters/vue
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.1.0
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.17
+      '@vue/runtime-core':
+        specifier: 'catalog:'
+        version: 3.5.39
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/haptics:
+    dependencies:
+      expo-haptics:
+        specifier: 'catalog:'
+        version: 57.0.1(expo@57.0.4)
+      expo-modules-core:
+        specifier: 'catalog:'
+        version: 57.0.5(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
+      react-native:
+        specifier: '>=0.86'
+        version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
+      vue:
+        specifier: '>=3.5.0'
+        version: 3.5.39(typescript@6.0.3)
+    devDependencies:
+      '@angular/compiler':
+        specifier: 'catalog:'
+        version: 22.0.5
+      '@angular/compiler-cli':
+        specifier: 'catalog:'
+        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+      '@angular/core':
+        specifier: 'catalog:'
+        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+      '@symbiote-native/angular':
+        specifier: workspace:*
+        version: link:../../adapters/angular
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
+      '@symbiote-native/react':
+        specifier: workspace:*
+        version: link:../../adapters/react
+      '@symbiote-native/test-utils':
+        specifier: workspace:*
+        version: link:../../core/test-utils
+      '@symbiote-native/vue':
+        specifier: workspace:*
+        version: link:../../adapters/vue
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.1.0
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.17
+      '@vue/runtime-core':
+        specifier: 'catalog:'
+        version: 3.5.39
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   packages/local-auth:
     dependencies:
@@ -3541,6 +3715,19 @@ packages:
       react: 19.2.3
       react-native: '*'
 
+  expo-battery@57.0.1:
+    resolution: {integrity: sha512-Q8WE1JedCs7XMFGLzShdtnGKC4ETjoV13DWXgN0lyWgicmIXOYN9+VlKm2g/lYzMObMP/r+psbPdnnOJhljZ/A==}
+    peerDependencies:
+      expo: '*'
+      react: 19.2.3
+
+  expo-clipboard@57.0.1:
+    resolution: {integrity: sha512-HWICri4+1ao7S6QEfcorxVumXDiDnx1guGGewjZgGJWLGxFYs0RgH8ujBs+lkTzBkMmlwADaWSlaesR+nDJt5Q==}
+    peerDependencies:
+      expo: '*'
+      react: 19.2.3
+      react-native: '*'
+
   expo-constants@57.0.3:
     resolution: {integrity: sha512-BghbZlzwFnA22BG0CWv6W29zx8w19FozYPfSeZ3HjMitoy4aAmF1FnFbbjYSmZz6HHXXTWOfqwobOEIaglfzxg==}
     peerDependencies:
@@ -3559,6 +3746,11 @@ packages:
       expo: '*'
       react: 19.2.3
       react-native: '*'
+
+  expo-haptics@57.0.1:
+    resolution: {integrity: sha512-8VhbnxlIrfXjP0syZr1JT197nafYicQu9119adOJnX62osU9Cw+PdDnAx/6LxuKJRzQdwxOMq7b7eWjhNL5zAQ==}
+    peerDependencies:
+      expo: '*'
 
   expo-keep-awake@57.0.0:
     resolution: {integrity: sha512-WqEoyDNSmUeAI9Gu7UaWKDjOhfaV+jGcms7N0hh/EAr7sqJrI2s0HpLSC3P9cWfXFUZCL1zZjd22m/NbsJYCKg==}
@@ -9957,6 +10149,17 @@ snapshots:
       - supports-color
       - typescript
 
+  expo-battery@57.0.1(expo@57.0.4)(react@19.2.3):
+    dependencies:
+      expo: 57.0.4(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
+      react: 19.2.3
+
+  expo-clipboard@57.0.1(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3):
+    dependencies:
+      expo: 57.0.4(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
+      react: 19.2.3
+      react-native: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
+
   expo-constants@57.0.3(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)):
     dependencies:
       '@expo/env': 2.4.1
@@ -9976,6 +10179,10 @@ snapshots:
       fontfaceobserver: 2.3.0
       react: 19.2.3
       react-native: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
+
+  expo-haptics@57.0.1(expo@57.0.4):
+    dependencies:
+      expo: 57.0.4(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
 
   expo-keep-awake@57.0.0(expo@57.0.4)(react@19.2.3):
     dependencies:

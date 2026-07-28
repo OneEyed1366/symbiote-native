@@ -12,6 +12,9 @@
     { "path": "packages/splash-screen" },
     { "path": "packages/navigation" },
     { "path": "packages/sensors" },
-    { "path": "packages/local-auth" }
+    { "path": "packages/local-auth" },
+    { "path": "packages/haptics" },
+    { "path": "packages/clipboard" },
+    { "path": "packages/battery" }
   ]
 }
