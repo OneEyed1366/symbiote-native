@@ -1,0 +1,256 @@
+---
+title: Haptics
+description: expo-haptics wrapped for every SymbioteNative adapter — impact, notification, and selection feedback via iOS's Taptic Engine and Android's Vibrator API.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/haptics` wraps
+[`expo-haptics`](https://github.com/expo/expo/tree/main/packages/expo-haptics) —
+`impactAsync`, `notificationAsync`, `selectionAsync`, and `performAndroidHapticsAsync` — so every
+SymbioteNative adapter can trigger vibration feedback. Like [local auth](/docs/packages/local-auth/),
+it's built on `expo-modules-core`; every function here is a fire-and-forget async call with no
+per-instance state or event stream, so there's even less adapter surface than local-auth's
+`authenticateAsync` — no result union to branch on, just a `Promise<void>` you can leave unawaited
+from a press handler.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React               | ✅ live |
+| Vue                 | ✅ live |
+| Angular             | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/haptics
+```
+
+`expo-haptics` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project
+(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-haptics`' native code is discovered by `expo-modules-autolinking`, a different mechanism
+  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses
+  — and it isn't the standard Expo setup flow either, since this project never installs the
+  `expo` meta-package. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every future `expo-modules-core` package with zero further native changes.
+</Aside>
+
+## Usage
+
+All three adapters — React, Vue, Angular — re-export the exact same free functions; there is no
+per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+subscription. Call one straight from a press handler.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Pressable, Text, View } from '@symbiote-native/react';
+    import {
+      impactAsync,
+      notificationAsync,
+      selectionAsync,
+      performAndroidHapticsAsync,
+      AndroidHaptics,
+      ImpactFeedbackStyle,
+      NotificationFeedbackType,
+    } from '@symbiote-native/haptics/react';
+
+    export default function HapticButtons() {
+      return (
+        <View>
+          <Pressable onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}>
+            <Text>Impact</Text>
+          </Pressable>
+          <Pressable onPress={() => notificationAsync(NotificationFeedbackType.Success)}>
+            <Text>Notify</Text>
+          </Pressable>
+          <Pressable onPress={() => selectionAsync()}>
+            <Text>Select</Text>
+          </Pressable>
+          <Pressable onPress={() => performAndroidHapticsAsync(AndroidHaptics.Confirm)}>
+            <Text>Android confirm</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { Pressable, Text, View } from '@symbiote-native/vue';
+    import {
+      impactAsync,
+      notificationAsync,
+      selectionAsync,
+      performAndroidHapticsAsync,
+      AndroidHaptics,
+      ImpactFeedbackStyle,
+      NotificationFeedbackType,
+    } from '@symbiote-native/haptics/vue';
+    </script>
+
+    <template>
+      <View>
+        <Pressable @press="impactAsync(ImpactFeedbackStyle.Medium)">
+          <Text>Impact</Text>
+        </Pressable>
+        <Pressable @press="notificationAsync(NotificationFeedbackType.Success)">
+          <Text>Notify</Text>
+        </Pressable>
+        <Pressable @press="selectionAsync()">
+          <Text>Select</Text>
+        </Pressable>
+        <Pressable @press="performAndroidHapticsAsync(AndroidHaptics.Confirm)">
+          <Text>Android confirm</Text>
+        </Pressable>
+      </View>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { Pressable, Text, View } from '@symbiote-native/angular';
+    import {
+      impactAsync,
+      notificationAsync,
+      selectionAsync,
+      performAndroidHapticsAsync,
+      AndroidHaptics,
+      ImpactFeedbackStyle,
+      NotificationFeedbackType,
+    } from '@symbiote-native/haptics/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Pressable, Text, View],
+      template: `
+        <View>
+          <Pressable (press)="onImpact()">
+            <Text>Impact</Text>
+          </Pressable>
+          <Pressable (press)="onNotify()">
+            <Text>Notify</Text>
+          </Pressable>
+          <Pressable (press)="onSelect()">
+            <Text>Select</Text>
+          </Pressable>
+          <Pressable (press)="onAndroidConfirm()">
+            <Text>Android confirm</Text>
+          </Pressable>
+        </View>
+      `,
+    })
+    export class HapticButtons {
+      onImpact(): void {
+        impactAsync(ImpactFeedbackStyle.Medium);
+      }
+
+      onNotify(): void {
+        notificationAsync(NotificationFeedbackType.Success);
+      }
+
+      onSelect(): void {
+        selectionAsync();
+      }
+
+      onAndroidConfirm(): void {
+        performAndroidHapticsAsync(AndroidHaptics.Confirm);
+      }
+    }
+    ```
+
+    There's no per-instance service to `inject()` here — every function is a plain free function
+    off the core package, called straight from a component method, same as local-auth's Angular
+    example.
+  </TabItem>
+</Tabs>
+
+## API
+
+### Functions
+
+| Signature | Description |
+| --- | --- |
+| `impactAsync(style?: ImpactFeedbackStyle): Promise<void>` | A collision indicator (defaults to `Medium`) — maps directly to `UIImpactFeedbackStyle` on iOS, simulated via `Vibrator` on Android |
+| `notificationAsync(type?: NotificationFeedbackType): Promise<void>` | Success/Warning/Error feedback (defaults to `Success`) — maps directly to `UINotificationFeedbackType` on iOS, simulated via `Vibrator` on Android |
+| `selectionAsync(): Promise<void>` | Lets the user know a selection change has been registered |
+| `performAndroidHapticsAsync(type: AndroidHaptics): Promise<void>` | Drives the Android device haptics engine directly instead of `Vibrator` — no `VIBRATE` permission needed. A no-op on every platform except Android. `@platform android` |
+
+### `ImpactFeedbackStyle`
+
+| Value | Description |
+| --- | --- |
+| `Light` | A collision between small, light user interface elements |
+| `Medium` | A collision between moderately sized user interface elements |
+| `Heavy` | A collision between large, heavy user interface elements |
+| `Soft` | A collision between elements that are soft, exhibiting a large amount of compression or elasticity |
+| `Rigid` | A collision between elements that are rigid, exhibiting a small amount of compression or elasticity |
+
+### `NotificationFeedbackType`
+
+| Value | Description |
+| --- | --- |
+| `Success` | A task has completed successfully |
+| `Warning` | A task has produced a warning |
+| `Error` | A task has failed |
+
+### `AndroidHaptics`
+
+Feedback effects driven directly by Android's haptics engine, via `performAndroidHapticsAsync`.
+`@platform android`
+
+| Value | Description |
+| --- | --- |
+| `Confirm` | Signals the confirmation or successful completion of a user interaction |
+| `Reject` | Signals the rejection or failure of a user interaction |
+| `Gesture_Start` | The user has started a gesture (for example, on the soft keyboard) |
+| `Gesture_End` | The user has finished a gesture (for example, on the soft keyboard) |
+| `Toggle_On` | The user has toggled a switch or button into the on position |
+| `Toggle_Off` | The user has toggled a switch or button into the off position |
+| `Clock_Tick` | The user has pressed either an hour or minute tick of a clock |
+| `Context_Click` | The user has performed a context click on an object |
+| `Drag_Start` | The user has started a drag-and-drop gesture — the drag target has just been "picked up" |
+| `Keyboard_Tap` | The user has pressed a soft keyboard key |
+| `Keyboard_Press` | The user has pressed a virtual or software keyboard key |
+| `Keyboard_Release` | The user has released a virtual keyboard key |
+| `Long_Press` | The user has performed a long press on an object that results in an action being performed |
+| `Virtual_Key` | The user has pressed on a virtual on-screen key |
+| `Virtual_Key_Release` | The user has released a virtual key |
+| `No_Haptics` | No haptic feedback should be performed |
+| `Segment_Tick` | The user is switching between a series of potential choices — e.g. items in a list or discrete points on a slider |
+| `Segment_Frequent_Tick` | The user is switching between a series of many potential choices — e.g. minutes on a clock face; expected to be very soft, so it may not vibrate at all if the device can't make a suitably soft vibration |
+| `Text_Handle_Move` | The user has performed a selection/insertion handle move on a text field |
+
+## How the wrapper works
+
+`@symbiote-native/haptics` ships **zero React/Vue/Angular logic in `expo-haptics` itself** — that
+package's own JS hard-imports `Platform` from the `expo` meta-package (which this project never
+installs), so its functions and enums are hand-ported, verbatim, into this package's own `core/`,
+changing only that one import line to pull `Platform` from `expo-modules-core` instead:
+
+```
+packages/haptics/src/
+├── core/     # framework-agnostic: the four exported functions, NotificationFeedbackType,
+│             # ImpactFeedbackStyle, AndroidHaptics; native-module.ts resolves the native module
+│             # via expo-modules-core's requireNativeModule
+├── react/    # @symbiote-native/haptics/react   — export * from '../core'
+├── vue/      # @symbiote-native/haptics/vue     — export * from '../core'
+└── angular/  # @symbiote-native/haptics/angular — export * from '../core'
+```
+
+Same shape as [local auth](/docs/packages/local-auth/): every function here is stateless and
+one-shot, so there is nothing for a hook, composable, or service to subscribe to or clean up —
+each adapter entry is a single-file re-export with no lifecycle code at all. The native code
+itself is never vendored or copied — `expo-modules-autolinking` resolves it straight out of
+`node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

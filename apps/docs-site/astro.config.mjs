@@ -225,6 +225,9 @@ export default defineConfig({
             { label: 'Splash screen', slug: 'docs/packages/splash-screen' },
             { label: 'Sensors', slug: 'docs/packages/sensors' },
             { label: 'Local auth', slug: 'docs/packages/local-auth' },
+            { label: 'Haptics', slug: 'docs/packages/haptics' },
+            { label: 'Clipboard', slug: 'docs/packages/clipboard' },
+            { label: 'Battery', slug: 'docs/packages/battery' },
           ],
         },
         {
