@@ -38,7 +38,7 @@ const repoSlug = () => {
   return DEFAULT_REPO;
 };
 
-const isPublished = (name) => {
+const isPublished = name => {
   try {
     execFileSync('npm', ['view', name, 'version'], { stdio: 'pipe' });
     return true;
@@ -49,7 +49,7 @@ const isPublished = (name) => {
 
 const args = process.argv.slice(2);
 const listOnly = args.includes('--list') || args.includes('--dry-run');
-const only = args.find((arg) => !arg.startsWith('-'));
+const only = args.find(arg => !arg.startsWith('-'));
 
 const repo = repoSlug();
 let entries = publishablePackageEntries();
@@ -58,7 +58,11 @@ if (only) {
 }
 
 if (entries.length === 0) {
-  console.error(only ? `No publishable package matched "${only}".` : 'No publishable @symbiote-native/* packages found.');
+  console.error(
+    only
+      ? `No publishable package matched "${only}".`
+      : 'No publishable @symbiote-native/* packages found.',
+  );
   process.exit(1);
 }
 
@@ -92,7 +96,7 @@ for (const { name, dir } of entries) {
   if (!isPublished(name)) {
     console.log(`=== pnpm publish ${name} (first publish — not yet on the registry) ===`);
     try {
-      execFileSync('pnpm', ['publish'], { cwd: dir, stdio: 'inherit' });
+      execFileSync('pnpm', ['publish', '--no-git-checks'], { cwd: dir, stdio: 'inherit' });
     } catch (error) {
       console.error(`  publish failed for ${name}: ${error.message}`);
       failed.push(name);
@@ -104,7 +108,17 @@ for (const { name, dir } of entries) {
   try {
     execFileSync(
       'npm',
-      ['trust', 'github', name, '--file', WORKFLOW, '--repository', repo, '--allow-publish', '--yes'],
+      [
+        'trust',
+        'github',
+        name,
+        '--file',
+        WORKFLOW,
+        '--repository',
+        repo,
+        '--allow-publish',
+        '--yes',
+      ],
       { stdio: 'inherit' },
     );
   } catch (error) {
