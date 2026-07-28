@@ -7,6 +7,9 @@ export const ROUTE_NAME = {
   Menu: 'Menu',
   Sensors: 'Sensors',
   LocalAuth: 'LocalAuth',
+  Haptics: 'Haptics',
+  Clipboard: 'Clipboard',
+  Battery: 'Battery',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

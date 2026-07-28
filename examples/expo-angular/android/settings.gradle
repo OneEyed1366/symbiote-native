@@ -13,9 +13,16 @@ pluginManagement {
   def resolvedExpoModules = new groovy.json.JsonSlurper().parseText(resolvedExpoModulesJson)
 
   // auto-install-peers pulls in the whole phantom `expo` tree too (same unmet-peer cause as
-  // the iOS Podfile exclude list) — filter down to exactly the packages you actually want.
+  // the iOS Podfile's own `use_expo_modules!(exclude: [...])`) — exclude exactly those unwanted
+  // phantom peers instead of allow-listing wanted packages, so a genuinely new expo-modules-core
+  // package is auto-discovered here with zero further edits to this file (see the
+  // symbiote-expo-native-module skill).
+  def unwantedExpoModules = [
+    "expo", "expo-asset", "expo-constants", "expo-file-system",
+    "expo-font", "expo-keep-awake", "@expo/dom-webview", "@expo/log-box",
+  ]
   def wantedExpoModules = resolvedExpoModules.modules
-    .findAll { ["expo-modules-core", "expo-sensors", "expo-local-authentication"].contains(it.packageName) }
+    .findAll { !unwantedExpoModules.contains(it.packageName) }
 
   wantedExpoModules.collect { it.plugins ?: [] }.flatten()
     .each { plugin -> includeBuild(new File(plugin.sourceDir as String)) }

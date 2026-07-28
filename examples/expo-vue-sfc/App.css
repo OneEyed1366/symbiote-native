@@ -23,6 +23,9 @@
      with no shared import path). */
   --line-sensors: #f6ad55;
   --line-local-auth: #ef4444;
+  --line-haptics: #8b5cf6;
+  --line-clipboard: #14b8a6;
+  --line-battery: #22c55e;
 
   /* Decoupled "good/live" state color — was borrowed from --line-structure back when the
      navigation demo suite's Structure line still existed in this app; now its own token so
@@ -140,6 +143,15 @@
 .line-tag-local-auth {
   background-color: var(--line-local-auth);
 }
+.line-tag-haptics {
+  background-color: var(--line-haptics);
+}
+.line-tag-clipboard {
+  background-color: var(--line-clipboard);
+}
+.line-tag-battery {
+  background-color: var(--line-battery);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -164,6 +176,18 @@
   border-left-width: 3px;
   border-left-color: var(--line-local-auth);
 }
+.menu-row-haptics {
+  border-left-width: 3px;
+  border-left-color: var(--line-haptics);
+}
+.menu-row-clipboard {
+  border-left-width: 3px;
+  border-left-color: var(--line-clipboard);
+}
+.menu-row-battery {
+  border-left-width: 3px;
+  border-left-color: var(--line-battery);
+}
 
 .menu-badge {
   width: 34px;
@@ -177,6 +201,15 @@
 }
 .menu-badge-local-auth {
   background-color: var(--line-local-auth);
+}
+.menu-badge-haptics {
+  background-color: var(--line-haptics);
+}
+.menu-badge-clipboard {
+  background-color: var(--line-clipboard);
+}
+.menu-badge-battery {
+  background-color: var(--line-battery);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -202,6 +235,15 @@
 }
 .menu-row-hint-local-auth {
   color: var(--line-local-auth);
+}
+.menu-row-hint-haptics {
+  color: var(--line-haptics);
+}
+.menu-row-hint-clipboard {
+  color: var(--line-clipboard);
+}
+.menu-row-hint-battery {
+  color: var(--line-battery);
 }
 
 /* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own
@@ -344,4 +386,160 @@
   color: var(--ink);
   font-size: 13px;
   font-weight: bold;
+}
+
+/* Shared row of compact side-by-side ActionButtons — HapticsScreen's feedback-family cards
+   (1 to 17 buttons each) and ClipboardScreen's URL get/set pair both wrap into this instead of
+   the one-per-row stack LocalAuthScreen uses for a single action. */
+.button-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* HapticsScreen — one card per feedback family (impact/notification/selection/android), plus a
+   standing "last fired" readout since every action here is fire-and-forget. */
+.haptics-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.haptics-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.haptics-last-fired-card {
+  padding: 14px;
+  border-radius: 12px;
+  background-color: var(--paper);
+}
+.haptics-last-fired-label {
+  color: var(--mist);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+.haptics-last-fired-value {
+  color: var(--chalk-bright);
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* ClipboardScreen — value card (live string + hasStringAsync status) and, on iOS, a URL row. */
+.clipboard-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.clipboard-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.clipboard-value-box {
+  padding: 12px;
+  border-radius: 10px;
+  background-color: var(--ink);
+}
+.clipboard-value-text {
+  color: var(--chalk-bright);
+  font-size: 14px;
+  font-weight: bold;
+}
+.clipboard-capability-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.clipboard-capability-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.clipboard-status-badge {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+.clipboard-status-badge-checking {
+  background-color: var(--mist);
+}
+.clipboard-status-badge-no {
+  background-color: #6b4a4a;
+}
+.clipboard-status-badge-yes {
+  background-color: var(--positive);
+}
+.clipboard-status-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+/* Shared text input — ClipboardScreen's copy/URL fields, retokenized off DeepLinkingScreen's
+   own .text-input (examples/vue-sfc/App.css) onto this app's --ink/--mist/--chalk-bright tokens. */
+.text-input {
+  height: 44px;
+  border-radius: 10px;
+  border-width: 1px;
+  border-color: var(--mist);
+  padding-left: 14px;
+  padding-right: 14px;
+  color: var(--chalk-bright);
+  font-size: 15px;
+  background-color: var(--ink);
+}
+
+/* BatteryScreen — one live card (level/state/low-power mode, driven by the three composables)
+   plus a one-shot capabilities card, mirroring LocalAuthScreen's capabilities-card shape. */
+.battery-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.battery-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.battery-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.battery-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.battery-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+.battery-status-badge {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+.battery-status-badge-checking {
+  background-color: var(--mist);
+}
+.battery-status-badge-no {
+  background-color: #6b4a4a;
+}
+.battery-status-badge-yes {
+  background-color: var(--positive);
+}
+.battery-status-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
 }

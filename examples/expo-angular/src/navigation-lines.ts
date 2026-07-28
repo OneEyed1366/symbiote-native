@@ -9,6 +9,9 @@ import type { IRouteName } from './routes';
 export const NAV_LINE = {
   Sensors: 'sensors',
   LocalAuth: 'local-auth',
+  Haptics: 'haptics',
+  Clipboard: 'clipboard',
+  Battery: 'battery',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -17,6 +20,11 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.Sensors]: '#ffb020',
   // Red — @symbiote-native/local-auth's own tour stop, distinct from Sensors' amber.
   [NAV_LINE.LocalAuth]: '#ef4444',
+  // Violet/teal/green — one distinct color per Expo-SDK-ported package, shared verbatim across
+  // every expo-* example app for visual consistency (see the other expo-* apps' navigation-lines.ts).
+  [NAV_LINE.Haptics]: '#8b5cf6',
+  [NAV_LINE.Clipboard]: '#14b8a6',
+  [NAV_LINE.Battery]: '#22c55e',
 };
 
 export type INavLineInfo = {
@@ -31,4 +39,7 @@ export type ITourRouteName = Exclude<IRouteName, typeof ROUTE_NAME.Menu>;
 export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.Sensors]: { line: NAV_LINE.Sensors, code: 'SN', label: 'SENSORS LINE' },
   [ROUTE_NAME.LocalAuth]: { line: NAV_LINE.LocalAuth, code: 'LA', label: 'LOCAL AUTH LINE' },
+  [ROUTE_NAME.Haptics]: { line: NAV_LINE.Haptics, code: 'HP', label: 'HAPTICS LINE' },
+  [ROUTE_NAME.Clipboard]: { line: NAV_LINE.Clipboard, code: 'CB', label: 'CLIPBOARD LINE' },
+  [ROUTE_NAME.Battery]: { line: NAV_LINE.Battery, code: 'BT', label: 'BATTERY LINE' },
 };

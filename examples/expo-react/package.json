@@ -17,8 +17,11 @@
   "dependencies": {
     "@react-native/new-app-screen": "0.86.0",
     "@symbiote-native/android": "^0.1.2",
+    "@symbiote-native/battery": "file:../../packages/battery/symbiote-native-battery-0.0.1.tgz",
+    "@symbiote-native/clipboard": "file:../../packages/clipboard/symbiote-native-clipboard-0.0.1.tgz",
     "@symbiote-native/components": "^0.3.0",
     "@symbiote-native/engine": "^0.1.7",
+    "@symbiote-native/haptics": "file:../../packages/haptics/symbiote-native-haptics-0.0.1.tgz",
     "@symbiote-native/local-auth": "file:../../packages/local-auth/symbiote-native-local-auth-0.1.0.tgz",
     "@symbiote-native/navigation": "^2.0.2",
     "@symbiote-native/react": "^0.2.8",

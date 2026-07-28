@@ -121,6 +121,9 @@ dependencies {
     implementation project(':expo-modules-core')
     implementation project(':expo-sensors')
     implementation project(':expo-local-authentication')
+    implementation project(':expo-haptics')
+    implementation project(':expo-clipboard')
+    implementation project(':expo-battery')
 
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")

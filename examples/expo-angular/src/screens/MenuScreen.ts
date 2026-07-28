@@ -14,6 +14,9 @@ type IMenuItem = {
 const MENU_ITEMS: readonly IMenuItem[] = [
   { label: 'Sensors', route: ROUTE_NAME.Sensors, hint: '@symbiote-native/sensors — Accelerometer, Gyroscope, Magnetometer, DeviceMotion, Pedometer' },
   { label: 'Local auth', route: ROUTE_NAME.LocalAuth, hint: '@symbiote-native/local-auth — FaceID/TouchID/fingerprint' },
+  { label: 'Haptics', route: ROUTE_NAME.Haptics, hint: '@symbiote-native/haptics — impact/notification/selection vibration feedback' },
+  { label: 'Clipboard', route: ROUTE_NAME.Clipboard, hint: '@symbiote-native/clipboard — read/write the system clipboard, with a live change listener' },
+  { label: 'Battery', route: ROUTE_NAME.Battery, hint: '@symbiote-native/battery — live battery level, charging state, and low power mode' },
 ];
 
 /**

@@ -9,6 +9,9 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import expo.modules.adapters.react.ModuleRegistryAdapter
 import expo.modules.adapters.react.ReactAdapterPackage
 import expo.modules.adapters.react.ReactModuleRegistryProvider
+import expo.modules.battery.BatteryModule
+import expo.modules.clipboard.ClipboardModule
+import expo.modules.haptics.HapticsModule
 import expo.modules.kotlin.ModulesProvider
 import expo.modules.kotlin.modules.Module
 import expo.modules.localauthentication.LocalAuthenticationModule
@@ -39,6 +42,9 @@ private class ExpoModulesProvider : ModulesProvider {
     MagnetometerUncalibratedModule::class.java to "ExponentMagnetometerUncalibrated",
     PedometerModule::class.java to "ExponentPedometer",
     LocalAuthenticationModule::class.java to "ExpoLocalAuthentication",
+    HapticsModule::class.java to "ExpoHaptics",
+    ClipboardModule::class.java to "ExpoClipboard",
+    BatteryModule::class.java to "ExpoBattery",
   )
 }
 

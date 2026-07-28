@@ -21,6 +21,9 @@
      different runtimes with no shared import path). */
   --line-sensors: #f5a623;
   --line-local-auth: #ef4444;
+  --line-haptics: #8b5cf6;
+  --line-clipboard: #14b8a6;
+  --line-battery: #22c55e;
 }
 
 .info-text {
@@ -129,6 +132,15 @@
 .line-tag-local-auth {
   background-color: var(--line-local-auth);
 }
+.line-tag-haptics {
+  background-color: var(--line-haptics);
+}
+.line-tag-clipboard {
+  background-color: var(--line-clipboard);
+}
+.line-tag-battery {
+  background-color: var(--line-battery);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -152,6 +164,18 @@
   border-left-width: 3px;
   border-left-color: var(--line-local-auth);
 }
+.menu-row-haptics {
+  border-left-width: 3px;
+  border-left-color: var(--line-haptics);
+}
+.menu-row-clipboard {
+  border-left-width: 3px;
+  border-left-color: var(--line-clipboard);
+}
+.menu-row-battery {
+  border-left-width: 3px;
+  border-left-color: var(--line-battery);
+}
 
 .menu-badge {
   width: 34px;
@@ -165,6 +189,15 @@
 }
 .menu-badge-local-auth {
   background-color: var(--line-local-auth);
+}
+.menu-badge-haptics {
+  background-color: var(--line-haptics);
+}
+.menu-badge-clipboard {
+  background-color: var(--line-clipboard);
+}
+.menu-badge-battery {
+  background-color: var(--line-battery);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -190,6 +223,15 @@
 }
 .menu-row-hint-local-auth {
   color: var(--line-local-auth);
+}
+.menu-row-hint-haptics {
+  color: var(--line-haptics);
+}
+.menu-row-hint-clipboard {
+  color: var(--line-clipboard);
+}
+.menu-row-hint-battery {
+  color: var(--line-battery);
 }
 
 /* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own
@@ -332,4 +374,81 @@
   color: var(--ink);
   font-size: 13px;
   font-weight: bold;
+}
+
+/* Shared card/badge/row vocabulary for HapticsScreen, ClipboardScreen, and BatteryScreen — same
+   visual language as .auth-card/.auth-status-badge/.sensor-card above, kept package-agnostic
+   (rather than tripled per package) since all three new screens use it identically. */
+.feature-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.feature-card-header {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.feature-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.capability-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.capability-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+.status-badge {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+.status-badge-checking {
+  background-color: var(--mist);
+}
+.status-badge-no {
+  background-color: #6b4a4a;
+}
+.status-badge-yes {
+  background-color: var(--positive);
+}
+.status-badge-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+/* HapticsScreen's button grids (impact/notification/android haptics) — action-button already
+   sizes to its own content, this just lets them wrap onto multiple lines. */
+.button-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ClipboardScreen's copy-text and set-URL inputs. */
+.text-input {
+  height: 44px;
+  border-radius: 10px;
+  border-width: 1px;
+  border-color: var(--mist);
+  padding-left: 14px;
+  padding-right: 14px;
+  color: var(--chalk-bright);
+  font-size: 16px;
+  background-color: var(--paper);
 }
