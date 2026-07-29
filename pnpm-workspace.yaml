@@ -49,6 +49,9 @@ minimumReleaseAgeExclude:
   - expo-haptics@57.0.1
   - expo-clipboard@57.0.1
   - expo-battery@57.0.1
+  - expo-brightness@57.0.1
+  - expo-cellular@57.0.1
+  - expo-network@57.0.1
 
 # Single source of truth for dependency versions (pnpm catalogs).
 # A package references a version with `catalog:` (default) or `catalog:<name>`
@@ -190,6 +193,13 @@ catalog:
   expo-haptics: 57.0.1
   expo-clipboard: 57.0.1
   expo-battery: 57.0.1
+  # Same exact-pin reasoning as the trio above: packages/brightness, packages/cellular,
+  # packages/network each depend on their matching expo-* package ONLY for its native
+  # ios/android folders (JS hand-ported into our own core). Versions are the real npm-published
+  # `latest` as of 2026-07-29, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-brightness: 57.0.1
+  expo-cellular: 57.0.1
+  expo-network: 57.0.1
   # Autolinking CLI only (never resolved via the `expo` package) — each native host app needs
   # it as a direct devDependency so its Podfile/settings.gradle can `require.resolve` it; see
   # apps/docs-site's expo-native-module-setup howto. Version verified against .vendors/expo at
