@@ -228,6 +228,9 @@ export default defineConfig({
             { label: 'Haptics', slug: 'docs/packages/haptics' },
             { label: 'Clipboard', slug: 'docs/packages/clipboard' },
             { label: 'Battery', slug: 'docs/packages/battery' },
+            { label: 'Brightness', slug: 'docs/packages/brightness' },
+            { label: 'Cellular', slug: 'docs/packages/cellular' },
+            { label: 'Network', slug: 'docs/packages/network' },
           ],
         },
         {
