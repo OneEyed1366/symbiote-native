@@ -91,6 +91,9 @@ catalog:
   eslint: ^10.6.0
   prettier: ^3.9.1
   '@eslint/js': ^10.0.1
+  # Official Language Plugin for linting package.json as JSON (not TS/JS) — backs the
+  # local require-readme / require-package-fields rules in eslint.config.js.
+  '@eslint/json': ^2.0.1
   eslint-config-prettier: ^10.1.8
   eslint-plugin-react-hooks: ^7.1.1
   typescript-eslint: ^8.62.0

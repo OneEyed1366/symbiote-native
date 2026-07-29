@@ -4,6 +4,9 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import prettier from 'eslint-config-prettier';
+import json from '@eslint/json';
+import requireReadme from './eslint-rules/require-readme.js';
+import requirePackageFields from './eslint-rules/require-package-fields.js';
 
 // Flat config for the symbiote LIBRARY code only (core / adapters / packages).
 // The RN example apps own their formatting + lint via the @react-native eslint
@@ -74,6 +77,25 @@ export default defineConfig(
   {
     files: ['adapters/vue/**/*.ts'],
     rules: {},
+  },
+
+  // ── package.json hygiene: every publishable package (core/adapters/packages) needs a
+  // README next to it, and the field set matching its detected tier (full-library /
+  // codegen-view / native-proxy — see eslint-rules/require-package-fields.js). apps/* is
+  // excluded on purpose: apps/docs-site is a private Astro app, not an npm package. ──
+  {
+    files: ['{core,adapters,packages}/*/package.json'],
+    language: 'json/json',
+    plugins: {
+      json,
+      local: {
+        rules: { 'require-readme': requireReadme, 'require-package-fields': requirePackageFields },
+      },
+    },
+    rules: {
+      'local/require-readme': 'error',
+      'local/require-package-fields': 'error',
+    },
   },
 
   // Future adapters get their own block here, e.g.:
