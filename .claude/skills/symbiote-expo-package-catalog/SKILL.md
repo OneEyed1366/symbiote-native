@@ -51,6 +51,12 @@ queue.
 | `@symbiote-native/haptics` | `expo-haptics` | `symbiote-expo-native-module` |
 | `@symbiote-native/clipboard` | `expo-clipboard` | `symbiote-expo-native-module` |
 | `@symbiote-native/battery` | `expo-battery` | `symbiote-expo-native-module` |
+| `@symbiote-native/brightness` | `expo-brightness` | `symbiote-expo-native-module` |
+| `@symbiote-native/cellular` | `expo-cellular` | `symbiote-expo-native-module` |
+| `@symbiote-native/network` | `expo-network` | `symbiote-expo-native-module` |
+| `@symbiote-native/device` | `expo-device` | `symbiote-expo-native-module` |
+| `@symbiote-native/application` | `expo-application` | `symbiote-expo-native-module` |
+| `@symbiote-native/crypto` | `expo-crypto` (excluding its `aes/` subfolder — out of scope for this pass) | `symbiote-expo-native-module` |
 
 ## Priority queue — one continuous sequence, ranked by complexity + demand
 
@@ -68,13 +74,13 @@ from each package's `expo-module.config.json`.
 | ~~1~~ | ~~`expo-haptics`~~ | M | shipped — see "Already shipped" |
 | ~~2~~ | ~~`expo-clipboard`~~ | M | shipped — see "Already shipped" |
 | ~~3~~ | ~~`expo-battery`~~ | M | shipped — see "Already shipped" |
-| 4 | `expo-brightness` | M | apple, android |
-| 5 | `expo-cellular` | M | apple, android, web |
-| 6 | `expo-network` | M | apple, android, web |
-| 7 | `expo-device` | M | apple, android, web |
-| 8 | `expo-application` | M | apple, android, web |
-| 9 | `expo-constants` | M | apple, android, web |
-| 10 | `expo-crypto` | M | apple, android |
+| ~~4~~ | ~~`expo-brightness`~~ | M | shipped — see "Already shipped" |
+| ~~5~~ | ~~`expo-cellular`~~ | M | shipped — see "Already shipped" |
+| ~~6~~ | ~~`expo-network`~~ | M | shipped — see "Already shipped" |
+| ~~7~~ | ~~`expo-device`~~ | M | shipped — see "Already shipped" |
+| ~~8~~ | ~~`expo-application`~~ | M | shipped — see "Already shipped" |
+| 9 | `expo-constants` | M | apple, android, web — **skipped this pass** (2026-07-29): its main value (`expoConfig`, `manifest`) hard-imports `expo/config` types and reads an Expo-CLI-generated manifest (`app.config`/EAS/updates) that doesn't exist in this bare, Metro-only, non-Expo-CLI project. Revisit only if a trimmed port (native-only fields like `sessionId`/`statusBarHeight`/`systemFonts`, skipping the manifest/config apparatus entirely) is explicitly wanted — never port the manifest surface as-is. |
+| ~~10~~ | ~~`expo-crypto`~~ | M | shipped — see "Already shipped" (`aes/` subfolder excluded) |
 | 11 | `expo-standard-web-crypto` | M | universal (pure-JS polyfill, no native folders) |
 | 12 | `expo-localization` | M | apple, android |
 | 13 | `expo-keep-awake` | M | apple, android |
