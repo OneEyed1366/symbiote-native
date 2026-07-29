@@ -136,6 +136,23 @@ Required, once per native host app (not per wrapped package):
 | `ios/*/AppDelegate.swift` | minimal Expo bootstrap hook |
 | `android/.../MainApplication.kt` | minimal Expo bootstrap hook |
 
+**Recurring mistake — happened twice (haptics/clipboard/battery in 2026-07, then device/
+application/crypto again in 2026-07-29) despite §7 documenting it: adding a new package's
+`MainApplication.kt` import + `ExpoModulesProvider` map entry is NOT sufficient.**
+`app/build.gradle`'s `dependencies {}` block needs its own new
+`implementation project(':expo-<pkg>')` line too — `settings.gradle`'s exclude-list resolver
+(§7) only makes the Gradle subproject *exist*, it does not add it to `:app`'s own compile
+classpath. Skip this line and `:app:compileDebugKotlin` fails with `Unresolved reference
+'<pkg>'` on the exact import you just added to `MainApplication.kt` — a real, reproduced
+failure mode, not a hypothetical. **A JS-level typecheck (`tsc`/`vue-tsc`/`ngc`) cannot catch
+this** — it never touches Gradle/Kotlin, so "typecheck passed" gives false confidence that
+Android wiring is complete. When wiring a new expo-modules-core package into ANY
+`examples/expo-*` app (whether doing it yourself or dispatching an agent to), the checklist is
+three files, every time: `settings.gradle` (automatic via the exclude-list, no edit needed),
+`app/build.gradle` (`implementation project(':expo-<pkg>')` — manual, easy to forget since
+nothing prompts for it), `MainApplication.kt` (import + map entry — manual). Verify by actually
+running `:app:compileDebugKotlin` (or the equivalent Gradle task), not just a JS typecheck.
+
 Per this repo's stated convention, wire this into `.examples/<app>` only, never the public
 `examples/<app>` — see `symbiote-dev-examples`. **Correction (2026-07-27, verified by reading
 both trees directly): the accelerometer bring-up documented below actually landed in the public
