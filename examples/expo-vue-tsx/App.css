@@ -414,10 +414,12 @@
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
 }
 .auth-capability-label {
   color: var(--chalk);
   font-size: 14px;
+  flex-shrink: 0;
 }
 .auth-status-badge {
   padding-top: 4px;
@@ -445,6 +447,7 @@
   color: var(--chalk-bright);
   font-size: 13px;
   font-weight: bold;
+  flex-shrink: 1;
 }
 .auth-result {
   padding: 10px;
