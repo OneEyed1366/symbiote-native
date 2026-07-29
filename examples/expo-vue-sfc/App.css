@@ -26,6 +26,9 @@
   --line-haptics: #8b5cf6;
   --line-clipboard: #14b8a6;
   --line-battery: #22c55e;
+  --line-brightness: #facc15;
+  --line-cellular: #3b82f6;
+  --line-network: #06b6d4;
 
   /* Decoupled "good/live" state color — was borrowed from --line-structure back when the
      navigation demo suite's Structure line still existed in this app; now its own token so
@@ -152,6 +155,15 @@
 .line-tag-battery {
   background-color: var(--line-battery);
 }
+.line-tag-brightness {
+  background-color: var(--line-brightness);
+}
+.line-tag-cellular {
+  background-color: var(--line-cellular);
+}
+.line-tag-network {
+  background-color: var(--line-network);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -188,6 +200,18 @@
   border-left-width: 3px;
   border-left-color: var(--line-battery);
 }
+.menu-row-brightness {
+  border-left-width: 3px;
+  border-left-color: var(--line-brightness);
+}
+.menu-row-cellular {
+  border-left-width: 3px;
+  border-left-color: var(--line-cellular);
+}
+.menu-row-network {
+  border-left-width: 3px;
+  border-left-color: var(--line-network);
+}
 
 .menu-badge {
   width: 34px;
@@ -210,6 +234,15 @@
 }
 .menu-badge-battery {
   background-color: var(--line-battery);
+}
+.menu-badge-brightness {
+  background-color: var(--line-brightness);
+}
+.menu-badge-cellular {
+  background-color: var(--line-cellular);
+}
+.menu-badge-network {
+  background-color: var(--line-network);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -244,6 +277,15 @@
 }
 .menu-row-hint-battery {
   color: var(--line-battery);
+}
+.menu-row-hint-brightness {
+  color: var(--line-brightness);
+}
+.menu-row-hint-cellular {
+  color: var(--line-cellular);
+}
+.menu-row-hint-network {
+  color: var(--line-network);
 }
 
 /* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own
@@ -542,4 +584,112 @@
   font-size: 11px;
   font-weight: bold;
   letter-spacing: 0.5px;
+}
+
+/* BrightnessScreen — a live card (screen brightness + set-brightness buttons), an Android-only
+   system-brightness-mode card, and a permission card, mirroring BatteryScreen's card/row/
+   value-text/status-badge shape. */
+.brightness-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.brightness-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.brightness-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.brightness-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.brightness-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+.brightness-status-badge {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+.brightness-status-badge-checking {
+  background-color: var(--mist);
+}
+.brightness-status-badge-no {
+  background-color: #6b4a4a;
+}
+.brightness-status-badge-yes {
+  background-color: var(--positive);
+}
+.brightness-status-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+/* CellularScreen — a one-shot info card (generation + Android-only carrier/SIM fields) and a
+   permission card, mirroring BatteryScreen's card/row/value-text shape. Every field renders as
+   plain text (no boolean badge needed — allowsVoip already reduces to a Yes/No value-text). */
+.cellular-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.cellular-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.cellular-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.cellular-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.cellular-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* NetworkScreen — a live network-state card (useNetworkState()) and a one-shot device-info card
+   (IP address, airplane mode), mirroring BatteryScreen's card/row/value-text shape. */
+.network-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.network-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.network-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.network-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.network-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
 }

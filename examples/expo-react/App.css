@@ -24,6 +24,9 @@
   --line-haptics: #8b5cf6;
   --line-clipboard: #14b8a6;
   --line-battery: #22c55e;
+  --line-brightness: #facc15;
+  --line-cellular: #3b82f6;
+  --line-network: #06b6d4;
 }
 
 .info-text {
@@ -141,6 +144,15 @@
 .line-tag-battery {
   background-color: var(--line-battery);
 }
+.line-tag-brightness {
+  background-color: var(--line-brightness);
+}
+.line-tag-cellular {
+  background-color: var(--line-cellular);
+}
+.line-tag-network {
+  background-color: var(--line-network);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -176,6 +188,18 @@
   border-left-width: 3px;
   border-left-color: var(--line-battery);
 }
+.menu-row-brightness {
+  border-left-width: 3px;
+  border-left-color: var(--line-brightness);
+}
+.menu-row-cellular {
+  border-left-width: 3px;
+  border-left-color: var(--line-cellular);
+}
+.menu-row-network {
+  border-left-width: 3px;
+  border-left-color: var(--line-network);
+}
 
 .menu-badge {
   width: 34px;
@@ -198,6 +222,15 @@
 }
 .menu-badge-battery {
   background-color: var(--line-battery);
+}
+.menu-badge-brightness {
+  background-color: var(--line-brightness);
+}
+.menu-badge-cellular {
+  background-color: var(--line-cellular);
+}
+.menu-badge-network {
+  background-color: var(--line-network);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -232,6 +265,15 @@
 }
 .menu-row-hint-battery {
   color: var(--line-battery);
+}
+.menu-row-hint-brightness {
+  color: var(--line-brightness);
+}
+.menu-row-hint-cellular {
+  color: var(--line-cellular);
+}
+.menu-row-hint-network {
+  color: var(--line-network);
 }
 
 /* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own

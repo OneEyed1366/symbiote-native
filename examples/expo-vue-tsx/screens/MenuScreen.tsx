@@ -17,6 +17,9 @@ const MENU_ITEMS: readonly IMenuItem[] = [
   { label: 'Haptics', route: ROUTE_NAME.Haptics, hint: '@symbiote-native/haptics — impact/notification/selection vibration feedback' },
   { label: 'Clipboard', route: ROUTE_NAME.Clipboard, hint: '@symbiote-native/clipboard — read/write clipboard text, URL, and image content' },
   { label: 'Battery', route: ROUTE_NAME.Battery, hint: '@symbiote-native/battery — live battery level, charging state, low-power-mode' },
+  { label: 'Brightness', route: ROUTE_NAME.Brightness, hint: '@symbiote-native/brightness — screen brightness get/set, Android system-brightness mode, permission gating' },
+  { label: 'Cellular', route: ROUTE_NAME.Cellular, hint: '@symbiote-native/cellular — cellular generation, carrier/SIM info, permission gating' },
+  { label: 'Network', route: ROUTE_NAME.Network, hint: '@symbiote-native/network — live network state, IP address, airplane mode' },
 ];
 
 /**

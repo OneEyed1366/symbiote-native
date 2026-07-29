@@ -10,6 +10,9 @@ export const ROUTE_NAME = {
   Haptics: 'Haptics',
   Clipboard: 'Clipboard',
   Battery: 'Battery',
+  Brightness: 'Brightness',
+  Cellular: 'Cellular',
+  Network: 'Network',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

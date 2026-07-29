@@ -10,11 +10,14 @@ import expo.modules.adapters.react.ModuleRegistryAdapter
 import expo.modules.adapters.react.ReactAdapterPackage
 import expo.modules.adapters.react.ReactModuleRegistryProvider
 import expo.modules.battery.BatteryModule
+import expo.modules.brightness.BrightnessModule
+import expo.modules.cellular.CellularModule
 import expo.modules.clipboard.ClipboardModule
 import expo.modules.haptics.HapticsModule
 import expo.modules.kotlin.ModulesProvider
 import expo.modules.kotlin.modules.Module
 import expo.modules.localauthentication.LocalAuthenticationModule
+import expo.modules.network.NetworkModule
 import expo.modules.sensors.modules.AccelerometerModule
 import expo.modules.sensors.modules.BarometerModule
 import expo.modules.sensors.modules.DeviceMotionModule
@@ -45,6 +48,9 @@ private class ExpoModulesProvider : ModulesProvider {
     HapticsModule::class.java to "ExpoHaptics",
     ClipboardModule::class.java to "ExpoClipboard",
     BatteryModule::class.java to "ExpoBattery",
+    BrightnessModule::class.java to "ExpoBrightness",
+    CellularModule::class.java to "ExpoCellular",
+    NetworkModule::class.java to "ExpoNetwork",
   )
 }
 

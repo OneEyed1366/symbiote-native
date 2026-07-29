@@ -18,6 +18,9 @@ import LocalAuthScreen from './screens/LocalAuthScreen.vue';
 import HapticsScreen from './screens/HapticsScreen.vue';
 import ClipboardScreen from './screens/ClipboardScreen.vue';
 import BatteryScreen from './screens/BatteryScreen.vue';
+import BrightnessScreen from './screens/BrightnessScreen.vue';
+import CellularScreen from './screens/CellularScreen.vue';
+import NetworkScreen from './screens/NetworkScreen.vue';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
 
@@ -96,6 +99,45 @@ onMounted(() => hide());
         title: 'Battery',
         headerShown: true,
         headerTintColor: LINE_COLOR.battery,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Brightness"
+      :component="BrightnessScreen"
+      :options="{
+        title: 'Brightness',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.brightness,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Cellular"
+      :component="CellularScreen"
+      :options="{
+        title: 'Cellular',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.cellular,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Network"
+      :component="NetworkScreen"
+      :options="{
+        title: 'Network',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.network,
         headerTranslucent: true,
         headerTitleColor: '#ffffff',
         headerStyle: { backgroundColor: '#0b1622' },

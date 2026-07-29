@@ -1,4 +1,14 @@
 PODS:
+  - ExpoBattery (57.0.1):
+    - ExpoModulesCore
+  - ExpoBrightness (57.0.1):
+    - ExpoModulesCore
+  - ExpoCellular (57.0.1):
+    - ExpoModulesCore
+  - ExpoClipboard (57.0.1):
+    - ExpoModulesCore
+  - ExpoHaptics (57.0.1):
+    - ExpoModulesCore
   - ExpoLocalAuthentication (57.0.2):
     - ExpoModulesCore
   - ExpoModulesCore (57.0.5):
@@ -31,6 +41,8 @@ PODS:
   - ExpoModulesWorklets (57.0.5):
     - ExpoModulesCore
     - ExpoModulesJSI
+  - ExpoNetwork (57.0.1):
+    - ExpoModulesCore
   - ExpoSensors (57.0.2):
     - ExpoModulesCore
   - FBLazyVector (0.86.0)
@@ -1929,10 +1941,16 @@ PODS:
   - Yoga (0.0.0)
 
 DEPENDENCIES:
+  - "ExpoBattery (from `../node_modules/@symbiote-native/battery/node_modules/expo-battery/ios`)"
+  - "ExpoBrightness (from `../node_modules/@symbiote-native/brightness/node_modules/expo-brightness/ios`)"
+  - "ExpoCellular (from `../node_modules/@symbiote-native/cellular/node_modules/expo-cellular/ios`)"
+  - "ExpoClipboard (from `../node_modules/@symbiote-native/clipboard/node_modules/expo-clipboard/ios`)"
+  - "ExpoHaptics (from `../node_modules/@symbiote-native/haptics/node_modules/expo-haptics/ios`)"
   - "ExpoLocalAuthentication (from `../node_modules/@symbiote-native/local-auth/node_modules/expo-local-authentication/ios`)"
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoModulesJSI (from `../node_modules/expo-modules-jsi/apple`)
   - ExpoModulesWorklets (from `../node_modules/expo-modules-core`)
+  - "ExpoNetwork (from `../node_modules/@symbiote-native/network/node_modules/expo-network/ios`)"
   - "ExpoSensors (from `../node_modules/@symbiote-native/sensors/node_modules/expo-sensors/ios`)"
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
@@ -2014,6 +2032,16 @@ DEPENDENCIES:
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 EXTERNAL SOURCES:
+  ExpoBattery:
+    :path: "../node_modules/@symbiote-native/battery/node_modules/expo-battery/ios"
+  ExpoBrightness:
+    :path: "../node_modules/@symbiote-native/brightness/node_modules/expo-brightness/ios"
+  ExpoCellular:
+    :path: "../node_modules/@symbiote-native/cellular/node_modules/expo-cellular/ios"
+  ExpoClipboard:
+    :path: "../node_modules/@symbiote-native/clipboard/node_modules/expo-clipboard/ios"
+  ExpoHaptics:
+    :path: "../node_modules/@symbiote-native/haptics/node_modules/expo-haptics/ios"
   ExpoLocalAuthentication:
     :path: "../node_modules/@symbiote-native/local-auth/node_modules/expo-local-authentication/ios"
   ExpoModulesCore:
@@ -2022,6 +2050,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-modules-jsi/apple"
   ExpoModulesWorklets:
     :path: "../node_modules/expo-modules-core"
+  ExpoNetwork:
+    :path: "../node_modules/@symbiote-native/network/node_modules/expo-network/ios"
   ExpoSensors:
     :path: "../node_modules/@symbiote-native/sensors/node_modules/expo-sensors/ios"
   FBLazyVector:
@@ -2181,10 +2211,16 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
+  ExpoBattery: cb4f978965f2d14d06f2d36293c2deedee6616b0
+  ExpoBrightness: bd5b283f0ccd168d6c5b7ff1e95bc3999972a54a
+  ExpoCellular: e78a2fe5ac3239ec7252f3451e170560c8e25dcd
+  ExpoClipboard: 95055b11758f339b61d4d8064dd799df1cf03b7f
+  ExpoHaptics: 4503d2da51ff7109712ccdfe0e4939f66818183e
   ExpoLocalAuthentication: 96989637e567a10cdeabe61e5c6026d30c0dc53f
   ExpoModulesCore: 9df645bbfcfe4fec54e6597aee756f7820ac8e0e
   ExpoModulesJSI: b20fefa4cdd9097e7e6b715466d1900b8c5d4711
   ExpoModulesWorklets: 18419b65da3b14a8df484baccec7dd6dad15387a
+  ExpoNetwork: 973d523fe9b1f99223dd945fed9ad1226ae64920
   ExpoSensors: e71c7b6cb0c09d3427ef6ae29c69532a10c86b05
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
   hermes-engine: 96d28976dac594e6fa77222be7d152b805aadfd7

@@ -17,6 +17,9 @@ import { LocalAuthScreen } from './screens/LocalAuthScreen';
 import { HapticsScreen } from './screens/HapticsScreen';
 import { ClipboardScreen } from './screens/ClipboardScreen';
 import { BatteryScreen } from './screens/BatteryScreen';
+import { BrightnessScreen } from './screens/BrightnessScreen';
+import { CellularScreen } from './screens/CellularScreen';
+import { NetworkScreen } from './screens/NetworkScreen';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
 import { hide } from '@symbiote-native/splash-screen/react';
@@ -99,6 +102,45 @@ function App() {
           title: 'Battery',
           headerShown: true,
           headerTintColor: LINE_COLOR.battery,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Brightness}
+        component={BrightnessScreen}
+        options={{
+          title: 'Brightness',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.brightness,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Cellular}
+        component={CellularScreen}
+        options={{
+          title: 'Cellular',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.cellular,
+          headerTranslucent: true,
+          headerTitleColor: '#ffffff',
+          headerStyle: { backgroundColor: '#0b1622' },
+          headerUserInterfaceStyle: 'dark',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Network}
+        component={NetworkScreen}
+        options={{
+          title: 'Network',
+          headerShown: true,
+          headerTintColor: LINE_COLOR.network,
           headerTranslucent: true,
           headerTitleColor: '#ffffff',
           headerStyle: { backgroundColor: '#0b1622' },

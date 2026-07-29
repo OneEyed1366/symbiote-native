@@ -12,6 +12,9 @@ export const NAV_LINE = {
   Haptics: 'haptics',
   Clipboard: 'clipboard',
   Battery: 'battery',
+  Brightness: 'brightness',
+  Cellular: 'cellular',
+  Network: 'network',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -28,6 +31,12 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.Clipboard]: '#14b8a6',
   // Green — @symbiote-native/battery's own tour stop, shared across all 4 expo-* apps.
   [NAV_LINE.Battery]: '#22c55e',
+  // Gold — @symbiote-native/brightness's own tour stop, shared across all 4 expo-* apps.
+  [NAV_LINE.Brightness]: '#facc15',
+  // Blue — @symbiote-native/cellular's own tour stop, shared across all 4 expo-* apps.
+  [NAV_LINE.Cellular]: '#3b82f6',
+  // Cyan — @symbiote-native/network's own tour stop, shared across all 4 expo-* apps.
+  [NAV_LINE.Network]: '#06b6d4',
 };
 
 export type INavLineInfo = {
@@ -45,4 +54,7 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.Haptics]: { line: NAV_LINE.Haptics, code: 'HP', label: 'HAPTICS LINE' },
   [ROUTE_NAME.Clipboard]: { line: NAV_LINE.Clipboard, code: 'CB', label: 'CLIPBOARD LINE' },
   [ROUTE_NAME.Battery]: { line: NAV_LINE.Battery, code: 'BT', label: 'BATTERY LINE' },
+  [ROUTE_NAME.Brightness]: { line: NAV_LINE.Brightness, code: 'BR', label: 'BRIGHTNESS LINE' },
+  [ROUTE_NAME.Cellular]: { line: NAV_LINE.Cellular, code: 'CL', label: 'CELLULAR LINE' },
+  [ROUTE_NAME.Network]: { line: NAV_LINE.Network, code: 'NW', label: 'NETWORK LINE' },
 };

@@ -3,6 +3,10 @@
   <uses-permission android:name="android.permission.VIBRATE" />
   <uses-permission android:name="android.permission.USE_FINGERPRINT" />
   <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+  <!-- @symbiote-native/brightness: setSystemBrightnessAsync/getPermissionsAsync -->
+  <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+  <!-- @symbiote-native/cellular: getCarrierNameAsync/getIsoCountryCodeAsync/etc. -->
+  <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
   <application
     android:name=".MainApplication"
