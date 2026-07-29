@@ -231,6 +231,9 @@ export default defineConfig({
             { label: 'Brightness', slug: 'docs/packages/brightness' },
             { label: 'Cellular', slug: 'docs/packages/cellular' },
             { label: 'Network', slug: 'docs/packages/network' },
+            { label: 'Device', slug: 'docs/packages/device' },
+            { label: 'Application', slug: 'docs/packages/application' },
+            { label: 'Crypto', slug: 'docs/packages/crypto' },
           ],
         },
         {
