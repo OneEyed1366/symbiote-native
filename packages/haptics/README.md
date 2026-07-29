@@ -1,20 +1,116 @@
 # @symbiote-native/haptics
 
 Port of [`expo-haptics`](https://docs.expo.dev/versions/latest/sdk/haptics/) for
-[SymbioteNative](../../README.md) — vibration/haptic feedback via iOS's Taptic Engine and
-Android's Vibrator API, reachable from every adapter (React, Vue, Angular), not just React.
+[SymbioteNative](../../README.md) — impact/notification/selection vibration feedback via iOS's
+Taptic Engine and Android's Vibrator API, plus a direct Android haptics-engine path
+(`performAndroidHapticsAsync`). Built the same way as
+[`@symbiote-native/local-auth`](../local-auth): an `expo-modules-core`-based wrapper, free
+functions with no per-instance state and no event stream. Reachable from every adapter — React,
+Vue, Angular — not just React.
 
-Built the same way as [`@symbiote-native/local-auth`](../local-auth), an `expo-modules-core`-based
-wrapper (see the `symbiote-expo-native-module` project skill for the full mechanism: why
-`expo-modules-core` is depended on directly and never the `expo` meta-package, why the upstream
-JS is hand-ported into `core/` rather than imported, and how autolinking picks up the native
-module).
+## Install
+
+```bash
+npm install @symbiote-native/haptics
+```
+
+`expo-haptics` and `expo-modules-core` come along as regular, exact-pinned dependencies — never
+install either yourself, and never add the `expo` meta-package (it bundles its own Metro/Babel
+pipeline that conflicts with this project's own).
+
+### Required one-time step: native autolinking wiring
+
+Unlike a plain RN native module, `expo-haptics`' native code is discovered by
+`expo-modules-autolinking`, not RN's own `react-native.config.cjs`/podspec mechanism — this needs
+wiring into the native host app **once**, covering this package and every other
+`expo-modules-core` package with zero further changes:
+
+| Platform | Touches |
+|---|---|
+| iOS | `ios/Podfile` — add `use_expo_modules!` |
+| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
+| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
+| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+
+Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
+implementation: `examples/expo-react/ios/Podfile` and
+`examples/expo-react/android/app/src/main/java/com/canary/MainApplication.kt` (registers
+`HapticsModule` as `"ExpoHaptics"`).
+
+No permission or `Info.plist`/`AndroidManifest.xml` entry is needed on either platform — haptic
+feedback requires none.
+
+## Shape
+
+```
+src/core/     notificationAsync / impactAsync / selectionAsync / performAndroidHapticsAsync,
+              plus NotificationFeedbackType / ImpactFeedbackStyle / AndroidHaptics.
+              native-module.ts resolves the ExpoHaptics native module via
+              expo-modules-core's requireNativeModule.
+src/react/    @symbiote-native/haptics/react   — plain re-export of core.
+src/vue/      @symbiote-native/haptics/vue     — plain re-export of core.
+src/angular/  @symbiote-native/haptics/angular — plain re-export of core.
+```
+
+Upstream ships four async functions and three enums, not a subscribable sensor — there's
+nothing per-framework to add, so all three adapter entry points are identical re-exports of
+`core`.
+
+## Use it
+
+```tsx
+// React — examples/expo-react/screens/HapticsScreen.tsx
+import { impactAsync, ImpactFeedbackStyle, notificationAsync, NotificationFeedbackType, selectionAsync } from '@symbiote-native/haptics';
+
+function HapticsScreen() {
+  return (
+    <>
+      <ActionButton title="Medium" onPress={() => impactAsync(ImpactFeedbackStyle.Medium)} />
+      <ActionButton title="Success" onPress={() => notificationAsync(NotificationFeedbackType.Success)} />
+      <ActionButton title="Selection" onPress={() => selectionAsync()} />
+    </>
+  );
+}
+```
+
+```vue
+<!-- Vue — examples/expo-vue-sfc/screens/HapticsScreen.vue -->
+<script setup lang="ts">
+import { impactAsync, ImpactFeedbackStyle, notificationAsync, NotificationFeedbackType, selectionAsync } from '@symbiote-native/haptics';
+
+function fireImpact(style: ImpactFeedbackStyle): void {
+  void impactAsync(style);
+}
+</script>
+<template>
+  <ActionButton title="Medium" :onPress="() => fireImpact(ImpactFeedbackStyle.Medium)" />
+</template>
+```
+
+```ts
+// Angular — examples/expo-angular/src/screens/HapticsScreen.ts
+import { Component } from '@angular/core';
+import { impactAsync, ImpactFeedbackStyle, notificationAsync, NotificationFeedbackType } from '@symbiote-native/haptics';
+
+@Component({
+  selector: 'HapticsScreen',
+  template: `<ActionButton title="Medium" (press)="handleImpact()"></ActionButton>`,
+})
+export class HapticsScreen {
+  handleImpact(): void {
+    impactAsync(ImpactFeedbackStyle.Medium);
+  }
+}
+```
+
+Every call is fire-and-forget (no result to await) — a real device is needed to feel the
+feedback, a simulator produces none. Android also gets `performAndroidHapticsAsync`, which
+drives the device haptics engine directly instead of `impactAsync`'s Vibrator simulation; it
+no-ops on every other platform.
 
 ## API
 
-Free functions, no event stream, no per-instance state — upstream ships four async functions and
-three enums, not a subscribable sensor, so the React/Vue/Angular entry points below are plain
-re-exports of `core` with nothing adapter-specific to add.
+Free functions, no event stream, no per-instance state:
 
 ```ts
 notificationAsync(type?: NotificationFeedbackType): Promise<void>
@@ -41,15 +137,16 @@ import { impactAsync } from '@symbiote-native/haptics/vue';
 import { impactAsync } from '@symbiote-native/haptics/angular';
 ```
 
-## Not yet done
+## Test it
 
-- **Native example wiring.** `examples/react` already has a working `expo-modules-core`
-  bring-up (Podfile monkeypatch + Android `settings.gradle` fallback, done for
-  `@symbiote-native/sensors`) that auto-discovers any resolvable expo-modules-core package —
-  adding this package needs only its entry in the Android `wantedExpoModules` allow-list in
-  `examples/react/android/settings.gradle`. No permission or `Info.plist`/`AndroidManifest.xml`
-  entry is needed — haptics feedback requires none on either platform. This waits on a real
-  published/canary build of this package first — `examples/react` resolves `@symbiote-native/*`
-  by pinned version, not `workspace:*`.
-- Tests exercise the JS layer only (fake native module, `vitest`) — no on-device/simulator smoke
-  test yet.
+No Fabric/Descriptor angle at all — haptics is a pure async-function surface, never a view.
+Tests exercise the JS layer via a fake native module in place of the real
+`requireNativeModule` resolution (`vitest`, `src/**/*.test.{ts,tsx}`) — no `installFabric()`, no
+ViewConfig. Native rendering itself is verified on-device (see the parent
+[README](../../README.md)).
+
+Native wiring for this package is done across all four `examples/expo-*` canary apps (Android
+3-layer registration in each app's `build.gradle`/`MainApplication.kt`/`AndroidManifest.xml`,
+plus iOS Podfile/pod install) — not yet ported into the plain, non-Expo public canaries
+(`examples/react`, `examples/vue-sfc`, `examples/vue-tsx`, `examples/angular`), and no
+on-device/simulator automated (Detox) smoke test exists yet, only manual verification.
