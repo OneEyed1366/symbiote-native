@@ -12,6 +12,9 @@ export const ROUTE_NAME = {
   Brightness: 'Brightness',
   Cellular: 'Cellular',
   Network: 'Network',
+  Device: 'Device',
+  Application: 'Application',
+  Crypto: 'Crypto',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

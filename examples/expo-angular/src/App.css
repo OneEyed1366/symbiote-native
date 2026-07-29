@@ -30,6 +30,9 @@
   --line-brightness: #facc15;
   --line-cellular: #3b82f6;
   --line-network: #06b6d4;
+  --line-device: #64748b;
+  --line-application: #ec4899;
+  --line-crypto: #6366f1;
 }
 
 .info-text {
@@ -156,6 +159,15 @@
 .line-tag-network {
   background-color: var(--line-network);
 }
+.line-tag-device {
+  background-color: var(--line-device);
+}
+.line-tag-application {
+  background-color: var(--line-application);
+}
+.line-tag-crypto {
+  background-color: var(--line-crypto);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -203,6 +215,18 @@
   border-left-width: 3px;
   border-left-color: var(--line-network);
 }
+.menu-row-device {
+  border-left-width: 3px;
+  border-left-color: var(--line-device);
+}
+.menu-row-application {
+  border-left-width: 3px;
+  border-left-color: var(--line-application);
+}
+.menu-row-crypto {
+  border-left-width: 3px;
+  border-left-color: var(--line-crypto);
+}
 
 .menu-badge {
   width: 34px;
@@ -234,6 +258,15 @@
 }
 .menu-badge-network {
   background-color: var(--line-network);
+}
+.menu-badge-device {
+  background-color: var(--line-device);
+}
+.menu-badge-application {
+  background-color: var(--line-application);
+}
+.menu-badge-crypto {
+  background-color: var(--line-crypto);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -277,6 +310,15 @@
 }
 .menu-row-hint-network {
   color: var(--line-network);
+}
+.menu-row-hint-device {
+  color: var(--line-device);
+}
+.menu-row-hint-application {
+  color: var(--line-application);
+}
+.menu-row-hint-crypto {
+  color: var(--line-crypto);
 }
 
 /* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own

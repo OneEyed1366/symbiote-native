@@ -15,6 +15,9 @@ export const NAV_LINE = {
   Brightness: 'brightness',
   Cellular: 'cellular',
   Network: 'network',
+  Device: 'device',
+  Application: 'application',
+  Crypto: 'crypto',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -36,6 +39,12 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.Cellular]: '#3b82f6',
   // @symbiote-native/network demo — cyan, shared across every expo-* app for consistency.
   [NAV_LINE.Network]: '#06b6d4',
+  // @symbiote-native/device demo — slate, shared across every expo-* app for consistency.
+  [NAV_LINE.Device]: '#64748b',
+  // @symbiote-native/application demo — pink, shared across every expo-* app for consistency.
+  [NAV_LINE.Application]: '#ec4899',
+  // @symbiote-native/crypto demo — indigo, shared across every expo-* app for consistency.
+  [NAV_LINE.Crypto]: '#6366f1',
 };
 
 export type INavLineInfo = {
@@ -56,4 +65,7 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.Brightness]: { line: NAV_LINE.Brightness, code: 'BR', label: 'BRIGHTNESS LINE' },
   [ROUTE_NAME.Cellular]: { line: NAV_LINE.Cellular, code: 'CL', label: 'CELLULAR LINE' },
   [ROUTE_NAME.Network]: { line: NAV_LINE.Network, code: 'NW', label: 'NETWORK LINE' },
+  [ROUTE_NAME.Device]: { line: NAV_LINE.Device, code: 'DV', label: 'DEVICE LINE' },
+  [ROUTE_NAME.Application]: { line: NAV_LINE.Application, code: 'AP', label: 'APPLICATION LINE' },
+  [ROUTE_NAME.Crypto]: { line: NAV_LINE.Crypto, code: 'CR', label: 'CRYPTO LINE' },
 };

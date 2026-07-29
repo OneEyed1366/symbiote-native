@@ -19,6 +19,9 @@ const MENU_ITEMS: readonly IMenuItem[] = [
   { label: 'Brightness', route: ROUTE_NAME.Brightness, hint: '@symbiote-native/brightness — screen brightness get/set, Android system-brightness mode, permission gating' },
   { label: 'Cellular', route: ROUTE_NAME.Cellular, hint: '@symbiote-native/cellular — cellular generation, carrier/SIM info, permission gating' },
   { label: 'Network', route: ROUTE_NAME.Network, hint: '@symbiote-native/network — live network state, IP address, airplane mode' },
+  { label: 'Device', route: ROUTE_NAME.Device, hint: '@symbiote-native/device — device brand/model/OS info, memory, root/jailbreak detection' },
+  { label: 'Application', route: ROUTE_NAME.Application, hint: '@symbiote-native/application — app version/build/name/ID, install time, Android ID, iOS vendor ID' },
+  { label: 'Crypto', route: ROUTE_NAME.Crypto, hint: '@symbiote-native/crypto — random bytes/UUID, cryptographic digest (SHA-1/256/384/512, MD2/4/5)' },
 ];
 
 /**

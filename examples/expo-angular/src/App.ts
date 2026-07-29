@@ -22,6 +22,9 @@ import { BatteryScreen } from './screens/BatteryScreen';
 import { BrightnessScreen } from './screens/BrightnessScreen';
 import { CellularScreen } from './screens/CellularScreen';
 import { NetworkScreen } from './screens/NetworkScreen';
+import { DeviceScreen } from './screens/DeviceScreen';
+import { ApplicationScreen } from './screens/ApplicationScreen';
+import { CryptoScreen } from './screens/CryptoScreen';
 import { LINE_COLOR } from './navigation-lines';
 // Static look lives in App.css — a plain global .css file, compiled at build time by
 // @symbiote-native/css-parser and resolved at runtime through the shared style registry every
@@ -45,6 +48,9 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
       <ng-template symbioteScreen name="Brightness" [component]="brightnessScreen" [options]="brightnessOptions"></ng-template>
       <ng-template symbioteScreen name="Cellular" [component]="cellularScreen" [options]="cellularOptions"></ng-template>
       <ng-template symbioteScreen name="Network" [component]="networkScreen" [options]="networkOptions"></ng-template>
+      <ng-template symbioteScreen name="Device" [component]="deviceScreen" [options]="deviceOptions"></ng-template>
+      <ng-template symbioteScreen name="Application" [component]="applicationScreen" [options]="applicationOptions"></ng-template>
+      <ng-template symbioteScreen name="Crypto" [component]="cryptoScreen" [options]="cryptoOptions"></ng-template>
     </Stack>
   `,
 })
@@ -58,6 +64,9 @@ export class AppComponent implements OnInit {
   readonly brightnessScreen = BrightnessScreen;
   readonly cellularScreen = CellularScreen;
   readonly networkScreen = NetworkScreen;
+  readonly deviceScreen = DeviceScreen;
+  readonly applicationScreen = ApplicationScreen;
+  readonly cryptoScreen = CryptoScreen;
 
   readonly menuOptions: IAngularScreenOptions = {
     title: 'Expo Modules Demos',
@@ -141,6 +150,36 @@ export class AppComponent implements OnInit {
     title: 'Network',
     headerShown: true,
     headerTintColor: LINE_COLOR.network,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly deviceOptions: IAngularScreenOptions = {
+    title: 'Device',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.device,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly applicationOptions: IAngularScreenOptions = {
+    title: 'Application',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.application,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly cryptoOptions: IAngularScreenOptions = {
+    title: 'Crypto',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.crypto,
     headerTranslucent: true,
     headerTitleColor: '#ffffff',
     headerStyle: DARK_HEADER_STYLE,

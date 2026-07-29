@@ -9,10 +9,13 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import expo.modules.adapters.react.ModuleRegistryAdapter
 import expo.modules.adapters.react.ReactAdapterPackage
 import expo.modules.adapters.react.ReactModuleRegistryProvider
+import expo.modules.application.ApplicationModule
 import expo.modules.battery.BatteryModule
 import expo.modules.brightness.BrightnessModule
 import expo.modules.cellular.CellularModule
 import expo.modules.clipboard.ClipboardModule
+import expo.modules.crypto.CryptoModule
+import expo.modules.device.DeviceModule
 import expo.modules.haptics.HapticsModule
 import expo.modules.kotlin.ModulesProvider
 import expo.modules.kotlin.modules.Module
@@ -51,6 +54,9 @@ private class ExpoModulesProvider : ModulesProvider {
     BrightnessModule::class.java to "ExpoBrightness",
     CellularModule::class.java to "ExpoCellular",
     NetworkModule::class.java to "ExpoNetwork",
+    DeviceModule::class.java to "ExpoDevice",
+    ApplicationModule::class.java to "ExpoApplication",
+    CryptoModule::class.java to "ExpoCrypto",
   )
 }
 

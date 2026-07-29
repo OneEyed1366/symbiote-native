@@ -21,6 +21,9 @@ import BatteryScreen from './screens/BatteryScreen.vue';
 import BrightnessScreen from './screens/BrightnessScreen.vue';
 import CellularScreen from './screens/CellularScreen.vue';
 import NetworkScreen from './screens/NetworkScreen.vue';
+import DeviceScreen from './screens/DeviceScreen.vue';
+import ApplicationScreen from './screens/ApplicationScreen.vue';
+import CryptoScreen from './screens/CryptoScreen.vue';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
 
@@ -138,6 +141,45 @@ onMounted(() => hide());
         title: 'Network',
         headerShown: true,
         headerTintColor: LINE_COLOR.network,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Device"
+      :component="DeviceScreen"
+      :options="{
+        title: 'Device',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.device,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Application"
+      :component="ApplicationScreen"
+      :options="{
+        title: 'Application',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.application,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Crypto"
+      :component="CryptoScreen"
+      :options="{
+        title: 'Crypto',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.crypto,
         headerTranslucent: true,
         headerTitleColor: '#ffffff',
         headerStyle: { backgroundColor: '#0b1622' },
