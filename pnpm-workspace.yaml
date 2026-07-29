@@ -52,6 +52,9 @@ minimumReleaseAgeExclude:
   - expo-brightness@57.0.1
   - expo-cellular@57.0.1
   - expo-network@57.0.1
+  - expo-device@57.0.1
+  - expo-application@57.0.2
+  - expo-crypto@57.0.1
 
 # Single source of truth for dependency versions (pnpm catalogs).
 # A package references a version with `catalog:` (default) or `catalog:<name>`
@@ -203,6 +206,20 @@ catalog:
   expo-brightness: 57.0.1
   expo-cellular: 57.0.1
   expo-network: 57.0.1
+  # Same exact-pin reasoning as the trio above: packages/application depends on expo-application
+  # ONLY for its native ios/android folders (JS hand-ported into our own core). Version verified
+  # against .vendors/expo at origin/sdk-57 (57.0.2) and matches the real npm-published `latest`
+  # as of 2026-07-29 — no drift between the two.
+  expo-application: 57.0.2
+  # Same exact-pin reasoning as the trio above: packages/device depends on expo-device ONLY for
+  # its native ios/android folders (JS hand-ported into our own core). Version verified against
+  # .vendors/expo at origin/sdk-57 (57.0.1), same expo-modules-core 57.0.5 peer/runtime line.
+  expo-device: 57.0.1
+  # Same exact-pin reasoning as the trio above: packages/crypto depends on expo-crypto ONLY for
+  # its native ios/android folders (JS hand-ported into our own core, skipping the aes/ AES
+  # subfolder — out of scope for this pass). Version verified against .vendors/expo at
+  # origin/sdk-57 (57.0.1), same expo-modules-core 57.0.5 peer/runtime line.
+  expo-crypto: 57.0.1
   # Autolinking CLI only (never resolved via the `expo` package) — each native host app needs
   # it as a direct devDependency so its Podfile/settings.gradle can `require.resolve` it; see
   # apps/docs-site's expo-native-module-setup howto. Version verified against .vendors/expo at

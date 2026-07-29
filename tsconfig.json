@@ -8,6 +8,7 @@
     { "path": "adapters/react" },
     { "path": "adapters/vue" },
     { "path": "adapters/angular" },
+    { "path": "packages/application" },
     { "path": "packages/slider" },
     { "path": "packages/splash-screen" },
     { "path": "packages/navigation" },
@@ -18,6 +19,8 @@
     { "path": "packages/battery" },
     { "path": "packages/brightness" },
     { "path": "packages/cellular" },
-    { "path": "packages/network" }
+    { "path": "packages/network" },
+    { "path": "packages/device" },
+    { "path": "packages/crypto" }
   ]
 }
