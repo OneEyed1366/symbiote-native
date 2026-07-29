@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-local-authentication",
+    "modules": [
+      {
+        "importPath": "expo.modules.localauthentication.LocalAuthenticationModule",
+        "className": "LocalAuthenticationModule",
+        "nativeName": "ExpoLocalAuthentication"
+      }
+    ]
+  }
+}

@@ -39,6 +39,7 @@ import expo.modules.sensors.modules.PedometerModule
 // module's own `definition() { Name("...") }` exactly.
 private class ExpoModulesProvider : ModulesProvider {
   override fun getModulesMap(): Map<Class<out Module>, String?> = mapOf(
+    // SYMBIOTE-EXPO-LINK:MODULES-MAP (generated — new lines are appended below, safe to keep)
     AccelerometerModule::class.java to "ExponentAccelerometer",
     BarometerModule::class.java to "ExpoBarometer",
     DeviceMotionModule::class.java to "ExponentDeviceMotion",

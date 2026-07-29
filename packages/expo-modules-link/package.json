@@ -1,0 +1,36 @@
+{
+  "name": "@symbiote-native/expo-modules-link",
+  "version": "0.1.0",
+  "description": "Shared postinstall runtime for expo-modules-core wrapper packages (sensors, local-auth, haptics, ...). Registers a package's native Android module into the consuming app's app/build.gradle and MainApplication.kt so a new native module never needs a hand-edit — every wrapper package depends on this and calls it from its own postinstall.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
+    "directory": "packages/expo-modules-link"
+  },
+  "homepage": "https://github.com/OneEyed1366/symbiote-native/tree/master/packages/expo-modules-link#readme",
+  "bugs": {
+    "url": "https://github.com/OneEyed1366/symbiote-native/issues"
+  },
+  "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "type": "commonjs",
+  "main": "src/index.cjs",
+  "module": "src/index.cjs",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": "./src/index.cjs"
+  },
+  "bin": {
+    "symbiote-expo-link": "./bin/postinstall.cjs"
+  },
+  "files": [
+    "src",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test src/index.test.cjs"
+  }
+}

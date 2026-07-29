@@ -123,7 +123,6 @@ dependencies {
     // module projects directly (see settings.gradle's includeBuild/include wiring).
     implementation project(':expo-modules-core')
     implementation project(':expo-sensors')
-    implementation project(':expo-local-authentication')
     implementation project(':expo-haptics')
     implementation project(':expo-clipboard')
     implementation project(':expo-battery')

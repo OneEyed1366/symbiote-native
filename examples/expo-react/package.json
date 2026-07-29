@@ -26,6 +26,7 @@
     "@symbiote-native/crypto": "file:../../packages/crypto/symbiote-native-crypto-0.0.1.tgz",
     "@symbiote-native/device": "file:../../packages/device/symbiote-native-device-0.0.1.tgz",
     "@symbiote-native/engine": "^0.1.7",
+    "@symbiote-native/expo-modules-link": "file:../../packages/expo-modules-link/symbiote-native-expo-modules-link-0.1.0.tgz",
     "@symbiote-native/haptics": "file:../../packages/haptics/symbiote-native-haptics-0.0.1.tgz",
     "@symbiote-native/local-auth": "file:../../packages/local-auth/symbiote-native-local-auth-0.1.0.tgz",
     "@symbiote-native/navigation": "^2.0.2",

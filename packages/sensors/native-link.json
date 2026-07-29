@@ -1,0 +1,47 @@
+{
+  "android": {
+    "gradleProjectName": "expo-sensors",
+    "modules": [
+      {
+        "importPath": "expo.modules.sensors.modules.AccelerometerModule",
+        "className": "AccelerometerModule",
+        "nativeName": "ExponentAccelerometer"
+      },
+      {
+        "importPath": "expo.modules.sensors.modules.BarometerModule",
+        "className": "BarometerModule",
+        "nativeName": "ExpoBarometer"
+      },
+      {
+        "importPath": "expo.modules.sensors.modules.DeviceMotionModule",
+        "className": "DeviceMotionModule",
+        "nativeName": "ExponentDeviceMotion"
+      },
+      {
+        "importPath": "expo.modules.sensors.modules.GyroscopeModule",
+        "className": "GyroscopeModule",
+        "nativeName": "ExponentGyroscope"
+      },
+      {
+        "importPath": "expo.modules.sensors.modules.LightSensorModule",
+        "className": "LightSensorModule",
+        "nativeName": "ExpoLightSensor"
+      },
+      {
+        "importPath": "expo.modules.sensors.modules.MagnetometerModule",
+        "className": "MagnetometerModule",
+        "nativeName": "ExponentMagnetometer"
+      },
+      {
+        "importPath": "expo.modules.sensors.modules.MagnetometerUncalibratedModule",
+        "className": "MagnetometerUncalibratedModule",
+        "nativeName": "ExponentMagnetometerUncalibrated"
+      },
+      {
+        "importPath": "expo.modules.sensors.modules.PedometerModule",
+        "className": "PedometerModule",
+        "nativeName": "ExponentPedometer"
+      }
+    ]
+  }
+}

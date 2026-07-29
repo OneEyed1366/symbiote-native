@@ -19,7 +19,6 @@ import expo.modules.device.DeviceModule
 import expo.modules.haptics.HapticsModule
 import expo.modules.kotlin.ModulesProvider
 import expo.modules.kotlin.modules.Module
-import expo.modules.localauthentication.LocalAuthenticationModule
 import expo.modules.network.NetworkModule
 import expo.modules.sensors.modules.AccelerometerModule
 import expo.modules.sensors.modules.BarometerModule
@@ -39,6 +38,7 @@ import expo.modules.sensors.modules.PedometerModule
 // module's own `definition() { Name("...") }` exactly.
 private class ExpoModulesProvider : ModulesProvider {
   override fun getModulesMap(): Map<Class<out Module>, String?> = mapOf(
+    // SYMBIOTE-EXPO-LINK:MODULES-MAP (generated — new lines are appended below, safe to keep)
     AccelerometerModule::class.java to "ExponentAccelerometer",
     BarometerModule::class.java to "ExpoBarometer",
     DeviceMotionModule::class.java to "ExponentDeviceMotion",
@@ -47,7 +47,6 @@ private class ExpoModulesProvider : ModulesProvider {
     MagnetometerModule::class.java to "ExponentMagnetometer",
     MagnetometerUncalibratedModule::class.java to "ExponentMagnetometerUncalibrated",
     PedometerModule::class.java to "ExponentPedometer",
-    LocalAuthenticationModule::class.java to "ExpoLocalAuthentication",
     HapticsModule::class.java to "ExpoHaptics",
     ClipboardModule::class.java to "ExpoClipboard",
     BatteryModule::class.java to "ExpoBattery",
