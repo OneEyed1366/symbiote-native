@@ -48,6 +48,9 @@ queue.
 | `@symbiote-native/sensors` | `expo-sensors` | `symbiote-expo-native-module` |
 | `@symbiote-native/slider` | `@react-native-community/slider` (not Expo) | `symbiote-third-party-native-view` |
 | `@symbiote-native/splash-screen` | `react-native-bootsplash` (not Expo — `expo-splash-screen` is excluded, see scope filter) | `symbiote-third-party-native-view` |
+| `@symbiote-native/haptics` | `expo-haptics` | `symbiote-expo-native-module` |
+| `@symbiote-native/clipboard` | `expo-clipboard` | `symbiote-expo-native-module` |
+| `@symbiote-native/battery` | `expo-battery` | `symbiote-expo-native-module` |
 
 ## Priority queue — one continuous sequence, ranked by complexity + demand
 
@@ -62,9 +65,9 @@ from each package's `expo-module.config.json`.
 
 | # | Package | Kind | Platforms |
 |---|---|---|---|
-| 1 | `expo-haptics` | M | apple, android |
-| 2 | `expo-clipboard` | M | apple, android, web |
-| 3 | `expo-battery` | M | apple, android, web |
+| ~~1~~ | ~~`expo-haptics`~~ | M | shipped — see "Already shipped" |
+| ~~2~~ | ~~`expo-clipboard`~~ | M | shipped — see "Already shipped" |
+| ~~3~~ | ~~`expo-battery`~~ | M | shipped — see "Already shipped" |
 | 4 | `expo-brightness` | M | apple, android |
 | 5 | `expo-cellular` | M | apple, android, web |
 | 6 | `expo-network` | M | apple, android, web |

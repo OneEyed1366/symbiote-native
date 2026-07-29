@@ -271,6 +271,23 @@ Verified end-to-end, in this order:
    loading wasn't exercised (no Metro server running in this pass, JS core not finished in
    this session) — verify that once `packages/sensors/src/core` + a demo screen exist.
 
+**`find DerivedData/<Scheme>-*/.../  -name "<Scheme>.app" | head -1` silently installs a STALE
+build if more than one `DerivedData/<Scheme>-<hash>` folder exists for the same scheme** — every
+`xcodebuild`/Xcode-GUI build creates a NEW hash-suffixed folder rather than reusing the old one,
+and `find`'s enumeration order is filesystem order, not mtime order, so `head -1` can just as
+easily pick a build from days ago as the one `xcodebuild` printed paths under moments earlier.
+Symptom: `requireNativeModule('Expo<X>')` throws "Cannot find native module" on the simulator for
+a module that IS correctly present in the just-verified `ExpoModulesProvider.swift` (steps 2-5
+above all pass) — because the INSTALLED binary predates the pod that ships it, not because
+autolinking is broken. Root-caused 2026-07-29 wiring `brightness`/`cellular`/`network` into
+`examples/expo-react`: `xcodebuild`'s own log named the fresh output path
+`DerivedData/CanaryExpo-hdlsozxhqnyltibrvcnvojacmxmm/...`, but a separate `find | head -1` call
+picked `CanaryExpo-epzwjurfnurzwsgcosfdwzwdurqi` (an older, pre-brightness build) and installed
+that instead. Fix: never re-derive the `.app` path with a fresh glob — reuse the EXACT path
+`xcodebuild` itself printed in its own build log for that invocation, or if that's unavailable,
+sort by mtime (`find ... -name "*.app" -exec stat -f '%m %N' {} \; | sort -rn | head -1`) rather
+than trusting enumeration order.
+
 **Android — done and verified 2026-07 (accelerometer pilot).** The premise that "the Gradle-side
 plugins live in `expo-modules-autolinking` itself, independent of the `expo` package" turned out
 to be **only half true** once the actual Kotlin source was read (`.vendors/expo` at
@@ -446,6 +463,34 @@ waiting for the first reading" unless the UI checks `isAvailableAsync()` separat
 device. Any demo/smoke screen for a sensor should render the availability check as its own
 state, not conflate it with "no reading yet" (see `frontend-ux-best-practices`'s "render every
 async state" rule) — otherwise a real bug and this simulator limitation look identical.
+
+**iOS Simulator does not implement `UIScreen.main.brightness` at all — `expo-brightness`'s
+get/set never round-trips there, only on a real device; Android's emulator is unaffected.**
+`BrightnessModule.swift`'s `setBrightnessAsync`/`getBrightnessAsync` are a bare
+`UIScreen.main.brightness = value` / `return UIScreen.main.brightness` — a real call, not a
+stub. But on the Simulator, `set` is silently a no-op and `get` always returns a constant
+(observed `1.0`), regardless of what was written — a long-standing Apple Simulator limitation,
+reproducible in any app including stock Expo Go, not something this wrapper can work around.
+Android's `WindowManager.LayoutParams.screenBrightness` has no such gap: the emulator runs the
+same framework code path as a real device (nothing to visually dim, but the value genuinely
+persists), so `getBrightnessAsync()` after `setBrightnessAsync()` correctly reflects the new
+value there. Symptom (verified 2026-07-29, `examples/expo-react`'s BrightnessScreen): tapping a
+brightness button updates the displayed `%` on Android but not on iOS Simulator — same shape as
+the CoreMotion note above (a real device is required to observe the effect), except here even
+the SOFTWARE-side readback fails on Simulator, not just the physical dimming.
+
+**A core test that imports `UnavailabilityError` (or anything else) as a real VALUE from
+`expo-modules-core` crashes Vitest with `Parse failure: Flow is not supported`** — the real
+`expo-modules-core` entry transitively imports `react-native`, whose Flow-typed source Vitest's
+Oxc transform can't parse. A test that only imports `EventSubscription` etc. as a `type` never
+hits this (types are erased, the real module never loads) — which is why `battery`'s core test
+never needed the fix but `network`'s and `brightness`'s did the moment they added the
+`UnavailabilityError` throw-on-missing-method convention. Fix: `vi.mock('expo-modules-core', ()
+=> ({ UnavailabilityError: class UnavailabilityError extends Error {}, Platform: { OS: 'ios' },
+PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' } }))` —
+mock only the members the file under test actually imports as values. `haptics`'s core test
+(`packages/haptics/src/core/haptics.test.ts`) already has this fix; check it before writing a
+new core test for any package that throws `UnavailabilityError` or reads `Platform.OS`.
 
 ## 7. `settings.gradle` allow-list → exclude-list — the pattern that scales past 2 packages
 
