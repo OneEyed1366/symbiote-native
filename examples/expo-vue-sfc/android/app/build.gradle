@@ -130,6 +130,9 @@ dependencies {
     implementation project(':expo-brightness')
     implementation project(':expo-cellular')
     implementation project(':expo-network')
+    implementation project(':expo-device')
+    implementation project(':expo-application')
+    implementation project(':expo-crypto')
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
