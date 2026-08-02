@@ -743,6 +743,139 @@ device-side, not code: Settings → Security → Screen lock → set a PIN/patte
 AVD, Extended Controls → Fingerprint → enroll one to test the biometric path specifically).
 Same shape as the iOS-Simulator quirks below — hardware/OS state masquerading as an app bug.
 
+## 9. `@symbiote-native/expo-modules-link` — the hand-maintained-registration pain from §4/§7 is now automated (2026-07)
+
+The recurring Android pain documented above and in §7's "This does NOT remove the other two
+registration points" note — `app/build.gradle`'s `implementation project(':expo-<pkg>')` and
+`MainApplication.kt`'s hand-maintained `ModulesProvider` map, both needing one new line per
+package with no compile error on omission, only a runtime `Cannot find native module` crash —
+is now closed by `packages/expo-modules-link`, a shared **postinstall** runtime every
+expo-modules-core wrapper package depends on and calls from its own `postinstall` script.
+
+**Mechanism.** Each wrapper package (sensors, local-auth, haptics, clipboard, battery,
+brightness, cellular, network, device, application, crypto) ships a `native-link.json` next to
+its `package.json`:
+
+```json
+{
+  "android": {
+    "gradleProjectName": "expo-local-authentication",
+    "modules": [
+      { "importPath": "expo.modules.localauthentication.LocalAuthenticationModule",
+        "className": "LocalAuthenticationModule", "nativeName": "ExpoLocalAuthentication" }
+    ]
+  }
+}
+```
+
+`"postinstall": "symbiote-expo-link"` (from `@symbiote-native/expo-modules-link`'s `bin`) finds
+the consuming app's root via `INIT_CWD` (the same technique `husky`/`patch-package` use — npm
+sets it to wherever the top-level `npm install` was invoked, inherited by every nested
+lifecycle script) and patches two files, **additively only** — it never rewrites or removes an
+existing line, only appends one if the exact string isn't already present. That's what makes it
+safe to run from N independent packages' postinstalls, in any order, any number of times, with
+no checksum/conflict-detection layer needed — there's nothing to conflict with:
+
+- `app/build.gradle`: appends `implementation project(':<gradleProjectName>')` right after a
+  lazily-inserted `// SYMBIOTE-EXPO-LINK:DEPENDENCIES` marker (itself inserted once, right after
+  the `implementation("com.facebook.react:react-android")` anchor line, the first time any
+  package's line is genuinely missing).
+- `MainApplication.kt`: appends the module's `import` line after the last existing import, and
+  a `<ClassName>::class.java to "<nativeName>",` entry right after a lazily-inserted
+  `// SYMBIOTE-EXPO-LINK:MODULES-MAP` marker (inserted once, right after the
+  `override fun getModulesMap(): Map<Class<out Module>, String?> = mapOf(` anchor line).
+
+**Caveat to "safe to run in any order, any number of times" — that was true for ORDER, not for
+CONCURRENCY (found and fixed 2026-08-03).** The additive-only design is a correct fix for running
+N postinstalls in any sequence, but npm (7+) runs independent dependencies' `postinstall` scripts
+**concurrently**, not sequentially. Each run was an unsynchronized read-modify-write against the
+SAME two/three files: read current content → compute the new line → write the whole file back.
+Two scripts racing on this produce a classic lost update — both read the same pre-edit snapshot,
+both compute their own addition, and whichever writes last wins, silently discarding the other's
+line (no error, no marker mismatch — the file is well-formed, just missing an entry). Reproduced
+wiring 6 new packages into `examples/expo-angular`/`expo-vue-sfc` at once: a single `npm install`
+landed only 4-5 of 6 entries in `build.gradle`/`MainApplication.kt` (a different subset per file,
+since each file's race resolves independently) — `expo-standard-web-crypto` correctly had nothing
+(pure JS, no `native-link.json` android block).
+
+**Root-cause fix, shipped**: `packages/expo-modules-link/src/index.cjs` now wraps every patch
+function's full read-check-modify-write cycle in `withFileLock(filePath, fn)` — a dependency-free
+mutex built on `fs.mkdirSync` being atomic (`EEXIST` if another process already holds it), with a
+stale-lock reclaim (30s) in case a process crashes mid-patch and a bounded wait (15s, then
+proceeds unlocked rather than hanging a real `npm install` forever) for the pathological case.
+Verified with a real regression test (`concurrent patches from separate processes do not lose
+entries` in `packages/expo-modules-link/src/index.test.cjs`) that spawns 8 actual child processes
+racing on the same fixture files — confirmed it reproduces the loss with the lock removed and
+passes with it in place. `npm rebuild <pkg>` one-at-a-time is no longer needed as a workaround; a
+plain `npm install` is now safe with any number of new native packages added at once.
+
+**What this replaces, what it doesn't.** Adding a NEW expo-modules-core package no longer needs
+a hand-edit to either file in any consuming app — this closes the exact gap §7 flagged as
+NOT solved by the `settings.gradle` exclude-list. iOS per-package *linking* already self-healed
+via its own `use_expo_modules!(exclude: [...])` (§`Accepted side effect`) before this package
+existed, so there was no recurring gap to close there — but a second, genuinely recurring iOS
+gap DID exist and is now also closed: per-package `Info.plist` usage-description strings (see
+below). The one-time per-app bootstrap (Podfile `use_expo_modules!` monkey-patch reproduction,
+`SymbioteExpoModulesFactory`, bridging header) remains fully manual either way — it is a
+one-time, whole-Xcode-project operation, not a per-package one, so it was never in scope.
+
+**iOS `Info.plist` permission strings, added 2026-08-03.** A package that needs a usage-
+description key (`local-auth` → `NSFaceIDUsageDescription`, `sensors` → `NSMotionUsageDescription`)
+declares it in its own `native-link.json` under `ios.infoPlistKeys: { "<KEY>": "<default text>" }`.
+`patchInfoPlist` finds the app's own `Info.plist` (walks `ios/`, skipping `Pods`/`build`/
+`DerivedData`/anything matching `Tests`) and inserts the key right before the outermost closing
+`</dict>` if — and only if — that exact `<key>NAME</key>` isn't already present anywhere in the
+file. No marker needed here (unlike the Android map/deps blocks): a plist key is unique by
+construction, so key-presence alone is the idempotency check.
+
+**The default text must be generic — never copy a specific app's own wording into a shared
+package manifest.** Caught mid-session: the first draft used `examples/expo-react`'s own live
+`Info.plist` text (`"CanaryExpo uses Face ID to demo @symbiote-native/local-auth."`) as the
+manifest's shipped default — which would have put a specific demo app's own name into every
+future consumer's `Info.plist`. There's no per-app config file for this postinstall to read a
+custom string from (unlike Expo's own config-plugins, which pull the string from the consuming
+app's `app.json`), so the shipped default has to name no app at all — e.g.
+`"This app uses Face ID to authenticate you."`
+
+**Overriding the default is a free consequence of the additive-only design, not a built
+feature.** The check is "does this `<key>` already exist", never "does its *value* match the
+default" — so an app can override by simply having the key already present, either by adding it
+to its own `Info.plist` before ever installing the package, or by hand-editing the generated
+string afterward; either way, every future `postinstall` run (this package's or a newly-added
+one's) leaves that key alone permanently. `examples/expo-react`'s own `Info.plist` deliberately
+keeps its original demo-specific wording for exactly this reason — it's a live example of the
+override, not an oversight.
+
+**Verified end-to-end for real** (2026-08-03), same methodology as the Android proof below, with
+one extra wrinkle worth remembering: after repacking `local-auth`'s tarball, the permission
+string still didn't appear — because `@symbiote-native/expo-modules-link` ITSELF was still the
+stale, pre-iOS-support tarball (a transitive dependency's postinstall doesn't retrigger just
+because you updated the dependency; you have to force-reinstall the dependency, THEN
+force-reinstall the package that depends on it, in that order) — see the npm gotcha
+below, which applies per-package, not just to the one package you're actively iterating on.
+
+**Verified end-to-end for real, not just simulated** (2026-07-30): stripped local-auth's three
+registration lines (import, map entry, gradle dependency) from the real, committed
+`examples/expo-react` android files, ran a genuine `npm install`, and confirmed
+`symbiote-expo-link` re-derived the exact same lines — proof the mechanism works against a real
+npm install, not only against synthetic fixtures or direct function calls.
+
+**npm gotcha hit while verifying this — will recur for anyone iterating on a `file:`-referenced
+package.** `npm install` can silently skip re-extracting a `file:` tarball dependency if you
+repack it (e.g. via `pnpm pack`) without bumping its version. `package-lock.json` records an
+`integrity` hash for the `file:` resolution; a plain `npm install` trusts that recorded
+hash/resolution rather than recomputing it against the tarball's current content, so a
+repacked-but-unversioned tarball's new content (e.g. a newly-added `postinstall` script) never
+reaches `node_modules` — the installed copy stays byte-for-byte stale, with **zero warning**.
+Confirmed directly: after repacking `packages/local-auth`, `node_modules/@symbiote-native/
+local-auth/package.json` in `examples/expo-react` still had no `postinstall` field and no
+`native-link.json`, identical to before the repack. Fix during local dev-loop iteration on a
+`file:`-referenced package: either delete `node_modules/@scope/<pkg>` before `npm install`
+(forces a fresh extraction), or explicitly reinstall with the specifier —
+`npm install "@scope/<pkg>@file:../../relative/path/to/the.tgz"` — to force npm to recompute
+resolution + integrity. A real npm consumer who bumps the package's actual published version
+never hits this; it's purely a local-tarball-dev-loop trap.
+
 ## Still-open execution checklist (nothing below has shipped yet)
 
 1. `packages/sensors/package.json` + `tsconfig.json`; add to root `tsconfig.json` references
@@ -775,6 +908,9 @@ Same shape as the iOS-Simulator quirks below — hardware/OS state masquerading 
   a non-view wrapper.
 - `symbiote-dev-examples` — why native wiring goes in `.examples/<app>`, never the public
   `examples/<app>`.
+- `packages/expo-modules-link` — the shared postinstall runtime (§9) that automates the
+  recurring `app/build.gradle`/`MainApplication.kt` registration for every new
+  expo-modules-core package; read its own README for the `native-link.json` manifest shape.
 - `symbiote-sfc-style-compiler` / root CLAUDE.md Build & platform section — this repo's own
   Metro pipeline, the reason `expo`'s own Metro config/babel preset must never be installed.
 - `.vendors/expo` — shared git checkout across projects via the `.vendors` symlink; read a

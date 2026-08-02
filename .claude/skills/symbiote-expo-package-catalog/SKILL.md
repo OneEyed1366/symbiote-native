@@ -57,6 +57,17 @@ queue.
 | `@symbiote-native/device` | `expo-device` | `symbiote-expo-native-module` |
 | `@symbiote-native/application` | `expo-application` | `symbiote-expo-native-module` |
 | `@symbiote-native/crypto` | `expo-crypto` (excluding its `aes/` subfolder — out of scope for this pass) | `symbiote-expo-native-module` |
+| `@symbiote-native/standard-web-crypto` | `expo-standard-web-crypto` (no native folders — delegates to `@symbiote-native/crypto`'s own `getRandomValues` instead of `expo-crypto` directly) | `symbiote-expo-native-module` (hand-ported, no `native-link.json` — no native module to register) |
+| `@symbiote-native/system-ui` | `expo-system-ui` | `symbiote-expo-native-module` |
+| `@symbiote-native/store-review` | `expo-store-review` (trimmed — `storeUrl()`/app.json manifest reading dropped, same reasoning as the `expo-constants` skip below; caller passes `{ iosAppStoreUrl, androidPlayStoreUrl }` explicitly instead) | `symbiote-expo-native-module` |
+| `@symbiote-native/keep-awake` | `expo-keep-awake` | `symbiote-expo-native-module` |
+| `@symbiote-native/screen-orientation` | `expo-screen-orientation` | `symbiote-expo-native-module` |
+| `@symbiote-native/localization` | `expo-localization` | `symbiote-expo-native-module` |
+| `@symbiote-native/tracking-transparency` | `expo-tracking-transparency` | `symbiote-expo-native-module` |
+
+**Tier 1 is now fully closed (2026-08-03)** — every Tier 1 row below is shipped except
+`expo-constants` (#9), which stays deliberately skipped (see its own row note). Tier 2 (permission/
+async, 31 packages) is next up.
 
 ## Priority queue — one continuous sequence, ranked by complexity + demand
 
@@ -81,13 +92,13 @@ from each package's `expo-module.config.json`.
 | ~~8~~ | ~~`expo-application`~~ | M | shipped — see "Already shipped" |
 | 9 | `expo-constants` | M | apple, android, web — **skipped this pass** (2026-07-29): its main value (`expoConfig`, `manifest`) hard-imports `expo/config` types and reads an Expo-CLI-generated manifest (`app.config`/EAS/updates) that doesn't exist in this bare, Metro-only, non-Expo-CLI project. Revisit only if a trimmed port (native-only fields like `sessionId`/`statusBarHeight`/`systemFonts`, skipping the manifest/config apparatus entirely) is explicitly wanted — never port the manifest surface as-is. |
 | ~~10~~ | ~~`expo-crypto`~~ | M | shipped — see "Already shipped" (`aes/` subfolder excluded) |
-| 11 | `expo-standard-web-crypto` | M | universal (pure-JS polyfill, no native folders) |
-| 12 | `expo-localization` | M | apple, android |
-| 13 | `expo-keep-awake` | M | apple, android |
-| 14 | `expo-screen-orientation` | M | apple, android |
-| 15 | `expo-tracking-transparency` | M | apple, android (iOS shows the ATT prompt; Android is a no-op shim) |
-| 16 | `expo-store-review` | M | apple, android |
-| 17 | `expo-system-ui` | M | apple, android |
+| ~~11~~ | ~~`expo-standard-web-crypto`~~ | M | shipped — see "Already shipped" |
+| ~~12~~ | ~~`expo-localization`~~ | M | shipped — see "Already shipped" |
+| ~~13~~ | ~~`expo-keep-awake`~~ | M | shipped — see "Already shipped" |
+| ~~14~~ | ~~`expo-screen-orientation`~~ | M | shipped — see "Already shipped" |
+| ~~15~~ | ~~`expo-tracking-transparency`~~ | M | shipped — see "Already shipped" |
+| ~~16~~ | ~~`expo-store-review`~~ | M | shipped — see "Already shipped" |
+| ~~17~~ | ~~`expo-system-ui`~~ | M | shipped — see "Already shipped" |
 
 ### Tier 2 — moderate (permission-gated, multi-step async, or background lifecycle)
 
