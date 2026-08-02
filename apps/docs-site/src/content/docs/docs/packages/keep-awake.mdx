@@ -1,0 +1,235 @@
+---
+title: Keep awake
+description: expo-keep-awake wrapped for every SymbioteNative adapter — keeps the screen on for the lifetime of a mounted component/composable/service.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/keep-awake` wraps
+[`expo-keep-awake`](https://docs.expo.dev/versions/latest/sdk/keep-awake/) — keeping the screen on
+for as long as a tag holds an active lock — so every SymbioteNative adapter can reach it, not just
+React. Like [network](/docs/packages/network/), it mixes stateless imperative functions
+(`activateKeepAwakeAsync`/`deactivateKeepAwake`/`isAvailableAsync`/`addListener`) with a lifecycle
+hook/composable/service (`useKeepAwake`) that activates a lock on mount and deactivates it on
+unmount — the tag-generation and activate/deactivate lifecycle is written once and shared by all
+three adapters.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React               | ✅ live |
+| Vue                 | ✅ live |
+| Angular             | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/keep-awake
+```
+
+`expo-keep-awake` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project
+(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-keep-awake`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
+  installs the `expo` meta-package. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+No platform permission string is needed — keeping the screen awake has no runtime permission
+prompt on either platform.
+
+## Usage
+
+### Keep the screen awake for a component's lifetime
+
+`useKeepAwake` activates a keep-awake lock on mount and deactivates it on unmount — the simplest
+way to use this package.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Text } from '@symbiote-native/react';
+    import { useKeepAwake } from '@symbiote-native/keep-awake/react';
+
+    export default function KeepAwakeScreen() {
+      useKeepAwake(); // screen stays on for as long as this component is mounted
+
+      return <Text>Screen will not sleep</Text>;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { useKeepAwake } from '@symbiote-native/keep-awake/vue';
+
+    useKeepAwake();
+    </script>
+
+    <template>
+      <Text>Screen will not sleep</Text>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { Text } from '@symbiote-native/angular';
+    import { KeepAwakeService } from '@symbiote-native/keep-awake/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Text],
+      template: `<Text>Screen will not sleep</Text>`,
+    })
+    export class KeepAwakeScreen {
+      constructor() {
+        inject(KeepAwakeService).connect();
+      }
+    }
+    ```
+
+    `KeepAwakeService.connect()` has no return value — it's a pure side effect for the component's
+    lifetime, wired through Angular's `effect()` so activation/deactivation follows the same
+    mount/cleanup timing as React's `useEffect`/Vue's `onMounted`/`onUnmounted`.
+  </TabItem>
+</Tabs>
+
+### Imperative functions
+
+The functions below work identically on every adapter — call them straight from any event
+handler when you need manual control over a specific tag, instead of the automatic
+mount/unmount lifecycle above.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Button } from '@symbiote-native/react';
+    import { activateKeepAwakeAsync, deactivateKeepAwake } from '@symbiote-native/keep-awake/react';
+
+    export default function ManualKeepAwake() {
+      return (
+        <>
+          <Button title="Keep awake" onPress={() => activateKeepAwakeAsync('download-tag')} />
+          <Button title="Allow sleep" onPress={() => deactivateKeepAwake('download-tag')} />
+        </>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { activateKeepAwakeAsync, deactivateKeepAwake } from '@symbiote-native/keep-awake/vue';
+    </script>
+
+    <template>
+      <Button title="Keep awake" @press="activateKeepAwakeAsync('download-tag')" />
+      <Button title="Allow sleep" @press="deactivateKeepAwake('download-tag')" />
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { Button } from '@symbiote-native/angular';
+    import { activateKeepAwakeAsync, deactivateKeepAwake } from '@symbiote-native/keep-awake/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Button],
+      template: `
+        <Button title="Keep awake" (press)="activateKeepAwakeAsync('download-tag')" />
+        <Button title="Allow sleep" (press)="deactivateKeepAwake('download-tag')" />
+      `,
+    })
+    export class ManualKeepAwake {
+      protected readonly activateKeepAwakeAsync = activateKeepAwakeAsync;
+      protected readonly deactivateKeepAwake = deactivateKeepAwake;
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## API
+
+### Functions
+
+| Signature | Description |
+| --- | --- |
+| `isAvailableAsync(): Promise<boolean>` | Resolves whether the keep-awake API is available on this device |
+| `activateKeepAwakeAsync(tag?: string): Promise<void>` | Activates a keep-awake lock under `tag` (the shared default tag when none is given) — the screen stays on for as long as any tag holds an active lock |
+| `deactivateKeepAwake(tag?: string): Promise<void>` | Releases the keep-awake lock held under `tag` (the shared default tag when none is given) |
+| `addListener(tagOrListener: string \| KeepAwakeListener, listener?: KeepAwakeListener): EventSubscription` | Subscribes to keep-awake state changes for a tag — overloaded to accept a bare listener for the default tag. Throws if the native module lacks `addListenerForTag` |
+
+Plus the `ExpoKeepAwakeTag` constant (the shared default tag string, `'ExpoKeepAwakeDefaultTag'`).
+
+### `useKeepAwake()` config
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `tag` (first argument) | `string \| undefined` | a per-instance auto-generated tag | The lock tag to activate/deactivate. React derives its default from `useId()`; Vue and Angular fall back to a monotonically-incrementing module-local counter (`keep-awake-tag-1`, `keep-awake-tag-2`, …), since neither has a `useId` equivalent |
+| `options` (second argument) | `KeepAwakeOptions \| undefined` | `undefined` | `{ listener?, suppressDeactivateWarnings? }` — see below |
+
+### `KeepAwakeOptions`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `listener` | `KeepAwakeListener \| undefined` | Registered via `addListener` once activation resolves, for keep-awake state-change notifications |
+| `suppressDeactivateWarnings` | `boolean \| undefined` | When `true`, a rejected `deactivateKeepAwake()` call on unmount is silently swallowed instead of surfacing as an unhandled rejection |
+
+### `KeepAwakeEvent` / `KeepAwakeListener`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `state` | `unknown` | Kept as a minimal placeholder — upstream's own `state` shape is a web-only `WakeLockSentinel`-derived value with no native analogue, and native listeners for it rarely fire |
+
+`KeepAwakeListener` is `(event: KeepAwakeEvent) => void`.
+
+## Notes
+
+<Aside type="note" title="React/Vue/Angular have no shared default-tag mechanism">
+  React uses `useId()` for its default per-instance tag, matching upstream exactly, so two
+  components calling `useKeepAwake()` concurrently without an explicit tag don't clobber each
+  other's activation/deactivation. Vue and Angular have no `useId` equivalent, so both fall back
+  to a small monotonically-incrementing module-local counter instead — functionally equivalent,
+  just not identical string values across adapters.
+</Aside>
+
+## How the wrapper works
+
+`@symbiote-native/keep-awake` ships zero React/Vue/Angular logic in `expo-keep-awake` itself —
+its functions and types are hand-ported, verbatim, into this package's own `core/`, resolving the
+native module through `expo-modules-core`'s `requireNativeModule` rather than the `expo`
+meta-package this project never installs:
+
+```
+packages/keep-awake/src/
+├── core/                 isAvailableAsync/activateKeepAwakeAsync/deactivateKeepAwake/addListener,
+│                         ExpoKeepAwakeTag. native-module.ts resolves the native module through
+│                         expo-modules-core's requireNativeModule. types.ts —
+│                         KeepAwakeEvent/KeepAwakeListener/KeepAwakeOptions, hand-ported from
+│                         KeepAwake.types.ts.
+├── react/hooks/          @symbiote-native/keep-awake/react   — useKeepAwake
+├── vue/composables/      @symbiote-native/keep-awake/vue     — useKeepAwake (same name)
+└── angular/services/     @symbiote-native/keep-awake/angular — KeepAwakeService (`.connect()`,
+                          no return value)
+```
+
+Each adapter's hook/composable/service is a thin lifecycle wrapper over the same `core` functions
+— activate on mount, register the optional listener once activation resolves, deactivate on
+unmount — written once as a shared pattern and reapplied identically across React's `useEffect`,
+Vue's `onMounted`/`onUnmounted`, and Angular's `effect()` (the same `connect()`/`effect()` pattern
+[battery](/docs/packages/battery/)'s `LowPowerModeService` uses, minus a Signal to return since
+keep-awake is a pure side effect). The native code itself is never vendored or copied —
+`expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
+guide](/docs/howtos/expo-native-module-setup/)).

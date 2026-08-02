@@ -234,6 +234,13 @@ export default defineConfig({
             { label: 'Device', slug: 'docs/packages/device' },
             { label: 'Application', slug: 'docs/packages/application' },
             { label: 'Crypto', slug: 'docs/packages/crypto' },
+            { label: 'Standard web crypto', slug: 'docs/packages/standard-web-crypto' },
+            { label: 'System UI', slug: 'docs/packages/system-ui' },
+            { label: 'Store review', slug: 'docs/packages/store-review' },
+            { label: 'Keep awake', slug: 'docs/packages/keep-awake' },
+            { label: 'Screen orientation', slug: 'docs/packages/screen-orientation' },
+            { label: 'Localization', slug: 'docs/packages/localization' },
+            { label: 'Tracking transparency', slug: 'docs/packages/tracking-transparency' },
           ],
         },
         {
