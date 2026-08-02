@@ -21,6 +21,13 @@
     { "path": "packages/cellular" },
     { "path": "packages/network" },
     { "path": "packages/device" },
-    { "path": "packages/crypto" }
+    { "path": "packages/crypto" },
+    { "path": "packages/standard-web-crypto" },
+    { "path": "packages/localization" },
+    { "path": "packages/keep-awake" },
+    { "path": "packages/screen-orientation" },
+    { "path": "packages/tracking-transparency" },
+    { "path": "packages/store-review" },
+    { "path": "packages/system-ui" }
   ]
 }

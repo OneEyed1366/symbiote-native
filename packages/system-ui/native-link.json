@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-system-ui",
+    "modules": [
+      {
+        "importPath": "expo.modules.systemui.SystemUIModule",
+        "className": "SystemUIModule",
+        "nativeName": "ExpoSystemUI"
+      }
+    ]
+  }
+}

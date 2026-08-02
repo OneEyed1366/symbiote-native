@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-screen-orientation",
+    "modules": [
+      {
+        "importPath": "expo.modules.screenorientation.ScreenOrientationModule",
+        "className": "ScreenOrientationModule",
+        "nativeName": "ExpoScreenOrientation"
+      }
+    ]
+  }
+}

@@ -55,6 +55,12 @@ minimumReleaseAgeExclude:
   - expo-device@57.0.1
   - expo-application@57.0.2
   - expo-crypto@57.0.1
+  - expo-localization@57.0.1
+  - expo-keep-awake@57.0.1
+  - expo-screen-orientation@57.0.1
+  - expo-tracking-transparency@57.0.1
+  - expo-store-review@57.0.1
+  - expo-system-ui@57.0.2
 
 # Single source of truth for dependency versions (pnpm catalogs).
 # A package references a version with `catalog:` (default) or `catalog:<name>`
@@ -220,6 +226,20 @@ catalog:
   # subfolder — out of scope for this pass). Version verified against .vendors/expo at
   # origin/sdk-57 (57.0.1), same expo-modules-core 57.0.5 peer/runtime line.
   expo-crypto: 57.0.1
+  # Same exact-pin reasoning as the trio above — this batch closes out tier-1 of the
+  # symbiote-expo-package-catalog priority queue: packages/localization, packages/keep-awake,
+  # packages/screen-orientation, packages/tracking-transparency, packages/store-review, and
+  # packages/system-ui each depend on their matching expo-* package ONLY for its native
+  # ios/android folders (JS hand-ported into our own core). Versions verified against
+  # .vendors/expo at origin/sdk-57, same expo-modules-core 57.0.5 peer/runtime line.
+  # (expo-standard-web-crypto has no native ios/android folders at all — it delegates entirely
+  # to packages/crypto's own getRandomValues — so it needs no catalog entry here.)
+  expo-localization: 57.0.1
+  expo-keep-awake: 57.0.1
+  expo-screen-orientation: 57.0.1
+  expo-tracking-transparency: 57.0.1
+  expo-store-review: 57.0.1
+  expo-system-ui: 57.0.2
   # Autolinking CLI only (never resolved via the `expo` package) — each native host app needs
   # it as a direct devDependency so its Podfile/settings.gradle can `require.resolve` it; see
   # apps/docs-site's expo-native-module-setup howto. Version verified against .vendors/expo at

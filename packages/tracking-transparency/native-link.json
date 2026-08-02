@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-tracking-transparency",
+    "modules": [
+      {
+        "importPath": "expo.modules.trackingtransparency.TrackingTransparencyModule",
+        "className": "TrackingTransparencyModule",
+        "nativeName": "ExpoTrackingTransparency"
+      }
+    ]
+  }
+}

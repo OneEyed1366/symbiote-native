@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-keep-awake",
+    "modules": [
+      {
+        "importPath": "expo.modules.keepawake.KeepAwakeModule",
+        "className": "KeepAwakeModule",
+        "nativeName": "ExpoKeepAwake"
+      }
+    ]
+  }
+}
