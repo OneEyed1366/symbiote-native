@@ -60,5 +60,7 @@
 	<string>This app uses Face ID to authenticate you.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>This app uses motion sensor data.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>CanaryExpo uses this to demo @symbiote-native/tracking-transparency.</string>
 </dict>
 </plist>
