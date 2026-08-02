@@ -23,6 +23,13 @@ const MENU_ITEMS: readonly IMenuItem[] = [
   { label: 'Device', route: ROUTE_NAME.Device, hint: '@symbiote-native/device — device brand/model/OS info, memory, root/jailbreak detection' },
   { label: 'Application', route: ROUTE_NAME.Application, hint: '@symbiote-native/application — app version/build/name/ID, install time, Android ID, iOS vendor ID' },
   { label: 'Crypto', route: ROUTE_NAME.Crypto, hint: '@symbiote-native/crypto — random bytes/UUID, cryptographic digest (SHA-1/256/384/512, MD2/4/5)' },
+  { label: 'Web Crypto', route: ROUTE_NAME.StandardWebCrypto, hint: '@symbiote-native/standard-web-crypto — W3C crypto.getRandomValues polyfill' },
+  { label: 'System UI', route: ROUTE_NAME.SystemUi, hint: '@symbiote-native/system-ui — root view background color get/set' },
+  { label: 'Store Review', route: ROUTE_NAME.StoreReview, hint: '@symbiote-native/store-review — native App Store/Play Store review prompt' },
+  { label: 'Keep Awake', route: ROUTE_NAME.KeepAwake, hint: '@symbiote-native/keep-awake — keep the screen on while a component is mounted' },
+  { label: 'Screen Orientation', route: ROUTE_NAME.ScreenOrientation, hint: '@symbiote-native/screen-orientation — lock/unlock orientation, live orientation state' },
+  { label: 'Localization', route: ROUTE_NAME.Localization, hint: '@symbiote-native/localization — user locales and calendar preferences' },
+  { label: 'Tracking Transparency', route: ROUTE_NAME.TrackingTransparency, hint: '@symbiote-native/tracking-transparency — App Tracking Transparency permission + advertising ID' },
 ];
 
 /**

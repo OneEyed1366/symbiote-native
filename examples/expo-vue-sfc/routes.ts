@@ -16,6 +16,13 @@ export const ROUTE_NAME = {
   Device: 'Device',
   Application: 'Application',
   Crypto: 'Crypto',
+  StandardWebCrypto: 'StandardWebCrypto',
+  SystemUi: 'SystemUi',
+  StoreReview: 'StoreReview',
+  KeepAwake: 'KeepAwake',
+  ScreenOrientation: 'ScreenOrientation',
+  Localization: 'Localization',
+  TrackingTransparency: 'TrackingTransparency',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

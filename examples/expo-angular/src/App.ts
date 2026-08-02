@@ -25,6 +25,13 @@ import { NetworkScreen } from './screens/NetworkScreen';
 import { DeviceScreen } from './screens/DeviceScreen';
 import { ApplicationScreen } from './screens/ApplicationScreen';
 import { CryptoScreen } from './screens/CryptoScreen';
+import { WebCryptoScreen } from './screens/WebCryptoScreen';
+import { SystemUiScreen } from './screens/SystemUiScreen';
+import { StoreReviewScreen } from './screens/StoreReviewScreen';
+import { KeepAwakeScreen } from './screens/KeepAwakeScreen';
+import { ScreenOrientationScreen } from './screens/ScreenOrientationScreen';
+import { LocalizationScreen } from './screens/LocalizationScreen';
+import { TrackingTransparencyScreen } from './screens/TrackingTransparencyScreen';
 import { LINE_COLOR } from './navigation-lines';
 // Static look lives in App.css — a plain global .css file, compiled at build time by
 // @symbiote-native/css-parser and resolved at runtime through the shared style registry every
@@ -51,6 +58,13 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
       <ng-template symbioteScreen name="Device" [component]="deviceScreen" [options]="deviceOptions"></ng-template>
       <ng-template symbioteScreen name="Application" [component]="applicationScreen" [options]="applicationOptions"></ng-template>
       <ng-template symbioteScreen name="Crypto" [component]="cryptoScreen" [options]="cryptoOptions"></ng-template>
+      <ng-template symbioteScreen name="StandardWebCrypto" [component]="webCryptoScreen" [options]="webCryptoOptions"></ng-template>
+      <ng-template symbioteScreen name="SystemUi" [component]="systemUiScreen" [options]="systemUiOptions"></ng-template>
+      <ng-template symbioteScreen name="StoreReview" [component]="storeReviewScreen" [options]="storeReviewOptions"></ng-template>
+      <ng-template symbioteScreen name="KeepAwake" [component]="keepAwakeScreen" [options]="keepAwakeOptions"></ng-template>
+      <ng-template symbioteScreen name="ScreenOrientation" [component]="screenOrientationScreen" [options]="screenOrientationOptions"></ng-template>
+      <ng-template symbioteScreen name="Localization" [component]="localizationScreen" [options]="localizationOptions"></ng-template>
+      <ng-template symbioteScreen name="TrackingTransparency" [component]="trackingTransparencyScreen" [options]="trackingTransparencyOptions"></ng-template>
     </Stack>
   `,
 })
@@ -67,6 +81,13 @@ export class AppComponent implements OnInit {
   readonly deviceScreen = DeviceScreen;
   readonly applicationScreen = ApplicationScreen;
   readonly cryptoScreen = CryptoScreen;
+  readonly webCryptoScreen = WebCryptoScreen;
+  readonly systemUiScreen = SystemUiScreen;
+  readonly storeReviewScreen = StoreReviewScreen;
+  readonly keepAwakeScreen = KeepAwakeScreen;
+  readonly screenOrientationScreen = ScreenOrientationScreen;
+  readonly localizationScreen = LocalizationScreen;
+  readonly trackingTransparencyScreen = TrackingTransparencyScreen;
 
   readonly menuOptions: IAngularScreenOptions = {
     title: 'Expo Modules Demos',
@@ -180,6 +201,76 @@ export class AppComponent implements OnInit {
     title: 'Crypto',
     headerShown: true,
     headerTintColor: LINE_COLOR.crypto,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly webCryptoOptions: IAngularScreenOptions = {
+    title: 'Web Crypto',
+    headerShown: true,
+    headerTintColor: LINE_COLOR['standard-web-crypto'],
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly systemUiOptions: IAngularScreenOptions = {
+    title: 'System UI',
+    headerShown: true,
+    headerTintColor: LINE_COLOR['system-ui'],
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly storeReviewOptions: IAngularScreenOptions = {
+    title: 'Store Review',
+    headerShown: true,
+    headerTintColor: LINE_COLOR['store-review'],
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly keepAwakeOptions: IAngularScreenOptions = {
+    title: 'Keep Awake',
+    headerShown: true,
+    headerTintColor: LINE_COLOR['keep-awake'],
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly screenOrientationOptions: IAngularScreenOptions = {
+    title: 'Screen Orientation',
+    headerShown: true,
+    headerTintColor: LINE_COLOR['screen-orientation'],
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly localizationOptions: IAngularScreenOptions = {
+    title: 'Localization',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.localization,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly trackingTransparencyOptions: IAngularScreenOptions = {
+    title: 'Tracking Transparency',
+    headerShown: true,
+    headerTintColor: LINE_COLOR['tracking-transparency'],
     headerTranslucent: true,
     headerTitleColor: '#ffffff',
     headerStyle: DARK_HEADER_STYLE,

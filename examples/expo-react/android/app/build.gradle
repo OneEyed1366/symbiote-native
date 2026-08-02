@@ -118,20 +118,9 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-
     // No `expo` aggregator project to depend on transitively — :app depends on both Expo
     // module projects directly (see settings.gradle's includeBuild/include wiring).
     implementation project(':expo-modules-core')
-    implementation project(':expo-sensors')
-    implementation project(':expo-haptics')
-    implementation project(':expo-clipboard')
-    implementation project(':expo-battery')
-    implementation project(':expo-brightness')
-    implementation project(':expo-cellular')
-    implementation project(':expo-network')
-    implementation project(':expo-device')
-    implementation project(':expo-application')
-    implementation project(':expo-crypto')
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

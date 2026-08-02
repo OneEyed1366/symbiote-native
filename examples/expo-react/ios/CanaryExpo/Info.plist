@@ -35,10 +35,6 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
-	<key>NSFaceIDUsageDescription</key>
-	<string>CanaryExpo uses Face ID to demo @symbiote-native/local-auth.</string>
-	<key>NSMotionUsageDescription</key>
-	<string>CanaryExpo reads motion sensor data to demo @symbiote-native/sensors.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
@@ -60,5 +56,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>This app uses Face ID to authenticate you.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>This app uses motion sensor data.</string>
 </dict>
 </plist>

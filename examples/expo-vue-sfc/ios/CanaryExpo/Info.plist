@@ -39,6 +39,8 @@
 	<string>CanaryExpo uses motion data to demo the sensors package.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>CanaryExpo uses Face ID to demo @symbiote-native/local-auth.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>CanaryExpo uses this to demo @symbiote-native/tracking-transparency.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

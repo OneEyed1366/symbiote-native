@@ -118,6 +118,13 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    // SYMBIOTE-EXPO-LINK:DEPENDENCIES (generated — new lines are appended below, safe to keep)
+    implementation project(':expo-screen-orientation')
+    implementation project(':expo-keep-awake')
+    implementation project(':expo-store-review')
+    implementation project(':expo-localization')
+    implementation project(':expo-system-ui')
+    implementation project(':expo-tracking-transparency')
 
     // No `expo` aggregator project to depend on transitively — :app depends on both Expo
     // module projects directly (see settings.gradle's manual include()).

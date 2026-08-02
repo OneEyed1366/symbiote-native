@@ -32,6 +32,13 @@
   --line-device: #64748b;
   --line-application: #ec4899;
   --line-crypto: #6366f1;
+  --line-standard-web-crypto: #f97316;
+  --line-system-ui: #a855f7;
+  --line-store-review: #84cc16;
+  --line-keep-awake: #0ea5e9;
+  --line-screen-orientation: #f43f5e;
+  --line-localization: #10b981;
+  --line-tracking-transparency: #78716c;
 
   /* Decoupled "good/live" state color — was borrowed from --line-structure back when the
      navigation demo suite's Structure line still existed in this app; now its own token so
@@ -176,6 +183,27 @@
 .line-tag-crypto {
   background-color: var(--line-crypto);
 }
+.line-tag-standard-web-crypto {
+  background-color: var(--line-standard-web-crypto);
+}
+.line-tag-system-ui {
+  background-color: var(--line-system-ui);
+}
+.line-tag-store-review {
+  background-color: var(--line-store-review);
+}
+.line-tag-keep-awake {
+  background-color: var(--line-keep-awake);
+}
+.line-tag-screen-orientation {
+  background-color: var(--line-screen-orientation);
+}
+.line-tag-localization {
+  background-color: var(--line-localization);
+}
+.line-tag-tracking-transparency {
+  background-color: var(--line-tracking-transparency);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -236,6 +264,34 @@
   border-left-width: 3px;
   border-left-color: var(--line-crypto);
 }
+.menu-row-standard-web-crypto {
+  border-left-width: 3px;
+  border-left-color: var(--line-standard-web-crypto);
+}
+.menu-row-system-ui {
+  border-left-width: 3px;
+  border-left-color: var(--line-system-ui);
+}
+.menu-row-store-review {
+  border-left-width: 3px;
+  border-left-color: var(--line-store-review);
+}
+.menu-row-keep-awake {
+  border-left-width: 3px;
+  border-left-color: var(--line-keep-awake);
+}
+.menu-row-screen-orientation {
+  border-left-width: 3px;
+  border-left-color: var(--line-screen-orientation);
+}
+.menu-row-localization {
+  border-left-width: 3px;
+  border-left-color: var(--line-localization);
+}
+.menu-row-tracking-transparency {
+  border-left-width: 3px;
+  border-left-color: var(--line-tracking-transparency);
+}
 
 .menu-badge {
   width: 34px;
@@ -276,6 +332,27 @@
 }
 .menu-badge-crypto {
   background-color: var(--line-crypto);
+}
+.menu-badge-standard-web-crypto {
+  background-color: var(--line-standard-web-crypto);
+}
+.menu-badge-system-ui {
+  background-color: var(--line-system-ui);
+}
+.menu-badge-store-review {
+  background-color: var(--line-store-review);
+}
+.menu-badge-keep-awake {
+  background-color: var(--line-keep-awake);
+}
+.menu-badge-screen-orientation {
+  background-color: var(--line-screen-orientation);
+}
+.menu-badge-localization {
+  background-color: var(--line-localization);
+}
+.menu-badge-tracking-transparency {
+  background-color: var(--line-tracking-transparency);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -328,6 +405,27 @@
 }
 .menu-row-hint-crypto {
   color: var(--line-crypto);
+}
+.menu-row-hint-standard-web-crypto {
+  color: var(--line-standard-web-crypto);
+}
+.menu-row-hint-system-ui {
+  color: var(--line-system-ui);
+}
+.menu-row-hint-store-review {
+  color: var(--line-store-review);
+}
+.menu-row-hint-keep-awake {
+  color: var(--line-keep-awake);
+}
+.menu-row-hint-screen-orientation {
+  color: var(--line-screen-orientation);
+}
+.menu-row-hint-localization {
+  color: var(--line-localization);
+}
+.menu-row-hint-tracking-transparency {
+  color: var(--line-tracking-transparency);
 }
 
 /* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own
@@ -813,6 +911,290 @@
   background-color: var(--ink);
 }
 .crypto-result-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* WebCryptoScreen — @symbiote-native/standard-web-crypto's tour stop, mirroring CryptoScreen's
+   own action-card/result-box shape (random bytes render as a hex string, same "long value" case
+   CryptoScreen's stacked-box layout already handles) plus one status row for the polyfill check. */
+.web-crypto-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.web-crypto-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.web-crypto-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.web-crypto-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.web-crypto-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+.web-crypto-result-box {
+  padding: 12px;
+  border-radius: 10px;
+  background-color: var(--ink);
+}
+.web-crypto-result-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* SystemUiScreen — one live card (fetch-on-mount background color + set/reset buttons),
+   mirroring DeviceScreen's card/row/value-text shape. */
+.system-ui-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.system-ui-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.system-ui-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.system-ui-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.system-ui-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* StoreReviewScreen — a capabilities card (isAvailableAsync/hasAction), mirroring BatteryScreen's
+   capabilities-card/status-badge shape. */
+.store-review-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.store-review-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.store-review-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.store-review-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.store-review-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+.store-review-status-badge {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+.store-review-status-badge-checking {
+  background-color: var(--mist);
+}
+.store-review-status-badge-no {
+  background-color: #6b4a4a;
+}
+.store-review-status-badge-yes {
+  background-color: var(--positive);
+}
+.store-review-status-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+/* KeepAwakeScreen — a toggle card (mount/unmount the useKeepAwake-holding child) plus a
+   capabilities row, mirroring BatteryScreen's card/row/status-badge shape. */
+.keep-awake-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.keep-awake-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.keep-awake-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.keep-awake-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.keep-awake-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+.keep-awake-status-badge {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+.keep-awake-status-badge-checking {
+  background-color: var(--mist);
+}
+.keep-awake-status-badge-no {
+  background-color: #6b4a4a;
+}
+.keep-awake-status-badge-yes {
+  background-color: var(--positive);
+}
+.keep-awake-status-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+/* ScreenOrientationScreen — a live card (useScreenOrientation's orientation + orientationLock)
+   plus a lock/unlock actions card, mirroring DeviceScreen's card/row/value-text shape. */
+.screen-orientation-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.screen-orientation-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.screen-orientation-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.screen-orientation-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.screen-orientation-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* LocalizationScreen — two eager-constants cards (first locale, first calendar), mirroring
+   DeviceScreen's card/row/value-text shape. */
+.localization-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.localization-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.localization-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.localization-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.localization-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* TrackingTransparencyScreen — a permissions card (status/granted + get/request buttons) and an
+   advertising-ID result box, mirroring CryptoScreen's result-box for the (potentially long) ID
+   value plus BatteryScreen's status-badge shape for granted/denied. */
+.tracking-transparency-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.tracking-transparency-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.tracking-transparency-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.tracking-transparency-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.tracking-transparency-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+}
+.tracking-transparency-status-badge {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+.tracking-transparency-status-badge-checking {
+  background-color: var(--mist);
+}
+.tracking-transparency-status-badge-no {
+  background-color: #6b4a4a;
+}
+.tracking-transparency-status-badge-yes {
+  background-color: var(--positive);
+}
+.tracking-transparency-status-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+.tracking-transparency-result-box {
+  padding: 12px;
+  border-radius: 10px;
+  background-color: var(--ink);
+}
+.tracking-transparency-result-text {
   color: var(--chalk-bright);
   font-size: 13px;
   font-weight: bold;

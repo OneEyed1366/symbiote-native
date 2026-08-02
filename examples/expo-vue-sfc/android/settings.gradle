@@ -19,7 +19,7 @@ pluginManagement {
   // symbiote-expo-native-module skill).
   def unwantedExpoModules = [
     "expo", "expo-asset", "expo-constants", "expo-file-system",
-    "expo-font", "expo-keep-awake", "@expo/dom-webview", "@expo/log-box",
+    "expo-font", "@expo/dom-webview", "@expo/log-box",
   ]
   def wantedExpoModules = resolvedExpoModules.modules
     .findAll { !unwantedExpoModules.contains(it.packageName) }

@@ -18,6 +18,13 @@ export const NAV_LINE = {
   Device: 'device',
   Application: 'application',
   Crypto: 'crypto',
+  StandardWebCrypto: 'standard-web-crypto',
+  SystemUi: 'system-ui',
+  StoreReview: 'store-review',
+  KeepAwake: 'keep-awake',
+  ScreenOrientation: 'screen-orientation',
+  Localization: 'localization',
+  TrackingTransparency: 'tracking-transparency',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -43,6 +50,20 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.Application]: '#ec4899',
   // Indigo — @symbiote-native/crypto.
   [NAV_LINE.Crypto]: '#6366f1',
+  // Orange — @symbiote-native/standard-web-crypto.
+  [NAV_LINE.StandardWebCrypto]: '#f97316',
+  // Purple — @symbiote-native/system-ui.
+  [NAV_LINE.SystemUi]: '#a855f7',
+  // Lime — @symbiote-native/store-review.
+  [NAV_LINE.StoreReview]: '#84cc16',
+  // Sky — @symbiote-native/keep-awake.
+  [NAV_LINE.KeepAwake]: '#0ea5e9',
+  // Rose — @symbiote-native/screen-orientation.
+  [NAV_LINE.ScreenOrientation]: '#f43f5e',
+  // Emerald — @symbiote-native/localization.
+  [NAV_LINE.Localization]: '#10b981',
+  // Stone — @symbiote-native/tracking-transparency.
+  [NAV_LINE.TrackingTransparency]: '#78716c',
 };
 
 export type INavLineInfo = {
@@ -66,4 +87,31 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.Device]: { line: NAV_LINE.Device, code: 'DV', label: 'DEVICE LINE' },
   [ROUTE_NAME.Application]: { line: NAV_LINE.Application, code: 'AP', label: 'APPLICATION LINE' },
   [ROUTE_NAME.Crypto]: { line: NAV_LINE.Crypto, code: 'CR', label: 'CRYPTO LINE' },
+  [ROUTE_NAME.StandardWebCrypto]: {
+    line: NAV_LINE.StandardWebCrypto,
+    code: 'WC',
+    label: 'WEB CRYPTO LINE',
+  },
+  [ROUTE_NAME.SystemUi]: { line: NAV_LINE.SystemUi, code: 'SU', label: 'SYSTEM UI LINE' },
+  [ROUTE_NAME.StoreReview]: {
+    line: NAV_LINE.StoreReview,
+    code: 'SR',
+    label: 'STORE REVIEW LINE',
+  },
+  [ROUTE_NAME.KeepAwake]: { line: NAV_LINE.KeepAwake, code: 'KA', label: 'KEEP AWAKE LINE' },
+  [ROUTE_NAME.ScreenOrientation]: {
+    line: NAV_LINE.ScreenOrientation,
+    code: 'SO',
+    label: 'SCREEN ORIENTATION LINE',
+  },
+  [ROUTE_NAME.Localization]: {
+    line: NAV_LINE.Localization,
+    code: 'LO',
+    label: 'LOCALIZATION LINE',
+  },
+  [ROUTE_NAME.TrackingTransparency]: {
+    line: NAV_LINE.TrackingTransparency,
+    code: 'TT',
+    label: 'TRACKING TRANSPARENCY LINE',
+  },
 };

@@ -29,6 +29,12 @@ import expo.modules.sensors.modules.LightSensorModule
 import expo.modules.sensors.modules.MagnetometerModule
 import expo.modules.sensors.modules.MagnetometerUncalibratedModule
 import expo.modules.sensors.modules.PedometerModule
+import expo.modules.storereview.StoreReviewModule
+import expo.modules.systemui.SystemUIModule
+import expo.modules.screenorientation.ScreenOrientationModule
+import expo.modules.keepawake.KeepAwakeModule
+import expo.modules.trackingtransparency.TrackingTransparencyModule
+import expo.modules.localization.LocalizationModule
 
 // There's no `expo` aggregator project here to auto-generate a module list, so this map is
 // hand-maintained — every expo-modules-core package wired into this app (sensors, local-auth, and
@@ -40,6 +46,12 @@ import expo.modules.sensors.modules.PedometerModule
 private class ExpoModulesProvider : ModulesProvider {
   override fun getModulesMap(): Map<Class<out Module>, String?> = mapOf(
     // SYMBIOTE-EXPO-LINK:MODULES-MAP (generated — new lines are appended below, safe to keep)
+    LocalizationModule::class.java to "ExpoLocalization",
+    TrackingTransparencyModule::class.java to "ExpoTrackingTransparency",
+    KeepAwakeModule::class.java to "ExpoKeepAwake",
+    ScreenOrientationModule::class.java to "ExpoScreenOrientation",
+    SystemUIModule::class.java to "ExpoSystemUI",
+    StoreReviewModule::class.java to "ExpoStoreReview",
     AccelerometerModule::class.java to "ExponentAccelerometer",
     BarometerModule::class.java to "ExpoBarometer",
     DeviceMotionModule::class.java to "ExponentDeviceMotion",
