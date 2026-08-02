@@ -9,6 +9,9 @@ export type ISymbioteExpoLinkManifest = {
     gradleProjectName: string;
     modules: ISymbioteExpoLinkAndroidModule[];
   };
+  ios?: {
+    infoPlistKeys: Record<string, string>;
+  };
 };
 
 export function linkPackage(manifest: ISymbioteExpoLinkManifest): void;

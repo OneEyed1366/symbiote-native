@@ -8,5 +8,10 @@
         "nativeName": "ExpoLocalAuthentication"
       }
     ]
+  },
+  "ios": {
+    "infoPlistKeys": {
+      "NSFaceIDUsageDescription": "This app uses Face ID to authenticate you."
+    }
   }
 }

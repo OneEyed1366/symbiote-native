@@ -349,6 +349,13 @@ buildscript {
 
 ## 6. Android — `app/build.gradle`
 
+<Aside type="tip" title="Automatic, as of @symbiote-native/expo-modules-link">
+  This line used to be a hand-edit. If the package you're consuming (or authoring) depends on
+  `@symbiote-native/expo-modules-link` and ships a `native-link.json` manifest plus a
+  `postinstall` script calling `symbiote-expo-link`, it's patched in for you the first time you
+  `npm install` — see step 7 for the manifest shape and what actually gets generated.
+</Aside>
+
 ```groovy
 dependencies {
   // No `expo` aggregator project to depend on transitively — :app depends on both Expo
@@ -360,13 +367,56 @@ dependencies {
 
 ## 7. Android — `MainApplication.kt`
 
-<Aside type="danger" title="Extend this map for every sensor you use">
-  There's no `expo` aggregator project to auto-generate a module list, so this map is
-  hand-maintained. A sensor whose `Module` class compiles into the app (it does — the whole
-  `expo-sensors` Android project is linked in step 4) but is missing from this map fails at
-  **runtime**, not build time: `Cannot find native module 'ExpoBarometer'`, with no compile
-  warning. Each key string must match that sensor's own `definition() { Name("...") }` exactly.
+<Aside type="tip" title="Automatic, as of @symbiote-native/expo-modules-link">
+  There's still no `expo` aggregator project to auto-generate this module list, and
+  `ModuleRegistryAdapter` still only accepts a single `ModulesProvider` — so every
+  expo-modules-core package wired into the app lands its own entry in the same shared map. What
+  changed is who writes that entry: a wrapper package that depends on
+  `@symbiote-native/expo-modules-link` and ships a `native-link.json` manifest gets it (and the
+  `build.gradle` line from the previous step) patched in automatically, the first time you
+  `npm install` it.
 </Aside>
+
+The manifest lives next to the wrapper package's own `package.json`. Here's
+`@symbiote-native/local-auth`'s — the simplest, single-module shape:
+
+```json
+{
+  "android": {
+    "gradleProjectName": "expo-local-authentication",
+    "modules": [
+      {
+        "importPath": "expo.modules.localauthentication.LocalAuthenticationModule",
+        "className": "LocalAuthenticationModule",
+        "nativeName": "ExpoLocalAuthentication"
+      }
+    ]
+  }
+}
+```
+
+`nativeName` still has to match that module's own `definition() { Name("...") }` string exactly
+— that part hasn't changed, only who types it. Get it wrong and it's the same failure as before:
+a clean compile, then a **runtime** `Cannot find native module '<Name>'`.
+
+Wiring a *new* wrapper package into this yourself needs two `package.json` edits — a dependency
+on `@symbiote-native/expo-modules-link` (`npm install @symbiote-native/expo-modules-link` adds
+it) and one script:
+
+```json
+{
+  "scripts": {
+    "postinstall": "symbiote-expo-link"
+  }
+}
+```
+
+If you're only *consuming* an already-published package like `@symbiote-native/sensors` in your
+own app, there's nothing to do here at all — its own `postinstall` runs this for you.
+
+What actually lands in your app's `MainApplication.kt` looks like this (a real excerpt — the
+patcher is additive-only, so every package's postinstall only ever appends a line under the
+marker, never rewrites one):
 
 ```kotlin
 import expo.modules.adapters.react.ModuleRegistryAdapter
@@ -374,25 +424,18 @@ import expo.modules.adapters.react.ReactAdapterPackage
 import expo.modules.adapters.react.ReactModuleRegistryProvider
 import expo.modules.kotlin.ModulesProvider
 import expo.modules.kotlin.modules.Module
+import expo.modules.localauthentication.LocalAuthenticationModule
 import expo.modules.sensors.modules.AccelerometerModule
 import expo.modules.sensors.modules.BarometerModule
-import expo.modules.sensors.modules.DeviceMotionModule
-import expo.modules.sensors.modules.GyroscopeModule
-import expo.modules.sensors.modules.LightSensorModule
-import expo.modules.sensors.modules.MagnetometerModule
-import expo.modules.sensors.modules.MagnetometerUncalibratedModule
-import expo.modules.sensors.modules.PedometerModule
+// ...one import per module, appended as each package's postinstall runs
 
-private class SensorsModulesProvider : ModulesProvider {
+private class ExpoModulesProvider : ModulesProvider {
   override fun getModulesMap(): Map<Class<out Module>, String?> = mapOf(
+    // SYMBIOTE-EXPO-LINK:MODULES-MAP (generated — new lines are appended below, safe to keep)
+    LocalAuthenticationModule::class.java to "ExpoLocalAuthentication",
     AccelerometerModule::class.java to "ExponentAccelerometer",
     BarometerModule::class.java to "ExpoBarometer",
-    DeviceMotionModule::class.java to "ExponentDeviceMotion",
-    GyroscopeModule::class.java to "ExponentGyroscope",
-    LightSensorModule::class.java to "ExpoLightSensor",
-    MagnetometerModule::class.java to "ExponentMagnetometer",
-    MagnetometerUncalibratedModule::class.java to "ExponentMagnetometerUncalibrated",
-    PedometerModule::class.java to "ExponentPedometer",
+    // ...one entry per module
   )
 }
 
@@ -407,7 +450,7 @@ class MainApplication : Application(), ReactApplication {
         add(
           ModuleRegistryAdapter(
             ReactModuleRegistryProvider(listOf(ReactAdapterPackage())),
-            SensorsModulesProvider(),
+            ExpoModulesProvider(),
           ),
         )
       },
@@ -419,8 +462,13 @@ class MainApplication : Application(), ReactApplication {
 
 ## 8. Permission strings
 
-Permission handling itself ships inside each sensor's native module — nothing to reimplement —
-but the platform permission string is still yours to declare:
+Permission handling itself ships inside each sensor's native module — nothing to reimplement.
+The platform permission string used to be yours to declare by hand; it's now registered
+automatically the same way as the Android module itself (see step 7) — a package that needs one
+declares it in its own `native-link.json` under `ios.infoPlistKeys`, and `symbiote-expo-link`
+inserts a generic default into `Info.plist` on `npm install` if that key isn't already there.
+Add your own wording to `Info.plist` yourself, before or after install, to override the default
+permanently — the patcher never touches a key that already exists.
 
 | Sensor | iOS `Info.plist` | Android |
 | --- | --- | --- |

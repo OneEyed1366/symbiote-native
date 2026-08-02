@@ -58,19 +58,46 @@ that's the key `requireNativeModule(...)` resolves by on the JS side.
 top-level `npm install` was run from — the same technique `husky`/`patch-package` use), then
 appends the missing lines to `app/build.gradle` and `MainApplication.kt` next to a one-line
 generated marker. The patcher is **additive-only** — it only ever appends a line if the exact
-string isn't already present, never rewrites or removes an existing one. That's what makes it
-safe to run from any number of independent packages' postinstall scripts, in any order, any
-number of times: there's nothing to conflict with, so no checksum/lock mechanism is needed.
+string isn't already present, never rewrites or removes an existing one. Since sibling
+packages' postinstall scripts genuinely run concurrently as separate processes, each patched
+file's full read-check-modify-write cycle is wrapped in a cross-process file lock (an atomic
+`mkdirSync` used as a mutex, with stale-lock reclaim) — without it, two processes reading the
+file before either writes back causes the second write to silently drop the first one's line.
+That combination is what makes it safe to run from any number of independent packages'
+postinstall scripts, in any order, any number of times.
 
-If the app isn't a React Native project at all (no `android/app/build.gradle`), or the file
-it needs to patch doesn't exist, it logs (under `DEBUG=1`) and exits cleanly — a missing
-manifest or unlinkable app never fails the consumer's `npm install`.
+If the app isn't a React Native project at all (no `android/app/build.gradle` and no
+`ios/*/Info.plist`), or the file it needs to patch doesn't exist, it logs (under `DEBUG=1`)
+and exits cleanly — a missing manifest or unlinkable app never fails the consumer's
+`npm install`.
+
+## iOS Info.plist permission strings
+
+A package that needs a usage-description string (e.g. `NSFaceIDUsageDescription` for
+`local-auth`, `NSMotionUsageDescription` for `sensors`) declares it in `native-link.json`
+under `ios.infoPlistKeys`. The value is a **generic, app-agnostic default** — there's no
+config file for this postinstall to read a custom string from, so it can never know your
+app's name or tone (never copy an example app's own demo wording into a package's shipped
+default — this bit us once during development).
+
+**Overriding the default is free, not a feature we built** — it falls straight out of the
+additive-only design. The patcher's only check is "does `<key>NAME</key>` already exist" —
+it never inspects or compares the *string* value. So:
+
+- Add the key to your own `Info.plist` with your own wording **before** installing the
+  package → the patcher sees it's already there and never inserts its default at all.
+- Edit the generated string **any time after** → since the key now exists, every future
+  `postinstall` run (this package's or a newly-added one's) leaves it alone permanently.
+
+There is no "supply a custom string up front via config" path — an app's own `Info.plist`
+*is* the config, and editing it is the override.
 
 ## Scope
 
-Android only. iOS's own autolinking (`use_expo_modules!(exclude: [...])` in the app's
-Podfile) already auto-discovers every installed expo-modules-core package with zero
-per-package edits once wired — see the `symbiote-expo-native-module` skill. The one-time
-per-app native bootstrap (Podfile monkey-patch, `SymbioteExpoModulesFactory`, bridging
+Android registration (`build.gradle` + `MainApplication.kt`) plus iOS Info.plist permission
+strings. iOS's own autolinking (`use_expo_modules!(exclude: [...])` in the app's Podfile)
+already auto-discovers every installed expo-modules-core package with zero per-package Podfile
+edits once wired — see the `symbiote-expo-native-module` skill. The one-time per-app native
+bootstrap (Podfile monkey-patch, `SymbioteExpoModulesFactory`, bridging
 header) is still a manual, one-time step per app — this package only automates the
 *recurring* per-package registration that repeats on every new native module.

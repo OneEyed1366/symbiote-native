@@ -43,5 +43,10 @@
         "nativeName": "ExponentPedometer"
       }
     ]
+  },
+  "ios": {
+    "infoPlistKeys": {
+      "NSMotionUsageDescription": "This app uses motion sensor data."
+    }
   }
 }
