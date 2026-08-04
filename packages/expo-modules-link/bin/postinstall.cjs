@@ -1,27 +1,15 @@
 #!/usr/bin/env node
 'use strict';
 
-// Runs as the `postinstall` script of an expo-modules-core wrapper package (sensors,
-// local-auth, ...). npm/pnpm run a package's own lifecycle scripts with cwd = that package's
-// own root (same convention as scripts/vendor-codegen-specs.cjs), so process.cwd() here is
-// the WRAPPER package's directory, not the consuming app's — the app root is found separately
-// via INIT_CWD inside linkPackage().
-const fs = require('node:fs');
-const path = require('node:path');
-const { linkPackage } = require('../src/index.cjs');
-
-const manifestPath = path.join(process.cwd(), 'native-link.json');
-
-if (!fs.existsSync(manifestPath)) {
-  // A missing manifest is a packaging bug in the calling package, not something that should
-  // ever fail a consumer's `npm install` — report and move on.
-  console.error(`[symbiote-expo-link] no native-link.json found at ${manifestPath}`);
-  process.exit(0);
-}
+// The APP's own `postinstall`, or `npx symbiote-expo-link` by hand. Not a per-dependency
+// lifecycle script, so cwd is the app root. Package managers extract the whole tree before
+// running any postinstall, so the scan sees every installed package.
+const { linkApp } = require('../src/index.cjs');
 
 try {
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  linkPackage(manifest);
+  linkApp();
 } catch (error) {
-  console.error('[symbiote-expo-link] failed to link native module, continuing install:', error.message);
+  // Never fail a consumer's install over this: an unlinked module fails loudly at runtime with
+  // "Cannot find native module", whereas a non-zero exit here would break the whole install.
+  console.error('[symbiote-expo-link] failed to link native modules, continuing install:', error.message);
 }

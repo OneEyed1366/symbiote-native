@@ -60,7 +60,6 @@
   },
   "scripts": {
     "prepare": "pnpm run ng:build",
-    "postinstall": "symbiote-expo-link",
     "typecheck": "tsc --build",
     "clean": "rm -rf build-ngc",
     "ng:build": "pnpm run clean && ngc -p tsconfig.angular.json",
@@ -68,8 +67,7 @@
   },
   "dependencies": {
     "expo-crypto": "catalog:",
-    "expo-modules-core": "catalog:",
-    "@symbiote-native/expo-modules-link": "workspace:*"
+    "expo-modules-core": "catalog:"
   },
   "peerDependencies": {
     "@symbiote-native/angular": "workspace:*",

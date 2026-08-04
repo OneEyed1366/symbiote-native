@@ -440,9 +440,6 @@ importers:
 
   packages/application:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-application:
         specifier: 'catalog:'
         version: 57.0.2(expo@57.0.4)
@@ -498,9 +495,6 @@ importers:
 
   packages/battery:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-battery:
         specifier: 'catalog:'
         version: 57.0.1(expo@57.0.4)(react@19.2.3)
@@ -556,9 +550,6 @@ importers:
 
   packages/brightness:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-brightness:
         specifier: 'catalog:'
         version: 57.0.1(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))
@@ -614,9 +605,6 @@ importers:
 
   packages/cellular:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-cellular:
         specifier: 'catalog:'
         version: 57.0.1(expo@57.0.4)
@@ -672,9 +660,6 @@ importers:
 
   packages/clipboard:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-clipboard:
         specifier: 'catalog:'
         version: 57.0.1(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
@@ -730,9 +715,6 @@ importers:
 
   packages/crypto:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-crypto:
         specifier: 'catalog:'
         version: 57.0.1(expo@57.0.4)
@@ -788,9 +770,6 @@ importers:
 
   packages/device:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-device:
         specifier: 'catalog:'
         version: 57.0.1(expo@57.0.4)
@@ -848,9 +827,6 @@ importers:
 
   packages/haptics:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-haptics:
         specifier: 'catalog:'
         version: 57.0.1(expo@57.0.4)
@@ -906,9 +882,6 @@ importers:
 
   packages/keep-awake:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-keep-awake:
         specifier: 'catalog:'
         version: 57.0.1(expo@57.0.4)(react@19.2.3)
@@ -964,9 +937,6 @@ importers:
 
   packages/local-auth:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-local-authentication:
         specifier: 'catalog:'
         version: 57.0.2(expo@57.0.4)
@@ -1028,9 +998,6 @@ importers:
 
   packages/localization:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-localization:
         specifier: 'catalog:'
         version: 57.0.1(expo@57.0.4)(react@19.2.3)
@@ -1144,9 +1111,6 @@ importers:
 
   packages/network:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-modules-core:
         specifier: 'catalog:'
         version: 57.0.5(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
@@ -1202,9 +1166,6 @@ importers:
 
   packages/screen-orientation:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-modules-core:
         specifier: 'catalog:'
         version: 57.0.5(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
@@ -1260,9 +1221,6 @@ importers:
 
   packages/sensors:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-modules-core:
         specifier: 'catalog:'
         version: 57.0.5(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
@@ -1483,9 +1441,6 @@ importers:
 
   packages/store-review:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-modules-core:
         specifier: 'catalog:'
         version: 57.0.5(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
@@ -1541,9 +1496,6 @@ importers:
 
   packages/system-ui:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-modules-core:
         specifier: 'catalog:'
         version: 57.0.5(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
@@ -1599,9 +1551,6 @@ importers:
 
   packages/tracking-transparency:
     dependencies:
-      '@symbiote-native/expo-modules-link':
-        specifier: workspace:*
-        version: link:../expo-modules-link
       expo-modules-core:
         specifier: 'catalog:'
         version: 57.0.5(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
@@ -4595,12 +4544,6 @@ packages:
     resolution: {integrity: sha512-8VhbnxlIrfXjP0syZr1JT197nafYicQu9119adOJnX62osU9Cw+PdDnAx/6LxuKJRzQdwxOMq7b7eWjhNL5zAQ==}
     peerDependencies:
       expo: '*'
-
-  expo-keep-awake@57.0.0:
-    resolution: {integrity: sha512-WqEoyDNSmUeAI9Gu7UaWKDjOhfaV+jGcms7N0hh/EAr7sqJrI2s0HpLSC3P9cWfXFUZCL1zZjd22m/NbsJYCKg==}
-    peerDependencies:
-      expo: '*'
-      react: 19.2.3
 
   expo-keep-awake@57.0.1:
     resolution: {integrity: sha512-28lkFImeXTS+bhAjuCFV7w7tW5bXg27BJVrxv+nC/nyYa86qEa0oFeHwqol6ha5k4pdVDQgBF09GM4A1k76Ssg==}
@@ -11114,11 +11057,6 @@ snapshots:
     dependencies:
       expo: 57.0.4(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
 
-  expo-keep-awake@57.0.0(expo@57.0.4)(react@19.2.3):
-    dependencies:
-      expo: 57.0.4(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
-      react: 19.2.3
-
   expo-keep-awake@57.0.1(expo@57.0.4)(react@19.2.3):
     dependencies:
       expo: 57.0.4(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
@@ -11212,7 +11150,7 @@ snapshots:
       expo-constants: 57.0.3(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))
       expo-file-system: 57.0.0(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))
       expo-font: 57.0.0(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
-      expo-keep-awake: 57.0.0(expo@57.0.4)(react@19.2.3)
+      expo-keep-awake: 57.0.1(expo@57.0.4)(react@19.2.3)
       expo-modules-autolinking: 57.0.8(typescript@6.0.3)
       expo-modules-core: 57.0.5(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
       pretty-format: 29.7.0

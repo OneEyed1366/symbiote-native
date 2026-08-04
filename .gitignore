@@ -18,6 +18,12 @@ packages/*/.rn-*
 # dependency inside its dependent's own node_modules, so the source has to be copied in).
 packages/*/codegen-specs/
 
+# expo-modules-link's atomic-write temp files (packages/expo-modules-link): created next to a
+# real, tracked native project file (build.gradle, MainApplication.kt, Info.plist) during
+# postinstall and renamed over it immediately; a killed process can leave one behind, and it must
+# never get committed by an unrelated `git add -A`.
+*.symbiote-expo-link.*.tmp
+
 # iOS
 ios/Pods/
 ios/build/

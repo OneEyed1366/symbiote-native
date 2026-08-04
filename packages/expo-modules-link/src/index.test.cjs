@@ -5,13 +5,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
 
-const { patchBuildGradle, patchMainApplication, patchInfoPlist } = require('./index.cjs');
+const {
+  linkApp,
+  collectManifests,
+  patchBuildGradle,
+  patchMainApplication,
+  patchInfoPlist,
+} = require('./index.cjs');
 
-// Trimmed-down fixtures mirroring the real shape of examples/expo-react's android files —
-// enough to exercise both anchors (react-android dependency line, ModulesProvider mapOf),
-// without the full app boilerplate.
+// Trimmed to exercise every anchor: the react-android dependency line, the last import, the
+// ModulesProvider mapOf, and the closing </dict>.
 const BUILD_GRADLE_FIXTURE = `dependencies {
     implementation("com.facebook.react:react-android")
 
@@ -33,8 +37,6 @@ private class ExpoModulesProvider : ModulesProvider {
 }
 `;
 
-// Trimmed to the keys relevant here — real RN Info.plist also has CFBundle*/UI* boilerplate,
-// irrelevant to this patcher, which only ever appends before the final closing </dict>.
 const INFO_PLIST_FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -50,21 +52,6 @@ const INFO_PLIST_FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 `;
 
-function makeAppRoot() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'symbiote-expo-link-test-'));
-  fs.mkdirSync(path.join(root, 'android', 'app', 'src', 'main', 'java', 'com', 'canaryexpo'), {
-    recursive: true,
-  });
-  fs.writeFileSync(path.join(root, 'android', 'app', 'build.gradle'), BUILD_GRADLE_FIXTURE);
-  fs.writeFileSync(
-    path.join(root, 'android', 'app', 'src', 'main', 'java', 'com', 'canaryexpo', 'MainApplication.kt'),
-    MAIN_APPLICATION_FIXTURE,
-  );
-  fs.mkdirSync(path.join(root, 'ios', 'CanaryExpo'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'ios', 'CanaryExpo', 'Info.plist'), INFO_PLIST_FIXTURE);
-  return root;
-}
-
 const LOCAL_AUTH_MANIFEST = {
   android: {
     gradleProjectName: 'expo-local-authentication',
@@ -76,6 +63,7 @@ const LOCAL_AUTH_MANIFEST = {
       },
     ],
   },
+  ios: { infoPlistKeys: { NSFaceIDUsageDescription: 'CanaryExpo uses Face ID to demo local-auth.' } },
 };
 
 const SENSORS_MANIFEST = {
@@ -96,171 +84,256 @@ const SENSORS_MANIFEST = {
   },
 };
 
-test('patchBuildGradle inserts the dependency line once and is idempotent', () => {
-  const appRoot = makeAppRoot();
-  const gradlePath = path.join(appRoot, 'android', 'app', 'build.gradle');
+const GRADLE_PATH = ['android', 'app', 'build.gradle'];
+const MAIN_APP_PATH = ['android', 'app', 'src', 'main', 'java', 'com', 'canaryexpo', 'MainApplication.kt'];
+const PLIST_PATH = ['ios', 'CanaryExpo', 'Info.plist'];
 
-  patchBuildGradle(appRoot, LOCAL_AUTH_MANIFEST);
-  const afterFirst = fs.readFileSync(gradlePath, 'utf8');
+function makeAppRoot() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'symbiote-expo-link-test-'));
+  fs.mkdirSync(path.join(root, ...MAIN_APP_PATH.slice(0, -1)), { recursive: true });
+  fs.writeFileSync(path.join(root, ...GRADLE_PATH), BUILD_GRADLE_FIXTURE);
+  fs.writeFileSync(path.join(root, ...MAIN_APP_PATH), MAIN_APPLICATION_FIXTURE);
+  fs.mkdirSync(path.join(root, ...PLIST_PATH.slice(0, -1)), { recursive: true });
+  fs.writeFileSync(path.join(root, ...PLIST_PATH), INFO_PLIST_FIXTURE);
+  return root;
+}
+
+// Materialises a manifest the way a package manager would, so collectManifests and linkApp run
+// against a real directory layout rather than a stubbed list.
+function installPackage(appRoot, packageName, manifest) {
+  const packageDir = path.join(appRoot, 'node_modules', ...packageName.split('/'));
+  fs.mkdirSync(packageDir, { recursive: true });
+  fs.writeFileSync(path.join(packageDir, 'native-link.json'), JSON.stringify(manifest));
+  return packageDir;
+}
+
+function read(appRoot, segments) {
+  return fs.readFileSync(path.join(appRoot, ...segments), 'utf8');
+}
+
+function entriesOf(...manifests) {
+  return manifests.map((manifest, i) => ({ packageName: `pkg-${i}`, manifest }));
+}
+
+test('collectManifests finds scoped and unscoped packages, sorted, ignoring the rest', () => {
+  const appRoot = makeAppRoot();
+  installPackage(appRoot, '@symbiote-native/sensors', SENSORS_MANIFEST);
+  installPackage(appRoot, '@symbiote-native/local-auth', LOCAL_AUTH_MANIFEST);
+  installPackage(appRoot, 'legacy-native-wrapper', SENSORS_MANIFEST);
+  fs.mkdirSync(path.join(appRoot, 'node_modules', 'react'), { recursive: true });
+  fs.mkdirSync(path.join(appRoot, 'node_modules', '.bin'), { recursive: true });
+
+  const found = collectManifests(appRoot);
+
+  assert.deepEqual(
+    found.map((entry) => entry.packageName),
+    ['@symbiote-native/local-auth', '@symbiote-native/sensors', 'legacy-native-wrapper'],
+    'sorted by package name, and packages without a native-link.json are skipped',
+  );
+});
+
+test('collectManifests skips a package whose manifest is malformed instead of throwing', () => {
+  const appRoot = makeAppRoot();
+  const brokenDir = installPackage(appRoot, '@symbiote-native/broken', SENSORS_MANIFEST);
+  fs.writeFileSync(path.join(brokenDir, 'native-link.json'), '{ not json');
+  installPackage(appRoot, '@symbiote-native/local-auth', LOCAL_AUTH_MANIFEST);
+
+  const found = collectManifests(appRoot);
+
+  assert.deepEqual(found.map((entry) => entry.packageName), ['@symbiote-native/local-auth']);
+});
+
+test('patchBuildGradle generates a sorted dependency region and is byte-stable on re-run', () => {
+  const appRoot = makeAppRoot();
+  const entries = entriesOf(SENSORS_MANIFEST, LOCAL_AUTH_MANIFEST);
+
+  patchBuildGradle(appRoot, entries);
+  const afterFirst = read(appRoot, GRADLE_PATH);
+
   assert.match(afterFirst, /implementation project\(':expo-local-authentication'\)/);
-  assert.equal((afterFirst.match(/expo-local-authentication/g) || []).length, 1);
+  assert.match(afterFirst, /implementation project\(':expo-sensors'\)/);
+  assert.ok(
+    afterFirst.indexOf('expo-local-authentication') < afterFirst.indexOf("':expo-sensors'"),
+    'entries are emitted in sorted order regardless of manifest order',
+  );
+  assert.match(afterFirst, /hermesEnabled\.toBoolean\(\)/, 'must not touch unrelated existing content');
 
-  patchBuildGradle(appRoot, LOCAL_AUTH_MANIFEST);
-  const afterSecond = fs.readFileSync(gradlePath, 'utf8');
-  assert.equal(afterSecond, afterFirst, 're-running must be a no-op');
+  patchBuildGradle(appRoot, entries);
+  assert.equal(read(appRoot, GRADLE_PATH), afterFirst, 're-running must be a no-op');
 });
 
-test('patchBuildGradle preserves existing content and supports multiple packages', () => {
+// The point of owning a region instead of appending: a leftover `implementation project(...)`
+// for an uninstalled package fails the Gradle build.
+test('patchBuildGradle drops the entry of a package that is no longer installed', () => {
   const appRoot = makeAppRoot();
-  const gradlePath = path.join(appRoot, 'android', 'app', 'build.gradle');
 
-  patchBuildGradle(appRoot, LOCAL_AUTH_MANIFEST);
-  patchBuildGradle(appRoot, SENSORS_MANIFEST);
-  const content = fs.readFileSync(gradlePath, 'utf8');
+  patchBuildGradle(appRoot, entriesOf(LOCAL_AUTH_MANIFEST, SENSORS_MANIFEST));
+  assert.match(read(appRoot, GRADLE_PATH), /expo-sensors/);
 
-  assert.match(content, /expo-local-authentication/);
-  assert.match(content, /expo-sensors/);
-  assert.match(content, /hermesEnabled\.toBoolean\(\)/, 'must not touch unrelated existing content');
+  patchBuildGradle(appRoot, entriesOf(LOCAL_AUTH_MANIFEST));
+  const after = read(appRoot, GRADLE_PATH);
+
+  assert.doesNotMatch(after, /expo-sensors/, 'the removed package must disappear from the region');
+  assert.match(after, /expo-local-authentication/, 'the remaining package stays');
 });
 
-test('patchMainApplication adds import + map entry and is idempotent', () => {
+test('patchMainApplication generates both regions, sorted, and is byte-stable on re-run', () => {
   const appRoot = makeAppRoot();
-  const filePath = path.join(
-    appRoot,
-    'android',
-    'app',
-    'src',
-    'main',
-    'java',
-    'com',
-    'canaryexpo',
-    'MainApplication.kt',
+  const entries = entriesOf(SENSORS_MANIFEST, LOCAL_AUTH_MANIFEST);
+
+  patchMainApplication(appRoot, entries);
+  const afterFirst = read(appRoot, MAIN_APP_PATH);
+
+  assert.match(afterFirst, /^import expo\.modules\.localauthentication\.LocalAuthenticationModule$/m);
+  assert.match(afterFirst, /^import expo\.modules\.sensors\.modules\.AccelerometerModule$/m);
+  assert.match(afterFirst, /AccelerometerModule::class\.java to "ExponentAccelerometer",/);
+  assert.match(afterFirst, /LocalAuthenticationModule::class\.java to "ExpoLocalAuthentication",/);
+  assert.match(afterFirst, /import expo\.modules\.kotlin\.ModulesProvider/, 'pre-existing imports survive');
+  assert.ok(
+    afterFirst.indexOf('AccelerometerModule::class') < afterFirst.indexOf('BarometerModule::class'),
+    'map entries are sorted',
   );
 
-  patchMainApplication(appRoot, LOCAL_AUTH_MANIFEST);
-  const afterFirst = fs.readFileSync(filePath, 'utf8');
-  assert.match(afterFirst, /import expo\.modules\.localauthentication\.LocalAuthenticationModule/);
-  assert.match(
-    afterFirst,
-    /LocalAuthenticationModule::class\.java to "ExpoLocalAuthentication",/,
+  patchMainApplication(appRoot, entries);
+  assert.equal(read(appRoot, MAIN_APP_PATH), afterFirst, 're-running must be a no-op');
+});
+
+test('patchMainApplication drops the import and map entry of an uninstalled package', () => {
+  const appRoot = makeAppRoot();
+
+  patchMainApplication(appRoot, entriesOf(LOCAL_AUTH_MANIFEST, SENSORS_MANIFEST));
+  assert.match(read(appRoot, MAIN_APP_PATH), /AccelerometerModule/);
+
+  patchMainApplication(appRoot, entriesOf(LOCAL_AUTH_MANIFEST));
+  const after = read(appRoot, MAIN_APP_PATH);
+
+  assert.doesNotMatch(after, /AccelerometerModule/);
+  assert.match(after, /LocalAuthenticationModule::class\.java to "ExpoLocalAuthentication",/);
+});
+
+// The marker pair is the contract: everything outside it belongs to the developer.
+test('patchMainApplication leaves hand-written code above and below the regions untouched', () => {
+  const appRoot = makeAppRoot();
+  const filePath = path.join(appRoot, ...MAIN_APP_PATH);
+  fs.writeFileSync(
+    filePath,
+    MAIN_APPLICATION_FIXTURE.replace(
+      '  override fun getModulesMap',
+      '  private val handWritten = "keep me"\n\n  override fun getModulesMap',
+    ).replace('import android.app.Application', 'import android.app.Application\nimport com.example.HandPicked'),
   );
 
-  patchMainApplication(appRoot, LOCAL_AUTH_MANIFEST);
-  const afterSecond = fs.readFileSync(filePath, 'utf8');
-  assert.equal(afterSecond, afterFirst, 're-running must be a no-op');
+  patchMainApplication(appRoot, entriesOf(LOCAL_AUTH_MANIFEST));
+  patchMainApplication(appRoot, entriesOf(LOCAL_AUTH_MANIFEST, SENSORS_MANIFEST));
+  const content = fs.readFileSync(filePath, 'utf8');
+
+  assert.match(content, /private val handWritten = "keep me"/);
+  assert.match(content, /^import com\.example\.HandPicked$/m);
 });
 
-test('patchInfoPlist inserts the permission string once and is idempotent', () => {
+test('a BEGIN marker with its END deleted by hand is refused, not guessed at', () => {
   const appRoot = makeAppRoot();
-  const plistPath = path.join(appRoot, 'ios', 'CanaryExpo', 'Info.plist');
-  const manifest = {
-    ios: { infoPlistKeys: { NSFaceIDUsageDescription: 'CanaryExpo uses Face ID to demo @symbiote-native/local-auth.' } },
-  };
+  patchBuildGradle(appRoot, entriesOf(LOCAL_AUTH_MANIFEST));
 
-  patchInfoPlist(appRoot, manifest);
-  const afterFirst = fs.readFileSync(plistPath, 'utf8');
-  assert.match(afterFirst, /<key>NSFaceIDUsageDescription<\/key>/);
-  assert.match(afterFirst, /<string>CanaryExpo uses Face ID to demo @symbiote-native\/local-auth\.<\/string>/);
-  // Must land inside the OUTER dict, after the nested NSAppTransportSecurity dict closes.
-  assert.ok(afterFirst.indexOf('NSFaceIDUsageDescription') > afterFirst.indexOf('NSAllowsArbitraryLoads'));
+  const gradlePath = path.join(appRoot, ...GRADLE_PATH);
+  const mutilated = fs
+    .readFileSync(gradlePath, 'utf8')
+    .split('\n')
+    .filter((line) => !line.includes('SYMBIOTE-EXPO-LINK:END'))
+    .join('\n');
+  fs.writeFileSync(gradlePath, mutilated);
 
-  patchInfoPlist(appRoot, manifest);
-  const afterSecond = fs.readFileSync(plistPath, 'utf8');
-  assert.equal(afterSecond, afterFirst, 're-running must be a no-op');
+  patchBuildGradle(appRoot, entriesOf(LOCAL_AUTH_MANIFEST, SENSORS_MANIFEST));
+
+  assert.equal(fs.readFileSync(gradlePath, 'utf8'), mutilated, 'must not touch a file with a broken region');
 });
 
-test('patchInfoPlist supports multiple packages and preserves existing keys', () => {
+test('patchInfoPlist inserts each permission string once, inside the outer dict', () => {
   const appRoot = makeAppRoot();
-  const plistPath = path.join(appRoot, 'ios', 'CanaryExpo', 'Info.plist');
-
-  patchInfoPlist(appRoot, {
-    ios: { infoPlistKeys: { NSFaceIDUsageDescription: 'uses Face ID' } },
-  });
-  patchInfoPlist(appRoot, {
+  const entries = entriesOf(LOCAL_AUTH_MANIFEST, {
     ios: { infoPlistKeys: { NSMotionUsageDescription: 'reads motion data' } },
   });
 
-  const content = fs.readFileSync(plistPath, 'utf8');
-  assert.match(content, /<key>NSFaceIDUsageDescription<\/key>/);
-  assert.match(content, /<key>NSMotionUsageDescription<\/key>/);
-  assert.match(content, /<key>CFBundleDisplayName<\/key>/, 'must preserve pre-existing keys');
-});
+  patchInfoPlist(appRoot, entries);
+  const afterFirst = read(appRoot, PLIST_PATH);
 
-test('patchMainApplication supports multiple modules from the same package and preserves existing imports', () => {
-  const appRoot = makeAppRoot();
-  const filePath = path.join(
-    appRoot,
-    'android',
-    'app',
-    'src',
-    'main',
-    'java',
-    'com',
-    'canaryexpo',
-    'MainApplication.kt',
+  assert.match(afterFirst, /<key>NSFaceIDUsageDescription<\/key>/);
+  assert.match(afterFirst, /<key>NSMotionUsageDescription<\/key>/);
+  assert.match(afterFirst, /<key>CFBundleDisplayName<\/key>/, 'pre-existing keys survive');
+  assert.ok(
+    afterFirst.indexOf('NSFaceIDUsageDescription') > afterFirst.indexOf('NSAllowsArbitraryLoads'),
+    'lands in the OUTER dict, after the nested NSAppTransportSecurity dict closes',
   );
 
-  patchMainApplication(appRoot, SENSORS_MANIFEST);
-  const content = fs.readFileSync(filePath, 'utf8');
-
-  assert.match(content, /import expo\.modules\.sensors\.modules\.AccelerometerModule/);
-  assert.match(content, /import expo\.modules\.sensors\.modules\.BarometerModule/);
-  assert.match(content, /AccelerometerModule::class\.java to "ExponentAccelerometer",/);
-  assert.match(content, /BarometerModule::class\.java to "ExpoBarometer",/);
-  assert.match(content, /import expo\.modules\.kotlin\.ModulesProvider/, 'must preserve pre-existing imports');
+  patchInfoPlist(appRoot, entries);
+  assert.equal(read(appRoot, PLIST_PATH), afterFirst, 're-running must be a no-op');
 });
 
-function patchInSubprocess(appRoot, manifest) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      process.execPath,
-      [path.join(__dirname, 'test-fixtures', 'patch-child.cjs'), appRoot, JSON.stringify(manifest)],
-      { stdio: 'inherit' },
-    );
-    child.on('error', reject);
-    child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`patch-child exited ${code}`))));
-  });
-}
-
-// Reproduces the real npm failure mode: N sibling packages' postinstall scripts run as N
-// separate OS processes, all racing to patch the same build.gradle/MainApplication.kt. Without
-// the file lock in index.cjs, this reliably lost entries (2 of 6 packages missing on a real
-// `npm install`, see the symbiote-expo-native-module skill's write-up of the incident).
-test('concurrent patches from separate processes do not lose entries', async () => {
+// An unescaped `&` or `<` produces a plist no parser will read, and it surfaces as an opaque
+// build error far from its cause.
+test('patchInfoPlist escapes XML metacharacters in a description', () => {
   const appRoot = makeAppRoot();
-  const gradlePath = path.join(appRoot, 'android', 'app', 'build.gradle');
-  const mainApplicationPath = path.join(
-    appRoot, 'android', 'app', 'src', 'main', 'java', 'com', 'canaryexpo', 'MainApplication.kt',
-  );
 
-  const manifests = Array.from({ length: 8 }, (_, i) => ({
-    android: {
-      gradleProjectName: `expo-concurrent-${i}`,
-      modules: [
-        {
-          importPath: `expo.modules.concurrent${i}.Concurrent${i}Module`,
-          className: `Concurrent${i}Module`,
-          nativeName: `ExpoConcurrent${i}`,
-        },
-      ],
-    },
+  patchInfoPlist(appRoot, entriesOf({
+    ios: { infoPlistKeys: { NSCameraUsageDescription: 'Scan R&D badges <fast> & often' } },
   }));
+  const content = read(appRoot, PLIST_PATH);
 
-  await Promise.all(manifests.map((manifest) => patchInSubprocess(appRoot, manifest)));
+  assert.match(content, /<string>Scan R&amp;D badges &lt;fast&gt; &amp; often<\/string>/);
+  assert.doesNotMatch(content, /<string>Scan R&D/, 'the raw ampersand must not survive');
+});
 
-  const gradleContent = fs.readFileSync(gradlePath, 'utf8');
-  const mainApplicationContent = fs.readFileSync(mainApplicationPath, 'utf8');
+// Deliberate policy, not an oversight: a permission description is user-facing App Store copy,
+// so a hand-edit outranks a package default. Drift is reported rather than silently applied.
+test('patchInfoPlist keeps a hand-edited description instead of overwriting it', () => {
+  const appRoot = makeAppRoot();
+  const plistPath = path.join(appRoot, ...PLIST_PATH);
 
-  for (let i = 0; i < manifests.length; i += 1) {
-    assert.match(
-      gradleContent,
-      new RegExp(`implementation project\\(':expo-concurrent-${i}'\\)`),
-      `build.gradle is missing package ${i} — a concurrent write clobbered it`,
-    );
-    assert.match(
-      mainApplicationContent,
-      new RegExp(`Concurrent${i}Module::class\\.java to "ExpoConcurrent${i}",`),
-      `MainApplication.kt is missing package ${i} — a concurrent write clobbered it`,
-    );
-  }
+  patchInfoPlist(appRoot, entriesOf(LOCAL_AUTH_MANIFEST));
+  fs.writeFileSync(
+    plistPath,
+    fs.readFileSync(plistPath, 'utf8').replace(
+      '<string>CanaryExpo uses Face ID to demo local-auth.</string>',
+      '<string>Hand-written copy the store approved.</string>',
+    ),
+  );
+
+  patchInfoPlist(appRoot, entriesOf(LOCAL_AUTH_MANIFEST));
+  const content = fs.readFileSync(plistPath, 'utf8');
+
+  assert.match(content, /<string>Hand-written copy the store approved\.<\/string>/);
+  assert.doesNotMatch(content, /demo local-auth/);
+});
+
+test('linkApp wires every installed package end to end from one scan', () => {
+  const appRoot = makeAppRoot();
+  installPackage(appRoot, '@symbiote-native/local-auth', LOCAL_AUTH_MANIFEST);
+  installPackage(appRoot, '@symbiote-native/sensors', SENSORS_MANIFEST);
+
+  linkApp(appRoot);
+
+  assert.match(read(appRoot, GRADLE_PATH), /implementation project\(':expo-sensors'\)/);
+  assert.match(read(appRoot, MAIN_APP_PATH), /BarometerModule::class\.java to "ExpoBarometer",/);
+  assert.match(read(appRoot, PLIST_PATH), /<key>NSFaceIDUsageDescription<\/key>/);
+
+  const snapshot = [GRADLE_PATH, MAIN_APP_PATH, PLIST_PATH].map((segments) => read(appRoot, segments));
+  linkApp(appRoot);
+  assert.deepEqual(
+    [GRADLE_PATH, MAIN_APP_PATH, PLIST_PATH].map((segments) => read(appRoot, segments)),
+    snapshot,
+    'a second full run changes nothing',
+  );
+});
+
+test('linkApp on an app with no linkable packages leaves empty regions, not junk', () => {
+  const appRoot = makeAppRoot();
+  fs.mkdirSync(path.join(appRoot, 'node_modules'), { recursive: true });
+
+  linkApp(appRoot);
+  const gradle = read(appRoot, GRADLE_PATH);
+
+  assert.match(gradle, /SYMBIOTE-EXPO-LINK:BEGIN DEPENDENCIES/);
+  assert.match(gradle, /SYMBIOTE-EXPO-LINK:END DEPENDENCIES/);
+  assert.doesNotMatch(gradle, /implementation project/);
+  assert.match(gradle, /hermesEnabled\.toBoolean\(\)/);
 });
