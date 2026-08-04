@@ -39,7 +39,9 @@ versions — never install either yourself, and never add the `expo` meta-packag
   — and it isn't the standard Expo setup flow either, since this project never installs the
   `expo` meta-package. Follow [How to: wire up an Expo native
   module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every future `expo-modules-core` package with zero further native changes.
+  every future `expo-modules-core` package with zero further native changes. DeviceMotion and
+  Pedometer need an `NSMotionUsageDescription` string on iOS; `symbiote-expo-link` inserts a
+  generic default when that key is absent, and leaves your own wording alone if you write one.
 </Aside>
 
 ## Usage

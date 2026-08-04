@@ -71,7 +71,10 @@ the app declaring the third-party native package directly.
 
 If you're authoring your own wrapper (not just consuming Slider), the app
 must only ever list `@symbiote-native/<lib>` — never the third-party native package
-directly. That means the wrapper itself has to look autolinkable to React
+directly. (That's the rule for native *view* wrappers, which go through React
+Native's own CLI autolinking. A wrapper over an `expo-modules-core` module
+registers through a different path — see [Wire up an Expo native
+module](/docs/howtos/expo-native-module-setup/).) That means the wrapper itself has to look autolinkable to React
 Native's CLI on both platforms, even though the real native code lives one
 level deeper, inside the wrapper's own dependency tree.
 

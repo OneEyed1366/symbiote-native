@@ -40,8 +40,8 @@ native autolinking requirements (already satisfied in any app that already wires
 `@symbiote-native/crypto` or `@symbiote-native/device`).
 
 No further native wiring is needed for this package itself — it has **no native module of its
-own**, so there is nothing to register in `AppDelegate.swift`/`MainApplication.kt` beyond what
-`@symbiote-native/crypto` already requires.
+own** and ships no `native-link.json`, so `symbiote-expo-link` generates nothing for it beyond
+what `@symbiote-native/crypto` already contributes.
 
 ## Usage
 

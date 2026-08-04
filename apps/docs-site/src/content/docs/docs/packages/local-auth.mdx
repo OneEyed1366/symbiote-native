@@ -202,7 +202,7 @@ and branch on `result.success`.
 | `supportedAuthenticationTypesAsync(): Promise<AuthenticationType[]>` | Determine what kinds of authentication are available on the device — a device can support several (`[FINGERPRINT, FACIAL_RECOGNITION]`), and an empty array means none |
 | `isEnrolledAsync(): Promise<boolean>` | Determine whether the device has saved fingerprints or facial data to use for authentication |
 | `getEnrolledLevelAsync(): Promise<SecurityLevel>` | Determine what kind of authentication is enrolled on the device — on pre-M Android devices this can read `SECRET` if only the SIM lock is enrolled, which `authenticateAsync` doesn't actually prompt |
-| `authenticateAsync(options?: ILocalAuthenticationOptions): Promise<ILocalAuthenticationResult>` | Attempts to authenticate via Fingerprint/TouchID, or FaceID where available; without `NSFaceIDUsageDescription` set in `Info.plist`, iOS falls back to the device passcode instead of throwing |
+| `authenticateAsync(options?: ILocalAuthenticationOptions): Promise<ILocalAuthenticationResult>` | Attempts to authenticate via Fingerprint/TouchID, or FaceID where available. `symbiote-expo-link` puts a default `NSFaceIDUsageDescription` into `Info.plist`; if that key is missing, iOS falls back to the device passcode instead of throwing |
 | `cancelAuthenticate(): Promise<void>` | Cancels an in-flight authentication flow. `@platform android` |
 
 ### `ILocalAuthenticationOptions`

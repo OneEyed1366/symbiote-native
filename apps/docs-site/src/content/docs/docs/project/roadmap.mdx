@@ -47,10 +47,12 @@ point over the same `@symbiote-native/engine` core.
 ## Package parity with Expo
 
 The [navigation package](/docs/navigation/) closed the biggest gap on the "can a real app ship
-without React Navigation" list. Next up is a run of small, one-dependency native-module wrapper
-packages — Clipboard-class APIs first, following the same recipe as `@symbiote-native/slider` and
-`@symbiote-native/splash-screen` — closing the gap against Expo's package set one module at a
-time. Reanimated, a full worklet-driven animation layer, is the largest remaining piece and is
+without React Navigation" list, and a run of small native-module wrapper packages has followed
+it — Clipboard, Haptics, Sensors, Battery, Device and a dozen more, each wrapping one
+`expo-modules-core` module. Those don't use the autolinking-proxy recipe `@symbiote-native/slider`
+and `@symbiote-native/splash-screen` do: they ship a passive manifest, and a single app-level
+`@symbiote-native/expo-modules-link` postinstall registers whichever ones are installed (see [How
+to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/)). Reanimated, a full worklet-driven animation layer, is the largest remaining piece and is
 saved for last. The end goal is package-surface parity with Expo's SDK: whatever a real app can
 reach for in Expo, a SymbioteNative app can reach for too, off the same untouched native core.
 

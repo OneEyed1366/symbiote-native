@@ -50,7 +50,9 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
   module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
   every other `expo-modules-core` package with zero further native changes. Additionally, iOS
   needs an `NSUserTrackingUsageDescription` string in `Info.plist` — required for the ATT prompt to
-  show at all. The Android native module also pulls in
+  show at all. `symbiote-expo-link` inserts a generic default for you when that key is absent;
+  write your own wording into `Info.plist` and it stands, since the linker never rewrites a key
+  that already exists. The Android native module also pulls in
   `com.google.android.gms:play-services-ads-identifier:18.0.1` transitively, automatically, with
   no extra wiring needed.
 </Aside>
