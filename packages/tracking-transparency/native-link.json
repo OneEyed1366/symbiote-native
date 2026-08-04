@@ -8,5 +8,10 @@
         "nativeName": "ExpoTrackingTransparency"
       }
     ]
+  },
+  "ios": {
+    "infoPlistKeys": {
+      "NSUserTrackingUsageDescription": "This app tracks your activity across other apps and websites."
+    }
   }
 }

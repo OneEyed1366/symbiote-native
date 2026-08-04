@@ -61,6 +61,6 @@
 	<key>NSMotionUsageDescription</key>
 	<string>This app uses motion sensor data.</string>
 	<key>NSUserTrackingUsageDescription</key>
-	<string>CanaryExpo uses this to demo @symbiote-native/tracking-transparency.</string>
+	<string>This app tracks your activity across other apps and websites.</string>
 </dict>
 </plist>

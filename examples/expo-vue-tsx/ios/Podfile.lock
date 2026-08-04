@@ -15,7 +15,11 @@ PODS:
     - ExpoModulesCore
   - ExpoHaptics (57.0.1):
     - ExpoModulesCore
+  - ExpoKeepAwake (57.0.1):
+    - ExpoModulesCore
   - ExpoLocalAuthentication (57.0.2):
+    - ExpoModulesCore
+  - ExpoLocalization (57.0.1):
     - ExpoModulesCore
   - ExpoModulesCore (57.0.5):
     - ExpoModulesJSI
@@ -49,7 +53,36 @@ PODS:
     - ExpoModulesJSI
   - ExpoNetwork (57.0.1):
     - ExpoModulesCore
+  - ExpoScreenOrientation (57.0.1):
+    - ExpoModulesCore
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - ExpoSensors (57.0.2):
+    - ExpoModulesCore
+  - ExpoStoreReview (57.0.1):
+    - ExpoModulesCore
+  - ExpoSystemUI (57.0.2):
+    - ExpoModulesCore
+  - ExpoTrackingTransparency (57.0.1):
     - ExpoModulesCore
   - FBLazyVector (0.86.0)
   - hermes-engine (250829098.0.14):
@@ -1955,12 +1988,18 @@ DEPENDENCIES:
   - "ExpoCrypto (from `../node_modules/@symbiote-native/crypto/node_modules/expo-crypto/ios`)"
   - "ExpoDevice (from `../node_modules/@symbiote-native/device/node_modules/expo-device/ios`)"
   - "ExpoHaptics (from `../node_modules/@symbiote-native/haptics/node_modules/expo-haptics/ios`)"
+  - "ExpoKeepAwake (from `../node_modules/@symbiote-native/keep-awake/node_modules/expo-keep-awake/ios`)"
   - "ExpoLocalAuthentication (from `../node_modules/@symbiote-native/local-auth/node_modules/expo-local-authentication/ios`)"
+  - "ExpoLocalization (from `../node_modules/@symbiote-native/localization/node_modules/expo-localization/ios`)"
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoModulesJSI (from `../node_modules/expo-modules-jsi/apple`)
   - ExpoModulesWorklets (from `../node_modules/expo-modules-core`)
   - "ExpoNetwork (from `../node_modules/@symbiote-native/network/node_modules/expo-network/ios`)"
+  - "ExpoScreenOrientation (from `../node_modules/@symbiote-native/screen-orientation/node_modules/expo-screen-orientation/ios`)"
   - "ExpoSensors (from `../node_modules/@symbiote-native/sensors/node_modules/expo-sensors/ios`)"
+  - "ExpoStoreReview (from `../node_modules/@symbiote-native/store-review/node_modules/expo-store-review/ios`)"
+  - "ExpoSystemUI (from `../node_modules/@symbiote-native/system-ui/node_modules/expo-system-ui/ios`)"
+  - "ExpoTrackingTransparency (from `../node_modules/@symbiote-native/tracking-transparency/node_modules/expo-tracking-transparency/ios`)"
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -2057,8 +2096,12 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@symbiote-native/device/node_modules/expo-device/ios"
   ExpoHaptics:
     :path: "../node_modules/@symbiote-native/haptics/node_modules/expo-haptics/ios"
+  ExpoKeepAwake:
+    :path: "../node_modules/@symbiote-native/keep-awake/node_modules/expo-keep-awake/ios"
   ExpoLocalAuthentication:
     :path: "../node_modules/@symbiote-native/local-auth/node_modules/expo-local-authentication/ios"
+  ExpoLocalization:
+    :path: "../node_modules/@symbiote-native/localization/node_modules/expo-localization/ios"
   ExpoModulesCore:
     :path: "../node_modules/expo-modules-core"
   ExpoModulesJSI:
@@ -2067,8 +2110,16 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-modules-core"
   ExpoNetwork:
     :path: "../node_modules/@symbiote-native/network/node_modules/expo-network/ios"
+  ExpoScreenOrientation:
+    :path: "../node_modules/@symbiote-native/screen-orientation/node_modules/expo-screen-orientation/ios"
   ExpoSensors:
     :path: "../node_modules/@symbiote-native/sensors/node_modules/expo-sensors/ios"
+  ExpoStoreReview:
+    :path: "../node_modules/@symbiote-native/store-review/node_modules/expo-store-review/ios"
+  ExpoSystemUI:
+    :path: "../node_modules/@symbiote-native/system-ui/node_modules/expo-system-ui/ios"
+  ExpoTrackingTransparency:
+    :path: "../node_modules/@symbiote-native/tracking-transparency/node_modules/expo-tracking-transparency/ios"
   FBLazyVector:
     :path: "../node_modules/react-native/Libraries/FBLazyVector"
   hermes-engine:
@@ -2234,12 +2285,18 @@ SPEC CHECKSUMS:
   ExpoCrypto: 366380ffafeb22cc9795438cddcbfa299e1aaf42
   ExpoDevice: 93a72d7c2bd656a4f0c0d580523e390e9ee7fba5
   ExpoHaptics: 4503d2da51ff7109712ccdfe0e4939f66818183e
+  ExpoKeepAwake: c26f14275017370cc8a4b7b43a0e23361f2053a5
   ExpoLocalAuthentication: 96989637e567a10cdeabe61e5c6026d30c0dc53f
+  ExpoLocalization: 659243b03b3a3e9589793cee2f728a899e181329
   ExpoModulesCore: 9df645bbfcfe4fec54e6597aee756f7820ac8e0e
   ExpoModulesJSI: b20fefa4cdd9097e7e6b715466d1900b8c5d4711
   ExpoModulesWorklets: 18419b65da3b14a8df484baccec7dd6dad15387a
   ExpoNetwork: 973d523fe9b1f99223dd945fed9ad1226ae64920
+  ExpoScreenOrientation: 17fd81b2bdb7615b4b540335673aaf98a358281f
   ExpoSensors: e71c7b6cb0c09d3427ef6ae29c69532a10c86b05
+  ExpoStoreReview: 2a0f6b8e04112aea2f6e3e1cb84109d78f4d041f
+  ExpoSystemUI: ff3142b323ae7b4d11dc0b1dc4acfa30d92be7dc
+  ExpoTrackingTransparency: 43401b22cf6aed3a4a35e0c24d0b320905acc477
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
   hermes-engine: 96d28976dac594e6fa77222be7d152b805aadfd7
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
@@ -2318,6 +2375,6 @@ SPEC CHECKSUMS:
   symbiote-splash-screen: 9f6b0e6435070cde1f31022a3fc21639fe50258e
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
-PODFILE CHECKSUM: 5e74ba8f802f057d18003d42275e27e731145792
+PODFILE CHECKSUM: aea70a8ce1f21cb93c40aba1ad20f2bf5dc9b393
 
 COCOAPODS: 1.16.2

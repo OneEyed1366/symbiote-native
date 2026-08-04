@@ -48,4 +48,6 @@ change listener (`addLocaleListener`/`addCalendarListener`).
 `getTrackingPermissionsAsync`, plus a per-adapter `usePermissions` hook/composable/service mirroring the
 existing `brightness`/`cellular` permission-hook shape. Android and web always short-circuit to a granted
 response — there is no tracking-consent concept on either platform — while iOS drives the real App
-Tracking Transparency prompt.
+Tracking Transparency prompt. Its `native-link.json` also declares an `ios.infoPlistKeys` entry
+(`NSUserTrackingUsageDescription`), so the required usage-description string registers automatically on
+`npm install`, with a generic default a consumer can freely override.
