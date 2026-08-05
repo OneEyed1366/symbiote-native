@@ -31,6 +31,10 @@ import KeepAwakeScreen from './screens/KeepAwakeScreen.vue';
 import ScreenOrientationScreen from './screens/ScreenOrientationScreen.vue';
 import LocalizationScreen from './screens/LocalizationScreen.vue';
 import TrackingTransparencyScreen from './screens/TrackingTransparencyScreen.vue';
+import SecureStoreScreen from './screens/SecureStoreScreen.vue';
+import SharingScreen from './screens/SharingScreen.vue';
+import WebBrowserScreen from './screens/WebBrowserScreen.vue';
+import SmsScreen from './screens/SmsScreen.vue';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
 
@@ -278,6 +282,58 @@ onMounted(() => hide());
         title: 'Tracking Transparency',
         headerShown: true,
         headerTintColor: LINE_COLOR['tracking-transparency'],
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.SecureStore"
+      :component="SecureStoreScreen"
+      :options="{
+        title: 'Secure Store',
+        headerShown: true,
+        headerTintColor: LINE_COLOR['secure-store'],
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Sharing"
+      :component="SharingScreen"
+      :options="{
+        title: 'Sharing',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.sharing,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.WebBrowser"
+      :component="WebBrowserScreen"
+      :options="{
+        title: 'Web Browser',
+        headerShown: true,
+        headerTintColor: LINE_COLOR['web-browser'],
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Sms"
+      :component="SmsScreen"
+      :options="{
+        title: 'SMS',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.sms,
         headerTranslucent: true,
         headerTitleColor: '#ffffff',
         headerStyle: { backgroundColor: '#0b1622' },

@@ -25,6 +25,7 @@ import expo.modules.localauthentication.LocalAuthenticationModule
 import expo.modules.localization.LocalizationModule
 import expo.modules.network.NetworkModule
 import expo.modules.screenorientation.ScreenOrientationModule
+import expo.modules.securestore.SecureStoreModule
 import expo.modules.sensors.modules.AccelerometerModule
 import expo.modules.sensors.modules.BarometerModule
 import expo.modules.sensors.modules.DeviceMotionModule
@@ -33,9 +34,12 @@ import expo.modules.sensors.modules.LightSensorModule
 import expo.modules.sensors.modules.MagnetometerModule
 import expo.modules.sensors.modules.MagnetometerUncalibratedModule
 import expo.modules.sensors.modules.PedometerModule
+import expo.modules.sharing.SharingModule
+import expo.modules.sms.SMSModule
 import expo.modules.storereview.StoreReviewModule
 import expo.modules.systemui.SystemUIModule
 import expo.modules.trackingtransparency.TrackingTransparencyModule
+import expo.modules.webbrowser.WebBrowserModule
 // SYMBIOTE-EXPO-LINK:END IMPORTS
 
 // No `expo` aggregator project here, so nothing auto-generates a module list. A missing entry
@@ -66,10 +70,14 @@ private class ExpoModulesProvider : ModulesProvider {
     MagnetometerUncalibratedModule::class.java to "ExponentMagnetometerUncalibrated",
     NetworkModule::class.java to "ExpoNetwork",
     PedometerModule::class.java to "ExponentPedometer",
+    SMSModule::class.java to "ExpoSMS",
     ScreenOrientationModule::class.java to "ExpoScreenOrientation",
+    SecureStoreModule::class.java to "ExpoSecureStore",
+    SharingModule::class.java to "ExpoSharing",
     StoreReviewModule::class.java to "ExpoStoreReview",
     SystemUIModule::class.java to "ExpoSystemUI",
     TrackingTransparencyModule::class.java to "ExpoTrackingTransparency",
+    WebBrowserModule::class.java to "ExpoWebBrowser",
     // SYMBIOTE-EXPO-LINK:END MODULES-MAP
   )
 }

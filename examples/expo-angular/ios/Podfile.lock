@@ -76,13 +76,21 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - ExpoSecureStore (57.0.1):
+    - ExpoModulesCore
   - ExpoSensors (57.0.2):
+    - ExpoModulesCore
+  - ExpoSharing (57.0.8):
+    - ExpoModulesCore
+  - ExpoSMS (57.0.1):
     - ExpoModulesCore
   - ExpoStoreReview (57.0.1):
     - ExpoModulesCore
   - ExpoSystemUI (57.0.2):
     - ExpoModulesCore
   - ExpoTrackingTransparency (57.0.1):
+    - ExpoModulesCore
+  - ExpoWebBrowser (57.0.2):
     - ExpoModulesCore
   - FBLazyVector (0.86.0)
   - hermes-engine (250829098.0.14):
@@ -1996,10 +2004,14 @@ DEPENDENCIES:
   - ExpoModulesWorklets (from `../node_modules/expo-modules-core`)
   - "ExpoNetwork (from `../node_modules/@symbiote-native/network/node_modules/expo-network/ios`)"
   - "ExpoScreenOrientation (from `../node_modules/@symbiote-native/screen-orientation/node_modules/expo-screen-orientation/ios`)"
+  - "ExpoSecureStore (from `../node_modules/@symbiote-native/secure-store/node_modules/expo-secure-store/ios`)"
   - "ExpoSensors (from `../node_modules/@symbiote-native/sensors/node_modules/expo-sensors/ios`)"
+  - "ExpoSharing (from `../node_modules/@symbiote-native/sharing/node_modules/expo-sharing/ios`)"
+  - "ExpoSMS (from `../node_modules/@symbiote-native/sms/node_modules/expo-sms/ios`)"
   - "ExpoStoreReview (from `../node_modules/@symbiote-native/store-review/node_modules/expo-store-review/ios`)"
   - "ExpoSystemUI (from `../node_modules/@symbiote-native/system-ui/node_modules/expo-system-ui/ios`)"
   - "ExpoTrackingTransparency (from `../node_modules/@symbiote-native/tracking-transparency/node_modules/expo-tracking-transparency/ios`)"
+  - "ExpoWebBrowser (from `../node_modules/@symbiote-native/web-browser/node_modules/expo-web-browser/ios`)"
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -2112,14 +2124,22 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@symbiote-native/network/node_modules/expo-network/ios"
   ExpoScreenOrientation:
     :path: "../node_modules/@symbiote-native/screen-orientation/node_modules/expo-screen-orientation/ios"
+  ExpoSecureStore:
+    :path: "../node_modules/@symbiote-native/secure-store/node_modules/expo-secure-store/ios"
   ExpoSensors:
     :path: "../node_modules/@symbiote-native/sensors/node_modules/expo-sensors/ios"
+  ExpoSharing:
+    :path: "../node_modules/@symbiote-native/sharing/node_modules/expo-sharing/ios"
+  ExpoSMS:
+    :path: "../node_modules/@symbiote-native/sms/node_modules/expo-sms/ios"
   ExpoStoreReview:
     :path: "../node_modules/@symbiote-native/store-review/node_modules/expo-store-review/ios"
   ExpoSystemUI:
     :path: "../node_modules/@symbiote-native/system-ui/node_modules/expo-system-ui/ios"
   ExpoTrackingTransparency:
     :path: "../node_modules/@symbiote-native/tracking-transparency/node_modules/expo-tracking-transparency/ios"
+  ExpoWebBrowser:
+    :path: "../node_modules/@symbiote-native/web-browser/node_modules/expo-web-browser/ios"
   FBLazyVector:
     :path: "../node_modules/react-native/Libraries/FBLazyVector"
   hermes-engine:
@@ -2293,10 +2313,14 @@ SPEC CHECKSUMS:
   ExpoModulesWorklets: 18419b65da3b14a8df484baccec7dd6dad15387a
   ExpoNetwork: 973d523fe9b1f99223dd945fed9ad1226ae64920
   ExpoScreenOrientation: 17fd81b2bdb7615b4b540335673aaf98a358281f
+  ExpoSecureStore: 94793113049a2d7478dfe1a13aa15081e9f61755
   ExpoSensors: e71c7b6cb0c09d3427ef6ae29c69532a10c86b05
+  ExpoSharing: dcf5cb459c99f344aabf126b171eb61d2e49276f
+  ExpoSMS: ac35f6c85b72ee5b18a7c6bb06550fbd4a683775
   ExpoStoreReview: 2a0f6b8e04112aea2f6e3e1cb84109d78f4d041f
   ExpoSystemUI: ff3142b323ae7b4d11dc0b1dc4acfa30d92be7dc
   ExpoTrackingTransparency: 43401b22cf6aed3a4a35e0c24d0b320905acc477
+  ExpoWebBrowser: 9b98d939d5f1c5dd8f523f0a0683056fb1204434
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
   hermes-engine: e84df3de84b36dc36ec09943b77ac73846326059
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b

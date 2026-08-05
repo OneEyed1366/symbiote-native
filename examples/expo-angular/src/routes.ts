@@ -23,6 +23,10 @@ export const ROUTE_NAME = {
   ScreenOrientation: 'ScreenOrientation',
   Localization: 'Localization',
   TrackingTransparency: 'TrackingTransparency',
+  SecureStore: 'SecureStore',
+  Sharing: 'Sharing',
+  WebBrowser: 'WebBrowser',
+  Sms: 'Sms',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

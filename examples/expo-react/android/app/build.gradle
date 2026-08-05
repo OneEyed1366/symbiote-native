@@ -132,10 +132,14 @@ dependencies {
     implementation project(':expo-localization')
     implementation project(':expo-network')
     implementation project(':expo-screen-orientation')
+    implementation project(':expo-secure-store')
     implementation project(':expo-sensors')
+    implementation project(':expo-sharing')
+    implementation project(':expo-sms')
     implementation project(':expo-store-review')
     implementation project(':expo-system-ui')
     implementation project(':expo-tracking-transparency')
+    implementation project(':expo-web-browser')
     // SYMBIOTE-EXPO-LINK:END DEPENDENCIES
 
     // No `expo` aggregator project to depend on transitively — :app depends on both Expo

@@ -32,6 +32,10 @@ import { KeepAwakeScreen } from './screens/KeepAwakeScreen';
 import { ScreenOrientationScreen } from './screens/ScreenOrientationScreen';
 import { LocalizationScreen } from './screens/LocalizationScreen';
 import { TrackingTransparencyScreen } from './screens/TrackingTransparencyScreen';
+import { SecureStoreScreen } from './screens/SecureStoreScreen';
+import { SharingScreen } from './screens/SharingScreen';
+import { WebBrowserScreen } from './screens/WebBrowserScreen';
+import { SmsScreen } from './screens/SmsScreen';
 import { LINE_COLOR } from './navigation-lines';
 // Static look lives in App.css — a plain global .css file, compiled at build time by
 // @symbiote-native/css-parser and resolved at runtime through the shared style registry every
@@ -65,6 +69,10 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
       <ng-template symbioteScreen name="ScreenOrientation" [component]="screenOrientationScreen" [options]="screenOrientationOptions"></ng-template>
       <ng-template symbioteScreen name="Localization" [component]="localizationScreen" [options]="localizationOptions"></ng-template>
       <ng-template symbioteScreen name="TrackingTransparency" [component]="trackingTransparencyScreen" [options]="trackingTransparencyOptions"></ng-template>
+      <ng-template symbioteScreen name="SecureStore" [component]="secureStoreScreen" [options]="secureStoreOptions"></ng-template>
+      <ng-template symbioteScreen name="Sharing" [component]="sharingScreen" [options]="sharingOptions"></ng-template>
+      <ng-template symbioteScreen name="WebBrowser" [component]="webBrowserScreen" [options]="webBrowserOptions"></ng-template>
+      <ng-template symbioteScreen name="Sms" [component]="smsScreen" [options]="smsOptions"></ng-template>
     </Stack>
   `,
 })
@@ -88,6 +96,10 @@ export class AppComponent implements OnInit {
   readonly screenOrientationScreen = ScreenOrientationScreen;
   readonly localizationScreen = LocalizationScreen;
   readonly trackingTransparencyScreen = TrackingTransparencyScreen;
+  readonly secureStoreScreen = SecureStoreScreen;
+  readonly sharingScreen = SharingScreen;
+  readonly webBrowserScreen = WebBrowserScreen;
+  readonly smsScreen = SmsScreen;
 
   readonly menuOptions: IAngularScreenOptions = {
     title: 'Expo Modules Demos',
@@ -271,6 +283,46 @@ export class AppComponent implements OnInit {
     title: 'Tracking Transparency',
     headerShown: true,
     headerTintColor: LINE_COLOR['tracking-transparency'],
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly secureStoreOptions: IAngularScreenOptions = {
+    title: 'Secure Store',
+    headerShown: true,
+    headerTintColor: LINE_COLOR['secure-store'],
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly sharingOptions: IAngularScreenOptions = {
+    title: 'Sharing',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.sharing,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly webBrowserOptions: IAngularScreenOptions = {
+    title: 'Web Browser',
+    headerShown: true,
+    headerTintColor: LINE_COLOR['web-browser'],
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly smsOptions: IAngularScreenOptions = {
+    title: 'SMS',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.sms,
     headerTranslucent: true,
     headerTitleColor: '#ffffff',
     headerStyle: DARK_HEADER_STYLE,

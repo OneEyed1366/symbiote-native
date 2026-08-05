@@ -31,6 +31,10 @@ import { KeepAwakeScreen } from './screens/KeepAwakeScreen';
 import { ScreenOrientationScreen } from './screens/ScreenOrientationScreen';
 import { LocalizationScreen } from './screens/LocalizationScreen';
 import { TrackingTransparencyScreen } from './screens/TrackingTransparencyScreen';
+import { SecureStoreScreen } from './screens/SecureStoreScreen';
+import { SharingScreen } from './screens/SharingScreen';
+import { WebBrowserScreen } from './screens/WebBrowserScreen';
+import { SmsScreen } from './screens/SmsScreen';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
 import { hide } from '@symbiote-native/splash-screen/vue';
@@ -281,6 +285,58 @@ const App = defineComponent({
             title: 'Tracking Transparency',
             headerShown: true,
             headerTintColor: LINE_COLOR['tracking-transparency'],
+            headerTranslucent: true,
+            headerTitleColor: '#ffffff',
+            headerStyle: { backgroundColor: '#0b1622' },
+            headerUserInterfaceStyle: 'dark',
+          }}
+        />
+        <Stack.Screen
+          name={ROUTE_NAME.SecureStore}
+          component={SecureStoreScreen}
+          options={{
+            title: 'Secure Store',
+            headerShown: true,
+            headerTintColor: LINE_COLOR['secure-store'],
+            headerTranslucent: true,
+            headerTitleColor: '#ffffff',
+            headerStyle: { backgroundColor: '#0b1622' },
+            headerUserInterfaceStyle: 'dark',
+          }}
+        />
+        <Stack.Screen
+          name={ROUTE_NAME.Sharing}
+          component={SharingScreen}
+          options={{
+            title: 'Sharing',
+            headerShown: true,
+            headerTintColor: LINE_COLOR.sharing,
+            headerTranslucent: true,
+            headerTitleColor: '#ffffff',
+            headerStyle: { backgroundColor: '#0b1622' },
+            headerUserInterfaceStyle: 'dark',
+          }}
+        />
+        <Stack.Screen
+          name={ROUTE_NAME.WebBrowser}
+          component={WebBrowserScreen}
+          options={{
+            title: 'Web Browser',
+            headerShown: true,
+            headerTintColor: LINE_COLOR['web-browser'],
+            headerTranslucent: true,
+            headerTitleColor: '#ffffff',
+            headerStyle: { backgroundColor: '#0b1622' },
+            headerUserInterfaceStyle: 'dark',
+          }}
+        />
+        <Stack.Screen
+          name={ROUTE_NAME.Sms}
+          component={SmsScreen}
+          options={{
+            title: 'SMS',
+            headerShown: true,
+            headerTintColor: LINE_COLOR.sms,
             headerTranslucent: true,
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },

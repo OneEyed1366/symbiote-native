@@ -37,6 +37,10 @@
   --line-screen-orientation: #f43f5e;
   --line-localization: #10b981;
   --line-tracking-transparency: #78716c;
+  --line-secure-store: #a16207;
+  --line-sharing: #d946ef;
+  --line-web-browser: #0369a1;
+  --line-sms: #65a30d;
 }
 
 .info-text {
@@ -193,6 +197,18 @@
 .line-tag-tracking-transparency {
   background-color: var(--line-tracking-transparency);
 }
+.line-tag-secure-store {
+  background-color: var(--line-secure-store);
+}
+.line-tag-sharing {
+  background-color: var(--line-sharing);
+}
+.line-tag-web-browser {
+  background-color: var(--line-web-browser);
+}
+.line-tag-sms {
+  background-color: var(--line-sms);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -280,6 +296,22 @@
   border-left-width: 3px;
   border-left-color: var(--line-tracking-transparency);
 }
+.menu-row-secure-store {
+  border-left-width: 3px;
+  border-left-color: var(--line-secure-store);
+}
+.menu-row-sharing {
+  border-left-width: 3px;
+  border-left-color: var(--line-sharing);
+}
+.menu-row-web-browser {
+  border-left-width: 3px;
+  border-left-color: var(--line-web-browser);
+}
+.menu-row-sms {
+  border-left-width: 3px;
+  border-left-color: var(--line-sms);
+}
 
 .menu-badge {
   width: 34px;
@@ -341,6 +373,18 @@
 }
 .menu-badge-tracking-transparency {
   background-color: var(--line-tracking-transparency);
+}
+.menu-badge-secure-store {
+  background-color: var(--line-secure-store);
+}
+.menu-badge-sharing {
+  background-color: var(--line-sharing);
+}
+.menu-badge-web-browser {
+  background-color: var(--line-web-browser);
+}
+.menu-badge-sms {
+  background-color: var(--line-sms);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -414,6 +458,18 @@
 }
 .menu-row-hint-tracking-transparency {
   color: var(--line-tracking-transparency);
+}
+.menu-row-hint-secure-store {
+  color: var(--line-secure-store);
+}
+.menu-row-hint-sharing {
+  color: var(--line-sharing);
+}
+.menu-row-hint-web-browser {
+  color: var(--line-web-browser);
+}
+.menu-row-hint-sms {
+  color: var(--line-sms);
 }
 
 /* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own

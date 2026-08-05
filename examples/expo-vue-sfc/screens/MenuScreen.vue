@@ -42,6 +42,10 @@ const MENU_ITEMS: readonly IMenuItem[] = [
   { label: 'Screen Orientation', route: ROUTE_NAME.ScreenOrientation, hint: '@symbiote-native/screen-orientation — orientation lock/unlock and live orientation state' },
   { label: 'Localization', route: ROUTE_NAME.Localization, hint: '@symbiote-native/localization — device locales and calendar preferences' },
   { label: 'Tracking Transparency', route: ROUTE_NAME.TrackingTransparency, hint: '@symbiote-native/tracking-transparency — iOS App Tracking Transparency prompt and advertising ID' },
+  { label: 'Secure Store', route: ROUTE_NAME.SecureStore, hint: '@symbiote-native/secure-store — encrypted key/value storage in the Keychain/Keystore, optionally behind biometrics' },
+  { label: 'Sharing', route: ROUTE_NAME.Sharing, hint: '@symbiote-native/sharing — opens the platform share sheet for a local file' },
+  { label: 'Web Browser', route: ROUTE_NAME.WebBrowser, hint: '@symbiote-native/web-browser — in-app browser (SFSafariViewController / Custom Tabs) and the OAuth auth session' },
+  { label: 'SMS', route: ROUTE_NAME.Sms, hint: '@symbiote-native/sms — opens the system SMS composer prefilled with recipients and a message' },
 ];
 
 function lineInfoFor(route: ITourRouteName) {

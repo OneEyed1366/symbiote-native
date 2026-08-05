@@ -25,6 +25,10 @@ export const NAV_LINE = {
   ScreenOrientation: 'screen-orientation',
   Localization: 'localization',
   TrackingTransparency: 'tracking-transparency',
+  SecureStore: 'secure-store',
+  Sharing: 'sharing',
+  WebBrowser: 'web-browser',
+  Sms: 'sms',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -67,6 +71,16 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.Localization]: '#10b981',
   // Stone — @symbiote-native/tracking-transparency's own tour stop, distinct from every color above.
   [NAV_LINE.TrackingTransparency]: '#78716c',
+  // Bronze — @symbiote-native/secure-store. Reads as a vault next to LocalAuth's crimson,
+  // and stays clear of Brightness' gold and StandardWebCrypto's orange.
+  [NAV_LINE.SecureStore]: '#a16207',
+  // Fuchsia — @symbiote-native/sharing's own tour stop, distinct from every color above.
+  [NAV_LINE.Sharing]: '#d946ef',
+  // Deep blue — @symbiote-native/web-browser's own tour stop, darker than Cellular's blue so the
+  // two read apart on a menu row.
+  [NAV_LINE.WebBrowser]: '#0369a1',
+  // Olive — @symbiote-native/sms's own tour stop, deeper than StoreReview's lime.
+  [NAV_LINE.Sms]: '#65a30d',
 };
 
 export type INavLineInfo = {
@@ -117,4 +131,8 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'TT',
     label: 'TRACKING TRANSPARENCY LINE',
   },
+  [ROUTE_NAME.SecureStore]: { line: NAV_LINE.SecureStore, code: 'SS', label: 'SECURE STORE LINE' },
+  [ROUTE_NAME.Sharing]: { line: NAV_LINE.Sharing, code: 'SH', label: 'SHARING LINE' },
+  [ROUTE_NAME.WebBrowser]: { line: NAV_LINE.WebBrowser, code: 'WB', label: 'WEB BROWSER LINE' },
+  [ROUTE_NAME.Sms]: { line: NAV_LINE.Sms, code: 'SM', label: 'SMS LINE' },
 };

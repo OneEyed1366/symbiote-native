@@ -39,6 +39,10 @@
   --line-screen-orientation: #f43f5e;
   --line-localization: #10b981;
   --line-tracking-transparency: #78716c;
+  --line-secure-store: #a16207;
+  --line-sharing: #d946ef;
+  --line-web-browser: #0369a1;
+  --line-sms: #65a30d;
 }
 
 .info-text {
@@ -195,6 +199,18 @@
 .line-tag-tracking-transparency {
   background-color: var(--line-tracking-transparency);
 }
+.line-tag-secure-store {
+  background-color: var(--line-secure-store);
+}
+.line-tag-sharing {
+  background-color: var(--line-sharing);
+}
+.line-tag-web-browser {
+  background-color: var(--line-web-browser);
+}
+.line-tag-sms {
+  background-color: var(--line-sms);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -282,6 +298,22 @@
   border-left-width: 3px;
   border-left-color: var(--line-tracking-transparency);
 }
+.menu-row-secure-store {
+  border-left-width: 3px;
+  border-left-color: var(--line-secure-store);
+}
+.menu-row-sharing {
+  border-left-width: 3px;
+  border-left-color: var(--line-sharing);
+}
+.menu-row-web-browser {
+  border-left-width: 3px;
+  border-left-color: var(--line-web-browser);
+}
+.menu-row-sms {
+  border-left-width: 3px;
+  border-left-color: var(--line-sms);
+}
 
 .menu-badge {
   width: 34px;
@@ -344,6 +376,18 @@
 .menu-badge-tracking-transparency {
   background-color: var(--line-tracking-transparency);
 }
+.menu-badge-secure-store {
+  background-color: var(--line-secure-store);
+}
+.menu-badge-sharing {
+  background-color: var(--line-sharing);
+}
+.menu-badge-web-browser {
+  background-color: var(--line-web-browser);
+}
+.menu-badge-sms {
+  background-color: var(--line-sms);
+}
 .menu-badge-text {
   color: var(--ink);
   font-size: 12px;
@@ -395,6 +439,39 @@
 }
 .menu-row-hint-crypto {
   color: var(--line-crypto);
+}
+.menu-row-hint-standard-web-crypto {
+  color: var(--line-standard-web-crypto);
+}
+.menu-row-hint-system-ui {
+  color: var(--line-system-ui);
+}
+.menu-row-hint-store-review {
+  color: var(--line-store-review);
+}
+.menu-row-hint-keep-awake {
+  color: var(--line-keep-awake);
+}
+.menu-row-hint-screen-orientation {
+  color: var(--line-screen-orientation);
+}
+.menu-row-hint-localization {
+  color: var(--line-localization);
+}
+.menu-row-hint-tracking-transparency {
+  color: var(--line-tracking-transparency);
+}
+.menu-row-hint-secure-store {
+  color: var(--line-secure-store);
+}
+.menu-row-hint-sharing {
+  color: var(--line-sharing);
+}
+.menu-row-hint-web-browser {
+  color: var(--line-web-browser);
+}
+.menu-row-hint-sms {
+  color: var(--line-sms);
 }
 
 /* SensorsScreen — one card per @symbiote-native/sensors hook, each rendering its own
@@ -553,4 +630,204 @@
   color: var(--chalk-bright);
   font-size: 15px;
   background-color: var(--ink);
+}
+
+/* SecureStoreScreen — capabilities card, stored-value card, write/read/delete card. Same shape
+   as .auth-* above; kept its own family so the two screens can drift independently. */
+.secure-store-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.secure-store-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.secure-store-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.secure-store-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+  flex-shrink: 1;
+}
+.secure-store-status-badge {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+.secure-store-status-badge-checking {
+  background-color: var(--mist);
+}
+.secure-store-status-badge-no {
+  background-color: #6b4a4a;
+}
+.secure-store-status-badge-yes {
+  background-color: var(--positive);
+}
+.secure-store-status-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+.secure-store-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+  flex-shrink: 1;
+}
+
+/* SharingScreen — availability card, file-URI input, share result. */
+.sharing-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.sharing-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.sharing-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sharing-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+  flex-shrink: 1;
+}
+.sharing-status-badge {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+.sharing-status-badge-checking {
+  background-color: var(--mist);
+}
+.sharing-status-badge-no {
+  background-color: #6b4a4a;
+}
+.sharing-status-badge-yes {
+  background-color: var(--positive);
+}
+.sharing-status-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+.sharing-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+  flex-shrink: 1;
+}
+.sharing-note {
+  color: var(--mist);
+  font-size: 12px;
+}
+
+/* WebBrowserScreen — URL input, open/dismiss actions, last-result card, Android-only Custom Tabs
+   service card. */
+.web-browser-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.web-browser-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.web-browser-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.web-browser-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+  flex-shrink: 1;
+}
+.web-browser-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+  flex-shrink: 1;
+}
+.web-browser-note {
+  color: var(--mist);
+  font-size: 12px;
+}
+
+/* SmsScreen — availability card, recipients/message inputs, composer-outcome card. */
+.sms-card {
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.sms-card-title {
+  color: var(--chalk-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.sms-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sms-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+  flex-shrink: 1;
+}
+.sms-status-badge {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+.sms-status-badge-checking {
+  background-color: var(--mist);
+}
+.sms-status-badge-no {
+  background-color: #6b4a4a;
+}
+.sms-status-badge-yes {
+  background-color: var(--positive);
+}
+.sms-status-text {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+.sms-value-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+  font-weight: bold;
+  flex-shrink: 1;
+}
+.sms-note {
+  color: var(--mist);
+  font-size: 12px;
 }

@@ -25,6 +25,10 @@ export const NAV_LINE = {
   ScreenOrientation: 'screen-orientation',
   Localization: 'localization',
   TrackingTransparency: 'tracking-transparency',
+  SecureStore: 'secure-store',
+  Sharing: 'sharing',
+  WebBrowser: 'web-browser',
+  Sms: 'sms',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -66,6 +70,18 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.Localization]: '#10b981',
   // @symbiote-native/tracking-transparency demo — stone, shared across every expo-* app for consistency.
   [NAV_LINE.TrackingTransparency]: '#78716c',
+  // Bronze — @symbiote-native/secure-store. Reads as a vault next to LocalAuth's crimson,
+  // and stays clear of Brightness' gold and StandardWebCrypto's orange.
+  [NAV_LINE.SecureStore]: '#a16207',
+  // Fuchsia — @symbiote-native/sharing. Loud enough to read as "hand it off", and far from
+  // Application's pink on the menu's badge column.
+  [NAV_LINE.Sharing]: '#d946ef',
+  // Deep ocean blue — @symbiote-native/web-browser. Darker than Cellular's blue so the two
+  // browser/network rows don't blur together.
+  [NAV_LINE.WebBrowser]: '#0369a1',
+  // Olive — @symbiote-native/sms. Sits between StoreReview's lime and Battery's green without
+  // matching either.
+  [NAV_LINE.Sms]: '#65a30d',
 };
 
 export type INavLineInfo = {
@@ -96,4 +112,8 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.ScreenOrientation]: { line: NAV_LINE.ScreenOrientation, code: 'SO', label: 'SCREEN ORIENTATION LINE' },
   [ROUTE_NAME.Localization]: { line: NAV_LINE.Localization, code: 'LO', label: 'LOCALIZATION LINE' },
   [ROUTE_NAME.TrackingTransparency]: { line: NAV_LINE.TrackingTransparency, code: 'TT', label: 'TRACKING TRANSPARENCY LINE' },
+  [ROUTE_NAME.SecureStore]: { line: NAV_LINE.SecureStore, code: 'SS', label: 'SECURE STORE LINE' },
+  [ROUTE_NAME.Sharing]: { line: NAV_LINE.Sharing, code: 'SH', label: 'SHARING LINE' },
+  [ROUTE_NAME.WebBrowser]: { line: NAV_LINE.WebBrowser, code: 'WB', label: 'WEB BROWSER LINE' },
+  [ROUTE_NAME.Sms]: { line: NAV_LINE.Sms, code: 'SM', label: 'SMS LINE' },
 };
