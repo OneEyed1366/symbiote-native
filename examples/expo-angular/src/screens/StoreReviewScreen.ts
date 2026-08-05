@@ -65,7 +65,13 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
             (press)="handleRequestReview()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="store-review-request-result" class="value-text">{{ requestLabel() }}</Text>
+          <Text testID="store-review-request-result" class="value-text">{{ lastResult() }}</Text>
+          <Text class="info-text">
+            resolved means the call completed, not that a prompt appeared. On Android the Play
+            dialog only shows for a build installed from Google Play (internal test track,
+            internal app sharing, or production); a sideloaded debug build resolves silently. iOS
+            shows it in debug builds. Both stores also enforce a quota.
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -81,19 +87,20 @@ export class StoreReviewScreen {
 
   readonly isAvailable = signal<ICapabilityStatus>('checking');
   readonly hasReviewAction = signal<ICapabilityStatus>('checking');
-  readonly requestState = signal<'idle' | 'requested'>('idle');
+  readonly lastResult = signal('idle');
 
   constructor() {
     isAvailableAsync().then(value => this.isAvailable.set(toCapabilityStatus(value)));
     hasAction().then(value => this.hasReviewAction.set(toCapabilityStatus(value)));
   }
 
+  // Neither store reports whether a prompt appeared — a suppressed dialog and a rejected call
+  // look identical unless the outcome is shown.
   handleRequestReview(): void {
-    requestReview().then(() => this.requestState.set('requested'));
-  }
-
-  requestLabel(): string {
-    return this.requestState() === 'requested' ? 'requestReview() resolved' : 'not requested yet';
+    this.lastResult.set('requesting…');
+    requestReview()
+      .then(() => this.lastResult.set('resolved'))
+      .catch((error: Error) => this.lastResult.set(`rejected: ${error.message}`));
   }
 
   statusBadgeClass(status: ICapabilityStatus): string {

@@ -28,6 +28,7 @@ export const StoreReviewScreen = defineComponent(
 
     const isAvailable: Ref<boolean | null> = ref(null);
     const canTakeAction: Ref<boolean | null> = ref(null);
+    const lastResult: Ref<string> = ref('idle');
 
     let isMounted = true;
     onUnmounted(() => {
@@ -43,8 +44,17 @@ export const StoreReviewScreen = defineComponent(
       });
     });
 
+    // Neither store reports whether a prompt appeared — a suppressed dialog and a rejected call
+    // look identical unless the outcome is shown.
     function handleRequestReview() {
-      requestReview();
+      lastResult.value = 'requesting…';
+      requestReview()
+        .then(() => {
+          lastResult.value = 'resolved';
+        })
+        .catch((error: Error) => {
+          lastResult.value = `rejected: ${error.message}`;
+        });
     }
 
     return () => (
@@ -84,6 +94,13 @@ export const StoreReviewScreen = defineComponent(
               onPress={handleRequestReview}
               color={lineColor}
             />
+            <ValueRow label="Last result" value={lastResult.value} />
+            <Text class="info-text">
+              resolved means the call completed, not that a prompt appeared. On Android the Play
+              dialog only shows for a build installed from Google Play (internal test track,
+              internal app sharing, or production); a sideloaded debug build resolves silently.
+              iOS shows it in debug builds. Both stores also enforce a quota.
+            </Text>
           </View>
         </ScrollView>
       </SafeAreaView>

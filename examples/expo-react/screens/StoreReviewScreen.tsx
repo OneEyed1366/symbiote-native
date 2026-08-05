@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
 import { hasAction, isAvailableAsync, requestReview } from '@symbiote-native/store-review';
 import { ActionButton } from '../components/ActionButton';
@@ -16,9 +16,10 @@ function ValueRow({ label, value }: { label: string; value: string }) {
 
 /**
  * @symbiote-native/store-review canary demo: capability card (isAvailableAsync/hasAction,
- * resolved on mount, no store-URL options supplied) plus a button firing requestReview() — on
- * the simulator this most likely hits the native review flow or warns to the console, both
- * expected outcomes for demo purposes.
+ * resolved on mount, no store-URL options supplied) plus a button firing requestReview().
+ *
+ * Neither store reports whether a dialog appeared, so without the result row a suppressed
+ * prompt and a rejected call are the same blank screen.
  */
 export function StoreReviewScreen() {
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StoreReview];
@@ -26,6 +27,7 @@ export function StoreReviewScreen() {
 
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [canRequestReview, setCanRequestReview] = useState<boolean | null>(null);
+  const [lastResult, setLastResult] = useState('idle');
 
   useEffect(() => {
     let isMounted = true;
@@ -38,6 +40,13 @@ export function StoreReviewScreen() {
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  const handleRequestReview = useCallback(() => {
+    setLastResult('requesting…');
+    requestReview()
+      .then(() => setLastResult('resolved'))
+      .catch((error: Error) => setLastResult(`rejected: ${error.message}`));
   }, []);
 
   return (
@@ -79,9 +88,21 @@ export function StoreReviewScreen() {
           <ActionButton
             testID="store-review-request-button"
             title="Request Review"
-            onPress={() => requestReview()}
+            onPress={handleRequestReview}
             color={lineColor}
           />
+          <View className="capability-row">
+            <Text className="capability-label">Last result</Text>
+            <Text testID="store-review-result" className="value-text">
+              {lastResult}
+            </Text>
+          </View>
+          <Text className="info-text">
+            resolved means the call completed, not that a prompt appeared. On Android the Play
+            dialog only shows for a build installed from Google Play (internal test track,
+            internal app sharing, or production); a sideloaded debug build resolves silently. iOS
+            shows it in debug builds. Both stores also enforce a quota.
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -24,6 +24,7 @@ const lineColor = LINE_COLOR[lineInfo.line];
 
 const isAvailable = ref<ICapabilityStatus>('checking');
 const hasReviewAction = ref<ICapabilityStatus>('checking');
+const lastResult = ref('idle');
 
 onMounted(() => {
   void isAvailableAsync().then(value => {
@@ -34,8 +35,17 @@ onMounted(() => {
   });
 });
 
+// Neither store reports whether a prompt appeared — a suppressed dialog and a rejected call
+// look identical unless the outcome is shown.
 function handleRequestReview(): void {
-  void requestReview();
+  lastResult.value = 'requesting…';
+  void requestReview()
+    .then(() => {
+      lastResult.value = 'resolved';
+    })
+    .catch((error: Error) => {
+      lastResult.value = `rejected: ${error.message}`;
+    });
 }
 </script>
 
@@ -85,6 +95,16 @@ function handleRequestReview(): void {
           :onPress="handleRequestReview"
           :color="lineColor"
         />
+        <View class="store-review-row">
+          <Text class="store-review-row-label">Last result</Text>
+          <Text testID="store-review-result" class="store-review-value-text">{{ lastResult }}</Text>
+        </View>
+        <Text class="info-text"
+          >resolved means the call completed, not that a prompt appeared. On Android the Play
+          dialog only shows for a build installed from Google Play (internal test track, internal
+          app sharing, or production); a sideloaded debug build resolves silently. iOS shows it in
+          debug builds. Both stores also enforce a quota.</Text
+        >
       </View>
     </ScrollView>
   </SafeAreaView>
