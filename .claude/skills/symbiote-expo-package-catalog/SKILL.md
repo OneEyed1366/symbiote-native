@@ -7,9 +7,9 @@ description: "Symbiote Expo-package migration catalog — read BEFORE starting w
 
 Decided 2026-07-28 via `grill-me`, after `local-auth` and `sensors` proved the
 `expo-modules-core`-only wrapping recipe (see `symbiote-expo-native-module`) and `slider` proved
-the native-view wrapping recipe (see `symbiote-third-party-native-view`). This skill is the
-**roadmap only** — no packages beyond `local-auth`/`sensors` are implemented yet. Each future
-package still goes through `symbiote-new-package-skeleton` (tier triage) →
+the native-view wrapping recipe (see `symbiote-third-party-native-view`). Tier 1 has since been
+closed (2026-08-03) — see "Already shipped" for the real state; from Tier 2 on this skill is a
+**roadmap**. Each future package still goes through `symbiote-new-package-skeleton` (tier triage) →
 `symbiote-expo-native-module` or `symbiote-third-party-native-view` (the actual recipe).
 
 ## Scope filter — what counts as a migration candidate
@@ -64,10 +64,25 @@ queue.
 | `@symbiote-native/screen-orientation` | `expo-screen-orientation` | `symbiote-expo-native-module` |
 | `@symbiote-native/localization` | `expo-localization` | `symbiote-expo-native-module` |
 | `@symbiote-native/tracking-transparency` | `expo-tracking-transparency` | `symbiote-expo-native-module` |
+| `@symbiote-native/secure-store` | `expo-secure-store` | `symbiote-expo-native-module` (first tier-2 package; also the first to need `native-link.json`'s `android.manifestApplicationAttributes` — see below) |
+| `@symbiote-native/sharing` | `expo-sharing` (OUTGOING share only — `shareAsync`/`isAvailableAsync`. The incoming half (`useIncomingShare`, `getSharedPayloads`, …) is deliberately NOT ported: it needs an iOS Share Extension target, which upstream's config plugin builds as a second Xcode target with entitlements + an App Group — the same app-extension category as `expo-widgets` in the backlog above) | `symbiote-expo-native-module` |
+| `@symbiote-native/web-browser` | `expo-web-browser` (minus the opt-in `experimentalLauncherActivity` config plugin, and minus the web-only `maybeCompleteAuthSession`) | `symbiote-expo-native-module` |
+| `@symbiote-native/sms` | `expo-sms` | `symbiote-expo-native-module` |
 
 **Tier 1 is now fully closed (2026-08-03)** — every Tier 1 row below is shipped except
 `expo-constants` (#9), which stays deliberately skipped (see its own row note). Tier 2 (permission/
-async, 31 packages) is next up.
+async, 31 packages) is under way: `expo-secure-store` (#18), `expo-sharing` (#19),
+`expo-web-browser` (#23) and `expo-sms` (#24) all shipped 2026-08-05, 27 left.
+
+**Tier 2 brought the first package that needs more than the two Android registration points.**
+`expo-secure-store`'s upstream config plugin also sets `android:fullBackupContent` /
+`android:dataExtractionRules` on the app's own `<application>` element — Auto Backup would
+otherwise upload the encrypted entries without the Keystore keys that decrypt them, so a restore
+onto a new device yields unreadable values. `@symbiote-native/expo-modules-link` grew an
+`android.manifestApplicationAttributes` section for this (additive-only, app's own value wins).
+**Read the upstream `plugin/src/with<Name>.ts` before porting any tier-2 package** — that file is
+where Expo hides per-app native config a thin JS wrapper does not otherwise reveal, and it is the
+cheapest place to find out that a package needs one.
 
 ## Priority queue — one continuous sequence, ranked by complexity + demand
 
@@ -104,13 +119,13 @@ from each package's `expo-module.config.json`.
 
 | # | Package | Kind | Platforms |
 |---|---|---|---|
-| 18 | `expo-secure-store` | M | apple, android |
-| 19 | `expo-sharing` | M | apple, android |
+| ~~18~~ | ~~`expo-secure-store`~~ | M | shipped — see "Already shipped" |
+| ~~19~~ | ~~`expo-sharing`~~ | M | shipped — see "Already shipped" |
 | 20 | `expo-file-system` | M | apple, android |
 | 21 | `expo-font` | M | apple, android, web |
 | 22 | `expo-asset` | M | apple, android, web |
-| 23 | `expo-web-browser` | M | apple, android |
-| 24 | `expo-sms` | M | apple, android |
+| ~~23~~ | ~~`expo-web-browser`~~ | M | shipped — see "Already shipped" |
+| ~~24~~ | ~~`expo-sms`~~ | M | shipped — see "Already shipped" |
 | 25 | `expo-mail-composer` | M | apple, android |
 | 26 | `expo-print` | M | apple, android |
 | 27 | `expo-document-picker` | M | apple, android |

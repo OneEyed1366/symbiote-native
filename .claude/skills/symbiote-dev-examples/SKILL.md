@@ -361,6 +361,175 @@ injected transform changed; a warm Metro serves a stale mix): composed selectors
 -> anchor host` and paint on iOS + Android. Full adapter-side record: `angular-adapter` §11c; changeset
 `.changeset/angular-anchor-host-leaf-module.md`.
 
+## 6. Parallelising canary wiring — split by APP, never by package (2026-08-05)
+
+Adding N packages to the four `examples/expo-*` canaries is a natural fan-out, but only one cut
+of it is conflict-free.
+
+**By package is wrong.** Every package a canary demos touches the SAME five shared files in that
+app — `routes.ts`, `navigation-lines.ts`, `App.css`, `App.<ext>`, `screens/MenuScreen.<ext>`.
+Three agents each adding one package to one app collide on all five.
+
+**By app is right.** The four apps share no files at all, so one agent per app adding all N
+packages never conflicts. Each app also has its OWN `package-lock.json`, so each agent can run
+`npm install` in its own directory safely — which matters, because that install is what fires the
+`symbiote-expo-link` postinstall that regenerates the app's native registration. (The repo-root
+`pnpm install` and `pnpm pack` stay the orchestrator's, and must be forbidden to agents: those
+DO share state.)
+
+**Pin the cross-app identity centrally, or the four apps drift.** Independent agents each invent
+their own route key, nav-line id, line color, badge code and menu wording. Hand them one fixed
+table — `ROUTE_NAME` key, `NAV_LINE` id, hex color, two-letter badge code, `… LINE` label, and
+the verbatim menu label + hint — and afterwards diff the four apps against it rather than
+trusting the reports. Colors especially: with ~20 lines already assigned, an agent picking
+"a distinct color" independently will land on someone else's.
+
+Verified 2026-08-05 wiring `sharing`/`web-browser`/`sms` into all four canaries this way: zero
+file conflicts, and a scripted post-check found all four apps agreeing on every constant.
+
+Orchestrator keeps: `pnpm-workspace.yaml`, root `tsconfig.json`, `apps/docs-site/astro.config.mjs`,
+the repo-root install, and `pnpm pack`. Agents keep: everything under their own `examples/<app>/`.
+
+## 7. A stale `file:` tarball silently UNLINKS native modules (2026-08-06)
+
+`examples/*` depends on local packages by tarball path
+(`"@symbiote-native/crypto": "file:../../packages/crypto/symbiote-native-crypto-0.0.1.tgz"`).
+Repacking without bumping the version leaves npm's cached copy in place — it trusts the
+lockfile integrity and never re-reads the file. The known half of this trap is stale *code*.
+The half that actually bites is stale **`native-link.json`**.
+
+`symbiote-expo-link` builds its generated regions by scanning `<app>/node_modules/*/native-link.json`.
+A package whose installed copy predates that manifest is **invisible to the linker** — so it
+generates no `implementation project(':expo-<pkg>')` and no `MainApplication.kt` map entry, with
+no warning. The linker is behaving correctly; it cannot warn, because plenty of packages
+legitimately ship no manifest (`standard-web-crypto` has none by design).
+
+Failure mode, end to end:
+
+```
+repack pkg (version unchanged)  →  npm serves cached tarball, no native-link.json
+                                →  linker scans, doesn't see the package
+                                →  regions regenerate WITHOUT it
+                                →  Gradle compiles fine (nothing references it)
+                                →  runtime: Cannot find native module 'ExpoCrypto'
+```
+
+Two consequences worth knowing, both observed:
+
+- The JS error arrives **twice, wearing different masks**. `requireNativeModule(...)` sits at
+  module top level, so the throw happens at import: first `Cannot find native module 'ExpoCrypto'`,
+  then `Cannot read property 'expoCrypto' of undefined` from the importing module, whose exports
+  object never initialized. The second message looks like a typo bug and is not one — chase the
+  first.
+- **A green Gradle build proves nothing here.** The missing case compiles cleanly, unlike the
+  forgotten-`implementation`-line failure in `symbiote-expo-native-module` §4 (which fails loudly
+  with `Unresolved reference`). Silent absence and correct linkage look identical to the compiler.
+
+**Audit before blaming code** — compare installed manifests against source, per app:
+
+```bash
+for app in expo-react expo-vue-sfc expo-vue-tsx expo-angular; do
+  for d in examples/$app/node_modules/@symbiote-native/*/; do p=$(basename "$d")
+    [ -f "packages/$p/native-link.json" ] || continue
+    [ -f "$d/native-link.json" ] || echo "$app: STALE $p"
+  done
+done
+```
+
+Fix is an **explicit** reinstall of every stale spec in one command —
+`npm install "@symbiote-native/crypto@file:../../packages/crypto/....tgz" ...`. `rm -rf` on the
+package dir followed by a plain `npm install` restores the same cached bytes.
+
+Then rebuild the APK: the regenerated regions are Gradle/Kotlin source, so a JS reload can't
+pick them up.
+
+Two traps found the same day, both worth pre-empting:
+
+- **`npm install` kills a running Metro** for that app — it rewrites `node_modules` underneath
+  it. Symptom is a red `Unable to load script`, and the app then reports **no JS errors at all**
+  because no JS ran. Restart Metro with `--reset-cache` and confirm the app actually painted
+  before reading anything into a clean log.
+- **`adb reverse tcp:8081 tcp:8081` is dropped by a reinstall.** Re-run it after every
+  `installDebug`, or the same red screen appears and looks like a bundler problem.
+
+Real incident: `crypto` + `standard-web-crypto` black-screened on Android in `expo-vue-tsx`.
+The audit found **11 stale packages in each of the three non-React apps** (`application`,
+`battery`, `brightness`, `cellular`, `clipboard`, `crypto`, `device`, `haptics`, `local-auth`,
+`network`, `sensors`) — their generated map held 10 modules where `expo-react`'s held 28.
+`expo-react` was clean only because it had been force-reinstalled by hand earlier.
+
+Counting rule when auditing the two regions: module-map entries and Gradle lines are **not**
+expected to match. One Gradle project can register many module classes — `expo-sensors` alone
+contributes 7 — so `expo-react`'s `28 modules / 21 gradle` is correct, not a discrepancy.
+
+A package installed from the **registry** can't be fixed this way at all: if the published
+version predates its `native-link.json` (as `@symbiote-native/sensors@0.2.0` does), the choice
+is publishing a new version or pinning the app at the local tarball the way `expo-react` does.
+
+## 8. "Works on iOS, dead on Android" is usually the platform gating you, not a bug (2026-08-06)
+
+A canary runs on a simulator/emulator with a sideloaded debug build — an environment several
+native APIs deliberately refuse to serve. The asymmetry is the tell: one platform gates the
+feature and the other doesn't, so the same correct code looks broken on exactly one side.
+
+**Check the gate before debugging the wrapper.** Known ones, all hit for real:
+
+| API | Gate | Looks like |
+|---|---|---|
+| `sms.sendSMSAsync` | iOS `MFMessageComposeViewController.canSendText()` is **false on the simulator** (no Messages app) | `SMSUnavailableException` on iOS, fine on the Android emulator — which ships a fake modem |
+| `store-review.requestReview` | Android Play in-app review only runs for a build **installed from Google Play** (internal test track / app sharing / production) | Nothing happens on Android, prompt appears on iOS, which shows it in debug builds |
+| `local-auth`, biometrics | Simulator/emulator enrolment must be configured in the device menu first | Reports unavailable on a fresh image |
+| `secure-store` with `requireAuthentication` | iOS prompts on **read/update**, never on a fresh **add** — `SecItemAdd` doesn't require satisfying the `kSecAttrAccessControl` it attaches, and upstream sets `kSecUseOperationPrompt` only in `update()` and the read paths. Android's Keystore key is `setUserAuthenticationRequired(true)`, so the cipher must be authorized *before* encrypting and it prompts on **write** | Saving "behind biometrics" is silent on iOS and prompts on Android — both correct |
+
+Flip simulator biometric enrolment without the Simulator.app menu:
+
+```bash
+xcrun simctl spawn booted notifyutil -s com.apple.BiometricKit.enrollmentChanged 1
+xcrun simctl spawn booted notifyutil -p com.apple.BiometricKit.enrollmentChanged
+```
+
+Confirm it took by re-entering the screen and reading its own capability row, not by trusting the
+command — the app only re-runs `canUseBiometricAuthentication()` on mount.
+
+**But enrolling does NOT make a keychain access-control prompt appear, and no simulator setting
+will.** A `kSecAttrAccessControl` item is gated by the Secure Enclave, which the simulator does
+not have — and a simulator can't have a device passcode either, so the gate has nothing to
+enforce. `SecItemCopyMatching` just returns the value. `LAContext.canEvaluatePolicy` still reports
+`true` after enrolment, which is why the capability row flips to YES while the prompt never comes:
+those are two different mechanisms, and only the `LAContext` one is emulated. **Biometric keychain
+gating is verifiable on a physical device only** — treat a green simulator run as no evidence at
+all here.
+
+A known workaround exists (call `LAContext.evaluatePolicy` explicitly before reading the item) —
+**do not adopt it in a package.** It relocates the gate from the Secure Enclave into app code,
+which is the textbook biometric-bypass shape: an attacker who can hook the JS/app layer skips it,
+whereas the real access control is enforced where they can't reach. It is a demo-only trick.
+
+Two checks that settle it in seconds:
+
+```bash
+adb shell dumpsys package <id> | grep installerPackageName   # null = sideloaded, Play APIs won't fire
+xcrun simctl list devices booted                             # a booted sim ≠ a phone
+```
+
+Play Core is loud about doing its job — `adb logcat | grep PlayCore` shows
+`requestInAppReview` → `onServiceConnected` → `onGetLaunchReviewFlowInfo`. The flow completing
+while nothing appears **is** the documented outcome; Google reports no signal either way,
+specifically so apps can't detect a suppressed prompt.
+
+**The canary lesson: never let an API like this resolve into silence.** A handler that drops the
+promise (`onPress={() => requestReview()}`) makes "suppressed by the platform", "resolved fine",
+and "rejected" render identically as nothing — which is unfalsifiable from the device and sends
+the next person hunting a bug that isn't there. Every such screen renders a `Last result` row
+fed by `.then()`/`.catch()`, plus one line of info text naming the gate. `SmsScreen` is the
+precedent; all four `StoreReviewScreen`s were retrofitted to match on 2026-08-06.
+
+Corollary for the wrappers themselves: when upstream's JSDoc contradicts its own native source,
+the native source wins. `expo-store-review`'s JSDoc claims Android availability means "Android
+5.0+"; `StoreReviewModule.kt` actually checks only whether the Play Store package is installed.
+Hand-ported docs inherit upstream's errors — verify claims against the `.swift`/`.kt` before
+copying them.
+
 ## Reference
 
 - `symbiote-dependency-catalog` — the `catalog:`/`workspace:*` mechanics `.examples/*` still

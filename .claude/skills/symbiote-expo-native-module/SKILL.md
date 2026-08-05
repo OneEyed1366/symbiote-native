@@ -885,6 +885,27 @@ both, unconditionally (not `DEBUG`-gated). The file is still left as the develop
 point is that drift stops being invisible, not that it gets corrected. Running the aggregator
 over those three apps is what surfaced the drift in the first place.
 
+**Android `<application>` attributes, added 2026-08-05 for `secure-store`.** A package declaring
+`android.manifestApplicationAttributes: { "<attr>": "<value>" }` gets those attributes set on the
+app's own `<application>` element in `android/app/src/main/AndroidManifest.xml`. `secure-store` is
+the first package to need it (`android:fullBackupContent` / `android:dataExtractionRules` pointing
+at the Auto Backup rule files `expo-secure-store` itself ships) - without them Android backs up
+the encrypted entries but not the Keystore keys that decrypt them, so a restore onto a new device
+yields values the app can no longer read. Additive-only for the same reason as Info.plist plus one
+of its own: an XML attribute is unique per element by construction, so presence is a sufficient
+idempotency check, and no comment can live inside a tag to delimit a region anyway. An attribute
+the app already carries is kept and reported - backup rules decide what leaves the device, so the
+app's own value has to win. The opening tag is located by scanning for the first UNQUOTED `>`
+after `<application`, not by regex: RN's own template puts `"${usesCleartextTraffic}"` in an
+attribute and a manifest may legally put a `>` inside one.
+
+**Generalisation worth carrying forward: read the upstream package's own
+`plugin/src/with<Name>.ts` before porting it.** That config plugin is where Expo hides per-app
+native configuration a thin JS wrapper never reveals - `expo-secure-store`'s does exactly two
+things, one of which (`NSFaceIDUsageDescription`) the linker already covered and one of which
+(the two manifest attributes) it did not. Tier 1 packages happened to need nothing there, which
+is why this only surfaced on the first tier-2 package.
+
 **Verified end-to-end for real** (2026-08-03), same methodology as the Android proof below, with
 one extra wrinkle worth remembering: after repacking `local-auth`'s tarball, the permission
 string still didn't appear — because `@symbiote-native/expo-modules-link` ITSELF was still the
