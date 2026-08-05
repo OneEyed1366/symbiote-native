@@ -142,6 +142,12 @@ export class TrackingScreen {
 }
 ```
 
+All three examples mirror the real canary demo screens —
+`examples/expo-react/screens/TrackingTransparencyScreen.tsx`,
+`examples/expo-vue-sfc/screens/TrackingTransparencyScreen.vue`,
+`examples/expo-vue-tsx/screens/TrackingTransparencyScreen.tsx`,
+`examples/expo-angular/src/screens/TrackingTransparencyScreen.ts`.
+
 ## API
 
 ```ts
@@ -205,6 +211,5 @@ surface, never a view. Tests inject a fake native-module object in place of the 
 
 ## Known gaps
 
-- Not yet wired into any `examples/expo-*` canary.
 - Tests exercise the JS layer only (fake native module, `vitest`) — no on-device/simulator
   automated smoke test yet, only manual verification.

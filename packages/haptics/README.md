@@ -34,7 +34,7 @@ wiring into the native host app **once**, covering this package and every other
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
-`examples/expo-react/android/app/src/main/java/com/canary/MainApplication.kt` (registers
+`examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt` (registers
 `HapticsModule` as `"ExpoHaptics"`).
 
 No permission or `Info.plist`/`AndroidManifest.xml` entry is needed on either platform — haptic

@@ -15,10 +15,16 @@ project more than once.
 
 ## Setup (once per app)
 
+```bash
+npm install @symbiote-native/expo-modules-link
+```
+
+Then wire the `postinstall` hook so every install re-runs the linker:
+
 ```json
 {
   "dependencies": {
-    "@symbiote-native/expo-modules-link": "^0.2.0"
+    "@symbiote-native/expo-modules-link": "^0.1.0"
   },
   "scripts": {
     "postinstall": "symbiote-expo-link"

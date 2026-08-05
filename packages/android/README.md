@@ -25,9 +25,9 @@ Autolinked automatically by RN's Gradle plugin — see
   `OnApplyWindowInsetsListener` on the activity's decor view, reading the IME inset directly
   (rather than `getRootWindowInsets()`, whose *consumed* insets read `0` under `adjustResize`
   while the keyboard is up) and emitting the same `keyboardDidShow`/`Hide` payload shape RN's JS
-  `Keyboard` module already listens for. `@symbiote-native/react`'s `Keyboard` resolves the
-  `KeyboardObserver` module name on both iOS and Android, so the JS side stays platform-uniform
-  and unchanged.
+  `Keyboard` module already listens for. `@symbiote-native/engine`'s `Keyboard` — re-exported by
+  every adapter — resolves the `KeyboardObserver` module name on both iOS and Android, so the JS
+  side stays platform-uniform and unchanged.
 - **`SettingsManagerModule`** (native module name `SettingsManager`) — RN's `Settings` API wraps
   iOS `NSUserDefaults` and has no stock Android implementation (`Settings.js` routes non-iOS
   platforms to a fallback that warns and returns `null`). This module claims the
@@ -45,8 +45,9 @@ This package ships no JavaScript or TypeScript — it is pure native autolinking
 Android app adds `@symbiote-native/android` as an ordinary dependency (`react-native.config.js`
 declares its Android `sourceDir` and the `SymbioteAndroidPackage` import/instance), and RN's
 Gradle autolinking picks it up automatically. There is nothing to import from JS: the modules
-are consumed transparently through `@symbiote-native/react`'s existing `Keyboard` and `Settings`
-wrappers, which simply find a real native module on Android where they previously found none.
+are consumed transparently through `@symbiote-native/engine`'s existing `Keyboard` and `Settings`
+wrappers — re-exported by the React, Vue and Angular adapters alike — which simply find a real
+native module on Android where they previously found none.
 
 ## Where it's wired
 

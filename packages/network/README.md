@@ -40,8 +40,8 @@ with zero further changes:
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
-implementation: `.examples/expo-react/ios/Podfile` and
-`.examples/expo-react/android/app/src/main/java/com/canary/MainApplication.kt`.
+implementation: `examples/expo-react/ios/Podfile` and
+`examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
 No platform permission string is needed for network's surface — connection state, IP address, and
 airplane-mode detection all read system state with no runtime permission prompt on either

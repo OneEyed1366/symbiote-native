@@ -159,9 +159,10 @@ export class ApplicationScreen {
 ```
 
 There's no per-instance service to `inject()` in the Angular case — every function is a plain
-free function off the core package, called straight from the constructor. Not yet demoed in any
-of the `examples/expo-*` canary apps — the code above is realistic, hand-written usage of the
-real API, not trimmed from an existing screen.
+free function off the core package, called straight from the constructor. All three examples
+mirror the real canary demo screens — `examples/expo-react/screens/ApplicationScreen.tsx`,
+`examples/expo-vue-sfc/screens/ApplicationScreen.vue`, `examples/expo-vue-tsx/screens/ApplicationScreen.tsx`,
+`examples/expo-angular/src/screens/ApplicationScreen.ts`.
 
 ## API
 
@@ -218,6 +219,5 @@ the real `requireNativeModule` resolution (`src/core/application.test.ts`, `vite
 [README](../../README.md) for the project's testing model).
 
 Native autolinking wiring is shared with `@symbiote-native/local-auth` and every other
-`expo-modules-core` package in this repo's `examples/expo-*` canaries — this package itself isn't
-yet demoed in any of them (no `ApplicationScreen`/equivalent exists yet), so the "Use it" section
-above is realistic example code, not a trimmed-down copy of a running demo.
+`expo-modules-core` package in this repo's `examples/expo-*` canaries, where this package is
+demoed by the `ApplicationScreen` of each app.

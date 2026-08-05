@@ -90,9 +90,9 @@ export class RootComponent {
 
 There's no per-instance service to `inject()` in the Angular case — both functions are plain
 exports off the core package, called straight in the constructor or wherever the app's root is
-set up. These snippets are not yet demoed in a real canary screen — no `SystemUiScreen.*` exists
-yet in `examples/expo-*` — so treat them as realistic reference code, not a trimmed-down copy of
-a running demo.
+set up. These snippets mirror the real canary demo screens —
+`examples/expo-react/screens/SystemUiScreen.tsx`, `examples/expo-vue-sfc/screens/SystemUiScreen.vue`,
+`examples/expo-vue-tsx/screens/SystemUiScreen.tsx`, `examples/expo-angular/src/screens/SystemUiScreen.ts`.
 
 ## API
 

@@ -38,8 +38,8 @@ package (`@symbiote-native/sensors`, `@symbiote-native/local-auth`) with zero fu
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
-implementation: `.examples/expo-react/ios/Podfile` and
-`.examples/expo-react/android/app/src/main/java/com/canary/MainApplication.kt`.
+implementation: `examples/expo-react/ios/Podfile` and
+`examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
 No platform permission string is needed for battery's basic surface —
 `isBatteryOptimizationEnabledAsync` reads an Android-only system state with no runtime permission

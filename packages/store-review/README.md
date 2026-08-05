@@ -114,8 +114,9 @@ export class RateAppButton {
 }
 ```
 
-These snippets are not yet demoed in a real canary screen — treat them as realistic reference
-code, not a trimmed-down copy of a running demo.
+These snippets mirror the real canary demo screens — `examples/expo-react/screens/StoreReviewScreen.tsx`,
+`examples/expo-vue-sfc/screens/StoreReviewScreen.vue`, `examples/expo-vue-tsx/screens/StoreReviewScreen.tsx`,
+`examples/expo-angular/src/screens/StoreReviewScreen.ts`.
 
 ## API
 

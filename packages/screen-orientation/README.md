@@ -40,8 +40,8 @@ with zero further changes:
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
-implementation: `.examples/expo-react/ios/Podfile` and
-`.examples/expo-react/android/app/src/main/java/com/canary/MainApplication.kt`.
+implementation: `examples/expo-react/ios/Podfile` and
+`examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
 No platform permission string is needed for screen-orientation's surface — locking and reading the
 current orientation read/write system state with no runtime permission prompt on either platform.
@@ -132,6 +132,8 @@ getOrientationLockAsync(): Promise<OrientationLock>           // the current loc
 getPlatformOrientationLockAsync(): Promise<PlatformOrientationInfo>
 supportsOrientationLockAsync(orientationLock): Promise<boolean>
 addOrientationChangeListener(listener): EventSubscription     // fires whenever orientation/lock changes
+removeOrientationChangeListener(subscription): void           // removes one subscription
+removeOrientationChangeListeners(): void                      // removes every subscription at once
 ```
 
 Plus `Orientation` (enum: `UNKNOWN`/`PORTRAIT_UP`/`PORTRAIT_DOWN`/`LANDSCAPE_LEFT`/

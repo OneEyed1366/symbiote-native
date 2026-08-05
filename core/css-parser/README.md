@@ -33,16 +33,14 @@ as a regular dependency and re-exports it via its own `./metro-css-parser` subpa
 app's `metro.config.js` wires:
 
 ```js
-// metro-css-transformer.js, in the app
-const { createCssMetroTransformer } = require('@symbiote-native/react/metro-css-parser');
-module.exports = createCssMetroTransformer(require('@react-native/metro-babel-transformer'));
-```
-
-```js
 // metro.config.js
 resolver: { sourceExts: [...defaultSourceExts, 'css', 'scss', 'sass', 'less', 'styl'] },
-transformer: { babelTransformerPath: require.resolve('./metro-css-transformer.js') },
+transformer: { babelTransformerPath: require.resolve('@symbiote-native/react/metro-css-parser') },
 ```
+
+The subpath already calls `createCssMetroTransformer` and exports the finished transformer, so an
+app writes no transformer file of its own — point `babelTransformerPath` straight at it. Reach for
+`createCssMetroTransformer` only when building the subpath for a NEW adapter.
 
 From there, a plain stylesheet import just works, from any adapter's own source file:
 
