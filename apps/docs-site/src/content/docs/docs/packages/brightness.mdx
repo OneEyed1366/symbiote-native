@@ -239,7 +239,7 @@ only changes in response to your own `setBrightnessAsync` calls.
 | `getSystemBrightnessAsync(): Promise<number>` | Gets the system-wide brightness. Delegates to `getBrightnessAsync` on every platform except Android, since iOS has no separate system-level value |
 | `setSystemBrightnessAsync(value: number): Promise<void>` | Sets the system-wide brightness. Delegates to `setBrightnessAsync` on every platform except Android |
 | `restoreSystemBrightnessAsync(): Promise<void>` | Resets the system brightness to the value it had before this app started controlling it. No-op on every platform except Android |
-| `isUsingSystemBrightnessAsync(): Promise<boolean>` | Whether the app is currently controlling the system brightness rather than only its own window's. Always `false` except on Android |
+| `isUsingSystemBrightnessAsync(): Promise<boolean>` | Whether the activity's window has no brightness override of its own, so the system-wide value is what the screen shows. It cannot distinguish "the app set the system value" from "the app never touched brightness" — it reports only that `setBrightnessAsync` is not overriding this window. Always `false` except on Android |
 | `getSystemBrightnessModeAsync(): Promise<BrightnessMode>` | Gets the system brightness mode. Always resolves `BrightnessMode.UNKNOWN` except on Android |
 | `setSystemBrightnessModeAsync(mode: BrightnessMode): Promise<void>` | Sets the system brightness mode. No-op except on Android, and also a no-op when passed `BrightnessMode.UNKNOWN` |
 | `getPermissionsAsync(): Promise<PermissionResponse>` | Checks the user's permission for accessing the system brightness |
@@ -268,6 +268,27 @@ again whenever `request`/`get` resolves.
 | Field | Type | Description |
 | --- | --- | --- |
 | `brightness` | `number` | The current brightness value between `0` and `1`, inclusive |
+
+## Notes
+
+- **`setSystemBrightnessAsync` switches the device out of adaptive brightness.** Before writing the
+  value, the Android module puts `SCREEN_BRIGHTNESS_MODE` into `MANUAL` — the device stays manual
+  afterwards until something sets the mode back, which is what `setSystemBrightnessModeAsync` is
+  for.
+- **The `WRITE_SETTINGS` grant is re-checked on every system write.** `setSystemBrightnessAsync`
+  and `setSystemBrightnessModeAsync` call `Settings.System.canWrite` each time and throw a
+  permissions exception when it is `false` — a grant revoked after the fact surfaces as a rejected
+  promise, not as a `PermissionResponse`, so keep a `catch` on those two even once
+  `requestPermissionsAsync` has resolved granted.
+- **Android quantizes the system value.** `0`..`1` is mapped onto Android's integer `1`..`255`
+  range on write and back on read, so a written brightness round-trips approximately, never
+  exactly. While the device is in `AUTOMATIC` mode, `getSystemBrightnessAsync` reads the
+  auto-brightness *adjustment* setting instead, rescaled — not the brightness actually on screen.
+- **`restoreSystemBrightnessAsync` clears an override rather than replaying a saved value.** It
+  puts the activity window's brightness back to `BRIGHTNESS_OVERRIDE_NONE`, handing the screen back
+  to the system setting; nothing this app wrote earlier is restored. The same override is why
+  `getBrightnessAsync` reports the *system* brightness until your first `setBrightnessAsync` call
+  installs one.
 
 ## How the wrapper works
 

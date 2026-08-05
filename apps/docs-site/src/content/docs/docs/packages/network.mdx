@@ -153,6 +153,27 @@ const airplaneMode = await isAirplaneModeEnabledAsync();
 | `VPN` | `'VPN'` | Active connection over VPN. `@platform android` |
 | `OTHER` | `'OTHER'` | Active connection over any other type. `@platform android` |
 
+## Notes
+
+- **`isAirplaneModeEnabledAsync` throws on iOS rather than resolving `false`.** iOS's native
+  module defines only `getIpAddressAsync` and `getNetworkStateAsync`, so the presence check in the
+  core raises an `UnavailabilityError` before anything is called. Branch on
+  `Platform.OS === 'android'` at a cross-platform call site.
+- **`getIpAddressAsync` returns a Wi-Fi address on both platforms.** iOS walks the interface list
+  and keeps only interfaces named `en*`; Android reads `WifiManager`'s connection info. On a
+  cellular-only connection both fall through to `"0.0.0.0"` — that value means "no Wi-Fi address",
+  not "the call failed".
+- **A one-shot `getNetworkStateAsync()` on iOS can block for up to five seconds and then look
+  offline.** The native module starts a throwaway `NWPathMonitor` for the call and waits on a
+  semaphore; if no path update arrives in time it returns the same
+  `{ type: 'NONE', isConnected: false, isInternetReachable: false }` a genuinely disconnected
+  device returns. The event path (`addNetworkStateListener`, and so `useNetworkState`) does not pay
+  this cost — it reads the module's own long-lived monitor.
+- **Android state events are debounced by 250 ms.** `ConnectivityManager` callbacks collapse onto
+  a single delayed emission, so a burst of transitions arrives as one event and the settled state
+  lands a quarter-second late. Disconnects are the exception — they are emitted immediately, to
+  avoid re-reading a just-lost network as still connected.
+
 ## How the wrapper works
 
 `@symbiote-native/network` ships **zero React/Vue/Angular logic in `expo-network` itself** — that

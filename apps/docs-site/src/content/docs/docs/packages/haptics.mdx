@@ -232,6 +232,26 @@ Feedback effects driven directly by Android's haptics engine, via `performAndroi
 | `Segment_Frequent_Tick` | The user is switching between a series of many potential choices — e.g. minutes on a clock face; expected to be very soft, so it may not vibrate at all if the device can't make a suitably soft vibration |
 | `Text_Handle_Move` | The user has performed a selection/insertion handle move on a text field |
 
+## Notes
+
+- **Most `AndroidHaptics` members only exist on newer API levels.** `expo-haptics` resolves each
+  one by *reflection* against `HapticFeedbackConstants`, looking the field up by name; when the
+  field is missing it falls back to a hard-coded five — `Clock_Tick`, `Context_Click`,
+  `Keyboard_Tap`, `Long_Press`, `Virtual_Key` — and every other member rejects with
+  `HapticsNotSupportedException`. The full set is only guaranteed on API 34+.
+- **`performAndroidHapticsAsync` needs a foreground activity.** The Android module looks up
+  `android.R.id.content` on the current activity and calls `performHapticFeedback` on that view;
+  with no current activity the promise still resolves, having done nothing.
+- **On iOS it returns before reaching the native module at all.** iOS's `HapticsModule.swift`
+  implements only `notificationAsync`, `impactAsync` and `selectionAsync` — there is no
+  `performHapticsAsync` to call and no fallback to `impactAsync`, so a cross-platform call site
+  gets silence on iOS rather than an error.
+- **Android's `impactAsync`/`notificationAsync`/`selectionAsync` are `Vibrator` waveforms, not the
+  haptics engine.** They need `android.permission.VIBRATE`, which merges into your app from
+  `expo-haptics`' own `AndroidManifest.xml` at build time — there is no runtime prompt and nothing
+  to request, but the permission does appear in your merged manifest even if you only ever call
+  `performAndroidHapticsAsync`, which uses the haptics engine and needs no permission.
+
 ## How the wrapper works
 
 `@symbiote-native/haptics` ships **zero React/Vue/Angular logic in `expo-haptics` itself** — that

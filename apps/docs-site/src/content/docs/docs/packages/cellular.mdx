@@ -231,6 +231,22 @@ again whenever `request`/`get` resolves. Byte-for-byte the same shape as
 | `CELLULAR_4G` | `3` | 4th generation (LTE-class) connection |
 | `CELLULAR_5G` | `4` | 5th generation (NR-class) connection |
 
+## Notes
+
+- **A missing `READ_PHONE_STATE` grant is indistinguishable from an unknown network.** Android's
+  `getCellularGenerationAsync` catches the `SecurityException`, logs it natively, and resolves
+  `CellularGeneration.UNKNOWN` — it never rejects. Check `getPermissionsAsync()` when `UNKNOWN`
+  comes back instead of reading it as "no cellular data".
+- **The carrier/SIM getters need the SIM *ready*, not merely present.** All five go through a
+  `TelephonyManager` accessor that yields `null` unless `simState == SIM_STATE_READY`, so a
+  PIN-locked or still-initializing SIM produces exactly the `null` an iPhone produces —
+  and `getCellularGenerationAsync` falls to `UNKNOWN` on the same check.
+- **On iOS the generation describes the cellular radio, not the path your traffic takes.** It reads
+  the telephony service's current radio access technology and takes the first entry, so on a
+  dual-SIM device the value can belong to whichever service comes first. Pair it with
+  [network](/docs/packages/network/)'s `NetworkStateType` if what you actually need is the
+  connection currently in use.
+
 ## How the wrapper works
 
 `@symbiote-native/cellular` ships **zero React/Vue/Angular logic in `expo-cellular` itself** — that

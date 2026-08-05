@@ -233,6 +233,27 @@ React returns this shape as a plain value; Vue returns `Ref<ScreenOrientationSta
 | `orientationLock` | `OrientationLock` | The orientation lock in effect when the change fired |
 | `orientationInfo` | `ScreenOrientationInfo` | The resolved orientation info at the time of the change |
 
+## Notes
+
+- **iOS rejects a lock the device cannot satisfy; Android accepts it.** `lockAsync` and
+  `lockPlatformAsync` check the requested mask against `isSupportedByDevice()` and throw
+  `UnsupportedOrientationLockException` otherwise — that is how `PORTRAIT_DOWN` (and `ALL`, which
+  contains it) fails on an iPhone. Android writes the value straight to
+  `activity.requestedOrientation`, and only a lock it cannot map raises at all. Probe with
+  `supportsOrientationLockAsync` before locking if you care about the difference.
+- **On Android the lock belongs to the current activity.** Every native function resolves
+  `appContext.currentActivity` and throws `MissingActivity` when there is none, and the module
+  writes the activity's initial `requestedOrientation` back when it is destroyed — a lock does not
+  outlive the activity that set it.
+- **iOS re-applies the last lock when the app returns to the foreground.** The module unregisters
+  itself while backgrounded and re-asserts the last mask it set on resume; the Android path has no
+  equivalent step.
+- **`getOrientationAsync` on Android is best effort.** It derives the orientation from the display
+  rotation plus window metrics rather than from a dedicated system API — upstream's own comment
+  says surface rotation is not standardized across devices. Devices whose natural orientation is
+  landscape take a different rotation-to-orientation branch, so a tablet and a phone held at the
+  same physical angle can report different values.
+
 ## How the wrapper works
 
 `@symbiote-native/screen-orientation` ships zero React/Vue/Angular logic in

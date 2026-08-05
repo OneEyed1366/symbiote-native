@@ -260,6 +260,22 @@ same as every other `connect()`-based service in this project.
 | `batteryState` | `BatteryState` | The current charging state, see [`BatteryState`](#batterystate) above |
 | `lowPowerMode` | `boolean` | `true` if Low Power Mode / Power Saver is on, `false` otherwise |
 
+## Notes
+
+- **Android stops delivering events while the app is backgrounded.** The native module unregisters
+  its broadcast receivers when the activity enters the background and registers them again on
+  return, and emits no catch-up event — so after a return to the foreground your listener still
+  holds the last value it saw until the next real change. Re-seed from `getPowerStateAsync()` if
+  you need to be current at that moment.
+- **`addBatteryLevelListener` fires far less often on Android.** The Android receiver subscribes to
+  `ACTION_BATTERY_LOW` and `ACTION_BATTERY_OKAY` only, so it reports crossing those thresholds and
+  nothing in between; iOS listens to `UIDevice.batteryLevelDidChangeNotification`, which fires on
+  every reported percentage change. Don't build a percentage readout on the Android event alone.
+- **The iOS Simulator resolves sentinels instead of failing.** `isSupported` is compiled to `false`
+  under `targetEnvironment(simulator)`, but the level and state functions have no simulator branch
+  at all — they read `UIDevice.current` straight through and resolve whatever it reports there. Gate
+  on `isAvailableAsync()` rather than treating a `-1` level as a real reading.
+
 ## How the wrapper works
 
 `@symbiote-native/battery` ships **zero React/Vue/Angular logic in `expo-battery` itself** — that

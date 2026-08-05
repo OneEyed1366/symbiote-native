@@ -257,6 +257,25 @@ its own mount/unmount lifecycle so you don't manage the subscription by hand:
 Every variant returns `null` until the clipboard changes at least once after mount — there's no
 initial read of whatever's already on the clipboard, only new changes going forward.
 
+## Notes
+
+- **On Android the change listener is paused while the app is backgrounded.** The native module
+  pauses on activity-background and resumes on activity-foreground, with no catch-up event — a copy
+  made in another app is never delivered, and (combined with the no-initial-read behavior above)
+  `useClipboard` is still `null` when the user comes back. Read the clipboard explicitly on resume
+  if you need what happened while you were away.
+- **`hasStringAsync`/`hasImageAsync` do not trigger Android 12+'s "pasted from clipboard" toast;
+  the getters do.** The `has*` calls inspect only the clip *description*, while `getStringAsync`/
+  `getImageAsync` read the clip itself. Probe with `has*Async` when all you need is whether
+  something is there to paste.
+- **Android never reports a `url` content type.** The Android module's own content-type enum has
+  only `plain-text`, `html` and `image`, so `IClipboardEvent.contentTypes` can carry `'url'` on iOS
+  alone — the same split as the iOS-only URL functions.
+- **`plain-text` is reported for HTML-only content on both platforms.** iOS marks `plain-text`
+  available when the pasteboard has strings *or* HTML; Android's text check matches both the
+  plain-text and HTML MIME types. Seeing `plain-text` in an event does not mean the content was
+  copied as plain text — check for `html` first if the distinction matters.
+
 ## How the wrapper works
 
 `@symbiote-native/clipboard` ships **zero React/Vue/Angular logic in `expo-clipboard` itself** —

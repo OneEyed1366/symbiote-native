@@ -90,8 +90,11 @@ export async function restoreSystemBrightnessAsync(): Promise<void> {
 }
 
 /**
- * Whether the app is currently controlling the system brightness (as opposed to only its own
- * window's brightness). Always `false` on every platform except Android.
+ * Whether the activity's window has NO brightness override of its own, so the system-wide
+ * brightness is what the screen shows. Native reads `screenBrightness == BRIGHTNESS_OVERRIDE_NONE`,
+ * which cannot tell "the app set the system value" apart from "the app never touched brightness" —
+ * it reports only that `setBrightnessAsync` is not currently overriding this window.
+ * Always `false` on every platform except Android.
  * @platform android
  */
 export async function isUsingSystemBrightnessAsync(): Promise<boolean> {
