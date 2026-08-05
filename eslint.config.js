@@ -7,6 +7,9 @@ import prettier from 'eslint-config-prettier';
 import json from '@eslint/json';
 import requireReadme from './eslint-rules/require-readme.js';
 import requirePackageFields from './eslint-rules/require-package-fields.js';
+import requireNativeLinkPackaged from './eslint-rules/require-native-link-packaged.js';
+import excludeTestsFromPublishedFiles from './eslint-rules/exclude-tests-from-published-files.js';
+import validNativeLinkManifest from './eslint-rules/valid-native-link-manifest.js';
 
 // Flat config for the symbiote LIBRARY code only (core / adapters / packages).
 // The RN example apps own their formatting + lint via the @react-native eslint
@@ -89,12 +92,35 @@ export default defineConfig(
     plugins: {
       json,
       local: {
-        rules: { 'require-readme': requireReadme, 'require-package-fields': requirePackageFields },
+        rules: {
+          'require-readme': requireReadme,
+          'require-package-fields': requirePackageFields,
+          'require-native-link-packaged': requireNativeLinkPackaged,
+          'exclude-tests-from-published-files': excludeTestsFromPublishedFiles,
+        },
       },
     },
     rules: {
       'local/require-readme': 'error',
       'local/require-package-fields': 'error',
+      'local/require-native-link-packaged': 'error',
+      'local/exclude-tests-from-published-files': 'error',
+    },
+  },
+
+  // ── expo wrapper manifests: native-link.json is consumed by @symbiote-native/expo-modules-link
+  // at app postinstall, and the aggregator ignores whatever it doesn't recognise rather than
+  // failing. Validating the schema here is the only place a typo surfaces before a Gradle
+  // compile error or a device-only "Cannot find native module". ──
+  {
+    files: ['{core,adapters,packages}/*/native-link.json'],
+    language: 'json/json',
+    plugins: {
+      json,
+      local: { rules: { 'valid-native-link-manifest': validNativeLinkManifest } },
+    },
+    rules: {
+      'local/valid-native-link-manifest': 'error',
     },
   },
 
