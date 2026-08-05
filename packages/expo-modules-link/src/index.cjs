@@ -254,6 +254,99 @@ function escapeXml(value) {
   return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// Inside a double-quoted attribute the quote itself also has to go, or it closes the value early.
+function escapeXmlAttribute(value) {
+  return escapeXml(value).replace(/"/g, '&quot;');
+}
+
+// The bounds of the `<application ...>` opening tag. Scanning for the first unquoted ">" rather
+// than matching a regex: RN's own template puts "${usesCleartextTraffic}" in an attribute, and
+// a manifest is free to put a ">" inside one.
+function findApplicationTag(content) {
+  const match = /<application(?=[\s>/])/.exec(content);
+  if (!match) return null;
+
+  let quote = null;
+  for (let i = match.index; i < content.length; i += 1) {
+    const char = content[i];
+    if (quote !== null) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'") quote = char;
+    else if (char === '>') return { start: match.index, end: i };
+  }
+  return null;
+}
+
+function readXmlAttribute(tagText, name) {
+  const match = new RegExp(`\\s${name}\\s*=\\s*"([^"]*)"`).exec(tagText);
+  return match ? match[1] : null;
+}
+
+// Attributes on the app's own `<application>` element, for packages whose Android side needs one
+// (secure-store's Auto Backup exclusion rules). Additive-only with the same reasoning as
+// Info.plist: an XML attribute is unique per element by construction, so presence is a sufficient
+// idempotency check, and no comment can live inside a tag to delimit a region anyway.
+function patchAndroidManifest(appRoot, entries) {
+  const wanted = new Map();
+  for (const entry of entries) {
+    const attributes = entry.manifest.android && entry.manifest.android.manifestApplicationAttributes;
+    if (!attributes) continue;
+    for (const [name, value] of Object.entries(attributes)) {
+      if (!wanted.has(name)) wanted.set(name, value);
+    }
+  }
+  if (wanted.size === 0) return;
+
+  const manifestPath = path.join(appRoot, 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
+  if (!fs.existsSync(manifestPath)) {
+    dlog('AndroidManifest.xml not found, skipping application attributes');
+    return;
+  }
+
+  const content = fs.readFileSync(manifestPath, 'utf8');
+  let next = content;
+
+  for (const [name, value] of [...wanted].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+    // A metacharacter would slip past readXmlAttribute and we'd append a duplicate attribute,
+    // which is an XML parse error rather than a bad value.
+    if (!/^[\w.:-]+$/.test(name)) {
+      warn(`skipping the manifest attribute "${name}": not a plain XML attribute name`);
+      continue;
+    }
+
+    const tag = findApplicationTag(next);
+    if (!tag) {
+      warn(`${manifestPath} has no <application> element, skipping ${name}`);
+      return;
+    }
+
+    const tagText = next.slice(tag.start, tag.end);
+    const escaped = escapeXmlAttribute(value);
+    const existing = readXmlAttribute(tagText, name);
+
+    if (existing !== null) {
+      if (existing !== escaped) {
+        warn(
+          `${name} in ${manifestPath} reads "${existing}" but the package manifest says ` +
+            `"${value}". Keeping the file as-is; edit it by hand if you want the manifest's.`,
+        );
+      }
+      continue;
+    }
+
+    // Follow the indentation of whichever attribute currently sits last, so the tag keeps the
+    // shape the developer (or the RN template) gave it.
+    const lastNewline = tagText.lastIndexOf('\n');
+    const separator = lastNewline === -1 ? ' ' : `\n${/^[ \t]*/.exec(tagText.slice(lastNewline + 1))[0]}`;
+    const insertAt = next[tag.end - 1] === '/' ? tag.end - 1 : tag.end;
+    next = `${next.slice(0, insertAt)}${separator}${name}="${escaped}"${next.slice(insertAt)}`;
+  }
+
+  applyIfChanged(manifestPath, content, next);
+}
+
 function readPlistString(content, key) {
   const keyIndex = content.indexOf(`<key>${key}</key>`);
   if (keyIndex === -1) return null;
@@ -328,6 +421,7 @@ function linkApp(explicitAppRoot) {
   const entries = collectManifests(appRoot);
   patchBuildGradle(appRoot, entries);
   patchMainApplication(appRoot, entries);
+  patchAndroidManifest(appRoot, entries);
   patchInfoPlist(appRoot, entries);
 }
 
@@ -339,5 +433,6 @@ module.exports = {
   findMainApplicationFile,
   patchBuildGradle,
   patchMainApplication,
+  patchAndroidManifest,
   patchInfoPlist,
 };

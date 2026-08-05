@@ -53,6 +53,22 @@ It has no `postinstall` of its own - the manifest is passive data the aggregator
 `nativeName` must match that module's own `definition() { Name("...") }` string exactly -
 that's the key `requireNativeModule(...)` resolves by on the JS side.
 
+A package whose Android side needs an attribute on the app's own `<application>` element adds
+`android.manifestApplicationAttributes` (`secure-store` uses this for its Auto Backup rules -
+without them, Android backs up encrypted entries whose Keystore keys it does not back up, so a
+restore onto a new device produces unreadable values):
+
+```json
+{
+  "android": {
+    "manifestApplicationAttributes": {
+      "android:fullBackupContent": "@xml/secure_store_backup_rules",
+      "android:dataExtractionRules": "@xml/secure_store_data_extraction_rules"
+    }
+  }
+}
+```
+
 ## How it works
 
 One process, one pass: scan the app's `node_modules` for every installed package shipping a
@@ -119,10 +135,18 @@ That makes overriding a description free:
 When your wording and the package's default disagree, the run prints a one-line notice naming
 both. It keeps your file as-is - the point is that drift is visible, not that it's corrected.
 
+## Android manifest attributes
+
+`android.manifestApplicationAttributes` is additive-only for the same reason Info.plist is, plus
+one of its own: an attribute is unique per element by construction, so presence is a sufficient
+idempotency check, and no XML comment can live inside a tag to delimit a region anyway. An
+attribute the app already carries is left alone and reported, never overwritten - backup rules
+decide what leaves the device, so the app's own value has to win.
+
 ## Scope
 
-Android registration (`build.gradle` + `MainApplication.kt`) plus iOS Info.plist permission
-strings. iOS's own autolinking (`use_expo_modules!(exclude: [...])` in the app's Podfile)
+Android registration (`build.gradle` + `MainApplication.kt` + `<application>` attributes) plus
+iOS Info.plist permission strings. iOS's own autolinking (`use_expo_modules!(exclude: [...])` in the app's Podfile)
 already auto-discovers every installed expo-modules-core package with zero per-package Podfile
 edits once wired - see the `symbiote-expo-native-module` skill. The one-time per-app native
 bootstrap (Podfile monkey-patch, `SymbioteExpoModulesFactory`, bridging header) is still a

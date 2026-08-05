@@ -11,6 +11,7 @@ const {
   collectManifests,
   patchBuildGradle,
   patchMainApplication,
+  patchAndroidManifest,
   patchInfoPlist,
 } = require('./index.cjs');
 
@@ -52,6 +53,20 @@ const INFO_PLIST_FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 `;
 
+// The "${usesCleartextTraffic}" attribute is RN's own template and deliberately kept: it is why
+// the opening tag is scanned for an unquoted ">" instead of matched with a regex.
+const ANDROID_MANIFEST_FIXTURE = `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.INTERNET" />
+
+  <application
+    android:name=".MainApplication"
+    android:allowBackup="false"
+    android:usesCleartextTraffic="\${usesCleartextTraffic}">
+    <activity android:name=".MainActivity" android:exported="true" />
+  </application>
+</manifest>
+`;
+
 const LOCAL_AUTH_MANIFEST = {
   android: {
     gradleProjectName: 'expo-local-authentication',
@@ -84,8 +99,26 @@ const SENSORS_MANIFEST = {
   },
 };
 
+const SECURE_STORE_MANIFEST = {
+  android: {
+    gradleProjectName: 'expo-secure-store',
+    modules: [
+      {
+        importPath: 'expo.modules.securestore.SecureStoreModule',
+        className: 'SecureStoreModule',
+        nativeName: 'ExpoSecureStore',
+      },
+    ],
+    manifestApplicationAttributes: {
+      'android:dataExtractionRules': '@xml/secure_store_data_extraction_rules',
+      'android:fullBackupContent': '@xml/secure_store_backup_rules',
+    },
+  },
+};
+
 const GRADLE_PATH = ['android', 'app', 'build.gradle'];
 const MAIN_APP_PATH = ['android', 'app', 'src', 'main', 'java', 'com', 'canaryexpo', 'MainApplication.kt'];
+const ANDROID_MANIFEST_PATH = ['android', 'app', 'src', 'main', 'AndroidManifest.xml'];
 const PLIST_PATH = ['ios', 'CanaryExpo', 'Info.plist'];
 
 function makeAppRoot() {
@@ -93,6 +126,7 @@ function makeAppRoot() {
   fs.mkdirSync(path.join(root, ...MAIN_APP_PATH.slice(0, -1)), { recursive: true });
   fs.writeFileSync(path.join(root, ...GRADLE_PATH), BUILD_GRADLE_FIXTURE);
   fs.writeFileSync(path.join(root, ...MAIN_APP_PATH), MAIN_APPLICATION_FIXTURE);
+  fs.writeFileSync(path.join(root, ...ANDROID_MANIFEST_PATH), ANDROID_MANIFEST_FIXTURE);
   fs.mkdirSync(path.join(root, ...PLIST_PATH.slice(0, -1)), { recursive: true });
   fs.writeFileSync(path.join(root, ...PLIST_PATH), INFO_PLIST_FIXTURE);
   return root;
@@ -248,6 +282,51 @@ test('a BEGIN marker with its END deleted by hand is refused, not guessed at', (
   assert.equal(fs.readFileSync(gradlePath, 'utf8'), mutilated, 'must not touch a file with a broken region');
 });
 
+test('patchAndroidManifest adds the application attributes once, keeping the tag intact', () => {
+  const appRoot = makeAppRoot();
+  const entries = entriesOf(SECURE_STORE_MANIFEST, LOCAL_AUTH_MANIFEST);
+
+  patchAndroidManifest(appRoot, entries);
+  const afterFirst = read(appRoot, ANDROID_MANIFEST_PATH);
+
+  assert.match(afterFirst, /android:fullBackupContent="@xml\/secure_store_backup_rules"/);
+  assert.match(afterFirst, /android:dataExtractionRules="@xml\/secure_store_data_extraction_rules"/);
+  assert.match(afterFirst, /android:usesCleartextTraffic="\$\{usesCleartextTraffic\}"/, 'existing attributes survive');
+  assert.match(afterFirst, /<activity android:name="\.MainActivity"/, 'the element body is untouched');
+  assert.match(afterFirst, /^    android:fullBackupContent=/m, "follows the tag's own indentation");
+
+  patchAndroidManifest(appRoot, entries);
+  assert.equal(read(appRoot, ANDROID_MANIFEST_PATH), afterFirst, 're-running must be a no-op');
+});
+
+// Same policy as a permission description: the app's own backup rules outrank a package default,
+// because overwriting them would silently change what the app backs up.
+test('patchAndroidManifest keeps an attribute the app already set', () => {
+  const appRoot = makeAppRoot();
+  const manifestPath = path.join(appRoot, ...ANDROID_MANIFEST_PATH);
+  fs.writeFileSync(
+    manifestPath,
+    ANDROID_MANIFEST_FIXTURE.replace('android:allowBackup="false"', 'android:fullBackupContent="@xml/my_own_rules"'),
+  );
+
+  patchAndroidManifest(appRoot, entriesOf(SECURE_STORE_MANIFEST));
+  const content = fs.readFileSync(manifestPath, 'utf8');
+
+  assert.match(content, /android:fullBackupContent="@xml\/my_own_rules"/);
+  assert.doesNotMatch(content, /secure_store_backup_rules/);
+  assert.match(content, /android:dataExtractionRules="@xml\/secure_store_data_extraction_rules"/, 'the other attribute still lands');
+});
+
+test('patchAndroidManifest escapes a quote in a value instead of closing it early', () => {
+  const appRoot = makeAppRoot();
+
+  patchAndroidManifest(appRoot, entriesOf({
+    android: { manifestApplicationAttributes: { 'android:label': 'The "Best" App' } },
+  }));
+
+  assert.match(read(appRoot, ANDROID_MANIFEST_PATH), /android:label="The &quot;Best&quot; App"/);
+});
+
 test('patchInfoPlist inserts each permission string once, inside the outer dict', () => {
   const appRoot = makeAppRoot();
   const entries = entriesOf(LOCAL_AUTH_MANIFEST, {
@@ -309,17 +388,20 @@ test('linkApp wires every installed package end to end from one scan', () => {
   const appRoot = makeAppRoot();
   installPackage(appRoot, '@symbiote-native/local-auth', LOCAL_AUTH_MANIFEST);
   installPackage(appRoot, '@symbiote-native/sensors', SENSORS_MANIFEST);
+  installPackage(appRoot, '@symbiote-native/secure-store', SECURE_STORE_MANIFEST);
 
+  const touched = [GRADLE_PATH, MAIN_APP_PATH, ANDROID_MANIFEST_PATH, PLIST_PATH];
   linkApp(appRoot);
 
   assert.match(read(appRoot, GRADLE_PATH), /implementation project\(':expo-sensors'\)/);
   assert.match(read(appRoot, MAIN_APP_PATH), /BarometerModule::class\.java to "ExpoBarometer",/);
+  assert.match(read(appRoot, ANDROID_MANIFEST_PATH), /android:fullBackupContent="@xml\/secure_store_backup_rules"/);
   assert.match(read(appRoot, PLIST_PATH), /<key>NSFaceIDUsageDescription<\/key>/);
 
-  const snapshot = [GRADLE_PATH, MAIN_APP_PATH, PLIST_PATH].map((segments) => read(appRoot, segments));
+  const snapshot = touched.map((segments) => read(appRoot, segments));
   linkApp(appRoot);
   assert.deepEqual(
-    [GRADLE_PATH, MAIN_APP_PATH, PLIST_PATH].map((segments) => read(appRoot, segments)),
+    touched.map((segments) => read(appRoot, segments)),
     snapshot,
     'a second full run changes nothing',
   );

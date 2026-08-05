@@ -8,6 +8,8 @@ export type ISymbioteExpoLinkManifest = {
   android?: {
     gradleProjectName: string;
     modules: ISymbioteExpoLinkAndroidModule[];
+    /** Attributes to set on the app's own `<application>` element, e.g. Auto Backup rules. */
+    manifestApplicationAttributes?: Record<string, string>;
   };
   ios?: {
     infoPlistKeys: Record<string, string>;
