@@ -31,7 +31,10 @@
     "src",
     "build",
     "build-ngc",
-    "native-link.json"
+    "native-link.json",
+    "!src/**/*.test.*",
+    "!src/**/*.spec.*",
+    "!src/**/*.detox.*"
   ],
   "publishConfig": {
     "access": "public",

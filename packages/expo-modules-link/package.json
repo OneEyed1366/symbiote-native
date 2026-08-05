@@ -25,7 +25,10 @@
   },
   "files": [
     "src",
-    "bin"
+    "bin",
+    "!src/**/*.test.*",
+    "!src/**/*.spec.*",
+    "!src/**/*.detox.*"
   ],
   "publishConfig": {
     "access": "public"

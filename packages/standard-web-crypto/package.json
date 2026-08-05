@@ -30,7 +30,10 @@
   "files": [
     "src",
     "build",
-    "build-ngc"
+    "build-ngc",
+    "!src/**/*.test.*",
+    "!src/**/*.spec.*",
+    "!src/**/*.detox.*"
   ],
   "publishConfig": {
     "access": "public",
