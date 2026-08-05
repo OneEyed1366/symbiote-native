@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-web-browser",
+    "modules": [
+      {
+        "importPath": "expo.modules.webbrowser.WebBrowserModule",
+        "className": "WebBrowserModule",
+        "nativeName": "ExpoWebBrowser"
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-sharing",
+    "modules": [
+      {
+        "importPath": "expo.modules.sharing.SharingModule",
+        "className": "SharingModule",
+        "nativeName": "ExpoSharing"
+      }
+    ]
+  }
+}

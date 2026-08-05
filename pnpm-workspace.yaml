@@ -46,6 +46,10 @@ minimumReleaseAgeExclude:
   - expo-sensors@57.0.2
   - expo-modules-autolinking@57.0.8
   - expo-local-authentication@57.0.2
+  - expo-secure-store@57.0.1
+  - expo-sharing@57.0.8
+  - expo-web-browser@57.0.2
+  - expo-sms@57.0.1
   - expo-haptics@57.0.1
   - expo-clipboard@57.0.1
   - expo-battery@57.0.1
@@ -240,6 +244,19 @@ catalog:
   expo-tracking-transparency: 57.0.1
   expo-store-review: 57.0.1
   expo-system-ui: 57.0.2
+  # Same exact-pin reasoning again — first of tier-2: packages/secure-store depends on
+  # expo-secure-store ONLY for its native ios/android folders (JS hand-ported into our own core).
+  # Version verified against .vendors/expo at origin/sdk-57 (57.0.1) and matches the real
+  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-secure-store: 57.0.1
+  # Same exact-pin reasoning, continuing tier-2: packages/sharing, packages/web-browser and
+  # packages/sms each depend on their matching expo-* package ONLY for its native ios/android
+  # folders (JS hand-ported into our own core). Versions verified against .vendors/expo at
+  # origin/sdk-57 and against the real npm-published `latest`, same expo-modules-core 57.0.5
+  # peer/runtime line.
+  expo-sharing: 57.0.8
+  expo-web-browser: 57.0.2
+  expo-sms: 57.0.1
   # Autolinking CLI only (never resolved via the `expo` package) — each native host app needs
   # it as a direct devDependency so its Podfile/settings.gradle can `require.resolve` it; see
   # apps/docs-site's expo-native-module-setup howto. Version verified against .vendors/expo at
