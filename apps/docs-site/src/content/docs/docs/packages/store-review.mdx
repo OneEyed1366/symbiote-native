@@ -135,7 +135,7 @@ subscription.
 
 | Signature | Description |
 | --- | --- |
-| `isAvailableAsync(): Promise<boolean>` | Whether the platform has the capabilities to use `requestReview()`'s native flow. iOS resolves `true` unless the app is distributed through TestFlight; Android resolves `true` on 5.0+ |
+| `isAvailableAsync(): Promise<boolean>` | Whether the platform has the capabilities to use `requestReview()`'s native flow. iOS resolves `true` unless the app is distributed through TestFlight; Android resolves `true` when the Play Store app is installed |
 | `requestReview(options?: IStoreReviewUrlOptions): Promise<void>` | Opens a native modal letting the user pick a star rating without leaving the app, when the native flow is available. Otherwise falls back to opening the store URL supplied via `options` through `Linking` |
 | `hasAction(options?: IStoreReviewUrlOptions): Promise<boolean>` | Whether `requestReview()` is capable of directing the user to some kind of store review flow — either the native flow is available, or a store URL was supplied via `options` |
 
@@ -154,6 +154,14 @@ subscription.
 - **A missing URL on the fallback path logs a warning, never throws** — matching upstream's own
   `console.warn`-and-continue behavior, just with different wording (pointing at the
   `IStoreReviewUrlOptions` argument instead of `app.json`).
+- **A resolved `requestReview()` does not mean a prompt appeared** — neither store reports that
+  back, by design, so there is nothing to branch on. Don't gate UI on it.
+- **On Android the prompt only appears for a build installed from Google Play** — internal test
+  track, internal app sharing, or production. A sideloaded debug build completes the whole Play
+  Core flow and shows nothing. iOS does show it in debug builds, so an app that works on iOS and
+  looks dead on Android is behaving correctly.
+- **Both stores enforce a quota**, which is why upstream's guidance is to trigger the prompt after
+  real engagement rather than from a button.
 
 ## How the wrapper works
 

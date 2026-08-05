@@ -20,7 +20,10 @@ export type IStoreReviewUrlOptions = {
  * Determines if the platform has the capabilities to use `requestReview()`'s native flow.
  * @return
  * - On iOS, resolves to `true` unless the app is distributed through TestFlight.
- * - On Android, resolves to `true` if the device is running Android 5.0+.
+ * - On Android, resolves to `true` when the Play Store app is installed — upstream's own JSDoc
+ *   claims "Android 5.0+", but its `StoreReviewModule.kt` checks only for that package.
+ *
+ * A `true` from either platform still does not mean a prompt will appear.
  */
 export async function isAvailableAsync(): Promise<boolean> {
   return expoStoreReview.isAvailableAsync?.() ?? false;
@@ -39,8 +42,12 @@ function urlFor(options?: IStoreReviewUrlOptions): string | null {
 /**
  * In ideal circumstances this opens a native modal letting the user pick a star rating that's
  * then applied to the App Store/Play Store, without leaving the app. If the native flow is
- * unavailable (e.g. Android below 5.0), falls back to opening the store URL supplied via
- * `options`.
+ * unavailable, falls back to opening the store URL supplied via `options`.
+ *
+ * Resolving does NOT mean a prompt appeared — neither store reports that back, by design, so
+ * there is nothing to branch on. On Android it only shows for a build installed from Google
+ * Play; a sideloaded build runs the whole Play Core flow and displays nothing. Both stores also
+ * enforce a quota.
  */
 export async function requestReview(options?: IStoreReviewUrlOptions): Promise<void> {
   if (expoStoreReview.requestReview) {
