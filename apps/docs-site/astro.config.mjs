@@ -245,6 +245,9 @@ export default defineConfig({
             { label: 'Sharing', slug: 'docs/packages/sharing' },
             { label: 'Web browser', slug: 'docs/packages/web-browser' },
             { label: 'SMS', slug: 'docs/packages/sms' },
+            { label: 'CSS parser', slug: 'docs/packages/css-parser' },
+            { label: 'Test utils', slug: 'docs/packages/test-utils' },
+            { label: 'Android host shims', slug: 'docs/packages/android' },
           ],
         },
         {
