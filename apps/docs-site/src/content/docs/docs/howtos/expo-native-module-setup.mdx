@@ -500,6 +500,27 @@ a one-line notice when your string and the package's default disagree.
   `NSMotionUsageDescription` even for Barometer-only usage if you target 17.4+.
 </Aside>
 
+## 9. Android `<application>` attributes
+
+A few packages need an attribute on your app's own `<application>` element rather than a Gradle
+line — [secure store](/docs/packages/secure-store/) is the first, and it needs the two Auto Backup
+rules that stop Android uploading encrypted entries whose Keystore keys it can't upload with them.
+Those come from the same manifest too, under `android.manifestApplicationAttributes`, and the
+app-level run adds them to `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<application
+  android:name=".MainApplication"
+  android:label="@string/app_name"
+  android:dataExtractionRules="@xml/secure_store_data_extraction_rules"
+  android:fullBackupContent="@xml/secure_store_backup_rules">
+```
+
+Like the iOS permission strings and unlike the two generated regions, this is additive-only: an
+attribute is unique per element by construction, so its presence is the whole idempotency check.
+An attribute your app already sets is kept as-is and reported in a one-line notice — backup rules
+decide what leaves the device, so your own value wins.
+
 ## Verify it actually linked
 
 Don't take the wiring on faith — each of these is a real, falsifiable check:

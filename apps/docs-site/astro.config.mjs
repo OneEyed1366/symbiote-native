@@ -241,6 +241,10 @@ export default defineConfig({
             { label: 'Screen orientation', slug: 'docs/packages/screen-orientation' },
             { label: 'Localization', slug: 'docs/packages/localization' },
             { label: 'Tracking transparency', slug: 'docs/packages/tracking-transparency' },
+            { label: 'Secure store', slug: 'docs/packages/secure-store' },
+            { label: 'Sharing', slug: 'docs/packages/sharing' },
+            { label: 'Web browser', slug: 'docs/packages/web-browser' },
+            { label: 'SMS', slug: 'docs/packages/sms' },
           ],
         },
         {

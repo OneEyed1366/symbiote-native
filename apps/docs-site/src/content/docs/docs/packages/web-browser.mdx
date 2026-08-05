@@ -1,0 +1,345 @@
+---
+title: Web browser
+description: expo-web-browser wrapped for every SymbioteNative adapter — an in-app browser and the OAuth auth-session flow.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/web-browser` wraps
+[`expo-web-browser`](https://github.com/expo/expo/tree/main/packages/expo-web-browser) — an in-app
+browser (`SFSafariViewController` on iOS, Chrome Custom Tabs on Android) plus the OAuth
+auth-session flow — so every SymbioteNative adapter can reach it, not just React. Like
+[secure store](/docs/packages/secure-store/) and [local auth](/docs/packages/local-auth/), every
+export is a free function with no per-instance state, so there is no hook/composable/service to
+wrap — the React, Vue, and Angular entry points are plain re-exports of the same `core`.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React               | ✅ live |
+| Vue                 | ✅ live |
+| Angular             | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/web-browser
+```
+
+`expo-web-browser` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project (it
+bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-web-browser`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
+  installs the `expo` meta-package. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+Nothing else is needed per-app. This package's `native-link.json` asks `symbiote-expo-link` only
+for the Android Gradle dependency and module-map entry; there is no iOS usage-description string,
+and the `<queries>` entry Android needs to see the Custom Tabs service ships inside
+`expo-web-browser`'s own manifest and merges into your app automatically.
+
+## Usage
+
+All three adapters re-export the exact same functions; there is no per-adapter
+hook/composable/service to reach for, since nothing here holds live state or a subscription.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Button, View } from '@symbiote-native/react';
+    import { openBrowserAsync } from '@symbiote-native/web-browser/react';
+
+    export default function Docs() {
+      return (
+        <View>
+          <Button
+            title="Read the docs"
+            onPress={() => openBrowserAsync('https://example.com')}
+          />
+        </View>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { Button, View } from '@symbiote-native/vue';
+    import { openBrowserAsync } from '@symbiote-native/web-browser/vue';
+
+    function onOpen() {
+      void openBrowserAsync('https://example.com');
+    }
+    </script>
+
+    <template>
+      <View>
+        <Button title="Read the docs" @press="onOpen" />
+      </View>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { Button, View } from '@symbiote-native/angular';
+    import { openBrowserAsync } from '@symbiote-native/web-browser/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Button, View],
+      template: `
+        <View>
+          <Button title="Read the docs" (press)="onOpen()" />
+        </View>
+      `,
+    })
+    export class Docs {
+      onOpen(): void {
+        void openBrowserAsync('https://example.com');
+      }
+    }
+    ```
+
+    There's no per-instance service to `inject()` here — every function is a plain export off the
+    core package, called straight from a template event binding.
+  </TabItem>
+</Tabs>
+
+The in-app browser keeps the user inside your app, unlike `Linking.openURL`, which hands them off
+to the system browser. iOS resolves once the browser closes; Android resolves with
+`{ type: 'opened' }` the moment the Custom Tab launches, and never reports the close.
+
+### A login flow that redirects back into the app
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useState } from 'react';
+    import { Button, Text, View } from '@symbiote-native/react';
+    import { openAuthSessionAsync } from '@symbiote-native/web-browser/react';
+
+    const AUTHORIZE_URL = 'https://auth.example.com/authorize?redirect_uri=myapp://callback';
+
+    export default function SignIn() {
+      const [code, setCode] = useState<string | null>(null);
+
+      async function onSignIn() {
+        const result = await openAuthSessionAsync(AUTHORIZE_URL, 'myapp://callback');
+        setCode(result.type === 'success' ? new URL(result.url).searchParams.get('code') : null);
+      }
+
+      return (
+        <View>
+          <Text>{code ?? 'not signed in'}</Text>
+          <Button title="Sign in" onPress={onSignIn} />
+        </View>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ref } from 'vue';
+    import { Button, Text, View } from '@symbiote-native/vue';
+    import { openAuthSessionAsync } from '@symbiote-native/web-browser/vue';
+
+    const AUTHORIZE_URL = 'https://auth.example.com/authorize?redirect_uri=myapp://callback';
+
+    const code = ref<string | null>(null);
+
+    async function onSignIn() {
+      const result = await openAuthSessionAsync(AUTHORIZE_URL, 'myapp://callback');
+      code.value = result.type === 'success' ? new URL(result.url).searchParams.get('code') : null;
+    }
+    </script>
+
+    <template>
+      <View>
+        <Text>{{ code ?? 'not signed in' }}</Text>
+        <Button title="Sign in" @press="onSignIn" />
+      </View>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, signal } from '@angular/core';
+    import { Button, Text, View } from '@symbiote-native/angular';
+    import { openAuthSessionAsync } from '@symbiote-native/web-browser/angular';
+
+    const AUTHORIZE_URL = 'https://auth.example.com/authorize?redirect_uri=myapp://callback';
+
+    @Component({
+      standalone: true,
+      imports: [Button, Text, View],
+      template: `
+        <View>
+          <Text>{{ code() ?? 'not signed in' }}</Text>
+          <Button title="Sign in" (press)="onSignIn()" />
+        </View>
+      `,
+    })
+    export class SignIn {
+      readonly code = signal<string | null>(null);
+
+      async onSignIn(): Promise<void> {
+        const result = await openAuthSessionAsync(AUTHORIZE_URL, 'myapp://callback');
+        this.code.set(
+          result.type === 'success' ? new URL(result.url).searchParams.get('code') : null,
+        );
+      }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+iOS uses `ASWebAuthenticationSession`, so the system asks the user whether your app may
+authenticate with that url, and the redirect URI registered with your authorization server has to
+use your app's own scheme (`myapp://`, not `https://`). Android has no equivalent native API, so it
+is polyfilled with a Custom Tab racing a `Linking` deep-link listener against an `AppState` return
+to the foreground. Adding your own `Linking` listener for the same redirect is unnecessary on both
+platforms, and on iOS can have side effects.
+
+### Warming up the Custom Tabs service
+
+```ts
+const { servicePackage } = await warmUpAsync();
+await mayInitWithUrlAsync('https://example.com', servicePackage);
+// …once you no longer need the connection
+await coolDownAsync(servicePackage);
+```
+
+Android only. Off Android these three resolve `{}` without touching the native module, so a
+cross-platform call site needs no `Platform` branch.
+
+## API
+
+### Browser
+
+| Signature | Description |
+| --- | --- |
+| `openBrowserAsync(url, options?): Promise<IWebBrowserResult>` | Opens `url` in the in-app browser. iOS resolves `{ type: 'cancel' }` when the user closed it and `{ type: 'dismiss' }` when `dismissBrowser()` did; Android resolves `{ type: 'opened' }` as soon as the tab launches |
+| `dismissBrowser(): Promise<IWebBrowserDismissResult>` | Closes the presented browser. iOS only — throws on Android, where a Custom Tab cannot be closed programmatically and the user has to press its own close button |
+
+### Auth session
+
+| Signature | Description |
+| --- | --- |
+| `openAuthSessionAsync(url, redirectUrl?, options?): Promise<IWebBrowserAuthSessionResult>` | Opens a login page and resolves `{ type: 'success', url }` once the provider redirects to `redirectUrl`, or `{ type: 'cancel' }` / `{ type: 'dismiss' }` if the session ended without one. Only one session can be open at a time |
+| `dismissAuthSession(): void` | Cancels the session in progress. iOS only — falls back to `dismissBrowser()` elsewhere, and so throws on Android for the same reason |
+
+### Custom Tabs service
+
+| Signature | Description |
+| --- | --- |
+| `warmUpAsync(browserPackage?): Promise<IWebBrowserWarmUpResult>` | Warms up the browser's Custom Tabs service ahead of time, so the first `openBrowserAsync` is faster. Defaults to the preferred browser. Resolves `{}` off Android |
+| `mayInitWithUrlAsync(url, browserPackage?): Promise<IWebBrowserMayInitWithUrlResult>` | Tells the warmed-up browser which page is most likely to be opened first, so it can prefetch. Resolves `{}` off Android |
+| `coolDownAsync(browserPackage?): Promise<IWebBrowserCoolDownResult>` | Drops every binding `warmUpAsync` and `mayInitWithUrlAsync` created. Resolves `{}` off Android, or when there was no connection to dismiss |
+| `getCustomTabsSupportingBrowsersAsync(): Promise<IWebBrowserCustomTabsResults>` | Lists the installed packages that can handle Custom Tabs and the Custom Tabs service, plus the user's default and the preferred one. Throws on iOS — see the notes below |
+
+### `IWebBrowserOpenOptions`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `toolbarColor` | `string \| undefined` | Color of the toolbar. Any React Native color format |
+| `enableBarCollapsing` | `boolean \| undefined` | Whether the toolbar hides as the user scrolls the page |
+| `browserPackage` | `string \| undefined` | Android: which browser should handle the Custom Tab. Pick one from `getCustomTabsSupportingBrowsersAsync` |
+| `secondaryToolbarColor` | `string \| undefined` | Android: color of the secondary toolbar |
+| `showTitle` | `boolean \| undefined` | Android: whether the toolbar shows the website's title |
+| `enableDefaultShareMenuItem` | `boolean \| undefined` | Android: whether a default share item is added to the browser's menu |
+| `showInRecents` | `boolean \| undefined` | Android: whether the browsed page gets its own entry in the recents view. Requires `createTask`. Defaults to `false` |
+| `createTask` | `boolean \| undefined` | Android: whether the browser opens in its own task rather than your app's. Defaults to `true` |
+| `useProxyActivity` | `boolean \| undefined` | Android: launch through a transparent proxy activity so the browser survives your app being backgrounded. Forces `showInRecents` on. Defaults to `true` |
+| `controlsColor` | `string \| undefined` | iOS: tint color for the `SFSafariViewController` controls |
+| `dismissButtonStyle` | `'done' \| 'close' \| 'cancel' \| undefined` | iOS: which label the dismiss button carries |
+| `readerMode` | `boolean \| undefined` | iOS: whether Safari enters Reader mode when the page supports it |
+| `presentationStyle` | `WebBrowserPresentationStyle \| undefined` | iOS: how the browser is presented modally. Defaults to `OVER_FULL_SCREEN` |
+
+### `IAuthSessionOpenOptions`
+
+Everything in `IWebBrowserOpenOptions`, plus the two fields below. On Android the inherited fields
+apply to the Custom Tab the polyfill opens; on iOS `ASWebAuthenticationSession` ignores them and
+reads only these two.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `preferEphemeralSession` | `boolean \| undefined` | iOS: ask the browser for a private session that shares no cookies with the user's normal browsing. Whether it's honored is up to their default browser. Defaults to `false` |
+| `preferUniversalLinks` | `boolean \| undefined` | iOS: use HTTPS universal-link callbacks instead of a custom URL scheme. Needs the Associated Domains entitlement and iOS 17.4+. Defaults to `false` |
+
+### Enums
+
+| Member | Description |
+| --- | --- |
+| `WebBrowserResultType.CANCEL` | The user dismissed the browser themselves |
+| `WebBrowserResultType.DISMISS` | The browser was closed by a `dismissBrowser()` call |
+| `WebBrowserResultType.OPENED` | The browser was launched. Android resolves here without waiting for it to close |
+| `WebBrowserResultType.LOCKED` | Another browser session is already in progress |
+| `WebBrowserPresentationStyle` | iOS modal presentation styles for `options.presentationStyle`, mapped onto `UIModalPresentationStyle`: `FULL_SCREEN`, `PAGE_SHEET`, `FORM_SHEET`, `CURRENT_CONTEXT`, `OVER_FULL_SCREEN`, `OVER_CURRENT_CONTEXT`, `POPOVER`, `AUTOMATIC` |
+
+## Notes
+
+- **`getCustomTabsSupportingBrowsersAsync` throws on iOS rather than resolving empty.** iOS's
+  native module registers its no-op stub as `getCustomTabsSupportingBrowsers`, without the `Async`
+  suffix, so the availability check fires before the "not Android, return an empty result" branch
+  is reached. `expo-web-browser` behaves identically — the guard order is kept deliberately so the
+  two cannot drift. Branch on `Platform.OS === 'android'` yourself if you call it cross-platform.
+- **Android never reports that the browser closed.** `openBrowserAsync` resolves at launch. If you
+  need to know when the user came back, that is exactly what `openAuthSessionAsync` polyfills, via
+  `AppState`.
+- **Only one auth session at a time.** Starting a second while the first is still open rejects.
+- **Colors are marshalled before the native call.** `toolbarColor`, `secondaryToolbarColor` and
+  `controlsColor` are run through `processColor`, so any React Native color format works.
+
+## Not ported
+
+Three pieces of upstream are deliberately left out rather than silently dropped:
+
+- **The `experimentalLauncherActivity` config plugin.** Upstream's
+  `plugin/src/withWebBrowserAndroid.ts` exists only for that opt-in flag: it writes a
+  `BrowserLauncherActivity.kt` into your app and registers it as the launcher activity in your
+  `AndroidManifest.xml`, as a workaround for a specific redirect edge case. It is opt-in upstream
+  and unnecessary for anything on this page, so this package does not reproduce it. If you
+  genuinely need that workaround, add the activity to your app by hand.
+- **`maybeCompleteAuthSession`.** Genuinely web-only — it closes the `window.open` popup the web
+  implementation creates. On a native platform upstream's own version can only ever return
+  `{ type: 'failed', message: 'Not supported on this platform' }`, so it is left out rather than
+  shipped as a function that can never succeed.
+- **The web-only open options `windowName` and `windowFeatures`**, for the same reason:
+  SymbioteNative has no web target, so nothing could read them.
+
+## How the wrapper works
+
+`@symbiote-native/web-browser` ships zero React/Vue/Angular logic — `expo-web-browser`'s own JS is
+hand-ported into this package's `core/`, resolving the native module through `expo-modules-core`'s
+`requireNativeModule` rather than the `expo` meta-package this project never installs:
+
+```
+packages/web-browser/src/
+├── core/     # framework-agnostic: open/dismiss, the auth session and its Android polyfill, the
+│             # Custom Tabs service functions. native-module.ts resolves ExpoWebBrowser via
+│             # requireNativeModule
+├── react/    # @symbiote-native/web-browser/react   — export * from '../core'
+├── vue/      # @symbiote-native/web-browser/vue     — export * from '../core'
+└── angular/  # @symbiote-native/web-browser/angular — export * from '../core'
+```
+
+Same shape as [secure store](/docs/packages/secure-store/)'s and
+[local auth](/docs/packages/local-auth/)'s three adapter entries: single-file re-exports with no
+lifecycle code. The Android auth-session polyfill does hold live state — a `Linking` subscription
+and an `AppState` listener — but both belong to one in-flight promise inside the core and are torn
+down when it settles, so no caller ever subscribes or cleans up, and there is nothing for a hook,
+composable, or service to own. The native code itself is never vendored or copied —
+`expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
+guide](/docs/howtos/expo-native-module-setup/)).

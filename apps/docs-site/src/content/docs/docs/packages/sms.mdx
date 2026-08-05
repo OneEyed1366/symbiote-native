@@ -1,0 +1,230 @@
+---
+title: SMS
+description: expo-sms wrapped for every SymbioteNative adapter — open the system SMS composer prefilled with recipients, a message, and attachments.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/sms` wraps [`expo-sms`](https://github.com/expo/expo/tree/main/packages/expo-sms)
+— opening the system SMS composer with recipients, message text, and optional attachments filled
+in — so every SymbioteNative adapter can reach it, not just React. Like
+[secure store](/docs/packages/secure-store/) and [local auth](/docs/packages/local-auth/), every
+export is a free function with no per-instance state, so there is no hook/composable/service to
+wrap — the React, Vue, and Angular entry points are plain re-exports of the same `core`.
+
+Nothing is ever sent on the user's behalf. Both platforms open their own composer with the draft
+in it; the user presses send, edits it, or throws it away.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React               | ✅ live |
+| Vue                 | ✅ live |
+| Angular             | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/sms
+```
+
+`expo-sms` and `expo-modules-core` come along as regular dependencies, pinned to exact versions —
+never install either yourself, and never add the `expo` meta-package to your project (it bundles
+its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-sms`'s native code is discovered by `expo-modules-autolinking`, a different mechanism from
+  the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses — and
+  it isn't the standard Expo setup flow either, since this project never installs the `expo`
+  meta-package. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+Beyond that one-time wiring there is nothing to configure. This is the lightest native footprint
+of the Expo wrappers documented here: no runtime permission on either platform, no `Info.plist`
+usage-description key, no manifest edit — `expo-sms` ships its own `<queries>` block declaring the
+`SEND`/`SENDTO` intents it resolves under Android 11+ package-visibility rules, and it merges into
+your app automatically — and no config plugin at all upstream. `symbiote-expo-link` generates the
+Android registration from the package's `native-link.json` on install.
+
+## Usage
+
+All three adapters re-export the exact same functions; there is no per-adapter
+hook/composable/service to reach for, since nothing here holds live state or a subscription.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useState } from 'react';
+    import { Button, Text, View } from '@symbiote-native/react';
+    import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/react';
+
+    export default function InviteByText() {
+      const [status, setStatus] = useState<string>('idle');
+
+      async function onInvite() {
+        if (!(await isAvailableAsync())) {
+          setStatus('this device cannot send SMS');
+          return;
+        }
+        const { result } = await sendSMSAsync('0123456789', 'Join me on this app!');
+        setStatus(result);
+      }
+
+      return (
+        <View>
+          <Text>{status}</Text>
+          <Button title="Invite a friend" onPress={onInvite} />
+        </View>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ref } from 'vue';
+    import { Button, Text, View } from '@symbiote-native/vue';
+    import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/vue';
+
+    const status = ref('idle');
+
+    async function onInvite() {
+      if (!(await isAvailableAsync())) {
+        status.value = 'this device cannot send SMS';
+        return;
+      }
+      const { result } = await sendSMSAsync('0123456789', 'Join me on this app!');
+      status.value = result;
+    }
+    </script>
+
+    <template>
+      <View>
+        <Text>{{ status }}</Text>
+        <Button title="Invite a friend" @press="onInvite" />
+      </View>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, signal } from '@angular/core';
+    import { Button, Text, View } from '@symbiote-native/angular';
+    import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Button, Text, View],
+      template: `
+        <View>
+          <Text>{{ status() }}</Text>
+          <Button title="Invite a friend" (press)="onInvite()" />
+        </View>
+      `,
+    })
+    export class InviteByText {
+      readonly status = signal('idle');
+
+      async onInvite(): Promise<void> {
+        if (!(await isAvailableAsync())) {
+          this.status.set('this device cannot send SMS');
+          return;
+        }
+        const { result } = await sendSMSAsync('0123456789', 'Join me on this app!');
+        this.status.set(result);
+      }
+    }
+    ```
+
+    There's no per-instance service to `inject()` here — both functions are plain exports off the
+    core package, called straight from a template event binding.
+  </TabItem>
+</Tabs>
+
+### Attachments
+
+```ts
+await sendSMSAsync('0123456789', 'Here is the receipt', {
+  attachments: {
+    uri: 'content://media/external/images/media/1',
+    mimeType: 'image/png',
+    filename: 'receipt.png',
+  },
+});
+```
+
+The `uri` has to be a **content** URI: the composer runs in another application's process, and a
+plain file path is not readable from there.
+
+## API
+
+### Functions
+
+| Signature | Description |
+| --- | --- |
+| `isAvailableAsync(): Promise<boolean>` | Whether this device can send an SMS at all. `false` on the iOS simulator, which has no Messages app, and on Android devices without telephony hardware |
+| `sendSMSAsync(addresses, message, options?): Promise<ISmsResponse>` | Opens the system composer prefilled with the recipients and text, and resolves once it closes. Rejects when there is no messaging application, or when a composer is already open |
+
+`addresses` takes one phone number as a string or a list of them; a bare string is normalised into
+a one-element array before the native call. Every recipient must be a string — anything else
+throws a `TypeError` before the native module is reached.
+
+### `ISmsOptions`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `attachments` | `ISmsAttachment \| ISmsAttachment[] \| undefined` | One file to attach, or a list of them. Android keeps only the first — its composer intent has a single `EXTRA_STREAM` slot — so extras are dropped before the native call. iOS attaches all of them |
+
+### `ISmsAttachment`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `uri` | `string` | Content URI of the file. It must be a content URI so applications outside your own can read it; a plain file path is not reachable from the composer |
+| `mimeType` | `string` | MIME type of the attachment, such as `image/png` |
+| `filename` | `string` | File name shown for the attachment in the composer |
+
+### `ISmsResponse`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `result` | `'sent' \| 'cancelled' \| 'unknown'` | How the composer was dismissed. `sent` when the user sent or scheduled the message, `cancelled` when they dismissed it, `unknown` when the outcome cannot be determined — always the case on Android |
+
+## Notes
+
+- **Android always resolves `unknown`.** Learning whether a message actually left the device means
+  querying the SMS database, which needs the `READ_SMS` permission Google restricts to
+  default-SMS-app publishers. Treat `unknown` as "the composer closed", not as a failure — and
+  don't build a flow that branches on `sent` unless iOS is the only platform that runs it.
+- **Only whether a message was sent is observed.** Neither the final text nor the final recipient
+  list is read back, so the user is free to edit both in the composer without your app knowing.
+- **The simulator reports unavailable.** `isAvailableAsync()` is `false` on the iOS simulator,
+  which ships no Messages app — the composer can only be exercised on a real device.
+
+## How the wrapper works
+
+`@symbiote-native/sms` ships zero React/Vue/Angular logic — `expo-sms`'s own JS is hand-ported
+into this package's `core/`, resolving the native module through `expo-modules-core`'s
+`requireNativeModule` rather than the `expo` meta-package this project never installs:
+
+```
+packages/sms/src/
+├── core/     # framework-agnostic: sendSMSAsync + isAvailableAsync, recipient and attachment
+│             # normalisation. native-module.ts resolves ExpoSMS via requireNativeModule
+├── react/    # @symbiote-native/sms/react   — export * from '../core'
+├── vue/      # @symbiote-native/sms/vue     — export * from '../core'
+└── angular/  # @symbiote-native/sms/angular — export * from '../core'
+```
+
+Same shape as [secure store](/docs/packages/secure-store/)'s and
+[local auth](/docs/packages/local-auth/)'s three adapter entries: single-file re-exports with no
+lifecycle code, since every export is a stateless free function — there is nothing for a hook,
+composable, or service to subscribe to or clean up. Upstream's web variant is not ported; this
+project ships iOS and Android only. The native code itself is never vendored or copied —
+`expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
+guide](/docs/howtos/expo-native-module-setup/)).
