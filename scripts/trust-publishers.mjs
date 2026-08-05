@@ -17,6 +17,8 @@
 // Prereq: npm CLI >= 11.15.0.
 
 import { execFileSync } from 'node:child_process';
+import { rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 import { publishablePackageEntries } from './lib/publishable-packages.mjs';
 
@@ -88,15 +90,36 @@ try {
   }
 }
 
-console.log('\nEach never-published package needs a one-off `pnpm publish`, then every');
-console.log('package needs `npm trust github` — both are interactive (OTP/browser).\n');
+console.log('\nEach never-published package is packed then published, and every package');
+console.log('needs `npm trust github` — both are interactive (OTP/browser).\n');
+
+// Only `pnpm pack` resolves the manifest: it applies the publishConfig overlay (main/exports ->
+// build/) and rewrites the `catalog:` / `workspace:*` specifiers 31 of these packages use into
+// real versions. npm understands neither, so an npm-packed tarball is unusable.
+//
+// Only `npm publish` completes npm's browser 2FA flow. `pnpm publish` prints the auth URL, the
+// approval succeeds, and the CLI waits forever — while npm's own commands, `npm trust` included,
+// finish the identical flow against the identical registry through the identical proxy.
+function publish(name, dir) {
+  const packed = execFileSync('pnpm', ['pack', '--pack-destination', tmpdir()], {
+    cwd: dir,
+    encoding: 'utf8',
+  });
+  // pnpm prints the tarball path as the last non-empty line of stdout.
+  const tarball = packed.trim().split('\n').filter(Boolean).pop();
+  try {
+    execFileSync('npm', ['publish', tarball, '--access', 'public'], { stdio: 'inherit' });
+  } finally {
+    rmSync(tarball, { force: true });
+  }
+}
 
 const failed = [];
 for (const { name, dir } of entries) {
   if (!isPublished(name)) {
-    console.log(`=== pnpm publish ${name} (first publish — not yet on the registry) ===`);
+    console.log(`=== publish ${name} (first publish — not yet on the registry) ===`);
     try {
-      execFileSync('pnpm', ['publish', '--no-git-checks'], { cwd: dir, stdio: 'inherit' });
+      publish(name, dir);
     } catch (error) {
       console.error(`  publish failed for ${name}: ${error.message}`);
       failed.push(name);
@@ -119,9 +142,20 @@ for (const { name, dir } of entries) {
         '--allow-publish',
         '--yes',
       ],
-      { stdio: 'inherit' },
+      // stderr is piped so a 409 can be told apart from a real failure; stdout still
+      // inherits, keeping npm's own auth prompts interactive.
+      { stdio: ['inherit', 'inherit', 'pipe'] },
     );
   } catch (error) {
+    const stderr = String(error.stderr ?? '');
+    // npm answers 409 when the package already carries this trust config. Re-running the
+    // script over a mostly-published repo hits it for every prior package, and treating
+    // that as a failure buries the ones that genuinely broke.
+    if (stderr.includes('E409') || stderr.includes('409 Conflict')) {
+      console.log('  already configured, skipping');
+      continue;
+    }
+    process.stderr.write(stderr);
     console.error(`  failed for ${name}: ${error.message}`);
     failed.push(name);
   }
