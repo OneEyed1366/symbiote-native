@@ -1,0 +1,241 @@
+---
+title: Localization
+description: expo-localization wrapped for every SymbioteNative adapter — the device's locale list and preferred calendar settings, each with its own reactive hook.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/localization` wraps
+[`expo-localization`](https://docs.expo.dev/versions/latest/sdk/localization/) — the device's
+locale list and preferred calendar settings — so every SymbioteNative adapter can reach it, not
+just React. Unlike [network](/docs/packages/network/)'s single `useNetworkState`, this package
+ships **two independent getters**, `getLocales`/`getCalendars`, each synchronous (a direct
+JSI-bridged native call, no `await`) and each with its own native change listener and its own
+reactive hook per adapter (`useLocales`, `useCalendars`) — mirroring
+[battery](/docs/packages/battery/)'s shape of several distinct hooks in one package rather than
+one combined hook.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React               | ✅ live |
+| Vue                 | ✅ live |
+| Angular             | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/localization
+```
+
+`expo-localization` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project
+(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-localization`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
+  installs the `expo` meta-package. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes.
+</Aside>
+
+No platform permission string is needed — locale and calendar settings are read-only system state
+with no runtime permission prompt on either platform.
+
+## Usage
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Text } from '@symbiote-native/react';
+    import { useLocales, useCalendars } from '@symbiote-native/localization/react';
+
+    export default function LocalizationScreen() {
+      const locales = useLocales();     // Locale[], guaranteed at least 1 element
+      const calendars = useCalendars(); // Calendar[], guaranteed at least 1 element
+
+      return (
+        <>
+          <Text>{locales[0].languageTag}</Text>
+          <Text>{calendars[0].timeZone}</Text>
+        </>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { Text } from '@symbiote-native/vue';
+    import { useLocales, useCalendars } from '@symbiote-native/localization/vue';
+
+    const locales = useLocales();     // Ref<Locale[]>
+    const calendars = useCalendars(); // Ref<Calendar[]>
+    </script>
+
+    <template>
+      <Text>{{ locales[0].languageTag }}</Text>
+      <Text>{{ calendars[0].timeZone }}</Text>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { Text } from '@symbiote-native/angular';
+    import { LocalesService, CalendarsService } from '@symbiote-native/localization/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Text],
+      template: `
+        <Text>{{ locales()[0].languageTag }}</Text>
+        <Text>{{ calendars()[0].timeZone }}</Text>
+      `,
+    })
+    export class LocalizationScreen {
+      readonly locales = inject(LocalesService).connect();     // Signal<Locale[]>
+      readonly calendars = inject(CalendarsService).connect(); // Signal<Calendar[]>
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## API
+
+### Functions
+
+| Signature | Description |
+| --- | --- |
+| `getLocales(): Locale[]` | List of the user's locales, in the order the user defines in their device settings. Guaranteed to contain at least 1 element |
+| `getCalendars(): Calendar[]` | List of the user's preferred calendars. For now always returns a single element, but may return a user preference list on some platforms in the future. Guaranteed to contain at least 1 element |
+| `addLocaleListener(listener: (event?: unknown) => void): EventSubscription` | Subscribes to locale-settings-change notifications — the listener carries no payload, it's an invalidate signal for `useLocales` to re-read `getLocales()` |
+| `addCalendarListener(listener: (event?: unknown) => void): EventSubscription` | Subscribes to calendar-settings-change notifications — same invalidate-signal shape as `addLocaleListener`, for `useCalendars` |
+
+### `useLocales()` / `useCalendars()` config
+
+Both hooks take no arguments — each seeds and subscribes automatically.
+
+### `useLocales()` return value
+
+| Field | Type | Description |
+| --- | --- | --- |
+| (return value) | `Locale[]` | React returns this as a plain array, recomputed via `useMemo` whenever the locale-change listener fires. Vue returns `Ref<Locale[]>`. Angular's `LocalesService.connect()` returns `Signal<Locale[]>` |
+
+### `useCalendars()` return value
+
+| Field | Type | Description |
+| --- | --- | --- |
+| (return value) | `Calendar[]` | React returns this as a plain array, recomputed via `useMemo` whenever the calendar-change listener fires. Vue returns `Ref<Calendar[]>`. Angular's `CalendarsService.connect()` returns `Signal<Calendar[]>` |
+
+### `Locale`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `languageTag` | `string` | An [IETF BCP 47 language tag](https://en.wikipedia.org/wiki/IETF_language_tag) with a region code, e.g. `'en-US'`, `'es-419'`, `'pl-PL'` |
+| `languageCode` | `string \| null` | An IETF BCP 47 language tag without the region code, e.g. `'en'`, `'es'`, `'pl'` |
+| `languageScriptCode` | `string \| null` | An [ISO 15924](https://en.wikipedia.org/wiki/ISO_15924) 4-letter script code, e.g. `'Latn'`, `'Hans'`, `'Hebr'`. May be `null` on Android and web |
+| `regionCode` | `string \| null` | The device's region, from the Region setting under Language & Region on iOS, Region settings on Android, and parsed from locale on web (can be `null` there), e.g. `'US'` |
+| `languageRegionCode` | `string \| null` | The region code for the preferred language — the same value as `regionCode` for a non-region-specific language, or the language's own region for a region-specific one (`'en-CA'` → `'CA'`). Prefer `regionCode` for internationalization purposes |
+| `currencyCode` | `string \| null` | Currency code for the locale, e.g. `'USD'`, `'EUR'`, `'PLN'`. On iOS this is the `Region` setting's currency, not necessarily the current locale's; on Android it's specific to the locale in the list; `null` on web (look up by region instead) |
+| `currencySymbol` | `string \| null` | Currency symbol for the currency in `currencyCode`, e.g. `'$'`, `'€'`, `'zł'` |
+| `languageCurrencyCode` | `string \| null` | Currency code for the current locale in the list rather than the device region (iOS), or equal to `currencyCode` (Android); `null` on web. Prefer `currencyCode` for internationalization purposes |
+| `languageCurrencySymbol` | `string \| null` | Currency symbol for the currency in `languageCurrencyCode`. Prefer `currencySymbol` for internationalization purposes |
+| `decimalSeparator` | `string \| null` | Decimal separator used for formatting numbers with fractional parts, e.g. `'.'`, `','` |
+| `digitGroupingSeparator` | `string \| null` | Digit grouping separator used for formatting large numbers, e.g. `'.'`, `','` |
+| `textDirection` | `'ltr' \| 'rtl'` | Text direction for the locale |
+| `measurementSystem` | `'metric' \| 'us' \| 'uk' \| null` | The measurement system used in the locale. `null` on web, since the user's chosen measurement system isn't exposed there and inferring it from locale is unreliable — ask for user preference if possible |
+| `temperatureUnit` | `'celsius' \| 'fahrenheit' \| null` | The temperature unit used in the locale. `null` if the region code is unknown |
+
+### `Calendar`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `calendar` | `CalendarIdentifier \| null` | The calendar identifier, one of the [Unicode calendar types](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Locale/calendar). Limited to Android's own available calendar types there; iOS maps its own identifiers to the closest Unicode type and never reports `'dangi'` or `'islamic-rgsa'` (not implemented on iOS) |
+| `uses24hourClock` | `boolean \| null` | `true` when the current device settings use 24-hour time format. Can be `null` on browsers that don't support the `hourCycle` property in `Intl` |
+| `firstWeekday` | `Weekday \| null` | The first day of the week — for most calendars Sunday is `1` and Saturday is `7`. Can be `null` on browsers that don't support the `weekInfo` property in `Intl` |
+| `timeZone` | `string \| null` | Time zone for the calendar, e.g. `'America/Los_Angeles'`, `'Europe/Warsaw'`, `'GMT+1'`. Can be `null` on web |
+
+### `Weekday`
+
+| Member | Value | Description |
+| --- | --- | --- |
+| `SUNDAY` | `1` | Sunday |
+| `MONDAY` | `2` | Monday |
+| `TUESDAY` | `3` | Tuesday |
+| `WEDNESDAY` | `4` | Wednesday |
+| `THURSDAY` | `5` | Thursday |
+| `FRIDAY` | `6` | Friday |
+| `SATURDAY` | `7` | Saturday |
+
+Maps days of the week in the Gregorian calendar to their index as returned by `Calendar.firstWeekday`.
+
+### `CalendarIdentifier`
+
+| Member | Value | Description |
+| --- | --- | --- |
+| `BUDDHIST` | `'buddhist'` | Thai Buddhist calendar |
+| `CHINESE` | `'chinese'` | Traditional Chinese calendar |
+| `COPTIC` | `'coptic'` | Coptic calendar |
+| `DANGI` | `'dangi'` | Traditional Korean calendar |
+| `ETHIOAA` | `'ethioaa'` | Ethiopic calendar, Amete Alem (epoch approx. 5493 B.C.E) |
+| `ETHIOPIC` | `'ethiopic'` | Ethiopic calendar, Amete Mihret (epoch approx. 8 C.E.) |
+| `GREGORY` | `'gregory'` | Gregorian calendar |
+| `HEBREW` | `'hebrew'` | Traditional Hebrew calendar |
+| `INDIAN` | `'indian'` | Indian calendar |
+| `ISLAMIC` | `'islamic'` | Islamic calendar |
+| `ISLAMIC_CIVIL` | `'islamic-civil'` | Islamic calendar, tabular (intercalary years 2,5,7,10,13,16,18,21,24,26,29 — civil epoch) |
+| `ISLAMIC_RGSA` | `'islamic-rgsa'` | Islamic calendar, Saudi Arabia sighting |
+| `ISLAMIC_TBLA` | `'islamic-tbla'` | Islamic calendar, tabular (intercalary years 2,5,7,10,13,16,18,21,24,26,29 — astronomical epoch) |
+| `ISLAMIC_UMALQURA` | `'islamic-umalqura'` | Islamic calendar, Umm al-Qura |
+| `ISO8601` | `'iso8601'` | ISO calendar (Gregorian calendar using the ISO 8601 calendar week rules) |
+| `JAPANESE` | `'japanese'` | Japanese imperial calendar |
+| `PERSIAN` | `'persian'` | Persian calendar |
+| `ROC` | `'roc'` | Civil (algorithmic) Arabic calendar |
+
+## Notes
+
+<Aside type="note" title="getLocales/getCalendars are synchronous">
+  Unlike most native-module calls in this repo, both getters are direct, synchronous, JSI-bridged
+  native calls — no `await`, no `Promise`. That's why Vue's `useLocales`/`useCalendars` seed their
+  `ref` directly at setup time (`ref(getLocales())`) instead of an async placeholder-then-fetch —
+  there is no "loading" state to represent.
+</Aside>
+
+## How the wrapper works
+
+`@symbiote-native/localization` ships zero React/Vue/Angular logic in `expo-localization` itself
+— its types and functions are hand-ported, verbatim, into this package's own `core/`, resolving
+the native module through `expo-modules-core`'s `requireNativeModule` rather than the `expo`
+meta-package this project never installs. One native module fans out two independent event
+streams (locale settings vs. calendar settings) through the same `addListener`, keyed by event
+name — the same trick [battery](/docs/packages/battery/)'s native module uses for its own
+multiple event names on one `addListener`:
+
+```
+packages/localization/src/
+├── core/                 types.ts — Locale, Weekday, CalendarIdentifier, Calendar, hand-ported
+│                         verbatim from Localization.types.ts. native-module.ts resolves the
+│                         native module through expo-modules-core's requireNativeModule and
+│                         exposes addLocaleListener/addCalendarListener. localization.ts —
+│                         getLocales/getCalendars, synchronous getters delegating straight to
+│                         the native module.
+├── react/hooks/          @symbiote-native/localization/react   — useLocales, useCalendars
+├── vue/composables/      @symbiote-native/localization/vue     — same two names, Vue lifecycle
+└── angular/services/     @symbiote-native/localization/angular — LocalesService, CalendarsService
+                          (`.connect()` returns a Signal)
+```
+
+Two independent getters, each with its own native change listener and its own reactive hook per
+adapter — mirroring `@symbiote-native/battery`'s shape of shipping several distinct hooks in one
+package, not one combined hook. Each hook/composable/service seeds its return value from the
+matching synchronous `get*()` call (no initial "loading" state needed — the native call is sync,
+not async) and recomputes it whenever the matching listener fires. The native code itself is
+never vendored or copied — `expo-modules-autolinking` resolves it straight out of `node_modules`
+(see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

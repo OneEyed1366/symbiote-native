@@ -6,6 +6,20 @@ description: The shared engine and component layers behind every adapter.
 Most app code should import from `@symbiote-native/react` or `@symbiote-native/vue`. The core
 packages explain why those adapters can stay thin and consistent.
 
+## Installation
+
+```sh
+pnpm add @symbiote-native/engine
+```
+
+Most apps never install this directly — `@symbiote-native/react`,
+`@symbiote-native/vue`, and `@symbiote-native/angular` all declare it as a peer
+dependency, so it arrives with the adapter. Install it by hand only when you are
+writing or debugging an adapter yourself. `react-native` (>=0.86) is a peer
+dependency and stays your app's own top-level dependency either way.
+`@symbiote-native/components` installs the same way — see the
+[Components API](/docs/api/components/#installation).
+
 ## @symbiote-native/engine
 
 The engine owns the native route:

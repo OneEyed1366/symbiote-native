@@ -136,11 +136,35 @@ Required, once per native host app (not per wrapped package):
 | `ios/*/AppDelegate.swift` | minimal Expo bootstrap hook |
 | `android/.../MainApplication.kt` | minimal Expo bootstrap hook |
 
-Per this repo's convention, wire this into `.examples/<app>` only, never the public
-`examples/<app>` — see `symbiote-dev-examples`. Once wired once at the app level, any *future*
-expo-modules-core-based package is auto-discovered with zero further app changes — unlike the
-per-package `react-native.config.cjs`/podspec proxy the native-view skill requires for every
-new RN-CLI-autolinked wrapper.
+**Recurring mistake — happened twice (haptics/clipboard/battery in 2026-07, then device/
+application/crypto again in 2026-07-29) despite §7 documenting it: adding a new package's
+`MainApplication.kt` import + `ExpoModulesProvider` map entry is NOT sufficient.**
+`app/build.gradle`'s `dependencies {}` block needs its own new
+`implementation project(':expo-<pkg>')` line too — `settings.gradle`'s exclude-list resolver
+(§7) only makes the Gradle subproject *exist*, it does not add it to `:app`'s own compile
+classpath. Skip this line and `:app:compileDebugKotlin` fails with `Unresolved reference
+'<pkg>'` on the exact import you just added to `MainApplication.kt` — a real, reproduced
+failure mode, not a hypothetical. **A JS-level typecheck (`tsc`/`vue-tsc`/`ngc`) cannot catch
+this** — it never touches Gradle/Kotlin, so "typecheck passed" gives false confidence that
+Android wiring is complete. When wiring a new expo-modules-core package into ANY
+`examples/expo-*` app (whether doing it yourself or dispatching an agent to), the checklist is
+three files, every time: `settings.gradle` (automatic via the exclude-list, no edit needed),
+`app/build.gradle` (`implementation project(':expo-<pkg>')` — manual, easy to forget since
+nothing prompts for it), `MainApplication.kt` (import + map entry — manual). Verify by actually
+running `:app:compileDebugKotlin` (or the equivalent Gradle task), not just a JS typecheck.
+
+Per this repo's stated convention, wire this into `.examples/<app>` only, never the public
+`examples/<app>` — see `symbiote-dev-examples`. **Correction (2026-07-27, verified by reading
+both trees directly): the accelerometer bring-up documented below actually landed in the public
+`examples/react` (undotted), not `.examples/react`.** `.examples/react` currently exists only as
+a bare, unwired RN scaffold (no `use_expo_modules!`, no Gradle fallback, doesn't even depend on
+`@symbiote-native/sensors`) — every `.examples/react` path in the narrative below describes
+where the work *should* live per convention, not where it *does* live on disk today. Before
+repeating any step below, `grep -n -i expo` the Podfile of whichever tree you intend to use to
+confirm which one actually has the wiring — don't assume the convention held. Once wired once at
+the app level, any *future* expo-modules-core-based package is auto-discovered with zero further
+app changes — unlike the per-package `react-native.config.cjs`/podspec proxy the native-view
+skill requires for every new RN-CLI-autolinked wrapper.
 
 **iOS — done and verified end-to-end (2026-07, accelerometer pilot).** Three separate hard
 requirements surfaced that the original plan didn't anticipate; all three are reproduced
@@ -264,6 +288,23 @@ Verified end-to-end, in this order:
    loading wasn't exercised (no Metro server running in this pass, JS core not finished in
    this session) — verify that once `packages/sensors/src/core` + a demo screen exist.
 
+**`find DerivedData/<Scheme>-*/.../  -name "<Scheme>.app" | head -1` silently installs a STALE
+build if more than one `DerivedData/<Scheme>-<hash>` folder exists for the same scheme** — every
+`xcodebuild`/Xcode-GUI build creates a NEW hash-suffixed folder rather than reusing the old one,
+and `find`'s enumeration order is filesystem order, not mtime order, so `head -1` can just as
+easily pick a build from days ago as the one `xcodebuild` printed paths under moments earlier.
+Symptom: `requireNativeModule('Expo<X>')` throws "Cannot find native module" on the simulator for
+a module that IS correctly present in the just-verified `ExpoModulesProvider.swift` (steps 2-5
+above all pass) — because the INSTALLED binary predates the pod that ships it, not because
+autolinking is broken. Root-caused 2026-07-29 wiring `brightness`/`cellular`/`network` into
+`examples/expo-react`: `xcodebuild`'s own log named the fresh output path
+`DerivedData/CanaryExpo-hdlsozxhqnyltibrvcnvojacmxmm/...`, but a separate `find | head -1` call
+picked `CanaryExpo-epzwjurfnurzwsgcosfdwzwdurqi` (an older, pre-brightness build) and installed
+that instead. Fix: never re-derive the `.app` path with a fresh glob — reuse the EXACT path
+`xcodebuild` itself printed in its own build log for that invocation, or if that's unavailable,
+sort by mtime (`find ... -name "*.app" -exec stat -f '%m %N' {} \; | sort -rn | head -1`) rather
+than trusting enumeration order.
+
 **Android — done and verified 2026-07 (accelerometer pilot).** The premise that "the Gradle-side
 plugins live in `expo-modules-autolinking` itself, independent of the `expo` package" turned out
 to be **only half true** once the actual Kotlin source was read (`.vendors/expo` at
@@ -373,7 +414,8 @@ pilot. The Gradle side (`settings.gradle`'s `include()` wiring) links the WHOLE 
 android/ project, so every sensor's `Module` class compiles into the app fine (confirmed
 present in the built APK's dex) — but compiling isn't registering. Since there's no `expo`
 package to auto-generate the package list, adding a sensor to the JS/core layer does **nothing**
-on the Android side by itself; `MainApplication.kt`'s map is hand-maintained and needs one new
+on the Android side by itself; `MainApplication.kt`'s map (generated by §9's aggregator since
+2026-08, hand-maintained when this was written) needs one new
 `<SensorModule>::class.java to "<its Name(...) string>"` line per sensor, matching each Module's
 own `definition() { Name("...") }` exactly (confirmed for all 8: `ExponentAccelerometer`,
 `ExpoBarometer`, `ExponentDeviceMotion`, `ExponentGyroscope`, `ExpoLightSensor`,
@@ -439,6 +481,81 @@ waiting for the first reading" unless the UI checks `isAvailableAsync()` separat
 device. Any demo/smoke screen for a sensor should render the availability check as its own
 state, not conflate it with "no reading yet" (see `frontend-ux-best-practices`'s "render every
 async state" rule) — otherwise a real bug and this simulator limitation look identical.
+
+**iOS Simulator does not implement `UIScreen.main.brightness` at all — `expo-brightness`'s
+get/set never round-trips there, only on a real device; Android's emulator is unaffected.**
+`BrightnessModule.swift`'s `setBrightnessAsync`/`getBrightnessAsync` are a bare
+`UIScreen.main.brightness = value` / `return UIScreen.main.brightness` — a real call, not a
+stub. But on the Simulator, `set` is silently a no-op and `get` always returns a constant
+(observed `1.0`), regardless of what was written — a long-standing Apple Simulator limitation,
+reproducible in any app including stock Expo Go, not something this wrapper can work around.
+Android's `WindowManager.LayoutParams.screenBrightness` has no such gap: the emulator runs the
+same framework code path as a real device (nothing to visually dim, but the value genuinely
+persists), so `getBrightnessAsync()` after `setBrightnessAsync()` correctly reflects the new
+value there. Symptom (verified 2026-07-29, `examples/expo-react`'s BrightnessScreen): tapping a
+brightness button updates the displayed `%` on Android but not on iOS Simulator — same shape as
+the CoreMotion note above (a real device is required to observe the effect), except here even
+the SOFTWARE-side readback fails on Simulator, not just the physical dimming.
+
+**A core test that imports `UnavailabilityError` (or anything else) as a real VALUE from
+`expo-modules-core` crashes Vitest with `Parse failure: Flow is not supported`** — the real
+`expo-modules-core` entry transitively imports `react-native`, whose Flow-typed source Vitest's
+Oxc transform can't parse. A test that only imports `EventSubscription` etc. as a `type` never
+hits this (types are erased, the real module never loads) — which is why `battery`'s core test
+never needed the fix but `network`'s and `brightness`'s did the moment they added the
+`UnavailabilityError` throw-on-missing-method convention. Fix: `vi.mock('expo-modules-core', ()
+=> ({ UnavailabilityError: class UnavailabilityError extends Error {}, Platform: { OS: 'ios' },
+PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' } }))` —
+mock only the members the file under test actually imports as values. `haptics`'s core test
+(`packages/haptics/src/core/haptics.test.ts`) already has this fix; check it before writing a
+new core test for any package that throws `UnavailabilityError` or reads `Platform.OS`.
+
+## 7. `settings.gradle` allow-list → exclude-list — the pattern that scales past 2 packages
+
+§4's Android recipe (filter the `expo-modules-autolinking resolve` JSON to "exactly
+`expo-modules-core` + `expo-sensors`") was written for the two-package pilot and is an
+ALLOW-list — every future package needs a new name added to that filter by hand. Confirmed
+this doesn't scale past a handful of packages (2026-07-28, adding `expo-haptics`/
+`expo-clipboard`/`expo-battery` to all four `examples/expo-*` canaries — the public,
+tarball-installed app family, not `.examples/react`): the allow-list fix alone left the new
+packages silently unlinked (project simply not included), a different symptom from the
+runtime "Cannot find native module" error below but with the same root cause — a filter that
+must be told about every new package by name.
+
+**Superseded pattern:** flip the filter to an EXCLUDE-list of the known phantom npm-peer
+packages, mirroring the iOS Podfile's own `use_expo_modules!(exclude: [...])` (§`Accepted side
+effect` above) instead of allow-listing the packages you actually want:
+
+```groovy
+def unwantedExpoModules = [
+  "expo", "expo-asset", "expo-constants", "expo-file-system",
+  "expo-font", "expo-keep-awake", "@expo/dom-webview", "@expo/log-box",
+]
+def wantedExpoModules = resolvedExpoModules.modules
+  .findAll { !unwantedExpoModules.contains(it.packageName) }
+```
+
+A genuinely new expo-modules-core package (real native code, not a phantom `auto-install-
+peers` peer) is then auto-discovered by `settings.gradle` with **zero further edits to this
+file** — verified by simulating the filter against real `resolve --platform android --json`
+output and confirming it yields exactly the wanted 6-package set with no manual per-package
+entry. Use the exclude-list form for any app with 2+ expo-modules-core packages already wired;
+the allow-list form in §4 is fine only for a from-scratch single/two-package pilot.
+
+**This does NOT remove the other two registration points** — `app/build.gradle`'s
+`implementation project(':expo-<pkg>')` and `MainApplication.kt`'s
+`ExpoModulesProvider` map (§4's `SensorsModulesProvider` under its later, more generic name)
+still need one new line each per package, exactly as documented above (§9's aggregator now
+generates both, so this is no longer a hand-edit - but it is still a distinct registration point
+that `settings.gradle` alone does not cover); `settings.gradle`'s
+job is only "is this Gradle subproject included at all," a necessary but insufficient
+condition for either compiling against it or resolving it at runtime. Confirmed by hitting
+both remaining gaps for real while adding these three packages: skipping the `app/build.gradle`
+entry fails `:app:compileDebugKotlin` with `Unresolved reference '<pkg>'`; skipping the
+`MainApplication.kt` map entry compiles and installs fine but crashes at first use with
+`Cannot find native module '<Name>'` — the exact symptom in the paragraph above, reproduced
+identically for a second, unrelated set of packages, confirming it's a general property of
+this Android wiring shape and not an accelerometer-specific quirk.
 
 ## 7. Package shape — mirrors `splash-screen`, not `slider`
 
@@ -610,6 +727,215 @@ unpatched native module — no `pnpm patch`, no native fork. It renders both `in
   `expo-sensors` or in this project's wrapper. A consumer that wants to display it defensively
   can check `Number.isNaN(...)`; there is nothing to fix natively.
 
+### Android emulator quirk — LocalAuthentication `not_enrolled` is device state, not a permission bug
+
+`authenticateAsync()` failing with `Failed: not_enrolled (KeyguardManager#isDeviceSecure()
+returned false)` on Android looks like a missing-permission bug (it reads like an
+authorization failure) but isn't one. Verified by reading the actual upstream source
+(`expo-local-authentication`'s `LocalAuthenticationModule.kt`): `authenticateAsync` checks
+`keyguardManager.isDeviceSecure` — a pure `KeyguardManager` device-state query, no permission
+involved — before ever touching `BiometricPrompt`, and resolves this exact error+warning pair
+if it's `false`. `USE_BIOMETRIC`/`USE_FINGERPRINT` are normal (non-dangerous) manifest
+permissions merged in automatically from the library's own `AndroidManifest.xml` at build
+time; grepping the whole module confirms zero `requestPermissions` calls anywhere in this
+code path — there is no runtime permission request to be missing.
+
+The actual cause: the emulator/device has no secure lock screen configured at all — no PIN,
+pattern, password, or enrolled fingerprint in Android Settings. Fix is entirely
+device-side, not code: Settings → Security → Screen lock → set a PIN/pattern (and, for an
+AVD, Extended Controls → Fingerprint → enroll one to test the biometric path specifically).
+Same shape as the iOS-Simulator quirks below — hardware/OS state masquerading as an app bug.
+
+## 9. `@symbiote-native/expo-modules-link` - the hand-maintained-registration pain from §4/§7 is now automated (2026-07, redesigned as an aggregator 2026-08-05)
+
+The recurring Android pain documented above and in §7's "This does NOT remove the other two
+registration points" note — `app/build.gradle`'s `implementation project(':expo-<pkg>')` and
+`MainApplication.kt`'s hand-maintained `ModulesProvider` map, both needing one new line per
+package with no compile error on omission, only a runtime `Cannot find native module` crash —
+is now closed by `packages/expo-modules-link`.
+
+**It is an aggregator: ONE process, ONE pass over the app's `node_modules`, regenerating the
+registration blocks from scratch.** The app - not the wrapper package - owns the trigger:
+
+```json
+{
+  "dependencies": { "@symbiote-native/expo-modules-link": "^0.2.0" },
+  "scripts": { "postinstall": "symbiote-expo-link" }
+}
+```
+
+Wrapper packages have NO `postinstall` and do NOT depend on `expo-modules-link`. They ship a
+passive `native-link.json` manifest and nothing else. **Do not add a `postinstall` back to a
+wrapper package** - that is the design this was moved away from, for the reason in "Why an
+aggregator" below.
+
+**Mechanism.** Each wrapper package (sensors, local-auth, haptics, clipboard, battery,
+brightness, cellular, network, device, application, crypto, ...) ships a `native-link.json`
+next to its `package.json`:
+
+```json
+{
+  "android": {
+    "gradleProjectName": "expo-local-authentication",
+    "modules": [
+      { "importPath": "expo.modules.localauthentication.LocalAuthenticationModule",
+        "className": "LocalAuthenticationModule", "nativeName": "ExpoLocalAuthentication" }
+    ]
+  }
+}
+```
+
+`symbiote-expo-link` (the package's `bin`) runs from the app root, scans
+`<app>/node_modules/*` and `<app>/node_modules/@scope/*` for every installed package shipping a
+`native-link.json`, sorts them by package name, and rewrites two regions from that list. Each
+region is delimited by a marker PAIR and the generator owns everything between them; everything
+outside is the developer's and is never touched:
+
+- `app/build.gradle`: a `// SYMBIOTE-EXPO-LINK:BEGIN DEPENDENCIES` … `:END DEPENDENCIES` region
+  holding one sorted `implementation project(':<gradleProjectName>')` per package. Created once
+  right after the `implementation("com.facebook.react:react-android")` anchor line.
+- `MainApplication.kt`: TWO regions - `:BEGIN IMPORTS` (created after the last existing import)
+  and `:BEGIN MODULES-MAP` (created after the
+  `override fun getModulesMap(): Map<Class<out Module>, String?> = mapOf(` anchor).
+
+Writes go through a temp-file + `renameSync`, so an interrupted install cannot leave a
+half-written `build.gradle`. A `BEGIN` whose `END` was hand-deleted is REFUSED with a warning
+rather than guessed at - guessing where the region ends would eat the developer's code.
+
+**Why an aggregator, and why NOT a per-package postinstall (the 2026-08 redesign).** The
+original design had every wrapper package's own `postinstall` append its own line. That is
+correct for ORDER but not for CONCURRENCY: npm 7+ and pnpm both run independent dependencies'
+lifecycle scripts **in parallel**, so N independent OS processes did read-modify-write on the
+same file. Two could read the same snapshot before either wrote back, and the later write
+silently dropped the earlier package's line - a well-formed file just missing an entry, which
+only surfaces at runtime as `Cannot find native module`. Originally reproduced wiring 6 new
+packages into `examples/expo-angular`/`expo-vue-sfc` at once: one `npm install` landed 4-5 of 6.
+
+Three lock designs were built and measured against it, all disproven:
+
+1. `unlink` then re-`open(O_EXCL)` with no re-check - failed ~1 in 5 runs.
+2. `rename(tmp, lock)` "clobber and read back" - `rename` always succeeds, so it has no
+   only-one-winner signal at all. Failed ~3 in 10, worse: every racer thinks it won.
+3. pid-liveness + same-content re-check immediately before `unlink` - narrowed the window to
+   roughly 1 lost registration in 100 installs, but could not close it.
+
+**The window is not closable from plain `fs`.** There is no compare-and-unlink and no `flock`,
+so "decide the holder is dead" and "act on it" stay two separate steps; another process can
+legitimately recreate the lock in between and have its live lock unlinked by the loser of the
+race. `proper-lockfile` does not close it either - its mtime-refresh design DETECTS a stolen
+lock (`onCompromised`) rather than preventing the steal, and its refresh timer is a `setTimeout`
+that never fires here because the critical section is fully synchronous.
+
+So the fix was to delete the concurrency instead of synchronising it, which is what
+`expo-modules-autolinking` does too: one process reads the installed tree and writes the answer.
+Three long-standing annoyances went with it - output is deterministic (sorted, so committed
+native files stop churning per-machine), uninstall finally works (an append-only patcher could
+only ever grow the list), and there are no lock artifacts to leak or gitignore.
+
+**If a future task reintroduces per-package `postinstall` linking, it reintroduces this race.**
+The lock is not a missing feature to add back; it is a thing that cannot be built correctly at
+this layer.
+
+**What this replaces, what it doesn't.** Adding a NEW expo-modules-core package no longer needs
+a hand-edit to either file in any consuming app — this closes the exact gap §7 flagged as
+NOT solved by the `settings.gradle` exclude-list. iOS per-package *linking* already self-healed
+via its own `use_expo_modules!(exclude: [...])` (§`Accepted side effect`) before this package
+existed, so there was no recurring gap to close there — but a second, genuinely recurring iOS
+gap DID exist and is now also closed: per-package `Info.plist` usage-description strings (see
+below). The one-time per-app bootstrap (Podfile `use_expo_modules!` monkey-patch reproduction,
+`SymbioteExpoModulesFactory`, bridging header) remains fully manual either way — it is a
+one-time, whole-Xcode-project operation, not a per-package one, so it was never in scope.
+
+**iOS `Info.plist` permission strings, added 2026-08-03.** A package that needs a usage-
+description key (`local-auth` → `NSFaceIDUsageDescription`, `sensors` → `NSMotionUsageDescription`,
+`tracking-transparency` → `NSUserTrackingUsageDescription`) declares it in its own
+`native-link.json` under `ios.infoPlistKeys: { "<KEY>": "<default text>" }`.
+`patchInfoPlist` finds the app's own `Info.plist` (walks `ios/`, skipping `Pods`/`build`/
+`DerivedData`/anything matching `Tests`) and inserts the key right before the outermost closing
+`</dict>` if — and only if — that exact `<key>NAME</key>` isn't already present anywhere in the
+file. The description is XML-escaped on the way in (`&`, `<`, `>`) - an unescaped `&` in a
+description produces a plist no parser will read, and the failure surfaces as an opaque build
+error far from its cause.
+
+**iOS deliberately gets NO generated region, unlike the two Android blocks.** Xcode rewrites
+`Info.plist` through its own plist serializer whenever target settings change, and that
+serializer drops XML comments. A lost `END` marker would make the next run insert a SECOND block
+and produce duplicate keys - an invalid plist. So iOS stays additive, with key-presence as the
+idempotency check: a plist key is unique by construction, so that check is sufficient.
+
+**The default text must be generic — never copy a specific app's own wording into a shared
+package manifest.** Caught mid-session: the first draft used `examples/expo-react`'s own live
+`Info.plist` text (`"CanaryExpo uses Face ID to demo @symbiote-native/local-auth."`) as the
+manifest's shipped default — which would have put a specific demo app's own name into every
+future consumer's `Info.plist`. There's no per-app config file for this postinstall to read a
+custom string from (unlike Expo's own config-plugins, which pull the string from the consuming
+app's `app.json`), so the shipped default has to name no app at all — e.g.
+`"This app uses Face ID to authenticate you."`
+
+**Overriding the default is a free consequence of the additive-only design, not a built
+feature.** The check is "does this `<key>` already exist", never "does its *value* match the
+default" — so an app can override by simply having the key already present, either by adding it
+to its own `Info.plist` before ever installing the package, or by hand-editing the generated
+string afterward; either way, every future run leaves that key alone permanently. The three
+`examples/expo-{angular,vue-sfc,vue-tsx}` apps deliberately keep their demo-specific wording for
+exactly this reason - a live example of the override, not an oversight.
+
+Since 2026-08-05 a value that disagrees with the package default prints a one-line notice naming
+both, unconditionally (not `DEBUG`-gated). The file is still left as the developer wrote it - the
+point is that drift stops being invisible, not that it gets corrected. Running the aggregator
+over those three apps is what surfaced the drift in the first place.
+
+**Android `<application>` attributes, added 2026-08-05 for `secure-store`.** A package declaring
+`android.manifestApplicationAttributes: { "<attr>": "<value>" }` gets those attributes set on the
+app's own `<application>` element in `android/app/src/main/AndroidManifest.xml`. `secure-store` is
+the first package to need it (`android:fullBackupContent` / `android:dataExtractionRules` pointing
+at the Auto Backup rule files `expo-secure-store` itself ships) - without them Android backs up
+the encrypted entries but not the Keystore keys that decrypt them, so a restore onto a new device
+yields values the app can no longer read. Additive-only for the same reason as Info.plist plus one
+of its own: an XML attribute is unique per element by construction, so presence is a sufficient
+idempotency check, and no comment can live inside a tag to delimit a region anyway. An attribute
+the app already carries is kept and reported - backup rules decide what leaves the device, so the
+app's own value has to win. The opening tag is located by scanning for the first UNQUOTED `>`
+after `<application`, not by regex: RN's own template puts `"${usesCleartextTraffic}"` in an
+attribute and a manifest may legally put a `>` inside one.
+
+**Generalisation worth carrying forward: read the upstream package's own
+`plugin/src/with<Name>.ts` before porting it.** That config plugin is where Expo hides per-app
+native configuration a thin JS wrapper never reveals - `expo-secure-store`'s does exactly two
+things, one of which (`NSFaceIDUsageDescription`) the linker already covered and one of which
+(the two manifest attributes) it did not. Tier 1 packages happened to need nothing there, which
+is why this only surfaced on the first tier-2 package.
+
+**Verified end-to-end for real** (2026-08-03), same methodology as the Android proof below, with
+one extra wrinkle worth remembering: after repacking `local-auth`'s tarball, the permission
+string still didn't appear — because `@symbiote-native/expo-modules-link` ITSELF was still the
+stale, pre-iOS-support tarball (a transitive dependency's postinstall doesn't retrigger just
+because you updated the dependency; you have to force-reinstall the dependency, THEN
+force-reinstall the package that depends on it, in that order) — see the npm gotcha
+below, which applies per-package, not just to the one package you're actively iterating on.
+
+**Verified end-to-end for real, not just simulated** (2026-07-30): stripped local-auth's three
+registration lines (import, map entry, gradle dependency) from the real, committed
+`examples/expo-react` android files, ran a genuine `npm install`, and confirmed
+`symbiote-expo-link` re-derived the exact same lines — proof the mechanism works against a real
+npm install, not only against synthetic fixtures or direct function calls.
+
+**npm gotcha hit while verifying this — will recur for anyone iterating on a `file:`-referenced
+package.** `npm install` can silently skip re-extracting a `file:` tarball dependency if you
+repack it (e.g. via `pnpm pack`) without bumping its version. `package-lock.json` records an
+`integrity` hash for the `file:` resolution; a plain `npm install` trusts that recorded
+hash/resolution rather than recomputing it against the tarball's current content, so a
+repacked-but-unversioned tarball's new content (e.g. a newly-added `postinstall` script) never
+reaches `node_modules` — the installed copy stays byte-for-byte stale, with **zero warning**.
+Confirmed directly: after repacking `packages/local-auth`, `node_modules/@symbiote-native/
+local-auth/package.json` in `examples/expo-react` still had no `postinstall` field and no
+`native-link.json`, identical to before the repack. Fix during local dev-loop iteration on a
+`file:`-referenced package: either delete `node_modules/@scope/<pkg>` before `npm install`
+(forces a fresh extraction), or explicitly reinstall with the specifier —
+`npm install "@scope/<pkg>@file:../../relative/path/to/the.tgz"` — to force npm to recompute
+resolution + integrity. A real npm consumer who bumps the package's actual published version
+never hits this; it's purely a local-tarball-dev-loop trap.
+
 ## Still-open execution checklist (nothing below has shipped yet)
 
 1. `packages/sensors/package.json` + `tsconfig.json`; add to root `tsconfig.json` references
@@ -630,6 +956,10 @@ unpatched native module — no `pnpm patch`, no native fork. It renders both `in
 
 ## References
 
+- `symbiote-new-package-skeleton` — read FIRST if the package doesn't exist yet at all: resolves
+  whether a brand-new package should start as a bare-skeleton (reserve-the-npm-name only, no
+  functional code — see `packages/local-auth`), core-only, or the full parity this skill
+  otherwise assumes.
 - `symbiote-third-party-native-view` — the native-VIEW sibling skill; read it first if the
   package you're wrapping has a `codegenNativeComponent`. The `.rn-<lib>` vendoring recipe and
   the CocoaPods symlink-glob gotcha it documents do **not** apply to expo-modules-core-based
@@ -638,6 +968,9 @@ unpatched native module — no `pnpm patch`, no native fork. It renders both `in
   a non-view wrapper.
 - `symbiote-dev-examples` — why native wiring goes in `.examples/<app>`, never the public
   `examples/<app>`.
+- `packages/expo-modules-link` - the app-level registration aggregator (§9) that generates the
+  `app/build.gradle`/`MainApplication.kt` blocks from every installed package's
+  `native-link.json`; read its own README for the manifest shape and the app-side setup.
 - `symbiote-sfc-style-compiler` / root CLAUDE.md Build & platform section — this repo's own
   Metro pipeline, the reason `expo`'s own Metro config/babel preset must never be installed.
 - `.vendors/expo` — shared git checkout across projects via the `.vendors` symlink; read a

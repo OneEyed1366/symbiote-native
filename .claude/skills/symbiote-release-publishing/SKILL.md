@@ -232,6 +232,57 @@ at all) — a NEW workflow file would need its own `trust:publishers`-style
 re-registration first, or every publish from it 404s (npm returns 404, not
 403, for an identity with no trust config).
 
+## Gotcha (found 2026-08-06 during the 18-package first-publish run): `pnpm publish` never completes npm's browser 2FA flow — pack with pnpm, upload with npm
+
+npm now requires 2FA for direct publishing even with a token in `~/.npmrc` (the
+`npm notice ... tokens that bypass 2FA are being restricted for account changes
+and direct publishing` banner). The 2FA flow prints an auth URL, the user
+approves it in a browser, and the CLI long-polls
+`registry.npmjs.org/-/v1/done?authId=…` for the result.
+
+**`pnpm publish` never picks up that result.** It prints the URL, the browser
+approval succeeds, and the CLI waits forever. Rule out the network, the proxy
+and the account in one step: run `npm trust list <pkg>`, which drives the
+identical flow against the identical registry through the identical proxy. If it
+completes while the publish hangs, the tool is what differs.
+
+**But `npm publish` cannot replace `pnpm publish` directly.** Two things only
+pnpm does when packing:
+
+1. Resolves `catalog:` and `workspace:*` specifiers into real versions. 31 of
+   the 34 publishable packages use them; npm understands neither and would ship
+   `"expo-modules-core": "catalog:"` verbatim — an uninstallable package.
+2. Applies the `publishConfig` overlay (`main`/`module`/`types`/`exports` →
+   `build/`). npm's own `publishConfig` support does not cover these field
+   overrides, so an npm-packed tarball keeps `main: src/index.ts`.
+
+So split the job — pnpm owns the manifest, npm owns the upload:
+
+```js
+const packed = execFileSync('pnpm', ['pack', '--pack-destination', tmpdir()], { cwd: dir, encoding: 'utf8' });
+const tarball = packed.trim().split('\n').filter(Boolean).pop();  // pnpm prints the path last
+execFileSync('npm', ['publish', tarball, '--access', 'public'], { stdio: 'inherit' });
+```
+
+This is what `scripts/trust-publishers.mjs` does. Verify a tarball before
+trusting the split: `main` must read `./build/...` and no `catalog:`/`workspace:`
+string may survive anywhere in the packed `package.json`.
+
+Two more things that look like failures in that script's output and are not:
+
+- **`E409` from `npm trust github`** means the package already carries this trust
+  config — expected on every re-run over an already-published repo. The script
+  treats it as "already configured, skipping".
+- **A fresh publish 404s on read for minutes.** `npm view` and even an anonymous
+  `curl https://registry.npmjs.org/<pkg>` return 404 while the write side already
+  knows the package (`npm trust` succeeds against it and returns a server-issued
+  UUID). In the 2026-08-06 run, 17 packages read as missing immediately after
+  publishing and 9 minutes later only the alphabetically-last 9 still did — they
+  were landing in publish order. Do NOT re-publish or debug on the strength of a
+  post-publish 404; re-check after a few minutes. Beware also that a verification
+  loop of ~34 `npm view` calls rotates `~/.npmrc`'s `_logs` (default `logs-max`
+  10) and destroys the publish logs you would want to read afterwards.
+
 ## CI (`.github/workflows/release.yml` + `checks.yml`)
 
 `checks.yml` is a `workflow_call`-only reusable workflow holding the three

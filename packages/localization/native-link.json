@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-localization",
+    "modules": [
+      {
+        "importPath": "expo.modules.localization.LocalizationModule",
+        "className": "LocalizationModule",
+        "nativeName": "ExpoLocalization"
+      }
+    ]
+  }
+}

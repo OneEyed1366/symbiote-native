@@ -33,7 +33,10 @@
     "build-ngc",
     "codegen-specs",
     "react-native.config.cjs",
-    "symbiote-navigation.podspec"
+    "symbiote-navigation.podspec",
+    "!src/**/*.test.*",
+    "!src/**/*.spec.*",
+    "!src/**/*.detox.*"
   ],
   "publishConfig": {
     "access": "public",

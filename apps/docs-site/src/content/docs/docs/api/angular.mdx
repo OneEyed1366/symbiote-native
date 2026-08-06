@@ -12,6 +12,19 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from '@symbi
 Every SymbioteNative component is a `standalone: true` Angular component — add it to
 the consuming component's `imports` array, there is no `NgModule` to register.
 
+## Installation
+
+```sh
+pnpm add @symbiote-native/angular react-native @angular/core
+```
+
+`react-native` and `@angular/core` (**>=20**, for stable zoneless change
+detection) stay your app's own top-level dependencies — `react-native` is the
+Metro version anchor, so it has to be pinned at the app root.
+`@symbiote-native/engine` is a peer dependency and installs alongside. The AOT
+pipeline (`ngc --watch` alongside Metro) and the Metro config still have to be
+wired by hand; `examples/angular` is the reference.
+
 ## Component shape
 
 | Concern         | Angular API                                                          |
@@ -209,6 +222,16 @@ The rest of the runtime-module surface re-exports the same way as React/Vue:
 `Keyboard`, `Vibration`, `ActionSheetIOS`, `BackHandler`, `ToastAndroid`,
 `PermissionsAndroid`, `AccessibilityInfo`, `I18nManager`, `Settings`,
 `LayoutAnimation`, `InteractionManager`, `StatusBar`, and `findNodeHandle`.
+
+On Android, `Keyboard` and `Settings` do nothing until you also install
+[`@symbiote-native/android`](/docs/packages/android/):
+`keyboardDidShow`/`keyboardDidHide` never fire, because Android's only stock
+keyboard-event source is `ReactRootView`'s layout listener and the bridgeless
+surface SymbioteNative mounts never triggers it, and `Settings` reads back `null`,
+because RN's `Settings` has no stock Android implementation at all. That package
+supplies both native modules (`KeyboardObserver`, `SettingsManager`), is picked
+up by Gradle autolinking, and exports nothing from JS — installing it is the
+whole integration.
 
 ## Animations and gestures
 

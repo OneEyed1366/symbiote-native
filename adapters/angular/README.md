@@ -78,7 +78,7 @@ export class AppComponent {
 ```
 
 The full canary is [`examples/angular`](../../examples/angular) — a stock RN 0.86 app whose
-[`App.ts`](../../examples/angular/App.ts) exercises the same surface as the React and Vue
+[`App.ts`](../../examples/angular/src/App.ts) exercises the same surface as the React and Vue
 reference canaries, standalone components, zoneless change detection.
 
 ---

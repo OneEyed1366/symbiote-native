@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-crypto",
+    "modules": [
+      {
+        "importPath": "expo.modules.crypto.CryptoModule",
+        "className": "CryptoModule",
+        "nativeName": "ExpoCrypto"
+      }
+    ]
+  }
+}

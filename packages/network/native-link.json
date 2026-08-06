@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-network",
+    "modules": [
+      {
+        "importPath": "expo.modules.network.NetworkModule",
+        "className": "NetworkModule",
+        "nativeName": "ExpoNetwork"
+      }
+    ]
+  }
+}

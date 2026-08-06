@@ -42,7 +42,10 @@
     "metro-config.cjs",
     "babel-linker.cjs",
     "babel-register-composed.cjs",
-    "tsconfig.angular.base.json"
+    "tsconfig.angular.base.json",
+    "!src/**/*.test.*",
+    "!src/**/*.spec.*",
+    "!src/**/*.detox.*"
   ],
   "bin": {
     "symbiote-angular-dev": "./bin/symbiote-angular-dev.cjs"

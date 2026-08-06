@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-battery",
+    "modules": [
+      {
+        "importPath": "expo.modules.battery.BatteryModule",
+        "className": "BatteryModule",
+        "nativeName": "ExpoBattery"
+      }
+    ]
+  }
+}

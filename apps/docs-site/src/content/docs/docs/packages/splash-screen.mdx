@@ -214,7 +214,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
 | Signature | Description |
 | --- | --- |
 | `hide(config?: { fade?: boolean }): Promise<void>` | Hides the native splash screen. `fade: true` fades the *native* view out before removing it; omitted/`false` removes it immediately — independent of the JS-side `useHideAnimation` fade below |
-| `isVisible(): Promise<boolean>` | Reads whether the native splash screen is currently shown |
+| `isVisible(): boolean` | Reads whether the native splash screen is currently shown. Synchronous — iOS exports it as a blocking sync method, Android returns a plain boolean |
 
 ### `useHideAnimation()` config
 
@@ -235,6 +235,27 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
 | `container` | `{ style, onLayout }` | Bind onto your own `View` — `style` positions and colors the full-screen backdrop, `onLayout` reports layout readiness |
 | `logo` | `{ source, fadeDuration, resizeMode, style, onLoadEnd }` | Bind onto your own `Image` — `onLoadEnd` reports logo-load readiness |
 | `brand` | `{ source, fadeDuration, resizeMode, style, onLoadEnd }` | Same shape as `logo`, bound onto a second `Image` for the optional brand asset |
+
+## Notes
+
+- **Calling `hide()` on your very first render is safe — it queues rather than failing.** iOS holds
+  the resolver until a 0.35 s timer started during native init reports that the system launch
+  screen has faded out; Android re-posts the request every 100 ms while the module is still
+  initializing or no activity is resumed. The promise settles late; it does not reject.
+- **`useHideAnimation` hides the native screen without a fade.** It calls `hide({ fade: false })`
+  itself the moment the readiness gate closes, because your `animate()` owns the fade-out —
+  `hide({ fade: true })` only matters when you hide the splash by hand.
+- **`animate()` runs at most once per mount.** The controller latches after the first call, and the
+  logo/brand readiness flags are captured when it is constructed — a config that later drops its
+  `logo`/`brand` source does not flip them back. If `ready` never becomes `true`, or a readiness
+  callback is never wired, `hide()` never fires and the splash stays up.
+- **Native constants are read once, on first render.** `darkModeEnabled` is what picks
+  `darkBackground`/`darkLogo`/`darkBrand`, so switching the system theme while the splash is still
+  on screen does not re-pick the dark assets.
+- **Only Android reports layout constants.** iOS exports `darkModeEnabled` alone;
+  `statusBarHeight`, `navigationBarHeight` and `logoSizeRatio` are Android-only, which is why the
+  container's negative margins and the logo scaling apply there and nowhere else. On Samsung One
+  UI 4 devices `logoSizeRatio` is `0.5`, so the logo renders at half its manifest size by design.
 
 ## How the wrapper works
 

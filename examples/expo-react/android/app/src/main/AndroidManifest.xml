@@ -1,0 +1,36 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.VIBRATE" />
+  <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+  <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+  <!-- @symbiote-native/brightness: setSystemBrightnessAsync/getPermissionsAsync -->
+  <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+  <!-- @symbiote-native/cellular: getCarrierNameAsync/getIsoCountryCodeAsync/etc. -->
+  <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+  <application
+    android:name=".MainApplication"
+    android:label="@string/app_name"
+    android:icon="@mipmap/ic_launcher"
+    android:roundIcon="@mipmap/ic_launcher_round"
+    android:allowBackup="false"
+    android:theme="@style/AppTheme"
+    android:usesCleartextTraffic="${usesCleartextTraffic}"
+    android:supportsRtl="true"
+    android:dataExtractionRules="@xml/secure_store_data_extraction_rules"
+    android:fullBackupContent="@xml/secure_store_backup_rules">
+    <activity
+      android:name=".MainActivity"
+      android:label="@string/app_name"
+      android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+      android:launchMode="singleTask"
+      android:windowSoftInputMode="adjustResize"
+      android:exported="true"
+      android:theme="@style/BootTheme">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>

@@ -28,7 +28,6 @@ import './App.css';
 
 import MenuScreen from './screens/MenuScreen.vue';
 import CanaryScreen from './screens/CanaryScreen.vue';
-import SensorsScreen from './screens/SensorsScreen.vue';
 import DetailsScreen from './screens/DetailsScreen.vue';
 import HeaderOptionsScreen from './screens/HeaderOptionsScreen.vue';
 import { headerOptionsScreenOptions } from './screens/header-options-screen-options';
@@ -108,19 +107,6 @@ onMounted(() => hide());
         headerShown: true,
         headerTranslucent: true,
         headerTintColor: LINE_COLOR.primitives,
-        headerTitleColor: '#ffffff',
-        headerStyle: { backgroundColor: '#0b1622' },
-        headerUserInterfaceStyle: 'dark',
-      }"
-    />
-    <Screen
-      :name="ROUTE_NAME.Sensors"
-      :component="SensorsScreen"
-      :options="{
-        title: 'Sensors',
-        headerShown: true,
-        headerTranslucent: true,
-        headerTintColor: LINE_COLOR.sensors,
         headerTitleColor: '#ffffff',
         headerStyle: { backgroundColor: '#0b1622' },
         headerUserInterfaceStyle: 'dark',

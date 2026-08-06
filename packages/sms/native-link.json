@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-sms",
+    "modules": [
+      {
+        "importPath": "expo.modules.sms.SMSModule",
+        "className": "SMSModule",
+        "nativeName": "ExpoSMS"
+      }
+    ]
+  }
+}

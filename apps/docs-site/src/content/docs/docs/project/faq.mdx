@@ -32,6 +32,15 @@ renderer does not.
 Apps should pin it explicitly at the top level. SymbioteNative hides most imports from
 app code, not the runtime dependency from the app manifest.
 
+## Does a wrapper package like Haptics or Sensors need setup?
+
+One step, once per app: add `@symbiote-native/expo-modules-link` to
+`dependencies` and `"postinstall": "symbiote-expo-link"` to `scripts`. Every
+wrapper package you install afterwards is picked up on the next install. Skip
+it and the JS imports still resolve — the app fails later, at runtime, with
+`Cannot find native module '<Name>'`. Full setup:
+[Wire up an Expo native module](/docs/howtos/expo-native-module-setup/).
+
 ## Can Vue render any React Native package?
 
 No. A third-party React Native package that exports a JavaScript React component

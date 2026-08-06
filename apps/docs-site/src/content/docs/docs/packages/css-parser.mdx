@@ -1,0 +1,298 @@
+---
+title: CSS parser
+description: The build-time CSS/SCSS/Sass/Less/Stylus compiler behind SymbioteNative's class-based styling — the Metro transformer, the css-dts CLI, and the TypeScript plugin.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/css-parser` compiles a stylesheet — a `.css`/`.module.css` file, a Vue SFC
+`<style>` block, or an SCSS/Sass/Less/Stylus source — into React Native style objects at build
+time, inside a Metro transformer. The runtime half lives elsewhere: `@symbiote-native/engine`'s
+`style-registry` (`registerStyles` / `resolveClassName`) is what turns `className="card"` back
+into a style object at render time. What to write in your stylesheets and how classes resolve per
+adapter is covered by the [Styling guide](/docs/learn/styling/) and [How to: style a
+component](/docs/howtos/styling/) — this page is about the package itself: how it gets into your
+Metro build, and what it exports.
+
+Unlike every other package documented here, this one wraps no native module and ships no
+component. It is a Node-only build tool: it runs on the build machine and never enters the app's
+native JS bundle, so there is no per-OS support table to give — the same compiled style objects
+are produced for iOS and Android from one transform.
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React               | ✅ live |
+| Vue                 | ✅ live |
+| Angular             | ✅ live |
+
+## Installation
+
+**For the Metro transformer: nothing to install.** `@symbiote-native/react`,
+`@symbiote-native/vue`, and `@symbiote-native/angular` each depend on `@symbiote-native/css-parser`
+directly and re-export it through their own `./metro-css-parser` subpath, so an app that already
+has an adapter installed can point Metro at the transformer with no extra dependency.
+
+Install it directly only for the two development-time pieces — the `css-dts` CLI and the
+TypeScript plugin, which your app's own `package.json` and `tsconfig.json` reference by name:
+
+```sh
+pnpm add -D @symbiote-native/css-parser
+```
+
+The SCSS/Sass, Less, and Stylus compilers are **optional and lazily loaded**. `sass`, `less`, and
+`stylus` are devDependencies of this package only, never regular dependencies — a project that
+authors plain CSS never installs any of the three. The first compile of a `.scss`/`.less`/`.styl`
+file whose compiler is missing throws an install instruction (`sass is required for .scss/.sass
+files. Install it: npm i -D sass`) rather than failing at import time.
+
+## Usage
+
+Wire `babelTransformerPath` at your adapter's `./metro-css-parser` subpath and add the style
+extensions to `sourceExts` so Metro treats a stylesheet as a source file. The subpath already
+calls `createCssMetroTransformer()` for you — it exports a ready `{ transform, getCacheKey }`
+object, not the factory — so no local wrapper file is needed.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```js
+    // metro.config.js
+    const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+
+    const defaultConfig = getDefaultConfig(__dirname);
+
+    const config = {
+      transformer: {
+        babelTransformerPath: require.resolve('@symbiote-native/react/metro-css-parser'),
+      },
+      resolver: {
+        sourceExts: [...defaultConfig.resolver.sourceExts, 'css', 'scss', 'sass', 'less', 'styl'],
+      },
+    };
+
+    module.exports = mergeConfig(defaultConfig, config);
+    ```
+
+    Then import stylesheets from any source file:
+
+    ```tsx
+    import './theme.css';                     // plain CSS — registers classes globally, no export
+    import styles from './Card.module.css';   // CSS Modules — default export is a name→scopedName map
+
+    <View className="card" style={styles.highlight} />
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    A Vue SFC app points `babelTransformerPath` at `@symbiote-native/vue/metro-vue-transformer`
+    instead — the SFC transformer requires `@symbiote-native/css-parser` itself to handle a
+    `<style>` block, and delegates everything else. A Vue TSX app (no `.vue` files) points at
+    `./metro-css-parser` exactly like React.
+
+    ```js
+    // metro.config.js — Vue SFC
+    const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+
+    const defaultConfig = getDefaultConfig(__dirname);
+
+    const config = {
+      transformer: {
+        babelTransformerPath: require.resolve('@symbiote-native/vue/metro-vue-transformer'),
+      },
+      resolver: {
+        sourceExts: [
+          ...defaultConfig.resolver.sourceExts,
+          'vue',
+          'css',
+          'scss',
+          'sass',
+          'less',
+          'styl',
+        ],
+      },
+    };
+
+    module.exports = mergeConfig(defaultConfig, config);
+    ```
+
+    ```js
+    // metro.config.js — Vue TSX
+    transformer: {
+      babelTransformerPath: require.resolve('@symbiote-native/vue/metro-css-parser'),
+    },
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    Angular needs one extra Metro accommodation on top of the transformer: ngc compiles only
+    `.ts` into its own `outDir`, so a relative `import './App.css'` survives into the compiled
+    JS still pointing at the original source location that ngc never copies.
+    `withSymbioteAngularMetroConfig` supplies both the `sourceExts` additions and the
+    `resolveRequest` that redirects such an import back to the real source file.
+
+    ```js
+    // metro.config.js
+    const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+    const { withSymbioteAngularMetroConfig } = require('@symbiote-native/angular/metro-config');
+
+    const projectRoot = __dirname;
+    const defaultConfig = getDefaultConfig(projectRoot);
+
+    const config = {
+      transformer: {
+        babelTransformerPath: require.resolve('@symbiote-native/angular/metro-css-parser'),
+      },
+      resolver: {
+        ...withSymbioteAngularMetroConfig(defaultConfig, projectRoot).resolver,
+      },
+    };
+
+    module.exports = mergeConfig(defaultConfig, config);
+    ```
+
+    `withSymbioteAngularMetroConfig(defaultConfig, projectRoot, { outDir })` defaults `outDir` to
+    `'build/angular'` — pass it explicitly if your `tsconfig` writes ngc output elsewhere. The
+    ngc/linker pipeline never sees a `.css` file, so there is no conflict with the CSS
+    transformer.
+  </TabItem>
+</Tabs>
+
+### Typed CSS Modules keys
+
+The `css-dts` bin and the language-service plugin are the devDependency half — wire them once in
+`package.json` and `tsconfig.json`:
+
+```json
+{ "scripts": { "pretypecheck": "css-dts ." } }
+```
+
+```json
+{ "compilerOptions": { "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }] } }
+```
+
+Both are needed, and why is spelled out in the [Styling
+guide](/docs/learn/styling/#real-key-narrowing-css-dts-and-the-typescript-plugin): a
+`tsconfig.json` plugin is invisible to a standalone `tsc`/CI run, and an on-disk `.d.ts` gives no
+feedback while you type.
+
+## API
+
+Everything below is exported from the package barrel `@symbiote-native/css-parser`. All of it is
+Node-only, meant to run inside a Metro transformer or a CLI — none of it is importable from app
+code that ships to the device.
+
+### Metro transformer
+
+| Signature | Description |
+| --- | --- |
+| `createCssMetroTransformer(upstreamTransformer?: IMetroTransformer): IMetroTransformer` | Builds the `{ transform, getCacheKey }` object Metro's `babelTransformerPath` expects: compiles a recognized style file, delegates every other file to the upstream transformer unchanged. Defaults the upstream to `resolveUpstreamTransformer()` |
+| `resolveUpstreamTransformer(): IMetroTransformer` | Resolves `@react-native/metro-babel-transformer` relative to this package (a real dependency of it), so a custom per-framework transformer can delegate its own passthrough branch without a fragile direct `require` |
+
+`transform()` is async for every recognized extension, plain `.css` included — Metro's own
+transform worker awaits the call either way, and Less/Stylus have no synchronous render API.
+
+### Compiler core
+
+| Signature | Description |
+| --- | --- |
+| `parseCSS(css: string, options?: ICssParserOptions): Record<string, Record<string, unknown>>` | Compiles plain CSS text into a `{ className: styleObject }` map — postcss AST walk, `var()`/`calc()` resolution, and CSS property → RN `ViewStyle`/`TextStyle` mapping |
+| `extractClassName(selector: string): string \| null` | Converts one CSS selector to the camelCase key `parseCSS` registers it under — `.card` → `card`, `.btn.primary` → `btnPrimary`, `.card .title` → `cardTitle`. Returns `null` for a selector with no RN equivalent (bare element, `*`, anything carrying a pseudo-class) |
+| `kebabToCamel(value: string): string` | Kebab-case → camelCase. Exported because a template's `class="section-label"` authoring must normalize to the same key `parseCSS` registered the selector under |
+| `globalClassNamesIn(css: string): Set<string>` | Scans CSS text for `:global(.name)`-wrapped class names, camelCased. A caller doing its own scope-suffixing uses this to exempt those names, since `parseCSS`'s output carries no per-key metadata |
+| `hashFilePath(filePath: string): string` | A short deterministic id derived from a file path, used as the scope suffix so two files can each define `.card` without colliding in the shared runtime registry |
+
+`ICssParserOptions` has one optional field, `filename: string` — passed to postcss as the source
+name for error reporting.
+
+### Standalone stylesheet files
+
+| Signature | Description |
+| --- | --- |
+| `compileCssFile(source: string, filename: string, options?: ICssParserOptions): Promise<ICompiledCssFile>` | Compiles one stylesheet file into JS module source. A plain file emits a `registerStyles(...)` side-effect module with no export; a `.module.*` file additionally scopes every class to a per-file hash and default-exports the name→scopedName map. Preprocessor sources are reduced to CSS first |
+| `isCssModuleFile(filename: string): boolean` | Whether a filename's stem ends in `.module` (`Card.module.scss` → `true`) — the check that decides scoped-with-a-map vs. global-side-effect output |
+
+`ICompiledCssFile` has one field, `code: string` — the generated JS module source.
+
+### Preprocessors
+
+| Signature | Description |
+| --- | --- |
+| `compile(source: string, lang: IPreprocessorLanguage, filePath?: string): Promise<string>` | Unified entry point: reduces any recognized language down to plain CSS text. `lang: 'css'` is a passthrough no-op |
+| `compileScss(source: string, filePath?: string): Promise<string>` | Compiles SCSS, or the indented Sass syntax when `filePath` ends in `.sass`, to CSS. Sets sass `loadPaths` to the source file's own directory so a relative `@use`/`@import` resolves as authored |
+| `compileSass` | An alias of `compileScss` — one compiler entry point serves both syntaxes, picked off the file extension |
+| `compileLess(source: string, filePath?: string): Promise<string>` | Compiles Less to CSS. Async because Less ships no synchronous render API |
+| `compileStylus(source: string, filePath?: string): Promise<string>` | Compiles Stylus to CSS, wrapping its callback-based `render` in a Promise |
+| `detectLanguage(filename: string): IPreprocessorLanguage` | Extension → language. `.scss`/`.sass` → `'scss'`, `.less` → `'less'`, `.styl`/`.stylus` → `'stylus'`; anything unrecognized falls back to `'css'` |
+| `isStyleFile(filename: string): boolean` | Whether an extension is a stylesheet the transformer should claim at all — the "should I even look at this file?" check |
+
+`IPreprocessorLanguage` is `'css' | 'scss' | 'less' | 'stylus'`.
+
+### CSS Modules typing
+
+| Signature | Description |
+| --- | --- |
+| `generateModuleDts(source: string, filename: string): Promise<string \| null>` | Produces the `.d.ts` source for one CSS Modules file. Returns `null` for a non-`.module.*` file, which has no default export to type |
+| `classNamesToDtsSource(classNames: readonly string[]): string` | Renders a sorted class-name list into `.d.ts` text — a `readonly` field per class, deliberately with no index signature, so a typo is a real `TS2339` |
+
+| CLI | Description |
+| --- | --- |
+| `css-dts [--watch] <dir-or-file> [...more]` | Walks the given paths and writes a sibling `<file>.d.ts` next to every `.module.css`/`.module.scss`/`.module.less`/`.module.styl` it finds, skipping `node_modules`, `build`, `.git`, and dot-directories. `--watch` regenerates on filesystem events, for live editor autocomplete without a running Metro |
+
+| Subpath | Description |
+| --- | --- |
+| `@symbiote-native/css-parser/typescript-plugin` | A TypeScript language-service plugin synthesizing a virtual `.d.ts` for a `.module.css` import, so the IDE's own TS server gives per-class autocomplete and typo errors on every keystroke |
+
+## Notes
+
+- **Node-only, never in the bundle.** Nothing here is importable from app code that ships to the
+  device. The runtime counterpart — resolving a class name back to a style object — is
+  `@symbiote-native/engine`'s `style-registry`.
+- **The transformer is delegating, not replacing.** Any file whose extension `isStyleFile` does
+  not recognize is passed straight through to the upstream RN Babel transformer, so wiring it as
+  `babelTransformerPath` does not change how your `.ts`/`.tsx` files are compiled.
+- **`sourceExts` is the half that's easy to forget.** Without the extension additions Metro never
+  routes a `.css` import to the transformer at all, and the import fails to resolve. Note that
+  `detectLanguage` also recognizes `.stylus`; add it to `sourceExts` too if you use that spelling
+  rather than `.styl`.
+- **`@media` and other at-rules are dropped**, with a console warning, before the rule walk — so
+  is any selector carrying a pseudo-class (`.card:hover`). RN has no hover/media-query concept, and
+  keeping the rule's other declarations would silently merge hover-only styles into the
+  always-applied base style.
+- **The TypeScript plugin covers plain `.module.css` only.** `getScriptSnapshot` must be
+  synchronous, and Less and Stylus have no sync compile API — `.module.scss`/`.less`/`.styl` still
+  get their on-disk `.d.ts` from `css-dts` at `pretypecheck` time, just no live per-class
+  completion. The plugin's regex extractor also splits a compound (`.btn.primary`) or descendant
+  (`.card .title`) selector into two keys where the real compiler produces one.
+- **`css-dts` is deliberately not wired into Metro.** Metro's transform is content-hash-cached and
+  only touches files reached by the bundle graph it happens to be building; a `tsc`/`vue-tsc` run
+  in CI has no Metro at all. `pretypecheck` runs before every typecheck, local or CI, with no dev
+  server involved.
+- **No Tailwind.** Whole-project class scanning and JIT utility generation is a different shape
+  from "one source file reduces to CSS text" and is out of scope for this package.
+
+## How it works
+
+Two halves, split across build time and runtime:
+
+```
+.css / .module.css / .scss / .sass / .less / .styl        className / class / addClass
+      │  build time, inside Metro                                    │  runtime, all adapters
+      ▼                                                              ▼
+@symbiote-native/css-parser                        @symbiote-native/engine's style-registry
+  preprocessors → parseCSS → JS module source        registerStyles() / resolveClassName()
+```
+
+A preprocessor source is reduced to plain CSS text first, so `parseCSS` is the single downstream
+consumer either way and every mechanism — scoping, `:global()`, CSS Modules — behaves identically
+regardless of source language. `compileCssFile` then emits JS module source that calls
+`registerStyles(...)`, which is what lands in the bundle; the compiler itself does not.
+
+Each adapter's `metro-css-parser.cjs` is a one-line re-export:
+
+```js
+module.exports = require('@symbiote-native/css-parser').createCssMetroTransformer();
+```
+
+That indirection is load-bearing. Node resolves a `require()` relative to the requiring **file's**
+location, so `require.resolve('@symbiote-native/react/metro-css-parser')` in your app's
+`metro.config.js` resolves `@symbiote-native/css-parser` from inside the adapter package, where it
+is a real dependency — not from your app's `node_modules`, which never needs to declare it. The
+file is `.cjs` because the adapter packages are `"type": "module"` while Metro loads a
+`babelTransformerPath` with `require()`.

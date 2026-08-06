@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-clipboard",
+    "modules": [
+      {
+        "importPath": "expo.modules.clipboard.ClipboardModule",
+        "className": "ClipboardModule",
+        "nativeName": "ExpoClipboard"
+      }
+    ]
+  }
+}

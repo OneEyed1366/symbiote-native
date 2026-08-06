@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-cellular",
+    "modules": [
+      {
+        "importPath": "expo.modules.cellular.CellularModule",
+        "className": "CellularModule",
+        "nativeName": "ExpoCellular"
+      }
+    ]
+  }
+}

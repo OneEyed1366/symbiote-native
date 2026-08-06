@@ -4,6 +4,12 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import prettier from 'eslint-config-prettier';
+import json from '@eslint/json';
+import requireReadme from './eslint-rules/require-readme.js';
+import requirePackageFields from './eslint-rules/require-package-fields.js';
+import requireNativeLinkPackaged from './eslint-rules/require-native-link-packaged.js';
+import excludeTestsFromPublishedFiles from './eslint-rules/exclude-tests-from-published-files.js';
+import validNativeLinkManifest from './eslint-rules/valid-native-link-manifest.js';
 
 // Flat config for the symbiote LIBRARY code only (core / adapters / packages).
 // The RN example apps own their formatting + lint via the @react-native eslint
@@ -74,6 +80,48 @@ export default defineConfig(
   {
     files: ['adapters/vue/**/*.ts'],
     rules: {},
+  },
+
+  // ── package.json hygiene: every publishable package (core/adapters/packages) needs a
+  // README next to it, and the field set matching its detected tier (full-library /
+  // codegen-view / native-proxy — see eslint-rules/require-package-fields.js). apps/* is
+  // excluded on purpose: apps/docs-site is a private Astro app, not an npm package. ──
+  {
+    files: ['{core,adapters,packages}/*/package.json'],
+    language: 'json/json',
+    plugins: {
+      json,
+      local: {
+        rules: {
+          'require-readme': requireReadme,
+          'require-package-fields': requirePackageFields,
+          'require-native-link-packaged': requireNativeLinkPackaged,
+          'exclude-tests-from-published-files': excludeTestsFromPublishedFiles,
+        },
+      },
+    },
+    rules: {
+      'local/require-readme': 'error',
+      'local/require-package-fields': 'error',
+      'local/require-native-link-packaged': 'error',
+      'local/exclude-tests-from-published-files': 'error',
+    },
+  },
+
+  // ── expo wrapper manifests: native-link.json is consumed by @symbiote-native/expo-modules-link
+  // at app postinstall, and the aggregator ignores whatever it doesn't recognise rather than
+  // failing. Validating the schema here is the only place a typo surfaces before a Gradle
+  // compile error or a device-only "Cannot find native module". ──
+  {
+    files: ['{core,adapters,packages}/*/native-link.json'],
+    language: 'json/json',
+    plugins: {
+      json,
+      local: { rules: { 'valid-native-link-manifest': validNativeLinkManifest } },
+    },
+    rules: {
+      'local/valid-native-link-manifest': 'error',
+    },
   },
 
   // Future adapters get their own block here, e.g.:

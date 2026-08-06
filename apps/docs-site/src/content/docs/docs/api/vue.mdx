@@ -12,6 +12,19 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from '@symbi
 Vue drives the same engine as React, but its public API follows Vue conventions.
 That matters most for events, children, and refs.
 
+## Installation
+
+```sh
+pnpm add @symbiote-native/vue react-native vue
+```
+
+`react-native` and `vue` stay your app's own top-level dependencies — this
+package replaces only the JS renderer that drives them, and `react-native` is
+the Metro version anchor, so it has to be pinned at the app root.
+`@symbiote-native/engine` is a peer dependency and installs alongside. TSX needs
+nothing beyond this; SFC additionally needs the Metro transformer for `.vue`
+files.
+
 ## Component shape
 
 - Events: typed emits like `@press` and `@value-change`.
@@ -119,6 +132,16 @@ so app code keeps one import root: `Platform`, `StyleSheet`, `Dimensions`,
 `LayoutAnimation`, `InteractionManager`, `StatusBar`, plus the
 `useWindowDimensions`/`useColorScheme` composables, `findNodeHandle`, and
 `dlog`/`isDebug` for diagnostic logging.
+
+On Android, `Keyboard` and `Settings` do nothing until you also install
+[`@symbiote-native/android`](/docs/packages/android/):
+`keyboardDidShow`/`keyboardDidHide` never fire, because Android's only stock
+keyboard-event source is `ReactRootView`'s layout listener and the bridgeless
+surface SymbioteNative mounts never triggers it, and `Settings` reads back `null`,
+because RN's `Settings` has no stock Android implementation at all. That package
+supplies both native modules (`KeyboardObserver`, `SettingsManager`), is picked
+up by Gradle autolinking, and exports nothing from JS — installing it is the
+whole integration.
 
 ## Animations and gestures
 

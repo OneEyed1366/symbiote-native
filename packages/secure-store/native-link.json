@@ -1,0 +1,21 @@
+{
+  "android": {
+    "gradleProjectName": "expo-secure-store",
+    "modules": [
+      {
+        "importPath": "expo.modules.securestore.SecureStoreModule",
+        "className": "SecureStoreModule",
+        "nativeName": "ExpoSecureStore"
+      }
+    ],
+    "manifestApplicationAttributes": {
+      "android:fullBackupContent": "@xml/secure_store_backup_rules",
+      "android:dataExtractionRules": "@xml/secure_store_data_extraction_rules"
+    }
+  },
+  "ios": {
+    "infoPlistKeys": {
+      "NSFaceIDUsageDescription": "This app uses Face ID to unlock your stored credentials."
+    }
+  }
+}
