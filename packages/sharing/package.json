@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/sharing",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "expo-sharing wrapped for SymbioteNative \u2014 one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. Opens the platform share sheet for a local file.",
   "license": "MIT",
   "repository": {

@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/localization",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "expo-localization wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. Two independent synchronous getters (getLocales, getCalendars), each with its own native change listener and its own reactive hook per adapter.",
   "license": "MIT",
   "repository": {

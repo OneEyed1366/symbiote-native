@@ -1,6 +1,28 @@
-# @symbiote-native/sensors
+# @symbiote-native/crypto
 
-## 0.2.1
+## 0.1.0
+
+### Minor Changes
+
+- 80ed828: Add `@symbiote-native/device`, `@symbiote-native/application`, and `@symbiote-native/crypto` — three
+  framework-agnostic wrappers around `expo-device`, `expo-application`, and `expo-crypto` (all built on
+  `expo-modules-core`, never the `expo` meta-package). All three follow `@symbiote-native/local-auth`'s
+  shape exactly: plain constants plus one-shot async/sync functions, no listener or permission state, so
+  the React/Vue/Angular entry points are single-file re-exports with no hook/composable/service.
+
+  `@symbiote-native/device` ships device brand/model/OS constants (`isDevice`, `brand`, `manufacturer`,
+  `modelName`, `deviceType`, `osName`, `osVersion`, `totalMemory`, …) plus `getDeviceTypeAsync`,
+  `getUptimeAsync`, `getMaxMemoryAsync`, `isRootedExperimentalAsync`, `isSideLoadingEnabledAsync`, and the
+  Android feature-flag pair `getPlatformFeaturesAsync`/`hasPlatformFeatureAsync`.
+
+  `@symbiote-native/application` ships app version/build/name/ID constants plus `getAndroidId`,
+  `getInstallReferrerAsync`, `getIosIdForVendorAsync`, `getIosApplicationReleaseTypeAsync`,
+  `getIosPushNotificationServiceEnvironmentAsync`, `getInstallationTimeAsync`, and
+  `getLastUpdateTimeAsync`.
+
+  `@symbiote-native/crypto` ships `getRandomBytes`/`getRandomBytesAsync`, `getRandomValues`,
+  `randomUUID`, `digestStringAsync`, and `digest` (SHA-1/256/384/512, MD2/4/5) — the AES surface from
+  upstream's `expo-crypto` is out of scope for this pass.
 
 ### Patch Changes
 
@@ -55,16 +77,3 @@
   freely override. No public API changed.
 - Updated dependencies [80ed828]
   - @symbiote-native/angular@0.6.2
-
-## 0.2.0
-
-### Minor Changes
-
-- 26af374: Add `@symbiote-native/sensors`, a framework-agnostic wrapper around `expo-sensors` (built on
-  `expo-modules-core`, never the `expo` meta-package). Ships Accelerometer, Barometer,
-  DeviceMotion, Gyroscope, LightSensor, Magnetometer, MagnetometerUncalibrated, and Pedometer, each
-  with a shared core sensor class plus a lifecycle wrapper per adapter — React hooks, Vue
-  composables, Angular services — all driving the same native module. `expo-sensors`' own JS is
-  never imported (it hard-imports the `expo` package); the sensor logic is hand-ported into this
-  package's core, with only the native ios/android module code coming from `expo-sensors` via
-  autolinking.

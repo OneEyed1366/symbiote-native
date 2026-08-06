@@ -1,5 +1,16 @@
 # @symbiote-native/navigation
 
+## 2.0.3
+
+### Patch Changes
+
+- 80ed828: Stop publishing co-located test files. These packages ship `src/` because the Angular entry's
+  `default` export condition resolves back into it, which also swept in every `*.test.ts` beside
+  those sources — 24% of tracking-transparency's unpacked size, 11% of web-browser's. `files` now
+  excludes the `.test.`/`.spec.`/`.detox.` suffixes, and an eslint rule keeps them out.
+- Updated dependencies [80ed828]
+  - @symbiote-native/angular@0.6.2
+
 ## 2.0.2
 
 ### Patch Changes

@@ -1,6 +1,20 @@
-# @symbiote-native/sensors
+# @symbiote-native/brightness
 
-## 0.2.1
+## 0.1.0
+
+### Minor Changes
+
+- 80ed828: Add `@symbiote-native/brightness`, a framework-agnostic wrapper around `expo-brightness` (built on
+  `expo-modules-core`, never the `expo` meta-package). Ships `getBrightnessAsync`/`setBrightnessAsync`,
+  the Android-only system-brightness surface (`getSystemBrightnessAsync`, `setSystemBrightnessAsync`,
+  `restoreSystemBrightnessAsync`, `isUsingSystemBrightnessAsync`, `getSystemBrightnessModeAsync`,
+  `setSystemBrightnessModeAsync`), the permission pair (`getPermissionsAsync`/`requestPermissionsAsync`),
+  and an iOS-only `addBrightnessListener`. A new `usePermissions()` hook/composable/service — shared
+  shape with `@symbiote-native/cellular` — auto-fetches the current permission status on mount and
+  exposes `get`/`request` as imperative callbacks; every other export is a stateless free function, same
+  as `@symbiote-native/local-auth`. Note: on the iOS Simulator, `getBrightnessAsync`/`setBrightnessAsync`
+  never round-trip — a documented Apple Simulator limitation of `UIScreen.main.brightness`, not a bug in
+  this wrapper; Android's emulator is unaffected.
 
 ### Patch Changes
 
@@ -55,16 +69,3 @@
   freely override. No public API changed.
 - Updated dependencies [80ed828]
   - @symbiote-native/angular@0.6.2
-
-## 0.2.0
-
-### Minor Changes
-
-- 26af374: Add `@symbiote-native/sensors`, a framework-agnostic wrapper around `expo-sensors` (built on
-  `expo-modules-core`, never the `expo` meta-package). Ships Accelerometer, Barometer,
-  DeviceMotion, Gyroscope, LightSensor, Magnetometer, MagnetometerUncalibrated, and Pedometer, each
-  with a shared core sensor class plus a lifecycle wrapper per adapter — React hooks, Vue
-  composables, Angular services — all driving the same native module. `expo-sensors`' own JS is
-  never imported (it hard-imports the `expo` package); the sensor logic is hand-ported into this
-  package's core, with only the native ios/android module code coming from `expo-sensors` via
-  autolinking.

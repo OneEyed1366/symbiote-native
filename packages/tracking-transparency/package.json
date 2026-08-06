@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/tracking-transparency",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "expo-tracking-transparency wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. iOS App Tracking Transparency prompt (permission get/request, always-granted on Android/web) plus the advertising-ID getter.",
   "license": "MIT",
   "repository": {
