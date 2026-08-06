@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/haptics",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "expo-haptics wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. Impact/notification/selection vibration feedback via iOS's Taptic Engine and Android's Vibrator API.",
   "license": "MIT",
   "repository": {

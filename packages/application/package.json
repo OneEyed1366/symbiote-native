@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/application",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "expo-application wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. Native app version/build/name/ID constants, the Android ID, install-referrer and install/update-time lookups, and the iOS vendor ID, release type, and push-notification-service environment.",
   "license": "MIT",
   "repository": {

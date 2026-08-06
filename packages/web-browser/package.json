@@ -1,7 +1,7 @@
 {
   "name": "@symbiote-native/web-browser",
-  "version": "0.0.1",
-  "description": "expo-web-browser wrapped for SymbioteNative \u2014 one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. In-app browser (SFSafariViewController / Android Custom Tabs) and the OAuth auth-session flow.",
+  "version": "0.1.0",
+  "description": "expo-web-browser wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. In-app browser (SFSafariViewController / Android Custom Tabs) and the OAuth auth-session flow.",
   "license": "MIT",
   "repository": {
     "type": "git",
