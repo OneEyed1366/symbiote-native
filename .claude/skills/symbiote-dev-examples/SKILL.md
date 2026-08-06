@@ -463,8 +463,19 @@ expected to match. One Gradle project can register many module classes — `expo
 contributes 7 — so `expo-react`'s `28 modules / 21 gradle` is correct, not a discrepancy.
 
 A package installed from the **registry** can't be fixed this way at all: if the published
-version predates its `native-link.json` (as `@symbiote-native/sensors@0.2.0` does), the choice
-is publishing a new version or pinning the app at the local tarball the way `expo-react` does.
+version predates its `native-link.json`, the choice is publishing a new version or pinning the
+app at a local tarball. Five packages are in that state — `battery`, `clipboard`, `haptics`,
+`local-auth`, `sensors` — because `files` only gained the manifest after they shipped. That makes
+the tarball-to-registry swap a two-way trap: moving `examples/*` onto published versions is what
+RE-INTRODUCED the unlinking for exactly those five (2026-08-06). Before swapping any app off
+tarballs, count installed manifests, don't trust the version bump:
+
+```bash
+ls examples/<app>/node_modules/@symbiote-native/*/native-link.json | wc -l
+```
+
+Compare against the count in `packages/*/native-link.json`. A shortfall names the packages whose
+published tarball is too old, and the only fix is releasing them.
 
 ## 8. "Works on iOS, dead on Android" is usually the platform gating you, not a bug (2026-08-06)
 
