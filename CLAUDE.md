@@ -173,8 +173,10 @@ component of their own. New runtime modules follow this split, never the reverse
 pnpm workspace entirely (removed from `pnpm-workspace.yaml`'s `packages:`) — a
 standalone `npm install`-able tree with no `catalog:`/`workspace:*` specifiers
 (neither resolves outside a pnpm workspace); every dependency is a literal
-version, and every `@symbiote-native/*` is a pkg.pr.new canary URL pending a real
-npm release. Install with plain `npm install` INSIDE the example directory, never
+version, `@symbiote-native/*` included — all of them now resolve from the real npm
+registry. A pkg.pr.new canary URL or a local `file:` tarball is a TEMPORARY state
+for testing a package that is not published yet, swapped back to a literal version
+once it is. Install with plain `npm install` INSIDE the example directory, never
 `pnpm install` from repo root — that reason is load-bearing: pnpm's
 `blockExoticSubdeps` supply-chain guard blocks a pkg.pr.new URL's own transitive
 URL subdeps anywhere in a SHARED pnpm workspace, which used to poison

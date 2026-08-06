@@ -129,8 +129,9 @@ codebase doesn't depend on `react-native-gesture-handler`/`react-native-reanimat
 `inject*` twins of all of them), header/search-bar screen options (bar buttons, menus,
 `formSheet`/modal presentation, `sheetAllowedDetents`), a `resolveRouteFromUrl`/
 `useLinkingIntegration` deep-linking layer, and `serializeNavigatorState`/
-`deserializeNavigatorState` for state persistence. See the docs-site package page
-(`docs/packages/navigation`) for the full config surface and every adapter's exact syntax — or the
+`deserializeNavigatorState` for state persistence. See the docs-site navigation section
+(`docs/navigation` — `index`, `stack`, `tabs`, `drawer`, `hooks`, `linking`, `faq`) for the full
+config surface and every adapter's exact syntax — or the
 canary demo screens themselves (`examples/*/screens/{TabsDemoScreen,DrawerDemoScreen,
 HeaderOptionsScreen,SheetDemoScreen,DeepLinkingScreen,StatePersistenceScreen}`), which the docs
 page mirrors verbatim.

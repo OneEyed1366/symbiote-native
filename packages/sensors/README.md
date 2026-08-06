@@ -38,8 +38,8 @@ package with zero further changes:
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list, per-sensor permission strings — live in the
-`symbiote-expo-native-module` skill. Reference implementation: `.examples/react/ios/Podfile` and
-`.examples/react/android/app/src/main/java/com/canary/MainApplication.kt`.
+`symbiote-expo-native-module` skill. Reference implementation: `examples/expo-react/ios/Podfile`
+and `examples/expo-react/android/app/src/main/java/com/canaryexpo/MainApplication.kt`.
 
 Permissions ship with the native module itself — nothing to reimplement, just the platform
 permission string each sensor needs (e.g. DeviceMotion/Pedometer need `NSMotionUsageDescription`
@@ -99,9 +99,9 @@ export class SensorsScreen {
 }
 ```
 
-The React example above mirrors the real demo screen, `.examples/react/screens/SensorsScreen.tsx`
-— the Vue and Angular snippets are illustrative; those adapters' own demo screens aren't wired up
-yet (React is this repo's "prove the pattern first" adapter for this package).
+All three examples above mirror the real canary demo screens —
+`examples/expo-react/screens/SensorsScreen.tsx`, `examples/expo-vue-sfc/screens/SensorsScreen.vue`,
+`examples/expo-vue-tsx/screens/SensorsScreen.tsx`, `examples/expo-angular/src/screens/SensorsScreen.ts`.
 
 Every hook/composable/`connect()` takes an optional `updateIntervalMs` and returns `null` until the
 first native reading arrives — check `isAvailableAsync()` separately if you need to distinguish

@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/sensors",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "expo-sensors wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. Accelerometer, Barometer, DeviceMotion, Gyroscope, LightSensor, Magnetometer, MagnetometerUncalibrated, Pedometer.",
   "license": "MIT",
   "repository": {
@@ -30,7 +30,11 @@
   "files": [
     "src",
     "build",
-    "build-ngc"
+    "build-ngc",
+    "native-link.json",
+    "!src/**/*.test.*",
+    "!src/**/*.spec.*",
+    "!src/**/*.detox.*"
   ],
   "publishConfig": {
     "access": "public",

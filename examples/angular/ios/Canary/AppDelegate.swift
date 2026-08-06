@@ -3,7 +3,6 @@ import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
 import RNBootSplash
-internal import ExpoModulesCore // matches ExpoModulesProvider.swift's own import level
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -17,7 +16,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
     let delegate = ReactNativeDelegate()
-    let factory = SymbioteExpoModulesFactory(delegate: delegate)
+    let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
 
     reactNativeDelegate = delegate
@@ -31,30 +30,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       launchOptions: launchOptions
     )
 
-    return ExpoAppDelegateSubscriberManager.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
-
-  // Forward the rest of UIApplicationDelegate's lifecycle to ExpoAppDelegateSubscriberManager so
-  // any autolinked Expo module that registers a subscriber keeps working — expo-sensors
-  // registers none today, this just keeps future expo-modules-core packages working for free.
-  func applicationDidBecomeActive(_ application: UIApplication) {
-    ExpoAppDelegateSubscriberManager.applicationDidBecomeActive(application)
-  }
-
-  func applicationWillResignActive(_ application: UIApplication) {
-    ExpoAppDelegateSubscriberManager.applicationWillResignActive(application)
-  }
-
-  func applicationDidEnterBackground(_ application: UIApplication) {
-    ExpoAppDelegateSubscriberManager.applicationDidEnterBackground(application)
-  }
-
-  func applicationWillEnterForeground(_ application: UIApplication) {
-    ExpoAppDelegateSubscriberManager.applicationWillEnterForeground(application)
-  }
-
-  func applicationWillTerminate(_ application: UIApplication) {
-    ExpoAppDelegateSubscriberManager.applicationWillTerminate(application)
+    return true
   }
 }
 

@@ -4,6 +4,10 @@ build-ngc/
 dist/
 *.tsbuildinfo
 
+# local `pnpm pack`/`npm pack` output — used for local-only dev testing (installing an
+# unpublished package into a standalone examples/* app before it has a real npm release)
+*.tgz
+
 # Native source vendored into a package's proxy podspec at pod-install time (CocoaPods'
 # Dir.glob never crosses a symlink, so a pnpm .pnpm-store symlink breaks pointing
 # source_files at the nested lib in place — see symbiote-third-party-native-view skill).
@@ -13,6 +17,12 @@ packages/*/.rn-*
 # must be a literal path react-native codegen can lstat directly — pnpm never nests a
 # dependency inside its dependent's own node_modules, so the source has to be copied in).
 packages/*/codegen-specs/
+
+# expo-modules-link's atomic-write temp files (packages/expo-modules-link): created next to a
+# real, tracked native project file (build.gradle, MainApplication.kt, Info.plist) during
+# postinstall and renamed over it immediately; a killed process can leave one behind, and it must
+# never get committed by an unrelated `git add -A`.
+*.symbiote-expo-link.*.tmp
 
 # iOS
 ios/Pods/

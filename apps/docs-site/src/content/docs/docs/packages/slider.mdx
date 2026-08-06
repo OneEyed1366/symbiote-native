@@ -9,7 +9,12 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 [`@react-native-community/slider`](https://github.com/callstack/react-native-slider) so every
 SymbioteNative adapter can render it — without importing that library's React component body. It is
 the reference implementation of the [third-party native-view wrapper](#how-the-wrapper-works)
-pattern: the recipe to follow for any future community RN view.
+pattern: the recipe to follow for any future community RN view. Its counterpart is
+[splash screen](/docs/packages/splash-screen/), which wraps a community library that ships an
+imperative native module and no view at all — both are autolinked through a
+`react-native.config.cjs` + podspec proxy, unlike the `expo-modules-core` packages such as
+[local auth](/docs/packages/local-auth/), whose native code `expo-modules-autolinking` discovers
+instead.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -168,6 +173,23 @@ a Vue scoped slot) — see [shared vs framework-specific](/docs/api/components/#
 | `onValueChange` | `(value: number) => void` | — | Fires continuously while dragging |
 | `onSlidingStart` / `onSlidingComplete` | `(value: number) => void` | — | Fires once when a drag begins/ends |
 | accessibility / `aria-*` / `testID` / `style` | — | — | Pass through to the native node unchanged |
+
+## Notes
+
+- **`value={0}` is discarded, not applied.** The shared fold treats `NaN` *and any falsy number,
+  including `0`*, as "no value given", so the native view falls back to its own initial position —
+  mirroring the community component. A slider that must start at zero wants `minimumValue={0}` and
+  no explicit `value`.
+- **A bare slider measures differently per platform.** The iOS entry gives the wrapper a 40pt
+  default height and nudges the step row down 10pt; the Android entry supplies no default height at
+  all, leaving the native view's intrinsic size to decide, and keeps the row at the top. Set an
+  explicit height through `style` if the two have to agree.
+- **A custom `StepMarker` takes over the native thumb.** With a marker present, `thumbImage` is not
+  forwarded to the native view — the marker draws it — and if you pass both, `thumbTintColor` is
+  forced to `transparent` so the marker shows through.
+- **Crossed limits fail quietly.** `lowerLimit >= upperLimit` only reaches a `dlog`, which is off
+  unless `DEBUG` is set, so an inverted pair produces no console warning at all — just a slider that
+  won't move where you expect.
 
 ## How the wrapper works
 

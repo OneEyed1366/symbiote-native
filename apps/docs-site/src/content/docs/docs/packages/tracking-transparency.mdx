@@ -1,0 +1,204 @@
+---
+title: Tracking transparency
+description: expo-tracking-transparency wrapped for every SymbioteNative adapter — the iOS App Tracking Transparency prompt and advertising ID.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/tracking-transparency` wraps
+[`expo-tracking-transparency`](https://github.com/expo/expo/tree/main/packages/expo-tracking-transparency)
+— the iOS App Tracking Transparency prompt, permission get/request, and the advertising-ID getter
+— so every SymbioteNative adapter can reach it, not just React. Its permission surface
+(`getTrackingPermissionsAsync`/`requestTrackingPermissionsAsync`) shares the same `usePermissions()`
+hook/composable/service shape as [brightness](/docs/packages/brightness/)'s own permission surface,
+so switching between the two packages needs no relearning; `getAdvertisingId`/`isAvailable` are
+plain stateless free functions, same as [device](/docs/packages/device/).
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React               | ✅ live |
+| Vue                 | ✅ live |
+| Angular             | ✅ live |
+
+<Aside type="note" title="Android and web always report granted">
+  There is no tracking-consent concept on either platform —
+  `getTrackingPermissionsAsync`/`requestTrackingPermissionsAsync` short-circuit to a fixed granted
+  response without ever calling the native module, matching upstream exactly. Only iOS drives the
+  real ATT system prompt.
+</Aside>
+
+## Installation
+
+```sh
+npm install @symbiote-native/tracking-transparency
+```
+
+`expo-tracking-transparency` and `expo-modules-core` come along as regular dependencies, pinned to
+exact versions — never install either yourself, and never add the `expo` meta-package to your
+project (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-tracking-transparency`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking every other
+  SymbioteNative wrapper uses — and it isn't the standard Expo setup flow either, since this
+  project never installs the `expo` meta-package. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes. Additionally, iOS
+  needs an `NSUserTrackingUsageDescription` string in `Info.plist` — required for the ATT prompt to
+  show at all. `symbiote-expo-link` inserts a generic default for you when that key is absent;
+  write your own wording into `Info.plist` and it stands, since the linker never rewrites a key
+  that already exists. The Android native module also pulls in
+  `com.google.android.gms:play-services-ads-identifier:18.0.1` transitively, automatically, with
+  no extra wiring needed.
+</Aside>
+
+## Usage
+
+### Permission
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Pressable, Text, View } from '@symbiote-native/react';
+    import { usePermissions } from '@symbiote-native/tracking-transparency/react';
+
+    export default function TrackingScreen() {
+      const [status, request] = usePermissions();
+
+      return (
+        <View>
+          <Text>{status?.status ?? 'checking…'}</Text>
+          <Pressable onPress={() => request()}>
+            <Text>Request tracking permission</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { Pressable, Text, View } from '@symbiote-native/vue';
+    import { usePermissions } from '@symbiote-native/tracking-transparency/vue';
+
+    const { status, request } = usePermissions();
+    </script>
+
+    <template>
+      <View>
+        <Text>{{ status?.status ?? 'checking…' }}</Text>
+        <Pressable @press="request()">
+          <Text>Request tracking permission</Text>
+        </Pressable>
+      </View>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { Pressable, Text, View } from '@symbiote-native/angular';
+    import { PermissionsService } from '@symbiote-native/tracking-transparency/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Pressable, Text, View],
+      template: `
+        <View>
+          <Text>{{ status()?.status ?? 'checking…' }}</Text>
+          <Pressable (press)="permissions.request()">
+            <Text>Request tracking permission</Text>
+          </Pressable>
+        </View>
+      `,
+    })
+    export class TrackingScreen {
+      readonly permissions = inject(PermissionsService);
+      readonly status = this.permissions.connect();
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+### Advertising ID
+
+The stateless functions are already framework-agnostic — import them straight from the package
+root, on any adapter:
+
+```ts
+import { getAdvertisingId } from '@symbiote-native/tracking-transparency';
+
+const advertisingId = getAdvertisingId(); // null on the iOS Simulator, or before/without consent
+```
+
+## API
+
+### Functions
+
+| Signature | Description |
+| --- | --- |
+| `getAdvertisingId(): string \| null` | Gets the advertising ID (Android AAID / iOS IDFA). Returns `null` on the iOS Simulator, when tracking hasn't been authorized via `requestTrackingPermissionsAsync`, or when the user declined |
+| `getTrackingPermissionsAsync(): Promise<PermissionResponse>` | Checks whether the user has authorized the app to access tracking-related data. Always resolves granted on Android and web |
+| `requestTrackingPermissionsAsync(): Promise<PermissionResponse>` | Requests the user to authorize or deny access to app-related data usable for tracking, showing the real ATT prompt on iOS. Always resolves granted on Android and web |
+| `isAvailable(): boolean` | Whether the tracking-transparency native module resolved at all |
+
+### `usePermissions()`
+
+| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Signature | Returns |
+| --- | --- | --- | --- | --- |
+| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `()` | React: `[PermissionResponse \| null, request, get]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `request()`/`get()` as separate service methods |
+
+Every variant auto-fetches the current permission status once on mount/`connect()`, and updates
+again whenever `request`/`get` resolves.
+
+### `PermissionResponse`
+
+Re-exported verbatim from `expo-modules-core`, never the `expo` meta-package:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `status` | `PermissionStatus` | The current permission status — `'undetermined'`, `'denied'`, or `'granted'` |
+| `granted` | `boolean` | Whether the permission is granted — a convenience shortcut over checking `status === 'granted'` |
+| `canAskAgain` | `boolean` | Whether the user can be asked again for this permission, or the OS has permanently blocked it |
+| `expires` | `PermissionExpiration` | When the permission expires (`'never'` on every platform this package targets) |
+
+## Notes
+
+- **Android and web always report granted.** There is no tracking-consent concept on either
+  platform — `getTrackingPermissionsAsync`/`requestTrackingPermissionsAsync` short-circuit to a
+  fixed granted response without ever calling the native module, matching upstream exactly.
+- **`getAdvertisingId` returns `null` on the iOS Simulator, regardless of any settings** — there is
+  no real IDFA to read there. This is expected Apple Simulator behavior, not a bug in this wrapper.
+
+## How the wrapper works
+
+`@symbiote-native/tracking-transparency` ships zero React/Vue/Angular logic in
+`expo-tracking-transparency` itself — its functions are hand-ported, verbatim, into this package's
+own `core/`, resolving the native module through `expo-modules-core`'s `requireNativeModule`
+rather than the `expo` meta-package this project never installs:
+
+```
+packages/tracking-transparency/src/
+├── core/                 getAdvertisingId, get/requestTrackingPermissionsAsync, isAvailable;
+│                         native-module.ts resolves ExpoTrackingTransparency through
+│                         expo-modules-core's requireNativeModule.
+├── react/hooks/           @symbiote-native/tracking-transparency/react   — usePermissions
+├── vue/composables/       @symbiote-native/tracking-transparency/vue     — usePermissions (same name)
+└── angular/services/      @symbiote-native/tracking-transparency/angular — PermissionsService
+```
+
+Only the permission surface gets a lifecycle hook — there's per-instance state to seed and
+refresh; `getAdvertisingId`/`isAvailable` are stateless, re-exported verbatim by all three
+adapters. Upstream's own `createPermissionHook`/`useTrackingPermissions` is **not** ported —
+that helper is React-only (built on `useState`/`useEffect`), and this repo's convention is for
+each adapter to hand-roll its own permission hook instead, exactly like
+[brightness](/docs/packages/brightness/#how-the-wrapper-works)/[cellular](/docs/packages/cellular/#usepermissions)
+already do. The native code itself is never vendored or copied — `expo-modules-autolinking`
+resolves it straight out of `node_modules` (see [the native setup
+guide](/docs/howtos/expo-native-module-setup/)).

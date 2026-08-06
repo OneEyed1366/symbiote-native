@@ -130,6 +130,42 @@ const { container, logo } = useHideAnimation({
 See the docs-site package page (`docs/packages/splash-screen`) for the full config surface and
 the Vue/Angular equivalents.
 
+## API
+
+The core entry point (`@symbiote-native/splash-screen`) is framework-agnostic — `hide`/`isVisible`
+re-exported verbatim from `react-native-bootsplash`, plus the readiness gate and style computation
+each adapter's lifecycle wrapper drives:
+
+```ts
+hide(config?: IHideConfig): Promise<void>              // dismisses the native splash, optional fade
+isVisible(): boolean                                    // is the native splash still up
+getHideAnimationConstants(): IHideAnimationConstants    // darkModeEnabled + logo/status-bar/nav-bar metrics,
+                                                        // read off the RNBootSplash native module
+new HideAnimationController(config: IHideAnimationConfig)
+// readiness gate — onContainerLayout / onLogoLoadEnd / onBrandLoadEnd / updateConfig(config);
+// hide() fires exactly once, after layout + both images + the caller's own `ready` all report in.
+computeHideAnimationStyles(config, constants, controller): IHideAnimationResult
+// the { container, logo, brand } prop bags, recomputed from the current config.
+```
+
+Plus `IHideConfig`, `IManifest`, `IHideAnimationConfig`, `IHideAnimationContainerProps`,
+`IHideAnimationImageProps`, `IHideAnimationResult`, `IHideAnimationConstants`.
+
+Each adapter entry point re-exports `hide`/`isVisible` (and the `IHideConfig`/`IManifest`/
+`IHideAnimationConfig`/`IHideAnimationResult` types) unchanged, and adds one lifecycle wrapper
+over the controller — the only per-framework difference is how the config is read:
+
+```ts
+// @symbiote-native/splash-screen/react — re-runs every render, so a plain value
+useHideAnimation(config: IHideAnimationConfig): IHideAnimationResult
+
+// @symbiote-native/splash-screen/vue — setup runs once, so a getter
+useHideAnimation(getConfig: () => IHideAnimationConfig): ComputedRef<IHideAnimationResult>
+
+// @symbiote-native/splash-screen/angular — inject(HideAnimationService), connect() once
+connect(getConfig: () => IHideAnimationConfig): Signal<IHideAnimationResult>
+```
+
 ## Test it
 
 Headless hook/composable tests live next to each adapter entry

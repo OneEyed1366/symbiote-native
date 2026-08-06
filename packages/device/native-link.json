@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-device",
+    "modules": [
+      {
+        "importPath": "expo.modules.device.DeviceModule",
+        "className": "DeviceModule",
+        "nativeName": "ExpoDevice"
+      }
+    ]
+  }
+}

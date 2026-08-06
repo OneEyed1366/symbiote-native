@@ -20,8 +20,8 @@
     "docs:preview": "pnpm --filter @symbiote-native/docs-site preview",
     "format": "prettier --write \"{core,adapters,packages,apps}/**/*.{ts,tsx,js,json,astro,md,mdx,css}\" \"*.{ts,json}\"",
     "format:check": "prettier --check \"{core,adapters,packages,apps}/**/*.{ts,tsx,js,json,astro,md,mdx,css}\" \"*.{ts,json}\"",
-    "lint": "eslint \"{core,adapters,packages}/**/*.{ts,tsx}\"",
-    "lint:fix": "eslint --fix \"{core,adapters,packages}/**/*.{ts,tsx}\"",
+    "lint": "eslint \"{core,adapters,packages}/**/*.{ts,tsx}\" \"{core,adapters,packages}/*/package.json\"",
+    "lint:fix": "eslint --fix \"{core,adapters,packages}/**/*.{ts,tsx}\" \"{core,adapters,packages}/*/package.json\"",
     "deps:check": "syncpack lint",
     "deps:fix": "syncpack fix",
     "prepare": "husky",
@@ -33,6 +33,7 @@
   "devDependencies": {
     "@changesets/cli": "catalog:",
     "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-plugin-react-hooks": "catalog:",

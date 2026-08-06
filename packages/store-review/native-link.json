@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-store-review",
+    "modules": [
+      {
+        "importPath": "expo.modules.storereview.StoreReviewModule",
+        "className": "StoreReviewModule",
+        "nativeName": "ExpoStoreReview"
+      }
+    ]
+  }
+}

@@ -45,6 +45,26 @@ minimumReleaseAgeExclude:
   - expo-modules-jsi@57.0.3
   - expo-sensors@57.0.2
   - expo-modules-autolinking@57.0.8
+  - expo-local-authentication@57.0.2
+  - expo-secure-store@57.0.1
+  - expo-sharing@57.0.8
+  - expo-web-browser@57.0.2
+  - expo-sms@57.0.1
+  - expo-haptics@57.0.1
+  - expo-clipboard@57.0.1
+  - expo-battery@57.0.1
+  - expo-brightness@57.0.1
+  - expo-cellular@57.0.1
+  - expo-network@57.0.1
+  - expo-device@57.0.1
+  - expo-application@57.0.2
+  - expo-crypto@57.0.1
+  - expo-localization@57.0.1
+  - expo-keep-awake@57.0.1
+  - expo-screen-orientation@57.0.1
+  - expo-tracking-transparency@57.0.1
+  - expo-store-review@57.0.1
+  - expo-system-ui@57.0.2
 
 # Single source of truth for dependency versions (pnpm catalogs).
 # A package references a version with `catalog:` (default) or `catalog:<name>`
@@ -84,6 +104,9 @@ catalog:
   eslint: ^10.6.0
   prettier: ^3.9.1
   '@eslint/js': ^10.0.1
+  # Official Language Plugin for linting package.json as JSON (not TS/JS) — backs the
+  # local require-readme / require-package-fields rules in eslint.config.js.
+  '@eslint/json': ^2.0.1
   eslint-config-prettier: ^10.1.8
   eslint-plugin-react-hooks: ^7.1.1
   typescript-eslint: ^8.62.0
@@ -173,11 +196,78 @@ catalog:
   # origin/sdk-57).
   expo-sensors: 57.0.2
   expo-modules-core: 57.0.5
+  # Same exact-pin reasoning as expo-sensors above: packages/local-auth depends on
+  # expo-local-authentication only for its native ios/android folders (JS hand-ported into our
+  # own core). Version verified against .vendors/expo at origin/sdk-57 — matches the version
+  # already published to npm (57.0.2), same expo-modules-core 57.0.5 peer/runtime as sensors.
+  expo-local-authentication: 57.0.2
+  # Same exact-pin reasoning again: packages/haptics, packages/clipboard, packages/battery each
+  # depend on their matching expo-* package ONLY for its native ios/android folders (JS
+  # hand-ported into our own core). Versions are the real npm-published `latest` as of 2026-07-28
+  # (registry.npmjs.org, not a guess from the .vendors/expo snapshot, which is pinned to an older
+  # 55.0.8 for these three specific packages) — same expo-modules-core 57.0.5 peer/runtime line.
+  expo-haptics: 57.0.1
+  expo-clipboard: 57.0.1
+  expo-battery: 57.0.1
+  # Same exact-pin reasoning as the trio above: packages/brightness, packages/cellular,
+  # packages/network each depend on their matching expo-* package ONLY for its native
+  # ios/android folders (JS hand-ported into our own core). Versions are the real npm-published
+  # `latest` as of 2026-07-29, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-brightness: 57.0.1
+  expo-cellular: 57.0.1
+  expo-network: 57.0.1
+  # Same exact-pin reasoning as the trio above: packages/application depends on expo-application
+  # ONLY for its native ios/android folders (JS hand-ported into our own core). Version verified
+  # against .vendors/expo at origin/sdk-57 (57.0.2) and matches the real npm-published `latest`
+  # as of 2026-07-29 — no drift between the two.
+  expo-application: 57.0.2
+  # Same exact-pin reasoning as the trio above: packages/device depends on expo-device ONLY for
+  # its native ios/android folders (JS hand-ported into our own core). Version verified against
+  # .vendors/expo at origin/sdk-57 (57.0.1), same expo-modules-core 57.0.5 peer/runtime line.
+  expo-device: 57.0.1
+  # Same exact-pin reasoning as the trio above: packages/crypto depends on expo-crypto ONLY for
+  # its native ios/android folders (JS hand-ported into our own core, skipping the aes/ AES
+  # subfolder — out of scope for this pass). Version verified against .vendors/expo at
+  # origin/sdk-57 (57.0.1), same expo-modules-core 57.0.5 peer/runtime line.
+  expo-crypto: 57.0.1
+  # Same exact-pin reasoning as the trio above — this batch closes out tier-1 of the
+  # symbiote-expo-package-catalog priority queue: packages/localization, packages/keep-awake,
+  # packages/screen-orientation, packages/tracking-transparency, packages/store-review, and
+  # packages/system-ui each depend on their matching expo-* package ONLY for its native
+  # ios/android folders (JS hand-ported into our own core). Versions verified against
+  # .vendors/expo at origin/sdk-57, same expo-modules-core 57.0.5 peer/runtime line.
+  # (expo-standard-web-crypto has no native ios/android folders at all — it delegates entirely
+  # to packages/crypto's own getRandomValues — so it needs no catalog entry here.)
+  expo-localization: 57.0.1
+  expo-keep-awake: 57.0.1
+  expo-screen-orientation: 57.0.1
+  expo-tracking-transparency: 57.0.1
+  expo-store-review: 57.0.1
+  expo-system-ui: 57.0.2
+  # Same exact-pin reasoning again — first of tier-2: packages/secure-store depends on
+  # expo-secure-store ONLY for its native ios/android folders (JS hand-ported into our own core).
+  # Version verified against .vendors/expo at origin/sdk-57 (57.0.1) and matches the real
+  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-secure-store: 57.0.1
+  # Same exact-pin reasoning, continuing tier-2: packages/sharing, packages/web-browser and
+  # packages/sms each depend on their matching expo-* package ONLY for its native ios/android
+  # folders (JS hand-ported into our own core). Versions verified against .vendors/expo at
+  # origin/sdk-57 and against the real npm-published `latest`, same expo-modules-core 57.0.5
+  # peer/runtime line.
+  expo-sharing: 57.0.8
+  expo-web-browser: 57.0.2
+  expo-sms: 57.0.1
   # Autolinking CLI only (never resolved via the `expo` package) — each native host app needs
   # it as a direct devDependency so its Podfile/settings.gradle can `require.resolve` it; see
   # apps/docs-site's expo-native-module-setup howto. Version verified against .vendors/expo at
   # origin/sdk-57.
   expo-modules-autolinking: 57.0.8
+  # react-native's own dependency (react-native/package.json pins "^2.2.4") — already present in
+  # every install via that transitive edge; packages/local-auth just makes its own use of it
+  # (authenticateAsync's promptMessage runtime guard, matching expo-local-authentication's own
+  # upstream code 1:1) an explicit direct dependency instead of relying on the transitive one.
+  invariant: ^2.2.4
+  '@types/invariant': ^2.2.37
   '@babel/core': ^7.25.2
   '@types/babel__core': ^7.20.5
   '@babel/preset-env': ^7.25.3

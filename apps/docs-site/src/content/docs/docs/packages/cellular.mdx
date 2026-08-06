@@ -1,0 +1,274 @@
+---
+title: Cellular
+description: expo-cellular wrapped for every SymbioteNative adapter — cellular generation, carrier/SIM info, and permissions.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/cellular` wraps [`expo-cellular`](https://docs.expo.dev/versions/latest/sdk/cellular/)
+so every SymbioteNative adapter can read the device's cellular connection generation and carrier/SIM
+info. Like [brightness](/docs/packages/brightness/) and [battery](/docs/packages/battery/), it's built
+on `expo-modules-core` — a pure async-function surface, no `EventEmitter` or Fabric view involved. Its
+permission surface (`getPermissionsAsync`/`requestPermissionsAsync`) shares the exact same
+`usePermissions()` hook/composable/service shape as `@symbiote-native/brightness`; what's unique to
+cellular is that almost the entire carrier/SIM surface is Android-only — iOS exposes none of it.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React               | ✅ live |
+| Vue                 | ✅ live |
+| Angular             | ✅ live |
+
+<Aside type="caution" title="Every field except generation is Android-only">
+  `allowsVoipAsync`, `getIsoCountryCodeAsync`, `getCarrierNameAsync`, `getMobileCountryCodeAsync`,
+  and `getMobileNetworkCodeAsync` each short-circuit to `null` on iOS before ever reaching the
+  native module — iOS exposes no equivalent carrier/SIM API. Only `getCellularGenerationAsync`
+  works on both platforms. A Simulator/emulator with no active SIM also reports `null`/`UNKNOWN`
+  for nearly everything — a physical device with an active SIM is needed for real values.
+</Aside>
+
+<Aside type="note">
+  `getPermissionsAsync`/`requestPermissionsAsync` are Android-only in effect — every other platform
+  needs no permission to read cellular info at all, and both functions resolve an already-`GRANTED`
+  response there without ever reaching a native module.
+</Aside>
+
+## Installation
+
+```sh
+npm install @symbiote-native/cellular
+```
+
+`expo-cellular` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project
+(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-cellular`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
+  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses —
+  and it isn't the standard Expo setup flow either, since this project never installs the `expo`
+  meta-package. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every other `expo-modules-core` package with zero further native changes. Reading carrier/SIM
+  info on Android additionally needs the `READ_PHONE_STATE` permission declared in your app's
+  `AndroidManifest.xml`.
+</Aside>
+
+## Usage
+
+### One-shot functions
+
+Every function is already framework-agnostic — import them straight from the package root, on any
+adapter, with no hook/composable/service in the way:
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useEffect, useState } from 'react';
+    import { Text } from '@symbiote-native/react';
+    import { CellularGeneration, getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
+
+    export default function CellularInfo() {
+      const [generation, setGeneration] = useState<CellularGeneration | null>(null);
+      const [carrierName, setCarrierName] = useState<string | null>(null);
+
+      useEffect(() => {
+        getCellularGenerationAsync().then(setGeneration);
+        getCarrierNameAsync().then(setCarrierName); // Android only — always null on iOS
+      }, []);
+
+      return <Text>{carrierName ?? `generation ${generation}`}</Text>;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue';
+    import { Text } from '@symbiote-native/vue';
+    import { CellularGeneration, getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
+
+    const generation = ref<CellularGeneration | null>(null);
+    const carrierName = ref<string | null>(null);
+
+    onMounted(() => {
+      void getCellularGenerationAsync().then(value => (generation.value = value));
+      void getCarrierNameAsync().then(value => (carrierName.value = value)); // Android only
+    });
+    </script>
+
+    <template>
+      <Text>{{ carrierName ?? `generation ${generation}` }}</Text>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, signal } from '@angular/core';
+    import { Text } from '@symbiote-native/angular';
+    import { CellularGeneration, getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
+
+    @Component({
+      standalone: true,
+      imports: [Text],
+      template: `<Text>{{ carrierName() ?? 'generation ' + generation() }}</Text>`,
+    })
+    export class CellularInfo {
+      readonly generation = signal<CellularGeneration | null>(null);
+      readonly carrierName = signal<string | null>(null);
+
+      constructor() {
+        getCellularGenerationAsync().then(value => this.generation.set(value));
+        getCarrierNameAsync().then(value => this.carrierName.set(value)); // Android only
+      }
+    }
+    ```
+
+    There's no per-instance service to `inject()` here — every function is a plain free function
+    off the core package, same as `@symbiote-native/local-auth`.
+  </TabItem>
+</Tabs>
+
+### Permission
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Pressable, Text } from '@symbiote-native/react';
+    import { usePermissions } from '@symbiote-native/cellular/react';
+
+    export default function CellularPermission() {
+      const [status, request] = usePermissions();
+
+      return (
+        <>
+          <Text>{status?.status ?? 'checking…'}</Text>
+          <Pressable onPress={() => request()}>
+            <Text>Request permission</Text>
+          </Pressable>
+        </>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { usePermissions } from '@symbiote-native/cellular/vue';
+
+    const { status, request } = usePermissions();
+    </script>
+
+    <template>
+      <Text>{{ status?.status ?? 'checking…' }}</Text>
+      <Pressable @press="request">
+        <Text>Request permission</Text>
+      </Pressable>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { Pressable, Text } from '@symbiote-native/angular';
+    import { PermissionsService } from '@symbiote-native/cellular/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Pressable, Text],
+      template: `
+        <Text>{{ status()?.status ?? 'checking…' }}</Text>
+        <Pressable (press)="permissions.request()">
+          <Text>Request permission</Text>
+        </Pressable>
+      `,
+    })
+    export class CellularPermission {
+      readonly permissions = inject(PermissionsService);
+      readonly status = this.permissions.connect();
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## API
+
+### Functions
+
+| Signature | Description |
+| --- | --- |
+| `getCellularGenerationAsync(): Promise<CellularGeneration>` | Gets the generation of the device's current cellular connection |
+| `allowsVoipAsync(): Promise<boolean \| null>` | *Deprecated upstream.* Whether the SIM's carrier allows VoIP calls on its network. `@platform android` — always `null` on iOS |
+| `getIsoCountryCodeAsync(): Promise<string \| null>` | ISO country code of the current registered operator's MCC. `@platform android` — always `null` on iOS |
+| `getCarrierNameAsync(): Promise<string \| null>` | Name of the user's cellular service provider. `@platform android` — always `null` on iOS |
+| `getMobileCountryCodeAsync(): Promise<string \| null>` | Mobile country code (MCC) of the current registered operator. `@platform android` — always `null` on iOS |
+| `getMobileNetworkCodeAsync(): Promise<string \| null>` | Mobile network code (MNC) of the current registered operator. `@platform android` — always `null` on iOS |
+| `getPermissionsAsync(): Promise<PermissionResponse>` | Checks the user's permission for accessing cellular info. Delegates to the native module only on Android; always resolves an already-granted response elsewhere |
+| `requestPermissionsAsync(): Promise<PermissionResponse>` | Asks the user for permission to access cellular info. Same Android-only/elsewhere-granted split as `getPermissionsAsync` |
+
+### `usePermissions()`
+
+| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Signature | Returns |
+| --- | --- | --- | --- | --- |
+| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `()` | React: `[PermissionResponse \| null, request, get]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `request()`/`get()` as separate service methods |
+
+Every variant auto-fetches the current permission status once on mount/`connect()`, and updates
+again whenever `request`/`get` resolves. Byte-for-byte the same shape as
+[brightness](/docs/packages/brightness/#usepermissions)'s `usePermissions`.
+
+### `CellularGeneration`
+
+| Member | Value | Description |
+| --- | --- | --- |
+| `UNKNOWN` | `0` | The device's connection generation could not be determined |
+| `CELLULAR_2G` | `1` | 2nd generation (GPRS/EDGE-class) connection |
+| `CELLULAR_3G` | `2` | 3rd generation (UMTS/HSPA-class) connection |
+| `CELLULAR_4G` | `3` | 4th generation (LTE-class) connection |
+| `CELLULAR_5G` | `4` | 5th generation (NR-class) connection |
+
+## Notes
+
+- **A missing `READ_PHONE_STATE` grant is indistinguishable from an unknown network.** Android's
+  `getCellularGenerationAsync` catches the `SecurityException`, logs it natively, and resolves
+  `CellularGeneration.UNKNOWN` — it never rejects. Check `getPermissionsAsync()` when `UNKNOWN`
+  comes back instead of reading it as "no cellular data".
+- **The carrier/SIM getters need the SIM *ready*, not merely present.** All five go through a
+  `TelephonyManager` accessor that yields `null` unless `simState == SIM_STATE_READY`, so a
+  PIN-locked or still-initializing SIM produces exactly the `null` an iPhone produces —
+  and `getCellularGenerationAsync` falls to `UNKNOWN` on the same check.
+- **On iOS the generation describes the cellular radio, not the path your traffic takes.** It reads
+  the telephony service's current radio access technology and takes the first entry, so on a
+  dual-SIM device the value can belong to whichever service comes first. Pair it with
+  [network](/docs/packages/network/)'s `NetworkStateType` if what you actually need is the
+  connection currently in use.
+
+## How the wrapper works
+
+`@symbiote-native/cellular` ships **zero React/Vue/Angular logic in `expo-cellular` itself** — that
+package's own types file hard-imports `PermissionResponse`/`PermissionStatus` from the `expo`
+meta-package (which this project never installs), so its functions, enum, and types are hand-ported,
+verbatim, into this package's own `core/`, changing only that one import line to pull from
+`expo-modules-core` instead:
+
+```
+packages/cellular/src/
+├── core/                       getCellularGenerationAsync + the Android-only carrier/SIM surface +
+│                                 getPermissionsAsync/requestPermissionsAsync; native-module.ts
+│                                 resolves the single `ExpoCellular` native module via
+│                                 expo-modules-core's requireNativeModule
+├── react/hooks/use-permissions   @symbiote-native/cellular/react
+├── vue/composables/use-permissions @symbiote-native/cellular/vue
+└── angular/services/permissions.service @symbiote-native/cellular/angular
+```
+
+`usePermissions` is written once as a shared pattern and reapplied identically in
+[brightness](/docs/packages/brightness/#how-the-wrapper-works); every other export is a stateless
+free function, re-exported verbatim by all three adapters, same as
+[local-auth](/docs/packages/local-auth/). The native code itself is never vendored or copied —
+`expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
+guide](/docs/howtos/expo-native-module-setup/)).

@@ -1,0 +1,303 @@
+---
+title: Local auth
+description: expo-local-authentication wrapped for every SymbioteNative adapter — FaceID/TouchID on iOS, the Fingerprint/Biometric API on Android.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/local-auth` wraps
+[`expo-local-authentication`](https://github.com/expo/expo/tree/main/packages/expo-local-authentication)
+— `hasHardwareAsync`, `isEnrolledAsync`, `getEnrolledLevelAsync`,
+`supportedAuthenticationTypesAsync`, `authenticateAsync`, `cancelAuthenticate` — so every
+SymbioteNative adapter can drive it. Like [sensors](/docs/packages/sensors/), it's built on
+`expo-modules-core`; but unlike sensors' `EventEmitter` + live-subscription surface, every
+function here is a one-shot async call with no per-instance state — the same imperative shape as
+[splash screen](/docs/packages/splash-screen/)'s `hide()`/`isVisible()`. What sets it apart from
+both: `authenticateAsync` resolves a discriminated `ILocalAuthenticationResult` success/error
+union rather than a plain boolean, and several `ILocalAuthenticationOptions` fields only apply on
+one platform (`promptSubtitle`, `biometricsSecurityLevel` — Android only; `fallbackLabel` — iOS
+only) — worth knowing before you reach for one.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React               | ✅ live |
+| Vue                 | ✅ live |
+| Angular             | ✅ live |
+
+## Installation
+
+```sh
+pnpm add @symbiote-native/local-auth
+```
+
+`expo-local-authentication` and `expo-modules-core` come along as regular dependencies, pinned to
+exact versions — never install either yourself, and never add the `expo` meta-package to your
+project (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-local-authentication`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking every other
+  SymbioteNative wrapper uses — and it isn't the standard Expo setup flow either, since this
+  project never installs the `expo` meta-package. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every future `expo-modules-core` package with zero further native changes.
+</Aside>
+
+## Usage
+
+All three adapters — React, Vue, Angular — re-export the exact same free functions; there is no
+per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+subscription. Probe capabilities once on mount, then call `authenticateAsync` from a button press
+and branch on `result.success`.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useEffect, useState } from 'react';
+    import { Pressable, Text, View } from '@symbiote-native/react';
+    import {
+      authenticateAsync,
+      getEnrolledLevelAsync,
+      hasHardwareAsync,
+      isEnrolledAsync,
+      supportedAuthenticationTypesAsync,
+    } from '@symbiote-native/local-auth/react';
+    import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/react';
+
+    export default function LocalAuthGate() {
+      const [hasHardware, setHasHardware] = useState(false);
+      const [isEnrolled, setIsEnrolled] = useState(false);
+      const [result, setResult] = useState<ILocalAuthenticationResult | null>(null);
+
+      useEffect(() => {
+        hasHardwareAsync().then(setHasHardware);
+        isEnrolledAsync().then(setIsEnrolled);
+        getEnrolledLevelAsync().then(level => console.log('enrolled level', level));
+        supportedAuthenticationTypesAsync().then(types => console.log('supported types', types));
+      }, []);
+
+      const handleAuthenticate = () => {
+        authenticateAsync({ promptMessage: 'Confirm it is you' }).then(setResult);
+      };
+
+      return (
+        <View>
+          <Text>{hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled'}</Text>
+          <Pressable onPress={handleAuthenticate}>
+            <Text>Authenticate</Text>
+          </Pressable>
+          {result && <Text>{result.success ? 'Success' : `Failed: ${result.error}`}</Text>}
+        </View>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue';
+    import { Pressable, Text, View } from '@symbiote-native/vue';
+    import {
+      authenticateAsync,
+      getEnrolledLevelAsync,
+      hasHardwareAsync,
+      isEnrolledAsync,
+      supportedAuthenticationTypesAsync,
+    } from '@symbiote-native/local-auth/vue';
+    import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/vue';
+
+    const hasHardware = ref(false);
+    const isEnrolled = ref(false);
+    const result = ref<ILocalAuthenticationResult | null>(null);
+
+    onMounted(() => {
+      void hasHardwareAsync().then(value => (hasHardware.value = value));
+      void isEnrolledAsync().then(value => (isEnrolled.value = value));
+      void getEnrolledLevelAsync().then(level => console.log('enrolled level', level));
+      void supportedAuthenticationTypesAsync().then(types => console.log('supported types', types));
+    });
+
+    function handleAuthenticate(): void {
+      void authenticateAsync({ promptMessage: 'Confirm it is you' }).then(value => {
+        result.value = value;
+      });
+    }
+    </script>
+
+    <template>
+      <View>
+        <Text>{{ hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled' }}</Text>
+        <Pressable @press="handleAuthenticate">
+          <Text>Authenticate</Text>
+        </Pressable>
+        <Text v-if="result">{{ result.success ? 'Success' : `Failed: ${result.error}` }}</Text>
+      </View>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, signal } from '@angular/core';
+    import { Pressable, Text, View } from '@symbiote-native/angular';
+    import {
+      authenticateAsync,
+      getEnrolledLevelAsync,
+      hasHardwareAsync,
+      isEnrolledAsync,
+      supportedAuthenticationTypesAsync,
+    } from '@symbiote-native/local-auth/angular';
+    import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Pressable, Text, View],
+      template: `
+        <View>
+          <Text>{{ hasHardware() && isEnrolled() ? 'Ready to authenticate' : 'No biometrics enrolled' }}</Text>
+          <Pressable (press)="handleAuthenticate()">
+            <Text>Authenticate</Text>
+          </Pressable>
+          @if (result(); as value) {
+            <Text>{{ value.success ? 'Success' : 'Failed: ' + value.error }}</Text>
+          }
+        </View>
+      `,
+    })
+    export class LocalAuthGate {
+      readonly hasHardware = signal(false);
+      readonly isEnrolled = signal(false);
+      readonly result = signal<ILocalAuthenticationResult | null>(null);
+
+      constructor() {
+        hasHardwareAsync().then(value => this.hasHardware.set(value));
+        isEnrolledAsync().then(value => this.isEnrolled.set(value));
+        getEnrolledLevelAsync().then(level => console.log('enrolled level', level));
+        supportedAuthenticationTypesAsync().then(types => console.log('supported types', types));
+      }
+
+      handleAuthenticate(): void {
+        authenticateAsync({ promptMessage: 'Confirm it is you' }).then(value => this.result.set(value));
+      }
+    }
+    ```
+
+    There's no per-instance service to `inject()` here — every function is a plain free function
+    off the core package, called straight from the constructor, same as the real
+    `examples/expo-angular` `LocalAuthScreen`.
+  </TabItem>
+</Tabs>
+
+## API
+
+### Functions
+
+| Signature | Description |
+| --- | --- |
+| `hasHardwareAsync(): Promise<boolean>` | Determine whether a face or fingerprint scanner is available on the device |
+| `supportedAuthenticationTypesAsync(): Promise<AuthenticationType[]>` | Determine what kinds of authentication are available on the device — a device can support several (`[FINGERPRINT, FACIAL_RECOGNITION]`), and an empty array means none |
+| `isEnrolledAsync(): Promise<boolean>` | Determine whether the device has saved fingerprints or facial data to use for authentication |
+| `getEnrolledLevelAsync(): Promise<SecurityLevel>` | Determine what kind of authentication is enrolled on the device — on pre-M Android devices this can read `SECRET` if only the SIM lock is enrolled, which `authenticateAsync` doesn't actually prompt |
+| `authenticateAsync(options?: ILocalAuthenticationOptions): Promise<ILocalAuthenticationResult>` | Attempts to authenticate via Fingerprint/TouchID, or FaceID where available. `symbiote-expo-link` puts a default `NSFaceIDUsageDescription` into `Info.plist`; if that key is missing, iOS falls back to the device passcode instead of throwing |
+| `cancelAuthenticate(): Promise<void>` | Cancels an in-flight authentication flow. `@platform android` |
+
+### `ILocalAuthenticationOptions`
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `promptMessage` | `string` | `'Authenticate'` | A message shown alongside the TouchID or FaceID prompt |
+| `promptSubtitle` | `string` | — | A subtitle displayed below the prompt message. `@platform android` |
+| `promptDescription` | `string` | — | A description displayed in the middle of the authentication prompt. `@platform android` |
+| `cancelLabel` | `string` | `'Cancel'` | Customizes the default `Cancel` label shown |
+| `disableDeviceFallback` | `boolean` | `false` | After several failed attempts the system normally falls back to the device passcode; set `true` to disable that and handle the fallback yourself |
+| `requireConfirmation` | `boolean` | `true` | Hints to the system whether it should require explicit user confirmation after a successful biometric read. `@platform android` |
+| `biometricsSecurityLevel` | `'weak' \| 'strong'` | `'weak'` | The biometric class to allow — `'strong'` accepts only Android Class 3 biometrics, `'weak'` accepts both Class 3 and Class 2. `@platform android` |
+| `fallbackLabel` | `string` | — | Customizes the default `Use Passcode` label shown after several failed attempts; an empty string hides the button entirely. `@platform ios` |
+
+### `ILocalAuthenticationResult`
+
+A discriminated union — always check `success` before reading `error`:
+
+| Branch | Fields | Description |
+| --- | --- | --- |
+| `{ success: true }` | none | Authentication succeeded — no further fields |
+| `{ success: false }` | `error: ILocalAuthenticationError`, `warning?: string` | Authentication failed or couldn't run; `error` is the machine-readable reason (see below), `warning` is an optional free-text detail some Android failures attach (e.g. `KeyguardManager#isDeviceSecure() returned false`) |
+
+### `AuthenticationType`
+
+| Field | Value | Description |
+| --- | --- | --- |
+| `FINGERPRINT` | `1` | Fingerprint support |
+| `FACIAL_RECOGNITION` | `2` | Facial recognition support |
+| `IRIS` | `3` | Iris recognition support. `@platform android` |
+
+### `SecurityLevel`
+
+| Field | Value | Description |
+| --- | --- | --- |
+| `NONE` | `0` | No enrolled authentication of any kind |
+| `SECRET` | `1` | Non-biometric authentication enrolled (PIN, pattern, or password) |
+| `BIOMETRIC_WEAK` | `2` | Weak biometric authentication enrolled — e.g. 2D image-based face unlock; there are currently no weak options on iOS |
+| `BIOMETRIC_STRONG` | `3` | Strong biometric authentication enrolled — e.g. a fingerprint scan or 3D face unlock |
+| `BIOMETRIC` *(deprecated)* | aliases `BIOMETRIC_STRONG`/`BIOMETRIC_WEAK` | A getter kept for upstream compatibility that resolves to the platform-correct strong/weak member and logs a deprecation warning on every read — use `BIOMETRIC_WEAK`/`BIOMETRIC_STRONG` directly instead |
+
+### `ILocalAuthenticationError`
+
+| Value | Description |
+| --- | --- |
+| `not_enrolled` | No PIN/pattern/password or biometric is enrolled on the device at all |
+| `user_cancel` | The user dismissed the authentication prompt themselves |
+| `app_cancel` | The app canceled the authentication flow (e.g. via `cancelAuthenticate()`) |
+| `not_available` | Authentication isn't available on this device right now |
+| `lockout` | Too many failed attempts — biometric authentication is temporarily locked out |
+| `no_space` | Not enough storage on the device to complete the operation |
+| `timeout` | The authentication attempt timed out |
+| `unable_to_process` | The system couldn't process the captured biometric data |
+| `unknown` | An unclassified failure with no more specific reason available |
+| `system_cancel` | The system itself canceled the request, e.g. another app came to the foreground |
+| `user_fallback` | The user tapped the fallback/passcode button instead of using biometrics |
+| `invalid_context` | The authentication context became invalid before the operation completed |
+| `passcode_not_set` | The device has no passcode set, so biometric authentication can't be enrolled |
+| `authentication_failed` | The biometric or passcode check itself did not match |
+
+## Notes
+
+<Aside type="caution" title="'not_enrolled' on Android almost always means the device's own lock screen has no PIN, pattern, or password set">
+  A real symptom to expect on a fresh emulator or a factory-reset device: `authenticateAsync`
+  resolves `{ success: false, error: 'not_enrolled', warning: 'KeyguardManager#isDeviceSecure()
+  returned false' }`. This is **not** a missing app permission — the native manifest permissions
+  this package needs are ordinary build-time merges with no runtime prompt anywhere in this flow,
+  so there is nothing for your app to request. The fix lives entirely on the device: Settings →
+  Security → Screen lock → set a PIN/pattern/password, then (on an emulator) open Extended
+  Controls → Fingerprint to enroll a fingerprint if you want to exercise the biometric path too,
+  not just the passcode fallback.
+</Aside>
+
+## How the wrapper works
+
+`@symbiote-native/local-auth` ships **zero React/Vue/Angular logic in `expo-local-authentication`
+itself** — that package's own types file hard-imports `Platform` from the `expo` meta-package
+(which this project never installs), so its functions, enums, and result types are hand-ported,
+verbatim, into this package's own `core/`, changing only that one import line to pull `Platform`
+from `expo-modules-core` instead:
+
+```
+packages/local-auth/src/
+├── core/     # framework-agnostic: the six exported functions, AuthenticationType,
+│             # SecurityLevel, and the option/result/error types; native-module.ts resolves
+│             # the native module via expo-modules-core's requireNativeModule
+├── react/    # @symbiote-native/local-auth/react   — export * from '../core'
+├── vue/      # @symbiote-native/local-auth/vue     — export * from '../core'
+└── angular/  # @symbiote-native/local-auth/angular — export * from '../core'
+```
+
+Unlike sensors' `react/hooks`, `vue/composables`, and `angular/services` folders — each full of
+per-sensor lifecycle wrappers — local-auth's three adapter entries are single-file re-exports
+with no lifecycle code at all: every function here is stateless and one-shot, so there is nothing
+for a hook, composable, or service to subscribe to or clean up. The native code itself is never
+vendored or copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

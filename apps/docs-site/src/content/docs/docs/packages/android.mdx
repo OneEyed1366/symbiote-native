@@ -1,0 +1,251 @@
+---
+title: Android host shims
+description: Kotlin native modules that re-provide the two Android host signals SymbioteNative's own Fabric surface bypasses — keyboard events and persisted settings.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/android` is the one package on this site that wraps nothing. Every other
+package here — [slider](/docs/packages/slider/), [local auth](/docs/packages/local-auth/),
+[system UI](/docs/packages/system-ui/) — puts a framework-agnostic JS surface over an existing
+native library. This one is the inverse: **pure Kotlin, zero JavaScript**, supplying native
+modules that RN's Android host would normally provide but doesn't here.
+
+Why it's needed: SymbioteNative drives Fabric directly and never instantiates `ReactRootView`, and
+two of RN's Android signals hang off exactly that class. Without this package installed,
+`Keyboard`'s events never fire on Android and `Settings` reads back `null` — both silently, with
+no error. iOS needs no equivalent: `RCTKeyboardObserver` and `RCTSettingsManager` are global
+native observers RN already ships, independent of which renderer drives the view tree.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | — not needed (RN ships both equivalents) |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React               | ✅ live |
+| Vue                 | ✅ live |
+| Angular             | ✅ live |
+
+All three adapters are listed as live because none of them import this package. They reach it
+through their existing `Keyboard` and `Settings` exports, which resolve a native module by name —
+this package is what makes that name resolve on Android.
+
+## Installation
+
+```sh
+npm install @symbiote-native/android
+```
+
+No further native setup. The package ships a `react-native.config.js` declaring its Android
+`sourceDir` plus the `SymbioteAndroidPackage` import path and instance, so RN's Gradle
+autolinking registers both modules deterministically. There is no iOS half to link (`ios: null`
+in that config) and no manifest permission to merge — the shipped `AndroidManifest.xml` is empty.
+
+<Aside type="caution" title="Two documented APIs are dead on Android without this package">
+  [`Keyboard`](/docs/api/react/) and [`Settings`](/docs/api/react/) are listed as available on
+  every adapter's API page, and they are — on iOS unconditionally, on Android only once this
+  package is installed. Missing it produces no crash and no error: `Keyboard.addListener` returns
+  a real subscription that never fires, and `Settings.get` reads from an empty snapshot. If either
+  API looks inert on an Android build, check this dependency first.
+</Aside>
+
+## Usage
+
+There is nothing to import from this package — see [API](#api) below. Using it means
+using `Keyboard` and `Settings` from your adapter's own barrel, exactly as you would on iOS.
+Both are re-exported by [React](/docs/api/react/), [Vue](/docs/api/vue/), and
+[Angular](/docs/api/angular/) from `@symbiote-native/engine`, so the JS is identical across all
+three and across both platforms.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useEffect, useState } from 'react';
+    import { KEYBOARD_EVENT, Keyboard, Settings, Text, View } from '@symbiote-native/react';
+
+    export default function KeyboardStatus() {
+      const [height, setHeight] = useState(0);
+
+      useEffect(() => {
+        const shown = Keyboard.addListener(KEYBOARD_EVENT.didShow, () => {
+          setHeight(Keyboard.metrics()?.height ?? 0);
+        });
+        const hidden = Keyboard.addListener(KEYBOARD_EVENT.didHide, () => setHeight(0));
+
+        // Persisted through SharedPreferences on Android, NSUserDefaults on iOS.
+        Settings.set({ lastSeenKeyboard: Date.now() });
+
+        return () => {
+          shown.remove();
+          hidden.remove();
+        };
+      }, []);
+
+      return (
+        <View>
+          <Text>Keyboard height: {height}</Text>
+        </View>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { onMounted, onUnmounted, ref } from 'vue';
+    import { KEYBOARD_EVENT, Keyboard, Settings, Text, View } from '@symbiote-native/vue';
+
+    const height = ref(0);
+    let subscriptions: ReturnType<typeof Keyboard.addListener>[] = [];
+
+    onMounted(() => {
+      subscriptions = [
+        Keyboard.addListener(KEYBOARD_EVENT.didShow, () => {
+          height.value = Keyboard.metrics()?.height ?? 0;
+        }),
+        Keyboard.addListener(KEYBOARD_EVENT.didHide, () => {
+          height.value = 0;
+        }),
+      ];
+
+      Settings.set({ lastSeenKeyboard: Date.now() });
+    });
+
+    onUnmounted(() => {
+      for (const subscription of subscriptions) subscription.remove();
+    });
+    </script>
+
+    <template>
+      <View>
+        <Text>Keyboard height: {{ height }}</Text>
+      </View>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+    import { KEYBOARD_EVENT, Keyboard, Settings, Text, View } from '@symbiote-native/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Text, View],
+      template: `
+        <View>
+          <Text>Keyboard height: {{ height() }}</Text>
+        </View>
+      `,
+    })
+    export class KeyboardStatus implements OnInit, OnDestroy {
+      readonly height = signal(0);
+
+      private subscriptions: ReturnType<typeof Keyboard.addListener>[] = [];
+
+      ngOnInit(): void {
+        this.subscriptions = [
+          Keyboard.addListener(KEYBOARD_EVENT.didShow, () => {
+            this.height.set(Keyboard.metrics()?.height ?? 0);
+          }),
+          Keyboard.addListener(KEYBOARD_EVENT.didHide, () => this.height.set(0)),
+        ];
+
+        Settings.set({ lastSeenKeyboard: Date.now() });
+      }
+
+      ngOnDestroy(): void {
+        for (const subscription of this.subscriptions) subscription.remove();
+      }
+    }
+    ```
+
+    There's no service to `inject()` — `Keyboard` and `Settings` are plain objects off the
+    adapter barrel, same as on React and Vue.
+  </TabItem>
+</Tabs>
+
+## API
+
+**This package has no JavaScript or TypeScript API.** It exports no functions, no types, no
+components — there is deliberately nothing to import from `@symbiote-native/android`, and a prop
+or signature table would be fabricated. What it publishes is a native surface, consumed by name.
+
+### Native modules
+
+| Native module name | Kotlin class | Backs |
+| --- | --- | --- |
+| `KeyboardObserver` | `KeyboardObserverModule` | The JS `Keyboard` module — `addListener`, `removeAllListeners`, `isVisible`, `metrics`, `scheduleLayoutAnimation`. The engine resolves this exact name on both platforms (RN's own `INativeKeyboardObserver` spec uses it), so the JS side is platform-uniform and unchanged |
+| `SettingsManager` | `SettingsManagerModule` | The JS `Settings` module — `get`, `set`, `watchKeys`, `clearWatch`. Claims the same name RN's iOS `Settings` resolves, and backs it with `SharedPreferences` instead of `NSUserDefaults` |
+
+Both are registered by one `ReactPackage`, `SymbioteAndroidPackage`, which is the class
+autolinking discovers. A plain legacy `ReactPackage` works under the New Architecture via
+TurboModule interop, so neither module needs a codegen spec.
+
+### Emitted events
+
+| Event | Emitted by | Payload |
+| --- | --- | --- |
+| `keyboardDidShow` | `KeyboardObserverModule` | `{ endCoordinates: { screenX, screenY, width, height }, easing: 'keyboard', duration: 0 }` — the same shape RN's JS `Keyboard` already parses, in DIP |
+| `keyboardDidHide` | `KeyboardObserverModule` | Same shape with `height: 0` and `screenY` at the full view height |
+| `settingsUpdated` | `SettingsManagerModule` | The full current `SharedPreferences` snapshot, re-broadcast when a value changes from outside RN. Suppressed for the module's own writes |
+
+## Notes
+
+- **Only the `did*` keyboard events exist on Android.** The module emits `keyboardDidShow` and
+  `keyboardDidHide`, never `keyboardWillShow`/`WillHide`/`WillChangeFrame` — Android's inset
+  callback fires after the transition, so there is no "will" moment to report. Code that must run
+  on both platforms should listen for the `did*` pair.
+- **`Keyboard.scheduleLayoutAnimation` is a no-op on Android.** The emitted payload carries
+  `duration: 0`, and that method returns early on a zero duration since a zero-length animation
+  does nothing. It stays meaningful on iOS, where native supplies a real duration and easing.
+- **The IME inset is read directly, not via `getRootWindowInsets()`.** Under `adjustResize` the
+  latter's *consumed* insets read `0` while the keyboard is up. The module observes the raw
+  `ime()` inset on the apply-insets dispatch instead, subtracting the system-bar inset to get the
+  on-screen height above the navigation bar.
+- **Insets are observed, never consumed.** The listener returns the insets unchanged, so RN's own
+  status-bar and safe-area handling is untouched.
+- **A floating/compact IME bar counts as keyboard-up.** `isVisible(ime())` is true for any IME
+  surface, including Gboard's one-handed bar at roughly 64dp. That is deliberate parity — RN's
+  `ReactRootView` keys off the same signal, and suppressing it by a height threshold would
+  diverge from RN.
+- **`Settings` numbers are stored as `Int` or `Float`, not `Double`.** `SharedPreferences` has no
+  `putDouble`, so an integral in-range JS number is stored as `Int` and everything else as
+  `Float`. Exact for counters and flags; a fractional double rounds to about 7 significant digits.
+- **Nested objects and arrays are skipped.** `NSUserDefaults` accepts them, `SharedPreferences`
+  does not, so a nested `Map`/`Array` value is dropped with a native warning rather than silently
+  written. A `null` value removes the key, mirroring the iOS plist write.
+- **The native `deleteValues` method has no JS caller today.** `SettingsManagerModule` implements
+  it for iOS-surface parity, but the engine's `Settings` only ever calls `setValues` — there is no
+  `Settings.delete` in the JS API to reach it.
+
+## How the wrapper works
+
+The whole package is three Kotlin files plus an autolinking config. `package.json` sets
+`"files": ["android"]` and `"react-native": "android"` — it ships tracked native source and
+performs **no JS build at all**, unlike every other publishable package here, which compiles
+`src/` to `build/` at pack time.
+
+```
+packages/android/
+├── react-native.config.js              # Android sourceDir + SymbioteAndroidPackage import/instance
+└── android/src/main/
+    ├── AndroidManifest.xml             # empty — no permission to merge
+    └── java/com/symbiote/android/
+        ├── SymbioteAndroidPackage      # the one ReactPackage, registers both modules
+        ├── KeyboardObserverModule.kt   # OnApplyWindowInsetsListener on the decor view
+        └── SettingsManagerModule.kt    # SharedPreferences ("symbiote.settings")
+```
+
+`KeyboardObserverModule` attaches its inset listener to the current activity's decor view, and
+re-attaches on host resume — the activity and its window may not exist yet when JS first
+subscribes, so a subscription made before the window is ready still starts observing.
+`SettingsManagerModule` registers its `SharedPreferences` change listener only while JS is
+observing (from the first `addListener` to the last `removeListeners`), and holds a strong
+reference to it, since `SharedPreferences` keeps only a weak one and GC would otherwise drop the
+subscription.
+
+Neither module touches the renderer. That is the point: the [SymbioteNative
+core](/docs/how-it-works/) drives Fabric directly and never forks RN's native stack, so a signal
+RN attaches to its own `ReactRootView` has to be re-derived beside it rather than patched into it.

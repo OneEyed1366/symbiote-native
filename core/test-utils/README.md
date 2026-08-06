@@ -37,9 +37,12 @@ test('tap increments the counter', () => {
 });
 ```
 
-Each test calls `installFabric()` fresh (or `.reset()` an existing handle between assertions in the
-same test) — the fake slot is a `globalThis` singleton, so a stale handle from a previous test would
-otherwise leak state into the next one.
+Call `installFabric()` ONCE per test file, at module scope, and `.reset()` the handle between
+tests. Do not re-install per test: the engine's `getSlot()` (`core/engine/src/fabric.ts`) reads the
+slot's methods once and caches them for the process lifetime, so a second `installFabric()` after
+anything has committed swaps the global while the engine keeps writing through the handle it
+already bound — the new recorder just stays empty, with nothing to signal why. File-level isolation
+comes from the test runner; `reset()` is what separates tests within a file.
 
 ## What `installFabric()` gives you
 

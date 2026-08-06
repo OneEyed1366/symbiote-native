@@ -12,6 +12,17 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from '@symbi
 The React adapter intentionally feels close to React Native. The difference is
 below the component surface: host mutations go through `@symbiote-native/engine`.
 
+## Installation
+
+```sh
+pnpm add @symbiote-native/react react-native react
+```
+
+`react-native` and `react` stay your app's own top-level dependencies — the
+adapter replaces only the JS renderer that drives them, and `react-native` is
+the Metro version anchor, so it has to be pinned at the app root.
+`@symbiote-native/engine` is a peer dependency and installs alongside.
+
 ## Component shape
 
 | Concern         | React API                                                  |
@@ -63,6 +74,16 @@ Some modules are pure engine utilities (`Platform`, `StyleSheet`, `PixelRatio`,
 `StatusBar`) that are shared or thinly adapted depending on lifecycle needs.
 `useWindowDimensions`/`useColorScheme` hooks and `findNodeHandle` are also
 re-exported.
+
+On Android, `Keyboard` and `Settings` do nothing until you also install
+[`@symbiote-native/android`](/docs/packages/android/):
+`keyboardDidShow`/`keyboardDidHide` never fire, because Android's only stock
+keyboard-event source is `ReactRootView`'s layout listener and the bridgeless
+surface SymbioteNative mounts never triggers it, and `Settings` reads back `null`,
+because RN's `Settings` has no stock Android implementation at all. That package
+supplies both native modules (`KeyboardObserver`, `SettingsManager`), is picked
+up by Gradle autolinking, and exports nothing from JS — installing it is the
+whole integration.
 
 ## Animations and gestures
 

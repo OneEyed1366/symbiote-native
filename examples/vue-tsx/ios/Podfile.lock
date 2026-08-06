@@ -1,36 +1,4 @@
 PODS:
-  - ExpoModulesCore (57.0.5):
-    - ExpoModulesJSI
-    - hermes-engine
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-Core-prebuilt
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-jsinspector
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - ReactNativeDependencies
-    - Yoga
-  - ExpoModulesJSI (57.0.4):
-    - React-Core
-    - ReactCommon
-  - ExpoModulesWorklets (57.0.5):
-    - ExpoModulesCore
-    - ExpoModulesJSI
-  - ExpoSensors (57.0.2):
-    - ExpoModulesCore
   - FBLazyVector (0.86.0)
   - hermes-engine (250829098.0.14):
     - hermes-engine/Pre-built (= 250829098.0.14)
@@ -1972,10 +1940,6 @@ PODS:
   - Yoga (0.0.0)
 
 DEPENDENCIES:
-  - ExpoModulesCore (from `../node_modules/expo-modules-core`)
-  - ExpoModulesJSI (from `../node_modules/expo-modules-jsi/apple`)
-  - ExpoModulesWorklets (from `../node_modules/expo-modules-core`)
-  - "ExpoSensors (from `../node_modules/@symbiote-native/sensors/node_modules/expo-sensors/ios`)"
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -2057,14 +2021,6 @@ DEPENDENCIES:
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 EXTERNAL SOURCES:
-  ExpoModulesCore:
-    :path: "../node_modules/expo-modules-core"
-  ExpoModulesJSI:
-    :path: "../node_modules/expo-modules-jsi/apple"
-  ExpoModulesWorklets:
-    :path: "../node_modules/expo-modules-core"
-  ExpoSensors:
-    :path: "../node_modules/@symbiote-native/sensors/node_modules/expo-sensors/ios"
   FBLazyVector:
     :path: "../node_modules/react-native/Libraries/FBLazyVector"
   hermes-engine:
@@ -2224,12 +2180,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  ExpoModulesCore: 9df645bbfcfe4fec54e6597aee756f7820ac8e0e
-  ExpoModulesJSI: b20fefa4cdd9097e7e6b715466d1900b8c5d4711
-  ExpoModulesWorklets: 18419b65da3b14a8df484baccec7dd6dad15387a
-  ExpoSensors: e71c7b6cb0c09d3427ef6ae29c69532a10c86b05
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
-  hermes-engine: 7a85d42b09686f26dba11b310a984d4c8cfcb9d9
+  hermes-engine: 4083fab3ee5ea54e1a97ad10429d6ba8a93e90f0
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
   RCTSwiftUI: 5aaf0b07e747ba749dc6acc94d8bd41eea4b570f
@@ -2302,11 +2254,11 @@ SPEC CHECKSUMS:
   ReactCodegen: afe0d436ee089d7bea6418429d8312b1d23a6801
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
-  symbiote-navigation: 57cbed279179adbd912ec9bb52cca1292361fea7
-  symbiote-slider: 7352af4f3330e37aab79825da674158c898bc8a5
+  symbiote-navigation: c5feca69b3c675a3a030e9535d126f2a5eef50f0
+  symbiote-slider: 01ea895cf70b2b7a4d1df039d6020c4bab0f0858
   symbiote-splash-screen: 9f6b0e6435070cde1f31022a3fc21639fe50258e
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
-PODFILE CHECKSUM: da95b1f02b15a119a7362bc236b711303c1bb8cd
+PODFILE CHECKSUM: 52535ff777e36b58e86c45571b57df53c0378d71
 
 COCOAPODS: 1.16.2

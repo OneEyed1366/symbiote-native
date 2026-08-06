@@ -1,0 +1,308 @@
+---
+title: Clipboard
+description: expo-clipboard wrapped for every SymbioteNative adapter — read/write clipboard text, URLs, and images, plus a clipboard-change listener.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/clipboard` wraps [`expo-clipboard`](https://github.com/expo/expo/tree/main/packages/expo-clipboard)
+so every SymbioteNative adapter can read and write the clipboard. Like [sensors](/docs/packages/sensors/)
+and [local auth](/docs/packages/local-auth/), it's built on `expo-modules-core`; unlike
+local-auth's pure free functions or sensors' fully-subscription-based API, clipboard mixes both —
+most of the surface is stateless one-shot async calls, plus exactly **one** listener-based
+subscription, `addClipboardListener`.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ------------------ | ------- |
+| React               | ✅ live |
+| Vue                 | ✅ live |
+| Angular             | ✅ live |
+
+<Aside type="caution" title="The URL functions are iOS-only">
+  `getUrlAsync`, `setUrlAsync`, and `hasUrlAsync` exist only on iOS — `expo-clipboard` ships no
+  Android implementation for URL-typed clipboard content. Text, image, and the change listener
+  work identically on both platforms.
+</Aside>
+
+## Installation
+
+```sh
+npm install @symbiote-native/clipboard
+```
+
+`expo-clipboard` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project
+(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-clipboard`'s native code is discovered by `expo-modules-autolinking`, a different
+  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
+  installs the `expo` meta-package. Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
+  every future `expo-modules-core` package with zero further native changes.
+</Aside>
+
+## Usage
+
+### One-shot functions
+
+`getStringAsync`/`setStringAsync` and the rest of the async functions are already
+framework-agnostic — import them straight from the package root, on any adapter, with no
+hook/composable/service in the way:
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Pressable, Text, View } from '@symbiote-native/react';
+    import { getStringAsync, setStringAsync } from '@symbiote-native/clipboard/react';
+
+    export default function CopyPaste() {
+      const handleCopy = () => {
+        void setStringAsync('Hello from SymbioteNative');
+      };
+
+      const handlePaste = () => {
+        void getStringAsync().then(text => console.log('clipboard text', text));
+      };
+
+      return (
+        <View>
+          <Pressable onPress={handleCopy}>
+            <Text>Copy</Text>
+          </Pressable>
+          <Pressable onPress={handlePaste}>
+            <Text>Paste</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { Pressable, Text, View } from '@symbiote-native/vue';
+    import { getStringAsync, setStringAsync } from '@symbiote-native/clipboard/vue';
+
+    function handleCopy(): void {
+      void setStringAsync('Hello from SymbioteNative');
+    }
+
+    function handlePaste(): void {
+      void getStringAsync().then(text => console.log('clipboard text', text));
+    }
+    </script>
+
+    <template>
+      <View>
+        <Pressable @press="handleCopy">
+          <Text>Copy</Text>
+        </Pressable>
+        <Pressable @press="handlePaste">
+          <Text>Paste</Text>
+        </Pressable>
+      </View>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { Pressable, Text, View } from '@symbiote-native/angular';
+    import { getStringAsync, setStringAsync } from '@symbiote-native/clipboard/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Pressable, Text, View],
+      template: `
+        <View>
+          <Pressable (press)="handleCopy()">
+            <Text>Copy</Text>
+          </Pressable>
+          <Pressable (press)="handlePaste()">
+            <Text>Paste</Text>
+          </Pressable>
+        </View>
+      `,
+    })
+    export class CopyPaste {
+      handleCopy(): void {
+        setStringAsync('Hello from SymbioteNative');
+      }
+
+      handlePaste(): void {
+        getStringAsync().then(text => console.log('clipboard text', text));
+      }
+    }
+    ```
+
+    There's no per-instance service to `inject()` here — every one-shot function is a plain free
+    function off the core package, same as `@symbiote-native/local-auth`.
+  </TabItem>
+</Tabs>
+
+### The clipboard-change listener
+
+`addClipboardListener` is the one piece of live state clipboard has — each adapter wraps it in
+its own mount/unmount lifecycle so you don't manage the subscription by hand:
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Text } from '@symbiote-native/react';
+    import { useClipboard } from '@symbiote-native/clipboard/react';
+
+    export default function ClipboardWatcher() {
+      const clipboardEvent = useClipboard(); // IClipboardEvent | null
+
+      return <Text>{clipboardEvent && `content types: ${clipboardEvent.contentTypes.join(', ')}`}</Text>;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { useClipboard } from '@symbiote-native/clipboard/vue';
+
+    const clipboardEvent = useClipboard(); // Ref<IClipboardEvent | null>
+    </script>
+
+    <template>
+      <Text>{{ clipboardEvent && `content types: ${clipboardEvent.contentTypes.join(', ')}` }}</Text>
+    </template>
+    ```
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { Text } from '@symbiote-native/angular';
+    import { ClipboardService } from '@symbiote-native/clipboard/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Text],
+      template: `<Text>{{ clipboardEvent()?.contentTypes?.join(', ') }}</Text>`,
+    })
+    export class ClipboardWatcher {
+      readonly clipboardEvent = inject(ClipboardService).connect();
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## API
+
+### Functions
+
+| Signature | Description |
+| --- | --- |
+| `getStringAsync(options?: IGetStringOptions): Promise<string>` | Reads the clipboard's text content; resolves an empty string if the clipboard is empty or (iOS 16+) paste permission was denied |
+| `setStringAsync(text: string, options?: ISetStringOptions): Promise<boolean>` | Writes a string to the clipboard; resolves `true` once saved |
+| `hasStringAsync(): Promise<boolean>` | Whether the clipboard has text content, plain or rich (e.g. HTML) |
+| `getUrlAsync(): Promise<string \| null>` | Reads the clipboard's URL content, or `null` if there is none. `@platform ios` |
+| `setUrlAsync(url: string): Promise<void>` | Writes a URL to the clipboard, marking its content type as a URL. `@platform ios` |
+| `hasUrlAsync(): Promise<boolean>` | Whether the clipboard has URL content. `@platform ios` |
+| `getImageAsync(options: IGetImageOptions): Promise<IClipboardImage \| null>` | Reads the clipboard's image content in the requested format, or `null` if there is none |
+| `setImageAsync(base64Image: string): Promise<void>` | Writes a base64-encoded image (no MIME prefix) to the clipboard |
+| `hasImageAsync(): Promise<boolean>` | Whether the clipboard has image content |
+| `addClipboardListener(listener: (event: IClipboardEvent) => void): EventSubscription` | Subscribes to clipboard-content changes; call `.remove()` on the returned subscription to unsubscribe. The primitive `useClipboard`/`ClipboardService.connect()` wrap |
+| `removeClipboardListener(subscription: EventSubscription): void` | *Deprecated* — call `subscription.remove()` instead |
+
+### `IGetStringOptions` / `ISetStringOptions`
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `preferredFormat` *(get)* | `StringFormat` | `StringFormat.PLAIN_TEXT` | The target format to convert the clipboard string to, if possible |
+| `inputFormat` *(set)* | `StringFormat` | `StringFormat.PLAIN_TEXT` | The format of the string being written, so other applications can interpret the copied content correctly |
+
+### `IGetImageOptions`
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `format` | `'png' \| 'jpeg'` | — | The format to convert the clipboard image to |
+| `jpegQuality` | `number` | `1` | Quality between `0` and `1`; only applies when `format` is `'jpeg'` |
+
+### `IClipboardImage`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `data` | `string` | Base64-encoded image data, already prefixed with `data:image/png;base64,` or `data:image/jpeg;base64,` depending on the requested format |
+| `size` | `{ width: number; height: number }` | Dimensions of the pasted image |
+
+### `IClipboardEvent`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `contentTypes` | `ContentType[]` | The content types currently available on the clipboard |
+
+### `ContentType` / `StringFormat`
+
+| Enum | Members | Description |
+| --- | --- | --- |
+| `ContentType` | `PLAIN_TEXT`, `HTML`, `IMAGE`, `URL` *(`@platform ios`)* | What kind of data the clipboard currently holds |
+| `StringFormat` | `PLAIN_TEXT`, `HTML` | The string encoding to read/write clipboard text as |
+
+### `useClipboard` / `ClipboardService.connect()`
+
+| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Signature | Returns |
+| --- | --- | --- | --- | --- |
+| `useClipboard` | `useClipboard` | `ClipboardService.connect()` | `()` — no config, always subscribes | React/Vue: live `IClipboardEvent \| null` directly; Angular: `Signal<IClipboardEvent \| null>` |
+
+Every variant returns `null` until the clipboard changes at least once after mount — there's no
+initial read of whatever's already on the clipboard, only new changes going forward.
+
+## Notes
+
+- **On Android the change listener is paused while the app is backgrounded.** The native module
+  pauses on activity-background and resumes on activity-foreground, with no catch-up event — a copy
+  made in another app is never delivered, and (combined with the no-initial-read behavior above)
+  `useClipboard` is still `null` when the user comes back. Read the clipboard explicitly on resume
+  if you need what happened while you were away.
+- **`hasStringAsync`/`hasImageAsync` do not trigger Android 12+'s "pasted from clipboard" toast;
+  the getters do.** The `has*` calls inspect only the clip *description*, while `getStringAsync`/
+  `getImageAsync` read the clip itself. Probe with `has*Async` when all you need is whether
+  something is there to paste.
+- **Android never reports a `url` content type.** The Android module's own content-type enum has
+  only `plain-text`, `html` and `image`, so `IClipboardEvent.contentTypes` can carry `'url'` on iOS
+  alone — the same split as the iOS-only URL functions.
+- **`plain-text` is reported for HTML-only content on both platforms.** iOS marks `plain-text`
+  available when the pasteboard has strings *or* HTML; Android's text check matches both the
+  plain-text and HTML MIME types. Seeing `plain-text` in an event does not mean the content was
+  copied as plain text — check for `html` first if the distinction matters.
+
+## How the wrapper works
+
+`@symbiote-native/clipboard` ships **zero React/Vue/Angular logic in `expo-clipboard` itself** —
+that package's own types file hard-imports from the `expo` meta-package (which this project never
+installs), so its functions, enums, and option/result types are hand-ported, verbatim, into this
+package's own `core/`, changing only the native-module resolution to go through
+`expo-modules-core`'s `requireNativeModule` instead:
+
+```
+packages/clipboard/src/
+├── core/     # framework-agnostic: every exported function, ContentType, StringFormat, the
+│             # option/image/event types, and addClipboardListener — native-module.ts resolves
+│             # the native module via expo-modules-core's requireNativeModule
+├── react/    # @symbiote-native/clipboard/react   — re-exports core + hooks/use-clipboard
+├── vue/      # @symbiote-native/clipboard/vue     — re-exports core + composables/use-clipboard
+└── angular/  # @symbiote-native/clipboard/angular — re-exports core + services/clipboard.service
+```
+
+The stateless functions are plain re-exports with no lifecycle code, same as
+[local-auth](/docs/packages/local-auth/); `addClipboardListener` itself lives once in `core/`,
+and each adapter's `useClipboard`/`ClipboardService` is a thin lifecycle wrapper — subscribe on
+mount, unsubscribe on unmount — over that same subscription, the same logic/lifecycle split as
+every other SymbioteNative component (see [how it works](/docs/how-it-works/)). The native code
+itself is never vendored or copied — `expo-modules-autolinking` resolves it straight out of
+`node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).
+
+Upstream's `ClipboardPasteButton` (a native paste-button view, iOS 16+) is **not** ported in this
+pass — it would follow the [third-party native-view wrapper](/docs/packages/slider/#how-the-wrapper-works)
+recipe, not this package's `expo-modules-core` one, since it's a real Fabric view rather than an
+event/async surface.

@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-haptics",
+    "modules": [
+      {
+        "importPath": "expo.modules.haptics.HapticsModule",
+        "className": "HapticsModule",
+        "nativeName": "ExpoHaptics"
+      }
+    ]
+  }
+}
