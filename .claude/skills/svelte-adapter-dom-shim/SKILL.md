@@ -1,6 +1,6 @@
 ---
 name: svelte-adapter-dom-shim
-description: "Symbiote Svelte adapter — the DOM-shim strategy and its exact hand-maintained surface. Read BEFORE writing any adapters/svelte/** code, before bumping the `svelte` dependency, and before debugging a Svelte-only render/event failure. Svelte's OFFICIAL custom-renderer API (sveltejs/svelte#18042, `createRenderer` from `svelte/renderer`) is still an UNMERGED PR, so the adapter instead patches globalThis DOM classes so stock compiled Svelte output runs unchanged — a deliberate, accepted coupling to Svelte PRIVATE internals, to be replaced by the official API once it ships. Holds: the measured mandatory DOM surface with file:line (init_operations' prototypes/descriptors/private fields; the 6 document factories; from_tree's cloneNode-per-instance; the universal `anchor.before()` mount path; createDocumentFragment in each/if/boundary); the dead-if-forbidden surface (svelte:head, element bind:, hydration, svelte:element, autofocus); why our camelCase onPress/onChangeText names DODGE Svelte's 23-name DELEGATED_EVENTS list and the lowercase-`onclick` trap that follows; the requirement that ISymbioteEvent be EXTENSIBLE and MUTABLE because handle_event_propagation writes a symbol and defines/deletes currentTarget on it; the measured React-Native 0.86 global collisions (installing `document` silently kills WebSocket React DevTools via setUpReactDevTools' `!window.document` gate; navigator and requestAnimationFrame must NOT be patched; Node/Element/HTMLElement/Text collide with setUpDOM but with a narrow blast radius); and the lazy-engine-node design that avoids wolf-tui's third tree. Two OPEN questions are recorded, not answered: tag mapping/bootstrap, and how dev-warnings can detect a delegated event the shim never sees. Trigger on: 'svelte adapter', 'svelte support', DOM shim, patchGlobals, init_operations, from_tree, fragments:'tree', delegated events, bumping svelte, or issue #47."
+description: "Symbiote Svelte adapter — the DOM-shim strategy and its exact hand-maintained surface. Read BEFORE writing any adapters/svelte/** code, before bumping the `svelte` dependency, and before debugging a Svelte-only render/event failure. Svelte's OFFICIAL custom-renderer API (sveltejs/svelte#18042, `createRenderer` from `svelte/renderer`) is still an UNMERGED PR, so the adapter instead patches globalThis DOM classes so stock compiled Svelte output runs unchanged — a deliberate, accepted coupling to Svelte PRIVATE internals, to be replaced by the official API once it ships. Holds: the measured mandatory DOM surface with file:line (init_operations' prototypes/descriptors/private fields; the 6 document factories; from_tree's build-once-then-clone; the universal `anchor.before()` mount path; createDocumentFragment in each/if/boundary); the CUSTOM-ELEMENT codegen path every hyphenated symbiote-* tag takes — importNode replaces cloneNode, and set_custom_element_data stringifies scalars and hard-excludes `style`, resolved by passing ONE object bag prop that lands as a property set and is unpacked into routeProp (which makes Svelte a flat-bag adapter, not a structural one, and collapses most of the event section); the dead-if-forbidden surface (svelte:head, element bind:, hydration, svelte:element, autofocus); why our camelCase onPress/onChangeText names DODGE Svelte's 23-name DELEGATED_EVENTS list and the lowercase-`onclick` trap that follows; the requirement that ISymbioteEvent be EXTENSIBLE and MUTABLE because handle_event_propagation writes a symbol and defines/deletes currentTarget on it; the measured React-Native 0.86 global collisions (installing `document` makes dev-menu React DevTools reconnects silently no-op via setUpReactDevTools' `!window.document` gate; navigator and requestAnimationFrame must NOT be patched; Node/Element/HTMLElement/Text collide with setUpDOM but with a narrow blast radius); and the lazy-engine-node design that avoids wolf-tui's third tree. NO web vocabulary belongs in the adapter — no div/span mapping, ever. Still OPEN: bootstrap/surface/multiple-roots, and how dev-warnings can detect a delegated event the shim never sees. Trigger on: 'svelte adapter', 'svelte support', DOM shim, patchGlobals, init_operations, from_tree, fragments:'tree', delegated events, bumping svelte, or issue #47."
 ---
 
 # Symbiote Svelte adapter — the DOM-shim strategy
@@ -168,7 +168,7 @@ fields.
 | `document.createElementNS(ns, tag)` / with `{ is }` | `dom/operations.js:255` |
 | `document.createDocumentFragment()` | `dom/operations.js:260` |
 | `document.createComment(data)` | `dom/operations.js:268` |
-| `document.importNode(node, true)` | `dom/template.js:78,245` — reached only under the `TEMPLATE_USE_IMPORT_NODE` flag or `is_firefox`. `is_firefox` is `false` for us (§6b), but implement it as a one-line delegate to `cloneNode`. |
+| `document.importNode(node, true)` | `dom/template.js:78,245` — ⚠️ **this is our PRIMARY clone path, not a fallback.** Every Symbiote primitive is hyphenated, hence a custom element, hence sets `TEMPLATE_USE_IMPORT_NODE` — see §3g. Functionally it is still a deep clone (we have one document), so delegating to `cloneNode` is correct; but it is `importNode` that must be tested and watched, not `cloneNode`. |
 
 ### 3c. Required node members
 
@@ -280,6 +280,116 @@ That is much easier to satisfy. Keep a `dlog` at `patchGlobals()` anyway so the
 ordering is observable, and re-check this if Svelte ever adds a module-level DOM
 access that is *not* optional-chained.
 
+### 3g. ⚠️ Our primitives are CUSTOM ELEMENTS to Svelte — a different codegen path
+
+**No web primitives ever appear in this adapter.** `<div>`, `<span>`, `<p>` are
+not mapped, not aliased, and not special-cased: the adapter must carry no web
+vocabulary at all. `createElement(tag)` asks `descriptorFor(tag)`
+(`core/components/src/component-names/index.ios.ts` — `symbiote-view → RCTView`,
+`symbiote-text → RCTText`, …, with an Android twin), and a tag with no entry is
+simply an unknown element. The error must come from the **absence** of a match,
+never from a table of HTML tags we'd otherwise have to maintain.
+
+That constraint has a consequence that is easy to miss and expensive to discover
+late. Every Symbiote intrinsic is **hyphenated**, and
+`is_custom_element_node` (`compiler/phases/nodes.js:40-46`) is:
+
+```js
+node.type === 'RegularElement' &&
+  (node.name.includes('-') ||
+   node.attributes.some((attr) => attr.type === 'Attribute' && attr.name === 'is'))
+```
+
+So **every one of our host tags compiles down the custom-element path**, which
+differs from the ordinary element path in two ways.
+
+#### (a) `importNode` replaces `cloneNode`
+
+```js
+// compiler/phases/3-transform/client/visitors/RegularElement.js:58
+context.state.template.needs_import_node ||= name === 'video' || is_custom_element;
+```
+
+→ `visitors/Fragment.js:96,140-141` ORs in `TEMPLATE_USE_IMPORT_NODE` →
+`dom/template.js:245` picks `document.importNode(node, true)`.
+
+Harmless in effect (same deep clone, one document) but it moves the thing to
+test and to watch. §8's checklist reflects this.
+
+#### (b) Attributes go through `set_custom_element_data`, which STRINGIFIES
+
+`RegularElement.js:670` emits `$.set_custom_element_data(node, name, value)`
+instead of `set_attribute`. The implementation (`dom/elements/attributes.js:226-273`):
+
+```js
+if (
+  prop !== 'style' &&
+  (setters_cache.has(node.getAttribute('is') || node.nodeName) ||
+   !customElements ||
+   customElements.get(node.getAttribute('is') || node.nodeName.toLowerCase())
+     ? get_setters(node).includes(prop)
+     : value && typeof value === 'object')
+) {
+  node[prop] = value;                                    // property set, type preserved
+} else {
+  set_attribute(node, prop, value == null ? value : String(value));   // ← String()
+}
+```
+
+Three hazards:
+
+1. **`style` is explicitly excluded** and therefore always stringified. A style
+   *object* becomes `"[object Object]"`. Correct for the web (where `style` is a
+   CSS string); fatal for us. **Never use the literal attribute name `style` on a
+   host tag.**
+2. **Scalars are stringified.** `numberOfLines={3}` arrives as `"3"`; booleans as
+   `"true"`.
+3. **Which branch runs depends on `customElements`.** wolf-tui stubs it
+   (`{ define: noop, get: () => undefined }`, `wolfie-document.ts:259`), which
+   makes the ternary condition falsy and selects the
+   `value && typeof value === 'object'` heuristic. Leaving `customElements`
+   undefined instead selects `get_setters(node)` — and `get_setters`
+   (`attributes.js:588-606`) walks the prototype chain **stopping at
+   `Element.prototype`**, which for us *is* our own element class, so the loop can
+   run zero times and return `[]`.
+
+#### (c) The resolution: one object prop, not many attributes
+
+Host tags take a **single object-valued prop** rather than a spread of
+attributes. An object always satisfies `value && typeof value === 'object'`, so it
+lands as `node[prop] = value` — a **property assignment**, untouched, with no
+stringification and no dependence on the `customElements` stub. Because we choose
+the property name, the shim element class can define a **real setter** for it on
+the prototype, which is where the bag is unpacked and handed to `routeProp`
+(`core/engine/src/node.ts:231-263`) — the same entry point React's flat bag and
+Vue's `patchProp` already use, so class/style merging and prop-vs-event routing
+stay identical across adapters.
+
+Consequences to keep in mind:
+
+- **This makes Svelte a FLAT-BAG adapter, not a structural one.** ⚠️ The engine's
+  own comment at `node.ts:140-142` currently predicts the opposite — it names
+  "Svelte `addEventListener`" as a *structural* adapter that calls
+  `setEventListener` directly. Under the bag design, host props (including
+  handlers) reach the engine through `routeProp` instead. Keep the
+  `addEventListener` path implemented as well (raw host-tag authoring, and
+  anything Svelte routes as a real event), but the bag is primary. **Update that
+  engine comment when this lands.**
+- **Most of §5 collapses.** Handlers passed as component props (`<View onPress={fn}>`
+  — idiomatic Svelte 5 callback props) ride inside the bag and never touch
+  Svelte's event system at all: no `addEventListener`, no
+  `handle_event_propagation`, no extensible/mutable `ISymbioteEvent` requirement,
+  no delegation trap. §5 still applies to any real event Svelte does attach, so it
+  stays — but it is no longer the main path.
+- **Referential stability matters.** Svelte re-applies the prop when the value
+  changes. Build a **fresh** bag object per update rather than mutating one in
+  place, or a mutation-in-place may be skipped as unchanged. (`RegularElement.js:673`
+  notes `set_custom_element_data` "may not be idempotent", so do not rely on
+  repeated identical application being free either.)
+- **This facade is INTERNAL.** App code writes `<View style={s} onPress={fn}>`
+  exactly as it would in any Svelte app; only the adapter's own `View.svelte` and
+  friends emit `<symbiote-view p={bag}>`. User-facing DX is unaffected.
+
 ---
 
 ## §4. The surface that is DEAD if we forbid the feature
@@ -334,6 +444,12 @@ line, and it converts a potential hard crash in a forbidden path into a no-op.
 ---
 
 ## §5. Events
+
+> ⚠️ **Read §3g(c) first.** Under the object-bag design, host props — handlers
+> included — reach the engine through `routeProp` and never touch Svelte's event
+> system. Everything below therefore applies to the *secondary* path: real events
+> Svelte does attach (raw host-tag authoring, and anything outside the bag). It
+> stays mandatory, but it is no longer where most interactions flow.
 
 ### 5a. The listener path
 
@@ -438,13 +554,28 @@ runs on load (`:234`) and on every dev-menu open. The module is required
 unconditionally in dev (`setUpDefaultReactNativeEnvironment.js:27-28`, under
 `if (__DEV__ && enableDeveloperTools)`), and RN sets `global.window = global`.
 
-> **Installing `globalThis.document` silently disables the WebSocket React
-> DevTools connection in every dev build.**
+**Severity, refined by call timing.** There are exactly two triggers
+(`setUpReactDevTools.js:230-234`):
 
-Not fatal, dev-only, and arguably irrelevant in a Svelte app that never runs React
-DevTools — but it is a real, silent regression that must be **documented in the
-adapter's README**, and it is the one place where the "libraries will think they
-are on the web" worry did come true.
+```js
+RCTNativeAppEventEmitter.addListener('RCTDevMenuShown', connectToWSBasedReactDevToolsFrontend);
+connectToWSBasedReactDevToolsFrontend(); // Try connecting once on load
+```
+
+`patchGlobals()` runs when a Svelte surface mounts — app code, strictly after RN
+bootstrap. So the **on-load** attempt happens while `document` is still undefined
+and connects normally. Only a **dev-menu-triggered reconnect while a surface is
+mounted** silently bails.
+
+> **Net: React DevTools connects fine at startup; reconnecting from the dev menu
+> silently no-ops while a Svelte surface is mounted.**
+
+Dev-only, and mild — but real, silent, and the one place where the "libraries will
+think they are on the web" worry did come true. **Document it in the adapter
+README.** It cannot be avoided by unpatching after `init_operations()`: Svelte
+reads bare `document.createElement` / `createDocumentFragment` on every template
+build and block update (`operations.js:82,251,260`), so `document` must remain
+installed for the surface's whole lifetime.
 
 (`HoverState.js` remains correctly web-gated: `canUseDOM` at `:19-25` and
 `document.addEventListener` at `:53-55` are all inside the `Platform.OS === 'web'`
@@ -585,9 +716,15 @@ Ordered by fragility. None of this is public API.
    requiring more, `ISymbioteEvent` must grow. (Note: it *already* calls
    `composedPath()` and *already* manipulates `currentTarget` — an earlier draft
    listed both as hypothetical futures.)
-4. **`cloneNode(true)` semantics in `from_tree` (`template.js:244-246`)** — clones
-   must copy attributes and must **not** carry listeners, or instance state leaks
+4. **`importNode(node, true)` semantics in `from_tree` (`template.js:244-246`)** —
+   ⚠️ watch `importNode`, **not** `cloneNode`: every Symbiote tag is a custom
+   element and therefore sets `TEMPLATE_USE_IMPORT_NODE` (§3g(a)). Clones must
+   copy attributes and must **not** carry listeners, or instance state leaks
    between component instances.
+4b. **The custom-element attribute path (`attributes.js:226-273`,
+   `RegularElement.js:58,670`)** — if Svelte changes `set_custom_element_data`'s
+   branch logic, the `customElements` interaction, or its `style` special-case,
+   the object-bag design in §3g(c) must be re-validated.
 5. **The mount path `anchor.before()` (`template.js:358-379`)** — if Svelte changes
    how blocks mount, this is where it shows.
 6. **Module-level DOM access** — currently only the optional-chained `IS_XHTML`
@@ -629,24 +766,26 @@ to position against. We have the same shape — the engine's `createAnchor` /
 
 ---
 
-## §10. OPEN: bootstrap and tag mapping
+## §10. OPEN: bootstrap
 
-**Not yet decided, and it is the first decision an implementer faces.** This
-document deliberately does not invent an answer.
+**Tag mapping is CLOSED (2026-08-10)** — see §3g. No web vocabulary in the
+adapter; `descriptorFor` resolves `symbiote-*` intrinsics; an unknown tag errors
+from the absence of a match. Do **not** adopt wolf-tui's blanket prefixing
+(`wolfie-document.ts:161`: `tag.startsWith('wolfie-') ? tag : 'wolfie-' + tag`),
+which would silently turn `div` into `symbiote-div`.
 
-Unanswered:
+**Prop delivery is DECIDED (2026-08-10)** — the single object bag, §3g(c).
 
-- What does `document.createElement('div')` become? Svelte templates name HTML
-  tags; SymbioteNative primitives are `symbiote-view` / `symbiote-text` /
-  `symbiote-image`. Vue solves the equivalent through `descriptorFor(type)`
-  (`adapters/vue/src/renderer/index.ts:44`); wolf-tui prefixes unknown tags
-  (`wolfie-document.ts:161`: `tag.startsWith('wolfie-') ? tag : 'wolfie-' + tag`).
-  Decide whether we map HTML tags, require `symbiote-*` tags, or both.
+Still genuinely open, and the first thing an implementer must settle:
+
 - What is the adapter's public entry point, and how is a `SymbioteSurface`
   obtained and handed to Svelte's `mount({ target })`?
 - Can more than one Svelte root coexist, given that `patchGlobals()` is
-  process-global?
+  process-global? (Note the interaction with §6a: `document` must stay installed
+  for a surface's lifetime, so "restore on unmount" is per-process, not
+  per-surface.)
 - What exactly happens on unmount beyond `restoreGlobals()`?
+- The dev-warning mechanism — §7, still open.
 
 Also still to design (covered by other skills, not here): the runes lifecycle layer
 and the `descriptorToSvelte` bridge — see `symbiote-add-component`.
