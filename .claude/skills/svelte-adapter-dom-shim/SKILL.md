@@ -381,11 +381,38 @@ Consequences to keep in mind:
   `handle_event_propagation`, no extensible/mutable `ISymbioteEvent` requirement,
   no delegation trap. §5 still applies to any real event Svelte does attach, so it
   stays — but it is no longer the main path.
-- **Referential stability matters.** Svelte re-applies the prop when the value
-  changes. Build a **fresh** bag object per update rather than mutating one in
-  place, or a mutation-in-place may be skipped as unchanged. (`RegularElement.js:673`
-  notes `set_custom_element_data` "may not be idempotent", so do not rely on
-  repeated identical application being free either.)
+- **⚠️ A per-key diff in the setter is MANDATORY, not an optimization.** An
+  earlier draft warned about "referential stability" and suggested a fresh bag
+  might be "skipped as unchanged". That was wrong in both directions: **Svelte
+  performs no value comparison on this path at all.**
+  - `template_effect` (`reactivity/effects.js:388-394`) is a bare `RENDER_EFFECT`
+    that just calls the thunk — no `Object.is`, no memo.
+  - `set_custom_element_data` has **no early-out guard**, unlike `set_attribute`
+    (which caches via `ATTRIBUTES_CACHE`). Hence the compiler's note that it
+    "may not be idempotent" and is deliberately **not grouped** with other
+    attribute updates (`RegularElement.js:669-673`).
+
+  What survives: effects are **dependency-tracked, not tick-based**, so unrelated
+  state never reaches us; and when an attribute value contains no reactive state,
+  `has_state` (`RegularElement.js:668`) emits the call **once at init** with no
+  effect at all, so static props are free.
+
+  What we lose: **per-attribute granularity.** Normally each attribute gets its
+  own effect and re-runs only for its own dependency. With one bag, the single
+  effect re-runs when *any* prop changes, rebuilds the whole object, and hands
+  the shim everything.
+
+  So the setter must keep the previous bag, compare per key, and call `routeProp`
+  only for keys that actually changed — exactly what Vue's `patchProp` receives
+  for free (`prev`/`next` per key). Without the diff, changing one prop rewrites
+  all of them: the engine's `setProp` (`node.ts:123-129`) neither compares nor
+  dirty-tracks, so the node is marked changed and the commit clones a subtree
+  whose props are identical. With the diff, rebuilding an object and comparing
+  5-15 keys is negligible against the Fabric commit it prevents.
+
+  A hybrid (static props as individual attributes to keep `has_state`, reactive
+  ones in the bag) is **not** worth it — it complicates component authoring and
+  reintroduces scalar stringification for the static ones.
 - **This facade is INTERNAL.** App code writes `<View style={s} onPress={fn}>`
   exactly as it would in any Svelte app; only the adapter's own `View.svelte` and
   friends emit `<symbiote-view p={bag}>`. User-facing DX is unaffected.
