@@ -2,10 +2,15 @@
 // The value graph, easing, interpolation and drivers are pure JS with no React
 // and no native dependency; every adapter re-exports them.
 
-export { AnimatedNode, AnimatedWithChildren, flushValue, type IValueListener } from './graph';
+export {
+  AnimatedNode,
+  AnimatedWithChildren,
+  AnimatedInterpolation,
+  flushValue,
+  type IValueListener,
+} from './graph';
 export { AnimatedValue } from './value';
 export { AnimatedValueXY, type IValueXY } from './value-xy';
-export { AnimatedInterpolation } from './interpolation-node';
 export {
   AnimatedAddition,
   AnimatedSubtraction,
