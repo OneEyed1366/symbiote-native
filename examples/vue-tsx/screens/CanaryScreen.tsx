@@ -603,6 +603,57 @@ const PlatformColorDemo = defineComponent({
   },
 });
 
+// The compound-class rule, on screen. `.badge.loud` (App.css) restates only two colours, so
+// `.badge`'s padding and radius must survive on an element carrying both tokens — a resolver
+// that returned the compound rule alone instead of layering it over the single-class one would
+// visibly blank the pill's shape here. `.loud` deliberately has no standalone rule, so nothing
+// but `.badge.loud` resolving can change the middle and right badges.
+//
+// The dynamic badge's LABEL is deliberately constant: the e2e journey proves the rule by
+// screenshot-diffing that badge across the toggle, and a label that changed with the state
+// would make the diff pass even with the compound rule dead.
+//
+// Twin of the Vue-SFC and Svelte canaries' CompoundClassDemo, which express the identical three
+// rules inside a per-component scoped style block — same law, different scoping (see the
+// symbiote-sfc-style-compiler skill §5b).
+const CompoundClassDemo = defineComponent({
+  name: 'CompoundClassDemo',
+  setup() {
+    const isLoud = ref(false);
+    return () => (
+      <View class="section-nested">
+        <Text class="section-label">Compound class · App.css</Text>
+        <View class="row">
+          <View class="badge" testID="compound-badge-plain">
+            <Text class="badge-text">plain</Text>
+          </View>
+          <View class="badge loud" testID="compound-badge-loud">
+            <Text class="badge-text">loud</Text>
+          </View>
+          {/* Built at runtime, so the resolver sees a string it never saw at build time. */}
+          <View
+            class={isLoud.value ? 'badge loud' : 'badge'}
+            testID="compound-badge-dynamic"
+          >
+            <Text class="badge-text">dynamic</Text>
+          </View>
+        </View>
+        <Text class="note-text" testID="compound-badge-readout">
+          {isLoud.value
+            ? 'dynamic badge carries both tokens — accent border, same pill shape'
+            : 'dynamic badge carries only .badge — grey border'}
+        </Text>
+        <Button
+          testID="compound-badge-toggle"
+          title={isLoud.value ? 'Drop .loud' : 'Add .loud'}
+          onPress={() => (isLoud.value = !isLoud.value)}
+          color="#42b883"
+        />
+      </View>
+    );
+  },
+});
+
 // Responder: the gesture capabilities exposed here, shown so the grabbed
 // element is the one that moves. Each chip is its OWN responder: it grabs on touch
 // start and drags ITSELF (onResponderMove translates that chip). Drag a chip past a
@@ -1365,6 +1416,9 @@ export const CanaryScreen = defineComponent({
 
           {/* Responder: drag-vs-tap + mid-gesture transfer (move-should-set / takeover) */}
           <ResponderDemo />
+
+          {/* Compound class rule: `.badge.loud` layers over `.badge`, static and dynamic */}
+          <CompoundClassDemo />
 
           {/* Parity checks: longPress · Keyboard.dismiss · animated scroll · sticky · a11y focus */}
           <ParityDemo />

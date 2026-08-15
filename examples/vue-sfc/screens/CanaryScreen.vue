@@ -76,6 +76,7 @@ import RefApiDemo from '../components/RefApiDemo.vue';
 import PlatformColorDemo from '../components/PlatformColorDemo.vue';
 import AccessibilityDemo from '../components/AccessibilityDemo.vue';
 import ResponderDemo from '../components/ResponderDemo.vue';
+import CompoundClassDemo from '../components/CompoundClassDemo.vue';
 import ParityDemo from '../components/ParityDemo.vue';
 import { nativeNumber } from '../components/event-utils';
 import { ROUTE_NAME } from '../routes';
@@ -553,6 +554,9 @@ const rotationStyle = {
 
       <!-- Responder: drag-vs-tap + mid-gesture transfer (move-should-set / takeover) -->
       <ResponderDemo />
+
+      <!-- Component-local style block: compound selector, static and dynamic class -->
+      <CompoundClassDemo />
 
       <!-- Parity checks: longPress · Keyboard.dismiss · animated scroll · sticky · a11y focus -->
       <ParityDemo />

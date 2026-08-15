@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs';
 import { by, device, element, expect, waitFor } from 'detox';
 
 // Interactive-control coverage for CanaryScreen that probe.test.ts doesn't exercise: the Switch's
@@ -36,6 +37,28 @@ async function bringIntoView(id: string): Promise<void> {
   }
   await waitFor(target).toBeVisible().withTimeout(3_000);
   await sleep(300);
+}
+
+// Animation-free visual proof, for a change that is a REPAINT rather than a motion: a class whose
+// style resolves differently after a tap. element().takeScreenshot crops to THIS component and
+// resolves to a PNG path, so two crops that differ prove the style changed and identical crops
+// prove it did not. Own copy, like bringIntoView above — each e2e file in this project keeps its
+// own helpers rather than importing them.
+async function elementShot(id: string, name: string): Promise<Buffer> {
+  const path = await element(by.id(id)).takeScreenshot(name);
+  return readFileSync(path);
+}
+
+async function assertTapRepaints(triggerId: string, targetId: string): Promise<void> {
+  const before = await elementShot(targetId, `${targetId}-before-class`);
+  await element(by.id(triggerId)).tap();
+  await sleep(400);
+  const after = await elementShot(targetId, `${targetId}-after-class`);
+  if (before.equals(after)) {
+    throw new Error(
+      `${targetId} looks identical after tapping ${triggerId}: the compound class rule never resolved`,
+    );
+  }
 }
 
 describe('Angular symbiote canary controls', () => {
@@ -150,5 +173,18 @@ describe('Angular symbiote canary controls', () => {
     await waitFor(element(by.id('angular-retention-readout')))
       .toBeVisible()
       .withTimeout(10_000);
+  });
+
+  // `.badge.loud` layers over `.badge` (CompoundClassDemo.css). `.loud` has no standalone rule and
+  // the dynamic badge's label never changes, so the ONLY thing that can alter its pixels is the
+  // compound rule resolving — identical crops mean it is dead. The Angular half of the same law
+  // the React / Vue / Svelte canaries assert (symbiote-sfc-style-compiler skill §5b).
+  it('repaints the badge when the second class is added (compound rule resolves)', async () => {
+    await bringIntoView('angular-compound-badge-toggle');
+    await expect(element(by.id('angular-compound-badge-plain'))).toBeVisible();
+    await expect(element(by.id('angular-compound-badge-loud'))).toBeVisible();
+    await assertTapRepaints('angular-compound-badge-toggle', 'angular-compound-badge-dynamic');
+    // Restore, so a later test does not inherit this screen's toggled state.
+    await element(by.id('angular-compound-badge-toggle')).tap();
   });
 });
