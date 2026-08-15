@@ -288,6 +288,70 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
   });
 });
 
+// Sticky force-mount: the RN _ensureClosestStickyHeader twin (buildListPlan's forcedStickyCell).
+// 20 uniform rows, sticky origins at [0, 10] — mirrors the core buildListPlan repro
+// (virtualized-list.test.ts's `describe('buildListPlan', ...)`) that reproduced the on-device bug
+// where a pinned section header got destroyed/recreated once scrolling carried its origin index out
+// of [first,last]. windowSize:1 collapses the overscan to 0, so the window is exactly the viewport —
+// small enough to genuinely push both sticky origins out of [first,last].
+const STICKY_ITEM_COUNT = 20;
+const STICKY_CELL_HEIGHT = 100;
+const STICKY_VIEWPORT = 100;
+const STICKY_DATA: IRow[] = makeRows(0, STICKY_ITEM_COUNT);
+
+function makeStickyList(): ReturnType<typeof defineComponent> {
+  return defineComponent({
+    setup: () => () =>
+      h(
+        FlatListHost,
+        {
+          ref: listRef,
+          data: STICKY_DATA,
+          keyExtractor: (item: IRow) => `k-${item.id}`,
+          getItemLayout: (_data: unknown, index: number) => ({
+            length: STICKY_CELL_HEIGHT,
+            offset: STICKY_CELL_HEIGHT * index,
+            index,
+          }),
+          stickyHeaderIndices: [0, 10],
+          windowSize: 1,
+        },
+        { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+      ),
+  });
+}
+
+describe('Vue VirtualizedList sticky header force-mount', () => {
+  it('keeps the nearest sticky header resident once the window scrolls past its origin index', async () => {
+    mount(ROOT_TAG, makeStickyList());
+    await tick();
+    const scrollView = findScrollView();
+    fabric.fireEvent(scrollView.instanceHandle, 'topLayout', {
+      layout: { x: 0, y: 0, width: 320, height: STICKY_VIEWPORT },
+    });
+    await tick();
+
+    // Scroll to offset 500: with windowSize:1 (zero overscan) the window collapses to [5,5],
+    // clear of both sticky origins (0 and 10). Only the force-mount keeps row-0 resident.
+    fabric.fireEvent(scrollView.instanceHandle, 'topScroll', {
+      contentOffset: { x: 0, y: 500 },
+      contentSize: { width: 320, height: STICKY_CELL_HEIGHT * STICKY_ITEM_COUNT },
+      layoutMeasurement: { width: 320, height: STICKY_VIEWPORT },
+    });
+    await tick();
+
+    const labels = collectRowLabels();
+    expect(labels.has('row-5'), 'the in-window cell at the scroll position is resident').toBe(true);
+    expect(labels.has('row-0'), 'the force-mounted sticky header stays resident off-window').toBe(
+      true,
+    );
+    expect(
+      labels.has('row-10'),
+      'the other sticky index (not the nearest one below the window) is not force-mounted',
+    ).toBe(false);
+  });
+});
+
 // A list whose data is the reactive mvcpData ref, so a unit can prepend rows and trigger the MVCP
 // anchor watcher. minIndexForVisible 0 anchors row k-0; no autoscrollToTopThreshold so the watcher
 // takes the offset-adjust branch (not the autoscroll-to-top branch).

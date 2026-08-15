@@ -9,6 +9,7 @@ import {
   resolveStickySectionHeaders,
   wrapFixedLayout,
   resolveAverageLength,
+  buildListPlan,
   type ICellLayout,
 } from './virtualized-list';
 
@@ -217,6 +218,80 @@ describe('resolveStickySectionHeaders', () => {
   it('honors the explicit prop over the platform default', () => {
     expect(resolveStickySectionHeaders(false, [0, 4], 'ios')).toBeUndefined();
     expect(resolveStickySectionHeaders(true, [0, 4], 'android')).toEqual([0, 4]);
+  });
+});
+
+describe('buildListPlan', () => {
+  // 20 uniform 100px cells (offsets[i] = i*100), sticky section headers at index 0 and 10 —
+  // mirrors the SectionList repro (Fruit@0, Tools@10) that vanished on-device once scrolling
+  // carried the window past a section's origin index.
+  const offsets = uniformOffsets(20);
+  const lengths = Array.from({ length: 20 }, () => 100);
+  const keyFor = keyForOf(offsets.map((_o, i) => String(i)));
+
+  it('force-mounts the nearest sticky index below the window, RN _ensureClosestStickyHeader-style', () => {
+    const plan = buildListPlan({
+      count: 20,
+      first: 6,
+      last: 15,
+      offsets,
+      lengths,
+      total: 2000,
+      keyFor,
+      stickyIndices: new Set([0, 10]),
+      hasHeader: false,
+      hasSeparators: false,
+    });
+    // The section-0 header must stay a distinct, force-mounted cell even though index 0 is
+    // long out of [first,last] — NOT silently dropped from plan.cells (which is what
+    // destroyed/recreated the adapter's sticky component every re-entry into the window).
+    expect(plan.forcedStickyCell).toEqual({ index: 0, key: '0' });
+    expect(plan.cells.map(c => c.index)).toEqual([6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    // Space before the forced cell (it sits at offset 0) plus the gap between it and the
+    // window's own first cell (offsets[6] - offsets[0] - lengths[0]).
+    expect(plan.leadingExtent).toBe(0);
+    expect(plan.gapExtent).toBe(500);
+    expect(plan.trailingExtent).toBe(400);
+    // Position 0 is the forced cell; position 6 is index 10, still correctly sticky inside
+    // the window (header absent, leading spacer absent, forced cell + its gap spacer = +2).
+    expect(plan.stickyChildPositions).toEqual([0, 6]);
+  });
+
+  it('matches the old single-window shape when no sticky index precedes the window', () => {
+    const plan = buildListPlan({
+      count: 20,
+      first: 0,
+      last: 9,
+      offsets,
+      lengths,
+      total: 2000,
+      keyFor,
+      stickyIndices: new Set([0, 10]),
+      hasHeader: false,
+      hasSeparators: false,
+    });
+    expect(plan.forcedStickyCell).toBeUndefined();
+    expect(plan.gapExtent).toBe(0);
+    expect(plan.leadingExtent).toBe(0);
+    expect(plan.cells.map(c => c.index)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(plan.stickyChildPositions).toEqual([0]);
+  });
+
+  it('does not force-mount a sticky index that is already inside the window', () => {
+    const plan = buildListPlan({
+      count: 20,
+      first: 8,
+      last: 12,
+      offsets,
+      lengths,
+      total: 2000,
+      keyFor,
+      stickyIndices: new Set([10]),
+      hasHeader: false,
+      hasSeparators: false,
+    });
+    expect(plan.forcedStickyCell).toBeUndefined();
+    expect(plan.gapExtent).toBe(0);
   });
 });
 

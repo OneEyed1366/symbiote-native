@@ -275,6 +275,20 @@ interface IWindowCell<ItemT> {
         @if (leadingSpacerStyle !== null) {
           <symbiote-view [style]="leadingSpacerStyle"></symbiote-view>
         }
+        @if (forcedStickyCell !== null) {
+          <symbiote-view
+            (layout)="handleCellLayout(forcedStickyCell.measure, $event)"
+            [style]="cellStyle"
+          >
+            <ng-container
+              [vListOutlet]="itemDir?.templateRef"
+              [vListOutletContext]="forcedStickyCell.context"
+            ></ng-container>
+          </symbiote-view>
+        }
+        @if (gapSpacerStyle !== null) {
+          <symbiote-view [style]="gapSpacerStyle"></symbiote-view>
+        }
         @for (cell of windowCells; track cell.key) {
           <symbiote-view (layout)="handleCellLayout(cell.measure, $event)" [style]="cellStyle">
             <ng-container
@@ -426,7 +440,13 @@ export class VirtualizedList<ItemT = unknown>
   // --- template-bound view state, assembled in ngDoCheck (recomputeView) ---
   itemCount = EMPTY_OFFSET;
   windowCells: IWindowCell<ItemT>[] = [];
+  // The nearest sticky-header cell force-mounted outside [first,last] (plan.forcedStickyCell), the
+  // Angular twin of RN's _ensureClosestStickyHeader. Rendered ahead of windowCells, right after the
+  // leading spacer, with gapSpacerStyle filling the gap to the window's own first cell — see
+  // buildListPlan's doc comment for the exact child order this assumes.
+  forcedStickyCell: IWindowCell<ItemT> | null = null;
   leadingSpacerStyle: IViewStyle | null = null;
+  gapSpacerStyle: IViewStyle | null = null;
   trailingSpacerStyle: IViewStyle | null = null;
   cellStyle: IViewStyle | undefined = undefined;
   renderedStickyIndices: number[] | undefined = undefined;
@@ -779,7 +799,9 @@ export class VirtualizedList<ItemT = unknown>
 
     if (m.count === FIRST_INDEX) {
       this.windowCells = [];
+      this.forcedStickyCell = null;
       this.leadingSpacerStyle = null;
+      this.gapSpacerStyle = null;
       this.trailingSpacerStyle = null;
       this.renderedStickyIndices = undefined;
       dlog(`Angular VirtualizedList empty (viewport=${this.listState.viewportLength})`);
@@ -800,6 +822,7 @@ export class VirtualizedList<ItemT = unknown>
     });
     this.leadingSpacerStyle =
       plan.leadingExtent > EMPTY_OFFSET ? this.spacerStyle(plan.leadingExtent) : null;
+    this.gapSpacerStyle = plan.gapExtent > EMPTY_OFFSET ? this.spacerStyle(plan.gapExtent) : null;
     this.trailingSpacerStyle =
       plan.trailingExtent > EMPTY_OFFSET ? this.spacerStyle(plan.trailingExtent) : null;
     this.renderedStickyIndices =
@@ -807,25 +830,15 @@ export class VirtualizedList<ItemT = unknown>
         ? plan.stickyChildPositions
         : undefined;
 
+    this.forcedStickyCell =
+      plan.forcedStickyCell !== undefined
+        ? this.buildWindowCell(plan.forcedStickyCell.index, plan.forcedStickyCell.key, false)
+        : null;
+
     const cells: IWindowCell<ItemT>[] = [];
     for (const planned of plan.cells) {
-      const item = this.getItem(this.data, planned.index);
-      const context: IVListItemContext<ItemT> = {
-        $implicit: item,
-        index: planned.index,
-        separators: this.makeSeparators(planned.index),
-      };
-      let separatorContext: IVListSeparatorContext<ItemT> | undefined;
-      if (hasSeparators && planned.index < m.last) {
-        separatorContext = this.buildSeparatorContext(planned.index, item);
-      }
-      cells.push({
-        key: planned.key,
-        index: planned.index,
-        context,
-        measure: this.cellMeasure(planned.index),
-        separatorContext,
-      });
+      const includeSeparator = hasSeparators && planned.index < m.last;
+      cells.push(this.buildWindowCell(planned.index, planned.key, includeSeparator));
     }
     this.windowCells = cells;
 
@@ -833,6 +846,28 @@ export class VirtualizedList<ItemT = unknown>
       `Angular VirtualizedList window [${m.first}, ${m.last}] of ${m.count} ` +
         `(offset=${this.listState.scrollOffset}, viewport=${this.listState.viewportLength}, rendered=${cells.length})`,
     );
+  }
+
+  // Assembles one cell (window or forced-sticky) — the context, measure closure, and optional
+  // separator context — so both plan.cells and plan.forcedStickyCell build identically.
+  private buildWindowCell(
+    index: number,
+    key: string,
+    includeSeparator: boolean,
+  ): IWindowCell<ItemT> {
+    const item = this.getItem(this.data, index);
+    const context: IVListItemContext<ItemT> = {
+      $implicit: item,
+      index,
+      separators: this.makeSeparators(index),
+    };
+    return {
+      key,
+      index,
+      context,
+      measure: this.cellMeasure(index),
+      separatorContext: includeSeparator ? this.buildSeparatorContext(index, item) : undefined,
+    };
   }
 
   private buildSeparatorContext(index: number, item: ItemT): IVListSeparatorContext<ItemT> {

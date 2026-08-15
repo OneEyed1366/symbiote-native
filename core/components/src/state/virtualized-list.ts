@@ -437,12 +437,26 @@ export interface IListCellPlan {
 }
 
 export interface IListPlan {
+  // Space before the very first rendered element: the forced sticky cell when one is
+  // present, else the window's own first cell (the old, only, meaning).
   leadingExtent: number;
+  // Space between the forced sticky cell and the window's first cell. Zero whenever
+  // forcedStickyCell is undefined.
+  gapExtent: number;
   trailingExtent: number;
+  // The in-WINDOW cells only ([first..last]) — unchanged meaning from before forcedStickyCell
+  // existed. Does NOT include forcedStickyCell; render that separately, ahead of these.
   cells: IListCellPlan[];
+  // The nearest sticky index BELOW `first`, force-mounted outside the normal window —
+  // the twin of RN's VirtualizedList._ensureClosestStickyHeader (stock RN keeps a
+  // non-contiguous CellRenderMask region for it). Without this, a pinned section's cell
+  // gets destroyed the moment scrolling carries its origin position out of [first,last],
+  // and recreated from scratch (losing its measured layout) every time the window slides
+  // back over it — the actual cause of a sticky header vanishing/flickering mid-scroll,
+  // not a native-driver issue.
+  forcedStickyCell: IListCellPlan | undefined;
   // Child positions (in the final emitted child array) of the sticky headers that landed
-  // in the window. Accounts for the list header, leading spacer, and the per-gap
-  // separators, so the adapter forwards these straight to the ScrollView.
+  // in the window, INCLUDING forcedStickyCell (counted first, at position 0 or 1) when set.
   stickyChildPositions: number[];
 }
 
@@ -459,31 +473,72 @@ export interface IListPlanParams {
   hasSeparators: boolean;
 }
 
-// Compute the windowed child PLAN: the two spacer extents, the in-window cells (index +
-// key), and the sticky child positions. The adapter walks this plan and creates the host
-// elements (createElement / h) plus the framework cell content. This is the shared half of
-// the render; only the element creation and the user's renderItem stay per-adapter.
+// Find the nearest sticky index strictly below `first` — the RN _ensureClosestStickyHeader
+// backward walk. Returns NO_INDEX when none exists (no sticky section applies yet, or the
+// applicable one is already inside the window).
+function findClosestStickyIndexBelow(first: number, stickyIndices: ReadonlySet<number>): number {
+  for (let index = first - 1; index >= FIRST_INDEX; index -= 1) {
+    if (stickyIndices.has(index)) return index;
+  }
+  return NO_INDEX;
+}
+
+// Compute the windowed child PLAN: the spacer extents, the in-window cells (index + key),
+// the force-mounted sticky cell (if any) ahead of the window, and the sticky child
+// positions. The adapter walks this plan and creates the host elements (createElement / h)
+// plus the framework cell content. This is the shared half of the render; only the element
+// creation and the user's renderItem stay per-adapter.
 export function buildListPlan(params: IListPlanParams): IListPlan {
   const cells: IListCellPlan[] = [];
-  const leadingExtent = params.first > FIRST_INDEX ? params.offsets[params.first] : EMPTY_OFFSET;
+  const closestStickyIndex =
+    params.stickyIndices !== undefined
+      ? findClosestStickyIndexBelow(params.first, params.stickyIndices)
+      : NO_INDEX;
+  const forcedStickyCell: IListCellPlan | undefined =
+    closestStickyIndex === NO_INDEX
+      ? undefined
+      : { index: closestStickyIndex, key: params.keyFor(closestStickyIndex) };
+
+  const windowLeadingExtent =
+    params.first > FIRST_INDEX ? params.offsets[params.first] : EMPTY_OFFSET;
+  const leadingExtent =
+    forcedStickyCell === undefined ? windowLeadingExtent : params.offsets[closestStickyIndex];
+  const gapExtent =
+    forcedStickyCell === undefined
+      ? EMPTY_OFFSET
+      : windowLeadingExtent -
+        params.offsets[closestStickyIndex] -
+        params.lengths[closestStickyIndex];
   const renderedExtent =
     params.last >= params.first
       ? params.offsets[params.last] + params.lengths[params.last] - params.offsets[params.first]
       : EMPTY_OFFSET;
-  const trailingExtent = params.total - leadingExtent - renderedExtent;
+  const trailingExtent = params.total - windowLeadingExtent - renderedExtent;
 
   const stickyChildPositions: number[] = [];
   // The header (when present) is child 0; the leading spacer (when non-empty) is the next
-  // child. Each cell is one child; a separator after it (when ItemSeparatorComponent is set
-  // and this is not the last cell) is another.
+  // child; the forced sticky cell (when present) plus its own gap spacer follow. Each cell
+  // is one child; a separator after it (when ItemSeparatorComponent is set and this is not
+  // the last cell) is another.
   let childPosition = (params.hasHeader ? 1 : 0) + (leadingExtent > EMPTY_OFFSET ? 1 : 0);
+  if (forcedStickyCell !== undefined) {
+    stickyChildPositions.push(childPosition);
+    childPosition += 1 + (gapExtent > EMPTY_OFFSET ? 1 : 0);
+  }
   for (let index = params.first; index <= params.last; index += 1) {
     cells.push({ index, key: params.keyFor(index) });
     if (params.stickyIndices?.has(index) === true) stickyChildPositions.push(childPosition);
     childPosition += 1;
     if (params.hasSeparators && index < params.last) childPosition += 1;
   }
-  return { leadingExtent, trailingExtent, cells, stickyChildPositions };
+  return {
+    leadingExtent,
+    gapExtent,
+    trailingExtent,
+    cells,
+    forcedStickyCell,
+    stickyChildPositions,
+  };
 }
 
 // maintainVisibleContentPosition JS anchor adjustment (RN getDerivedStateFromProps): native MVCP
