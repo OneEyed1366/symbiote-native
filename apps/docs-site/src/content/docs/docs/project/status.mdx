@@ -3,8 +3,8 @@ title: Status
 description: What is stable enough to document today.
 ---
 
-The documented public surface focuses on React, Vue, Angular, and the shared
-core packages.
+The documented public surface focuses on React, Vue, Angular, Svelte, and the
+shared core packages.
 
 ## Adapter status
 
@@ -28,7 +28,13 @@ core packages.
   an `Animated.event(...)` marker, which `@Output()` can't express. On the
   landing page's live framework switcher now; the Slider wrapper package also
   ships an Angular build (`@symbiote-native/slider/angular`).
-- Svelte — not started. Architecture diagrams and roadmap text only.
+- Svelte — the third non-React adapter. A DOM shim over stock compiled Svelte
+  output drives the same engine, so components are stock Svelte markup —
+  no custom compiler output, no bespoke reconciler. Full component parity
+  with React/Vue/Angular, verified on-device on iOS and Android
+  (`examples/svelte`); the Slider wrapper package also ships a Svelte build.
+  Not yet on the landing page's live framework switcher — that needs its own
+  demo assets.
 - Solid — not started. Architecture diagrams and roadmap text only.
 
 ## Core status
@@ -38,7 +44,7 @@ core packages.
   wraps.
 - `@symbiote-native/css-parser` — build-time compiler for plain CSS, CSS Modules, and
   SCSS/Sass, Less, and Stylus preprocessor sources, resolved at runtime
-  through a class registry shared by React, Vue, and Angular. Also ships a
+  through a class registry shared by React, Vue, Angular, and Svelte. Also ships a
   `css-dts` CLI (typo-safe `.module.css` `.d.ts` generation) and a
   `typescript-plugin` for live in-editor autocomplete — see the
   [roadmap](/docs/project/roadmap/).
@@ -49,15 +55,17 @@ core packages.
   `package.json` with a `postinstall` script; each install rescans
   `node_modules` and regenerates the Android registration blocks for every
   wrapper package it finds.
-- React/Vue/Angular adapters — framework lifecycle and public API bridges over
-  the shared core.
+- React/Vue/Angular/Svelte adapters — framework lifecycle and public API
+  bridges over the shared core.
 
 ## What the docs promise
 
 React, Vue, and Angular are presented as live choices on the landing page's
 framework switcher, each with its own demo GIF on the landing page and its
-learn guide. Svelte and Solid stay in architecture diagrams and roadmap text
-only, with no dedicated guide yet because no code exists for them.
+learn guide. Svelte ships and is documented alongside them but hasn't joined
+the landing page's live switcher yet, pending its own demo assets. Solid
+stays in architecture diagrams and roadmap text only, with no dedicated guide
+yet because no code exists for it.
 
 ## What remains moving
 

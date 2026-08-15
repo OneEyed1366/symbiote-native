@@ -23,6 +23,7 @@ brightness is an Android-only system-brightness-mode surface and an iOS-only cha
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 <Aside type="caution" title="getBrightnessAsync/setBrightnessAsync never round-trip on the iOS Simulator">
   `UIScreen.main.brightness` is a long-standing Apple Simulator limitation, reproducible in any app
@@ -163,6 +164,30 @@ only changes in response to your own `setBrightnessAsync` calls.
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text, View } from '@symbiote-native/svelte';
+      import { addBrightnessListener, getBrightnessAsync, setBrightnessAsync } from '@symbiote-native/brightness';
+      import type { EventSubscription } from '@symbiote-native/brightness';
+
+      let brightness = $state<number | null>(null);
+
+      $effect(() => {
+        getBrightnessAsync().then(value => (brightness = value));
+        const subscription: EventSubscription = addBrightnessListener(event => (brightness = event.brightness));
+        return () => subscription.remove();
+      });
+    </script>
+
+    <View>
+      <Text>{brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`}</Text>
+      <Pressable onPress={() => setBrightnessAsync(0.5)}>
+        <Text>Set to 50%</Text>
+      </Pressable>
+    </View>
+    ```
+  </TabItem>
 </Tabs>
 
 ### Permission
@@ -223,6 +248,21 @@ only changes in response to your own `setBrightnessAsync` calls.
       readonly permissions = inject(PermissionsService);
       readonly status = this.permissions.connect();
     }
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text } from '@symbiote-native/svelte';
+      import { usePermissions } from '@symbiote-native/brightness/svelte';
+
+      const permissions = usePermissions();
+    </script>
+
+    <Text>{permissions.status?.status ?? 'checking…'}</Text>
+    <Pressable onPress={() => permissions.request()}>
+      <Text>Request permission</Text>
+    </Pressable>
     ```
   </TabItem>
 </Tabs>
@@ -307,12 +347,13 @@ packages/brightness/src/
 │                                 expo-modules-core's requireNativeModule
 ├── react/hooks/use-permissions   @symbiote-native/brightness/react
 ├── vue/composables/use-permissions @symbiote-native/brightness/vue
+├── svelte/runes/use-permissions  @symbiote-native/brightness/svelte
 └── angular/services/permissions.service @symbiote-native/brightness/angular
 ```
 
 `usePermissions` is the only stateful surface — auto-fetch on mount, expose `get`/`request` as
 imperative callbacks — written once as a shared pattern and reapplied identically in
 [cellular](/docs/packages/cellular/#usepermissions); every other export is a stateless free
-function, re-exported verbatim by all three adapters. The native code itself is never vendored or
+function, re-exported verbatim by all four adapters. The native code itself is never vendored or
 copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native
 setup guide](/docs/howtos/expo-native-module-setup/)).

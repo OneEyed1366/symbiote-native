@@ -10,8 +10,8 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 reading the root view's background color — so every SymbioteNative adapter can reach it, not
 just React. Like [device](/docs/packages/device/) and [local auth](/docs/packages/local-auth/),
 both exports here are one-shot async calls with no per-instance state, so there is no
-hook/composable/service to wrap — the React, Vue, and Angular entry points are plain re-exports of
-the same `core`.
+hook/composable/service to wrap — the React, Vue, Angular, and Svelte entry points are plain
+re-exports of the same `core`.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -23,6 +23,7 @@ the same `core`.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Installation
 
@@ -48,8 +49,8 @@ background color, nothing gated by a permission prompt.
 
 ## Usage
 
-Both adapters — React, Vue, Angular — re-export the exact same two functions; there is no
-per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+All four adapters — React, Vue, Angular, Svelte — re-export the exact same two functions; there
+is no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
 subscription.
 
 <Tabs syncKey="framework">
@@ -116,6 +117,20 @@ subscription.
     There's no per-instance service to `inject()` here — both functions are plain exports off the
     core package, called straight in the constructor or wherever the app's root is set up.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text, View } from '@symbiote-native/svelte';
+      import { setBackgroundColorAsync } from '@symbiote-native/system-ui/svelte';
+
+      $effect(() => {
+        void setBackgroundColorAsync('black');
+      });
+    </script>
+
+    <View><Text>Root background set to black</Text></View>
+    ```
+  </TabItem>
 </Tabs>
 
 ## API
@@ -151,11 +166,12 @@ packages/system-ui/src/
 │             # requireNativeModule
 ├── react/    # @symbiote-native/system-ui/react   — export * from '../core'
 ├── vue/      # @symbiote-native/system-ui/vue     — export * from '../core'
-└── angular/  # @symbiote-native/system-ui/angular — export * from '../core'
+├── angular/  # @symbiote-native/system-ui/angular — export * from '../core'
+└── svelte/   # @symbiote-native/system-ui/svelte  — export * from '../core'
 ```
 
 Same shape as [device](/docs/packages/device/)'s and [local auth](/docs/packages/local-auth/)'s
-three adapter entries: single-file re-exports with no lifecycle code at all, since every export
+adapter entries: single-file re-exports with no lifecycle code at all, since every export
 here is a stateless one-shot async call — there is nothing for a hook, composable, or service to
 subscribe to or clean up. The native code itself is never vendored or copied —
 `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup

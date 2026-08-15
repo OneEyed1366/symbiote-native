@@ -10,8 +10,8 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 prompting the platform's native in-app review flow — so every SymbioteNative adapter can reach it,
 not just React. Like [device](/docs/packages/device/) and
 [local auth](/docs/packages/local-auth/), every export here is a one-shot async call with no
-per-instance state, so there is no hook/composable/service to wrap — the React, Vue, and Angular
-entry points are plain re-exports of the same `core`.
+per-instance state, so there is no hook/composable/service to wrap — the React, Vue, Angular, and
+Svelte entry points are plain re-exports of the same `core`.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -23,6 +23,7 @@ entry points are plain re-exports of the same `core`.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 <Aside type="caution" title="Deliberate deviation from upstream — no expo-constants dependency">
   Upstream's `storeUrl()` reads `Constants.expoConfig.ios.appStoreUrl`/`.android.playStoreUrl` off
@@ -59,7 +60,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
 
 ## Usage
 
-All three adapters — React, Vue, Angular — re-export the exact same functions; there is no
+All four adapters — React, Vue, Angular, Svelte — re-export the exact same functions; there is no
 per-adapter hook/composable/service to reach for, since nothing here holds live state or a
 subscription.
 
@@ -127,6 +128,23 @@ subscription.
     There's no per-instance service to `inject()` here — every function is a plain export off the
     core package, called straight from a template event binding.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Button } from '@symbiote-native/svelte';
+      import { requestReview } from '@symbiote-native/store-review/svelte';
+
+      function onRatePress() {
+        void requestReview({
+          iosAppStoreUrl: 'https://apps.apple.com/app/id123456789',
+          androidPlayStoreUrl: 'https://play.google.com/store/apps/details?id=com.example.app',
+        });
+      }
+    </script>
+
+    <Button title="Rate this app" onPress={onRatePress} />
+    ```
+  </TabItem>
 </Tabs>
 
 ## API
@@ -177,11 +195,12 @@ packages/store-review/src/
 │             # expo-modules-core's requireNativeModule
 ├── react/    # @symbiote-native/store-review/react   — export * from '../core'
 ├── vue/      # @symbiote-native/store-review/vue     — export * from '../core'
-└── angular/  # @symbiote-native/store-review/angular — export * from '../core'
+├── angular/  # @symbiote-native/store-review/angular — export * from '../core'
+└── svelte/   # @symbiote-native/store-review/svelte  — export * from '../core'
 ```
 
 Same shape as [device](/docs/packages/device/)'s and [local auth](/docs/packages/local-auth/)'s
-three adapter entries: single-file re-exports with no lifecycle code at all, since every export
+adapter entries: single-file re-exports with no lifecycle code at all, since every export
 here is a stateless one-shot async call — there is nothing for a hook, composable, or service to
 subscribe to or clean up. The native code itself is never vendored or copied —
 `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup

@@ -23,32 +23,89 @@ adapter or a native-view wrapper. `@symbiote-native/engine` and `react-native`
 
 ## Status matrix
 
-Every component below ships on React, Vue, and Angular. What differs is the
-framework-shaped surface:
+Every component below ships on React, Vue, Angular, and Svelte. What differs is
+the framework-shaped surface:
 
-- `View` — React uses `children`; Vue uses the default slot. Refs are
-  framework-shaped.
+- `View` — React uses `children`; Vue uses the default slot; Svelte takes a
+  `children: Snippet` prop rendered with `{@render children?.()}` — closer to
+  React's callback-prop shape than to Vue's slot. Refs are framework-shaped:
+  Svelte's `View` forwards no `bind:this` escape hatch of its own, so
+  imperative access goes through the `hostInstance()` rune over a raw
+  `symbiote-view` host tag (or a component's own exported functions, e.g.
+  `TextInput`/`ScrollView`'s `focus`/`scrollTo`).
 - `Text` — Text children differ by framework; press events follow callback vs
-  emit shape.
-- `Image` — Source resolution and statics are shared.
+  emit shape. Svelte's `Text` takes the same object-bag props as `View`
+  (no `IResponderProps`, matching every other adapter's `ITextProps`).
+- `Image` — Source resolution and statics are shared. Svelte's `Image.svelte`
+  re-derives the same prop-assembly logic `renderImage()` encapsulates
+  (`buildImageBag`, mirroring the source/width-height/resizeMode/tintColor
+  folds field-for-field) rather than calling the shared function directly —
+  documented duplication, not a behavior difference; statics
+  (`getSize`/`prefetch`/`queryCache`/…) attach from the sibling `index.ts`.
 - `ScrollView` — Imperative handle, refresh, and sticky behavior need
-  framework-specific examples.
-- `Pressable` — React uses a render child; Vue uses a scoped slot. Events are
-  callbacks vs emits.
-- `TextInput` — `onValueChange` maps to `@value-change`; the controlled write
-  handshake is shared.
-- `Switch` — `onValueChange` maps to `@value-change`; controlled snap-back is
-  shared.
-- `ActivityIndicator` — Mostly shared render-only props.
-- Lists — Render item/slot shape differs; windowing math is shared.
+  framework-specific examples. Svelte exposes `scrollTo`/`scrollToEnd`/
+  `flashScrollIndicators`/`getScrollNode` as plain exported functions read off
+  `bind:this`, the Svelte-5 twin of `useImperativeHandle`/`expose()`. Sticky
+  headers ride the same native driver as React/Vue once
+  `isNativeAnimatedAvailable()` is true. **Honest gap**: `stickyHeaderIndices`/
+  `invertStickyHeaders` auto-wrap is not implemented — Svelte hands a
+  component only an opaque `Snippet`, with no `Children.toArray`/`slots.default()`
+  equivalent to pull "child at index N" out of it, so compose
+  `ScrollViewStickyHeader` manually instead (it auto-wires to the parent's
+  scroll offset via Svelte context).
+- `Pressable` — React uses a render child; Vue uses a scoped slot; Svelte uses
+  a named snippet prop, `{#snippet children({ pressed })}...{/snippet}`.
+  Events are plain callback props (`onPress`, `onLongPress`, …) exactly like
+  React — Svelte never translates to an emit/Output shape.
+- `TextInput` — `onValueChange` maps to `@value-change` on Vue and `(valueChange)`
+  on Angular; Svelte keeps the RN name unchanged as a plain callback prop,
+  `onValueChange={(text, event) => …}` — the same shape as React, no
+  translation layer. The controlled write handshake (event-count-gated
+  `setTextAndSelection` command) is shared logic across all four.
+- `Switch` — `onValueChange` maps to `@value-change` on Vue and `(valueChange)`
+  on Angular; Svelte again keeps `onValueChange` as a plain callback prop,
+  React-shaped. Controlled snap-back (`dispatchViewCommand` when native
+  reports a value the parent rejects) is shared logic.
+- `ActivityIndicator` — Mostly shared render-only props. Svelte calls
+  `renderActivityIndicator()` directly and syncs its one child through the
+  generic `descriptorToSvelte` bridge (`mountDescriptorChildren`) rather than
+  hand-authoring the spinner tag.
+- Lists — Render item/slot shape differs; windowing math is shared. Svelte's
+  cell renderer is a **required named snippet prop**, `item`:
+  `{#snippet item({ item, index, separators })}...{/snippet}` — not a
+  `renderItem` callback prop, and not `#item` scoped-slot syntax. **Honest
+  gaps**: `SectionList`/`VirtualizedSectionList` and multi-column `FlatList`
+  are compile-verified only (via `svelte/compiler` directly), not
+  execution-verified by a running smoke test the way single-column
+  `FlatList`/`VirtualizedList` are; and `IVirtualizedListProps`/
+  `IFlatListProps`/`IVirtualizedSectionListProps` do not yet extend
+  `IAccessibilityProps`/`IAriaProps` on Svelte, so `testID` and
+  `accessibilityLabel` have no effect on a Svelte list today, unlike React.
 - `Animated` — The value graph is shared; component wrapping differs by
-  adapter (see the [Animations guide](/docs/learn/animations/)).
+  adapter (see the [Animations guide](/docs/learn/animations/)). Svelte has no
+  generic `Animated.createAnimatedComponent(Component)` — a compiled Svelte
+  component isn't a runtime value you can wrap with one call the way React's
+  `createElement`/Vue's `h()` allow — so `Animated.View`/`.Text`/`.Image`/
+  `.ScrollView` are each their own hand-authored `.svelte` file sharing only
+  the non-visual reconcile logic. **Honest gaps**: `Animated.FlatList` and
+  `Animated.SectionList` have no Svelte wrapper yet (follow-up, not silently
+  dropped); the `Touchable*` family's press-fade is a self-contained
+  `setTimeout`-driven tween reproducing `Animated.timing`'s curve, not a real
+  native-thread `useNativeDriver` animation.
 - `Modal`, `KeyboardAvoidingView`, `SafeAreaView`, `RefreshControl`,
   `ImageBackground`, `InputAccessoryView`, `StatusBar`, `Button` — shared
   render/behavior logic, framework-shaped props and events same as above.
+  Svelte's `Modal` hand-authors its two fixed host tags (`symbiote-modal` >
+  `symbiote-view`) and reads `renderModal()`'s output straight off the known
+  `props`/`children[0].props` positions, the Svelte twin of React's/Vue's
+  element-chain. `StatusBar` is the one runtime module with a real
+  declarative half on every adapter: Svelte renders nothing and re-applies
+  props via `$effect` (the Svelte twin of Vue's `watchEffect`-based version).
 - The `Touchable*` family (`TouchableOpacity`, `TouchableHighlight`,
   `TouchableWithoutFeedback`, `TouchableNativeFeedback`) — built on the same
-  shared press state machine as `Pressable`.
+  shared press state machine as `Pressable`. See `Animated`'s honest-gaps note
+  above for the one Svelte-specific shortfall (the tween stand-in for a real
+  native-driven fade).
 - `PanResponder` — an engine-level gesture-recognition module, not a
   component; shared across every adapter unchanged.
 
@@ -70,18 +127,22 @@ Framework-specific when the prop contains framework values:
 
 ## Event naming examples
 
-| Component   | React           | Vue             | Angular            | Payload          |
-| ----------- | --------------- | --------------- | -------------------- | ---------------- |
-| `Pressable` | `onPress`       | `@press`        | `(press)`            | `ISymbioteEvent` |
-| `Pressable` | `onLongPress`   | `@long-press`   | `(longPress)`        | `ISymbioteEvent` |
-| `Switch`    | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `boolean`        |
-| `TextInput` | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `string`         |
-| `View`      | `onLayout`      | `@layout`       | `(layout)`         | `ISymbioteEvent` |
+| Component   | React           | Vue             | Angular            | Svelte          | Payload          |
+| ----------- | --------------- | --------------- | -------------------- | --------------- | ---------------- |
+| `Pressable` | `onPress`       | `@press`        | `(press)`            | `onPress`       | `ISymbioteEvent` |
+| `Pressable` | `onLongPress`   | `@long-press`   | `(longPress)`        | `onLongPress`   | `ISymbioteEvent` |
+| `Switch`    | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `onValueChange` | `boolean`        |
+| `TextInput` | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `onValueChange` | `string`         |
+| `View`      | `onLayout`      | `@layout`       | `(layout)`         | `onLayout`      | `ISymbioteEvent` |
 
 `TextInput`'s React/Vue callback fires as `(text, event)` — one value merged
 from what used to be two separate callbacks. Angular can't do that in one
 `EventEmitter`, so it keeps a second, separate `(change)` output for the raw
-event alongside text-only `(valueChange)`.
+event alongside text-only `(valueChange)`. Svelte's `onValueChange` fires the
+identical `(text, event)` shape React's does — the adapter is a flat
+object-bag adapter (every prop, handlers included, rides one object handed to
+the shim element's `p` setter), so there is no per-event translation layer to
+begin with: the callback prop name is RN's own name, unchanged.
 
 Angular's names (`(press)`, `(longPress)`, `(valueChange)`, `(change)`,
 `(layout)`) are all real `@Output()` `EventEmitter`s, bound like
@@ -91,7 +152,18 @@ events (`onScroll`, `onScrollBeginDrag`, `onScrollEndDrag`,
 components, which stay plain callbacks bound as an `@Input()` —
 `[onScroll]="handler"` — because they can carry an `Animated.event(...)`
 marker for native-driven scroll, and `@Output()` only binds a template
-listener expression, never an arbitrary value.
+listener expression, never an arbitrary value. Svelte has no `@Output()`
+equivalent at all — every event on every component, scroll-family included,
+is a plain callback prop, so this Angular-only exception has no Svelte
+counterpart to carve out.
+
+Svelte's own two-way-binding primitive, the nearest equivalent to Vue's
+`v-model`, is `$bindable()` (`let { value = $bindable() } = $props()`, wired
+with `bind:value={x}` at the call site) — a supported authoring pattern for
+your own components. The shipped `TextInput`/`Switch` do not use it: they
+keep the same controlled `value` + `onValueChange` callback handshake React
+uses, so a Svelte app writes `<TextInput value={x} onValueChange={setX} />`,
+not `bind:value`.
 
 ## Framework event idioms side by side
 
@@ -121,6 +193,19 @@ listener expression, never an arbitrary value.
     })
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <!-- Svelte — callback props, same names as React; no emits, no @Output() -->
+    <script lang="ts">
+      import { Pressable, Switch } from '@symbiote-native/svelte';
+
+      let enabled = $state(false);
+    </script>
+
+    <Pressable onPress={event => console.log(event)} />
+    <Switch value={enabled} onValueChange={next => (enabled = next)} />
+    ```
+  </TabItem>
 </Tabs>
 
 ## API
@@ -132,7 +217,15 @@ adapter (or a native-view wrapper package) drives directly.
 
 A render function returns a `Descriptor` tree — a tiny framework-agnostic node
 description each adapter maps onto its own element (`descriptorToReact` →
-`React.createElement`, `descriptorToVue` → `h()`).
+`React.createElement`, `descriptorToVue` → `h()`). Svelte has no such generic
+walker: since Svelte compiles templates statically, each component
+hand-authors the fixed-shape host tag(s) its `render*()` counterpart always
+produces and reads the returned props/children off known positions
+(`descriptor.props`, `descriptor.children[0]`); `mountDescriptorChildren`
+(`descriptor-to-svelte.ts`) exists only to sync an already-fixed-shape
+`Descriptor`'s children onto a literal host tag without recreating nodes on
+every update — narrower in scope than `descriptorToReact`/`descriptorToVue`,
+not a like-for-like replacement.
 
 | Export | Signature | Description |
 | --- | --- | --- |
@@ -176,7 +269,8 @@ elements, so the shared half is the state and math below, not a descriptor.
 ### State machines
 
 Pure reducers and folds. The adapter supplies the lifecycle cell (React
-`useReducer`, Vue `ref`/`watch`, Angular signals) and executes the effects.
+`useReducer`, Vue `ref`/`watch`, Angular signals, Svelte `$state`/`$effect`
+runes) and executes the effects.
 
 | Export | Signature | Description |
 | --- | --- | --- |
@@ -260,9 +354,13 @@ Constants with the same shared-math role are exported alongside them —
 ### Shared prop types
 
 `IResponderProps`, `IActivityIndicatorProps`, `ISwitchProps`, and `IButtonProps`
-are fully framework-agnostic, so every adapter re-exports them verbatim rather
-than redeclaring them. `IImageProps`, `ITextInputProps`, `ITextInputHandle`,
-`IScrollViewHandle`, `IVirtualizedListHandle`, and
+are fully framework-agnostic at their core, so every adapter's own prop type
+layers only its own class-styling field on top of the shared base rather than
+redeclaring the whole shape — React adds `className?: string`, Vue and
+Svelte both add `class?:` (Svelte's is `ISvelteClassValue`, a wider type that
+additionally accepts a clsx-style object/array, resolved by the adapter
+itself before it reaches the engine). `IImageProps`, `ITextInputProps`,
+`ITextInputHandle`, `IScrollViewHandle`, `IVirtualizedListHandle`, and
 `IVirtualizedSectionListHandle` ship here too; a prop type carrying framework
 children, refs, or render callbacks stays per-adapter by design.
 

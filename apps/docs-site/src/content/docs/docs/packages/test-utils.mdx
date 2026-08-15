@@ -13,7 +13,7 @@ to push a native event back into the renderer. Unlike every other package docume
 [system UI](/docs/packages/system-ui/) — it wraps no native library and ships nothing your app
 imports at runtime: it is a `devDependency` test double standing in for the native side of the
 [engine](/docs/api/core/)'s commit path, imported by the co-located Vitest suites across the
-engine, all three adapters, the wrapper packages, and the example apps. Its persistence
+engine, all four adapters, the wrapper packages, and the example apps. Its persistence
 semantics are faithful, not simplified — every clone is a new identity, `clone*WithNewProps`
 merges the engine's minimal diff onto the previous props, and `appendChild` throws on an illegal
 Fabric family reparent.
@@ -33,6 +33,7 @@ The adapter table, by contrast, is real: each adapter's own suite drives this ha
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Installation
 
@@ -46,7 +47,7 @@ default `node` environment is enough.
 
 ## Usage
 
-One shape across all three adapters: install the recorder once at module scope, `reset()` it
+One shape across all four adapters: install the recorder once at module scope, `reset()` it
 between tests, `mount()` the thing under test, then assert on what reached the fake slot. The
 examples below are trimmed from real suites in this repo — the file each one comes from is named
 under it.
@@ -191,6 +192,64 @@ under it.
     Angular components are bound to the harness through the same `mount(rootTag, Component)` the
     other adapters use — there is no test-utils-specific `TestBed` setup, and no service to
     `inject()`.
+  </TabItem>
+  <TabItem label="Svelte">
+    ```ts
+    import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+    import { compile } from 'svelte/compiler';
+    import { writeFileSync } from 'node:fs';
+    import { join } from 'node:path';
+    import type { Component } from 'svelte';
+    import { installFabric } from '@symbiote-native/test-utils';
+    import { mount, unmount } from '@symbiote-native/svelte';
+
+    const ROOT_TAG = 91_001;
+    const fabric = installFabric();
+    const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+
+    beforeEach(() => fabric.reset());
+    afterEach(() => unmount(ROOT_TAG));
+
+    // No @sveltejs/vite-plugin-svelte in this repo's vitest config, so real .svelte source is
+    // compiled through the real compiler and dynamic-imported, rather than transformed by a loader.
+    async function compileComponent(source: string, name: string): Promise<Component> {
+      const result = compile(source, {
+        generate: 'client',
+        filename: `${name}.svelte`,
+        fragments: 'tree',
+        css: 'external',
+      });
+      const file = join(__dirname, `${name}.mjs`);
+      writeFileSync(file, result.js.code);
+      const mod = (await import(`file://${file}`)) as { default: Component };
+      return mod.default;
+    }
+
+    describe('Svelte $state mutation on the engine', () => {
+      it('re-commits when a rune changes', async () => {
+        const Counter = await compileComponent(
+          `<script>
+             let count = $state(0);
+             $effect(() => { if (count < 1) count = count + 1; });
+           </script>
+           <symbiote-text p={{}}>count {count}</symbiote-text>`,
+          'Counter',
+        );
+
+        mount(ROOT_TAG, Counter);
+        await tick();
+        await tick();
+        await tick();
+
+        expect(fabric.serialize([fabric.appRoot()])).toContain('RCTRawText "count 1"');
+      });
+    });
+    ```
+
+    Trimmed from `adapters/svelte/src/mount-pipeline.smoke.test.ts`. Svelte is the one adapter
+    whose own suites can't lean on a loader to transform `.svelte` source — there is no
+    `@sveltejs/vite-plugin-svelte` wired into this repo's Vitest config — so its tests compile
+    real source through `svelte/compiler` by hand before mounting it, unlike the other three tabs.
   </TabItem>
 </Tabs>
 

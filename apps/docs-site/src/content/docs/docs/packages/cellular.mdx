@@ -23,6 +23,7 @@ cellular is that almost the entire carrier/SIM surface is Android-only — iOS e
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 <Aside type="caution" title="Every field except generation is Android-only">
   `allowsVoipAsync`, `getIsoCountryCodeAsync`, `getCarrierNameAsync`, `getMobileCountryCodeAsync`,
@@ -132,6 +133,27 @@ adapter, with no hook/composable/service in the way:
     There's no per-instance service to `inject()` here — every function is a plain free function
     off the core package, same as `@symbiote-native/local-auth`.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text } from '@symbiote-native/svelte';
+      import { CellularGeneration, getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
+
+      let generation = $state<CellularGeneration | null>(null);
+      let carrierName = $state<string | null>(null);
+
+      $effect(() => {
+        getCellularGenerationAsync().then(value => (generation = value));
+        getCarrierNameAsync().then(value => (carrierName = value)); // Android only — always null on iOS
+      });
+    </script>
+
+    <Text>{carrierName ?? `generation ${generation}`}</Text>
+    ```
+
+    There's no per-instance rune to reach for here either — every function is a plain free
+    function off the core package, called straight from `$effect`.
+  </TabItem>
 </Tabs>
 
 ### Permission
@@ -192,6 +214,21 @@ adapter, with no hook/composable/service in the way:
       readonly permissions = inject(PermissionsService);
       readonly status = this.permissions.connect();
     }
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text } from '@symbiote-native/svelte';
+      import { usePermissions } from '@symbiote-native/cellular/svelte';
+
+      const permissions = usePermissions();
+    </script>
+
+    <Text>{permissions.status?.status ?? 'checking…'}</Text>
+    <Pressable onPress={() => permissions.request()}>
+      <Text>Request permission</Text>
+    </Pressable>
     ```
   </TabItem>
 </Tabs>
@@ -263,12 +300,13 @@ packages/cellular/src/
 │                                 expo-modules-core's requireNativeModule
 ├── react/hooks/use-permissions   @symbiote-native/cellular/react
 ├── vue/composables/use-permissions @symbiote-native/cellular/vue
+├── svelte/runes/use-permissions  @symbiote-native/cellular/svelte
 └── angular/services/permissions.service @symbiote-native/cellular/angular
 ```
 
 `usePermissions` is written once as a shared pattern and reapplied identically in
 [brightness](/docs/packages/brightness/#how-the-wrapper-works); every other export is a stateless
-free function, re-exported verbatim by all three adapters, same as
+free function, re-exported verbatim by all four adapters, same as
 [local-auth](/docs/packages/local-auth/). The native code itself is never vendored or copied —
 `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
 guide](/docs/howtos/expo-native-module-setup/)).

@@ -63,9 +63,18 @@ real-device Detox e2e suite, but doesn't yet share the identical
 `canary-journeys` spec file that React and Vue run byte-for-byte. See the
 [status page](/docs/project/status/) for the exact line.
 
-## What about Svelte and Solid?
+## Is Svelte a first-class adapter?
+
+Yes. It's a DOM shim over stock compiled Svelte output driving the same
+engine, with full component parity against React, Vue, and Angular, verified
+on-device on iOS and Android (`examples/svelte`). The Slider wrapper package
+ships a Svelte build too. It isn't on the landing page's live framework
+switcher yet — that's pending demo assets, not adapter work — so it doesn't
+have its own learn guide page yet either.
+
+## What about Solid?
 
 No code exists yet. The architecture is built for thin adapters over the same
-shared engine, so they fit the same long-term model Angular proved out, but
-they stay in architecture diagrams and roadmap text only until that work
-starts.
+shared engine, so it fits the same long-term model React, Vue, Angular, and
+Svelte all proved out, but it stays in architecture diagrams and roadmap text
+only until that work starts.

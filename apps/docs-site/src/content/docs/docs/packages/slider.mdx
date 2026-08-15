@@ -26,6 +26,7 @@ instead.
 | React               | ✅ live    |
 | Vue                 | ✅ live    |
 | Angular             | ✅ live    |
+| Svelte              | ✅ live    |
 
 ## Installation
 
@@ -40,8 +41,8 @@ as a workspace dependency the same way the examples do.
   `@react-native-community/slider` ships a React component (`Slider.tsx`) built on hooks. Never
   import that component directly in a non-React adapter — it throws with `Cannot read property
   'useState' of null` because the React dispatcher is absent. Always import from
-  `@symbiote-native/slider/react`, `@symbiote-native/slider/vue`, or `@symbiote-native/slider/angular`,
-  never from the community package itself.
+  `@symbiote-native/slider/react`, `@symbiote-native/slider/vue`, `@symbiote-native/slider/angular`,
+  or `@symbiote-native/slider/svelte`, never from the community package itself.
 </Aside>
 
 ## Usage
@@ -127,13 +128,36 @@ as a workspace dependency the same way the examples do.
     `value` input + `valueChange` output pair — write `[value]="volume()"
     (valueChange)="volume.set($event)"` instead if you need the explicit form.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Slider } from '@symbiote-native/slider/svelte';
+
+      let volume = $state(0.5);
+    </script>
+
+    <Slider
+      value={volume}
+      onValueChange={next => (volume = next)}
+      minimumValue={0}
+      maximumValue={1}
+      step={0.05}
+      minimumTrackTintColor="#ff3e00"
+      thumbTintColor="#ff3e00"
+    />
+    ```
+
+    Svelte has no two-way-binding sugar for this component — `value`/`onValueChange` is the
+    explicit, only form, same as writing out React's or Vue's `:value`/`@value-change` pair by
+    hand.
+  </TabItem>
 </Tabs>
 
 ### Custom step markers
 
 `renderStepNumber` draws the library's built-in step dots. To draw your own marker per step,
-pass a `StepMarker` (React) or fill the `#stepMarker` scoped slot (Vue) — both receive
-`{ stepMarked, currentValue, index, min, max }`:
+pass a `StepMarker` (React), fill the `#stepMarker` scoped slot (Vue), or pass a `stepMarker`
+snippet (Svelte) — all three receive `{ stepMarked, currentValue, index, min, max }`:
 
 ```tsx
 <Slider
@@ -147,13 +171,18 @@ pass a `StepMarker` (React) or fill the `#stepMarker` scoped slot (Vue) — both
 />
 ```
 
+```svelte
+<Slider value={2} minimumValue={0} maximumValue={4} step={1}>{#snippet stepMarker({ stepMarked })}<View style={{ width: 8, height: 8, borderRadius: 4, opacity: stepMarked ? 1 : 0.4 }} />{/snippet}</Slider>
+```
+
 ## API
 
 ### Props
 
 Every prop below is framework-agnostic and shared verbatim by every adapter, **except**
-`StepMarker`, which is per-adapter because it returns a framework element (a React component vs
-a Vue scoped slot) — see [shared vs framework-specific](/docs/api/components/#shared-vs-framework-specific).
+`StepMarker`, which is per-adapter because it returns a framework element (a React component, a
+Vue scoped slot, or a Svelte snippet) — see [shared vs
+framework-specific](/docs/api/components/#shared-vs-framework-specific).
 
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -169,7 +198,7 @@ a Vue scoped slot) — see [shared vs framework-specific](/docs/api/components/#
 | `tapToSeek` | `boolean` | `false` | Tapping anywhere on the track jumps the thumb there, instead of requiring a drag |
 | `vertical` | `boolean` | `false` | Renders the slider top-to-bottom instead of left-to-right |
 | `renderStepNumber` | `boolean` | `false` | Draws the built-in step-number indicator |
-| `StepMarker` (React) / `#stepMarker` (Vue) | render prop / scoped slot | — | Custom per-step marker, replacing `renderStepNumber`'s built-in dot |
+| `StepMarker` (React) / `#stepMarker` (Vue) / `stepMarker` (Svelte) | render prop / scoped slot / snippet | — | Custom per-step marker, replacing `renderStepNumber`'s built-in dot |
 | `onValueChange` | `(value: number) => void` | — | Fires continuously while dragging |
 | `onSlidingStart` / `onSlidingComplete` | `(value: number) => void` | — | Fires once when a drag begins/ends |
 | accessibility / `aria-*` / `testID` / `style` | — | — | Pass through to the native node unchanged |
@@ -205,10 +234,11 @@ packages/slider/src/
 ├── register.ts       # side-effect: registers RNCSlider's ViewConfig fallback + event/color processors
 ├── react/            # React lifecycle (hooks) + descriptorToReact bridge
 ├── vue/               # Vue lifecycle (refs/emits) + descriptorToVue bridge
-└── angular/           # Angular lifecycle (@Output EventEmitters) + DescriptorOutlet bridge
+├── angular/           # Angular lifecycle (@Output EventEmitters) + DescriptorOutlet bridge
+└── svelte/            # Svelte lifecycle (runes) + the native-view bridge's descriptor-children mount
 ```
 
-All three adapters import `../register` first (never the library's `Slider.tsx`), then call into the
+Every adapter imports `../register` first (never the library's `Slider.tsx`), then calls into the
 same `core` render — the same logic/view/lifecycle split as every other SymbioteNative component (see
 [how it works](/docs/how-it-works/)). Wrapping a different third-party native view follows
 this same recipe: register its `ViewConfig` fallback and processors as a side effect, then implement the

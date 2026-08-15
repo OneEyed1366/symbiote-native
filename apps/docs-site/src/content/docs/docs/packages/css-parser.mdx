@@ -24,13 +24,15 @@ are produced for iOS and Android from one transform.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Installation
 
 **For the Metro transformer: nothing to install.** `@symbiote-native/react`,
-`@symbiote-native/vue`, and `@symbiote-native/angular` each depend on `@symbiote-native/css-parser`
-directly and re-export it through their own `./metro-css-parser` subpath, so an app that already
-has an adapter installed can point Metro at the transformer with no extra dependency.
+`@symbiote-native/vue`, `@symbiote-native/angular`, and `@symbiote-native/svelte` each depend on
+`@symbiote-native/css-parser` directly and re-export it through their own `./metro-css-parser`
+subpath, so an app that already has an adapter installed can point Metro at the transformer with
+no extra dependency.
 
 Install it directly only for the two development-time pieces — the `css-dts` CLI and the
 TypeScript plugin, which your app's own `package.json` and `tsconfig.json` reference by name:
@@ -151,6 +153,51 @@ object, not the factory — so no local wrapper file is needed.
     `'build/angular'` — pass it explicitly if your `tsconfig` writes ngc output elsewhere. The
     ngc/linker pipeline never sees a `.css` file, so there is no conflict with the CSS
     transformer.
+  </TabItem>
+  <TabItem label="Svelte">
+    A Svelte app points `babelTransformerPath` at `@symbiote-native/svelte/metro-svelte-transformer`
+    instead — the `.svelte` transformer requires `@symbiote-native/css-parser` itself, both to
+    compile a component's own `<style>` block (via its scoped-styles preprocessor, before the
+    markup even reaches `svelte/compiler`) and to handle a standalone `.css`/`.scss`/`.less`/`.styl`
+    import through the exact same `isStyleFile`/`compileCssFile` branch React's transformer uses —
+    and delegates everything else.
+
+    ```js
+    // metro.config.js
+    const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+
+    const defaultConfig = getDefaultConfig(__dirname);
+
+    const config = {
+      transformer: {
+        babelTransformerPath: require.resolve('@symbiote-native/svelte/metro-svelte-transformer'),
+      },
+      resolver: {
+        sourceExts: [
+          ...defaultConfig.resolver.sourceExts,
+          'svelte',
+          'css',
+          'scss',
+          'sass',
+          'less',
+          'styl',
+        ],
+      },
+    };
+
+    module.exports = mergeConfig(defaultConfig, config);
+    ```
+
+    Then import stylesheets from any source file, `.svelte` included:
+
+    ```svelte
+    <script lang="ts">
+      import './theme.css';                     // plain CSS — registers classes globally, no export
+      import styles from './Card.module.css';   // CSS Modules — default export is a name→scopedName map
+    </script>
+
+    <View class="card" style={styles.highlight} />
+    ```
   </TabItem>
 </Tabs>
 

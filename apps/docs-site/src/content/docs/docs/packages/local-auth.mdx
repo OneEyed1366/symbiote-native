@@ -28,6 +28,7 @@ only) — worth knowing before you reach for one.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Installation
 
@@ -50,8 +51,8 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
 
 ## Usage
 
-All three adapters — React, Vue, Angular — re-export the exact same free functions; there is no
-per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+All four adapters — React, Vue, Angular, Svelte — re-export the exact same free functions; there
+is no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
 subscription. Probe capabilities once on mount, then call `authenticateAsync` from a button press
 and branch on `result.success`.
 
@@ -190,6 +191,46 @@ and branch on `result.success`.
     off the core package, called straight from the constructor, same as the real
     `examples/expo-angular` `LocalAuthScreen`.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text, View } from '@symbiote-native/svelte';
+      import {
+        authenticateAsync,
+        getEnrolledLevelAsync,
+        hasHardwareAsync,
+        isEnrolledAsync,
+        supportedAuthenticationTypesAsync,
+      } from '@symbiote-native/local-auth/svelte';
+      import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/svelte';
+
+      let hasHardware = $state(false);
+      let isEnrolled = $state(false);
+      let result = $state<ILocalAuthenticationResult | null>(null);
+
+      $effect(() => {
+        hasHardwareAsync().then(value => (hasHardware = value));
+        isEnrolledAsync().then(value => (isEnrolled = value));
+        getEnrolledLevelAsync().then(level => console.log('enrolled level', level));
+        supportedAuthenticationTypesAsync().then(types => console.log('supported types', types));
+      });
+
+      function handleAuthenticate(): void {
+        authenticateAsync({ promptMessage: 'Confirm it is you' }).then(value => (result = value));
+      }
+    </script>
+
+    <View>
+      <Text>{hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled'}</Text>
+      <Pressable onPress={handleAuthenticate}>
+        <Text>Authenticate</Text>
+      </Pressable>
+      {#if result}
+        <Text>{result.success ? 'Success' : `Failed: ${result.error}`}</Text>
+      {/if}
+    </View>
+    ```
+  </TabItem>
 </Tabs>
 
 ## API
@@ -292,12 +333,14 @@ packages/local-auth/src/
 │             # the native module via expo-modules-core's requireNativeModule
 ├── react/    # @symbiote-native/local-auth/react   — export * from '../core'
 ├── vue/      # @symbiote-native/local-auth/vue     — export * from '../core'
+├── svelte/   # @symbiote-native/local-auth/svelte  — export * from '../core'
 └── angular/  # @symbiote-native/local-auth/angular — export * from '../core'
 ```
 
-Unlike sensors' `react/hooks`, `vue/composables`, and `angular/services` folders — each full of
-per-sensor lifecycle wrappers — local-auth's three adapter entries are single-file re-exports
-with no lifecycle code at all: every function here is stateless and one-shot, so there is nothing
-for a hook, composable, or service to subscribe to or clean up. The native code itself is never
+Unlike sensors' `react/hooks`, `vue/composables`, `svelte/runes`, and `angular/services` folders
+— each full of per-sensor lifecycle wrappers — local-auth's four adapter entries are single-file
+re-exports with no lifecycle code at all: every function here is stateless and one-shot, so there
+is nothing for a hook, composable, rune, or service to subscribe to or clean up. The native code
+itself is never
 vendored or copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see
 [the native setup guide](/docs/howtos/expo-native-module-setup/)).

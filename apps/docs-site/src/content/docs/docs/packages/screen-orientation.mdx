@@ -25,6 +25,7 @@ seed-then-subscribe shape as network's own `useNetworkState`.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 <Aside type="note" title="Android has no native expoDidUpdateDimensions event">
   `expo-screen-orientation` doesn't emit its own `expoDidUpdateDimensions` event on Android — the
@@ -125,6 +126,25 @@ system state with no runtime permission prompt on either platform.
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Button, Text } from '@symbiote-native/svelte';
+      import { lockAsync, OrientationLock } from '@symbiote-native/screen-orientation';
+      import { useScreenOrientation } from '@symbiote-native/screen-orientation/svelte';
+
+      const screenOrientation = useScreenOrientation(); // { readonly current: ScreenOrientationState }
+
+      function onLockLandscape(): void {
+        void lockAsync(OrientationLock.LANDSCAPE);
+      }
+    </script>
+
+    <Text>Orientation: {screenOrientation.current.orientation}</Text>
+    <Text>Lock: {screenOrientation.current.orientationLock}</Text>
+    <Button title="Lock landscape" onPress={onLockLandscape} />
+    ```
+  </TabItem>
 </Tabs>
 
 ## API
@@ -156,7 +176,8 @@ Takes no arguments — the hook/composable/service seeds and subscribes automati
 | `orientationLock` | `OrientationLock` | The current orientation lock, seeded `OrientationLock.UNKNOWN` until the first reading arrives |
 
 React returns this shape as a plain value; Vue returns `Ref<ScreenOrientationState>`; Angular's
-`ScreenOrientationService.connect()` returns `Signal<ScreenOrientationState>`.
+`ScreenOrientationService.connect()` returns `Signal<ScreenOrientationState>`; Svelte returns
+`{ readonly current: ScreenOrientationState }`, a boxed getter read as `.current`.
 
 ### `Orientation`
 
@@ -273,11 +294,12 @@ packages/screen-orientation/src/
 │                         service return shape).
 ├── react/hooks/          @symbiote-native/screen-orientation/react   — useScreenOrientation
 ├── vue/composables/      @symbiote-native/screen-orientation/vue     — useScreenOrientation (same name)
+├── svelte/runes/         @symbiote-native/screen-orientation/svelte  — useScreenOrientation (same name)
 └── angular/services/     @symbiote-native/screen-orientation/angular — ScreenOrientationService
                           (`.connect()` returns a Signal)
 ```
 
-Each adapter's hook/composable/service is a thin lifecycle wrapper — seed from one-shot
+Each adapter's hook/composable/rune/service is a thin lifecycle wrapper — seed from one-shot
 `getOrientationAsync()`/`getOrientationLockAsync()` calls, subscribe to
 `addOrientationChangeListener`, unsubscribe on unmount — over the same `core` functions, the same
 one-listener seed-then-subscribe shape as [network](/docs/packages/network/)'s

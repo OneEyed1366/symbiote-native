@@ -25,6 +25,7 @@ one combined hook.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Installation
 
@@ -105,6 +106,24 @@ with no runtime permission prompt on either platform.
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text } from '@symbiote-native/svelte';
+      import { useLocales, useCalendars } from '@symbiote-native/localization/svelte';
+
+      const locales = useLocales();     // { readonly current: Locale[] }
+      const calendars = useCalendars(); // { readonly current: Calendar[] }
+    </script>
+
+    <Text>{locales.current[0].languageTag}</Text>
+    <Text>{calendars.current[0].timeZone}</Text>
+    ```
+
+    Both runes return a boxed getter object rather than a bare value — Svelte 5 reactivity does
+    not survive being returned as a raw value from a plain function, so read `.current` exactly
+    like unwrapping Vue's `Ref` via `.value`.
+  </TabItem>
 </Tabs>
 
 ## API
@@ -126,13 +145,13 @@ Both hooks take no arguments — each seeds and subscribes automatically.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| (return value) | `Locale[]` | React returns this as a plain array, recomputed via `useMemo` whenever the locale-change listener fires. Vue returns `Ref<Locale[]>`. Angular's `LocalesService.connect()` returns `Signal<Locale[]>` |
+| (return value) | `Locale[]` | React returns this as a plain array, recomputed via `useMemo` whenever the locale-change listener fires. Vue returns `Ref<Locale[]>`. Angular's `LocalesService.connect()` returns `Signal<Locale[]>`. Svelte returns `{ readonly current: Locale[] }`, a boxed getter read as `.current` |
 
 ### `useCalendars()` return value
 
 | Field | Type | Description |
 | --- | --- | --- |
-| (return value) | `Calendar[]` | React returns this as a plain array, recomputed via `useMemo` whenever the calendar-change listener fires. Vue returns `Ref<Calendar[]>`. Angular's `CalendarsService.connect()` returns `Signal<Calendar[]>` |
+| (return value) | `Calendar[]` | React returns this as a plain array, recomputed via `useMemo` whenever the calendar-change listener fires. Vue returns `Ref<Calendar[]>`. Angular's `CalendarsService.connect()` returns `Signal<Calendar[]>`. Svelte returns `{ readonly current: Calendar[] }`, a boxed getter read as `.current` |
 
 ### `Locale`
 
@@ -228,13 +247,14 @@ packages/localization/src/
 │                         the native module.
 ├── react/hooks/          @symbiote-native/localization/react   — useLocales, useCalendars
 ├── vue/composables/      @symbiote-native/localization/vue     — same two names, Vue lifecycle
+├── svelte/runes/         @symbiote-native/localization/svelte  — same two names, Svelte lifecycle
 └── angular/services/     @symbiote-native/localization/angular — LocalesService, CalendarsService
                           (`.connect()` returns a Signal)
 ```
 
 Two independent getters, each with its own native change listener and its own reactive hook per
 adapter — mirroring `@symbiote-native/battery`'s shape of shipping several distinct hooks in one
-package, not one combined hook. Each hook/composable/service seeds its return value from the
+package, not one combined hook. Each hook/composable/rune/service seeds its return value from the
 matching synchronous `get*()` call (no initial "loading" state needed — the native call is sync,
 not async) and recomputes it whenever the matching listener fires. The native code itself is
 never vendored or copied — `expo-modules-autolinking` resolves it straight out of `node_modules`

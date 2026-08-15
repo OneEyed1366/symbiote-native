@@ -60,6 +60,38 @@ wiring your own change handler by hand.
     name (`value`) already matching Angular's `@Output()` naming convention
     (`value` + `valueChange`), which is exactly what `[(x)]` expects.
   </TabItem>
+  <TabItem label="Svelte">
+    Svelte is in the same boat as React here. React's controlled-component idiom
+    (`value` + `onValueChange`, both explicit) is already the two-way binding —
+    Svelte uses that exact same shape, and there is no `[(value)]`/`v-model`
+    shorthand to reach for. Svelte's own element `bind:` directive is a
+    different mechanism (it targets a DOM element's own properties), and this
+    adapter doesn't implement it — app code never authors a raw host element,
+    only these framework components, and none of them declare a `$bindable()`
+    prop today. `Switch`/`TextInput` come from `@symbiote-native/svelte`; `Slider`
+    ships from the separate [`@symbiote-native/slider`](/docs/packages/slider/)
+    wrapper package (`@symbiote-native/slider/svelte`), not the adapter's own barrel:
+
+    ```svelte
+    <script lang="ts">
+      import { Switch, TextInput } from '@symbiote-native/svelte';
+      import { Slider } from '@symbiote-native/slider/svelte';
+
+      let enabled = $state(false);
+      let name = $state('');
+      let volume = $state(0.5);
+    </script>
+
+    <Switch value={enabled} onValueChange={(next) => (enabled = next)} />
+    <TextInput value={name} onValueChange={(next) => (name = next)} />
+    <Slider
+      value={volume}
+      onValueChange={(next) => (volume = next)}
+      minimumValue={0}
+      maximumValue={1}
+    />
+    ```
+  </TabItem>
 </Tabs>
 
 ## Why this isn't fragile

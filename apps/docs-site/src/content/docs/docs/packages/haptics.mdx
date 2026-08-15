@@ -24,6 +24,7 @@ from a press handler.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Installation
 
@@ -46,8 +47,8 @@ versions — never install either yourself, and never add the `expo` meta-packag
 
 ## Usage
 
-All three adapters — React, Vue, Angular — re-export the exact same free functions; there is no
-per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+All four adapters — React, Vue, Angular, Svelte — re-export the exact same free functions; there
+is no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
 subscription. Call one straight from a press handler.
 
 <Tabs syncKey="framework">
@@ -174,6 +175,40 @@ subscription. Call one straight from a press handler.
     off the core package, called straight from a component method, same as local-auth's Angular
     example.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text, View } from '@symbiote-native/svelte';
+      import {
+        impactAsync,
+        notificationAsync,
+        selectionAsync,
+        performAndroidHapticsAsync,
+        AndroidHaptics,
+        ImpactFeedbackStyle,
+        NotificationFeedbackType,
+      } from '@symbiote-native/haptics/svelte';
+    </script>
+
+    <View>
+      <Pressable onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}>
+        <Text>Impact</Text>
+      </Pressable>
+      <Pressable onPress={() => notificationAsync(NotificationFeedbackType.Success)}>
+        <Text>Notify</Text>
+      </Pressable>
+      <Pressable onPress={() => selectionAsync()}>
+        <Text>Select</Text>
+      </Pressable>
+      <Pressable onPress={() => performAndroidHapticsAsync(AndroidHaptics.Confirm)}>
+        <Text>Android confirm</Text>
+      </Pressable>
+    </View>
+    ```
+
+    Same shape as every other adapter here — every function is a plain free function off the core
+    package, called straight from `onPress`.
+  </TabItem>
 </Tabs>
 
 ## API
@@ -266,6 +301,7 @@ packages/haptics/src/
 │             # via expo-modules-core's requireNativeModule
 ├── react/    # @symbiote-native/haptics/react   — export * from '../core'
 ├── vue/      # @symbiote-native/haptics/vue     — export * from '../core'
+├── svelte/   # @symbiote-native/haptics/svelte  — export * from '../core'
 └── angular/  # @symbiote-native/haptics/angular — export * from '../core'
 ```
 
