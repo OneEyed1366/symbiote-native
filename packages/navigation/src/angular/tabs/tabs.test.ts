@@ -54,7 +54,7 @@ let capturedProfileInstance: ProfileScreenComponent | undefined;
   template: `<symbiote-text>feed</symbiote-text>`,
 })
 class FeedScreenComponent {
-  // Real screens (e.g. .examples/angular's TabHomeScreen) call injectIsFocused() - see the
+  // Real screens (e.g. examples/angular's TabHomeScreen) call injectIsFocused() - see the
   // regression test below for why this matters.
   readonly isFocused: Signal<boolean> = injectIsFocused();
 
@@ -202,7 +202,7 @@ describe('Angular Tab navigator', () => {
   // context for the current CD pass. It synchronously calls emitter.emit(FOCUS/BLUR), which
   // fan-out-calls every listener on that route's emitter synchronously too - including
   // injectIsFocused()'s `isFocused.set(...)`, since every real screen (TabHomeScreen,
-  // TabSearchScreen, TabProfileScreen in .examples/angular) calls injectIsFocused(). Angular
+  // TabSearchScreen, TabProfileScreen in examples/angular) calls injectIsFocused(). Angular
   // throws NG600 ("signal write during a template execution") the instant that set() runs
   // inside a tracked read - not gated behind ngDevMode, so this reproduces in every build,
   // not just dev. jumpTo() is exactly what a tab-bar tap fires (see the test above), so this

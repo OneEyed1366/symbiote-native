@@ -105,7 +105,7 @@ let capturedSettingsInstance: SettingsDrawerScreenComponent | undefined;
   template: `<symbiote-text>home</symbiote-text>`,
 })
 class HomeDrawerScreenComponent {
-  // Real screens (e.g. .examples/angular's DrawerHomeScreen) call injectIsFocused() - see the
+  // Real screens (e.g. examples/angular's DrawerHomeScreen) call injectIsFocused() - see the
   // regression test below for why this matters.
   readonly isFocused: Signal<boolean> = injectIsFocused();
 

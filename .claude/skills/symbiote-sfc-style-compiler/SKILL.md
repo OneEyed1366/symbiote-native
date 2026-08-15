@@ -399,6 +399,120 @@ came from inside a `:global()` wrapper, since `parseCSS`'s return shape
 from suffixing and from `__localScopedClassNames`, registering exactly like
 an unscoped class.
 
+## 5b. Compound selectors under scope — FIXED 2026-08-14 (was silently dead in Vue AND Svelte)
+
+**Symptom:** a `.card.big { }` rule inside a `<style scoped>` block (Vue) or a
+`<style>` block (Svelte) never applied. No warning, no error — the rule
+compiled, registered, and was never looked up. Unscoped/global CSS was fine,
+which is why it went unnoticed: `examples/*/App.css` compound selectors work.
+
+**Root cause — two operations that do not commute.** Registration collapses a
+compound selector to ONE key and suffixes THAT (`.card.big` → `cardBig` →
+`cardBig__data-v-h`). The markup rewrite suffixes each TOKEN
+(`class="card big"` → `class="card__data-v-h big__data-v-h"`). At runtime
+`toCompoundKey` concatenates the tokens it is given, producing
+`card__data-v-hBig__data-v-h` — a string that cannot equal the registered key
+for any input. Lookup fell through to the per-class merge, so only the single
+-class rules applied.
+
+**Second, compounding defect:** `localScopedNames` / `localNames` was built
+from `Object.keys(parseCSS(...))`, i.e. the COLLAPSED keys. `.card.big`
+contributes only `cardBig`, a name that appears nowhere in the markup — so
+when `.big` had no standalone rule of its own, the `big` token was never
+scoped at all and the rule was unreachable by a second, independent route.
+
+**The fix, three parts, all shared across adapters:**
+
+1. `@symbiote-native/css-parser` now exposes `extractClassTokens(selector)`
+   (the un-collapsed form of `extractClassName`, which is now built on it —
+   one selector walk, two shapes, no chance of the two disagreeing) and
+   `classTokensIn(css)` mapping each registered key back to its tokens.
+2. Both transformers add those TOKENS to their local-scoped-name set, so
+   every part of a compound/descendant selector gets suffixed in the markup.
+   `adapters/vue/metro-vue-transformer.cjs` and
+   `adapters/svelte/src/preprocessor/scoped-styles.ts`, same three lines.
+3. `core/engine/src/style-registry`'s compound lookup factors the shared
+   suffix back out: strip it off every token of the subset, join the bases,
+   re-append once — `card__svelte-h` + `big__svelte-h` → `cardBig__svelte-h`.
+   Only when ALL tokens carry the SAME scope; the unsuffixed key is still
+   tried alongside.
+
+**Two deliberate behavior changes that came with it** (both were latent bugs
+of the same family, both now covered by tests):
+
+- **A compound rule LAYERS OVER the single-class rules, it no longer replaces
+  them.** `.card { padding: 8; background: white }` + `.card.big { padding: 16 }`
+  on `class="card big"` is now padding 16 AND background white. The old
+  early-return dropped every property the compound rule did not itself
+  restate — invisible while compound-under-scope was dead, immediately
+  visible once it worked.
+- **A scoped token layers over its own unscoped base.** `card__svelte-h`
+  resolves `card` first, then the scoped rule on top — reproducing the web,
+  where the element carries `class="card svelte-h"` and App.css's `.card`
+  still applies underneath a component's own rule. Renaming the token is how
+  the scope is expressed here, so the base has to be re-consulted explicitly.
+
+**The trap to not re-introduce:** a scoped token is recognized by the SHAPE of
+its suffix (`/^(?:data-v|svelte)-[0-9a-z]+$/`), never by "there is a `__`
+somewhere in the name". BEM is `card__title`. Splitting on a bare `__` would
+merge `.card`'s declarations into every BEM element class in the codebase.
+
+**Known remaining limit (not fixed, low value):** a compound rule where one
+token is scoped and the other is global (`:global(...)`-exempt, or a class
+that only exists in App.css) has no single suffix to factor out and still
+does not resolve. On the web it would, because the element carries both
+classes as separate tokens. Reaching it needs a registry that indexes by
+token set rather than by concatenated key.
+
+**Checking it on a device needs THREE re-packed tarballs, not one.** `@symbiote-native/css-parser`
+is a regular dependency of every adapter, so an example that pins only the adapter and the engine
+resolves css-parser from the REGISTRY and gets a build-time crash on the first missing export
+(`classTokensIn is not a function`). It is already a direct `devDependency` of each example, which
+means `overrides` cannot redirect it either — npm answers `EOVERRIDE: Override for
+@symbiote-native/css-parser conflicts with direct dependency`. Point that devDependency straight
+at the tarball instead:
+
+```json
+"devDependencies": { "@symbiote-native/css-parser": "file:../../core/css-parser/symbiote-native-css-parser-<v>.tgz" }
+```
+
+Then the usual reinstall dance from `<examples_vs_dot_examples>` — delete BOTH
+`node_modules/@symbiote-native` and `package-lock.json`, `npm install`, `pod install`. Like every
+other `file:` pin, this one is TEMPORARY and swaps back to a literal version once css-parser has a
+release carrying the export.
+
+### `var()` resolves ONLY within one compiled file — a per-component stylesheet cannot reach App.css
+
+Measured 2026-08-15 adding `examples/angular/src/components/CompoundClassDemo.css`. `parseCSS`
+collects custom properties with a `root.walkDecls` over the CSS string it was handed, so the
+variable table is per-CALL, i.e. per FILE. A component stylesheet writing `var(--mist)` against a
+token declared in `App.css`'s `:root` finds nothing, and `resolveVariables` leaves the text alone
+on a miss — so the LITERAL STRING `"var(--mist)"` is what registers and what reaches Fabric:
+
+```
+.badge { border-color: var(--mist); }        ->  { borderColor: "var(--mist)" }   ← ships as-is
+```
+
+No warning, no error, and `tsc`/`ngc` are both perfectly happy. On device it is a colour that
+silently does not paint. The tell is easy to miss in review because the CSS reads correctly.
+
+**Rule: custom properties are usable only in the file that declares them.** App.css declares the
+`:root` palette and may use `var()` freely within itself (that is why the `.badge`/`.badge.loud`
+rules appended to `examples/react/App.css` and `examples/vue-tsx/App.css` DO resolve — same file).
+Every OTHER stylesheet uses literals — which is exactly why every pre-existing
+`examples/angular/src/components/*.css` in this repo is literal-valued, a convention that had no
+recorded reason until now.
+
+Verify a stylesheet in one command rather than on device:
+
+```
+node -e "console.log(require('./core/css-parser/build/index.js').parseCSS(require('fs').readFileSync('<file>','utf8')))"
+```
+
+Any `"var(--…)"` left in the output is a bug. Making `var()` cross files would mean a shared
+variable table threaded through every `parseCSS` call — a deliberate design step, not a quick fix,
+since the compiler is per-file by construction (one Metro transform per stylesheet).
+
 ## 6. CSS Modules — implemented (2026-07), two forms
 
 Both forms reuse the SAME suffixing scheme: a class registers under
@@ -933,8 +1047,8 @@ collide, and whichever one's `registerStyles()` call runs LAST wins — decided
 by ES module import order (a module's own imports evaluate before its body,
 in declared order), not by file position or "more specific wins" intuition.
 
-**2026-07 incident (hit independently in `.examples/vue-sfc` AND
-`.examples/angular` the same session):** each app's shared `App.css` had a
+**2026-07 incident (hit independently in `examples/vue-sfc` AND
+`examples/angular` the same session):** each app's shared `App.css` had a
 handful of stale duplicate rules (`.pulse-dot`, `.lead-dot`, `.ref-box`,
 `.section-header`) left over from before the per-component `.css`/`<style>`
 files existed, still carrying React's literal accent-blue hex instead of
@@ -956,7 +1070,7 @@ is not a one-off oversight; it can recur any time a shared top-level
 stylesheet (`App.css`) and per-component stylesheets both define the same
 class name.
 
-**2026-07-10 incident, much larger shape (`.examples/angular`):** the
+**2026-07-10 incident, much larger shape (`examples/angular`):** the
 `.section` layout wrapper (`padding: 24px` in `App.css`'s top-level "shared /
 common" block, the class every non-scrolling demo screen's `<SafeAreaView>
 > <View class="section">` root uses) silently lost its padding on EVERY

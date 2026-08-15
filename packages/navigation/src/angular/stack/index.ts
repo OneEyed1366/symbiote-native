@@ -35,7 +35,7 @@
 // self-registers instead: `adapters/angular/babel-register-composed.cjs` (a Metro babel preset
 // applied bundle-wide, not scoped to adapters/angular) scans this package's own AOT-compiled
 // (`ngc`) `ɵɵngDeclareComponent({selector: 'Stack', ...})` output and auto-calls
-// `registerComposedComponent('Stack')` at bundle time - same mechanism `.examples/angular`
+// `registerComposedComponent('Stack')` at bundle time - same mechanism `examples/angular`
 // navigation-demo screens and `@symbiote-native/slider`'s `Slider` rely on for their own composed
 // components mounted statically or via `NgComponentOutlet`. Unregistered, `createElement('Stack')`
 // falls through to a real `createNode` call and RN paints its own "Unimplemented component"

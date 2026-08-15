@@ -82,8 +82,8 @@ import '@react-native-community/slider/dist/RNCSliderNativeComponent'; // side-e
 RN autolinking still does **not** recursively link native modules hidden in arbitrary transitive
 dependencies. That part was verified and remains true: if `@symbiote-native/<lib>` merely has a regular
 `dependency` on `@react-native-community/slider` but ships no native proxy metadata, then
-`cd .examples/<app> && npx react-native config` does NOT list a native slider dependency.
-(Verify in `.examples/<app>`, never `examples/<app>` — see `symbiote-dev-examples`.)
+`cd examples/<app> && npx react-native config` does NOT list a native slider dependency.
+(Verify in `examples/<app>`.)
 
 The validated escape hatch is: make `@symbiote-native/<lib>` itself the native package RN autolinks.
 For the reference `@symbiote-native/slider`, the app lists only:
@@ -110,8 +110,6 @@ For `@symbiote-native/slider`, this was verified in three layers:
 
 - `npx react-native config` in `examples/react`, `examples/vue-sfc`, and `examples/vue-tsx` lists
   `@symbiote-native/slider` only (not `@react-native-community/slider`) and includes iOS + Android config.
-  (Historical record, predates the `.examples/` split — a wrapper under active development now
-  verifies this in `.examples/<app>` instead, see `symbiote-dev-examples`.)
 - Android `./gradlew clean app:generateAutolinkingPackageList app:generateAutolinkingNewArchitectureFiles`
   generates `ReactSliderPackage`, `RNCSliderComponentDescriptor`, and `RNCSlider` CMake entries.
 - iOS `pod install --no-repo-update` autolinks `symbiote-slider`, runs Codegen for `RNCSlider`, and
@@ -223,14 +221,15 @@ forwards a native ref via `forwardRef` → the host node.
 5. Root `tsconfig.json`: add `{ "path": "packages/<lib>" }`.
 6. Root `vitest.config.ts`: add `packages/**/src/**/*.test.{ts,tsx}`.
 7. Add the descriptor-bridge / attr-fold exports to the adapter barrels (above).
-8. `.examples/<app>` (never `examples/<app>` — see `symbiote-dev-examples`): add ONLY
-   `@symbiote-native/<lib>: workspace:*`; do NOT add the native lib directly unless no proxy exists.
-   Import `{ X } from '@symbiote-native/<lib>/<adapter>'`; `pnpm install`.
-9. Verify: `pnpm deps:check`; package `tsc --build`; package vitest; `cd .examples/<app> && npx
+8. `examples/<app>`: add ONLY `@symbiote-native/<lib>` (a `pnpm pack` tarball via `file:` while
+   developing, CLAUDE.md's `<examples_vs_dot_examples>`); do NOT add the native lib directly
+   unless no proxy exists. Import `{ X } from '@symbiote-native/<lib>/<adapter>'`; `npm install`
+   inside `examples/<app>` (never `pnpm install` from repo root).
+9. Verify: `pnpm deps:check`; package `tsc --build`; package vitest; `cd examples/<app> && npx
    react-native config` shows `@symbiote-native/<lib>` with iOS+Android native config; Android autolinking
    generation succeeds; iOS `pod install --no-repo-update` succeeds; simulator renders.
 10. **Standing step, not optional — after every `pod install`, `grep -c <NativeClassName>
-    Pods/Pods.xcodeproj/project.pbxproj` in `.examples/<app>/ios`, expecting > 0.** A `0` means the
+    Pods/Pods.xcodeproj/project.pbxproj` in `examples/<app>/ios`, expecting > 0.** A `0` means the
     vendoring fix (gotcha below) is missing or broken and the pod silently compiled to an empty
     target — a green `pod install` and a green Xcode build both give zero indication of this; it
     only shows up as a runtime crash. This check is what actually caught the bug in `symbiote-slider`
@@ -283,7 +282,7 @@ forwards a native ref via `forwardRef` → the host node.
   (react-native-screens) and `symbiote-slider` in the same session despite slider's "verified
   working on-device" claim below. **Update (2026-07-04, `packages/splash-screen` session): that
   claim was WRONG, confirmed by a real crash.** `symbiote-slider.podspec` still used a relative
-  path (`Pathname#relative_path_from`) for `source_files` — never vendored — and `.examples/react`
+  path (`Pathname#relative_path_from`) for `source_files` — never vendored — and `examples/react`
   had simply never launched far enough to hit it before (an unrelated build error blocked it
   first). Once that earlier error was fixed, the app built, launched, and crashed on the JS thread
   the moment Fabric tried to register third-party components: `RCTThirdPartyComponentsProvider`'s

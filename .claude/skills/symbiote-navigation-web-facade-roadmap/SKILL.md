@@ -115,7 +115,7 @@ Menu context menu — deferred).
 | 7 | REACT | `Slot` (Outlet) |
 | 8 | REACT | loaders (useLoaderData + wire into Screen) — *defer* |
 | 9 | REACT | barrel exports (keep RN hooks as escape hatch) |
-| 10 | REACT | `.examples/react` wiring + smoke |
+| 10 | REACT | `examples/react` wiring + smoke |
 | 11 | REACT | facade tests (port the scenarios above) |
 | 12 | VUE | `useRouter()`/`useRoute()` |
 | 13 | VUE | `RouterLink to` / `RouterView` (Slot) |

@@ -5,8 +5,8 @@ description: "Symbiote raw-Vue-TSX (.tsx, @vue/babel-plugin-jsx) typecheck setup
 
 # Symbiote raw-Vue-TSX — why typecheck needs a jsxFactory shim
 
-`.examples/vue-tsx` (and any future raw-TSX Vue app in this monorepo — NOT `.vue` SFC apps like
-`.examples/vue-sfc`, which vue-tsc typechecks correctly out of the box via its Volar language
+`examples/vue-tsx` (and any future raw-TSX Vue app in this monorepo — NOT `.vue` SFC apps like
+`examples/vue-sfc`, which vue-tsc typechecks correctly out of the box via its Volar language
 service plugin) had **no working typecheck** until this was diagnosed: adding a naive `vue-tsc
 --noEmit` produced ~786 errors, every one shaped like React demanding the file be React.
 
@@ -35,7 +35,7 @@ invisible until a typecheck script actually exists for the app.
 
 ## Fix: redirect jsxFactory to a namespace React never touches
 
-Two files (see `.examples/vue-tsx/vue-jsx.d.ts` and `tsconfig.typecheck.json` for the working
+Two files (see `examples/vue-tsx/vue-jsx.d.ts` and `tsconfig.typecheck.json` for the working
 copy):
 
 1. **`vue-jsx.d.ts`** — declare a throwaway global namespace + const, and put YOUR global `JSX`

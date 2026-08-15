@@ -426,10 +426,11 @@ https://pkg.pr.new/OneEyed1366/symbiote-native/@symbiote-native/<pkg>@<sha>` —
 the exact URL is printed in the job's log / posted as a PR comment by the
 pkg.pr.new GitHub App). This is ephemeral by nature — tied to a specific
 commit, not something `examples/*/package.json` commits to git. For a
-git-tracked, branch-surviving dependency on in-progress code, use
-`.examples/*` (`workspace:*`, private, untracked — see
-`symbiote-dev-examples`) instead; `examples/*` continues to default to real
-published semver ranges.
+git-tracked, branch-surviving dependency on in-progress code, build a tarball
+with `pnpm pack` from the package's own directory and point
+`examples/*/package.json` at it with a `file:` specifier instead (CLAUDE.md's
+`<examples_vs_dot_examples>`); swap back to a real published semver range once
+released.
 
 ## The actual release workflow (day to day)
 

@@ -7,7 +7,7 @@
 // hands it to the navigator via IVueSearchBarOptions.ref, the screen component's buttons read it
 // back to drive the search bar imperatively. Fine for a single demo screen instance; a
 // multi-instance screen would need the ref threaded through some other shared owner instead. Vue
-// twin of .examples/react/screens/HeaderOptionsScreen.tsx's module-scope createRef<...>().
+// twin of examples/react/screens/HeaderOptionsScreen.tsx's module-scope createRef<...>().
 
 import { ref } from 'vue';
 import type { ISearchBarCommands } from '@symbiote-native/navigation';

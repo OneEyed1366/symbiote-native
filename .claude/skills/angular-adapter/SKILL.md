@@ -256,6 +256,57 @@ is the only thing that moves the floor.
 - Lowering the floor later is a one-line range change; raising it is breaking — so
   start high.
 
+### There is now a CEILING too: `~22.0.8`. Angular 22.1 moved to Babel 8; Metro is Babel 7 (2026-08)
+
+The floor above says "start high". That advice now has a hard stop on the other end, and it
+is NOT a stale pin someone forgot to widen — widening it breaks the iOS/Android build outright:
+
+```
+[BABEL] examples/angular/index.js: Requires Babel "^8.0.0-0", but was loaded with "7.29.7".
+        (While processing: ".../examples/angular/babel.config.js$1")
+```
+
+What changed, exactly — `@angular/compiler-cli@22.1.0` (not 22.0.x):
+
+```
+22.0.0  dependencies.@babel/core = 7.29.0
+22.0.8  dependencies.@babel/core = 7.29.7   ← last Babel-7 release, our pin
+22.1.0  dependencies.@babel/core = 8.0.1    ← the break
+22.1.1  dependencies.@babel/core = 8.0.1
+```
+
+and in lock-step, `bundles/linker/babel/index.js:585` flipped `api.assertVersion(7)` →
+`assertVersion(8)`. That linker is **stage B of our AOT pipeline and runs INSIDE Metro's
+Babel** (`examples/angular/babel.config.js` requires it via
+`@symbiote-native/angular/babel-linker`), and `@react-native/babel-preset` 0.86 is Babel
+7.29.7. So Angular's plugin is handed a Babel 7 `api` and refuses.
+
+**Do NOT stub `assertVersion` to get past it.** It looks like a pure version guard, but the
+bundle does `import { types } from '@babel/core'` (4 sites: lines 24/27/308/435), which — with
+compiler-cli 22.1.x installing its OWN nested `@babel/core@8.0.1` — resolves to **Babel 8's**
+`types`. Bypassing the assert would splice Babel-8-constructed AST nodes into a Babel-7
+program. The assert is reporting a real incompatibility, not being pedantic.
+
+All four `@angular/*` entries move together (`pnpm-workspace.yaml` catalog + `examples/angular/package.json`)
+because compiler-cli peer-requires `@angular/compiler` at an EXACT version.
+
+Two ways out, when someone wants Angular 22.1+:
+
+1. **Wait for RN to ship a Babel 8 preset.** Zero work here; just widen the pin and drop this
+   section. This is the expected resolution.
+2. **Move the linker out of Metro** — run it as a post-`ngc` pass under Angular's own bundled
+   Babel 8, so Metro only ever sees fully-linked Ivy and never loads an Angular Babel plugin.
+   This decouples the two Babel majors permanently, and `ngc` is already a separate build step
+   (`pnpm ng:build`), so it costs no new stage. It does give up the per-file granularity the
+   Metro plugin has today — worth checking against Fast Refresh on template edits before
+   committing to it.
+
+Verified after pinning (2026-08-13): `ngc -p tsconfig.angular.json` clean, and
+`react-native bundle --platform ios --reset-cache` produces a bundle with **79**
+`ɵɵdefineComponent` and **zero** unlinked `ɵɵngDeclareComponent` call sites (the 3 textual
+matches left are `@angular/core`'s own runtime export plus our comment in
+`babel-register-composed.cjs`) — i.e. the linker genuinely ran, it did not silently skip.
+
 ## 6. Component parity (L4) — a generic `descriptorToAngular` NOW EXISTS (mixed adoption)
 
 Full parity is structural (`<adapters_reach_full_feature_parity>`): the shared
@@ -454,10 +505,10 @@ array anyone editing `ANCHOR_HOST_COMPONENTS` (e.g. adding a new component) coul
 retype without the `.map`, silently reintroducing this every time; if a future audit touches this
 file, verify the `.map(toLowerCase)` call is still there before trusting §11a/§11b's narrative.
 
-**§11c. The real root cause of the `.examples/angular` composed-component blank/redbox was STALE ngc
+**§11c. The real root cause of the `examples/angular` composed-component blank/redbox was STALE ngc
 BUILD ARTIFACTS, not the require cycle (found + proven via bundle inspection 2026-07-17).** Symptom:
 an app-authored composed screen (`MenuScreen`, mounted via `NgComponentOutlet`) did NOT anchor-host under
-`.examples/angular` on `workspace:*` — `createElement menuscreen -> menuscreen` (raw native path) → iOS
+`examples/angular` on `workspace:*` — `createElement menuscreen -> menuscreen` (raw native path) → iOS
 blank body under a working native header, Android `Can't find ViewManager 'menuscreen'` redbox. ONLY the
 pnpm `workspace:*` harness — the published/canary `examples/angular` (fresh `npm` build) rendered it
 correctly. That divergence was the tell: **canary builds `build/` from a clean pack, the workspace reuses a
@@ -498,11 +549,11 @@ resolution) — do not re-attempt it.
 - **ngc never cleans.** The general lesson beyond this bug: after ANY source file/folder rename in a package
   built by `ngc -p`/`tsc -p`, the old output lingers in `build/` and can shadow the new one. Clean before build.
 
-**Device-verified 2026-07-17** on `.examples/angular` (Metro `--reset-cache`, since both the build and the
+**Device-verified 2026-07-17** on `examples/angular` (Metro `--reset-cache`, since both the build and the
 injected transform changed; a warm Metro serves a stale mix): every composed selector now logs
-`createElement <selector> -> anchor host` and paints correctly on iOS + Android. Full harness-side record:
-`symbiote-dev-examples` §5e; changeset `.changeset/angular-anchor-host-leaf-module.md`. The build-hygiene
-angle also lives in the `angular-adapter-build` skill.
+`createElement <selector> -> anchor host` and paints correctly on iOS + Android. Changeset:
+`.changeset/angular-anchor-host-leaf-module.md`. The build-hygiene angle also lives in the
+`angular-adapter-build` skill.
 
 ## §16. `[style]="[a, b]"` (RN's array-composition idiom) crashes Angular's built-in `ɵɵstyleMap` — always flatten first (2026-07)
 
