@@ -1132,7 +1132,7 @@ export const CanaryScreen = defineComponent({
     const onShare = (): void => {
       void Share.share({
         message: 'Sent from symbiote',
-        url: 'https://reactnative.dev',
+        url: 'https://vuejs.org',
       }).catch(() => {});
     };
     const onAlert = (): void => {
@@ -1151,7 +1151,7 @@ export const CanaryScreen = defineComponent({
       );
     };
     const onOpenUrl = (): void => {
-      void Linking.openURL('https://reactnative.dev').catch(() => {});
+      void Linking.openURL('https://vuejs.org').catch(() => {});
     };
 
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Canary];
@@ -1307,7 +1307,7 @@ export const CanaryScreen = defineComponent({
             </View>
           </View>
           <Button
-            title="Open reactnative.dev"
+            title="Open vuejs.org"
             onPress={onOpenUrl}
             color="#42b883"
           />
@@ -1641,10 +1641,10 @@ export const CanaryScreen = defineComponent({
           </View>
 
           {/* Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
-            width/height→style); a screen reader reads "React logo" (alt→accessibilityLabel). */}
+            width/height→style); a screen reader reads "Vue logo" (alt→accessibilityLabel). */}
           <Image
             src="https://vuejs.org/images/logo.png"
-            alt="React logo"
+            alt="Vue logo"
             width={48}
             height={48}
             class="web-image"

@@ -253,7 +253,7 @@ const onToggleStatusBarTranslucent = (): void => {
 const onShare = (): void => {
   void Share.share({
     message: 'Sent from symbiote',
-    url: 'https://reactnative.dev',
+    url: 'https://vuejs.org',
   }).catch(() => {});
 };
 const onAlert = (): void => {
@@ -272,7 +272,7 @@ const onActionSheet = (): void => {
   );
 };
 const onOpenUrl = (): void => {
-  void Linking.openURL('https://reactnative.dev').catch(() => {});
+  void Linking.openURL('https://vuejs.org').catch(() => {});
 };
 
 const onRetentionMove = (event: ISymbioteEvent): void => {
@@ -465,7 +465,7 @@ const rotationStyle = {
         </View>
       </View>
       <ActionButton
-        title="Open reactnative.dev"
+        title="Open vuejs.org"
         :onPress="onOpenUrl"
         :color="LINE_COLOR.primitives"
       />
@@ -726,10 +726,10 @@ const rotationStyle = {
       </View>
 
       <!-- Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
-           width/height→style); a screen reader reads "React logo" (alt→accessibilityLabel). -->
+           width/height→style); a screen reader reads "Vue logo" (alt→accessibilityLabel). -->
       <Image
-        src="https://reactnative.dev/img/tiny_logo.png"
-        alt="React logo"
+        src="https://vuejs.org/images/logo.png"
+        alt="Vue logo"
         :width="48"
         :height="48"
         class="web-image"
@@ -760,7 +760,7 @@ const rotationStyle = {
       </KeyboardAvoidingView>
 
       <Image
-        :source="{ uri: 'https://reactnative.dev/img/tiny_logo.png' }"
+        :source="{ uri: 'https://vuejs.org/images/logo.png' }"
         class="logo-image"
       />
 
