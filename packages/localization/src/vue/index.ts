@@ -5,14 +5,4 @@
 
 export { useLocales } from './composables/use-locales';
 export { useCalendars } from './composables/use-calendars';
-export {
-  getLocales,
-  getCalendars,
-  addLocaleListener,
-  addCalendarListener,
-  Weekday,
-  CalendarIdentifier,
-  type Locale,
-  type Calendar,
-  type EventSubscription,
-} from '../core';
+export * from '../core';

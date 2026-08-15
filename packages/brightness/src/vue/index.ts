@@ -4,23 +4,4 @@
 // adapters/vue/src/composables (never `hooks/`, that's React's term).
 
 export { usePermissions } from './composables/use-permissions';
-export {
-  isAvailableAsync,
-  getBrightnessAsync,
-  setBrightnessAsync,
-  getSystemBrightnessAsync,
-  setSystemBrightnessAsync,
-  restoreSystemBrightnessAsync,
-  isUsingSystemBrightnessAsync,
-  getSystemBrightnessModeAsync,
-  setSystemBrightnessModeAsync,
-  getPermissionsAsync,
-  requestPermissionsAsync,
-  addBrightnessListener,
-  BrightnessMode,
-  PermissionStatus,
-  type BrightnessEvent,
-  type PermissionExpiration,
-  type PermissionResponse,
-  type EventSubscription,
-} from '../core';
+export * from '../core';

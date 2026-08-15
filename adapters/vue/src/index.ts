@@ -287,8 +287,18 @@ export type {
 } from '@symbiote-native/engine';
 // Wired once by the app entry on a real host (like setColorProcessor): hands the engine
 // RN's ViewConfig registry so third-party Fabric views auto-derive their metadata.
-export { setNativeViewConfigSource } from '@symbiote-native/engine';
+// setDeviceEventSource is the third seam of the same set and travels with them.
+export { setNativeViewConfigSource, setDeviceEventSource } from '@symbiote-native/engine';
 export type { INativeViewConfig, INativeViewConfigSource } from '@symbiote-native/engine';
+// Component-detail types carrying no framework element or ref, so they are defined once in
+// @symbiote-native/components and every adapter re-exports the SAME type.
+export type {
+  IEnterKeyHint,
+  IInputMode,
+  ISubmitBehavior,
+  ITextInputSelection,
+  IImageStatics,
+} from '@symbiote-native/components';
 // Pure utilities that moved to the engine (single source, both adapters re-export):
 // PixelRatio + PanResponder, plus the color builders and the interaction scheduler.
 export {

@@ -5,14 +5,4 @@
 
 export { useLocales } from './hooks/use-locales';
 export { useCalendars } from './hooks/use-calendars';
-export {
-  getLocales,
-  getCalendars,
-  addLocaleListener,
-  addCalendarListener,
-  Weekday,
-  CalendarIdentifier,
-  type Locale,
-  type Calendar,
-  type EventSubscription,
-} from '../core';
+export * from '../core';

@@ -4,7 +4,7 @@
 
 import { useSyncExternalStore } from 'react';
 
-import { Appearance, type IColorSchemeName } from '../modules/appearance';
+import { Appearance, type IColorSchemeName } from '@symbiote-native/engine';
 
 const subscribe = (onStoreChange: () => void): (() => void) => {
   const subscription = Appearance.addChangeListener(onStoreChange);

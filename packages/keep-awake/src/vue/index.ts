@@ -3,14 +3,4 @@
 // adapters/vue/src/composables for the same convention.
 
 export { useKeepAwake } from './composables/use-keep-awake';
-export {
-  ExpoKeepAwakeTag,
-  isAvailableAsync,
-  activateKeepAwakeAsync,
-  deactivateKeepAwake,
-  addListener,
-  type KeepAwakeEvent,
-  type KeepAwakeListener,
-  type KeepAwakeOptions,
-  type EventSubscription,
-} from '../core';
+export * from '../core';
