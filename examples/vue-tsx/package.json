@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "android:release": "react-native run-android --mode Release",
     "ios": "react-native run-ios",
+    "ios:release": "react-native run-ios --mode Release",
     "lint": "eslint .",
     "typecheck": "vue-tsc --noEmit -p tsconfig.typecheck.json",
     "dev": "react-native start --reset-cache",
