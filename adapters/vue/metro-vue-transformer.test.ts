@@ -160,6 +160,22 @@ const label = 'hi'
 </style>
 `;
 
+// `.big` has no standalone rule, so `big` reaches __localScopedClassNames ONLY through the
+// compound selector's tokens. Registering just the collapsed `cardBig` key left the template's
+// `big` unscoped and the rule permanently unreachable.
+const SFC_WITH_COMPOUND_SCOPED_SELECTOR = `
+<script setup lang="ts">
+const label = 'hi'
+</script>
+<template>
+  <View class="card big" />
+</template>
+<style scoped>
+.card { padding: 10px; }
+.card.big { padding: 20px; }
+</style>
+`;
+
 const SFC_WITH_GLOBAL_ESCAPE_IN_SCOPED_BLOCK = `
 <script setup lang="ts">
 const label = 'hi'
@@ -348,6 +364,19 @@ describe('metro-vue-transformer compileSfc <style scoped> support', () => {
     // static class="card highlight" — only the scoped token gets suffixed, the global one
     // that lives in the sibling unscoped block passes through unchanged in the same string.
     expect(code).toContain(`class: "card__${scopeId} highlight"`);
+  });
+
+  it('scopes both tokens of a compound selector whose parts have no standalone rule', async () => {
+    const code = await compileSfc(SFC_WITH_COMPOUND_SCOPED_SELECTOR, 'Card.vue');
+    const scopeId = scopeIdOf(code);
+
+    expect(extractRegisterStylesArg(code)).toEqual({
+      [`card__${scopeId}`]: { padding: 10 },
+      [`cardBig__${scopeId}`]: { padding: 20 },
+    });
+    // Both tokens carry the suffix, which is what lets the engine factor it back out and find
+    // the once-suffixed `cardBig__<scope>` key the compound rule registered under.
+    expect(code).toContain(`class: "card__${scopeId} big__${scopeId}"`);
   });
 
   it('does not suffix a :global(...) selector inside a scoped block', async () => {

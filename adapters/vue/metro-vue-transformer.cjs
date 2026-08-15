@@ -29,6 +29,7 @@ registerTS(() => require('typescript'));
 // (rather than through the ./metro-css-parser public subpath, which exists for CONSUMERS) resolves
 // straight from this package's own node_modules under pnpm.
 const {
+  classTokensIn,
   compile: compilePreprocessor,
   compileCssFile,
   globalClassNamesIn,
@@ -229,10 +230,18 @@ async function compileSfc(src, filename) {
       cssModuleBindings.set(bindingName, classMap);
     } else if (style.scoped) {
       const exemptFromScope = globalClassNamesIn(content);
+      // A compound/descendant selector registers under ONE collapsed key (`.card.big` ->
+      // `cardBig`) that appears nowhere in the template — the template writes
+      // `class="card big"`. Recording only the key leaves both tokens unscoped, so the rule
+      // becomes unreachable; its TOKENS are what the nodeTransform below has to recognize.
+      const tokensByName = classTokensIn(content, { filename });
       for (const [className, props] of Object.entries(parsed)) {
         const isExempt = exemptFromScope.has(className);
         const registeredName = isExempt ? className : `${className}__${scopeId}`;
-        if (!isExempt) localScopedNames.add(className);
+        if (!isExempt) {
+          localScopedNames.add(className);
+          for (const token of tokensByName.get(className) ?? []) localScopedNames.add(token);
+        }
         styles[registeredName] = { ...styles[registeredName], ...props };
       }
     } else {

@@ -70,4 +70,62 @@ describe('style-registry', () => {
     registerStyles({ 'section-label': { color: 'green' }, sectionLabel: { color: 'red' } });
     expect(resolveClassName('section-label')).toEqual({ color: 'green' });
   });
+
+  it('layers a compound rule over the single-class rules instead of replacing them', () => {
+    registerStyles({
+      card: { padding: 8, backgroundColor: 'white' },
+      cardBig: { padding: 16 },
+    });
+    expect(resolveClassName('card big')).toEqual({ padding: 16, backgroundColor: 'white' });
+  });
+});
+
+// A `<style scoped>` block suffixes the class it registers ONCE, at the end of the collapsed
+// key (`.card.big` -> `cardBig__svelte-h`), while the markup it rewrites carries the suffix on
+// EVERY token (`class="card__svelte-h big__svelte-h"`). Appending per token and concatenating
+// tokens do not commute, so the key built naively from the tokens can never match — every scoped
+// compound rule was silently dead. Both scope prefixes in use are covered: `svelte-` and Vue's
+// `data-v-`.
+describe('style-registry — scoped class names', () => {
+  beforeEach(() => {
+    clearGlobalStyles();
+  });
+
+  it('resolves a compound rule registered under the collapsed, once-suffixed key', () => {
+    registerStyles({ 'cardBig__svelte-1a2b3c4d': { padding: 16 } });
+    expect(resolveClassName('card__svelte-1a2b3c4d big__svelte-1a2b3c4d')).toEqual({ padding: 16 });
+  });
+
+  it('does the same for a Vue data-v- scope', () => {
+    registerStyles({ 'btnPrimary__data-v-9z8y7x': { color: 'white' } });
+    expect(resolveClassName('btn__data-v-9z8y7x primary__data-v-9z8y7x')).toEqual({
+      color: 'white',
+    });
+  });
+
+  it('does not factor out a suffix two different scopes do not share', () => {
+    registerStyles({ 'cardBig__svelte-1a2b3c4d': { padding: 16 } });
+    expect(resolveClassName('card__svelte-1a2b3c4d big__svelte-99999999')).toEqual({});
+  });
+
+  it('layers a scoped class over a global rule of the same base name', () => {
+    // The web equivalent is one element carrying `class="card svelte-h"`, where App.css's
+    // `.card` still applies underneath the component's own rule. Here the scope is expressed by
+    // renaming the token, so the base has to be re-consulted explicitly.
+    registerStyles({
+      card: { padding: 8, backgroundColor: 'white' },
+      'card__svelte-1a2b3c4d': { padding: 12 },
+    });
+    expect(resolveClassName('card__svelte-1a2b3c4d')).toEqual({
+      padding: 12,
+      backgroundColor: 'white',
+    });
+  });
+
+  it('never reads a BEM class as a scoped one', () => {
+    // `card__title` splits at `__` exactly like a scoped token does; only the suffix SHAPE
+    // separates them. Merging `.card` into `.card__title` here would be a silent, wrong cascade.
+    registerStyles({ card: { padding: 8 }, card__title: { color: 'red' } });
+    expect(resolveClassName('card__title')).toEqual({ color: 'red' });
+  });
 });

@@ -19,11 +19,32 @@ type IResolvedStyle = Partial<IViewStyle & ITextStyle>;
 export type IClassNameValue =
   string | IResolvedStyle | Array<string | IResolvedStyle> | undefined | null;
 
-// Compound lookup tries every ordering of 2-4 space-separated class parts joined by
-// '.' (e.g. "btn primary" -> "btn.primary" / "primary.btn") before falling back to a
-// per-class merge, mirroring CSS compound-selector registration (`.btn.primary { }`).
+// Compound lookup tries every ordering of 2-4 space-separated class parts (e.g. "btn primary"
+// -> "btnPrimary" / "primaryBtn"), mirroring CSS compound-selector registration
+// (`.btn.primary { }`), and layers whatever it finds ON TOP of the per-class merge.
 const COMPOUND_MIN_PARTS = 2;
 const COMPOUND_MAX_PARTS = 4;
+
+// A scope suffix as the `<style scoped>` compilers emit it: `card__data-v-1a2b3c4d` (Vue) or
+// `card__svelte-1a2b3c4d` (Svelte), the hash being css-parser's base36 hashFilePath. Matched by
+// SHAPE, never by "there is a `__` somewhere in the name" — a BEM class (`card__title`) must
+// never be read as a scoped `card`, which would silently merge the block's styles into the
+// element's.
+const SCOPE_SEPARATOR = '__';
+const SCOPE_SUFFIX_PATTERN = /^(?:data-v|svelte)-[0-9a-z]+$/;
+
+interface IScopedToken {
+  readonly base: string;
+  readonly scope: string;
+}
+
+function splitScopedToken(token: string): IScopedToken | null {
+  const separator = token.lastIndexOf(SCOPE_SEPARATOR);
+  if (separator <= 0) return null;
+  const scope = token.slice(separator + SCOPE_SEPARATOR.length);
+  if (!SCOPE_SUFFIX_PATTERN.test(scope)) return null;
+  return { base: token.slice(0, separator), scope };
+}
 
 const globalStyles = new Map<string, IResolvedStyle>();
 
@@ -64,40 +85,51 @@ export function resolveClassName(className: IClassNameValue): IResolvedStyle {
   const trimmed = className.trim();
   if (!trimmed) return {};
 
-  const exactMatch = globalStyles.get(trimmed) ?? globalStyles.get(kebabToCamel(trimmed));
-  if (exactMatch) return exactMatch;
-
   const parts = trimmed.split(/\s+/).filter(Boolean);
 
-  if (parts.length >= COMPOUND_MIN_PARTS && parts.length <= COMPOUND_MAX_PARTS) {
-    const compound = tryCompoundLookup(parts);
-    if (compound) return compound;
-  }
+  // A single token is nothing but the exact-match lookup, so it goes through resolveOne, which
+  // adds the scoped-token base layering below. A multi-token string still tries the whole string
+  // as one key first — `$style.card`-style output arrives pre-resolved and must not be split.
+  if (parts.length <= 1) return resolveOne(trimmed);
 
-  return parts.reduce<IResolvedStyle>((acc, cls) => {
+  const exactMatch = lookupKey(trimmed);
+  if (exactMatch) return exactMatch;
+
+  const merged = parts.reduce<IResolvedStyle>((acc, cls) => {
     return { ...acc, ...resolveOne(cls) };
   }, {});
+
+  // A compound rule LAYERS OVER the single-class rules rather than replacing them, matching the
+  // cascade: `.card { padding: 8; background: white }` + `.card.big { padding: 16 }` on
+  // `class="card big"` is padding 16 AND background white. Returning the compound alone (what
+  // this did before) silently dropped every property the compound did not itself restate.
+  if (parts.length >= COMPOUND_MIN_PARTS && parts.length <= COMPOUND_MAX_PARTS) {
+    const compound = tryCompoundLookup(parts);
+    if (compound) return { ...merged, ...compound };
+  }
+
+  return merged;
 }
 
-function generateCompoundPermutations(parts: string[]): string[] {
+function generateCompoundPermutations(parts: string[]): string[][] {
   if (parts.length < COMPOUND_MIN_PARTS) return [];
 
-  const compounds: string[] = [];
+  const compounds: string[][] = [];
   for (let size = COMPOUND_MIN_PARTS; size <= parts.length; size++) {
     compounds.push(...generateKPermutations(parts, size));
   }
   return compounds;
 }
 
-function generateKPermutations(parts: string[], size: number): string[] {
-  if (size === 0) return [''];
+function generateKPermutations(parts: string[], size: number): string[][] {
+  if (size === 0) return [[]];
   if (parts.length === 0) return [];
 
-  const result: string[] = [];
+  const result: string[][] = [];
 
   function helper(current: string[], remaining: string[], depth: number): void {
     if (depth === size) {
-      result.push(toCompoundKey(current));
+      result.push(current);
       return;
     }
     for (let i = 0; i < remaining.length; i++) {
@@ -140,16 +172,60 @@ export function kebabToCamel(value: string): string {
 function tryCompoundLookup(parts: string[]): IResolvedStyle | null {
   if (parts.length < COMPOUND_MIN_PARTS) return null;
 
-  for (const compound of generateCompoundPermutations(parts)) {
-    const style = globalStyles.get(compound);
-    if (style) return style;
+  for (const subset of generateCompoundPermutations(parts)) {
+    for (const key of compoundKeysFor(subset)) {
+      const style = globalStyles.get(key);
+      if (style) return style;
+    }
   }
 
   return null;
 }
 
+function compoundKeysFor(subset: string[]): string[] {
+  const scoped = scopedCompoundKey(subset);
+  return scoped === null ? [toCompoundKey(subset)] : [toCompoundKey(subset), scoped];
+}
+
+// The scope suffix is appended per TOKEN in the markup (`class="card__svelte-h big__svelte-h"`)
+// but appears ONCE, at the end, in the registered key a compound rule produces
+// (`.card.big` -> `cardBig__svelte-h`) — the compiler collapses the selector to one name and
+// suffixes that. Those two operations do not commute, so the key built from the raw tokens
+// (`card__svelte-hBig__svelte-h`) can never match and every scoped compound rule was dead.
+// Rebuild the key the way registration did: strip the shared suffix, join the bases, re-append
+// once. Requires all tokens of the subset to carry the SAME scope — a mix of scoped and global
+// tokens has no single suffix to factor out, and the unsuffixed key is already tried alongside.
+function scopedCompoundKey(subset: string[]): string | null {
+  const bases: string[] = [];
+  let scope: string | undefined;
+
+  for (const token of subset) {
+    const split = splitScopedToken(token);
+    if (split === null) return null;
+    if (scope !== undefined && split.scope !== scope) return null;
+    scope = split.scope;
+    bases.push(split.base);
+  }
+
+  return scope === undefined ? null : toCompoundKey(bases) + SCOPE_SEPARATOR + scope;
+}
+
+// A scoped token layers over its own unscoped name: on the web the element carries BOTH classes
+// (`class="card svelte-h"`), so a global `.card` in App.css still applies underneath the
+// component's `<style>` rule. Rewriting `card` -> `card__svelte-h` here is how the scope is
+// expressed instead of a second class, so the base has to be re-consulted explicitly or that
+// global rule silently disappears the moment a component defines a class of the same name.
 function resolveOne(name: string): IResolvedStyle {
   const trimmed = name.trim();
   if (!trimmed) return {};
-  return globalStyles.get(trimmed) ?? globalStyles.get(kebabToCamel(trimmed)) ?? {};
+
+  const scoped = lookupKey(trimmed);
+  const split = splitScopedToken(trimmed);
+  if (split === null) return scoped ?? {};
+
+  return { ...lookupKey(split.base), ...scoped };
+}
+
+function lookupKey(name: string): IResolvedStyle | undefined {
+  return globalStyles.get(name) ?? globalStyles.get(kebabToCamel(name));
 }

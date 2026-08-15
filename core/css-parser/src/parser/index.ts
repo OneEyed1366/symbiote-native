@@ -43,6 +43,29 @@ function unescapeIdentifier(value: string): string {
  * - `.my-class-name` → `'myClassName'` (kebab → camel)
  */
 export function extractClassName(selector: string): string | null {
+  const tokens = extractClassTokens(selector);
+  return tokens === null ? null : joinClassTokens(tokens);
+}
+
+// The collapsed key is nothing but its tokens concatenated, so both forms come from ONE walk of
+// the selector — a caller that scope-suffixes names needs the tokens, everything else needs the
+// key, and two separate parsers would be two chances to disagree about what `.a\.b.c` means.
+function joinClassTokens(tokens: string[]): string {
+  return tokens.map((token, index) => (index === 0 ? token : capitalize(token))).join('');
+}
+
+/**
+ * The individual camelCase class tokens a selector is built from — the un-collapsed form of
+ * {@link extractClassName}. `.btn.primary` → `['btn', 'primary']`, `.card .title` →
+ * `['card', 'title']`, `.card` → `['card']`; `null` on the same selectors extractClassName
+ * rejects.
+ *
+ * Needed by every caller that scope-suffixes class names (Vue `<style scoped>`, a Svelte
+ * `<style>` block): the markup those callers rewrite says `class="btn primary"`, so `btn` and
+ * `primary` are the names they must recognize as locally defined — the collapsed `btnPrimary`
+ * key appears nowhere in the markup and would leave both tokens unscoped.
+ */
+export function extractClassTokens(selector: string): string[] | null {
   const trimmed = selector.trim();
 
   if (/^[a-z]+$/i.test(trimmed)) return null;
@@ -56,7 +79,7 @@ export function extractClassName(selector: string): string | null {
   // colon that must not trigger them. Known gap: a `:global(...)` wrapping only PART of a larger
   // compound/descendant selector (e.g. `.card :global(.reset)`) is NOT unwrapped by this check.
   const globalMatch = trimmed.match(/^:global\(\s*(.+?)\s*\)$/);
-  if (globalMatch?.[1]) return extractClassName(globalMatch[1]);
+  if (globalMatch?.[1]) return extractClassTokens(globalMatch[1]);
 
   if (trimmed.startsWith(':')) return null;
 
@@ -78,13 +101,7 @@ export function extractClassName(selector: string): string | null {
       const startIndex = startsWithElement ? 1 : 0;
       if (startIndex >= parts.length) return null;
 
-      return parts
-        .slice(startIndex)
-        .map((part, i) => {
-          const camelPart = kebabToCamel(unescapeIdentifier(part));
-          return i === 0 ? camelPart : capitalize(camelPart);
-        })
-        .join('');
+      return parts.slice(startIndex).map(part => kebabToCamel(unescapeIdentifier(part)));
     }
   }
 
@@ -104,27 +121,47 @@ export function extractClassName(selector: string): string | null {
     }
 
     if (classNames.length === 0) return null;
-    return classNames
-      .map((name, i) => {
-        const camelName = kebabToCamel(name);
-        return i === 0 ? camelName : capitalize(camelName);
-      })
-      .join('');
+    return classNames.map(name => kebabToCamel(name));
   }
 
   // Single class selector (`.card`).
   const classMatch = trimmed.match(/^\.((?:[a-zA-Z0-9_-]|\\.)+)/);
-  if (classMatch?.[1]) return kebabToCamel(unescapeIdentifier(classMatch[1]));
+  if (classMatch?.[1]) return [kebabToCamel(unescapeIdentifier(classMatch[1]))];
 
   // ID selector (`#header`).
   const idMatch = trimmed.match(/^#((?:[a-zA-Z0-9_-]|\\.)+)/);
-  if (idMatch?.[1]) return kebabToCamel(unescapeIdentifier(idMatch[1]));
+  if (idMatch?.[1]) return [kebabToCamel(unescapeIdentifier(idMatch[1]))];
 
   // Attribute selector (`[data-theme]`).
   const attrMatch = trimmed.match(/^\[([a-zA-Z0-9_-]+)(?:=[^\]]+)?\]/);
-  if (attrMatch?.[1]) return kebabToCamel(attrMatch[1]);
+  if (attrMatch?.[1]) return [kebabToCamel(attrMatch[1])];
 
   return null;
+}
+
+/**
+ * Every registered class key in a stylesheet, mapped back to the class tokens it was built from
+ * (`.card.big { }` → `cardBig` → `['card', 'big']`). Build-time only, same as {@link parseCSS},
+ * whose rule walk this mirrors — at-rules are dropped first for the same reason, silently here
+ * since parseCSS already warns about them on its own pass.
+ */
+export function classTokensIn(css: string, options?: ICssParserOptions): Map<string, string[]> {
+  const tokensByName = new Map<string, string[]>();
+  if (!css || typeof css !== 'string') return tokensByName;
+
+  const root = postcss.parse(css, { from: options?.filename });
+  root.walkAtRules(atRule => {
+    atRule.remove();
+  });
+  root.walkRules(rule => {
+    for (const selector of rule.selector.split(',')) {
+      const tokens = extractClassTokens(selector.trim());
+      if (tokens === null || tokens.length === 0) continue;
+      tokensByName.set(joinClassTokens(tokens), tokens);
+    }
+  });
+
+  return tokensByName;
 }
 
 //#endregion Selector utilities

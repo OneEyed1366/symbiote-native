@@ -3,7 +3,7 @@
 // React Native style prop names and values.
 
 import { describe, expect, it, vi } from 'vitest';
-import { parseCSS } from './index';
+import { classTokensIn, extractClassTokens, parseCSS } from './index';
 
 describe('parseCSS', () => {
   it('maps a single class selector', () => {
@@ -189,5 +189,62 @@ describe('parseCSS', () => {
 
   it('returns an empty object for empty input', () => {
     expect(parseCSS('')).toEqual({});
+  });
+});
+
+// The un-collapsed form of extractClassName. A caller that scope-suffixes class names needs the
+// tokens the markup actually writes, not the one key they collapse into.
+describe('extractClassTokens', () => {
+  it.each([
+    ['.card', ['card']],
+    ['.btn.primary', ['btn', 'primary']],
+    ['.card .title', ['card', 'title']],
+    ['.card > .title', ['card', 'title']],
+    ['div.card', ['card']],
+    ['.my-class-name', ['myClassName']],
+    ['.card-box.is-big', ['cardBox', 'isBig']],
+    ['#header', ['header']],
+    ['[data-theme]', ['dataTheme']],
+    [':global(.reset)', ['reset']],
+  ])('splits %s', (selector, expected) => {
+    expect(extractClassTokens(selector)).toEqual(expected);
+  });
+
+  it.each(['div', '*', ':hover', '.card:hover', '.card::before'])(
+    'rejects %s exactly like extractClassName does',
+    selector => {
+      expect(extractClassTokens(selector)).toBeNull();
+    },
+  );
+});
+
+describe('classTokensIn', () => {
+  it('maps each registered key back to the tokens its selector was built from', () => {
+    const css = '.card { color: red } .card.big { color: blue } .card .title { color: green }';
+    expect(classTokensIn(css)).toEqual(
+      new Map([
+        ['card', ['card']],
+        ['cardBig', ['card', 'big']],
+        ['cardTitle', ['card', 'title']],
+      ]),
+    );
+  });
+
+  it('splits a comma-separated selector list into one entry per selector', () => {
+    expect(classTokensIn('.a.b, .c { color: red }')).toEqual(
+      new Map([
+        ['aB', ['a', 'b']],
+        ['c', ['c']],
+      ]),
+    );
+  });
+
+  it('drops at-rules, silently — parseCSS already warns on its own pass', () => {
+    const css = '@media (min-width: 600px) { .card.big { color: red } } .title { color: blue }';
+    expect(classTokensIn(css)).toEqual(new Map([['title', ['title']]]));
+  });
+
+  it('returns an empty map for empty input', () => {
+    expect(classTokensIn('')).toEqual(new Map());
   });
 });

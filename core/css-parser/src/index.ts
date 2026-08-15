@@ -1,4 +1,10 @@
-export { parseCSS, extractClassName, kebabToCamel } from './parser/index.ts';
+export {
+  parseCSS,
+  extractClassName,
+  extractClassTokens,
+  classTokensIn,
+  kebabToCamel,
+} from './parser/index.ts';
 export type { ICssParserOptions } from './parser/index.ts';
 export { globalClassNamesIn } from './global-selectors.ts';
 export { hashFilePath } from './file-scope-id.ts';
