@@ -1,0 +1,10 @@
+// pluginManagement {} must stay the file's first statement — Gradle enforces this at parse
+// time, even ahead of a plain `def`.
+pluginManagement {
+  includeBuild("../node_modules/@react-native/gradle-plugin")
+}
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension) { ex -> ex.autolinkLibrariesFromCommand() }
+rootProject.name = 'Canary'
+include ':app'
+includeBuild('../node_modules/@react-native/gradle-plugin')

@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "comment": "svelte-check / tsc typecheck of the app + its .svelte components. @symbiote-native/* resolve to this example's own node_modules (examples/* is a standalone npm install), so this also pulls in react-native-screens' codegen specs through @symbiote-native/navigation — which is why @types/react is a devDependency here even though no React component is ever authored. e2e/ is excluded: Detox tests with jest globals, type-checked via ts-jest.",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "exclude": ["**/node_modules", "**/Pods", "e2e"]
+}
