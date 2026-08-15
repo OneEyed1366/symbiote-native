@@ -7,17 +7,17 @@ settings:
 catalogs:
   default:
     '@angular/common':
-      specifier: ^22
-      version: 22.0.6
+      specifier: ~22.0.8
+      version: 22.0.8
     '@angular/compiler':
-      specifier: ^22
-      version: 22.0.5
+      specifier: ~22.0.8
+      version: 22.0.8
     '@angular/compiler-cli':
-      specifier: ^22
-      version: 22.0.5
+      specifier: ~22.0.8
+      version: 22.0.8
     '@angular/core':
-      specifier: ^22
-      version: 22.0.5
+      specifier: ~22.0.8
+      version: 22.0.8
     '@astrojs/check':
       specifier: ^0.9.9
       version: 0.9.9
@@ -198,6 +198,12 @@ catalogs:
     stylus:
       specifier: ^0.64.0
       version: 0.64.0
+    svelte:
+      specifier: ^5.56.0
+      version: 5.56.8
+    svelte2tsx:
+      specifier: ^0.7.61
+      version: 0.7.61
     syncpack:
       specifier: ^15.3.2
       version: 15.3.2
@@ -251,6 +257,12 @@ importers:
       prettier:
         specifier: 'catalog:'
         version: 3.9.4
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
+      svelte2tsx:
+        specifier: 'catalog:'
+        version: 0.7.61(svelte@5.56.8(@typescript-eslint/types@8.63.0))(typescript@6.0.3)
       syncpack:
         specifier: 'catalog:'
         version: 15.3.2
@@ -268,7 +280,7 @@ importers:
     dependencies:
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@react-native/typescript-config':
         specifier: 'catalog:'
         version: 0.86.0
@@ -284,10 +296,10 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@babel/core':
         specifier: 'catalog:'
         version: 7.29.7
@@ -337,6 +349,43 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+
+  adapters/svelte:
+    dependencies:
+      '@symbiote-native/components':
+        specifier: workspace:*
+        version: link:../../core/components
+      '@symbiote-native/css-parser':
+        specifier: workspace:*
+        version: link:../../core/css-parser
+      react-native:
+        specifier: '>=0.86'
+        version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+    devDependencies:
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../../core/engine
+      '@symbiote-native/react':
+        specifier: workspace:*
+        version: link:../react
+      '@symbiote-native/test-utils':
+        specifier: workspace:*
+        version: link:../../core/test-utils
+      '@symbiote-native/vue':
+        specifier: workspace:*
+        version: link:../vue
+      '@vue/runtime-core':
+        specifier: 'catalog:'
+        version: 3.5.39
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
 
   adapters/vue:
     dependencies:
@@ -467,13 +516,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -483,6 +532,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -501,6 +553,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -522,13 +577,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -538,6 +593,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -556,6 +614,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -577,13 +638,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -593,6 +654,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -611,6 +675,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -632,13 +699,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -648,6 +715,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -666,6 +736,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -687,13 +760,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -703,6 +776,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -721,6 +797,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -742,13 +821,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -758,6 +837,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -776,6 +858,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -797,13 +882,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -813,6 +898,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -831,6 +919,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -854,13 +945,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -870,6 +961,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -888,6 +982,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -909,13 +1006,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -925,6 +1022,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -943,6 +1043,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -967,13 +1070,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -983,6 +1086,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1004,6 +1110,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1025,13 +1134,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1041,6 +1150,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1059,6 +1171,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1080,16 +1195,16 @@ importers:
     devDependencies:
       '@angular/common':
         specifier: 'catalog:'
-        version: 22.0.6(@angular/core@22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2))(rxjs@7.8.2)
+        version: 22.0.8(@angular/core@22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2))(rxjs@7.8.2)
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1099,6 +1214,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1117,6 +1235,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1138,13 +1259,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1154,6 +1275,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1172,6 +1296,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1193,13 +1320,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1209,6 +1336,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1227,6 +1357,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1248,13 +1381,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1264,6 +1397,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1282,6 +1418,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1303,13 +1442,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1319,6 +1458,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1337,6 +1479,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1358,13 +1503,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1374,6 +1519,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1392,6 +1540,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1413,13 +1564,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1429,6 +1580,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1447,6 +1601,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1468,13 +1625,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1484,6 +1641,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1502,6 +1662,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1526,13 +1689,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1542,6 +1705,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1560,6 +1726,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1578,13 +1747,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1594,6 +1763,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1612,6 +1784,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1633,13 +1808,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1649,6 +1824,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1667,6 +1845,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1688,13 +1869,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1704,6 +1885,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1722,6 +1906,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1743,13 +1930,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1759,6 +1946,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1777,6 +1967,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1798,13 +1991,13 @@ importers:
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
-        version: 22.0.5
+        version: 22.0.8
       '@angular/compiler-cli':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)
+        version: 22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)
       '@angular/core':
         specifier: 'catalog:'
-        version: 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+        version: 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       '@symbiote-native/angular':
         specifier: workspace:*
         version: link:../../adapters/angular
@@ -1814,6 +2007,9 @@ importers:
       '@symbiote-native/react':
         specifier: workspace:*
         version: link:../../adapters/react
+      '@symbiote-native/svelte':
+        specifier: workspace:*
+        version: link:../../adapters/svelte
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
@@ -1832,6 +2028,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      svelte:
+        specifier: 'catalog:'
+        version: 5.56.8(@typescript-eslint/types@8.63.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1841,33 +2040,33 @@ packages:
   '@adobe/css-tools@4.3.3':
     resolution: {integrity: sha512-rE0Pygv0sEZ4vBWHlAgJLGDU7Pm8xoO6p3wsEceb7GYAjScrOHpEo8KK/eVkAcnSM+slAEtXjA2JpdjLp4fJQQ==}
 
-  '@angular/common@22.0.6':
-    resolution: {integrity: sha512-+sC0W0FWGeZ/HKUhueCBX8kXdFQDlStbUSK6WF/32igfNYR/PdUrp2L5bU7q654yjxnMzFWDAB+Uvzv6YI/cQg==}
+  '@angular/common@22.0.8':
+    resolution: {integrity: sha512-FnwkXndUgAyWk1/p5flMfocIUtuuneJ01mxC1FxRc5/bdWTyNVeQDsM9Lw4PEAPc0AHu//EnblegRq8o6LGdUQ==}
     engines: {node: ^22.22.3 || ^24.15.0 || >=26.0.0}
     peerDependencies:
-      '@angular/core': 22.0.6
+      '@angular/core': 22.0.8
       rxjs: ^6.5.3 || ^7.4.0
 
-  '@angular/compiler-cli@22.0.5':
-    resolution: {integrity: sha512-DR9kahfd5P/xrXbX8HJu8jBkkUZNqCZuMCod4lyo4a9MTOSKs2ltNU9VEDT7Qw++hDYowr37/lLfIzrvDEFPEQ==}
+  '@angular/compiler-cli@22.0.8':
+    resolution: {integrity: sha512-shBqaUxMtqriv4UG2MHmYT8GSvDizI40mUFkOfeQ1yRJ2C9dk0TnWKPwjSO7o6bs6UiU6V8Y3uSWdmfCGVVZAA==}
     engines: {node: ^22.22.3 || ^24.15.0 || >=26.0.0}
     hasBin: true
     peerDependencies:
-      '@angular/compiler': 22.0.5
+      '@angular/compiler': 22.0.8
       typescript: '>=6.0 <6.1'
     peerDependenciesMeta:
       typescript:
         optional: true
 
-  '@angular/compiler@22.0.5':
-    resolution: {integrity: sha512-yGhbEBh2WU1kCubjBD+Eo5bwvZPR+zacDhyPao/PgopH0PiVETd4Iv1gK0ZAvg7XdImgzZfipJXKqTK4JbOFiQ==}
+  '@angular/compiler@22.0.8':
+    resolution: {integrity: sha512-ot7rvntfkZsPHmp8yl6PWUj/yG4e50X0+YeR7QYy/rEYKBiIg91w8GwjxSzaF4g5+bzJGDv7l/XnachKm0IySg==}
     engines: {node: ^22.22.3 || ^24.15.0 || >=26.0.0}
 
-  '@angular/core@22.0.5':
-    resolution: {integrity: sha512-8cc6CLC1u7kNHpUZA15tak0WPHAZTF16DPslXxDdWbw/WIlDGPsNdTW8Nsaeb/G45mLvBcMwcZpOC70R6iRzmA==}
+  '@angular/core@22.0.8':
+    resolution: {integrity: sha512-HagZZVzbtXd+ZhMb++k/HOtr/UTiBROHHH7xutgYgnSnPRXX0kCca5EQ02OZ/OCWfsMP5liSJDfwiePFULKA6Q==}
     engines: {node: ^22.22.3 || ^24.15.0 || >=26.0.0}
     peerDependencies:
-      '@angular/compiler': 22.0.5
+      '@angular/compiler': 22.0.8
       rxjs: ^6.5.3 || ^7.4.0
       zone.js: ~0.15.0 || ~0.16.0
     peerDependenciesMeta:
@@ -2742,9 +2941,6 @@ packages:
   '@expo/config-plugins@57.0.2':
     resolution: {integrity: sha512-85wEk9NKzdT25+UWEaSgF7gp9uR/GmtvrvQtGqZmyhFgVRNL2H3GdJOL4/50vyZh4JK69Hl7fWKGtARTN3B8Ag==}
 
-  '@expo/config-plugins@57.0.3':
-    resolution: {integrity: sha512-J3P2T7FoOE9P3TuLcJXwt8jISKRxo7UntTzbJ/Qc5F7QXenNntk/4t1XndVkLucYjpnHArPd9xzDXuxxKEHVbQ==}
-
   '@expo/config-plugins@57.0.6':
     resolution: {integrity: sha512-7CmKrS5Rnu8aSZyNlxH2qzA7Ls1HEa4EQvEVOAkHDKPr1e4Cg/nz7I7dUl09QDTVjMvkKYDH4Th0DuAsgqASaw==}
 
@@ -2844,14 +3040,6 @@ packages:
 
   '@expo/require-utils@57.0.1':
     resolution: {integrity: sha512-uXen5/4x7j60I5slShgZr5QEtJDBK8homFiNLDnDrNrxZhrRHXASo0H6JArs3/1PDzw1wahzhGWg2WKuYyZd0A==}
-    peerDependencies:
-      typescript: ^5.0.0 || ^5.0.0-0 || ^6.0.0
-    peerDependenciesMeta:
-      typescript:
-        optional: true
-
-  '@expo/require-utils@57.0.3':
-    resolution: {integrity: sha512-ns05X1K8tM+Qtzp6dNloUFOopSdh3J+HC61BtOR8WHhgtPFyX8TKuO2diqZUqVg9K8yfkWug7g8tBS0qRniSTA==}
     peerDependencies:
       typescript: ^5.0.0 || ^5.0.0-0 || ^6.0.0
     peerDependenciesMeta:
@@ -3597,6 +3785,11 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
+  '@sveltejs/acorn-typescript@1.0.12':
+    resolution: {integrity: sha512-J1jNYG23QWd67UfrQSFHtjhV37r9mVi0gdc12A3MWPldOjRK35Xk+um+qACPVjgw3AleiqoyEAhok8Wm3q46NA==}
+    peerDependencies:
+      acorn: ^8.9.0
+
   '@tybys/wasm-util@0.10.3':
     resolution: {integrity: sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg==}
 
@@ -3688,6 +3881,9 @@ packages:
 
   '@types/stylus@0.48.43':
     resolution: {integrity: sha512-72dv/zdhuyXWVHUXG2VTPEQdOG+oen95/DNFx2aMFFaY6LoITI6PwEqf5x31JF49kp2w9hvUzkNfTGBIeg61LQ==}
+
+  '@types/trusted-types@2.0.7':
+    resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
 
   '@types/unist@2.0.11':
     resolution: {integrity: sha512-CmBKiL6NNo/OqgmMn95Fk9Whlp2mtvIv+KNpQKN2F4SjvrEesubTRWGYSg+BnWZOnlCaSTU1sMpsBOzgbYhnsA==}
@@ -3973,6 +4169,10 @@ packages:
 
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
+
+  aria-query@5.3.1:
+    resolution: {integrity: sha512-Z/ZeOgVl7bcSYZ/u/rh0fOpvEpq//LZmdbkXyc7syVzjPAhfOa9ebsdTSjEBDU4vs5nC98Kfduj1uFo0qyET3g==}
+    engines: {node: '>= 0.4'}
 
   aria-query@5.3.2:
     resolution: {integrity: sha512-COROpnaoap1E2F000S62r6A60uHZnmlvomhfyT2DlTcrY1OrBKn2UhH7qn5wTC9zMvD0AY7csdPSNwKP+7WiQw==}
@@ -4430,6 +4630,9 @@ packages:
   decode-named-character-reference@1.3.0:
     resolution: {integrity: sha512-GtpQYB283KrPp6nRw50q3U9/VfOutZOe103qlN7BPP6Ad27xYnOIWv4lPzo8HCAL+mMZofJ9KEy30fq6MfaK6Q==}
 
+  dedent-js@1.0.1:
+    resolution: {integrity: sha512-OUepMozQULMLUmhxS95Vudo0jb0UchLimi3+pQ2plj61Fcy8axbP9hbiD4Sz6DPqn6XG3kfmziVfQ1rSys5AJQ==}
+
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
 
@@ -4659,6 +4862,9 @@ packages:
       jiti:
         optional: true
 
+  esm-env@1.2.2:
+    resolution: {integrity: sha512-Epxrv+Nr/CaL4ZcFGPJIYLWFom+YeV1DqMLHJoEd9SYRxNbaFruBwfEX/kkHUJf55j2+TUbmDcmuilbP1TmXHA==}
+
   espree@11.2.0:
     resolution: {integrity: sha512-7p3DrVEIopW1B1avAGLuCSh1jubc01H2JHc8B4qqGblmg5gI9yumBgACjWo4JlIc04ufug4xJ3SQI8HkS/Rgzw==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
@@ -4671,6 +4877,14 @@ packages:
   esquery@1.7.0:
     resolution: {integrity: sha512-Ap6G0WQwcU/LHsvLwON1fAQX9Zp0A2Y6Y/cJBl9r/JbW90Zyg4/zbG6zzKa2OTALELarYHmKu0GhpM5EO+7T0g==}
     engines: {node: '>=0.10'}
+
+  esrap@2.3.2:
+    resolution: {integrity: sha512-40GyiEJevYKXzYTHtZkFqAgTjLOuFcaXMao8TPyOlnWTlkHDlvZ6mPMJaJyOqVwrVCgomEG1WhJd81w0X+IcCw==}
+    peerDependencies:
+      '@typescript-eslint/types': ^8.2.0
+    peerDependenciesMeta:
+      '@typescript-eslint/types':
+        optional: true
 
   esrecurse@4.3.0:
     resolution: {integrity: sha512-KmfKL3b6G+RXvP8N1vr3Tq1kL/oCFgn2NYXEtqP8/L3pKapUA4G8cFVaoF3SU323CD4XypR/ffioHmkti6/Tag==}
@@ -5398,6 +5612,9 @@ packages:
     resolution: {integrity: sha512-+Pgi+vMuUNkJyExiMBt5IlFoMyKnr5zhJ4Uspz58WOhBF5QoIZkFyNHIbBAtHwzVAgk5RtndVNsDRN61/mmDqg==}
     engines: {node: '>=12'}
 
+  is-reference@3.0.3:
+    resolution: {integrity: sha512-ixkJoqQvAP88E6wLydLGGqCJsrFUnqoH6HnaczB8XmDH1oaWU+xxdptvikTgaEhtZ53Ky6YXiBuUI2WXLMCwjw==}
+
   is-stream@2.0.1:
     resolution: {integrity: sha512-hFoiJiTl63nn+kstHGBtewWSKnQLpyb155KHheA1l39uvtO9nWIop1p3udqPcUd/xbF1VLMO4n7OI6p7RbngDg==}
     engines: {node: '>=8'}
@@ -5629,6 +5846,9 @@ packages:
   listr2@10.2.2:
     resolution: {integrity: sha512-JtNtbZj8q5BnDMR7trpwvwk3RIrANtIVzEUm8w7amp6xelLgyuq+4WZoTH913XaQAoH/cNdYhaNzBPA2U3xbDw==}
     engines: {node: '>=22.13.0'}
+
+  locate-character@3.0.0:
+    resolution: {integrity: sha512-SW13ws7BjaeJ6p7Q6CO2nchbYEc3X3J6WrmTTDto7yMPqVSZTUyY5Tjbid+Ab8gLnATtygYtiDIJGQRRn2ZOiA==}
 
   locate-path@5.0.0:
     resolution: {integrity: sha512-t7hw9pI+WvuwNJXwk5zVHpyhIqzg2qTlklJOf0mVxGSbe3Fp2VieZcduNYjaLDoy6p9uGpQEGWG87WpMKlNq8g==}
@@ -6682,6 +6902,9 @@ packages:
   scheduler@0.27.0:
     resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
 
+  scule@1.3.0:
+    resolution: {integrity: sha512-6FtHJEvt+pVMIB9IBY+IcCJ6Z5f1iQnytgyfKMhDKgmzYG+TeH/wx1y3l27rshSbLiSanrR9ffZDrEsmjlQF2g==}
+
   semver@6.3.1:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
     hasBin: true
@@ -6933,6 +7156,16 @@ packages:
   supports-preserve-symlinks-flag@1.0.0:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
+
+  svelte2tsx@0.7.61:
+    resolution: {integrity: sha512-EpQ/+UHITBULeUojx/LLD3uTYasZXcX1BrqlrzfLUnT9vdUhaOWK59a3ryWcFU8L0sY1SP+gRhJ2Beiis98+qw==}
+    peerDependencies:
+      svelte: ^3.55 || ^4.0.0-next.0 || ^4.0 || ^5.0.0-next.0
+      typescript: ^4.9.4 || ^5.0.0 || ^6.0.0
+
+  svelte@5.56.8:
+    resolution: {integrity: sha512-PY8LOw7xP6c8IOiVqdo0sbbZVYhXRSfklOQLAUyGBKqjTX0wx/z4l/9J+PmBpmlLnxzEb1NqltxQ5/wZme/Cmg==}
+    engines: {node: '>=18'}
 
   svgo@4.0.1:
     resolution: {integrity: sha512-XDpWUOPC6FEibaLzjfe0ucaV0YrOjYotGJO1WpF0Zd+n6ZGEQUsSugaoLq9QkEZtAfQIxT42UChcssDVPP3+/w==}
@@ -7654,6 +7887,9 @@ packages:
     resolution: {integrity: sha512-4LCcse/U2MHZ63HAJVE+v71o7yOdIe4cZ70Wpf8D/IyjDKYQLV5GD46B+hSTjJsvV5PztjvHoU580EftxjDZFQ==}
     engines: {node: '>=12.20'}
 
+  zimmerframe@1.1.4:
+    resolution: {integrity: sha512-B58NGBEoc8Y9MWWCQGl/gq9xBCe4IiKM0a2x7GZdQKOW5Exr8S1W24J6OgM1njK8xCRGvAJIL/MxXHf6SkmQKQ==}
+
   zod-validation-error@4.0.2:
     resolution: {integrity: sha512-Q6/nZLe6jxuU80qb/4uJ4t5v2VEZ44lzQjPDhYJNztRQ4wyWc6VF3D3Kb/fAuPetZQnhS3hnajCf9CsWesghLQ==}
     engines: {node: '>=18.0.0'}
@@ -7673,15 +7909,15 @@ snapshots:
 
   '@adobe/css-tools@4.3.3': {}
 
-  '@angular/common@22.0.6(@angular/core@22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2))(rxjs@7.8.2)':
+  '@angular/common@22.0.8(@angular/core@22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2))(rxjs@7.8.2)':
     dependencies:
-      '@angular/core': 22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)
+      '@angular/core': 22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)
       rxjs: 7.8.2
       tslib: 2.8.1
 
-  '@angular/compiler-cli@22.0.5(@angular/compiler@22.0.5)(typescript@6.0.3)':
+  '@angular/compiler-cli@22.0.8(@angular/compiler@22.0.8)(typescript@6.0.3)':
     dependencies:
-      '@angular/compiler': 22.0.5
+      '@angular/compiler': 22.0.8
       '@babel/core': 7.29.7
       '@jridgewell/sourcemap-codec': 1.5.5
       chokidar: 5.0.0
@@ -7695,16 +7931,16 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@angular/compiler@22.0.5':
+  '@angular/compiler@22.0.8':
     dependencies:
       tslib: 2.8.1
 
-  '@angular/core@22.0.5(@angular/compiler@22.0.5)(rxjs@7.8.2)':
+  '@angular/core@22.0.8(@angular/compiler@22.0.8)(rxjs@7.8.2)':
     dependencies:
       rxjs: 7.8.2
       tslib: 2.8.1
     optionalDependencies:
-      '@angular/compiler': 22.0.5
+      '@angular/compiler': 22.0.8
 
   '@astrojs/check@0.9.9(prettier@3.9.4)(typescript@6.0.3)':
     dependencies:
@@ -8748,21 +8984,21 @@ snapshots:
     dependencies:
       '@expo/code-signing-certificates': 0.0.6
       '@expo/config': 57.0.3(typescript@6.0.3)
-      '@expo/config-plugins': 57.0.3(typescript@6.0.3)
+      '@expo/config-plugins': 57.0.6(typescript@6.0.3)
       '@expo/devcert': 1.2.1
       '@expo/env': 2.4.1
       '@expo/image-utils': 0.11.1(typescript@6.0.3)
       '@expo/inline-modules': 0.1.2(typescript@6.0.3)
-      '@expo/json-file': 11.0.0
+      '@expo/json-file': 11.0.1
       '@expo/log-box': 57.0.0(@expo/dom-webview@57.0.0)(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
       '@expo/metro': 56.0.0
       '@expo/metro-config': 57.0.3(expo@57.0.4)(typescript@6.0.3)
       '@expo/metro-file-map': 57.0.0
       '@expo/osascript': 2.7.0
       '@expo/package-manager': 1.13.0
-      '@expo/plist': 0.8.0
+      '@expo/plist': 0.8.1
       '@expo/prebuild-config': 57.0.5(typescript@6.0.3)
-      '@expo/require-utils': 57.0.3(typescript@6.0.3)
+      '@expo/require-utils': 57.0.4(typescript@6.0.3)
       '@expo/router-server': 57.0.2(expo-constants@57.0.3(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)))(expo-font@57.0.0(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3))(expo-server@57.0.0)(expo@57.0.4)(react@19.2.3)
       '@expo/schema-utils': 57.0.1
       '@expo/spawn-async': 1.8.0
@@ -8843,25 +9079,6 @@ snapshots:
       - supports-color
       - typescript
 
-  '@expo/config-plugins@57.0.3(typescript@6.0.3)':
-    dependencies:
-      '@expo/config-types': 57.0.1
-      '@expo/json-file': 11.0.0
-      '@expo/plist': 0.8.0
-      '@expo/require-utils': 57.0.3(typescript@6.0.3)
-      '@expo/sdk-runtime-versions': 1.0.0
-      chalk: 4.1.2
-      debug: 4.4.3
-      getenv: 2.0.0
-      glob: 13.0.6
-      semver: 7.8.5
-      slugify: 1.6.9
-      xcode: 3.0.1
-      xml2js: 0.6.0
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
-
   '@expo/config-plugins@57.0.6(typescript@6.0.3)':
     dependencies:
       '@expo/config-types': 57.0.2
@@ -8887,10 +9104,10 @@ snapshots:
 
   '@expo/config@57.0.3(typescript@6.0.3)':
     dependencies:
-      '@expo/config-plugins': 57.0.3(typescript@6.0.3)
-      '@expo/config-types': 57.0.1
-      '@expo/json-file': 11.0.0
-      '@expo/require-utils': 57.0.3(typescript@6.0.3)
+      '@expo/config-plugins': 57.0.6(typescript@6.0.3)
+      '@expo/config-types': 57.0.2
+      '@expo/json-file': 11.0.1
+      '@expo/require-utils': 57.0.4(typescript@6.0.3)
       deepmerge: 4.3.1
       getenv: 2.0.0
       glob: 13.0.6
@@ -8949,7 +9166,7 @@ snapshots:
 
   '@expo/image-utils@0.11.1(typescript@6.0.3)':
     dependencies:
-      '@expo/require-utils': 57.0.3(typescript@6.0.3)
+      '@expo/require-utils': 57.0.4(typescript@6.0.3)
       '@expo/spawn-async': 1.8.0
       chalk: 4.1.2
       getenv: 2.0.0
@@ -8962,7 +9179,7 @@ snapshots:
 
   '@expo/inline-modules@0.1.2(typescript@6.0.3)':
     dependencies:
-      '@expo/config-plugins': 57.0.3(typescript@6.0.3)
+      '@expo/config-plugins': 57.0.6(typescript@6.0.3)
     transitivePeerDependencies:
       - supports-color
       - typescript
@@ -9001,9 +9218,9 @@ snapshots:
       '@babel/generator': 7.29.7
       '@expo/config': 57.0.3(typescript@6.0.3)
       '@expo/env': 2.4.1
-      '@expo/json-file': 11.0.0
+      '@expo/json-file': 11.0.1
       '@expo/metro': 56.0.0
-      '@expo/require-utils': 57.0.3(typescript@6.0.3)
+      '@expo/require-utils': 57.0.4(typescript@6.0.3)
       '@expo/spawn-async': 1.8.0
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/remapping': 2.3.5
@@ -9065,7 +9282,7 @@ snapshots:
 
   '@expo/package-manager@1.13.0':
     dependencies:
-      '@expo/json-file': 11.0.0
+      '@expo/json-file': 11.0.1
       '@expo/spawn-async': 1.8.0
       chalk: 4.1.2
       npm-package-arg: 11.0.3
@@ -9087,10 +9304,10 @@ snapshots:
   '@expo/prebuild-config@57.0.5(typescript@6.0.3)':
     dependencies:
       '@expo/config': 57.0.3(typescript@6.0.3)
-      '@expo/config-plugins': 57.0.3(typescript@6.0.3)
-      '@expo/config-types': 57.0.1
+      '@expo/config-plugins': 57.0.6(typescript@6.0.3)
+      '@expo/config-types': 57.0.2
       '@expo/image-utils': 0.11.1(typescript@6.0.3)
-      '@expo/json-file': 11.0.0
+      '@expo/json-file': 11.0.1
       '@react-native/normalize-colors': 0.86.0
       debug: 4.4.3
       expo-modules-autolinking: 57.0.8(typescript@6.0.3)
@@ -9101,16 +9318,6 @@ snapshots:
       - typescript
 
   '@expo/require-utils@57.0.1(typescript@6.0.3)':
-    dependencies:
-      '@babel/code-frame': 7.29.7
-      '@babel/core': 7.29.7
-      '@babel/plugin-transform-modules-commonjs': 7.29.7(@babel/core@7.29.7)
-    optionalDependencies:
-      typescript: 6.0.3
-    transitivePeerDependencies:
-      - supports-color
-
-  '@expo/require-utils@57.0.3(typescript@6.0.3)':
     dependencies:
       '@babel/code-frame': 7.29.7
       '@babel/core': 7.29.7
@@ -9936,6 +10143,10 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
+  '@sveltejs/acorn-typescript@1.0.12(acorn@8.17.0)':
+    dependencies:
+      acorn: 8.17.0
+
   '@tybys/wasm-util@0.10.3':
     dependencies:
       tslib: 2.8.1
@@ -10040,6 +10251,8 @@ snapshots:
   '@types/stylus@0.48.43':
     dependencies:
       '@types/node': 26.1.0
+
+  '@types/trusted-types@2.0.7': {}
 
   '@types/unist@2.0.11': {}
 
@@ -10398,6 +10611,8 @@ snapshots:
       sprintf-js: 1.0.3
 
   argparse@2.0.1: {}
+
+  aria-query@5.3.1: {}
 
   aria-query@5.3.2: {}
 
@@ -10979,6 +11194,8 @@ snapshots:
     dependencies:
       character-entities: 2.0.2
 
+  dedent-js@1.0.1: {}
+
   deep-is@0.1.4: {}
 
   deepmerge@4.3.1: {}
@@ -11230,6 +11447,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  esm-env@1.2.2: {}
+
   espree@11.2.0:
     dependencies:
       acorn: 8.17.0
@@ -11241,6 +11460,12 @@ snapshots:
   esquery@1.7.0:
     dependencies:
       estraverse: 5.3.0
+
+  esrap@2.3.2(@typescript-eslint/types@8.63.0):
+    dependencies:
+      '@jridgewell/sourcemap-codec': 1.5.5
+    optionalDependencies:
+      '@typescript-eslint/types': 8.63.0
 
   esrecurse@4.3.0:
     dependencies:
@@ -11392,7 +11617,7 @@ snapshots:
 
   expo-modules-autolinking@57.0.8(typescript@6.0.3):
     dependencies:
-      '@expo/require-utils': 57.0.3(typescript@6.0.3)
+      '@expo/require-utils': 57.0.4(typescript@6.0.3)
       '@expo/spawn-async': 1.8.0
       chalk: 4.1.2
       commander: 7.2.0
@@ -11479,7 +11704,7 @@ snapshots:
       '@babel/runtime': 7.29.7
       '@expo/cli': 57.0.6(@expo/dom-webview@57.0.0)(expo-constants@57.0.3(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)))(expo-font@57.0.0(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3))(expo@57.0.4)(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
       '@expo/config': 57.0.3(typescript@6.0.3)
-      '@expo/config-plugins': 57.0.3(typescript@6.0.3)
+      '@expo/config-plugins': 57.0.6(typescript@6.0.3)
       '@expo/devtools': 57.0.0(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
       '@expo/fingerprint': 0.20.3
       '@expo/local-build-cache-provider': 57.0.2(typescript@6.0.3)
@@ -12094,6 +12319,10 @@ snapshots:
 
   is-plain-obj@4.1.0: {}
 
+  is-reference@3.0.3:
+    dependencies:
+      '@types/estree': 1.0.9
+
   is-stream@2.0.1:
     optional: true
 
@@ -12314,6 +12543,8 @@ snapshots:
       log-update: 6.1.0
       rfdc: 1.4.1
       wrap-ansi: 10.0.0
+
+  locate-character@3.0.0: {}
 
   locate-path@5.0.0:
     dependencies:
@@ -13886,6 +14117,8 @@ snapshots:
 
   scheduler@0.27.0: {}
 
+  scule@1.3.0: {}
+
   semver@6.3.1: {}
 
   semver@7.8.5: {}
@@ -14185,6 +14418,34 @@ snapshots:
       supports-color: 7.2.0
 
   supports-preserve-symlinks-flag@1.0.0: {}
+
+  svelte2tsx@0.7.61(svelte@5.56.8(@typescript-eslint/types@8.63.0))(typescript@6.0.3):
+    dependencies:
+      dedent-js: 1.0.1
+      scule: 1.3.0
+      svelte: 5.56.8(@typescript-eslint/types@8.63.0)
+      typescript: 6.0.3
+
+  svelte@5.56.8(@typescript-eslint/types@8.63.0):
+    dependencies:
+      '@jridgewell/remapping': 2.3.5
+      '@jridgewell/sourcemap-codec': 1.5.5
+      '@sveltejs/acorn-typescript': 1.0.12(acorn@8.17.0)
+      '@types/estree': 1.0.9
+      '@types/trusted-types': 2.0.7
+      acorn: 8.17.0
+      aria-query: 5.3.1
+      axobject-query: 4.1.0
+      clsx: 2.1.1
+      devalue: 5.8.1
+      esm-env: 1.2.2
+      esrap: 2.3.2(@typescript-eslint/types@8.63.0)
+      is-reference: 3.0.3
+      locate-character: 3.0.0
+      magic-string: 0.30.21
+      zimmerframe: 1.1.4
+    transitivePeerDependencies:
+      - '@typescript-eslint/types'
 
   svgo@4.0.1:
     dependencies:
@@ -14787,6 +15048,8 @@ snapshots:
   yocto-queue@0.1.0: {}
 
   yocto-queue@1.2.2: {}
+
+  zimmerframe@1.1.4: {}
 
   zod-validation-error@4.0.2(zod@4.4.3):
     dependencies:
