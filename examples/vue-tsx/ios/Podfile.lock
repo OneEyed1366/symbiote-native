@@ -2181,7 +2181,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
-  hermes-engine: 4083fab3ee5ea54e1a97ad10429d6ba8a93e90f0
+  hermes-engine: 74d05fe0d5f835edd7581e598a64022c34463b24
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
   RCTSwiftUI: 5aaf0b07e747ba749dc6acc94d8bd41eea4b570f
@@ -2254,8 +2254,8 @@ SPEC CHECKSUMS:
   ReactCodegen: afe0d436ee089d7bea6418429d8312b1d23a6801
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
-  symbiote-navigation: c5feca69b3c675a3a030e9535d126f2a5eef50f0
-  symbiote-slider: 01ea895cf70b2b7a4d1df039d6020c4bab0f0858
+  symbiote-navigation: f23241fd1b01cfc1712e167c0a435d70c2d141c8
+  symbiote-slider: b3f95db46b9f5acc5500d7eaea92c6a99fe5bc1a
   symbiote-splash-screen: 9f6b0e6435070cde1f31022a3fc21639fe50258e
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
