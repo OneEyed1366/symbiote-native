@@ -57,6 +57,10 @@ afterEach(() => {
 });
 
 describe('ScrollView contentContainerStyle class-name support', () => {
+  // why: contentContainerStyle styles the SCROLLABLE content, not the scroll frame — a
+  // class-name string must resolve onto RCTScrollContentView the same way a style object always
+  // has, and must not leak onto the outer RCTScrollView (that would double-apply padding/layout
+  // meant for the inner content only).
   it('resolves a class-name string onto the content view, not the outer scroll view', async () => {
     mount(ROOT_TAG, ScrollViewContentStyleClassHost);
     await tick();
@@ -66,6 +70,8 @@ describe('ScrollView contentContainerStyle class-name support', () => {
     expect(scrollHost?.props.padding).toBeUndefined();
   });
 
+  // why: the class-name path is additive — an author who never opts into a class must keep
+  // getting the plain JS-object contract contentContainerStyle always supported.
   it('still accepts an ordinary style object unchanged', async () => {
     mount(ROOT_TAG, ScrollViewContentStyleObjectHost);
     await tick();

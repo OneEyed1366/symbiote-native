@@ -119,43 +119,31 @@ export function mount(
         useValue: new SymbioteRendererFactory(surface),
       },
       { provide: DOCUMENT, useValue: { head: surface, body: surface } },
-      // createEnvironmentInjector with a null parent gives this injector scope
-      // {'environment'} only (see EnvironmentNgModuleRefAdapter), so providedIn:'root'
-      // tokens — ApplicationRef included — never resolve on their own (R3Injector.get
-      // walks up looking for an injector whose `scopes` contains 'root', and a null
-      // parent means that search always dead-ends in NullInjector). platform-browser's
-      // BROWSER_MODULE_PROVIDERS solves this the same way for real DOM apps: it hands
-      // { provide: INJECTOR_SCOPE, useValue: 'root' } to its OWN app-level providers, and
-      // R3Injector's constructor reads that provider and self-tags this.scopes with
-      // 'root'. We do the same here — no PlatformRef, no DOM, just this one provider.
+      // createEnvironmentInjector with a null parent scopes this injector to {'environment'}
+      // only (see EnvironmentNgModuleRefAdapter), so providedIn:'root' tokens — ApplicationRef
+      // included — never resolve (R3Injector.get walks up for a `scopes` containing 'root', and
+      // a null parent always dead-ends in NullInjector). platform-browser solves this the same
+      // way for real DOM apps via BROWSER_MODULE_PROVIDERS: hand { provide: INJECTOR_SCOPE,
+      // useValue: 'root' } to the app-level providers, which R3Injector's constructor reads to
+      // self-tag this.scopes with 'root'. Same trick here, no PlatformRef, no DOM.
       { provide: INJECTOR_SCOPE, useValue: 'root' },
-      // Supplies the real ChangeDetectionSchedulerImpl (microtask-batched, self-scheduling
-      // via ApplicationRef.afterTick) + NoopNgZone + ZONELESS_ENABLED: true — the exact
-      // bundle internalCreateApplication() uses. With ApplicationRef reachable (see above),
-      // there is no more reason for a hand-rolled scheduler: it replaces our old
-      // unconditional `rootView.detectChanges(); cmpView.detectChanges()` (which force-ran
-      // BOTH root views on every tick regardless of cause) with Angular's own tick(), which
-      // only enters an attached view when something actually marked it (RefreshView / Dirty
-      // consumer / HasChildViewsToRefresh). NOTE: this does NOT stop the root's own template
-      // from re-running on a plain press or `ChangeDetectorRef.markForCheck()` anywhere in
-      // the tree — `markViewDirty` (which both native (event) bindings and `markForCheck()`
-      // go through, see SymbioteHostPropsDirective) unconditionally sets RefreshView on
-      // EVERY ancestor up to the root; that is fundamental, unavoidable Angular zoneless
-      // behavior, true in every Angular app, not something this swap changes. What DOES
-      // still protect a sibling branch from an unrelated press is a genuine child
-      // `@Component` boundary — SignalView-compiled children are skip-eligible regardless of
-      // this scheduler.
+      // Supplies the real ChangeDetectionSchedulerImpl (microtask-batched via
+      // ApplicationRef.afterTick) + NoopNgZone + ZONELESS_ENABLED: true — the exact bundle
+      // internalCreateApplication() uses. Replaces the old unconditional
+      // `rootView.detectChanges(); cmpView.detectChanges()` (force-ran both root views on every
+      // tick) with Angular's own tick(), which only enters a view something actually marked
+      // dirty. This does NOT stop the root's own template from re-running on a plain press or
+      // `markForCheck()` anywhere in the tree — `markViewDirty` unconditionally sets RefreshView
+      // on every ancestor up to the root; that's fundamental Angular zoneless behavior, not
+      // something this swap changes. A genuine child `@Component` boundary still protects a
+      // sibling branch from an unrelated press.
       ...provideZonelessChangeDetectionInternal(),
-      // Angular's own INTERNAL_APPLICATION_ERROR_HANDLER (core.mjs) reports a tick()
-      // exception by calling `injector.get(ErrorHandler)` — a normal `bootstrapApplication`
-      // registers this token by default (platform-browser's BROWSER_MODULE_PROVIDERS), but
-      // our from-scratch environment injector never did, so that lookup itself threw
-      // NG0201 and REPLACED whatever the real error was with an unrelated "No provider
-      // found for ErrorHandler" — the real exception never got logged, and the NG0201 itself
-      // propagated out of a bare Timeout callback uncaught (nothing above it in the stack to
-      // catch it), i.e. any async tick() exception, anywhere in the app, crashed hard instead
-      // of being reported. Providing the default `ErrorHandler` (same one bootstrapApplication
-      // ships) restores the intended behavior: `console.error('ERROR', e)` and keep running.
+      // Angular's INTERNAL_APPLICATION_ERROR_HANDLER reports a tick() exception via
+      // `injector.get(ErrorHandler)`; a normal `bootstrapApplication` registers that token by
+      // default, but our from-scratch environment injector never did, so the lookup itself threw
+      // NG0201 and replaced the real error with "No provider found for ErrorHandler" — any async
+      // tick() exception crashed hard, uncaught, instead of being reported. Providing the
+      // default `ErrorHandler` restores `console.error('ERROR', e)` and keep running.
       { provide: ErrorHandler, useClass: ErrorHandler },
       ColorSchemeService,
       WindowDimensionsService,

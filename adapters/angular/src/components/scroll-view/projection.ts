@@ -73,6 +73,9 @@ function isProjectedRefreshControl(node: ISymbioteNode): boolean {
 // delay, rebuild ranges, cross-talk record) live there; this runner only EXECUTES the effects on the
 // engine node (build interpolation + wire listener, hold the debounce timer, re-apply the node props).
 // Because it owns the child index, it consumes the reducer's record-header-y effect for cross-talk.
+// Diagnostic-only: a process-wide counter so each controller's log lines are attributable.
+let projectionControllerSeq = 0;
+
 class StickyProjectionWrapper {
   private readonly state = createInitialStickyState();
   private animatedTranslateY: AnimatedInterpolation;
@@ -91,6 +94,9 @@ class StickyProjectionWrapper {
       inputRange: [-1, 0],
       outputRange: [0, 0],
     });
+    dlog(
+      `STICKY[wrap] created index=${childIndex} scrollValueIsNative=${this.controller.config.scrollAnimatedValue.__isNative()}`,
+    );
     this.dispatch({ kind: 'inputs-changed' });
   }
 
@@ -148,7 +154,7 @@ class StickyProjectionWrapper {
           this.animatedTranslateY = next;
           this.applyProps();
           dlog(
-            `Angular ScrollView projection sticky index=${this.childIndex} measured=${this.state.measured} y=${this.state.layoutY}`,
+            `STICKY[wrap] rebuilt index=${this.childIndex} measured=${this.state.measured} y=${this.state.layoutY}`,
           );
           break;
         }
@@ -172,6 +178,7 @@ class StickyProjectionWrapper {
   private readonly onLayout = (event: ISymbioteEvent): void => {
     const y = readLayoutNumber(event, 'y');
     const height = readLayoutNumber(event, 'height');
+    dlog(`STICKY[wrap] index=${this.childIndex} onLayout y=${y} height=${height}`);
     // Keep the previous value when a field is absent (RN sets state only on a defined read).
     this.dispatch({
       kind: 'layout',
@@ -180,7 +187,12 @@ class StickyProjectionWrapper {
     });
   };
 
+  // The ONLY thing that drives the committed pin on this path: applyProps has no __makeNative(),
+  // so the wrapper is JS-driven end to end. If the scroll value has been made native up front the
+  // cascade to child listeners stops (AnimatedWithChildren.__callListeners skips children once
+  // isNative) and this never fires - the header then renders in place and never moves.
   private readonly animatedValueListener = ({ value }: { value: number | string }): void => {
+    dlog(() => `STICKY[wrap] index=${this.childIndex} animated-tick value=${String(value)}`);
     if (typeof value === 'number') this.dispatch({ kind: 'animated-tick', value });
   };
 
@@ -203,14 +215,37 @@ class StickyProjectionWrapper {
   private applyProps(): void {
     const props = this.props();
     const reduced = reduceProps(props);
+    // Thunk: applyProps is on the scroll-driven path (every animated-tick while the pin is
+    // JS-driven), and JSON.stringify of a reduced transform is not free.
+    dlog(
+      () =>
+        `STICKY[wrap] index=${this.childIndex} applyProps translateY=${String(this.state.translateY)} ` +
+        `measured=${this.state.measured} layoutY=${this.state.layoutY} ` +
+        `scrollValueIsNative=${this.controller.config.scrollAnimatedValue.__isNative()} ` +
+        `reducedTransform=${JSON.stringify(reduced.transform ?? reduced.style)}`,
+    );
     for (const [key, value] of Object.entries(reduced)) routeProp(this.node, key, value);
 
     const next = new AnimatedProps(props);
     next.__attach();
+    // No explicit __makeNative() here on purpose: __attach joins the leaf to the interpolation,
+    // which sits under the shared scroll value, and AnimatedWithChildren.__addChild promotes a
+    // child joining an ALREADY-native parent (graph.ts). So the pin is native exactly when the
+    // scroll value is - logged below, because "is this actually on the UI thread" is otherwise
+    // invisible until you read three files.
+    dlog(
+      () =>
+        `STICKY[wrap] index=${this.childIndex} leaf attached isNative=${next.__isNative()} ` +
+        `interpolationIsNative=${this.animatedTranslateY.__isNative()} ` +
+        `scrollValueIsNative=${this.controller.config.scrollAnimatedValue.__isNative()}`,
+    );
     if (this.animatedProps !== undefined) this.animatedProps.__detach();
     this.animatedProps = next;
     this.cancelBind?.();
-    this.cancelBind = whenCommitted(this.node, () => next.setNativeView(this.node));
+    this.cancelBind = whenCommitted(this.node, () => {
+      next.setNativeView(this.node);
+      dlog(`STICKY[wrap] index=${this.childIndex} setNativeView isNative=${next.__isNative()}`);
+    });
   }
 }
 
@@ -219,6 +254,13 @@ export class ScrollViewProjectionController {
   private contentNode: ISymbioteNode | undefined;
   private readonly records: IProjectedRecord[] = [];
   private readonly headerLayoutYs = new Map<number, number>();
+
+  // Diagnostic-only: one ScrollView can host several projection controllers over its lifetime,
+  // and an app has several ScrollViews at once. Without an id every log line below is
+  // indistinguishable between instances, which is what made a "logs never stop" report
+  // impossible to read as either a real loop or two lists warming up in turn.
+  private readonly instanceId = ++projectionControllerSeq;
+  private reconcileSeq = 0;
 
   constructor(config: IScrollViewProjectionConfig) {
     this.config = config;
@@ -305,10 +347,13 @@ export class ScrollViewProjectionController {
   nextStickyHeaderY(index: number): number | undefined {
     const stickyIndices = this.config.stickyHeaderIndices ?? [];
     const next = stickyIndices.find(entry => entry > index);
-    return next === undefined ? undefined : this.headerLayoutYs.get(next);
+    const y = next === undefined ? undefined : this.headerLayoutYs.get(next);
+    dlog(`STICKY[proj] nextStickyHeaderY(index=${index}) next=${next} y=${y}`);
+    return y;
   }
 
   recordHeaderLayoutY(index: number, y: number): void {
+    dlog(`STICKY[proj] recordHeaderLayoutY index=${index} y=${y}`);
     if (this.headerLayoutYs.get(index) === y) return;
     this.headerLayoutYs.set(index, y);
     for (const record of this.records) record.sticky?.rebuild();
@@ -322,7 +367,8 @@ export class ScrollViewProjectionController {
   ): void {
     const before = beforeRecord === undefined ? undefined : directNode(beforeRecord);
     dlog(
-      `Angular ScrollView projection insertRecord physicalParent=${parent.component} child=${record.child.component} before=${before ? before.component : 'undefined(append)'} parentIsContentNode=${parent === this.contentNode}`,
+      `STICKY[proj#${this.instanceId}] insertRecord child=${record.child.component} ` +
+        `before=${before ? before.component : 'append'} parentIsContentNode=${parent === this.contentNode}`,
     );
     if (before === undefined) insert(parent, record.child);
     else insert(parent, record.child, before);
@@ -330,26 +376,36 @@ export class ScrollViewProjectionController {
 
   private reconcileStickyRecords(): void {
     if (this.contentNode === undefined) return;
+    const seq = ++this.reconcileSeq;
     dlog(
-      `Angular ScrollView projection reconcile contentNode=${this.contentNode.component} records=${this.records.length} contentNodeActualChildren=${this.contentNode.children.length}`,
+      () =>
+        `STICKY[proj#${this.instanceId}] reconcile#${seq} records=${this.records.length} ` +
+        `children=${this.contentNode?.children.length} sticky=${JSON.stringify(this.config.stickyHeaderIndices ?? [])}`,
     );
     const stickyIndices = new Set(this.config.stickyHeaderIndices ?? []);
     if (this.config.customStickyHeaderComponent !== undefined && stickyIndices.size > 0) {
       dlog(
-        'Angular ScrollView projection uses built-in sticky wrapper; custom StickyHeaderComponent is explicit-composition only',
+        'STICKY[proj] uses built-in sticky wrapper; custom StickyHeaderComponent is explicit-composition only',
       );
     }
 
     let paintIndex = 0;
     for (const record of [...this.records]) {
       if (this.config.excludeRefreshControl && isProjectedRefreshControl(record.child)) {
-        this.removeProjectedChild(record.child, (parent, child) => removeChild(parent, child));
+        // Removed INLINE, not through removeProjectedChild: that method ends with its own
+        // reconcileStickyRecords(), so calling it from inside this walk re-enters the walk while
+        // this.records is being spliced under it - one refresh control could then drive an
+        // unbounded recursion. Same removal, without the re-entry.
+        this.dropRecord(record);
         continue;
       }
       const countsAsChild = !isAnchor(record.child) && !isProjectedRefreshControl(record.child);
       const childIndex = paintIndex;
       if (countsAsChild) paintIndex += 1;
       const shouldWrap = countsAsChild && stickyIndices.has(childIndex);
+      // Deliberately NOT logged per child per walk: reconcile runs on every projected insert, so
+      // that shape is O(children x inserts) and buries the few lines that carry information. Only
+      // a state TRANSITION is logged, below.
       if (shouldWrap && record.wrapper === undefined) this.wrapRecord(record, childIndex);
       else if (!shouldWrap && record.wrapper !== undefined) this.unwrapRecord(record);
       else if (shouldWrap && record.stickyIndex !== childIndex) {
@@ -358,6 +414,18 @@ export class ScrollViewProjectionController {
         record.stickyIndex = childIndex;
       } else if (shouldWrap) record.sticky?.rebuild();
     }
+  }
+
+  // The removal half of removeProjectedChild, without its trailing reconcile - safe to call from
+  // inside the reconcile walk itself.
+  private dropRecord(record: IProjectedRecord): void {
+    if (this.contentNode === undefined) return;
+    record.sticky?.destroy();
+    projectedWrappers.delete(record.child);
+    const direct = directNode(record);
+    if (direct.parent === this.contentNode) removeChild(this.contentNode, direct);
+    const index = this.records.indexOf(record);
+    if (index !== -1) this.records.splice(index, 1);
   }
 
   // Auto projection runs after Angular has already created projected child host nodes. At this
@@ -383,10 +451,12 @@ export class ScrollViewProjectionController {
     record.sticky = new StickyProjectionWrapper(this, childIndex, wrapper);
     record.stickyIndex = childIndex;
     projectedWrappers.set(record.child, record);
+    dlog(`STICKY[proj#${this.instanceId}] WRAP child=${record.child.component} paintIndex=${childIndex}`);
   }
 
   private unwrapRecord(record: IProjectedRecord): void {
     if (this.contentNode === undefined || record.wrapper === undefined) return;
+    dlog(`STICKY[proj#${this.instanceId}] UNWRAP child=${record.child.component}`);
     record.sticky?.destroy();
     record.sticky = undefined;
     record.stickyIndex = undefined;

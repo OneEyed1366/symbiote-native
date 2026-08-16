@@ -10,11 +10,15 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   ChangeDetectionStrategy,
   Component,
+  computed,
   ElementRef,
   EventEmitter,
   inject,
   Input,
   Output,
+  signal,
+  type DoCheck,
+  type OnChanges,
 } from '@angular/core';
 import {
   resolveAccessibilityProps,
@@ -28,7 +32,7 @@ import {
   type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { anchorHostStyle, SafeAreaViewHost, SymbioteHostPropsDirective } from '../../primitives';
+import { anchorHostStyle, SafeAreaViewHost, SymbioteHostPropsDirective, SymbioteStyleInputDirective } from '../../primitives';
 
 // Mirrors React's ISafeAreaViewProps minus children (Angular takes children via <ng-content>),
 // declared per-adapter over the shared accessibility base since the framework-specific children
@@ -53,12 +57,13 @@ export type IAngularSafeAreaViewInputs = Omit<
 @Component({
   selector: 'SafeAreaView',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SafeAreaViewHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <symbiote-safe-area-view
-      [symbioteHostProps]="hostProps"
+      [symbioteHostProps]="hostProps()"
       (accessibilityAction)="emit(accessibilityAction, $event)"
       (accessibilityTap)="emit(accessibilityTap, $event)"
       (magicTap)="emit(magicTap, $event)"
@@ -69,7 +74,7 @@ export type IAngularSafeAreaViewInputs = Omit<
     </symbiote-safe-area-view>
   `,
 })
-export class SafeAreaView implements IAngularSafeAreaViewInputs {
+export class SafeAreaView implements IAngularSafeAreaViewInputs, OnChanges, DoCheck {
   @Input() style?: IStyleProp<IViewStyle>;
   // Real @Output()s, not `[onX]="…"` callbacks. Safe to name `layout` the same as the native
   // `layout` event fired inside this component's own template — the engine's bubble() treats
@@ -127,6 +132,35 @@ export class SafeAreaView implements IAngularSafeAreaViewInputs {
     if (isSymbioteEvent(event)) emitter.emit(event);
   }
 
+  // Bridges the non-reactive fields `hostProps` reads into the reactive graph, so it can memoize.
+  // Plain fields read inside a computed() are UNTRACKED - something must signal "a dependency
+  // changed" or the bag goes stale. Signal inputs would do this natively, but `input()` is visible
+  // only to the AOT compiler and this package's unit suite runs on JIT (see the
+  // `angular-adapter-change-detection` skill, §6); `signal()`/`computed()` are plain runtime APIs.
+  // TWO bump sites, both required - see ngOnChanges and ngDoCheck below.
+  private readonly hostPropsRevision = signal(0);
+  // What the anchor's class-derived style was when the bag was last built (identity, not value).
+  private lastAnchorStyle: unknown;
+
+  ngOnChanges(): void {
+    // The single moment Angular has finished writing every changed @Input for this pass.
+    this.hostPropsRevision.update(revision => revision + 1);
+  }
+
+  // The anchor's class-derived style is NOT an @Input: `class="..."`/`[ngClass]` at the use site
+  // resolves through the renderer's addClass onto this component's anchor host (see
+  // anchorHostStyle's doc comment), so it never shows up in SimpleChanges - ngOnChanges alone
+  // would strand a class toggled after mount (regression-covered by safe-area-view.test.ts's
+  // class-toggle case, which fails the moment this hook stops bumping). ngDoCheck runs at exactly
+  // the cadence the old getter was re-read, and bumps only on a real identity change, so an
+  // unchanged anchor still costs nothing.
+  ngDoCheck(): void {
+    const anchorStyle = anchorHostStyle(this.elementRef);
+    if (anchorStyle === this.lastAnchorStyle) return;
+    this.lastAnchorStyle = anchorStyle;
+    this.hostPropsRevision.update(revision => revision + 1);
+  }
+
   // Folds style/testID/nativeID/accessible alongside the accessibility*/aria-*/role surface into
   // one bag for [symbioteHostProps] — resolveAccessibilityProps takes the whole props object (not
   // just the accessibility slice) and returns it with aria-*/role folded into accessibility*, so
@@ -134,7 +168,13 @@ export class SafeAreaView implements IAngularSafeAreaViewInputs {
   // SafeAreaView runs over its whole `rawProps`. The anchor's class-derived style goes FIRST, this
   // component's own explicit `style` @Input SECOND — flattenStyle's later-wins collapse keeps an
   // explicit [style] winning over its ambient class.
-  get hostProps(): Record<string, unknown> {
+  //
+  // A computed(), not a getter: Angular re-reads a template getter on every refresh of this view
+  // and `[symbioteHostProps]` compares by REFERENCE, so a freshly rebuilt (but identical) bag
+  // re-pushes every key through renderer.setProperty -> the engine's prop routing. Memoized, an
+  // a11y/layout event that only dirties this view costs nothing.
+  readonly hostProps = computed<Record<string, unknown>>(() => {
+    this.hostPropsRevision();
     return resolveAccessibilityProps({
       style: [anchorHostStyle(this.elementRef), this.style],
       testID: this.testID,
@@ -173,5 +213,5 @@ export class SafeAreaView implements IAngularSafeAreaViewInputs {
       'aria-valuenow': this.ariaValueNow,
       'aria-valuetext': this.ariaValueText,
     });
-  }
+  });
 }
