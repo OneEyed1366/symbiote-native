@@ -34,6 +34,31 @@ export function createInitialTabState(
   return { routes, index: index === -1 ? INITIAL_FOCUSED_INDEX : index };
 }
 
+// A screen marker can appear or disappear after mount (a marker behind an `{#if}`, a data-driven
+// screen list), so a navigator's route list has to follow its registry instead of staying frozen
+// at whatever createInitialTabState saw first. Mirrors TabRouter.getStateForRouteNamesChange:
+// membership and order come from `nextRoutes`, but a route that survives keeps its IDENTITY (its
+// key) and everything jumpTo/setParams accumulated onto its params - only genuinely new names
+// take their entry from `nextRoutes`. Focus follows the previously focused route's NAME, so an
+// unrelated screen disappearing never moves the user; when the focused route is the one that
+// disappeared, focus falls back to the first route, the same landing spot every unresolvable
+// focus gets here (createInitialTabState's own fallback).
+export function reconcileTabRoutes(
+  state: ITabRouterState,
+  nextRoutes: readonly IRouteEntry[],
+): ITabRouterState {
+  const routes = nextRoutes.map(
+    next => state.routes.find(route => route.name === next.name) ?? next,
+  );
+  const isUnchanged =
+    routes.length === state.routes.length &&
+    routes.every((route, at) => route === state.routes[at]);
+  if (isUnchanged) return state;
+  const focusedName = state.routes[state.index]?.name;
+  const index = routes.findIndex(route => route.name === focusedName);
+  return { routes, index: index === -1 ? INITIAL_FOCUSED_INDEX : index };
+}
+
 // jumpTo moves the focused index to an existing route by name and optionally merges params
 // (navigation.jumpTo(name, params) - the tab-actions doc's own signature); it never adds,
 // removes, or reorders routes (mirrors TabRouter: JUMP_TO is a no-op when the target name isn't

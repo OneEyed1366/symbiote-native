@@ -27,7 +27,7 @@ and the option silently falls back to its default. No error, no warning — just
 behavior (e.g. a drawer opening on the default LEFT edge instead of the RIGHT one
 explicitly requested).
 
-Raw-TSX/JSX authoring of the same component (`.examples/vue-tsx`, `@vue/babel-plugin-jsx`)
+Raw-TSX/JSX authoring of the same component (`examples/vue-tsx`, `@vue/babel-plugin-jsx`)
 does **not** trigger this, because JSX is naturally camelCase (`drawerPosition="right"`) —
 that's a coincidence, not a safety net. A fix must handle both authoring styles.
 
@@ -61,7 +61,7 @@ packages can use it, per `adapters/vue/src/index.ts`'s own comment: "Exported so
 adopting this convention — they read `rawAttrs.drawerPosition` /
 `rawAttrs.initialRouteName` / `rawAttrs.screenOptions` / etc. directly. Every kebab-authored
 option on `<Stack>`/`<Tab>`/`<Drawer>` in a `.vue` SFC silently fell back to its default.
-Caught via a real iOS simulator screenshot: `.examples/vue-sfc`'s `DrawerDemoScreen.vue`
+Caught via a real iOS simulator screenshot: `examples/vue-sfc`'s `DrawerDemoScreen.vue`
 declared `drawer-position="right"` but the drawer opened on the left.
 
 Fix: import `normalizeVueAttrs` from `@symbiote-native/vue`, add

@@ -115,19 +115,25 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 describe('clone-on-write prop removal', () => {
-  it('sets opacity on press and fully resets it on release', () => {
-    mount(ROOT_TAG, createElement(App));
+  // Positive only: this is a regression on the commit's merge semantics, not a guard clause —
+  // there is no invalid input here to reject.
+  describe('Positive', () => {
+    // why: `diffProps` sending `{ opacity: null }` must survive a Fabric-faithful MERGE (not
+    // the shared harness's replace) — a merge slot is the only way this bug is observable at all.
+    it('sets opacity on press and fully resets it on release', () => {
+      mount(ROOT_TAG, createElement(App));
 
-    expect(eventHandler, 'an event handler was registered').toBeDefined();
-    const button = findByTestId(committed, TEST_ID);
-    expect(button, 'the button is in the committed tree').toBeDefined();
-    const handle = button!.instanceHandle;
+      expect(eventHandler, 'an event handler was registered').toBeDefined();
+      const button = findByTestId(committed, TEST_ID);
+      expect(button, 'the button is in the committed tree').toBeDefined();
+      const handle = button!.instanceHandle;
 
-    eventHandler!(handle, 'topTouchStart', {});
-    expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(ACTIVE_OPACITY);
+      eventHandler!(handle, 'topTouchStart', {});
+      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(ACTIVE_OPACITY);
 
-    eventHandler!(handle, 'topTouchEnd', {});
-    // The whole point: opacity must be GONE (reset), not stuck at 0.2 after the merge.
-    expect(findByTestId(committed, TEST_ID)?.props.opacity).toBeUndefined();
+      eventHandler!(handle, 'topTouchEnd', {});
+      // The whole point: opacity must be GONE (reset), not stuck at 0.2 after the merge.
+      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBeUndefined();
+    });
   });
 });

@@ -53,8 +53,16 @@ function mountShowable(visible: boolean): void {
   );
 }
 
+// why: no Negative group — vShow has no invalid input (its `value` is a plain boolean coerced by
+// the directive binding, never user-supplied data that could be malformed) and no guard clause.
+// The whole surface is "does the directive converge on the right display value", grouped below by
+// the two distinct mechanisms that could break that: the async-commit race on first mount, and
+// clobbering unrelated style props on later re-commits.
 describe('vShow runtime-helpers shim', () => {
   it('applies display:none on the very first mount despite the async-commit race', async () => {
+    // why: Vue's `mounted` hook is synchronous but this renderer's Fabric commit is coalesced onto
+    // a microtask — a bare setNativeProps at mount time would read no tag yet and silently no-op
+    // (vue-adapter-reactivity Gotcha 2). whenCommitted is what makes this converge at all.
     mountShowable(false);
     await tick();
     const node = committedView();
@@ -68,6 +76,9 @@ describe('vShow runtime-helpers shim', () => {
     expect(committedView().props.display).not.toBe('none');
   });
 
+  // why: setNativeProps merges a partial style object rather than replacing it — a directive that
+  // clobbered sibling style props on every toggle would silently reset unrelated layout each time
+  // visibility changes, a real regression class for any component styled + conditionally shown.
   it('toggles display back and forth without clobbering other style props', async () => {
     const visible = ref(true);
     mount(
@@ -93,6 +104,29 @@ describe('vShow runtime-helpers shim', () => {
     node = committedView();
     expect(node.props.display).not.toBe('none');
     expect(node.props.padding).toBe(PADDING);
+  });
+
+  // why: applyShow explicitly cancels the PREVIOUS pending whenCommitted wait before scheduling a
+  // new one (`pendingShowCommits.get(el)?.()` at the top of applyShow) — proving the directive
+  // converges on the LAST value when toggled again before the first commit lands is the only way
+  // to show that cancellation actually prevents a stale first-mount apply from firing after a
+  // later toggle already landed, rather than just happening to pass because nothing raced.
+  it('converges to the last value when toggled again before the first commit lands', async () => {
+    const visible = ref(false);
+    mount(
+      ROOT_TAG,
+      defineComponent({
+        setup: () => () =>
+          withDirectives(h('symbiote-view', { style: { padding: PADDING } }), [
+            [vShow, visible.value],
+          ]),
+      }),
+    );
+    // Flip again before any macrotask boundary — both the Vue re-render and the engine's
+    // microtask-coalesced commit are still pending at this point.
+    visible.value = true;
+    await tick();
+    expect(committedView().props.display).not.toBe('none');
   });
 });
 
@@ -133,52 +167,104 @@ function mountTeleportApp(): void {
 }
 
 describe('Teleport runtime-helpers shim', () => {
-  it('renders content under the target node, not its own template position', async () => {
-    mountTeleportApp();
-    await tick();
+  describe('Positive', () => {
+    // why: the whole reason this wrapper exists over stock Teleport — a real host node target,
+    // not a CSS selector, moves content under it while keeping it out of the template parent.
+    it('renders content under the target node, not its own template position', async () => {
+      mountTeleportApp();
+      await tick();
 
-    const overlayHost = findByTestId('overlay-host');
-    const source = findByTestId('source');
-    const ported = findByTestId('ported');
-    expect(overlayHost, 'overlay host was committed').toBeDefined();
-    expect(source, 'source was committed').toBeDefined();
-    expect(ported, 'ported node was committed').toBeDefined();
-    if (overlayHost === undefined || source === undefined || ported === undefined) {
-      throw new Error('unreachable');
-    }
+      const overlayHost = findByTestId('overlay-host');
+      const source = findByTestId('source');
+      const ported = findByTestId('ported');
+      expect(overlayHost, 'overlay host was committed').toBeDefined();
+      expect(source, 'source was committed').toBeDefined();
+      expect(ported, 'ported node was committed').toBeDefined();
+      if (overlayHost === undefined || source === undefined || ported === undefined) {
+        throw new Error('unreachable');
+      }
 
-    expect(isDescendantOf(overlayHost, ported), 'ported node landed under the overlay host').toBe(
-      true,
-    );
-    expect(
-      isDescendantOf(source, ported),
-      'ported node did NOT stay under its own template parent',
-    ).toBe(false);
-  });
+      expect(isDescendantOf(overlayHost, ported), 'ported node landed under the overlay host').toBe(
+        true,
+      );
+      expect(
+        isDescendantOf(source, ported),
+        'ported node did NOT stay under its own template parent',
+      ).toBe(false);
+    });
 
-  it('throws for a CSS-selector string target instead of silently no-oping', () => {
-    expect(() =>
+    // why: `disabled` is a documented Vue Teleport option our wrapper passes straight through
+    // (setup only validates `to`) — a regression here would silently ship broken in-place
+    // rendering even though this wrapper's whole reason to exist is validating `to`, not `disabled`.
+    it('keeps content in its own template position when disabled', async () => {
+      const overlayRef = shallowRef<ISymbioteNode | null>(null);
       mount(
         ROOT_TAG,
         defineComponent({
-          setup: () => () => h(Teleport, { to: 'body' }, () => h('symbiote-view')),
+          setup: () => () =>
+            h('symbiote-view', {}, [
+              h('symbiote-view', { ref: overlayRef, testID: 'overlay-host' }),
+              h('symbiote-view', { testID: 'source' }, [
+                overlayRef.value
+                  ? h(Teleport, { to: overlayRef.value, disabled: true }, () =>
+                      h('symbiote-view', { testID: 'ported' }),
+                    )
+                  : null,
+              ]),
+            ]),
         }),
-      ),
-    ).toThrow(/CSS-selector string/);
+      );
+      await tick();
+
+      const overlayHost = findByTestId('overlay-host');
+      const source = findByTestId('source');
+      const ported = findByTestId('ported');
+      if (overlayHost === undefined || source === undefined || ported === undefined) {
+        throw new Error('unreachable: overlay-host/source/ported missing');
+      }
+
+      expect(isDescendantOf(source, ported), 'ported node stayed in its template position').toBe(
+        true,
+      );
+      expect(
+        isDescendantOf(overlayHost, ported),
+        'ported node did NOT move to the disabled target',
+      ).toBe(false);
+    });
   });
 
-  it('rejects a target that is not a real host node', () => {
-    // JSON.parse returns an untyped value, the honest way to hand Teleport something its own
-    // `to: null` (no-typecheck) prop would normally accept but our runtime guard must still reject.
-    const garbage = JSON.parse('{}');
-    expect(isSymbioteNode(garbage)).toBe(false);
-    expect(() =>
-      mount(
-        ROOT_TAG,
-        defineComponent({
-          setup: () => () => h(Teleport, { to: garbage }, () => h('symbiote-view')),
-        }),
-      ),
-    ).toThrow(/not a real host node/);
+  describe('Negative — an invalid target throws immediately instead of corrupting the tree', () => {
+    // why: renderer.ts stubs querySelector to null (no DOM), so a DOM-world CSS-selector string
+    // must fail loudly at the Teleport boundary, not silently resolve `to` to nothing deep inside
+    // insert/remove where the failure would be much harder to trace back to the real cause.
+    it('throws for a CSS-selector string target instead of silently no-oping', () => {
+      expect(() =>
+        mount(
+          ROOT_TAG,
+          defineComponent({
+            setup: () => () => h(Teleport, { to: 'body' }, () => h('symbiote-view')),
+          }),
+        ),
+      ).toThrow(/CSS-selector string/);
+    });
+
+    // why: `to` is typed `null` (no compile-time check) so a wrong runtime value — a plain object,
+    // a forgotten `.value` on a ref — must be caught by this component's own runtime guard before
+    // it reaches the real Teleport and silently corrupts the retained tree.
+    it('rejects a target that is not a real host node', () => {
+      // JSON.parse returns an untyped value, the honest way to hand Teleport something its own
+      // `to: null` (no-typecheck) prop would normally accept but our runtime guard must still
+      // reject — no `as` cast needed to reach this input, it is a legitimate runtime value.
+      const garbage = JSON.parse('{}');
+      expect(isSymbioteNode(garbage)).toBe(false);
+      expect(() =>
+        mount(
+          ROOT_TAG,
+          defineComponent({
+            setup: () => () => h(Teleport, { to: garbage }, () => h('symbiote-view')),
+          }),
+        ),
+      ).toThrow(/not a real host node/);
+    });
   });
 });

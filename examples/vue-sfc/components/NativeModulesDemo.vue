@@ -9,11 +9,11 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { View, Text, Image, I18nManager, Settings } from '@symbiote-native/vue'
 import ActionButton from './ActionButton.vue'
 
-const LOGO_URI = 'https://reactnative.dev/img/tiny_logo.png'
+const LOGO_URI = 'https://vuejs.org/images/logo.png'
 // A distinct cache key for the prefetch demo: same asset, different URL (query
 // string), so nothing has loaded it yet. The cache starts cold and the button
 // visibly warms it, unlike LOGO_URI, which getSize + the <Image> already pulled in.
-const PREFETCH_URI = 'https://reactnative.dev/img/tiny_logo.png?warm=symbiote'
+const PREFETCH_URI = 'https://vuejs.org/images/logo.png?warm=symbiote'
 const TAP_KEY = 'symbiote.tapCount'
 
 // I18nManager: RTL constants, read once at setup. A non-throwing read proves the

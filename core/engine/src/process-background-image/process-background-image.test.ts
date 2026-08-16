@@ -2,6 +2,10 @@
 // root cause as boxShadow/transform/filter (enableNativeCSSParsing defaults false). Two coverage
 // paths: STRING form (the CSS gradient syntax authors actually write) and ARRAY form (the
 // structured/animated hot path, color detection irrelevant there).
+//
+// processBackgroundImage never throws — every invalid gradient resolves to [] (web semantics:
+// an invalid background-image paints none of it), so "rejects" below means "resolves to []",
+// not a thrown error. There is no Negative (toThrow) group.
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { processBackgroundImage } from './index';
@@ -131,6 +135,14 @@ describe('processBackgroundImage', () => {
       installRealisticColorProcessor();
       expect(processBackgroundImage('linear-gradient(45xyz, red, blue)')).toEqual([]);
     });
+
+    // why: a stop position with no recognized unit (not px, not %) is unresolvable —
+    // getPositionFromCSSValue's fallthrough must reject the whole gradient, not silently
+    // drop the position.
+    it('rejects a color-stop position with no recognized unit', () => {
+      installRealisticColorProcessor();
+      expect(processBackgroundImage('linear-gradient(red 10, blue)')).toEqual([]);
+    });
   });
 
   describe('radial-gradient string form', () => {
@@ -195,6 +207,27 @@ describe('processBackgroundImage', () => {
       expect(gradient.size).toBe('farthest-side');
       expect(gradient.position).toEqual({ top: '0%', left: '0%' });
     });
+
+    // why: "at <single keyword>" (just one token) is a distinct parse branch from the
+    // 2-keyword and 4-token forms already covered — CSS defaults the OTHER axis to center.
+    it('parses "at <single keyword position>", defaulting the other axis to center', () => {
+      installRealisticColorProcessor();
+      const [gradient] = processBackgroundImage('radial-gradient(at right, red, blue)');
+      if (gradient?.type !== 'radial-gradient') throw new Error('expected radial-gradient');
+      expect(gradient.position).toEqual({ left: '100%', top: '50%' });
+    });
+
+    // why: the 4-token position form ("[left|right] <len> [top|bottom] <len>") is CSS's most
+    // explicit position syntax and resolves through a THIRD branch of
+    // parseRadialGradientPositionTokens distinct from the 1- and 2-token forms above.
+    it('parses "at [left|right] <length> [top|bottom] <length>" (the 4-token form)', () => {
+      installRealisticColorProcessor();
+      const [gradient] = processBackgroundImage(
+        'radial-gradient(at right 20px bottom 30px, red, blue)',
+      );
+      if (gradient?.type !== 'radial-gradient') throw new Error('expected radial-gradient');
+      expect(gradient.position).toEqual({ right: 20, bottom: 30 });
+    });
   });
 
   describe('array form — identity color processor passes colors through', () => {
@@ -258,6 +291,40 @@ describe('processBackgroundImage', () => {
       expect(
         processBackgroundImage([{ type: 'linear-gradient', colorStops: [{ color: null }] }]),
       ).toEqual([]);
+    });
+
+    // why: array-form direction is validated by the SAME angle-unit/keyword regexes as the
+    // string form, but through a separate code path (processBackgroundImageArray, not
+    // parseLinearGradientCSSString) — must be proven independently.
+    it('rejects an array-form linear-gradient with an unrecognized direction', () => {
+      expect(
+        processBackgroundImage([
+          { type: 'linear-gradient', direction: 'sideways', colorStops: [{ color: 'red' }] },
+        ]),
+      ).toEqual([]);
+    });
+
+    it('rejects an array-form radial-gradient with an invalid shape', () => {
+      expect(
+        processBackgroundImage([
+          { type: 'radial-gradient', shape: 'hexagon', colorStops: [{ color: 'red' }] },
+        ]),
+      ).toEqual([]);
+    });
+
+    it('rejects an array-form radial-gradient with an invalid size', () => {
+      expect(
+        processBackgroundImage([
+          { type: 'radial-gradient', size: 'huge', colorStops: [{ color: 'red' }] },
+        ]),
+      ).toEqual([]);
+    });
+
+    // why: an entry whose `type` is neither gradient kind is silently skipped (not an
+    // error) — the loop just produces nothing for it, matching "no image" rather than a
+    // crash on an unrecognized entry.
+    it('produces nothing for an entry whose type is neither gradient kind', () => {
+      expect(processBackgroundImage([{ type: 'conic-gradient', colorStops: [] }])).toEqual([]);
     });
   });
 

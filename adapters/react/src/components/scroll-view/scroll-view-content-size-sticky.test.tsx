@@ -6,6 +6,15 @@
 //      child in a sticky-header component fed by the scroll offset; the native scroll view
 //      ignores the index array. We assert the flagged child is wrapped, and that each sticky
 //      header is fed the NEXT flagged header's y (nextHeaderLayoutY cross-talk).
+//
+// SCOPE: the interpolation/translateY math the sticky wrapper runs on scroll is
+// `core/components/src/state/sticky-header-reducer.ts`, already unit-tested exhaustively at
+// core (reduceSticky's rebuild/debounce/zero-swallow branches) — N/A here, out of scope. This
+// file proves the layer ABOVE that: does ScrollView actually identify + wrap the flagged
+// children, and does the index-ordered nextHeaderLayoutY cross-talk (which header learns which
+// other header's y) resolve correctly — that assignment logic lives only in the adapter, not in
+// the reducer. No Negative group: a bad/out-of-range stickyHeaderIndices entry is simply not
+// matched by any child position — nothing throws.
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -81,6 +90,10 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 describe('ScrollView content-size + sticky headers', () => {
+  // why: RN has no native onContentSizeChange event — it is synthesized purely in JS from the
+  // content node's onLayout, and MUST dedupe identical sizes, since Yoga can re-fire onLayout
+  // without the box actually changing (a consumer re-measuring a list on every such no-op fire
+  // would be a real perf bug, not just a wasted call).
   it('synthesizes onContentSizeChange from the content onLayout and dedupes', () => {
     mount(ROOT_TAG, <App />);
 
@@ -111,6 +124,11 @@ describe('ScrollView content-size + sticky headers', () => {
     expect(contentSizes[1][1]).toBe(1200);
   });
 
+  // why: a sticky header has no native support at all here — the entire effect is a JS wrapper
+  // holding a transform the scroll offset drives, so an un-collapsed (collapsable:false) real
+  // view carrying a translateY transform IS the feature; a flattened/optimized-away wrapper
+  // would silently kill stickiness. scrollEventThrottle must be numeric so native actually
+  // samples the offset frequently enough to drive it.
   it('wraps the flagged sticky child and sets a scrollEventThrottle', () => {
     mount(ROOT_TAG, <App />);
 
@@ -147,10 +165,12 @@ describe('ScrollView content-size + sticky headers', () => {
     expect(typeof outer!.props.scrollEventThrottle).toBe('number');
   });
 
+  // why: RN feeds each sticky header the y of the NEXT flagged header (_onStickyHeaderLayout ->
+  // previousHeader.setNextHeaderY): that y is the push-off collision point. With TWO sticky
+  // headers, the EARLIER header must receive the LATER header's y, while the LAST stays
+  // undefined — and it must resolve by INDEX order, not by which layout event arrives first
+  // (real devices don't guarantee layout-callback ordering).
   it('feeds the earlier sticky header the next header y by index order', () => {
-    // RN feeds each sticky header the y of the NEXT flagged header (_onStickyHeaderLayout ->
-    // previousHeader.setNextHeaderY): that y is the push-off collision point. With TWO sticky
-    // headers, the EARLIER header must receive the LATER header's y, while the LAST stays undefined.
     mount(ROOT_TAG, <StickyApp />);
 
     // Before any layout: neither header knows the next one's y.

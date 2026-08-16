@@ -2,6 +2,15 @@
 // transformer's inline <style>/<style module> handling — a plain .css file registers globally
 // (no default export), a .module.css file always scopes its classes and exports a name->
 // scopedName map any adapter can pass through resolveClassName.
+//
+// No Negative group: isCssModuleFile is a total string predicate and compileCssFile's own
+// failure mode (a malformed preprocessor source rejecting) is preprocessors.ts's contract,
+// exercised in preprocessors.test.ts and generate-dts.test.ts (which shares this same compile
+// step) — duplicating it here would only re-prove compile() propagates its rejection, already
+// covered by both. `.module.sass`/plain `.sass` compilation is intentionally not re-exercised
+// here either: `sass` is a plain alias of the same `compileScss` function the `.scss` cases below
+// already drive (see preprocessors.ts), so a dedicated `.sass` case would only re-confirm
+// detectLanguage's extension mapping, already proven by the isCssModuleFile recognition test.
 
 import { describe, expect, it } from 'vitest';
 import { compileCssFile, isCssModuleFile } from './index';
@@ -31,6 +40,12 @@ describe('isCssModuleFile', () => {
     expect(isCssModuleFile('Card.module.styl')).toBe(true);
     expect(isCssModuleFile('Card.scss')).toBe(false);
   });
+
+  // why: path.extname returns '' for an extensionless path — the guard must short-circuit false
+  // rather than let `''.slice(0, -0)` (a no-op slice) accidentally match on the whole filename.
+  it('is false for a filename with no extension at all', () => {
+    expect(isCssModuleFile('theme')).toBe(false);
+  });
 });
 
 describe('compileCssFile — plain .css', () => {
@@ -40,6 +55,13 @@ describe('compileCssFile — plain .css', () => {
     expect(code).toContain("from '@symbiote-native/engine'");
     expect(extractRegisterStylesArg(code)).toEqual({ card: { padding: 10 } });
     expect(code).not.toContain('export default');
+  });
+
+  // why: a stylesheet with no class rules (a file that's only comments, or not yet written to)
+  // must compile to a valid, empty registerStyles() call, not crash the Metro transform.
+  it('compiles an empty stylesheet to an empty registerStyles() call', async () => {
+    const { code } = await compileCssFile('', 'empty.css');
+    expect(extractRegisterStylesArg(code)).toEqual({});
   });
 });
 

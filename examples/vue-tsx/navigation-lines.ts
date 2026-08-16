@@ -3,10 +3,9 @@ import type { IRouteName } from './routes';
 
 // The @symbiote-native/navigation demo suite groups its 9 tour screens into 5 thematic "lines" —
 // which part of the package each screen exercises — carried through MenuScreen's row badges, each
-// demo screen's own line tag, and (where the native header/tab bar already takes a tint color) the
-// OS chrome itself. One color per line replaces the single flat accent every row/button used to
-// share. Kept in sync by hand with App.css's `:root` `--line-*` tokens — CSS custom properties and
-// this module are different runtimes with no shared import path.
+// demo screen's own line tag, and (where the native header/tab bar already takes a tint color)
+// the OS chrome itself. Kept in sync by hand with App.css's `:root` `--line-*` tokens — CSS
+// custom properties and this module are different runtimes with no shared import path.
 export const NAV_LINE = {
   Primitives: 'primitives',
   Presentation: 'presentation',
@@ -18,10 +17,9 @@ export const NAV_LINE = {
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
 
 export const LINE_COLOR: Record<INavLine, string> = {
-  // Vue's own brand green (vuejs.org's Ocean Green, the color of the Vue logo) — CanaryScreen is
-  // the "every @symbiote-native/vue primitive" showcase, so its line wears Vue's actual color
-  // instead of an arbitrary pick. This is the ONE line color that differs from the React/Angular
-  // canaries (which use React's #149eca / an arbitrary Angular red respectively) — every other
+  // Vue's own brand green (vuejs.org's Ocean Green) — CanaryScreen is the "every
+  // @symbiote-native/vue primitive" showcase, so its line wears Vue's actual color instead of an
+  // arbitrary pick. The ONE line color that differs from the React/Angular canaries; every other
   // line below stays byte-identical across every framework's example app.
   [NAV_LINE.Primitives]: '#42b883',
   [NAV_LINE.Presentation]: '#5ec8f2',

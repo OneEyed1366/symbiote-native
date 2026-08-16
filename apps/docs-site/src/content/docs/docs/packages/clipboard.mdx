@@ -22,6 +22,7 @@ subscription, `addClipboardListener`.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 <Aside type="caution" title="The URL functions are iOS-only">
   `getUrlAsync`, `setUrlAsync`, and `hasUrlAsync` exist only on iOS — `expo-clipboard` ships no
@@ -145,6 +146,34 @@ hook/composable/service in the way:
     There's no per-instance service to `inject()` here — every one-shot function is a plain free
     function off the core package, same as `@symbiote-native/local-auth`.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text, View } from '@symbiote-native/svelte';
+      import { getStringAsync, setStringAsync } from '@symbiote-native/clipboard/svelte';
+
+      function handleCopy(): void {
+        void setStringAsync('Hello from SymbioteNative');
+      }
+
+      function handlePaste(): void {
+        void getStringAsync().then(text => console.log('clipboard text', text));
+      }
+    </script>
+
+    <View>
+      <Pressable onPress={handleCopy}>
+        <Text>Copy</Text>
+      </Pressable>
+      <Pressable onPress={handlePaste}>
+        <Text>Paste</Text>
+      </Pressable>
+    </View>
+    ```
+
+    There's no per-instance rune to reach for here either — every one-shot function is a plain
+    free function off the core package, same as `@symbiote-native/local-auth`.
+  </TabItem>
 </Tabs>
 
 ### The clipboard-change listener
@@ -192,6 +221,18 @@ its own mount/unmount lifecycle so you don't manage the subscription by hand:
     export class ClipboardWatcher {
       readonly clipboardEvent = inject(ClipboardService).connect();
     }
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text } from '@symbiote-native/svelte';
+      import { useClipboard } from '@symbiote-native/clipboard/svelte';
+
+      const clipboardEvent = useClipboard(); // { readonly current: IClipboardEvent | null }
+    </script>
+
+    <Text>{clipboardEvent.current && `content types: ${clipboardEvent.current.contentTypes.join(', ')}`}</Text>
     ```
   </TabItem>
 </Tabs>
@@ -291,6 +332,7 @@ packages/clipboard/src/
 │             # the native module via expo-modules-core's requireNativeModule
 ├── react/    # @symbiote-native/clipboard/react   — re-exports core + hooks/use-clipboard
 ├── vue/      # @symbiote-native/clipboard/vue     — re-exports core + composables/use-clipboard
+├── svelte/   # @symbiote-native/clipboard/svelte  — re-exports core + runes/use-clipboard
 └── angular/  # @symbiote-native/clipboard/angular — re-exports core + services/clipboard.service
 ```
 

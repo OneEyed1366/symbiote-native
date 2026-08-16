@@ -101,11 +101,17 @@ function findScrollView(): IFakeNode {
   return node!;
 }
 
-describe('React FlatList pull-to-refresh on the engine', () => {
+// No Negative group: onRefresh/refreshing/progressViewOffset are plain optional props with no
+// invalid value FlatList rejects — the contract under test is conditional wiring (present vs
+// absent), not a validation boundary.
+describe('React FlatList pull-to-refresh on the engine (Positive)', () => {
   it('wires a PullToRefreshView child onto the scroll view when onRefresh is set', () => {
+    // why: RN renders a RefreshControl into the inner ScrollView's `refreshControl` prop
+    // whenever `onRefresh` is set — a FlatList that drops this wiring silently loses
+    // pull-to-refresh, and `refreshing`/`progressViewOffset` must reach the native control
+    // controlled, not just present.
     mount(ROOT_TAG, <RefreshApp />);
 
-    // Establish the viewport so the list commits its body.
     const refreshScroll = findScrollView();
     fabric.fireEvent(refreshScroll.instanceHandle, 'topLayout', {
       layout: { x: 0, y: 0, width: 320, height: VIEWPORT_HEIGHT },
@@ -117,11 +123,13 @@ describe('React FlatList pull-to-refresh on the engine', () => {
     const scrollWithRefresh = findScrollWithRefreshChild();
     expect(scrollWithRefresh, `${REFRESH_VIEW_NAME} is a child of the RCTScrollView`).toBeDefined();
 
-    // The controlled refreshing prop reaches native.
     expect(refreshNode!.props.refreshing).toBe(true);
+    expect(refreshNode!.props.progressViewOffset).toBe(12);
   });
 
   it('commits no PullToRefreshView when onRefresh is absent', () => {
+    // why: RN omits the RefreshControl entirely when `onRefresh` is unset — a list that always
+    // renders one would show a native pull-to-refresh affordance with no handler to call.
     mount(ROOT_TAG, <PlainApp />);
 
     const plainScroll = findScrollView();

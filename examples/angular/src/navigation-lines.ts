@@ -1,12 +1,11 @@
 import { ROUTE_NAME } from './routes';
 import type { IRouteName } from './routes';
 
-// The @symbiote-native/navigation demo suite groups its 9 tour screens into 5 thematic "lines" —
-// which part of the package each screen exercises — carried through MenuScreen's row badges, each
-// demo screen's own line tag, and (where the native header/tab bar already takes a tint color) the
-// OS chrome itself. One color per line replaces the single flat accent every row/button used to
-// share. Kept in sync by hand with App.css's `:root` `--line-*` tokens — CSS custom properties and
-// this module are different runtimes with no shared import path.
+// MenuScreen's tour groups its screens into thematic "lines" — carried through each row's badge,
+// the demo screen's own line tag, and (where the native header/tab bar already takes a tint color)
+// the OS chrome itself. Which part of @symbiote-native/navigation a screen exercises. Kept in sync
+// BY HAND with App.css's `:root` `--line-*` tokens — CSS custom properties and this module are
+// different runtimes with no shared import path.
 export const NAV_LINE = {
   Primitives: 'primitives',
   Presentation: 'presentation',
@@ -18,13 +17,10 @@ export const NAV_LINE = {
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
 
 export const LINE_COLOR: Record<INavLine, string> = {
-  // Angular's own brand red (angular.dev's shield/wordmark red, #DD0031 — verified against
-  // Simple Icons' curated Angular icon color, which sources its palette from official brand
-  // assets) — CanaryScreen is the "every @symbiote-native/angular primitive" showcase, so its
-  // line wears Angular's actual color instead of an arbitrary pick, exactly the way the React
-  // canary's Primitives line wears react.dev's blue. Every other line color below stays
-  // byte-identical to the React canary's navigation-lines.ts — only this one framework-identity
-  // swap is deliberate.
+  // Angular's own brand red (#DD0031, angular.dev's shield/wordmark color) — CanaryScreen is the
+  // "every primitive" showcase, so its line wears Angular's real color instead of an arbitrary
+  // pick. Every other line color below stays byte-identical to the React canary's
+  // navigation-lines.ts — only this one framework-identity swap is deliberate.
   [NAV_LINE.Primitives]: '#dd0031',
   [NAV_LINE.Presentation]: '#5ec8f2',
   [NAV_LINE.Structure]: '#4fd1a5',
@@ -39,7 +35,7 @@ export type INavLineInfo = {
 };
 
 // Every route reachable from MenuScreen, minus Menu itself. Deliberately excludes Details — it's a
-// plain push-target off Canary, not one of the 9 tour stops.
+// plain push-target off Canary, not one of the tour stops.
 export type ITourRouteName = Exclude<IRouteName, typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details>;
 
 export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
@@ -52,4 +48,5 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.HooksDemo]: { line: NAV_LINE.Introspection, code: 'HK', label: 'INTROSPECTION LINE' },
   [ROUTE_NAME.DeepLinking]: { line: NAV_LINE.Routing, code: 'DL', label: 'ROUTING LINE' },
   [ROUTE_NAME.StatePersistence]: { line: NAV_LINE.Routing, code: 'SP', label: 'ROUTING LINE' },
+  [ROUTE_NAME.ReactiveStyle]: { line: NAV_LINE.Primitives, code: 'RS', label: 'PRIMITIVES LINE' },
 };

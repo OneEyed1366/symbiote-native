@@ -5,7 +5,7 @@
 // range (values-with-units like '0deg' or colors like '#000') is interpolated
 // per numeric token and reassembled. See createStringInterpolation below.
 
-import { normalizeColor, type IRgbaValue } from './color';
+import { normalizeColor, type IRgbaValue } from './rgba';
 import { Easing, type IEasingFunction } from './easing';
 
 export type IExtrapolateType = 'extend' | 'identity' | 'clamp';

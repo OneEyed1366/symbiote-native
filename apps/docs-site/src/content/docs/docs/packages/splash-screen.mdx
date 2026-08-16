@@ -24,6 +24,7 @@ the same native module.
 | React               | ✅ live    |
 | Vue                 | ✅ live    |
 | Angular             | ✅ live    |
+| Svelte              | ✅ live    |
 
 ## Installation
 
@@ -88,6 +89,21 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
       }
     }
     ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { hide } from '@symbiote-native/splash-screen/svelte';
+
+      $effect(() => {
+        hide();
+      });
+    </script>
+    ```
+
+    Bare `hide()` on mount, matching `examples/svelte/App.svelte` — this repo's own canary calls
+    it exactly this way at the app root, inside an `$effect` with no dependency, since a Svelte
+    component's `<script>` body itself runs only once and there is no ongoing state to react to.
   </TabItem>
 </Tabs>
 
@@ -205,6 +221,42 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
     calling the readiness callbacks `container.onLayout`/`logo.onLoadEnd` by hand; skipping them
     means the readiness gate never completes and `hide()` never fires.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { View, Image, Animated } from '@symbiote-native/svelte';
+      import { useHideAnimation } from '@symbiote-native/splash-screen/svelte';
+      import manifest from '../assets/bootsplash/manifest.json';
+      import logo from '../assets/bootsplash/logo.png';
+
+      // Animated.View is dotted, so it can't be a template tag — aliased first, matching
+      // examples/svelte's own AnimatedDemo.svelte convention.
+      const AnimatedView = Animated.View;
+      const opacity = new Animated.Value(1);
+      let ready = $state(false);
+
+      const hideAnimation = useHideAnimation(() => ({
+        manifest,
+        logo,
+        ready,
+        animate: () => {
+          Animated.timing(opacity, { toValue: 0, duration: 250, useNativeDriver: true }).start();
+        },
+      }));
+    </script>
+
+    <AnimatedView
+      {...hideAnimation.current.container}
+      style={[hideAnimation.current.container.style, { opacity }]}
+    ><Image {...hideAnimation.current.logo} /></AnimatedView>
+    ```
+
+    `useHideAnimation` takes a config **getter**, not a plain value — a Svelte component's
+    `<script>` body runs once, like Vue's `setup`, so the getter is what lets it keep reading
+    `ready` as it changes. The return value is a getter too (`hideAnimation.current`), the same
+    boxed-getter convention as this adapter's other runes, since a raw `$state` doesn't survive
+    being returned from a plain function.
+  </TabItem>
 </Tabs>
 
 ## API
@@ -272,12 +324,14 @@ packages/splash-screen/src/
 │             # HideAnimationController (readiness state machine), computeHideAnimationStyles
 ├── react/    # React lifecycle (hooks) over the core
 ├── vue/      # Vue lifecycle (composables) over the core
-└── angular/  # Angular lifecycle (a DI service) over the core
+├── angular/  # Angular lifecycle (a DI service) over the core
+└── svelte/   # Svelte lifecycle (runes/use-hide-animation.svelte.ts) over the core
 ```
 
 Every adapter's `useHideAnimation` constructs the **same** `HideAnimationController` once, reads
 native constants once, and re-syncs the controller's config through its own reactivity primitive
-— a React effect with no dependency array, a Vue `watchEffect`, an Angular `effect()`. The style
+— a React effect with no dependency array, a Vue `watchEffect`, an Angular `effect()`, a Svelte
+`$effect`. The style
 computation itself (`computeHideAnimationStyles`) is a faithful, framework-agnostic port of
 `react-native-bootsplash`'s own `useHideAnimation` `useMemo` body, so the container/logo/brand
 prop bags are byte-for-byte the same shape upstream produces — the same logic/lifecycle split as

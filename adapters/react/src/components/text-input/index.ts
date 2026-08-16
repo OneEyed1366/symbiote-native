@@ -24,7 +24,7 @@ import {
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
-import { blurTextInput, setInputBlurred, setInputFocused } from '../../modules/text-input-state';
+import { blurTextInput, setInputBlurred, setInputFocused } from '@symbiote-native/engine';
 import {
   resolveAccessibilityProps,
   resolveTextInputProps,

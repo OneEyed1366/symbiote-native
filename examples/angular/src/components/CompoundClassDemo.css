@@ -1,0 +1,33 @@
+/* .section/.section-label/.row/.note-text are the app-wide generic classes from App.css, not
+   redeclared here — see the style-registry-collisions rule. `.badge`/`.badge.loud`/`.badge-text`
+   are defined ONLY here in this app.
+
+   Colours are LITERALS, not var(--token): @symbiote-native/css-parser resolves var() only against
+   custom properties declared in the SAME compiled file, so a per-component stylesheet cannot
+   reach App.css's :root — it would ship the literal string "var(--mist)" to Fabric. The values
+   below are App.css's --mist/--paper/--chalk/--line-primitives, copied. Same reason every other
+   component stylesheet in this app uses literals. */
+
+/* The compound-class rule, the one thing this component exists to show. `.badge.loud` restates
+   only the two colours, so `.badge`'s padding and radius have to survive on an element carrying
+   both tokens — a resolver that returned the compound rule alone instead of layering it over the
+   single-class one would visibly blank the pill's shape. `.loud` deliberately has no standalone
+   rule, so nothing but `.badge.loud` resolving can change the middle and right badges.
+   Twin of the React / Vue-SFC / Vue-TSX / Svelte canaries' CompoundClassDemo; the SFC-based ones
+   express the identical three rules inside a per-component scoped style block instead — same law,
+   different scoping (symbiote-sfc-style-compiler skill §5b). */
+.badge {
+  padding: 8px;
+  border-radius: 999px;
+  border-width: 1px;
+  border-color: #41506a;
+  background-color: #13243a;
+}
+.badge.loud {
+  border-color: #dd0031;
+  background-color: #3a0a14;
+}
+.badge-text {
+  font-size: 13px;
+  color: #cbd5e1;
+}

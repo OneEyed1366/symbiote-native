@@ -132,6 +132,8 @@ export type { IPlatformStatic, IPlatformOSType, IPlatformSelectSpec } from './pl
 export type { IPlatformConstantsIOS } from './platform/index.ios';
 export type { IPlatformConstantsAndroid } from './platform/index.android';
 export { dlog, isDebug } from './debug';
+export { reportUncaughtError } from './report-error';
+export type { IUncaughtErrorInfo } from './report-error';
 
 export { getNativeModule, getEnforcingNativeModule } from './native-modules';
 export { installDeviceEventHub, NativeEventEmitter, setDeviceEventSource } from './native-events';
@@ -186,6 +188,7 @@ export {
   nativeAnimated,
   isNativeAnimatedAvailable,
   AnimatedProps,
+  createAnimatedLeafLifecycle,
   AnimatedStyle,
   AnimatedTransform,
   AnimatedMock,
@@ -195,6 +198,7 @@ export {
   resolveHostNode,
 } from './animated';
 export type {
+  IAnimatedLeafLifecycle,
   IValueXY,
   IRgbaValue,
   IColorInput,

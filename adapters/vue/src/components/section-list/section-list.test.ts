@@ -5,6 +5,19 @@
 // collapsable:false wrapper (and none when disabled), and scrollToLocation maps
 // (sectionIndex, itemIndex) onto the correct flat offset, landing as the native scrollTo command.
 // Vue reactivity is async, so each driving step is followed by a macrotask `tick`.
+//
+// Unit under test: SectionList (adapters/vue/src/components/section-list/index.ts) is a pure
+// forwarder over VirtualizedSectionList — this file proves the WIRING (attrs pass through, the
+// handle delegates, stickySectionHeadersEnabled reaches the inner stickyHeaderIndices prop),
+// not VirtualizedSectionList's own flattening/scroll-mapping math, which is
+// `virtualized-section-list.test.ts`'s unit. flattenSections/scrollLocationToFlatIndex/
+// resolveStickySectionHeaders are shared @symbiote-native/components logic — N/A here, covered at
+// their own layer; the sticky-wrapper transform/collapsable:false shape itself is
+// VirtualizedList's stickyHeaderIndices handling (shared, N/A here too) — what IS SectionList's
+// own job, and what these scenarios check, is that stickySectionHeadersEnabled actually reaches
+// that shared mechanism through this thin wrapper.
+//
+// No Negative group: SectionList's public props have no throwing path.
 
 import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -82,125 +95,84 @@ function stickyWrappers(): IFakeNode[] {
   return fabric.created.filter(n => Array.isArray(n.props.transform));
 }
 
+function mountSectionList(extra: Record<string, unknown>): Promise<void> {
+  mount(
+    ROOT_TAG,
+    defineComponent({
+      setup: () => () =>
+        h(
+          SectionListHost,
+          { sections: SECTIONS, ...extra },
+          {
+            sectionHeader: ({ section }: { section: ISectionShape }) => [
+              h('symbiote-text', {}, `header:${section.title}`),
+            ],
+            item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)],
+          },
+        ),
+    }),
+  );
+  return tick();
+}
+
 describe('Vue SectionList on the engine', () => {
-  it('renders every section header and item', async () => {
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            SectionListHost,
-            {
-              sections: SECTIONS,
-              keyExtractor: (item: IRow) => `k-${item.id}`,
-            },
-            {
-              sectionHeader: ({ section }: { section: ISectionShape }) => [
-                h('symbiote-text', {}, `header:${section.title}`),
-              ],
-              item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)],
-            },
-          ),
-      }),
-    );
-    await tick();
+  describe('Positive (attrs, sticky wiring, and the imperative handle all pass through the wrapper)', () => {
+    it('renders every section header and item', async () => {
+      // why: SectionList must forward `sections` and the scoped slots through to
+      // VirtualizedSectionList untouched — every header and every row is expected to reach Fabric.
+      await mountSectionList({ keyExtractor: (item: IRow) => `k-${item.id}` });
 
-    const texts = collectTexts();
-    for (const want of ['header:A', 'row-a0', 'row-a1', 'header:B', 'row-b0', 'row-b1']) {
-      expect(texts).toContain(want);
-    }
-  });
+      const texts = collectTexts();
+      for (const want of ['header:A', 'row-a0', 'row-a1', 'header:B', 'row-b0', 'row-b1']) {
+        expect(texts).toContain(want);
+      }
+    });
 
-  it('wraps each section header in a collapsable:false sticky wrapper when enabled', async () => {
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            SectionListHost,
-            {
-              sections: SECTIONS,
-              stickySectionHeadersEnabled: true,
-            },
-            {
-              sectionHeader: ({ section }: { section: ISectionShape }) => [
-                h('symbiote-text', {}, section.title),
-              ],
-              item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, `row-${item.id}`)],
-            },
-          ),
-      }),
-    );
-    await tick();
+    it('wraps each section header in a collapsable:false sticky wrapper when enabled', async () => {
+      // why: proves stickySectionHeadersEnabled on the PUBLIC SectionList surface actually reaches
+      // the inner stickyHeaderIndices mechanism through this wrapper — the shared wrap/transform
+      // shape itself lives in VirtualizedList (N/A here) and is exercised, not re-derived.
+      await mountSectionList({ stickySectionHeadersEnabled: true });
 
-    const wrappers = stickyWrappers();
-    expect(wrappers.length, 'one sticky wrapper per section header').toBe(2);
-    for (const wrapper of wrappers) {
-      expect(wrapper.props.collapsable, 'sticky wrapper is collapsable:false').toBe(false);
-    }
-  });
+      const wrappers = stickyWrappers();
+      expect(wrappers.length, 'one sticky wrapper per section header').toBe(2);
+      for (const wrapper of wrappers) {
+        expect(wrapper.props.collapsable, 'sticky wrapper is collapsable:false').toBe(false);
+      }
+    });
 
-  it('wraps nothing when stickySectionHeadersEnabled is false', async () => {
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            SectionListHost,
-            {
-              sections: SECTIONS,
-              stickySectionHeadersEnabled: false,
-            },
-            {
-              sectionHeader: ({ section }: { section: ISectionShape }) => [
-                h('symbiote-text', {}, section.title),
-              ],
-              item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, `row-${item.id}`)],
-            },
-          ),
-      }),
-    );
-    await tick();
+    it('wraps nothing when stickySectionHeadersEnabled is false', async () => {
+      // why: the opt-out must be honored end-to-end through the wrapper — a caller that explicitly
+      // disables sticky headers must pay zero sticky-wrapper cost.
+      await mountSectionList({ stickySectionHeadersEnabled: false });
 
-    expect(stickyWrappers().length, 'disabled sticky headers wrap no header').toBe(0);
-  });
+      expect(stickyWrappers().length, 'disabled sticky headers wrap no header').toBe(0);
+    });
 
-  it('maps scrollToLocation onto the correct flat offset via scrollTo', async () => {
-    const listRef = ref<ISectionListHandle | null>(null);
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            SectionListHost,
-            {
-              ref: listRef,
-              sections: SECTIONS,
-              stickySectionHeadersEnabled: false,
-              getItemLayout: (_data: unknown, index: number) => ({
-                length: ITEM_HEIGHT,
-                offset: ITEM_HEIGHT * index,
-                index,
-              }),
-            },
-            {
-              sectionHeader: ({ section }: { section: ISectionShape }) => [
-                h('symbiote-text', {}, `header:${section.title}`),
-              ],
-              item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)],
-            },
-          ),
-      }),
-    );
-    await tick();
+    it('maps scrollToLocation onto the correct flat offset via scrollTo', async () => {
+      // why: the exposed handle must DELEGATE to the inner VirtualizedSectionList's handle (Vue
+      // resolves a parent ref to the exposed object, so a naive forward would miss it) — proven by
+      // an end-to-end scrollTo landing at the section's real flat offset, not by re-deriving
+      // scrollLocationToFlatIndex's math (shared, N/A here).
+      const listRef = ref<ISectionListHandle | null>(null);
+      await mountSectionList({
+        ref: listRef,
+        stickySectionHeadersEnabled: false,
+        getItemLayout: (_data: unknown, index: number) => ({
+          length: ITEM_HEIGHT,
+          offset: ITEM_HEIGHT * index,
+          index,
+        }),
+      });
 
-    expect(listRef.value, 'SectionList handle attached').not.toBeNull();
-    // Flattened (header + items + footer per section): section B's first item lands at flat
-    // index 5 ([h:A,a0,a1,foot:A,h:B,b0,...]) -> offset 5 * ITEM_HEIGHT.
-    listRef.value!.scrollToLocation({ sectionIndex: 1, itemIndex: 1, animated: true });
-    const scrolls = commands.filter(c => c.name === 'scrollTo');
-    expect(scrolls.length, 'one scrollTo from scrollToLocation').toBe(1);
-    expect(scrolls[0].args[1]).toBe(5 * ITEM_HEIGHT);
-    expect(scrolls[0].args[2]).toBe(true);
+      expect(listRef.value, 'SectionList handle attached').not.toBeNull();
+      // Flattened (header + items + footer per section): section B's first item lands at flat
+      // index 5 ([h:A,a0,a1,foot:A,h:B,b0,...]) -> offset 5 * ITEM_HEIGHT.
+      listRef.value!.scrollToLocation({ sectionIndex: 1, itemIndex: 1, animated: true });
+      const scrolls = commands.filter(c => c.name === 'scrollTo');
+      expect(scrolls.length, 'one scrollTo from scrollToLocation').toBe(1);
+      expect(scrolls[0].args[1]).toBe(5 * ITEM_HEIGHT);
+      expect(scrolls[0].args[2]).toBe(true);
+    });
   });
 });

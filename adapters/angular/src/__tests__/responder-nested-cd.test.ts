@@ -5,6 +5,14 @@
 // root detectChanges() will NOT descend into it — the child's {{status}} used to stay stale
 // ("pan does nothing"). SymbioteHostPropsDirective now refreshes its own host component's view
 // right after the callback runs, so the nested child repaints.
+//
+// Coverage dictionary: this file exists specifically to close the ONE logical outcome
+// responder-change-detection.test.ts structurally cannot reach — `markForCheck()` called on a
+// directive whose injecting view is a NESTED component, not the root, proving the RefreshView
+// flag actually survives the ancestor descent instead of only refreshing a flat root's own
+// view. Every other branch of `SymbioteHostPropsDirective` (the setter loop, the non-function
+// passthrough) is already closed by that sibling file; this file's coverage responsibility is
+// narrowly the ancestor-marking behavior, not a full re-closure of the same unit.
 
 import '@angular/compiler';
 import { Component } from '@angular/core';
@@ -91,7 +99,18 @@ class NestedResponderOuter {}
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
+// No Negative group, same reason as responder-change-detection.test.ts: wrapCallback has no
+// throwing path. This file's whole reason to exist alongside that flat-root sibling is the
+// SignalView descent boundary the header comment names: markForCheck() must flag the CALLBACK
+// OWNER'S ancestors (RefreshView survives descent), not just re-run the owner's own
+// detectChanges() — a fix that worked for a flat root but only refreshed the directive's own
+// injecting view without marking ancestors would leave `App -> child` nesting silently stale
+// even though the flat-root sibling test stayed green. That's the real device shape
+// (App -> ResponderDemo), so this is the one that actually proves the fix generalizes.
 describe('Angular nested-child responder CD', () => {
+  // why: see file header — a nested CHILD component's state, not the root's, must repaint after
+  // its own flat-bag callback runs; the root's detectChanges() alone does not descend into a
+  // SignalView child with no RefreshView flag.
   it('re-renders a nested child component`s state mutated in a flat-bag responder callback', async () => {
     mount(ROOT_TAG, NestedResponderOuter);
     await flush();

@@ -6,7 +6,7 @@
     // packages/splash-screen and adapters/angular) instead of raw `.ts` source, so this app no
     // longer pulls sibling package source into its own program — declaration files are exempt
     // from TS's rootDir check, so rootDir stays scoped to this directory like every other
-    // `.examples/*` app.
+    // `examples/*` app.
     "rootDir": ".",
     "outDir": "build/angular",
     "baseUrl": "."

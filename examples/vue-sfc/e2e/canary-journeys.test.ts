@@ -107,6 +107,21 @@ async function assertTapMoves(triggerId: string, dotId: string): Promise<void> {
   }
 }
 
+// Same before/after element screenshot as assertTapMoves, for a change that is a REPAINT rather
+// than a motion: a class whose style resolves differently after the tap. Separate name because a
+// failure means something else — the style did not resolve, not that an animation froze.
+async function assertTapRepaints(triggerId: string, targetId: string): Promise<void> {
+  const before = await elementShot(targetId, `${targetId}-before-class`)
+  await tapWithRetry(triggerId)
+  await sleep(400)
+  const after = await elementShot(targetId, `${targetId}-after-class`)
+  if (before.equals(after)) {
+    throw new Error(
+      `${targetId} looks identical after tapping ${triggerId}: the compound class rule never resolved`,
+    )
+  }
+}
+
 describe('symbiote canary · user journeys', () => {
   beforeAll(async () => {
     await device.launchApp(launchOpts)
@@ -221,5 +236,19 @@ describe('symbiote canary · user journeys', () => {
   it('sticky SectionList renders and is visible', async () => {
     await bringIntoView('sticky-section-list')
     await expect(element(by.id('sticky-section-list'))).toBeVisible()
+  })
+
+  // ---- compound class rule: .badge.loud layers over .badge --------------------------------
+
+  it('repaints the badge when the second class is added (compound rule resolves)', async () => {
+    await bringIntoView('compound-badge-toggle')
+    await expect(element(by.id('compound-badge-plain'))).toBeVisible()
+    await expect(element(by.id('compound-badge-loud'))).toBeVisible()
+    // `.loud` has no standalone rule, and this badge's LABEL never changes, so the ONLY thing
+    // that can alter its pixels is `.badge.loud` resolving. Identical crops = the rule is dead.
+    await assertTapRepaints('compound-badge-toggle', 'compound-badge-dynamic')
+    await waitForText('compound-badge-readout', text => text.includes('both tokens'), 3_000)
+    // Restore, so a later journey does not inherit this screen's toggled state.
+    await tapWithRetry('compound-badge-toggle')
   })
 })

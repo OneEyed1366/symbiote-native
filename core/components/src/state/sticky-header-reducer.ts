@@ -40,6 +40,13 @@ export interface IStickyHeaderState {
   haveReceivedInitialZeroTranslateY: boolean;
   inputRange: number[];
   outputRange: number[];
+  // Has a `rebuild-interpolation` effect ever been emitted? The redundant-rebuild guards below
+  // compare newly derived ranges against `inputRange`/`outputRange`, and those START at the
+  // identity ranges — which is ALSO exactly what an unmeasured header derives. Without this flag
+  // the very first `inputs-changed` (Angular dispatches one from ngOnInit before any layout) looks
+  // like a no-op and is skipped, so the header never emits its first rebuild and never commits its
+  // wrapper at all. "Same as the initial placeholder" is not the same as "already applied".
+  rangesEmitted: boolean;
 }
 
 // The config the reducer reads each call (it comes off the adapter's props/inputs, so it is passed in
@@ -96,6 +103,7 @@ export function createInitialStickyState(): IStickyHeaderState {
     haveReceivedInitialZeroTranslateY: true,
     inputRange: [...IDENTITY_INPUT_RANGE],
     outputRange: [...IDENTITY_OUTPUT_RANGE],
+    rangesEmitted: false,
   };
 }
 
@@ -103,6 +111,11 @@ export function createInitialStickyState(): IStickyHeaderState {
 // adapter can skip re-wiring when it is unchanged. Shared so the key CANNOT drift between adapters.
 export function stickyEffectSignature(state: IStickyHeaderState): string {
   return `${state.inputRange.join(',')}|${state.outputRange.join(',')}|${state.translateY}`;
+}
+
+function arraysEqual(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
 }
 
 // Recompute the derived interpolation ranges off the current state + inputs (wrapping the load-bearing
@@ -126,31 +139,103 @@ function deriveRanges(
 
 // The single transition every sticky-header adapter shares. The adapter maps a native event / animated
 // tick / timer fire to an action, calls this, stores the returned state, and executes the effects.
+// DIAGNOSTIC-only, gated: identifies which header instance a log line belongs to across a
+// device dump without needing full state dumps at every call — layoutY doubles as a stable
+// per-header id once measured (0 before the first layout).
+function headerTag(state: IStickyHeaderState): string {
+  return `y=${state.layoutY}`;
+}
+
 export function reduceSticky(
   state: IStickyHeaderState,
   action: IStickyAction,
   inputs: IStickyReducerInputs,
 ): IStickyReduceResult {
+  dlog(
+    `STICKY[reducer ${headerTag(state)}] action=${action.kind}` +
+      (action.kind === 'layout' ? ` y=${action.y} height=${action.height}` : '') +
+      (action.kind === 'animated-tick' || action.kind === 'debounce-fired'
+        ? ` value=${action.value}`
+        : '') +
+      ` inputs={inverted=${inputs.inverted} scrollViewHeight=${inputs.scrollViewHeight} nextHeaderLayoutY=${inputs.nextHeaderLayoutY}}`,
+  );
   switch (action.kind) {
     case 'layout': {
       // Record own y/height, mark measured, rebuild the interpolation, and (when the reducer owns the
       // cross-talk index) hand the parent this header's y so the PREVIOUS header learns its collision
       // point. Matches RN ScrollViewStickyHeader.js._onLayout.
+      //
+      // Redundant-geometry guard: Yoga legitimately re-fires onLayout with the SAME y/height (relayout
+      // passes triggered by an unrelated sibling, a native-driven prop commit, ...) — every consumer
+      // must tolerate that. React's port gets this guard for FREE: `setLayoutY(sameValue)` is a no-op
+      // (React bails out of re-rendering on an unchanged primitive), so a redundant onLayout never
+      // reaches the rebuild `useEffect`. This reducer has no such implicit bail-out, so it must skip
+      // the rebuild explicitly — device-confirmed (2026-08-13) that omitting this guard lets a
+      // native-driven rebuild (fresh AnimatedProps/AnimatedStyle graph, fresh native connect) commit a
+      // fresh prop identity on every redundant layout, which can itself provoke another relayout pass —
+      // an unbounded same-tick rebuild ping-pong that trips Svelte's effect_update_depth_exceeded guard.
+      const alreadyAtThisGeometry =
+        state.measured && state.layoutY === action.y && state.layoutHeight === action.height;
       state.layoutY = action.y;
       state.layoutHeight = action.height;
       state.measured = true;
-      const { inputRange, outputRange } = deriveRanges(state, inputs);
       const effects: IStickyEffect[] = [];
       if (inputs.index !== undefined) {
         effects.push({ kind: 'record-header-y', index: inputs.index, y: action.y });
       }
+      if (alreadyAtThisGeometry && state.rangesEmitted) {
+        dlog(`STICKY[reducer ${headerTag(state)}] layout: redundant geometry, skipped rebuild`);
+        return { state, effects, changed: effects.length > 0 };
+      }
+      const { inputRange, outputRange } = deriveRanges(state, inputs);
+      state.rangesEmitted = true;
+      dlog(
+        `STICKY[reducer ${headerTag(state)}] layout: measured=true inputRange=${JSON.stringify(inputRange)} ` +
+          `outputRange=${JSON.stringify(outputRange)}`,
+      );
       effects.push({ kind: 'rebuild-interpolation', inputRange, outputRange });
       return { state, effects, changed: true };
     }
     case 'inputs-changed': {
       // A collision/viewport input changed (RN effect deps: inverted, scrollViewHeight,
       // nextHeaderLayoutY): recompute the ranges and rebuild.
+      //
+      // Redundant-ranges guard (sibling of 'layout's `alreadyAtThisGeometry` above, same root
+      // cause): the adapter's own mount `$effect` re-dispatches 'inputs-changed' whenever its
+      // `inverted`/`scrollViewHeight`/`nextHeaderLayoutY` derived values re-evaluate — which can
+      // happen on an unrelated parent re-render (e.g. VirtualizedList re-deriving
+      // `nextHeaderLayoutYFor(cell.index)` off its cross-talk Map on every reactive pass) even when
+      // the COMPUTED value is identical. React gets no implicit protection here either (this is a
+      // real `useEffect` with real deps), but RN's own deps array only fires on an ACTUAL primitive
+      // change; a framework-agnostic caller re-dispatching on every derive needs the reducer itself
+      // to compare the RESULT (the ranges), not the raw inputs (which may recompute to the same
+      // ranges via different intermediate values) — device-confirmed (2026-08-13) this is a second,
+      // independent source of the same unbounded same-tick rebuild loop the 'layout' guard fixed.
+      const previousInputRange = state.inputRange;
+      const previousOutputRange = state.outputRange;
+      const hadEmitted = state.rangesEmitted;
       const { inputRange, outputRange } = deriveRanges(state, inputs);
+      state.rangesEmitted = true;
+      // `hadEmitted` is load-bearing, not defensive: an unmeasured header derives exactly the
+      // identity ranges the initial state already holds, so without it the FIRST dispatch (Angular
+      // sends one from ngOnInit, before any layout) reads as redundant and the header never emits
+      // a rebuild at all — its wrapper then never commits. Regression-covered in
+      // sticky-header-reducer.test.ts.
+      if (
+        hadEmitted &&
+        arraysEqual(previousInputRange, inputRange) &&
+        arraysEqual(previousOutputRange, outputRange)
+      ) {
+        dlog(
+          `STICKY[reducer ${headerTag(state)}] inputs-changed: ranges unchanged, skipped rebuild`,
+        );
+        return { state, effects: [], changed: false };
+      }
+      dlog(
+        `STICKY[reducer ${headerTag(state)}] inputs-changed: inputRange ${JSON.stringify(previousInputRange)}->` +
+          `${JSON.stringify(inputRange)} outputRange ${JSON.stringify(previousOutputRange)}->` +
+          `${JSON.stringify(outputRange)}`,
+      );
       return {
         state,
         effects: [{ kind: 'rebuild-interpolation', inputRange, outputRange }],
@@ -163,9 +248,15 @@ export function reduceSticky(
       // settled value into the committed transform for hit-testing.
       if (action.value === 0 && !state.haveReceivedInitialZeroTranslateY) {
         state.haveReceivedInitialZeroTranslateY = true;
-        dlog('sticky-header swallowed re-emitted zero translateY');
+        dlog(
+          `STICKY[reducer ${headerTag(state)}] animated-tick: swallowed re-emitted zero translateY`,
+        );
         return { state, effects: [], changed: false };
       }
+      dlog(
+        `STICKY[reducer ${headerTag(state)}] animated-tick: scheduling debounce delay=${stickyDebounceMs(inputs.os)} ` +
+          `value=${action.value}`,
+      );
       return {
         state,
         effects: [
@@ -177,6 +268,9 @@ export function reduceSticky(
     case 'debounce-fired': {
       // The debounce completed: commit the settled translateY. Once a NON-zero value commits, re-arm
       // the swallow gate so the next interpolation rebuild's spurious 0 is dropped (RN).
+      dlog(
+        `STICKY[reducer ${headerTag(state)}] debounce-fired: committing translateY=${action.value}`,
+      );
       state.translateY = action.value;
       if (action.value !== 0) state.haveReceivedInitialZeroTranslateY = false;
       return {

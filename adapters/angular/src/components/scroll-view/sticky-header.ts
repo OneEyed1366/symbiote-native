@@ -1,20 +1,15 @@
-// Sticky headers: the Angular twin of adapters/{react,vue}/src/components/scroll-view/
-// sticky-header.{tsx,ts}, the JS layer RN implements in ScrollView.js / ScrollViewStickyHeader.js.
-//
-// Source-based: RN does stickiness PURELY IN JS. A single `_scrollAnimatedValue` an Animated.event
-// drives from `onScroll` feeds each flagged header's translateY through an interpolation that pins
-// it to the top (or bottom, inverted) until the next header collides with it. The native Fabric
-// scroll view does NOT honor `stickyHeaderIndices` on its own. The load-bearing top/inverted
-// interpolation math (computeStickyInterpolation) lives framework-agnostic in @symbiote-native/components
-// this file holds the Angular component shell, the layout state, and the interpolation
-// build, sharing the math verbatim with React/Vue. Angular supplies only the lifecycle (inputs +
-// manual change detection instead of useState/useEffect or refs/watch).
+// Sticky headers: RN does stickiness PURELY IN JS (ScrollView.js / ScrollViewStickyHeader.js).
+// A single `_scrollAnimatedValue` an Animated.event drives from `onScroll` feeds each flagged
+// header's translateY through an interpolation that pins it to the top (or bottom, inverted)
+// until the next header collides with it — the native Fabric scroll view does NOT honor
+// `stickyHeaderIndices` on its own. The interpolation math (computeStickyInterpolation) lives
+// framework-agnostic in @symbiote-native/components, shared verbatim with React/Vue; this file
+// holds the Angular component shell, layout state, and interpolation build.
 //
 // This is the public sticky-header WRAPPER for explicit composition. ScrollView also auto-wraps
-// projected direct children named by stickyHeaderIndices through its projection bridge (see
-// projection.ts), because Angular templates cannot map <ng-content> children directly; that auto
-// path intentionally uses this built-in wrapper rather than dynamically instantiating arbitrary
-// custom component classes.
+// projected children named by stickyHeaderIndices through its projection bridge (projection.ts),
+// because Angular templates cannot map <ng-content> children directly; that auto path
+// intentionally reuses this built-in wrapper rather than instantiating arbitrary component types.
 
 import {
   ChangeDetectionStrategy,
@@ -198,7 +193,7 @@ export class ScrollViewStickyHeader
           this.interpolation = next;
           this.animatedTranslateY = next;
           dlog(
-            `Angular ScrollViewStickyHeader interpolation measured=${this.state.measured} y=${this.state.layoutY}`,
+            `STICKY[header] interpolation measured=${this.state.measured} y=${this.state.layoutY}`,
           );
           break;
         }

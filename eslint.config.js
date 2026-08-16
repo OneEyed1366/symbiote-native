@@ -10,6 +10,7 @@ import requirePackageFields from './eslint-rules/require-package-fields.js';
 import requireNativeLinkPackaged from './eslint-rules/require-native-link-packaged.js';
 import excludeTestsFromPublishedFiles from './eslint-rules/exclude-tests-from-published-files.js';
 import validNativeLinkManifest from './eslint-rules/valid-native-link-manifest.js';
+import coLocateModuleFiles from './eslint-rules/co-locate-module-files.js';
 
 // Flat config for the symbiote LIBRARY code only (core / adapters / packages).
 // The RN example apps own their formatting + lint via the @react-native eslint
@@ -38,6 +39,9 @@ export default defineConfig(
     languageOptions: {
       globals: { ...globals.node, ...globals.browser },
     },
+    plugins: {
+      local: { rules: { 'co-locate-module-files': coLocateModuleFiles } },
+    },
     rules: {
       // The Fabric JSI seam (nativeFabricUIManager, ViewConfigs, host element bags)
       // is genuinely untyped at the boundary, so `any` there is the contract rather than a lint slip.
@@ -48,6 +52,9 @@ export default defineConfig(
         'warn',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
       ],
+      // ADR 0026: a module's files (base + platform variants + co-located test) must all
+      // live in the same folder — either flat or entirely inside one X/ subfolder, never split.
+      'local/co-locate-module-files': 'error',
     },
   },
 

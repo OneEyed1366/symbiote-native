@@ -121,8 +121,9 @@ L3  Events         press / change                   → routeProp → setEventLi
 L4  Parity (P0)    @symbiote-native/components via descriptorTo<fw> + lifecycle  → symbiote-add-component
 ```
 
-Mount/build every layer against `.examples/<app>` (workspace:*-linked dev harness),
-never `examples/<app>` (published-catalog canary) — `symbiote-dev-examples`.
+Mount/build every layer against `examples/<app>`, using a `pnpm pack` tarball
+installed via `file:` for the in-progress adapter (CLAUDE.md's
+`<examples_vs_dot_examples>`).
 
 ## Reference
 

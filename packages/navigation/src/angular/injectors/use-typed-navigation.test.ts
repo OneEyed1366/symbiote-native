@@ -1,6 +1,15 @@
 // Co-located Angular-driven test for injectStackNavigation/injectTabNavigation/
 // injectDrawerNavigation - the narrowed twins of injectNavigation() that hide the union guard.
-// Angular twin of react/hooks/use-typed-navigation.test.tsx.
+// Angular twin of react/hooks/use-typed-navigation.test.tsx. The underlying
+// isStackNavigatorHandle/isTabNavigatorHandle/isDrawerNavigatorHandle guards already have their
+// own framework-free coverage in core/navigator-handles.test.ts (including the Drawer-also-has-
+// jumpTo disambiguation) - what's proven HERE is only that each injector calls the right guard
+// and throws Angular's own error message when it fails, not the guard logic itself.
+//
+// Each describe block below IS this file's Positive/Negative split, scoped per injector: one
+// positive case (the handle narrows correctly, exposing its concrete method) and one negative
+// case (wrong navigator kind -> throws the SPECIFIC "nearest navigator is not a <Kind>" message,
+// not just "threw something").
 
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, Input } from '@angular/core';
@@ -180,6 +189,9 @@ class DrawerHost {
 }
 
 describe('injectStackNavigation', () => {
+  // why: a screen that KNOWS it only ever renders under a Stack should get `.push` typed
+  // directly, no `isStackNavigatorHandle` narrowing at the call site (this injector's whole
+  // reason to exist over the plain injectNavigation() union).
   it('returns a concretely-typed Stack handle with push, no narrowing needed', async () => {
     canPush = false;
     mount(ROOT_TAG, StackHost, { initialProps: { homeComponent: StackTrackedScreenComponent } });
@@ -187,6 +199,9 @@ describe('injectStackNavigation', () => {
     expect(canPush).toBe(true);
   });
 
+  // why: mounting a Stack-only injector under a Tab is a real misuse a developer can make -
+  // failing loudly, naming the actual mismatch, beats a silent `undefined.push is not a function`
+  // three lines deeper in the component.
   it('throws when the nearest navigator is a Tab, not a Stack', () => {
     expect(() =>
       mount(ROOT_TAG, TabHost, { initialProps: { homeComponent: StackThrowingScreenComponent } }),
@@ -210,6 +225,8 @@ describe('injectTabNavigation', () => {
 });
 
 describe('injectDrawerNavigation', () => {
+  // why: Drawer handles ALSO carry `jumpTo` (core/navigator-handles.ts) - proving this injector
+  // returns openDrawer specifically confirms it narrows to Drawer and not accidentally to Tab.
   it('returns a concretely-typed Drawer handle with openDrawer, no narrowing needed', async () => {
     canOpenDrawer = false;
     mount(ROOT_TAG, DrawerHost, {

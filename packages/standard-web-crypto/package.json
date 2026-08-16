@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/standard-web-crypto",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "expo-standard-web-crypto ported for SymbioteNative — a Web Crypto API getRandomValues polyfill built on @symbiote-native/crypto's native random source.",
   "license": "MIT",
   "repository": {
@@ -21,6 +21,7 @@
     ".": "./src/core/index.ts",
     "./vue": "./src/vue/index.ts",
     "./react": "./src/react/index.ts",
+    "./svelte": "./src/svelte/index.ts",
     "./angular": {
       "types": "./build-ngc/angular/index.d.ts",
       "react-native": "./build-ngc/angular/index.js",
@@ -53,6 +54,10 @@
         "types": "./build/react/index.d.ts",
         "default": "./build/react/index.js"
       },
+      "./svelte": {
+        "types": "./build/svelte/index.d.ts",
+        "default": "./build/svelte/index.js"
+      },
       "./angular": {
         "types": "./build-ngc/angular/index.d.ts",
         "react-native": "./build-ngc/angular/index.js",
@@ -71,14 +76,16 @@
     "@symbiote-native/crypto": "workspace:*"
   },
   "peerDependencies": {
-    "@symbiote-native/angular": "workspace:*",
+    "@symbiote-native/angular": ">=0.6.2",
     "@symbiote-native/engine": ">=0.1.7",
-    "@symbiote-native/react": "workspace:*",
-    "@symbiote-native/vue": "workspace:*",
+    "@symbiote-native/react": ">=0.2.8",
+    "@symbiote-native/svelte": ">=0.1.0",
+    "@symbiote-native/vue": ">=0.3.8",
     "@angular/core": ">=20",
     "@vue/runtime-core": "^3.5.13",
     "react": ">=19.0.0",
     "react-native": ">=0.86",
+    "svelte": ">=5.56.0",
     "vue": ">=3.5.0"
   },
   "peerDependenciesMeta": {
@@ -86,6 +93,9 @@
       "optional": true
     },
     "@symbiote-native/react": {
+      "optional": true
+    },
+    "@symbiote-native/svelte": {
       "optional": true
     },
     "@symbiote-native/vue": {
@@ -100,6 +110,9 @@
     "react": {
       "optional": true
     },
+    "svelte": {
+      "optional": true
+    },
     "vue": {
       "optional": true
     }
@@ -111,12 +124,14 @@
     "@symbiote-native/angular": "workspace:*",
     "@symbiote-native/engine": "workspace:*",
     "@symbiote-native/react": "workspace:*",
+    "@symbiote-native/svelte": "workspace:*",
     "@symbiote-native/test-utils": "workspace:*",
     "@symbiote-native/vue": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@vue/runtime-core": "catalog:",
     "react": "catalog:",
+    "svelte": "catalog:",
     "typescript": "catalog:"
   }
 }

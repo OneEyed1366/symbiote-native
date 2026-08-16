@@ -11,7 +11,7 @@ browser (`SFSafariViewController` on iOS, Chrome Custom Tabs on Android) plus th
 auth-session flow — so every SymbioteNative adapter can reach it, not just React. Like
 [secure store](/docs/packages/secure-store/) and [local auth](/docs/packages/local-auth/), every
 export is a free function with no per-instance state, so there is no hook/composable/service to
-wrap — the React, Vue, and Angular entry points are plain re-exports of the same `core`.
+wrap — the React, Vue, Angular, and Svelte entry points are plain re-exports of the same `core`.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -23,6 +23,7 @@ wrap — the React, Vue, and Angular entry points are plain re-exports of the sa
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Installation
 
@@ -50,7 +51,7 @@ and the `<queries>` entry Android needs to see the Custom Tabs service ships ins
 
 ## Usage
 
-All three adapters re-export the exact same functions; there is no per-adapter
+All four adapters re-export the exact same functions; there is no per-adapter
 hook/composable/service to reach for, since nothing here holds live state or a subscription.
 
 <Tabs syncKey="framework">
@@ -113,6 +114,20 @@ hook/composable/service to reach for, since nothing here holds live state or a s
 
     There's no per-instance service to `inject()` here — every function is a plain export off the
     core package, called straight from a template event binding.
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Button, View } from '@symbiote-native/svelte';
+      import { openBrowserAsync } from '@symbiote-native/web-browser/svelte';
+
+      function onOpen() {
+        void openBrowserAsync('https://example.com');
+      }
+    </script>
+
+    <View><Button title="Read the docs" onPress={onOpen} /></View>
+    ```
   </TabItem>
 </Tabs>
 
@@ -201,6 +216,25 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
         );
       }
     }
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Button, Text, View } from '@symbiote-native/svelte';
+      import { openAuthSessionAsync } from '@symbiote-native/web-browser/svelte';
+
+      const AUTHORIZE_URL = 'https://auth.example.com/authorize?redirect_uri=myapp://callback';
+
+      let code = $state<string | null>(null);
+
+      async function onSignIn() {
+        const result = await openAuthSessionAsync(AUTHORIZE_URL, 'myapp://callback');
+        code = result.type === 'success' ? new URL(result.url).searchParams.get('code') : null;
+      }
+    </script>
+
+    <View><Text>{code ?? 'not signed in'}</Text><Button title="Sign in" onPress={onSignIn} /></View>
     ```
   </TabItem>
 </Tabs>
@@ -321,9 +355,10 @@ Three pieces of upstream are deliberately left out rather than silently dropped:
 
 ## How the wrapper works
 
-`@symbiote-native/web-browser` ships zero React/Vue/Angular logic — `expo-web-browser`'s own JS is
-hand-ported into this package's `core/`, resolving the native module through `expo-modules-core`'s
-`requireNativeModule` rather than the `expo` meta-package this project never installs:
+`@symbiote-native/web-browser` ships zero React/Vue/Angular/Svelte logic —
+`expo-web-browser`'s own JS is hand-ported into this package's `core/`, resolving the native
+module through `expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package
+this project never installs:
 
 ```
 packages/web-browser/src/
@@ -332,11 +367,12 @@ packages/web-browser/src/
 │             # requireNativeModule
 ├── react/    # @symbiote-native/web-browser/react   — export * from '../core'
 ├── vue/      # @symbiote-native/web-browser/vue     — export * from '../core'
-└── angular/  # @symbiote-native/web-browser/angular — export * from '../core'
+├── angular/  # @symbiote-native/web-browser/angular — export * from '../core'
+└── svelte/   # @symbiote-native/web-browser/svelte  — export * from '../core'
 ```
 
 Same shape as [secure store](/docs/packages/secure-store/)'s and
-[local auth](/docs/packages/local-auth/)'s three adapter entries: single-file re-exports with no
+[local auth](/docs/packages/local-auth/)'s adapter entries: single-file re-exports with no
 lifecycle code. The Android auth-session polyfill does hold live state — a `Linking` subscription
 and an `AppState` listener — but both belong to one in-flight promise inside the core and are torn
 down when it settles, so no caller ever subscribes or cleans up, and there is nothing for a hook,

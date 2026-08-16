@@ -1,11 +1,11 @@
 // Shared deep-linking config: one ILinkingConfig instance used BOTH by the root wiring
 // (App.tsx's useLinkingIntegration, for real OS deep links) and by the DeepLinking demo screen
-// (a direct resolveRouteFromUrl call against a typed-in URL) — a single source of truth so the
-// two never drift into resolving the same URL differently.
+// (a direct resolveRouteFromUrl call) — a single source of truth so the two never drift into
+// resolving the same URL differently.
 //
 // The URL scheme carries a distinct 'vuetsx' segment (vs the React canary's plain
-// 'symbiotecanary://' and the Vue-SFC canary's own scheme) so all the framework canaries' deep
-// links stay distinguishable from one another once every one of them exists on a device at once.
+// 'symbiotecanary://') so the framework canaries' deep links stay distinguishable from one
+// another when several exist on the same device.
 
 import type { ILinkingConfig } from '@symbiote-native/navigation/vue';
 import { ROUTE_NAME } from './routes';

@@ -16,6 +16,11 @@ export {
 } from './navigator-state';
 export type { IRoute, INavigatorState, INavigatorAction } from './navigator-state';
 
+// Drops history entries whose `<Stack.Screen>` marker has unregistered - see
+// stack-router-state.ts's header for why the Stack's history needs this and the Tab's projection
+// does not.
+export { reconcileStackRoutes } from './stack-router-state';
+
 export type {
   IStackAnimation,
   IStackPresentation,
@@ -89,7 +94,12 @@ export { isRecord } from './guards';
 
 // Bottom-tabs navigator: a FOCUSED-INDEX router (not a stack - see tab-router-state.ts) driving
 // a pure-JS tab bar render, framework-agnostic and shared verbatim by every adapter.
-export { createInitialTabState, tabRouterReducer, isFocusedRoute } from './tab-router-state';
+export {
+  createInitialTabState,
+  tabRouterReducer,
+  reconcileTabRoutes,
+  isFocusedRoute,
+} from './tab-router-state';
 export type { ITabRouterState, ITabRouterAction } from './tab-router-state';
 
 export type { ITabBarIcon, ITabOptions } from './tab-options';

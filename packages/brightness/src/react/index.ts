@@ -4,23 +4,4 @@
 // mirrors the lifecycle-bucket naming convention of adapters/react/src/hooks.
 
 export { usePermissions } from './hooks/use-permissions';
-export {
-  isAvailableAsync,
-  getBrightnessAsync,
-  setBrightnessAsync,
-  getSystemBrightnessAsync,
-  setSystemBrightnessAsync,
-  restoreSystemBrightnessAsync,
-  isUsingSystemBrightnessAsync,
-  getSystemBrightnessModeAsync,
-  setSystemBrightnessModeAsync,
-  getPermissionsAsync,
-  requestPermissionsAsync,
-  addBrightnessListener,
-  BrightnessMode,
-  PermissionStatus,
-  type BrightnessEvent,
-  type PermissionExpiration,
-  type PermissionResponse,
-  type EventSubscription,
-} from '../core';
+export * from '../core';

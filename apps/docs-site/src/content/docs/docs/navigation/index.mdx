@@ -1,14 +1,14 @@
 ---
 title: Navigation
-description: A framework-agnostic Stack/Tab/Drawer navigation library with native react-native-screens transitions, shared across React, Vue, and Angular.
+description: A framework-agnostic Stack/Tab/Drawer navigation library with native react-native-screens transitions, shared across React, Vue, Angular, and Svelte.
 ---
 
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 `@symbiote-native/navigation` is SymbioteNative's navigation library — broadly comparable in
 scope to `react-navigation`, but built the SymbioteNative way: **one shared,
-framework-agnostic core** (`packages/navigation/src/core/`) drives thin React, Vue, and Angular
-adapters, exactly like every other package in this monorepo. It ships **native Stack
+framework-agnostic core** (`packages/navigation/src/core/`) drives thin React, Vue, Angular, and
+Svelte adapters, exactly like every other package in this monorepo. It ships **native Stack
 navigation** built on `react-native-screens`' `RNSScreen`/`RNSScreenStack` views — real native
 push/pop transitions, headers, and modals, not a JS-only fake — plus pure-JS **Tab** and
 **Drawer** navigators (bottom tabs and a swipeable side panel) for the parts of a navigation
@@ -24,6 +24,7 @@ surface that don't need a native view underneath.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Installation
 
@@ -35,11 +36,12 @@ npm install @symbiote-native/navigation
   Stack navigation is built on `react-native-screens`' native views, but you do **not** need to
   `pnpm add react-native-screens` yourself or import anything from it directly.
   `@symbiote-native/navigation` depends on it directly and registers its native views' `ViewConfig`s
-  itself — every adapter barrel (`react/index.ts`, `vue/index.ts`, `angular/index.ts`) starts with
-  `import '../register'`, a side-effect import that registers `RNSScreen`, `RNSScreenStack`,
-  `RNSModalScreen`, `RNSScreenStackHeaderConfig`, `RNSScreenStackHeaderSubview`, `RNSSearchBar`, and
-  `RNSScreenContentWrapper` in Fabric's view-config registry before any navigator is used. You only
-  ever import from `@symbiote-native/navigation/react`, `/vue`, or `/angular`.
+  itself — every adapter barrel (`react/index.ts`, `vue/index.ts`, `angular/index.ts`,
+  `svelte/index.ts`) starts with `import '../register'`, a side-effect import that registers
+  `RNSScreen`, `RNSScreenStack`, `RNSModalScreen`, `RNSScreenStackHeaderConfig`,
+  `RNSScreenStackHeaderSubview`, `RNSSearchBar`, and `RNSScreenContentWrapper` in Fabric's
+  view-config registry before any navigator is used. You only ever import from
+  `@symbiote-native/navigation/react`, `/vue`, `/angular`, or `/svelte`.
 </Aside>
 
 ## Quick start
@@ -144,6 +146,46 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <!-- Home.svelte -->
+    <script lang="ts">
+      import { Button } from '@symbiote-native/svelte';
+      import { useStackNavigation } from '@symbiote-native/navigation/svelte';
+
+      const navigation = useStackNavigation();
+    </script>
+
+    <Button title="Open details" onPress={() => navigation.current.push('Details')} />
+    ```
+
+    ```svelte
+    <!-- Details.svelte -->
+    <script lang="ts">
+      import { Button } from '@symbiote-native/svelte';
+      import { useStackNavigation } from '@symbiote-native/navigation/svelte';
+
+      const navigation = useStackNavigation();
+    </script>
+
+    <Button title="Go back" onPress={() => navigation.current.pop()} />
+    ```
+
+    ```svelte
+    <!-- App.svelte -->
+    <script lang="ts">
+      import { Screen, Stack } from '@symbiote-native/navigation/svelte';
+      import Home from './Home.svelte';
+      import Details from './Details.svelte';
+    </script>
+
+    <Stack initialRouteName="Home"
+      ><Screen name="Home" component={Home}
+      /><Screen name="Details" component={Details}
+    /></Stack
+    >
+    ```
+  </TabItem>
 </Tabs>
 
 ## What's in this section
@@ -152,7 +194,7 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
 - [Tabs](/docs/navigation/tabs/) — the bottom tab bar navigator.
 - [Drawer](/docs/navigation/drawer/) — the swipeable side-panel navigator.
 - [Hooks](/docs/navigation/hooks/) — `useNavigation`/`useRoute`/`useIsFocused`/`useFocusEffect`/`useNavigationState`
-  (and their Angular `injectX` equivalents) across all three adapters.
+  (Svelte: the same names, as runes; Angular: their `injectX` equivalents) across all four adapters.
 - [Linking](/docs/navigation/linking/) — deep linking and navigation-state persistence.
 - [FAQ](/docs/navigation/faq/) — frequently asked questions.
 
@@ -169,14 +211,19 @@ tab-switch vs. drawer-open depending on context — you call the verb that match
 shared shape. React uses JSX children (`<Stack.Screen name="..." component={...} />`); Vue uses
 default-slot components (`<Screen name="..." :component="..." />`, or a scoped slot for Drawer's
 custom content); Angular uses structural marker directives on an inert `ng-template`
-(`<ng-template symbioteScreen name="..." [component]="...">`). This is deliberate: each adapter
-follows its own framework's idiom for declaring children rather than forcing one JSX-shaped
-convention onto Vue's or Angular's template model.
+(`<ng-template symbioteScreen name="..." [component]="...">`); Svelte uses the same declarative
+`<Screen name="..." component={...} />` marker as Vue, but discovers it differently underneath —
+Svelte hands a component its children as an opaque `Snippet`, so `<Screen>`/`<Stack.Screen>`
+registers itself on a context-based collector while the snippet renders, rather than being read
+from a children scan. This is deliberate: each adapter follows its own framework's idiom for
+declaring children rather than forcing one JSX-shaped convention onto Vue's, Angular's, or
+Svelte's template model.
 
 **Read `route`/`navigation` with a hook — there is no props path.** Every component under a
-navigator reads its current route and navigator handle by calling a hook (React/Vue) or an
-inject function (Angular): `useRoute()`/`useNavigation()` — or, better, the navigator-specific
-`useStackNavigation()`/`useTabNavigation()`/`useDrawerNavigation()` (Angular:
+navigator reads its current route and navigator handle by calling a hook (React/Vue), a rune
+(Svelte), or an inject function (Angular): `useRoute()`/`useNavigation()` — or, better, the
+navigator-specific `useStackNavigation()`/`useTabNavigation()`/`useDrawerNavigation()` (Svelte
+uses these same names; Angular:
 `injectRoute()`/`injectNavigation()`/`injectStackNavigation()`/…). The navigator does **not**
 thread `route`/`navigation` into the mounted screen as a prop or `@Input()`; the screen's own
 top-level component reads them exactly the way any component nested deeper does, so there's
@@ -196,6 +243,14 @@ are read the same way. See [Hooks & focus](/docs/navigation/hooks/) for the full
   See [Hooks & focus](/docs/navigation/hooks/) for the full picture.
 </Aside>
 
+<Aside type="caution">
+  On Svelte, every one of `useNavigation()`/`useRoute()`/`useStackNavigation()`/`useIsFocused()`/…
+  returns a **boxed getter** (`{ readonly current: T }`), never a plain value — Svelte 5
+  reactivity does not survive being returned as a plain value from a plain function. Read it as
+  `useNavigation().current`, and only inside a `$derived`/template/`$effect` for it to stay
+  reactive — the same unwrap pattern as Vue's `ComputedRef.value`.
+</Aside>
+
 **Route `params` are `unknown` in this v1** — there is no per-navigator generic param-list type
 the way `react-navigation`'s `RootStackParamList` gives you. `route.params` always types as
 `unknown`; narrow it yourself (a type guard, a schema, a cast at the one I/O edge) on the
@@ -205,9 +260,9 @@ screen that reads it.
 
 All of the router logic — the route-stack reducer, screen-options resolution/merging, and the
 derivation of the native view props `RNSScreen`/`RNSScreenStack`/the header config leaves need —
-lives once in `core/`, shared verbatim by React, Vue, and Angular. Each adapter supplies only its
-own lifecycle glue (hooks, composables, or a directive/signal pair) and the descriptor bridge that
-turns the core's render output into that framework's elements:
+lives once in `core/`, shared verbatim by React, Vue, Angular, and Svelte. Each adapter supplies
+only its own lifecycle glue (hooks, composables, runes, or a directive/signal pair) and the
+descriptor bridge that turns the core's render output into that framework's elements:
 
 ```
 packages/navigation/src/
@@ -215,10 +270,11 @@ packages/navigation/src/
 ├── register.ts   # side-effect: registers react-native-screens' native ViewConfigs
 ├── react/         # React lifecycle (hooks) + descriptorToReact bridge
 ├── vue/           # Vue lifecycle (composables) + descriptorToVue bridge
-└── angular/       # Angular lifecycle (injectors/signals) + directive-based descriptor bridge
+├── angular/       # Angular lifecycle (injectors/signals) + directive-based descriptor bridge
+└── svelte/        # Svelte lifecycle (runes) + descriptor-subtree bridge for Tab's pure-JS bar
 ```
 
 A persistence bug in the route-stack reducer, or a header-layout bug in the native prop
-derivation, is fixed once in `core/` for all three adapters — the same shared-core pattern every
+derivation, is fixed once in `core/` for all four adapters — the same shared-core pattern every
 SymbioteNative package follows. See [how it works](/docs/how-it-works/) for the general
 render-pipeline this sits on top of.

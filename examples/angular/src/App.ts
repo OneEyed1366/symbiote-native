@@ -35,6 +35,7 @@ import { NestedNavigatorsScreen } from './screens/NestedNavigatorsScreen';
 import { HooksDemoScreen } from './screens/HooksDemoScreen';
 import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
 import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
+import { ReactiveStyleScreen } from './screens/ReactiveStyleScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
@@ -62,6 +63,7 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
       <ng-template symbioteScreen name="HooksDemo" [component]="hooksDemoScreen" [options]="hooksDemoOptions"></ng-template>
       <ng-template symbioteScreen name="DeepLinking" [component]="deepLinkingScreen" [options]="deepLinkingOptions"></ng-template>
       <ng-template symbioteScreen name="StatePersistence" [component]="statePersistenceScreen" [options]="statePersistenceOptions"></ng-template>
+      <ng-template symbioteScreen name="ReactiveStyle" [component]="reactiveStyleScreen" [options]="reactiveStyleOptions"></ng-template>
     </Stack>
   `,
 })
@@ -80,6 +82,7 @@ export class AppComponent implements OnInit, AfterViewInit {
   readonly hooksDemoScreen = HooksDemoScreen;
   readonly deepLinkingScreen = DeepLinkingScreen;
   readonly statePersistenceScreen = StatePersistenceScreen;
+  readonly reactiveStyleScreen = ReactiveStyleScreen;
 
   readonly menuOptions: IAngularScreenOptions = {
     title: 'Navigation Demos',
@@ -171,6 +174,16 @@ export class AppComponent implements OnInit, AfterViewInit {
     headerShown: true,
     headerTintColor: LINE_COLOR.routing,
     headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly reactiveStyleOptions: IAngularScreenOptions = {
+    title: 'Reactive Style',
+    headerShown: true,
+    headerTranslucent: true,
+    headerTintColor: LINE_COLOR.primitives,
     headerTitleColor: '#ffffff',
     headerStyle: DARK_HEADER_STYLE,
     headerUserInterfaceStyle: 'dark',

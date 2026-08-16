@@ -33,6 +33,7 @@ import {
   Output,
   type OnChanges,
 } from '@angular/core';
+import type { ControlValueAccessor } from '@angular/forms';
 import { anchorHostStyle } from '@symbiote-native/angular';
 import { resolveAccessibilityProps } from '@symbiote-native/components';
 import type {
@@ -87,7 +88,7 @@ function asStyle(value: unknown): ISliderProps['style'] {
 }
 
 @Directive()
-export abstract class SliderBase implements ISliderProps, OnChanges {
+export abstract class SliderBase implements ISliderProps, OnChanges, ControlValueAccessor {
   @Input() value?: number;
   @Input() minimumValue?: number;
   @Input() maximumValue?: number;
@@ -214,6 +215,29 @@ export abstract class SliderBase implements ISliderProps, OnChanges {
       this.changeDetector.markForCheck();
     }
   };
+
+  // ControlValueAccessor — `value`/`disabled` are plain @Input() fields feeding the `descriptor`
+  // getter (re-evaluated on every OnPush check, no fold/commit dance), so writeValue()/
+  // setDisabledState() can set them straight, no TextInput-style stale-safe seam needed.
+  writeValue(value: number | null): void {
+    this.value = value ?? undefined;
+    this.changeDetector.markForCheck();
+  }
+
+  registerOnChange(fn: (value: number) => void): void {
+    this.valueChange.subscribe(fn);
+  }
+
+  registerOnTouched(fn: () => void): void {
+    // Slider has no blur concept (it's a drag control, not a text field) — the thumb release is
+    // the closest "the user is done interacting" signal.
+    this.slidingComplete.subscribe(() => fn());
+  }
+
+  setDisabledState(isDisabled: boolean): void {
+    this.disabled = isDisabled;
+    this.changeDetector.markForCheck();
+  }
 
   private inputProps(): ISliderProps {
     return {

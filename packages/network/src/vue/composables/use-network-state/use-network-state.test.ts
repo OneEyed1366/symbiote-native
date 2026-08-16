@@ -1,5 +1,12 @@
 // Co-located Vue-driven test (ADR 0025) for useNetworkState. See battery's
 // use-battery-state.test.ts for the shared rationale.
+//
+// Scope: this composable adds no branching of its own — getNetworkStateAsync/
+// addNetworkStateListener are mocked wholesale, and their own guard/throw paths are already
+// exhaustively covered by core/network.test.ts (Positive/Negative). What's unique to THIS
+// layer is Vue lifecycle: does it seed the ref, subscribe onMounted, react to the native
+// event, and clean up onUnmounted. No Negative group — the composable has no guard clause of
+// its own to reject on.
 
 import { defineComponent, h, type Ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -63,13 +70,17 @@ function mountNetworkState(): Ref<INetworkState> {
   return networkState;
 }
 
-describe('useNetworkState (Vue)', () => {
+describe('useNetworkState (Vue) — lifecycle (mount seeds + subscribes, event updates, unmount cleans up)', () => {
+  // why: a template bound to `networkState.value` must never read `undefined` before the
+  // first fetch lands — the composable's own initial ref value guarantees a safe first render.
   it('starts at an empty object before the initial fetch resolves', () => {
     const networkState = mountNetworkState();
 
     expect(networkState.value).toEqual({});
   });
 
+  // why: onMounted must trigger the one-shot fetch so the template has real data before any
+  // native change event ever fires.
   it('updates to the fetched value once getNetworkStateAsync() resolves', async () => {
     const networkState = mountNetworkState();
 
@@ -82,6 +93,8 @@ describe('useNetworkState (Vue)', () => {
     );
   });
 
+  // why: the ref must stay reactive for the component's whole lifetime — a subscription that
+  // only fires once would leave the template showing a stale connection type forever.
   it('updates the ref when the native listener fires', async () => {
     const networkState = mountNetworkState();
     await vi.waitFor(() => expect(networkState.value.type).toBe('WIFI'));
@@ -91,6 +104,8 @@ describe('useNetworkState (Vue)', () => {
     expect(networkState.value.type).toBe('CELLULAR');
   });
 
+  // why: an un-cleaned subscription is a memory/listener leak and can write to a ref whose
+  // owning component no longer exists — onUnmounted must release it.
   it('removes the subscription on unmount', () => {
     mountNetworkState();
     unmount(ROOT_TAG);

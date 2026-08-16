@@ -4,14 +4,4 @@
 // hooks.
 export { LocalesService } from './services/locales.service';
 export { CalendarsService } from './services/calendars.service';
-export {
-  getLocales,
-  getCalendars,
-  addLocaleListener,
-  addCalendarListener,
-  Weekday,
-  CalendarIdentifier,
-  type Locale,
-  type Calendar,
-  type EventSubscription,
-} from '../core';
+export * from '../core';

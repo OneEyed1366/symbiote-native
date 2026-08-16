@@ -14,7 +14,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { esmExtensionBuildDirs } from './lib/build-dirs.mjs';
 
-const EXT_RE = /\.(js|jsx|mjs|cjs|json)$/;
+// .svelte is a real, already-correct extension too — copy-svelte-sources places the source
+// file at that exact path later in the `prepublish-build` pipeline, so this script must never
+// try to resolve/rewrite it (it doesn't need fixing, and the file doesn't exist on disk yet at
+// this point in the pipeline anyway).
+const EXT_RE = /\.(js|jsx|mjs|cjs|json|svelte)$/;
 const RELATIVE_RE = /^\.\.?\//; // a specifier we rewrite: './x' or '../x'
 
 function listJsFiles(dir) {

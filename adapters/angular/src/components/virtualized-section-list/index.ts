@@ -64,7 +64,7 @@ import {
   type IVListSeparatorContext,
 } from '../virtualized-list';
 import { VListOutletDirective } from '../virtualized-list/directives';
-import { stableAnchorStyle } from '../../primitives';
+import { stableAnchorStyle, SymbioteStyleInputDirective } from '../../primitives';
 import {
   VSectionFooterDirective,
   VSectionHeaderDirective,
@@ -146,6 +146,7 @@ export type IVirtualizedSectionListInputs<ItemT> = Omit<
 @Component({
   selector: 'VirtualizedSectionList',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   imports: [
     VirtualizedList,
     VListItemDirective,

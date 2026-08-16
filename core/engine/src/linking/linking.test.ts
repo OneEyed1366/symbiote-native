@@ -19,14 +19,22 @@ let androidOpenedUrl: string | undefined;
 let sentIntent: { action: string; extras?: unknown } | undefined;
 let deviceHub: IDeviceHub | undefined;
 
-beforeEach(async () => {
-  openedUrl = undefined;
-  androidOpenedUrl = undefined;
-  sentIntent = undefined;
-  deviceHub = undefined;
+const INITIAL_URL = 'https://start-from-native';
 
-  const fakeLinkingManager = {
-    getInitialURL: (): Promise<string | null> => Promise.resolve(null),
+function isPresent<T>(value: unknown): value is T {
+  return value !== null && value !== undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function fakeLinkingManager(): Record<string, unknown> {
+  return {
+    // Deliberately NOT null, so this is distinguishable from the module-unavailable
+    // fallback (which also resolves null) -- proves this value came from native, not
+    // from the degrade path.
+    getInitialURL: (): Promise<string | null> => Promise.resolve(INITIAL_URL),
     canOpenURL: (_url: string): Promise<boolean> => Promise.resolve(true),
     openURL: (url: string): Promise<void> => {
       openedUrl = url;
@@ -36,11 +44,13 @@ beforeEach(async () => {
     addListener: (): void => {},
     removeListeners: (_count: number): void => {},
   };
+}
 
-  // Android routes to IntentAndroid instead, and adds sendIntent. Separate record state
-  // proves the Android build hit IntentAndroid, not LinkingManager.
-  const fakeIntentAndroid = {
-    getInitialURL: (): Promise<string | null> => Promise.resolve(null),
+// Android routes to IntentAndroid instead, and adds sendIntent. Separate record state
+// proves the Android build hit IntentAndroid, not LinkingManager.
+function fakeIntentAndroid(): Record<string, unknown> {
+  return {
+    getInitialURL: (): Promise<string | null> => Promise.resolve(INITIAL_URL),
     canOpenURL: (_url: string): Promise<boolean> => Promise.resolve(true),
     openURL: (url: string): Promise<void> => {
       androidOpenedUrl = url;
@@ -54,16 +64,22 @@ beforeEach(async () => {
     addListener: (): void => {},
     removeListeners: (_count: number): void => {},
   };
+}
 
-  const registeredModules: Record<string, unknown> = {
-    LinkingManager: fakeLinkingManager,
-    IntentAndroid: fakeIntentAndroid,
-  };
-
+function installModules(modules: Record<string, unknown>): void {
   globalThis.__turboModuleProxy = <T>(name: string): T | null => {
-    const module = registeredModules[name];
+    const module = modules[name];
     return isPresent<T>(module) ? module : null;
   };
+}
+
+beforeEach(async () => {
+  openedUrl = undefined;
+  androidOpenedUrl = undefined;
+  sentIntent = undefined;
+  deviceHub = undefined;
+
+  installModules({ LinkingManager: fakeLinkingManager(), IntentAndroid: fakeIntentAndroid() });
   globalThis.RN$registerCallableModule = (name: string, factory: () => IDeviceHub): void => {
     if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
   };
@@ -78,61 +94,134 @@ afterEach(() => {
   globalThis.RN$registerCallableModule = undefined;
 });
 
-function isPresent<T>(value: unknown): value is T {
-  return value !== null && value !== undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 describe('Linking (iOS build -> LinkingManager)', () => {
-  it('canOpenURL resolves the native boolean', async () => {
-    await expect(iosLinking.canOpenURL('https://x')).resolves.toBe(true);
-  });
-
-  it('openURL passes the url to LinkingManager', async () => {
-    await iosLinking.openURL('https://x');
-    expect(openedUrl).toBe('https://x');
-  });
-
-  it('getInitialURL does not throw', async () => {
-    await expect(iosLinking.getInitialURL()).resolves.toBeNull();
-  });
-
-  it('sendIntent rejects (no iOS counterpart) and never reaches IntentAndroid', async () => {
-    await expect(iosLinking.sendIntent('android.intent.action.VIEW')).rejects.toBeDefined();
-    expect(sentIntent).toBeUndefined();
-  });
-
-  it('delivers a native `url` deep-link event to the listener, then stops after remove', () => {
-    let received: unknown;
-    const sub = iosLinking.addEventListener('url', event => {
-      received = event;
+  describe('with the module linked', () => {
+    it('canOpenURL resolves the native boolean', async () => {
+      await expect(iosLinking.canOpenURL('https://x')).resolves.toBe(true);
     });
-    expect(deviceHub).toBeDefined();
 
-    deviceHub?.emit('url', { url: 'app://deep' });
-    expect(isRecord(received) && received.url).toBe('app://deep');
+    it('openURL passes the url to LinkingManager', async () => {
+      await iosLinking.openURL('https://x');
+      expect(openedUrl).toBe('https://x');
+    });
 
-    sub.remove();
+    it("getInitialURL resolves native's answer", async () => {
+      await expect(iosLinking.getInitialURL()).resolves.toBe(INITIAL_URL);
+    });
+
+    it('openSettings resolves', async () => {
+      await expect(iosLinking.openSettings()).resolves.toBeUndefined();
+    });
+
+    // why: iOS has no native counterpart to Android's sendIntent -- it must reject
+    // 'Unsupported' unconditionally, never forward to IntentAndroid.
+    it('sendIntent rejects (no iOS counterpart) and never reaches IntentAndroid', async () => {
+      await expect(iosLinking.sendIntent('android.intent.action.VIEW')).rejects.toBeDefined();
+      expect(sentIntent).toBeUndefined();
+    });
+
+    it('delivers a native `url` deep-link event to the listener, then stops after remove', () => {
+      let received: unknown;
+      const sub = iosLinking.addEventListener('url', event => {
+        received = event;
+      });
+      expect(deviceHub).toBeDefined();
+
+      deviceHub?.emit('url', { url: 'app://deep' });
+      expect(isRecord(received) && received.url).toBe('app://deep');
+
+      sub.remove();
+    });
+
+    // why: toUrlEvent guards a malformed native payload (no `url` field) -- the
+    // listener must still be called (an app may just log/ignore it), with the
+    // documented empty-string fallback, never with `undefined` or a crash.
+    it('delivers an empty-url fallback event for a malformed native payload', () => {
+      let received: unknown;
+      iosLinking.addEventListener('url', event => {
+        received = event;
+      });
+      deviceHub?.emit('url', { notAUrl: true });
+      expect(isRecord(received) && received.url).toBe('');
+    });
+  });
+
+  describe('invalid input (Negative)', () => {
+    // why: RN's _validateURL fails loudly and SYNCHRONOUSLY (before any promise is
+    // even created) on an empty/non-string url -- a typo'd deep link must surface
+    // immediately at the call site, not as a swallowed rejection.
+    it('openURL throws synchronously for an empty url', () => {
+      expect(() => iosLinking.openURL('')).toThrow('Invalid URL: ');
+    });
+
+    it('canOpenURL throws synchronously for an empty url', () => {
+      expect(() => iosLinking.canOpenURL('')).toThrow('Invalid URL: ');
+    });
+  });
+
+  describe('module unavailable', () => {
+    beforeEach(async () => {
+      installModules({ IntentAndroid: fakeIntentAndroid() });
+      vi.resetModules();
+      ({ Linking: iosLinking } = await import('./index.ios'));
+    });
+
+    // why: an app calling openURL before/without LinkingManager linked must get an
+    // informative rejection, not a hang or a generic native crash.
+    it('openURL rejects with an "unavailable" error', async () => {
+      await expect(iosLinking.openURL('https://x')).rejects.toThrow(/unavailable/);
+    });
+
+    it('canOpenURL rejects with an "unavailable" error', async () => {
+      await expect(iosLinking.canOpenURL('https://x')).rejects.toThrow(/unavailable/);
+    });
+
+    it('openSettings rejects with an "unavailable" error', async () => {
+      await expect(iosLinking.openSettings()).rejects.toThrow(/unavailable/);
+    });
+
+    // why: getInitialURL alone degrades to null instead of rejecting (RN parity --
+    // "no deep link launched this app" and "can't tell" are the same observable
+    // outcome to a caller), so an app can call it unconditionally at startup.
+    it('getInitialURL resolves null instead of rejecting', async () => {
+      await expect(iosLinking.getInitialURL()).resolves.toBeNull();
+    });
   });
 });
 
 describe('Linking (Android build -> IntentAndroid)', () => {
-  it('canOpenURL resolves the native boolean', async () => {
-    await expect(androidLinking.canOpenURL('https://a')).resolves.toBe(true);
+  describe('with the module linked', () => {
+    it('canOpenURL resolves the native boolean', async () => {
+      await expect(androidLinking.canOpenURL('https://a')).resolves.toBe(true);
+    });
+
+    it('openURL routes to IntentAndroid', async () => {
+      await androidLinking.openURL('intent://a');
+      expect(androidOpenedUrl).toBe('intent://a');
+    });
+
+    it('sendIntent forwards action and extras', async () => {
+      const extras = [{ key: 'foo', value: 'bar' }];
+      await androidLinking.sendIntent('android.intent.action.VIEW', extras);
+      expect(sentIntent?.action).toBe('android.intent.action.VIEW');
+      expect(sentIntent?.extras).toEqual(extras);
+    });
   });
 
-  it('openURL routes to IntentAndroid', async () => {
-    await androidLinking.openURL('intent://a');
-    expect(androidOpenedUrl).toBe('intent://a');
-  });
+  describe('module unavailable', () => {
+    beforeEach(async () => {
+      installModules({ LinkingManager: fakeLinkingManager() });
+      vi.resetModules();
+      ({ Linking: androidLinking } = await import('./index.android'));
+    });
 
-  it('sendIntent forwards action and extras', async () => {
-    const extras = [{ key: 'foo', value: 'bar' }];
-    await androidLinking.sendIntent('android.intent.action.VIEW', extras);
-    expect(sentIntent?.action).toBe('android.intent.action.VIEW');
-    expect(sentIntent?.extras).toEqual(extras);
+    // why: unlike iOS (which always rejects 'Unsupported'), Android's sendIntent
+    // genuinely depends on IntentAndroid -- without it, the rejection must name
+    // the real cause (module unavailable), not silently no-op a launched intent.
+    it('sendIntent rejects with an "unavailable" error', async () => {
+      await expect(androidLinking.sendIntent('android.intent.action.VIEW')).rejects.toThrow(
+        /unavailable/,
+      );
+    });
   });
 });

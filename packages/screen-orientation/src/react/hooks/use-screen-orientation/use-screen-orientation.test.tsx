@@ -53,13 +53,21 @@ beforeEach(() => {
 
 afterEach(() => unmount(ROOT_TAG));
 
+// This layer owns ONLY React lifecycle wiring over core (mount → fetch + subscribe, unmount →
+// unsubscribe) — core's own validation/platform-branch logic is exhaustively covered by
+// screen-orientation.test.ts and must not be re-asserted here. No Negative group: the hook has no
+// guard clause of its own — it has nothing to throw, only state to keep in sync with core.
 describe('useScreenOrientation', () => {
+  // why: a caller renders before the async initial fetch settles — the hook must expose a real,
+  // documented UNKNOWN state rather than `undefined`/a stale value during that window
   it('reports OrientationLock/Orientation UNKNOWN before the initial fetch resolves', () => {
     mount(ROOT_TAG, createElement(Probe));
 
     expect(results[results.length - 1]).toEqual({ orientation: 0, orientationLock: 9 });
   });
 
+  // why: the hook must actually apply the values core's one-shot getters resolve to, not just
+  // call them
   it('reports the fetched state once the initial getOrientationAsync()/getOrientationLockAsync() resolve', async () => {
     mount(ROOT_TAG, createElement(Probe));
 
@@ -68,6 +76,8 @@ describe('useScreenOrientation', () => {
     );
   });
 
+  // why: the whole point of subscribing on mount is staying in sync with device rotation after
+  // the initial read — a hook that only reflects the one-shot fetch would go stale immediately
   it('updates when the native listener fires', async () => {
     mount(ROOT_TAG, createElement(Probe));
     await vi.waitFor(() => expect(results[results.length - 1].orientation).toBe(1));
@@ -83,6 +93,8 @@ describe('useScreenOrientation', () => {
     );
   });
 
+  // why: an unmounted component must not keep a live native subscription — that would leak a
+  // listener that outlives the component and can update state after unmount
   it('unsubscribes from the native listener on unmount', () => {
     mount(ROOT_TAG, createElement(Probe));
 

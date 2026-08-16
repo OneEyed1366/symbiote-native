@@ -13,7 +13,7 @@
 // callback contract.
 
 import { createElement, useEffect, useReducer, type FC, type ReactNode } from 'react';
-import { dlog } from '@symbiote-native/engine';
+import { dlog, type ISymbioteEvent } from '@symbiote-native/engine';
 import {
   createInitialModalState,
   modalReducer,
@@ -24,7 +24,6 @@ import {
   type IAriaProps,
   type IModalAnimationType,
   type IModalOrientation,
-  type IModalOrientationChangeEvent,
   type IModalPresentationStyle,
 } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
@@ -54,7 +53,9 @@ export interface IModalProps extends IAccessibilityProps, IAriaProps {
   onShow?: () => void;
   onDismiss?: () => void;
   onRequestClose?: () => void;
-  onOrientationChange?: (event: IModalOrientationChangeEvent) => void;
+  // The engine hands every listener the ISymbioteEvent wrapper, so the orientation is read at
+  // event.nativeEvent.orientation (IModalOrientationChangeEvent describes that payload).
+  onOrientationChange?: (event: ISymbioteEvent) => void;
   style?: IStyleProp<IViewStyle>;
   // Forwarded onto the container View like `style` — resolves through the shared style
   // registry.

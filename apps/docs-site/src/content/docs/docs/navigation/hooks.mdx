@@ -1,6 +1,6 @@
 ---
 title: Hooks & focus
-description: Reading the current route/navigator and reacting to screen focus from React, Vue, and Angular.
+description: Reading the current route/navigator and reacting to screen focus from React, Vue, Angular, and Svelte.
 ---
 
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -8,11 +8,12 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 A screen reads and reacts to navigation state through five small primitives: the navigator
 handle, the current route, whether the screen is focused right now, an effect that re-runs on
 focus/blur, and a live selector over the navigator's state. Every adapter names them per its own
-framework idiom — React and Vue use `useX()`, Angular uses `injectX()`. That's not a typo:
-Angular's own ecosystem convention names an [`inject()`](https://angular.dev/guide/di/dependency-injection)-based
+framework idiom — React, Vue, and Svelte use `useX()`, Angular uses `injectX()`. That's not a
+typo: Angular's own ecosystem convention names an [`inject()`](https://angular.dev/guide/di/dependency-injection)-based
 function `injectX`, the same way this site's [Angular guide](/docs/learn/angular/) documents for
-every other Angular-adapter API. All three read from the nearest enclosing `<Stack>`, `<Tab>`, or
-`<Drawer>` screen and throw if called outside one.
+every other Angular-adapter API. Svelte calls this bucket "runes" rather than "hooks", but the
+function names are identical to React's/Vue's. All four read from the nearest enclosing
+`<Stack>`, `<Tab>`, or `<Drawer>` screen and throw if called outside one.
 
 <Aside type="tip">
   This is the primary way to read `route`/`navigation` in **any** component under a navigator —
@@ -21,6 +22,8 @@ every other Angular-adapter API. All three read from the nearest enclosing `<Sta
   Angular's `injectRoute()`/`injectNavigation()`), or the navigator-specific narrowed variants
   below. The other three primitives on this page — `useIsFocused()`, `useFocusEffect()`, and
   `useNavigationState()` — are read the same way and have no other API, at any nesting depth.
+  Svelte's runes return a **boxed getter** (`{ readonly current: T }`), read as `.current` inside
+  a `$derived`/template/`$effect` — the same unwrap pattern as Vue's `ComputedRef.value`.
 </Aside>
 
 ## Reading the current route and navigator
@@ -54,6 +57,14 @@ tracks changing values:
     | --- | --- |
     | Navigator handle | `injectNavigation(): INavigationHandle` — plain object, read once at injection time |
     | Current route | `injectRoute(): Signal<IRoute<unknown>>` — call as `route()` |
+
+  </TabItem>
+  <TabItem label="Svelte">
+
+    | Primitive | Signature |
+    | --- | --- |
+    | Navigator handle | `useNavigation(): { readonly current: INavigationHandle }` — boxed getter, read `.current` |
+    | Current route | `useRoute(): { readonly current: IRoute<unknown> }` — boxed getter, read `.current` |
 
   </TabItem>
 </Tabs>
@@ -130,6 +141,22 @@ tracks changing values:
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { useStackNavigation, useRoute } from '@symbiote-native/navigation/svelte';
+      import ActionButton from '../components/ActionButton.svelte';
+
+      const navigation = useStackNavigation();
+      const route = useRoute();
+    </script>
+
+    <ActionButton
+      title={`Push detail for ${route.current.name}`}
+      onPress={() => navigation.current.push('Detail', { id: route.current.params })}
+    />
+    ```
+  </TabItem>
 </Tabs>
 
 ## Focus lifecycle
@@ -142,9 +169,9 @@ pair instead of once on mount.
 <Aside type="caution">
   React's `useFocusEffect` must be given a **memoized** callback (wrap it in `useCallback`) — a
   new function identity on every render re-subscribes the effect, same as any other
-  `useEffect` dependency. Vue's `useFocusEffect` and Angular's `injectFocusEffect` need no
-  memoization: `setup()` and a component constructor each run once, so the callback is captured a
-  single time by value.
+  `useEffect` dependency. Vue's `useFocusEffect`, Angular's `injectFocusEffect`, and Svelte's
+  `useFocusEffect` need no memoization: `setup()`, a component constructor, and a Svelte
+  component's script each run exactly once, so the callback is captured a single time by value.
 </Aside>
 
 `useIsFocused`/`injectIsFocused` always **starts `false`**. It never guesses focus from stack
@@ -175,6 +202,14 @@ transition, not an instant JS-only mount.
     | --- | --- |
     | Is focused | `injectIsFocused(): Signal<boolean>` — call as `isFocused()` |
     | Focus effect | `injectFocusEffect(effect: () => (() => void) \| void): void` |
+
+  </TabItem>
+  <TabItem label="Svelte">
+
+    | Primitive | Signature |
+    | --- | --- |
+    | Is focused | `useIsFocused(): { readonly current: boolean }` — boxed getter, read `.current` |
+    | Focus effect | `useFocusEffect(effect: () => (() => void) \| void): void` |
 
   </TabItem>
 </Tabs>
@@ -247,6 +282,24 @@ transition, not an instant JS-only mount.
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { useFocusEffect } from '@symbiote-native/navigation/svelte';
+
+      let focusCount = $state(0);
+
+      useFocusEffect(() => {
+        focusCount += 1;
+        return () => {
+          /* runs on blur */
+        };
+      });
+    </script>
+
+    <Text>{`focus count: ${focusCount}`}</Text>
+    ```
+  </TabItem>
 </Tabs>
 
 ## Subscribing to navigator state
@@ -277,13 +330,21 @@ navigator's state changes.
     | Navigator state | `injectNavigationState<T>(selector): Signal<T>` |
 
   </TabItem>
+  <TabItem label="Svelte">
+
+    | Primitive | Signature |
+    | --- | --- |
+    | Navigator state | `useNavigationState<T>(selector): { readonly current: T }` — boxed getter, read `.current` |
+
+  </TabItem>
 </Tabs>
 
 <Aside type="note">
   Only `<Stack>` currently broadcasts **live** state updates. Under `<Tab>` or `<Drawer>`, this
-  hook/composable/injector silently stays on its initial one-route snapshot — it never re-fires
-  after the first render, because `Tab`/`Drawer` don't emit the state event `Stack` does. This is
-  a real, documented scoping limitation of the current implementation, not a bug to route around.
+  hook/composable/injector/rune silently stays on its initial one-route snapshot — it never
+  re-fires after the first render, because `Tab`/`Drawer` don't emit the state event `Stack`
+  does. This is a real, documented scoping limitation of the current implementation, not a bug to
+  route around.
 </Aside>
 
 <Tabs syncKey="framework">
@@ -330,6 +391,17 @@ navigator's state changes.
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { useNavigationState } from '@symbiote-native/navigation/svelte';
+
+      const routeNames = useNavigationState(state => state.routes.map(route => route.name));
+    </script>
+
+    {#each routeNames.current as name, index (`${name}-${index}`)}<Text>{`${index}. ${name}`}</Text>{/each}
+    ```
+  </TabItem>
 </Tabs>
 
 ## Nested navigators and `getParent()`
@@ -364,9 +436,10 @@ though, since — unlike the navigator that mounted this screen — it doesn't s
 kind of navigator is above it. This is the one place a raw guard is genuinely unavoidable, so
 `isStackNavigatorHandle()`/`isTabNavigatorHandle()`/`isDrawerNavigatorHandle()` live in the
 framework-agnostic core and are importable from the bare `@symbiote-native/navigation` package
-(the same place `IRoute`/`INavigatorState` come from), not from `/react`/`/vue`/`/angular`. Vue's
-equivalent reads `navigation.value.getParent()`; Angular's reads
-`injectTabNavigation().getParent()` — same one-hop semantics in both.
+(the same place `IRoute`/`INavigatorState` come from), not from `/react`/`/vue`/`/angular`/`/svelte`.
+Vue's equivalent reads `navigation.value.getParent()`; Svelte's reads
+`navigation.current.getParent()`; Angular's reads `injectTabNavigation().getParent()` — same
+one-hop semantics in all three.
 
 ## API
 
@@ -403,11 +476,21 @@ equivalent reads `navigation.value.getParent()`; Angular's reads
     | `injectDrawerNavigation(): IDrawerNavigationHandle` | `injectNavigation()` narrowed to a Drawer handle; throws if the nearest navigator isn't a `Drawer` |
 
   </TabItem>
+  <TabItem label="Svelte">
+
+    | Signature | Description |
+    | --- | --- |
+    | `useNavigation(): { readonly current: INavigationHandle }` | The current screen's navigator handle (`IAnyNavigatorHandle` union) plus `addListener` and `getParent`. Boxed getter, read `.current` |
+    | `useStackNavigation(): { readonly current: IStackNavigationHandle }` | `useNavigation()` narrowed to a Stack handle; throws if the nearest navigator isn't a `Stack` |
+    | `useTabNavigation(): { readonly current: ITabNavigationHandle }` | `useNavigation()` narrowed to a Tab handle; throws if the nearest navigator isn't a `Tab` |
+    | `useDrawerNavigation(): { readonly current: IDrawerNavigationHandle }` | `useNavigation()` narrowed to a Drawer handle; throws if the nearest navigator isn't a `Drawer` |
+
+  </TabItem>
 </Tabs>
 
 `isStackNavigatorHandle(handle)`/`isTabNavigatorHandle(handle)`/`isDrawerNavigatorHandle(handle)`
 are framework-agnostic type guards importable from the bare `@symbiote-native/navigation` package
-(not `/react`/`/vue`/`/angular`) — the same guards `useStackNavigation()`/etc. use internally,
+(not `/react`/`/vue`/`/angular`/`/svelte`) — the same guards `useStackNavigation()`/etc. use internally,
 exposed for the one case they don't cover: narrowing a `getParent()` result, which is always a
 union since it doesn't statically know the enclosing navigator's kind. See
 [Nested navigators and `getParent()`](#nested-navigators-and-getparent) above.
@@ -436,6 +519,13 @@ union since it doesn't statically know the enclosing navigator's kind. See
     | `injectRoute(): Signal<IRoute<unknown>>` | The current screen's route (`name`, `key`, `params`); call as `route()` |
 
   </TabItem>
+  <TabItem label="Svelte">
+
+    | Signature | Description |
+    | --- | --- |
+    | `useRoute(): { readonly current: IRoute<unknown> }` | The current screen's route (`name`, `key`, `params`). Boxed getter, read `.current` |
+
+  </TabItem>
 </Tabs>
 
 ### IsFocused
@@ -460,6 +550,13 @@ union since it doesn't statically know the enclosing navigator's kind. See
     | Signature | Description |
     | --- | --- |
     | `injectIsFocused(): Signal<boolean>` | Whether this screen is focused right now; starts `false`, flips once the real focus event fires. Call as `isFocused()` |
+
+  </TabItem>
+  <TabItem label="Svelte">
+
+    | Signature | Description |
+    | --- | --- |
+    | `useIsFocused(): { readonly current: boolean }` | Whether this screen is focused right now; starts `false`, flips once the real focus event fires. Boxed getter, read `.current` |
 
   </TabItem>
 </Tabs>
@@ -488,6 +585,13 @@ union since it doesn't statically know the enclosing navigator's kind. See
     | `injectFocusEffect(effect: () => (() => void) \| void): void` | Runs `effect` on focus, runs its returned cleanup on blur. No memoization needed |
 
   </TabItem>
+  <TabItem label="Svelte">
+
+    | Signature | Description |
+    | --- | --- |
+    | `useFocusEffect(effect: () => (() => void) \| void): void` | Runs `effect` on focus, runs its returned cleanup on blur. No memoization needed — a Svelte component's script runs exactly once, so the closure is captured a single time by value |
+
+  </TabItem>
 </Tabs>
 
 ### NavigationState
@@ -512,6 +616,13 @@ union since it doesn't statically know the enclosing navigator's kind. See
     | Signature | Description |
     | --- | --- |
     | `injectNavigationState<T>(selector: (state: INavigatorState) => T): Signal<T>` | Selects a value out of the navigator's live state; only `<Stack>` broadcasts live updates, `<Tab>`/`<Drawer>` stay on the initial snapshot |
+
+  </TabItem>
+  <TabItem label="Svelte">
+
+    | Signature | Description |
+    | --- | --- |
+    | `useNavigationState<T>(selector: (state: INavigatorState) => T): { readonly current: T }` | Selects a value out of the navigator's live state; only `<Stack>` broadcasts live updates, `<Tab>`/`<Drawer>` stay on the initial snapshot. Boxed getter, read `.current` |
 
   </TabItem>
 </Tabs>

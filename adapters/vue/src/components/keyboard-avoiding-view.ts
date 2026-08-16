@@ -1,14 +1,11 @@
-// KeyboardAvoidingView: the Vue lifecycle half. The inset math + the behavior → style/structure
-// decision live in @symbiote-native/components (render-keyboard-avoiding-view), shared verbatim with the
-// React adapter; Vue supplies only the reactivity: a ref holds the inset, onMounted subscribes to
-// the now-core Keyboard module (show / changeFrame / hide), onUnmounted tears the subscriptions
-// down, and onLayout measures the wrapper frame that feeds the next event's inset. This is the Vue
-// twin of React's useState + useEffect + onLayout. Full parity: behavior 'height'|'position'|
-// 'padding', enabled, keyboardVerticalOffset, contentContainerStyle, onLayout.
+// KeyboardAvoidingView: the Vue lifecycle half. The inset math + the behavior->style/structure
+// decision live in @symbiote-native/components (render-keyboard-avoiding-view), shared verbatim
+// with React; Vue supplies only the reactivity: a ref holds the inset, onMounted subscribes to
+// the Keyboard module (show/changeFrame/hide), onUnmounted tears the subscriptions down, and
+// onLayout measures the wrapper frame that feeds the next event's inset.
 //
-// Inputs arrive as attrs (untyped), so each is narrowed with a runtime guard rather than a cast.
-// rawAttrs runs through normalizeVueAttrs (kebab→camel) so a template `:keyboard-vertical-offset`
-// and `:content-container-style` resolve; aria-*/data-* are preserved and forwarded to the host.
+// Inputs arrive as attrs (untyped), so each is narrowed with a runtime guard, never a cast.
+// rawAttrs runs through normalizeVueAttrs so a template `:keyboard-vertical-offset` resolves.
 
 import { defineComponent, h, ref, onMounted, onUnmounted, type VNode } from '@vue/runtime-core';
 import {
@@ -35,17 +32,15 @@ import {
 } from '@symbiote-native/components';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
-// The Vue-facing prop surface. layout is NOT here: it is a typed Vue emit (@layout), wrapper-composed
-// from the wrapper's own onLayout (which the component already intercepts to measure the frame).
+// layout is NOT here: it is a typed Vue emit (@layout), wrapper-composed from the wrapper's own
+// onLayout (which the component already intercepts to measure the frame).
 export interface IKeyboardAvoidingViewProps extends IAccessibilityProps, IAriaProps {
   behavior?: IKeyboardAvoidingBehavior;
   enabled?: boolean;
   keyboardVerticalOffset?: number;
   contentContainerStyle?: IStyleProp<IViewStyle>;
   style?: IStyleProp<IViewStyle>;
-  // Not in HANDLED_ATTRS below — passes through untouched onto the wrapper host, which already
-  // resolves `class`. contentContainerStyle stays JS-only (a plain style-object prop, not
-  // `style`/`class` itself).
+  // Not in HANDLED_ATTRS below - passes through untouched onto the wrapper host.
   class?: IClassNameValue;
   testID?: string;
 }
@@ -54,8 +49,6 @@ export type IKeyboardAvoidingViewEmits = {
   layout: (event: ISymbioteEvent) => boolean;
 };
 
-// A style prop is an object (a style record) or an array of them; numbers/strings/null degrade
-// to undefined (the engine flattens what it gets). A runtime guard, not a cast.
 function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
   return typeof value === 'object' && value !== null;
 }
@@ -64,8 +57,6 @@ function asBehavior(value: unknown): IKeyboardAvoidingBehavior | undefined {
   return value === 'height' || value === 'position' || value === 'padding' ? value : undefined;
 }
 
-// The prop/handler keys the lifecycle consumes itself; everything else (accessibility, testID,
-// aria-*/data-*) forwards onto the wrapper host node.
 const HANDLED_ATTRS = [
   'behavior',
   'enabled',
@@ -75,9 +66,8 @@ const HANDLED_ATTRS = [
   'onLayout',
 ];
 
-// The forwarded bag carries the aria/role aliases, so it is typed as the a11y intersection (a
-// genuine narrowing: the accumulator is BUILT at that type, not cast) so resolveAccessibilityProps
-// folds aria-* into accessibility* before it reaches the wrapper host, exactly as React's View does.
+// Built at the a11y-intersection type (a real narrowing, not a cast) so resolveAccessibilityProps
+// folds aria-* into accessibility* before it reaches the wrapper host.
 type IForwardBag = IAccessibilityProps & IAriaProps & Record<string, unknown>;
 
 function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
@@ -95,11 +85,9 @@ export const KeyboardAvoidingView = defineComponent<
   IKeyboardAvoidingViewEmits
 >(
   (_props, { attrs: rawAttrs, slots, emit }) => {
-    // The inset is a number (plain data), so a plain ref is correct; no engine node is held here
-    // (onLayout delivers the frame, so no imperative measure / host-node capture is needed).
     const inset = ref(0);
     // Mutable, not reactive: changing the measured frame alone shouldn't re-render; it feeds the
-    // next keyboard event's inset math (React's frameRef / initialHeightRef).
+    // next keyboard event's inset math.
     let frame: IMeasuredFrame | undefined;
     let initialHeight: number | undefined;
 
@@ -165,8 +153,8 @@ export const KeyboardAvoidingView = defineComponent<
         onLayout: handleLayout,
       };
 
-      // 'nested' ('position') pushes the children in an inner view by `bottom: inset`; the wrapper
-      // modes adjust the single wrapper directly.
+      // 'nested' pushes the children in an inner view by `bottom: inset`; the wrapper modes
+      // adjust the single wrapper directly.
       if (layout.kind === 'nested') {
         return h('symbiote-view', wrapperProps, [
           h('symbiote-view', { style: layout.innerStyle }, childNodes),

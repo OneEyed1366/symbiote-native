@@ -43,13 +43,21 @@ beforeEach(() => {
 
 afterEach(() => unmount(ROOT_TAG));
 
-describe('useClipboard', () => {
+// This hook has no throwing path of its own — it only wires core's addClipboardListener into
+// React's mount/unmount lifecycle and mirrors whatever core hands it into state, so there is no
+// Negative group here (core's own native-absent/throw contract is covered by
+// packages/clipboard/src/core/clipboard.test.ts, not re-derived here).
+describe('useClipboard (lifecycle wiring over core, no throwing path)', () => {
+  // why: a subscriber mounting mid-session must not see stale/undefined state before the first
+  // native event — React consumers rely on `null` meaning "no clipboard change observed yet"
   it('reports null before any clipboard-change event arrives', () => {
     mount(ROOT_TAG, createElement(Probe));
 
     expect(results[results.length - 1]).toBeNull();
   });
 
+  // why: the hook must re-render with whatever core's listener callback receives, unmodified —
+  // any transformation here would duplicate core's own event-shaping responsibility
   it('updates to the latest event once the native listener fires', async () => {
     mount(ROOT_TAG, createElement(Probe));
 
@@ -63,6 +71,8 @@ describe('useClipboard', () => {
     await vi.waitFor(() => expect(results[results.length - 1]).toEqual(event));
   });
 
+  // why: an unmounted component must not keep a live native subscription — a leaked listener
+  // keeps firing setState on an unmounted component and leaks the native EventEmitter entry
   it('unsubscribes from the native listener on unmount', () => {
     mount(ROOT_TAG, createElement(Probe));
 

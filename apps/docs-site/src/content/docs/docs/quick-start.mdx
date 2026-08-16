@@ -85,6 +85,27 @@ pnpm install
     seam — maps Angular's operations onto the engine mutation API, with a
     DOM-less bootstrap (no `platform-browser`, no zone.js).
   </TabItem>
+  <TabItem label="Svelte">
+    Run the Svelte canary:
+
+    ```sh
+    cd examples/svelte
+    pnpm ios
+    ```
+
+    For Android:
+
+    ```sh
+    cd examples/svelte
+    pnpm android
+    ```
+
+    The Svelte example proves the engine can be driven with no framework
+    reconciler at all: `@symbiote-native/svelte` patches `globalThis` DOM classes so
+    stock compiled Svelte output believes it is talking to the real DOM, and
+    every DOM call it makes routes into the same mutation API every other
+    adapter drives.
+  </TabItem>
 </Tabs>
 
 ## What to look for

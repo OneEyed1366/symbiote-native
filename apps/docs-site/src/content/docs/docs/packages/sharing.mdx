@@ -23,6 +23,7 @@ are plain re-exports of the same `core`.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Scope: outgoing share only
 
@@ -69,7 +70,7 @@ into your app automatically.
 
 ## Usage
 
-All three adapters re-export the exact same functions; there is no per-adapter
+All four adapters re-export the exact same functions; there is no per-adapter
 hook/composable/service to reach for, since nothing here holds live state or a subscription.
 
 <Tabs syncKey="framework">
@@ -167,6 +168,35 @@ hook/composable/service to reach for, since nothing here holds live state or a s
     There's no per-instance service to `inject()` here — both functions are plain exports off the
     core package, called straight from a template event binding.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Button, Text, View } from '@symbiote-native/svelte';
+      import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/svelte';
+
+      let { fileUri }: { fileUri: string } = $props();
+      let error = $state<string | null>(null);
+
+      async function onShare(): Promise<void> {
+        if (!(await isAvailableAsync())) {
+          error = 'Sharing is not available on this device';
+          return;
+        }
+        await shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Send the report' });
+      }
+    </script>
+
+    <View>
+      <Button title="Share the report" onPress={onShare} />
+      {#if error}
+        <Text>{error}</Text>
+      {/if}
+    </View>
+    ```
+
+    There's no per-instance rune to reach for here either — both functions are plain exports off
+    the core package, called straight from `onPress`.
+  </TabItem>
 </Tabs>
 
 ### On iPad
@@ -233,13 +263,14 @@ packages/sharing/src/
 │             # ExpoSharing via requireNativeModule
 ├── react/    # @symbiote-native/sharing/react   — export * from '../core'
 ├── vue/      # @symbiote-native/sharing/vue     — export * from '../core'
+├── svelte/   # @symbiote-native/sharing/svelte  — export * from '../core'
 └── angular/  # @symbiote-native/sharing/angular — export * from '../core'
 ```
 
 Same shape as [secure store](/docs/packages/secure-store/)'s and
-[local auth](/docs/packages/local-auth/)'s three adapter entries: single-file re-exports with no
+[local auth](/docs/packages/local-auth/)'s four adapter entries: single-file re-exports with no
 lifecycle code, since every export is a stateless free function — there is nothing for a hook,
-composable, or service to subscribe to or clean up. The incoming-share half in the scope section
+composable, rune, or service to subscribe to or clean up. The incoming-share half in the scope section
 above is exactly the part that *would* have needed one. The native code itself is never
 vendored or copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see
 [the native setup guide](/docs/howtos/expo-native-module-setup/)).

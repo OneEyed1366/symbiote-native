@@ -1,22 +1,13 @@
 // Tab, the Vue lifecycle half. The focused-index router (tab-router-state) and the tab-bar
 // Descriptor builder (render-tabs) live in @symbiote-native/navigation core, shared verbatim with
-// the React/Angular adapters; here Vue supplies the lifecycle - a plain ref for the focused index
-// (Vue's twin of useReducer), useId for route-key generation, expose() for the jumpTo/setParams
-// handle - plus the descriptor bridge for the tab-bar leaf, exactly like Stack bridges its header
+// the React/Angular adapters; here Vue supplies the lifecycle - a shallowRef for the dispatched
+// router state (Vue's twin of useReducer), useId for route-key generation, expose() for the
+// jumpTo/setParams handle - plus the descriptor bridge for the tab-bar leaf, like Stack's header
 // config (stack.ts). Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints ordinary
 // `symbiote-view`/`symbiote-text` primitives via the shared render fn, so there is no
 // react-native-screens ViewConfig to register here - Tab needs no `../register` import.
 
-import {
-  defineComponent,
-  h,
-  nextTick,
-  onMounted,
-  onUnmounted,
-  shallowRef,
-  useId,
-  watch,
-} from '@vue/runtime-core';
+import { defineComponent, h, nextTick, onUnmounted, shallowRef, useId } from '@vue/runtime-core';
 import type { VNode } from '@vue/runtime-core';
 import { descriptorToVue, normalizeVueAttrs } from '@symbiote-native/vue';
 import { dlog } from '@symbiote-native/engine';
@@ -28,6 +19,7 @@ import {
   diffFocusedRoute,
   isFocusedRoute,
   isRecord,
+  reconcileTabRoutes,
   renderTabBar,
   tabRouterReducer,
 } from '../../core';
@@ -37,6 +29,8 @@ import type {
   ITabBarItemView,
   ITabNavigatorHandle,
   ITabOptions,
+  ITabRouterAction,
+  ITabRouterState,
 } from '../../core';
 import { NavigationScope, injectNavigationScope } from '../navigation-context';
 import { TabScreen } from '../tab-screen';
@@ -130,12 +124,30 @@ const TabImpl = defineComponent<ITabProps>(
     const initialRoutes = buildRoutes(initialRegistry);
     if (initialRoutes.length === 0) dlog('Tab: no <Tab.Screen> children registered');
 
-    const state = shallowRef(
-      createInitialTabState(initialRoutes, asString(attrs.initialRouteName)),
-    );
+    // A <Tab.Screen> can appear or disappear after mount (a marker behind a v-if, a data-driven
+    // screen list), so the route list is re-collected from the slot on every render and the
+    // DISPATCHED state is reconciled against it (reconcileTabRoutes, core - it preserves each
+    // surviving route's key and accumulated params and keeps focus on the same route NAME) rather
+    // than staying frozen at whatever setup() first saw. Slot vnodes are not reactive state, so
+    // the render fn is the only place that can observe the registry change: the reconciliation
+    // happens there, as a pure local, and never writes back - a state write inside a derivation is
+    // an error in Vue, not a style choice. `null` means nothing has dispatched yet, which is what
+    // keeps initialRouteName honored when the markers arrive after the first render.
+    const dispatchedState = shallowRef<ITabRouterState | null>(null);
+    // Non-reactive cache of the route list the last render derived: dispatch() reduces over the
+    // RECONCILED state, so it needs the same list that paint used. A ref here would be a reactive
+    // write from the render fn, exactly what the comment above rules out.
+    let latestRoutes: readonly IRoute<unknown>[] = initialRoutes;
 
-    function dispatch(action: Parameters<typeof tabRouterReducer>[1]): void {
-      state.value = tabRouterReducer(state.value, action);
+    function resolveState(routes: readonly IRoute<unknown>[]): ITabRouterState {
+      const dispatched = dispatchedState.value;
+      return dispatched === null
+        ? createInitialTabState(routes, asString(attrs.initialRouteName))
+        : reconcileTabRoutes(dispatched, routes);
+    }
+
+    function dispatch(action: ITabRouterAction): void {
+      dispatchedState.value = tabRouterReducer(resolveState(latestRoutes), action);
     }
 
     const jumpTo = (name: string, params?: unknown): void =>
@@ -145,16 +157,6 @@ const TabImpl = defineComponent<ITabProps>(
 
     const handle: ITabNavigatorHandle = { jumpTo, setParams };
     expose(handle);
-
-    // Tab paints its own bar in pure JS - there is no native onAppear/onDisappear to hook (unlike
-    // Stack's RNSScreen), so focus/blur is synthesized here: emit 'focus' once the newly-focused
-    // route's content has mounted, 'blur' when it's about to be replaced or Tab itself unmounts.
-    // Keyed on the route KEY (not the route object) so a setParams-only change (new route object,
-    // same key) doesn't spuriously re-fire focus/blur - mirrors tabs.ts's React twin exactly,
-    // just expressed as a `watch` over the focused key instead of a useEffect dependency array.
-    function focusedKeyOf(current: typeof state.value): string | undefined {
-      return current.routes[current.index]?.key;
-    }
 
     // One emitter per route.key, created lazily and cached for the navigator's whole lifetime -
     // mirrors stack.ts's own `emitters` map. This decouples emitter IDENTITY (stable, looked up
@@ -179,43 +181,39 @@ const TabImpl = defineComponent<ITabProps>(
     // Stack's RNSScreen), so focus/blur is synthesized here: emit 'focus' once the newly-focused
     // route's content has mounted, 'blur' when it's about to be replaced or Tab itself unmounts.
     // Keyed on the route KEY (not the route object) so a setParams-only change (new route object,
-    // same key) doesn't spuriously re-fire focus/blur - mirrors tabs.ts's React twin exactly,
-    // just expressed as a `watch` over the focused key instead of a useEffect dependency array.
-    let focusedRouteKey = focusedKeyOf(state.value);
-
-    onMounted(() => {
-      if (focusedRouteKey !== undefined) {
-        dlog(`Tab: route "${focusedRouteKey}" focused at t=${Date.now()}`);
-        emitterFor(focusedRouteKey).emit(NAVIGATION_EVENT_FOCUS);
-      }
-    });
-
+    // same key) doesn't spuriously re-fire focus/blur.
+    //
+    // Driven from the render pass rather than a `watch` because the focused key follows the
+    // SLOT-collected route list too - a marker disappearing can move focus, and slot vnodes are
+    // not reactive state, so no watcher source can see that; only a render can. The diff therefore
+    // lives where the state is derived, and stays a plain local, never a reactive write.
+    //
     // The bookkeeping (which key is focused) updates immediately so the render closure below
     // always reads the right route; the actual emit is deferred to nextTick(), which resolves
     // only after the CURRENT flush cycle fully drains - including the newly-focused screen's own
-    // onMounted (subscribing its useIsFocused/useFocusEffect listeners). flush:'post' alone is
-    // NOT enough here: it only guarantees this callback runs after THIS component's own render
-    // effect, not after an arbitrary sibling post-flush job (a just-mounted child's onMounted)
-    // that may be queued after it in the same batch - nextTick is the one API that waits for the
-    // WHOLE cycle, not just this watcher's own slot in it.
-    watch(
-      () => focusedKeyOf(state.value),
-      nextKey => {
-        const { blurKey, focusKey } = diffFocusedRoute(focusedRouteKey, nextKey);
-        if (blurKey === undefined && focusKey === undefined) return;
-        focusedRouteKey = nextKey;
-        nextTick(() => {
-          if (blurKey !== undefined) {
-            dlog(`Tab: route "${blurKey}" blurred at t=${Date.now()}`);
-            emitterFor(blurKey).emit(NAVIGATION_EVENT_BLUR);
-          }
-          if (focusKey !== undefined) {
-            dlog(`Tab: route "${focusKey}" focused at t=${Date.now()}`);
-            emitterFor(focusKey).emit(NAVIGATION_EVENT_FOCUS);
-          }
-        });
-      },
-    );
+    // onMounted (subscribing its useIsFocused/useFocusEffect listeners). Emitting inline would
+    // reach zero subscribers; flush:'post' would not have been enough either, since it only
+    // orders a callback after THIS component's own render effect, not after an arbitrary sibling
+    // post-flush job (a just-mounted child's onMounted) queued after it in the same batch.
+    let focusedRouteKey: string | undefined;
+
+    function syncFocus(current: ITabRouterState): void {
+      const nextKey = current.routes[current.index]?.key;
+      const { blurKey, focusKey } = diffFocusedRoute(focusedRouteKey, nextKey);
+      if (blurKey === undefined && focusKey === undefined) return;
+      focusedRouteKey = nextKey;
+      nextTick(() => {
+        if (blurKey !== undefined) {
+          dlog(`Tab: route "${blurKey}" blurred at t=${Date.now()}`);
+          emitterFor(blurKey).emit(NAVIGATION_EVENT_BLUR);
+        }
+        if (focusKey !== undefined) {
+          dlog(`Tab: route "${focusKey}" focused at t=${Date.now()}`);
+          emitterFor(focusKey).emit(NAVIGATION_EVENT_FOCUS);
+        }
+      });
+    }
+
     onUnmounted(() => {
       if (focusedRouteKey !== undefined) emitterFor(focusedRouteKey).emit(NAVIGATION_EVENT_BLUR);
     });
@@ -226,11 +224,16 @@ const TabImpl = defineComponent<ITabProps>(
 
       if (registry.size === 0) dlog('Tab: no <Tab.Screen> children registered');
 
-      const focusedRoute: IRoute<unknown> | undefined = state.value.routes[state.value.index];
+      const routes = buildRoutes(registry);
+      latestRoutes = routes;
+      const state = resolveState(routes);
+      syncFocus(state);
 
-      const items: ITabBarItemView[] = state.value.routes.map((route, index) => {
+      const focusedRoute: IRoute<unknown> | undefined = state.routes[state.index];
+
+      const items: ITabBarItemView[] = state.routes.map((route, index) => {
         const entry = registry.get(route.name);
-        const focused = isFocusedRoute(index, state.value.index);
+        const focused = isFocusedRoute(index, state.index);
         if (entry === undefined) {
           dlog(`Tab: no screen registered for route name "${route.name}"`);
           return { key: route.key, focused, label: route.name, passthrough: {} };

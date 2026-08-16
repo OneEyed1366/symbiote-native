@@ -263,13 +263,14 @@ const DrawerImpl = defineComponent<IDrawerProps>(
         dispatch({ type: 'toggleDrawer' });
       },
       jumpTo: (name: string) => {
-        // Captured BEFORE dispatch: unlike React's isOpenRef (only refreshed at the TOP of the
-        // next render, so it still holds the pre-dispatch value here since React batches the
-        // re-render asynchronously), this ref's `.value` mutates SYNCHRONOUSLY inside dispatch -
-        // reading it after dispatch would already see the reducer's own isOpen: false.
+        // Both sides of the dispatch, because an unregistered name is a documented reducer no-op
+        // that hands the SAME state back: animating off the pre-dispatch snapshot alone would
+        // slide the panel shut while the router still says isOpen. The ref's `.value` mutates
+        // SYNCHRONOUSLY inside dispatch (unlike React's isOpenRef, refreshed only at the top of
+        // the next render), so the second read is already the reducer's own answer.
         const wasOpen = state.value.isOpen;
         dispatch({ type: 'jumpTo', name });
-        if (wasOpen) animateProgressTo(false);
+        if (wasOpen && !state.value.isOpen) animateProgressTo(false);
       },
     };
     expose(handle);

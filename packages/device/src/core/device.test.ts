@@ -79,8 +79,15 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('eagerly resolved constants', () => {
-  it('read straight off the native module at import time', () => {
+describe('constants', () => {
+  // why: every constant is resolved once, eagerly, at import time straight off the native
+  // module — there is no lazy getter a consumer could re-read after the native side changes.
+  // Not separately exercised here: the `?? true` / `?? null` fallback for a genuinely-undefined
+  // native field (e.g. isDevice on a module that never set it). Proving that branch needs
+  // vi.resetModules()+doMock() before every other binding in this file is imported, which no
+  // sibling package (application/crypto) does either for the same eager-resolution shape —
+  // N/A, not worth the isolation cost for a one-line default.
+  it('reads straight off the native module at import time', () => {
     expect(isDevice).toBe(true);
     expect(brand).toBe('Apple');
     expect(manufacturer).toBe('Apple');
@@ -103,100 +110,177 @@ describe('eagerly resolved constants', () => {
 });
 
 describe('getDeviceTypeAsync', () => {
-  it('delegates to the native module', async () => {
-    await expect(getDeviceTypeAsync()).resolves.toBe(1);
+  describe('positive', () => {
+    // why: the wrapper's whole job for this method is a pure passthrough to the native call.
+    it('delegates to the native module', async () => {
+      await expect(getDeviceTypeAsync()).resolves.toBe(1);
+    });
   });
 
-  it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
-    const { getDeviceTypeAsync: native } = FAKE_NATIVE_DEVICE;
-    // @ts-expect-error -- simulating a platform where the native module has no such method
-    FAKE_NATIVE_DEVICE.getDeviceTypeAsync = undefined;
+  describe('negative', () => {
+    // why: on a platform build missing this native method, the app must get a clear
+    // UnavailabilityError, not a silent `undefined` or a raw "not a function" crash.
+    it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
+      const { getDeviceTypeAsync: native } = FAKE_NATIVE_DEVICE;
+      // @ts-expect-error -- simulating a platform where the native module has no such method
+      FAKE_NATIVE_DEVICE.getDeviceTypeAsync = undefined;
 
-    await expect(getDeviceTypeAsync()).rejects.toThrow(
-      'getDeviceTypeAsync is not available on expo-device',
-    );
+      await expect(getDeviceTypeAsync()).rejects.toThrow(
+        'getDeviceTypeAsync is not available on expo-device',
+      );
 
-    FAKE_NATIVE_DEVICE.getDeviceTypeAsync = native;
+      FAKE_NATIVE_DEVICE.getDeviceTypeAsync = native;
+    });
   });
 });
 
 describe('getUptimeAsync', () => {
-  it('delegates to the native module', async () => {
-    await expect(getUptimeAsync()).resolves.toBe(4_371_054);
+  describe('positive', () => {
+    it('delegates to the native module', async () => {
+      await expect(getUptimeAsync()).resolves.toBe(4_371_054);
+    });
+  });
+
+  describe('negative', () => {
+    // why: same UnavailabilityError contract as every other method in this file — a missing
+    // native method must fail loud and typed, never resolve `undefined`.
+    it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
+      const { getUptimeAsync: native } = FAKE_NATIVE_DEVICE;
+      // @ts-expect-error -- simulating a platform where the native module has no such method
+      FAKE_NATIVE_DEVICE.getUptimeAsync = undefined;
+
+      await expect(getUptimeAsync()).rejects.toThrow(
+        'getUptimeAsync is not available on expo-device',
+      );
+
+      FAKE_NATIVE_DEVICE.getUptimeAsync = native;
+    });
   });
 });
 
 describe('getMaxMemoryAsync', () => {
-  it('delegates to the native module', async () => {
-    await expect(getMaxMemoryAsync()).resolves.toBe(402_653_184);
+  describe('positive', () => {
+    it('delegates to the native module', async () => {
+      await expect(getMaxMemoryAsync()).resolves.toBe(402_653_184);
+    });
+
+    // why: the JVM reports "no inherent limit" as the native sentinel -1, which is not a byte
+    // count and would be a nonsensical (and negative!) memory figure if surfaced verbatim — it
+    // must read as "effectively unlimited" to a consumer expecting a byte count.
+    it('normalizes the -1 unlimited sentinel to Number.MAX_SAFE_INTEGER', async () => {
+      const { getMaxMemoryAsync: native } = FAKE_NATIVE_DEVICE;
+      FAKE_NATIVE_DEVICE.getMaxMemoryAsync = vi.fn(async () => -1);
+
+      await expect(getMaxMemoryAsync()).resolves.toBe(Number.MAX_SAFE_INTEGER);
+
+      FAKE_NATIVE_DEVICE.getMaxMemoryAsync = native;
+    });
   });
 
-  it('normalizes the -1 unlimited sentinel to Number.MAX_SAFE_INTEGER', async () => {
-    const { getMaxMemoryAsync: native } = FAKE_NATIVE_DEVICE;
-    FAKE_NATIVE_DEVICE.getMaxMemoryAsync = vi.fn(async () => -1);
+  describe('negative', () => {
+    it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
+      const { getMaxMemoryAsync: native } = FAKE_NATIVE_DEVICE;
+      // @ts-expect-error -- simulating a platform where the native module has no such method
+      FAKE_NATIVE_DEVICE.getMaxMemoryAsync = undefined;
 
-    await expect(getMaxMemoryAsync()).resolves.toBe(Number.MAX_SAFE_INTEGER);
+      await expect(getMaxMemoryAsync()).rejects.toThrow(
+        'getMaxMemoryAsync is not available on expo-device',
+      );
 
-    FAKE_NATIVE_DEVICE.getMaxMemoryAsync = native;
-  });
-
-  it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
-    const { getMaxMemoryAsync: native } = FAKE_NATIVE_DEVICE;
-    // @ts-expect-error -- simulating a platform where the native module has no such method
-    FAKE_NATIVE_DEVICE.getMaxMemoryAsync = undefined;
-
-    await expect(getMaxMemoryAsync()).rejects.toThrow(
-      'getMaxMemoryAsync is not available on expo-device',
-    );
-
-    FAKE_NATIVE_DEVICE.getMaxMemoryAsync = native;
+      FAKE_NATIVE_DEVICE.getMaxMemoryAsync = native;
+    });
   });
 });
 
 describe('isRootedExperimentalAsync', () => {
-  it('delegates to the native module', async () => {
-    await expect(isRootedExperimentalAsync()).resolves.toBe(false);
+  describe('positive', () => {
+    it('delegates to the native module', async () => {
+      await expect(isRootedExperimentalAsync()).resolves.toBe(false);
+    });
+  });
+
+  describe('negative', () => {
+    it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
+      const { isRootedExperimentalAsync: native } = FAKE_NATIVE_DEVICE;
+      // @ts-expect-error -- simulating a platform where the native module has no such method
+      FAKE_NATIVE_DEVICE.isRootedExperimentalAsync = undefined;
+
+      await expect(isRootedExperimentalAsync()).rejects.toThrow(
+        'isRootedExperimentalAsync is not available on expo-device',
+      );
+
+      FAKE_NATIVE_DEVICE.isRootedExperimentalAsync = native;
+    });
   });
 });
 
 describe('isSideLoadingEnabledAsync', () => {
-  it('delegates to the native module', async () => {
-    await expect(isSideLoadingEnabledAsync()).resolves.toBe(false);
+  describe('positive', () => {
+    it('delegates to the native module', async () => {
+      await expect(isSideLoadingEnabledAsync()).resolves.toBe(false);
+    });
+  });
+
+  describe('negative', () => {
+    it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
+      const { isSideLoadingEnabledAsync: native } = FAKE_NATIVE_DEVICE;
+      // @ts-expect-error -- simulating a platform where the native module has no such method
+      FAKE_NATIVE_DEVICE.isSideLoadingEnabledAsync = undefined;
+
+      await expect(isSideLoadingEnabledAsync()).rejects.toThrow(
+        'isSideLoadingEnabledAsync is not available on expo-device',
+      );
+
+      FAKE_NATIVE_DEVICE.isSideLoadingEnabledAsync = native;
+    });
   });
 });
 
 describe('getPlatformFeaturesAsync', () => {
-  it('delegates to the native module', async () => {
-    await expect(getPlatformFeaturesAsync()).resolves.toEqual([
-      'android.hardware.sensor.accelerometer',
-    ]);
+  // why: this method has no throwing path — unlike every method above, an absent native
+  // implementation (always the case on iOS) means "no platform features" is itself the correct
+  // answer, not an error condition, so there is no Negative group here.
+  describe('positive', () => {
+    it('delegates to the native module', async () => {
+      await expect(getPlatformFeaturesAsync()).resolves.toEqual([
+        'android.hardware.sensor.accelerometer',
+      ]);
+    });
   });
 
-  it('resolves an empty array instead of throwing when the native method is absent', async () => {
-    const { getPlatformFeaturesAsync: native } = FAKE_NATIVE_DEVICE;
-    // @ts-expect-error -- simulating iOS, where getPlatformFeaturesAsync has no native implementation
-    FAKE_NATIVE_DEVICE.getPlatformFeaturesAsync = undefined;
+  describe('falls back (no throwing path)', () => {
+    it('resolves an empty array instead of throwing when the native method is absent', async () => {
+      const { getPlatformFeaturesAsync: native } = FAKE_NATIVE_DEVICE;
+      // @ts-expect-error -- simulating iOS, where getPlatformFeaturesAsync has no native implementation
+      FAKE_NATIVE_DEVICE.getPlatformFeaturesAsync = undefined;
 
-    await expect(getPlatformFeaturesAsync()).resolves.toEqual([]);
+      await expect(getPlatformFeaturesAsync()).resolves.toEqual([]);
 
-    FAKE_NATIVE_DEVICE.getPlatformFeaturesAsync = native;
+      FAKE_NATIVE_DEVICE.getPlatformFeaturesAsync = native;
+    });
   });
 });
 
 describe('hasPlatformFeatureAsync', () => {
-  it('delegates to the native module', async () => {
-    await expect(hasPlatformFeatureAsync('android.hardware.sensor.accelerometer')).resolves.toBe(
-      true,
-    );
+  // why: mirrors getPlatformFeaturesAsync — "doesn't have the feature" is the correct answer on
+  // a platform with no such native concept, not an error. No Negative group.
+  describe('positive', () => {
+    it('delegates to the native module', async () => {
+      await expect(hasPlatformFeatureAsync('android.hardware.sensor.accelerometer')).resolves.toBe(
+        true,
+      );
+    });
   });
 
-  it('resolves false instead of throwing when the native method is absent', async () => {
-    const { hasPlatformFeatureAsync: native } = FAKE_NATIVE_DEVICE;
-    // @ts-expect-error -- simulating iOS, where hasPlatformFeatureAsync has no native implementation
-    FAKE_NATIVE_DEVICE.hasPlatformFeatureAsync = undefined;
+  describe('falls back (no throwing path)', () => {
+    it('resolves false instead of throwing when the native method is absent', async () => {
+      const { hasPlatformFeatureAsync: native } = FAKE_NATIVE_DEVICE;
+      // @ts-expect-error -- simulating iOS, where hasPlatformFeatureAsync has no native implementation
+      FAKE_NATIVE_DEVICE.hasPlatformFeatureAsync = undefined;
 
-    await expect(hasPlatformFeatureAsync('any')).resolves.toBe(false);
+      await expect(hasPlatformFeatureAsync('any')).resolves.toBe(false);
 
-    FAKE_NATIVE_DEVICE.hasPlatformFeatureAsync = native;
+      FAKE_NATIVE_DEVICE.hasPlatformFeatureAsync = native;
+    });
   });
 });

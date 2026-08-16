@@ -17,6 +17,14 @@ native_splash_screen_root = File.dirname(native_splash_screen_package_json)
 # NSClassFromString crash on first launch, not a build error. Fix: vendor (copy) the native iOS
 # sources into a gitignored folder next to this podspec on every `pod install`, and point
 # source_files at that copy (a purely-downward relative pattern).
+#
+# CONSEQUENCE, and it looks like something else entirely: this copy is made at PODSPEC
+# EVALUATION time, i.e. during `pod install` — nothing in package.json regenerates it. So any
+# `npm install` that replaces this package's folder in an example app (the routine
+# pack-a-tarball-and-reinstall loop) deletes `.rn-bootsplash`, and the NEXT iOS build dies with
+#   Build input file cannot be found: '.../splash-screen/.rn-bootsplash/ios/RNBootSplash.mm'
+# buried under hundreds of lines of clang argument dumps. It reads like a corrupt install; it is
+# not. Fix: re-run `pod install` in that app's ios/ directory.
 vendored_dir = File.join(__dir__, '.rn-bootsplash')
 
 FileUtils.rm_rf(vendored_dir)

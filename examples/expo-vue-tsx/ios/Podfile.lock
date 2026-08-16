@@ -76,13 +76,21 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - ExpoSecureStore (57.0.1):
+    - ExpoModulesCore
   - ExpoSensors (57.0.2):
+    - ExpoModulesCore
+  - ExpoSharing (57.0.8):
+    - ExpoModulesCore
+  - ExpoSMS (57.0.1):
     - ExpoModulesCore
   - ExpoStoreReview (57.0.1):
     - ExpoModulesCore
   - ExpoSystemUI (57.0.2):
     - ExpoModulesCore
   - ExpoTrackingTransparency (57.0.1):
+    - ExpoModulesCore
+  - ExpoWebBrowser (57.0.2):
     - ExpoModulesCore
   - FBLazyVector (0.86.0)
   - hermes-engine (250829098.0.14):
@@ -1908,7 +1916,7 @@ PODS:
     - React-utils (= 0.86.0)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.0)
-  - symbiote-navigation (2.0.2):
+  - symbiote-navigation (2.0.3):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1930,9 +1938,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - symbiote-navigation/common (= 2.0.2)
+    - symbiote-navigation/common (= 2.0.3)
     - Yoga
-  - symbiote-navigation/common (2.0.2):
+  - symbiote-navigation/common (2.0.3):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1955,7 +1963,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-splash-screen (3.0.2):
+  - symbiote-splash-screen (3.0.3):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1996,10 +2004,14 @@ DEPENDENCIES:
   - ExpoModulesWorklets (from `../node_modules/expo-modules-core`)
   - "ExpoNetwork (from `../node_modules/@symbiote-native/network/node_modules/expo-network/ios`)"
   - "ExpoScreenOrientation (from `../node_modules/@symbiote-native/screen-orientation/node_modules/expo-screen-orientation/ios`)"
+  - "ExpoSecureStore (from `../node_modules/@symbiote-native/secure-store/node_modules/expo-secure-store/ios`)"
   - "ExpoSensors (from `../node_modules/@symbiote-native/sensors/node_modules/expo-sensors/ios`)"
+  - "ExpoSharing (from `../node_modules/@symbiote-native/sharing/node_modules/expo-sharing/ios`)"
+  - "ExpoSMS (from `../node_modules/@symbiote-native/sms/node_modules/expo-sms/ios`)"
   - "ExpoStoreReview (from `../node_modules/@symbiote-native/store-review/node_modules/expo-store-review/ios`)"
   - "ExpoSystemUI (from `../node_modules/@symbiote-native/system-ui/node_modules/expo-system-ui/ios`)"
   - "ExpoTrackingTransparency (from `../node_modules/@symbiote-native/tracking-transparency/node_modules/expo-tracking-transparency/ios`)"
+  - "ExpoWebBrowser (from `../node_modules/@symbiote-native/web-browser/node_modules/expo-web-browser/ios`)"
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -2112,14 +2124,22 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@symbiote-native/network/node_modules/expo-network/ios"
   ExpoScreenOrientation:
     :path: "../node_modules/@symbiote-native/screen-orientation/node_modules/expo-screen-orientation/ios"
+  ExpoSecureStore:
+    :path: "../node_modules/@symbiote-native/secure-store/node_modules/expo-secure-store/ios"
   ExpoSensors:
     :path: "../node_modules/@symbiote-native/sensors/node_modules/expo-sensors/ios"
+  ExpoSharing:
+    :path: "../node_modules/@symbiote-native/sharing/node_modules/expo-sharing/ios"
+  ExpoSMS:
+    :path: "../node_modules/@symbiote-native/sms/node_modules/expo-sms/ios"
   ExpoStoreReview:
     :path: "../node_modules/@symbiote-native/store-review/node_modules/expo-store-review/ios"
   ExpoSystemUI:
     :path: "../node_modules/@symbiote-native/system-ui/node_modules/expo-system-ui/ios"
   ExpoTrackingTransparency:
     :path: "../node_modules/@symbiote-native/tracking-transparency/node_modules/expo-tracking-transparency/ios"
+  ExpoWebBrowser:
+    :path: "../node_modules/@symbiote-native/web-browser/node_modules/expo-web-browser/ios"
   FBLazyVector:
     :path: "../node_modules/react-native/Libraries/FBLazyVector"
   hermes-engine:
@@ -2293,12 +2313,16 @@ SPEC CHECKSUMS:
   ExpoModulesWorklets: 18419b65da3b14a8df484baccec7dd6dad15387a
   ExpoNetwork: 973d523fe9b1f99223dd945fed9ad1226ae64920
   ExpoScreenOrientation: 17fd81b2bdb7615b4b540335673aaf98a358281f
+  ExpoSecureStore: 94793113049a2d7478dfe1a13aa15081e9f61755
   ExpoSensors: e71c7b6cb0c09d3427ef6ae29c69532a10c86b05
+  ExpoSharing: dcf5cb459c99f344aabf126b171eb61d2e49276f
+  ExpoSMS: ac35f6c85b72ee5b18a7c6bb06550fbd4a683775
   ExpoStoreReview: 2a0f6b8e04112aea2f6e3e1cb84109d78f4d041f
   ExpoSystemUI: ff3142b323ae7b4d11dc0b1dc4acfa30d92be7dc
   ExpoTrackingTransparency: 43401b22cf6aed3a4a35e0c24d0b320905acc477
+  ExpoWebBrowser: 9b98d939d5f1c5dd8f523f0a0683056fb1204434
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
-  hermes-engine: 96d28976dac594e6fa77222be7d152b805aadfd7
+  hermes-engine: 111c1ba23244c05cd01df1824b12c1e962b302aa
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
   RCTSwiftUI: 5aaf0b07e747ba749dc6acc94d8bd41eea4b570f
@@ -2371,8 +2395,8 @@ SPEC CHECKSUMS:
   ReactCodegen: afe0d436ee089d7bea6418429d8312b1d23a6801
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
-  symbiote-navigation: 93c98034004c6bfff44ffa5898b9901732f29fbb
-  symbiote-splash-screen: 9f6b0e6435070cde1f31022a3fc21639fe50258e
+  symbiote-navigation: 647b27ff12ed22c1876cc3e7668a1e5b3d721808
+  symbiote-splash-screen: 94836f2a38e77e14889d079b7a209842fa87bf17
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
 PODFILE CHECKSUM: aea70a8ce1f21cb93c40aba1ad20f2bf5dc9b393

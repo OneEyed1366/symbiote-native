@@ -48,6 +48,7 @@ import { hide } from '@symbiote-native/splash-screen/angular';
 import { AccessibilityDemo } from '../components/AccessibilityDemo';
 import { ActionButton } from '../components/ActionButton';
 import { AnimatedDemo } from '../components/AnimatedDemo';
+import { CompoundClassDemo } from '../components/CompoundClassDemo';
 import { AnimatedParityDemo } from '../components/AnimatedParityDemo';
 import { NativeModulesDemo } from '../components/NativeModulesDemo';
 import { ParityDemo } from '../components/ParityDemo';
@@ -93,6 +94,7 @@ const overlayTunnel = createTunnel();
     ActivityIndicator,
     AnimatedDemo,
     AnimatedParityDemo,
+    CompoundClassDemo,
     AnimatedScrollView,
     AnimatedView,
     FlatList,
@@ -322,6 +324,7 @@ const overlayTunnel = createTunnel();
         <PlatformColorDemo></PlatformColorDemo>
         <AccessibilityDemo></AccessibilityDemo>
         <ResponderDemo></ResponderDemo>
+        <CompoundClassDemo></CompoundClassDemo>
         <ParityDemo></ParityDemo>
 
         <Pressable

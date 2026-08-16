@@ -1,11 +1,9 @@
 // Hand-ported from .vendors/expo/packages/expo-localization/src/ExpoLocalization.native.ts
-// (sdk-57). getLocales()/getCalendars() are synchronous, JSI-bridged native calls (no await) —
-// the native module itself implements them as sync-bridged functions, the same constants-style
-// read pattern this repo already uses for expo-device's eagerly-resolved fields
+// (sdk-57). getLocales()/getCalendars() are synchronous, JSI-bridged native calls (no await) -
+// same constants-style read pattern as expo-device's eagerly-resolved fields
 // (packages/device/src/core/native-module.ts). One native module fans out two independent event
-// streams (locale settings vs calendar settings) through the same addListener, keyed by event
-// name — mirrors the three-event-names-on-one-addListener overload trick in
-// packages/battery/src/core/native-module.ts.
+// streams (locale vs calendar settings) through the same addListener, keyed by event name -
+// mirrors the overload trick in packages/battery/src/core/native-module.ts.
 import { type EventSubscription, requireNativeModule } from 'expo-modules-core';
 import type { Calendar, Locale } from './types';
 

@@ -1,17 +1,16 @@
-// Pressable, the Vue lifecycle half. The press lifecycle (the long-press timer, unstable_press-
-// Delay deferral, the pressRetentionOffset drift test, the suppression flags) lives in
-// @symbiote-native/components/state as a pure machine over a runtime + host; the render decisions (the
-// responder listeners, the disabled→accessibilityState fold, the ripple prop) in
-// @symbiote-native/components/view, both shared verbatim with the React adapter. Here Vue supplies the
+// Pressable, the Vue lifecycle half. The press lifecycle (long-press timer, unstable_press-
+// Delay deferral, pressRetentionOffset drift test, suppression flags) lives in
+// @symbiote-native/components/state as a pure machine over a runtime + host; the render
+// decisions (responder listeners, disabled->accessibilityState fold, ripple prop) in
+// @symbiote-native/components/view, both shared verbatim with React. Vue supplies the
 // reactivity: a `ref` holds `pressed`, a setup-scope object holds the press runtime, a function
-// ref grabs the responder View's host node, and the machine measures through it. This is the Vue
-// twin of the React adapter's useState + useRef(runtime) + useRef(viewRef).
+// ref grabs the responder View's host node.
 //
-// Inputs arrive as attrs (untyped), so each is narrowed with a runtime guard rather than a cast.
-// The user's onPress / onPressIn / … are consumed by the machine and MUST be stripped from the
-// forwarded attrs (they are pure-JS callbacks; the machine's SYNTHESIZED handlers go on the View,
-// where routeProp turns press/pressIn/pressOut + the responder events into listeners). Children
-// arrive as a (scoped) default slot so `v-slot="{ pressed }"` mirrors React's children-as-function.
+// Inputs arrive as attrs (untyped), so each is narrowed with a runtime guard, never a cast. The
+// user's onPress/onPressIn/... are consumed by the machine and MUST be stripped from the
+// forwarded attrs (pure-JS callbacks); the machine's SYNTHESIZED handlers go on the View instead.
+// Children arrive as a (scoped) default slot so `v-slot="{ pressed }"` mirrors React's
+// children-as-function.
 
 import { defineComponent, h, ref, shallowRef, type EmitFn, type VNode } from '@vue/runtime-core';
 import {
@@ -57,8 +56,7 @@ export type IPressableEmits = {
   hoverOut: (event: ISymbioteEvent) => boolean;
 };
 
-// The emits-options validator for the full press surface. Reused verbatim as the `emits` of every
-// Touchable* wrapper (they expose the same events), so the runtime list lives in exactly one place.
+// Reused verbatim as the `emits` of every Touchable* wrapper, so the runtime list lives once.
 export const PRESSABLE_EMITS = {
   press: (_event: ISymbioteEvent): boolean => true,
   pressIn: (_event: ISymbioteEvent): boolean => true,
@@ -70,9 +68,8 @@ export const PRESSABLE_EMITS = {
 };
 
 // Bridge the whole press surface onto a child Pressable: each host onX callback re-emits the
-// matching event on the wrapper. Every Touchable* wraps Pressable, so spread this onto the child's
-// props. A wrapper that intercepts an event for its own state (e.g. TouchableOpacity's opacity
-// animation on press-in/out) overrides that one key AFTER the spread.
+// matching event on the wrapper. A wrapper that intercepts an event for its own state (e.g.
+// TouchableOpacity's opacity animation on press-in/out) overrides that one key AFTER the spread.
 export function emitPressableEvents(
   emit: EmitFn<IPressableEmits>,
 ): Record<string, (event: ISymbioteEvent) => void> {
@@ -87,8 +84,7 @@ export function emitPressableEvents(
   };
 }
 
-// The Vue-facing prop surface (mirrors React's IPressableProps minus children/callback props, which
-// Vue takes via slots/emits). style may be a plain style or a function of the press state.
+// Mirrors React's IPressableProps minus children/callback props, which Vue takes via slots/emits.
 export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   delayLongPress?: number;
   disabled?: boolean;
@@ -102,15 +98,11 @@ export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   delayHoverOut?: number;
   testID?: string;
   style?: IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
-  // Unlike `style`, never a function of press state — a CSS class is compiled statically, so
-  // only the truly static half of a Pressable's look can move here; a press-state-dependent
-  // look still needs `style`'s function form. Passes through untouched (not in HANDLED_ATTRS
-  // below) straight onto the inner View, which already resolves `class` via routeProp.
+  // Unlike `style`, never a function of press state - a CSS class is compiled statically, so a
+  // press-state-dependent look still needs `style`'s function form.
   class?: IClassNameValue;
 }
 
-// The scoped default slot mirrors React's children-as-function: it receives the press state, so a
-// consumer's `v-slot="{ pressed }"` / `#default="{ pressed }"` is typed (not any).
 export type IPressableSlots = {
   default?: (state: IPressState) => VNode[] | VNode;
 };
@@ -128,7 +120,7 @@ function numberOr(value: unknown, fallback: number): number {
 }
 
 // A scalar offset, or the per-edge object; anything else is dropped (the machine reads undefined
-// as "no offset" → RN's defaults).
+// as "no offset" -> RN's defaults).
 function asRectOffset(value: unknown): IRectOffset | undefined {
   if (typeof value === 'number') return value;
   if (!isRecord(value)) return undefined;
@@ -169,9 +161,8 @@ function resolveStyle(value: unknown, state: IPressState): unknown {
   return value;
 }
 
-// The prop/handler keys the lifecycle consumes itself; everything else (aria/accessibility/
-// testID/nativeID/native props) forwards onto the View. The user press callbacks are pure JS and
-// must never reach the host; the machine's synthesized handlers go on via buildPressableListeners.
+// Everything else forwards onto the View. User press callbacks are pure JS and must never reach
+// the host; the machine's synthesized handlers go on via buildPressableListeners.
 const HANDLED_ATTRS = [
   'onPress',
   'onPressIn',
@@ -208,17 +199,17 @@ export const Pressable = defineComponent(
   ) => {
     const pressed = ref(false);
     // The mutable press runtime (timers, suppression flags, measured region). A plain setup-scope
-    // object, never a ref: it is mutated by the machine, never reactively read.
+    // object, never a ref: mutated by the machine, never reactively read.
     const runtime = createPressRuntime();
-    // shallowRef, NOT ref: the engine node is held by IDENTITY so measure() hits the engine's
-    // WeakMap mirror (a plain ref would wrap it in a reactive Proxy → mirror miss → measure no-op).
+    // shallowRef, NOT ref: a plain ref would wrap the node in a reactive Proxy, missing the
+    // engine's WeakMap mirror and making measure() no-op.
     const nodeRef = shallowRef<ISymbioteNode | null>(null);
     const setNodeRef = (el: unknown): void => {
       nodeRef.value = isSymbioteNode(el) ? el : null;
     };
 
     // The lifecycle seam the machine fills: flip the reactive `pressed`, and expose the responder
-    // View's raw frame-measure (or undefined before the node commits → radius fallback).
+    // View's raw frame-measure (or undefined before the node commits, a radius fallback).
     const host: IPressHost = {
       setPressed: next => {
         pressed.value = next;
@@ -256,9 +247,8 @@ export const Pressable = defineComponent(
 
       const state: IPressState = { pressed: pressed.value };
 
-      // Fold the disabled state into the user's accessibilityState, then fold aria/role over the
-      // forwarded attrs (the Vue View is a bare host primitive, so Pressable folds; React's View
-      // folds for it). resolveAccessibilityProps merges aria into the accessibilityState we set.
+      // Vue's View is a bare host primitive, so Pressable folds disabled into accessibilityState
+      // and aria/role itself, rather than the View folding it (as React's does).
       const forwarded = forwardAttrs(attrs);
       forwarded.accessibilityState = resolveDisabledAccessibilityState(
         asAccessibilityState(attrs.accessibilityState),
@@ -275,12 +265,10 @@ export const Pressable = defineComponent(
         viewProps.android_disableSound = attrs.android_disableSound;
       Object.assign(viewProps, buildPressableListeners(handlers, { disabled, cancelable }));
 
-      // Children come from the (scoped) default slot, receiving the press state so a render-prop
-      // child (`v-slot="{ pressed }"`) mirrors React's children-as-function.
       const content: VNode[] | VNode = slots.default !== undefined ? slots.default(state) : [];
 
       // android_ripple rides a dedicated inner View; on iOS the prop is undefined, so the child
-      // renders unwrapped, no extra node. Mirrors the React Pressable + touchable-native-feedback.
+      // renders unwrapped, no extra node.
       const ripple = isRecord(attrs.android_ripple)
         ? rippleProps(asRippleConfig(attrs.android_ripple) ?? {})
         : undefined;

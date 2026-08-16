@@ -1,6 +1,6 @@
 ---
 title: TextInput example
-description: Controlled text input in React, Vue, and Angular.
+description: Controlled text input in React, Vue, Angular, and Svelte.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
@@ -93,16 +93,37 @@ controlled write handshake is shared; the public event name is framework-shaped.
     `EventEmitter` only carries one value, so `(valueChange)` stays text-only to
     keep `[(value)]` working, and `(change)` exists purely for the raw event.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text, TextInput, View } from '@symbiote-native/svelte';
+
+      let name = $state('Symbiote');
+    </script>
+
+    <View class="root"><TextInput value={name} onValueChange={next => (name = next)} class="input" /><Text>Hello, {name}</Text></View>
+
+    <style>
+      .root { gap: 12px; }
+      .input { min-width: 220px; padding: 12px; border-width: 1px; }
+    </style>
+    ```
+
+    Svelte's own element `bind:value` is explicitly unsupported by this
+    adapter's DOM shim — there is no sugar over `value`/`onValueChange` here,
+    same as React. `onValueChange`'s second argument is the raw native event,
+    same controlled-write contract every other adapter shares underneath.
+  </TabItem>
 </Tabs>
 
 ## API takeaway
 
-| Concern           | React                          | Vue                                          | Angular                                    |
-| ------------------ | ------------------------------- | ----------------------------------------------- | ----------------------------------------------- |
-| Text prop          | `value`                         | `:value`<br />or `v-model`                       | `[value]`<br />or `[(value)]`                    |
-| Text change        | `onValueChange(text, event)`    | `@value-change`<br />or `v-model`                | `(valueChange)="handler($event)"` (text only)    |
-| Native event       | *(same callback, 2nd arg)*      | *(same emit, 2nd arg)*                           | `(change)="handler($event)"` (separate output)   |
-| Imperative handle  | React `ref`                     | Vue template ref / exposed handle                | `@ViewChild(TextInput)` (the component IS the handle) |
+| Concern           | React                          | Vue                                          | Angular                                    | Svelte                                |
+| ------------------ | ------------------------------- | ----------------------------------------------- | ----------------------------------------------- | ---------------------------------------- |
+| Text prop          | `value`                         | `:value`<br />or `v-model`                       | `[value]`<br />or `[(value)]`                    | `value`                                  |
+| Text change        | `onValueChange(text, event)`    | `@value-change`<br />or `v-model`                | `(valueChange)="handler($event)"` (text only)    | `onValueChange={(text, event) => …}`     |
+| Native event       | *(same callback, 2nd arg)*      | *(same emit, 2nd arg)*                           | `(change)="handler($event)"` (separate output)   | *(same callback, 2nd arg)*               |
+| Imperative handle  | React `ref`                     | Vue template ref / exposed handle                | `@ViewChild(TextInput)` (the component IS the handle) | `bind:this` (a `ShimElement`) via `hostInstance()` |
 
 `StyleSheet.create` works identically to a CSS class if you'd rather keep
 style objects inline — see the [Styling guide](/docs/learn/styling/).

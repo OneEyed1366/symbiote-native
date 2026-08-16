@@ -36,6 +36,8 @@ afterEach(() => {
 });
 
 describe('TextInput anchor class= resolution', () => {
+  // why: buildPassthrough merges anchorHostStyle(this.elementRef) so a class= at the use site
+  // reaches the real single-line native host, not TextInput's own non-painting anchor.
   it('resolves a class= on the TextInput use site onto the real committed single-line host', async () => {
     mount(ROOT_TAG, TextInputClassHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -44,6 +46,8 @@ describe('TextInput anchor class= resolution', () => {
     expect(node?.props.backgroundColor).toBe('red');
   });
 
+  // why: `@if`/`@else` picks the single-line vs multiline host at RUNTIME — the anchor merge must
+  // hold for whichever branch actually committed, not just the single-line default.
   it('resolves a class= on the TextInput use site onto the real committed multiline host', async () => {
     mount(ROOT_TAG, TextInputClassHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));

@@ -60,6 +60,15 @@ framework-agnostic core plus a thin entry per adapter:
     export class VolumeControl {}
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Slider } from '@symbiote-native/slider/svelte';
+    </script>
+
+    <Slider value={0.5} onValueChange={next => (value = next)} />
+    ```
+  </TabItem>
 </Tabs>
 
 The consuming app installs only `@symbiote-native/slider` — the wrapper package

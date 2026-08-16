@@ -24,8 +24,8 @@ export enum DeviceMotionOrientation {
 
 export class DeviceMotionSensor extends DeviceSensor<IDeviceMotionMeasurement> {
   // Standard gravitational acceleration for Earth (m/s^2), read off the native module rather
-  // than hardcoded — mirrors upstream's dual exposure as both an instance property and the
-  // standalone `gravity` export below.
+  // than hardcoded — mirrors upstream's dual exposure as an instance property and this
+  // standalone export.
   readonly gravity: number = exponentDeviceMotion.Gravity;
 }
 
@@ -36,6 +36,5 @@ export const DeviceMotion = new DeviceMotionSensor(
   DEVICE_MOTION_DID_UPDATE_EVENT_NAME,
 );
 
-// Standalone export mirroring the instance property above, for callers that only need the
-// constant and not the full sensor singleton.
+// Same value as `DeviceMotion.gravity`, for callers that only need the constant.
 export const gravity: number = exponentDeviceMotion.Gravity;

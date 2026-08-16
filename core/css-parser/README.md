@@ -45,17 +45,22 @@ app writes no transformer file of its own — point `babelTransformerPath` strai
 From there, a plain stylesheet import just works, from any adapter's own source file:
 
 ```ts
-import styles from './Card.module.css';   // CSS Modules — default export is a name→scopedName map
-import './theme.css';                     // plain CSS — registers classes globally, no export
+import styles from './Card.module.css'; // CSS Modules — default export is a name→scopedName map
+import './theme.css'; // plain CSS — registers classes globally, no export
 ```
 
 ```tsx
-<View className="card" style={styles.highlight} />   // React
+<View className="card" style={styles.highlight} /> // React
 ```
+
 ```html
 <!-- Vue SFC -->
 <view :class="['card', { active: isActive }]" />
-<style scoped>.card { padding: 10px; }</style>
+<style scoped>
+  .card {
+    padding: 10px;
+  }
+</style>
 ```
 
 ## The pipeline
@@ -76,12 +81,24 @@ mechanism below runs identically regardless of source language.
 
 ```ts
 import {
-  parseCSS, extractClassName, kebabToCamel,       // core compiler
-  compileCssFile, isCssModuleFile,                 // standalone .css/.module.css files
-  createCssMetroTransformer,                       // Metro babelTransformerPath factory
-  compileScss, compileSass, compileLess, compileStylus, compile, detectLanguage, isStyleFile,
-  classNamesToDtsSource, generateModuleDts,        // .d.ts generation for CSS Modules typing
-  globalClassNamesIn, hashFilePath,
+  parseCSS,
+  extractClassName,
+  kebabToCamel, // core compiler
+  compileCssFile,
+  isCssModuleFile, // standalone .css/.module.css files
+  createCssMetroTransformer, // Metro babelTransformerPath factory
+  compileScss,
+  compileSass,
+  compileLess,
+  compileStylus,
+  compile,
+  detectLanguage,
+  isStyleFile,
+  classNamesToDtsSource,
+  generateModuleDts, // .d.ts generation for CSS Modules typing
+  globalClassNamesIn,
+  globalClassTokensIn,
+  hashFilePath,
 } from '@symbiote-native/css-parser';
 ```
 
@@ -95,6 +112,13 @@ import {
   `.css` file registers globally via a side-effect import.
 - **`createCssMetroTransformer`** — wraps an upstream RN Babel transformer, detecting a stylesheet
   extension and compiling it before delegating everything else unchanged.
+- **`globalClassNamesIn` / `globalClassTokensIn`** — the two halves of `:global()`, and they answer
+  different questions. The first returns registered KEYS whose selector was global in full, so the
+  key itself skips scoping. The second returns MARKUP TOKENS that came out of a `:global(...)`
+  payload wherever it sat, including inside an otherwise-scoped selector — `.card :global(.reset)`
+  yields the key `cardReset` from neither, and the token `reset` from the second. A caller that
+  suffixes class names needs both: exempting only by key leaves a partial global's token
+  scope-mangled, exempting only by token leaves a fully global compound's rule dead.
 - **Preprocessors** — `sass`/`less`/`stylus` are lazy, **optional** `devDependencies`: a project
   that never authors `.scss`/`.less`/`.styl` never installs any of the three.
 - **CSS Modules type safety** — `css-dts` (bin) walks a directory and writes a real `<file>.d.ts`

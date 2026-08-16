@@ -77,6 +77,13 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
 
     setElementText(el, text) {
       if (isSurface(el)) return;
+      // Same invariant insert() enforces, on the other route text can reach a node: Vue calls
+      // this instead of insert() when an element's children collapse to a single string, so
+      // without the check a raw text lands under a non-Text parent - an invalid Fabric tree
+      // built silently, which is worse than the throw insert() would have given.
+      if (!el.isText) {
+        throw new Error(`Text string "${text}" must be rendered inside a <Text>`);
+      }
       // An RCTText carries its string as a single raw-text child. Reuse a lone existing
       // one to avoid churn; otherwise replace all children with a fresh raw-text node.
       const [first] = el.children;
@@ -127,12 +134,10 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
 
     patchProp(el, key, _prev, next) {
       if (isSurface(el)) return;
-      // routeProp makes the prop-vs-event decision from the node's ViewConfig (onPress on
-      // a View becomes a listener; onTintColor on a Switch stays a prop): identical to
-      // the React host config, so the whole event layer is shared. `class`/`style` merge
-      // (explicit :style always winning over class-derived style, regardless of which of
-      // Vue's two independent patchProp calls lands last) is centralized in routeProp too
-      // (core/engine/src/node.ts) — every adapter gets it, not just this one.
+      // routeProp makes the prop-vs-event decision from the node's ViewConfig (onPress on a
+      // View becomes a listener; onTintColor on a Switch stays a prop), shared with React. The
+      // class/style merge (explicit :style always winning, regardless of which of Vue's two
+      // independent patchProp calls lands last) is centralized there too (core/engine/src/node.ts).
       routeProp(el, key, next);
       surface.requestCommit();
     },

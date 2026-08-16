@@ -5,7 +5,7 @@
 // listener. Only the window metrics changing triggers a re-render.
 
 import { useEffect, useState } from 'react';
-import { Dimensions, type IDimensionsSet, type IDisplayMetrics } from '../modules/dimensions';
+import { Dimensions, type IDimensionsSet, type IDisplayMetrics } from '@symbiote-native/engine';
 
 export function useWindowDimensions(): IDisplayMetrics {
   const [dimensions, setDimensions] = useState<IDisplayMetrics>(() => Dimensions.get('window'));

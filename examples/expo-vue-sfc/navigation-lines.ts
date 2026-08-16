@@ -3,9 +3,8 @@ import type { IRouteName } from './routes';
 
 // The Expo-package demo suite groups its tour screens into thematic "lines" — which package each
 // screen exercises — carried through MenuScreen's row badges and each demo screen's own line tag.
-// One color per line replaces the single flat accent every row/button used to share. Kept in sync
-// by hand with App.css's `:root` `--line-*` tokens — CSS custom properties and this module are
-// different runtimes with no shared import path.
+// Kept in sync by hand with App.css's `:root` `--line-*` tokens — CSS custom properties and this
+// module are different runtimes with no shared import path.
 export const NAV_LINE = {
   Sensors: 'sensors',
   LocalAuth: 'local-auth',
@@ -34,52 +33,50 @@ export const NAV_LINE = {
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
 
 export const LINE_COLOR: Record<INavLine, string> = {
-  // Amber — @symbiote-native/sensors' own tour stop (Accelerometer/Gyroscope/Magnetometer/
-  // DeviceMotion/Pedometer over expo-modules-core), distinct from every line color above.
+  // Amber — Accelerometer/Gyroscope/Magnetometer/DeviceMotion/Pedometer over expo-modules-core.
   [NAV_LINE.Sensors]: '#f6ad55',
-  // Red — @symbiote-native/local-auth's own tour stop, distinct from every color above.
+  // Red — @symbiote-native/local-auth.
   [NAV_LINE.LocalAuth]: '#ef4444',
-  // Violet — @symbiote-native/haptics' own tour stop, shared across all 4 expo-* apps.
+  // Violet — @symbiote-native/haptics.
   [NAV_LINE.Haptics]: '#8b5cf6',
-  // Teal — @symbiote-native/clipboard's own tour stop, shared across all 4 expo-* apps.
+  // Teal — @symbiote-native/clipboard.
   [NAV_LINE.Clipboard]: '#14b8a6',
-  // Green — @symbiote-native/battery's own tour stop, shared across all 4 expo-* apps.
+  // Green — @symbiote-native/battery.
   [NAV_LINE.Battery]: '#22c55e',
-  // Gold — @symbiote-native/brightness's own tour stop, shared across all 4 expo-* apps.
+  // Gold — @symbiote-native/brightness.
   [NAV_LINE.Brightness]: '#facc15',
-  // Blue — @symbiote-native/cellular's own tour stop, shared across all 4 expo-* apps.
+  // Blue — @symbiote-native/cellular.
   [NAV_LINE.Cellular]: '#3b82f6',
-  // Cyan — @symbiote-native/network's own tour stop, shared across all 4 expo-* apps.
+  // Cyan — @symbiote-native/network.
   [NAV_LINE.Network]: '#06b6d4',
-  // Slate — @symbiote-native/device's own tour stop, shared across all 4 expo-* apps.
+  // Slate — @symbiote-native/device.
   [NAV_LINE.Device]: '#64748b',
-  // Pink — @symbiote-native/application's own tour stop, shared across all 4 expo-* apps.
+  // Pink — @symbiote-native/application.
   [NAV_LINE.Application]: '#ec4899',
-  // Indigo — @symbiote-native/crypto's own tour stop, shared across all 4 expo-* apps.
+  // Indigo — @symbiote-native/crypto.
   [NAV_LINE.Crypto]: '#6366f1',
-  // Orange — @symbiote-native/standard-web-crypto's own tour stop, distinct from every color above.
+  // Orange — @symbiote-native/standard-web-crypto.
   [NAV_LINE.StandardWebCrypto]: '#f97316',
-  // Purple — @symbiote-native/system-ui's own tour stop, distinct from every color above.
+  // Purple — @symbiote-native/system-ui.
   [NAV_LINE.SystemUi]: '#a855f7',
-  // Lime — @symbiote-native/store-review's own tour stop, distinct from every color above.
+  // Lime — @symbiote-native/store-review.
   [NAV_LINE.StoreReview]: '#84cc16',
-  // Sky — @symbiote-native/keep-awake's own tour stop, distinct from every color above.
+  // Sky — @symbiote-native/keep-awake.
   [NAV_LINE.KeepAwake]: '#0ea5e9',
-  // Rose — @symbiote-native/screen-orientation's own tour stop, distinct from every color above.
+  // Rose — @symbiote-native/screen-orientation.
   [NAV_LINE.ScreenOrientation]: '#f43f5e',
-  // Emerald — @symbiote-native/localization's own tour stop, distinct from every color above.
+  // Emerald — @symbiote-native/localization.
   [NAV_LINE.Localization]: '#10b981',
-  // Stone — @symbiote-native/tracking-transparency's own tour stop, distinct from every color above.
+  // Stone — @symbiote-native/tracking-transparency.
   [NAV_LINE.TrackingTransparency]: '#78716c',
   // Bronze — @symbiote-native/secure-store. Reads as a vault next to LocalAuth's crimson,
   // and stays clear of Brightness' gold and StandardWebCrypto's orange.
   [NAV_LINE.SecureStore]: '#a16207',
-  // Fuchsia — @symbiote-native/sharing's own tour stop, distinct from every color above.
+  // Fuchsia — @symbiote-native/sharing.
   [NAV_LINE.Sharing]: '#d946ef',
-  // Deep blue — @symbiote-native/web-browser's own tour stop, darker than Cellular's blue so the
-  // two read apart on a menu row.
+  // Deep blue — @symbiote-native/web-browser, darker than Cellular's blue so the two read apart.
   [NAV_LINE.WebBrowser]: '#0369a1',
-  // Olive — @symbiote-native/sms's own tour stop, deeper than StoreReview's lime.
+  // Olive — @symbiote-native/sms, deeper than StoreReview's lime.
   [NAV_LINE.Sms]: '#65a30d',
 };
 

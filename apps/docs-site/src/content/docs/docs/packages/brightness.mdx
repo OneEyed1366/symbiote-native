@@ -23,6 +23,7 @@ brightness is an Android-only system-brightness-mode surface and an iOS-only cha
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 <Aside type="caution" title="getBrightnessAsync/setBrightnessAsync never round-trip on the iOS Simulator">
   `UIScreen.main.brightness` is a long-standing Apple Simulator limitation, reproducible in any app
@@ -163,6 +164,30 @@ only changes in response to your own `setBrightnessAsync` calls.
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text, View } from '@symbiote-native/svelte';
+      import { addBrightnessListener, getBrightnessAsync, setBrightnessAsync } from '@symbiote-native/brightness';
+      import type { EventSubscription } from '@symbiote-native/brightness';
+
+      let brightness = $state<number | null>(null);
+
+      $effect(() => {
+        getBrightnessAsync().then(value => (brightness = value));
+        const subscription: EventSubscription = addBrightnessListener(event => (brightness = event.brightness));
+        return () => subscription.remove();
+      });
+    </script>
+
+    <View>
+      <Text>{brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`}</Text>
+      <Pressable onPress={() => setBrightnessAsync(0.5)}>
+        <Text>Set to 50%</Text>
+      </Pressable>
+    </View>
+    ```
+  </TabItem>
 </Tabs>
 
 ### Permission
@@ -174,13 +199,13 @@ only changes in response to your own `setBrightnessAsync` calls.
     import { usePermissions } from '@symbiote-native/brightness/react';
 
     export default function BrightnessPermission() {
-      const [status, request] = usePermissions();
+      const [status, request, get, error] = usePermissions();
 
       return (
         <>
-          <Text>{status?.status ?? 'checking…'}</Text>
-          <Pressable onPress={() => request()}>
-            <Text>Request permission</Text>
+          <Text>{error ? `check failed: ${error.message}` : (status?.status ?? 'checking…')}</Text>
+          <Pressable onPress={() => (error ? get() : request())}>
+            <Text>{error ? 'Retry check' : 'Request permission'}</Text>
           </Pressable>
         </>
       );
@@ -192,13 +217,13 @@ only changes in response to your own `setBrightnessAsync` calls.
     <script setup lang="ts">
     import { usePermissions } from '@symbiote-native/brightness/vue';
 
-    const { status, request } = usePermissions();
+    const { status, error, request, get } = usePermissions();
     </script>
 
     <template>
-      <Text>{{ status?.status ?? 'checking…' }}</Text>
-      <Pressable @press="request">
-        <Text>Request permission</Text>
+      <Text>{{ error ? `check failed: ${error.message}` : (status?.status ?? 'checking…') }}</Text>
+      <Pressable @press="error ? get() : request()">
+        <Text>{{ error ? 'Retry check' : 'Request permission' }}</Text>
       </Pressable>
     </template>
     ```
@@ -213,19 +238,42 @@ only changes in response to your own `setBrightnessAsync` calls.
       standalone: true,
       imports: [Pressable, Text],
       template: `
-        <Text>{{ status()?.status ?? 'checking…' }}</Text>
-        <Pressable (press)="permissions.request()">
-          <Text>Request permission</Text>
+        <Text>{{ error() ? 'check failed: ' + error()?.message : (status()?.status ?? 'checking…') }}</Text>
+        <Pressable (press)="error() ? permissions.get() : permissions.request()">
+          <Text>{{ error() ? 'Retry check' : 'Request permission' }}</Text>
         </Pressable>
       `,
     })
     export class BrightnessPermission {
       readonly permissions = inject(PermissionsService);
       readonly status = this.permissions.connect();
+      readonly error = this.permissions.error;
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text } from '@symbiote-native/svelte';
+      import { usePermissions } from '@symbiote-native/brightness/svelte';
+
+      const permissions = usePermissions();
+    </script>
+
+    <Text>
+      {permissions.error
+        ? `check failed: ${permissions.error.message}`
+        : (permissions.status?.status ?? 'checking…')}
+    </Text>
+    <Pressable onPress={() => (permissions.error ? permissions.get() : permissions.request())}>
+      <Text>{permissions.error ? 'Retry check' : 'Request permission'}</Text>
+    </Pressable>
+    ```
+  </TabItem>
 </Tabs>
+
+`status` stays `null` both while the first fetch is in flight and after it fails, so `error` is what
+tells those two apart; `get()` re-runs the check without prompting the user.
 
 ## API
 
@@ -248,12 +296,37 @@ only changes in response to your own `setBrightnessAsync` calls.
 
 ### `usePermissions()`
 
-| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Signature | Returns |
-| --- | --- | --- | --- | --- |
-| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `()` | React: `[PermissionResponse \| null, request, get]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `request()`/`get()` as separate service methods |
+| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Svelte (`/svelte`) | Signature | Returns |
+| --- | --- | --- | --- | --- | --- |
+| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions` | `()` | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null` |
+
+### `usePermissions()` return value
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `status` | `PermissionResponse \| null` | The permission status last read, `null` until the first fetch resolves |
+| `error` | `Error \| null` | Why the automatic fetch left `status` at `null`. Cleared by the next successful `get()`/`request()` |
+| `request` | `() => Promise<PermissionResponse>` | Asks the user for the permission, then updates `status` and clears `error`. Rejects to its caller when the native call fails |
+| `get` | `() => Promise<PermissionResponse>` | Re-reads the current status without prompting. Same update and rejection behavior as `request` |
+
+React hands those back positionally, as `[status, request, get, error]`, so existing two- and
+three-element destructuring keeps working. Vue wraps `status` and `error` in refs; Angular exposes
+`status` through `connect()` and `error` as a separate readonly signal on the service; Svelte
+returns both as getters, read as `permissions.status` / `permissions.error`.
+
+Read together, the two fields separate the three states:
+
+| `status` | `error` | Meaning |
+| --- | --- | --- |
+| `null` | `null` | Not fetched yet |
+| `null` | `Error` | The automatic fetch failed |
+| `PermissionResponse` | `null` | Fetched |
 
 Every variant auto-fetches the current permission status once on mount/`connect()`, and updates
-again whenever `request`/`get` resolves.
+again whenever `request`/`get` resolves. A failure in that automatic fetch lands in `error` instead
+of escaping as an unhandled rejection; `get()`/`request()` called by hand still reject to their
+caller. Angular's auto-fetch is latched to at most one run per service instance, so a later
+`connect()` never re-fetches: call `get()` to retry.
 
 ### `BrightnessMode`
 
@@ -307,12 +380,13 @@ packages/brightness/src/
 │                                 expo-modules-core's requireNativeModule
 ├── react/hooks/use-permissions   @symbiote-native/brightness/react
 ├── vue/composables/use-permissions @symbiote-native/brightness/vue
+├── svelte/runes/use-permissions  @symbiote-native/brightness/svelte
 └── angular/services/permissions.service @symbiote-native/brightness/angular
 ```
 
 `usePermissions` is the only stateful surface — auto-fetch on mount, expose `get`/`request` as
 imperative callbacks — written once as a shared pattern and reapplied identically in
 [cellular](/docs/packages/cellular/#usepermissions); every other export is a stateless free
-function, re-exported verbatim by all three adapters. The native code itself is never vendored or
+function, re-exported verbatim by all four adapters. The native code itself is never vendored or
 copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native
 setup guide](/docs/howtos/expo-native-module-setup/)).

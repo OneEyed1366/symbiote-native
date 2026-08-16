@@ -24,13 +24,11 @@
   --chalk: #cbd5e1;
   --chalk-bright: #ffffff;
 
-  /* wayfinding line system — the @symbiote-native/navigation demo suite's signature. Its 9 tour
-     screens (MenuScreen's rows) group into 5 thematic "lines" (which part of the package each one
-     exercises), each carrying its own color through a 2-letter badge, a matching hint tint, and
-     (where a screen's own native header/tab bar takes a tint) the OS chrome itself — replacing the
-     single flat accent every row/button used to share. Kept in sync by hand with
-     navigation-lines.ts's LINE_COLOR (CSS custom properties and that module are different
-     runtimes with no shared import path). */
+  /* wayfinding line system — MenuScreen's tour groups into thematic "lines", each carrying its own
+     color through a 2-letter badge, a matching hint tint, and (where a screen's own native
+     header/tab bar takes a tint) the OS chrome itself — which part of @symbiote-native/navigation
+     a screen exercises. Kept in sync by hand with navigation-lines.ts's LINE_COLOR (CSS custom
+     properties and that module are different runtimes with no shared import path). */
   --line-primitives: #dd0031;
   --line-presentation: #5ec8f2;
   --line-structure: #4fd1a5;
@@ -38,16 +36,26 @@
   --line-routing: #f2789a;
 }
 
-/* shared / common. .section is always the outermost content wrapper directly inside a demo
-   screen's SafeAreaView (never a nested inner group — CanaryScreen's own inner groups use
-   .section-tight instead), so its padding matches CanaryScreen's own root .scroll-content
-   edge padding (24px) without double-padding anything nested. */
+/* shared / common. .section is the outermost content wrapper directly inside a demo screen's
+   SafeAreaView (e.g. DetailsScreen, HooksDemoScreen) — a screen with no ScrollView padding of
+   its own, so .section's own 24px is the sole edge inset. CanaryScreen is different: its
+   ScrollView already carries that same 24px via .scroll-content, so anything nested INSIDE it
+   uses .section-tight (no padding, just the tighter 8px gap) or .section-nested (same 24px
+   top/bottom rhythm + 12px gap as .section, but no left/right — the horizontal inset already
+   comes from .scroll-content) instead of plain .section, which would double it to 48px. */
 .section {
   gap: 12px;
   padding: 24px;
 }
 .section-tight {
   gap: 8px;
+}
+/* CanaryScreen's own extracted demo components (AnimatedDemo, NativeModulesDemo, …) — see the
+   .section comment above for why this exists instead of reusing .section unmodified. */
+.section-nested {
+  gap: 12px;
+  padding-top: 24px;
+  padding-bottom: 24px;
 }
 .row {
   flex-direction: row;

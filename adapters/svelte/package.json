@@ -1,0 +1,98 @@
+{
+  "name": "@symbiote-native/svelte",
+  "version": "0.2.0",
+  "description": "SymbioteNative's Svelte adapter — a DOM shim over stock compiled Svelte output driving real native iOS/Android views through the same engine as every other adapter.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
+    "directory": "adapters/svelte"
+  },
+  "homepage": "https://github.com/OneEyed1366/symbiote-native/tree/master/adapters/svelte#readme",
+  "bugs": {
+    "url": "https://github.com/OneEyed1366/symbiote-native/issues"
+  },
+  "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "type": "module",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./bootstrap": "./src/bootstrap.ts",
+    "./native-view-bridge": "./src/native-view-bridge.ts",
+    "./preprocessor": "./src/preprocessor/forbid-web-only-constructs.ts",
+    "./scoped-styles": "./src/preprocessor/scoped-styles.ts",
+    "./style-scope": "./src/style-scope.ts",
+    "./scope-token": "./src/scope-token.ts",
+    "./metro-svelte-transformer": "./metro-svelte-transformer.cjs",
+    "./metro-css-parser": "./metro-css-parser.cjs"
+  },
+  "files": [
+    "build",
+    "metro-svelte-transformer.cjs",
+    "metro-css-parser.cjs"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./build/index.js",
+    "module": "./build/index.js",
+    "types": "./build/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      },
+      "./bootstrap": {
+        "types": "./build/bootstrap.d.ts",
+        "default": "./build/bootstrap.js"
+      },
+      "./native-view-bridge": {
+        "types": "./build/native-view-bridge.d.ts",
+        "default": "./build/native-view-bridge.js"
+      },
+      "./preprocessor": {
+        "types": "./build/preprocessor/forbid-web-only-constructs.d.ts",
+        "default": "./build/preprocessor/forbid-web-only-constructs.js"
+      },
+      "./scoped-styles": {
+        "types": "./build/preprocessor/scoped-styles.d.ts",
+        "default": "./build/preprocessor/scoped-styles.js"
+      },
+      "./style-scope": {
+        "types": "./build/style-scope.d.ts",
+        "default": "./build/style-scope.js"
+      },
+      "./scope-token": {
+        "types": "./build/scope-token.d.ts",
+        "default": "./build/scope-token.js"
+      },
+      "./metro-svelte-transformer": "./metro-svelte-transformer.cjs",
+      "./metro-css-parser": "./metro-css-parser.cjs"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --build",
+    "format": "prettier --write \"src/**/*.{ts,svelte}\"",
+    "prepack": "pnpm run typecheck && cd ../.. && node scripts/copy-svelte-sources.mjs && node scripts/emit-svelte-declarations.mjs"
+  },
+  "dependencies": {
+    "@symbiote-native/components": "workspace:*",
+    "@symbiote-native/css-parser": "workspace:*",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "@symbiote-native/engine": ">=0.1.7",
+    "svelte": ">=5.56.0",
+    "react-native": ">=0.86"
+  },
+  "devDependencies": {
+    "@symbiote-native/engine": "workspace:*",
+    "@symbiote-native/react": "workspace:*",
+    "@symbiote-native/test-utils": "workspace:*",
+    "@symbiote-native/vue": "workspace:*",
+    "@vue/runtime-core": "catalog:",
+    "react": "catalog:",
+    "svelte": "catalog:"
+  }
+}
