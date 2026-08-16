@@ -138,8 +138,14 @@ function findScrollView(): IFakeNode {
   return node!;
 }
 
-describe('React FlatList inverted + waitForInteraction on the engine', () => {
+// No Negative group: `inverted` and `viewabilityConfig.waitForInteraction` are plain flags
+// with no invalid value to reject — the contract under test is a transform/gating placement
+// rule, not a validation boundary.
+describe('React FlatList inverted + waitForInteraction on the engine (Positive)', () => {
   it('flips the scroll node and each cell, NOT the content container', () => {
+    // why: `inverted` must flip exactly the scroll node and each cell (a counter-flip so cell
+    // content still reads upright); flipping the content container too would cancel the scroll
+    // node's flip and render every cell upside-down — a real regression this test pins.
     mount(ROOT_TAG, <InvertedApp />);
 
     // Establish the viewport so cells actually commit.
@@ -164,6 +170,9 @@ describe('React FlatList inverted + waitForInteraction on the engine', () => {
   });
 
   it('suppresses viewable items until the first scroll', () => {
+    // why: `waitForInteraction: true` must gate viewability reports on a real user scroll, not
+    // on the layout event that merely establishes the viewport — else a list that never asked
+    // to be measured yet reports items as "viewed".
     mount(ROOT_TAG, <GatedApp />);
 
     const gatedScroll = findScrollView();

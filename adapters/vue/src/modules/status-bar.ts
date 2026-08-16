@@ -1,14 +1,11 @@
 // StatusBar, the Vue lifecycle half. The native StatusBarManager driving (applyStatusBarProps),
-// the imperative statics (statusBarImperative), and the Android bar-height constant all live in
-// @symbiote-native/engine, shared verbatim with React; Metro selects the engine's status-bar.ios.ts /
-// status-bar.android.ts per host, so the platform divergence never reaches this file. Vue supplies
-// only the declarative shape: a component that renders NOTHING and re-applies the props through a
-// watchEffect on mount + every prop change, with the imperative statics attached to the component
-// object (RN's StatusBar: the value doubles as the imperative namespace, like the Vue Image).
+// the imperative statics, and the Android bar-height constant all live in @symbiote-native/engine,
+// shared verbatim with React; Metro selects the engine's status-bar.ios.ts/.android.ts per host,
+// so platform divergence never reaches this file. Vue supplies only the declarative shape: a
+// component that renders NOTHING and re-applies the props through a watchEffect on mount + every
+// prop change, with the imperative statics attached to the component object.
 //
-// Renders null (no Fabric view), so it follows neither the descriptor split nor a host-node ref:
-// the "else keep its current shape" path of the StatusBar component. Inputs arrive as attrs
-// (untyped) and run through normalizeVueAttrs (kebab→camel) before each is narrowed by a guard.
+// Inputs arrive as attrs (untyped) and run through normalizeVueAttrs before each is narrowed by a guard.
 
 import { defineComponent, watchEffect, type SetupContext } from '@vue/runtime-core';
 import {
@@ -33,8 +30,6 @@ function asBarStyle(value: unknown): IStatusBarStyle | undefined {
     : undefined;
 }
 
-// backgroundColor is a string / int / opaque PlatformColor; any other shape is dropped. A runtime
-// guard at the untyped-attrs boundary, not a cast.
 function asColorValue(value: unknown): IColorValue | undefined {
   if (typeof value === 'string') return value;
   if (isOpaqueColorValue(value)) return value;
@@ -56,13 +51,11 @@ const StatusBarComponent = defineComponent({
   name: 'StatusBar',
   inheritAttrs: false,
   setup(_props, { attrs: rawAttrs }: SetupContext) {
-    // watchEffect tracks rawAttrs (reactive), so reading it here re-applies on every prop change:
-    // the Vue twin of React's useEffect over the prop deps. Resolution is lazy inside the engine
-    // (a missing StatusBarManager is a no-op), so this never crashes a render.
+    // watchEffect tracks rawAttrs (reactive), so reading it here re-applies on every prop change.
+    // Resolution is lazy inside the engine (a missing StatusBarManager is a no-op).
     watchEffect(() => {
       applyStatusBarProps(buildProps(normalizeVueAttrs(rawAttrs)));
     });
-    // Renders nothing: StatusBar has no Fabric view, exactly like React's `return null`.
     return () => null;
   },
 });

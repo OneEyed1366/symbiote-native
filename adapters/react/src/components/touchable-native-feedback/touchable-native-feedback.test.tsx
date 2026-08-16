@@ -3,6 +3,18 @@
 // the underlying Pressable's committed node, that a press round-trips through that
 // Pressable, and that a missing background defaults to SelectableBackground. Android-only
 // feature; on iOS the native prop is inert but still committed (exactly what we assert).
+//
+// SCOPE: `backgroundProps`/`canUseNativeForeground`/the static factories (core/components'
+// render-touchable-native-feedback.ts) have no unit test anywhere else in the repo — this
+// integration test is their only coverage, not merely adapter-wiring proof. No Negative group:
+// nothing here throws; a missing/invalid background just falls back to a default dict.
+//
+// KNOWN GAP (characterization, not fixed): `canUseNativeForeground()` reads Platform.OS, which
+// headless vitest resolves to 'ios' (core/engine/src/platform/index.ts has no Metro to pick
+// .android — see that file's comment). So `useForeground` can NEVER reach its `true` branch
+// (nativeForegroundAndroid) in this suite; only the always-false-here fallback is reachable.
+// The `useForeground` test below is intentionally a characterization of the FALLBACK branch, not
+// a proof that the real Android/API23 foreground path works — that needs a real Android/detox run.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { View, TouchableNativeFeedback, mount, unmount } from '@symbiote-native/react';
@@ -39,6 +51,9 @@ function feedbackProps(): Record<string, unknown> {
 }
 
 describe('React TouchableNativeFeedback', () => {
+  // why: callers reach these as `TouchableNativeFeedback.Ripple(...)` etc. (RN's own static-
+  // method surface) to build the exact dict shape Android's native ripple manager expects —
+  // wrong keys/values here mean a silently broken ripple on device, nothing throws to catch it.
   it('builds the right config dicts from the static factories', () => {
     const sel = TouchableNativeFeedback.SelectableBackground();
     expect(sel.type).toBe('ThemeAttrAndroid');
@@ -55,6 +70,9 @@ describe('React TouchableNativeFeedback', () => {
     expect(ripple.borderless).toBe(true);
   });
 
+  // why: the resolved background must actually reach the real committed native node under the
+  // key Android's ReactViewManager reads (nativeBackgroundAndroid) — a config dict that never
+  // lands on a real prop would build correctly and still do nothing on device.
   it('lands the ripple background on the committed node as nativeBackgroundAndroid', () => {
     mount(
       ROOT_TAG,
@@ -69,6 +87,9 @@ describe('React TouchableNativeFeedback', () => {
     expect(props.nativeForegroundAndroid).toBeUndefined();
   });
 
+  // why: TouchableNativeFeedback is built on Pressable for its press wiring (the ripple View is
+  // purely decorative) — this proves the press synthesis path still works end-to-end through the
+  // extra feedback View nesting, not just that the ripple prop exists.
   it('fires onPress through the underlying Pressable', () => {
     let presses = 0;
     mount(
@@ -87,6 +108,8 @@ describe('React TouchableNativeFeedback', () => {
     expect(presses).toBe(1);
   });
 
+  // why: RN never leaves a TouchableNativeFeedback with zero feedback — an unset `background`
+  // must fall back to SelectableBackground() so the control always visibly reacts to touch.
   it('defaults a missing background to SelectableBackground', () => {
     mount(
       ROOT_TAG,
@@ -96,5 +119,30 @@ describe('React TouchableNativeFeedback', () => {
     );
     const bg = feedbackProps().nativeBackgroundAndroid;
     expect(isRecord(bg) && bg.attribute === 'selectableItemBackground').toBe(true);
+  });
+
+  // characterization [Platform.OS resolves to 'ios' headless — see file header]: useForeground
+  // requests the foreground ripple slot, but on a platform where canUseNativeForeground() is
+  // false it must fall back to the background slot rather than dropping the ripple entirely.
+  // QUESTION: this only proves the fallback; the real Android/API23 foreground branch
+  // (nativeForegroundAndroid actually being used) has no automated coverage anywhere in the repo.
+  it('characterization: useForeground falls back to nativeBackgroundAndroid on this host', () => {
+    mount(
+      ROOT_TAG,
+      <TouchableNativeFeedback useForeground background={TouchableNativeFeedback.Ripple('#0f0', false)}>
+        <View />
+      </TouchableNativeFeedback>,
+    );
+    const props = feedbackProps();
+    expect(props.nativeForegroundAndroid).toBeUndefined();
+    const bg = props.nativeBackgroundAndroid;
+    expect(isRecord(bg) && bg.type === 'RippleAndroid' && bg.color === '#0f0').toBe(true);
+  });
+
+  // why: canUseNativeForeground() is exposed as a static so callers can branch their own UI on
+  // it (RN does the same) — proves it is reachable as a real boolean, and matches the platform
+  // gate this host resolves to (false, since Platform.OS is 'ios' headless).
+  it('exposes canUseNativeForeground() reflecting this host\'s platform gate', () => {
+    expect(TouchableNativeFeedback.canUseNativeForeground()).toBe(false);
   });
 });

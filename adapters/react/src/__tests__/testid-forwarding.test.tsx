@@ -3,6 +3,12 @@
 // never forwarding) is invisible to e2e. This is the cross-component guard: render each component
 // with a unique testID and assert some committed Fabric node carries it. A wrapping component
 // (Button -> TouchableOpacity -> Pressable -> View) passes as long as the id lands on its root.
+//
+// `cases` is the closure: it must list every public visual component exported from
+// adapters/react/src/index.ts. TouchableNativeFeedback / VirtualizedSectionList / RefreshControl
+// were missing from the original sweep (Android touchable, the SectionList/VirtualizedList tier,
+// and the pull-to-refresh primitive respectively) — added here so the guard actually covers the
+// full component barrel rather than the components someone remembered to add a case for.
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -22,6 +28,7 @@ import {
   TouchableOpacity,
   TouchableHighlight,
   TouchableWithoutFeedback,
+  TouchableNativeFeedback,
   SafeAreaView,
   Modal,
   KeyboardAvoidingView,
@@ -29,6 +36,8 @@ import {
   FlatList,
   SectionList,
   VirtualizedList,
+  VirtualizedSectionList,
+  RefreshControl,
   Animated,
 } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -85,6 +94,10 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
     'TouchableWithoutFeedback',
     id => createElement(TouchableWithoutFeedback, { testID: id }, createElement(View, {})),
   ],
+  [
+    'TouchableNativeFeedback',
+    id => createElement(TouchableNativeFeedback, { testID: id }, createElement(Text, {}, 'x')),
+  ],
   ['SafeAreaView', id => createElement(SafeAreaView, { testID: id }, createElement(Text, {}, 'x'))],
   [
     'KeyboardAvoidingView',
@@ -132,16 +145,32 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
         renderItem: (info: { item: unknown }) => createElement(Text, {}, String(info.item)),
       }),
   ],
+  [
+    'VirtualizedSectionList',
+    id =>
+      createElement(VirtualizedSectionList, {
+        testID: id,
+        sections: [{ title: 's', data: [1] }],
+        renderItem: (info: { item: unknown }) => createElement(Text, {}, String(info.item)),
+      }),
+  ],
+  ['RefreshControl', id => createElement(RefreshControl, { testID: id, refreshing: false })],
   ['Animated.View', id => createElement(Animated.View, { testID: id })],
   ['Animated.Text', id => createElement(Animated.Text, { testID: id }, 'x')],
 ];
 
 describe('testID reaches the committed native node for every component', () => {
-  for (const [name, build] of cases) {
-    it(`${name} forwards testID to Fabric`, () => {
-      const id = `tid-${name}`;
-      mount(ROOT_TAG, build(id));
-      expect(carriesTestId(id)).toBeDefined();
-    });
-  }
+  // Positive only: this is a per-component parity sweep, not a guard clause — there is no
+  // rejecting branch (a component either forwards testID or the assertion catches the drop).
+  describe('Positive', () => {
+    // why: table-driven so adding a new public component to `cases` is the ENTIRE cost of
+    // extending the guard — one factory line, not a hand-written test per component.
+    for (const [name, build] of cases) {
+      it(`${name} forwards testID to Fabric`, () => {
+        const id = `tid-${name}`;
+        mount(ROOT_TAG, build(id));
+        expect(carriesTestId(id)).toBeDefined();
+      });
+    }
+  });
 });

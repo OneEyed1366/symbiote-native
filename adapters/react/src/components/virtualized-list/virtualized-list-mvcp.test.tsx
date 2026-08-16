@@ -8,6 +8,33 @@
 //      ({index, highestMeasuredFrameIndex, averageItemLength}) instead of silently scrolling
 //      to an estimate, so NO scrollTo command is dispatched on that path.
 // No simulator: a failure here is in the JS routing, not native.
+//
+// SCOPE:
+// (1) is genuinely adapter-owned, not core: the ListHeaderComponent +1 bump and the
+//     maintainVisibleContentPosition -> scrollProps.maintainVisibleContentPosition forwarding
+//     both live directly in adapters/react/src/components/virtualized-list/index.ts (~line 734),
+//     with no core/components counterpart — this test is that logic's only coverage.
+// (2)'s NUMBERS (highestMeasuredFrameIndex/averageItemLength/the getItemLayout-vs-measured-
+//     ceiling branch) are already unit-tested in core/components/src/state/
+//     virtualized-list-reducer.test.ts ("scroll-to-index reports failure..." / "...resolves the
+//     offset..." / "...resolves normally without getItemLayout when the target was measured") —
+//     that part is N/A here (covered elsewhere). What THIS test proves instead is the WIRING: that
+//     the imperative ref's scrollToIndex actually reaches the reducer, that its
+//     fire-scroll-to-index-failed effect actually surfaces as a real onScrollToIndexFailed
+//     callback, and that the failure path dispatches no native scrollTo command — none of which
+//     the pure-reducer test can see.
+//
+// N/A (not exercised here, and not fabricated): the 'shift'/'autoscroll-top' MVCP scroll effects
+// (a real prepend shifting an already-scrolled window) are called out as an acknowledged,
+// undocumented-as-a-bug gap in virtualized-list-reducer.test.ts's own header comment — reaching
+// them needs a genuine two-commit prepend across a virtualized window, which would require
+// re-deriving computeWindow's own throttling arithmetic to set up, making the assertion restate
+// the implementation rather than check it independently. Not re-attempted at the adapter level,
+// where the same problem is strictly harder (real commits, not synthetic reducer inputs).
+//
+// No Negative group: the reducer this drives is total over its action union (reduceList's own
+// header comment: "no default/throw... never a rejection"), and the adapter wiring around it adds
+// no guard clause of its own — an unresolvable scrollToIndex reports a callback, it never throws.
 
 import { createElement, createRef, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -83,7 +110,10 @@ function FailPathApp(): ReactElement {
   });
 }
 
-describe('VirtualizedList MVCP forwarding and scrollToIndex failure path', () => {
+describe('VirtualizedList MVCP forwarding and scrollToIndex failure path (Positive)', () => {
+  // why: native MVCP anchors by CHILD INDEX inside the ScrollView, but a ListHeaderComponent
+  // occupies child 0 — if the adapter forwarded minIndexForVisible unbumped, native would anchor
+  // one row too early (the header instead of the caller's intended first data row).
   it('forwards maintainVisibleContentPosition to the scroll view, bumping minIndexForVisible for the header', () => {
     mount(ROOT_TAG, <MvcpApp />);
     expect(fabric.committed.length, 'MVCP FlatList committed').toBeGreaterThan(0);
@@ -101,6 +131,9 @@ describe('VirtualizedList MVCP forwarding and scrollToIndex failure path', () =>
     expect(autoscroll, 'autoscrollToTopThreshold passes through as 10').toBe(10);
   });
 
+  // why: scrolling to a far, never-rendered index with no getItemLayout has no real offset to
+  // scroll to — RN reports the failure to the caller (so it can retry after measuring more cells)
+  // instead of silently jumping to a guessed offset, which would land the user somewhere wrong.
   it('fires onScrollToIndexFailed for an unmeasured cell and dispatches no scrollTo', () => {
     mount(ROOT_TAG, <FailPathApp />);
     expect(fabric.committed.length, 'fail-path FlatList committed').toBeGreaterThan(0);

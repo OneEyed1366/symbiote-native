@@ -1,9 +1,8 @@
-// Zero-config app entry: wires the four RN-backed host seams (via @symbiote-native/components'
+// Zero-config app entry: wires the four RN-backed host seams (via @symbiote-native/components's
 // bootstrapHost) plus this adapter's own AppRegistry host-registrar bridge, then registers the
-// root component — collapsing the canary's manual sequence into one call. Lives OUTSIDE the
-// package's main barrel (see package.json's "./bootstrap" export): it imports react-native
-// directly, which Vitest's Flow-unaware transform can't parse (see
-// @symbiote-native/components/bootstrap for the full reason).
+// root component in one call. Lives OUTSIDE the package's main barrel (package.json's
+// "./bootstrap" export) because it imports react-native directly, which Vitest's Flow-unaware
+// transform can't parse (see @symbiote-native/components/bootstrap for the full reason).
 
 import type { ComponentType } from 'react';
 import { AppRegistry as RNAppRegistry } from 'react-native';

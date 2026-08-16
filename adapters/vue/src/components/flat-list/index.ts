@@ -1,18 +1,14 @@
-// FlatList, the Vue convenience surface over VirtualizedList. It takes a plain `data` array
-// and derives getItem/getItemCount; numColumns packs items into rows (a horizontal sub-View),
-// so the virtualized stream is rows, not items (RN's FlatList). All windowing / viewability /
-// batching / imperative scrolling are inherited from VirtualizedList; the data shaping and the
-// row/viewability/separator transforms are shared from @symbiote-native/components.
+// FlatList, the Vue convenience surface over VirtualizedList. Takes a plain `data` array and
+// derives getItem/getItemCount; numColumns packs items into rows (a horizontal sub-View), so the
+// virtualized stream is rows, not items. All windowing/viewability/batching/imperative scrolling
+// are inherited from VirtualizedList; the data shaping and row/viewability/separator transforms
+// are shared from @symbiote-native/components.
 //
-// This is the FIRST generic component on the typed-emits pattern (the symbiote port of pd-web-kit):
-// a GENERIC setup function `<ItemT,>(props, ctx: ICtx<IFlatListEmits<ItemT>>)` so the events emit
-// with ItemT-typed payloads (`@viewable-items-changed` carries `ItemT`, not `unknown`). For that to
-// infer at the call site, the generic INPUTS (data/renderItem/keyExtractor/…) must be typed `props`,
-// not `$attrs` — so they are declared in the runtime `props` array; the long passthrough tail
-// (horizontal/inverted/style/getItemLayout/raw scroll/…) still rides through `$attrs` onto the inner
-// VirtualizedList. The inner list still GATES RefreshControl + viewability on callback presence, so
-// each emit bridge is wired to it ONLY when the consumer actually listens (read off the instance
-// vnode props), keeping behavior identical to the prop-callback era.
+// Typed-emits generic component: a GENERIC setup function so events emit with ItemT-typed
+// payloads. For that to infer at the call site, the generic INPUTS must be typed `props`, not
+// $attrs - so they are declared in the runtime `props` array; the passthrough tail rides through
+// $attrs onto the inner VirtualizedList. The inner list still GATES RefreshControl + viewability
+// on callback presence, so each emit bridge is wired ONLY when the consumer actually listens.
 
 import {
   defineComponent,
@@ -48,9 +44,9 @@ import { VirtualizedList } from '../virtualized-list';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 import type { ICtx } from '../../utils/component-helpers';
 
-// VirtualizedList is itself a generic component (generic construct signature), which h()'s overloads
-// can't resolve. Drive it through a loose functional-component handle (generic-component h()
-// limitation — the ItemT surface is proven at the typed FlatList boundary above).
+// VirtualizedList's generic construct signature can't be resolved by h()'s overloads, so drive
+// it through a loose functional-component handle (the ItemT surface is proven at the typed
+// FlatList boundary above).
 const VirtualizedListHost = VirtualizedList as unknown as FunctionalComponent<
   Record<string, unknown>
 >;
@@ -61,8 +57,7 @@ export type IFlatListHandle = IVirtualizedListHandle;
 export interface IFlatListProps<ItemT> {
   data: readonly ItemT[];
   // The cell renderer + separator are Vue scoped slots (#item / #separator / #header / #footer /
-  // #empty), typed by IFlatListSlots — not renderItem / ItemSeparatorComponent props (no duality
-  // with the React surface). See utils/slots-to-render-props.
+  // #empty), typed by IFlatListSlots - not renderItem / ItemSeparatorComponent props.
   keyExtractor?: (item: ItemT, index: number) => string;
   numColumns?: number;
   // A bare string is a class name, resolved through the shared style registry; a style
@@ -74,9 +69,7 @@ export interface IFlatListProps<ItemT> {
   [key: string]: unknown;
 }
 
-// FlatList's scoped-slot surface mirrors VirtualizedList's: #item carries { item, index,
-// separators } typed by ItemT (inferred from `data`); the chrome slots are forwarded down. In
-// multi-column mode #item is invoked per cell inside a packed row, exactly as renderItem was.
+// In multi-column mode #item is invoked per cell inside a packed row.
 export type IFlatListSlots<ItemT> = {
   item: (info: { item: ItemT; index: number; separators: ISeparators }) => VNode[] | VNode;
   separator?: (props: ISeparatorProps<ItemT>) => VNode[] | VNode;
@@ -97,9 +90,8 @@ export type IFlatListEmits<ItemT> = {
   }) => void;
 };
 
-// The typed inputs FlatList reads off `props`; everything else falls through $attrs onto the inner
-// VirtualizedList. Listed for the runtime `props` declaration (keyof can't derive it: the index
-// signature widens keyof to `string`).
+// Listed for the runtime `props` declaration (keyof can't derive it: the index signature widens
+// keyof to `string`).
 const PROP_KEYS = [
   'data',
   'keyExtractor',
@@ -151,9 +143,8 @@ export const FlatList = defineComponent(
     };
     expose(buildDelegateHandle(() => inner.value));
 
-    // VirtualizedList gates RefreshControl + viewability on callback presence, so a bridge is wired
-    // ONLY when the consumer actually listens. Declared emits are stripped from $attrs, so read the
-    // listener off the instance's own vnode props (what the parent passed) instead.
+    // Declared emits are stripped from $attrs, so read the listener off the instance's own vnode
+    // props instead, gating each bridge to when the consumer actually listens.
     const instance = getCurrentInstance();
     const listens = (onName: string): boolean => {
       const vnodeProps = instance?.vnode.props;
@@ -165,17 +156,11 @@ export const FlatList = defineComponent(
       const keyExtractor = props.keyExtractor;
       const numColumns = typeof props.numColumns === 'number' ? props.numColumns : SINGLE_COLUMN;
       const viewabilityPairs = props.viewabilityConfigCallbackPairs;
-      // The chrome slots ride straight down to the inner list; #item/#separator are forwarded as-is
-      // for a single column and re-wrapped per cell for multi-column below.
       const chromeSlots = { header: slots.header, footer: slots.footer, empty: slots.empty };
-      // The passthrough tail: declared props + declared emits' onX are already removed from $attrs,
-      // so what's left is the VirtualizedList passthrough (kebab-folded for the inner list).
       const forwarded = normalizeVueAttrs(attrs);
 
       dlog(`Vue FlatList over ${data.length} items, ${numColumns} column(s)`);
 
-      // The synthesized list events become VL handlers ONLY when listened, so the inner list keeps
-      // gating (no parasitic RefreshControl / viewability work for an unlistened event).
       const endReached = listens('onEndReached')
         ? (info: { distanceFromEnd: number }): void => emit('endReached', info)
         : undefined;
@@ -212,7 +197,6 @@ export const FlatList = defineComponent(
             onViewableItemsChanged,
             viewabilityConfigCallbackPairs: viewabilityPairs,
           },
-          // A single column forwards the consumer's slots untouched (#item info shape is identical).
           { ...chromeSlots, item: slots.item, separator: slots.separator },
         );
       }
@@ -220,8 +204,6 @@ export const FlatList = defineComponent(
       // Multi-column: the virtualized stream is rows. Each cell renders its items side by side
       // in a flex-row View so windowing accounts for whole rows.
       const rows = chunkIntoRows(data, numColumns);
-      // A class-name string resolves through the shared style registry; an object/array is
-      // already style-shaped and passes through as-is.
       const rowStyle: IStyleProp<IViewStyle> = [
         { flexDirection: 'row' },
         typeof props.columnWrapperStyle === 'string'

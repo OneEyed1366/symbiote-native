@@ -1,6 +1,16 @@
 // Covers the `<style>` block support in compileSfc (registerStyles injection). The rest of the
 // transformer (script/template inlining, `vue` import rewrite) is exercised by the canary build
 // itself; this file only guards the CSS-parsing addition.
+//
+// N/A, deliberately not covered here: compileSfc's SFC-parse-error and missing-<script> throws
+// (`descriptor.errors`, `scriptSetup == null && script == null`) are @vue/compiler-sfc's own
+// input-validation surface, not the CSS-parsing addition this file exists to guard — and
+// `transform`/`getCacheKey` (the Metro entry points wrapping compileSfc) are integration-only,
+// exercised by the canary build, not unit-testable without a real Metro worker.
+//
+// No throwing-vs-non-throwing split by describe group: each nested describe below groups by
+// SFC feature (plain <style>, `scoped`, `module`, kebab-case classes); the one throwing case
+// (unsupported lang) sits inside its feature's describe, asserting the specific error message.
 import { describe, expect, it } from 'vitest';
 import metroVueTransformer from './metro-vue-transformer.cjs';
 
@@ -70,6 +80,30 @@ $spacing: 10px;
     font-weight: bold;
   }
 }
+</style>
+`;
+
+// Indented syntax (no braces/semicolons) — distinct from SCSS at the SYNTAX level, but
+// SFC_STYLE_LANG_TO_PREPROCESSOR routes both `lang="scss"` and `lang="sass"` through the same
+// compilePreprocessor('scss', ...) entry point, disambiguated only by a synthetic `${filename}.sass`
+// path (compileStyleBlockContent). A wrong synthetic path would hand indented text to the
+// brace-expecting SCSS parser and fail outright — this proves the SFC-level wiring picks the right
+// syntax, not the preprocessor itself (that unit is core/css-parser/src/preprocessors's own job).
+const SFC_WITH_SASS_STYLE_BLOCK = `
+<script setup lang="ts">
+const label = 'hi'
+</script>
+<template>
+  <View class="card"><Text>{{ label }}</Text></View>
+</template>
+<style lang="sass">
+$spacing: 10px
+
+.card
+  padding: $spacing
+
+  .title
+    font-weight: bold
 </style>
 `;
 
@@ -184,6 +218,35 @@ const label = 'hi'
   <View class="reset" />
 </template>
 <style scoped>
+:global(.reset) { margin: 0; }
+</style>
+`;
+
+// `.legacy` sits inside a `:global()` that is only PART of its selector: the rule as a whole is
+// this file's own (it hangs off the file's `.card`), but the `legacy` half names markup this file
+// does not own and must survive unsuffixed.
+const SFC_WITH_PARTIAL_GLOBAL_IN_SCOPED_BLOCK = `
+<script setup lang="ts">
+const label = 'hi'
+</script>
+<template>
+  <View class="card legacy" />
+</template>
+<style scoped>
+.card { padding: 10px; }
+.card :global(.legacy) { margin: 0; }
+</style>
+`;
+
+const SFC_WITH_GLOBAL_AND_SCOPED_RULES_IN_ONE_BLOCK = `
+<script setup lang="ts">
+const label = 'hi'
+</script>
+<template>
+  <View class="card reset" />
+</template>
+<style scoped>
+.card { padding: 10px; }
 :global(.reset) { margin: 0; }
 </style>
 `;
@@ -320,6 +383,18 @@ describe('metro-vue-transformer compileSfc <style> support', () => {
     });
   });
 
+  // why: lang="sass" (the indented syntax) and lang="scss" share ONE compiler entry point
+  // (compilePreprocessor('scss', ...)); only the synthetic file path fed to it tells dart-sass
+  // which syntax to parse. A regression here would make every indented-syntax SFC style block
+  // throw a brace-expected parse error instead of compiling.
+  it('compiles a lang="sass" (indented syntax) block via the synthetic .sass path', async () => {
+    const code = await compileSfc(SFC_WITH_SASS_STYLE_BLOCK, 'Card.vue');
+    expect(extractRegisterStylesArg(code)).toEqual({
+      card: { padding: 10 },
+      cardTitle: { fontWeight: 'bold' },
+    });
+  });
+
   it('throws for a genuinely unsupported style lang', async () => {
     await expect(compileSfc(SFC_WITH_UNSUPPORTED_STYLE_LANG, 'Card.vue')).rejects.toThrow(
       /lang="typo" not supported yet/,
@@ -387,6 +462,38 @@ describe('metro-vue-transformer compileSfc <style scoped> support', () => {
     });
     expect(code).toContain('class: "reset"');
     expect(code).not.toMatch(/reset__data-v-/);
+  });
+
+  // why: `:global()` around PART of a selector is the escape hatch for reaching markup this file
+  // does not own. Exempting by registered key alone left `legacy` in __localScopedClassNames (it
+  // is a token of the scoped `cardLegacy` key), so the template's `legacy` was suffixed anyway
+  // and matched nothing — the escape hatch silently did the opposite of what it says.
+  it('leaves a partial :global() token unsuffixed while the rest of its chain is suffixed', async () => {
+    const code = await compileSfc(SFC_WITH_PARTIAL_GLOBAL_IN_SCOPED_BLOCK, 'Card.vue');
+    const scopeId = scopeIdOf(code);
+
+    // Both keys survive registration: the compound rule LAYERS over `.card` rather than
+    // replacing it, so `.card`'s own declarations must still be there to layer under.
+    expect(extractRegisterStylesArg(code)).toEqual({
+      [`card__${scopeId}`]: { padding: 10 },
+      [`cardLegacy__${scopeId}`]: { margin: 0 },
+    });
+    expect(code).toContain(`class: "card__${scopeId} legacy"`);
+    expect(code).not.toContain(`legacy__${scopeId}`);
+  });
+
+  // why: the exemption must be surgical — a fully global selector still registers under its plain
+  // name and an ordinary scoped one in the SAME block still gets its suffix. Widening the token
+  // exemption into either of those would unscope the whole file.
+  it('still suffixes an ordinary scoped class beside a fully global one in the same block', async () => {
+    const code = await compileSfc(SFC_WITH_GLOBAL_AND_SCOPED_RULES_IN_ONE_BLOCK, 'Card.vue');
+    const scopeId = scopeIdOf(code);
+
+    expect(extractRegisterStylesArg(code)).toEqual({
+      [`card__${scopeId}`]: { padding: 10 },
+      reset: { margin: 0 },
+    });
+    expect(code).toContain(`class: "card__${scopeId} reset"`);
   });
 
   it('adds no scopeClassName import or nodeTransform overhead for a file with no scoped block', async () => {
