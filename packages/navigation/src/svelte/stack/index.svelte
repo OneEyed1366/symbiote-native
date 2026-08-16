@@ -35,6 +35,7 @@
     createInitialNavigatorState,
     createNavigationEmitter,
     navigatorReducer,
+    reconcileStackRoutes,
     resolveStackProps,
   } from '../../core';
   import type {
@@ -107,7 +108,13 @@
     return seededState;
   }
 
-  const state = $derived(pushedState ?? seedState());
+  // A `<Stack.Screen>` marker can unregister while its route is still in the pushed history (a
+  // marker behind an `{#if}`, a data-driven screen list), which would leave that entry with nothing
+  // for componentFor() to mount (reconcileStackRoutes' header). The reconciliation belongs in the
+  // derivation because it is PURE - it hands back the same state reference when nothing changed, so
+  // it writes no state and cannot re-trigger itself; `dispatch` below then persists the pruned
+  // history, since it reduces over this value rather than over `pushedState`.
+  const state = $derived(reconcileStackRoutes(pushedState ?? seedState(), [...registry.keys()]));
 
   function dispatch(action: INavigatorAction): void {
     pushedState = navigatorReducer(state, action);

@@ -73,6 +73,7 @@ import {
   createInitialNavigatorState,
   createNavigationEmitter,
   navigatorReducer,
+  reconcileStackRoutes,
   resolveHeaderInModalStackStyle,
   resolveScreenRenderPlan,
   resolveStackProps,
@@ -242,6 +243,20 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
     for (const screen of this.screenChildren) {
       this.registry.set(screen.name, screen);
     }
+    this.reconcileWithRegistry();
+  }
+
+  // A `<ng-template symbioteScreen>` marker can leave the @ContentChildren query (a marker behind
+  // an `@if`, a data-driven screen list) while its route is still in the pushed history, which
+  // would leave that entry with nothing for componentFor() to mount (reconcileStackRoutes' header).
+  // The signal write lives HERE, in the query-change callback, and never in a computed/template
+  // accessor - reconciliation is a reaction to the registry changing, not a derivation of it.
+  private reconcileWithRegistry(): void {
+    const current = this.stateSignal();
+    if (current === undefined) return;
+    const next = reconcileStackRoutes(current, [...this.registry.keys()]);
+    if (next === current) return;
+    this.commitState(next);
   }
 
   private initializeState(): void {
@@ -269,7 +284,13 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
   private dispatch(action: INavigatorAction): void {
     const current = this.stateSignal();
     if (current === undefined) return;
-    const next = navigatorReducer(current, action);
+    this.commitState(navigatorReducer(current, action));
+  }
+
+  // The one write path into stateSignal, shared by a dispatched action and a registry-driven
+  // reconciliation: both invalidate the plan cache, broadcast to every still-live route, and prune
+  // the emitters of routes that are gone.
+  private commitState(next: INavigatorState): void {
     this.planCache.clear();
     this.stateSignal.set(next);
     const liveRouteKeys = new Set(next.routes.map(route => route.key));

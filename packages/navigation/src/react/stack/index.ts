@@ -46,6 +46,7 @@ import {
   createInitialNavigatorState,
   createNavigationEmitter,
   navigatorReducer,
+  reconcileStackRoutes,
   resolveScreenRenderPlan,
   resolveStackProps,
 } from '../../core';
@@ -122,7 +123,9 @@ const StackImpl = forwardRef<INavigatorHandle, IStackProps>((props, forwardedRef
     [routeIdPrefix],
   );
 
-  const [state, dispatch] = useReducer(navigatorReducer, undefined, () => {
+  const registeredNames = useMemo(() => [...registry.keys()], [registry]);
+
+  const [dispatchedState, dispatch] = useReducer(navigatorReducer, undefined, () => {
     const initialRouteName = props.initialRouteName ?? registry.keys().next().value;
     if (initialRouteName === undefined) {
       dlog('Stack: no <Stack.Screen> children registered');
@@ -132,6 +135,17 @@ const StackImpl = forwardRef<INavigatorHandle, IStackProps>((props, forwardedRef
       createRoute(initialRouteName, registry.get(initialRouteName)?.initialParams),
     );
   });
+
+  // A <Stack.Screen> marker can unregister while its route is still in the pushed history, which
+  // would leave that entry with nothing to render (reconcileStackRoutes' header). Reconciling here
+  // rather than in an effect repairs the CURRENT paint - the call is pure and hands back the same
+  // reference when nothing changed, so it is safe during render; the effect below only PERSISTS
+  // the repair, so the next push builds on the pruned history instead of the phantom one.
+  const state = reconcileStackRoutes(dispatchedState, registeredNames);
+
+  useEffect(() => {
+    if (state !== dispatchedState) dispatch({ type: 'reset', state });
+  }, [state, dispatchedState]);
 
   const handle = useMemo<INavigatorHandle>(
     () => ({

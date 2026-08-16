@@ -8,6 +8,9 @@
 // navigator; Angular's own hierarchical DI does this automatically, see navigation-context.
 // service.ts's header comment). Mirrors stack.test.ts's fixture since a real Stack is part of
 // this composition; Tab needs no ViewConfig of its own.
+//
+// No Negative group: getParent() never throws - "no ambient navigator above" is a legitimate
+// `undefined` return (first test below), asserted directly rather than a caught error.
 
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, Input, ViewChild, type Type } from '@angular/core';
@@ -152,6 +155,9 @@ class NestedTestHost {
 }
 
 describe('Angular nested navigators (DI parent chain)', () => {
+  // why: a screen at the TOP of the whole navigation tree has nothing above it to walk up to -
+  // NavigationContextService's `@Optional() @SkipSelf()` read finds no ambient provider, so
+  // getParent() must degrade to `undefined` rather than throw or return a stale/wrong handle.
   it("a root Stack screen's injectNavigation().getParent() is undefined (no ambient navigator above it)", async () => {
     capturedParent = undefined;
     getParentCalled = false;
@@ -165,6 +171,10 @@ describe('Angular nested navigators (DI parent chain)', () => {
     expect(capturedParent).toBeUndefined();
   });
 
+  // why: proves the DI parent chain is not just "returns SOME truthy handle" but the RIGHT one -
+  // the returned handle is exercised end-to-end (an actual `.push()` that lands a real route),
+  // which a handle-identity check alone (`toBeDefined()`) wouldn't distinguish from a handle
+  // that merely LOOKS like a Stack handle's shape.
   it('injectNavigation().getParent() from inside a Tab screen nested in a Stack screen reaches the enclosing Stack, and pushing through it adds a Stack route', async () => {
     capturedParent = undefined;
     capturedHost = undefined;

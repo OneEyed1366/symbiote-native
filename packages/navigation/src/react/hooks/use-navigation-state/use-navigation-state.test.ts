@@ -5,6 +5,10 @@
 // function identity every render, so an effect keyed on `selector` unsubscribes/resubscribes on
 // every parent re-render instead of once. A fake emitter (rather than a real Stack) isolates
 // exactly that churn, independent of any router/native-screen machinery.
+//
+// No Negative group: this hook has no guard clause of its own (the shared missing-context throw is
+// covered once, in hooks.test.tsx, for the whole hooks layer) - every scenario here completes
+// without an error, so only a Positive group applies.
 
 import { act, createElement, useReducer } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -23,63 +27,69 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('useNavigationState subscription lifecycle', () => {
-  it('subscribes to the emitter once, not once per render, across a fresh inline selector', () => {
-    let subscribeCount = 0;
-    let unsubscribeCount = 0;
-    const listeners = new Set<INavigationEventListener>();
-    const fakeEmitter: INavigationEmitter = {
-      emit: () => {},
-      addListener: (_event, listener) => {
-        subscribeCount += 1;
-        listeners.add(listener);
-        return () => {
-          unsubscribeCount += 1;
-          listeners.delete(listener);
-        };
-      },
-    };
-    const contextValue: INavigationContextValue = {
-      route: { key: 'home-1', name: 'Home', params: undefined },
-      navigation: {
-        push: () => {},
-        pop: () => {},
-        popToTop: () => {},
-        popTo: () => {},
-        replace: () => {},
-        setParams: () => {},
-        reset: (_state: INavigatorState) => {},
-        canGoBack: () => false,
-      },
-      emitter: fakeEmitter,
-    };
+  describe('Positive', () => {
+    // why: a subscribe-per-render bug is invisible from the OBSERVABLE state alone (the selector
+    // still returns the right value either way) - it only shows up as an ever-growing listener
+    // count, which is why this test counts addListener/removeListener calls directly instead of
+    // asserting on a selected value.
+    it('subscribes to the emitter once, not once per render, across a fresh inline selector', () => {
+      let subscribeCount = 0;
+      let unsubscribeCount = 0;
+      const listeners = new Set<INavigationEventListener>();
+      const fakeEmitter: INavigationEmitter = {
+        emit: () => {},
+        addListener: (_event, listener) => {
+          subscribeCount += 1;
+          listeners.add(listener);
+          return () => {
+            unsubscribeCount += 1;
+            listeners.delete(listener);
+          };
+        },
+      };
+      const contextValue: INavigationContextValue = {
+        route: { key: 'home-1', name: 'Home', params: undefined },
+        navigation: {
+          push: () => {},
+          pop: () => {},
+          popToTop: () => {},
+          popTo: () => {},
+          replace: () => {},
+          setParams: () => {},
+          reset: (_state: INavigatorState) => {},
+          canGoBack: () => false,
+        },
+        emitter: fakeEmitter,
+      };
 
-    let triggerRerender: (() => void) | undefined;
+      let triggerRerender: (() => void) | undefined;
 
-    function Child(): null {
-      // Deliberately a fresh inline selector on every render - the exact call-site shape
-      // (`useNavigationState(s => ...)`) that causes the churn this test guards against.
-      useNavigationState(state => state.routes.length);
-      return null;
-    }
+      function Child(): null {
+        // Deliberately a fresh inline selector on every render - the exact call-site shape
+        // (`useNavigationState(s => ...)`) that causes the churn this test guards against.
+        useNavigationState(state => state.routes.length);
+        return null;
+      }
 
-    function Harness(): ReturnType<typeof createElement> {
-      const [, dispatch] = useReducer((n: number) => n + 1, 0);
-      triggerRerender = () => dispatch();
-      return createElement(
-        NavigationContext.Provider,
-        { value: contextValue },
-        createElement(Child),
-      );
-    }
+      function Harness(): ReturnType<typeof createElement> {
+        const [, dispatch] = useReducer((n: number) => n + 1, 0);
+        triggerRerender = () => dispatch();
+        return createElement(
+          NavigationContext.Provider,
+          { value: contextValue },
+          createElement(Child),
+        );
+      }
 
-    act(() => mount(ROOT_TAG, createElement(Harness)));
-    expect(subscribeCount).toBe(1);
+      act(() => mount(ROOT_TAG, createElement(Harness)));
+      expect(subscribeCount).toBe(1);
 
-    act(() => triggerRerender?.());
-    act(() => triggerRerender?.());
-    act(() => triggerRerender?.());
+      act(() => triggerRerender?.());
+      act(() => triggerRerender?.());
+      act(() => triggerRerender?.());
 
-    expect(subscribeCount).toBe(1);
-    expect(unsubscribeCount).toBe(0);
+      expect(subscribeCount).toBe(1);
+      expect(unsubscribeCount).toBe(0);
+    });
   });
 });
