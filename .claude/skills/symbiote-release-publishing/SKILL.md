@@ -481,6 +481,54 @@ First-ever publish of a new scoped package needs `access: public` — already
 set both in `.changeset/config.json` and per-package `publishConfig.access`,
 so no `--access` flag juggling is needed by hand.
 
+4. Move `examples/*` onto the freshly published versions — see the section
+   below. This is part of the release, not a follow-up: an example left behind
+   keeps running pre-release code while looking updated.
+
+## Post-release: moving `examples/*` forward is TWO edits, and the second one is invisible (2026-08-16)
+
+A release leaves every example manifest stale in two different ways, and doing
+only the obvious one silently ships examples pinned to the previous release.
+
+**Edit 1, the obvious one — the `file:` tarballs.** Local iteration points an
+example at `file:../../core/engine/symbiote-native-engine-0.1.7.tgz`
+(`<examples_vs_dot_examples>`). Swap each back to `^<published version>`.
+
+**Edit 2, the one that hides — stale carets on 0.x packages.** The examples
+also carry ordinary `^` specifiers, and `npm install` will NOT move them:
+**a caret on a 0.x version pins the MINOR**, so `^0.1.0` never resolves to a
+freshly published `0.2.0`, and `^0.2.8` never picks up `0.3.0`. Only packages
+past 1.0 (`navigation ^2.0.3`, `splash-screen ^3.0.3`) float on their own.
+
+Measured on the 2026-08-16 release: 55 tarball specifiers vs **127** stale
+carets across the same 10 examples. Skipping edit 2 would have left the four
+`expo-*` examples entirely on pre-release code — installing cleanly, reporting
+`added N packages`, and looking done.
+
+Rewrite EVERY `@symbiote-native/*` specifier to the version that package
+carries in the monorepo after `changeset version` (which equals what was just
+published). Read the versions from `{core,adapters,packages}/*/package.json`,
+never from the tarball filenames — those are the OLD numbers.
+
+**Reinstall: keep the lockfile.** `<examples_vs_dot_examples>` says to delete
+`package-lock.json` — that rule is for re-packing the SAME version, where the
+specifier does not change and npm short-circuits on a stale integrity hash.
+Here the specifier itself changes (`file:` -> `^x.y.z`), so npm must
+re-resolve, and keeping the lockfile holds the diff to the affected entries.
+`rm -rf node_modules/@symbiote-native && npm install` per example is enough.
+
+**Verify what is EXTRACTED, not what the manifest says** — walk
+`examples/*/node_modules/@symbiote-native/*/package.json` and compare each
+`version` against the monorepo's. A manifest edit is not proof the bytes moved.
+
+Expect one honest surprise in the lock diff: swapping `splash-screen` from a
+tarball to a registry entry adds ~24 `@img/sharp-*` rows. They come from
+`sharp` via `react-native-bootsplash`; the tarball install collapsed sharp's
+per-platform binary matrix and the registry install records it in full. All but
+`@img/colour` are gated by `os`/`cpu`/`optional`. Not a dependency drift —
+confirm by diffing the lock for NON-symbiote version changes, which should be
+exactly zero.
+
 ## Known pre-existing blocker (not caused by this setup)
 
 `pnpm run <any script>` triggers pnpm's dependency-status check, which can
