@@ -8,6 +8,11 @@ dist/
 # unpublished package into a standalone examples/* app before it has a real npm release)
 *.tgz
 
+# WIP devtools inspector — see the symbiote-devtools-inspector skill. Deliberately kept off
+# disk-only, excluded from pnpm-workspace.yaml's packages: glob too, until it's designed and
+# ready to ship.
+packages/devtools/
+
 # co-located svelte-compiler output a *.smoke.test.ts writes next to the real .svelte source
 # it's compiling (so the compiled file's own relative imports resolve without copying its
 # sibling .ts dependencies) — always cleaned up in afterEach, this is insurance against a
