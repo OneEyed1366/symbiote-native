@@ -45,7 +45,10 @@ describe('AnimatedLeafBinder before the host node commits', () => {
     const binder = new AnimatedLeafBinder(() => node, 'test');
     const scroll = new AnimatedValue(0);
 
-    binder.reconcile(styleProps(scroll.interpolate({ inputRange: [0, 1], outputRange: [0, 1] })), false);
+    binder.reconcile(
+      styleProps(scroll.interpolate({ inputRange: [0, 1], outputRange: [0, 1] })),
+      false,
+    );
     // The sticky header's 'rebuild-interpolation' after it measures: a brand-new node.
     const rebuilt = scroll.interpolate({ inputRange: [-1, 0, 40, 41], outputRange: [0, 0, 0, 1] });
     binder.reconcile(styleProps(rebuilt), false);

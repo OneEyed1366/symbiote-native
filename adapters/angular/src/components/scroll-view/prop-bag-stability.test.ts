@@ -72,11 +72,7 @@ function probeHostProps(): { setterRuns: () => number; restore: () => void } {
   return {
     setterRuns: (): number => runs,
     restore: (): void => {
-      Object.defineProperty(
-        SymbioteHostPropsDirective.prototype,
-        'symbioteHostProps',
-        descriptor,
-      );
+      Object.defineProperty(SymbioteHostPropsDirective.prototype, 'symbioteHostProps', descriptor);
     },
   };
 }

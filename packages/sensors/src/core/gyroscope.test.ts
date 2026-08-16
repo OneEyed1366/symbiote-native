@@ -50,7 +50,10 @@ describe('Gyroscope', () => {
       const listener = vi.fn();
       Gyroscope.addListener(listener);
 
-      expect(FAKE_NATIVE_GYROSCOPE.addListener).toHaveBeenCalledWith('gyroscopeDidUpdate', listener);
+      expect(FAKE_NATIVE_GYROSCOPE.addListener).toHaveBeenCalledWith(
+        'gyroscopeDidUpdate',
+        listener,
+      );
     });
   });
 });

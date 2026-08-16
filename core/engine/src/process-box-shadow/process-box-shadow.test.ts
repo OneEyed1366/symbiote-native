@@ -73,9 +73,7 @@ describe('processBoxShadow', () => {
     });
 
     it('rejects an unparseable spreadDistance', () => {
-      expect(
-        processBoxShadow([{ offsetX: 0, offsetY: 0, spreadDistance: 'nope' }]),
-      ).toEqual([]);
+      expect(processBoxShadow([{ offsetX: 0, offsetY: 0, spreadDistance: 'nope' }])).toEqual([]);
     });
 
     // why: blurRadius has an EXTRA constraint beyond parseability — negative blur is
@@ -123,9 +121,7 @@ describe('processBoxShadow', () => {
     // occurrence of either is invalid syntax, must reject the whole shadow.
     it('rejects a shadow string with two colors', () => {
       installRealisticColorProcessor();
-      expect(
-        processBoxShadow('rgba(0,0,0,1) 0px 0px rgba(1,1,1,1)'),
-      ).toEqual([]);
+      expect(processBoxShadow('rgba(0,0,0,1) 0px 0px rgba(1,1,1,1)')).toEqual([]);
     });
 
     // why: CSS requires the length values (offsetX/offsetY/blur/spread) to stay grouped

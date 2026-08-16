@@ -154,6 +154,11 @@ describe('noteHoverNoop', () => {
   // a product outcome this predicate-level module should assert on.
   it('is a safe no-op regardless of whether hover callbacks are provided', () => {
     expect(() => noteHoverNoop(undefined, undefined)).not.toThrow();
-    expect(() => noteHoverNoop(() => {}, () => {})).not.toThrow();
+    expect(() =>
+      noteHoverNoop(
+        () => {},
+        () => {},
+      ),
+    ).not.toThrow();
   });
 });

@@ -193,8 +193,7 @@ export const Modal = defineComponent<IModalProps, IModalEmits>(
           onShow: (): void => emit('show'),
           onDismiss: (): void => emit('dismiss'),
           onRequestClose: (): void => emit('requestClose'),
-          onOrientationChange: (event: ISymbioteEvent): void =>
-            emit('orientationChange', event),
+          onOrientationChange: (event: ISymbioteEvent): void => emit('orientationChange', event),
         },
         [
           h(

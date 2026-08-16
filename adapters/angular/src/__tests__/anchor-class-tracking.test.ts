@@ -88,7 +88,12 @@ let fixture: AnchorClassFixture | undefined;
   ],
   template: `
     <TextInput [testID]="'anchor-text-input'" [class.dark]="dark" />
-    <ActivityIndicator [testID]="'anchor-spinner'" [animating]="false" [hidesWhenStopped]="false" [class.dark]="dark" />
+    <ActivityIndicator
+      [testID]="'anchor-spinner'"
+      [animating]="false"
+      [hidesWhenStopped]="false"
+      [class.dark]="dark"
+    />
     <ImageBackground [testID]="'anchor-image-bg'" src="x" [class.dark]="dark">
       <symbiote-text>Hi</symbiote-text>
     </ImageBackground>
@@ -148,19 +153,16 @@ describe('a class toggled after mount', () => {
     ['anchor-image-bg'],
     ['anchor-flat-list'],
     ['anchor-vlist'],
-  ])(
-    'reaches the committed view of %s',
-    async testID => {
-      registerStyles({ dark: { backgroundColor: 'black' } });
+  ])('reaches the committed view of %s', async testID => {
+    registerStyles({ dark: { backgroundColor: 'black' } });
 
-      mount(ROOT_TAG, AnchorClassFixture);
-      await new Promise<void>(resolve => setTimeout(resolve, 0));
-      expect(nearestStyled(testID, 'backgroundColor')).toBeUndefined();
+    mount(ROOT_TAG, AnchorClassFixture);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    expect(nearestStyled(testID, 'backgroundColor')).toBeUndefined();
 
-      fixture?.enableDark();
-      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    fixture?.enableDark();
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-      expect(nearestStyled(testID, 'backgroundColor')).toBe('black');
-    },
-  );
+    expect(nearestStyled(testID, 'backgroundColor')).toBe('black');
+  });
 });

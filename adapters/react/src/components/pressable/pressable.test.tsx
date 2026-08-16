@@ -413,7 +413,9 @@ describe('React Pressable on the engine', () => {
       </Pressable>,
     );
     const rippleCarrier = fabric.find(
-      n => n.props.nativeBackgroundAndroid !== undefined || n.props.nativeForegroundAndroid !== undefined,
+      n =>
+        n.props.nativeBackgroundAndroid !== undefined ||
+        n.props.nativeForegroundAndroid !== undefined,
     );
     expect(rippleCarrier).toBeUndefined();
   });

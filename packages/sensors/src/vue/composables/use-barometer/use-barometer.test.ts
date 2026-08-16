@@ -93,7 +93,11 @@ describe('useBarometer (Vue)', () => {
       // why: each native event is a full snapshot, not a delta — merging would leave a
       // stale altitude/pressure behind after a real reading changes.
       const measurement = mountBarometer();
-      const first: IBarometerMeasurement = { pressure: 1013.25, relativeAltitude: 12.3, timestamp: 1 };
+      const first: IBarometerMeasurement = {
+        pressure: 1013.25,
+        relativeAltitude: 12.3,
+        timestamp: 1,
+      };
       const second: IBarometerMeasurement = { pressure: 950, relativeAltitude: 500, timestamp: 2 };
 
       registeredListener?.(first);

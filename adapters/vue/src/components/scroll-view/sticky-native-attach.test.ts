@@ -105,7 +105,10 @@ describe('Vue ScrollView sticky native scroll attach', () => {
       // claims to.
       mountStickyScrollView();
 
-      expect(callsOf('addAnimatedEventToView'), 'no bind before the commit microtask runs').toHaveLength(0);
+      expect(
+        callsOf('addAnimatedEventToView'),
+        'no bind before the commit microtask runs',
+      ).toHaveLength(0);
     });
 
     it('binds the scroll event to the committed scroll view tag once the retry runs after commit', async () => {

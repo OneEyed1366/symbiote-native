@@ -184,10 +184,9 @@ describe('Teleport runtime-helpers shim', () => {
         throw new Error('unreachable');
       }
 
-      expect(
-        isDescendantOf(overlayHost, ported),
-        'ported node landed under the overlay host',
-      ).toBe(true);
+      expect(isDescendantOf(overlayHost, ported), 'ported node landed under the overlay host').toBe(
+        true,
+      );
       expect(
         isDescendantOf(source, ported),
         'ported node did NOT stay under its own template parent',

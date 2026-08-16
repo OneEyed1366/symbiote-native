@@ -77,7 +77,9 @@ export const ANIMATED_IMAGE_INPUTS = [...IMAGE_INPUTS, 'animatedProps', PASSTHRO
 // @Directive() (no selector) is the Angular-sanctioned decorator for an abstract base that
 // declares lifecycle hooks — without it ngtsc rejects the inherited hooks (NG2007).
 @Directive()
-export abstract class AnimatedComponentBase implements AfterViewInit, DoCheck, OnChanges, OnDestroy {
+export abstract class AnimatedComponentBase
+  implements AfterViewInit, DoCheck, OnChanges, OnDestroy
+{
   style: unknown;
   animatedProps: Record<string, unknown> | undefined;
   passthroughAnimatedPropExplicitValues: unknown;

@@ -18,7 +18,11 @@
 
 const { compile, compileModule } = require('svelte/compiler');
 const ts = require('typescript');
-const { compileCssFile, isStyleFile, resolveUpstreamTransformer } = require('@symbiote-native/css-parser');
+const {
+  compileCssFile,
+  isStyleFile,
+  resolveUpstreamTransformer,
+} = require('@symbiote-native/css-parser');
 
 const upstreamTransformer = resolveUpstreamTransformer();
 
@@ -118,11 +122,19 @@ module.exports.transform = async function transform(params) {
     const code = compileSvelteFile(preprocessed.code, params.filename);
     // Re-label as .tsx so RN's transformer processes the module exactly like app source; Metro
     // tracks the real path separately. Matches metro-vue-transformer.cjs's identical trick.
-    return upstreamTransformer.transform({ ...params, src: code, filename: params.filename + '.tsx' });
+    return upstreamTransformer.transform({
+      ...params,
+      src: code,
+      filename: params.filename + '.tsx',
+    });
   }
   if (params.filename.endsWith('.svelte.ts') || params.filename.endsWith('.svelte.js')) {
     const code = compileSvelteModuleFile(params.src, params.filename);
-    return upstreamTransformer.transform({ ...params, src: code, filename: params.filename + '.tsx' });
+    return upstreamTransformer.transform({
+      ...params,
+      src: code,
+      filename: params.filename + '.tsx',
+    });
   }
   // A standalone style file (as opposed to a component's own <style> block, handled by the
   // preprocessor above) — the framework-agnostic path (core/css-parser's compileCssFile), usable
@@ -130,7 +142,11 @@ module.exports.transform = async function transform(params) {
   // .css/.scss/.sass/.less/.styl (+ .module.*).
   if (isStyleFile(params.filename)) {
     const { code } = await compileCssFile(params.src, params.filename);
-    return upstreamTransformer.transform({ ...params, src: code, filename: params.filename + '.js' });
+    return upstreamTransformer.transform({
+      ...params,
+      src: code,
+      filename: params.filename + '.js',
+    });
   }
   return upstreamTransformer.transform(params);
 };

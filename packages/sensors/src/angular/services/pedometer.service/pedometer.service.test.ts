@@ -80,7 +80,8 @@ describe('PedometerService.connect', () => {
       mount(ROOT_TAG, PedometerHost);
       await tick();
 
-      if (capturedListener === undefined) throw new Error('watchStepCount callback was not captured');
+      if (capturedListener === undefined)
+        throw new Error('watchStepCount callback was not captured');
       capturedListener(RESULT);
 
       expect(capturedResult?.()).toEqual(RESULT);

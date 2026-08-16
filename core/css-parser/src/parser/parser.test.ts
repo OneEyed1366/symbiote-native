@@ -115,7 +115,7 @@ describe('parseCSS', () => {
       });
     });
 
-    it('drops an unsupported property without throwing, keeping the rule\'s supported ones', () => {
+    it("drops an unsupported property without throwing, keeping the rule's supported ones", () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       expect(parseCSS('.card { animation: spin 1s linear; color: red }')).toEqual({
@@ -266,7 +266,7 @@ describe('parseCSS', () => {
   // caller (the Metro transformer) as an immediate build failure instead of silently producing
   // a partial/wrong style map, which would be far harder to notice.
   describe('negative — malformed CSS is rejected, not silently partially parsed', () => {
-    it('throws postcss\'s own CssSyntaxError for an unclosed block', () => {
+    it("throws postcss's own CssSyntaxError for an unclosed block", () => {
       expect(() => parseCSS('.card { color: red ')).toThrow(/Unclosed block/);
     });
   });
@@ -424,7 +424,7 @@ describe('classTokensIn — every registered key mapped back to its selector tok
   // compiler (Vue/Svelte) calling this at build time must see a build failure, not a Map that
   // silently omits the malformed rule's classes.
   describe('negative — malformed CSS is rejected', () => {
-    it('throws postcss\'s own CssSyntaxError for an unclosed block', () => {
+    it("throws postcss's own CssSyntaxError for an unclosed block", () => {
       expect(() => classTokensIn('.card { color: red ')).toThrow(/Unclosed block/);
     });
   });

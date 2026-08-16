@@ -54,7 +54,9 @@ async function expectThrowsWhenNativeMethodAbsent(
   // @ts-expect-error -- simulating a platform where the native module has no such method
   FAKE_NATIVE_LOCAL_AUTHENTICATION[methodName] = undefined;
 
-  await expect(call()).rejects.toThrow(`${methodName} is not available on expo-local-authentication`);
+  await expect(call()).rejects.toThrow(
+    `${methodName} is not available on expo-local-authentication`,
+  );
 
   FAKE_NATIVE_LOCAL_AUTHENTICATION[methodName] = original;
 }
@@ -116,7 +118,7 @@ describe('Positive — the native module is present and answers', () => {
     });
   });
 
-  it('authenticateAsync resolves with the native module\'s success result', async () => {
+  it("authenticateAsync resolves with the native module's success result", async () => {
     await expect(authenticateAsync()).resolves.toEqual({ success: true });
   });
 

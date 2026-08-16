@@ -46,7 +46,9 @@ let capturedHost: HostApp | undefined;
       <View portalOutlet #overlayHostA="portalOutlet" testID="overlay-host-a"></View>
       <View portalOutlet #overlayHostB="portalOutlet" testID="overlay-host-b"></View>
       @if (visible()) {
-        <View *portal="useFirstOutlet() ? overlayHostA : overlayHostB"><Text>portaled content</Text></View>
+        <View *portal="useFirstOutlet() ? overlayHostA : overlayHostB"
+          ><Text>portaled content</Text></View
+        >
       }
     </View>
   `,
@@ -103,7 +105,8 @@ function outletPosition(testId: string): number | undefined {
 // shadow it (DFS visits the deepest match last and it wins).
 function portaledContentPosition(): number | undefined {
   return findWithSiblings(
-    node => node.viewName === 'RCTView' && !node.props.testID && containsText(node, 'portaled content'),
+    node =>
+      node.viewName === 'RCTView' && !node.props.testID && containsText(node, 'portaled content'),
   )?.index;
 }
 

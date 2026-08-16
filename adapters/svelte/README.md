@@ -1,7 +1,7 @@
 # @symbiote-native/svelte
 
 The **Svelte adapter** for [SymbioteNative](../../README.md) — render real native iOS/Android views
-from Svelte 5, on the *same* untouched core as React, Vue, and Angular, with React Native's own
+from Svelte 5, on the _same_ untouched core as React, Vue, and Angular, with React Native's own
 renderer never in the path. Svelte ships no official host-renderer API yet (`createRenderer` is
 still an unmerged PR upstream), so instead of hooking a framework-blessed extension point this
 adapter patches `globalThis`'s DOM classes: stock compiled Svelte client output believes it is
@@ -40,13 +40,13 @@ rather than a generator:
 - `svelte.config.js` — registers the `forbidWebOnlyConstructs()` and `scopedStyles()`
   preprocessors, so `svelte-check` and the editor catch the same things Metro's transformer
   already guards against at build time, and sets `compilerOptions: { fragments: 'tree', css:
-  'external' }`.
+'external' }`.
 
 ---
 
 ## Use it
 
-The native entry reaches the *same* seam as every other adapter. `createApp(App).mount(appName)`
+The native entry reaches the _same_ seam as every other adapter. `createApp(App).mount(appName)`
 wires the native-host seams and RN's own `AppRegistry`, then mounts via `@symbiote-native/engine` —
 RN's own renderer is never in the path:
 
@@ -96,10 +96,10 @@ the way React and Vue use one.
 The one deliberate gap, same as every other non-React adapter — **third-party React component
 packages** (`@react-native-community/slider` used directly) run only under the React adapter:
 their body calls React hooks off the React dispatcher, which is null under Svelte.
-`@symbiote-native/slider` (this repo's own wrapper) *does* ship a real Svelte build
+`@symbiote-native/slider` (this repo's own wrapper) _does_ ship a real Svelte build
 (`@symbiote-native/slider/svelte`) through the same `createNode`-by-ViewConfig path Svelte uses
 for its own primitives — that wrapper is what makes this one third-party native view usable from
-Svelte at all; any *other* React-only component package stays React-adapter-only until it gets the
+Svelte at all; any _other_ React-only component package stays React-adapter-only until it gets the
 same treatment.
 
 ---
@@ -116,7 +116,7 @@ re-enters itself while mounting and blows the JS stack — `Maximum call stack s
 override, since RN's default Metro config doesn't know to do this on its own.
 
 A smaller one: Svelte's compiler only trims LEADING/TRAILING whitespace inside a fragment —
-whitespace strictly *between* two sibling non-text nodes collapses to a real text node and is
+whitespace strictly _between_ two sibling non-text nodes collapses to a real text node and is
 kept. That's invisible on the web, but a stray text node between siblings under a non-`Text`
 parent is an invalid Fabric child on this DOM shim, so markup inside an `{#each}`/`{#if}` chain
 over host primitives has to avoid it — this repo carries a device-verified regression test

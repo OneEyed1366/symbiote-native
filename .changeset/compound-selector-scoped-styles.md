@@ -1,6 +1,6 @@
 ---
-"@symbiote-native/css-parser": patch
-"@symbiote-native/engine": patch
+'@symbiote-native/css-parser': patch
+'@symbiote-native/engine': patch
 ---
 
 Fix compound selectors (`.card.featured`) under a scoped `<style>` block. The parser emitted the

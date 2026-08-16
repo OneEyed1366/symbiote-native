@@ -270,7 +270,11 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
         _event: ISymbioteEvent,
         gestureState: IPanResponderGestureState,
       ): void => {
-        const intent = resolveSwipeIntent(gestureState, stateRef.current.isOpen, optionsRef.current);
+        const intent = resolveSwipeIntent(
+          gestureState,
+          stateRef.current.isOpen,
+          optionsRef.current,
+        );
         const open = intent === 'open';
         dlog(`Drawer: gesture release -> ${open ? 'open' : 'close'}`);
         animateProgressTo(open);

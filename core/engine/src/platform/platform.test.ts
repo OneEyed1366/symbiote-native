@@ -107,7 +107,9 @@ describe('Platform (iOS) — derived getters, each proven against its own fresh 
 
   async function loadPlatformWith(constants: IPlatformConstantsIOS): Promise<typeof Platform> {
     vi.resetModules();
-    installFakeProxy({ PlatformConstants: { getConstants: (): IPlatformConstantsIOS => constants } });
+    installFakeProxy({
+      PlatformConstants: { getConstants: (): IPlatformConstantsIOS => constants },
+    });
     const imported = await import('./index');
     return imported.Platform;
   }
@@ -180,7 +182,9 @@ describe('Platform (Android)', () => {
     constants: Record<string, unknown>,
   ): Promise<typeof import('./index.android').Platform> {
     vi.resetModules();
-    installFakeProxy({ PlatformConstants: { getConstants: (): Record<string, unknown> => constants } });
+    installFakeProxy({
+      PlatformConstants: { getConstants: (): Record<string, unknown> => constants },
+    });
     const imported = await import('./index.android');
     return imported.Platform;
   }

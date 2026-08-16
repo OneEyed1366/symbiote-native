@@ -1,7 +1,7 @@
 ---
-"@symbiote-native/brightness": minor
-"@symbiote-native/cellular": minor
-"@symbiote-native/tracking-transparency": minor
+'@symbiote-native/brightness': minor
+'@symbiote-native/cellular': minor
+'@symbiote-native/tracking-transparency': minor
 ---
 
 Surface a failed permission fetch instead of losing it. `usePermissions` auto-fetches the current
@@ -12,11 +12,11 @@ could not tell a device that denied the read from one that had not answered yet.
 Every adapter now exposes an `error` of type `Error | null` beside `status`, so the two states read
 apart:
 
-| status | error | meaning |
-| --- | --- | --- |
-| `null` | `null` | not fetched yet |
-| `null` | `Error` | the automatic fetch failed |
-| response | `null` | fetched |
+| status   | error   | meaning                    |
+| -------- | ------- | -------------------------- |
+| `null`   | `null`  | not fetched yet            |
+| `null`   | `Error` | the automatic fetch failed |
+| response | `null`  | fetched                    |
 
 A later successful `get()` / `request()` clears `error`, so a stale failure cannot sit next to a
 fresh status. Hand-called `get()` and `request()` still REJECT to their direct caller - only the

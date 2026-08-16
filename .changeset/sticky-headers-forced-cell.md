@@ -1,8 +1,8 @@
 ---
-"@symbiote-native/components": patch
-"@symbiote-native/angular": patch
-"@symbiote-native/react": patch
-"@symbiote-native/vue": patch
+'@symbiote-native/components': patch
+'@symbiote-native/angular': patch
+'@symbiote-native/react': patch
+'@symbiote-native/vue': patch
 ---
 
 Keep sticky headers correct when a cell is force-rendered. `VirtualizedList` can render a cell

@@ -132,7 +132,11 @@ describe('I18nManager', () => {
     // why: localeIdentifier is the one OPTIONAL field -- an invalid type for it must
     // not poison the two required booleans, which are still valid and usable.
     it('drops an invalid localeIdentifier without falling back on the valid booleans', async () => {
-      await loadWithModule(() => ({ isRTL: true, doLeftAndRightSwapInRTL: false, localeIdentifier: 42 }));
+      await loadWithModule(() => ({
+        isRTL: true,
+        doLeftAndRightSwapInRTL: false,
+        localeIdentifier: 42,
+      }));
       expect(I18nManager.isRTL).toBe(true);
       expect(I18nManager.doLeftAndRightSwapInRTL).toBe(false);
       expect(I18nManager.getConstants().localeIdentifier).toBeUndefined();

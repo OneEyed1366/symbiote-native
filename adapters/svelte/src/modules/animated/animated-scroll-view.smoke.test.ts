@@ -129,10 +129,7 @@ function isScrollHandle(
   value: unknown,
 ): value is { scrollTo: unknown; getScrollNode: () => unknown } {
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    'scrollTo' in value &&
-    'getScrollNode' in value
+    typeof value === 'object' && value !== null && 'scrollTo' in value && 'getScrollNode' in value
   );
 }
 

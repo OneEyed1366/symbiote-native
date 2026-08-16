@@ -1,11 +1,7 @@
 import { dlog } from '@symbiote-native/engine';
 import { hide } from './hide';
 import { getHideAnimationConstants } from './native-module';
-import type {
-  IHideAnimationConfig,
-  IHideAnimationConstants,
-  IHideAnimationFailure,
-} from './types';
+import type { IHideAnimationConfig, IHideAnimationConstants, IHideAnimationFailure } from './types';
 
 type IReadinessState = {
   layoutReady: boolean;

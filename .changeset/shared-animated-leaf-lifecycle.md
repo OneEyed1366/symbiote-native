@@ -1,9 +1,9 @@
 ---
-"@symbiote-native/engine": minor
-"@symbiote-native/angular": patch
-"@symbiote-native/react": patch
-"@symbiote-native/svelte": patch
-"@symbiote-native/vue": patch
+'@symbiote-native/engine': minor
+'@symbiote-native/angular': patch
+'@symbiote-native/react': patch
+'@symbiote-native/svelte': patch
+'@symbiote-native/vue': patch
 ---
 
 Move the AnimatedProps leaf lifecycle into the engine, where it should always have lived. Building

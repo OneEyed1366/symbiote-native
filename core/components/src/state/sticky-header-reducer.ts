@@ -226,7 +226,9 @@ export function reduceSticky(
         arraysEqual(previousInputRange, inputRange) &&
         arraysEqual(previousOutputRange, outputRange)
       ) {
-        dlog(`STICKY[reducer ${headerTag(state)}] inputs-changed: ranges unchanged, skipped rebuild`);
+        dlog(
+          `STICKY[reducer ${headerTag(state)}] inputs-changed: ranges unchanged, skipped rebuild`,
+        );
         return { state, effects: [], changed: false };
       }
       dlog(

@@ -45,7 +45,12 @@ import {
   type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { anchorHostStyle, RefreshControlHost, SymbioteHostPropsDirective, SymbioteStyleInputDirective } from '../../primitives';
+import {
+  anchorHostStyle,
+  RefreshControlHost,
+  SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
+} from '../../primitives';
 
 // Record<string, unknown> already tolerates `style` holding the [anchorHostStyle, this.style]
 // array anchorHostStyle's merge produces (see hostProps below) — no widening needed.

@@ -1,5 +1,5 @@
 ---
-"@symbiote-native/navigation": minor
+'@symbiote-native/navigation': minor
 ---
 
 Keep the navigators in step with their registered screens, and stop the drawer from disagreeing

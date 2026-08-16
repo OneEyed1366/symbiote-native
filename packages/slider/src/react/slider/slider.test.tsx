@@ -198,7 +198,10 @@ describe('React Slider wrapper', () => {
     });
 
     it('resolves disabled from accessibilityState when no explicit boolean', () => {
-      mount(ROOT_TAG, createElement(Slider, { value: 0.2, accessibilityState: { disabled: true } }));
+      mount(
+        ROOT_TAG,
+        createElement(Slider, { value: 0.2, accessibilityState: { disabled: true } }),
+      );
       expect(sliderNode().props.disabled).toBe(true);
     });
 

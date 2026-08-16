@@ -1,9 +1,9 @@
 ---
-"@symbiote-native/keep-awake": patch
-"@symbiote-native/clipboard": patch
-"@symbiote-native/engine": patch
-"@symbiote-native/svelte": patch
-"@symbiote-native/vue": patch
+'@symbiote-native/keep-awake': patch
+'@symbiote-native/clipboard': patch
+'@symbiote-native/engine': patch
+'@symbiote-native/svelte': patch
+'@symbiote-native/vue': patch
 ---
 
 Four unrelated defects, each small and each previously invisible in tests.

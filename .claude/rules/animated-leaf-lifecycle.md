@@ -1,7 +1,7 @@
 ---
 paths:
-  - "adapters/*/src/modules/animated/**"
-  - "core/engine/src/animated/leaf-lifecycle.ts"
+  - 'adapters/*/src/modules/animated/**'
+  - 'core/engine/src/animated/leaf-lifecycle.ts'
 ---
 
 # The AnimatedProps leaf lifecycle is the ENGINE's - do not re-derive it per adapter

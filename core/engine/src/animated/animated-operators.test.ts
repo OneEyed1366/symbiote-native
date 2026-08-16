@@ -260,7 +260,10 @@ describe('Animated operators — native __getNativeConfig types (Positive)', () 
   it.each([
     ['addition', () => new AnimatedAddition(new AnimatedValue(1), new AnimatedValue(2))],
     ['subtraction', () => new AnimatedSubtraction(new AnimatedValue(1), new AnimatedValue(2))],
-    ['multiplication', () => new AnimatedMultiplication(new AnimatedValue(1), new AnimatedValue(2))],
+    [
+      'multiplication',
+      () => new AnimatedMultiplication(new AnimatedValue(1), new AnimatedValue(2)),
+    ],
     ['division', () => new AnimatedDivision(new AnimatedValue(1), new AnimatedValue(2))],
     ['modulus', () => new AnimatedModulo(new AnimatedValue(1), 5)],
     ['diffclamp', () => new AnimatedDiffClamp(new AnimatedValue(0), 0, 10)],

@@ -129,7 +129,10 @@ describe('React TouchableNativeFeedback', () => {
   it('characterization: useForeground falls back to nativeBackgroundAndroid on this host', () => {
     mount(
       ROOT_TAG,
-      <TouchableNativeFeedback useForeground background={TouchableNativeFeedback.Ripple('#0f0', false)}>
+      <TouchableNativeFeedback
+        useForeground
+        background={TouchableNativeFeedback.Ripple('#0f0', false)}
+      >
         <View />
       </TouchableNativeFeedback>,
     );
@@ -142,7 +145,7 @@ describe('React TouchableNativeFeedback', () => {
   // why: canUseNativeForeground() is exposed as a static so callers can branch their own UI on
   // it (RN does the same) — proves it is reachable as a real boolean, and matches the platform
   // gate this host resolves to (false, since Platform.OS is 'ios' headless).
-  it('exposes canUseNativeForeground() reflecting this host\'s platform gate', () => {
+  it("exposes canUseNativeForeground() reflecting this host's platform gate", () => {
     expect(TouchableNativeFeedback.canUseNativeForeground()).toBe(false);
   });
 });

@@ -43,8 +43,8 @@ const upstreamTransformer = resolveUpstreamTransformer();
 // in non-Node environment". Wiring Node's own `fs` straight through is simpler than a second
 // registerTS-style loader.
 const compileScriptFs = {
-  fileExists: (file) => nodeFs.existsSync(file),
-  readFile: (file) => {
+  fileExists: file => nodeFs.existsSync(file),
+  readFile: file => {
     try {
       return nodeFs.readFileSync(file, 'utf-8');
     } catch {
@@ -79,7 +79,7 @@ function createScopeClassNodeTransform(localNames, scopeId) {
         prop.value.content = prop.value.content
           .split(/\s+/)
           .filter(Boolean)
-          .map((token) => {
+          .map(token => {
             const camelToken = kebabToCamel(token);
             return localNames.has(camelToken) ? `${camelToken}__${scopeId}` : camelToken;
           })
@@ -244,7 +244,10 @@ async function compileSfc(src, filename) {
   });
   // Retargets every Vue import (compiler-injected helpers AND the user's own `from 'vue'`) at
   // the runtime-helpers shim - no vue/runtime-dom in a native bundle.
-  const code = compiled.content.replace(/from\s*(['"])vue\1/g, 'from "@symbiote-native/vue/runtime-helpers"');
+  const code = compiled.content.replace(
+    /from\s*(['"])vue\1/g,
+    'from "@symbiote-native/vue/runtime-helpers"',
+  );
 
   if (Object.keys(styles).length === 0) return code;
 
@@ -267,7 +270,10 @@ async function compileSfc(src, filename) {
     preamble.push(`const ${bindingName} = ${JSON.stringify(classMap)};`);
   }
 
-  return [`import { ${engineImports} } from '@symbiote-native/engine';`, ...preamble, code].join('\n') + '\n';
+  return (
+    [`import { ${engineImports} } from '@symbiote-native/engine';`, ...preamble, code].join('\n') +
+    '\n'
+  );
 }
 
 // Exported separately from `transform` so tests can assert on the compiled SFC output
@@ -294,7 +300,11 @@ module.exports.transform = async function transform(params) {
   // compileCssFile path. isStyleFile recognizes .css/.scss/.sass/.less/.styl/.stylus (+ .module.* twins).
   if (isStyleFile(params.filename)) {
     const { code } = await compileCssFile(params.src, params.filename);
-    return upstreamTransformer.transform({ ...params, src: code, filename: params.filename + '.js' });
+    return upstreamTransformer.transform({
+      ...params,
+      src: code,
+      filename: params.filename + '.js',
+    });
   }
   return upstreamTransformer.transform(params);
 };

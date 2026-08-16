@@ -44,7 +44,12 @@ import {
   type IStyleProp,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { anchorHostStyle, SymbioteHostPropsDirective, SymbioteStyleInputDirective, ViewHost } from '../../primitives';
+import {
+  anchorHostStyle,
+  SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
+  ViewHost,
+} from '../../primitives';
 
 export type { IPressState, IPressableAndroidRippleConfig } from '@symbiote-native/components';
 

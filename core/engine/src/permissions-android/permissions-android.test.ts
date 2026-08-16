@@ -214,14 +214,12 @@ describe('PermissionsAndroid.request with a rationale', () => {
       ),
       requestMultiplePermissions: record('requestMultiplePermissions', {}),
     };
-    const registeredModules: Record<string, unknown> = { PermissionsAndroid: fakePermissionsAndroid };
+    const registeredModules: Record<string, unknown> = {
+      PermissionsAndroid: fakePermissionsAndroid,
+    };
     if (options.dialogPresent) {
       registeredModules.DialogManagerAndroid = {
-        showAlert: (
-          alertRationale: unknown,
-          onError: () => void,
-          onAction: () => void,
-        ): void => {
+        showAlert: (alertRationale: unknown, onError: () => void, onAction: () => void): void => {
           showAlertCalls.push({ rationale: alertRationale, onError, onAction });
         },
       };

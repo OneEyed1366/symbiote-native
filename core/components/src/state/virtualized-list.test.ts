@@ -655,7 +655,15 @@ describe('averageMeasuredLength', () => {
   });
 
   it('averages the measured cell lengths', () => {
-    expect(averageMeasuredLength(new Map([[0, 20], [1, 40], [2, 60]]))).toBe(40);
+    expect(
+      averageMeasuredLength(
+        new Map([
+          [0, 20],
+          [1, 40],
+          [2, 60],
+        ]),
+      ),
+    ).toBe(40);
   });
 });
 
@@ -667,7 +675,16 @@ describe('highestMeasuredIndex', () => {
   // why: measurement arrives out of order (cells scroll into view non-sequentially) — the
   // result must be the max KEY, not the last-inserted entry.
   it('reports the highest measured index regardless of insertion order', () => {
-    expect(highestMeasuredIndex(new Map([[5, 10], [2, 10], [8, 10], [1, 10]]))).toBe(8);
+    expect(
+      highestMeasuredIndex(
+        new Map([
+          [5, 10],
+          [2, 10],
+          [8, 10],
+          [1, 10],
+        ]),
+      ),
+    ).toBe(8);
   });
 });
 
@@ -735,7 +752,9 @@ describe('computeViewableSet', () => {
   const data = ['a', 'b', 'c'];
   const getItem = (_source: unknown, index: number): string => data[index];
 
-  function pairsWith(config: Parameters<typeof isCellViewable>[1]): IViewabilityConfigCallbackPair<string>[] {
+  function pairsWith(
+    config: Parameters<typeof isCellViewable>[1],
+  ): IViewabilityConfigCallbackPair<string>[] {
     return [{ viewabilityConfig: config, onViewableItemsChanged: () => {} }];
   }
 

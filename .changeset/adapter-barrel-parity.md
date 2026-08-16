@@ -1,7 +1,7 @@
 ---
-"@symbiote-native/angular": minor
-"@symbiote-native/react": minor
-"@symbiote-native/vue": minor
+'@symbiote-native/angular': minor
+'@symbiote-native/react': minor
+'@symbiote-native/vue': minor
 ---
 
 Close 22 gaps in the adapters' public barrels. About half of each adapter's surface is names

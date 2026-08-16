@@ -116,162 +116,165 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
     // why: the core await contract — pending renders first, then swaps to the resolved value once
     // the promise settles, with the pending subtree fully gone rather than left alongside it.
     it('paints pending, then swaps to then when the promise resolves AFTER mount', async () => {
-    const Awaiter = await compileComponent(
-      `<script>let { promise } = $props();</script>` +
-        `{#await promise}${branchMarkup('pending', 'loading')}` +
-        `{:then value}<symbiote-view p={{ testID: 'then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>` +
-        `{:catch error}${branchMarkup('catch', 'boom')}{/await}`,
-      'Awaiter',
-    );
+      const Awaiter = await compileComponent(
+        `<script>let { promise } = $props();</script>` +
+          `{#await promise}${branchMarkup('pending', 'loading')}` +
+          `{:then value}<symbiote-view p={{ testID: 'then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>` +
+          `{:catch error}${branchMarkup('catch', 'boom')}{/await}`,
+        'Awaiter',
+      );
 
-    const gate = deferred();
-    mount(ROOT_TAG, Awaiter, { promise: gate.promise });
-    await tick();
+      const gate = deferred();
+      mount(ROOT_TAG, Awaiter, { promise: gate.promise });
+      await tick();
 
-    // Exactly the pending branch — not pending PLUS an anchor-turned-RCTRawText, and not both
-    // branches at once.
-    expect(testIds()).toEqual(['pending']);
-    expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "loading"))');
+      // Exactly the pending branch — not pending PLUS an anchor-turned-RCTRawText, and not both
+      // branches at once.
+      expect(testIds()).toEqual(['pending']);
+      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "loading"))');
 
-    gate.resolve('ready');
-    await tick();
-    await tick();
+      gate.resolve('ready');
+      await tick();
+      await tick();
 
-    // The pending subtree must be GONE, not merely followed by the then subtree.
-    expect(testIds()).toEqual(['then']);
-    expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "ready"))');
-  });
+      // The pending subtree must be GONE, not merely followed by the then subtree.
+      expect(testIds()).toEqual(['then']);
+      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "ready"))');
+    });
 
-  // why: the short form has no pending snippet at all, so the block must contribute a real engine
-  // anchor (not an empty RCTRawText) while unresolved — the "empty text node is an anchor" rule
-  // from dom-shim/text.ts, exercised here through a construct that has no other branch to fall
-  // back on if that rule is wrong.
-  it('renders nothing until resolution in the `{#await expr then value}` short form', async () => {
-    const Awaiter = await compileComponent(
-      `<script>let { promise } = $props();</script>` +
-        `{#await promise then value}<symbiote-view p={{ testID: 'then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>{/await}`,
-      'AwaiterShort',
-    );
+    // why: the short form has no pending snippet at all, so the block must contribute a real engine
+    // anchor (not an empty RCTRawText) while unresolved — the "empty text node is an anchor" rule
+    // from dom-shim/text.ts, exercised here through a construct that has no other branch to fall
+    // back on if that rule is wrong.
+    it('renders nothing until resolution in the `{#await expr then value}` short form', async () => {
+      const Awaiter = await compileComponent(
+        `<script>let { promise } = $props();</script>` +
+          `{#await promise then value}<symbiote-view p={{ testID: 'then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>{/await}`,
+        'AwaiterShort',
+      );
 
-    const gate = deferred();
-    mount(ROOT_TAG, Awaiter, { promise: gate.promise });
-    await tick();
+      const gate = deferred();
+      mount(ROOT_TAG, Awaiter, { promise: gate.promise });
+      await tick();
 
-    // No pending branch exists, so the block contributes NO native node — its anchor must be a
-    // real engine anchor the commit walk skips, never an empty RCTRawText (dom-shim/text.ts's
-    // "an empty text node is an anchor" rule). A stray node here would be a genuine paint bug.
-    expect(appChildren()).toHaveLength(0);
+      // No pending branch exists, so the block contributes NO native node — its anchor must be a
+      // real engine anchor the commit walk skips, never an empty RCTRawText (dom-shim/text.ts's
+      // "an empty text node is an anchor" rule). A stray node here would be a genuine paint bug.
+      expect(appChildren()).toHaveLength(0);
 
-    gate.resolve('late');
-    await tick();
-    await tick();
+      gate.resolve('late');
+      await tick();
+      await tick();
 
-    expect(testIds()).toEqual(['then']);
-    expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "late"))');
-  });
+      expect(testIds()).toEqual(['then']);
+      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "late"))');
+    });
 
-  // why: the re-entrancy case — the first promise's `.then` still fires after it was replaced,
-  // and await.js's own `destroyed` guard is what must keep it from re-installing a stale branch.
-  // Without this, a fast-changing async prop (e.g. a search-as-you-type query) could flash a
-  // response for a request the user has already moved on from.
-  it('handles a NEW promise swapped in while the first is still pending', async () => {
-    // The component publishes its setter onto the props object so the test can drive the swap
-    // through the same reactive path app code would.
-    const Awaiter = await compileComponent(
-      `<script>
+    // why: the re-entrancy case — the first promise's `.then` still fires after it was replaced,
+    // and await.js's own `destroyed` guard is what must keep it from re-installing a stale branch.
+    // Without this, a fast-changing async prop (e.g. a search-as-you-type query) could flash a
+    // response for a request the user has already moved on from.
+    it('handles a NEW promise swapped in while the first is still pending', async () => {
+      // The component publishes its setter onto the props object so the test can drive the swap
+      // through the same reactive path app code would.
+      const Awaiter = await compileComponent(
+        `<script>
          let { control } = $props();
          let current = $state(control.initial);
          control.swap = next => { current = next; };
        </script>` +
-        `{#await current}${branchMarkup('pending', 'loading')}` +
-        `{:then value}<symbiote-view p={{ testID: 'then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>` +
-        `{:catch error}${branchMarkup('catch', 'boom')}{/await}`,
-      'AwaiterSwap',
-    );
+          `{#await current}${branchMarkup('pending', 'loading')}` +
+          `{:then value}<symbiote-view p={{ testID: 'then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>` +
+          `{:catch error}${branchMarkup('catch', 'boom')}{/await}`,
+        'AwaiterSwap',
+      );
 
-    const first = deferred();
-    const second = deferred();
-    const control: { initial: Promise<string>; swap: (next: Promise<string>) => void } = {
-      initial: first.promise,
-      swap: () => {},
-    };
+      const first = deferred();
+      const second = deferred();
+      const control: { initial: Promise<string>; swap: (next: Promise<string>) => void } = {
+        initial: first.promise,
+        swap: () => {},
+      };
 
-    mount(ROOT_TAG, Awaiter, { control });
-    await tick();
-    expect(testIds()).toEqual(['pending']);
+      mount(ROOT_TAG, Awaiter, { control });
+      await tick();
+      expect(testIds()).toEqual(['pending']);
 
-    control.swap(second.promise);
-    await tick();
-    expect(testIds()).toEqual(['pending']);
+      control.swap(second.promise);
+      await tick();
+      expect(testIds()).toEqual(['pending']);
 
-    // The abandoned promise resolves first — its branch must never appear.
-    first.resolve('stale');
-    await tick();
-    await tick();
-    expect(testIds()).toEqual(['pending']);
+      // The abandoned promise resolves first — its branch must never appear.
+      first.resolve('stale');
+      await tick();
+      await tick();
+      expect(testIds()).toEqual(['pending']);
 
-    second.resolve('fresh');
-    await tick();
-    await tick();
-    expect(testIds()).toEqual(['then']);
-    expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "fresh"))');
+      second.resolve('fresh');
+      await tick();
+      await tick();
+      expect(testIds()).toEqual(['then']);
+      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "fresh"))');
+    });
+
+    // why: three sibling {#await} blocks inside one keyed {#each}, resolving OUT of order. Each
+    // block owns its own anchor inside the shared each-block parent, so a mis-ordered insertion
+    // (the ShimNode.insertBefore/anchor path) shows up as a permuted child list, and a leaked
+    // anchor shows up as an extra child — this is the case that actually exercises anchor identity
+    // across multiple independent await instances, which the single-block tests above cannot.
+    it('interleaves block anchors correctly when nested inside {#each}', async () => {
+      const List = await compileComponent(
+        `<script>let { rows } = $props();</script>` +
+          `<symbiote-view p={{ testID: 'list' }}>` +
+          `{#each rows as row (row.key)}` +
+          `{#await row.promise}<symbiote-view p={{ testID: row.key + '-pending' }}></symbiote-view>` +
+          `{:then value}<symbiote-view p={{ testID: row.key + '-then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>{/await}` +
+          `{/each}` +
+          `</symbiote-view>`,
+        'AwaitInEach',
+      );
+
+      const gates = [deferred(), deferred(), deferred()];
+      const rows = gates.map((gate, index) => ({
+        key: `r${String(index)}`,
+        promise: gate.promise,
+      }));
+      mount(ROOT_TAG, List, { rows });
+      await tick();
+
+      const listChildren = (): IFakeNode[] => appChildren()[0]?.children ?? [];
+      expect(listChildren().map(child => child.props.testID)).toEqual([
+        'r0-pending',
+        'r1-pending',
+        'r2-pending',
+      ]);
+
+      // Middle first, then last, then first — every insertion lands between live siblings.
+      gates[1]?.resolve('one');
+      await tick();
+      await tick();
+      expect(listChildren().map(child => child.props.testID)).toEqual([
+        'r0-pending',
+        'r1-then',
+        'r2-pending',
+      ]);
+
+      gates[2]?.resolve('two');
+      gates[0]?.resolve('zero');
+      await tick();
+      await tick();
+      expect(listChildren().map(child => child.props.testID)).toEqual([
+        'r0-then',
+        'r1-then',
+        'r2-then',
+      ]);
+      expect(fabric.serialize(listChildren())).toBe(
+        'RCTView(RCTText(RCTRawText "zero"))RCTView(RCTText(RCTRawText "one"))RCTView(RCTText(RCTRawText "two"))',
+      );
+    });
   });
 
-  // why: three sibling {#await} blocks inside one keyed {#each}, resolving OUT of order. Each
-  // block owns its own anchor inside the shared each-block parent, so a mis-ordered insertion
-  // (the ShimNode.insertBefore/anchor path) shows up as a permuted child list, and a leaked
-  // anchor shows up as an extra child — this is the case that actually exercises anchor identity
-  // across multiple independent await instances, which the single-block tests above cannot.
-  it('interleaves block anchors correctly when nested inside {#each}', async () => {
-    const List = await compileComponent(
-      `<script>let { rows } = $props();</script>` +
-        `<symbiote-view p={{ testID: 'list' }}>` +
-        `{#each rows as row (row.key)}` +
-        `{#await row.promise}<symbiote-view p={{ testID: row.key + '-pending' }}></symbiote-view>` +
-        `{:then value}<symbiote-view p={{ testID: row.key + '-then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>{/await}` +
-        `{/each}` +
-        `</symbiote-view>`,
-      'AwaitInEach',
-    );
-
-    const gates = [deferred(), deferred(), deferred()];
-    const rows = gates.map((gate, index) => ({ key: `r${String(index)}`, promise: gate.promise }));
-    mount(ROOT_TAG, List, { rows });
-    await tick();
-
-    const listChildren = (): IFakeNode[] => appChildren()[0]?.children ?? [];
-    expect(listChildren().map(child => child.props.testID)).toEqual([
-      'r0-pending',
-      'r1-pending',
-      'r2-pending',
-    ]);
-
-    // Middle first, then last, then first — every insertion lands between live siblings.
-    gates[1]?.resolve('one');
-    await tick();
-    await tick();
-    expect(listChildren().map(child => child.props.testID)).toEqual([
-      'r0-pending',
-      'r1-then',
-      'r2-pending',
-    ]);
-
-    gates[2]?.resolve('two');
-    gates[0]?.resolve('zero');
-    await tick();
-    await tick();
-    expect(listChildren().map(child => child.props.testID)).toEqual([
-      'r0-then',
-      'r1-then',
-      'r2-then',
-    ]);
-    expect(fabric.serialize(listChildren())).toBe(
-      'RCTView(RCTText(RCTRawText "zero"))RCTView(RCTText(RCTRawText "one"))RCTView(RCTText(RCTRawText "two"))',
-    );
-  });
-  });
-
-  describe('Recovers (rejected promise — {#await}\'s job is to catch it, not propagate it)', () => {
+  describe("Recovers (rejected promise — {#await}'s job is to catch it, not propagate it)", () => {
     // why: {:catch} exists specifically to turn a rejection into a rendered fallback instead of
     // an uncaught rejection reaching the app — this pins that the error's own message actually
     // reaches the catch snippet, not just that SOMETHING renders.

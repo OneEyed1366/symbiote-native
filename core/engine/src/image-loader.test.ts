@@ -221,9 +221,7 @@ describe('imageStatics', () => {
         ...defaultFakeImageLoader(),
         queryCache: () => Promise.reject(new Error('cache lookup failed')),
       });
-      await expect(imageStatics.queryCache(['https://a'])).rejects.toThrow(
-        'cache lookup failed',
-      );
+      await expect(imageStatics.queryCache(['https://a'])).rejects.toThrow('cache lookup failed');
     });
   });
 });

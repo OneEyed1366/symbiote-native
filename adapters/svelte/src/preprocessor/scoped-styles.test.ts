@@ -252,9 +252,7 @@ describe('scopedStyles preprocessor', () => {
 
       expect(lines[4]).toContain('<View class="card__');
       // The injected module script is appended AFTER everything, so nothing above it moves.
-      expect(lines.slice(0, 9).some(line => line.includes('__symbioteRegisterStyles'))).toBe(
-        false,
-      );
+      expect(lines.slice(0, 9).some(line => line.includes('__symbioteRegisterStyles'))).toBe(false);
     });
 
     // why: this preprocessor exists specifically to make the compiler's own CSS output a no-op

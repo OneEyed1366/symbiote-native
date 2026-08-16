@@ -102,7 +102,10 @@ describe('getNativeModule', () => {
           },
         },
       );
-      Object.assign(globalThis, { __turboModuleProxy: undefined, nativeModuleProxy: throwingProxy });
+      Object.assign(globalThis, {
+        __turboModuleProxy: undefined,
+        nativeModuleProxy: throwingProxy,
+      });
 
       expect(() => getNativeModule('AnyManager')).not.toThrow();
       expect(getNativeModule('AnyManager')).toBeNull();

@@ -359,7 +359,10 @@ describe('TextInput (real compiled index.svelte)', () => {
     const setSelectionCommand = fabric.commands.find(
       c => c.commandName === 'setTextAndSelection' && c.args[2] === 1 && c.args[3] === 2,
     );
-    expect(setSelectionCommand, 'setSelection dispatched setTextAndSelection(…, 1, 2)').toBeDefined();
+    expect(
+      setSelectionCommand,
+      'setSelection dispatched setTextAndSelection(…, 1, 2)',
+    ).toBeDefined();
     expect(setSelectionCommand?.args[1]).toBe('hi');
   });
 

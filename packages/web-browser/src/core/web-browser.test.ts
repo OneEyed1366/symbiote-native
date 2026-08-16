@@ -92,15 +92,12 @@ afterEach(() => {
 describe('openBrowserAsync', () => {
   describe('Positive', () => {
     it('passes the url and options through to the native module', async () => {
-      await expect(
-        openBrowserAsync('https://example.com', { showTitle: true }),
-      ).resolves.toEqual({
+      await expect(openBrowserAsync('https://example.com', { showTitle: true })).resolves.toEqual({
         type: 'opened',
       });
-      expect(FAKE_NATIVE_WEB_BROWSER.openBrowserAsync).toHaveBeenCalledWith(
-        'https://example.com',
-        { showTitle: true },
-      );
+      expect(FAKE_NATIVE_WEB_BROWSER.openBrowserAsync).toHaveBeenCalledWith('https://example.com', {
+        showTitle: true,
+      });
     });
 
     it('runs the three color options through processColor', async () => {
@@ -111,14 +108,11 @@ describe('openBrowserAsync', () => {
         secondaryToolbarColor: 'blue',
         controlsColor: 'red',
       });
-      expect(FAKE_NATIVE_WEB_BROWSER.openBrowserAsync).toHaveBeenCalledWith(
-        'https://example.com',
-        {
-          toolbarColor: 'processed:#ffffff',
-          secondaryToolbarColor: 'processed:blue',
-          controlsColor: 'processed:red',
-        },
-      );
+      expect(FAKE_NATIVE_WEB_BROWSER.openBrowserAsync).toHaveBeenCalledWith('https://example.com', {
+        toolbarColor: 'processed:#ffffff',
+        secondaryToolbarColor: 'processed:blue',
+        controlsColor: 'processed:red',
+      });
     });
   });
 
@@ -154,9 +148,7 @@ describe('dismissBrowser', () => {
       // @ts-expect-error -- simulating Android, where the native module has no such method
       FAKE_NATIVE_WEB_BROWSER.dismissBrowser = undefined;
 
-      expect(() => dismissBrowser()).toThrow(
-        'dismissBrowser is not available on expo-web-browser',
-      );
+      expect(() => dismissBrowser()).toThrow('dismissBrowser is not available on expo-web-browser');
 
       FAKE_NATIVE_WEB_BROWSER.dismissBrowser = native;
     });
@@ -212,7 +204,9 @@ describe('the Custom Tabs service functions', () => {
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_WEB_BROWSER.warmUpAsync = undefined;
 
-      await expect(warmUpAsync()).rejects.toThrow('warmUpAsync is not available on expo-web-browser');
+      await expect(warmUpAsync()).rejects.toThrow(
+        'warmUpAsync is not available on expo-web-browser',
+      );
 
       FAKE_NATIVE_WEB_BROWSER.warmUpAsync = native;
     });
@@ -397,46 +391,43 @@ describe('openAuthSessionAsync on Android', () => {
       FAKE_NATIVE_WEB_BROWSER.dismissBrowser = nativeDismiss;
     });
 
-    it(
-      // characterization: the reentrancy guard fires — a second concurrent session IS rejected —
-      // but through the "invalid state with a redirect handler set" branch, not the more clearly
-      // worded "already open, only one can be open at a time" branch below it in source. Both
-      // internal flags (redirectSubscription, onWebBrowserCloseAndroid) are set together at the
-      // top of openAuthSessionPolyfillAsync's Promise.race, and redirectSubscription's check runs
-      // first, so the second check reads as dead code under every path reachable from the public
-      // API. [characterization — behavior not confirmed as intentional]
-      'rejects a second concurrent Android auth session while one is in flight',
-      async () => {
-        // QUESTION: is the "already open, only one can be open at a time" guard meant to ever be
-        // the one that actually fires, or is it intentionally a defensive belt-and-suspenders
-        // check behind the redirectSubscription guard? The message reaching real callers today
-        // ("...invalid state with a redirect handler set...") reads like an internal-invariant
-        // violation, not a normal "you already have a session open" user-facing error — worth
-        // confirming with whoever owns this port before relying on the message text anywhere.
-        fakePlatform.OS = 'android';
-        const { openAuthSessionAsync: nativeAuth, dismissBrowser: nativeDismiss } =
-          FAKE_NATIVE_WEB_BROWSER;
-        // @ts-expect-error -- simulating Android's native surface
-        FAKE_NATIVE_WEB_BROWSER.openAuthSessionAsync = undefined;
-        // @ts-expect-error -- simulating Android's native surface
-        FAKE_NATIVE_WEB_BROWSER.dismissBrowser = undefined;
+    it(// characterization: the reentrancy guard fires — a second concurrent session IS rejected —
+    // but through the "invalid state with a redirect handler set" branch, not the more clearly
+    // worded "already open, only one can be open at a time" branch below it in source. Both
+    // internal flags (redirectSubscription, onWebBrowserCloseAndroid) are set together at the
+    // top of openAuthSessionPolyfillAsync's Promise.race, and redirectSubscription's check runs
+    // first, so the second check reads as dead code under every path reachable from the public
+    // API. [characterization — behavior not confirmed as intentional]
+    'rejects a second concurrent Android auth session while one is in flight', async () => {
+      // QUESTION: is the "already open, only one can be open at a time" guard meant to ever be
+      // the one that actually fires, or is it intentionally a defensive belt-and-suspenders
+      // check behind the redirectSubscription guard? The message reaching real callers today
+      // ("...invalid state with a redirect handler set...") reads like an internal-invariant
+      // violation, not a normal "you already have a session open" user-facing error — worth
+      // confirming with whoever owns this port before relying on the message text anywhere.
+      fakePlatform.OS = 'android';
+      const { openAuthSessionAsync: nativeAuth, dismissBrowser: nativeDismiss } =
+        FAKE_NATIVE_WEB_BROWSER;
+      // @ts-expect-error -- simulating Android's native surface
+      FAKE_NATIVE_WEB_BROWSER.openAuthSessionAsync = undefined;
+      // @ts-expect-error -- simulating Android's native surface
+      FAKE_NATIVE_WEB_BROWSER.dismissBrowser = undefined;
 
-        const firstSession = openAuthSessionAsync('https://login.example', 'myapp://callback');
-        await flush();
+      const firstSession = openAuthSessionAsync('https://login.example', 'myapp://callback');
+      await flush();
 
-        await expect(openAuthSessionAsync('https://other.example')).rejects.toThrow(
-          "invalid state with a redirect handler set",
-        );
+      await expect(openAuthSessionAsync('https://other.example')).rejects.toThrow(
+        'invalid state with a redirect handler set',
+      );
 
-        // Let the first session settle so its subscriptions are released before the next test.
-        emitAppState('active');
-        await flush();
-        await firstSession;
+      // Let the first session settle so its subscriptions are released before the next test.
+      emitAppState('active');
+      await flush();
+      await firstSession;
 
-        FAKE_NATIVE_WEB_BROWSER.openAuthSessionAsync = nativeAuth;
-        FAKE_NATIVE_WEB_BROWSER.dismissBrowser = nativeDismiss;
-      },
-    );
+      FAKE_NATIVE_WEB_BROWSER.openAuthSessionAsync = nativeAuth;
+      FAKE_NATIVE_WEB_BROWSER.dismissBrowser = nativeDismiss;
+    });
   });
 });
 

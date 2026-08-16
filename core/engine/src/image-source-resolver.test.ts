@@ -25,9 +25,8 @@ describe('image-source-resolver', () => {
 
   describe('after a resolver is registered', () => {
     it('resolveImageSource runs the registered resolver', async () => {
-      const { setImageSourceResolver, resolveImageSource } = await import(
-        './image-source-resolver'
-      );
+      const { setImageSourceResolver, resolveImageSource } =
+        await import('./image-source-resolver');
       setImageSourceResolver(source => ({ uri: `asset://${String(source)}` }));
       expect(resolveImageSource(7)).toEqual({ uri: 'asset://7' });
     });
@@ -36,9 +35,8 @@ describe('image-source-resolver', () => {
     // (e.g. app hot-reload, a test resetting state) must fully replace the prior resolver, not
     // compose with it.
     it('a later registration replaces the earlier one entirely', async () => {
-      const { setImageSourceResolver, resolveImageSource } = await import(
-        './image-source-resolver'
-      );
+      const { setImageSourceResolver, resolveImageSource } =
+        await import('./image-source-resolver');
       setImageSourceResolver(() => 'first');
       setImageSourceResolver(() => 'second');
       expect(resolveImageSource(1)).toBe('second');

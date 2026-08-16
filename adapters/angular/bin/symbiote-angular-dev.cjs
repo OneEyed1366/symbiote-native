@@ -68,7 +68,10 @@ if (initialBuild.status !== 0) {
 }
 
 const watchTsconfigPath = resolveWatchTsconfig(TSCONFIG);
-const ngcWatch = spawn('ngc', ['-p', watchTsconfigPath, '--watch'], { stdio: 'inherit', shell: true });
+const ngcWatch = spawn('ngc', ['-p', watchTsconfigPath, '--watch'], {
+  stdio: 'inherit',
+  shell: true,
+});
 const metro = spawn('react-native', ['start', ...metroArgs], { stdio: 'inherit', shell: true });
 
 function stopNgcWatch() {
@@ -78,7 +81,7 @@ function stopNgcWatch() {
   }
 }
 
-metro.on('exit', (code) => {
+metro.on('exit', code => {
   stopNgcWatch();
   process.exit(code ?? 0);
 });

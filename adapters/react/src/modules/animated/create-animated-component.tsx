@@ -88,14 +88,17 @@ export function createAnimatedComponent<P extends IAnimatableProps>(
     // by every render anyway, so a dependency list could only ever say "always" - the real
     // rebuild-vs-skip decision is the lifecycle's, and it compares CONTENT by key identity.
     useEffect(() => {
-      lifecycle.reconcile(rest, isSymbioteNode(nodeRef.current) ? nodeRef.current : null, wantsNative);
+      lifecycle.reconcile(
+        rest,
+        isSymbioteNode(nodeRef.current) ? nodeRef.current : null,
+        wantsNative,
+      );
     });
 
     // Final teardown: detach the last-attached leaf and any native event bindings on unmount.
     useEffect(() => {
       return () => lifecycle.teardown();
     }, [lifecycle]);
-
 
     // Callback ref: when the base component mounts, capture its public instance, resolve
     // it to the underlying host node (unwrapping a scroll-container handle), record THAT

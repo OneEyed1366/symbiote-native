@@ -127,15 +127,12 @@ describe('insert', () => {
   // natively with a less legible error.
   it('rejects a raw text child inserted outside a <Text>', () => {
     expect(() =>
-      mount(
-        ROOT_TAG,
-        defineComponent({ setup: () => () => h(View, null, 'plain text') }),
-      ),
+      mount(ROOT_TAG, defineComponent({ setup: () => () => h(View, null, 'plain text') })),
     ).toThrow('must be rendered inside a <Text>');
   });
 });
 
-describe('createComment / createText(\'\') — Fragment and v-if placeholder anchors', () => {
+describe("createComment / createText('') — Fragment and v-if placeholder anchors", () => {
   // why: Vue represents a false v-if branch as a comment node, and a multi-root/v-for Fragment
   // boundary as an empty text node. Fabric has no comment/empty-text primitive, so both must
   // degrade to a non-painting anchor (never an RCTRawText, which WOULD paint) — otherwise toggling
@@ -182,7 +179,9 @@ describe('setElementText — <Text> content updates', () => {
     const label = ref('first');
     mount(ROOT_TAG, defineComponent({ setup: () => () => h(Text, null, label.value) }));
     await tick();
-    expect(findCommitted(n => n.viewName === 'RCTRawText' && n.props.text === 'first')).toBeDefined();
+    expect(
+      findCommitted(n => n.viewName === 'RCTRawText' && n.props.text === 'first'),
+    ).toBeDefined();
 
     label.value = 'second';
     await tick();
@@ -193,7 +192,9 @@ describe('setElementText — <Text> content updates', () => {
 
     label.value = 'third';
     await tick();
-    expect(findCommitted(n => n.viewName === 'RCTRawText' && n.props.text === 'third')).toBeDefined();
+    expect(
+      findCommitted(n => n.viewName === 'RCTRawText' && n.props.text === 'third'),
+    ).toBeDefined();
   });
 
   // why: a plain STRING child on the raw HOST INTRINSIC (Vue's TEXT_CHILDREN shape,

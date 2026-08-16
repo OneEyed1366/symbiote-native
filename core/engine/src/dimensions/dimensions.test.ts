@@ -111,7 +111,13 @@ describe('Dimensions', () => {
         DeviceInfo: {
           getConstants: () => ({
             Dimensions: {
-              windowPhysicalPixels: { width: 1200, height: 2400, scale: 3, fontScale: 1, densityDpi: 480 },
+              windowPhysicalPixels: {
+                width: 1200,
+                height: 2400,
+                scale: 3,
+                fontScale: 1,
+                densityDpi: 480,
+              },
             },
           }),
         },
@@ -127,8 +133,20 @@ describe('Dimensions', () => {
         DeviceInfo: {
           getConstants: () => ({
             Dimensions: {
-              windowPhysicalPixels: { width: 900, height: 1800, scale: 3, fontScale: 1, densityDpi: 480 },
-              screenPhysicalPixels: { width: 1200, height: 2400, scale: 3, fontScale: 1, densityDpi: 480 },
+              windowPhysicalPixels: {
+                width: 900,
+                height: 1800,
+                scale: 3,
+                fontScale: 1,
+                densityDpi: 480,
+              },
+              screenPhysicalPixels: {
+                width: 1200,
+                height: 2400,
+                scale: 3,
+                fontScale: 1,
+                densityDpi: 480,
+              },
             },
           }),
         },

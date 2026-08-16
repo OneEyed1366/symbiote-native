@@ -260,9 +260,9 @@ describe('Pressable (real compiled index.svelte)', () => {
       // 'press' listener at all — the responder lookup this file's other tests rely on must find
       // nothing here.
       const handle = view?.instanceHandle;
-      expect(isRecord(handle) && handle.listeners instanceof Map && handle.listeners.has('press')).toBe(
-        false,
-      );
+      expect(
+        isRecord(handle) && handle.listeners instanceof Map && handle.listeners.has('press'),
+      ).toBe(false);
 
       fabric.fireEvent(handle, 'topTouchStart');
       fabric.fireEvent(handle, 'topTouchEnd');

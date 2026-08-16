@@ -32,7 +32,12 @@ import {
   type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { anchorHostStyle, SafeAreaViewHost, SymbioteHostPropsDirective, SymbioteStyleInputDirective } from '../../primitives';
+import {
+  anchorHostStyle,
+  SafeAreaViewHost,
+  SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
+} from '../../primitives';
 
 // Mirrors React's ISafeAreaViewProps minus children (Angular takes children via <ng-content>),
 // declared per-adapter over the shared accessibility base since the framework-specific children

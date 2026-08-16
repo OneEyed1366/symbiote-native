@@ -288,6 +288,8 @@ describe('LayoutAnimation.checkConfig', () => {
   // deprecation notice) -- calling it with any arguments must stay a harmless
   // no-op so old call sites don't need to be ripped out.
   it('is a no-op regardless of arguments', () => {
-    expect(() => LayoutAnimation.checkConfig(LayoutAnimation.Presets.linear, () => {})).not.toThrow();
+    expect(() =>
+      LayoutAnimation.checkConfig(LayoutAnimation.Presets.linear, () => {}),
+    ).not.toThrow();
   });
 });

@@ -1,6 +1,6 @@
 ---
 paths:
-  - "apps/docs-site/**/*.astro"
+  - 'apps/docs-site/**/*.astro'
 ---
 
 # docs-site — Astro template whitespace vs inline tags

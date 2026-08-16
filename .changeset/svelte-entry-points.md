@@ -1,29 +1,29 @@
 ---
-"@symbiote-native/application": minor
-"@symbiote-native/battery": minor
-"@symbiote-native/brightness": minor
-"@symbiote-native/cellular": minor
-"@symbiote-native/clipboard": minor
-"@symbiote-native/crypto": minor
-"@symbiote-native/device": minor
-"@symbiote-native/haptics": minor
-"@symbiote-native/keep-awake": minor
-"@symbiote-native/local-auth": minor
-"@symbiote-native/localization": minor
-"@symbiote-native/navigation": minor
-"@symbiote-native/network": minor
-"@symbiote-native/screen-orientation": minor
-"@symbiote-native/secure-store": minor
-"@symbiote-native/sensors": minor
-"@symbiote-native/sharing": minor
-"@symbiote-native/slider": minor
-"@symbiote-native/sms": minor
-"@symbiote-native/splash-screen": minor
-"@symbiote-native/standard-web-crypto": minor
-"@symbiote-native/store-review": minor
-"@symbiote-native/system-ui": minor
-"@symbiote-native/tracking-transparency": minor
-"@symbiote-native/web-browser": minor
+'@symbiote-native/application': minor
+'@symbiote-native/battery': minor
+'@symbiote-native/brightness': minor
+'@symbiote-native/cellular': minor
+'@symbiote-native/clipboard': minor
+'@symbiote-native/crypto': minor
+'@symbiote-native/device': minor
+'@symbiote-native/haptics': minor
+'@symbiote-native/keep-awake': minor
+'@symbiote-native/local-auth': minor
+'@symbiote-native/localization': minor
+'@symbiote-native/navigation': minor
+'@symbiote-native/network': minor
+'@symbiote-native/screen-orientation': minor
+'@symbiote-native/secure-store': minor
+'@symbiote-native/sensors': minor
+'@symbiote-native/sharing': minor
+'@symbiote-native/slider': minor
+'@symbiote-native/sms': minor
+'@symbiote-native/splash-screen': minor
+'@symbiote-native/standard-web-crypto': minor
+'@symbiote-native/store-review': minor
+'@symbiote-native/system-ui': minor
+'@symbiote-native/tracking-transparency': minor
+'@symbiote-native/web-browser': minor
 ---
 
 Add a `./svelte` entry point to every package, so a Svelte app reaches the same surface React, Vue

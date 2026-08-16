@@ -25,12 +25,10 @@ function createFakeNativeModule(
 ): INativeSensorModule<IFakeMeasurement> {
   const listeners = new Set<(measurement: IFakeMeasurement) => void>();
   return {
-    addListener: vi.fn(
-      (_eventName: string, listener: (measurement: IFakeMeasurement) => void) => {
-        listeners.add(listener);
-        return { remove: () => listeners.delete(listener) };
-      },
-    ),
+    addListener: vi.fn((_eventName: string, listener: (measurement: IFakeMeasurement) => void) => {
+      listeners.add(listener);
+      return { remove: () => listeners.delete(listener) };
+    }),
     listenerCount: vi.fn(() => listeners.size),
     removeAllListeners: vi.fn(() => listeners.clear()),
     ...overrides,

@@ -26,7 +26,15 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { existsSync, mkdtempSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
@@ -201,9 +209,15 @@ describe('load-time registrations survive an inline-requires production bundle',
         'thing.ts',
         "import { registerFactory } from './registry';\nregisterFactory('thing', {});\nexport const Thing = 1;\n",
       );
-      writeModule('registry.ts', 'export function registerFactory(name: string, impl: unknown): void {}\n');
+      writeModule(
+        'registry.ts',
+        'export function registerFactory(name: string, impl: unknown): void {}\n',
+      );
       writeModule('barrel.ts', "export { Thing } from './thing';\n");
-      writeModule('consumer.ts', "import type { Thing } from './barrel';\nexport type { Thing };\n");
+      writeModule(
+        'consumer.ts',
+        "import type { Thing } from './barrel';\nexport type { Thing };\n",
+      );
 
       expect(scanScratchDir()).toEqual(['thing.ts']);
     });
@@ -216,7 +230,10 @@ describe('load-time registrations survive an inline-requires production bundle',
         'thing.ts',
         "import { registerFactory } from './registry';\nregisterFactory('thing', {});\nexport const Thing = 1;\n",
       );
-      writeModule('registry.ts', 'export function registerFactory(name: string, impl: unknown): void {}\n');
+      writeModule(
+        'registry.ts',
+        'export function registerFactory(name: string, impl: unknown): void {}\n',
+      );
       writeModule('entry.ts', "import './thing';\n");
 
       expect(scanScratchDir()).toEqual([]);
@@ -229,7 +246,10 @@ describe('load-time registrations survive an inline-requires production bundle',
         'thing.ts',
         "import { registerFactory } from './registry';\nregisterFactory('thing', {});\nexport const Thing = 1;\n",
       );
-      writeModule('registry.ts', 'export function registerFactory(name: string, impl: unknown): void {}\n');
+      writeModule(
+        'registry.ts',
+        'export function registerFactory(name: string, impl: unknown): void {}\n',
+      );
       writeModule('consumer.ts', "import { Thing } from './thing';\nconsole.log(Thing);\n");
 
       expect(scanScratchDir()).toEqual([]);

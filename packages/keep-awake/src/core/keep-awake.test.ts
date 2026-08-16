@@ -46,7 +46,7 @@ describe('isAvailableAsync', () => {
   // why: the wrapper must forward the native module's OWN answer, not just always report
   // available — asserting a value that differs from the true-by-default fallback is what
   // actually proves delegation happens instead of the fallback masking a broken pass-through.
-  it('resolves with the native module\'s own result when isAvailableAsync exists', async () => {
+  it("resolves with the native module's own result when isAvailableAsync exists", async () => {
     FAKE_NATIVE_KEEP_AWAKE.isAvailableAsync.mockResolvedValueOnce(false);
 
     await expect(isAvailableAsync()).resolves.toBe(false);
@@ -147,10 +147,7 @@ describe('addListener', () => {
       const listener = vi.fn();
       addListener('custom-tag', listener);
 
-      expect(FAKE_NATIVE_KEEP_AWAKE.addListenerForTag).toHaveBeenCalledWith(
-        'custom-tag',
-        listener,
-      );
+      expect(FAKE_NATIVE_KEEP_AWAKE.addListenerForTag).toHaveBeenCalledWith('custom-tag', listener);
     });
 
     // why: the overload resolution is positional, not "whichever argument looks like a
@@ -190,9 +187,7 @@ describe('addListener', () => {
     // why: calling the tag-only overload without a listener leaves nothing to subscribe —
     // failing loudly here beats silently registering `undefined` as a listener.
     it('throws when no listener can be resolved', () => {
-      expect(() => addListener('custom-tag')).toThrow(
-        'addListener requires a listener function',
-      );
+      expect(() => addListener('custom-tag')).toThrow('addListener requires a listener function');
     });
   });
 });

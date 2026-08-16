@@ -266,9 +266,9 @@ describe('hasPlatformFeatureAsync', () => {
   // a platform with no such native concept, not an error. No Negative group.
   describe('positive', () => {
     it('delegates to the native module', async () => {
-      await expect(
-        hasPlatformFeatureAsync('android.hardware.sensor.accelerometer'),
-      ).resolves.toBe(true);
+      await expect(hasPlatformFeatureAsync('android.hardware.sensor.accelerometer')).resolves.toBe(
+        true,
+      );
     });
   });
 

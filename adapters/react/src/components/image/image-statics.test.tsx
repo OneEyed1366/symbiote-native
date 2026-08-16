@@ -45,7 +45,9 @@ describe('Image statics (React entry-point wiring)', () => {
       setImageSourceResolver(() => ({ uri: 'resolved://b.png', scale: 3 }));
       const resolved = Image.resolveAssetSource(42);
       const uri =
-        typeof resolved === 'object' && resolved !== null ? Reflect.get(resolved, 'uri') : undefined;
+        typeof resolved === 'object' && resolved !== null
+          ? Reflect.get(resolved, 'uri')
+          : undefined;
       expect(uri).toBe('resolved://b.png');
     });
   });

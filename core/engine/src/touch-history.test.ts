@@ -7,7 +7,12 @@
 // Negative.
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { attachTouchHistory, recordTouchTrack, resetTouchHistory, touchHistory } from './touch-history';
+import {
+  attachTouchHistory,
+  recordTouchTrack,
+  resetTouchHistory,
+  touchHistory,
+} from './touch-history';
 
 describe('touch-history store', () => {
   beforeEach(() => {
@@ -189,8 +194,9 @@ describe('touch-history store', () => {
     });
 
     it('a non-array changedTouches/touches is treated as empty, not thrown', () => {
-      expect(() => recordTouchTrack('start', { changedTouches: 'nope', touches: 'nope' })).not
-        .toThrow();
+      expect(() =>
+        recordTouchTrack('start', { changedTouches: 'nope', touches: 'nope' }),
+      ).not.toThrow();
       expect(touchHistory.numberActiveTouches).toBe(0);
     });
 

@@ -48,7 +48,12 @@ import {
   type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { anchorHostStyle, SymbioteHostPropsDirective, SymbioteStyleInputDirective, ViewHost } from '../../primitives';
+import {
+  anchorHostStyle,
+  SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
+  ViewHost,
+} from '../../primitives';
 
 export type { IKeyboardAvoidingBehavior } from '@symbiote-native/components';
 

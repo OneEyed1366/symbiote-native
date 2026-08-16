@@ -324,9 +324,7 @@ describe('processBackgroundImage', () => {
     // error) — the loop just produces nothing for it, matching "no image" rather than a
     // crash on an unrecognized entry.
     it('produces nothing for an entry whose type is neither gradient kind', () => {
-      expect(
-        processBackgroundImage([{ type: 'conic-gradient', colorStops: [] }]),
-      ).toEqual([]);
+      expect(processBackgroundImage([{ type: 'conic-gradient', colorStops: [] }])).toEqual([]);
     });
   });
 

@@ -926,7 +926,9 @@ export abstract class ScrollViewBase
     this.stickyAttachedEnabled = wantsAttach;
     this.stickyAttachedNode = node;
     if (!wantsAttach || node === null) {
-      dlog(`STICKY[sv] attachSticky NOT attaching (wantsAttach=${wantsAttach} hasNode=${node !== null})`);
+      dlog(
+        `STICKY[sv] attachSticky NOT attaching (wantsAttach=${wantsAttach} hasNode=${node !== null})`,
+      );
       return;
     }
     dlog('STICKY[sv] attachSticky waiting for commit to bind the native scroll event');

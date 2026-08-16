@@ -46,7 +46,13 @@ import {
   type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { anchorHostStyle, ModalHost, SymbioteHostPropsDirective, SymbioteStyleInputDirective, ViewHost } from '../../primitives';
+import {
+  anchorHostStyle,
+  ModalHost,
+  SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
+  ViewHost,
+} from '../../primitives';
 
 export type {
   IModalAnimationType,

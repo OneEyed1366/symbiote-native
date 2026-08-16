@@ -1,8 +1,8 @@
 ---
 paths:
-  - "packages/*/src/core/*.ts"
-  - "core/engine/src/**/*.ts"
-  - "core/components/src/**/*.ts"
+  - 'packages/*/src/core/*.ts'
+  - 'core/engine/src/**/*.ts'
+  - 'core/components/src/**/*.ts'
 ---
 
 # A bug inherited from upstream gets TAGGED, not fixed

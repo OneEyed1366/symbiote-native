@@ -84,7 +84,11 @@ describe('useBarometer', () => {
       // stale altitude/pressure behind after a real reading changes.
       mount(ROOT_TAG, createElement(Probe, {}));
       const listener = addListener.mock.calls[0][0];
-      const first: IBarometerMeasurement = { pressure: 1013.25, relativeAltitude: 12.3, timestamp: 1 };
+      const first: IBarometerMeasurement = {
+        pressure: 1013.25,
+        relativeAltitude: 12.3,
+        timestamp: 1,
+      };
       const second: IBarometerMeasurement = { pressure: 950, relativeAltitude: 500, timestamp: 2 };
 
       listener(first);

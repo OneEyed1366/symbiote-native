@@ -241,7 +241,9 @@ describe('typescript-plugin', () => {
   it('leaves a non-.module.css import literal to the original resolver', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'symbiote-ts-plugin-'));
     const containingFile = path.join(dir, 'index.ts').replace(/\\/g, '/');
-    const originalResult = [{ resolvedModule: { resolvedFileName: '/x/Helper.ts', extension: '.ts' } }];
+    const originalResult = [
+      { resolvedModule: { resolvedFileName: '/x/Helper.ts', extension: '.ts' } },
+    ];
 
     const info = makeFakeInfo();
     info.languageServiceHost.resolveModuleNameLiterals = vi.fn(() => originalResult);

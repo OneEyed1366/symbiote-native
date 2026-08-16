@@ -464,9 +464,7 @@ describe('Angular SymbioteRenderer rejects text placed outside a <Text> host', (
   it('throws when a raw text node is appended directly to the surface', () => {
     const { surface, renderer } = setup();
     const raw = renderer.createText('stray');
-    expect(() => renderer.appendChild(surface, raw)).toThrow(
-      /must be rendered inside a <Text>/,
-    );
+    expect(() => renderer.appendChild(surface, raw)).toThrow(/must be rendered inside a <Text>/);
   });
 
   // why: the same guard must apply to insertBefore, not just appendChild — a raw text node

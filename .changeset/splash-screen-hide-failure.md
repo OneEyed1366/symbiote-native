@@ -1,5 +1,5 @@
 ---
-"@symbiote-native/splash-screen": minor
+'@symbiote-native/splash-screen': minor
 ---
 
 Stop a failed `hide()` from stranding the app under a splash it can never dismiss. The readiness

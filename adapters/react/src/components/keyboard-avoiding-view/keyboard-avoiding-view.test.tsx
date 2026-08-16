@@ -77,7 +77,12 @@ const EXPECTED_INSET = FRAME_Y + SCREEN_HEIGHT - KEYBOARD_SCREEN_Y;
 const WRAPPER_FRAME = { x: 0, y: FRAME_Y, width: 400, height: SCREEN_HEIGHT };
 
 function App(
-  props: Partial<Pick<Parameters<typeof KeyboardAvoidingView>[0], 'behavior' | 'enabled' | 'keyboardVerticalOffset'>>,
+  props: Partial<
+    Pick<
+      Parameters<typeof KeyboardAvoidingView>[0],
+      'behavior' | 'enabled' | 'keyboardVerticalOffset'
+    >
+  >,
 ): ReactElement {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} {...props}>

@@ -96,7 +96,9 @@ describe('renderImage — source resolution (Positive)', () => {
   // why: the twin malformed case — a trailing 'x' but a non-numeric scale — must also be dropped,
   // not turned into a NaN scale that would corrupt native's decode-time downsampling.
   it('skips a srcSet entry whose scale token is non-numeric', () => {
-    const descriptor = renderImage(baseView({ srcSet: 'http://x/bad.png abcx, http://x/ok.png 2x' }));
+    const descriptor = renderImage(
+      baseView({ srcSet: 'http://x/bad.png abcx, http://x/ok.png 2x' }),
+    );
     expect(descriptor.props.source).toEqual([expect.objectContaining({ uri: 'http://x/ok.png' })]);
   });
 });
@@ -117,9 +119,14 @@ describe('renderImage — header aliases (Positive)', () => {
   });
 
   it('adds a Referrer-Policy header onto an `src`-resolved source', () => {
-    const descriptor = renderImage(baseView({ src: 'http://x/d.png', referrerPolicy: 'no-referrer' }));
+    const descriptor = renderImage(
+      baseView({ src: 'http://x/d.png', referrerPolicy: 'no-referrer' }),
+    );
     expect(descriptor.props.source).toEqual([
-      expect.objectContaining({ uri: 'http://x/d.png', headers: { 'Referrer-Policy': 'no-referrer' } }),
+      expect.objectContaining({
+        uri: 'http://x/d.png',
+        headers: { 'Referrer-Policy': 'no-referrer' },
+      }),
     ]);
   });
 

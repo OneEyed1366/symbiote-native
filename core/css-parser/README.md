@@ -45,17 +45,22 @@ app writes no transformer file of its own — point `babelTransformerPath` strai
 From there, a plain stylesheet import just works, from any adapter's own source file:
 
 ```ts
-import styles from './Card.module.css';   // CSS Modules — default export is a name→scopedName map
-import './theme.css';                     // plain CSS — registers classes globally, no export
+import styles from './Card.module.css'; // CSS Modules — default export is a name→scopedName map
+import './theme.css'; // plain CSS — registers classes globally, no export
 ```
 
 ```tsx
-<View className="card" style={styles.highlight} />   // React
+<View className="card" style={styles.highlight} /> // React
 ```
+
 ```html
 <!-- Vue SFC -->
 <view :class="['card', { active: isActive }]" />
-<style scoped>.card { padding: 10px; }</style>
+<style scoped>
+  .card {
+    padding: 10px;
+  }
+</style>
 ```
 
 ## The pipeline
@@ -76,12 +81,24 @@ mechanism below runs identically regardless of source language.
 
 ```ts
 import {
-  parseCSS, extractClassName, kebabToCamel,       // core compiler
-  compileCssFile, isCssModuleFile,                 // standalone .css/.module.css files
-  createCssMetroTransformer,                       // Metro babelTransformerPath factory
-  compileScss, compileSass, compileLess, compileStylus, compile, detectLanguage, isStyleFile,
-  classNamesToDtsSource, generateModuleDts,        // .d.ts generation for CSS Modules typing
-  globalClassNamesIn, globalClassTokensIn, hashFilePath,
+  parseCSS,
+  extractClassName,
+  kebabToCamel, // core compiler
+  compileCssFile,
+  isCssModuleFile, // standalone .css/.module.css files
+  createCssMetroTransformer, // Metro babelTransformerPath factory
+  compileScss,
+  compileSass,
+  compileLess,
+  compileStylus,
+  compile,
+  detectLanguage,
+  isStyleFile,
+  classNamesToDtsSource,
+  generateModuleDts, // .d.ts generation for CSS Modules typing
+  globalClassNamesIn,
+  globalClassTokensIn,
+  hashFilePath,
 } from '@symbiote-native/css-parser';
 ```
 

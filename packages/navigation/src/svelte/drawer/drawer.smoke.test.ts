@@ -198,7 +198,9 @@ function swipe(path: readonly ITouchFrame[]): void {
   };
   const [start, ...rest] = path;
   fire('topTouchStart', start, false);
-  rest.forEach((frame, i) => fire(i === rest.length - 1 ? 'topTouchEnd' : 'topTouchMove', frame, i === rest.length - 1));
+  rest.forEach((frame, i) =>
+    fire(i === rest.length - 1 ? 'topTouchEnd' : 'topTouchMove', frame, i === rest.length - 1),
+  );
 }
 
 // Starts inside the left edge zone (swipeEdgeWidth default 32) and drags right far/fast enough to

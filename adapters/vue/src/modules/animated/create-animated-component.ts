@@ -65,7 +65,11 @@ export function createAnimatedComponent(Component: Component) {
       let wantsNative = false;
 
       function reconcile(): void {
-        lifecycle.reconcile(currentRest, isSymbioteNode(nodeRef.value) ? nodeRef.value : null, wantsNative);
+        lifecycle.reconcile(
+          currentRest,
+          isSymbioteNode(nodeRef.value) ? nodeRef.value : null,
+          wantsNative,
+        );
       }
 
       onMounted(reconcile);

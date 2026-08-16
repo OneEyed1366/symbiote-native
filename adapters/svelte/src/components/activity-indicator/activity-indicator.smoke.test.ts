@@ -116,10 +116,7 @@ describe('ActivityIndicator (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      const spinner = findLive(
-        fabric.appRoot(),
-        node => node.viewName === 'ActivityIndicatorView',
-      );
+      const spinner = findLive(fabric.appRoot(), node => node.viewName === 'ActivityIndicatorView');
       expect(spinner).toBeDefined();
       expect(spinner?.props.animating).toBe(true);
       expect(spinner?.props.color).toBe('#123456');

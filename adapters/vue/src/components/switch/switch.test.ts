@@ -144,7 +144,10 @@ describe('Vue Switch on the engine', () => {
     fabric.fireEvent(switchNode().instanceHandle, 'topChange', { value: true });
     await tick();
 
-    expect(commands.find(c => c.name === 'setValue'), 'no correction for an accepted toggle').toBeUndefined();
+    expect(
+      commands.find(c => c.name === 'setValue'),
+      'no correction for an accepted toggle',
+    ).toBeUndefined();
   });
 
   // why: HANDLED_ATTRS' whole reason to exist — onValueChange is plain JS, not a Fabric

@@ -244,7 +244,9 @@ describe('PanResponder reject / terminate', () => {
 
     panHandlers.onResponderGrant(buildEvent(GRANT_X, GRANT_Y, GRANT_T));
     panHandlers.onResponderMove(buildEvent(GRANT_X + STEP_X, GRANT_Y + STEP_Y, GRANT_T + FRAME_MS));
-    panHandlers.onResponderTerminate(buildEvent(GRANT_X + STEP_X, GRANT_Y + STEP_Y, GRANT_T + FRAME_MS));
+    panHandlers.onResponderTerminate(
+      buildEvent(GRANT_X + STEP_X, GRANT_Y + STEP_Y, GRANT_T + FRAME_MS),
+    );
     expect(terminated).toBe(true);
 
     // A later grant (e.g. a new gesture after the previous one was cut short) must
@@ -299,7 +301,11 @@ describe('PanResponder multi-touch (no touch-history store)', () => {
       type: 'touch',
       target: targetNode,
       currentTarget: targetNode,
-      nativeEvent: { touches: [touchA, touchB], changedTouches: [touchA, touchB], timestamp: 1_000 },
+      nativeEvent: {
+        touches: [touchA, touchB],
+        changedTouches: [touchA, touchB],
+        timestamp: 1_000,
+      },
       stopPropagation: () => {},
     };
     panHandlers.onResponderGrant(event);

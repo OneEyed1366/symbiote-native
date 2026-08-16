@@ -50,7 +50,10 @@ describe('Barometer', () => {
       const listener = vi.fn();
       Barometer.addListener(listener);
 
-      expect(FAKE_NATIVE_BAROMETER.addListener).toHaveBeenCalledWith('barometerDidUpdate', listener);
+      expect(FAKE_NATIVE_BAROMETER.addListener).toHaveBeenCalledWith(
+        'barometerDidUpdate',
+        listener,
+      );
     });
   });
 });

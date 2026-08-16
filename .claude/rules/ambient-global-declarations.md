@@ -1,7 +1,7 @@
 ---
 paths:
-  - "core/engine/src/**/*.ts"
-  - "core/components/src/**/*.ts"
+  - 'core/engine/src/**/*.ts'
+  - 'core/components/src/**/*.ts'
 ---
 
 # `declare global` in a shared package typechecks clean here and breaks every consumer

@@ -51,7 +51,8 @@ export function reconcileTabRoutes(
     next => state.routes.find(route => route.name === next.name) ?? next,
   );
   const isUnchanged =
-    routes.length === state.routes.length && routes.every((route, at) => route === state.routes[at]);
+    routes.length === state.routes.length &&
+    routes.every((route, at) => route === state.routes[at]);
   if (isUnchanged) return state;
   const focusedName = state.routes[state.index]?.name;
   const index = routes.findIndex(route => route.name === focusedName);

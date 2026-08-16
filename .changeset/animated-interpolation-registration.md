@@ -1,5 +1,5 @@
 ---
-"@symbiote-native/engine": patch
+'@symbiote-native/engine': patch
 ---
 
 Fix `.interpolate()` throwing `interpolation factory not registered` in release builds only.

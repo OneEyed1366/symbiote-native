@@ -147,7 +147,10 @@ describe('createTunnel (Angular) — genuine cross-surface delivery', () => {
       // its view.
       unmount(SOURCE_TAG);
       await settle();
-      expect(findText('still here'), 'gone from surface B after the source unmounts').toBeUndefined();
+      expect(
+        findText('still here'),
+        'gone from surface B after the source unmounts',
+      ).toBeUndefined();
     });
 
     it('renders multiple simultaneously-tunneled entries in registration order', async () => {

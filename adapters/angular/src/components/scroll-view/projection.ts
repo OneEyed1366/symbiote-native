@@ -451,7 +451,9 @@ export class ScrollViewProjectionController {
     record.sticky = new StickyProjectionWrapper(this, childIndex, wrapper);
     record.stickyIndex = childIndex;
     projectedWrappers.set(record.child, record);
-    dlog(`STICKY[proj#${this.instanceId}] WRAP child=${record.child.component} paintIndex=${childIndex}`);
+    dlog(
+      `STICKY[proj#${this.instanceId}] WRAP child=${record.child.component} paintIndex=${childIndex}`,
+    );
   }
 
   private unwrapRecord(record: IProjectedRecord): void {

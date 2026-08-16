@@ -212,7 +212,9 @@ describe('ActionSheetIOS', () => {
     // lack it even when the module itself resolves) — the `?.()` call must not throw "not a
     // function" on such a host.
     it('dismissActionSheet is a no-op when the module resolves but lacks dismissActionSheet', () => {
-      installFakeManager({ showActionSheetWithOptions: defaultFakeManager().showActionSheetWithOptions });
+      installFakeManager({
+        showActionSheetWithOptions: defaultFakeManager().showActionSheetWithOptions,
+      });
       expect(() => ActionSheetIOS.dismissActionSheet()).not.toThrow();
       expect(dismissCalled).toBe(false);
     });

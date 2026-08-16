@@ -137,9 +137,7 @@ describe('performAndroidHapticsAsync', () => {
     it('delegates to the native module on Android', async () => {
       fakePlatform.OS = 'android';
       await performAndroidHapticsAsync(AndroidHaptics.Confirm);
-      expect(FAKE_NATIVE_HAPTICS.performHapticsAsync).toHaveBeenCalledWith(
-        AndroidHaptics.Confirm,
-      );
+      expect(FAKE_NATIVE_HAPTICS.performHapticsAsync).toHaveBeenCalledWith(AndroidHaptics.Confirm);
     });
   });
 

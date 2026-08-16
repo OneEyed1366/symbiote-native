@@ -8,7 +8,12 @@ import {
   type DoCheck,
 } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { anchorHostStyle, SwitchHost, SymbioteHostPropsDirective, SymbioteStyleInputDirective } from '../../primitives';
+import {
+  anchorHostStyle,
+  SwitchHost,
+  SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
+} from '../../primitives';
 import { SwitchBase } from './shared';
 export type { ISwitchProps, ISwitchTrackColor } from './shared';
 

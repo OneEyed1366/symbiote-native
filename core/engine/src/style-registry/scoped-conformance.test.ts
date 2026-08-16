@@ -229,7 +229,6 @@ describe('documented divergences from web CSS', () => {
     registerStyles({ aB: { padding: 1 } });
     expect(resolveClassName('a b c d e')).toEqual({});
   });
-
 });
 
 // The registry half of `:global()`. The compiler half - erasing the wrapper, exempting its

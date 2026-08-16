@@ -1,6 +1,6 @@
 ---
-"@symbiote-native/engine": minor
-"@symbiote-native/react": minor
+'@symbiote-native/engine': minor
+'@symbiote-native/react': minor
 ---
 
 Stop the React adapter from swallowing render errors. `createContainer` takes three error

@@ -20,7 +20,10 @@ describe('globalClassNamesIn — keys whose whole selector lives outside the fil
     });
 
     it('collects one entry per selector of a comma-separated list', () => {
-      expect([...globalClassNamesIn(':global(.a), :global(.b) { color: red }')]).toEqual(['a', 'b']);
+      expect([...globalClassNamesIn(':global(.a), :global(.b) { color: red }')]).toEqual([
+        'a',
+        'b',
+      ]);
     });
   });
 
@@ -89,7 +92,9 @@ describe('globalClassTokensIn — tokens that came out of a :global() payload', 
     // build failure instead of a silently partial exemption set, which would be far harder to
     // notice. The caller reaches parseCSS first anyway, so it throws there before it throws here.
     it('rejects an unbalanced :global( rather than exempting part of it', () => {
-      expect(() => globalClassTokensIn('.card :global(.reset { margin: 0 }')).toThrow(/Unclosed bracket/);
+      expect(() => globalClassTokensIn('.card :global(.reset { margin: 0 }')).toThrow(
+        /Unclosed bracket/,
+      );
     });
 
     it('returns an empty set for empty input', () => {

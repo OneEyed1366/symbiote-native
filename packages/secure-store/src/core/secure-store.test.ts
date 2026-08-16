@@ -162,11 +162,9 @@ describe('positive — successful native delegation', () => {
   describe('setItem (sync)', () => {
     it('passes value, key and options to the native module in the native argument order', () => {
       setItem('token', 'secret', { requireAuthentication: true });
-      expect(FAKE_NATIVE_SECURE_STORE.setValueWithKeySync).toHaveBeenCalledWith(
-        'secret',
-        'token',
-        { requireAuthentication: true },
-      );
+      expect(FAKE_NATIVE_SECURE_STORE.setValueWithKeySync).toHaveBeenCalledWith('secret', 'token', {
+        requireAuthentication: true,
+      });
     });
 
     it('defaults the options to an empty object when omitted', () => {

@@ -50,9 +50,9 @@ describe('negative — malformed persisted data is rejected with a specific erro
   });
 
   it('rejects a route missing its name, key present', () => {
-    expect(() =>
-      deserializeNavigatorState({ routes: [{ key: 'r1', params: undefined }] }),
-    ).toThrow(ERROR_MESSAGE);
+    expect(() => deserializeNavigatorState({ routes: [{ key: 'r1', params: undefined }] })).toThrow(
+      ERROR_MESSAGE,
+    );
   });
 
   it('rejects a non-object payload', () => {

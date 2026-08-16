@@ -126,32 +126,29 @@ describe('usePermissions (Vue)', () => {
   });
 
   describe('characterization', () => {
-    it(
-      // characterization: React's usePermissions guards against a late setStatus with an
-      // isMounted ref; this composable has no equivalent guard — status.value is written
-      // unconditionally whenever the promise resolves, mount state notwithstanding. Writing a
-      // bare Vue ref after its owning component unmounted doesn't throw (there's simply no
-      // template left to react to it), so this isn't a crash — but it's a structural asymmetry
-      // with the React wrapper. [characterization — behavior not confirmed as intentional]
-      'updates status.value even after the component has already unmounted',
-      async () => {
-        // QUESTION: is skipping the post-unmount write (React's approach) actually required here,
-        // or is writing a now-orphaned ref harmless enough that Vue's composable intentionally
-        // omits the guard? Worth confirming with whoever owns the adapter parity contract.
-        let resolveFetch: (value: PermissionResponse) => void = () => {};
-        getTrackingPermissionsAsync.mockReturnValueOnce(
-          new Promise(resolve => {
-            resolveFetch = resolve;
-          }),
-        );
+    it(// characterization: React's usePermissions guards against a late setStatus with an
+    // isMounted ref; this composable has no equivalent guard — status.value is written
+    // unconditionally whenever the promise resolves, mount state notwithstanding. Writing a
+    // bare Vue ref after its owning component unmounted doesn't throw (there's simply no
+    // template left to react to it), so this isn't a crash — but it's a structural asymmetry
+    // with the React wrapper. [characterization — behavior not confirmed as intentional]
+    'updates status.value even after the component has already unmounted', async () => {
+      // QUESTION: is skipping the post-unmount write (React's approach) actually required here,
+      // or is writing a now-orphaned ref harmless enough that Vue's composable intentionally
+      // omits the guard? Worth confirming with whoever owns the adapter parity contract.
+      let resolveFetch: (value: PermissionResponse) => void = () => {};
+      getTrackingPermissionsAsync.mockReturnValueOnce(
+        new Promise(resolve => {
+          resolveFetch = resolve;
+        }),
+      );
 
-        const { status } = mountPermissions();
-        unmount(ROOT_TAG);
+      const { status } = mountPermissions();
+      unmount(ROOT_TAG);
 
-        expect(() => resolveFetch(GRANTED)).not.toThrow();
-        await vi.waitFor(() => expect(status.value).toEqual(GRANTED));
-      },
-    );
+      expect(() => resolveFetch(GRANTED)).not.toThrow();
+      await vi.waitFor(() => expect(status.value).toEqual(GRANTED));
+    });
   });
 
   // get()/request() are called directly here — neither catches a rejection from core, so it

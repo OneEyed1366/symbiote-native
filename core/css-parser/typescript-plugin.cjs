@@ -68,7 +68,7 @@ function generateDts(classNames) {
 
   const fields = [...classNames]
     .sort()
-    .map((name) => {
+    .map(name => {
       const key = IDENTIFIER_RE.test(name) ? name : JSON.stringify(name);
       return `  readonly ${key}: string;`;
     })
@@ -116,12 +116,14 @@ function init(modules) {
     const originalGetScriptSnapshot = host.getScriptSnapshot.bind(host);
     const originalResolveModuleNameLiterals = host.resolveModuleNameLiterals;
 
-    host.getScriptKind = (fileName) =>
+    host.getScriptKind = fileName =>
       isCssModuleFile(fileName)
         ? typescript.ScriptKind.TS
-        : (originalGetScriptKind ? originalGetScriptKind(fileName) : typescript.ScriptKind.Unknown);
+        : originalGetScriptKind
+          ? originalGetScriptKind(fileName)
+          : typescript.ScriptKind.Unknown;
 
-    host.getScriptSnapshot = (fileName) =>
+    host.getScriptSnapshot = fileName =>
       isCssModuleFile(fileName)
         ? typescript.ScriptSnapshot.fromString(getDtsForCssFile(fileName))
         : originalGetScriptSnapshot(fileName);

@@ -69,8 +69,8 @@ component. This is the exact Angular twin of what React/Vue get for free.
 
 - **`detectChanges()` in the directive does NOT work; `markForCheck()` does.** `createViewRef`
   (`.vendors/angular/.../change_detector_ref.ts`): a component-host tNode → `new ViewRef(componentView,
-  componentView)`; a plain ELEMENT tNode (what a directive sits on) → `new ViewRef(hostComponentView,
-  lView)`. `ViewRef.detectChanges()` acts on `_lView` (wrong view for the element case), but
+componentView)`; a plain ELEMENT tNode (what a directive sits on) → `new ViewRef(hostComponentView,
+lView)`. `ViewRef.detectChanges()` acts on `_lView` (wrong view for the element case), but
   `markForCheck()` acts on `_cdRefInjectingView` (= the host component). So a directive must use
   `markForCheck`, not `detectChanges`.
 - **`ApplicationRef.tick()` is unavailable** — `injector.get(ApplicationRef, null)` is `null` in this
@@ -172,7 +172,7 @@ NotificationSource.MarkForCheck)` — see `view_ref.ts`) walk `LViewFlags.Refres
 ```ts
 // mark_view_dirty.ts — markViewDirty
 while (lView) {
-  lView[FLAGS] |= dirtyBitsToUse;   // RefreshView | Dirty, not the weaker HasChildViewsToRefresh
+  lView[FLAGS] |= dirtyBitsToUse; // RefreshView | Dirty, not the weaker HasChildViewsToRefresh
   lView = getLViewParent(lView)!;
   // ... until isRootView(lView) && !parent
 }
@@ -182,7 +182,7 @@ This is universal, unavoidable Angular zoneless behavior — true in every Angul
 not, `ApplicationRef` or hand-rolled scheduler, and it is exactly why `SymbioteHostPropsDirective`
 already has its own correct comment about `markForCheck()` reaching "THIS component's view AND
 all its ancestors." **`ApplicationRef.tick()`'s Targeted mode changes NOTHING about this** — it
-only changes the OUTER decision of "which top-level *attached* view do we even enter"
+only changes the OUTER decision of "which top-level _attached_ view do we even enter"
 (`ApplicationRef._views`, relevant across multiple independently-`attachView()`'d roots) and
 whether refreshing a view also force-checks `CheckAlways` content that ISN'T actually dirty.
 **Once any view decides to refresh at all, `refreshView()` (`change_detection.ts`) hardcodes
@@ -399,7 +399,6 @@ The pilot was reverted — the components are back on plain fields and getters, 
 left on `ScrollView.contentProps`. The two measurement files stay: `prop-bag-stability.test.ts`
 pins the baseline so the win is re-measurable, and `__tests__/scroll-change-detection-cost.test.ts`
 pins §5's numbers.
-
 
 ## §7. You do not need AOT to get the signals win: `signal()`/`computed()` are runtime, only `input()` needs the compiler
 
@@ -719,9 +718,9 @@ before / green after in `components/button.test.ts`.
 
 So the two shapes are not alternatives, they are for different causes:
 
-| what changed | reaches the component as | fix |
-| --- | --- | --- |
-| `[style]` where a `style` @Input exists | an input write with no dirty mark | `SymbioteStyleInputDirective` |
+| what changed                                                             | reaches the component as                                      | fix                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------ |
+| `[style]` where a `style` @Input exists                                  | an input write with no dirty mark                             | `SymbioteStyleInputDirective`              |
 | `class=` / `[class.x]` / `[ngClass]`, or `[style]` with no `style` input | renderer addClass/removeClass onto the anchor, never an input | `anchorStyle` signal polled in `ngDoCheck` |
 
 A NEW composed component needs whichever row applies to it, and a plain getter over

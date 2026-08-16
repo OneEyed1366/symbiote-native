@@ -386,7 +386,9 @@ describe('Negative (native method absent / invalid input must throw, not silentl
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_SCREEN_ORIENTATION.lockAsync = undefined;
 
-      await expect(unlockAsync()).rejects.toThrow('lockAsync is not available on ScreenOrientation');
+      await expect(unlockAsync()).rejects.toThrow(
+        'lockAsync is not available on ScreenOrientation',
+      );
 
       FAKE_NATIVE_SCREEN_ORIENTATION.lockAsync = native;
     });
@@ -465,9 +467,9 @@ describe('falsy Android constant — upstream parity', () => {
     it('throws the generic "no option supplied" error for NaN instead of the isNaN-specific message', async () => {
       fakePlatform.OS = 'android';
 
-      await expect(
-        lockPlatformAsync({ screenOrientationConstantAndroid: NaN }),
-      ).rejects.toThrow('cannot be called with undefined option properties');
+      await expect(lockPlatformAsync({ screenOrientationConstantAndroid: NaN })).rejects.toThrow(
+        'cannot be called with undefined option properties',
+      );
     });
   });
 });

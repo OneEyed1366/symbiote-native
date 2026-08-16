@@ -95,7 +95,10 @@ class InputPropagationChild {
   imports: [View, AnimatedView, InputPropagationChild, SymbioteHostPropsDirective],
   template: `<View [symbioteHostProps]="handlers"></View
     ><input-propagation-child [style]="margins()" [testID]="'styled-leaf'"></input-propagation-child
-    ><input-propagation-child [other]="margins()" [testID]="'control-leaf'"></input-propagation-child
+    ><input-propagation-child
+      [other]="margins()"
+      [testID]="'control-leaf'"
+    ></input-propagation-child
     ><symbiote-animated-view
       [style]="margins()"
       [animatedProps]="animatedLeafProps"

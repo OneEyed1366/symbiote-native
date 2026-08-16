@@ -7,7 +7,12 @@ import {
   type DoCheck,
   type OnChanges,
 } from '@angular/core';
-import { anchorHostStyle, ImageHost, SymbioteHostPropsDirective, SymbioteStyleInputDirective } from '../../primitives';
+import {
+  anchorHostStyle,
+  ImageHost,
+  SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
+} from '../../primitives';
 import { IMAGE_INPUTS, IMAGE_OUTPUTS, ImageBase, resolveImageProps } from './shared';
 export { setImageSourceResolver } from './shared';
 export type {

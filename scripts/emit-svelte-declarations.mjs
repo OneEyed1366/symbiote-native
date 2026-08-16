@@ -69,7 +69,9 @@ async function emitToStaging(srcDir, stagingDir) {
     console.warn = originalWarn;
   }
   if (warnings.length > 0) {
-    throw new Error(`svelte2tsx could not type every component under ${srcDir}:\n${warnings.join('\n')}`);
+    throw new Error(
+      `svelte2tsx could not type every component under ${srcDir}:\n${warnings.join('\n')}`,
+    );
   }
 }
 
@@ -110,14 +112,19 @@ export async function emitSvelteDeclarations(pkgDir) {
 
     for (const declaration of listDeclarationFiles(buildDir).filter(usesAmbientFallback)) {
       const relative = path.relative(buildDir, declaration);
-      takeStagedDeclaration(stagingDir, buildDir, relative, 'its tsc declaration inlined the ambient `*.svelte` any');
+      takeStagedDeclaration(
+        stagingDir,
+        buildDir,
+        relative,
+        'its tsc declaration inlined the ambient `*.svelte` any',
+      );
       repaired++;
     }
 
     const stillAmbient = listDeclarationFiles(buildDir).filter(usesAmbientFallback);
     if (stillAmbient.length > 0) {
       throw new Error(
-        `the ambient \`*.svelte\` fallback survived in:\n${stillAmbient.map((file) => `  ${file}`).join('\n')}`,
+        `the ambient \`*.svelte\` fallback survived in:\n${stillAmbient.map(file => `  ${file}`).join('\n')}`,
       );
     }
   } finally {

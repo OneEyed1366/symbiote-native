@@ -172,9 +172,9 @@ describe('hasAction', () => {
       // why: hasAction's contract is "requestReview will do SOMETHING" — a supplied URL already
       // guarantees that via the fallback path, so the (potentially slower/async) native
       // availability check must be skipped rather than run redundantly.
-      await expect(
-        hasAction({ iosAppStoreUrl: 'https://apps.apple.com/app/id123' }),
-      ).resolves.toBe(true);
+      await expect(hasAction({ iosAppStoreUrl: 'https://apps.apple.com/app/id123' })).resolves.toBe(
+        true,
+      );
 
       expect(FAKE_NATIVE_STORE_REVIEW.isAvailableAsync).not.toHaveBeenCalled();
     });

@@ -78,14 +78,9 @@ describe('Angular source imports under Vitest', () => {
       }
 
       expect(VirtualizedList.ɵcmp?.selectors).toEqual([['VirtualizedList']]);
-      expect(AnimatedView.ɵcmp?.selectors).toEqual([
-        ['AnimatedView'],
-        ['symbiote-animated-view'],
-      ]);
+      expect(AnimatedView.ɵcmp?.selectors).toEqual([['AnimatedView'], ['symbiote-animated-view']]);
       expect(VListItemDirective.ɵdir?.selectors).toEqual([['', 'vListItem', '']]);
-      expect(SymbioteHostPropsDirective.ɵdir?.selectors).toEqual([
-        ['', 'symbioteHostProps', ''],
-      ]);
+      expect(SymbioteHostPropsDirective.ɵdir?.selectors).toEqual([['', 'symbioteHostProps', '']]);
     });
 
     // why: the Animated namespace re-exports component classes built by

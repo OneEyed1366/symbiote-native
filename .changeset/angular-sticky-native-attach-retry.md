@@ -1,5 +1,5 @@
 ---
-"@symbiote-native/angular": patch
+'@symbiote-native/angular': patch
 ---
 
 Fix Angular sticky headers that render in the right place and never move.

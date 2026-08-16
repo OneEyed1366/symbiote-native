@@ -57,7 +57,9 @@ describe('COLOR_PROPS processing', () => {
       expect(view, 'a styled RCTView was committed').toBeDefined();
 
       for (const key of COLOR_KEYS) {
-        expect(view!.props[key], `"${key}" must not reach Fabric as the raw string`).not.toBe('red');
+        expect(view!.props[key], `"${key}" must not reach Fabric as the raw string`).not.toBe(
+          'red',
+        );
         expect(view!.props[key], `"${key}" must be the processed int`).toBe(PROCESSED_COLOR);
       }
     });

@@ -17,7 +17,13 @@ import { join } from 'node:path';
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
 import type { ITabNavigatorHandle } from '../../core';
-import { countLive, findAllLive, findLiveByTestId, outline, walkLive } from '../fabric-tree.test-helper';
+import {
+  countLive,
+  findAllLive,
+  findLiveByTestId,
+  outline,
+  walkLive,
+} from '../fabric-tree.test-helper';
 import { createSvelteHarness, loadComponent } from '../svelte-compile.test-helper';
 
 if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
@@ -133,21 +139,32 @@ async function mountEmptyTab(): Promise<ITabNavigatorHandle> {
   const app = harness.compileSource(__dirname, 'tab-app-empty', emptyAppSource());
   const App = await loadComponent(app);
   let handle: unknown = null;
-  mount(ROOT_TAG, App, { onReady: (value: unknown) => { handle = value; } });
+  mount(ROOT_TAG, App, {
+    onReady: (value: unknown) => {
+      handle = value;
+    },
+  });
   await tick();
   await tick();
   if (!isTabHandle(handle)) throw new Error('Tab did not expose a navigator handle');
   return handle;
 }
 
-async function mountToggleTab(): Promise<{ navigator: ITabNavigatorHandle; hideProfile: () => void }> {
+async function mountToggleTab(): Promise<{
+  navigator: ITabNavigatorHandle;
+  hideProfile: () => void;
+}> {
   const dir = __dirname;
   harness.compileSource(dir, 'feed-fixture', screenSource('feed'));
   harness.compileSource(dir, 'profile-fixture', screenSource('profile'));
   const app = harness.compileSource(dir, 'tab-app-toggle', toggleAppSource());
   const App = await loadComponent(app);
   let handle: unknown = null;
-  mount(ROOT_TAG, App, { onReady: (value: unknown) => { handle = value; } });
+  mount(ROOT_TAG, App, {
+    onReady: (value: unknown) => {
+      handle = value;
+    },
+  });
   await tick();
   await tick();
   if (
@@ -222,7 +239,12 @@ function readScreenLabel(
   const label = findLiveByTestId(fabric.appRoot(), testID)?.props?.accessibilityLabel;
   if (typeof label !== 'string') return undefined;
   const [name, focused, paramsJson, key] = label.split('|');
-  if (name === undefined || focused === undefined || paramsJson === undefined || key === undefined) {
+  if (
+    name === undefined ||
+    focused === undefined ||
+    paramsJson === undefined ||
+    key === undefined
+  ) {
     return undefined;
   }
   return { name, focused: focused === 'true', params: JSON.parse(paramsJson), key };

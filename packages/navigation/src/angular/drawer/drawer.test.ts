@@ -271,9 +271,7 @@ describe('Angular Drawer navigator', () => {
     // (deep-link) without the panel appearing over it.
     it('mounts closed, with the initial route focused', async () => {
       await mountDrawer();
-      expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
-      ).toBeDefined();
+      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
       expect(
         findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'settings'),
       ).toBeUndefined();
@@ -351,7 +349,9 @@ describe('Angular Drawer navigator', () => {
     it('projects drawer content via the #drawerContent template, reading live router state', async () => {
       await mountDrawer();
       expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === '2 routes, focused index 0'),
+        findInTree(
+          n => n.viewName === 'RCTRawText' && n.props.text === '2 routes, focused index 0',
+        ),
       ).toBeDefined();
     });
 
@@ -420,9 +420,7 @@ describe('Angular Drawer navigator', () => {
       const handle = await mountDrawer();
       handle.jumpTo('does-not-exist');
       await tick();
-      expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
-      ).toBeDefined();
+      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
       expect(
         findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'settings'),
       ).toBeUndefined();

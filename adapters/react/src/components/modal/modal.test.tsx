@@ -214,7 +214,7 @@ describe('React Modal on the engine', () => {
     });
   });
 
-  describe('Positive — React-side prop bridge not exercised by core\'s direct renderModal calls', () => {
+  describe("Positive — React-side prop bridge not exercised by core's direct renderModal calls", () => {
     // why: core's renderModal test passes a hand-built `passthrough` object directly; this
     // proves the REAL path — JSX props -> resolveAccessibilityProps -> ...passthrough -> the
     // host node — carries ViewProps/a11y through a real mount without resolveAccessibilityProps

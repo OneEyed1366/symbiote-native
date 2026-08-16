@@ -62,11 +62,11 @@ Fabric's persistent clone-on-write child sets.
 
 Every adapter so far was handed such a seam by its framework:
 
-| Adapter | Official seam | Renderer size |
-| --- | --- | --- |
-| React | `react-reconciler` host config (mutation mode) | — |
-| Vue | `@vue/runtime-core`'s `createRenderer` | 154 lines (`adapters/vue/src/renderer/index.ts`) |
-| Angular | `Renderer2` / `RendererFactory2` | 347 lines (`adapters/angular/src/renderer/index.ts`) |
+| Adapter | Official seam                                  | Renderer size                                        |
+| ------- | ---------------------------------------------- | ---------------------------------------------------- |
+| React   | `react-reconciler` host config (mutation mode) | —                                                    |
+| Vue     | `@vue/runtime-core`'s `createRenderer`         | 154 lines (`adapters/vue/src/renderer/index.ts`)     |
+| Angular | `Renderer2` / `RendererFactory2`               | 347 lines (`adapters/angular/src/renderer/index.ts`) |
 
 **Svelte, in its released versions, has no such seam.** It compiles a component
 straight into direct `document.createElement()` / `.append()` calls. There is no
@@ -85,7 +85,7 @@ injection point.
    `customRenderer` compiler option and **no** `svelte/renderer` export.
 2. **A DOM shim** — replace `globalThis.Node` / `Element` / `HTMLElement` /
    `SVGElement` / `Text` / `Comment` / `DocumentFragment` / `document` with our
-   own classes, so Svelte's compiled output calls *us* while believing it calls
+   own classes, so Svelte's compiled output calls _us_ while believing it calls
    the DOM. Needs no framework cooperation; works on released Svelte **today**.
 
 ### Why the shim was chosen
@@ -94,7 +94,7 @@ Option 1 would pin the adapter to an unmerged PR commit hash — an adapter nobo
 can install. Option 2 ships against released Svelte.
 
 **The accepted trade, stated explicitly by the project owner (2026-08-10):** the
-shim couples us to Svelte's *private* internals, which carry no compatibility
+shim couples us to Svelte's _private_ internals, which carry no compatibility
 guarantee. We accept that, maintain it by hand, and fix breakage honestly and
 promptly when a Svelte release breaks a user. **When #18042 merges and ships, we
 move to the official API.** This skill exists so that maintenance is a checklist
@@ -106,8 +106,8 @@ rather than an archaeology expedition.
 Svelte package built exactly this way — `packages/svelte/src/renderer/`:
 `wolfie-element.ts` (860), `wolfie-document.ts` (300), `wolfie-action.ts` (73),
 `init-layout-tree.ts` (38) = **1271 lines**. Its README states the reason plainly:
-*"Svelte 5 has no custom renderer API — this is the only way to intercept its DOM
-calls"* (`packages/svelte/README.md:16`).
+_"Svelte 5 has no custom renderer API — this is the only way to intercept its DOM
+calls"_ (`packages/svelte/README.md:16`).
 
 **Read it for the shape; do not port it verbatim.** §9 and §12 record what must
 change and why.
@@ -165,14 +165,14 @@ stated otherwise.
 
 The single most private thing we depend on.
 
-| What it does | Our obligation |
-| --- | --- |
-| `$window = window` | RN already sets `global.window = global` (`Libraries/Core/setUpGlobals.js:18-20`). **Nothing to do.** |
-| `$document = document` | We must provide `document`. See §6a for the one real cost of doing so. |
-| `is_firefox = /Firefox/.test(navigator.userAgent)` | **Do NOT patch `navigator`** — §6b. |
-| reads `Node.prototype` descriptors for `firstChild` and `nextSibling` | **These getters must live on `Node.prototype` itself**, not as instance own-properties and not per-subclass. Svelte extracts them ONCE and then calls `getter.call(node)` for nodes of *every* type (`operations.js:88,97` — applied to fragments, elements and text alike). |
-| writes `CLASS_CACHE`, `ATTRIBUTES_CACHE`, `STYLE_CACHE`, `__e` onto `Element.prototype`; `TEXT_CACHE` onto `Text.prototype` | Guarded by `is_extensible(...)`. Our prototypes must not be frozen or sealed. |
-| **DEV only:** writes `__svelte_meta = null` onto `Element.prototype` (`operations.js:69-73`) | ⚠️ This is a **sixth** field, and it sits **outside** the `is_extensible` guard (which closes at line 63). Dev builds — i.e. the canary — write it unconditionally. An earlier draft said "5 private fields"; it is 5 in prod, 6 in DEV. |
+| What it does                                                                                                                | Our obligation                                                                                                                                                                                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `$window = window`                                                                                                          | RN already sets `global.window = global` (`Libraries/Core/setUpGlobals.js:18-20`). **Nothing to do.**                                                                                                                                                                        |
+| `$document = document`                                                                                                      | We must provide `document`. See §6a for the one real cost of doing so.                                                                                                                                                                                                       |
+| `is_firefox = /Firefox/.test(navigator.userAgent)`                                                                          | **Do NOT patch `navigator`** — §6b.                                                                                                                                                                                                                                          |
+| reads `Node.prototype` descriptors for `firstChild` and `nextSibling`                                                       | **These getters must live on `Node.prototype` itself**, not as instance own-properties and not per-subclass. Svelte extracts them ONCE and then calls `getter.call(node)` for nodes of _every_ type (`operations.js:88,97` — applied to fragments, elements and text alike). |
+| writes `CLASS_CACHE`, `ATTRIBUTES_CACHE`, `STYLE_CACHE`, `__e` onto `Element.prototype`; `TEXT_CACHE` onto `Text.prototype` | Guarded by `is_extensible(...)`. Our prototypes must not be frozen or sealed.                                                                                                                                                                                                |
+| **DEV only:** writes `__svelte_meta = null` onto `Element.prototype` (`operations.js:69-73`)                                | ⚠️ This is a **sixth** field, and it sits **outside** the `is_extensible` guard (which closes at line 63). Dev builds — i.e. the canary — write it unconditionally. An earlier draft said "5 private fields"; it is 5 in prod, 6 in DEV.                                     |
 
 `CLASS_CACHE` / `ATTRIBUTES_CACHE` / `STYLE_CACHE` / `TEXT_CACHE` are `Symbol()`s
 (`internal/client/constants.js:66-69`); `__e` and `__svelte_meta` are plain string
@@ -180,33 +180,33 @@ fields.
 
 ### 3b. The six document factories
 
-| Call | Source |
-| --- | --- |
-| `document.createTextNode(value)` | `dom/operations.js:82` |
-| `document.createElement(tag)` / `createElement(tag, { is })` | `dom/operations.js:251` |
-| `document.createElementNS(ns, tag)` / with `{ is }` | `dom/operations.js:255` |
-| `document.createDocumentFragment()` | `dom/operations.js:260` |
-| `document.createComment(data)` | `dom/operations.js:268` |
-| `document.importNode(node, true)` | `dom/template.js:78,245` — ⚠️ **this is our PRIMARY clone path, not a fallback.** Every Symbiote primitive is hyphenated, hence a custom element, hence sets `TEMPLATE_USE_IMPORT_NODE` — see §3g. Functionally it is still a deep clone (we have one document), so delegating to `cloneNode` is correct; but it is `importNode` that must be tested and watched, not `cloneNode`. |
+| Call                                                         | Source                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `document.createTextNode(value)`                             | `dom/operations.js:82`                                                                                                                                                                                                                                                                                                                                                             |
+| `document.createElement(tag)` / `createElement(tag, { is })` | `dom/operations.js:251`                                                                                                                                                                                                                                                                                                                                                            |
+| `document.createElementNS(ns, tag)` / with `{ is }`          | `dom/operations.js:255`                                                                                                                                                                                                                                                                                                                                                            |
+| `document.createDocumentFragment()`                          | `dom/operations.js:260`                                                                                                                                                                                                                                                                                                                                                            |
+| `document.createComment(data)`                               | `dom/operations.js:268`                                                                                                                                                                                                                                                                                                                                                            |
+| `document.importNode(node, true)`                            | `dom/template.js:78,245` — ⚠️ **this is our PRIMARY clone path, not a fallback.** Every Symbiote primitive is hyphenated, hence a custom element, hence sets `TEMPLATE_USE_IMPORT_NODE` — see §3g. Functionally it is still a deep clone (we have one document), so delegating to `cloneNode` is correct; but it is `importNode` that must be tested and watched, not `cloneNode`. |
 
 ### 3c. Required node members
 
 Collected from every mandatory path. A shim missing any of these fails.
 
-| Member | Where it is required | Note |
-| --- | --- | --- |
-| `firstChild`, `nextSibling` | `operations.js:52-54,88,97` | **must be `Node.prototype` getters** (§3a) |
-| `lastChild` | `template.js:250` | read as an **ordinary property**, not via the cached descriptor |
-| `append(...nodes)` | `template.js:176,182,202,207,345` | **variadic** — `template.js:345` is `frag.append(start, anchor)`, a 2-arg call. Not the same method as `appendChild`. |
-| **`before(node)`** | `template.js:378`, `blocks/snippet.js:93`, `blocks/boundary.js:282` | ⚠️ **The universal mount path.** `export function append(anchor, dom) { … anchor.before(dom) }` (`template.js:358-379`) is how every block and component gets mounted. An earlier draft omitted this entirely — a shim built to that draft fails at the *first* mount. |
-| `nodeName` | `template.js:198,203` | compared against `TEMPLATE_TAG` and `'foreignObject'` |
-| `content` | `template.js:199` | only when `nodeName` is `TEMPLATE`; we never emit `<template>`, so leaving it undefined is fine |
-| `cloneNode(deep)` | `template.js:245` | deep clone, **per instantiation** — see below |
-| `ownerDocument` | `dom/elements/events.js:175` | read on **every handled event**; must return our document |
-| `textContent = ''` | `operations.js:217-218` (`clear_text_content`), used by the `{#each}` fast path at `blocks/each.js:117` | setter must clear children |
-| `appendChild`, `insertBefore`, `removeChild` | general mutation | DOM move semantics — already free from the engine, §12 |
-| `addEventListener` / `removeEventListener` | `dom/elements/events.js` | §5 |
-| `setAttribute` / `getAttribute` / `removeAttribute` | `template.js:193` and the attribute layer | |
+| Member                                              | Where it is required                                                                                    | Note                                                                                                                                                                                                                                                                   |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `firstChild`, `nextSibling`                         | `operations.js:52-54,88,97`                                                                             | **must be `Node.prototype` getters** (§3a)                                                                                                                                                                                                                             |
+| `lastChild`                                         | `template.js:250`                                                                                       | read as an **ordinary property**, not via the cached descriptor                                                                                                                                                                                                        |
+| `append(...nodes)`                                  | `template.js:176,182,202,207,345`                                                                       | **variadic** — `template.js:345` is `frag.append(start, anchor)`, a 2-arg call. Not the same method as `appendChild`.                                                                                                                                                  |
+| **`before(node)`**                                  | `template.js:378`, `blocks/snippet.js:93`, `blocks/boundary.js:282`                                     | ⚠️ **The universal mount path.** `export function append(anchor, dom) { … anchor.before(dom) }` (`template.js:358-379`) is how every block and component gets mounted. An earlier draft omitted this entirely — a shim built to that draft fails at the _first_ mount. |
+| `nodeName`                                          | `template.js:198,203`                                                                                   | compared against `TEMPLATE_TAG` and `'foreignObject'`                                                                                                                                                                                                                  |
+| `content`                                           | `template.js:199`                                                                                       | only when `nodeName` is `TEMPLATE`; we never emit `<template>`, so leaving it undefined is fine                                                                                                                                                                        |
+| `cloneNode(deep)`                                   | `template.js:245`                                                                                       | deep clone, **per instantiation** — see below                                                                                                                                                                                                                          |
+| `ownerDocument`                                     | `dom/elements/events.js:175`                                                                            | read on **every handled event**; must return our document                                                                                                                                                                                                              |
+| `textContent = ''`                                  | `operations.js:217-218` (`clear_text_content`), used by the `{#each}` fast path at `blocks/each.js:117` | setter must clear children                                                                                                                                                                                                                                             |
+| `appendChild`, `insertBefore`, `removeChild`        | general mutation                                                                                        | DOM move semantics — already free from the engine, §12                                                                                                                                                                                                                 |
+| `addEventListener` / `removeEventListener`          | `dom/elements/events.js`                                                                                | §5                                                                                                                                                                                                                                                                     |
+| `setAttribute` / `getAttribute` / `removeAttribute` | `template.js:193` and the attribute layer                                                               |                                                                                                                                                                                                                                                                        |
 
 ### 3d. `from_tree` — `dom/template.js:171-259`
 
@@ -217,9 +217,13 @@ real function is worth reading in full.
 function fragment_from_tree(structure, ns) {
   var fragment = create_fragment();
   for (var item of structure) {
-    if (typeof item === 'string') { fragment.append(create_text(item)); continue; }
+    if (typeof item === 'string') {
+      fragment.append(create_text(item));
+      continue;
+    }
     if (item === undefined || item[0][0] === '/') {
-      fragment.append(create_comment(item ? item[0].slice(3) : '')); continue;
+      fragment.append(create_comment(item ? item[0].slice(3) : ''));
+      continue;
     }
     const [name, attributes, ...children] = item;
     /* … namespace selection elided … */
@@ -227,8 +231,9 @@ function fragment_from_tree(structure, ns) {
     for (var key in attributes) set_attribute(element, key, attributes[key]);
     if (children.length > 0) {
       var target = element.nodeName === TEMPLATE_TAG ? element.content : element;
-      target.append(fragment_from_tree(children,
-        element.nodeName === 'foreignObject' ? undefined : namespace));
+      target.append(
+        fragment_from_tree(children, element.nodeName === 'foreignObject' ? undefined : namespace),
+      );
     }
     fragment.append(element);
   }
@@ -246,18 +251,17 @@ emitted by the compiler. A `string` item is a text node. An item whose
 **The structural fact that drives everything else** (`from_tree`, lines 219-259):
 
 ```js
-if (node === undefined) {            // :232 — the template graph is built ONCE
+if (node === undefined) {
+  // :232 — the template graph is built ONCE
   node = fragment_from_tree(structure, ns);
   if (!is_fragment) node = get_first_child(node);
 }
-var clone = use_import_node || is_firefox
-  ? document.importNode(node, true)
-  : node.cloneNode(true);            // :245 — and DEEP-CLONED per instance
+var clone = use_import_node || is_firefox ? document.importNode(node, true) : node.cloneNode(true); // :245 — and DEEP-CLONED per instance
 ```
 
 `get_first_child(clone)` (`:249`) goes through the cached descriptor;
 `clone.lastChild` (`:250`) is a plain property read. Corroborated by the compiler's
-own docs: *"`tree` creates the fragment one element at a time and then clones it"*.
+own docs: _"`tree` creates the fragment one element at a time and then clones it"_.
 
 **This once-build-then-clone shape is why the engine node must be lazy — §9.**
 
@@ -265,14 +269,14 @@ own docs: *"`tree` creates the fragment one element at a time and then clones it
 
 Not only templates; the core control-flow blocks allocate fragments per update:
 
-| Source | Feature |
-| --- | --- |
-| `dom/blocks/each.js:160` | `{#each}` |
+| Source                           | Feature             |
+| -------------------------------- | ------------------- |
+| `dom/blocks/each.js:160`         | `{#each}`           |
 | `dom/blocks/branches.js:142,192` | `{#if}` / `{:else}` |
 | `dom/blocks/boundary.js:272,305` | `<svelte:boundary>` |
 
 A fragment must be **cheap**, and must implement the DOM rule that inserting a
-fragment inserts its *children* and leaves the fragment empty.
+fragment inserts its _children_ and leaves the fragment empty.
 
 ### 3f. Ordering: when must `patchGlobals()` run?
 
@@ -289,7 +293,7 @@ That derivation was **wrong**. The optional chaining means this cannot throw and
 imposes **no** ordering constraint at all.
 
 **The real constraint is weaker and different:** `init_operations()` reads the
-globals *at call time*, and it is called before the first render, not at module
+globals _at call time_, and it is called before the first render, not at module
 load. So the actual rule is:
 
 > **`patchGlobals()` must run before `mount()` — not necessarily before the
@@ -297,7 +301,7 @@ load. So the actual rule is:
 
 That is much easier to satisfy. Keep a `dlog` at `patchGlobals()` anyway so the
 ordering is observable, and re-check this if Svelte ever adds a module-level DOM
-access that is *not* optional-chained.
+access that is _not_ optional-chained.
 
 ### 3g. ⚠️ Our primitives are CUSTOM ELEMENTS to Svelte — a different codegen path
 
@@ -316,7 +320,7 @@ late. Every Symbiote intrinsic is **hyphenated**, and
 ```js
 node.type === 'RegularElement' &&
   (node.name.includes('-') ||
-   node.attributes.some((attr) => attr.type === 'Attribute' && attr.name === 'is'))
+    node.attributes.some(attr => attr.type === 'Attribute' && attr.name === 'is'));
 ```
 
 So **every one of our host tags compiles down the custom-element path**, which
@@ -344,21 +348,21 @@ instead of `set_attribute`. The implementation (`dom/elements/attributes.js:226-
 if (
   prop !== 'style' &&
   (setters_cache.has(node.getAttribute('is') || node.nodeName) ||
-   !customElements ||
-   customElements.get(node.getAttribute('is') || node.nodeName.toLowerCase())
-     ? get_setters(node).includes(prop)
-     : value && typeof value === 'object')
+  !customElements ||
+  customElements.get(node.getAttribute('is') || node.nodeName.toLowerCase())
+    ? get_setters(node).includes(prop)
+    : value && typeof value === 'object')
 ) {
-  node[prop] = value;                                    // property set, type preserved
+  node[prop] = value; // property set, type preserved
 } else {
-  set_attribute(node, prop, value == null ? value : String(value));   // ← String()
+  set_attribute(node, prop, value == null ? value : String(value)); // ← String()
 }
 ```
 
 Three hazards:
 
 1. **`style` is explicitly excluded** and therefore always stringified. A style
-   *object* becomes `"[object Object]"`. Correct for the web (where `style` is a
+   _object_ becomes `"[object Object]"`. Correct for the web (where `style` is a
    CSS string); fatal for us. **Never use the literal attribute name `style` on a
    host tag.**
 2. **Scalars are stringified.** `numberOfLines={3}` arrives as `"3"`; booleans as
@@ -369,7 +373,7 @@ Three hazards:
    `value && typeof value === 'object'` heuristic. Leaving `customElements`
    undefined instead selects `get_setters(node)` — and `get_setters`
    (`attributes.js:588-606`) walks the prototype chain **stopping at
-   `Element.prototype`**, which for us *is* our own element class, so the loop can
+   `Element.prototype`**, which for us _is_ our own element class, so the loop can
    run zero times and return `[]`.
 
 #### (c) The resolution: one object prop, not many attributes
@@ -388,7 +392,7 @@ Consequences to keep in mind:
 
 - **This makes Svelte a FLAT-BAG adapter, not a structural one.** ⚠️ The engine's
   own comment at `node.ts:140-142` currently predicts the opposite — it names
-  "Svelte `addEventListener`" as a *structural* adapter that calls
+  "Svelte `addEventListener`" as a _structural_ adapter that calls
   `setEventListener` directly. Under the bag design, host props (including
   handlers) reach the engine through `routeProp` instead. Keep the
   `addEventListener` path implemented as well (raw host-tag authoring, and
@@ -418,7 +422,7 @@ Consequences to keep in mind:
 
   What we lose: **per-attribute granularity.** Normally each attribute gets its
   own effect and re-runs only for its own dependency. With one bag, the single
-  effect re-runs when *any* prop changes, rebuilds the whole object, and hands
+  effect re-runs when _any_ prop changes, rebuilds the whole object, and hands
   the shim everything.
 
   So the setter must keep the previous bag, compare per key, and call `routeProp`
@@ -432,6 +436,7 @@ Consequences to keep in mind:
   A hybrid (static props as individual attributes to keep `has_state`, reactive
   ones in the bag) is **not** worth it — it complicates component authoring and
   reintroduces scalar stringification for the static ones.
+
 - **This facade is INTERNAL.** App code writes `<View style={s} onPress={fn}>`
   exactly as it would in any Svelte app; only the adapter's own `View.svelte` and
   friends emit `<symbiote-view p={bag}>`. User-facing DX is unaffected.
@@ -443,20 +448,20 @@ Consequences to keep in mind:
 None of this needs implementing **provided** the corresponding Svelte feature is
 forbidden and the prohibition is made loud (§7).
 
-| Source | Feature |
-| --- | --- |
-| `dom/blocks/svelte-head.js:24,48` (`document.head`) | `<svelte:head>` |
-| `dom/elements/bindings/document.js` (`document.activeElement`) | `bind:activeElement` |
-| `dom/elements/bindings/navigator.js` (`navigator.onLine`) | `bind:online` |
-| `dom/elements/bindings/input.js:89`, `select.js:123`, `universal.js:59,73` | `bind:` on **elements** |
-| `dom/elements/misc.js:13,17,41` | `autofocus`, `document.addEventListener` |
-| `dom/elements/attributes.js:645` (`document.baseURI`) | `src`/`srcset` URL comparison |
-| all of `dom/hydration.js` | hydration (never applicable) |
+| Source                                                                     | Feature                                  |
+| -------------------------------------------------------------------------- | ---------------------------------------- |
+| `dom/blocks/svelte-head.js:24,48` (`document.head`)                        | `<svelte:head>`                          |
+| `dom/elements/bindings/document.js` (`document.activeElement`)             | `bind:activeElement`                     |
+| `dom/elements/bindings/navigator.js` (`navigator.onLine`)                  | `bind:online`                            |
+| `dom/elements/bindings/input.js:89`, `select.js:123`, `universal.js:59,73` | `bind:` on **elements**                  |
+| `dom/elements/misc.js:13,17,41`                                            | `autofocus`, `document.addEventListener` |
+| `dom/elements/attributes.js:645` (`document.baseURI`)                      | `src`/`srcset` URL comparison            |
+| all of `dom/hydration.js`                                                  | hydration (never applicable)             |
 
 ⚠️ **`dom/blocks/svelte-element.js:95` (`<svelte:element>`) was previously listed here
 and does NOT belong — it is load-bearing, not dead.** It is the only way to reach a
 CAPITALIZED, un-hyphenated native tag (`RNSScreen`, `RNSScreenStack`, `RNSSearchBar`):
-a literal `<RNSScreen>` in a template parses as a *component reference*, not an element,
+a literal `<RNSScreen>` in a template parses as a _component reference_, not an element,
 and Slider's Descriptor-bridge workaround does not generalize to a tag with live
 framework children. `<svelte:element this={'RNSScreen'}>` builds it from a runtime string
 the compiler never inspects. Established by `packages/navigation/src/svelte` (2026-08-14);
@@ -506,7 +511,7 @@ line, and it converts a potential hard crash in a forbidden path into a no-op.
 
 > ⚠️ **Read §3g(c) first.** Under the object-bag design, host props — handlers
 > included — reach the engine through `routeProp` and never touch Svelte's event
-> system. Everything below therefore applies to the *secondary* path: real events
+> system. Everything below therefore applies to the _secondary_ path: real events
 > Svelte does attach (raw host-tag authoring, and anything outside the bag). It
 > stays mandatory, but it is no longer where most interactions flow.
 
@@ -525,17 +530,17 @@ bubble phase only** (`events.js:60-64`: `if (!options.capture) { … }`).
 An earlier draft claimed `handle_event_propagation` touches "exactly two
 properties". **That was wrong.** `dom/elements/events.js:173-305` does all of:
 
-| Line | Operation |
-| --- | --- |
-| `:175` | reads `handler_element.ownerDocument` — a **node** member (see §3c) |
-| `:176` | reads `event.type` |
-| `:177` | calls `event.composedPath?.()` (optional — may be absent) |
-| `:178` | reads `event.target` |
-| `:192` | **reads** an expando `event[event_symbol]` |
+| Line   | Operation                                                                    |
+| ------ | ---------------------------------------------------------------------------- |
+| `:175` | reads `handler_element.ownerDocument` — a **node** member (see §3c)          |
+| `:176` | reads `event.type`                                                           |
+| `:177` | calls `event.composedPath?.()` (optional — may be absent)                    |
+| `:178` | reads `event.target`                                                         |
+| `:192` | **reads** an expando `event[event_symbol]`                                   |
 | `:232` | `define_property(event, 'currentTarget', { configurable: true, get() {…} })` |
-| `:282` | reads `event.cancelBubble` |
-| `:299` | **writes** `event[event_symbol] = handler_element` |
-| `:301` | `delete event.currentTarget` |
+| `:282` | reads `event.cancelBubble`                                                   |
+| `:299` | **writes** `event[event_symbol] = handler_element`                           |
+| `:301` | `delete event.currentTarget`                                                 |
 
 **Consequences for `ISymbioteEvent`:**
 
@@ -577,9 +582,9 @@ large category of expected pain that simply does not apply.
 ⚠️ **Corrected citation and entry point.** The engine's own comment
 (`core/engine/src/node.ts:140-142`) already anticipates us:
 
-> *"Structural adapters (Svelte `addEventListener`, Angular `Renderer2.listen`)
+> _"Structural adapters (Svelte `addEventListener`, Angular `Renderer2.listen`)
 > call this directly with an already-known event name; flat-bag adapters reach it
-> through `routeProp`."*
+> through `routeProp`."_
 
 So the shim's entry point is **`setEventListener` (`node.ts:143`), not `routeProp`
 (`node.ts:231-263`)**. The `onX → x` conversion the engine uses lives in
@@ -652,7 +657,7 @@ wolf-tui sets `navigator = { userAgent: 'wolfie' }`
 **We do not need to.** RN's `navigator` exists but has no `userAgent`, so
 `/Firefox/.test(undefined)` stringifies to `"undefined"`, does not match, and
 yields `is_firefox === false` — exactly the value that keeps `document.importNode`
-off the hot path. The property access is safe precisely *because* RN guarantees
+off the hot path. The property access is safe precisely _because_ RN guarantees
 `navigator` exists, and `setUpNavigator` runs at bootstrap
 (`setUpDefaultReactNativeEnvironment.js:34`) long before any app import.
 
@@ -668,8 +673,8 @@ shim is installed.
 ⚠️ **Precision fix:** an earlier draft said RN "polyfills it lazily off
 `JSTimers`" citing `setUpTimers.js:82-83`. Those lines are inside the **legacy-bridge
 `else` branch** (`setUpTimers.js:22` is `if (global.RN$Bridgeless === true)`, whose
-comment reads *"In bridgeless mode, timers are host functions installed from
-cpp"*). SymbioteNative runs Fabric/bridgeless, so rAF comes from C++ and never touches
+comment reads _"In bridgeless mode, timers are host functions installed from
+cpp"_). SymbioteNative runs Fabric/bridgeless, so rAF comes from C++ and never touches
 `JSTimers`. The conclusion is unchanged and if anything stronger: **leave
 `requestAnimationFrame` and `cancelAnimationFrame` alone.**
 
@@ -699,7 +704,7 @@ silently**, with no throw and no warning.
 
 **Why the blast radius is nevertheless narrow:**
 
-1. **RN's own internals do not break.** Every RN `instanceof` names the *imported*
+1. **RN's own internals do not break.** Every RN `instanceof` names the _imported_
    class, not the global — `instanceof ReactNativeElement` / `ReadOnlyElement`
    (`MutationObserver.js:75`, `IntersectionObserver.js:90,217,243`,
    `ReactNativeResponder.js:588`, `getScrollParent.js:30,40`,
@@ -718,7 +723,7 @@ Third-party code doing `instanceof Node` / `instanceof Element` gets the wrong
 answer in both directions.
 
 **The exposure that actually matters is Svelte-side, not RN-side.** A Svelte
-developer reaches for *Svelte/web ecosystem* packages, which are written for
+developer reaches for _Svelte/web ecosystem_ packages, which are written for
 browsers and do sniff the DOM. Under a shim those libraries **half-work** instead
 of failing fast. Compare `symbiote-web-lib-portability-check`, which records the
 project's independently-reached position on this exact class of problem (the
@@ -737,13 +742,13 @@ our own adapter source (`View.svelte`, `Text.svelte`, `Image.svelte`, …) emits
 `<symbiote-view p={bag}>`; app code imports `View` / `Text` / `Image` from
 `@symbiote-native/svelte`, exactly like every other adapter's public surface.
 
-| Construct | Reachable from app code? | Why it needs no custom guard |
-| --- | --- | --- |
-| `bind:` / `transition:`/`animate:`/`in:`/`out:` on a raw `symbiote-*` tag | **No** | app code never writes a host tag; this is our own adapter source, written with discipline and covered by tests, not an app-facing dev-warning target |
-| `bind:x` on one of OUR exported components (`<TextInput bind:value>`) | Yes, but already caught **for free** | Svelte's own compiler errors at compile time if `value` is not declared `$bindable()` inside the component — see the `$bindable()` decision below |
-| lowercase delegated event name (`onclick`, …) passed as a prop to one of our components | Yes, but already caught **for free** | our exported prop types are explicit (`IViewProps` etc.) with no index-signature catch-all — an undeclared prop name is a plain TS error |
-| a raw HTML tag (`<div>`, `<input>`) | Yes, but already caught **for free** | `descriptorFor` has no entry for it — "unknown element", same as any typo'd tag (§3g) |
-| `<svelte:head\|window\|body\|document>` | **Yes — the one real gap** | these are compiler-level special elements, not typed symbols reachable through our exports; nothing above catches them, they compile cleanly, and they silently do nothing under RN |
+| Construct                                                                               | Reachable from app code?             | Why it needs no custom guard                                                                                                                                                        |
+| --------------------------------------------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bind:` / `transition:`/`animate:`/`in:`/`out:` on a raw `symbiote-*` tag               | **No**                               | app code never writes a host tag; this is our own adapter source, written with discipline and covered by tests, not an app-facing dev-warning target                                |
+| `bind:x` on one of OUR exported components (`<TextInput bind:value>`)                   | Yes, but already caught **for free** | Svelte's own compiler errors at compile time if `value` is not declared `$bindable()` inside the component — see the `$bindable()` decision below                                   |
+| lowercase delegated event name (`onclick`, …) passed as a prop to one of our components | Yes, but already caught **for free** | our exported prop types are explicit (`IViewProps` etc.) with no index-signature catch-all — an undeclared prop name is a plain TS error                                            |
+| a raw HTML tag (`<div>`, `<input>`)                                                     | Yes, but already caught **for free** | `descriptorFor` has no entry for it — "unknown element", same as any typo'd tag (§3g)                                                                                               |
+| `<svelte:head\|window\|body\|document>`                                                 | **Yes — the one real gap**           | these are compiler-level special elements, not typed symbols reachable through our exports; nothing above catches them, they compile cleanly, and they silently do nothing under RN |
 
 **Net: the only construct that needs an actual dev-time guard is
 `<svelte:head|window|body|document>`.** Everything else originally in §4's table
@@ -819,11 +824,11 @@ anyway, so the echo is unconditionally correct and `bind:value` round-trips
 with no correction command dispatched — proven by a new test in each
 `*.smoke.test.ts` file (`round-trips a native … into a \`bind:value\` variable
 with no correction command`). **The one real, documented limit:** combining
-`bind:value` with a caller-supplied `onValueChange` on the SAME instance
+`bind:value`with a caller-supplied`onValueChange`on the SAME instance
 silently disables the bind: echo (onValueChange's own logic governs
 acceptance instead) — pick one authoring style per instance, matching how a
-raw DOM `<input bind:value>` has no built-in interception either; if you need
-both, mirror what `bind:` would do inside your own handler
+raw DOM`<input bind:value>`has no built-in interception either; if you need
+both, mirror what`bind:` would do inside your own handler
 (`onValueChange={(v) => (x = v)}`).
 
 ### Mechanism for the one real gap — DECIDED: build-time preprocessor
@@ -866,15 +871,15 @@ ships a per-framework entry whose smokes drive the same `mount()`. Find newly ad
 3. **`handle_event_propagation`'s event contract (`dom/elements/events.js:173-305`)** —
    currently reads `type`, `target`, `cancelBubble`, optional `composedPath()`,
    plus an expando read/write and `currentTarget` define/delete. If it starts
-   requiring more, `ISymbioteEvent` must grow. (Note: it *already* calls
-   `composedPath()` and *already* manipulates `currentTarget` — an earlier draft
+   requiring more, `ISymbioteEvent` must grow. (Note: it _already_ calls
+   `composedPath()` and _already_ manipulates `currentTarget` — an earlier draft
    listed both as hypothetical futures.)
 4. **`importNode(node, true)` semantics in `from_tree` (`template.js:244-246`)** —
    ⚠️ watch `importNode`, **not** `cloneNode`: every Symbiote tag is a custom
    element and therefore sets `TEMPLATE_USE_IMPORT_NODE` (§3g(a)). Clones must
    copy attributes and must **not** carry listeners, or instance state leaks
    between component instances.
-4b. **The custom-element attribute path (`attributes.js:226-273`,
+   4b. **The custom-element attribute path (`attributes.js:226-273`,
    `RegularElement.js:58,670`)** — if Svelte changes `set_custom_element_data`'s
    branch logic, the `customElements` interaction, or its `style` special-case,
    the object-bag design in §3g(c) must be re-validated.
@@ -1031,10 +1036,10 @@ about **1 MB**, so it cannot account for a 20 MB difference.
 
 Two related claims that are WRONG and were corrected here:
 
-- *"Vue keeps one object per element, Svelte keeps two."* No. `@vue/runtime-core` still builds
+- _"Vue keeps one object per element, Svelte keeps two."_ No. `@vue/runtime-core` still builds
   and retains a **VNode tree** above the host nodes. Both adapters carry two retained layers;
   the shim is not a uniquely extra one, it just replaces VNodes with a DOM-shaped tree.
-- *"A smaller bundle means less RAM."* Measured on the iOS dev bundles (2026-08-13):
+- _"A smaller bundle means less RAM."_ Measured on the iOS dev bundles (2026-08-13):
   `vue-sfc 6.0M · svelte 5.9M · angular 8.4M` (879 / 967 / 1331 modules). Svelte's is the
   SMALLEST of the three while its device RSS is higher than Vue's — so bundle size does not
   order the RAM numbers and is not the explanation.
@@ -1138,7 +1143,7 @@ So `''` at creation time only ever means anchor.
 **The one wrinkle, handled:** a node that mounts empty becomes an anchor, and the engine has no
 anchor→text conversion (an anchor is a distinct component). If such a node is later given real
 content, `set data` PROMOTES it — removes the anchor from the parent engine node and inserts a
-fresh raw text at the same position, anchoring before the first *live* following sibling exactly
+fresh raw text at the same position, anchoring before the first _live_ following sibling exactly
 as `ShimNode.insertOne` does. The reverse is deliberately NOT done: a node that once had content
 and is set back to `''` stays a raw text, because that is genuine empty text content and is what
 React commits there too, and demoting would churn the tree on every binding that empties.
@@ -1156,13 +1161,13 @@ them; the serialized shape did. That test now also locks in the remaining, legit
 estimated 350-450 lines. The arithmetic did not support that. Honest accounting
 against wolf-tui's 1271:
 
-| Chunk | Lines | Verdict |
-| --- | --- | --- |
-| `parseHTMLIntoFragment` + `createTemplateFragment` (`wolfie-document.ts:81-147`) | ~67 | **skip** — `fragments:'tree'` means `from_html` is never used |
-| `className` / `classList` / style proxy (`wolfie-element.ts:423-510`) | ~88 | **skip** — class+style merging is already centralised cross-adapter in `routeProp` (`node.ts:193-243`); reimplementing it would diverge from React/Vue/Angular |
-| Eager core-node creation + `_coreDom*` (`wolfie-element.ts:378-384`, `615-689`) | ~80 | **replace** with the lazy design (§9) |
-| `getBoundingClientRect` + misc DOM compat (`wolfie-element.ts:552-615`) | ~63 | **mostly skip** — measurement goes through the engine's host-instance API |
-| `wolfie-action.ts`, `init-layout-tree.ts` | 111 | **wolf-tui-specific** — we need our own equivalents, not these |
+| Chunk                                                                            | Lines | Verdict                                                                                                                                                        |
+| -------------------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parseHTMLIntoFragment` + `createTemplateFragment` (`wolfie-document.ts:81-147`) | ~67   | **skip** — `fragments:'tree'` means `from_html` is never used                                                                                                  |
+| `className` / `classList` / style proxy (`wolfie-element.ts:423-510`)            | ~88   | **skip** — class+style merging is already centralised cross-adapter in `routeProp` (`node.ts:193-243`); reimplementing it would diverge from React/Vue/Angular |
+| Eager core-node creation + `_coreDom*` (`wolfie-element.ts:378-384`, `615-689`)  | ~80   | **replace** with the lazy design (§9)                                                                                                                          |
+| `getBoundingClientRect` + misc DOM compat (`wolfie-element.ts:552-615`)          | ~63   | **mostly skip** — measurement goes through the engine's host-instance API                                                                                      |
+| `wolfie-action.ts`, `init-layout-tree.ts`                                        | 111   | **wolf-tui-specific** — we need our own equivalents, not these                                                                                                 |
 
 Net: roughly 300-400 lines genuinely dropped, not ~820. **A realistic target is
 700-900 lines**, plus tests. Treat that as an estimate, not a measurement.
@@ -1195,15 +1200,16 @@ Stated honestly so nobody treats this file as uniformly evidence-backed:
 
 - **PR #18042's metadata** (open, March 2026, 158 commits, no approving review) and
   **PR #18511**, and **issue #47's contents**. GitHub API access in the measuring
-  session was scoped to `oneeyed1366/symbiote-native` only. *Indirect* corroboration
+  session was scoped to `oneeyed1366/symbiote-native` only. _Indirect_ corroboration
   for the load-bearing claim: the cloned 5.56.8 tree has no `customRenderer` option
   and no `svelte/renderer` export, consistent with "unmerged".
 - **The 700-900 line estimate** (§12) — an estimate, not a measurement.
 
 **Verified 2026-08-11** (previously listed here as unverified, now confirmed against
 the real installed `svelte@5.56.8` and a real `tsc --build` of `adapters/svelte`):
+
 - The `forbidSpecialElements()` preprocessor's AST assumptions — `parse(content,
-  {modern: true})` really does yield `Root.fragment.nodes[].type` ===
+{modern: true})` really does yield `Root.fragment.nodes[].type` ===
   `'SvelteHead'`/`'SvelteWindow'`/`'SvelteDocument'`/`'SvelteBody'`; the preprocessor
   throws on each forbidden tag and passes clean markup through unchanged.
 - `svelte.config.js` importing `forbid-special-elements.ts` by its real `.ts`
@@ -1278,6 +1284,7 @@ Svelte output → shim tree → engine → Fabric), via
 `adapters/svelte/src/components/switch/switch.smoke.test.ts`. Both pass.
 
 ### No `.svelte`-aware bundler is wired into this repo's vitest — the harness works
+
 around it, not through one
 
 There is no `@sveltejs/vite-plugin-svelte` in the catalog and no plan to add one for
@@ -1302,13 +1309,13 @@ filename directly.
    `lifecycle_function_unavailable: mount(...) is not available on the server` — a
    HARD CRASH on literally the first line `render.ts`'s `mount()` executes. Fixed
    for the test suite in the root `vitest.config.ts` (`resolve.conditions:
-   ['browser']` AND `ssr.resolve.conditions: ['browser']` — Vitest runs test files
+['browser']` AND `ssr.resolve.conditions: ['browser']` — Vitest runs test files
    through Vite's SSR module graph, so the plain `resolve.conditions` alone was not
    enough). **Metro-side fix (2026-08-12): `examples/svelte/metro.config.js` sets
    `resolver.unstable_conditionNames: ['browser']`.** Confirmed this is genuinely
    needed, not a maybe: `@react-native/metro-config`'s own default is
    `unstable_conditionNames: []` with `unstable_conditionsByPlatform: { web:
-   ['browser'] }` — the `browser` condition is ONLY applied for the `web` platform
+['browser'] }` — the `browser` condition is ONLY applied for the `web` platform
    by default, so iOS/Android would silently resolve svelte's SSR build without this
    override (read straight out of the installed `metro-config/src/defaults/index.js`,
    not guessed). Still open: nobody has verified this against a real Metro bundle
@@ -1366,7 +1373,7 @@ Worth stating once here rather than re-deriving per component:
   AppContainer) matches the EMPTY mount target first, since it is a plain depth-first
   pre-order search and the mount target is the shallower match — found while
   building Animated.View's own smoke tests (`adapters/svelte/src/modules/animated/
-  animated-view.smoke.test.ts` and friends), where `appView().props.opacity` read as
+animated-view.smoke.test.ts` and friends), where `appView().props.opacity` read as
   `undefined` even though the real node one level deeper carried the right value.
   Fix: key the search on a prop only YOUR component's root carries (a `testID` set
   in the test), not on the generic `viewName`/`pointerEvents` shape alone — the same
@@ -1381,19 +1388,20 @@ Before writing Switch, the plan assumed React's `descriptorToReact`/Vue's
 `descriptorToVue` (a generic runtime `Descriptor → element` materializer via
 h()-style hyperscript) would need a Svelte equivalent, built on the shim (walk a
 `Descriptor`, construct `ShimElement`/`ShimText` nodes via `document.createElement`
-+ `.p =` the bag, append into a live anchor). Reading every
-`core/components/src/view/render-*.ts` function that returns an `IDescriptor`
-(`renderActivityIndicator`, `renderSwitch`, `renderImage`, `renderImageBackground`,
-`renderInputAccessoryView`, `renderModal`, `renderTextInput`) shows each ALWAYS
-produces the SAME tree shape — only prop VALUES vary (`renderSwitch` is always
-exactly `el('symbiote-switch', props)`; `renderImageBackground` is always exactly a
-wrapper View containing one Image, with children injected after). That part is
-correct and stands: since Svelte compiles templates statically, no generic
-recursive walker is needed anywhere. Lists (`FlatList`/`SectionList`/
-`VirtualizedList`) have no `render-*.ts` at all (`core/components`'s own comment:
-"the cell content is the framework's own children, so there is no Descriptor render
-fn") — they were always meant to be hand-assembled per adapter using the
-framework's native loop, which for Svelte is `{#each}`.
+
+- `.p =` the bag, append into a live anchor). Reading every
+  `core/components/src/view/render-*.ts` function that returns an `IDescriptor`
+  (`renderActivityIndicator`, `renderSwitch`, `renderImage`, `renderImageBackground`,
+  `renderInputAccessoryView`, `renderModal`, `renderTextInput`) shows each ALWAYS
+  produces the SAME tree shape — only prop VALUES vary (`renderSwitch` is always
+  exactly `el('symbiote-switch', props)`; `renderImageBackground` is always exactly a
+  wrapper View containing one Image, with children injected after). That part is
+  correct and stands: since Svelte compiles templates statically, no generic
+  recursive walker is needed anywhere. Lists (`FlatList`/`SectionList`/
+  `VirtualizedList`) have no `render-*.ts` at all (`core/components`'s own comment:
+  "the cell content is the framework's own children, so there is no Descriptor render
+  fn") — they were always meant to be hand-assembled per adapter using the
+  framework's native loop, which for Svelte is `{#each}`.
 
 **CORRECTED 2026-08-12 — the conclusion drawn from that insight was wrong and shipped
 a real bug.** The first pass of this section said to skip consuming a `render-*.ts`
@@ -1451,9 +1459,10 @@ mapping, base re-exports iOS, same convention as every other adapter's Switch) +
 `switch-platform-types.ts` (the shared type neither platform file imports FROM the
 other). Two things `switch.smoke.test.ts` specifically proves, not just asserts in a
 comment:
+
 - **`$state.raw`, not `$state`, for the engine-node/shim-element identity** — same
   concern as Vue's `shallowRef` (documented in `adapters/vue/src/components/switch/
-  shared.ts`): `$state()` deep-proxies an assigned object, and `dispatchViewCommand`
+shared.ts`): `$state()` deep-proxies an assigned object, and `dispatchViewCommand`
   needs the RAW `ShimElement` the engine's mirror actually knows, or every
   imperative command silently misses.
 - **`bind:this` timing vs. the shim's lazy engine-node binding** — the open question
@@ -1539,9 +1548,15 @@ code in this project): pack every multi-sibling region — everything between on
 `<View>`'s opening tag and its closing tag when it holds 2+ children — edge-to-edge
 with zero whitespace, exactly like `virtualized-list/index.svelte`'s own internal
 rule.** A one-line auditing snippet (Node, given `svelte/compiler`):
+
 ```js
 const { compile } = require('svelte/compiler');
-const result = compile(source, { generate: 'client', fragments: 'tree', css: 'external', filename });
+const result = compile(source, {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  filename,
+});
 const strayCount = (result.js.code.match(/,\s*'\s+'\s*,/g) || []).length; // must be 0
 ```
 
@@ -1644,6 +1659,7 @@ real `topLayout` event on the scroll view (300×600), await two macrotask ticks.
 test's own assertions PASS (the windowed child count really does grow past the
 pre-layout `initialNumToRender` bound), but vitest ALSO reports one uncaught
 exception per run:
+
 ```
 Error: ShimNode.before() called on a node with no parent
   at ShimText.before shim-node.ts:115
@@ -1651,6 +1667,7 @@ Error: ShimNode.before() called on a node with no parent
 ```
 
 **Ruled out, with direct evidence, not just reasoning:**
+
 - **NOT a `batchTimer`/`viewableTimer` leak past `unmount()`.** Instrumented both the
   `schedule-refill` timer-set call and the destroy-effect's cleanup with logging:
   `batchTimer`/`viewableTimer` were `null` at cleanup time in every run — the
@@ -1742,7 +1759,7 @@ they don't get lost in six separate agent transcripts:
   (`refresh-control-props.ts`), so ScrollView's Android RefreshControl wrap DOES
   split layout-vs-visual style via `splitLayoutProps`, the same as elsewhere
   (`scroll-view/index.svelte`: `layoutSplit = shouldWrapRefreshControl ?
-  splitLayoutProps(...) : undefined`, applied as `style={layoutSplit?.outer}` on
+splitLayoutProps(...) : undefined`, applied as `style={layoutSplit?.outer}` on
   the wrapping `<RefreshControl>`). This paragraph originally flagged the gap as
   open; verified closed 2026-08-15 while auditing `api/components.mdx` for the
   docs-site Svelte-parity sweep — kept here (not deleted) as a record that the
@@ -1760,7 +1777,7 @@ they don't get lost in six separate agent transcripts:
   `adapters/vue/metro-vue-transformer.cjs`: `svelte/compiler`'s `compile()` with this
   adapter's own `{fragments:'tree', css:'external', generate:'client'}`, no framework-
   import rewriting needed unlike Vue, delegated to `@react-native/metro-babel-
-  transformer` via `resolveUpstreamTransformer()`). Unit-tested
+transformer` via `resolveUpstreamTransformer()`). Unit-tested
   (`adapters/svelte/metro-svelte-transformer.test.ts`, 6 tests: client-runtime-only
   import, `from_tree` not `from_html`, `set_custom_element_data` routing, TS erasure
   with no filesystem resolution needed, full transform() through the upstream
@@ -1785,7 +1802,7 @@ they don't get lost in six separate agent transcripts:
   package's own compiled barrel (`build/components/index.js`) still literally
   contains `export { default as Switch } from './switch/index.svelte'` — `tsc`
   passes the specifier through unresolved without erroring (an ambient `declare
-  module '*.svelte'` satisfies its type check) but never copies the file the
+module '*.svelte'` satisfies its type check) but never copies the file the
   specifier points at. Exit code 0, no warning — this is NOT the same gap as
   Vue's: Vue's own components are plain `.ts`/`.tsx` render functions
   (`adapters/vue/src/components/switch/index.ts`), so Vue never hits this; Svelte
@@ -1797,7 +1814,7 @@ they don't get lost in six separate agent transcripts:
   `scripts/fix-esm-extensions.mjs`'s pattern: discovers every publishable package
   via `publishablePackageEntries()`, copies any `src/**/*.svelte` to the matching
   `build/` path), wired into root `prepublish-build` right after `fix-esm-
-  extensions`. A future package authored the same way is covered automatically.
+extensions`. A future package authored the same way is covered automatically.
 
 ## §19. `descriptorToSvelte` — BUILT (2026-08-12): `adapters/svelte/src/descriptor-to-svelte.ts`
 
@@ -1833,7 +1850,9 @@ rewriting by hand) now backs Switch, TextInput, AND ActivityIndicator identicall
 
 ```ts
 const syncChildren = createDescriptorChildrenSync();
-$effect(() => { syncChildren(hostShim, descriptor.children); });
+$effect(() => {
+  syncChildren(hostShim, descriptor.children);
+});
 ```
 
 For Switch/TextInput this is a provably harmless no-op loop over an empty array
@@ -1875,12 +1894,12 @@ exactly this, in production, today:
 
 ```ts
 export function wNodeToSvelte(node: WNode): WolfieElement {
-  const el = new WolfieElement(node.type)
-  if (node.props.style) setStyle(el.domElement, node.props.style)  // bypasses Svelte's setAttribute
+  const el = new WolfieElement(node.type);
+  if (node.props.style) setStyle(el.domElement, node.props.style); // bypasses Svelte's setAttribute
   for (const child of node.children) {
-    el.appendChild(typeof child === 'string' ? new WolfieText(child) : wNodeToSvelte(child))
+    el.appendChild(typeof child === 'string' ? new WolfieText(child) : wNodeToSvelte(child));
   }
-  return el
+  return el;
 }
 ```
 
@@ -1898,13 +1917,14 @@ ANY element, static or dynamic tag alike).
 
 ```ts
 function descriptorToSvelte(node: IDescriptor): ShimElement | ShimText {
-  if (typeof node === 'string') return document.createTextNode(node)
-  const el = document.createElement(node.type)   // our own document shim, not Svelte's
-  el.p = node.props                              // our object-bag setter, already proven
-  for (const child of node.children) el.appendChild(descriptorToSvelte(child))
-  return el
+  if (typeof node === 'string') return document.createTextNode(node);
+  const el = document.createElement(node.type); // our own document shim, not Svelte's
+  el.p = node.props; // our object-bag setter, already proven
+  for (const child of node.children) el.appendChild(descriptorToSvelte(child));
+  return el;
 }
 ```
+
 mounted via one `use:mountDescriptor={renderX(viewProps, platform)}` action per
 component, instead of each component hand-writing a markup skeleton that mirrors
 its `render-*.ts`'s known shape.
@@ -1981,12 +2001,12 @@ four-file shape by hand rather than reaching for a generic wrapper.
 hatch — not a uniform recipe:**
 
 - `AnimatedView` / `AnimatedText` HAND-AUTHOR their own root tag (`<symbiote-view
-  p={reduced} bind:this={hostShim}>`), mirroring `Pressable`/`ScrollView`'s own
+p={reduced} bind:this={hostShim}>`), mirroring `Pressable`/`ScrollView`'s own
   precedent for needing a raw `ShimElement`. Safe here because `View.svelte` /
   `Text.svelte` are pure pass-through bags with zero prop transformation of their
   own — hand-authoring loses no logic.
 - `AnimatedScrollView` WRAPS the real `ScrollView.svelte` directly (`<ScrollView
-  {...reduced} bind:this={scrollRef}>`), because `ScrollView.svelte` already
+{...reduced} bind:this={scrollRef}>`), because `ScrollView.svelte` already
   exposes `getScrollNode()` (+ `scrollTo`/`scrollToEnd`/`flashScrollIndicators`)
   via top-level `export function`s — exactly the `IScrollViewHandle` shape
   `resolveHostNode` expects on Vue/React. Hand-authoring a reduced duplicate here
@@ -2128,7 +2148,6 @@ bundle, not just compiled in isolation. Repo-wide `npx vitest run`: 1923/1927
 (same 4 pre-existing, unrelated `less`-package failures), zero regressions.
 Real simulator/device boot remains the next, not-yet-taken step.
 
-
 ## Sticky headers must ride the NATIVE driver — never force the JS path (2026-08-13)
 
 `nativeStickyAvailable` is resolved dynamically in both `scroll-view/index.svelte` and
@@ -2159,7 +2178,6 @@ test asserting the listener DOES go quiet after promotion. It looks like it is a
 is asserting RN parity. Do not "fix" the engine to make it tick — that is the divergence, and it
 would re-open the door to hardcoding the JS path again.
 
-
 ## Never store Svelte's rest-props object as "previous state" (2026-08-13)
 
 Svelte hands a component the **same** rest-props object on every reactive tick — it mutates what
@@ -2168,9 +2186,9 @@ itself as its previous value therefore compares that proxy **against itself**, r
 current values through both sides, and can never report a change:
 
 ```ts
-lastRest = rest;                                   // WRONG — same proxy next tick
-const changed = !shallowEqual(lastRest, rest);     // structurally always false
-lastRest = { ...rest };                            // RIGHT — snapshot of the values
+lastRest = rest; // WRONG — same proxy next tick
+const changed = !shallowEqual(lastRest, rest); // structurally always false
+lastRest = { ...rest }; // RIGHT — snapshot of the values
 ```
 
 This shipped in `modules/animated/animated-props-runtime.ts` and cost most of a debugging session.
@@ -2186,7 +2204,7 @@ because something else is churning is not working.**
 
 Deep comparison is NOT the fix and would break it further: `rest.style` holds live `AnimatedNode`s
 in a circular parent↔children graph (hence `describeTransform` instead of `JSON.stringify`), and
-the signal being detected is *"this is a different node object"* — identity, not value equality.
+the signal being detected is _"this is a different node object"_ — identity, not value equality.
 Two interpolations with similar fields must count as a change.
 
 Locked in by `modules/animated/animated-props-rest-proxy.test.ts`. Note `wantsNative: true` there
@@ -2293,6 +2311,7 @@ reactivity inside it:
 ```svelte
 {@attach which === 'first' ? first : second}
 ```
+
 ```js
 [$.attachment()]: ($$node) => ($.get(which) === 'first' ? first : second)($$node)
 ```
@@ -2386,7 +2405,6 @@ The probe script also prints a `preprocessor verdict` section alongside the comp
 "ok" under `[control flow]` is never mistaken for "supported" — `compile()` does not invoke
 preprocessors, and that distinction is exactly what made this gap easy to miss.
 
-
 ## A CAPITALIZED native Fabric tag: `<svelte:element>` + `{@attach}`, not the Descriptor bridge (2026-08-14)
 
 Found while porting `packages/navigation` to Svelte, whose whole surface is
@@ -2412,7 +2430,9 @@ with
 
 ```ts
 export function hostProps(props: Record<string, unknown>): (node: unknown) => void {
-  return node => { if (isShimElement(node)) node.p = props; };
+  return node => {
+    if (isShimElement(node)) node.p = props;
+  };
 }
 ```
 
@@ -2429,7 +2449,7 @@ export function hostProps(props: Record<string, unknown>): (node: unknown) => vo
   `dom/blocks/svelte-element.js` needs, verified by
   `packages/navigation/src/svelte/stack/stack.smoke.test.ts` committing a real
   `RNSScreenStack > RNSScreen > [RNSScreenStackHeaderConfig,
-  RNSScreenContentWrapper]` tree. Do not forbid it; it is the ONLY route to a
+RNSScreenContentWrapper]` tree. Do not forbid it; it is the ONLY route to a
   capitalized native tag with live children.
 
 ## Rendering declarative marker children Svelte cannot introspect (2026-08-14)
@@ -2502,8 +2522,8 @@ A `.svelte` file imported from `node_modules` resolves through Svelte's ambient
 `declare module '*.svelte'` fallback, i.e. a bare `SvelteComponent<Record<string, any>, any, any>`.
 The `export function push/pop/replace/reset/…` surface that `bind:this` actually returns at
 runtime is erased, so annotating the binding as `INavigatorHandle | null` fails with
-*"Type 'SvelteComponent<…>' is missing the following properties … push, pop, popToTop, popTo, and
-4 more."*
+_"Type 'SvelteComponent<…>' is missing the following properties … push, pop, popToTop, popTo, and
+4 more."_
 
 This affects EVERY package that ships raw `.svelte` sources — currently `@symbiote-native/
 navigation` and `@symbiote-native/slider` — and it is the type-level twin of §13's already-recorded
@@ -2568,30 +2588,30 @@ offsets against.
 `svelte/reactivity` is mostly portable, so the gap is narrow and worth stating precisely rather
 than re-grepping. Measured against `svelte/src`:
 
-| subpackage | verdict |
-|---|---|
-| `svelte/reactivity` — `map` / `set` / `date` / `url` / `url-search-params` / `create-subscriber` | PURE, work as-is. Do not wrap them. |
-| `svelte/reactivity` — `media-query.js` | browser-only: `window.matchMedia` |
-| `svelte/reactivity/window` | browser-only: `innerWidth` `innerHeight` `outerWidth` `outerHeight` `scrollX` `scrollY` `screenLeft` `screenTop` `devicePixelRatio` `navigator.onLine` |
-| `svelte/motion` | no browser API. `Tween`/`Spring` use `raf` from `internal/client/timing.js`, which resolves to a real `requestAnimationFrame` under the `browser` export condition Metro already sets. Runs on the JS thread. |
-| `svelte/store`, `svelte/easing`, `svelte/attachments`, `svelte/events` | PURE |
+| subpackage                                                                                       | verdict                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `svelte/reactivity` — `map` / `set` / `date` / `url` / `url-search-params` / `create-subscriber` | PURE, work as-is. Do not wrap them.                                                                                                                                                                           |
+| `svelte/reactivity` — `media-query.js`                                                           | browser-only: `window.matchMedia`                                                                                                                                                                             |
+| `svelte/reactivity/window`                                                                       | browser-only: `innerWidth` `innerHeight` `outerWidth` `outerHeight` `scrollX` `scrollY` `screenLeft` `screenTop` `devicePixelRatio` `navigator.onLine`                                                        |
+| `svelte/motion`                                                                                  | no browser API. `Tween`/`Spring` use `raf` from `internal/client/timing.js`, which resolves to a real `requestAnimationFrame` under the `browser` export condition Metro already sets. Runs on the JS thread. |
+| `svelte/store`, `svelte/easing`, `svelte/attachments`, `svelte/events`                           | PURE                                                                                                                                                                                                          |
 
-The dom-shim patches only the DOM *classes* compiled Svelte output touches — never the browser's
+The dom-shim patches only the DOM _classes_ compiled Svelte output touches — never the browser's
 window-metric properties — so every browser-only value above reads `undefined` forever and never
 updates. Silent, not a crash.
 
 ### The twins (`adapters/svelte/src/runes/`, exported from the package barrel)
 
-| Svelte browser value | RN twin | source |
-|---|---|---|
-| `innerWidth` / `innerHeight` | `innerWidth` / `innerHeight` | `Dimensions.get('window')` |
-| `outerWidth` / `outerHeight` | `outerWidth` / `outerHeight` | `Dimensions.get('screen')` |
-| `devicePixelRatio` | `devicePixelRatio` | `PixelRatio.get()` |
-| `new MediaQuery('orientation: …')` | `orientation` → `'portrait' \| 'landscape'` | `Dimensions.get('window')`, `height >= width` is portrait |
-| `new MediaQuery('min-width: 800px')` | `createWidthQuery({ minWidth, maxWidth })` → `boolean` | `Dimensions.get('window').width`, both bounds inclusive, in dp |
-| `new MediaQuery('prefers-color-scheme: dark')` | the EXISTING `useColorScheme()` rune | `Appearance` |
-| `online` | `useNetworkState()` from `@symbiote-native/network/svelte` | expo-network |
-| `scrollX` / `scrollY` / `screenLeft` / `screenTop` | **none — deliberately absent** | — |
+| Svelte browser value                               | RN twin                                                    | source                                                         |
+| -------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
+| `innerWidth` / `innerHeight`                       | `innerWidth` / `innerHeight`                               | `Dimensions.get('window')`                                     |
+| `outerWidth` / `outerHeight`                       | `outerWidth` / `outerHeight`                               | `Dimensions.get('screen')`                                     |
+| `devicePixelRatio`                                 | `devicePixelRatio`                                         | `PixelRatio.get()`                                             |
+| `new MediaQuery('orientation: …')`                 | `orientation` → `'portrait' \| 'landscape'`                | `Dimensions.get('window')`, `height >= width` is portrait      |
+| `new MediaQuery('min-width: 800px')`               | `createWidthQuery({ minWidth, maxWidth })` → `boolean`     | `Dimensions.get('window').width`, both bounds inclusive, in dp |
+| `new MediaQuery('prefers-color-scheme: dark')`     | the EXISTING `useColorScheme()` rune                       | `Appearance`                                                   |
+| `online`                                           | `useNetworkState()` from `@symbiote-native/network/svelte` | expo-network                                                   |
+| `scrollX` / `scrollY` / `screenLeft` / `screenTop` | **none — deliberately absent**                             | —                                                              |
 
 Files: `runes/dimensions-value.ts` (the one `createSubscriber` ↔ `Dimensions` bridge),
 `runes/window.ts`, `runes/media-query.ts`, plus `window.test.ts` / `media-query.test.ts`.
@@ -2848,7 +2868,7 @@ css-parser's existing `globalClassNamesIn` — same escape hatch, same code, as 
   extensionless graph. Hence the three-file split — `scope-token.ts` (the per-token rule, zero
   imports, shared by both halves so a static `class="card"` and a dynamic `class={'card'}` can
   never disagree), `style-scope.ts` (the clsx-aware runtime value scoper), `preprocessor/
-  scoped-styles.ts` (build time). `scoped-styles.test.ts` spawns real Node against the real
+scoped-styles.ts` (build time). `scoped-styles.test.ts` spawns real Node against the real
   config as a regression guard.
 
 - **Line numbers are preserved.** No source map is emitted (matching the sibling guard), so the
@@ -2870,18 +2890,18 @@ css-parser's existing `globalClassNamesIn` — same escape hatch, same code, as 
 Everything here is a property of `@symbiote-native/css-parser` + the flat registry, shared with
 Vue and Angular; none of it is Svelte-specific, and none of it was made worse by this feature.
 
-| CSS feature | Result |
-|---|---|
-| plain declarations, `var()`, `calc()`, `rem` | work |
-| `transform`, `box-shadow`, `filter`, `transform-origin`, `background-image` gradients | work (engine `STYLE_PROCESSORS`) |
-| `:global(.x)` | works — registers unsuffixed |
-| `.card-title` kebab authoring | works — matched against its camelCase registry key |
-| `@media`, `@keyframes`/`animation`, `@supports` | **dropped**, one `console.warn` each — RN has no concept to target |
-| `.card:hover` / any pseudo-class | **whole rule dropped** (`symbiote-sfc-style-compiler`'s pseudo-class bug) |
-| `.card .title` descendant, `.card.big` compound | register under ONE merged key (`cardTitle`/`cardBig`) — so under scoping, markup writing `class="card big"` does NOT pick up `.card.big`; only the single-class rules resolve. Same on Vue; a pre-existing limit of the suffix scheme, not new here |
-| `class:foo={cond}` directive | **not scoped** — it compiles to `set_class`, which the shim does not implement, so it is dead regardless (§22a: the directive is illegal on a component anyway) |
-| `{...spread}` carrying a `class` key | **not scoped** — the preprocessor only sees literal `class` attributes |
-| `<style lang="scss"/"sass"/"less"/"stylus">` | supported (delegates to css-parser's preprocessor layer), but **not covered by a test here**: the `svelte` vitest project sets `resolve.conditions: ['browser']`, and `sass`/`less`/`stylus` each declare a `browser` export first, resolving to browser bundles that fail under Node — the exact trap the vitest config comment already documents. Any other `lang` throws with a naming message rather than dropping the block |
+| CSS feature                                                                           | Result                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| plain declarations, `var()`, `calc()`, `rem`                                          | work                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `transform`, `box-shadow`, `filter`, `transform-origin`, `background-image` gradients | work (engine `STYLE_PROCESSORS`)                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `:global(.x)`                                                                         | works — registers unsuffixed                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `.card-title` kebab authoring                                                         | works — matched against its camelCase registry key                                                                                                                                                                                                                                                                                                                                                                               |
+| `@media`, `@keyframes`/`animation`, `@supports`                                       | **dropped**, one `console.warn` each — RN has no concept to target                                                                                                                                                                                                                                                                                                                                                               |
+| `.card:hover` / any pseudo-class                                                      | **whole rule dropped** (`symbiote-sfc-style-compiler`'s pseudo-class bug)                                                                                                                                                                                                                                                                                                                                                        |
+| `.card .title` descendant, `.card.big` compound                                       | register under ONE merged key (`cardTitle`/`cardBig`) — so under scoping, markup writing `class="card big"` does NOT pick up `.card.big`; only the single-class rules resolve. Same on Vue; a pre-existing limit of the suffix scheme, not new here                                                                                                                                                                              |
+| `class:foo={cond}` directive                                                          | **not scoped** — it compiles to `set_class`, which the shim does not implement, so it is dead regardless (§22a: the directive is illegal on a component anyway)                                                                                                                                                                                                                                                                  |
+| `{...spread}` carrying a `class` key                                                  | **not scoped** — the preprocessor only sees literal `class` attributes                                                                                                                                                                                                                                                                                                                                                           |
+| `<style lang="scss"/"sass"/"less"/"stylus">`                                          | supported (delegates to css-parser's preprocessor layer), but **not covered by a test here**: the `svelte` vitest project sets `resolve.conditions: ['browser']`, and `sass`/`less`/`stylus` each declare a `browser` export first, resolving to browser bundles that fail under Node — the exact trap the vitest config comment already documents. Any other `lang` throws with a naming message rather than dropping the block |
 
 ### 25f. Verification actually run
 
@@ -2922,7 +2942,7 @@ LegacyComponentType`). That erasure escapes into the published tarball two diffe
 2. **The `.ts` modules that launder a component through a VALUE — the one that actually caused
    §24c's symptom, and the one a naive "emit `.svelte.d.ts`" pass silently misses.** `Stack` is
    `Object.assign(StackImpl, { Screen })` in `packages/navigation/src/svelte/stack/index.ts`, so
-   tsc *inlines* the type it saw at emit time straight into `build/svelte/stack/index.d.ts`:
+   tsc _inlines_ the type it saw at emit time straight into `build/svelte/stack/index.d.ts`:
    `LegacyComponentType & { Screen: LegacyComponentType }`. That text is frozen — adding
    `index.svelte.d.ts` afterwards does not change it, because nothing re-resolves it. Measured:
    7 such files repo-wide (`navigation` stack/tabs/drawer, `adapters/svelte`
@@ -2985,12 +3005,12 @@ consumer with only the tarball in `node_modules`, and run `svelte-check` (borrow
 ```
 
 - WITH the generated declarations: `svelte-check found 0 errors and 0 warnings`. A deliberate
-  `reset({ index: 0, routes: [] })` typo was rejected with *"'index' does not exist in type
-  'Readonly<{ routes: readonly Readonly<{ key; name; params }>[] }>'"* — the argument shape is
+  `reset({ index: 0, routes: [] })` typo was rejected with _"'index' does not exist in type
+  'Readonly<{ routes: readonly Readonly<{ key; name; params }>[] }>'"_ — the argument shape is
   really checked, not merely `any`.
-- With ONLY those files removed from the same extracted tarball: *"Type
+- With ONLY those files removed from the same extracted tarball: _"Type
   `SvelteComponent<Record<string, any>, any, any>` is missing the following properties from type
-  'INavigatorHandle': push, pop, popToTop, popTo, and 4 more"* — §24c's exact error, reproduced
+  'INavigatorHandle': push, pop, popToTop, popTo, and 4 more"_ — §24c's exact error, reproduced
   and then removed.
 
 The tarball carries a `.svelte.d.ts` beside all 8 of `navigation`'s `.svelte` files; 40 across the

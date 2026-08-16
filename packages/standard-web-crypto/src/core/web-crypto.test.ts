@@ -49,9 +49,7 @@ describe('webCrypto.getRandomValues', () => {
       // reaching the native boundary, with a clear error rather than an opaque native-side one.
       const { default: webCrypto } = await import('./web-crypto');
 
-      expect(() => webCrypto.getRandomValues(new DataView(new ArrayBuffer(4)))).toThrow(
-        TypeError,
-      );
+      expect(() => webCrypto.getRandomValues(new DataView(new ArrayBuffer(4)))).toThrow(TypeError);
       expect(getRandomValues).not.toHaveBeenCalled();
     });
   });

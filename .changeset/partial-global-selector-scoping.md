@@ -1,8 +1,8 @@
 ---
-"@symbiote-native/css-parser": minor
-"@symbiote-native/engine": minor
-"@symbiote-native/svelte": patch
-"@symbiote-native/vue": patch
+'@symbiote-native/css-parser': minor
+'@symbiote-native/engine': minor
+'@symbiote-native/svelte': patch
+'@symbiote-native/vue': patch
 ---
 
 Make a partial `:global(...)` work inside a larger selector. `:global()` is the escape hatch for

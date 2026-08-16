@@ -47,7 +47,9 @@ describe('React Counter on the engine', () => {
       mount(ROOT_TAG, <Counter />);
 
       // The app's own View is the non-box-none RCTView (the box-none one is the AppContainer).
-      const view = fabric.find(n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none');
+      const view = fabric.find(
+        n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+      );
       expect(view, 'app View was created').toBeDefined();
 
       // A press is an honest gesture: a touch that starts and ends on the same node. Fabric

@@ -26,7 +26,5 @@ export function useHideAnimation(
     controller.updateConfig(getConfig());
   });
 
-  return computed(() =>
-    computeHideAnimationStyles(getConfig(), controller.constants, controller),
-  );
+  return computed(() => computeHideAnimationStyles(getConfig(), controller.constants, controller));
 }

@@ -331,7 +331,6 @@ describe('useHideAnimation (Svelte)', () => {
 
       expect(failures).toEqual([{ stage: 'hide', error: hideError }]);
     });
-
   });
 
   describe('Negative', () => {

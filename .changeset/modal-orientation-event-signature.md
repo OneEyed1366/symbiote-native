@@ -1,9 +1,9 @@
 ---
-"@symbiote-native/components": minor
-"@symbiote-native/angular": minor
-"@symbiote-native/react": minor
-"@symbiote-native/svelte": minor
-"@symbiote-native/vue": minor
+'@symbiote-native/components': minor
+'@symbiote-native/angular': minor
+'@symbiote-native/react': minor
+'@symbiote-native/svelte': minor
+'@symbiote-native/vue': minor
 ---
 
 Correct `Modal`'s `onOrientationChange` signature, which promised a payload it never delivered. The
