@@ -2,63 +2,62 @@
 //
 // WHY SVELTE'S OWN CSS OUTPUT CANNOT BE CONSUMED — measure this before "simplifying" any of the
 // below back to "just wire up `result.css`". Compiled with this adapter's options
-// (`generate:'client', fragments:'tree', css:'external'`), a `<style>` block behaves in one of
-// two ways:
+// (`generate:'client', fragments:'tree', css:'external'`), a `<style>` block behaves one of two
+// ways:
 //
 //   <symbiote-view class="card">   ->  result.css: `.card.svelte-4psua6 { … }`
 //                                      result.js:  `$.set_class(node, 1, 'card svelte-4psua6')`
 //   <View class="card">            ->  warning: css_unused_selector
 //                                      result.css: `/* (unused) .card { … }*/`
 //
-// The first is dead because `set_class` writes `dom.className`, which `ShimElement` does not
-// implement — and app code never authors a host tag anyway (§22a). The second is 100% of real
-// app code, and Svelte deliberately refuses to scope a parent's styles into a child COMPONENT,
-// so by the time `result.css` exists every rule in it is commented out. There is nothing left
-// to register. The scoping therefore has to happen HERE, before the compiler ever sees the
-// block — conceptually the same pass `adapters/vue/metro-vue-transformer.cjs` runs for a Vue SFC
-// (symbiote-sfc-style-compiler §5), moved from a compiler node-transform to a source rewrite
-// because Svelte's compiler exposes no AST hook.
+// The first is dead: `set_class` writes `dom.className`, which `ShimElement` does not implement,
+// and app code never authors a host tag anyway (§22a). The second is 100% of real app code —
+// Svelte refuses to scope a parent's styles into a child COMPONENT, so by the time `result.css`
+// exists every rule is commented out. Nothing is left to register, so the scoping has to happen
+// HERE, before the compiler ever sees the block — the same pass `adapters/vue/metro-vue-
+// transformer.cjs` runs for a Vue SFC (symbiote-sfc-style-compiler §5), moved from a compiler
+// node-transform to a source rewrite because Svelte's compiler exposes no AST hook.
 //
 // Four steps, in order:
 //   1. parse the block out and compile it through @symbiote-native/css-parser, exactly like Vue's
 //      <style scoped> — every class registers under a per-file-suffixed key, `card` ->
 //      `card__svelte-<hash>`, in the same global registry App.css and Vue SFC blocks populate.
-//   2. rewrite `class` in THIS file's own markup so it names the suffixed key. Static values are
+//   2. rewrite `class` in THIS file's own markup to name the suffixed key. Static values are
 //      resolved here, at build time; a dynamic `class={expr}` is wrapped in a runtime call to
-//      `scopeSvelteClass` (../style-scope), which is the only shape that can scope a value the
-//      compiler cannot see into.
+//      `scopeSvelteClass` (../style-scope) — the only shape that can scope a value the compiler
+//      cannot see into.
 //   3. delete the `<style>` block from the source handed on, so Svelte emits no
 //      `css_unused_selector` warnings and adds no scope hash of its own.
 //   4. append one `<script module>` line holding the `registerStyles()` call and the two
-//      per-file constants the rewrite in step 2 refers to.
+//      per-file constants step 2's rewrite refers to.
 //
 // SCOPING SEMANTICS, AND THE ONE DELIBERATE DIVERGENCE FROM SVELTE-ON-THE-WEB. Svelte scopes by
-// FILE: only the markup written in this file carries the scope, never markup a child component
-// owns. That rule is reproduced exactly — step 2 only ever rewrites this file's own source text.
-// Where this diverges is the component boundary: on the web, `<Child class="card"/>` does NOT
-// apply the parent's `.card`, because the hash never lands on the child's element. Here it does,
-// because the scoped NAME travels as an ordinary prop and every Symbiote component forwards
-// `class` down to its host node. That divergence is not incidental — in this project a component
-// renders only other components, so the web rule would make every `<style>` block a no-op, which
-// is precisely the bug this file exists to fix. An author's mental model still holds: "my
-// `<style>` styles the markup I wrote".
+// FILE: only markup written in this file carries the scope, never markup a child component owns
+// — reproduced exactly, step 2 only ever rewrites this file's own source text. Where this
+// diverges is the component boundary: on the web, `<Child class="card"/>` does NOT apply the
+// parent's `.card`, because the hash never lands on the child's element. Here it does, because
+// the scoped NAME travels as an ordinary prop and every Symbiote component forwards `class` down
+// to its host node. Not incidental: a component here renders only other components, so the web
+// rule would make every `<style>` block a no-op — exactly the bug this file exists to fix. An
+// author's mental model still holds: "my `<style>` styles the markup I wrote".
 //
 // Registered in `svelte.config.js`'s `preprocess` AND called directly by
 // `metro-svelte-transformer.cjs`, for the same reason `forbid-web-only-constructs.ts` is — the
 // config covers `svelte-check`/the language server, the transformer covers a consuming app whose
 // own config never registers it.
 //
-// LINE NUMBERS ARE PRESERVED ON PURPOSE (this preprocessor emits no source map, matching its
-// sibling): the `<style>` block is replaced by the same number of newlines it occupied rather
-// than deleted outright, and the injected script is one single line appended AFTER all original
-// content, or spliced onto the existing `<script module>` tag's own line. So every original line
-// keeps its number and a `svelte-check` diagnostic still points at the right place.
+// LINE NUMBERS ARE PRESERVED ON PURPOSE (this preprocessor emits no source map): the `<style>`
+// block is replaced by the same number of newlines it occupied rather than deleted outright, and
+// the injected script is one line appended after all original content, or spliced onto the
+// existing `<script module>` tag's own line — so every original line keeps its number and a
+// `svelte-check` diagnostic still points at the right place.
 
 import { parse } from 'svelte/compiler';
 import {
   classTokensIn,
   compile as compilePreprocessor,
   globalClassNamesIn,
+  globalClassTokensIn,
   hashFilePath,
   parseCSS,
   type IPreprocessorLanguage,
@@ -140,7 +139,13 @@ export function scopedStyles(): {
       // the key alone is not enough to know what this file owns: its TOKENS are recorded too, or
       // a `.card.big` rule whose parts have no standalone rule of their own leaves both tokens
       // unscoped and the rule unreachable.
+      //
+      // A token out of a `:global(...)` payload is the one exception: in `.card :global(.reset)`
+      // the collapsed KEY is this file's own, because `.card` is, but `reset` was written
+      // precisely to name markup this file does not own. Suffixing it along with the rest of its
+      // chain scope-mangles the escape hatch into matching nothing.
       const tokensByName = classTokensIn(css, { filename: path });
+      const globalTokens = globalClassTokensIn(css, { filename: path });
       const styles: Record<string, Record<string, unknown>> = {};
       const localNames = new Set<string>();
       for (const [className, props] of Object.entries(parsed)) {
@@ -148,7 +153,9 @@ export function scopedStyles(): {
         const registeredName = isExempt ? className : `${className}__${scopeId}`;
         if (!isExempt) {
           localNames.add(className);
-          for (const token of tokensByName.get(className) ?? []) localNames.add(token);
+          for (const token of tokensByName.get(className) ?? []) {
+            if (!globalTokens.has(token)) localNames.add(token);
+          }
         }
         styles[registeredName] = props;
       }

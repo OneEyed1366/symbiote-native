@@ -6,13 +6,12 @@
 // here per <prop_types_split_agnostic_vs_per_adapter> (children is a Svelte Snippet, so the full
 // prop type is per-adapter like React's/Vue's IModalProps, not shared).
 import type { Snippet } from 'svelte';
-import type { IClassNameValue, IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type { IStyleProp, ISymbioteEvent, IViewStyle } from '@symbiote-native/engine';
 import type {
   IAccessibilityProps,
   IAriaProps,
   IModalAnimationType,
   IModalOrientation,
-  IModalOrientationChangeEvent,
   IModalPresentationStyle,
 } from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../../class-value';
@@ -45,7 +44,9 @@ export interface IModalProps extends IAccessibilityProps, IAriaProps {
   onShow?: () => void;
   onDismiss?: () => void;
   onRequestClose?: () => void;
-  onOrientationChange?: (event: IModalOrientationChangeEvent) => void;
+  // The engine hands every listener the ISymbioteEvent wrapper, so the orientation is read at
+  // event.nativeEvent.orientation (IModalOrientationChangeEvent describes that payload).
+  onOrientationChange?: (event: ISymbioteEvent) => void;
   style?: IStyleProp<IViewStyle>;
   // Targets the CONTAINER View renderModal wraps the children in, not the outer symbiote-modal
   // host — same split React's className / Vue's class apply on the container, not the host.

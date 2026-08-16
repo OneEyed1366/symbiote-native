@@ -4,6 +4,16 @@
 // no per-frame Svelte re-render — the everyday (non-native-driver) case every Animated consumer
 // hits before opting into useNativeDriver. Compiles the REAL AnimatedView.svelte, same harness
 // shape as animated-native-driver.test.ts / components/switch/switch.smoke.test.ts.
+//
+// Scope note: flushValue's graph walk and AnimatedProps.update()'s rasterization are core/engine
+// (core/engine/src/animated/*.test.ts) and are used, not re-verified, here. This file's job is the
+// Svelte-specific claim: that AnimatedView's reconcile $effect binds the leaf to the REAL committed
+// host node (not a stand-in), so a plain `setValue()` reaches the actual Fabric-facing props
+// without any native module installed. This is the counterpart of animated-native-driver.test.ts —
+// same component, no `nativeModuleProxy`, so `wantsNative` never engages.
+//
+// No Negative group: `AnimatedValue.setValue()` and the reconcile $effect have no rejecting path
+// for this shape — every scenario below is a Positive "does the paint land" claim.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -88,8 +98,11 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-describe('Animated.View (real compiled source) JS-driven path', () => {
-  it('paints the initial rasterized value, then re-paints on setValue with no native module', async () => {
+describe('Animated.View (real compiled source) JS-driven path (Positive)', () => {
+  // why: the FIRST paint must already carry the rasterized value — an AnimatedValue's initial
+  // value, not zero/undefined — so a component mounting with a non-default starting value never
+  // flashes the wrong opacity before the first animation frame.
+  it('paints the initial rasterized value on mount, with no native module', async () => {
     const JsParent = await loadParent();
     const opacity = new AnimatedValue(0.25);
 
@@ -99,6 +112,19 @@ describe('Animated.View (real compiled source) JS-driven path', () => {
 
     expect(appView().viewName).toBe('RCTView');
     expect(appView().props.opacity).toBe(0.25);
+  });
+
+  // why: this is the everyday (non-native-driver) path every Animated consumer hits before opting
+  // into useNativeDriver — a plain setValue() must reach the committed view with no Svelte
+  // re-render of the component itself (the value graph's own flushValue -> setNativeProps commit,
+  // not a reactive prop change).
+  it('re-paints on setValue, with no native module installed', async () => {
+    const JsParent = await loadParent();
+    const opacity = new AnimatedValue(0.25);
+
+    mount(ROOT_TAG, JsParent, { style: { opacity }, testID: 'animated-box' });
+    await tick();
+    await tick();
 
     opacity.setValue(0.75);
     await tick();

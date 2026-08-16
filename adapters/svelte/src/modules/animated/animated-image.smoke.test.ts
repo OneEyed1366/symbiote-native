@@ -3,6 +3,15 @@
 // style) rather than forwarding raw props — the exact gap AnimatedImage.svelte's header comment
 // warns a hand-authored pass-through bag would create. Also proves the JS-driven animated style
 // path (opacity) still lands, keyed the same way as AnimatedView's own JS-driven smoke.
+//
+// Scope note: buildImageBag's own field mapping (source normalization, resizeMode/tintColor
+// resolution) is core/components logic, already covered by image/index.svelte's own tests; this
+// file's job is proving AnimatedImage.svelte actually CALLS it with rasterized values, rather than
+// hand-rolling a pass-through bag — the exact copy-paste-instead-of-calling bug class the
+// svelte-adapter-dom-shim skill's §15/§19 caught on four other components.
+//
+// No Negative group: AnimatedImage.svelte has no throwing/rejecting path — every prop is optional
+// and rides an open `[key: string]: unknown` bag (IAnimatedComponentProps).
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -82,8 +91,31 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-describe('Animated.Image (real compiled source)', () => {
-  it('routes through buildImageBag (resolved source array) and drives style reactively', async () => {
+describe('Animated.Image (real compiled source) (Positive)', () => {
+  // why: a hand-rolled pass-through bag would commit `source` as the bare object it arrived as;
+  // RCTImageView's ViewConfig expects the resolved ARRAY shape buildImageBag produces — this is
+  // the exact regression the component's own header comment warns about.
+  it('routes non-animated props through buildImageBag, not a raw pass-through bag', async () => {
+    const ImageParent = await loadParent();
+
+    mount(ROOT_TAG, ImageParent, {
+      source: { uri: 'https://example.com/a.png' },
+      style: {},
+      resizeMode: 'cover',
+    });
+    await tick();
+    await tick();
+
+    const node = appView();
+    expect(node.viewName).toBe('RCTImageView');
+    expect(node.props.source).toEqual([{ uri: 'https://example.com/a.png' }]);
+    expect(node.props.resizeMode).toBe('cover');
+  });
+
+  // why: `style` must survive buildImageBag's own field-splitting and stay reactive — an
+  // AnimatedValue driving `style.opacity` is exactly the supported animate-an-Image use named in
+  // the component's own header comment (as opposed to animating `source`, which is not).
+  it('drives an animated style prop reactively through buildImageBag', async () => {
     const ImageParent = await loadParent();
     const opacity = new AnimatedValue(0.5);
 
@@ -95,11 +127,7 @@ describe('Animated.Image (real compiled source)', () => {
     await tick();
     await tick();
 
-    const node = appView();
-    expect(node.viewName).toBe('RCTImageView');
-    expect(node.props.source).toEqual([{ uri: 'https://example.com/a.png' }]);
-    expect(node.props.resizeMode).toBe('cover');
-    expect(node.props.opacity).toBe(0.5);
+    expect(appView().props.opacity).toBe(0.5);
 
     opacity.setValue(1);
     await tick();

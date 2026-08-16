@@ -105,42 +105,53 @@ const VueRoot = {
   },
 };
 
+// No Negative group: this is a cross-adapter structural invariant, not a unit with a throwing
+// contract — the only outcome that matters is whether the two committed trees agree.
+// No Negative group: this is a cross-adapter structural invariant, not a unit with a throwing
+// contract — the only outcome that matters is whether the two committed trees agree.
 describe('native node production per adapter, same UI', () => {
-  it('differs from Vue by exactly one constant root wrapper, nothing per-element', async () => {
-    const SvelteRoot = await compileComponent(SVELTE_SOURCE, 'ParityRoot');
+  describe('Positive', () => {
+    it('differs from Vue by exactly one constant root wrapper, nothing per-element', async () => {
+      // why: the product rule this file locks in — the Svelte shim must not inflate native
+      // Fabric node count beyond its one constant root-wrapper cost (see the file header for
+      // the investigation that ruled out every other explanation for the measured RSS gap). A
+      // regression here means the shim started emitting extra native nodes per element, which
+      // is exactly the class of bug §16 (stray whitespace -> real RCTRawText) already caused.
+      const SvelteRoot = await compileComponent(SVELTE_SOURCE, 'ParityRoot');
 
-    svelteMount(SVELTE_ROOT, SvelteRoot);
-    await tick();
-    await tick();
-    const svelteCreated = [...fabric.created];
-    const svelteTree = fabric.serialize([fabric.appRoot()]);
+      svelteMount(SVELTE_ROOT, SvelteRoot);
+      await tick();
+      await tick();
+      const svelteCreated = [...fabric.created];
+      const svelteTree = fabric.serialize([fabric.appRoot()]);
 
-    fabric.reset();
+      fabric.reset();
 
-    vueMount(VUE_ROOT, VueRoot);
-    await tick();
-    await tick();
-    const vueCreated = [...fabric.created];
-    const vueTree = fabric.serialize([fabric.appRoot()]);
+      vueMount(VUE_ROOT, VueRoot);
+      await tick();
+      await tick();
+      const vueCreated = [...fabric.created];
+      const vueTree = fabric.serialize([fabric.appRoot()]);
 
-    // root-element.ts puts a wrapper ShimElement between the engine's synthetic box-none
-    // AppContainer and the app's own root, because Svelte's compiled output mounts through an
-    // anchor rather than handing us a root node the way Vue/React do. It carries flex:1 so a
-    // flex:1 app root still fills the screen (mount-pipeline.smoke.test.ts covers that). Peeling
-    // BOTH layers off the Svelte tree and ONE off Vue's must leave identical trees.
-    expect(stripOuter(stripOuter(svelteTree)), 'tree below the adapter wrappers').toBe(
-      stripOuter(vueTree),
-    );
+      // root-element.ts puts a wrapper ShimElement between the engine's synthetic box-none
+      // AppContainer and the app's own root, because Svelte's compiled output mounts through an
+      // anchor rather than handing us a root node the way Vue/React do. It carries flex:1 so a
+      // flex:1 app root still fills the screen (mount-pipeline.smoke.test.ts covers that).
+      // Peeling BOTH layers off the Svelte tree and ONE off Vue's must leave identical trees.
+      expect(stripOuter(stripOuter(svelteTree)), 'tree below the adapter wrappers').toBe(
+        stripOuter(vueTree),
+      );
 
-    const svelteTally = byViewName(svelteCreated);
-    const vueTally = byViewName(vueCreated);
-    expect(svelteTally, 'the only difference is one extra RCTView').toEqual({
-      ...vueTally,
-      RCTView: (vueTally.RCTView ?? 0) + 1,
+      const svelteTally = byViewName(svelteCreated);
+      const vueTally = byViewName(vueCreated);
+      expect(svelteTally, 'the only difference is one extra RCTView').toEqual({
+        ...vueTally,
+        RCTView: (vueTally.RCTView ?? 0) + 1,
+      });
+
+      // Stated as a constant, not a ratio, on purpose: if this ever starts scaling with ROWS the
+      // assertion breaks loudly, which is exactly the regression worth catching.
+      expect(svelteCreated.length, 'total native nodes created').toBe(vueCreated.length + 1);
     });
-
-    // Stated as a constant, not a ratio, on purpose: if this ever starts scaling with ROWS the
-    // assertion breaks loudly, which is exactly the regression worth catching.
-    expect(svelteCreated.length, 'total native nodes created').toBe(vueCreated.length + 1);
   });
 });

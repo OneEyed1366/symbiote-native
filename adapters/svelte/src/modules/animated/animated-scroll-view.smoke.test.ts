@@ -8,6 +8,16 @@
 // imports RefreshControl.svelte — both are pre-compiled to co-located sibling `.mjs` files with
 // their import specifiers rewritten, the same chained technique scroll-view.smoke.test.ts uses
 // for ScrollView -> RefreshControl (see that file's compileScrollViewWithRefreshControl).
+//
+// Scope note: ScrollView's own feature surface (sticky headers, RefreshControl,
+// maintainVisibleContentPosition) is covered by scroll-view.smoke.test.ts; this file's job is the
+// narrower, Animated-specific claim from AnimatedScrollView.svelte's own header comment — that it
+// WRAPS the real component (so that surface comes along for free) instead of hand-authoring a
+// reduced duplicate, and that the wrapper forwards ScrollView's imperative handle rather than
+// exposing its own.
+//
+// No Negative group: AnimatedScrollView.svelte has no throwing/rejecting path — every prop rides
+// the same open IAnimatedComponentProps bag as every other Animated.* component.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -113,8 +123,26 @@ async function loadParent(): Promise<Component> {
   return mod.default as Component;
 }
 
-describe('Animated.ScrollView (real compiled source)', () => {
-  it('wraps the full ScrollView shape and forwards the imperative handle', async () => {
+// Narrows the handle stashed on `globalThis` without an `as` cast — the compiled parent's own
+// `$effect` writes it, so its true shape is only known at runtime.
+function isScrollHandle(
+  value: unknown,
+): value is { scrollTo: unknown; getScrollNode: () => unknown } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'scrollTo' in value &&
+    'getScrollNode' in value
+  );
+}
+
+describe('Animated.ScrollView (real compiled source) (Positive)', () => {
+  // why: the wrap-vs-hand-author choice is the whole point of AnimatedScrollView.svelte (see its
+  // own header comment) — a hand-authored duplicate would silently lose sticky headers,
+  // RefreshControl and maintainVisibleContentPosition, an <adapters_reach_full_feature_parity>
+  // violation. Asserting the exact committed shape (both native views, the outer's own prop) is
+  // what actually distinguishes "wrapped the real component" from "recreated a look-alike".
+  it('renders the full RCTScrollView/RCTScrollContentView shape via the real ScrollView', async () => {
     const AnimatedScrollParent = await loadParent();
     mount(ROOT_TAG, AnimatedScrollParent);
     await tick();
@@ -128,13 +156,28 @@ describe('Animated.ScrollView (real compiled source)', () => {
     const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
     expect(content, 'RCTScrollContentView was created').toBeDefined();
     expect(outer?.props.height).toBe(200);
+  });
 
-    const handle = (globalThis as { __animatedScrollHandle?: Record<string, unknown> })
-      .__animatedScrollHandle;
-    expect(handle, 'AnimatedScrollView forwards its imperative handle via bind:this').toBeDefined();
-    expect(typeof handle?.scrollTo).toBe('function');
-    expect(typeof handle?.getScrollNode).toBe('function');
-    const getScrollNode = handle?.getScrollNode as () => unknown;
-    expect(getScrollNode()).not.toBeNull();
+  // why: AnimatedScrollView re-exports its OWN scrollTo/scrollToEnd/flashScrollIndicators/
+  // getScrollNode functions that delegate to the wrapped ScrollView's captured `scrollRef` (the
+  // Svelte twin of Vue's delegating Proxy `expose()`) — a parent binding `bind:this` on
+  // `<Animated.ScrollView>` must reach a live, callable handle, not the wrapper's own component
+  // instance with nothing forwarded.
+  it('forwards the wrapped ScrollView imperative handle via its own bind:this exports', async () => {
+    const AnimatedScrollParent = await loadParent();
+    mount(ROOT_TAG, AnimatedScrollParent);
+    await tick();
+    await tick();
+
+    const handle = Reflect.get(globalThis, '__animatedScrollHandle');
+    expect(
+      isScrollHandle(handle),
+      'AnimatedScrollView forwards its imperative handle via bind:this',
+    ).toBe(true);
+    if (!isScrollHandle(handle)) return;
+
+    expect(typeof handle.scrollTo).toBe('function');
+    expect(typeof handle.getScrollNode).toBe('function');
+    expect(handle.getScrollNode()).not.toBeNull();
   });
 });

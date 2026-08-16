@@ -1,6 +1,12 @@
-// The MediaQuery replacements — `orientation` and `createWidthQuery` — driven the same way as
-// runes/window.test.ts: a real compiled Svelte component, mounted through the real render
-// pipeline, with the real engine Dimensions module emitting through its public `set()`.
+// The MediaQuery replacements — `orientation` and `createWidthQuery` — driven two ways:
+// (1) direct reads of `.current` (legal outside a component per dimensions-value.ts's own
+//     contract — `subscribe()` no-ops when called outside a tracking effect), which is the
+//     cheapest way to pin down the actual comparison logic and its boundaries;
+// (2) a real compiled Svelte component mounted through the real render pipeline, which is the
+//     only way to prove the createSubscriber wiring (updates on 'change', teardown on unmount)
+//     actually threads through Svelte's reactivity.
+// No Negative group: neither export has a throwing path — both are total over their input
+// (Dimensions always answers; createWidthQuery accepts any combination of optional bounds).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -14,6 +20,7 @@ import {
 } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
+import { createWidthQuery, orientation } from './media-query';
 
 if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
@@ -103,7 +110,49 @@ async function mountProbe(values: IQueryState[]): Promise<void> {
   await tick();
 }
 
-describe('MediaQuery replacements', () => {
+// Direct `.current` reads — no compiled component, no mount — exercising the actual comparison
+// logic and its documented boundaries. Legal per dimensions-value.ts's own contract: `.current`
+// reads through untracked outside a reactive scope.
+describe('Positive — orientation and createWidthQuery, direct reads', () => {
+  // why: the source comment states this explicitly — "a square window counts as portrait …
+  // not a coin flip" (height >= width). Untested, this boundary could silently flip to
+  // landscape-on-tie with no test catching it.
+  it('treats a square window as portrait, not a coin flip', () => {
+    Dimensions.set({ window: { width: 500, height: 500, scale: 1, fontScale: 1 } });
+    expect(orientation.current).toBe('portrait');
+  });
+
+  it('is landscape when width exceeds height', () => {
+    Dimensions.set({ window: { width: 800, height: 400, scale: 1, fontScale: 1 } });
+    expect(orientation.current).toBe('landscape');
+  });
+
+  // why: the source comment states both bounds are INCLUSIVE, matching CSS min-width/max-width —
+  // a width exactly at the bound must still match, not fall just outside it.
+  it('matches minWidth exactly (inclusive lower bound)', () => {
+    Dimensions.set({ window: { width: 600, height: 800, scale: 1, fontScale: 1 } });
+    const query = createWidthQuery({ minWidth: 600 });
+    expect(query.current).toBe(true);
+  });
+
+  it('matches maxWidth exactly (inclusive upper bound)', () => {
+    Dimensions.set({ window: { width: 599, height: 800, scale: 1, fontScale: 1 } });
+    const query = createWidthQuery({ maxWidth: 599 });
+    expect(query.current).toBe(true);
+  });
+
+  // why: with neither bound supplied there is nothing to reject — the query is unconditionally
+  // satisfied, the same way an empty CSS media-query condition matches everything.
+  it('is unconditionally true when neither bound is given', () => {
+    Dimensions.set({ window: { width: 1, height: 1, scale: 1, fontScale: 1 } });
+    const query = createWidthQuery({});
+    expect(query.current).toBe(true);
+  });
+});
+
+describe('MediaQuery replacements — reactive wiring through a mounted component', () => {
+  // why: proves createDimensionsValue's `.current` read INSIDE a real `$effect` actually reads
+  // through to the engine's current state on the very first run, not a stale/undefined default.
   it('seeds from the engine Dimensions module', async () => {
     const values: IQueryState[] = [];
     await mountProbe(values);
@@ -116,6 +165,10 @@ describe('MediaQuery replacements', () => {
     });
   });
 
+  // why: this is the actual product claim — an author reading `orientation.current`/a width
+  // query inside a component expects it to re-render on rotation, the same way the web
+  // MediaQuery this replaces would. Direct reads above prove the math; this proves the
+  // subscription actually drives Svelte's reactivity end to end.
   it('flips orientation and the width queries when the device rotates', async () => {
     const values: IQueryState[] = [];
     await mountProbe(values);
@@ -146,6 +199,8 @@ describe('MediaQuery replacements', () => {
     });
   });
 
+  // why: createSubscriber's teardown must actually run on unmount, or a component that reads
+  // orientation/a width query leaks an engine Dimensions listener every time it is torn down.
   it('removes the subscription on unmount and stops tracking further changes', async () => {
     const values: IQueryState[] = [];
     await mountProbe(values);

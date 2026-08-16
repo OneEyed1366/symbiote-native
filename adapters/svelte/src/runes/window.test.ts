@@ -9,6 +9,9 @@
 // native pushes metrics through — so the real engine Dimensions module, its real 'change' fan-out
 // and its real listener bookkeeping are all in the path. Only `addEventListener` is wrapped, to
 // get a handle on the subscription whose removal is being asserted.
+//
+// No Negative group: every export here is a pure mapping over `Dimensions`/`PixelRatio` with no
+// guard clause and no input to reject.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -29,7 +32,9 @@ if (globalThis.navigator === undefined) {
 }
 
 const ROOT_TAG = 91_931;
+const SECOND_ROOT_TAG = 91_933;
 const PROBE_OUT = join(__dirname, '.smoke-compiled-window-probe.mjs');
+const SECOND_PROBE_OUT = join(__dirname, '.smoke-compiled-window-second-probe.mjs');
 
 const INITIAL: IDimensionsPayload = {
   window: { width: 400, height: 800, scale: 3, fontScale: 1 },
@@ -60,8 +65,10 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
+  unmount(SECOND_ROOT_TAG);
   vi.restoreAllMocks();
   rmSync(PROBE_OUT, { force: true });
+  rmSync(SECOND_PROBE_OUT, { force: true });
 });
 
 // One probe reading all five values at once — each carries its own createSubscriber, so this also
@@ -117,7 +124,41 @@ async function mountProbe(values: IMetrics[]): Promise<void> {
   await tick();
 }
 
-describe('svelte/reactivity/window twins', () => {
+// A second, independent probe reading only `innerWidth` — used to prove the module-level
+// singleton claim in dimensions-value.ts's own header comment: "N components reading
+// innerWidth.current share exactly one" listener, not one per reading component.
+const SECOND_PROBE = `<script lang="ts">
+  import { innerWidth } from './window';
+  let { onValue }: { onValue: (width: number) => void } = $props();
+  $effect(() => { onValue(innerWidth.current); });
+</script>
+<symbiote-view p={{}} />`;
+
+async function mountSecondProbe(values: number[]): Promise<void> {
+  writeFileSync(
+    SECOND_PROBE_OUT,
+    compile(SECOND_PROBE, {
+      generate: 'client',
+      fragments: 'tree',
+      css: 'external',
+      filename: 'WindowSecondProbe.svelte',
+    }).js.code,
+  );
+  const mod: unknown = await import(`file://${SECOND_PROBE_OUT}`);
+  if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
+    throw new Error('WindowSecondProbe.svelte produced no default export');
+  }
+  const probe: unknown = mod.default;
+  if (typeof probe !== 'function')
+    throw new Error('WindowSecondProbe.svelte default export is not a component');
+  const component: Component = probe;
+  mount(SECOND_ROOT_TAG, component, { onValue: (width: number) => values.push(width) });
+  await tick();
+}
+
+describe('Positive — svelte/reactivity/window twins', () => {
+  // why: proves the mapping each export makes (window→inner*, screen→outer*,
+  // PixelRatio.get()→devicePixelRatio) is right at the very first read, inside a real `$effect`.
   it('seeds from the engine Dimensions module', async () => {
     const values: IMetrics[] = [];
     await mountProbe(values);
@@ -131,6 +172,9 @@ describe('svelte/reactivity/window twins', () => {
     });
   });
 
+  // why: the whole point of these twins is that a component re-renders on a native metric
+  // change (rotation, split-screen resize) the way `svelte/reactivity/window` does on the web —
+  // a value that only seeds once and never updates would defeat the replacement's purpose.
   it('updates every value when the native source emits a change', async () => {
     const values: IMetrics[] = [];
     await mountProbe(values);
@@ -161,6 +205,26 @@ describe('svelte/reactivity/window twins', () => {
     expect(removals).toHaveLength(5);
   });
 
+  // why: dimensions-value.ts's own header comment makes this an explicit product claim — "N
+  // components reading innerWidth.current share exactly one" engine listener, because `start`
+  // runs lazily on the first read and refcounts every further one. Every other test in this file
+  // mounts a single component reading 5 DIFFERENT values, which proves per-value cost but never
+  // proves per-READER sharing — this is the one scenario that actually exercises two independent
+  // mounted components reading the SAME value.
+  it('shares one underlying subscription across two independently mounted readers', async () => {
+    const firstValues: IMetrics[] = [];
+    await mountProbe(firstValues);
+    expect(removals).toHaveLength(5);
+
+    const secondValues: number[] = [];
+    await mountSecondProbe(secondValues);
+
+    expect(removals).toHaveLength(5);
+    expect(secondValues[secondValues.length - 1]).toBe(400);
+  });
+
+  // why: createSubscriber's teardown must actually fire on unmount, or every component reading
+  // any of these values leaks an engine Dimensions listener on every screen it unmounts from.
   it('removes the subscription on unmount and stops tracking further changes', async () => {
     const values: IMetrics[] = [];
     await mountProbe(values);

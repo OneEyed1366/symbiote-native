@@ -7,6 +7,9 @@
 // Svelte's idiom is `class`, matching View/Text/Switch. Unlike Vue's TextInput, Svelte keeps
 // onValueChange/onFocus/onBlur as plain callback props (Svelte 5's idiomatic shape, same as
 // React) rather than Omit-ing them for an emit-based surface, so the base type is reused as-is.
+//
+// `value` is declared `$bindable()` in index.svelte (`bind:value` sugar) — pure Svelte
+// compile-time behavior on the destructuring site, so `value?: string` here is unchanged.
 import type { IClassNameValue } from '@symbiote-native/engine';
 import type { ITextInputProps as ITextInputBaseProps } from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../../class-value';

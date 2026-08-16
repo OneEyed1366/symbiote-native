@@ -63,7 +63,14 @@ function rootWrapperChildIds(): Array<unknown> {
   return (wrapper?.children ?? []).map(child => child.props.testID);
 }
 
+// Positive-only: ShimNode's mutation API (appendChild/insertBefore/removeChild/fragment.append)
+// has no throwing contract to test against — every scenario here is "does the committed tree end
+// up correct", not "does this reject invalid input".
 describe('a live node moved into an offscreen DocumentFragment', () => {
+  // why: `fragment.append(liveNode)` in real DOM takes the node OUT of the document. The shim
+  // used to move it out of the shim tree but leave its ISymbioteNode attached to the old engine
+  // parent, so Fabric kept painting a subtree Svelte believed was offscreen (detachFromParent, see
+  // shim-node.ts and the skill's "Rendering declarative marker children" / async-blocks section).
   it('leaves the committed native tree, and comes back exactly once when re-inserted', async () => {
     const root = liveRoot();
     const parked = markerView('parked');
@@ -87,6 +94,9 @@ describe('a live node moved into an offscreen DocumentFragment', () => {
     expect(rootWrapperChildIds()).toEqual(['kept', 'parked']);
   });
 
+  // why: the fix that unlinks the engine node on every detach must not turn an ordinary live->live
+  // move (the shape a keyed `{#each}` reorder takes on every update) into a drop — the extra
+  // unlink call in detachFromParent must be a no-op here, not a second removal.
   it('still reorders siblings correctly within one live parent', async () => {
     // The same detach path runs on an ordinary live->live move; this pins that the extra unlink
     // did not turn a keyed-{#each}-style reorder into a drop.

@@ -26,10 +26,9 @@ import { ShimNode } from './shim-node';
 
 export type IShimPropBag = Record<string, unknown>;
 
-// Diagnostic-only (2026-08-13, tracking the effect_update_depth_exceeded device crash): a
-// process-wide sequence so every `set p` call across every shim element in a log dump is
-// individually orderable against AnimatedProps reconcile#N / AnimatedView reduced#N / hostShim
-// identity-change#N, to see which one is driving which.
+// Diagnostic-only: a process-wide sequence so every `set p` call across every shim element in a
+// log dump is individually orderable against AnimatedProps reconcile#N / AnimatedView reduced#N
+// / hostShim identity-change#N, to see which one is driving which.
 let globalSetPSeq = 0;
 
 // `on<Name>` handlers ride inside the prop bag (idiomatic Svelte 5 callback props — see the

@@ -152,15 +152,26 @@ function scriptBodies(ast: unknown): unknown[] {
   });
 }
 
-function importedNames(node: Record<string, unknown>): string[] {
+function importSpecifiers(node: Record<string, unknown>): Record<string, unknown>[] {
   const specifiers = node.specifiers;
   if (!Array.isArray(specifiers)) return [];
-  return specifiers.flatMap(specifier => {
-    if (!isRecord(specifier)) return [];
+  return specifiers.filter(isRecord);
+}
+
+// Only an ImportSpecifier carries `imported`; a namespace or default specifier has no member
+// name to read, which is why they are handled separately below.
+function importedNames(node: Record<string, unknown>): string[] {
+  return importSpecifiers(node).flatMap(specifier => {
     const imported = specifier.imported;
     if (!isRecord(imported)) return [];
     return typeof imported.name === 'string' ? [imported.name] : [];
   });
+}
+
+// A default specifier is deliberately NOT treated as a dodge: none of these svelte subpackages
+// has a default export, and a default binding cannot reach a named member anyway.
+function hasNamespaceSpecifier(node: Record<string, unknown>): boolean {
+  return importSpecifiers(node).some(specifier => specifier.type === 'ImportNamespaceSpecifier');
 }
 
 function checkImports(ast: unknown, filename: string): void {
@@ -173,6 +184,18 @@ function checkImports(ast: unknown, filename: string): void {
 
     if (rule.named === undefined) {
       throw new Error(`${filename}: importing from '${source.value}' ${rule.advice}`);
+    }
+    // `import * as R from 'svelte/reactivity'` hands the whole module object over under one
+    // local name, so whether app code reaches R.MediaQuery is decided at runtime and this check
+    // can never see it. A named ban is only enforceable on named imports, so the namespace shape
+    // is refused outright instead of being waved through.
+    if (hasNamespaceSpecifier(node)) {
+      const banned = [...rule.named].map(name => `'${name}'`).join(' / ');
+      throw new Error(
+        `${filename}: '${source.value}' is imported as a namespace, which cannot be checked — ` +
+          `import the members you need by name so ${banned} is ruled out. ${banned} ` +
+          rule.advice,
+      );
     }
     for (const name of importedNames(node)) {
       if (rule.named.has(name)) {

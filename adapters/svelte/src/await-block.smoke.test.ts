@@ -107,7 +107,15 @@ function deferred(): IDeferred {
 }
 
 describe('{#await} (real compiled output, real fake-Fabric)', () => {
-  it('paints pending, then swaps to then when the promise resolves AFTER mount', async () => {
+  // No true Negative group: `mount()` never throws out of any scenario here, including a
+  // rejected promise — {#await}'s own job is to catch that rejection and render `{:catch}`
+  // instead of letting it propagate. That scenario is grouped separately below as "Recovers"
+  // rather than folded into Positive (it exercises the error PATH, not the success path) or
+  // mislabeled Negative (nothing is asserted to throw).
+  describe('Positive (resolves successfully)', () => {
+    // why: the core await contract — pending renders first, then swaps to the resolved value once
+    // the promise settles, with the pending subtree fully gone rather than left alongside it.
+    it('paints pending, then swaps to then when the promise resolves AFTER mount', async () => {
     const Awaiter = await compileComponent(
       `<script>let { promise } = $props();</script>` +
         `{#await promise}${branchMarkup('pending', 'loading')}` +
@@ -134,28 +142,10 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
     expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "ready"))');
   });
 
-  it('paints the catch branch when the promise rejects after mount', async () => {
-    const Awaiter = await compileComponent(
-      `<script>let { promise } = $props();</script>` +
-        `{#await promise}${branchMarkup('pending', 'loading')}` +
-        `{:then value}${branchMarkup('then', 'ok')}` +
-        `{:catch error}<symbiote-view p={{ testID: 'catch' }}><symbiote-text p={{}}>{error.message}</symbiote-text></symbiote-view>{/await}`,
-      'AwaiterReject',
-    );
-
-    const gate = deferred();
-    mount(ROOT_TAG, Awaiter, { promise: gate.promise });
-    await tick();
-    expect(testIds()).toEqual(['pending']);
-
-    gate.reject(new Error('nope'));
-    await tick();
-    await tick();
-
-    expect(testIds()).toEqual(['catch']);
-    expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "nope"))');
-  });
-
+  // why: the short form has no pending snippet at all, so the block must contribute a real engine
+  // anchor (not an empty RCTRawText) while unresolved — the "empty text node is an anchor" rule
+  // from dom-shim/text.ts, exercised here through a construct that has no other branch to fall
+  // back on if that rule is wrong.
   it('renders nothing until resolution in the `{#await expr then value}` short form', async () => {
     const Awaiter = await compileComponent(
       `<script>let { promise } = $props();</script>` +
@@ -180,9 +170,11 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
     expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "late"))');
   });
 
+  // why: the re-entrancy case — the first promise's `.then` still fires after it was replaced,
+  // and await.js's own `destroyed` guard is what must keep it from re-installing a stale branch.
+  // Without this, a fast-changing async prop (e.g. a search-as-you-type query) could flash a
+  // response for a request the user has already moved on from.
   it('handles a NEW promise swapped in while the first is still pending', async () => {
-    // The re-entrancy case: the first promise's `.then` still fires after it was replaced, and
-    // await.js's own `destroyed` guard is what must keep it from re-installing a stale branch.
     // The component publishes its setter onto the props object so the test can drive the swap
     // through the same reactive path app code would.
     const Awaiter = await compileComponent(
@@ -225,11 +217,12 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
     expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "fresh"))');
   });
 
+  // why: three sibling {#await} blocks inside one keyed {#each}, resolving OUT of order. Each
+  // block owns its own anchor inside the shared each-block parent, so a mis-ordered insertion
+  // (the ShimNode.insertBefore/anchor path) shows up as a permuted child list, and a leaked
+  // anchor shows up as an extra child — this is the case that actually exercises anchor identity
+  // across multiple independent await instances, which the single-block tests above cannot.
   it('interleaves block anchors correctly when nested inside {#each}', async () => {
-    // Three sibling {#await} blocks inside one keyed {#each}, resolving OUT of order. Each block
-    // owns its own anchor inside the shared each-block parent, so a mis-ordered insertion (the
-    // ShimNode.insertBefore/anchor path) shows up as a permuted child list, and a leaked anchor
-    // shows up as an extra child.
     const List = await compileComponent(
       `<script>let { rows } = $props();</script>` +
         `<symbiote-view p={{ testID: 'list' }}>` +
@@ -275,5 +268,33 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
     expect(fabric.serialize(listChildren())).toBe(
       'RCTView(RCTText(RCTRawText "zero"))RCTView(RCTText(RCTRawText "one"))RCTView(RCTText(RCTRawText "two"))',
     );
+  });
+  });
+
+  describe('Recovers (rejected promise — {#await}\'s job is to catch it, not propagate it)', () => {
+    // why: {:catch} exists specifically to turn a rejection into a rendered fallback instead of
+    // an uncaught rejection reaching the app — this pins that the error's own message actually
+    // reaches the catch snippet, not just that SOMETHING renders.
+    it('paints the catch branch when the promise rejects after mount', async () => {
+      const Awaiter = await compileComponent(
+        `<script>let { promise } = $props();</script>` +
+          `{#await promise}${branchMarkup('pending', 'loading')}` +
+          `{:then value}${branchMarkup('then', 'ok')}` +
+          `{:catch error}<symbiote-view p={{ testID: 'catch' }}><symbiote-text p={{}}>{error.message}</symbiote-text></symbiote-view>{/await}`,
+        'AwaiterReject',
+      );
+
+      const gate = deferred();
+      mount(ROOT_TAG, Awaiter, { promise: gate.promise });
+      await tick();
+      expect(testIds()).toEqual(['pending']);
+
+      gate.reject(new Error('nope'));
+      await tick();
+      await tick();
+
+      expect(testIds()).toEqual(['catch']);
+      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "nope"))');
+    });
   });
 });

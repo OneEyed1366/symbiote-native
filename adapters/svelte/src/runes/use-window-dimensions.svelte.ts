@@ -1,23 +1,17 @@
-// useWindowDimensions, the Svelte twin of React's hook / Vue's composable
-// (adapters/vue/src/composables/use-window-dimensions.ts), over the framework-agnostic
-// Dimensions module (@symbiote-native/engine). Seeds from Dimensions.get('window'), subscribes
-// to 'change', and re-checks once right after subscribing to close the gap between this
-// function's own call-time read and the effect's mount-time listener attach. Only a real
-// window-metric change updates the returned reactive value.
+// Svelte twin of React's hook / Vue's composable (use-window-dimensions.ts), over the
+// framework-agnostic Dimensions module. Seeds from Dimensions.get('window'), subscribes to
+// 'change', and re-checks right after subscribing to close the gap between this call's read
+// and the effect's mount-time listener attach.
 //
-// `.svelte.ts` (not `.ts`): runes ($state/$effect) are only usable in files with this
-// extension outside an actual `.svelte` component. `runes/` is this adapter's own bucket name
-// for framework-lifecycle helpers, per CLAUDE.md's <adapter_src_follows_framework_idioms> — every
-// adapter names this bucket after ITS framework's own term for the concept (React "hooks", Vue
-// "composables"); Svelte's own docs and ecosystem call $state/$effect "runes", so this adapter's
-// twin is `runes/`, not a borrowed "hooks"/"composables" name.
+// `.svelte.ts`: runes ($state/$effect) only work in files with this extension outside a
+// `.svelte` component. `runes/` is this adapter's bucket name for framework-lifecycle helpers
+// (CLAUDE.md's <adapter_src_follows_framework_idioms>) - Svelte calls $state/$effect "runes".
 //
-// Returns a boxed getter object, NOT a bare `$state` variable: Svelte 5's reactivity is
-// lexically scoped to the declaring module — exporting/returning a raw `let dimensions =
-// $state(...)` loses reactivity for the caller, so this returns `{ get current() { … } }`
-// instead (the sanctioned Svelte 5 pattern for handing reactive state out of a plain function).
-// A caller reads `useWindowDimensions().current` inside a `$derived`/template/`$effect` to track
-// it, exactly like unwrapping Vue's `Ref` via `.value`.
+// Returns a boxed getter, not a bare `$state` variable: Svelte 5 reactivity is lexically
+// scoped to the declaring module, so returning a raw `let dimensions = $state(...)` loses
+// reactivity for the caller. `{ get current() { ... } }` is the sanctioned pattern - read
+// `useWindowDimensions().current` inside `$derived`/template/`$effect`, like unwrapping Vue's
+// `Ref.value`.
 import {
   Dimensions,
   type IDimensionsSet,
@@ -27,11 +21,9 @@ import {
 
 export function useWindowDimensions(): { readonly current: IDisplayMetrics } {
   let dimensions = $state<IDisplayMetrics>(Dimensions.get('window'));
-  // Plain closure variable, NOT $state: used only for the equality guard below. If the guard
-  // read `dimensions` itself, the $effect this compares inside would establish a dependency on
-  // its OWN write and re-run itself — this keeps the effect's dependency set empty, so it runs
-  // exactly once on mount and cleans up exactly once on unmount, matching Vue's
-  // onMounted/onUnmounted pair.
+  // Plain closure variable, not $state: reading `dimensions` here instead would make the
+  // $effect depend on its own write and re-run itself. This keeps the effect's dependency set
+  // empty, so it runs once on mount and cleans up once on unmount.
   let last: IDisplayMetrics = dimensions;
 
   $effect(() => {
@@ -51,8 +43,8 @@ export function useWindowDimensions(): { readonly current: IDisplayMetrics } {
       'change',
       (set: IDimensionsSet) => handleChange(set.window),
     );
-    // We may have missed an update between this function's own call-time `get` and subscribing
-    // here; re-check now. If nothing changed, the equality guard filters the no-op.
+    // Covers an update missed between the call-time `get` and subscribing here; the equality
+    // guard filters the no-op if nothing changed.
     handleChange(Dimensions.get('window'));
 
     return () => subscription.remove();

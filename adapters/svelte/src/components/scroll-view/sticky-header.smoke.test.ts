@@ -4,7 +4,7 @@
 // interpolation/debounce MATH (computeStickyInterpolation, reduceSticky's transitions) is core
 // logic exercised by core/components' own state/sticky-header-reducer.test.ts; this test proves
 // only the Svelte WIRING: composition inside ScrollView, context resolution, and that a real
-// layout event drives the reducer without throwing.
+// layout event both drives the reducer AND reaches the caller's own onLayout prop.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -31,6 +31,11 @@ const REFRESH_CONTROL_OUT = join(COMPONENTS_DIR, '.smoke-sticky-refresh-control.
 const SCROLL_VIEW_OUT = join(__dirname, '.smoke-sticky-scroll-view.mjs');
 const STICKY_HEADER_OUT = join(__dirname, '.smoke-sticky-header.mjs');
 const PARENT_OUT = join(__dirname, '.smoke-sticky-parent.mjs');
+// A SEPARATE file from PARENT_OUT, not a rewrite of it: Node's dynamic `import()` caches by
+// resolved URL (same reason scroll-view.smoke.test.ts keeps EVENT_PARENT_OUT distinct from
+// PARENT_OUT), so re-writing PARENT_OUT with different content and re-importing the same path
+// would silently hand back the earlier test's cached module.
+const LAYOUT_PARENT_OUT = join(__dirname, '.smoke-sticky-layout-parent.mjs');
 
 const fabric = installFabric();
 const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
@@ -46,6 +51,7 @@ afterEach(() => {
   rmSync(SCROLL_VIEW_OUT, { force: true });
   rmSync(STICKY_HEADER_OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
+  rmSync(LAYOUT_PARENT_OUT, { force: true });
 });
 
 const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
@@ -55,7 +61,7 @@ function compileToFile(source: string, filename: string, outPath: string): void 
   writeFileSync(outPath, result.js.code);
 }
 
-async function loadMountable(): Promise<Component> {
+function compileSharedModules(): void {
   const refreshControlSource = readFileSync(join(COMPONENTS_DIR, 'RefreshControl.svelte'), 'utf8');
   compileToFile(refreshControlSource, 'RefreshControl.svelte', REFRESH_CONTROL_OUT);
 
@@ -84,6 +90,10 @@ async function loadMountable(): Promise<Component> {
     "from '../../modules/animated/.smoke-sticky-animated-view.mjs'",
   );
   writeFileSync(STICKY_HEADER_OUT, stickyHeaderResult);
+}
+
+async function loadMountable(): Promise<Component> {
+  compileSharedModules();
 
   // A manually-composed sticky header inside ScrollView's children, with NO scrollAnimatedValue/
   // inverted/scrollViewHeight props — proving the context auto-wiring (scroll-view-props.ts's
@@ -109,36 +119,88 @@ async function loadMountable(): Promise<Component> {
   return mod.default as Component;
 }
 
+// Same composition, but the header carries a caller-supplied `onLayout` that records the event on
+// `window.__stickyLayout` — proves handleLayout's forwarding contract (sticky-header.svelte:
+// `onLayoutProp?.(event)`), not just that the reducer dispatch ran.
+async function loadMountableWithOnLayout(): Promise<Component> {
+  compileSharedModules();
+
+  compileToFile(
+    `<script>
+       import ScrollView from './.smoke-sticky-scroll-view.mjs';
+       import ScrollViewStickyHeader from './.smoke-sticky-header.mjs';
+       function onLayout(event) {
+         window.__stickyLayout = event.nativeEvent;
+       }
+     </script>
+     <ScrollView>
+       <ScrollViewStickyHeader onLayout={onLayout}>
+         <symbiote-view p={{}}></symbiote-view>
+       </ScrollViewStickyHeader>
+     </ScrollView>`,
+    'StickyLayoutParent.svelte',
+    LAYOUT_PARENT_OUT,
+  );
+
+  const mod: unknown = await import(`file://${LAYOUT_PARENT_OUT}`);
+  if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
+    throw new Error('StickyLayoutParent.svelte produced no default export');
+  }
+  return mod.default as Component;
+}
+
+// No Negative group: sticky-header-props.ts is a permissive bag (every field optional) with no
+// runtime guard/throw path. Both scenarios below are Positive — the reducer math itself
+// (computeStickyInterpolation, reduceSticky's transitions) is core logic already closed by
+// core/components/src/state/sticky-header-reducer.test.ts; these prove only the Svelte WIRING:
+// composition/context resolution, and that a real layout event reaches the reducer AND the
+// component's own public onLayout contract.
 describe('ScrollViewStickyHeader (real compiled, composed inside a real ScrollView)', () => {
-  it('paints with the sticky z-index, resolving scrollAnimatedValue from context with no props', async () => {
-    const StickyParent = await loadMountable();
-    mount(ROOT_TAG, StickyParent);
-    await tick();
-    await tick();
+  describe('Positive', () => {
+    // why: the header has NO scrollAnimatedValue/inverted/scrollViewHeight props in this
+    // composition — proving it resolves them from ScrollView's context (scroll-view-sticky-
+    // context.ts) rather than requiring the manual wiring React/Vue get for free via
+    // stickyHeaderIndices auto-wrap (scroll-view-props.ts's KNOWN GAP note).
+    it('paints with the sticky z-index, resolving scrollAnimatedValue from context with no props', async () => {
+      const StickyParent = await loadMountable();
+      mount(ROOT_TAG, StickyParent);
+      await tick();
+      await tick();
 
-    // The sticky header wraps its content in a symbiote-view (RCTView) carrying
-    // STICKY_HEADER_Z_INDEX — proving the whole composition (context resolution -> reduceSticky
-    // 'inputs-changed' on mount -> bag assembly) ran without needing scrollAnimatedValue as a prop.
-    const stickyHost = fabric.find(node => node.viewName === 'RCTView' && node.props.zIndex === 10);
-    expect(stickyHost, 'sticky header host painted with zIndex 10').toBeDefined();
-    expect(stickyHost?.props.collapsable).toBe(false);
-  });
+      // The sticky header wraps its content in a symbiote-view (RCTView) carrying
+      // STICKY_HEADER_Z_INDEX — proving the whole composition (context resolution -> reduceSticky
+      // 'inputs-changed' on mount -> bag assembly) ran without needing scrollAnimatedValue as a prop.
+      const stickyHost = fabric.find(
+        node => node.viewName === 'RCTView' && node.props.zIndex === 10,
+      );
+      expect(stickyHost, 'sticky header host painted with zIndex 10').toBeDefined();
+      expect(stickyHost?.props.collapsable).toBe(false);
+    });
 
-  it('drives the layout -> reduceSticky dispatch without throwing on a real layout event', async () => {
-    const StickyParent = await loadMountable();
-    mount(ROOT_TAG, StickyParent);
-    await tick();
-    await tick();
+    // why: handleLayout (sticky-header.svelte) has a real contract beyond driving the reducer —
+    // it also forwards the native event to the caller's own `onLayout` prop unchanged
+    // (`onLayoutProp?.(event)`), mirroring every other onLayout consumer in this adapter. A bare
+    // "does it throw" check would miss a regression where the forward is silently dropped while
+    // the reducer dispatch keeps running underneath.
+    it('forwards a real onLayout event to the caller-supplied onLayout after driving reduceSticky', async () => {
+      const StickyParent = await loadMountableWithOnLayout();
+      mount(ROOT_TAG, StickyParent);
+      await tick();
+      await tick();
 
-    const stickyHost = fabric.find(node => node.viewName === 'RCTView' && node.props.zIndex === 10);
-    expect(stickyHost).toBeDefined();
+      const stickyHost = fabric.find(
+        node => node.viewName === 'RCTView' && node.props.zIndex === 10,
+      );
+      expect(stickyHost, 'sticky header host painted').toBeDefined();
 
-    expect(() => {
-      fabric.fireEvent(stickyHost?.instanceHandle, 'topLayout', {
-        layout: { x: 0, y: 40, width: 100, height: 24 },
-      });
-    }).not.toThrow();
-    await tick();
-    await tick();
+      const payload = { layout: { x: 0, y: 40, width: 100, height: 24 } };
+      fabric.fireEvent(stickyHost?.instanceHandle, 'topLayout', payload);
+      await tick();
+      await tick();
+
+      const forwarded = (globalThis as { __stickyLayout?: unknown }).__stickyLayout;
+      expect(forwarded, 'the caller onLayout prop fired with the native event').toBeDefined();
+      expect(forwarded).toBe(payload);
+    });
   });
 });

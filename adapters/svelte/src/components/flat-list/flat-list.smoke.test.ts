@@ -69,6 +69,10 @@ const ANIMATED_VIEW_OUT = join(
 const FLAT_OUT = join(__dirname, '.smoke-compiled-flat-list.mjs');
 const ROOT_OUT = join(__dirname, '.smoke-compiled-flat-root.mjs');
 const REFRESH_ROOT_OUT = join(__dirname, '.smoke-compiled-flat-refresh-root.mjs');
+// Distinct from ROOT_OUT: Node's dynamic `import()` cache is keyed by resolved URL, so
+// re-writing ROOT_OUT with different content and re-importing the same path would silently hand
+// back an earlier test's cached module (the same reason REFRESH_ROOT_OUT is its own path).
+const COLUMNS_ROOT_OUT = join(__dirname, '.smoke-compiled-flat-columns-root.mjs');
 
 const fabric = installFabric();
 const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
@@ -86,6 +90,7 @@ afterEach(() => {
   rmSync(FLAT_OUT, { force: true });
   rmSync(ROOT_OUT, { force: true });
   rmSync(REFRESH_ROOT_OUT, { force: true });
+  rmSync(COLUMNS_ROOT_OUT, { force: true });
 });
 
 const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
@@ -179,6 +184,27 @@ async function loadMountable(): Promise<Component> {
   return mod.default as Component;
 }
 
+async function loadMountableWithColumns(numColumns: number): Promise<Component> {
+  compileFlatListWithVirtualizedList();
+
+  compileToFile(
+    `<script>
+       import FlatList from './.smoke-compiled-flat-list.mjs';
+       let { data } = $props();
+     </script>
+     {#snippet cell({ item })}<symbiote-text p={{ text: item }}></symbiote-text>{/snippet}
+     <FlatList {data} item={cell} numColumns={${numColumns}} />`,
+    'FlatListColumnsRoot.svelte',
+    COLUMNS_ROOT_OUT,
+  );
+
+  const mod: unknown = await import(`file://${COLUMNS_ROOT_OUT}`);
+  if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
+    throw new Error('FlatListColumnsRoot.svelte produced no default export');
+  }
+  return mod.default as Component;
+}
+
 async function loadMountableWithAccessibilityAndRefresh(): Promise<Component> {
   compileFlatListWithVirtualizedList();
 
@@ -207,41 +233,98 @@ async function loadMountableWithAccessibilityAndRefresh(): Promise<Component> {
   return mod.default as Component;
 }
 
+// No Negative group: flat-list-props.ts is a permissive bag (Omit over IVirtualizedListProps, every
+// field optional) with no runtime guard/throw path. The data-shaping helpers (chunkIntoRows,
+// expandRowViewability, rowKeyExtractor, ...) are core logic covered by @symbiote-native/components'
+// own tests; this file's job is proving the Svelte WIRING: which of VirtualizedList's two
+// getItem/getItemCount pairs gets selected (single-column passthrough vs numColumns row-chunking),
+// and that props forwarded onto the inner VirtualizedList actually reach the committed tree.
 describe('FlatList (real compiled index.svelte over a real compiled VirtualizedList)', () => {
-  it('renders only the windowed slice of a plain data array, not every item', async () => {
-    const FlatListRoot = await loadMountable();
-    const data = Array.from({ length: ITEM_COUNT }, (_unused, index) => `row-${index}`);
-    mount(ROOT_TAG, FlatListRoot, { data });
-    await tick();
-    await tick();
+  describe('Positive', () => {
+    // why: FlatList's single-column path (numColumns <= 1) must derive getItem/getItemCount from
+    // the plain `data` array and hand them straight to VirtualizedList unchanged — proving the
+    // convenience wrapper doesn't accidentally re-window or duplicate what VirtualizedList already
+    // does.
+    it('renders only the windowed slice of a plain data array, not every item', async () => {
+      const FlatListRoot = await loadMountable();
+      const data = Array.from({ length: ITEM_COUNT }, (_unused, index) => `row-${index}`);
+      mount(ROOT_TAG, FlatListRoot, { data });
+      await tick();
+      await tick();
 
-    const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
-    expect(content).toBeDefined();
-    if (content === undefined) return;
+      const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+      expect(content).toBeDefined();
+      if (content === undefined) return;
 
-    expect(content.children.length).toBe(DEFAULT_INITIAL_NUM_TO_RENDER);
-    expect(content.children.length).toBeLessThan(ITEM_COUNT);
-  });
+      expect(content.children.length).toBe(DEFAULT_INITIAL_NUM_TO_RENDER);
+      expect(content.children.length).toBeLessThan(ITEM_COUNT);
+    });
 
-  it('forwards testID and wires a real RefreshControl through to the inner VirtualizedList (gaps 1 and 2)', async () => {
-    const FlatListRoot = await loadMountableWithAccessibilityAndRefresh();
-    const data = ['row-0', 'row-1'];
-    mount(ROOT_TAG, FlatListRoot, { data });
-    await tick();
-    await tick();
+    // why: numColumns > 1 takes FlatList's OTHER branch (index.svelte's `{:else}` VirtualizedList
+    // instance) — data gets chunked into IRow entries via getRow/getRowCount instead of
+    // getSingleItem/getSingleCount, and each row must actually paint every item it packed, not
+    // just the first. Without this test the entire row-chunking wiring path had zero coverage.
+    it('packs data into rows and paints every item of each row when numColumns > 1', async () => {
+      const NUM_COLUMNS = 2;
+      const ROW_COUNT = 2;
+      const data = Array.from(
+        { length: NUM_COLUMNS * ROW_COUNT },
+        (_unused, index) => `cell-${index}`,
+      );
+      const FlatListRoot = await loadMountableWithColumns(NUM_COLUMNS);
+      mount(ROOT_TAG, FlatListRoot, { data });
+      await tick();
+      await tick();
 
-    // Gap 1: testID passed to <FlatList> reaches the committed RCTScrollView through the
-    // component-to-component forward onto <VirtualizedList> — walk the LIVE tree, not
-    // fabric.find()'s creation log.
-    const scrollView = findLive(fabric.appRoot(), node => node.props.testID === 'flat-list-a11y');
-    expect(scrollView, 'testID reached the committed RCTScrollView').toBeDefined();
-    expect(scrollView?.viewName).toBe('RCTScrollView');
+      const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+      expect(content, 'content container painted').toBeDefined();
+      if (content === undefined) return;
 
-    // Gap 2: onRefresh/refreshing set on <FlatList> produce a real RefreshControl
-    // (PullToRefreshView), attached as a sibling of the content container.
-    const refresh = findLive(fabric.appRoot(), node => node.viewName === 'PullToRefreshView');
-    expect(refresh, 'a real RefreshControl.svelte painted PullToRefreshView').toBeDefined();
-    expect(refresh?.props.refreshing).toBe(true);
-    expect(scrollView?.children.some(child => child.tag === refresh?.tag)).toBe(true);
+      // One committed cell-measure wrapper per IRow, not per item — the row-chunking branch, not
+      // the single-column one (which would have produced NUM_COLUMNS * ROW_COUNT wrappers).
+      expect(content.children.length).toBe(ROW_COUNT);
+
+      const paintedItems = new Set<string>();
+      for (const cellWrapper of content.children) {
+        // rowItem's own symbiote-view (flexDirection: 'row'), one level inside VirtualizedList's
+        // per-row measure wrapper.
+        const row = cellWrapper.children[0];
+        expect(row?.props.flexDirection, 'the row snippet painted flexDirection: row').toBe('row');
+        for (const itemWrapper of row?.children ?? []) {
+          for (const textNode of itemWrapper.children) {
+            const text = textNode.props.text;
+            if (typeof text === 'string') paintedItems.add(text);
+          }
+        }
+      }
+      // Every item that went INTO chunkIntoRows must come back OUT painted — proves rowItem's
+      // {#each row.items ...} loop actually rendered each item, not just that the row count matched.
+      expect(paintedItems).toEqual(new Set(data));
+    });
+
+    // why: FlatList's imperative handle (testID a11y forwarding, RefreshControl wiring) is thin
+    // delegation onto the inner VirtualizedList — proves the delegation actually reaches the
+    // committed tree, not just that the type surface compiles.
+    it('forwards testID and wires a real RefreshControl through to the inner VirtualizedList (gaps 1 and 2)', async () => {
+      const FlatListRoot = await loadMountableWithAccessibilityAndRefresh();
+      const data = ['row-0', 'row-1'];
+      mount(ROOT_TAG, FlatListRoot, { data });
+      await tick();
+      await tick();
+
+      // Gap 1: testID passed to <FlatList> reaches the committed RCTScrollView through the
+      // component-to-component forward onto <VirtualizedList> — walk the LIVE tree, not
+      // fabric.find()'s creation log.
+      const scrollView = findLive(fabric.appRoot(), node => node.props.testID === 'flat-list-a11y');
+      expect(scrollView, 'testID reached the committed RCTScrollView').toBeDefined();
+      expect(scrollView?.viewName).toBe('RCTScrollView');
+
+      // Gap 2: onRefresh/refreshing set on <FlatList> produce a real RefreshControl
+      // (PullToRefreshView), attached as a sibling of the content container.
+      const refresh = findLive(fabric.appRoot(), node => node.viewName === 'PullToRefreshView');
+      expect(refresh, 'a real RefreshControl.svelte painted PullToRefreshView').toBeDefined();
+      expect(refresh?.props.refreshing).toBe(true);
+      expect(scrollView?.children.some(child => child.tag === refresh?.tag)).toBe(true);
+    });
   });
 });

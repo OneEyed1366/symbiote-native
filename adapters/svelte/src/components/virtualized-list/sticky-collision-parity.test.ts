@@ -336,27 +336,39 @@ async function svelteSnapshots(): Promise<Record<string, number | undefined>[]> 
   return snapshots;
 }
 
+// This whole file is a DIFFERENTIAL regression group, not classic Positive/Negative — there is no
+// throw/reject contract here (both adapters' props are permissive bags). The product rule under
+// test is cross-adapter parity: <adapters_reach_full_feature_parity> (CLAUDE.md) requires the
+// SAME collision math to see the SAME inputs regardless of which adapter derives them, since the
+// state machine itself (reduceSticky) is shared and already proven correct on device. The
+// expectation for the Svelte side comes from React's OWN measured behavior in this same run, not
+// from reading Svelte's implementation back — so this is real differential evidence, not a
+// tautology.
 describe('sticky collision input parity: Svelte vs the React reference', () => {
+  // why: a sanity gate on the scenario itself — if React (the adapter this test trusts as ground
+  // truth) never establishes a defined collision point, the whole comparison is vacuous and a
+  // "parity" pass downstream would prove nothing.
   it('React (reference) keeps supplying a collision point across the whole scroll path', async () => {
     const snapshots = await reactSnapshots();
     expect(snapshots.length).toBe(SCROLL_STEPS.length);
-    // Sanity that the scenario is not vacuous: the reference adapter really does establish a
-    // collision point at some point along the path.
     expect(
       snapshots.some(step => Object.values(step).some(value => value !== undefined)),
       'React established a defined nextHeaderLayoutY somewhere along the scroll path',
     ).toBe(true);
   });
 
+  // why: THE differential assertion. Svelte cannot reuse React's/Vue's shared wrapStickyHeaders()
+  // (it only ever sees an opaque children Snippet, not an indexable child list — see this file's
+  // header comment), so VirtualizedList hand-rolls its own collision channel (a headerLayoutYs Map
+  // + stickyVersion counter). If the per-step inputs diverge from React's here, the defect is
+  // definitively in THAT hand-rolled channel, not in the shared reducer — collapsing what was
+  // previously an ambiguous device-log investigation into a deterministic file diff.
   it('Svelte feeds the shared reducer the SAME collision inputs at every scroll step', async () => {
     const react = await reactSnapshots();
     fabric.reset();
     trace.length = 0;
     const svelte = await svelteSnapshots();
 
-    // THE DIFFERENTIAL ASSERTION. `reduceSticky` is shared and already proven correct on device;
-    // if these snapshots diverge, the defect is definitively in Svelte's hand-rolled collision
-    // channel (VirtualizedList's headerLayoutYs Map + stickyVersion counter), not in sticky logic.
     for (const [step, y] of SCROLL_STEPS.entries()) {
       expect(svelte[step], `collision inputs after scrolling to y=${y} (step ${step})`).toEqual(
         react[step],

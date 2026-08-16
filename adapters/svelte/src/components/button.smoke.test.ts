@@ -5,6 +5,26 @@
 // syntax-checking cannot catch (it does not execute the compiled output). Compiles all three real
 // sources, mounts them nested, and drives a press through the whole chain against a real
 // fake-Fabric recorder.
+//
+// Coverage ledger (per CLAUDE.md's <components_split_logic_view_lifecycle> — Button has no
+// `renderButton()` in core/components at all, it is adapter-assembled per
+// component-render-fn-boundary.md's rule, composing TouchableOpacity + a raw symbiote-text):
+//   - `resolveButtonTextStyle(color, disabled)` (the color-tint / disabled-grey fold) — this
+//     file only asserts its OUTPUT indirectly is applied (title paints); it does not assert the
+//     tint/grey branches themselves. characterization: no test anywhere in the repo (core or any
+//     adapter) exercises `resolveButtonTextStyle`'s branches directly — flagged as a real upstream
+//     gap, not duplicated here per the "don't re-test core logic" rule, but also not silently
+//     assumed correct. See `// QUESTION:` on the disabled test below.
+//   - `BUTTON_ACCESSIBILITY_ROLE` / the fixed accessible=true / accessibilityState={disabled} fold
+//     applied AFTER the caller's own accessibility spread — covered below (second test).
+//   - the caller's `{...accessibilityRest}` passing through underneath Button's own fixed fields —
+//     covered indirectly (role/accessible read off the committed node), not separately asserted
+//     for override order — N/A: this is Svelte's own prop-spread-order semantics (last object
+//     wins), not adapter logic; testing it would test the Svelte compiler, not this component.
+//   - `nativeForward`'s native-only TV-focus/testID passthrough fields — N/A: plain conditional
+//     forwarding with no adapter-specific transform, and TV-focus is inert on a phone target.
+//   - the composition chain itself (Button -> TouchableOpacity -> Pressable, spread props,
+//     snippet-as-prop) and a real press round-trip — covered below (first test).
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -93,46 +113,58 @@ function responderHandle(): unknown {
 }
 
 describe('Button (real compiled button.svelte -> TouchableOpacity -> Pressable)', () => {
-  it('mounts the full chain, paints the title, and fires onPress through it', async () => {
-    let presses = 0;
-    const Button = await loadButton();
-    mount(ROOT_TAG, Button, {
-      title: 'OK',
-      onPress: () => {
-        presses++;
-      },
+  // No Negative group: Button has no guard clause of its own (disabled routes THROUGH
+  // Pressable's own suppression, never a thrown error) — every IButtonProps value the type
+  // allows renders and mounts.
+  describe('Positive (renders through the full composition chain and responds to touch)', () => {
+    // why: proves the three-file composition chain (spread props across two layers + a snippet
+    // passed through as a prop) actually wires end to end — a shape only real compiled output
+    // can prove, not `tsc` or a syntax check. Also proves onPress reaches the caller through
+    // TouchableOpacity's and Pressable's own press machinery, unmodified by Button.
+    it('mounts the full chain, paints the title, and fires onPress through it', async () => {
+      let presses = 0;
+      const Button = await loadButton();
+      mount(ROOT_TAG, Button, {
+        title: 'OK',
+        onPress: () => {
+          presses++;
+        },
+      });
+      await tick();
+      await tick();
+
+      const tree = fabric.serialize([fabric.appRoot()]);
+      expect(tree).toContain('RCTText');
+      expect(tree).toContain('RCTRawText "OK"');
+
+      const handle = responderHandle();
+      fabric.fireEvent(handle, 'topTouchStart');
+      fabric.fireEvent(handle, 'topTouchEnd');
+      await tick();
+      await tick();
+
+      expect(presses).toBe(1);
     });
-    await tick();
-    await tick();
 
-    const tree = fabric.serialize([fabric.appRoot()]);
-    expect(tree).toContain('RCTText');
-    expect(tree).toContain('RCTRawText "OK"');
+    // why: RN's Button.js contract — role=button, accessible=true, and the disabled
+    // accessibilityState fold are Button's OWN fixed fields, applied AFTER the caller's
+    // accessibility spread, so a caller cannot accidentally clobber them.
+    it('gives the responder role=button, accessible, and a disabled a11y state', async () => {
+      const Button = await loadButton();
+      mount(ROOT_TAG, Button, { title: 'Go', disabled: true, onPress: () => {} });
+      await tick();
+      await tick();
 
-    const handle = responderHandle();
-    fabric.fireEvent(handle, 'topTouchStart');
-    fabric.fireEvent(handle, 'topTouchEnd');
-    await tick();
-    await tick();
-
-    expect(presses).toBe(1);
-  });
-
-  it('gives the responder role=button, accessible, and a disabled a11y state', async () => {
-    const Button = await loadButton();
-    mount(ROOT_TAG, Button, { title: 'Go', disabled: true, onPress: () => {} });
-    await tick();
-    await tick();
-
-    // A disabled Pressable suppresses its listeners entirely (shouldSuppressPress), so this
-    // reads the role/accessible/accessibilityState fold straight off the committed view by its
-    // fixed accessibilityRole instead of the 'press'-listener lookup responderHandle() uses.
-    const view = fabric.find(
-      n => n.viewName === 'RCTView' && n.props.accessibilityRole === 'button',
-    );
-    expect(view).toBeDefined();
-    expect(view?.props.accessible).toBe(true);
-    const state = view?.props.accessibilityState;
-    expect(isRecord(state) && state.disabled).toBe(true);
+      // A disabled Pressable suppresses its listeners entirely (shouldSuppressPress), so this
+      // reads the role/accessible/accessibilityState fold straight off the committed view by its
+      // fixed accessibilityRole instead of the 'press'-listener lookup responderHandle() uses.
+      const view = fabric.find(
+        n => n.viewName === 'RCTView' && n.props.accessibilityRole === 'button',
+      );
+      expect(view).toBeDefined();
+      expect(view?.props.accessible).toBe(true);
+      const state = view?.props.accessibilityState;
+      expect(isRecord(state) && state.disabled).toBe(true);
+    });
   });
 });

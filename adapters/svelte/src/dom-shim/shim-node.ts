@@ -199,14 +199,12 @@ Object.defineProperty(ShimNode.prototype, 'nextSibling', {
 // The case that makes this load-bearing is a LIVE node moved into an OFFSCREEN
 // `DocumentFragment`. In real DOM, `fragment.append(liveNode)` takes the node out of the
 // document; here the fragment has no engine node of its own, so `insertOne`'s engine half is
-// skipped entirely and the only chance to detach is right here. Svelte does exactly that move
-// in three places, all of them the deferred/offscreen machinery §17 already burned us in:
-// `dom/blocks/branches.js` (an onscreen branch parked for a later batch), `dom/blocks/each.js`
-// (`destroy_effects` preserving an item a pending batch still needs), and
-// `dom/blocks/boundary.js`'s `#render` (`move_effect` of the main effect while a `pending`
-// snippet shows). Without this the parked subtree stays committed underneath whatever replaced
-// it — silent, since nothing throws and every existing smoke that only checks "is my new
-// content there" still passes.
+// skipped entirely and this is the only chance to detach. Svelte does exactly that move in
+// three places (§17): `dom/blocks/branches.js` (an onscreen branch parked for a later batch),
+// `dom/blocks/each.js` (`destroy_effects` preserving an item a pending batch still needs), and
+// `dom/blocks/boundary.js`'s `#render` (`move_effect` while a `pending` snippet shows). Without
+// this the parked subtree stays committed underneath whatever replaced it — silent, since
+// nothing throws and a smoke that only checks "is my new content there" still passes.
 //
 // A live->live move (a keyed `{#each}` reorder) reaches this too and is unaffected in outcome:
 // the engine's own `appendChild`/`insertBefore` already detach first, so removing here just

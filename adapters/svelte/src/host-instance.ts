@@ -20,8 +20,12 @@ import type { ShimElement } from './dom-shim';
 
 export type { IHostInstance } from '@symbiote-native/engine';
 
+// `engineNode` alone does NOT identify a ShimElement: it is declared on the shared ShimNode base
+// (dom-shim/shim-node.ts), so a ShimText / ShimComment / ShimDocumentFragment satisfies it too,
+// and none of those is a host ref an interop library can hand back. `tagName` is ShimElement's
+// own field, so checking it makes the predicate mean what its name says.
 function isShimElement(value: unknown): value is ShimElement {
-  return typeof value === 'object' && value !== null && 'engineNode' in value;
+  return typeof value === 'object' && value !== null && 'engineNode' in value && 'tagName' in value;
 }
 
 // The typed imperative handle (measure/measureInWindow/measureLayout/setNativeProps/focus/blur)

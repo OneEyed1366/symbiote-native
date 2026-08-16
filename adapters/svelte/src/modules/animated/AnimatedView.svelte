@@ -19,8 +19,13 @@
 </script>
 
 <script lang="ts">
-  import { dlog, isNativeAnimatedAvailable, reduceProps, readPassthroughStyle } from '@symbiote-native/engine';
-  import { createAnimatedReconcileRuntime } from './animated-props-runtime';
+  import {
+    createAnimatedLeafLifecycle,
+    dlog,
+    isNativeAnimatedAvailable,
+    reduceProps,
+    readPassthroughStyle,
+  } from '@symbiote-native/engine';
   import { createAttachmentsSync } from '../../runes/attachments';
   import type { ShimElement } from '../../dom-shim';
 
@@ -52,7 +57,7 @@
     return out;
   });
 
-  const runtime = createAnimatedReconcileRuntime();
+  const runtime = createAnimatedLeafLifecycle('AnimatedView');
 
   // DIAGNOSTIC (2026-08-13, tracking the effect_update_depth_exceeded device crash): isolates
   // whether `bind:this={hostShim}` below EVER re-fires after the initial mount. If it does — a

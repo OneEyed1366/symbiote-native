@@ -134,7 +134,14 @@ async function survivorsAfterShrink(size: number, rootTag: number): Promise<numb
   return handles.filter(ref => ref.deref() !== undefined).length;
 }
 
+// Positive-only: this is a memory-retention measurement, not a function with an input it can
+// reject — there is no throwing contract to pin a Negative scenario against.
 describe('shim node release', () => {
+  // why: a shim that RETAINS a strong reference to every removed node (e.g. a listener map, a
+  // parent-child edge never cleared) grows unboundedly with list churn — exactly the device-RSS
+  // symptom this test was written to rule out (see file header). The assertion is deliberately
+  // about SCALING, not about zero survivors, because `gc()` gives no guarantee a given object is
+  // reclaimed by a given cycle — see the file header for why `toBe(0)` would be a flaky test.
   it('retains a constant, not a per-node accumulation, after nodes leave the tree', async () => {
     const smallSurvivors = await survivorsAfterShrink(SMALL, 93_001);
     const largeSurvivors = await survivorsAfterShrink(LARGE, 93_002);

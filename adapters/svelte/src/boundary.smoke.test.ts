@@ -128,128 +128,147 @@ const THROWING_CHILD_SOURCE =
   `<symbiote-view p={{ testID: 'child' }}><symbiote-text p={{}}>ok</symbiote-text></symbiote-view>`;
 
 describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
-  it('is transparent when nothing throws — children commit, the failed snippet does not', async () => {
-    const Guarded = await compileComponent(
-      `<svelte:boundary>` +
-        `<symbiote-view p={{ testID: 'child' }}><symbiote-text p={{}}>ok</symbiote-text></symbiote-view>` +
-        `{#snippet failed(error, reset)}<symbiote-view p={{ testID: 'failed' }}></symbiote-view>{/snippet}` +
-        `</svelte:boundary>`,
-      'Transparent',
-    );
-
-    mount(ROOT_TAG, Guarded);
-    await tick();
-    await tick();
-
-    // Exactly one child: the boundary itself must contribute NO native node of its own, and its
-    // anchor must stay an engine anchor the commit walk skips.
-    expect(testIds()).toEqual(['child']);
-    expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "ok"))');
-  });
-
-  it('renders the failed snippet and fires onerror when a child throws during render', async () => {
-    compileToFile(THROWING_CHILD_SOURCE, 'ThrowingChild', CHILD_MODULE);
-    const Guarded = await compileComponent(
-      `<script>
-         import Child from './${CHILD_MODULE}';
-         let { control } = $props();
-       </script>` +
-        `<svelte:boundary onerror={control.onError}>` +
-        `<Child {control} />` +
-        `{#snippet failed(error, reset)}` +
-        `<symbiote-view p={{ testID: 'failed' }}><symbiote-text p={{}}>{error.message}</symbiote-text></symbiote-view>` +
-        `{/snippet}` +
-        `</svelte:boundary>`,
-      'CatchingBoundary',
-    );
-
-    const control = throwControl();
-    const onError = vi.fn();
-    control.onError = onError;
-
-    mount(ROOT_TAG, Guarded, { control });
-    await tick();
-    await tick();
-
-    expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
-
-    // The child's own subtree must be fully gone, not merely hidden behind the failed snippet.
-    expect(testIds()).toEqual(['failed']);
-    expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "child exploded"))');
-  });
-
-  it('restores the children when reset() is called from the failed snippet', async () => {
-    compileToFile(THROWING_CHILD_SOURCE, 'ThrowingChild', CHILD_MODULE);
-    // The reset really does travel out of the failed snippet (see IThrowControl.failedBag),
-    // exactly as an app would wire it to a retry button.
-    const Guarded = await compileComponent(
-      `<script>
-         import Child from './${CHILD_MODULE}';
-         let { control } = $props();
-       </script>` +
+  // No true Negative group: `mount()` itself never throws in any of these scenarios — a child
+  // throwing during render is exactly the case `<svelte:boundary>` exists to catch, so the two
+  // "a child throws" scenarios below are grouped as "Recovers" (the correct handling of an error
+  // that DID happen), distinct from a Negative scenario asserting mount() itself must reject.
+  describe('Positive (renders and updates without any child throwing)', () => {
+    // why: the boundary must contribute NO native node of its own on the happy path — only the
+    // wrapped children commit, and the `failed` snippet must not also render alongside them.
+    it('is transparent when nothing throws — children commit, the failed snippet does not', async () => {
+      const Guarded = await compileComponent(
         `<svelte:boundary>` +
-        `<Child {control} />` +
-        `{#snippet failed(error, reset)}` +
-        `<symbiote-view p={control.failedBag(reset)}><symbiote-text p={{}}>{error.message}</symbiote-text></symbiote-view>` +
-        `{/snippet}` +
-        `</svelte:boundary>`,
-      'ResettableBoundary',
-    );
+          `<symbiote-view p={{ testID: 'child' }}><symbiote-text p={{}}>ok</symbiote-text></symbiote-view>` +
+          `{#snippet failed(error, reset)}<symbiote-view p={{ testID: 'failed' }}></symbiote-view>{/snippet}` +
+          `</svelte:boundary>`,
+        'Transparent',
+      );
 
-    const control = throwControl();
-    mount(ROOT_TAG, Guarded, { control });
-    await tick();
-    await tick();
-    expect(testIds()).toEqual(['failed']);
+      mount(ROOT_TAG, Guarded);
+      await tick();
+      await tick();
 
-    control.shouldThrow = false;
-    control.reset();
-    await tick();
-    await tick();
+      // Exactly one child: the boundary itself must contribute NO native node of its own, and its
+      // anchor must stay an engine anchor the commit walk skips.
+      expect(testIds()).toEqual(['child']);
+      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "ok"))');
+    });
 
-    // Back to exactly the child — the failed subtree must be torn down, and re-rendering the
-    // children must not leave a second copy behind.
-    expect(testIds()).toEqual(['child']);
-    expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "ok"))');
-  });
-
-  it('wraps a real {#each} list, keeping exact child order across a list mutation', async () => {
-    const Guarded = await compileComponent(
-      `<script>
+    // why: a boundary wrapping a live `{#each}` must let the each-block's own keyed diff run
+    // normally underneath it — the boundary's presence must not pin child identity or otherwise
+    // interfere with an ordinary reorder+grow+shrink update.
+    it('wraps a real {#each} list, keeping exact child order across a list mutation', async () => {
+      const Guarded = await compileComponent(
+        `<script>
          let { control } = $props();
          let rows = $state(control.rows);
          control.setRows = next => { rows = next; };
        </script>` +
-        `<symbiote-view p={{ testID: 'list' }}>` +
-        `<svelte:boundary>` +
-        `{#each rows as row (row)}<symbiote-view p={{ testID: row }}><symbiote-text p={{}}>{row}</symbiote-text></symbiote-view>{/each}` +
-        `{#snippet failed(error, reset)}<symbiote-view p={{ testID: 'failed' }}></symbiote-view>{/snippet}` +
-        `</svelte:boundary>` +
-        `</symbiote-view>`,
-      'BoundaryList',
-    );
+          `<symbiote-view p={{ testID: 'list' }}>` +
+          `<svelte:boundary>` +
+          `{#each rows as row (row)}<symbiote-view p={{ testID: row }}><symbiote-text p={{}}>{row}</symbiote-text></symbiote-view>{/each}` +
+          `{#snippet failed(error, reset)}<symbiote-view p={{ testID: 'failed' }}></symbiote-view>{/snippet}` +
+          `</svelte:boundary>` +
+          `</symbiote-view>`,
+        'BoundaryList',
+      );
 
-    const control: { rows: string[]; setRows: (next: string[]) => void } = {
-      rows: ['a', 'b', 'c'],
-      setRows: () => {},
-    };
-    mount(ROOT_TAG, Guarded, { control });
-    await tick();
-    await tick();
+      const control: { rows: string[]; setRows: (next: string[]) => void } = {
+        rows: ['a', 'b', 'c'],
+        setRows: () => {},
+      };
+      mount(ROOT_TAG, Guarded, { control });
+      await tick();
+      await tick();
 
-    const listChildren = (): IFakeNode[] => appChildren()[0]?.children ?? [];
-    expect(listChildren().map(child => child.props.testID)).toEqual(['a', 'b', 'c']);
+      const listChildren = (): IFakeNode[] => appChildren()[0]?.children ?? [];
+      expect(listChildren().map(child => child.props.testID)).toEqual(['a', 'b', 'c']);
 
-    // Reorder + grow + shrink in one update: the each-block's keyed diff moves nodes around the
-    // boundary's own anchor, which is where a mis-managed anchor would surface as a wrong order.
-    control.setRows(['c', 'd', 'a']);
-    await tick();
-    await tick();
+      // Reorder + grow + shrink in one update: the each-block's keyed diff moves nodes around the
+      // boundary's own anchor, which is where a mis-managed anchor would surface as a wrong order.
+      control.setRows(['c', 'd', 'a']);
+      await tick();
+      await tick();
 
-    expect(listChildren().map(child => child.props.testID)).toEqual(['c', 'd', 'a']);
-    expect(fabric.serialize(listChildren())).toBe(
-      'RCTView(RCTText(RCTRawText "c"))RCTView(RCTText(RCTRawText "d"))RCTView(RCTText(RCTRawText "a"))',
-    );
+      expect(listChildren().map(child => child.props.testID)).toEqual(['c', 'd', 'a']);
+      expect(fabric.serialize(listChildren())).toBe(
+        'RCTView(RCTText(RCTRawText "c"))RCTView(RCTText(RCTRawText "d"))RCTView(RCTText(RCTRawText "a"))',
+      );
+    });
+  });
+
+  describe('Recovers (a child throws during render — the boundary catches it, not propagates it)', () => {
+    // why: an error thrown from a child's own init is the shape a boundary exists to catch in
+    // real app code, and recovery is only real if the thrown subtree is FULLY torn down (not
+    // merely hidden behind the failed snippet) and `onerror` actually receives the real Error.
+    it('renders the failed snippet and fires onerror when a child throws during render', async () => {
+      compileToFile(THROWING_CHILD_SOURCE, 'ThrowingChild', CHILD_MODULE);
+      const Guarded = await compileComponent(
+        `<script>
+         import Child from './${CHILD_MODULE}';
+         let { control } = $props();
+       </script>` +
+          `<svelte:boundary onerror={control.onError}>` +
+          `<Child {control} />` +
+          `{#snippet failed(error, reset)}` +
+          `<symbiote-view p={{ testID: 'failed' }}><symbiote-text p={{}}>{error.message}</symbiote-text></symbiote-view>` +
+          `{/snippet}` +
+          `</svelte:boundary>`,
+        'CatchingBoundary',
+      );
+
+      const control = throwControl();
+      const onError = vi.fn();
+      control.onError = onError;
+
+      mount(ROOT_TAG, Guarded, { control });
+      await tick();
+      await tick();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+
+      // The child's own subtree must be fully gone, not merely hidden behind the failed snippet.
+      expect(testIds()).toEqual(['failed']);
+      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "child exploded"))');
+    });
+
+    // why: `reset()` is the boundary's own retry mechanism — a real app wires it to a "try again"
+    // button, and recovery must be exact: the failed subtree torn down, the children rebuilt
+    // once, never left duplicated alongside the failed snippet.
+    it('restores the children when reset() is called from the failed snippet', async () => {
+      compileToFile(THROWING_CHILD_SOURCE, 'ThrowingChild', CHILD_MODULE);
+      // The reset really does travel out of the failed snippet (see IThrowControl.failedBag),
+      // exactly as an app would wire it to a retry button.
+      const Guarded = await compileComponent(
+        `<script>
+         import Child from './${CHILD_MODULE}';
+         let { control } = $props();
+       </script>` +
+          `<svelte:boundary>` +
+          `<Child {control} />` +
+          `{#snippet failed(error, reset)}` +
+          `<symbiote-view p={control.failedBag(reset)}><symbiote-text p={{}}>{error.message}</symbiote-text></symbiote-view>` +
+          `{/snippet}` +
+          `</svelte:boundary>`,
+        'ResettableBoundary',
+      );
+
+      const control = throwControl();
+      mount(ROOT_TAG, Guarded, { control });
+      await tick();
+      await tick();
+      expect(testIds()).toEqual(['failed']);
+
+      control.shouldThrow = false;
+      control.reset();
+      await tick();
+      await tick();
+
+      // Back to exactly the child — the failed subtree must be torn down, and re-rendering the
+      // children must not leave a second copy behind.
+      expect(testIds()).toEqual(['child']);
+      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "ok"))');
+    });
   });
 });

@@ -8,8 +8,12 @@
 </script>
 
 <script lang="ts">
-  import { isNativeAnimatedAvailable, reduceProps, readPassthroughStyle } from '@symbiote-native/engine';
-  import { createAnimatedReconcileRuntime } from './animated-props-runtime';
+  import {
+    createAnimatedLeafLifecycle,
+    isNativeAnimatedAvailable,
+    reduceProps,
+    readPassthroughStyle,
+  } from '@symbiote-native/engine';
   import { createAttachmentsSync } from '../../runes/attachments';
   import type { ShimElement } from '../../dom-shim';
 
@@ -32,7 +36,7 @@
     return out;
   });
 
-  const runtime = createAnimatedReconcileRuntime();
+  const runtime = createAnimatedLeafLifecycle('AnimatedText');
 
   $effect(() => {
     const currentRest = rest;

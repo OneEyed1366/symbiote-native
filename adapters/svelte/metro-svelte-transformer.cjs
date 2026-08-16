@@ -34,12 +34,9 @@ const upstreamTransformer = resolveUpstreamTransformer();
 const COMPILER_OPTIONS = { fragments: 'tree', css: 'external', generate: 'client' };
 
 // The web-only-construct guard (svelte-adapter-dom-shim skill §7/§22) RUNS HERE, on every
-// `.svelte` Metro compiles. It used to be skipped, on the reasoning that `svelte-check` and the
-// language server already run the same pass over the same source, and that the constructs it
-// guards are inert rather than wrong even if one slipped through. **That reasoning stopped
-// holding when `{@html}` joined the list**: `{@html}` is not inert — it compiles to `$.html()`,
-// which assigns to an `innerHTML` the shim does not define, so the content silently never
-// renders. And editor-time tooling only covers a developer who HAS that tooling wired up; a
+// `.svelte` Metro compiles — not just via svelte-check/the language server. `{@html}` compiles
+// to `$.html()`, which assigns to an `innerHTML` the shim does not define, so the content
+// silently never renders; editor tooling only covers a developer who has it wired up, and a
 // consuming app whose own `svelte.config.js` never registers the preprocessor would still ship
 // the broken bundle. A build-time gate is the only one nobody can be missing.
 //
@@ -78,22 +75,20 @@ function compileSvelteFile(src, filename) {
 }
 
 // `.svelte.js`/`.svelte.ts` files (adapters/svelte/src/runes/*.svelte.ts and any package that
-// ships its own runes, e.g. packages/splash-screen/src/svelte/runes) carry rune syntax
-// ($state/$effect/...) OUTSIDE a component's markup, so they need svelte/compiler's separate
-// MODULE api, not compile() — compile() expects a component and throws a parse error on a bare
-// module (verified directly against svelte@5.56.8). Uncompiled, a literal `$state(...)` call
-// hits svelte/index-client.js's dev-guard export and throws `rune_outside_svelte` the instant
-// it runs — this filename check was previously MISSING entirely, so every .svelte.ts rune file
+// ships its own runes) carry rune syntax ($state/$effect/...) OUTSIDE a component's markup, so
+// they need svelte/compiler's separate MODULE api, not compile() — compile() expects a
+// component and throws a parse error on a bare module. Uncompiled, a literal `$state(...)` call
+// hits svelte/index-client.js's dev-guard export and throws `rune_outside_svelte` the instant it
+// runs — this filename check was previously MISSING entirely, so every .svelte.ts rune file
 // shipped uncompiled and would crash on first call on a real device.
 //
 // Unlike compile() (which strips <script lang="ts"> types itself via bundled acorn-typescript),
-// compileModule() does NOT parse TypeScript at all — verified directly: it throws js_parse_error
-// on a bare return-type annotation regardless of the .ts filename passed. So TS has to be
-// stripped BEFORE compileModule() ever sees the source. ts.transpileModule() (isolated-file
-// "strip only" mode, module:ESNext/target:ESNext) does exactly this: drops type-only
-// imports/annotations, keeps every used value import and leaves $state/$effect call expressions
-// completely untouched — verified it does not require full-program type information the way
-// metro-vue-transformer.cjs's registerTS step does.
+// compileModule() does NOT parse TypeScript at all — it throws js_parse_error on a bare
+// return-type annotation regardless of the .ts filename passed. So TS has to be stripped BEFORE
+// compileModule() ever sees the source. ts.transpileModule() (isolated-file "strip only" mode,
+// module:ESNext/target:ESNext) does exactly this: drops type-only imports/annotations, keeps
+// every used value import, and leaves $state/$effect call expressions untouched — it does not
+// require full-program type information the way metro-vue-transformer.cjs's registerTS step does.
 function stripTypeScript(src, filename) {
   const { outputText } = ts.transpileModule(src, {
     fileName: filename,

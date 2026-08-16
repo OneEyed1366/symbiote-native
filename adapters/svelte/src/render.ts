@@ -38,8 +38,8 @@ export function mount(
 ): SymbioteSurface {
   teardown(rootTag);
 
-  // Single root per process (decided 2026-08-11): safe to install unconditionally —
-  // patchGlobals() is itself idempotent if a surface is already live.
+  // Safe to install unconditionally - patchGlobals() is itself idempotent if a surface is
+  // already live.
   patchGlobals();
 
   const surface = createSurface(rootTag);
@@ -55,8 +55,7 @@ export function mount(
 export function unmount(rootTag: IRootTag): void {
   dlog(`svelte unmount root=${rootTag}`);
   teardown(rootTag);
-  // Single root per process: no other surface can still need the shim, so this is always
-  // safe — no ref-counting (svelte-adapter-dom-shim skill §10).
+  // No other surface can still need the shim (single root per process, see module header).
   restoreGlobals();
 }
 

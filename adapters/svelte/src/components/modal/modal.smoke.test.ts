@@ -8,6 +8,30 @@
 // React's own modal.test.tsx DismissCase: onRequestClose flips its own `visible` $state), and
 // asserts against a real fake-Fabric recorder — same harness shape as switch.smoke.test.ts.
 //
+// Coverage ledger (per CLAUDE.md's <components_split_logic_view_lifecycle>):
+//   - renderModal()'s own fold logic (default attributes, transparent -> overFullScreen +
+//     transparent backdrop, backdropColor override, explicit presentationStyle winning) — N/A:
+//     covered directly at core/components/src/__tests__/wave1-core.test.ts's `renderModal`
+//     describe block. This file instead proves index.svelte CALLS renderModal() (not a
+//     hand-duplicated bag) and wires its two fixed Descriptor positions onto the two literal
+//     host tags — covered below (first test).
+//   - `createInitialModalState` / `modalReducer` / `shouldRenderModal` (the keep-alive state
+//     machine's pure branches: seed from initial visibility, drop on hide, re-arm on show,
+//     the render gate) — N/A: covered directly at wave1-core.test.ts's `modal keep-alive state
+//     machine` describe block. This file instead proves the SVELTE LIFECYCLE actually drives
+//     that reducer end to end through a real native event, which a pure-function unit test of
+//     the reducer alone cannot prove (the effect ordering, the `$state`/`$effect` wiring, and
+//     the real cloneNodeWithNewProps/removeChild commit are all adapter-owned) — covered below
+//     (second and third tests).
+//   - the `{@render rawProps.children?.()}` nesting under the container View, never as a direct
+//     sibling of the host — covered below (first test asserts the exact 3-level shape).
+//   - `onShow`/`onDismiss` passthrough — N/A: plain object-bag forwarding with no adapter-specific
+//     transform (same as every other DirectEvent passthrough field); not separately exercised here,
+//     `onRequestClose` alone proves the passthrough wiring works. `onOrientationChange` IS covered
+//     below (its own test) — it is the only one of the four carrying a payload, so it is the only
+//     one whose declared signature can disagree with the ISymbioteEvent wrapper the engine hands
+//     every listener.
+//
 // Two real gotchas measured while building this file, both worth recording so the next co-
 // located smoke test doesn't rediscover them:
 //   1. `fabric.find()` walks the fake Fabric's `created` log — every node ever createNode'd this
@@ -35,6 +59,7 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
+import type { ISymbioteEvent } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
@@ -121,6 +146,13 @@ async function loadDismissible(): Promise<Component> {
   return importDefault(DISMISSIBLE_PARENT_OUT, 'DismissibleParent.svelte');
 }
 
+// The Modal on its own, driven straight through mount()'s props argument — no controlling parent
+// needed to observe a callback prop, and the compiled source stays byte-identical (gotcha 2).
+async function loadModal(): Promise<Component> {
+  compileModal();
+  return importDefault(MODAL_OUT, 'Modal.svelte');
+}
+
 async function loadHidden(): Promise<Component> {
   compileModal();
   compileToFile(
@@ -132,54 +164,92 @@ async function loadHidden(): Promise<Component> {
 }
 
 describe('Modal (real compiled index.svelte)', () => {
-  it('commits a visible modal as ModalHostView(RCTView(RCTView)) with default host props', async () => {
-    const Dismissible = await loadDismissible();
-    mount(ROOT_TAG, Dismissible);
-    await settle();
+  // No Negative group: Modal has no guard clause of its own — an invalid IModalProps value is
+  // rejected by TypeScript, not by a runtime throw. `visible=false` is a valid Positive boundary
+  // (declining to render), not an error path — covered in its own test below.
+  describe('Positive (mounts, composes the host/container/children shape, and reacts to native events)', () => {
+    // why: proves index.svelte calls the real renderModal() and lands its Descriptor onto the
+    // two literal host tags, with default (non-transparent) attributes RN's own Modal.js
+    // contract requires — a hand-duplicated bag could drift from the shared fold silently.
+    it('commits a visible modal as ModalHostView(RCTView(RCTView)) with default host props', async () => {
+      const Dismissible = await loadDismissible();
+      mount(ROOT_TAG, Dismissible);
+      await settle();
 
-    // appRoot() is the engine's synthetic box-none AppContainer; its one child is this Svelte
-    // adapter's own root symbiote-view (root-element.ts), under which the mounted component's
-    // own output lands — hence the extra RCTView wrapper vs React's/Vue's own tests. `toContain`
-    // (not exact equality), matching mount-pipeline.smoke.test.ts's own precedent: mount()'s
-    // component boundary contributes a couple of empty RCTRawText siblings alongside the real
-    // content that aren't this test's concern.
-    expect(fabric.serialize(fabric.appRoot().children)).toContain(
-      'ModalHostView(RCTView(RCTView))',
-    );
+      // appRoot() is the engine's synthetic box-none AppContainer; its one child is this Svelte
+      // adapter's own root symbiote-view (root-element.ts), under which the mounted component's
+      // own output lands — hence the extra RCTView wrapper vs React's/Vue's own tests. `toContain`
+      // (not exact equality), matching mount-pipeline.smoke.test.ts's own precedent: mount()'s
+      // component boundary contributes a couple of empty RCTRawText siblings alongside the real
+      // content that aren't this test's concern.
+      expect(fabric.serialize(fabric.appRoot().children)).toContain(
+        'ModalHostView(RCTView(RCTView))',
+      );
 
-    const host = committedModalNode();
-    expect(host.props.visible).toBe(true);
-    expect(host.props.animationType).toBe('none');
-    // RN sets styles.modal (position:'absolute') on RCTModalHostView itself.
-    expect(host.props.position).toBe('absolute');
-    // Default (opaque, non-transparent) presentationStyle is 'fullScreen'.
-    expect(host.props.presentationStyle).toBe('fullScreen');
-    // The opaque modal's container backdrop stays the default white.
-    expect(host.children[0]?.props.backgroundColor).toBe('white');
-  });
+      const host = committedModalNode();
+      expect(host.props.visible).toBe(true);
+      expect(host.props.animationType).toBe('none');
+      // RN sets styles.modal (position:'absolute') on RCTModalHostView itself.
+      expect(host.props.position).toBe('absolute');
+      // Default (opaque, non-transparent) presentationStyle is 'fullScreen'.
+      expect(host.props.presentationStyle).toBe('fullScreen');
+      // The opaque modal's container backdrop stays the default white.
+      expect(host.children[0]?.props.backgroundColor).toBe('white');
+    });
 
-  it('round-trips a native topRequestClose through the reducer and drops the node once it settles', async () => {
-    const Dismissible = await loadDismissible();
-    mount(ROOT_TAG, Dismissible);
-    await settle();
-    expect(findInCommittedTree(n => n.viewName === 'ModalHostView')).toBeDefined();
+    // why: proves the keep-alive reducer (modalReducer/shouldRenderModal) is actually wired
+    // through the Svelte `$state`/`$effect` lifecycle end to end — a real native event flips the
+    // controlling parent's own state, which must flow back through the reducer and eventually
+    // drop the committed node, never leaving it stuck mounted after the transition settles.
+    it('round-trips a native topRequestClose through the reducer and drops the node once it settles', async () => {
+      const Dismissible = await loadDismissible();
+      mount(ROOT_TAG, Dismissible);
+      await settle();
+      expect(findInCommittedTree(n => n.viewName === 'ModalHostView')).toBeDefined();
 
-    // Drive the native close exactly like React's DismissCase: topRequestClose -> the parent's
-    // own $state flips visible=false, which flows back down through the SAME onRequestClose bag
-    // entry the passthrough props wired onto the host node.
-    fabric.fireEvent(committedModalNode().instanceHandle, 'topRequestClose', {});
-    await settle();
+      // Drive the native close exactly like React's DismissCase: topRequestClose -> the parent's
+      // own $state flips visible=false, which flows back down through the SAME onRequestClose bag
+      // entry the passthrough props wired onto the host node.
+      fabric.fireEvent(committedModalNode().instanceHandle, 'topRequestClose', {});
+      await settle();
 
-    // The keep-alive reducer must have actually transitioned (not gotten stuck): the node is
-    // fully gone from the CURRENTLY COMMITTED tree.
-    expect(findInCommittedTree(n => n.viewName === 'ModalHostView')).toBeUndefined();
-  });
+      // The keep-alive reducer must have actually transitioned (not gotten stuck): the node is
+      // fully gone from the CURRENTLY COMMITTED tree.
+      expect(findInCommittedTree(n => n.viewName === 'ModalHostView')).toBeUndefined();
+    });
 
-  it('commits no modal node when visible starts false', async () => {
-    const Hidden = await loadHidden();
-    mount(ROOT_TAG, Hidden);
-    await settle();
+    // why: onOrientationChange rides the object bag like every other DirectEvent, but it is the
+    // only one carrying a payload — the engine registers it as `(event) => handler(event)`, so the
+    // orientation arrives on nativeEvent, never on the event itself. A signature promising a bare
+    // { orientation } would leave every Svelte caller reading undefined.
+    it('routes topOrientationChange to onOrientationChange with the orientation on nativeEvent', async () => {
+      const Modal = await loadModal();
+      let received: ISymbioteEvent | undefined;
+      mount(ROOT_TAG, Modal, {
+        visible: true,
+        onOrientationChange: (event: ISymbioteEvent) => {
+          received = event;
+        },
+      });
+      await settle();
 
-    expect(findInCommittedTree(n => n.viewName === 'ModalHostView')).toBeUndefined();
+      fabric.fireEvent(committedModalNode().instanceHandle, 'topOrientationChange', {
+        orientation: 'landscape',
+      });
+
+      expect(received?.type).toBe('orientationChange');
+      expect(received?.nativeEvent.orientation).toBe('landscape');
+    });
+
+    // why: `shouldRender` gates the `{#if}` around the host tag entirely — a modal that starts
+    // hidden must never commit a node at all (not commit-then-immediately-remove), matching
+    // `createInitialModalState`'s seed-from-initial-visibility contract.
+    it('commits no modal node when visible starts false', async () => {
+      const Hidden = await loadHidden();
+      mount(ROOT_TAG, Hidden);
+      await settle();
+
+      expect(findInCommittedTree(n => n.viewName === 'ModalHostView')).toBeUndefined();
+    });
   });
 });

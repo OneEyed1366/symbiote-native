@@ -9,6 +9,16 @@
 // whenCommitted defer (core/engine/src/animated/event.ts) is what makes this actually land. The
 // fake NativeAnimatedTurboModule records the bind so we assert it landed against the real tag,
 // no host needed.
+//
+// Scope note: the AnimatedEvent/native-event plumbing itself (whenCommitted's post-commit defer,
+// the event-name -> UI-thread bind) is core/engine (core/engine/src/animated/event.ts, already
+// tested there) and is used, not re-verified, here. This file's own job is the Svelte-specific
+// claim: that the attach genuinely waits for a committed Fabric tag rather than firing against
+// undefined on the reconcile $effect's first (pre-commit) run.
+//
+// No Negative group: attachNativeEventHandler() has no throw path for this shape — an
+// onScroll prop that is NOT a native Animated.event is simply not attached (a different,
+// already-covered engine-level contract), not rejected.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -132,7 +142,10 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-describe('Animated.View (real compiled source) native event', () => {
+describe('Animated.View (real compiled source) native event (Positive)', () => {
+  // why: proves attachNativeEventHandler's post-commit retry actually matters here — under
+  // Svelte's async-batched commit the reconcile $effect can run before completeRoot assigns the
+  // view its Fabric tag, so a naive same-tick attach would silently bind nothing.
   it('binds a native Animated.event to the committed view tag', async () => {
     const EventParent = await loadParent();
     const scrollY = new AnimatedValue(0);
