@@ -26,11 +26,15 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   ChangeDetectionStrategy,
   Component,
+  computed,
+  type DoCheck,
   ElementRef,
   EventEmitter,
   inject,
   Input,
+  type OnChanges,
   Output,
+  signal,
 } from '@angular/core';
 import {
   createTouchableFeedbackHandlers,
@@ -53,7 +57,7 @@ import {
   type ITouchableFeedbackHandlers,
 } from '@symbiote-native/components';
 import { type ISymbioteEvent, type IStyleProp, type IViewStyle } from '@symbiote-native/engine';
-import { anchorHostStyle, anchorStyleProp } from '../../primitives';
+import { anchorHostStyle, anchorStyleProp, SymbioteStyleInputDirective } from '../../primitives';
 import { Pressable, type IAngularPressableInputs } from '../pressable';
 import { Animated, AnimatedView } from '../../modules/animated';
 
@@ -88,6 +92,7 @@ function scheduleTimeout(callback: () => void, ms: number): () => void {
 @Component({
   selector: 'TouchableOpacity',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [Pressable, AnimatedView],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -163,7 +168,7 @@ function scheduleTimeout(callback: () => void, ms: number): () => void {
     </Pressable>
   `,
 })
-export class TouchableOpacity implements IAngularTouchableOpacityProps {
+export class TouchableOpacity implements IAngularTouchableOpacityProps, DoCheck {
   @Output() readonly press = new EventEmitter<ISymbioteEvent>();
   @Output() readonly pressIn = new EventEmitter<ISymbioteEvent>();
   @Output() readonly pressOut = new EventEmitter<ISymbioteEvent>();
@@ -249,7 +254,21 @@ export class TouchableOpacity implements IAngularTouchableOpacityProps {
   // the commit layer flattens). `unknown` because the array mixes a plain style with an
   // AnimatedNode, exactly the bag AnimatedView's `style` input accepts.
   get animatedStyle(): unknown {
-    return [anchorHostStyle(this.elementRef), this.style, { opacity: this.opacity }];
+    return [this.anchorStyle(), this.style, { opacity: this.opacity }];
+  }
+
+  // The anchor's class-derived style is written by the renderer's addClass/removeClass at the USE
+  // SITE - it never appears in SimpleChanges, and nothing about it dirties THIS component's view.
+  // A `class=` present at creation therefore worked, while one toggled later did not: the parent
+  // refreshed, the class landed on the anchor, and this component's own view was never refreshed,
+  // so whatever merged the anchor style in was never re-evaluated. Polling it into a signal from
+  // ngDoCheck fixes both halves: ngDoCheck runs during the PARENT's refresh even when this view is
+  // skipped, and the signal write is what then marks this view for refresh. `signal.set`'s own
+  // Object.is makes an unchanged poll a no-op, so there is no loop.
+  private readonly anchorStyle = signal<unknown>(undefined);
+
+  ngDoCheck(): void {
+    this.anchorStyle.set(anchorHostStyle(this.elementRef));
   }
 
   private setOpacityTo(toValue: number, duration: number): void {
@@ -304,11 +323,12 @@ export class TouchableOpacity implements IAngularTouchableOpacityProps {
 @Component({
   selector: 'TouchableHighlight',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   imports: [Pressable],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <Pressable
-      [style]="pressedStyle"
+      [style]="pressedStyle()"
       (press)="press.emit($event)"
       (pressIn)="pressIn.emit($event)"
       (pressOut)="pressOut.emit($event)"
@@ -377,7 +397,7 @@ export class TouchableOpacity implements IAngularTouchableOpacityProps {
     </Pressable>
   `,
 })
-export class TouchableHighlight implements IAngularTouchableHighlightProps {
+export class TouchableHighlight implements IAngularTouchableHighlightProps, OnChanges, DoCheck {
   @Output() readonly press = new EventEmitter<ISymbioteEvent>();
   @Output() readonly pressIn = new EventEmitter<ISymbioteEvent>();
   @Output() readonly pressOut = new EventEmitter<ISymbioteEvent>();
@@ -458,20 +478,46 @@ export class TouchableHighlight implements IAngularTouchableHighlightProps {
   // [style] still beats the ambient class. When pressed, paint the underlay color + lower the
   // child opacity (RN drives this with setState, not Animated, so we mirror that faithfully
   // through Pressable's pressed flag, no tween) — the overlay always goes last so it wins.
-  pressedStyle = (state: IPressState): IStyleProp<IViewStyle> => {
-    const base: IStyleProp<IViewStyle> = [anchorStyleProp<IViewStyle>(this.elementRef), this.style];
-    return highlightPressedStyle(
-      state.pressed,
-      base,
-      this.underlayColor ?? DEFAULT_UNDERLAY_COLOR,
-      this.activeOpacity ?? DEFAULT_HIGHLIGHT_CHILD_OPACITY,
-    );
-  };
+  // A computed that RETURNS A NEW ARROW when its dependencies move, not one stable arrow forever.
+  // The stable-arrow form was silently frozen: Pressable's `style` @Input never reported a change,
+  // so Pressable's view never refreshed and never re-invoked the arrow - a class or [style]
+  // toggled after mount never reached the committed view. Reading the anchor signal from inside
+  // the arrow body instead would have worked by accident, by registering THIS component's signal
+  // on Pressable's consumer; returning a new reference keeps the dependency where it belongs, in
+  // an ordinary input change.
+  readonly pressedStyle = computed<(state: IPressState) => IStyleProp<IViewStyle>>(() => {
+    this.inputsRevision();
+    const base: IStyleProp<IViewStyle> = [this.anchorStyle(), this.style];
+    const underlayColor = this.underlayColor ?? DEFAULT_UNDERLAY_COLOR;
+    const childOpacity = this.activeOpacity ?? DEFAULT_HIGHLIGHT_CHILD_OPACITY;
+    return (state: IPressState): IStyleProp<IViewStyle> =>
+      highlightPressedStyle(state.pressed, base, underlayColor, childOpacity);
+  });
+
+  // `style`, `underlayColor` and `activeOpacity` are read untracked inside that computed, so the
+  // bump is what tells it they moved. See the ngDoCheck note below for the anchor half, which
+  // ngOnChanges cannot cover.
+  private readonly inputsRevision = signal(0);
+  private readonly anchorStyle = signal<IStyleProp<IViewStyle> | undefined>(undefined);
+
+  ngOnChanges(): void {
+    this.inputsRevision.update(revision => revision + 1);
+  }
+
+  // The anchor's class-derived style is written by the renderer's addClass/removeClass at the USE
+  // SITE - it never appears in SimpleChanges, and nothing about it dirties THIS component's view.
+  // ngDoCheck runs during the PARENT's refresh even when this view is skipped, and the signal
+  // write is what then marks this view for refresh. `signal.set`'s own Object.is makes an
+  // unchanged poll a no-op, so there is no loop.
+  ngDoCheck(): void {
+    this.anchorStyle.set(anchorStyleProp<IViewStyle>(this.elementRef));
+  }
 }
 
 @Component({
   selector: 'TouchableWithoutFeedback',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   imports: [Pressable],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -545,7 +591,7 @@ export class TouchableHighlight implements IAngularTouchableHighlightProps {
     </Pressable>
   `,
 })
-export class TouchableWithoutFeedback implements IAngularTouchableWithoutFeedbackProps {
+export class TouchableWithoutFeedback implements DoCheck, IAngularTouchableWithoutFeedbackProps {
   // delayPressIn/delayPressOut/minPressDuration ride the prop type for surface parity with the
   // other two, but TouchableWithoutFeedback has no visual feedback, so nothing schedules off them
   // (RN's TouchableWithoutFeedback is the same pure passthrough).
@@ -624,6 +670,20 @@ export class TouchableWithoutFeedback implements IAngularTouchableWithoutFeedbac
   // The anchor's class-derived style goes first, then the explicit style, so an explicit [style]
   // still beats the ambient class.
   get mergedStyle(): IStyleProp<IViewStyle> {
-    return [anchorStyleProp<IViewStyle>(this.elementRef), this.style];
+    return [this.anchorStyle(), this.style];
+  }
+
+  // The anchor's class-derived style is written by the renderer's addClass/removeClass at the USE
+  // SITE - it never appears in SimpleChanges, and nothing about it dirties THIS component's view.
+  // A `class=` present at creation therefore worked, while one toggled later did not: the parent
+  // refreshed, the class landed on the anchor, and this component's own view was never refreshed,
+  // so whatever merged the anchor style in was never re-evaluated. Polling it into a signal from
+  // ngDoCheck fixes both halves: ngDoCheck runs during the PARENT's refresh even when this view is
+  // skipped, and the signal write is what then marks this view for refresh. `signal.set`'s own
+  // Object.is makes an unchanged poll a no-op, so there is no loop.
+  private readonly anchorStyle = signal<IStyleProp<IViewStyle> | undefined>(undefined);
+
+  ngDoCheck(): void {
+    this.anchorStyle.set(anchorStyleProp<IViewStyle>(this.elementRef));
   }
 }

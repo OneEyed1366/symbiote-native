@@ -27,6 +27,7 @@ export {
   stableAnchorStyle,
   Switch,
   SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
   Text,
   TextInput,
   TouchableHighlight,

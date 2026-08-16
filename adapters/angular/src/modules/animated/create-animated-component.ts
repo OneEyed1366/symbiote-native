@@ -1,22 +1,18 @@
-// createAnimatedComponent for @symbiote-native/angular: the Angular twin of the React/Vue
-// wrapper. React/Vue have a runtime HOC (`createAnimatedComponent(Component)` builds a
-// fresh wrapped component on the fly). Angular has NO such idiom AND it cannot have one:
-// the AOT-under-Metro build compiles every @Component at build
-// time and ships NO JIT compiler to Hermes, so a runtime `Component({...})(class)` would
-// throw. The idiomatic, AOT-safe equivalent is therefore an EXPLICIT set of standalone
-// components — AnimatedView / AnimatedText / AnimatedImage / AnimatedScrollView — each a
-// thin @Component over the matching host primitive, all sharing one abstract lifecycle
-// base. The mechanism (build an AnimatedProps leaf, reduce animated props to current
-// values for the first paint, bind the leaf to the committed host node, swap leaves on
-// re-render, tear down on destroy) lives once in AnimatedComponentBase; only the per-host
-// template differs.
+// createAnimatedComponent for @symbiote-native/angular. React/Vue have a runtime HOC
+// (`createAnimatedComponent(Component)` builds a fresh wrapped component on the fly); Angular
+// can't — the AOT-under-Metro build compiles every @Component ahead of time and ships no JIT
+// compiler to Hermes, so a runtime `Component({...})(class)` would throw. The AOT-safe
+// equivalent is an EXPLICIT set of standalone components — AnimatedView / AnimatedText /
+// AnimatedImage / AnimatedScrollView — each a thin @Component over the matching host primitive,
+// sharing one abstract lifecycle base. The mechanism (build an AnimatedProps leaf, reduce
+// animated props to current values for the first paint, bind the leaf to the committed host
+// node, swap leaves on re-render, tear down on destroy) lives once in AnimatedComponentBase.
 //
 // The framework-agnostic half (reduceProps / readPassthroughStyle / resolveHostNode /
 // AnimatedProps / attachNativeEventHandler / isNativeAnimatedAvailable) comes from
-// @symbiote-native/engine, shared verbatim with React and Vue. Angular supplies
-// only the lifecycle wiring. The per-frame path NEVER goes through Angular change
-// detection: value.setValue / animation -> flushValue -> AnimatedProps.update() ->
-// setNativeProps(node), exactly as on the other adapters.
+// @symbiote-native/engine, shared with React and Vue. The per-frame path NEVER goes through
+// Angular change detection: value.setValue / animation -> flushValue -> AnimatedProps.update()
+// -> setNativeProps(node), same as the other adapters.
 
 import {
   ChangeDetectionStrategy,
@@ -25,8 +21,10 @@ import {
   Directive,
   ElementRef,
   inject,
+  signal,
   ViewChild,
   type AfterViewInit,
+  type DoCheck,
   type OnChanges,
   type OnDestroy,
   type Type,
@@ -43,11 +41,12 @@ import { selectScrollIntrinsics } from '@symbiote-native/components';
 import { Image, ScrollView, Text, View } from '../../components';
 import {
   anchorHostStyle,
-  ViewHost,
-  TextHost,
   ImageHost,
   ScrollViewHost,
   SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
+  TextHost,
+  ViewHost,
 } from '../../primitives';
 import { FlatList } from '../../components/flat-list';
 import {
@@ -67,9 +66,8 @@ const PASSTHROUGH_PROP = 'passthroughAnimatedPropExplicitValues';
 // The inputs every animated wrapper accepts. `style` is the (possibly animated) style — the
 // common path (TouchableOpacity passes `[style, { opacity }]`). `animatedProps` is the generic
 // escape hatch for any OTHER prop that may hold an AnimatedNode or an Animated.event handler,
-// plus static host props to forward (the React/Vue `rest`). The passthrough drives native.
-// Each concrete @Component re-lists these (Angular's inputs-on-base convention, mirroring
-// Switch/Image), so they are inherited consistently.
+// plus static host props to forward (the React/Vue `rest`). Each concrete @Component re-lists
+// these (Angular's inputs-on-base convention, mirroring Switch/Image).
 export const ANIMATED_INPUTS = ['style', 'animatedProps', PASSTHROUGH_PROP];
 export const ANIMATED_IMAGE_INPUTS = [...IMAGE_INPUTS, 'animatedProps', PASSTHROUGH_PROP];
 
@@ -79,7 +77,7 @@ export const ANIMATED_IMAGE_INPUTS = [...IMAGE_INPUTS, 'animatedProps', PASSTHRO
 // @Directive() (no selector) is the Angular-sanctioned decorator for an abstract base that
 // declares lifecycle hooks — without it ngtsc rejects the inherited hooks (NG2007).
 @Directive()
-export abstract class AnimatedComponentBase implements AfterViewInit, OnChanges, OnDestroy {
+export abstract class AnimatedComponentBase implements AfterViewInit, DoCheck, OnChanges, OnDestroy {
   style: unknown;
   animatedProps: Record<string, unknown> | undefined;
   passthroughAnimatedPropExplicitValues: unknown;
@@ -115,8 +113,27 @@ export abstract class AnimatedComponentBase implements AfterViewInit, OnChanges,
       reduced['style'] =
         reduced['style'] === undefined ? passthroughStyle : [reduced['style'], passthroughStyle];
     }
-    reduced['style'] = [anchorHostStyle(this.elementRef), reduced['style']];
+    reduced['style'] = [this.anchorStyle(), reduced['style']];
     return reduced;
+  }
+
+  // The anchor's class-derived style, polled rather than read live inside `reducedProps`.
+  //
+  // Two different writers land style on this component's anchor and NEITHER goes through
+  // ngOnChanges: `class=` / `[class.x]` / `[ngClass]` at the use site (via the renderer's
+  // addClass/removeClass -> commitClassStyle), and a `[style]` binding from a composing parent
+  // that Angular writes as a host property because `style` is not declared as an @Input here.
+  // Reading them live in the getter worked at CREATION only - nothing dirties THIS view when the
+  // anchor changes, so the getter was never re-read and the update was lost. Device-visible as a
+  // TouchableOpacity whose `class` toggled after mount never repainted.
+  //
+  // ngDoCheck runs during the PARENT's refresh even when this view is skipped, and the signal
+  // write is what then marks this view for refresh. `signal.set`'s own Object.is makes an
+  // unchanged poll a no-op, so a steady screen costs one property read per pass and nothing else.
+  private readonly anchorStyle = signal<unknown>(undefined);
+
+  ngDoCheck(): void {
+    this.anchorStyle.set(anchorHostStyle(this.elementRef));
   }
 
   ngAfterViewInit(): void {
@@ -167,6 +184,7 @@ export abstract class AnimatedComponentBase implements AfterViewInit, OnChanges,
 @Component({
   selector: 'AnimatedView, symbiote-animated-view',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SymbioteHostPropsDirective, ViewHost],
   inputs: ANIMATED_INPUTS,
@@ -182,6 +200,7 @@ export class AnimatedView extends AnimatedComponentBase {}
 @Component({
   selector: 'AnimatedText, symbiote-animated-text',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SymbioteHostPropsDirective, TextHost],
   inputs: ANIMATED_INPUTS,
@@ -197,6 +216,7 @@ export class AnimatedText extends AnimatedComponentBase {}
 @Component({
   selector: 'AnimatedImage, symbiote-animated-image',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SymbioteHostPropsDirective, ImageHost],
   inputs: ANIMATED_IMAGE_INPUTS,
@@ -251,6 +271,25 @@ export class AnimatedImage extends ImageBase implements AfterViewInit, OnChanges
     return resolved;
   }
 
+  // The anchor's class-derived style, polled rather than read live inside `reducedProps`.
+  //
+  // Two different writers land style on this component's anchor and NEITHER goes through
+  // ngOnChanges: `class=` / `[class.x]` / `[ngClass]` at the use site (via the renderer's
+  // addClass/removeClass -> commitClassStyle), and a `[style]` binding from a composing parent
+  // that Angular writes as a host property because `style` is not declared as an @Input here.
+  // Reading them live in the getter worked at CREATION only - nothing dirties THIS view when the
+  // anchor changes, so the getter was never re-read and the update was lost. Device-visible as a
+  // TouchableOpacity whose `class` toggled after mount never repainted.
+  //
+  // ngDoCheck runs during the PARENT's refresh even when this view is skipped, and the signal
+  // write is what then marks this view for refresh. `signal.set`'s own Object.is makes an
+  // unchanged poll a no-op, so a steady screen costs one property read per pass and nothing else.
+  private readonly anchorStyle = signal<unknown>(undefined);
+
+  ngDoCheck(): void {
+    this.anchorStyle.set(anchorHostStyle(this.elementRef));
+  }
+
   ngAfterViewInit(): void {
     this.viewReady = true;
     this.reconcile();
@@ -291,6 +330,7 @@ export class AnimatedImage extends ImageBase implements AfterViewInit, OnChanges
 @Component({
   selector: 'AnimatedScrollView, symbiote-animated-scroll-view',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SymbioteHostPropsDirective, ScrollViewHost],
   inputs: ANIMATED_INPUTS,
@@ -305,20 +345,17 @@ export class AnimatedImage extends ImageBase implements AfterViewInit, OnChanges
 })
 export class AnimatedScrollView extends AnimatedComponentBase {
   // RN defaults nested scrolling ON (ScrollView.js `nestedScrollEnabled ?? true`) — Android
-  // needs it explicit or a ScrollView nested inside another scrollable container never
-  // receives touch (swallowed by the outer scroll view; iOS doesn't gate on this). The real
-  // ScrollView component already defaults this (scroll-view/shared.ts), but AnimatedScrollView
-  // talks to the raw primitive directly and has no such defaulting, so it must apply it too.
+  // needs it explicit or a nested ScrollView never receives touch (swallowed by the outer one;
+  // iOS doesn't gate on this). The real ScrollView component already defaults this
+  // (scroll-view/shared.ts), but AnimatedScrollView talks to the raw primitive directly and
+  // must apply it too.
   //
-  // scrollViewBaseStyle (overflow: 'scroll' + the per-axis flexDirection) is the OTHER thing
-  // the real ScrollView applies that this bespoke template used to skip entirely — without it,
-  // iOS Fabric never clips the scroll view's content to its own frame (Android's native
-  // ViewGroup clips regardless of the style prop, which is why this was invisible there). This
-  // wrapper has no dedicated `horizontal` input (only the generic `animatedProps`/`style`
-  // surface), and its template is hardcoded to the vertical intrinsics
-  // (symbiote-scroll-view/symbiote-scroll-content, not the horizontal variants), so
-  // selectScrollIntrinsics is always called with isHorizontal=false here — matching what the
-  // template can actually render.
+  // scrollViewBaseStyle (overflow: 'scroll' + the per-axis flexDirection) is the other thing the
+  // real ScrollView applies that this bespoke template used to skip — without it, iOS Fabric
+  // never clips content to the scroll view's frame (invisible on Android, whose native ViewGroup
+  // clips regardless of style). This wrapper has no `horizontal` input and its template is
+  // hardcoded to the vertical intrinsics, so selectScrollIntrinsics is always called with
+  // isHorizontal=false here, matching what the template can actually render.
   override get reducedProps(): Record<string, unknown> {
     const reduced = super.reducedProps;
     const { scrollViewBaseStyle } = selectScrollIntrinsics(false, undefined);
