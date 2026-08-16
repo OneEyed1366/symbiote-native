@@ -35,6 +35,16 @@ const SWITCH_OUT = join(__dirname, '.smoke-compiled-switch.mjs');
 const REJECT_OUT = join(__dirname, '.smoke-compiled-reject-parent.mjs');
 const ACCEPT_OUT = join(__dirname, '.smoke-compiled-accept-parent.mjs');
 const BIND_OUT = join(__dirname, '.smoke-compiled-bind-parent.mjs');
+const COLOR_OUT = join(__dirname, '.smoke-compiled-color-parent.mjs');
+
+// The iOS mapping switch-platform.ts resolves to under vitest, spelled out so the assertions
+// below read as the contract rather than as echoes of the source they check.
+const TRACK_ON = '#81b0ff';
+const TRACK_OFF = '#767577';
+const THUMB = '#f5dd4b';
+const IOS_BACKGROUND = '#3e3e3e';
+const IOS_BACKGROUND_BORDER_RADIUS = 16;
+const STYLE_MARGIN_TOP = 8;
 
 const fabric = installFabric();
 const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
@@ -49,6 +59,7 @@ afterEach(() => {
   rmSync(REJECT_OUT, { force: true });
   rmSync(ACCEPT_OUT, { force: true });
   rmSync(BIND_OUT, { force: true });
+  rmSync(COLOR_OUT, { force: true });
 });
 
 const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
@@ -154,6 +165,33 @@ async function loadBindMountable(): Promise<Component> {
   return mod.default as Component;
 }
 
+// Every prop shape that Svelte's own attribute machinery would mangle if the adapter ever
+// stopped routing props through the single `p={bag}` property: an `on`-prefixed COLOR and an
+// object `style`. See the colour test below for what each one proves.
+async function loadColorMountable(): Promise<Component> {
+  compileSwitch();
+  compileToFile(
+    `<script>
+       import Switch from './.smoke-compiled-switch.mjs';
+     </script>
+     <Switch
+       value={true}
+       onValueChange={() => {}}
+       trackColor={{ true: '${TRACK_ON}', false: '${TRACK_OFF}' }}
+       thumbColor="${THUMB}"
+       ios_backgroundColor="${IOS_BACKGROUND}"
+       style={{ marginTop: ${STYLE_MARGIN_TOP} }} />`,
+    'ColorParent.svelte',
+    COLOR_OUT,
+  );
+
+  const mod: unknown = await import(`file://${COLOR_OUT}`);
+  if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
+    throw new Error('ColorParent.svelte produced no default export');
+  }
+  return mod.default as Component;
+}
+
 describe('Switch (real compiled index.svelte)', () => {
   // why: the initial commit must reflect whatever value the parent seeded, proving the
   // `fabricValue` fold + renderSwitch() wiring reaches the real intrinsic tag through the
@@ -246,5 +284,34 @@ describe('Switch (real compiled index.svelte)', () => {
 
     expect(reads.at(-1)).toBe(true);
     expect(fabric.commands).toHaveLength(0);
+  });
+
+  // why: `onTintColor` is the one prop in the whole component surface whose NAME lies about its
+  // kind — a framework that infers events from an `on` prefix eats it and iOS loses its ON-track
+  // colour. Nothing here does: props ride to the host as one object through `p={bag}`, so Svelte
+  // never inspects a key, and the engine decides prop-vs-listener from Switch's ViewConfig, which
+  // declares `change` as its only event (core/engine/src/view-config.ts). React, Vue and Angular
+  // each pin this; Svelte did not, and the seam it depends on is Svelte-specific.
+  //
+  // The same mount pins the object `style`: `set_custom_element_data` stringifies a scalar and
+  // hard-excludes `style`, so a style that ever reached it as an ATTRIBUTE would arrive as
+  // "[object Object]" and every key below would be missing. They land flattened, which is proof
+  // the object went through the property path instead.
+  it('lands the on-prefixed track colour and an object style as PROPS, not as an event', async () => {
+    const ColorParent = await loadColorMountable();
+    mount(ROOT_TAG, ColorParent, {});
+    await tick();
+    await tick();
+
+    const props = committedSwitch().props;
+    expect(props.onTintColor).toBe(TRACK_ON);
+    expect(props.tintColor).toBe(TRACK_OFF);
+    expect(props.thumbTintColor).toBe(THUMB);
+    // ios_backgroundColor folds into the style array (render-switch.ts's foldIosBackground), so
+    // seeing both it and the caller's own margin proves the whole array flattened, not just the
+    // last entry.
+    expect(props.marginTop).toBe(STYLE_MARGIN_TOP);
+    expect(props.backgroundColor).toBe(IOS_BACKGROUND);
+    expect(props.borderRadius).toBe(IOS_BACKGROUND_BORDER_RADIUS);
   });
 });
