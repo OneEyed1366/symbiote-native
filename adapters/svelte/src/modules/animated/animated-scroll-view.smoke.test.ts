@@ -49,7 +49,12 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 function compileToFile(source: string, filename: string, outPath: string): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
@@ -100,7 +105,7 @@ async function loadParent(): Promise<Component> {
        });
      </script>
      <AnimatedScrollView bind:this={handle} style={{ height: 200 }}>
-       <symbiote-view p={{}}></symbiote-view>
+       <symbiote-view></symbiote-view>
      </AnimatedScrollView>`,
     'AnimatedScrollParent.svelte',
     PARENT_OUT,

@@ -40,7 +40,12 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 function compileToFile(source: string, filename: string, outPath: string): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
@@ -61,7 +66,7 @@ async function loadMountable(): Promise<Component> {
      </script>
      <Pressable {onPress} {onPressIn} {onPressOut}>
        {#snippet children(state)}
-         <symbiote-view p={{ testID: state.pressed ? 'pressed' : 'idle' }} />
+         <symbiote-view testID={state.pressed ? 'pressed' : 'idle'} />
        {/snippet}
      </Pressable>`,
     'Parent.svelte',

@@ -80,7 +80,12 @@ const ROOT_TAG = 91_811;
 // relative imports ('../runes/attachments'), which only resolve from that directory.
 const VIEW_OUT = join(__dirname, 'components', '.smoke-compiled-class-value-view.mjs');
 const PARENT_OUT = join(__dirname, 'components', '.smoke-compiled-class-value-parent.mjs');
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 const fabric = installFabric();
 const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));

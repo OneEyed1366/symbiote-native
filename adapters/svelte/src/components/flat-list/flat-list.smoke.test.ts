@@ -13,8 +13,8 @@ import { installFabric } from '@symbiote-native/test-utils';
 import type { IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
-// fabric.find() walks the CREATION log, which never reflects a later clone's props
-// (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must instead
+// fabric.find() walks the CREATION log, which never reflects a later clone's props (the engine's
+// own clone-on-write, unrelated to the compiler/renderer) — a live-value assertion must instead
 // walk the currently COMMITTED tree.
 function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeNode | undefined {
   if (predicate(node)) return node;
@@ -88,7 +88,12 @@ afterEach(() => {
   rmSync(REFRESH_ROOT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 function compileToFile(source: string, filename: string, outPath: string): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
@@ -148,8 +153,7 @@ function compileFlatListWithVirtualizedList(): void {
 
   // Redirect FlatList's real `'../virtualized-list/index.svelte'` import to the compiled sibling
   // written above (compile() does not rewrite import specifiers, and plain Node ESM cannot import
-  // a raw .svelte file — no svelte-aware loader is wired into this repo's vitest, per the
-  // svelte-adapter-dom-shim skill §15's "no .svelte-aware bundler" note).
+  // a raw .svelte file — no svelte-aware loader is wired into this repo's vitest).
   const rawFlatSource = readFileSync(join(__dirname, 'index.svelte'), 'utf8');
   const flatSource = rawFlatSource.replace(
     "'../virtualized-list/index.svelte'",

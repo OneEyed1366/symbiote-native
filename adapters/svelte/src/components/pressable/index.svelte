@@ -5,16 +5,16 @@
   // render decisions (the responder listeners, the disabled->accessibilityState fold, the
   // ripple prop) in @symbiote-native/components/view, shared verbatim with React and Vue. Here
   // runes supply the reactivity: `$state` holds `pressed`, a plain setup-scope object (created
-  // once, like Vue's) holds the press runtime, and `$state.raw` holds the responder's ShimElement
+  // once, like Vue's) holds the press runtime, and `$state.raw` holds the responder's host node
   // by IDENTITY so the machine can measure through it (same shallowRef-not-ref concern as Vue's
-  // pressable.ts / Switch's own hostShim — a deep-proxied `$state` object would miss the engine's
+  // pressable.ts / Switch's own hostRef — a deep-proxied `$state` object would miss the engine's
   // WeakMap mirror lookup).
   //
   // Pressable owns no `renderPressable()` Descriptor factory (unlike Switch's fixed-shape
   // `renderSwitch()`) — core/components/src/view/render-pressable only resolves the responder-
   // listener bag and the accessibilityState fold, so this hand-authors the host node directly,
   // close to View.svelte's own shape, wiring the press responder listeners onto it instead of
-  // importing View.svelte (which has no `bind:this` escape hatch for the raw ShimElement the
+  // importing View.svelte (which has no `{@attach}` escape hatch for the raw host node the
   // measure handle needs).
   import type { IPressableProps } from './pressable-props';
 
@@ -34,9 +34,8 @@
     type IPressHost,
     type IPressState,
   } from '@symbiote-native/components';
-  import { measure, type ISymbioteNode } from '@symbiote-native/engine';
-  import type { ShimElement } from '../../dom-shim';
-  import { createAttachmentsSync } from '../../runes/attachments';
+  import { measure, type IHostInstance } from '@symbiote-native/engine';
+  import { toTemplateSafeProps } from '../../renderer';
 
   let {
     onPress,
@@ -67,18 +66,18 @@
   // Plain setup-scope object, never `$state`: mutated by the machine on every event, never
   // reactively read — same as Vue's setup-scope runtime.
   const runtime = createPressRuntime();
-  // `$state.raw`, NOT `$state`: holds the responder ShimElement by IDENTITY. `$state()` would
+  // `$state.raw`, NOT `$state`: holds the responder host node by IDENTITY. `$state()` would
   // deep-proxy it, and `measure()` looks the RAW node up in the engine's WeakMap mirror — a Proxy
   // wrapper misses that lookup and the retention-region measure silently no-ops.
-  let hostShim = $state.raw<ShimElement | null>(null);
+  let hostRef = $state.raw<IHostInstance | null>(null);
 
   const host: IPressHost = {
     setPressed(next: boolean): void {
       pressed = next;
     },
     getMeasureFn: () => {
-      const node: ISymbioteNode | undefined = hostShim?.engineNode;
-      if (node === undefined) return undefined;
+      if (hostRef === null) return undefined;
+      const node = hostRef;
       return callback => measure(node, callback);
     },
     schedule: (callback, ms) => {
@@ -142,16 +141,15 @@
     ...buildPressableListeners(handlers, { disabled, cancelable }),
   });
 
-  // See View.svelte's note on `{@attach}`.
-  const syncAttachments = createAttachmentsSync();
-  $effect(() => {
-    syncAttachments(hostShim, rest);
-  });
+  // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+  // TEMPLATE_KEY_UNMANGLE header comment) — renamed before the spread; `setAttributeOp`'s
+  // `realPropName()` reverses it right before `routeProp`.
+  const templateBag = $derived(toTemplateSafeProps(bag));
 </script>
 
-<symbiote-view p={bag} bind:this={hostShim}>
+<symbiote-view {...templateBag} {@attach (node) => (hostRef = node)}>
   {#if ripple !== undefined}
-    <symbiote-view p={ripple}>
+    <symbiote-view {...ripple}>
       {@render children?.(state)}
     </symbiote-view>
   {:else}

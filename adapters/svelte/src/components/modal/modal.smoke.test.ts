@@ -68,7 +68,12 @@ afterEach(() => {
   rmSync(HIDDEN_PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 function compileToFile(source: string, filename: string, outPath: string): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
@@ -114,7 +119,7 @@ async function loadDismissible(): Promise<Component> {
   // exactly the transition state/modal.ts's keep-alive reducer exists to survive. Written on one
   // line so the compiler emits no incidental whitespace-only text nodes between the tags.
   compileToFile(
-    `<script>import Modal from './.smoke-compiled-modal.mjs';let visible = $state(true);</script><Modal {visible} onRequestClose={() => { visible = false; }}><symbiote-view p={{}} /></Modal>`,
+    `<script>import Modal from './.smoke-compiled-modal.mjs';let visible = $state(true);</script><Modal {visible} onRequestClose={() => { visible = false; }}><symbiote-view /></Modal>`,
     'DismissibleParent.svelte',
     DISMISSIBLE_PARENT_OUT,
   );
@@ -124,7 +129,7 @@ async function loadDismissible(): Promise<Component> {
 async function loadHidden(): Promise<Component> {
   compileModal();
   compileToFile(
-    `<script>import Modal from './.smoke-compiled-modal.mjs';</script><Modal visible={false}><symbiote-view p={{}} /></Modal>`,
+    `<script>import Modal from './.smoke-compiled-modal.mjs';</script><Modal visible={false}><symbiote-view /></Modal>`,
     'HiddenParent.svelte',
     HIDDEN_PARENT_OUT,
   );

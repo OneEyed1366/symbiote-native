@@ -84,7 +84,12 @@ afterEach(() => {
   rmSync(STICKY_ROOT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 function compileToFile(source: string, filename: string, outPath: string): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
@@ -276,7 +281,7 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
          function getItem(source, index) { return source[index]; }
          function getItemCount(source) { return source.length; }
        </script>
-       {#snippet cell()}<symbiote-text p={{}}>row</symbiote-text>{/snippet}
+       {#snippet cell()}<symbiote-text>row</symbiote-text>{/snippet}
        <VirtualizedList
          data={['a', 'b', 'c']}
          {getItem}

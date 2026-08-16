@@ -37,7 +37,7 @@
 
 <Pressable {...rest}>
   {#snippet children()}
-    <symbiote-view p={nativeProps}>
+    <symbiote-view {...nativeProps}>
       {@render content?.()}
     </symbiote-view>
   {/snippet}

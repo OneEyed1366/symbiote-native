@@ -14,9 +14,33 @@
 // `rest_props` and `spread_props` expose symbol keys through their `ownKeys` traps, so
 // `Object.getOwnPropertySymbols()` over `$props()` — or over the `...rest` object — finds them.
 //
-// WHY IT DELEGATES TO SVELTE'S OWN `attach()` RATHER THAN CALLING THE FUNCTION DIRECTLY. A
-// DYNAMIC attachment expression does not compile to a changing prop VALUE; the compiler emits a
-// STABLE wrapper and moves the reactivity inside it:
+// `createAttachmentsSync` IS NOT ALWAYS NEEDED ANYMORE (2026-08-16). Since the DOM-shim retirement,
+// most components spread their resolved props object DIRECTLY onto a `symbiote-*` intrinsic
+// (`{...rest}`), and Svelte's own compiled spread handling ALREADY walks
+// `Object.getOwnPropertySymbols(next)` and auto-invokes any `ATTACHMENT_KEY`-tagged entry itself
+// (`dom/elements/attributes.js`, confirmed by reading the source and by observing a double-fire
+// when BOTH Svelte's auto-invocation and this module's manual sync ran on the same node). For a
+// component whose template spread target is symbol-preserving (built via `{...props}` object-
+// spread somewhere in its own chain — the common case: View/Text/Switch/Pressable/Modal/
+// ScrollView/InputAccessoryView/ActivityIndicator/KeyboardAvoidingView/Image/RefreshControl/
+// SafeAreaView), calling `createAttachmentsSync` is now REDUNDANT and was removed from those
+// components' call sites (it double-invoked every forwarded attachment).
+//
+// IT IS STILL NEEDED wherever a component's actual template spread target is built through a
+// STRING-KEYED-ONLY transform that drops symbol keys before the value ever reaches the markup —
+// confirmed cases: `reduceProps` (modules/animated/*, uses `Object.keys`), `forwardProps` in
+// text-input/index.svelte (uses `Object.entries`), virtualized-list/index.svelte's `outerBag`
+// (built via explicit field-by-field assignment, no spread of the raw props at all), and
+// image-background/index.svelte (the WRAPPER node's own props never receive `passthrough` at
+// all — only the inner Image's props do, per render-image-background.ts). These components still
+// call `createAttachmentsSync` and must keep doing so until/unless they're rewritten to route
+// attachments through `pickAttachmentProps` merged into what actually gets spread (the fix
+// `pickAttachmentProps`'s own doc comment below describes) — evaluate case by case, this is not
+// interchangeable with a blanket removal.
+//
+// THE MECHANISM (continued). WHY IT DELEGATES TO SVELTE'S OWN `attach()` RATHER THAN CALLING THE
+// FUNCTION DIRECTLY. A DYNAMIC attachment expression does not compile to a changing prop VALUE;
+// the compiler emits a STABLE wrapper and moves the reactivity inside it:
 //
 //   {@attach which === 'first' ? first : second}
 //   ->  [$.attachment()]: ($$node) => ($.get(which) === 'first' ? first : second)($$node)
@@ -34,7 +58,7 @@
 // the same call shape, as `createDescriptorChildrenSync`.
 import { attach } from 'svelte/internal/client';
 import { createAttachmentKey } from 'svelte/attachments';
-import type { ShimElement } from '../dom-shim';
+import type { ISymbioteNode } from '@symbiote-native/engine';
 
 // Read off a real key rather than hardcoded: `ATTACHMENT_KEY` lives in svelte/src/constants.js
 // and is not part of the public export surface, so a rename there would otherwise silently
@@ -42,7 +66,7 @@ import type { ShimElement } from '../dom-shim';
 // key a description at all.
 const ATTACHMENT_KEY_DESCRIPTION = createAttachmentKey().description ?? '@attach';
 
-type IAttachmentSync = (host: ShimElement | null | undefined, props: object) => void;
+type IAttachmentSync = (host: ISymbioteNode | null | undefined, props: object) => void;
 
 // Call once during component init, then drive it from an `$effect`:
 //

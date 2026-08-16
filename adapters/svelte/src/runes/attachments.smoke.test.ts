@@ -4,6 +4,28 @@
 // feature legal on a component (the compiler rejects use:/transition:/class:/style: there), so it
 // is also the only route by which a third-party Svelte action reaches a node here, via
 // `fromAction` — which the last test round-trips end to end.
+//
+// Under the official custom-renderer API the node an attachment receives IS the real
+// `ISymbioteNode` (renderer.ts's `createElementNode` grafts `toPublicInstance` at CREATION, not
+// on later insertion — svelte-adapter-custom-renderer skill §2/§4), so there is no separate
+// engine-node field to unwrap anymore.
+//
+// KNOWN FAILING (out of this file's fix scope, root-caused, not a test-writing bug): every test
+// below in the `{@attach} on a Symbiote component` describe block currently observes the
+// forwarded attachment invoked TWICE on the SAME node (verified: `events[0].node ===
+// events[1].node`), because View.svelte spreads `{...rest}` directly onto `<symbiote-view>` AND
+// separately calls `createAttachmentsSync()`'s own `$effect(() => syncAttachments(hostRef,
+// rest))` on the SAME `rest` object. Both now invoke the SAME symbol-keyed attachment: Svelte's
+// own `set_attributes` (dom/elements/attributes.js) already calls `attach(element, () => n)` for
+// any `ATTACHMENT_KEY`-tagged entry in a spread object — confirmed by reading that source — which
+// makes `createAttachmentsSync` redundant for props that are ALSO spread as `{...rest}` onto the
+// same element. Under the retired DOM-shim, spreading onto a custom element went through
+// `set_custom_element_data`, which has no such automatic attachment handling, so
+// `createAttachmentsSync` was load-bearing there; it is not anymore. Fixing this requires editing
+// `View.svelte`/`Text.svelte`/`components/switch/index.svelte` and/or `runes/attachments.ts` —
+// all explicitly out of scope for this pass (owned by a parallel component-migration effort). The
+// assertions below assert the CORRECT single-fire behavior on purpose, left red as a documented,
+// root-caused pointer to that fix rather than adjusted to accept the duplicate.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -12,9 +34,9 @@ import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
 import { createAttachmentKey } from 'svelte/attachments';
+import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
 import { mount, unmount } from '../render';
 import { pickAttachmentProps } from './attachments';
-import type { ShimElement } from '../dom-shim';
 
 if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
@@ -42,7 +64,12 @@ const TOUCHABLE_PARENT_OUT = join(
   '.smoke-compiled-attachments-touchable-parent.mjs',
 );
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 const fabric = installFabric();
 const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
@@ -66,8 +93,7 @@ function compileView(): void {
   compileToFile(readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'), 'View.svelte', VIEW_OUT);
 }
 
-// Node caches import() by path, so each differently-SOURCED parent needs its own filename
-// (svelte-adapter-dom-shim skill §15's harness gotchas).
+// Node caches import() by path, so each differently-SOURCED parent needs its own filename.
 const SWAP_PARENT = `<script>
   import View from './.smoke-compiled-attachments-view.mjs';
   let { onEvent, onCapture } = $props();
@@ -96,7 +122,7 @@ const ACTION_PARENT = `<script>
 
 interface IEvent {
   name: string;
-  node: ShimElement;
+  node: ISymbioteNode;
   value: unknown;
 }
 
@@ -105,7 +131,7 @@ type ISetter = (next: string) => void;
 let events: IEvent[] = [];
 let setValue: ISetter | null = null;
 
-function record(name: string, node: ShimElement, value?: unknown): void {
+function record(name: string, node: ISymbioteNode, value?: unknown): void {
   events.push({ name, node, value });
 }
 
@@ -150,7 +176,7 @@ describe('pickAttachmentProps', () => {
 });
 
 describe('{@attach} on a Symbiote component', () => {
-  it('invokes the attachment with the committed host ShimElement, and tears it down on unmount', async () => {
+  it('invokes the attachment with the committed real host node, and tears it down on unmount', async () => {
     compileToFile(SWAP_PARENT, 'Parent.svelte', PARENT_OUT);
     const Parent = await loadComponent(PARENT_OUT);
     mount(ROOT_TAG, Parent, { onEvent: record, onCapture: captureSetter });
@@ -159,12 +185,14 @@ describe('{@attach} on a Symbiote component', () => {
 
     expect(events.map(entry => entry.name)).toEqual(['attach:first']);
     const node = events[0].node;
-    expect(node.tagName).toBe('symbiote-view');
-    // The real proof it is the COMMITTED node, not a detached template prototype: the shim only
-    // creates an engine node on insertion into a live tree, and the fake Fabric only hands out a
-    // tag for a node it actually created.
-    expect(node.engineNode).toBeDefined();
-    expect(node.engineNode?.props.testID).toBe('attach-target');
+    // The resolved Fabric view name (descriptorFor('symbiote-view').component), not the
+    // template's intrinsic tag string.
+    expect(node.component).toBe('RCTView');
+    // The real proof it is the COMMITTED node, not a detached template prototype: it is branded
+    // (isSymbioteNode) as one of the engine's own nodes, and the fake Fabric only hands out a tag
+    // for a node it actually created — a stale/uncommitted node would never have a live testID.
+    expect(isSymbioteNode(node)).toBe(true);
+    expect(node.props.testID).toBe('attach-target');
 
     unmount(ROOT_TAG);
     expect(events.map(entry => entry.name)).toEqual(['attach:first', 'teardown:first']);
@@ -225,7 +253,7 @@ describe('{@attach} on a Symbiote component', () => {
     await tick();
 
     expect(events.map(entry => entry.name)).toEqual(['attach:touchable']);
-    expect(events[0].node.engineNode?.props.testID).toBe('touchable-target');
+    expect(events[0].node.props.testID).toBe('touchable-target');
   });
 
   it('round-trips a real Svelte action through fromAction', async () => {
@@ -237,7 +265,7 @@ describe('{@attach} on a Symbiote component', () => {
 
     expect(events.map(entry => entry.name)).toEqual(['action:init']);
     expect(events[0].value).toBe('one');
-    expect(events[0].node.engineNode?.props.testID).toBe('action-target');
+    expect(events[0].node.props.testID).toBe('action-target');
 
     setValue?.('two');
     await tick();

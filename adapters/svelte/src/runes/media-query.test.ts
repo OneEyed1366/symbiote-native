@@ -72,7 +72,7 @@ const PROBE = `<script lang="ts">
     });
   });
 </script>
-<symbiote-view p={{}} />`;
+<symbiote-view />`;
 
 interface IQueryState {
   orientation: string;
@@ -89,6 +89,7 @@ async function mountProbe(values: IQueryState[]): Promise<void> {
       fragments: 'tree',
       css: 'external',
       filename: 'MediaQueryProbe.svelte',
+      experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
     }).js.code,
   );
   const mod: unknown = await import(`file://${PROBE_OUT}`);

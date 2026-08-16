@@ -29,12 +29,13 @@
   import type { IVirtualizedListHandle, IScrollViewHandle } from '../virtualized-list/virtualized-list-props';
   import type { IFlatListProps as IProps } from './flat-list-props';
   import { pickAttachmentProps } from '../../runes/attachments';
+  import { toTemplateSafeProps } from '../../renderer';
 
   let props: IProps<ItemT> = $props();
 
   // $state.raw: the inner VirtualizedList component instance (its exports), held by identity —
-  // same concern as every other handle in this adapter (Switch's hostShim, VirtualizedList's own
-  // scrollHandle over its ShimElement).
+  // same concern as every other handle in this adapter (Switch's hostRef, VirtualizedList's own
+  // scrollHandle over its host node).
   let inner = $state.raw<IVirtualizedListHandle | null>(null);
 
   const numColumns = $derived(typeof props.numColumns === 'number' ? props.numColumns : SINGLE_COLUMN);
@@ -68,6 +69,13 @@
         : undefined,
   ]);
 
+  // A literal `style={...}` attribute on a symbiote-* intrinsic hits the SAME Svelte
+  // special-case a `style` key inside a spread does (renderer.ts's TEMPLATE_KEY_UNMANGLE header
+  // comment) — routed as one-key spreads below instead. `cellFlexProps` is a static constant
+  // (`{ flex: 1 }` never changes), computed once rather than re-derived every render.
+  const rowContainerProps = $derived(toTemplateSafeProps({ style: rowStyle }));
+  const cellFlexProps = toTemplateSafeProps({ style: { flex: 1 } });
+
   // The divider between rows shows real items (last of the row above, first of the row below), so
   // the user's `separator` snippet, typed on ItemT, sees items rather than the IRow wrapper.
   function rowSeparatorProps(entryProps: ISeparatorProps<IRow<ItemT>>): ISeparatorProps<ItemT> {
@@ -93,10 +101,9 @@
     })),
   );
 
-  // Forwarded onto the inner VirtualizedList as a component-prop spread (not a raw attribute
-  // spread on a symbiote-* host tag — that stays banned, svelte-adapter-dom-shim skill §3g(c) —
-  // this lands on another compiled Svelte COMPONENT, an ordinary prop merge). Picked field-by-
-  // field by pickAccessibilityProps, same helper VirtualizedList's own host bag uses.
+  // Forwarded onto the inner VirtualizedList as a component-prop spread — this lands on another
+  // compiled Svelte COMPONENT, an ordinary prop merge, not a symbiote-* host tag. Picked field-by-
+  // field by pickAccessibilityProps, same helper VirtualizedList's own host props use.
   const accessibilityProps = $derived(pickAccessibilityProps(props));
 
   // ---- imperative handle: delegate straight through to the inner VirtualizedList instance. ----
@@ -142,9 +149,9 @@
 </script>
 
 {#snippet rowItem({ item: row, index, separators }: { item: IRow<ItemT>; index: number; separators: ISeparators })}
-  <symbiote-view p={{ style: rowStyle }}>
+  <symbiote-view {...rowContainerProps}>
     {#each row.items as rowItem, column (props.keyExtractor ? props.keyExtractor(rowItem, row.startIndex + column) : String(row.startIndex + column))}
-      <symbiote-view p={{ style: { flex: 1 } }}>
+      <symbiote-view {...cellFlexProps}>
         {@render props.item({ item: rowItem, index: row.startIndex + column, separators })}
       </symbiote-view>
     {/each}

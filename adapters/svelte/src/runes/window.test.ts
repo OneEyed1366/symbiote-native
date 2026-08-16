@@ -85,7 +85,7 @@ const PROBE = `<script lang="ts">
     });
   });
 </script>
-<symbiote-view p={{}} />`;
+<symbiote-view />`;
 
 interface IMetrics {
   innerWidth: number;
@@ -103,6 +103,7 @@ async function mountProbe(values: IMetrics[]): Promise<void> {
       fragments: 'tree',
       css: 'external',
       filename: 'WindowProbe.svelte',
+      experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
     }).js.code,
   );
   const mod: unknown = await import(`file://${PROBE_OUT}`);

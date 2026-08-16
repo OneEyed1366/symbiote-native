@@ -36,7 +36,12 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 function compileToFile(source: string, filename: string, outPath: string): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
@@ -66,7 +71,7 @@ async function loadMountable(): Promise<Component> {
        let { visible = false } = $props();
        const tunnel = createTunnel();
      </script>
-     <symbiote-view p={{}}>{#if visible}<TunnelIn tunnel={tunnel}>{#snippet children()}<symbiote-text p={{}}>tunneled</symbiote-text>{/snippet}</TunnelIn>{/if}<TunnelOut tunnel={tunnel} /></symbiote-view>`,
+     <symbiote-view>{#if visible}<TunnelIn tunnel={tunnel}>{#snippet children()}<symbiote-text>tunneled</symbiote-text>{/snippet}</TunnelIn>{/if}<TunnelOut tunnel={tunnel} /></symbiote-view>`,
     'TunnelParent.svelte',
     PARENT_OUT,
   );

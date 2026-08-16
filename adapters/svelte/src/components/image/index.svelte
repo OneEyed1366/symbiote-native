@@ -15,9 +15,9 @@
 
 <script lang="ts">
   import { resolveAccessibilityProps } from '@symbiote-native/components';
+  import type { IHostInstance } from '@symbiote-native/engine';
   import { buildImageBag } from './image-logic';
-  import { createAttachmentsSync } from '../../runes/attachments';
-  import type { ShimElement } from '../../dom-shim';
+  import { toTemplateSafeProps } from '../../renderer';
 
   let {
     source,
@@ -55,12 +55,13 @@
     }),
   );
 
+  // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+  // TEMPLATE_KEY_UNMANGLE header comment) — renamed before the spread; `setAttributeOp`'s
+  // `realPropName()` reverses it right before `routeProp`.
+  const templateBag = $derived(toTemplateSafeProps(bag));
+
   // See View.svelte's note on `{@attach}`.
-  let hostShim = $state.raw<ShimElement | null>(null);
-  const syncAttachments = createAttachmentsSync();
-  $effect(() => {
-    syncAttachments(hostShim, passthrough);
-  });
+  let hostRef = $state.raw<IHostInstance | null>(null);
 </script>
 
-<symbiote-image p={bag} bind:this={hostShim} />
+<symbiote-image {...templateBag} {@attach (node) => (hostRef = node)} />

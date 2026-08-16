@@ -57,7 +57,12 @@ afterEach(() => {
   rmSync(REFRESH_PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 function compileToFile(source: string, filename: string, outPath: string): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
@@ -92,7 +97,7 @@ async function loadMountable(): Promise<Component> {
        });
      </script>
      <ScrollView bind:this={handle} contentContainerStyle={{ padding: 8 }}>
-       <symbiote-view p={{}}></symbiote-view>
+       <symbiote-view></symbiote-view>
      </ScrollView>`,
     'ScrollParent.svelte',
     PARENT_OUT,
@@ -169,7 +174,7 @@ describe('ScrollView (real compiled index.svelte)', () => {
          }
        </script>
        <ScrollView onScroll={onScroll}>
-         <symbiote-view p={{}}></symbiote-view>
+         <symbiote-view></symbiote-view>
        </ScrollView>`,
       'ScrollEventParent.svelte',
       EVENT_PARENT_OUT,
@@ -205,7 +210,7 @@ describe('ScrollView (real compiled index.svelte)', () => {
          import ScrollView from './.smoke-compiled-scroll-view.mjs';
        </script>
        <ScrollView refreshControl={{ refreshing: true, tintColor: 'red' }}>
-         <symbiote-view p={{}}></symbiote-view>
+         <symbiote-view></symbiote-view>
        </ScrollView>`,
       'ScrollRefreshParent.svelte',
       REFRESH_PARENT_OUT,

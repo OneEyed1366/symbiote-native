@@ -11,7 +11,7 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
@@ -40,7 +40,12 @@ afterEach(() => {
   rmSync(VIEW_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 function compileToFile(source: string, filename: string, outPath: string): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
@@ -78,6 +83,25 @@ async function loadMountable(): Promise<Component> {
   return mod.default as Component;
 }
 
+// Walks the CURRENTLY COMMITTED tree, unlike `fabric.find`, which walks the fake Fabric's
+// `created` log — every node ever createNode'd this run, clones excluded — so it keeps
+// returning the ORIGINAL pre-clone snapshot forever, stale the moment a later commit clones
+// the node with new props (mirrors modal.smoke.test.ts's own `findInCommittedTree`; the two
+// style properties here reach the wrapper/inner-Image nodes via a SECOND, `$effect`-driven
+// commit — see index.svelte's note on `requestActiveCommit` — so a `fabric.find` snapshot
+// taken after mount would miss them).
+function findInCommittedTree(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+  function walk(nodes: IFakeNode[]): IFakeNode | undefined {
+    for (const node of nodes) {
+      if (predicate(node)) return node;
+      const found = walk(node.children);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  }
+  return walk(fabric.appRoot().children);
+}
+
 describe('ImageBackground (real compiled index.svelte)', () => {
   it('commits View(RCTImageView, marker) with the wrapper dimensions proxied onto the Image', async () => {
     const Parent = await loadMountable();
@@ -85,7 +109,7 @@ describe('ImageBackground (real compiled index.svelte)', () => {
     await tick();
     await tick();
 
-    const wrapper = fabric.find(
+    const wrapper = findInCommittedTree(
       node => node.viewName === 'RCTView' && node.children.some(c => c.viewName === 'RCTImageView'),
     );
     expect(wrapper).toBeDefined();

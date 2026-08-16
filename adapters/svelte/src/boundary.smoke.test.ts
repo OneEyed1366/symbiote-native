@@ -1,7 +1,6 @@
-// Real execution of `<svelte:boundary>` against the DOM shim. Like `{#await}`, the construct was
-// only ever COMPILE-verified before this file: the preprocessor permits it and `tsc --build` sees
-// nothing, but no test in the repo had ever run `$.boundary`
-// (svelte/internal/client/dom/blocks/boundary.js).
+// Real execution of `<svelte:boundary>` against the official custom-renderer API. Like `{#await}`,
+// the construct was only ever COMPILE-verified before this file: no test in the repo had ever run
+// `$.boundary` (svelte/internal/client/dom/blocks/boundary.js).
 //
 // Boundary is the one construct that TEARS DOWN an already-committed subtree and replaces it from
 // an error handler, then can restore it via `reset()` — three tree rewrites driven from outside
@@ -11,7 +10,22 @@
 // `toBeDefined()` assertion would miss.
 //
 // Harness shape is mount-pipeline.smoke.test.ts's; every compiled artifact gets its own filename
-// because Node caches import() by path (skill §15).
+// because Node caches import() by path.
+//
+// `experimental.async: true` is REQUIRED here, not optional, even though nothing in this file
+// actually suspends: the git-pinned compiler's `SvelteBoundary.js` visitor has a real bug in its
+// NON-async, customRenderer branch (`snippet_fn.body.body.unshift(...)` at
+// `compiler/phases/3-transform/client/visitors/SvelteBoundary.js:95`, throwing `Cannot read
+// properties of undefined (reading 'body')`) that fires for ANY `<svelte:boundary>` carrying ANY
+// snippet (`failed`, `pending`, or any other name — confirmed by compiling minimal repros of
+// each) the moment `experimental.customRenderer` is set without `experimental.async`. Setting
+// `async: true` alongside `customRenderer` takes the OTHER branch of that same `if` and avoids
+// the crash entirely (confirmed by compiling the exact same source both ways). `should_defer_
+// append()` (dom/operations.js) still only defers a REACTION_RAN-flagged re-render, never a first
+// render, so this file's synchronous, single-render assertions are unaffected in practice; where
+// a later update genuinely could take the offscreen-fragment path (the {#each} mutation test),
+// `isSvelteBootstrapAnchor` below already filters the empty-text artifacts that path can leave
+// behind.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -53,6 +67,7 @@ function compileToFile(source: string, name: string, fileName?: string): string 
     filename: `${name}.svelte`,
     fragments: 'tree',
     css: 'external',
+    experimental: { async: true, customRenderer: '@symbiote-native/svelte/renderer' },
   });
   compileCounter += 1;
   const file = join(TMP_DIR, fileName ?? `${name}-${String(compileCounter)}.mjs`);
@@ -76,14 +91,31 @@ async function compileComponent(source: string, name: string): Promise<Component
   return loadComponent(compileToFile(source, name), name);
 }
 
-// root-element.ts inserts an unlabeled `symbiote-view` between the box-none AppContainer and the
-// mounted component (skill §15). Reading children off `fabric.appRoot()` rather than
+// render.ts's mount() inserts an unlabeled `symbiote-view` wrapper between the box-none
+// AppContainer and the mounted component. Reading children off `fabric.appRoot()` rather than
 // `fabric.find()` is deliberate: find() walks the creation log and would still report a subtree
 // the boundary has since torn down.
+//
+// Two EMPTY RCTRawText nodes always land here too, unrelated to anything this file exercises:
+// Svelte's own `_mount_inner` (render.js) creates `append_child(target, create_text())` as its
+// `anchor_node` whenever `mount()` is called without an explicit `anchor` option (render.ts never
+// passes one), and — when the compiled component's own top-level content has no static leading
+// element, as every fixture here doesn't — the compiler wraps it in `$.comment()`
+// (dom/template.js), whose own trailing `anchor = create_text()` marks the end of the component's
+// root effect range. Both are real `create_text('')` calls, dispatched to our renderer exactly
+// like any other text node (confirmed by reading render.js/template.js directly) — `isAnchor()`
+// only skips nodes built via `createComment`/`createAnchor`, not an empty raw-text node, so the
+// engine's commit walk does NOT skip them. Filtering by an empty string is safe here because every
+// fixture's OWN raw text always carries real content; a real empty text node is never part of this
+// file's intended markup.
+function isSvelteBootstrapAnchor(node: IFakeNode): boolean {
+  return node.viewName === 'RCTRawText' && node.props.text === '';
+}
+
 function appChildren(): IFakeNode[] {
   const wrapper = fabric.appRoot().children[0];
   expect(wrapper, 'the root wrapper symbiote-view committed').toBeDefined();
-  return wrapper?.children ?? [];
+  return (wrapper?.children ?? []).filter(child => !isSvelteBootstrapAnchor(child));
 }
 
 function testIds(): Array<unknown> {
@@ -94,11 +126,11 @@ type IThrowControl = {
   shouldThrow: boolean;
   reset: () => void;
   /**
-   * Captures the `reset` the failed snippet was handed, and returns the prop bag for the marker
-   * node. Routing the capture through the BAG expression rather than a `{@const}` is deliberate:
-   * `{@const}` compiles to a lazy `$.derived`, so a const nothing reads is never evaluated and
-   * the capture silently never happens (verified by reading the compiled output). A prop bag is
-   * always evaluated, because `set_custom_element_data` consumes it.
+   * Captures the `reset` the failed snippet was handed, and returns the attributes to spread onto
+   * the marker node. Routing the capture through this SPREAD expression rather than a `{@const}`
+   * is deliberate: `{@const}` compiles to a lazy `$.derived`, so a const nothing reads is never
+   * evaluated and the capture silently never happens (verified by reading the compiled output). A
+   * spread attribute is always evaluated, because `attribute_effect` consumes it.
    */
   failedBag: (reset: () => void) => Record<string, unknown>;
   onError: (error: unknown, reset: () => void) => void;
@@ -124,15 +156,14 @@ const THROWING_CHILD_SOURCE =
   `<script>
      let { control } = $props();
      if (control.shouldThrow) throw new Error('child exploded');
-   </script>` +
-  `<symbiote-view p={{ testID: 'child' }}><symbiote-text p={{}}>ok</symbiote-text></symbiote-view>`;
+   </script>` + `<symbiote-view testID="child"><symbiote-text>ok</symbiote-text></symbiote-view>`;
 
 describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
   it('is transparent when nothing throws — children commit, the failed snippet does not', async () => {
     const Guarded = await compileComponent(
       `<svelte:boundary>` +
-        `<symbiote-view p={{ testID: 'child' }}><symbiote-text p={{}}>ok</symbiote-text></symbiote-view>` +
-        `{#snippet failed(error, reset)}<symbiote-view p={{ testID: 'failed' }}></symbiote-view>{/snippet}` +
+        `<symbiote-view testID="child"><symbiote-text>ok</symbiote-text></symbiote-view>` +
+        `{#snippet failed(error, reset)}<symbiote-view testID="failed"></symbiote-view>{/snippet}` +
         `</svelte:boundary>`,
       'Transparent',
     );
@@ -157,7 +188,7 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
         `<svelte:boundary onerror={control.onError}>` +
         `<Child {control} />` +
         `{#snippet failed(error, reset)}` +
-        `<symbiote-view p={{ testID: 'failed' }}><symbiote-text p={{}}>{error.message}</symbiote-text></symbiote-view>` +
+        `<symbiote-view testID="failed"><symbiote-text>{error.message}</symbiote-text></symbiote-view>` +
         `{/snippet}` +
         `</svelte:boundary>`,
       'CatchingBoundary',
@@ -191,7 +222,7 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
         `<svelte:boundary>` +
         `<Child {control} />` +
         `{#snippet failed(error, reset)}` +
-        `<symbiote-view p={control.failedBag(reset)}><symbiote-text p={{}}>{error.message}</symbiote-text></symbiote-view>` +
+        `<symbiote-view {...control.failedBag(reset)}><symbiote-text>{error.message}</symbiote-text></symbiote-view>` +
         `{/snippet}` +
         `</svelte:boundary>`,
       'ResettableBoundary',
@@ -221,10 +252,10 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
          let rows = $state(control.rows);
          control.setRows = next => { rows = next; };
        </script>` +
-        `<symbiote-view p={{ testID: 'list' }}>` +
+        `<symbiote-view testID="list">` +
         `<svelte:boundary>` +
-        `{#each rows as row (row)}<symbiote-view p={{ testID: row }}><symbiote-text p={{}}>{row}</symbiote-text></symbiote-view>{/each}` +
-        `{#snippet failed(error, reset)}<symbiote-view p={{ testID: 'failed' }}></symbiote-view>{/snippet}` +
+        `{#each rows as row (row)}<symbiote-view testID={row}><symbiote-text>{row}</symbiote-text></symbiote-view>{/each}` +
+        `{#snippet failed(error, reset)}<symbiote-view testID="failed"></symbiote-view>{/snippet}` +
         `</svelte:boundary>` +
         `</symbiote-view>`,
       'BoundaryList',
@@ -238,7 +269,10 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
     await tick();
     await tick();
 
-    const listChildren = (): IFakeNode[] => appChildren()[0]?.children ?? [];
+    // Filtered for the same reason `appChildren()` is: a keyed {#each} re-render can take the
+    // async-mode offscreen-fragment path too, which leaves its own empty-text anchor behind.
+    const listChildren = (): IFakeNode[] =>
+      (appChildren()[0]?.children ?? []).filter(child => !isSvelteBootstrapAnchor(child));
     expect(listChildren().map(child => child.props.testID)).toEqual(['a', 'b', 'c']);
 
     // Reorder + grow + shrink in one update: the each-block's keyed diff moves nodes around the

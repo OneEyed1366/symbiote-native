@@ -4,10 +4,10 @@
   // shouldSnapBack, exactly like React's useReducer + Vue's ref-based reducer wiring) and
   // calls renderSwitch() itself for the prop assembly — its Descriptor is always exactly one
   // `symbiote-switch` node with zero children (core/components/src/view/render-switch.ts). Root
-  // stays a literal tag (bind:this needs a known tag); `createDescriptorChildrenSync` is still
-  // wired for its (always-empty) children, matching every other category-1 component uniformly
-  // — the same reason React still routes a childless Switch through descriptorToReact rather
-  // than special-casing it. See svelte-adapter-dom-shim skill §19.
+  // stays a literal tag (the host ref needs a known tag); `createDescriptorChildrenSync` is
+  // still wired for its (always-empty) children, matching every other category-1 component
+  // uniformly — the same reason React still routes a childless Switch through descriptorToReact
+  // rather than special-casing it.
   import type { ISwitchProps } from './switch-props';
 
   export type { ISwitchProps };
@@ -21,11 +21,10 @@
     valueFromChange,
     renderSwitch,
   } from '@symbiote-native/components';
-  import { dispatchViewCommand, dlog, type ISymbioteEvent } from '@symbiote-native/engine';
+  import { dispatchViewCommand, dlog, type ISymbioteEvent, type IHostInstance } from '@symbiote-native/engine';
   import { PLATFORM } from './switch-platform';
   import { createDescriptorChildrenSync } from '../../descriptor-to-svelte';
-  import { createAttachmentsSync } from '../../runes/attachments';
-  import type { ShimElement } from '../../dom-shim';
+  import { remapOnPrefixedValueProps } from '../../renderer';
 
   let {
     value,
@@ -39,12 +38,11 @@
     ...passthrough
   }: ISwitchProps = $props();
 
-  // $state.raw, NOT $state: this holds the shim element by IDENTITY (the same
+  // $state.raw, NOT $state: this holds the host node by IDENTITY (the same
   // shallowRef-not-ref concern Vue's switch/shared.ts documents). $state() would deep-proxy
-  // the object, and every imperative command (dispatchViewCommand) reads `.engineNode` off
-  // the RAW ShimElement the engine's WeakMap-keyed mirror actually knows about — a Proxy
-  // wrapper would miss on every lookup and silently no-op.
-  let hostShim = $state.raw<ShimElement | null>(null);
+  // the object, and every imperative command (dispatchViewCommand) reads it directly — a Proxy
+  // wrapper would miss the engine's WeakMap-keyed mirror lookup and silently no-op.
+  let hostRef = $state.raw<IHostInstance | null>(null);
   let switchState = $state(createInitialSwitchState());
 
   const fabricValue = $derived(value === true);
@@ -63,13 +61,11 @@
   // change), command the JS value back down — the controlled-Switch correction RN does via
   // SwitchCommands.setValue/setNativeValue. Mirrors React's useLayoutEffect / Vue's post-flush
   // watch; Svelte's $effect reruns whenever switchState or fabricValue changes, which is the
-  // same trigger set. Verified against a real compiled mount
-  // (mount-pipeline.smoke.test.ts + switch.smoke.test.ts): the shim's insertOne() calls
-  // makeLive() synchronously as part of the SAME appendChild the compiler emits before
-  // bind:this fires, so hostShim.engineNode is always populated by the time this first runs.
+  // same trigger set. Nodes are eagerly bound under the custom-renderer API (unlike the retired
+  // shim's lazy-until-committed ShimElement), so `hostRef` is already the real, dispatchable
+  // engine node the moment the `{@attach}` below runs.
   $effect(() => {
-    const engineNode = hostShim?.engineNode;
-    if (engineNode === undefined) return;
+    if (hostRef === null) return;
     if (!shouldSnapBack(switchState, fabricValue)) {
       dlog(
         `Switch snap-back no-op reported=${String(switchState.lastNativeReport)} value=${fabricValue}`,
@@ -79,7 +75,7 @@
     dlog(
       `Switch ${PLATFORM.snapBackCommand} snap-back reported=${String(switchState.lastNativeReport)} value=${fabricValue}`,
     );
-    dispatchViewCommand(engineNode, PLATFORM.snapBackCommand, [fabricValue]);
+    dispatchViewCommand(hostRef, PLATFORM.snapBackCommand, [fabricValue]);
   });
 
   const descriptor = $derived(
@@ -97,16 +93,15 @@
     ),
   );
 
+  // iOS's `onTintColor` (renderSwitch's own output, see switch-platform.ios.ts) collides with
+  // Svelte's on-prefix-is-always-an-event rule — renderer.ts's `remapOnPrefixedValueProps`
+  // renames it before it reaches the template spread; `setAttributeOp` reverses the rename.
+  const props = $derived(remapOnPrefixedValueProps(descriptor.props));
+
   const syncChildren = createDescriptorChildrenSync();
   $effect(() => {
-    syncChildren(hostShim, descriptor.children);
-  });
-
-  // See View.svelte's note on `{@attach}`.
-  const syncAttachments = createAttachmentsSync();
-  $effect(() => {
-    syncAttachments(hostShim, passthrough);
+    syncChildren(hostRef, descriptor.children);
   });
 </script>
 
-<symbiote-switch p={descriptor.props} bind:this={hostShim} />
+<symbiote-switch {...props} {@attach (node) => (hostRef = node)} />

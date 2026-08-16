@@ -1,25 +1,27 @@
 <script lang="ts" module>
-  // See View.svelte's header comment — same object-bag design (svelte-adapter-dom-shim
-  // skill §3g(c)). No IResponderProps here, matching every other adapter's ITextProps.
+  // See View.svelte's header comment — same per-attribute spread design
+  // (svelte-adapter-custom-renderer skill). No IResponderProps here, matching every other
+  // adapter's ITextProps.
   import type { ITextProps } from './text-props';
 
   export type { ITextProps };
 </script>
 
 <script lang="ts">
-  import { createAttachmentsSync } from '../runes/attachments';
-  import type { ShimElement } from '../dom-shim';
+  import { toTemplateSafeProps } from '../renderer';
+  import type { IHostInstance } from '@symbiote-native/engine';
 
-  let { children, ...bag }: ITextProps = $props();
+  let { children, ...rest }: ITextProps = $props();
 
-  // See View.svelte's note: `{@attach}` arrives as a symbol-keyed entry in the same rest object.
-  let hostShim = $state.raw<ShimElement | null>(null);
-  const syncAttachments = createAttachmentsSync();
-  $effect(() => {
-    syncAttachments(hostShim, bag);
-  });
+  // See View.svelte's note: `{@attach}` arrives as a symbol-keyed entry in the same rest object,
+  // and Svelte's own spread handling invokes it automatically — no manual re-sync needed.
+  let hostRef = $state.raw<IHostInstance | null>(null);
+
+  // `style` collides with Svelte's own special-cased attribute name — see renderer.ts's
+  // TEMPLATE_KEY_UNMANGLE header comment.
+  const templateProps = $derived(toTemplateSafeProps(rest));
 </script>
 
-<symbiote-text p={bag} bind:this={hostShim}>
+<symbiote-text {...templateProps} {@attach (node) => (hostRef = node)}>
   {@render children?.()}
 </symbiote-text>

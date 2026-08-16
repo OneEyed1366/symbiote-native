@@ -48,7 +48,12 @@ function appView(): IFakeNode {
   return node;
 }
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 const VIEW_OUT = join(__dirname, '.smoke-compiled-animated-view-js.mjs');
 const PARENT_OUT = join(__dirname, '.smoke-compiled-js-parent.mjs');
 

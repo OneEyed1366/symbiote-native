@@ -10,8 +10,8 @@
   // Touchable/Button pass. `tweenOpacity` below is a deliberate, documented stand-in: it
   // reproduces Animated.timing's quad-inOut curve over the SAME shared duration constants
   // directly onto the style bag via `$state`, using `setTimeout` (not `requestAnimationFrame`,
-  // which this adapter must never patch globally per the dom-shim skill §6c, and which a bare
-  // headless test sandbox does not provide) so TouchableOpacity still visibly fades. It is not
+  // which this adapter must never patch globally onto `globalThis`, and which a bare headless
+  // test sandbox does not provide) so TouchableOpacity still visibly fades. It is not
   // wired into the native Animated node graph — `useNativeDriver`-style native-thread driving is
   // NOT available here until a real Animated adapter binding lands.
   import type { ITouchableOpacityProps } from './touchable-opacity-props';
@@ -31,6 +31,7 @@
   } from '@symbiote-native/components';
   import type { ISymbioteEvent } from '@symbiote-native/engine';
   import Pressable from '../pressable/index.svelte';
+  import { toTemplateSafeProps } from '../../renderer';
 
   const TWEEN_FRAME_MS = 16;
 
@@ -113,11 +114,15 @@
   );
 
   const foldedStyle = $derived([style, { opacity }]);
+  // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+  // TEMPLATE_KEY_UNMANGLE header comment) — even a literal `style={...}` attribute (no spread)
+  // hits `$.set_style()`/`to_style()`, so this renames before the intrinsic below.
+  const innerProps = $derived(toTemplateSafeProps({ style: foldedStyle, class: className }));
 </script>
 
 <Pressable {...rest} onPressIn={handlers.handlePressIn} onPressOut={handlers.handlePressOut}>
   {#snippet children()}
-    <symbiote-view p={{ style: foldedStyle, class: className }}>
+    <symbiote-view {...innerProps}>
       {@render content?.()}
     </symbiote-view>
   {/snippet}

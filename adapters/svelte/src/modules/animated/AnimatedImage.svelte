@@ -26,12 +26,13 @@
   import { buildImageBag } from '../../components/image/image-logic';
   import { createAnimatedReconcileRuntime } from './animated-props-runtime';
   import { createAttachmentsSync } from '../../runes/attachments';
-  import type { ShimElement } from '../../dom-shim';
+  import { toTemplateSafeProps } from '../../renderer';
+  import type { IHostInstance } from '@symbiote-native/engine';
 
   let { passthroughAnimatedPropExplicitValues: passthrough, ...rest }: IAnimatedComponentProps =
     $props();
 
-  let hostShim = $state.raw<ShimElement | null>(null);
+  let hostRef = $state.raw<IHostInstance | null>(null);
 
   const wantsNative = $derived(passthrough != null && isNativeAnimatedAvailable());
 
@@ -88,14 +89,17 @@
     if (passthroughStyle !== undefined) {
       bag.style = bag.style === undefined ? passthroughStyle : [bag.style, passthroughStyle];
     }
-    return bag;
+    // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+    // TEMPLATE_KEY_UNMANGLE header comment) — renamed before the spread; `setAttributeOp`'s
+    // `realPropName()` reverses it right before `routeProp`.
+    return toTemplateSafeProps(bag);
   });
 
   const runtime = createAnimatedReconcileRuntime();
 
   $effect(() => {
     const currentRest = rest;
-    const node = hostShim?.engineNode ?? null;
+    const node = hostRef;
     runtime.reconcile(currentRest, node, wantsNative);
   });
 
@@ -104,8 +108,8 @@
   // See View.svelte's note on `{@attach}`.
   const syncAttachments = createAttachmentsSync();
   $effect(() => {
-    syncAttachments(hostShim, rest);
+    syncAttachments(hostRef, rest);
   });
 </script>
 
-<symbiote-image p={reduced} bind:this={hostShim} />
+<symbiote-image {...reduced} {@attach (node) => (hostRef = node)} />

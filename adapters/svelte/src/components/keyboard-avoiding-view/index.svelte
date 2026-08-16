@@ -26,8 +26,7 @@
     type IEventSubscription,
     type ISymbioteEvent,
   } from '@symbiote-native/engine';
-  import { createAttachmentsSync } from '../../runes/attachments';
-  import type { ShimElement } from '../../dom-shim';
+  import type { IHostInstance } from '@symbiote-native/engine';
   import {
     computeInset,
     readKeyboardFrame,
@@ -37,6 +36,7 @@
     DEFAULT_VERTICAL_OFFSET,
     type IMeasuredFrame,
   } from '@symbiote-native/components';
+  import { toTemplateSafeProps } from '../../renderer';
 
   let {
     behavior,
@@ -104,32 +104,38 @@
     }),
   );
 
-  const wrapperBag = $derived({
-    ...resolveAccessibilityProps(passthrough),
-    style: layout.wrapperStyle,
-    class: className,
-    onLayout: handleLayout,
-  });
+  // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+  // TEMPLATE_KEY_UNMANGLE header comment) — renamed before either spread below; `setAttributeOp`'s
+  // `realPropName()` reverses it right before `routeProp`.
+  const wrapperProps = $derived(
+    toTemplateSafeProps({
+      ...resolveAccessibilityProps(passthrough),
+      style: layout.wrapperStyle,
+      class: className,
+      onLayout: handleLayout,
+    }),
+  );
 
-  const innerBag = $derived(layout.kind === 'nested' ? { style: layout.innerStyle } : undefined);
+  const innerProps = $derived(
+    toTemplateSafeProps({
+      style: layout.kind === 'nested' ? layout.innerStyle : undefined,
+    }),
+  );
 
-  // See View.svelte's note on `{@attach}` — bound to the OUTER wrapper, which is the node
-  // this component's own style lands on in both the nested and flat layouts.
-  let hostShim = $state.raw<ShimElement | null>(null);
-  const syncAttachments = createAttachmentsSync();
-  $effect(() => {
-    syncAttachments(hostShim, passthrough);
-  });
+  // Bound to the OUTER wrapper, which is the node this component's own style lands on in both
+  // the nested and flat layouts. `{@attach}` forwarding happens automatically via Svelte's own
+  // spread handling on `wrapperProps` below — see View.svelte's note.
+  let hostRef = $state.raw<IHostInstance | null>(null);
 </script>
 
 {#if layout.kind === 'nested'}
-  <symbiote-view p={wrapperBag} bind:this={hostShim}>
-    <symbiote-view p={innerBag}>
+  <symbiote-view {...wrapperProps} {@attach (node) => (hostRef = node)}>
+    <symbiote-view {...innerProps}>
       {@render children?.()}
     </symbiote-view>
   </symbiote-view>
 {:else}
-  <symbiote-view p={wrapperBag} bind:this={hostShim}>
+  <symbiote-view {...wrapperProps} {@attach (node) => (hostRef = node)}>
     {@render children?.()}
   </symbiote-view>
 {/if}

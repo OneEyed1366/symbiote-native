@@ -37,7 +37,12 @@ const COMPOUND_OUT = join(__dirname, '.smoke-compiled-scoped-compound.mjs');
 const PARENT_OUT = join(__dirname, '.smoke-compiled-scoped-parent.mjs');
 const OUTPUTS = [VIEW_OUT, CARD_A_OUT, CARD_B_OUT, DYNAMIC_OUT, COMPOUND_OUT, PARENT_OUT];
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 const preprocess = scopedStyles();
 
 const fabric = installFabric();

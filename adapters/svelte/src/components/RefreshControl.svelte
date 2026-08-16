@@ -11,10 +11,9 @@
 </script>
 
 <script lang="ts">
-  import { dlog } from '@symbiote-native/engine';
+  import { dlog, type IHostInstance } from '@symbiote-native/engine';
   import { resolveAccessibilityProps } from '@symbiote-native/components';
-  import { createAttachmentsSync } from '../runes/attachments';
-  import type { ShimElement } from '../dom-shim';
+  import { toTemplateSafeProps } from '../renderer';
 
   let { children, ...rest }: IRefreshControlProps = $props();
 
@@ -23,16 +22,14 @@
   if (rest.enabled !== undefined) dlog(`RefreshControl enabled=${String(rest.enabled)} (Android-only)`);
   if (rest.onRefresh !== undefined) dlog('RefreshControl onRefresh listener wired');
 
-  const bag = $derived(resolveAccessibilityProps(rest));
+  // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+  // TEMPLATE_KEY_UNMANGLE header comment) — renamed before the spread; `setAttributeOp`'s
+  // `realPropName()` reverses it right before `routeProp`.
+  const bag = $derived(toTemplateSafeProps(resolveAccessibilityProps(rest)));
 
-  // See View.svelte's note on `{@attach}`.
-  let hostShim = $state.raw<ShimElement | null>(null);
-  const syncAttachments = createAttachmentsSync();
-  $effect(() => {
-    syncAttachments(hostShim, rest);
-  });
+  let hostRef = $state.raw<IHostInstance | null>(null);
 </script>
 
-<symbiote-refresh-control p={bag} bind:this={hostShim}>
+<symbiote-refresh-control {...bag} {@attach (node) => (hostRef = node)}>
   {@render children?.()}
 </symbiote-refresh-control>

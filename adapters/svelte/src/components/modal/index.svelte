@@ -29,9 +29,8 @@
     resolveAccessibilityProps,
     shouldRenderModal,
   } from '@symbiote-native/components';
-  import { dlog } from '@symbiote-native/engine';
-  import { createAttachmentsSync } from '../../runes/attachments';
-  import type { ShimElement } from '../../dom-shim';
+  import { dlog, type IHostInstance } from '@symbiote-native/engine';
+  import { toTemplateSafeProps } from '../../renderer';
 
   let rawProps: IModalProps = $props();
 
@@ -105,24 +104,24 @@
     const [container] = descriptor.children;
     const containerProps = typeof container === 'string' ? {} : container.props;
 
+    // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+    // TEMPLATE_KEY_UNMANGLE header comment) — `toTemplateSafeProps` renames it before either bag
+    // is spread below; `setAttributeOp`'s `realPropName()` reverses it right before `routeProp`.
     return {
-      hostBag: descriptor.props,
-      containerBag: { ...containerProps, class: className },
+      hostProps: toTemplateSafeProps(descriptor.props),
+      containerProps: toTemplateSafeProps({ ...containerProps, class: className }),
     };
   });
 
   // See View.svelte's note on `{@attach}` — bound to the modal host itself, the node this
   // component owns (the inner container view is Modal's own structural child).
-  let hostShim = $state.raw<ShimElement | null>(null);
-  const syncAttachments = createAttachmentsSync();
-  $effect(() => {
-    syncAttachments(hostShim, rawProps);
-  });
+  let hostRef = $state.raw<IHostInstance | null>(null);
+  let containerRef = $state.raw<IHostInstance | null>(null);
 </script>
 
 {#if shouldRender}
-  <symbiote-modal p={root.hostBag} bind:this={hostShim}>
-    <symbiote-view p={root.containerBag}>
+  <symbiote-modal {...root.hostProps} {@attach (node) => (hostRef = node)}>
+    <symbiote-view {...root.containerProps} {@attach (node) => (containerRef = node)}>
       {@render rawProps.children?.()}
     </symbiote-view>
   </symbiote-modal>

@@ -13,6 +13,7 @@
 <script lang="ts">
   import { BUTTON_ACCESSIBILITY_ROLE, resolveButtonTextStyle } from '@symbiote-native/components';
   import TouchableOpacity from './touchable-opacity/index.svelte';
+  import { toTemplateSafeProps } from '../renderer';
 
   let {
     title,
@@ -32,6 +33,10 @@
   }: IButtonProps = $props();
 
   const textStyle = $derived(resolveButtonTextStyle(color, disabled));
+  // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+  // TEMPLATE_KEY_UNMANGLE header comment) — even a literal `style={...}` attribute (no spread)
+  // hits `$.set_style()`/`to_style()`, so this renames before the intrinsic below.
+  const textProps = $derived(toTemplateSafeProps({ style: textStyle }));
 
   // The native-only props TouchableOpacity does not type but forwards to Fabric (testID +
   // TV-focus). Carried as a plain record (the pass-through idiom Image/React's Button use) so
@@ -66,6 +71,6 @@
   accessibilityState={{ disabled }}
 >
   {#snippet children()}
-    <symbiote-text p={{ style: textStyle }}>{title}</symbiote-text>
+    <symbiote-text {...textProps}>{title}</symbiote-text>
   {/snippet}
 </TouchableOpacity>

@@ -1,12 +1,12 @@
 <script lang="ts" module>
   // Animated.View: wraps @symbiote-native/engine's Animated value graph around a
   // symbiote-view host tag. Hand-authors its own root tag rather than composing View.svelte —
-  // View.svelte exposes no host-node escape hatch (no bind:this on its own root, nothing
-  // exported), so there is nothing to capture a ref onto; the pattern instead mirrors
-  // Pressable/ScrollView, the adapter's existing precedent for a component that needs the raw
-  // ShimElement (svelte-adapter-dom-shim skill). Since View.svelte does no prop transformation
-  // of its own (it is a pure pass-through bag), hand-authoring here loses no logic — unlike
-  // AnimatedImage, which reuses Image's buildImageBag for exactly that reason.
+  // View.svelte exposes no host-node escape hatch (nothing exported), so there is nothing to
+  // capture a ref onto; the pattern instead mirrors Pressable/ScrollView, the adapter's existing
+  // precedent for a component that needs the raw host node (svelte-adapter-custom-renderer
+  // skill). Since View.svelte does no prop transformation of its own (it is a pure pass-through
+  // bag), hand-authoring here loses no logic — unlike AnimatedImage, which reuses Image's
+  // buildImageBag for exactly that reason.
   //
   // The reactive plumbing (leaf lifecycle, native-driver opt-in, native event attach) is shared
   // with AnimatedText/AnimatedImage/AnimatedScrollView via animated-props-runtime.ts — see this
@@ -22,7 +22,8 @@
   import { dlog, isNativeAnimatedAvailable, reduceProps, readPassthroughStyle } from '@symbiote-native/engine';
   import { createAnimatedReconcileRuntime } from './animated-props-runtime';
   import { createAttachmentsSync } from '../../runes/attachments';
-  import type { ShimElement } from '../../dom-shim';
+  import { toTemplateSafeProps } from '../../renderer';
+  import type { IHostInstance } from '@symbiote-native/engine';
 
   let {
     children,
@@ -33,7 +34,7 @@
   // $state.raw, NOT $state — same identity rule every stateful component in this adapter
   // follows (Switch/Pressable/ScrollView): a deep $state proxy would make the engine's
   // WeakMap-keyed node lookups miss.
-  let hostShim = $state.raw<ShimElement | null>(null);
+  let hostRef = $state.raw<IHostInstance | null>(null);
 
   const wantsNative = $derived(passthrough != null && isNativeAnimatedAvailable());
 
@@ -49,30 +50,32 @@
       out.style = out.style === undefined ? passthroughStyle : [out.style, passthroughStyle];
     }
     dlog(`AnimatedView reduced#${++reducedCallCount} wantsNative=${wantsNative}`);
-    return out;
+    // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+    // TEMPLATE_KEY_UNMANGLE header comment) — renamed before the spread; `setAttributeOp`'s
+    // `realPropName()` reverses it right before `routeProp`.
+    return toTemplateSafeProps(out);
   });
 
   const runtime = createAnimatedReconcileRuntime();
 
   // DIAGNOSTIC (2026-08-13, tracking the effect_update_depth_exceeded device crash): isolates
-  // whether `bind:this={hostShim}` below EVER re-fires after the initial mount. If it does — a
-  // custom-element `p` prop commit re-triggering the ref callback — that reassignment would make
-  // THIS effect's `hostShim?.engineNode` read see a "new" dependency and re-run, independent of
-  // whatever else changed, which is a plausible source of a same-flush synchronous loop that has
-  // no equivalent in React (ref callbacks)/Vue (template refs)/Angular (ViewChild). Reads ONLY
-  // hostShim, deliberately excluding `rest`, so it is unambiguous which one retriggered it.
-  let hostShimChangeCount = 0;
+  // whether `{@attach}` below EVER re-fires after the initial mount. Nodes are eagerly bound
+  // under the custom-renderer API (unlike the retired shim's lazy-until-committed ShimElement),
+  // so a re-fire here would mean the host node identity itself changed — worth keeping as a
+  // tripwire even though the original suspect (a custom-element `p` prop commit re-triggering
+  // the ref callback) no longer exists under per-prop spreading.
+  let hostRefChangeCount = 0;
   $effect(() => {
-    void hostShim;
-    dlog(`AnimatedView hostShim identity change #${++hostShimChangeCount} isNull=${hostShim === null}`);
+    void hostRef;
+    dlog(`AnimatedView hostRef identity change #${++hostRefChangeCount} isNull=${hostRef === null}`);
   });
 
-  // `rest` and `hostShim` are read unconditionally before any branch — the dependency-tracking
+  // `rest` and `hostRef` are read unconditionally before any branch — the dependency-tracking
   // discipline every $effect in this adapter follows (a guarded read drops that dependency from
-  // future re-runs; svelte-adapter-dom-shim skill). reconcile() itself handles a null node.
+  // future re-runs). reconcile() itself handles a null node.
   $effect(() => {
     const currentRest = rest;
-    const node = hostShim?.engineNode ?? null;
+    const node = hostRef;
     runtime.reconcile(currentRest, node, wantsNative);
   });
 
@@ -81,10 +84,10 @@
   // See View.svelte's note on `{@attach}`.
   const syncAttachments = createAttachmentsSync();
   $effect(() => {
-    syncAttachments(hostShim, rest);
+    syncAttachments(hostRef, rest);
   });
 </script>
 
-<symbiote-view p={reduced} bind:this={hostShim}>
+<symbiote-view {...reduced} {@attach (node) => (hostRef = node)}>
   {@render children?.()}
 </symbiote-view>

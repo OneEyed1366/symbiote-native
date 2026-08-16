@@ -14,9 +14,9 @@
 
 <script lang="ts">
   import { renderImageBackground, resolveAccessibilityProps } from '@symbiote-native/components';
-  import { resolveClassName } from '@symbiote-native/engine';
+  import { resolveClassName, type IHostInstance } from '@symbiote-native/engine';
   import { createAttachmentsSync } from '../../runes/attachments';
-  import type { ShimElement } from '../../dom-shim';
+  import { toTemplateSafeProps } from '../../renderer';
 
   let {
     children,
@@ -69,13 +69,24 @@
   });
   const wrapperBag = $derived({ ...descriptor.props, class: className });
 
+  // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+  // TEMPLATE_KEY_UNMANGLE header comment) — renamed before either bag is spread below;
+  // `setAttributeOp`'s `realPropName()` reverses it right before `routeProp`.
+  const templateImageBag = $derived(toTemplateSafeProps(imageBag));
+  const templateWrapperBag = $derived(toTemplateSafeProps(wrapperBag));
+
   // See View.svelte's note on `{@attach}` — the attachment binds to the OUTER wrapper, the node
   // this component's own `class`/`style` land on and the one a caller means by "this component".
-  let hostShim = $state.raw<ShimElement | null>(null);
+  // `innerImageRef` is a second, internal-only ref on the absolute-fill Image.
+  let hostRef = $state.raw<IHostInstance | null>(null);
+  let innerImageRef = $state.raw<IHostInstance | null>(null);
+  // passthrough never rides `wrapperBag`'s own spread (it only feeds the inner Image via
+  // renderImageBackground) — so `{@attach}` symbols inside it need this manual re-sync, unlike
+  // most components (see runes/attachments.ts's header).
   const syncAttachments = createAttachmentsSync();
   $effect(() => {
-    syncAttachments(hostShim, passthrough);
+    syncAttachments(hostRef, passthrough);
   });
 </script>
 
-<symbiote-view p={wrapperBag} bind:this={hostShim}><symbiote-image p={imageBag} />{@render children?.()}</symbiote-view>
+<symbiote-view {...templateWrapperBag} {@attach (node) => (hostRef = node)}><symbiote-image {...templateImageBag} {@attach (node) => (innerImageRef = node)} />{@render children?.()}</symbiote-view>

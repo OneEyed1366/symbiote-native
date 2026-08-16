@@ -29,7 +29,7 @@
   }: IAnimatedComponentProps = $props();
 
   // The wrapped ScrollView's own instance — its exported functions ARE its public handle
-  // (svelte-adapter-dom-shim skill's ScrollView precedent), captured by IDENTITY via bind:this,
+  // (svelte-adapter-custom-renderer skill's ScrollView precedent), captured by IDENTITY via bind:this,
   // never $state (a deep proxy would still work here since it's just function references, but
   // $state.raw stays consistent with every other imperative-handle capture in this adapter).
   let scrollRef = $state.raw<IScrollViewHandle | null>(null);

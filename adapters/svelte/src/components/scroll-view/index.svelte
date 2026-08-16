@@ -61,6 +61,7 @@
     event as animatedEvent,
     isNativeAnimatedAvailable,
     resolveClassName,
+    type IHostInstance,
     type ISymbioteEvent,
     type ISymbioteNode,
   } from '@symbiote-native/engine';
@@ -68,8 +69,7 @@
   import { PLATFORM } from './scroll-view-platform';
   import { SCROLL_VIEW_STICKY_CONTEXT_KEY } from './scroll-view-sticky-context';
   import RefreshControl from '../RefreshControl.svelte';
-  import type { ShimElement } from '../../dom-shim';
-  import { createAttachmentsSync } from '../../runes/attachments';
+  import { toTemplateSafeProps } from '../../renderer';
 
   let {
     style,
@@ -96,17 +96,19 @@
     );
   });
 
-  // $state.raw, NOT $state: holds the shim element by IDENTITY, same rule Switch's hostShim
+  // $state.raw, NOT $state: holds the host node by IDENTITY, same rule Switch's hostRef
   // documents — a deep $state proxy would make dispatchViewCommand miss the engine's WeakMap
-  // mirror and every scrollTo/scrollToEnd/flashScrollIndicators would silently no-op.
-  let hostShim = $state.raw<ShimElement | null>(null);
-  const handle: IScrollViewHandle = buildScrollViewHandle(
-    (): ISymbioteNode | null => hostShim?.engineNode ?? null,
-  );
+  // mirror and every scrollTo/scrollToEnd/flashScrollIndicators would silently no-op. Nodes are
+  // eagerly bound under the custom-renderer API (svelte-adapter-custom-renderer skill §2/§4), so
+  // `hostRef` is already the real, dispatchable engine node the moment `{@attach}` fires below.
+  let hostRef = $state.raw<IHostInstance | null>(null);
+  const handle: IScrollViewHandle = buildScrollViewHandle((): ISymbioteNode | null => hostRef);
 
-  // Plain exported functions on the instance script are what a parent's `bind:this={ref}` sees
-  // (svelte-adapter-dom-shim skill §15's Switch precedent) — the Svelte mechanism for exposing an
-  // imperative handle, the twin of React's useImperativeHandle / Vue's expose().
+  // Plain exported functions on the instance script are what a parent's `bind:this={ref}` sees —
+  // component-level `bind:this` (unlike element-level `bind:`, banned under the custom renderer,
+  // svelte-adapter-custom-renderer skill §4) is a completely different, untouched code path — the
+  // Svelte mechanism for exposing an imperative handle, the twin of React's useImperativeHandle /
+  // Vue's expose().
   export function scrollTo(options?: { x?: number; y?: number; animated?: boolean }): void {
     handle.scrollTo(options);
   }
@@ -175,9 +177,8 @@
   // for sticky headers (see the comment above); kept for other native-event-attach consumers.
   $effect(() => {
     if (!nativeStickyAvailable) return;
-    const node = hostShim?.engineNode;
-    if (node === undefined) return;
-    return attachStickyScroll(node, scrollAnimatedValue);
+    if (hostRef === null) return;
+    return attachStickyScroll(hostRef, scrollAnimatedValue);
   });
 
   const resolvedContentContainerStyle = $derived(
@@ -270,11 +271,13 @@
     ...(forwarding.collapsableChildren ? { collapsableChildren: false } : {}),
     ...(onContentSizeChange !== undefined ? { onLayout: handleContentLayout } : {}),
   }));
-  // See View.svelte's note on `{@attach}`.
-  const syncAttachments = createAttachmentsSync();
-  $effect(() => {
-    syncAttachments(hostShim, passthrough);
-  });
+
+  // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+  // TEMPLATE_KEY_UNMANGLE header comment) — renamed before either bag is spread onto its
+  // symbiote-* intrinsic below; `setAttributeOp`'s `realPropName()` reverses it right before
+  // `routeProp`.
+  const templateOuterBag = $derived(toTemplateSafeProps(outerBag));
+  const templateContentBag = $derived(toTemplateSafeProps(contentBag));
 </script>
 
 {#snippet scrollBody()}
@@ -285,22 +288,22 @@
   {#if !shouldWrapRefreshControl && refreshControl !== undefined}
     <RefreshControl {...refreshControl} />
   {/if}{#if isHorizontal}
-    <symbiote-horizontal-scroll-content p={contentBag}>{@render children?.()}</symbiote-horizontal-scroll-content>
+    <symbiote-horizontal-scroll-content {...templateContentBag}>{@render children?.()}</symbiote-horizontal-scroll-content>
   {:else}
-    <symbiote-scroll-content p={contentBag}>{@render children?.()}</symbiote-scroll-content>
+    <symbiote-scroll-content {...templateContentBag}>{@render children?.()}</symbiote-scroll-content>
   {/if}
 {/snippet}
 
 {#if shouldWrapRefreshControl && refreshControl !== undefined}
   <RefreshControl {...refreshControl} style={layoutSplit?.outer}>
     {#if isHorizontal}
-      <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-horizontal-scroll-view>
+      <symbiote-horizontal-scroll-view {...templateOuterBag} {@attach (node) => (hostRef = node)}>{@render scrollBody()}</symbiote-horizontal-scroll-view>
     {:else}
-      <symbiote-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-scroll-view>
+      <symbiote-scroll-view {...templateOuterBag} {@attach (node) => (hostRef = node)}>{@render scrollBody()}</symbiote-scroll-view>
     {/if}
   </RefreshControl>
 {:else if isHorizontal}
-  <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-horizontal-scroll-view>
+  <symbiote-horizontal-scroll-view {...templateOuterBag} {@attach (node) => (hostRef = node)}>{@render scrollBody()}</symbiote-horizontal-scroll-view>
 {:else}
-  <symbiote-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-scroll-view>
+  <symbiote-scroll-view {...templateOuterBag} {@attach (node) => (hostRef = node)}>{@render scrollBody()}</symbiote-scroll-view>
 {/if}

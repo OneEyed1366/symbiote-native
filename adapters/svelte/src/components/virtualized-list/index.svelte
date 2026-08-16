@@ -31,9 +31,11 @@
   // shape ScrollView's own index.svelte uses, just against the raw intrinsic instead of a
   // `<ScrollView>` component reference.
   //
-  // `<svelte:element>` is a forbidden construct (svelte-adapter-dom-shim skill §4/§7 — its shim
-  // surface is not implemented), so the horizontal/vertical intrinsic choice is two static branches
-  // sharing one local `{#snippet listBody()}`, not a dynamic tag.
+  // `<svelte:element>` remains legal under the custom-renderer API (svelte-adapter-custom-renderer
+  // skill §7 — only its a11y check is skipped, the dynamic-tag mechanism itself is untouched), but
+  // this file still keeps the horizontal/vertical intrinsic choice as two static branches sharing
+  // one local `{#snippet listBody()}` rather than switching to a dynamic tag — no functional need
+  // to change a working design just because the option opened up.
   import type { IVirtualizedListProps, IVirtualizedListHandle } from './virtualized-list-props';
 
   export type { IVirtualizedListProps, IVirtualizedListHandle };
@@ -82,13 +84,14 @@
     event as animatedEvent,
     isNativeAnimatedAvailable,
     resolveClassName,
+    type IHostInstance,
     type ISymbioteEvent,
     type ISymbioteNode,
   } from '@symbiote-native/engine';
   import { resolveSvelteClass } from '../../class-value';
   import { setContext } from 'svelte';
-  import type { ShimElement } from '../../dom-shim';
   import RefreshControl from '../RefreshControl.svelte';
+  import { toTemplateSafeProps } from '../../renderer';
   import { PLATFORM } from '../scroll-view/scroll-view-platform';
   import ScrollViewStickyHeader from '../scroll-view/sticky-header.svelte';
   import {
@@ -100,28 +103,30 @@
 
   let props: IProps<ItemT> = $props();
 
-  // $state.raw, NOT $state: holds the shim element by IDENTITY (same concern as Switch's
-  // hostShim / Vue's shallowRef scrollHandle). dispatchViewCommand reads `.engineNode` off the RAW
-  // ShimElement the engine's WeakMap mirror actually knows about.
-  let hostShim = $state.raw<ShimElement | null>(null);
+  // $state.raw, NOT $state: holds the host node by IDENTITY (same concern as Switch's hostRef /
+  // Vue's shallowRef scrollHandle). dispatchViewCommand reads it directly — a Proxy wrapper would
+  // miss the engine's WeakMap-keyed mirror lookup. Nodes are eagerly bound under the custom-
+  // renderer API (unlike the retired shim's lazy-until-committed ShimElement), so `hostRef` is
+  // already the real, dispatchable engine node the moment `{@attach}` below runs.
+  let hostRef = $state.raw<IHostInstance | null>(null);
 
   // See View.svelte's note on `{@attach}` — bound to the scroll host, the node a caller
   // means by "the list" (the same node getScrollNode()/scrollTo drive).
   const syncAttachments = createAttachmentsSync();
   $effect(() => {
-    syncAttachments(hostShim, props);
+    syncAttachments(hostRef, props);
   });
 
-  // The offset we are imperatively driving native to (fallback before hostShim's engine node is
-  // live). Fresh object identity each push so the commit path re-applies it even when the numeric
-  // value repeats. undefined = none pending.
+  // The offset we are imperatively driving native to (fallback before `{@attach}` has run and
+  // hostRef is still null). Fresh object identity each push so the commit path re-applies it even
+  // when the numeric value repeats. undefined = none pending.
   let commandedOffset = $state.raw<{ x: number; y: number } | undefined>(undefined);
   // Bumped when a transition changes render-relevant state, so `metrics` (and the markup that reads
   // it) re-run — listState is a PLAIN object (not $state), mutating it triggers nothing itself.
   let version = $state(0);
   let separatorVersion = $state(0);
 
-  const scrollHandle: IScrollViewHandle = buildScrollViewHandle(() => hostShim?.engineNode ?? null);
+  const scrollHandle: IScrollViewHandle = buildScrollViewHandle(() => hostRef);
 
   // The one folded state cell — the Svelte twin of Vue's plain listState / React's stateRef.
   const listState: IListState<ItemT> = createInitialListState<ItemT>();
@@ -232,7 +237,7 @@
     const target = narrowed.horizontal
       ? { x: clamped, y: EMPTY_OFFSET }
       : { x: EMPTY_OFFSET, y: clamped };
-    if (hostShim?.engineNode === undefined) {
+    if (hostRef === null) {
       dlog(`VirtualizedList scrollTo offset=${clamped} pending-ref`);
       commandedOffset = target;
       return;
@@ -359,13 +364,12 @@
       dlog('VirtualizedList sticky attachStickyScroll skipped: nativeStickyAvailable=false');
       return;
     }
-    const node = hostShim?.engineNode;
-    if (node === undefined) {
-      dlog('VirtualizedList sticky attachStickyScroll skipped: engineNode not ready yet');
+    if (hostRef === null) {
+      dlog('VirtualizedList sticky attachStickyScroll skipped: hostRef not attached yet');
       return;
     }
     dlog('VirtualizedList sticky attachStickyScroll attached');
-    return attachStickyScroll(node, scrollAnimatedValue);
+    return attachStickyScroll(hostRef, scrollAnimatedValue);
   });
 
   function handleScroll(event: ISymbioteEvent): void {
@@ -449,6 +453,20 @@
       dlog(`VirtualizedList cell ${index} measured length=${length}`);
       dispatch({ kind: 'measure', index, length });
     };
+  }
+
+  // A literal `style={...}` attribute on a symbiote-* intrinsic hits the SAME Svelte
+  // special-case as a `style` key inside a spread (renderer.ts's TEMPLATE_KEY_UNMANGLE header
+  // comment) — so the leading/gap/trailing spacer views and the per-cell wrapper below route
+  // their style through a one-key `toTemplateSafeProps` spread instead of a literal attribute.
+  function extentSpacerProps(extent: number): Record<string, unknown> {
+    return toTemplateSafeProps({
+      style: narrowed.horizontal ? { width: extent } : { height: extent },
+    });
+  }
+
+  function cellHostProps(index: number): Record<string, unknown> {
+    return toTemplateSafeProps({ onLayout: makeCellMeasure(index), style: cellInvertedStyle });
   }
 
   function mergeSeparator(gapIndex: number, patch: Partial<ISeparatorProps<ItemT>>): void {
@@ -608,11 +626,19 @@
     }
     // The list's accessibility/testID/aria surface rides down onto the raw scroll intrinsic —
     // Object.assign merges a bag already built field-by-field (pickAccessibilityProps), not a raw
-    // spread of `props`, so this stays inside the object-bag convention (svelte-adapter-dom-shim
-    // skill §3g(c)) — only ONE prop (`p={bag}`) ever lands on the symbiote-* host tag.
+    // spread of `props`, because `pickAccessibilityProps` is shared by every list forwarding hop
+    // (FlatList/SectionList/VirtualizedSectionList -> VirtualizedList), each of which folds it
+    // into its OWN host-attribute bag the same way — a raw spread would forward stray fields
+    // (extraData, renderItem, …) those callers never mean to pass down.
     Object.assign(bag, pickAccessibilityProps(props));
     return bag;
   });
+
+  // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+  // TEMPLATE_KEY_UNMANGLE header comment) — renamed before either bag is spread onto its
+  // symbiote-* intrinsic below; `setAttributeOp`'s `realPropName()` reverses it right before
+  // `routeProp`.
+  const templateOuterBag = $derived(toTemplateSafeProps(outerBag));
 
   // Pull-to-refresh: build the real RefreshControl's own prop bag when onRefresh is set (mirrors
   // React's `scrollProps.refreshControl = createElement(RefreshControl, {...})`); refreshing
@@ -633,6 +659,7 @@
   );
 
   const contentBag = $derived({ style: resolvedContentContainerStyle, collapsable: false });
+  const templateContentBag = $derived(toTemplateSafeProps(contentBag));
 
   const stickySet = $derived(
     narrowed.stickyHeaderIndices !== undefined ? new Set(narrowed.stickyHeaderIndices) : undefined,
@@ -701,42 +728,42 @@
   fragment; whitespace strictly BETWEEN two sibling non-text nodes collapses to a single-space
   TEXT NODE and is kept (Svelte compiler utils.js clean_nodes, verified against 5.56.8) — which
   would land as a stray RCTRawText child of this scroll content view. A raw-text child of a
-  non-Text view is invalid on real Fabric (see dom-shim/text.ts's own comment on this), so this
-  is a correctness fix, not just formatting. Caught by virtualized-list.smoke.test.ts asserting
-  an exact windowed child count; keep it exact this way if you touch this block.
--->{#if hasHeader}<symbiote-view p={{}}>{@render props.header?.()}</symbiote-view>{/if}{#if metrics.count === FIRST_INDEX}{#if props.empty}<symbiote-view p={{}}>{@render props.empty()}</symbiote-view>{/if}{:else if plan}{#if plan.leadingExtent > EMPTY_OFFSET}<symbiote-view
-        p={{ style: narrowed.horizontal ? { width: plan.leadingExtent } : { height: plan.leadingExtent } }}
+  non-Text view is invalid on real Fabric, so this is a correctness fix, not just formatting.
+  Caught by virtualized-list.smoke.test.ts asserting an exact windowed child count; keep it exact
+  this way if you touch this block.
+-->{#if hasHeader}<symbiote-view>{@render props.header?.()}</symbiote-view>{/if}{#if metrics.count === FIRST_INDEX}{#if props.empty}<symbiote-view>{@render props.empty()}</symbiote-view>{/if}{:else if plan}{#if plan.leadingExtent > EMPTY_OFFSET}<symbiote-view
+        {...extentSpacerProps(plan.leadingExtent)}
       ></symbiote-view>{/if}{#each allCells as cell (cell.key)}{#if stickySet?.has(cell.index)}<ScrollViewStickyHeader onLayout={stickyLayoutFor(cell.index)} nextHeaderLayoutY={nextStickyHeaderYFor(cell.index)}>{@render props.item({
           item: narrowed.getItem(narrowed.data, cell.index),
           index: cell.index,
           separators: makeSeparators(cell.index),
-        })}</ScrollViewStickyHeader>{:else}<symbiote-view p={{ onLayout: makeCellMeasure(cell.index), style: cellInvertedStyle }}>{@render props.item({
+        })}</ScrollViewStickyHeader>{:else}<symbiote-view {...cellHostProps(cell.index)}>{@render props.item({
           item: narrowed.getItem(narrowed.data, cell.index),
           index: cell.index,
           separators: makeSeparators(cell.index),
         })}</symbiote-view>{/if}{#if plan.forcedStickyCell && cell.index === plan.forcedStickyCell.index && plan.gapExtent > EMPTY_OFFSET}<symbiote-view
-        p={{ style: narrowed.horizontal ? { width: plan.gapExtent } : { height: plan.gapExtent } }}
-      ></symbiote-view>{/if}{#if props.separator && cell.index < metrics.last && cell.index !== plan.forcedStickyCell?.index}<symbiote-view p={{}}>{@render props.separator(separatorPropsFor(cell.index))}</symbiote-view>{/if}{/each}{#if plan.trailingExtent > EMPTY_OFFSET}<symbiote-view
-        p={{ style: narrowed.horizontal ? { width: plan.trailingExtent } : { height: plan.trailingExtent } }}
-      ></symbiote-view>{/if}{/if}{#if props.footer}<symbiote-view p={{}}>{@render props.footer()}</symbiote-view>{/if}
+        {...extentSpacerProps(plan.gapExtent)}
+      ></symbiote-view>{/if}{#if props.separator && cell.index < metrics.last && cell.index !== plan.forcedStickyCell?.index}<symbiote-view>{@render props.separator(separatorPropsFor(cell.index))}</symbiote-view>{/if}{/each}{#if plan.trailingExtent > EMPTY_OFFSET}<symbiote-view
+        {...extentSpacerProps(plan.trailingExtent)}
+      ></symbiote-view>{/if}{/if}{#if props.footer}<symbiote-view>{@render props.footer()}</symbiote-view>{/if}
 {/snippet}
 
 {#snippet scrollBody()}<!--
   Same no-whitespace-between-siblings rule as listBody() above: the optional sibling
   RefreshControl and the content container are two siblings of one parent when RefreshControl is
   NOT wrapping (iOS), so they must sit edge-to-edge with zero characters between them.
--->{#if !shouldWrapRefreshControl && refreshControlProps !== undefined}<RefreshControl {...refreshControlProps} />{/if}{#if narrowed.horizontal}<symbiote-horizontal-scroll-content p={contentBag}>{@render listBody()}</symbiote-horizontal-scroll-content>{:else}<symbiote-scroll-content p={contentBag}>{@render listBody()}</symbiote-scroll-content>{/if}{/snippet}
+-->{#if !shouldWrapRefreshControl && refreshControlProps !== undefined}<RefreshControl {...refreshControlProps} />{/if}{#if narrowed.horizontal}<symbiote-horizontal-scroll-content {...templateContentBag}>{@render listBody()}</symbiote-horizontal-scroll-content>{:else}<symbiote-scroll-content {...templateContentBag}>{@render listBody()}</symbiote-scroll-content>{/if}{/snippet}
 
 {#if shouldWrapRefreshControl && refreshControlProps !== undefined}
   <RefreshControl {...refreshControlProps} style={layoutSplit?.outer}>
     {#if narrowed.horizontal}
-      <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-horizontal-scroll-view>
+      <symbiote-horizontal-scroll-view {...templateOuterBag} {@attach (node) => (hostRef = node)}>{@render scrollBody()}</symbiote-horizontal-scroll-view>
     {:else}
-      <symbiote-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-scroll-view>
+      <symbiote-scroll-view {...templateOuterBag} {@attach (node) => (hostRef = node)}>{@render scrollBody()}</symbiote-scroll-view>
     {/if}
   </RefreshControl>
 {:else if narrowed.horizontal}
-  <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-horizontal-scroll-view>
+  <symbiote-horizontal-scroll-view {...templateOuterBag} {@attach (node) => (hostRef = node)}>{@render scrollBody()}</symbiote-horizontal-scroll-view>
 {:else}
-  <symbiote-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-scroll-view>
+  <symbiote-scroll-view {...templateOuterBag} {@attach (node) => (hostRef = node)}>{@render scrollBody()}</symbiote-scroll-view>
 {/if}

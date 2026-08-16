@@ -110,7 +110,12 @@ const STICKY_HEADER_OUT = join(COMPONENTS_DIR, 'scroll-view', '.parity-compiled-
 const LIST_OUT = join(__dirname, '.parity-compiled-virtualized-list.mjs');
 const ROOT_OUT = join(__dirname, '.parity-compiled-list-root.mjs');
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 function compileToFile(source: string, filename: string, outPath: string): void {
   writeFileSync(outPath, compile(source, { ...COMPILE_OPTIONS, filename }).js.code);
@@ -162,7 +167,7 @@ async function loadSvelteRoot(): Promise<Component> {
        function getItemCount(source) { return source.length; }
        function keyExtractor(item) { return 'k-' + item.id; }
      </script>
-     {#snippet cell({ item })}<symbiote-text p={{ text: 'row-' + item.id }}></symbiote-text>{/snippet}
+     {#snippet cell({ item })}<symbiote-text text={'row-' + item.id}></symbiote-text>{/snippet}
      <VirtualizedList {data} {getItem} {getItemCount} {keyExtractor} {getItemLayout}
        {stickyHeaderIndices} windowSize={1} item={cell} />`,
     'ParityListRoot.svelte',

@@ -102,16 +102,15 @@ export interface IVirtualizedListProps<ItemT> extends IAccessibilityProps, IAria
   class?: ISvelteClassValue;
 }
 
-// Re-exported so consumers can type a `bind:this` target without reaching into
+// Re-exported so consumers can type a `{@attach}`/host-ref target without reaching into
 // @symbiote-native/components directly.
 export type { ISeparators, ISeparatorProps, ISymbioteEvent, ISymbioteNode };
 
-// Every IAccessibilityProps field, named explicitly (the object-bag convention this adapter's
-// custom-element host tags require — svelte-adapter-dom-shim skill §3g(c) — forbids a raw
-// `...rest` spread landing on a symbiote-* tag, so this mirrors React's `...accessibilityRest`
-// field-by-field instead of reusing its spread). Shared by every list component (VirtualizedList's
-// own host-bag construction AND FlatList's/VirtualizedSectionList's/SectionList's component-to-
-// component forwarding down to VirtualizedList) so the field list lives in exactly one place.
+// Every IAccessibilityProps field, named explicitly — mirrors React's `...accessibilityRest`
+// field-by-field instead of reusing its spread, because this picked object is reused as-is by
+// every list component (VirtualizedList's own host-bag construction AND FlatList's/
+// SectionList's/VirtualizedSectionList's component-to-component forwarding down to
+// VirtualizedList) so the field list lives in exactly one place.
 // resolveAccessibilityProps folds aria-*/role into their accessibility* twins first (idempotent —
 // calling it twice, once per forwarding hop, is a documented no-op once the aria keys are gone).
 export function pickAccessibilityProps<T extends IAccessibilityProps & IAriaProps>(

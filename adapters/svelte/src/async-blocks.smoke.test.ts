@@ -1,10 +1,12 @@
-// The DEFERRED half of `{#await}` / `<svelte:boundary>` — the paths that actually allocate
-// `document.createDocumentFragment()` and render OFFSCREEN before splicing the result in.
+// The DEFERRED half of `{#await}` / `<svelte:boundary>` — the paths that actually allocate an
+// offscreen fragment (via `renderer.ts`'s `createFragmentNode`, dispatched through
+// `current_renderer.createFragment()` — `dom/operations.js`'s `create_fragment()`) and render
+// OFFSCREEN before splicing the result in.
 //
 // Why this needs its own file: those paths are gated on Svelte's async mode.
 // `should_defer_append()` (dom/operations.js) short-circuits on `async_mode_flag`, so
 // `BranchManager`'s offscreen branch and `<svelte:boundary>`'s `pending` snippet
-// (dom/blocks/boundary.js:272/305 — `createDocumentFragment` + `move_effect`) are UNREACHABLE
+// (dom/blocks/boundary.js:272/305 — `create_fragment` + `move_effect`) are UNREACHABLE
 // unless the component was compiled with `experimental: { async: true }`. The sibling
 // await-block/boundary smokes compile with this repo's own svelte.config.js options, which do
 // not set it, so they exercise the synchronous branch path only. That flag is turned on by a
@@ -12,10 +14,11 @@
 // process-wide with no supported way back, hence a separate file — vitest isolates each test
 // file's module registry.
 //
-// This is the §17 shape at full strength: a subtree is rendered into a LIVE parent, moved into an
-// offscreen fragment, and spliced back later. Assertions check the exact committed Fabric child
-// list, because the failure mode is a node that is present twice, or still present after being
-// moved away.
+// This exercises the `IFragmentNode` design at full strength (renderer.ts, §1 of the
+// svelte-adapter-custom-renderer skill): a subtree is rendered into a LIVE parent, moved into an
+// offscreen fragment (tracked via `fragmentParentOf`), and spliced back later. Assertions check
+// the exact committed Fabric child list, because the failure mode is a node that is present
+// twice, or still present after being moved away.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -55,7 +58,7 @@ function compileToFile(source: string, name: string, fileName?: string): string 
     filename: `${name}.svelte`,
     fragments: 'tree',
     css: 'external',
-    experimental: { async: true },
+    experimental: { async: true, customRenderer: '@symbiote-native/svelte/renderer' },
   });
   compileCounter += 1;
   const file = join(TMP_DIR, fileName ?? `${name}-${String(compileCounter)}.mjs`);
@@ -76,10 +79,28 @@ async function compileComponent(source: string, name: string): Promise<Component
   return component;
 }
 
+// Empty RCTRawText nodes always land here, unrelated to anything this file exercises: Svelte's
+// own `_mount_inner` (render.js) creates `append_child(target, create_text())` as its `anchor_node`
+// whenever `mount()` is called without an explicit `anchor` option (render.ts never passes one);
+// the compiler wraps a component whose own top-level content has no static leading element (every
+// fixture here) in `$.comment()` (dom/template.js), whose own trailing `anchor = create_text()`
+// marks the end of the component's root effect range; and — specific to THIS file's async mode —
+// `BranchManager`'s own offscreen-fragment anchor (`branches.js`'s `var target = create_text()`,
+// gated on `should_defer_append()`) is itself an empty text node that gets spliced back in
+// alongside the branch it anchors. All are real `create_text('')` calls, dispatched to our
+// renderer exactly like any other text node (confirmed by reading render.js/template.js/
+// branches.js directly) — `isAnchor()` only skips nodes built via `createComment`/`createAnchor`,
+// not an empty raw-text node, so the engine's commit walk does NOT skip them. Filtering by an
+// empty string is safe here because every fixture's OWN raw text always carries real content; a
+// real empty text node is never part of this file's intended markup.
+function isSvelteBootstrapAnchor(node: IFakeNode): boolean {
+  return node.viewName === 'RCTRawText' && node.props.text === '';
+}
+
 function appChildren(): IFakeNode[] {
   const wrapper = fabric.appRoot().children[0];
   expect(wrapper, 'the root wrapper symbiote-view committed').toBeDefined();
-  return wrapper?.children ?? [];
+  return (wrapper?.children ?? []).filter(child => !isSvelteBootstrapAnchor(child));
 }
 
 function testIds(): Array<unknown> {
@@ -107,8 +128,8 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
          let current = $state(control.initial);
          control.swap = next => { current = next; };
        </script>` +
-        `{#await current}<symbiote-view p={{ testID: 'pending' }}><symbiote-text p={{}}>loading</symbiote-text></symbiote-view>` +
-        `{:then value}<symbiote-view p={{ testID: 'then' }}><symbiote-text p={{}}>{value}</symbiote-text></symbiote-view>{/await}`,
+        `{#await current}<symbiote-view testID="pending"><symbiote-text>loading</symbiote-text></symbiote-view>` +
+        `{:then value}<symbiote-view testID="then"><symbiote-text>{value}</symbiote-text></symbiote-view>{/await}`,
       'DeferredAwaiter',
     );
 
@@ -147,16 +168,16 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
   it('shows a boundary pending snippet, then splices the awaited child in from its offscreen fragment', async () => {
     // A component with top-level `await` suspends to the nearest boundary carrying a `pending`
     // snippet. That drives boundary.js's `#render`: children render into the LIVE anchor first,
-    // then `move_effect` rips them into a fresh DocumentFragment, and `#anchor.before(fragment)`
-    // splices them back once the promise settles. A shim that detaches a node from its shim
-    // parent without also detaching its engine node would leave the child painted the whole time
-    // and then committed twice.
+    // then `move_effect` rips them into a fresh offscreen fragment, and `#anchor.before(fragment)`
+    // splices them back once the promise settles. `insertNode` (renderer.ts) removing a node from
+    // its old parent — real or fragment — before re-inserting is what keeps this from leaving the
+    // child painted the whole time and then committed twice.
     compileToFile(
       `<script>
          let { gate } = $props();
          const label = await gate.promise;
        </script>` +
-        `<symbiote-view p={{ testID: 'child' }}><symbiote-text p={{}}>{label}</symbiote-text></symbiote-view>`,
+        `<symbiote-view testID="child"><symbiote-text>{label}</symbiote-text></symbiote-view>`,
       'AwaitingChild',
       AWAITING_CHILD_MODULE,
     );
@@ -168,7 +189,7 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
        </script>` +
         `<svelte:boundary>` +
         `<Child {gate} />` +
-        `{#snippet pending()}<symbiote-view p={{ testID: 'pending' }}><symbiote-text p={{}}>loading</symbiote-text></symbiote-view>{/snippet}` +
+        `{#snippet pending()}<symbiote-view testID="pending"><symbiote-text>loading</symbiote-text></symbiote-view>{/snippet}` +
         `</svelte:boundary>`,
       'PendingBoundary',
     );
@@ -197,15 +218,15 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     // The sharpest version of the previous test. Here the boundary's children include a plain
     // element that renders SYNCHRONOUSLY into the live anchor before the awaiting child bumps the
     // pending count — so `move_effect` moves a node that already has a committed engine node into
-    // a fragment that has none. `fragment.append(liveNode)` in real DOM takes the node OUT of the
-    // document; the shim must make the same thing true of the engine tree, or the sibling keeps
-    // painting underneath the pending snippet.
+    // a fragment that has none. `insertNode`'s `removeNode(node)` call (renderer.ts) must take the
+    // node OUT of the real engine tree the same way `fragment.append(liveNode)` takes it out of a
+    // real DOM, or the sibling keeps painting underneath the pending snippet.
     compileToFile(
       `<script>
          let { gate } = $props();
          const label = await gate.promise;
        </script>` +
-        `<symbiote-view p={{ testID: 'child' }}><symbiote-text p={{}}>{label}</symbiote-text></symbiote-view>`,
+        `<symbiote-view testID="child"><symbiote-text>{label}</symbiote-text></symbiote-view>`,
       'AwaitingChild',
       AWAITING_CHILD_MODULE,
     );
@@ -216,9 +237,9 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
          let { gate } = $props();
        </script>` +
         `<svelte:boundary>` +
-        `<symbiote-view p={{ testID: 'sibling' }}><symbiote-text p={{}}>sync</symbiote-text></symbiote-view>` +
+        `<symbiote-view testID="sibling"><symbiote-text>sync</symbiote-text></symbiote-view>` +
         `<Child {gate} />` +
-        `{#snippet pending()}<symbiote-view p={{ testID: 'pending' }}><symbiote-text p={{}}>loading</symbiote-text></symbiote-view>{/snippet}` +
+        `{#snippet pending()}<symbiote-view testID="pending"><symbiote-text>loading</symbiote-text></symbiote-view>{/snippet}` +
         `</svelte:boundary>`,
       'PendingBoundaryWithSibling',
     );

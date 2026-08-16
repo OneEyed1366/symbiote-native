@@ -1,6 +1,6 @@
 // Real-execution proof (not just typecheck) of ActivityIndicator/index.svelte — the first
-// component retrofitted onto the generic descriptorToSvelte bridge (mountDescriptorChildren,
-// svelte-adapter-dom-shim skill §19) instead of a hand-written child tag. Compiles the REAL
+// component retrofitted onto the generic descriptorToSvelte bridge (mountDescriptorChildren)
+// instead of a hand-written child tag. Compiles the REAL
 // index.svelte source through svelte/compiler, mounts via the real render pipeline, and
 // asserts against a real fake-Fabric recorder — proving both that the wrapper/spinner shape
 // still commits correctly AND that a reactive prop change updates the SAME native node
@@ -16,8 +16,8 @@ import type { IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
 // fabric.find() walks the CREATION log, which never reflects a later clone's props
-// (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must
-// instead walk the currently COMMITTED tree.
+// (the engine's own clone-on-write commit, unrelated to the renderer strategy) — a live-value
+// assertion must instead walk the currently COMMITTED tree.
 function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeNode | undefined {
   if (predicate(node)) return node;
   for (const child of node.children) {
@@ -49,7 +49,12 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 function compileToFile(source: string, filename: string, outPath: string): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });

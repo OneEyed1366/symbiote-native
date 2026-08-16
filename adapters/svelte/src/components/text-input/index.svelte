@@ -1,18 +1,22 @@
 <script lang="ts" module>
   // TextInput: the controlled-value / event-count handshake, calling straight into
   // core/components/src/view/render-text-input.ts's renderTextInput() for the prop assembly —
-  // its returned Descriptor's `.props` is destructured onto whichever of the two literal host
-  // tags `isMultiline` picks below. NOT `<svelte:element this={descriptor.type}>`: a dynamic tag
+  // its returned Descriptor's `.props` is spread onto whichever of the two literal host tags
+  // `isMultiline` picks below. NOT `<svelte:element this={descriptor.type}>`: a dynamic tag
   // compiles through Svelte's generic setAttribute path, not the custom-element `p=` property-set
-  // codegen every symbiote-* tag needs (proven by a real regression — see svelte-adapter-dom-shim
-  // skill §15). Reuses the shared logic verbatim (resolveTextInputProps / foldText /
-  // textFromChange / eventCountFromChange / shouldCommandText), exactly like React's
-  // useState+useRef+useLayoutEffect+useImperativeHandle
-  // and Vue's ref+shallowRef+watch+expose(). Runes: `$state.raw` holds the shim-element/engine-
-  // node reference (imperative commands read the RAW ShimElement — see switch/index.svelte's
-  // header comment for why `$state()` would break the engine's WeakMap-keyed identity lookup),
-  // `$state` tracks the acknowledged event count, and `$effect` drives the controlled-write
-  // command — the TextInput twin of Switch's snap-back effect. The imperative handle
+  // codegen every symbiote-* tag used to need under the DOM shim (see svelte-adapter-dom-shim
+  // skill §15) — under the official custom-renderer API every element goes through the ordinary
+  // per-attribute path regardless (svelte-adapter-custom-renderer skill §5), but the tag still
+  // needs to be a literal for the `{@attach}` ref-capture idiom below. Reuses the shared logic
+  // verbatim (resolveTextInputProps / foldText / textFromChange / eventCountFromChange /
+  // shouldCommandText), exactly like React's useState+useRef+useLayoutEffect+useImperativeHandle
+  // and Vue's ref+shallowRef+watch+expose(). Runes: `$state.raw` holds the host node reference by
+  // IDENTITY (imperative commands read the RAW node — see switch/index.svelte's header comment for
+  // why `$state()` would break the engine's WeakMap-keyed identity lookup), `$state` tracks the
+  // acknowledged event count, and `$effect` drives the controlled-write command — the TextInput
+  // twin of Switch's snap-back effect. Nodes are bound eagerly via `{@attach}` (svelte-adapter-
+  // custom-renderer skill §4), so `hostRef` is already the real, dispatchable engine node the
+  // instant it fires — no more `.engineNode` indirection. The imperative handle
   // (focus/blur/clear/isFocused/setSelection) is exposed the Svelte 5 way: plain functions
   // declared in the INSTANCE script (not here in `<script module>`, which is shared across every
   // instance) become callable off a parent's `bind:this` target.
@@ -41,10 +45,11 @@
     setInputFocused,
     setInputBlurred,
     type ISymbioteEvent,
+    type IHostInstance,
   } from '@symbiote-native/engine';
   import { createDescriptorChildrenSync } from '../../descriptor-to-svelte';
   import { createAttachmentsSync } from '../../runes/attachments';
-  import type { ShimElement } from '../../dom-shim';
+  import { toTemplateSafeProps } from '../../renderer';
 
   // The exact destructure list React's index.ts pulls out of props before building
   // `passthrough` (everything else rides through to Fabric untouched — placeholder,
@@ -99,7 +104,7 @@
   const rawProps: ITextInputProps = $props();
 
   // $state.raw, NOT $state: identity concern, see the module-script header above.
-  let hostShim = $state.raw<ShimElement | null>(null);
+  let hostRef = $state.raw<IHostInstance | null>(null);
 
   // The count native last acknowledged. $state so the bag echoes it back on every commit and
   // the exposed handle reads the latest (the Svelte twin of React's useState / Vue's ref).
@@ -161,15 +166,13 @@
   function handleFocus(event: ISymbioteEvent): void {
     focused = true;
     // Track focus app-wide so Keyboard.dismiss can blur this input without a ref.
-    const engineNode = hostShim?.engineNode;
-    if (engineNode !== undefined) setInputFocused(engineNode);
+    if (hostRef !== null) setInputFocused(hostRef);
     rawProps.onFocus?.(event);
   }
 
   function handleBlur(event: ISymbioteEvent): void {
     focused = false;
-    const engineNode = hostShim?.engineNode;
-    if (engineNode !== undefined) setInputBlurred(engineNode);
+    if (hostRef !== null) setInputBlurred(hostRef);
     rawProps.onBlur?.(event);
   }
 
@@ -182,34 +185,32 @@
   // handleChange), so reading `count` only after the `shouldCommandText` guard would drop it from
   // the tracked dependency set on the run that first falls through the guard, and a later
   // event-count-only change would then silently fail to retrigger this effect (same class of bug
-  // Switch's snap-back effect avoids by reading `switchState` unconditionally too). Verified
-  // against a real compiled mount (text-input.smoke.test.ts, following switch.smoke.test.ts's
-  // proof): the shim's insertOne() calls makeLive() synchronously as part of the SAME
-  // appendChild/insertBefore the compiler emits, before `bind:this` fires, so
-  // `hostShim.engineNode` is always populated by the time this first runs.
+  // Switch's snap-back effect avoids by reading `switchState` unconditionally too). `hostRef` is
+  // bound eagerly by `{@attach}` (svelte-adapter-custom-renderer skill §4), always populated by
+  // the time this first runs — no more commit-timing guard needed here.
   $effect(() => {
-    const engineNode = hostShim?.engineNode;
+    const node = hostRef;
     const value = rawProps.value;
     const count = mostRecentEventCount;
-    if (engineNode === undefined) return;
+    if (node === null) return;
     if (!shouldCommandText(lastNativeText, value)) return;
     const selStart = rawProps.selection?.start ?? SELECTION_NONE;
     const selEnd = rawProps.selection?.end ?? rawProps.selection?.start ?? SELECTION_NONE;
     dlog(`TextInput setTextAndSelection count=${count} text=${JSON.stringify(value)}`);
-    dispatchViewCommand(engineNode, 'setTextAndSelection', [count, value, selStart, selEnd]);
+    dispatchViewCommand(node, 'setTextAndSelection', [count, value, selStart, selEnd]);
     lastNativeText = value;
   });
 
   // autoFocus is driven in JS, not as a native prop: once the host node first goes live, command
   // `focus` down once (RN does the same via TextInputState.focusInput). No commit-timing retry
-  // needed here (unlike Vue's whenCommitted) — same synchronous makeLive() guarantee the
-  // controlled-write effect above relies on.
+  // needed here (unlike Vue's whenCommitted) — same eager-binding guarantee the controlled-write
+  // effect above relies on.
   $effect(() => {
-    const engineNode = hostShim?.engineNode;
-    if (autoFocused || engineNode === undefined || rawProps.autoFocus !== true) return;
+    const node = hostRef;
+    if (autoFocused || node === null || rawProps.autoFocus !== true) return;
     autoFocused = true;
     dlog('TextInput autoFocus -> focus command');
-    dispatchViewCommand(engineNode, 'focus', []);
+    dispatchViewCommand(node, 'focus', []);
   });
 
   // The imperative API RN exposes on a TextInput ref, as plain instance-script functions — the
@@ -218,19 +219,17 @@
   // focus/blur drive native view commands; clear/setSelection reuse setTextAndSelection (the
   // same stale-safe path as a controlled write), echoing the acknowledged event count.
   export function focus(): void {
-    const engineNode = hostShim?.engineNode;
-    if (engineNode !== undefined) dispatchViewCommand(engineNode, 'focus', []);
+    if (hostRef !== null) dispatchViewCommand(hostRef, 'focus', []);
   }
 
   export function blur(): void {
     // Routes through TextInputState so the app-wide focus tracking clears too.
-    blurTextInput(hostShim?.engineNode ?? null);
+    blurTextInput(hostRef);
   }
 
   export function clear(): void {
-    const engineNode = hostShim?.engineNode;
-    if (engineNode === undefined) return;
-    dispatchViewCommand(engineNode, 'setTextAndSelection', [mostRecentEventCount, '', 0, 0]);
+    if (hostRef === null) return;
+    dispatchViewCommand(hostRef, 'setTextAndSelection', [mostRecentEventCount, '', 0, 0]);
     lastNativeText = '';
   }
 
@@ -239,10 +238,9 @@
   }
 
   export function setSelection(start: number, end: number): void {
-    const engineNode = hostShim?.engineNode;
-    if (engineNode === undefined) return;
+    if (hostRef === null) return;
     const current = lastNativeText ?? '';
-    dispatchViewCommand(engineNode, 'setTextAndSelection', [
+    dispatchViewCommand(hostRef, 'setTextAndSelection', [
       mostRecentEventCount,
       current,
       start,
@@ -271,18 +269,23 @@
   // Switch is, see its header comment.
   const syncChildren = createDescriptorChildrenSync();
   $effect(() => {
-    syncChildren(hostShim, descriptor.children);
+    syncChildren(hostRef, descriptor.children);
   });
 
   // See View.svelte's note on `{@attach}`.
   const syncAttachments = createAttachmentsSync();
   $effect(() => {
-    syncAttachments(hostShim, rawProps);
+    syncAttachments(hostRef, rawProps);
   });
+
+  // `style` collides with Svelte's own special-cased attribute name (renderer.ts's
+  // TEMPLATE_KEY_UNMANGLE header comment) — renamed before the spread; `setAttributeOp`'s
+  // `realPropName()` reverses it right before `routeProp`.
+  const templateProps = $derived(toTemplateSafeProps(descriptor.props));
 </script>
 
 {#if isMultiline}
-  <symbiote-text-input-multiline p={descriptor.props} bind:this={hostShim} />
+  <symbiote-text-input-multiline {...templateProps} {@attach (node) => (hostRef = node)} />
 {:else}
-  <symbiote-text-input p={descriptor.props} bind:this={hostShim} />
+  <symbiote-text-input {...templateProps} {@attach (node) => (hostRef = node)} />
 {/if}
