@@ -75,7 +75,12 @@ setNativeViewConfigSource(name => (name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG
 
 const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+} as const;
 
 function compileToFile(source: string, filename: string, outPath: string): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
@@ -104,9 +109,10 @@ async function loadMarkerParent(): Promise<Component> {
   compileToFile(
     `<script>
        import Slider from './.smoke-compiled-slider.mjs';
+       import { toTemplateSafeProps } from '@symbiote-native/svelte/renderer';
      </script>
      {#snippet marker({ stepMarked, index })}
-       <symbiote-view p={{ testID: 'marker-' + index, style: { opacity: stepMarked ? 1 : 0 } }} />
+       <symbiote-view {...toTemplateSafeProps({ testID: 'marker-' + index, style: { opacity: stepMarked ? 1 : 0 } })} />
      {/snippet}
      <Slider value={0.5} minimumValue={0} maximumValue={1} step={0.25} stepMarker={marker} />`,
     'MarkerParent.svelte',
@@ -260,8 +266,7 @@ describe('Slider (real compiled index.svelte)', () => {
 
     const node = sliderNode();
     expect(node.props.value).toBe(0.5);
-    // The overlay sits under the SAME wrapper as the native leaf, never as a sibling of a
-    // stray whitespace text node (svelte-adapter-dom-shim skill §16) — confirmed by the exact
+    // The overlay sits under the SAME wrapper as the native leaf — confirmed by the exact
     // marker count above matching computeStepOptions() with none dropped/duplicated.
   });
 });

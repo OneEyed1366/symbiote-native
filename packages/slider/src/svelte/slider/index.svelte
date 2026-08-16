@@ -11,14 +11,15 @@
   // lowercase-leading, so a literal `<RNCSlider>` in a Svelte template would parse as a COMPONENT
   // reference (Svelte's own tag-vs-component heuristic), not an element — confirmed against the
   // real compiler (`RNCSlider($$anchor, {...})` in the compiled output, not
-  // `document.createElement('RNCSlider')`). `descriptorFor('RNCSlider')` (core/components/src/
+  // `createElementNode('RNCSlider')`). `descriptorFor('RNCSlider')` (core/components/src/
   // component-names/shared.ts) already resolves correctly at the ENGINE level for any non-
   // `symbiote-`-prefixed name (falls through to `{component: type, isText: false}`) — the only
   // obstacle is the Svelte COMPILER's template syntax, not engine node resolution. The generic
   // descriptor bridge (`@symbiote-native/svelte/native-view-bridge`'s `mountDescriptorChildren`,
-  // svelte-adapter-dom-shim skill §19) sidesteps this entirely: it calls
-  // `document.createElement(child.type)` PROGRAMMATICALLY (a plain runtime string), which the
-  // compiler never inspects, so the hyphen/capitalization rule never applies. Every other adapter
+  // svelte-adapter-custom-renderer skill §5) sidesteps this entirely: it calls
+  // `createElementNode(child.type)` PROGRAMMATICALLY (renderer.ts's own engine-backed factory,
+  // no DOM involved), which the compiler never inspects, so the hyphen/capitalization rule never
+  // applies. Every other adapter
   // passes 'RNCSlider' straight into `h()`/`createElement()` — a runtime call, same free pass;
   // Svelte alone routes through a compiled template, hence the bridge. Imported from
   // `native-view-bridge`, NOT the package's main barrel: the main barrel re-exports View/Text/…,
@@ -39,13 +40,18 @@
 </script>
 
 <script lang="ts">
-  import { dlog, type ISymbioteEvent } from '@symbiote-native/engine';
+  import {
+    dlog,
+    removeChild,
+    type ISymbioteEvent,
+    type IHostInstance,
+  } from '@symbiote-native/engine';
   import {
     mountDescriptorChildren,
     createDescriptorChildrenSync,
     type IDescriptorChildrenMount,
-    type ShimElement,
   } from '@symbiote-native/svelte/native-view-bridge';
+  import { toTemplateSafeProps } from '@symbiote-native/svelte/renderer';
   import type { IDescriptorChild } from '@symbiote-native/components';
   import {
     sanitizeSliderValue,
@@ -219,14 +225,23 @@
         ),
   );
 
-  let hostShimDefault = $state.raw<ShimElement | null>(null);
+  // `style` collides with Svelte's own special-cased attribute name (svelte-adapter-custom-
+  // renderer skill §6 / renderer.ts's TEMPLATE_KEY_UNMANGLE) — this wrapper's own props ride a
+  // literal template spread below (the mounted CHILDREN go through the JS-only descriptor bridge
+  // above, unaffected), so `style` is renamed before the spread; `setAttributeOp`'s
+  // `realPropName()` reverses it right before `routeProp`.
+  const defaultTemplateProps = $derived.by(() =>
+    defaultDescriptor === undefined ? undefined : toTemplateSafeProps(defaultDescriptor.props),
+  );
+
+  let hostShimDefault = $state.raw<IHostInstance | null>(null);
   let mountedDefault: IDescriptorChildrenMount | undefined;
   let mountedDefaultCount = -1;
 
   function syncDefaultChildren(children: IDescriptorChild[]): void {
     if (hostShimDefault === null) return;
     if (mountedDefault === undefined || mountedDefaultCount !== children.length) {
-      for (const child of hostShimDefault.children.slice()) hostShimDefault.removeChild(child);
+      for (const child of hostShimDefault.children.slice()) removeChild(hostShimDefault, child);
       mountedDefault = mountDescriptorChildren(hostShimDefault, children);
       mountedDefaultCount = children.length;
     } else {
@@ -248,13 +263,17 @@
   const minOption = $derived(options[0]);
   const maxOption = $derived(options[options.length - 1]);
   const nativeLeafDescriptor = $derived(renderSliderNative(view, PLATFORM));
-  const markerWrapperBag = $derived({
-    style: resolveSliderWrapperStyle(style, PLATFORM),
-    class: className,
-    onLayout: handleLayout,
-  });
+  // See `defaultTemplateProps`'s note above — same rename, this wrapper's props also ride a
+  // literal template spread.
+  const markerWrapperBag = $derived(
+    toTemplateSafeProps({
+      style: resolveSliderWrapperStyle(style, PLATFORM),
+      class: className,
+      onLayout: handleLayout,
+    }),
+  );
 
-  let hostShimMarker = $state.raw<ShimElement | null>(null);
+  let hostShimMarker = $state.raw<IHostInstance | null>(null);
   const syncMarkerLeaf = createDescriptorChildrenSync();
 
   $effect(() => {
@@ -264,19 +283,17 @@
 </script>
 
 {#if hasStepMarker}
-  <symbiote-view p={markerWrapperBag} bind:this={hostShimMarker}>
+  <symbiote-view {...markerWrapperBag} {@attach (node) => (hostShimMarker = node)}>
     <symbiote-view
-      p={{
-        pointerEvents: 'none',
-        testID: 'StepsIndicator-Container',
-        style: resolveStepsContainerStyle(width, PLATFORM),
-      }}
+      pointerEvents="none"
+      testID="StepsIndicator-Container"
+      {...toTemplateSafeProps({ style: resolveStepsContainerStyle(width, PLATFORM) })}
     >
       {#each orderedOptions as optionValue, index (optionValue)}
-        <symbiote-view p={{ style: STEP_INDICATOR_ELEMENT_STYLE }}><symbiote-view p={{ style: TRACK_MARK_CONTAINER_STYLE }}>{@render stepMarker?.({ stepMarked: optionValue === currentValue, currentValue, index, min: minOption, max: maxOption })}{#if thumbImage !== undefined && optionValue === currentValue}<symbiote-view p={{ style: THUMB_IMAGE_CONTAINER_STYLE, testID: 'sliderTrackMark-thumbImage' }}><symbiote-image p={{ source: thumbImage, style: THUMB_IMAGE_STYLE }} /></symbiote-view>{/if}</symbiote-view>{#if renderStepNumber}<symbiote-view p={{ style: STEP_NUMBER_CONTAINER_STYLE }}><symbiote-text p={{ testID: `${index}th-step`, style: { fontSize } }}>{String(optionValue)}</symbiote-text></symbiote-view>{/if}</symbiote-view>
+        <symbiote-view {...toTemplateSafeProps({ style: STEP_INDICATOR_ELEMENT_STYLE })}><symbiote-view {...toTemplateSafeProps({ style: TRACK_MARK_CONTAINER_STYLE })}>{@render stepMarker?.({ stepMarked: optionValue === currentValue, currentValue, index, min: minOption, max: maxOption })}{#if thumbImage !== undefined && optionValue === currentValue}<symbiote-view {...toTemplateSafeProps({ style: THUMB_IMAGE_CONTAINER_STYLE })} testID="sliderTrackMark-thumbImage"><symbiote-image source={thumbImage} {...toTemplateSafeProps({ style: THUMB_IMAGE_STYLE })} /></symbiote-view>{/if}</symbiote-view>{#if renderStepNumber}<symbiote-view {...toTemplateSafeProps({ style: STEP_NUMBER_CONTAINER_STYLE })}><symbiote-text testID={`${index}th-step`} {...toTemplateSafeProps({ style: { fontSize } })}>{String(optionValue)}</symbiote-text></symbiote-view>{/if}</symbiote-view>
       {/each}
     </symbiote-view>
   </symbiote-view>
 {:else}
-  <symbiote-view p={{ ...defaultDescriptor?.props, class: className }} bind:this={hostShimDefault} />
+  <symbiote-view {...defaultTemplateProps} class={className} {@attach (node) => (hostShimDefault = node)} />
 {/if}
