@@ -126,6 +126,19 @@ which framework renders them.
   through, only a real `ngc` build does.
 </Aside>
 
+## Why not Svelte's `transition:`/`animate:`/`in:`/`out:`?
+
+Those directives — along with `use:`, `class:`, and `style:` — are Svelte's own
+**element**-only directives: the compiler itself rejects them on a component tag
+("This type of directive is not valid on components"), the same as it would for
+any third-party Svelte component library, not just SymbioteNative's. Every
+SymbioteNative primitive (`View`, `Text`, …) is a component reference in app code,
+never a raw DOM element, so `<View transition:fade>` simply doesn't compile — this
+is Svelte's own component/element split, not an adapter limitation. `{@attach fn}`
+is the one directive in that family that *is* legal on a component, and it's your
+route to the underlying host node when you need it; for animation itself, reach
+for the same `Animated` API and `$effect`-driven lifecycle shown above.
+
 ## JS driver vs native driver
 
 `useNativeDriver: true` hands the entire animation curve to a native-side

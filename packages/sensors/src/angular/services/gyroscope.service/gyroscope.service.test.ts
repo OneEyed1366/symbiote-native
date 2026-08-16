@@ -59,6 +59,19 @@ class GyroscopeIntervalHost {
   }
 }
 
+@Component({
+  selector: 'symbiote-gyroscope-zero-interval-host',
+  standalone: true,
+  template: '',
+})
+class GyroscopeZeroIntervalHost {
+  readonly measurement = inject(GyroscopeService).connect(0);
+
+  constructor() {
+    capturedResult = this.measurement;
+  }
+}
+
 beforeEach(() => {
   capturedResult = undefined;
   capturedListener = undefined;
@@ -74,45 +87,68 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// connect() never rejects or throws — it returns a signal synchronously and reports failures
+// (if any) through the native module's own event stream, not through connect() itself. So there
+// is no Negative group here; every scenario below is Positive.
 describe('GyroscopeService.connect', () => {
-  it('reports null before any measurement event fires', async () => {
-    mount(ROOT_TAG, GyroscopeHost);
-    await tick();
+  describe('Positive (expected to succeed without an error)', () => {
+    it('reports null before any measurement event fires', async () => {
+      // why: the template reads `measurement()?.x` — the signal must start at a value that
+      // optional-chains safely, so the UI doesn't render a stale or fabricated reading.
+      mount(ROOT_TAG, GyroscopeHost);
+      await tick();
 
-    expect(capturedResult?.()).toBeNull();
-  });
+      expect(capturedResult?.()).toBeNull();
+    });
 
-  it('updates the signal when the registered listener fires with a measurement', async () => {
-    mount(ROOT_TAG, GyroscopeHost);
-    await tick();
+    it('updates the signal when the registered listener fires with a measurement', async () => {
+      // why: this is the entire point of connect() — bridge the native event stream into a
+      // signal a template can read reactively.
+      mount(ROOT_TAG, GyroscopeHost);
+      await tick();
 
-    if (capturedListener === undefined) throw new Error('addListener callback was not captured');
-    capturedListener(MEASUREMENT);
+      if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+      capturedListener(MEASUREMENT);
 
-    expect(capturedResult?.()).toEqual(MEASUREMENT);
-  });
+      expect(capturedResult?.()).toEqual(MEASUREMENT);
+    });
 
-  it('removes the subscription when the host component is unmounted', async () => {
-    mount(ROOT_TAG, GyroscopeHost);
-    await tick();
+    it('removes the subscription when the host component is unmounted', async () => {
+      // why: an Angular service is `providedIn: 'root'` (a singleton) — if the effect's
+      // subscription outlived the component, every remount would stack another native listener.
+      mount(ROOT_TAG, GyroscopeHost);
+      await tick();
 
-    unmount(ROOT_TAG);
-    await tick();
+      unmount(ROOT_TAG);
+      await tick();
 
-    expect(removeMock).toHaveBeenCalledOnce();
-  });
+      expect(removeMock).toHaveBeenCalledOnce();
+    });
 
-  it('calls setUpdateInterval with the given interval when one is passed', async () => {
-    mount(ROOT_TAG, GyroscopeIntervalHost);
-    await tick();
+    describe('the optional updateIntervalMs param', () => {
+      it('calls setUpdateInterval with the given interval when one is passed', async () => {
+        mount(ROOT_TAG, GyroscopeIntervalHost);
+        await tick();
 
-    expect(setUpdateIntervalMock).toHaveBeenCalledWith(500);
-  });
+        expect(setUpdateIntervalMock).toHaveBeenCalledWith(500);
+      });
 
-  it('does not call setUpdateInterval when no interval is passed', async () => {
-    mount(ROOT_TAG, GyroscopeHost);
-    await tick();
+      it('calls setUpdateInterval with 0 rather than skipping it (0 is a valid interval, not "no interval")', async () => {
+        // why: the guard is `updateIntervalMs !== undefined`, not a truthiness check — 0ms is a
+        // legitimate "as fast as possible" interval and must not be silently treated the same
+        // as "no interval was passed".
+        mount(ROOT_TAG, GyroscopeZeroIntervalHost);
+        await tick();
 
-    expect(setUpdateIntervalMock).not.toHaveBeenCalled();
+        expect(setUpdateIntervalMock).toHaveBeenCalledWith(0);
+      });
+
+      it('does not call setUpdateInterval when no interval is passed', async () => {
+        mount(ROOT_TAG, GyroscopeHost);
+        await tick();
+
+        expect(setUpdateIntervalMock).not.toHaveBeenCalled();
+      });
+    });
   });
 });

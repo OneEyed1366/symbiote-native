@@ -63,10 +63,7 @@
   }
 </script>
 
-<!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16. Order: I18nManager
-     RTL readout + force-RTL button; Settings counter persisted to NSUserDefaults (survives
-     relaunch); Image statics — rendered asset + getSize measurement, then prefetch-cold-url
-     readout (not cached → tap → cached). -->
+<!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16. -->
 <View class="section-nested"><Text class="section-label">Runtime modules · I18nManager / Settings / Image statics</Text><Text class="info-text">{`RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`}</Text><ActionButton
     title={rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'}
     onPress={() => I18nManager.forceRTL(!rtl.isRTL)}

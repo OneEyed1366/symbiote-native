@@ -16,6 +16,11 @@ export type IModalPresentationStyle = 'fullScreen' | 'pageSheet' | 'formSheet' |
 export type IModalOrientation =
   'portrait' | 'portrait-upside-down' | 'landscape' | 'landscape-left' | 'landscape-right';
 
+// What Fabric puts on `nativeEvent` for topOrientationChange — NOT what an onOrientationChange
+// handler receives. The engine registers every `onX` prop as `(event: ISymbioteEvent) => handler(event)`
+// (core/engine/src/node.ts setEventListener), so a handler always gets the wrapper and reads the
+// orientation at `event.nativeEvent.orientation`, narrowed at runtime like every other nativeEvent
+// field (readLayoutField, valueFromChange).
 export interface IModalOrientationChangeEvent {
   orientation: 'portrait' | 'landscape';
 }

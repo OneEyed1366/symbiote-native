@@ -8,6 +8,12 @@
   // still wired for its (always-empty) children, matching every other category-1 component
   // uniformly — the same reason React still routes a childless Switch through descriptorToReact
   // rather than special-casing it.
+  //
+  // `value` is `$bindable()` (2026-08-15): `<Switch bind:value={x}>` round-trips a native toggle
+  // into `x` with no extra plumbing at the call site. See handleChange's own comment for exactly
+  // when the echo fires and why it is gated on `onValueChange` being absent — the full reasoning
+  // (and why an ungated echo would silently defeat the existing snap-back correction) lives next
+  // to TextInput's identical mechanism in text-input/index.svelte.
   import type { ISwitchProps } from './switch-props';
 
   export type { ISwitchProps };
@@ -27,7 +33,7 @@
   import { remapOnPrefixedValueProps } from '../../renderer';
 
   let {
-    value,
+    value = $bindable(),
     onValueChange,
     disabled,
     trackColor,
@@ -54,6 +60,11 @@
     );
     if (next === undefined) return;
     onValueChange?.(next, event);
+    // $bindable() sugar: with no onValueChange nothing could reject this report, so mirror it
+    // straight into the bound value. A caller that ALSO supplies onValueChange keeps full
+    // accept/reject control via the snap-back effect below — see TextInput's identical
+    // mechanism (text-input/index.svelte) for why echoing unconditionally would break that.
+    if (onValueChange === undefined) value = next;
     switchState = switchReducer(switchState, { type: 'native-reported', value: next });
   }
 

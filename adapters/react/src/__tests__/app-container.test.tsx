@@ -23,21 +23,29 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('synthetic AppContainer root', () => {
-  it('wraps the app in a single box-none, flex:1 RCTView', () => {
-    mount(ROOT_TAG, <App />);
+  // Positive only: the wrapper is unconditional structural setup around every commit, not a
+  // guarded/validated path — no Negative group applies.
+  describe('Positive', () => {
+    // why: pointerEvents:"box-none" is what makes the wrapper transparent to touches (RN's own
+    // AppContainer contract) — a plain RCTView here would swallow touches meant for the app.
+    it('wraps the app in a single box-none, flex:1 RCTView', () => {
+      mount(ROOT_TAG, <App />);
 
-    // appRoot() asserts the invariant: exactly one committed root, box-none.
-    const root = fabric.appRoot();
-    expect(root.viewName).toBe('RCTView');
-    expect(root.props.flex).toBe(1);
-    expect(root.props.pointerEvents).toBe('box-none');
-  });
+      // appRoot() asserts the invariant: exactly one committed root, box-none.
+      const root = fabric.appRoot();
+      expect(root.viewName).toBe('RCTView');
+      expect(root.props.flex).toBe(1);
+      expect(root.props.pointerEvents).toBe('box-none');
+    });
 
-  it("puts the app's own View as the container's single child", () => {
-    mount(ROOT_TAG, <App />);
+    // why: the wrapper must add exactly one layer, never nest the app tree deeper or merge
+    // multiple top-level app nodes into the wrapper itself.
+    it("puts the app's own View as the container's single child", () => {
+      mount(ROOT_TAG, <App />);
 
-    const root = fabric.appRoot();
-    expect(root.children).toHaveLength(1);
-    expect(root.children[0].viewName).toBe('RCTView');
+      const root = fabric.appRoot();
+      expect(root.children).toHaveLength(1);
+      expect(root.children[0].viewName).toBe('RCTView');
+    });
   });
 });

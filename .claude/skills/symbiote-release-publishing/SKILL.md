@@ -178,6 +178,41 @@ FUTURE mixed-mechanism package must get `clean` pointed at `build-ngc`, not
 `build`, from the start — check this the moment a new package.json copies the
 `ng:build`/`clean` pair from an existing one.
 
+### `pre-push` must `unset GIT_DIR` or every push from a worktree fails (2026-08-16)
+
+`.husky/pre-push` gates a branch on `pnpm exec changeset status --since=master`.
+From a **linked git worktree** that gate failed with a lie:
+
+```
+error Some packages have been changed but no changesets were found.
+husky - pre-push script failed (code 1)
+```
+
+while the branch carried 34 `.changeset/*.md` files and the SAME command run by
+hand in the same directory exited 0. The difference is the environment, not the
+state: git exports `GIT_DIR` to every hook, and in a linked worktree that value
+is ABSOLUTE (`<main>/.git/worktrees/<name>`), not the relative `.git` a normal
+checkout gets. With `GIT_DIR` set and no `GIT_WORK_TREE`, git skips discovery and
+treats the CURRENT DIRECTORY as the work-tree root. `@changesets/read` runs its
+diff with `cwd = <root>/.changeset` (`filterChangesetsSinceRef`), so git rooted
+the work tree at `.changeset/` and returned `README.md` instead of
+`.changeset/*.md`. Its regex `/.changeset\/[^/]+\.md$/` matched nothing ->
+`changesets.length === 0` -> the error above (`changesets-cli.cjs.js`, the
+`changedPackages.length > 0 && changesets.length === 0` branch). In the main
+checkout the exported `.git` is relative, fails to resolve from `.changeset/`,
+and git falls back to discovery - which is why this only ever bites worktrees.
+
+Fix, at the top of the hook:
+
+```sh
+unset GIT_DIR GIT_WORK_TREE
+```
+
+Reproduce without pushing: `git push --dry-run` runs pre-push for real. Running
+the hook body by hand does NOT reproduce it - the env var is only there under
+git. The same trap applies to any hook that shells out to a tool which runs git
+from a subdirectory.
+
 ## Changesets config (`.changeset/config.json`)
 
 ```jsonc

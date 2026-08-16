@@ -1,5 +1,10 @@
-// Co-located Vue-driven test (ADR 0025) for useLocales. See packages/battery's
-// use-battery-state.test.ts for the shared rationale.
+// Co-located Vue-driven test (ADR 0025) for useLocales. `core` is mocked wholesale (the real
+// getLocales/addLocaleListener delegation is covered once in
+// packages/localization/src/core/localization.test.ts) — see packages/battery's
+// use-battery-state.test.ts for the shared mounting rationale.
+//
+// No Negative group: the composable has no guard clause or throwing path — getLocales() is a
+// synchronous, always-succeeding native read.
 
 import { defineComponent, h, type Ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -93,12 +98,17 @@ function mountLocales(): Ref<Locale[]> {
 
 describe('useLocales (Vue)', () => {
   it('reads the current locales synchronously at setup', () => {
+    // why: getLocales() is called directly at ref() initialization (not inside onMounted) — the
+    // ref must hold the real value immediately, with no "loading" gap.
     const locales = mountLocales();
 
     expect(locales.value).toEqual(FAKE_LOCALES_INITIAL);
   });
 
   it('recomputes the ref when the native listener fires', () => {
+    // why: locale settings can change while the app runs — the ref must re-read getLocales() off
+    // the native invalidation event registered in onMounted, not cache the setup-time value
+    // forever.
     const locales = mountLocales();
 
     getLocalesMock.mockReturnValue(FAKE_LOCALES_UPDATED);
@@ -108,6 +118,8 @@ describe('useLocales (Vue)', () => {
   });
 
   it('removes the subscription on unmount', () => {
+    // why: onUnmounted must call subscription.remove(), or the native listener leaks past the
+    // component's lifetime.
     mountLocales();
     unmount(ROOT_TAG);
 

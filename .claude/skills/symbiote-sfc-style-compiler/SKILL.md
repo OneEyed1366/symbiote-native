@@ -121,6 +121,7 @@ root `pnpm-workspace.yaml`) that the runtime registry does not.
   `textShadowColor`/`textShadowOffset`/`textShadowRadius`, no composite/no
   engine-level processor to defer to) — so decomposing the CSS shorthand
   really is this package's job, and stays hand-rolled in `values.ts`.
+
 - `src/values.ts` — `px` → plain `number`, `%` stays a `string`, colors pass
   through as raw strings unchanged. `REM_TO_PX = 16` is SymbioteNative's own
   constant (RN has no root-font-size registry to derive it from); wolf-tui's
@@ -163,10 +164,12 @@ simpler and immune to a `</style>`-lookalike inside a string breaking a greedy
 regex match. For each block, calls `@symbiote-native/css-parser`'s `parseCSS()`,
 merges multiple blocks with last-wins semantics (same cascade wolf-tui
 documents), and prepends this to the compiled module source:
+
 ```js
 import { registerStyles } from '@symbiote-native/engine';
-registerStyles({ /* merged parseCSS() output */ });
+registerStyles({/* merged parseCSS() output */});
 ```
+
 No `<style>` block → no injected code, zero behavior change for style-less
 `.vue` files. `lang="scss"`/`"sass"`/`"less"`/`"stylus"` are preprocessed
 first (§7); any OTHER `lang` value still throws
@@ -200,18 +203,23 @@ order — Vue's `patchProp` fires one call per changed key, Angular's
 even React re-invokes `routeProp` once per changed prop on an update. The
 engine's `setProp` does a flat overwrite (`node.props[key] = value`, no merge),
 so naively routing both branches to `routeProp(el, 'style', ...)`
-independently would let whichever call runs *last* silently clobber the
+independently would let whichever call runs _last_ silently clobber the
 other. That is wrong: explicit `style` must always win over class-derived
 style, like CSS cascade specificity, regardless of call order.
 
 Fix, in `node.ts`:
+
 ```ts
-const classStyleParts = new WeakMap<ISymbioteNode, { classStyle?: unknown; explicitStyle?: unknown }>();
+const classStyleParts = new WeakMap<
+  ISymbioteNode,
+  { classStyle?: unknown; explicitStyle?: unknown }
+>();
 const CLASS_PROP_KEYS: ReadonlySet<string> = new Set(['class', 'className']);
 // routeProp: 'class'/'className' -> commitClassStyle(node, { classStyle: resolveClassName(...) })
 //            'style'             -> commitClassStyle(node, { explicitStyle: value })
 // commitClassStyle always does: setProp(node, 'style', [entry.classStyle, entry.explicitStyle]);
 ```
+
 Both branches always write a **2-element array in fixed order**
 (`[classStyle, explicitStyle]`), and let `core/engine/src/style/index.ts`'s
 existing `flattenStyle` do the actual collapse (array flatten is already
@@ -315,7 +323,7 @@ wrote a test for.
 
 ### The pseudo-class bug this practice caught
 
-`.card:hover { opacity: 0.5 }` — a pseudo-class *trailing a real class*, not
+`.card:hover { opacity: 0.5 }` — a pseudo-class _trailing a real class_, not
 a bare `:hover`. The original ported `extractClassName` had a test for bare
 `:hover` (correctly → `null`), but its **compound-selector branch** matched
 `.card:hover` as a compound selector before that check could apply, and
@@ -338,7 +346,7 @@ classes register globally, unsuffixed, shared across every component. A
 `card` → `card__data-v-xxxxxxxx`, using the SAME `scopeIdFor(filename)` hash
 `metro-vue-transformer.js` already computed for `compileScript({ id })` — so
 two components can each own a `.card` without colliding in the shared
-registry. This is the *intent* of Vue's real `data-v-hash` DOM-attribute
+registry. This is the _intent_ of Vue's real `data-v-hash` DOM-attribute
 mechanism, reimplemented as a name suffix instead, since SymbioteNative has no DOM
 and no attribute-selector matching (`class` is always a flat string-keyed
 `Map` lookup, full stop).
@@ -363,14 +371,14 @@ separately). The transform:
 - A static `AttributeNode` (`prop.type === 6`, `name === 'class'`) — its
   string content is rewritten DIRECTLY, at compile time: every space-
   separated token that's in this file's locally-scoped class set gets the
-  `__${scopeId}` suffix, everything else (a class from a sibling *unscoped*
+  `__${scopeId}` suffix, everything else (a class from a sibling _unscoped_
   block in the same file, or literally anything else) passes through
   untouched. No runtime call needed for the purely-static case.
 - A dynamic `bind` `DirectiveNode` targeting `class` (`prop.arg.content ===
-  'class'`) — its expression node (`prop.exp`) is wrapped, via
+'class'`) — its expression node (`prop.exp`) is wrapped, via
   `@vue/compiler-core`'s `createCompoundExpression`, into a call to
   `scopeClassName(<original expression, untouched>, __localScopedClassNames,
-  __scopeId)` (`scopeClassName` — `core/engine/src/style-registry/index.ts`
+__scopeId)` (`scopeClassName` — `core/engine/src/style-registry/index.ts`
   — imported as `__scopeClass`). Vue's own `normalizeClass()` still runs
   afterward on `scopeClassName`'s return value exactly as it would have on
   the original, so no other codegen shape changes.
@@ -378,7 +386,7 @@ separately). The transform:
 Because our transform runs on `prop.exp`/`prop.value` **before** Vue's own
 merge-and-normalize logic executes, `transformElement`'s merge of a
 same-element static `class=` + dynamic `:class=` into one codegen entry still
-runs *on our rewritten nodes*, unmodified — this is what makes the mixed case
+runs _on our rewritten nodes_, unmodified — this is what makes the mixed case
 (`class="card" :class="{ active: isActive }"`) come out correctly without any
 special-case merge code of our own. `scopeClassName` does its token-matching
 at **runtime**, so even a fully opaque dynamic value the compiler can't see
@@ -457,12 +465,29 @@ its suffix (`/^(?:data-v|svelte)-[0-9a-z]+$/`), never by "there is a `__`
 somewhere in the name". BEM is `card__title`. Splitting on a bare `__` would
 merge `.card`'s declarations into every BEM element class in the codebase.
 
-**Known remaining limit (not fixed, low value):** a compound rule where one
-token is scoped and the other is global (`:global(...)`-exempt, or a class
-that only exists in App.css) has no single suffix to factor out and still
-does not resolve. On the web it would, because the element carries both
-classes as separate tokens. Reaching it needs a registry that indexes by
-token set rather than by concatenated key.
+**Mixed scoped/global tokens — FIXED 2026-08-15 (was "low value", turned out
+to be the whole partial-`:global()` feature).** A compound rule where one
+token is scoped and the other is not (`:global(...)`-exempt, or a class that
+only exists in App.css, or one handed down from a parent component) used to
+have "no single suffix to factor out" and bail. That is exactly what a partial
+`:global()` produces: `.card :global(.legacy)` registers the collapsed key
+`cardLegacy__<scope>` (the rule still only applies where the file's own
+`.card` does, so the KEY is scoped) against markup `card__<scope> legacy` (the
+escape hatch exempts the TOKEN). Both halves were individually correct and
+could never meet. `scopedCompoundKey` now treats an unscoped token as
+contributing its own name and no scope, so the one scope present is still
+factorable; two tokens carrying DIFFERENT suffixes still bail, because no rule
+legitimately spans two components.
+
+**The divergence that buys:** a fully-scoped `.card.reset` collapses to the
+same key as `.card :global(.reset)`, so a foreign `reset` now matches a rule
+its author scoped to their own. The key format cannot tell them apart —
+separating them needs a registry indexed by token SET, with per-token scope.
+Asserted in `scoped-conformance.test.ts` beside the behavior it comes with, so
+it stays deliberate. End-to-end proof (real preprocess + compile + mount, both
+halves meeting at the registry) lives in
+`adapters/svelte/src/components/scoped-styles.smoke.test.ts`, "partial
+`:global()` under scope".
 
 **Checking it on a device needs THREE re-packed tarballs, not one.** `@symbiote-native/css-parser`
 is a regular dependency of every adapter, so an example that pins only the adapter and the engine
@@ -625,13 +650,17 @@ further given the fix is simple and robust either way: anchor
 depends on metro-babel-transformer itself and pnpm always guarantees a
 package can resolve its own direct dependencies from within its own store
 location:
+
 ```js
 const path = require('path');
 const metroConfigPkgPath = require.resolve('@react-native/metro-config/package.json');
 const upstreamTransformer = require(
-  require.resolve('@react-native/metro-babel-transformer', { paths: [path.dirname(metroConfigPkgPath)] }),
+  require.resolve('@react-native/metro-babel-transformer', {
+    paths: [path.dirname(metroConfigPkgPath)],
+  }),
 );
 ```
+
 See `examples/angular/metro-css-transformer.js` for the real, working version
 of this. If a future app's own `babelTransformerPath` wiring throws
 `Cannot find module '@react-native/metro-babel-transformer'`, this is why —
@@ -699,6 +728,7 @@ at each decision site (`metro-css-module.ts`, `metro-transformer.ts`,
 
 **The four wiring points that needed updating** (all documented at the call
 site, not just here):
+
 1. `metro-css-module.ts`'s `compileCssFile` — now `async`; detects the
    language via `detectLanguage()` and awaits `preprocessors.ts`'s `compile()`
    before `parseCSS()` runs. `isCssModuleFile()` was generalized from a
@@ -734,9 +764,10 @@ function, per language) rather than mocking them, since this is exactly the
 kind of ported/adapted logic that can pass green against a mock while
 silently diverging from the real compiler's actual output — the missing-
 package error path is the one thing that IS mocked (`vi.doMock` + `vi.resetModules()`
-+ a fresh dynamic `import('./preprocessors.ts')` per case, so each test gets
-an isolated lazy-load cache instead of colliding with the "real compile"
-tests for the same language).
+
+- a fresh dynamic `import('./preprocessors.ts')` per case, so each test gets
+  an isolated lazy-load cache instead of colliding with the "real compile"
+  tests for the same language).
 
 ## 8. Standalone `.module.css` type safety — CLOSED (2026-07)
 
@@ -848,6 +879,7 @@ unreferenced-by-the-built-entry files from an earlier decomposed attempt —
 `vite.config.ts`'s `build.lib.entry` points at `index.ts` alone.
 
 **Scope, honestly recorded, not silently thinner:**
+
 - Plain `.module.css` only — not `.module.scss`/`.less`/`.styl`.
   `getScriptSnapshot` must be fully SYNCHRONOUS (no async hook in the
   plugin protocol); Less and Stylus have no sync compile API at all (see
@@ -939,9 +971,11 @@ STILL OPEN, and confirmed NOT WORTH CLOSING** — verified by reading
 config flag might exist. `generateStyleModules` in
 `@vue/language-core/lib/codegen/style/modules.js` hardcodes the intersection
 unconditionally:
+
 ```js
-yield `: Record<string, string> & __VLS_PrettifyGlobal<{}`;
+yield`: Record<string, string> & __VLS_PrettifyGlobal<{}`;
 ```
+
 — no `vueCompilerOptions` flag gates it (grepped the package's `types.d.ts`,
 nothing like a `strictCssModules` option exists), and it is called directly
 from `codegen/script/template.js`, NOT through Volar's own pluggable
@@ -996,7 +1030,7 @@ by reading `.vendors/react-native` source directly (not memory):
    `process-box-shadow` already existed and were already wired into
    `commit.ts`'s `STYLE_PROCESSORS`; the CSS-parser side was the only gap.
 2. `filter`/`transform-origin` → same pattern: `core/engine/src/
-   process-filter.ts` and `process-transform-origin` were ALSO already ported
+process-filter.ts` and `process-transform-origin` were ALSO already ported
    and wired, `PROPERTY_TABLE` was just missing the two `raw` entries.
 3. `background-image` → the only one needing a NEW engine-level port:
    `core/engine/src/process-background-image/index.ts` (a faithful port of
@@ -1073,48 +1107,43 @@ class name.
 **2026-07-10 incident, much larger shape (`examples/angular`):** the
 `.section` layout wrapper (`padding: 24px` in `App.css`'s top-level "shared /
 common" block, the class every non-scrolling demo screen's `<SafeAreaView>
-> <View class="section">` root uses) silently lost its padding on EVERY
-screen except `CanaryScreen` (which never uses `.section` at all — it wraps
-in `<ScrollView contentContainerStyle="scroll-content">` instead). Confirmed
-live on device (not just by reading source): `mobile_list_elements_on_screen`
-showed every direct-child `Text`/`TextInput` of `.section` at `x:0,
-width:402` (full device width, zero horizontal inset) while the SAME
-screen's `hero-card` (a nested `View`, one level deeper) sat correctly
+
+> <View class="section">`root uses) silently lost its padding on EVERY
+screen except`CanaryScreen`(which never uses`.section`at all — it wraps
+in`<ScrollView contentContainerStyle="scroll-content">`instead). Confirmed
+live on device (not just by reading source):`mobile_list_elements_on_screen`showed every direct-child`Text`/`TextInput`of`.section`at`x:0,
+> width:402`(full device width, zero horizontal inset) while the SAME
+screen's`hero-card`(a nested`View`, one level deeper) sat correctly
 inset — proving `.section`'s OWN padding was gone, not a text-measurement
 quirk. Root cause: **`App.css` still carried a full pre-split legacy copy of
-every demo component's styles** (`/* AnimatedDemo */`, `/* ParityDemo */`,
-etc., ~230 lines, each with its own `.section`/`.section-label`
-re-declaration missing the `padding`) FROM BEFORE the `components/*.css`
-split existed — never deleted after the split, unlike the smaller 2026-07
+every demo component's styles** (`/* AnimatedDemo _/`, `/_ ParityDemo _/`,
+etc., ~230 lines, each with its own `.section`/`.section-label`re-declaration missing the`padding`) FROM BEFORE the `components/_.css`split existed — never deleted after the split, unlike the smaller 2026-07
 incident above which only left 4 stray rules behind. On top of that, ALL 8
-of that app's `components/*.css` files (`AccessibilityDemo`, `AnimatedDemo`,
+of that app's`components/_.css` files (`AccessibilityDemo`, `AnimatedDemo`,
 `AnimatedParityDemo`, `NativeModulesDemo`, `ParityDemo`, `PlatformColorDemo`,
 `RefApiDemo`, `ResponderDemo`) had ALSO independently re-declared the generic
 utility classes (`.section`, `.section-label`, `.info-text`, `.note-text`,
 `.row`) with narrower values (e.g. `.section {gap: 12px}`, no padding) —
 each demo author apparently reached for the obvious name instead of
 checking whether it already existed app-wide. Every static per-file audit
-(`grep` for "does this class exist in App.css" — yes, it does, just a second
+(`grep`for "does this class exist in App.css" — yes, it does, just a second
 time with different values) passed clean; only a live device element-tree
 read surfaced it. **Why Vue/React don't have this failure mode**: React's
-canary has NO per-component `.css` files at all (every component reuses
-`App.css`'s classes directly, no local redeclaration possible); Vue's
-per-component styles live in each `.vue` file's own `<style scoped>` block,
+canary has NO per-component`.css`files at all (every component reuses`App.css`'s classes directly, no local redeclaration possible); Vue's
+per-component styles live in each `.vue`file's own`<style scoped>`block,
 which Vue's SFC compiler scopes by construction, so a same-named class can't
-leak into the global registry. **Angular's plain `components/*.css` file
+leak into the global registry. **Angular's plain`components/_.css`file
 convention has no such scoping** — it is the one adapter genuinely exposed
-to this bug shape, so an Angular `components/*.css` file should NEVER
-redeclare a class that already exists in `App.css`'s shared/common section,
+to this bug shape, so an Angular`components/_.css`file should NEVER
+redeclare a class that already exists in`App.css`'s shared/common section,
 even if the values happen to currently match (a match today is not a
 guarantee against future drift). **Fix applied:** deleted the entire
-pre-split legacy block from `App.css` (every component-specific class now
-has exactly one source: its own `components/*.css` file) and deleted every
-generic-utility redeclaration from the 8 component files (now inheriting
-`App.css`'s single top-level definition). Verified via `ngc`/`tsc` (both
+pre-split legacy block from `App.css`(every component-specific class now
+has exactly one source: its own`components/_.css`file) and deleted every
+generic-utility redeclaration from the 8 component files (now inheriting`App.css`'s single top-level definition). Verified via `ngc`/`tsc`(both
 blind to this class of bug) AND a live device re-check post-fix (padding
-correctly `x:24, width:354` everywhere). **Diagnostic for next time:** don't
+correctly`x:24, width:354`everywhere). **Diagnostic for next time:** don't
 trust "the class exists in App.css" as proof a screen renders it correctly —
 grep for a SECOND definition of the same class name anywhere else in the
 app's CSS sources, and if the visual symptom is "padding/spacing missing but
-no build error", check the live device element tree (accessibility-tree
-`x`/`width` bounds), not just source.
+no build error", check the live device element tree (accessibility-tree`x`/`width` bounds), not just source.

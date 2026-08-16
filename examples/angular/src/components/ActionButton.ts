@@ -2,13 +2,11 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { Pressable, Text } from '@symbiote-native/angular';
 
 // Drop-in replacement for RN's stock <Button> (same title/color/testID surface, `press` as a real
-// Angular @Output() instead of React's onPress callback prop — Angular's own idiom, see
-// angular-adapter-events) — a bare Button renders as unstyled tinted text on iOS, visually
-// indistinguishable from a body Text line, which was the single biggest source of "looks messy"
-// across the demo app (2026-07 cohesion pass). One consistent bordered pill, tinted in the
-// caller's own `color` exactly like Button already took, so every screen's per-feature
-// color-coding (e.g. AnimatedDemo's JS-vs-native pairing) is preserved — only the chrome becomes
-// consistent. Twin of ../../react/components/ActionButton.tsx.
+// Angular @Output() instead of React's onPress prop — Angular's own idiom, see
+// angular-adapter-events). A bare Button renders as unstyled tinted text on iOS, indistinguishable
+// from a body Text line, so this gives every screen one consistent bordered pill instead, tinted
+// per caller — preserving each screen's own color-coding (e.g. AnimatedDemo's JS-vs-native
+// pairing) while making the chrome consistent. Twin of ../../react/components/ActionButton.tsx.
 @Component({
   selector: 'ActionButton',
   standalone: true,

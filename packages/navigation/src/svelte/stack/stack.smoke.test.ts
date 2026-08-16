@@ -158,168 +158,308 @@ async function mountStack(
   return handle;
 }
 
+// A fixture whose marker set SHRINKS at runtime - the Svelte shape of "a <Screen> behind an
+// {#if}", which appSource's fixed marker list cannot express. `onControls` hands the flip out to
+// the test, the same escape hatch `onReady` already uses for the navigator handle.
+const DYNAMIC_APP_SOURCE = `<script lang="ts">
+     import Stack from './index.svelte';
+     import Screen from '../screen.svelte';
+     import Home from './home-fixture.svelte';
+     import Details from './details-fixture.svelte';
+     import Profile from './profile-fixture.svelte';
+     let { onReady, onControls }: {
+       onReady?: (handle: unknown) => void;
+       onControls?: (controls: { hideDetails: () => void }) => void;
+     } = $props();
+     let navigator = $state.raw<unknown>(null);
+     let isDetailsRegistered = $state(true);
+     $effect(() => { if (navigator !== null) onReady?.(navigator); });
+     onControls?.({ hideDetails: () => { isDetailsRegistered = false; } });
+   </script>
+   <Stack bind:this={navigator}>
+     <Screen name="home" component={Home} />
+     {#if isDetailsRegistered}<Screen name="details" component={Details} />{/if}
+     <Screen name="profile" component={Profile} />
+   </Stack>`;
+
+const PROFILE_SOURCE = `<symbiote-view p={{ testID: 'profile' }} />`;
+
+function isDynamicControls(value: unknown): value is { hideDetails: () => void } {
+  return typeof value === 'object' && value !== null && 'hideDetails' in value;
+}
+
+async function mountDynamicStack(): Promise<{
+  handle: INavigatorHandle;
+  hideDetails: () => void;
+}> {
+  const dir = __dirname;
+  await harness.compileSource(dir, 'home-fixture', HOME_SOURCE);
+  await harness.compileSource(dir, 'details-fixture', DETAILS_SOURCE);
+  await harness.compileSource(dir, 'profile-fixture', PROFILE_SOURCE);
+  const app = await harness.compileSource(dir, 'stack-app-dynamic', DYNAMIC_APP_SOURCE);
+  const App = await loadComponent(app);
+  let handle: unknown = null;
+  let controls: unknown = null;
+  mount(ROOT_TAG, App, {
+    onReady: (value: unknown) => {
+      handle = value;
+    },
+    onControls: (value: unknown) => {
+      controls = value;
+    },
+  });
+  await tick();
+  await tick();
+  if (!isNavigatorHandle(handle)) throw new Error('Stack did not expose a navigator handle');
+  if (!isDynamicControls(controls)) throw new Error('the dynamic fixture exposed no controls');
+  return { handle, hideDetails: controls.hideDetails };
+}
+
+// No product-level Negative group: every export here (push/pop/replace/canGoBack, screen
+// registration, options folding) accepts whatever it's given and composes it - there is no
+// user-input validation path in this Svelte lifecycle layer that is meant to reject/throw
+// (unlike runes/runes.smoke.test.ts's requireNavigationScope guards, or the core reducer's own
+// tests). `mountStack`'s `isNavigatorHandle` check above is a TEST-HARNESS safeguard against a
+// broken fixture, not a product contract under test, so it stays out of the grouping below.
 describe('Stack (real compiled index.svelte)', () => {
-  it('paints the react-native-screens chrome for the initial route', async () => {
-    await mountStack();
+  describe('Positive', () => {
+    it('paints the react-native-screens chrome for the initial route', async () => {
+      // why: the lone RCTRawText is the whitespace between the two `<Screen>` markers in the
+      // fixture - it must land inside the collapsed RCTText registry host (../registry-host.ts)
+      // rather than become an illegal raw-text child of RNSScreenStack, and the initial route's
+      // screen must paint as RNSScreen > RNSScreenStackHeaderConfig + RNSScreenContentWrapper.
+      await mountStack();
 
-    // The lone RCTRawText is the whitespace between the two `<Screen>` markers in the fixture,
-    // safely parked inside the collapsed RCTText registry host (../registry-host.ts) instead of
-    // becoming an illegal raw-text child of RNSScreenStack.
-    expect(outline(fabric.appRoot())).toEqual([
-      'RCTView',
-      '  RCTView',
-      '    RCTView',
-      '      RCTText',
-      '        RCTRawText',
-      '      RNSScreenStack',
-      '        RNSScreen',
-      '          RNSScreenStackHeaderConfig',
-      '          RNSScreenContentWrapper',
-      '            RCTView',
-    ]);
-  });
+      expect(outline(fabric.appRoot())).toEqual([
+        'RCTView',
+        '  RCTView',
+        '    RCTView',
+        '      RCTText',
+        '        RCTRawText',
+        '      RNSScreenStack',
+        '        RNSScreen',
+        '          RNSScreenStackHeaderConfig',
+        '          RNSScreenContentWrapper',
+        '            RCTView',
+      ]);
+    });
 
-  it('registers every marker and can push/pop the second route through bind:this', async () => {
-    const handle = await mountStack();
-    expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
+    it('registers every marker and can push/pop the second route through bind:this', async () => {
+      // why: the context-based screen collector must populate the registry during the SAME
+      // synchronous mount pass that paints it (this file's header comment) - proven by push
+      // immediately reaching a route the collector registered moments earlier - and the exported
+      // handle's push/pop must move canGoBack() in lockstep with the actual RNSScreen count.
+      const handle = await mountStack();
+      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
 
-    handle.push('details');
-    await tick();
-    await tick();
-    expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(2);
-    expect(handle.canGoBack()).toBe(true);
+      handle.push('details');
+      await tick();
+      await tick();
+      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(2);
+      expect(handle.canGoBack()).toBe(true);
 
-    handle.pop();
-    await tick();
-    await tick();
-    expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
-    expect(handle.canGoBack()).toBe(false);
-  });
+      handle.pop();
+      await tick();
+      await tick();
+      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
+      expect(handle.canGoBack()).toBe(false);
+    });
 
-  it('replaces the top route without growing the stack', async () => {
-    const handle = await mountStack();
-    handle.replace('details');
-    await tick();
-    await tick();
+    it('replaces the top route without growing the stack', async () => {
+      // why: replace() must swap the top route's content in place - a caller relying on "replace,
+      // not push" (e.g. a login screen replaced by home) would regress if this silently grew the
+      // stack instead.
+      const handle = await mountStack();
+      handle.replace('details');
+      await tick();
+      await tick();
 
-    expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
-    const screen = findLive(fabric.appRoot(), 'RNSScreenContentWrapper');
-    expect(screen?.children?.[0]?.props?.testID).toBe('details');
-  });
+      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
+      const screen = findLive(fabric.appRoot(), 'RNSScreenContentWrapper');
+      expect(screen?.children?.[0]?.props?.testID).toBe('details');
+    });
 
-  it('honours initialRouteName over registration order', async () => {
-    await mountStack('initial-route', 'initialRouteName="details"');
-    const wrapper = findLive(fabric.appRoot(), 'RNSScreenContentWrapper');
-    expect(wrapper?.children?.[0]?.props?.testID).toBe('details');
-  });
+    it('honours initialRouteName over registration order', async () => {
+      // why: initialRouteName must win over "whichever <Screen> registered first" - the second
+      // registered screen ("details") mounts as the initial route when named explicitly.
+      await mountStack('initial-route', 'initialRouteName="details"');
+      const wrapper = findLive(fabric.appRoot(), 'RNSScreenContentWrapper');
+      expect(wrapper?.children?.[0]?.props?.testID).toBe('details');
+    });
 
-  it('folds screen options into the native header config', async () => {
-    await mountStack('options', '', 'options={{ title: "Home screen", headerLargeTitle: true }}');
-    const header = findLive(fabric.appRoot(), 'RNSScreenStackHeaderConfig');
-    expect(header?.props?.title).toBe('Home screen');
-    expect(header?.props?.largeTitle).toBe(true);
-  });
+    it('folds screen options into the native header config', async () => {
+      // why: per-screen `options` must reach the native RNSScreenStackHeaderConfig view's props
+      // (title/largeTitle), not stay trapped in JS state - this is the only way a screen actually
+      // gets a native header.
+      await mountStack('options', '', 'options={{ title: "Home screen", headerLargeTitle: true }}');
+      const header = findLive(fabric.appRoot(), 'RNSScreenStackHeaderConfig');
+      expect(header?.props?.title).toBe('Home screen');
+      expect(header?.props?.largeTitle).toBe(true);
+    });
 
-  it('drives useIsFocused from the native onAppear/onDisappear events', async () => {
-    await mountStack();
-    expect(findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel).toBe(
-      'home:false',
-    );
+    it('drives useIsFocused from the native onAppear/onDisappear events', async () => {
+      // why: useIsFocused has no synthetic timer of its own (see use-is-focused.svelte.ts) - it
+      // must track the REAL native RNSScreen onAppear/onDisappear events one-to-one, starting
+      // false, since a route genuinely isn't focused at the instant it mounts.
+      await mountStack();
+      expect(findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel).toBe(
+        'home:false',
+      );
 
-    const screen = findLive(fabric.appRoot(), 'RNSScreen');
-    expect(screen).toBeDefined();
-    if (screen === undefined) return;
+      const screen = findLive(fabric.appRoot(), 'RNSScreen');
+      expect(screen).toBeDefined();
+      if (screen === undefined) return;
 
-    fabric.fireEvent(screen.instanceHandle, 'topAppear', {});
-    await tick();
-    await tick();
-    expect(findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel).toBe('home:true');
+      fabric.fireEvent(screen.instanceHandle, 'topAppear', {});
+      await tick();
+      await tick();
+      expect(findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel).toBe(
+        'home:true',
+      );
 
-    fabric.fireEvent(screen.instanceHandle, 'topDisappear', {});
-    await tick();
-    await tick();
-    expect(findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel).toBe(
-      'home:false',
-    );
-  });
+      fabric.fireEvent(screen.instanceHandle, 'topDisappear', {});
+      await tick();
+      await tick();
+      expect(findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel).toBe(
+        'home:false',
+      );
+    });
 
-  it('pops one route when the native screen reports a dismissal', async () => {
-    const handle = await mountStack();
-    handle.push('details');
-    await tick();
-    await tick();
+    it('pops one route when the native screen reports a dismissal', async () => {
+      // why: an iOS swipe-back or native back-button press reports `topDismissed` on the native
+      // screen, not a JS-driven pop() call - the stack must still respond by popping exactly one
+      // route, keeping JS state in sync with what the user already saw happen natively.
+      const handle = await mountStack();
+      handle.push('details');
+      await tick();
+      await tick();
 
-    const topScreen = findAllLive(fabric.appRoot(), 'RNSScreen')[1];
-    expect(topScreen).toBeDefined();
-    if (topScreen === undefined) return;
+      const topScreen = findAllLive(fabric.appRoot(), 'RNSScreen')[1];
+      expect(topScreen).toBeDefined();
+      if (topScreen === undefined) return;
 
-    fabric.fireEvent(topScreen.instanceHandle, 'topDismissed', {});
-    await tick();
-    await tick();
-    expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
-  });
+      fabric.fireEvent(topScreen.instanceHandle, 'topDismissed', {});
+      await tick();
+      await tick();
+      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
+    });
 
-  it('mounts the search bar and wires its imperative ref to real view commands', async () => {
-    const searchBarRef: { current: ISearchBarCommands | null } = { current: null };
-    const dir = __dirname;
-    await harness.compileSource(dir, 'home-fixture', HOME_SOURCE);
-    await harness.compileSource(dir, 'details-fixture', DETAILS_SOURCE);
-    const app = await harness.compileSource(
-      dir,
-      'stack-search-app',
-      `<script lang="ts">
+    it('mounts the search bar and wires its imperative ref to real view commands', async () => {
+      // why: `headerSearchBarOptions.ref` is an ESCAPE HATCH into imperative native view commands
+      // (setText etc.) - this proves the ref actually resolves to a live RNSSearchBar tag and that
+      // calling a method on it dispatches a REAL Fabric command, not a no-op stub.
+      const searchBarRef: { current: ISearchBarCommands | null } = { current: null };
+      const dir = __dirname;
+      await harness.compileSource(dir, 'home-fixture', HOME_SOURCE);
+      await harness.compileSource(dir, 'details-fixture', DETAILS_SOURCE);
+      const app = await harness.compileSource(
+        dir,
+        'stack-search-app',
+        `<script lang="ts">
          import Stack from './index.svelte';
          import Screen from '../screen.svelte';
          import Home from './home-fixture.svelte';
          let { searchBarRef }: { searchBarRef: unknown } = $props();
        </script>
        <Stack><Screen name="home" component={Home} options={{ headerSearchBarOptions: { placeholder: 'Find', ref: searchBarRef } }} /></Stack>`,
-    );
-    const App = await loadComponent(app);
-    mount(ROOT_TAG, App, { searchBarRef });
-    await tick();
-    await tick();
+      );
+      const App = await loadComponent(app);
+      mount(ROOT_TAG, App, { searchBarRef });
+      await tick();
+      await tick();
 
-    const searchBar = findLive(fabric.appRoot(), 'RNSSearchBar');
-    expect(searchBar?.props?.placeholder).toBe('Find');
-    expect(findLive(fabric.appRoot(), 'RNSScreenStackHeaderSubview')?.props?.type).toBe(
-      'searchBar',
-    );
+      const searchBar = findLive(fabric.appRoot(), 'RNSSearchBar');
+      expect(searchBar?.props?.placeholder).toBe('Find');
+      expect(findLive(fabric.appRoot(), 'RNSScreenStackHeaderSubview')?.props?.type).toBe(
+        'searchBar',
+      );
 
-    expect(searchBarRef.current).not.toBeNull();
-    searchBarRef.current?.setText('hello');
-    expect(fabric.commands).toHaveLength(1);
-    expect(fabric.commands[0]?.commandName).toBe('setText');
-    expect(fabric.commands[0]?.args).toEqual(['hello']);
+      expect(searchBarRef.current).not.toBeNull();
+      searchBarRef.current?.setText('hello');
+      expect(fabric.commands).toHaveLength(1);
+      expect(fabric.commands[0]?.commandName).toBe('setText');
+      expect(fabric.commands[0]?.args).toEqual(['hello']);
+    });
+
+    it('nests an inner stack so a modally presented screen can host a header', async () => {
+      // why: a `stackPresentation: "formSheet"` screen must mount inside its OWN nested
+      // RNSScreenStack (wrapped in RNSModalScreen) so it can still carry a native header - this is
+      // architecturally distinct from a plain pushed screen, not just a style variant.
+      await mountStack('modal', '', 'options={{ stackPresentation: "formSheet" }}');
+
+      expect(outline(fabric.appRoot())).toEqual([
+        'RCTView',
+        '  RCTView',
+        '    RCTView',
+        '      RCTText',
+        '        RCTRawText',
+        '      RNSScreenStack',
+        '        RNSModalScreen',
+        '          RNSScreenStack',
+        '            RNSScreen',
+        '              RNSScreenStackHeaderConfig',
+        '              RNSScreenContentWrapper',
+        '                RCTView',
+      ]);
+    });
+
+    it('drops a pushed route whose <Screen> marker unregisters', async () => {
+      // why: the route list is navigation HISTORY, not a projection of the registered markers, so
+      // a marker unregistering (its `{#if}` going false, onDestroy firing) while its route is still
+      // pushed used to leave a phantom entry - a route nothing can render, which the user cannot
+      // see but every back press has to walk through. Reconciling against the registry must drop it
+      // and leave the user on a real screen.
+      const { handle, hideDetails } = await mountDynamicStack();
+      handle.push('details');
+      await tick();
+      await tick();
+      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(2);
+
+      hideDetails();
+      await tick();
+      await tick();
+
+      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
+      expect(findLiveByTestId(fabric.appRoot(), 'home')).toBeDefined();
+      expect(findLiveByTestId(fabric.appRoot(), 'details')).toBeUndefined();
+      expect(handle.canGoBack()).toBe(false);
+    });
+
+    it('keeps the pruned history when a new route is pushed afterwards', async () => {
+      // why: the pruning must be PERSISTED, not just derived for the paint - a phantom left in the
+      // pushed state has the next push rebuild the stack on top of it, and the user then has to
+      // press back TWICE to leave a route they only visited once.
+      const { handle, hideDetails } = await mountDynamicStack();
+      handle.push('details');
+      await tick();
+      await tick();
+      hideDetails();
+      await tick();
+      await tick();
+      handle.push('profile');
+      await tick();
+      await tick();
+      handle.pop();
+      await tick();
+      await tick();
+
+      expect(countLive(fabric.appRoot(), 'RNSScreen')).toBe(1);
+      expect(findLiveByTestId(fabric.appRoot(), 'home')).toBeDefined();
+      expect(handle.canGoBack()).toBe(false);
+    });
   });
 
-  it('nests an inner stack so a modally presented screen can host a header', async () => {
-    await mountStack('modal', '', 'options={{ stackPresentation: "formSheet" }}');
-
-    expect(outline(fabric.appRoot())).toEqual([
-      'RCTView',
-      '  RCTView',
-      '    RCTView',
-      '      RCTText',
-      '        RCTRawText',
-      '      RNSScreenStack',
-      '        RNSModalScreen',
-      '          RNSScreenStack',
-      '            RNSScreen',
-      '              RNSScreenStackHeaderConfig',
-      '              RNSScreenContentWrapper',
-      '                RCTView',
-    ]);
-  });
-
-  // The package's OWN templates must be packed edge-to-edge (skill §16); the app fixture above
-  // deliberately is not, which is why this compiles the real sources through a fresh harness.
-  it('compiles every navigator template with no stray whitespace text nodes', async () => {
-    const audit = createSvelteHarness('stack-audit');
-    await audit.compileFile(join(__dirname, 'index.svelte'));
-    await audit.compileFile(join(__dirname, '../navigation-scope.svelte'));
-    await audit.compileFile(join(__dirname, '../screen.svelte'));
-    expect(audit.strayWhitespaceCount()).toBe(0);
-    audit.cleanup();
+  // Not a Positive/Negative behavior scenario - a build-hygiene audit that the package's OWN
+  // templates compile edge-to-edge with no stray whitespace text nodes, distinct from the
+  // deliberately-not-packed app fixture used by the tests above.
+  describe('compilation hygiene', () => {
+    it('compiles every navigator template with no stray whitespace text nodes', async () => {
+      const audit = createSvelteHarness('stack-audit');
+      await audit.compileFile(join(__dirname, 'index.svelte'));
+      await audit.compileFile(join(__dirname, '../navigation-scope.svelte'));
+      await audit.compileFile(join(__dirname, '../screen.svelte'));
+      expect(audit.strayWhitespaceCount()).toBe(0);
+      audit.cleanup();
+    });
   });
 });

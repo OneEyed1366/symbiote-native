@@ -20,11 +20,15 @@
 </script>
 
 <script lang="ts">
-  import { isNativeAnimatedAvailable, reduceProps, readPassthroughStyle } from '@symbiote-native/engine';
+  import {
+    createAnimatedLeafLifecycle,
+    isNativeAnimatedAvailable,
+    reduceProps,
+    readPassthroughStyle,
+  } from '@symbiote-native/engine';
   import { resolveAccessibilityProps } from '@symbiote-native/components';
   import type { IAccessibilityProps, IAriaProps, IImageViewProps } from '@symbiote-native/components';
   import { buildImageBag } from '../../components/image/image-logic';
-  import { createAnimatedReconcileRuntime } from './animated-props-runtime';
   import { createAttachmentsSync } from '../../runes/attachments';
   import { toTemplateSafeProps } from '../../renderer';
   import type { IHostInstance } from '@symbiote-native/engine';
@@ -95,7 +99,7 @@
     return toTemplateSafeProps(bag);
   });
 
-  const runtime = createAnimatedReconcileRuntime();
+  const runtime = createAnimatedLeafLifecycle('AnimatedImage');
 
   $effect(() => {
     const currentRest = rest;

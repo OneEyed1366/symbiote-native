@@ -3,4 +3,11 @@
 // machine, style computation, and native-constants read all live in core, shared with React/Vue.
 export { hide, isVisible } from '../core';
 export { HideAnimationService } from './services/hide-animation.service';
-export type { IHideAnimationConfig, IHideAnimationResult, IManifest, IHideConfig } from '../core';
+export type {
+  IHideAnimationConfig,
+  IHideAnimationFailure,
+  IHideAnimationFailureStage,
+  IHideAnimationResult,
+  IManifest,
+  IHideConfig,
+} from '../core';

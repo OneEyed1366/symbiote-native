@@ -106,46 +106,101 @@ async function mountMagnetometerUncalibrated(
 }
 
 describe('useMagnetometerUncalibrated (Svelte)', () => {
-  it('starts null before any measurement arrives', async () => {
-    const values: (IMagnetometerUncalibratedMeasurement | null)[] = [];
-    await mountMagnetometerUncalibrated(values);
+  // No Negative group: useMagnetometerUncalibrated has no guard clause or throwing path — every
+  // accepted updateIntervalMs value (or its absence) and every
+  // IMagnetometerUncalibratedMeasurement the native listener can deliver reaches `current`
+  // unchanged. Only the shared lifecycle wiring (subscribe once on mount, replace state on each
+  // event, unsubscribe on unmount) is under test here; DeviceSensor's own methods are not called
+  // by this rune at all and are covered by core/magnetometer-uncalibrated.test.ts.
+  describe('Positive (subscribe -> update -> cleanup lifecycle)', () => {
+    // why: a consumer renders BEFORE the first native event can possibly arrive, so `current`
+    // must expose a real "no reading yet" value rather than staying `undefined` or throwing.
+    it('starts null before any measurement arrives', async () => {
+      const values: (IMagnetometerUncalibratedMeasurement | null)[] = [];
+      await mountMagnetometerUncalibrated(values);
 
-    expect(values[values.length - 1]).toBeNull();
-  });
+      expect(values[values.length - 1]).toBeNull();
+    });
 
-  it('updates the state when the native listener fires', async () => {
-    const values: (IMagnetometerUncalibratedMeasurement | null)[] = [];
-    await mountMagnetometerUncalibrated(values);
-    const reading: IMagnetometerUncalibratedMeasurement = {
-      x: 0.1,
-      y: 0.2,
-      z: 0.9,
-      timestamp: 123,
-    };
+    // why: the effect body writes `measurement` but never reads it, so it must run exactly once
+    // on mount and never re-subscribe on its own — a double subscription would mean double
+    // native event delivery per commit.
+    it('subscribes to the native module exactly once on mount', async () => {
+      await mountMagnetometerUncalibrated([]);
 
-    registeredListener?.(reading);
-    await tick();
+      expect(addListenerMock).toHaveBeenCalledTimes(1);
+    });
 
-    expect(values[values.length - 1]).toEqual(reading);
-  });
+    // why: the whole point of the rune is to mirror the native module's push events (raw,
+    // uncalibrated field strength per axis in microteslas) into reactive state, so a fired event
+    // must be visible through `current`.
+    it('updates the state when the native listener fires', async () => {
+      const values: (IMagnetometerUncalibratedMeasurement | null)[] = [];
+      await mountMagnetometerUncalibrated(values);
+      const reading: IMagnetometerUncalibratedMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.9,
+        timestamp: 123,
+      };
 
-  it('removes the subscription on unmount', async () => {
-    await mountMagnetometerUncalibrated([]);
-    unmount(ROOT_TAG);
+      registeredListener?.(reading);
+      await tick();
 
-    expect(removeMock).toHaveBeenCalledTimes(1);
-  });
+      expect(values[values.length - 1]).toEqual(reading);
+    });
 
-  it('sets the update interval once at subscribe time when provided', async () => {
-    await mountMagnetometerUncalibrated([], 50);
+    // why: `measurement = next` is a plain reassignment, not a merge — a second event must fully
+    // REPLACE the first reading. A merge bug would leave stale axis values behind.
+    it('replaces the previous reading, not merges it, on a second native event', async () => {
+      const values: (IMagnetometerUncalibratedMeasurement | null)[] = [];
+      await mountMagnetometerUncalibrated(values);
+      const first: IMagnetometerUncalibratedMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.9,
+        timestamp: 123,
+      };
+      const second: IMagnetometerUncalibratedMeasurement = {
+        x: -12.4,
+        y: 33.1,
+        z: -5.6,
+        timestamp: 456,
+      };
 
-    expect(setUpdateIntervalMock).toHaveBeenCalledWith(50);
-    expect(setUpdateIntervalMock).toHaveBeenCalledTimes(1);
-  });
+      registeredListener?.(first);
+      await tick();
+      registeredListener?.(second);
+      await tick();
 
-  it('does not touch the update interval when omitted', async () => {
-    await mountMagnetometerUncalibrated([]);
+      expect(values[values.length - 1]).toEqual(second);
+    });
 
-    expect(setUpdateIntervalMock).not.toHaveBeenCalled();
+    // why: an active native subscription after the consuming component is gone leaks a listener
+    // and keeps the sensor powered on the device for nothing.
+    it('removes the subscription on unmount', async () => {
+      await mountMagnetometerUncalibrated([]);
+      unmount(ROOT_TAG);
+
+      expect(removeMock).toHaveBeenCalledTimes(1);
+    });
+
+    // why: the caller-supplied sample rate must reach the native module, applied once at subscribe
+    // time (not on every render) per the rune's header comment on why `updateIntervalMs` is a
+    // plain number, not a reactive getter.
+    it('sets the update interval once at subscribe time when provided', async () => {
+      await mountMagnetometerUncalibrated([], 50);
+
+      expect(setUpdateIntervalMock).toHaveBeenCalledWith(50);
+      expect(setUpdateIntervalMock).toHaveBeenCalledTimes(1);
+    });
+
+    // why: an omitted interval must leave the native module's own default sample rate alone —
+    // calling setUpdateInterval with an undefined/fallback value would silently override it.
+    it('does not touch the update interval when omitted', async () => {
+      await mountMagnetometerUncalibrated([]);
+
+      expect(setUpdateIntervalMock).not.toHaveBeenCalled();
+    });
   });
 });

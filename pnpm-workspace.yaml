@@ -97,11 +97,15 @@ catalog:
   '@angular/common': ~22.0.8
   '@angular/compiler': ~22.0.8
   '@angular/compiler-cli': ~22.0.8
+  # Same lock-step family as the four above — @angular/forms has no runtime Babel/linker
+  # entanglement of its own, but pinning it to the same patch avoids a second, independent
+  # version drift source on top of the one already being managed here.
+  '@angular/forms': ~22.0.8
   # TEMPORARY pin (2026-08-16, svelte-adapter-custom-renderer skill) on sveltejs/svelte PR
-  # #18042's `svelte-custom-renderer` branch — the official `createRenderer` API
+  # #18042's `svelte-custom-renderer` branch - the official `createRenderer` API
   # (`svelte/renderer`) this adapter now drives instead of the retired DOM-shim. The PR is still
   # OPEN/unmerged, so no npm release carries this API yet; `main`/`module`/`types` all point at
-  # committed source (no build step required — verified `types/index.d.ts` is checked in, not
+  # committed source (no build step required - verified `types/index.d.ts` is checked in, not
   # gitignored). Swap back to a real semver range the moment #18042 ships.
   svelte: github:sveltejs/svelte#dd148ebb74f326b9cd4f9c49b785a12518858b6a&path:/packages/svelte
   # Declaration emit for the raw `.svelte` sources we publish (scripts/emit-svelte-declarations.mjs).

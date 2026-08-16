@@ -145,6 +145,8 @@ async function survivorsAfterShrink(size: number, rootTag: number): Promise<numb
   return handles.filter(ref => ref.deref() !== undefined).length;
 }
 
+// Positive-only: this is a memory-retention measurement, not a function with an input it can
+// reject — there is no throwing contract to pin a Negative scenario against.
 describe('engine node release', () => {
   it('retains a constant, not a per-node accumulation, after nodes leave the tree', async () => {
     const smallSurvivors = await survivorsAfterShrink(SMALL, 93_001);

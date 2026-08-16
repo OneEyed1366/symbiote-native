@@ -27,7 +27,11 @@ function compiler() {
 }
 
 const ts = require('typescript');
-const { compileCssFile, isStyleFile, resolveUpstreamTransformer } = require('@symbiote-native/css-parser');
+const {
+  compileCssFile,
+  isStyleFile,
+  resolveUpstreamTransformer,
+} = require('@symbiote-native/css-parser');
 
 const upstreamTransformer = resolveUpstreamTransformer();
 
@@ -72,22 +76,20 @@ async function compileSvelteFile(src, filename) {
 }
 
 // `.svelte.js`/`.svelte.ts` files (adapters/svelte/src/runes/*.svelte.ts and any package that
-// ships its own runes, e.g. packages/splash-screen/src/svelte/runes) carry rune syntax
-// ($state/$effect/...) OUTSIDE a component's markup, so they need svelte/compiler's separate
-// MODULE api, not compile() — compile() expects a component and throws a parse error on a bare
-// module (verified directly against svelte@5.56.8). Uncompiled, a literal `$state(...)` call
-// hits svelte/index-client.js's dev-guard export and throws `rune_outside_svelte` the instant
-// it runs — this filename check was previously MISSING entirely, so every .svelte.ts rune file
+// ships its own runes) carry rune syntax ($state/$effect/...) OUTSIDE a component's markup, so
+// they need svelte/compiler's separate MODULE api, not compile() — compile() expects a
+// component and throws a parse error on a bare module. Uncompiled, a literal `$state(...)` call
+// hits svelte/index-client.js's dev-guard export and throws `rune_outside_svelte` the instant it
+// runs — this filename check was previously MISSING entirely, so every .svelte.ts rune file
 // shipped uncompiled and would crash on first call on a real device.
 //
 // Unlike compile() (which strips <script lang="ts"> types itself via bundled acorn-typescript),
-// compileModule() does NOT parse TypeScript at all — verified directly: it throws js_parse_error
-// on a bare return-type annotation regardless of the .ts filename passed. So TS has to be
-// stripped BEFORE compileModule() ever sees the source. ts.transpileModule() (isolated-file
-// "strip only" mode, module:ESNext/target:ESNext) does exactly this: drops type-only
-// imports/annotations, keeps every used value import and leaves $state/$effect call expressions
-// completely untouched — verified it does not require full-program type information the way
-// metro-vue-transformer.cjs's registerTS step does.
+// compileModule() does NOT parse TypeScript at all — it throws js_parse_error on a bare
+// return-type annotation regardless of the .ts filename passed. So TS has to be stripped BEFORE
+// compileModule() ever sees the source. ts.transpileModule() (isolated-file "strip only" mode,
+// module:ESNext/target:ESNext) does exactly this: drops type-only imports/annotations, keeps
+// every used value import, and leaves $state/$effect call expressions untouched — it does not
+// require full-program type information the way metro-vue-transformer.cjs's registerTS step does.
 function stripTypeScript(src, filename) {
   const { outputText } = ts.transpileModule(src, {
     fileName: filename,
@@ -119,7 +121,11 @@ module.exports.transform = async function transform(params) {
     const code = await compileSvelteFile(preprocessed.code, params.filename);
     // Re-label as .tsx so RN's transformer processes the module exactly like app source; Metro
     // tracks the real path separately. Matches metro-vue-transformer.cjs's identical trick.
-    return upstreamTransformer.transform({ ...params, src: code, filename: params.filename + '.tsx' });
+    return upstreamTransformer.transform({
+      ...params,
+      src: code,
+      filename: params.filename + '.tsx',
+    });
   }
   if (params.filename.endsWith('.svelte.ts') || params.filename.endsWith('.svelte.js')) {
     const code = await compileSvelteModuleFile(params.src, params.filename);
@@ -131,7 +137,11 @@ module.exports.transform = async function transform(params) {
   // .css/.scss/.sass/.less/.styl (+ .module.*).
   if (isStyleFile(params.filename)) {
     const { code } = await compileCssFile(params.src, params.filename);
-    return upstreamTransformer.transform({ ...params, src: code, filename: params.filename + '.js' });
+    return upstreamTransformer.transform({
+      ...params,
+      src: code,
+      filename: params.filename + '.js',
+    });
   }
   return upstreamTransformer.transform(params);
 };

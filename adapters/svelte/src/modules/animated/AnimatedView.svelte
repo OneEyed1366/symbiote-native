@@ -19,8 +19,13 @@
 </script>
 
 <script lang="ts">
-  import { dlog, isNativeAnimatedAvailable, reduceProps, readPassthroughStyle } from '@symbiote-native/engine';
-  import { createAnimatedReconcileRuntime } from './animated-props-runtime';
+  import {
+    createAnimatedLeafLifecycle,
+    dlog,
+    isNativeAnimatedAvailable,
+    reduceProps,
+    readPassthroughStyle,
+  } from '@symbiote-native/engine';
   import { createAttachmentsSync } from '../../runes/attachments';
   import { toTemplateSafeProps } from '../../renderer';
   import type { IHostInstance } from '@symbiote-native/engine';
@@ -56,7 +61,7 @@
     return toTemplateSafeProps(out);
   });
 
-  const runtime = createAnimatedReconcileRuntime();
+  const runtime = createAnimatedLeafLifecycle('AnimatedView');
 
   // DIAGNOSTIC (2026-08-13, tracking the effect_update_depth_exceeded device crash): isolates
   // whether `{@attach}` below EVER re-fires after the initial mount. Nodes are eagerly bound

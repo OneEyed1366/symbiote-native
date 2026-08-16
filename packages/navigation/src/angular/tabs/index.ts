@@ -39,6 +39,7 @@ import {
   createNavigationEmitter,
   diffFocusedRoute,
   isFocusedRoute,
+  reconcileTabRoutes,
   renderTabBar,
   tabRouterReducer,
 } from '../../core';
@@ -114,10 +115,9 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
     this.dispatch({ type: 'setParams', key, params });
 
   ngAfterContentInit(): void {
-    this.rebuildRegistry();
-    this.initializeState();
+    this.syncRegistry();
     this.tabScreenChildrenSubscription = this.tabScreenChildren.changes.subscribe(() => {
-      this.rebuildRegistry();
+      this.syncRegistry();
     });
   }
 
@@ -141,10 +141,24 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
     }));
   }
 
-  private initializeState(): void {
-    if (this.stateSignal() !== undefined) return;
+  // A <ng-template symbioteTabScreen> can appear or disappear after mount (a marker behind an
+  // @if, a data-driven screen list), so the route list follows the LIVE query instead of staying
+  // frozen at whatever ngAfterContentInit first saw: reconcileTabRoutes (core) keeps each
+  // surviving route's key and accumulated params and moves focus only when the focused route is
+  // the one that left. Runs from the query's own `changes` subscription - an ordinary imperative
+  // callback, deliberately not a computed, since this writes the state signal.
+  private syncRegistry(): void {
+    this.rebuildRegistry();
     const routes = this.routesFromRegistry();
     if (routes.length === 0) dlog('Tab: no <ng-template symbioteTabScreen> children registered');
+    const current = this.stateSignal();
+    if (current !== undefined) {
+      this.stateSignal.set(reconcileTabRoutes(current, routes));
+      return;
+    }
+    // Seeding an empty list would resolve initialRouteName against nothing and lose it once the
+    // markers do arrive, so the state stays unseeded until at least one has registered.
+    if (routes.length === 0) return;
     this.stateSignal.set(createInitialTabState(routes, this.initialRouteName));
   }
 

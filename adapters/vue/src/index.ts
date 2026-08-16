@@ -3,12 +3,9 @@
 // lives in the engine, shared with every other adapter. App code names only @symbiote-native/vue.
 
 export { mount, unmount } from './render';
-// createTunnel: cross-surface content sharing (Teleport stays same-surface-only by design —
-// see create-tunnel.ts for why).
+// Teleport stays same-surface-only by design - see create-tunnel.ts for why.
 export { createTunnel, type ITunnel } from './create-tunnel';
 export { View, Text } from './components';
-// Accessibility / ARIA prop types: framework-agnostic, shared verbatim from
-// @symbiote-native/components (the same source the React adapter re-exports).
 export type {
   IAccessibilityProps,
   IAriaProps,
@@ -17,17 +14,12 @@ export type {
   IAccessibilityStateValue,
   IAccessibilityValue,
   IAccessibilityActionInfo,
-  // Gesture-responder props: framework-agnostic, the shared base of View props.
   IResponderProps,
 } from '@symbiote-native/components';
-// findNodeHandle: RN's ref -> native reactTag lookup, the Vue twin of the React adapter's
-// host-instance resolution. IHostInstance is the raw engine node (Vue host refs fall
-// through to it; imperative methods live on each component's expose() handle).
+// IHostInstance is the raw engine node (Vue host refs fall through to it; imperative methods
+// live on each component's expose() handle).
 export { findNodeHandle } from './host-instance';
 export type { IHostInstance } from './host-instance';
-// Image. Full parity with React: source/src/srcSet resolution, the width/height → style fold,
-// alt → accessibility, and the Image statics (getSize / prefetch / queryCache / …) are shared
-// verbatim from @symbiote-native/components via renderImage; Vue supplies only the functional bridge.
 export { Image, setImageSourceResolver } from './components/image';
 export type {
   IImageProps,
@@ -37,29 +29,16 @@ export type {
   IImageSize,
   IImageCacheStatus,
 } from './components/image';
-// First component off the shared @symbiote-native/components layer: render-only, drives the
-// agnostic renderActivityIndicator through descriptorToVue. Proof the layer is reusable:
-// the render fn is shared verbatim with React; Vue supplies only the bridge.
 export { ActivityIndicator } from './components/activity-indicator';
 export type { IActivityIndicatorProps } from './components/activity-indicator';
-// First component to bring the state half into Vue (the lastNativeReport reducer + the
-// snap-back watch); render shared verbatim with React, Vue supplies the reactive lifecycle.
 export { Switch } from './components/switch';
 export type { ISwitchProps, ISwitchTrackColor } from './components/switch';
-// ScrollView. Full parity: vertical + horizontal, every pass-through prop, the
-// synthesized onContentSizeChange, the imperative handle via expose() + shallowRef, RefreshControl
-// (iOS sibling / Android wrap), and sticky headers (the scroll AnimatedValue,
-// the headerLayoutYs cross-talk, and the per-header Animated.View wrap). The pure math (intrinsics,
-// decelerationRate, content-size dedupe, the handle, the sticky interpolation) is shared verbatim
-// with React from @symbiote-native/components.
 export { ScrollView } from './components/scroll-view';
 export type {
   IScrollViewProps,
   IScrollViewEmits,
   IScrollViewHandle,
 } from './components/scroll-view';
-// Pressable family. Full parity with React (the 3-layer split): the press state machine + render
-// decisions are shared in @symbiote-native/components; Vue supplies the reactivity + descriptor bridge.
 export { Pressable } from './components/pressable';
 export type {
   IPressableProps,
@@ -86,14 +65,8 @@ export type {
 } from './components/touchable-native-feedback';
 export { Button } from './components/button';
 export type { IButtonProps } from './components/button';
-// TextInput. Full parity with React (the 3-layer split): the value/selection folds + the
-// controlled-write predicate live in @symbiote-native/components; Vue supplies the reactivity
-// (shallowRef host node, post-flush watch) + the imperative handle via expose().
 export { TextInput } from './components/text-input';
 export type { ITextInputProps, ITextInputHandle } from './components/text-input';
-// VirtualizedList family. Full parity with React: the windowing math (visible range, cell
-// keys, viewability token diffing, edge-reached, the list plan) is shared in
-// @symbiote-native/components; Vue supplies the reactive lifecycle + the per-cell element.
 export { VirtualizedList } from './components/virtualized-list';
 export type {
   IVirtualizedListProps,
@@ -130,29 +103,20 @@ export type {
   ISectionListEmits,
   ISectionListHandle,
 } from './components/section-list';
-// SafeAreaView + RefreshControl, wired into ScrollView with the iOS-sibling /
-// Android-wrap platform split. RefreshControl hosts the wrapped scroll view via its default slot.
+// RefreshControl hosts the wrapped scroll view via its default slot.
 export { SafeAreaView } from './components/safe-area-view';
 export type { ISafeAreaViewProps } from './components/safe-area-view';
 export { RefreshControl } from './components/refresh-control';
 export type { IRefreshControlProps, IRefreshControlEmits } from './components/refresh-control';
 export { descriptorToVue } from './descriptor-to-vue';
-// normalizeVueAttrs: the kebab→camel attr fold every component applies at entry. Exported so an
-// external wrapper package (e.g. @symbiote-native/slider/vue over a third-party native view) can fold
-// its incoming attrs through the SAME transform rather than reimplementing it.
+// Exported so an external wrapper package (e.g. @symbiote-native/slider/vue over a third-party
+// native view) can fold its incoming attrs/v-model through the SAME transform rather than
+// reimplementing it.
 export { normalizeVueAttrs } from './utils/normalize-attrs';
-// resolveModelValue/emitModelUpdate: the v-model helper every
-// controlled-value component uses. Exported for the same external-package reason as
-// normalizeVueAttrs above (e.g. @symbiote-native/slider/vue).
 export { resolveModelValue, emitModelUpdate } from './utils/model-binding';
 export { createSymbioteRenderer } from './renderer';
-// Animated: Animated.View/Text/Image + the lazy Animated.ScrollView over the
-// Vue primitives, with the value graph / easing / drivers spread from @symbiote-native/engine. The wrap
-// mechanism (createAnimatedComponent) is the Vue twin of React's; the pure leaves live in the
-// engine.
 export { Animated, createAnimatedComponent } from './modules/animated';
 
-// Visual components off the shared @symbiote-native/components layer (wave: simple-visual).
 export { ImageBackground } from './components/image-background';
 export type { IImageBackgroundProps } from './components/image-background';
 export { InputAccessoryView } from './components/input-accessory-view';
@@ -166,18 +130,16 @@ export type {
   IModalOrientation,
   IModalOrientationChangeEvent,
 } from './components/modal';
-// KeyboardAvoidingView: full parity via the shared inset math; Vue owns the Keyboard subscription.
 export { KeyboardAvoidingView } from './components/keyboard-avoiding-view';
 export type {
   IKeyboardAvoidingBehavior,
   IKeyboardAvoidingViewProps,
   IKeyboardAvoidingViewEmits,
 } from './components/keyboard-avoiding-view';
-// StatusBar: declarative component + the shared imperative API.
 export { StatusBar } from './modules/status-bar';
 export type { IStatusBarProps, IStatusBarStyle } from './modules/status-bar';
-// AppRegistry: RN's app entry point over `mount`. setHostRegistrar wires RN's own
-// registrar so the native Fabric host finds our runnable by app key.
+// RN's app entry point over `mount`. setHostRegistrar wires RN's own registrar so the native
+// Fabric host finds our runnable by app key.
 export { AppRegistry, setHostRegistrar } from './modules/app-registry';
 export type {
   IComponentProvider,

@@ -52,9 +52,9 @@ export default defineConfig({
           content: `
             try {
               var s = localStorage.getItem('symbiote');
-              var id = s === 'vue' || s === 'angular' ? s : 'react';
+              var id = s === 'vue' || s === 'angular' || s === 'svelte' ? s : 'react';
               document.documentElement.dataset.symbiote = id;
-              var LABEL = { react: 'React', vue: 'Vue', angular: 'Angular' };
+              var LABEL = { react: 'React', vue: 'Vue', angular: 'Angular', svelte: 'Svelte' };
               localStorage.setItem('starlight-synced-tabs__framework', LABEL[id]);
             } catch (e) {}
           `,
@@ -81,8 +81,9 @@ export default defineConfig({
                 react: ['#61dafb', '#2bb0d6'],
                 vue: ['#42d392', '#35a479'],
                 angular: ['#e40035', '#f6007b', '#9c0aab'],
+                svelte: ['#ff3e00', '#d63200'],
               };
-              var ID_BY_LABEL = { React: 'react', Vue: 'vue', Angular: 'angular' };
+              var ID_BY_LABEL = { React: 'react', Vue: 'vue', Angular: 'angular', Svelte: 'svelte' };
 
               function recolorFavicon() {
                 try {
@@ -161,6 +162,7 @@ export default defineConfig({
             { label: 'React guide', slug: 'docs/learn/react' },
             { label: 'Vue guide', slug: 'docs/learn/vue' },
             { label: 'Angular guide', slug: 'docs/learn/angular' },
+            { label: 'Svelte guide', slug: 'docs/learn/svelte' },
             { label: 'Styling', slug: 'docs/learn/styling' },
             { label: 'Animations', slug: 'docs/learn/animations' },
             { label: 'Events', slug: 'docs/learn/events' },
@@ -177,9 +179,17 @@ export default defineConfig({
             { label: 'Share content across surfaces', slug: 'docs/howtos/portals-and-tunnels' },
             { label: 'Write platform-specific code', slug: 'docs/howtos/platform-code' },
             { label: 'Wrap a third-party native view', slug: 'docs/howtos/third-party-views' },
-            { label: 'Wire up an Expo native module', slug: 'docs/howtos/expo-native-module-setup' },
+            {
+              label: 'Wire up an Expo native module',
+              slug: 'docs/howtos/expo-native-module-setup',
+            },
             { label: 'Add a native splash screen', slug: 'docs/howtos/splash-screen' },
             { label: 'Turn on diagnostic logging', slug: 'docs/howtos/debugging' },
+            {
+              label: 'Refs and attachments in Svelte',
+              slug: 'docs/howtos/svelte-refs-and-attachments',
+            },
+            { label: 'Catch render errors (Svelte)', slug: 'docs/howtos/error-boundaries' },
           ],
         },
         {
@@ -214,6 +224,7 @@ export default defineConfig({
             { label: 'React', slug: 'docs/api/react' },
             { label: 'Vue', slug: 'docs/api/vue' },
             { label: 'Angular', slug: 'docs/api/angular' },
+            { label: 'Svelte', slug: 'docs/api/svelte' },
             { label: 'Components', slug: 'docs/api/components' },
             { label: 'Core', slug: 'docs/api/core' },
           ],

@@ -56,132 +56,161 @@ function textScreen(label: string) {
   return () => createElement('symbiote-text', {}, label);
 }
 
-describe('useStackNavigation', () => {
-  it('returns a concretely-typed Stack handle with push, no narrowing needed', () => {
-    let canPush = false;
-    function TrackedHomeScreen(): ReturnType<typeof createElement> {
-      const navigation = useStackNavigation();
-      canPush = typeof navigation.push === 'function';
-      return createElement('symbiote-text', {}, 'home');
-    }
+// Each of the three hooks below is a THIN union-narrowing wrapper over useNavigation() (see
+// use-stack-navigation.ts's header): same shared logic, same shared guard
+// (isStackNavigatorHandle/isTabNavigatorHandle/isDrawerNavigatorHandle from core), one hook per
+// navigator kind. Each gets its own Positive (correct navigator -> concretely-typed handle, no
+// union-narrowing needed at the call site) and Negative (wrong navigator -> throws instead of
+// silently handing back a handle missing the methods the caller expects) pair.
 
-    const ref = createRef<INavigatorHandle>();
-    mount(
-      ROOT_TAG,
-      createElement(
-        Stack,
-        { ref, initialRouteName: 'Home' },
-        createElement(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-        createElement(Stack.Screen, { name: 'Details', component: textScreen('details') }),
-      ),
-    );
-    expect(canPush).toBe(true);
+describe('useStackNavigation', () => {
+  describe('Positive', () => {
+    // why: the whole point of this hook over useNavigation() is that a caller who KNOWS it only
+    // ever renders under a Stack gets a concretely-typed handle back, with `push` available with no
+    // `'push' in navigation` guard at the call site.
+    it('returns a concretely-typed Stack handle with push, no narrowing needed', () => {
+      let canPush = false;
+      function TrackedHomeScreen(): ReturnType<typeof createElement> {
+        const navigation = useStackNavigation();
+        canPush = typeof navigation.push === 'function';
+        return createElement('symbiote-text', {}, 'home');
+      }
+
+      const ref = createRef<INavigatorHandle>();
+      mount(
+        ROOT_TAG,
+        createElement(
+          Stack,
+          { ref, initialRouteName: 'Home' },
+          createElement(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
+          createElement(Stack.Screen, { name: 'Details', component: textScreen('details') }),
+        ),
+      );
+      expect(canPush).toBe(true);
+    });
   });
 
-  it('throws when the nearest navigator is a Tab, not a Stack', () => {
-    function TrackedHomeTab(): ReturnType<typeof createElement> {
-      useStackNavigation();
-      return createElement('symbiote-text', {}, 'home');
-    }
+  describe('Negative', () => {
+    // why: silently handing back a Tab handle typed as a Stack handle would let a caller invoke
+    // `.push()` and get a runtime TypeError far from the real mistake - failing immediately, at the
+    // hook call site, with a message naming the actual mismatch, is the fail-closed contract.
+    it('throws when the nearest navigator is a Tab, not a Stack', () => {
+      function TrackedHomeTab(): ReturnType<typeof createElement> {
+        useStackNavigation();
+        return createElement('symbiote-text', {}, 'home');
+      }
 
-    expect(() => {
-      act(() => {
-        mount(
-          ROOT_TAG,
-          createElement(
-            Tab,
-            { initialRouteName: 'Home' },
-            createElement(Tab.Screen, { name: 'Home', component: TrackedHomeTab }),
-            createElement(Tab.Screen, { name: 'Search', component: textScreen('search') }),
-          ),
-        );
-      });
-    }).toThrow(/nearest navigator is not a Stack/);
+      expect(() => {
+        act(() => {
+          mount(
+            ROOT_TAG,
+            createElement(
+              Tab,
+              { initialRouteName: 'Home' },
+              createElement(Tab.Screen, { name: 'Home', component: TrackedHomeTab }),
+              createElement(Tab.Screen, { name: 'Search', component: textScreen('search') }),
+            ),
+          );
+        });
+      }).toThrow(/nearest navigator is not a Stack/);
+    });
   });
 });
 
 describe('useTabNavigation', () => {
-  it('returns a concretely-typed Tab handle with jumpTo, no narrowing needed', () => {
-    let canJumpTo = false;
-    function TrackedHomeTab(): ReturnType<typeof createElement> {
-      const navigation = useTabNavigation();
-      canJumpTo = typeof navigation.jumpTo === 'function';
-      return createElement('symbiote-text', {}, 'home');
-    }
+  describe('Positive', () => {
+    // why: twin of useStackNavigation's own case - jumpTo is available with no narrowing.
+    it('returns a concretely-typed Tab handle with jumpTo, no narrowing needed', () => {
+      let canJumpTo = false;
+      function TrackedHomeTab(): ReturnType<typeof createElement> {
+        const navigation = useTabNavigation();
+        canJumpTo = typeof navigation.jumpTo === 'function';
+        return createElement('symbiote-text', {}, 'home');
+      }
 
-    mount(
-      ROOT_TAG,
-      createElement(
-        Tab,
-        { initialRouteName: 'Home' },
-        createElement(Tab.Screen, { name: 'Home', component: TrackedHomeTab }),
-        createElement(Tab.Screen, { name: 'Search', component: textScreen('search') }),
-      ),
-    );
-    expect(canJumpTo).toBe(true);
+      mount(
+        ROOT_TAG,
+        createElement(
+          Tab,
+          { initialRouteName: 'Home' },
+          createElement(Tab.Screen, { name: 'Home', component: TrackedHomeTab }),
+          createElement(Tab.Screen, { name: 'Search', component: textScreen('search') }),
+        ),
+      );
+      expect(canJumpTo).toBe(true);
+    });
   });
 
-  it('throws when the nearest navigator is a Stack, not a Tab', () => {
-    function TrackedHomeScreen(): ReturnType<typeof createElement> {
-      useTabNavigation();
-      return createElement('symbiote-text', {}, 'home');
-    }
+  describe('Negative', () => {
+    // why: same fail-closed contract as useStackNavigation's Negative case, mirrored for Tab.
+    it('throws when the nearest navigator is a Stack, not a Tab', () => {
+      function TrackedHomeScreen(): ReturnType<typeof createElement> {
+        useTabNavigation();
+        return createElement('symbiote-text', {}, 'home');
+      }
 
-    expect(() => {
-      act(() => {
-        mount(
-          ROOT_TAG,
-          createElement(
-            Stack,
-            { initialRouteName: 'Home' },
-            createElement(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-            createElement(Stack.Screen, { name: 'Details', component: textScreen('details') }),
-          ),
-        );
-      });
-    }).toThrow(/nearest navigator is not a Tab/);
+      expect(() => {
+        act(() => {
+          mount(
+            ROOT_TAG,
+            createElement(
+              Stack,
+              { initialRouteName: 'Home' },
+              createElement(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
+              createElement(Stack.Screen, { name: 'Details', component: textScreen('details') }),
+            ),
+          );
+        });
+      }).toThrow(/nearest navigator is not a Tab/);
+    });
   });
 });
 
 describe('useDrawerNavigation', () => {
-  it('returns a concretely-typed Drawer handle with openDrawer, no narrowing needed', () => {
-    let canOpenDrawer = false;
-    function TrackedHomeScreen(): ReturnType<typeof createElement> {
-      const navigation = useDrawerNavigation();
-      canOpenDrawer = typeof navigation.openDrawer === 'function';
-      return createElement('symbiote-text', {}, 'home');
-    }
+  describe('Positive', () => {
+    // why: twin of useStackNavigation's own case - openDrawer is available with no narrowing.
+    it('returns a concretely-typed Drawer handle with openDrawer, no narrowing needed', () => {
+      let canOpenDrawer = false;
+      function TrackedHomeScreen(): ReturnType<typeof createElement> {
+        const navigation = useDrawerNavigation();
+        canOpenDrawer = typeof navigation.openDrawer === 'function';
+        return createElement('symbiote-text', {}, 'home');
+      }
 
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { initialRouteName: 'Home' },
-        createElement(Drawer.Screen, { name: 'Home', component: TrackedHomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: textScreen('profile') }),
-      ),
-    );
-    expect(canOpenDrawer).toBe(true);
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { initialRouteName: 'Home' },
+          createElement(Drawer.Screen, { name: 'Home', component: TrackedHomeScreen }),
+          createElement(Drawer.Screen, { name: 'Profile', component: textScreen('profile') }),
+        ),
+      );
+      expect(canOpenDrawer).toBe(true);
+    });
   });
 
-  it('throws when the nearest navigator is a Stack, not a Drawer', () => {
-    function TrackedHomeScreen(): ReturnType<typeof createElement> {
-      useDrawerNavigation();
-      return createElement('symbiote-text', {}, 'home');
-    }
+  describe('Negative', () => {
+    // why: same fail-closed contract as useStackNavigation's Negative case, mirrored for Drawer.
+    it('throws when the nearest navigator is a Stack, not a Drawer', () => {
+      function TrackedHomeScreen(): ReturnType<typeof createElement> {
+        useDrawerNavigation();
+        return createElement('symbiote-text', {}, 'home');
+      }
 
-    expect(() => {
-      act(() => {
-        mount(
-          ROOT_TAG,
-          createElement(
-            Stack,
-            { initialRouteName: 'Home' },
-            createElement(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-            createElement(Stack.Screen, { name: 'Details', component: textScreen('details') }),
-          ),
-        );
-      });
-    }).toThrow(/nearest navigator is not a Drawer/);
+      expect(() => {
+        act(() => {
+          mount(
+            ROOT_TAG,
+            createElement(
+              Stack,
+              { initialRouteName: 'Home' },
+              createElement(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
+              createElement(Stack.Screen, { name: 'Details', component: textScreen('details') }),
+            ),
+          );
+        });
+      }).toThrow(/nearest navigator is not a Drawer/);
+    });
   });
 });

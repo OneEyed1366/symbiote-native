@@ -117,7 +117,16 @@ async function scrollPastSection(): Promise<void> {
   await tick();
 }
 
+// No Negative group: this is a render-tree assertion over the Angular adapter's consumption of
+// `plan.forcedStickyCell` (index.ts's recomputeView + buildWindowCell), not a guard clause — there
+// is no invalid input for buildListPlan's caller to reject here, only a windowing/wrapping outcome
+// to prove correct. Both scenarios below are Positive.
 describe('VirtualizedList force-mounts the sticky header below the window', () => {
+  // why: regression coverage for a0ad319 ("keep sticky headers correct when a cell is
+  // force-rendered") — before the fix, recomputeView never read plan.forcedStickyCell/gapExtent,
+  // so a pinned header whose origin index scrolled out of [first,last] was torn down and rebuilt
+  // (losing measured layout, flickering) every time the window slid back over it, instead of
+  // staying resident the way RN's own VirtualizedList._ensureClosestStickyHeader keeps it.
   it('keeps the sticky index-0 cell mounted after scrolling its origin position off-window', async () => {
     mount(ROOT_TAG, StickyForcedCellHost);
     await tick();
@@ -140,6 +149,10 @@ describe('VirtualizedList force-mounts the sticky header below the window', () =
     );
   });
 
+  // why: the forced cell is a SEPARATE render branch from the windowed `@for` loop (index.ts
+  // template), so it is not automatically covered by ScrollView's sticky-wrapping nodeTransform —
+  // that wrapping has to be proven explicitly for the forced branch too, or a force-mounted header
+  // would render unstyled/unpinned even though the fix above keeps it merely present.
   it('wraps the forced cell in the sticky-header projection, same as an in-window sticky cell', async () => {
     mount(ROOT_TAG, StickyForcedCellHost);
     await tick();

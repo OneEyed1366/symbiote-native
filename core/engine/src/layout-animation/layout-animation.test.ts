@@ -79,6 +79,20 @@ describe('LayoutAnimation JS surface', () => {
     expect(built.delete?.type).toBe('linear');
     expect(built.delete?.property).toBe('scaleXY');
   });
+
+  // why: unlike easeInEaseOut/linear (built uniformly via createLayoutAnimation with
+  // one type for create/update/delete), spring is hand-authored ASYMMETRICALLY --
+  // create/delete fade with a linear opacity while only update actually springs.
+  // That asymmetry is the whole point of the preset (an item springs INTO place but
+  // fades in/out linearly), so it deserves its own shape assertion, not just
+  // exercising it as a generic "some preset" in the dispatch tests below.
+  it('Presets.spring uses a linear create/delete but a spring update', () => {
+    const preset = LayoutAnimation.Presets.spring;
+    expect(preset.duration).toBe(700);
+    expect(preset.create).toEqual({ type: 'linear', property: 'opacity' });
+    expect(preset.update).toEqual({ type: 'spring', springDamping: 0.4 });
+    expect(preset.delete).toEqual({ type: 'linear', property: 'opacity' });
+  });
 });
 
 describe('LayoutAnimation.coerceType', () => {
@@ -119,6 +133,63 @@ describe('LayoutAnimation.configureNext dispatch', () => {
     captured?.onSuccess();
     captured?.onError();
     expect(didEndCount).toBe(1);
+  });
+
+  // why: onAnimationDidFail is a real, distinct callback (native config parsing
+  // failed) -- it must actually reach the caller, not just be swallowed like a
+  // late/repeat error after success already fired.
+  it('drives onAnimationDidFail from a native error, exactly once', () => {
+    let didFailCount = 0;
+    LayoutAnimation.configureNext(
+      LayoutAnimation.Presets.linear,
+      () => {},
+      () => {
+        didFailCount += 1;
+      },
+    );
+    captured?.onError();
+    expect(didFailCount).toBe(1);
+  });
+
+  // why: onAnimationDidFail is documented optional -- native calling the error
+  // callback with none supplied must not throw (the default is a plain no-op).
+  it('does not throw when native errors and no onAnimationDidFail was given', () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.linear);
+    expect(() => captured?.onError()).not.toThrow();
+  });
+
+  // why: easeInEaseOut/linear/spring are documented shortcuts for
+  // configureNext(Presets.X, cb) -- each must dispatch its OWN matching preset, not
+  // some shared default.
+  it('the easeInEaseOut/linear/spring shortcuts each dispatch their matching preset', () => {
+    LayoutAnimation.easeInEaseOut();
+    expect(captured?.config).toBe(LayoutAnimation.Presets.easeInEaseOut);
+
+    LayoutAnimation.linear();
+    expect(captured?.config).toBe(LayoutAnimation.Presets.linear);
+
+    LayoutAnimation.spring();
+    expect(captured?.config).toBe(LayoutAnimation.Presets.spring);
+  });
+});
+
+describe('LayoutAnimation.setLayoutAnimationEnabled', () => {
+  // why: this is the documented kill switch for the whole feature (e.g. a
+  // reduce-motion setting) -- once disabled, configureNext must never reach
+  // native, regardless of which module is linked.
+  it('makes configureNext a no-op while disabled', () => {
+    LayoutAnimation.setLayoutAnimationEnabled(false);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.linear);
+    expect(captured).toBeNull();
+  });
+
+  // why: the gate must be reversible -- re-enabling must restore normal dispatch,
+  // proving it's a toggle, not a one-way kill switch.
+  it('re-enabling restores normal dispatch', () => {
+    LayoutAnimation.setLayoutAnimationEnabled(false);
+    LayoutAnimation.setLayoutAnimationEnabled(true);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.linear);
+    expect(captured).not.toBeNull();
   });
 });
 
@@ -180,6 +251,22 @@ describe('LayoutAnimation native resolution mechanism', () => {
 
     expect(captured).toBeNull();
   });
+
+  // why: resolveUIManager's TurboModule fallback resolves ANY module registered
+  // under the right name, without checking it actually carries
+  // configureNextLayoutAnimation (an older/partial native binary) -- configureNext's
+  // own `manager.configureNextLayoutAnimation === undefined` guard must catch that
+  // and no-op, distinct from "no module resolved at all".
+  it('is a no-op when the resolved UIManager module lacks configureNextLayoutAnimation', () => {
+    const moduleWithoutTheMethod = {};
+    globalThis.__turboModuleProxy = <T>(name: string): T | null =>
+      name === NATIVE_MODULE_NAME && isPresent<T>(moduleWithoutTheMethod)
+        ? moduleWithoutTheMethod
+        : null;
+
+    expect(() => LayoutAnimation.configureNext(LayoutAnimation.Presets.linear)).not.toThrow();
+    expect(captured).toBeNull();
+  });
 });
 
 describe('LayoutAnimation (no native module)', () => {
@@ -193,5 +280,16 @@ describe('LayoutAnimation (no native module)', () => {
       fresh.LayoutAnimation.configureNext(fresh.LayoutAnimation.Presets.easeInEaseOut);
     }).not.toThrow();
     expect(captured).toBeNull();
+  });
+});
+
+describe('LayoutAnimation.checkConfig', () => {
+  // why: RN retired this dev-time validator upstream (it now only logs a
+  // deprecation notice) -- calling it with any arguments must stay a harmless
+  // no-op so old call sites don't need to be ripped out.
+  it('is a no-op regardless of arguments', () => {
+    expect(() =>
+      LayoutAnimation.checkConfig(LayoutAnimation.Presets.linear, () => {}),
+    ).not.toThrow();
   });
 });

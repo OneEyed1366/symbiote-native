@@ -70,40 +70,52 @@ function reconcileCycle(
   return newLeaf;
 }
 
+// No Negative group: reconcileCycle has no guard clause and nothing here is expected to throw —
+// the 2026-08-13 crash was a silent unbounded-growth leak, not a thrown error, so both scenarios
+// below are Positive claims about growth being bounded rather than error-path claims.
 describe('AnimatedProps reconcile-every-render over a shared long-lived interpolation', () => {
-  it('does not grow the interpolation node children array across repeated reconciles', () => {
-    const scroll = new AnimatedValue(0);
-    const translateY = scroll.interpolate({ inputRange: [-1, 0], outputRange: [0, 0] });
+  describe('Positive', () => {
+    // why: the crash traced back to __attach() re-adding the shared interpolation as a child on
+    // every single reconcile without the old leaf's __detach() ever removing it first (attach
+    // came before detach). A children array that keeps growing IS the leak the crash was.
+    it('does not grow the interpolation node children array across repeated reconciles', () => {
+      const scroll = new AnimatedValue(0);
+      const translateY = scroll.interpolate({ inputRange: [-1, 0], outputRange: [0, 0] });
 
-    let attached: AnimatedProps | null = null;
-    for (let i = 0; i < 20; i++) {
+      let attached: AnimatedProps | null = null;
+      for (let i = 0; i < 20; i++) {
+        attached = reconcileCycle(attached, translateY);
+      }
+
+      expect(translateY.__getChildren().length).toBe(1);
+    });
+
+    // why: device logs showed `restoreDefaultValues` firing in a rapidly-climbing, unbounded
+    // loop — each stale child left behind by a prior cycle got re-visited by every later one, so
+    // native-call volume grew with the SQUARE of cycle count, not linearly. Steady per-cycle cost
+    // is the direct, observable symptom of the same leak the children-array count proves above.
+    it('costs a constant, non-growing number of native calls per reconcile once steady-state', () => {
+      const scroll = new AnimatedValue(0);
+      const translateY = scroll.interpolate({ inputRange: [-1, 0], outputRange: [0, 0] });
+
+      let attached: AnimatedProps | null = null;
+      // Warm up: the first couple of cycles cost more (first-ever native creation of the shared
+      // interpolation node). Steady-state cost is whatever a cycle costs once that's amortized.
+      for (let i = 0; i < 3; i++) {
+        attached = reconcileCycle(attached, translateY);
+      }
+      nativeCalls.length = 0;
       attached = reconcileCycle(attached, translateY);
-    }
+      const costOfOneCycle = nativeCalls.length;
 
-    expect(translateY.__getChildren().length).toBe(1);
-  });
-
-  it('costs a constant, non-growing number of native calls per reconcile once steady-state', () => {
-    const scroll = new AnimatedValue(0);
-    const translateY = scroll.interpolate({ inputRange: [-1, 0], outputRange: [0, 0] });
-
-    let attached: AnimatedProps | null = null;
-    // Warm up: the first couple of cycles cost more (first-ever native creation of the shared
-    // interpolation node). Steady-state cost is whatever a cycle costs once that's amortized.
-    for (let i = 0; i < 3; i++) {
-      attached = reconcileCycle(attached, translateY);
-    }
-    nativeCalls.length = 0;
-    attached = reconcileCycle(attached, translateY);
-    const costOfOneCycle = nativeCalls.length;
-
-    nativeCalls.length = 0;
-    for (let i = 0; i < 20; i++) {
-      attached = reconcileCycle(attached, translateY);
-    }
-    // 20 more identical cycles must cost 20x one cycle, not more — a leak shows up as
-    // super-linear growth (each cycle reconnecting nodes accumulated by every prior cycle).
-    expect(nativeCalls.length).toBe(costOfOneCycle * 20);
-    expect(attached).not.toBeNull();
+      nativeCalls.length = 0;
+      for (let i = 0; i < 20; i++) {
+        attached = reconcileCycle(attached, translateY);
+      }
+      // 20 more identical cycles must cost 20x one cycle, not more — a leak shows up as
+      // super-linear growth (each cycle reconnecting nodes accumulated by every prior cycle).
+      expect(nativeCalls.length).toBe(costOfOneCycle * 20);
+      expect(attached).not.toBeNull();
+    });
   });
 });

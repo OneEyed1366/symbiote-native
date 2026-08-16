@@ -80,8 +80,10 @@ const absoluteFill: Readonly<IStyleObject> = Object.freeze({
   bottom: 0,
 });
 
-// RN's composeStyles: falsy left → right, falsy right → left, else the pair [a, b]
-// (which flatten later collapses, later keys winning).
+// RN's composeStyles: a null/undefined side yields the other, else the pair [a, b]
+// (which flatten later collapses, later keys winning). The test is null/undefined, NOT
+// falsy - compose(0, y) returns [0, y], matching react-native's own
+// src/private/styles/composeStyles.js, which branches on `== null`.
 function compose<A, B>(style1: A, style2: B): A | B | [A, B] {
   if (style1 === null || style1 === undefined) return style2;
   if (style2 === null || style2 === undefined) return style1;

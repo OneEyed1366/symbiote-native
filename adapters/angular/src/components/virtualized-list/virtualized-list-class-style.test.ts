@@ -65,6 +65,9 @@ afterEach(() => {
 });
 
 describe('VirtualizedList anchor class= resolution', () => {
+  // why: VirtualizedList is its own ANCHOR_HOST_COMPONENTS entry, one level ABOVE the ScrollView it
+  // composes — ScrollView's own anchor fix (scroll-view-class-style.test.ts) does not transitively
+  // cover VirtualizedList's use-site class=, since each anchor resolves independently.
   it('resolves a class= on the VirtualizedList use site onto the real committed scroll host', async () => {
     mount(ROOT_TAG, VirtualizedListClassHost);
     await tick();

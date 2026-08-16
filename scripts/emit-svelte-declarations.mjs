@@ -1,50 +1,30 @@
-// copy-svelte-sources.mjs gets the raw .svelte files into build/; this gets their TYPES there.
+// copy-svelte-sources.mjs copies the raw .svelte files into build/; this emits their TYPES.
 //
-// Without it a consumer importing a published .svelte component resolves it through svelte's
-// ambient `declare module '*.svelte'` fallback (svelte/types/index.d.ts: `const Comp:
-// LegacyComponentType`). Everything the component actually exposes is erased: props are `any`,
-// and the `export function push/pop/reset/…` surface that `bind:this` returns at runtime is not
-// there at all, so annotating the binding as `INavigatorHandle | null` fails with "Type
-// 'SvelteComponent<…>' is missing the following properties … push, pop, popToTop, popTo, and 4
-// more." (svelte-adapter-dom-shim skill, §24c).
+// Without it, a consumer importing a published .svelte component falls back to svelte's ambient
+// `declare module '*.svelte'` (LegacyComponentType): props become `any` and the `bind:this`
+// push/pop/reset/... surface disappears entirely (svelte-adapter-dom-shim skill, §24c).
+// tsc alone can't fix this — it never reads .svelte. svelte2tsx's `emitDts` (the same entry
+// point `svelte-package` uses) compiles each .svelte to TSX and emits `X.svelte.d.ts` beside it,
+// which a concrete `./X.svelte` import resolves to over the ambient wildcard.
 //
-// tsc cannot fix this: it only ever reads .ts/.tsx/.d.ts. svelte2tsx's `emitDts` can — it is the
-// same entry point `@sveltejs/package` (`svelte-package`) uses. It transforms each .svelte file
-// into TSX, runs a real TypeScript program over the result, and emits `X.svelte.d.ts` beside
-// where `X.svelte` sits. TypeScript resolves a relative `./X.svelte` import to `./X.svelte.d.ts`,
-// and a concrete file always beats the ambient `*.svelte` wildcard.
+// Two things need fixing, not one:
+// 1. Components themselves — `build/**/X.svelte.d.ts` next to the copied `.svelte`. Repairs
+//    every `export { default as X } from './X.svelte'` re-export for free.
+// 2. .ts modules that launder a component through a VALUE (e.g. `Stack = Object.assign(StackImpl,
+//    { Screen })` in svelte/stack/index.ts) — tsc bakes the ambient type it saw at emit time into
+//    build/svelte/stack/index.d.ts, so those declarations are found by scanning for the
+//    `LegacyComponentType` marker and replaced with svelte2tsx's own.
 //
-// TWO THINGS HAVE TO BE FIXED, not one.
+// emitDts runs over the WHOLE package src, so it writes into a throwaway staging dir first and
+// only the wanted files get copied into build/ — otherwise it would clobber tsc's own output for
+// every plain .ts file, and for `*.svelte.ts` rune modules (which also compile to `.svelte.d.ts`)
+// a `*.svelte.d.ts` glob would pick the wrong file entirely.
 //
-// 1. The components themselves — `build/**/X.svelte.d.ts` next to the copied `build/**/X.svelte`.
-//    That alone repairs every `export { default as X } from './X.svelte'` re-export, because tsc
-//    keeps the specifier verbatim in its .d.ts and the consumer re-resolves it.
+// emitDts fails silently (console.warn's a "likely not generated" list and resolves), so every
+// signal here is turned into a thrown error: the warning, a copied .svelte with no declaration
+// beside it, or any LegacyComponentType left in build/ when the run finishes.
 //
-// 2. The .ts modules that launder a component through a VALUE. `Stack` is
-//    `Object.assign(StackImpl, { Screen })` in svelte/stack/index.ts, so tsc INLINES the type it
-//    saw at emit time — the ambient one — into build/svelte/stack/index.d.ts, and no amount of
-//    later .svelte.d.ts fixes that frozen text. Those files are found mechanically: an inlined
-//    ambient fallback is the only thing in this repo that can put `LegacyComponentType` into a
-//    declaration (nothing under src/ names it), so each build declaration containing it is
-//    replaced by svelte2tsx's own — whose program resolved the .svelte for real. Its version of
-//    svelte/stack/index.d.ts carries the full push/pop/popTo/reset surface AND `Stack.Screen`.
-//    Only the .d.ts is taken; tsc's .js output stays authoritative.
-//
-// WHY A STAGING DIR RATHER THAN EMITTING STRAIGHT INTO build/: emitDts runs over the WHOLE
-// package src, so it emits a declaration for every plain .ts file too. We want tsc's output to
-// stay authoritative everywhere except the two cases above, so emitDts writes into a throwaway
-// folder and only the wanted files are copied across. Deriving the component copy from the
-// .svelte source list (rather than from a `*.svelte.d.ts` glob) also matters: a Svelte 5 rune
-// module named `linking.svelte.ts` compiles to `linking.svelte.d.ts` too, and a glob would
-// clobber tsc's version of it.
-//
-// FAILING LOUDLY: emitDts does not throw when a component cannot be typed — it console.warn's a
-// "likely not generated" list and resolves, leaving the consumer back on the ambient `any` this
-// script exists to remove. That silent fallback IS the bug, so every signal is turned into a
-// thrown error: the warning itself, a copied .svelte source with no declaration beside it, and
-// any `LegacyComponentType` still left in build/ when the run is over.
-//
-// Runs AFTER `tsc --build` in `prepublish-build` — it reads and patches tsc's emitted build/.
+// Runs AFTER `tsc --build` in `prepublish-build` — reads and patches tsc's emitted build/.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -89,7 +69,9 @@ async function emitToStaging(srcDir, stagingDir) {
     console.warn = originalWarn;
   }
   if (warnings.length > 0) {
-    throw new Error(`svelte2tsx could not type every component under ${srcDir}:\n${warnings.join('\n')}`);
+    throw new Error(
+      `svelte2tsx could not type every component under ${srcDir}:\n${warnings.join('\n')}`,
+    );
   }
 }
 
@@ -130,14 +112,19 @@ export async function emitSvelteDeclarations(pkgDir) {
 
     for (const declaration of listDeclarationFiles(buildDir).filter(usesAmbientFallback)) {
       const relative = path.relative(buildDir, declaration);
-      takeStagedDeclaration(stagingDir, buildDir, relative, 'its tsc declaration inlined the ambient `*.svelte` any');
+      takeStagedDeclaration(
+        stagingDir,
+        buildDir,
+        relative,
+        'its tsc declaration inlined the ambient `*.svelte` any',
+      );
       repaired++;
     }
 
     const stillAmbient = listDeclarationFiles(buildDir).filter(usesAmbientFallback);
     if (stillAmbient.length > 0) {
       throw new Error(
-        `the ambient \`*.svelte\` fallback survived in:\n${stillAmbient.map((file) => `  ${file}`).join('\n')}`,
+        `the ambient \`*.svelte\` fallback survived in:\n${stillAmbient.map(file => `  ${file}`).join('\n')}`,
       );
     }
   } finally {

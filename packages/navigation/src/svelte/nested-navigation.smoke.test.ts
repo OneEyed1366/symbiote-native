@@ -89,30 +89,43 @@ async function mountNested(): Promise<void> {
   await tick();
 }
 
+// No Negative group: nesting is pure context-propagation composition (navigation-context.ts's
+// setContext/getContext chain) with no user-facing input to reject, so every scenario below is
+// Positive - it either wires the parent link/registry correctly or it doesn't.
 describe('nested navigation (Stack inside a Tab screen)', () => {
-  it('gives the inner Stack screen its OWN route rather than the enclosing Tab screen route', async () => {
-    await mountNested();
-    expect(findLiveByTestId(fabric.appRoot(), 'stack-host')?.props?.accessibilityLabel).toBe(
-      'main',
-    );
-    expect(findLiveByTestId(fabric.appRoot(), 'inner')?.props?.accessibilityLabel).toContain(
-      'inner|',
-    );
-  });
+  describe('Positive', () => {
+    it('gives the inner Stack screen its OWN route rather than the enclosing Tab screen route', async () => {
+      // why: context in Svelte follows the RUNTIME render tree, not the lexical definition site
+      // (navigation-context.ts's header comment) - the inner Stack mounts its own NavigationScope
+      // for its "inner" route, so a screen inside it must NOT inherit the Tab's "main" route.
+      await mountNested();
+      expect(findLiveByTestId(fabric.appRoot(), 'stack-host')?.props?.accessibilityLabel).toBe(
+        'main',
+      );
+      const innerLabel = findLiveByTestId(fabric.appRoot(), 'inner')?.props?.accessibilityLabel;
+      // The full label format (route|typeof-push|parent-kind) is asserted precisely by the next
+      // test; this one only needs to prove the route name segment is "inner", not "main".
+      expect(innerLabel?.split('|')[0]).toBe('inner');
+    });
 
-  it('walks one hop up to the enclosing Tab handle via getParent()', async () => {
-    await mountNested();
-    expect(findLiveByTestId(fabric.appRoot(), 'inner')?.props?.accessibilityLabel).toBe(
-      'inner|function|tab-parent',
-    );
-  });
+    it('walks one hop up to the enclosing Tab handle via getParent()', async () => {
+      // why: navigation-context.ts threads `parent` as the ambient scope a navigator read on ITS
+      // OWN mount, forming a linked list - useNavigation().getParent() inside the nested Stack's
+      // screen must resolve to the Tab's handle specifically (a jumpTo-capable handle), not merely
+      // "some" ancestor object.
+      await mountNested();
+      expect(findLiveByTestId(fabric.appRoot(), 'inner')?.props?.accessibilityLabel).toBe(
+        'inner|function|tab-parent',
+      );
+    });
 
-  it('keeps the two navigators screen registries separate', async () => {
-    await mountNested();
-    // The Tab's `other` screen is NOT mounted (only the focused route is), and the Stack's own
-    // `inner` marker never leaked into the Tab's registry - if it had, the tab bar would carry a
-    // third item and `other` would not be the second one.
-    expect(findLiveByTestId(fabric.appRoot(), 'other')).toBeUndefined();
-    expect(findLiveByTestId(fabric.appRoot(), 'inner')).toBeDefined();
+    it('keeps the two navigators screen registries separate', async () => {
+      // why: the Tab's `other` screen is NOT mounted (only the focused route is), and the Stack's
+      // own `inner` marker must never leak into the Tab's registry - if it had, the tab bar would
+      // carry a third item and `other` would not be the second one.
+      await mountNested();
+      expect(findLiveByTestId(fabric.appRoot(), 'other')).toBeUndefined();
+      expect(findLiveByTestId(fabric.appRoot(), 'inner')).toBeDefined();
+    });
   });
 });

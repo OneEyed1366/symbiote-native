@@ -68,12 +68,14 @@
   },
   "peerDependencies": {
     "@angular/core": ">=20",
+    "@angular/forms": ">=20",
     "@symbiote-native/engine": ">=0.1.7",
     "react-native": ">=0.86"
   },
   "devDependencies": {
     "@angular/compiler": "catalog:",
     "@angular/core": "catalog:",
+    "@angular/forms": "catalog:",
     "@babel/core": "catalog:",
     "@symbiote-native/engine": "workspace:*",
     "@symbiote-native/test-utils": "workspace:*",

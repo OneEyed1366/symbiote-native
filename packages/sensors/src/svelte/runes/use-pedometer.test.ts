@@ -91,28 +91,70 @@ async function mountPedometer(values: (IPedometerResult | null)[]): Promise<void
 }
 
 describe('usePedometer (Svelte)', () => {
-  it('starts null before any step count arrives', async () => {
-    const values: (IPedometerResult | null)[] = [];
-    await mountPedometer(values);
+  // No Negative group: usePedometer has no guard clause or throwing path — every
+  // IPedometerResult the native `watchStepCount` listener can deliver reaches `current`
+  // unchanged. Only the shared subscribe/update/cleanup lifecycle is under test here; Pedometer's
+  // own free functions (getStepCountAsync, isAvailableAsync, get/requestPermissionsAsync — see
+  // core/pedometer.ts's header on why Pedometer has no DeviceSensor instance to hang them off)
+  // are not called by this rune at all and are covered by core/pedometer.test.ts. There is also
+  // no update-interval branch here, unlike every other sensor rune: Pedometer has no
+  // setUpdateInterval upstream (core/pedometer.ts), so usePedometer takes no interval param at
+  // all — nothing to assert either provided or omitted.
+  describe('Positive (subscribe -> update -> cleanup lifecycle)', () => {
+    // why: a consumer renders BEFORE the first native event can possibly arrive, so `current`
+    // must expose a real "no reading yet" value rather than staying `undefined` or throwing.
+    it('starts null before any step count arrives', async () => {
+      const values: (IPedometerResult | null)[] = [];
+      await mountPedometer(values);
 
-    expect(values[values.length - 1]).toBeNull();
-  });
+      expect(values[values.length - 1]).toBeNull();
+    });
 
-  it('updates the state when the native listener fires', async () => {
-    const values: (IPedometerResult | null)[] = [];
-    await mountPedometer(values);
-    const reading: IPedometerResult = { steps: 456 };
+    // why: the effect body writes `result` but never reads it, so it must run exactly once on
+    // mount and never re-subscribe on its own — a double subscription would mean double native
+    // event delivery per commit.
+    it('subscribes to watchStepCount exactly once on mount', async () => {
+      await mountPedometer([]);
 
-    registeredListener?.(reading);
-    await tick();
+      expect(watchStepCountMock).toHaveBeenCalledTimes(1);
+    });
 
-    expect(values[values.length - 1]).toEqual(reading);
-  });
+    // why: the whole point of the rune is to mirror the native module's push events (cumulative
+    // step count) into reactive state, so a fired event must be visible through `current`.
+    it('updates the state when the native listener fires', async () => {
+      const values: (IPedometerResult | null)[] = [];
+      await mountPedometer(values);
+      const reading: IPedometerResult = { steps: 456 };
 
-  it('removes the subscription on unmount', async () => {
-    await mountPedometer([]);
-    unmount(ROOT_TAG);
+      registeredListener?.(reading);
+      await tick();
 
-    expect(removeMock).toHaveBeenCalledTimes(1);
+      expect(values[values.length - 1]).toEqual(reading);
+    });
+
+    // why: `result = next` is a plain reassignment, not a merge or an accumulator — a later event
+    // reporting a NEWER step count must fully REPLACE the earlier one rather than summing with it.
+    it('replaces the previous step count, not merges it, on a second native event', async () => {
+      const values: (IPedometerResult | null)[] = [];
+      await mountPedometer(values);
+      const first: IPedometerResult = { steps: 100 };
+      const second: IPedometerResult = { steps: 456 };
+
+      registeredListener?.(first);
+      await tick();
+      registeredListener?.(second);
+      await tick();
+
+      expect(values[values.length - 1]).toEqual(second);
+    });
+
+    // why: an active native subscription after the consuming component is gone leaks a listener
+    // and keeps the step counter delivering events for nothing.
+    it('removes the subscription on unmount', async () => {
+      await mountPedometer([]);
+      unmount(ROOT_TAG);
+
+      expect(removeMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

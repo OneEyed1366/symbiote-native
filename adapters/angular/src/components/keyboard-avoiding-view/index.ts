@@ -48,7 +48,12 @@ import {
   type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { anchorHostStyle, SymbioteHostPropsDirective, ViewHost } from '../../primitives';
+import {
+  anchorHostStyle,
+  SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
+  ViewHost,
+} from '../../primitives';
 
 export type { IKeyboardAvoidingBehavior } from '@symbiote-native/components';
 
@@ -79,6 +84,7 @@ export type IAngularKeyboardAvoidingViewInputs = Omit<
 @Component({
   selector: 'KeyboardAvoidingView',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [ViewHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,

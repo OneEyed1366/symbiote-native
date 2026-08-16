@@ -229,7 +229,17 @@ async function loadMountable(): Promise<Component> {
   return mod.default as Component;
 }
 
+// Regression group, not Positive/Negative: this file's whole job is proving a SPECIFIC fixed crash
+// (Svelte's effect_update_depth_exceeded, root-caused to reduceSticky's 'layout' case unconditionally
+// emitting 'rebuild-interpolation' on every onLayout, even a redundant one) does not come back. The
+// `.not.toThrow()` assertions ARE the product contract here — the crash IS a JS throw, so "did it
+// throw" is the correct question for this file specifically (unlike a generic "did it crash" smoke,
+// which the coverage-sweep discipline otherwise bans as too weak to prove anything).
 describe('sticky-header native-driven shape — reconstructed pre-revert repro', () => {
+  // why: reconstructs the EXACT pre-revert shape (native-driven AnimatedInterpolation in
+  // style.transform + the same interpolation's addListener driving the debounced passthrough) and
+  // drives it with a real measure + a fast scroll burst — the precise sequence a real device
+  // delivers during a drag gesture, and the sequence that crashed on-device 2026-08-13.
   it('survives a real onLayout measure followed by a fast scroll burst without effect_update_depth_exceeded', async () => {
     const { AnimatedValue } = await import('@symbiote-native/engine');
     const scrollAnimatedValue = new AnimatedValue(0);
@@ -260,6 +270,11 @@ describe('sticky-header native-driven shape — reconstructed pre-revert repro',
     await tick();
   });
 
+  // why: the actual crashing condition needed the native-driven path LIVE (a settled debounced
+  // translateY, not just measured-but-still-JS-only) before a redundant-geometry relayout burst
+  // could provoke the unbounded rebuild ping-pong — this proves the reducer's
+  // `alreadyAtThisGeometry` guard (sticky-header-reducer.ts) actually short-circuits that burst by
+  // asserting zero NEW native nodes get minted, not merely that nothing throws.
   it('does not rebuild the interpolation graph on a burst of REDUNDANT identical-geometry layouts', async () => {
     const { AnimatedValue } = await import('@symbiote-native/engine');
     const scrollAnimatedValue = new AnimatedValue(0);

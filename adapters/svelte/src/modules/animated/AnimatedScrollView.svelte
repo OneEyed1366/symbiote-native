@@ -14,12 +14,16 @@
 </script>
 
 <script lang="ts">
-  import { isNativeAnimatedAvailable, reduceProps, readPassthroughStyle } from '@symbiote-native/engine';
+  import {
+    createAnimatedLeafLifecycle,
+    isNativeAnimatedAvailable,
+    reduceProps,
+    readPassthroughStyle,
+  } from '@symbiote-native/engine';
   import type { ISymbioteNode } from '@symbiote-native/engine';
   import type { IScrollViewHandle } from '@symbiote-native/components';
   import ScrollView from '../../components/scroll-view/index.svelte';
   import type { IScrollViewProps } from '../../components/scroll-view/scroll-view-props';
-  import { createAnimatedReconcileRuntime } from './animated-props-runtime';
   import { pickAttachmentProps } from '../../runes/attachments';
 
   let {
@@ -52,7 +56,7 @@
     return props;
   });
 
-  const runtime = createAnimatedReconcileRuntime();
+  const runtime = createAnimatedLeafLifecycle('AnimatedScrollView');
 
   $effect(() => {
     const currentRest = rest;

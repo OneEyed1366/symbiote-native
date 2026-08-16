@@ -37,6 +37,16 @@ function findText(text: string): IFakeNode | undefined {
   return found;
 }
 
+function findByTestId(testId: string): IFakeNode | undefined {
+  let found: IFakeNode | undefined;
+  walk(fabric.committed, node => {
+    if (node.props.testID === testId) found = node;
+  });
+  return found;
+}
+
+// Positive only: createTunnel has no invalid-input/guard-clause path — `In`/`Out` take no props
+// that could be malformed, and the shared Map is entirely internal. There is no Negative group.
 describe('createTunnel — genuine cross-surface delivery', () => {
   it('paints content registered by surface A on surface B, a DIFFERENT mounted surface', async () => {
     const tunnel = createTunnel();
@@ -109,5 +119,60 @@ describe('createTunnel — genuine cross-surface delivery', () => {
       findText('toggle me'),
       'gone after the source flips its own slot content',
     ).toBeUndefined();
+  });
+
+  // why: the doc comment on `Out` promises "renders everything currently tunneled in, in
+  // registration order" — every other test in this file registers exactly one <tunnel.In>, so
+  // that ordering promise is otherwise unverified.
+  it('renders multiple simultaneous registrations in registration order', async () => {
+    const tunnel = createTunnel();
+
+    const SourceApp = defineComponent({
+      setup: () => () => [
+        h(tunnel.In, {}, () => h('symbiote-text', {}, 'first')),
+        h(tunnel.In, {}, () => h('symbiote-text', {}, 'second')),
+      ],
+    });
+    const TargetApp = defineComponent({
+      setup: () => () => h('symbiote-view', { testID: 'target' }, [h(tunnel.Out)]),
+    });
+
+    mount(SOURCE_TAG, SourceApp);
+    await tick();
+    mount(TARGET_TAG, TargetApp);
+    await tick();
+
+    const target = findByTestId('target');
+    expect(target, 'target view committed').toBeDefined();
+    if (target === undefined) throw new Error('unreachable: target missing');
+    // Each registration is an RCTText wrapping one RCTRawText child, not a bare RCTRawText —
+    // read the raw text one level below each direct child to recover registration order.
+    const texts = target.children.map(cell => cell.children[0]?.props.text);
+    expect(texts).toEqual(['first', 'second']);
+  });
+
+  // why: the React twin's create-tunnel history records a real infinite-render-loop white screen
+  // when In/Out shared ONE component; this Vue version avoids the class structurally (In writes
+  // the Map, but never reads it, so it has no reactive dependency on its own write) — but that
+  // structural argument is only a proof if something actually mounts In and Out TOGETHER in one
+  // render tree and settles, rather than always in separate surfaces like every test above.
+  it('settles without a render loop when In and Out share the same surface', async () => {
+    const tunnel = createTunnel();
+    mount(
+      SOURCE_TAG,
+      defineComponent({
+        setup: () => () =>
+          h('symbiote-view', {}, [
+            h(tunnel.In, {}, () => h('symbiote-text', {}, 'same-surface')),
+            h(tunnel.Out),
+          ]),
+      }),
+    );
+    await tick();
+
+    expect(findText('same-surface')).toBeDefined();
+    // A real render loop would keep re-committing every microtask; a handful of commits for one
+    // mount + one reactive settle is the honest upper bound, not an exact implementation count.
+    expect(fabric.counts.completeRoot).toBeLessThan(5);
   });
 });

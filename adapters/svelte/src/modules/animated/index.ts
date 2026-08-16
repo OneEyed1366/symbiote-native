@@ -57,8 +57,6 @@ import AnimatedImageComponent from './AnimatedImage.svelte';
 import AnimatedScrollViewComponent from './AnimatedScrollView.svelte';
 
 export type { IAnimatedComponentProps } from './animated-component-props';
-export { createAnimatedReconcileRuntime } from './animated-props-runtime';
-export type { IAnimatedReconcileRuntime } from './animated-props-runtime';
 
 // The live, JS-driven driver namespace (real frames). RN's AnimatedImplementation.
 const liveDrivers = {

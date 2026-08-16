@@ -29,6 +29,7 @@
     createNavigationEmitter,
     diffFocusedRoute,
     isFocusedRoute,
+    reconcileTabRoutes,
     renderTabBar,
     tabRouterReducer,
   } from '../../core';
@@ -82,29 +83,32 @@
 
   const registry = $derived(toRegistry(screens));
 
-  // Same seed-once-then-dispatch shape Stack uses: the router state cannot exist until the
-  // markers have registered, and `seededState` is a plain local so memoizing it inside the
-  // derivation is not a state write during a derivation.
-  let dispatchedState = $state.raw<ITabRouterState | null>(null);
-  let seededState: ITabRouterState | undefined;
-
-  function seedState(): ITabRouterState {
-    if (seededState !== undefined) return seededState;
-    const routes: IRoute<unknown>[] = [...registry.entries()].map(([name, entry]) => ({
+  // A tab's route list is a PROJECTION of the registry, not navigation history the way Stack's
+  // is: a marker registering or unregistering must add or drop its tab. Unlike Stack, a route key
+  // here is derived from the route NAME rather than an incrementing sequence, so re-deriving this
+  // list on every registry change re-keys nothing.
+  const registeredRoutes = $derived.by<IRoute<unknown>[]>(() =>
+    [...registry.entries()].map(([name, entry]) => ({
       key: `${routeIdPrefix}-${name}`,
       name,
       params: entry.initialParams,
-    }));
-    if (routes.length === 0) {
-      dlog('Tab: no <Tab.Screen> children registered');
-      // Deliberately not memoized - markers may still be registering.
-      return createInitialTabState(routes, initialRouteName);
-    }
-    seededState = createInitialTabState(routes, initialRouteName);
-    return seededState;
-  }
+    })),
+  );
 
-  const state = $derived(dispatchedState ?? seedState());
+  // The dispatched half is the only STATE here; the registry half is re-derived and reconciled
+  // against it on every change (reconcileTabRoutes, core - it is what preserves each surviving
+  // route's key/params and keeps the focus on the same route NAME). Nothing needs memoizing
+  // inside the derivation, so there is no state write during a derivation to avoid in the first
+  // place. Until something dispatches there is nothing to reconcile against, hence the seed.
+  let dispatchedState = $state.raw<ITabRouterState | null>(null);
+
+  const state = $derived.by<ITabRouterState>(() => {
+    if (registeredRoutes.length === 0) dlog('Tab: no <Tab.Screen> children registered');
+    const dispatched = dispatchedState;
+    return dispatched === null
+      ? createInitialTabState(registeredRoutes, initialRouteName)
+      : reconcileTabRoutes(dispatched, registeredRoutes);
+  });
 
   function dispatch(action: ITabRouterAction): void {
     dispatchedState = tabRouterReducer(state, action);

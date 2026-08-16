@@ -82,6 +82,7 @@ afterEach(() => {
   rmSync(ROOT_OUT, { force: true });
   rmSync(REFRESH_ROOT_OUT, { force: true });
   rmSync(STICKY_ROOT_OUT, { force: true });
+  rmSync(HANDLE_ROOT_OUT, { force: true });
 });
 
 const COMPILE_OPTIONS = {
@@ -162,67 +163,117 @@ async function loadMountable(): Promise<Component> {
   return mod.default as Component;
 }
 
+// A path distinct from every other compiled root above (Node's dynamic `import()` cache is keyed
+// by resolved URL — the same reason ROOT_OUT/REFRESH_ROOT_OUT/STICKY_ROOT_OUT are already separate
+// paths in this file).
+const HANDLE_ROOT_OUT = join(__dirname, '.smoke-compiled-handle-root.mjs');
+
+// A root exposing the inner VirtualizedList's exported imperative handle on
+// `window.__listHandle` via `bind:this`, same pattern scroll-view.smoke.test.ts uses to drive
+// ScrollView's own handle from outside the compiled tree.
+async function loadMountableWithHandle(): Promise<Component> {
+  compileVirtualizedListWithRefreshControl();
+  compileToFile(
+    `<script>
+       import VirtualizedList from './.smoke-compiled-virtualized-list.mjs';
+       let { data } = $props();
+       let handle = $state();
+       $effect(() => {
+         window.__listHandle = handle;
+       });
+       function getItem(source, index) { return source[index]; }
+       function getItemCount(source) { return source.length; }
+     </script>
+     {#snippet cell()}{/snippet}
+     <VirtualizedList bind:this={handle} {data} {getItem} {getItemCount} item={cell} />`,
+    'HandleRoot.svelte',
+    HANDLE_ROOT_OUT,
+  );
+  const mod: unknown = await import(`file://${HANDLE_ROOT_OUT}`);
+  if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
+    throw new Error('HandleRoot.svelte produced no default export');
+  }
+  return mod.default as Component;
+}
+
+// No Negative group: virtualized-list-props.ts is a permissive bag (every field but
+// data/getItem/getItemCount/item optional) with no runtime guard/throw path. The windowing STATE
+// machine (reduceList, buildListPlan, computeWindow) is core logic covered by
+// core/components/src/state/virtualized-list.test.ts and virtualized-list-reducer.test.ts; this
+// file's job is proving the Svelte WIRING: the reducer's effects actually reach the committed
+// Fabric tree and a real native command.
 describe('VirtualizedList (real compiled index.svelte)', () => {
-  it('renders only the windowed slice of a large data set, not every item', async () => {
-    const ListRoot = await loadMountable();
-    const data = Array.from({ length: ITEM_COUNT }, (_unused, index) => `item-${index}`);
-    mount(ROOT_TAG, ListRoot, { data });
-    await tick();
-    await tick();
+  describe('Positive', () => {
+    // why: proves the reducer's "before viewport known" branch (computeWindow's bounded-prefix
+    // path) actually reaches the committed tree as a small deterministic slice, not the whole
+    // 100-item list — this is the entire point of virtualization: unbounded data must not mean
+    // unbounded native views.
+    it('renders only the windowed slice of a large data set, not every item', async () => {
+      const ListRoot = await loadMountable();
+      const data = Array.from({ length: ITEM_COUNT }, (_unused, index) => `item-${index}`);
+      mount(ROOT_TAG, ListRoot, { data });
+      await tick();
+      await tick();
 
-    const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
-    expect(content).toBeDefined();
-    if (content === undefined) return;
+      const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+      expect(content).toBeDefined();
+      if (content === undefined) return;
 
-    // No onLayout has fired (viewportLength is still 0), so computeWindow takes the
-    // "before viewport known" bounded-prefix branch: exactly `initialNumToRender` cells, index
-    // [0, initialNumToRender - 1] — a small, fully deterministic slice of the 100-item list.
-    expect(content.children.length).toBe(DEFAULT_INITIAL_NUM_TO_RENDER);
-    expect(content.children.length).toBeLessThan(ITEM_COUNT);
-    for (const child of content.children) {
-      expect(child.viewName).toBe('RCTView');
-    }
+      // No onLayout has fired (viewportLength is still 0), so computeWindow takes the
+      // "before viewport known" bounded-prefix branch: exactly `initialNumToRender` cells, index
+      // [0, initialNumToRender - 1] — a small, fully deterministic slice of the 100-item list.
+      expect(content.children.length).toBe(DEFAULT_INITIAL_NUM_TO_RENDER);
+      expect(content.children.length).toBeLessThan(ITEM_COUNT);
+      for (const child of content.children) {
+        expect(child.viewName).toBe('RCTView');
+      }
 
-    const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
-    expect(scrollView).toBeDefined();
-    // Android nested-scroll gesture arbitration: without this, a FlatList/SectionList nested
-    // inside a page ScrollView never gets its own scroll gesture — only the outer page scrolls.
-    // ScrollView.svelte defaults this on; this file hand-rolls the raw intrinsic instead of
-    // rendering <ScrollView>, so it must default it itself too.
-    expect(scrollView?.props.nestedScrollEnabled).toBe(true);
-  });
-
-  it('grows the window toward the target as onLayout reports a real viewport', async () => {
-    const ListRoot = await loadMountable();
-    const data = Array.from({ length: ITEM_COUNT }, (_unused, index) => `item-${index}`);
-    mount(ROOT_TAG, ListRoot, { data });
-    await tick();
-    await tick();
-
-    const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
-    expect(scrollView).toBeDefined();
-    if (scrollView === undefined) return;
-
-    // Report a real viewport: computeWindow can now size a window off real geometry instead of the
-    // pre-layout bounded prefix. Every rendered cell has length 0 (nothing measured yet, no
-    // getItemLayout), so the window covers the WHOLE unmeasured content in one pass — still a
-    // proof the windowing math is live and reactive to a real event, not that it never changes.
-    fabric.fireEvent(scrollView.instanceHandle, 'topLayout', {
-      layout: { width: 300, height: 600 },
+      const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
+      expect(scrollView).toBeDefined();
+      // Android nested-scroll gesture arbitration: without this, a FlatList/SectionList nested
+      // inside a page ScrollView never gets its own scroll gesture — only the outer page scrolls.
+      // ScrollView.svelte defaults this on; this file hand-rolls the raw intrinsic instead of
+      // rendering <ScrollView>, so it must default it itself too.
+      expect(scrollView?.props.nestedScrollEnabled).toBe(true);
     });
-    await tick();
-    await tick();
 
-    const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
-    expect(content).toBeDefined();
-    if (content === undefined) return;
-    expect(content.children.length).toBeGreaterThan(0);
-  });
+    // why: proves the window is REACTIVE to a real onLayout, not just correct at mount — the
+    // "before viewport known" bounded prefix from the previous test must actually grow once real
+    // geometry is known, or a device would forever render the pre-layout placeholder count.
+    it('grows the window toward the target as onLayout reports a real viewport', async () => {
+      const ListRoot = await loadMountable();
+      const data = Array.from({ length: ITEM_COUNT }, (_unused, index) => `item-${index}`);
+      mount(ROOT_TAG, ListRoot, { data });
+      await tick();
+      await tick();
 
-  it('forwards testID and wires a real RefreshControl (gaps 1 and 2)', async () => {
-    compileVirtualizedListWithRefreshControl();
-    compileToFile(
-      `<script>
+      const scrollView = fabric.find(node => node.viewName === 'RCTScrollView');
+      expect(scrollView).toBeDefined();
+      if (scrollView === undefined) return;
+
+      // Report a real viewport: computeWindow can now size a window off real geometry instead of the
+      // pre-layout bounded prefix. Every rendered cell has length 0 (nothing measured yet, no
+      // getItemLayout), so the window covers the WHOLE unmeasured content in one pass — still a
+      // proof the windowing math is live and reactive to a real event, not that it never changes.
+      fabric.fireEvent(scrollView.instanceHandle, 'topLayout', {
+        layout: { width: 300, height: 600 },
+      });
+      await tick();
+      await tick();
+
+      const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+      expect(content).toBeDefined();
+      if (content === undefined) return;
+      expect(content.children.length).toBeGreaterThan(0);
+    });
+
+    // why: VirtualizedList hand-rolls its own scroll-view host node (unlike FlatList, which just
+    // forwards) — accessibility props and RefreshControl composition are its OWN wiring
+    // responsibility here, not inherited "for free" from a wrapped <ScrollView>.
+    it('forwards testID and wires a real RefreshControl (gaps 1 and 2)', async () => {
+      compileVirtualizedListWithRefreshControl();
+      compileToFile(
+        `<script>
          import VirtualizedList from './.smoke-compiled-virtualized-list.mjs';
          function getItem(source, index) { return source[index]; }
          function getItemCount(source) { return source.length; }
@@ -238,45 +289,45 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
          onRefresh={onRefresh}
          refreshing={true}
        />`,
-      'RefreshRoot.svelte',
-      REFRESH_ROOT_OUT,
-    );
-    const mod: unknown = await import(`file://${REFRESH_ROOT_OUT}`);
-    if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
-      throw new Error('RefreshRoot.svelte produced no default export');
-    }
+        'RefreshRoot.svelte',
+        REFRESH_ROOT_OUT,
+      );
+      const mod: unknown = await import(`file://${REFRESH_ROOT_OUT}`);
+      if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
+        throw new Error('RefreshRoot.svelte produced no default export');
+      }
 
-    mount(ROOT_TAG, mod.default as Component);
-    await tick();
-    await tick();
+      mount(ROOT_TAG, mod.default as Component);
+      await tick();
+      await tick();
 
-    // Gap 1: testID (IAccessibilityProps) actually reaches the committed scroll-view host node,
-    // not just the type surface — walk the LIVE tree, not fabric.find()'s creation log.
-    const scrollView = findLive(
-      fabric.appRoot(),
-      node => node.props.testID === 'virtualized-list-a11y',
-    );
-    expect(scrollView, 'testID reached the committed RCTScrollView').toBeDefined();
-    expect(scrollView?.viewName).toBe('RCTScrollView');
+      // Gap 1: testID (IAccessibilityProps) actually reaches the committed scroll-view host node,
+      // not just the type surface — walk the LIVE tree, not fabric.find()'s creation log.
+      const scrollView = findLive(
+        fabric.appRoot(),
+        node => node.props.testID === 'virtualized-list-a11y',
+      );
+      expect(scrollView, 'testID reached the committed RCTScrollView').toBeDefined();
+      expect(scrollView?.viewName).toBe('RCTScrollView');
 
-    // Gap 2: onRefresh/refreshing produce a REAL RefreshControl (PullToRefreshView) as a sibling
-    // of the content container inside the scroll view (iOS sibling attachment) — not an inert prop.
-    const refresh = findLive(fabric.appRoot(), node => node.viewName === 'PullToRefreshView');
-    expect(refresh, 'a real RefreshControl.svelte painted PullToRefreshView').toBeDefined();
-    expect(refresh?.props.refreshing).toBe(true);
-    expect(scrollView?.children.some(child => child.tag === refresh?.tag)).toBe(true);
-  });
+      // Gap 2: onRefresh/refreshing produce a REAL RefreshControl (PullToRefreshView) as a sibling
+      // of the content container inside the scroll view (iOS sibling attachment) — not an inert prop.
+      const refresh = findLive(fabric.appRoot(), node => node.viewName === 'PullToRefreshView');
+      expect(refresh, 'a real RefreshControl.svelte painted PullToRefreshView').toBeDefined();
+      expect(refresh?.props.refreshing).toBe(true);
+      expect(scrollView?.children.some(child => child.tag === refresh?.tag)).toBe(true);
+    });
 
-  // Unlike ScrollView.svelte (only an opaque children Snippet — no auto-wrap, see
-  // scroll-view-props.ts's KNOWN GAP), this file walks an indexable `plan.cells` list and CAN
-  // auto-wrap a flagged cell in ScrollViewStickyHeader itself. Proves the wiring end to end: a
-  // stickyHeaderIndices-flagged windowed cell actually paints through the sticky component (real
-  // zIndex/collapsable), not just an inert prop forwarded onto the native scroll view (which does
-  // NOT honor stickyHeaderIndices on its own — see render-scroll-sticky.ts's header comment).
-  it('wraps a stickyHeaderIndices-flagged windowed cell in ScrollViewStickyHeader', async () => {
-    compileVirtualizedListWithRefreshControl();
-    compileToFile(
-      `<script>
+    // Unlike ScrollView.svelte (only an opaque children Snippet — no auto-wrap, see
+    // scroll-view-props.ts's KNOWN GAP), this file walks an indexable `plan.cells` list and CAN
+    // auto-wrap a flagged cell in ScrollViewStickyHeader itself. Proves the wiring end to end: a
+    // stickyHeaderIndices-flagged windowed cell actually paints through the sticky component (real
+    // zIndex/collapsable), not just an inert prop forwarded onto the native scroll view (which does
+    // NOT honor stickyHeaderIndices on its own — see render-scroll-sticky.ts's header comment).
+    it('wraps a stickyHeaderIndices-flagged windowed cell in ScrollViewStickyHeader', async () => {
+      compileVirtualizedListWithRefreshControl();
+      compileToFile(
+        `<script>
          import VirtualizedList from './.smoke-compiled-virtualized-list.mjs';
          function getItem(source, index) { return source[index]; }
          function getItemCount(source) { return source.length; }
@@ -289,20 +340,55 @@ describe('VirtualizedList (real compiled index.svelte)', () => {
          item={cell}
          stickyHeaderIndices={[0]}
        />`,
-      'StickyRoot.svelte',
-      STICKY_ROOT_OUT,
-    );
-    const mod: unknown = await import(`file://${STICKY_ROOT_OUT}`);
-    if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
-      throw new Error('StickyRoot.svelte produced no default export');
-    }
+        'StickyRoot.svelte',
+        STICKY_ROOT_OUT,
+      );
+      const mod: unknown = await import(`file://${STICKY_ROOT_OUT}`);
+      if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
+        throw new Error('StickyRoot.svelte produced no default export');
+      }
 
-    mount(ROOT_TAG, mod.default as Component);
-    await tick();
-    await tick();
+      mount(ROOT_TAG, mod.default as Component);
+      await tick();
+      await tick();
 
-    const stickyHost = fabric.find(node => node.viewName === 'RCTView' && node.props.zIndex === 10);
-    expect(stickyHost, 'the flagged cell painted through ScrollViewStickyHeader').toBeDefined();
-    expect(stickyHost?.props.collapsable).toBe(false);
+      const stickyHost = fabric.find(
+        node => node.viewName === 'RCTView' && node.props.zIndex === 10,
+      );
+      expect(stickyHost, 'the flagged cell painted through ScrollViewStickyHeader').toBeDefined();
+      expect(stickyHost?.props.collapsable).toBe(false);
+    });
+
+    // why: the exported imperative surface (scrollToOffset, scrollToIndex, scrollToItem,
+    // scrollToEnd, flashScrollIndicators, getNativeScrollRef/getScrollableNode/getScrollResponder/
+    // getScrollNode, recordInteraction) had ZERO coverage before this test — every method is thin
+    // Svelte-side wiring (dispatch -> reducer effect -> scrollHandle call), not core reducer logic,
+    // so it belongs here. scrollToOffset is the representative case: it exercises the FULL chain
+    // (export -> dispatch({kind:'scroll-to-offset'}) -> reduceList's 'scroll-to' effect ->
+    // scrollToPixel -> scrollHandle.scrollTo -> a real dispatchViewCommand). The remaining
+    // imperative exports are structurally identical thin delegations through the SAME dispatch/
+    // scrollHandle wiring this test already exercises (getNativeScrollRef/getScrollableNode/
+    // getScrollResponder/getScrollNode are direct field reads with no branch of their own) — closed
+    // N/A on that basis rather than duplicated one-by-one.
+    it('dispatches a real scrollTo command through the exported scrollToOffset handle', async () => {
+      const ListRoot = await loadMountableWithHandle();
+      const data = Array.from({ length: ITEM_COUNT }, (_unused, index) => `item-${index}`);
+      mount(ROOT_TAG, ListRoot, { data });
+      await tick();
+      await tick();
+
+      const handle = (globalThis as { __listHandle?: Record<string, unknown> }).__listHandle;
+      expect(handle, 'imperative handle was exposed via bind:this').toBeDefined();
+      const scrollToOffset = handle?.scrollToOffset as
+        ((params: { offset: number; animated?: boolean }) => void) | undefined;
+      expect(typeof scrollToOffset).toBe('function');
+      scrollToOffset?.({ offset: 240, animated: false });
+      await tick();
+
+      expect(fabric.commands).toHaveLength(1);
+      expect(fabric.commands[0]?.commandName).toBe('scrollTo');
+      expect(fabric.commands[0]?.args).toEqual([0, 240, false]);
+      expect(fabric.commands[0]?.node.viewName).toBe('RCTScrollView');
+    });
   });
 });

@@ -22,7 +22,6 @@ import {
   type IAriaProps,
   type IModalAnimationType,
   type IModalOrientation,
-  type IModalOrientationChangeEvent,
   type IModalPresentationStyle,
   type IModalState,
 } from '@symbiote-native/components';
@@ -30,6 +29,7 @@ import {
   dlog,
   type IClassNameValue,
   type IStyleProp,
+  type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
 
@@ -65,7 +65,9 @@ export type IModalEmits = {
   show: () => boolean;
   dismiss: () => boolean;
   requestClose: () => boolean;
-  orientationChange: (event: IModalOrientationChangeEvent) => boolean;
+  // Forwarded verbatim, so the listener sees the ISymbioteEvent wrapper the engine delivers; the
+  // orientation is read at event.nativeEvent.orientation (IModalOrientationChangeEvent).
+  orientationChange: (event: ISymbioteEvent) => boolean;
 };
 
 function asBoolean(value: unknown): boolean | undefined {
@@ -191,8 +193,7 @@ export const Modal = defineComponent<IModalProps, IModalEmits>(
           onShow: (): void => emit('show'),
           onDismiss: (): void => emit('dismiss'),
           onRequestClose: (): void => emit('requestClose'),
-          onOrientationChange: (event: IModalOrientationChangeEvent): void =>
-            emit('orientationChange', event),
+          onOrientationChange: (event: ISymbioteEvent): void => emit('orientationChange', event),
         },
         [
           h(
@@ -211,7 +212,7 @@ export const Modal = defineComponent<IModalProps, IModalEmits>(
       show: (): boolean => true,
       dismiss: (): boolean => true,
       requestClose: (): boolean => true,
-      orientationChange: (_event: IModalOrientationChangeEvent): boolean => true,
+      orientationChange: (_event: ISymbioteEvent): boolean => true,
     },
   },
 );

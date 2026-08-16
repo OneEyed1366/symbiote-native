@@ -2,7 +2,8 @@
 // default), lays out implicit steps at 1000-point resolution, and nudges the step row down 10pt.
 // Also the base (./index re-exports it) for headless. Mirrors the library's iOS branches.
 
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, forwardRef } from '@angular/core';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { DescriptorOutlet } from '@symbiote-native/angular';
 import { SliderBase } from './shared';
 import { SLIDER_IOS_DEFAULT_HEIGHT, SLIDER_STEP_RESOLUTION_IOS } from '../../core';
@@ -15,6 +16,7 @@ const IOS_STEPS_CONTAINER_TOP = 10;
   standalone: true,
   imports: [DescriptorOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => Slider), multi: true }],
   template: `<symbiote-descriptor-outlet [node]="descriptor" />`,
 })
 export class Slider extends SliderBase {

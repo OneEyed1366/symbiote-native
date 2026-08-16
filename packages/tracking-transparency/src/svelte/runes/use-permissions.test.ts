@@ -116,37 +116,105 @@ async function mountPermissions(): Promise<IPermissions> {
   return permissions;
 }
 
+// Node only reports an unhandled rejection a macrotask after the promise settles, so a plain
+// `await` on the rune's own boxed state is too early to prove one did not happen. The mount
+// itself has to run inside the window, hence the passed-through result.
+async function collectUnhandledRejections<T>(run: () => Promise<T>): Promise<[T, unknown[]]> {
+  const unhandled: unknown[] = [];
+  const onUnhandledRejection = (reason: unknown): void => {
+    unhandled.push(reason);
+  };
+  process.on('unhandledRejection', onUnhandledRejection);
+  try {
+    const result = await run();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    return [result, unhandled];
+  } finally {
+    process.off('unhandledRejection', onUnhandledRejection);
+  }
+}
+
+// get()/request() have no guard clause of their own — they forward straight to the mocked core
+// calls and write whatever those resolve with (core's own rejection contract is exercised by
+// packages/tracking-transparency/src/core/tracking-transparency.test.ts, out of this rune's
+// scope). The Positive group covers seed, auto-fetch-on-mount, and the two imperative actions
+// keeping BOTH their return value and the reactive `status` in sync. The Negative group covers
+// the one path that DOES catch: the mount fetch, which has no caller to reject to.
 describe('usePermissions (Svelte)', () => {
-  it('starts at null before the initial fetch resolves', async () => {
-    const permissions = await mountPermissions();
+  describe('Positive (seed, auto-fetch, request/get keep return value + reactive status in sync)', () => {
+    it('starts at null before the initial fetch resolves', async () => {
+      // why: the caller needs a distinguishable "don't know yet" state (null) instead of an
+      // arbitrary default permission value while the one-shot mount fetch is in flight.
+      const permissions = await mountPermissions();
 
-    expect(permissions.status).toBe(null);
+      expect(permissions.status).toBe(null);
+    });
+
+    it('fetches the permission status exactly once on mount, with no request() call', async () => {
+      // why: mirrors upstream's auto-fetch-on-mount contract (a Svelte twin of Vue's onMounted) —
+      // reading current permission status must never itself trigger the OS prompt that
+      // requestTrackingPermissionsAsync would show.
+      const permissions = await mountPermissions();
+
+      await vi.waitFor(() => expect(permissions.status).toEqual(GRANTED));
+      expect(getTrackingPermissionsAsync).toHaveBeenCalledTimes(1);
+      expect(requestTrackingPermissionsAsync).not.toHaveBeenCalled();
+    });
+
+    it('request() resolves with the fresh response AND updates reactive status to the same value', async () => {
+      // why: request() is documented as an imperative callback the caller can await directly
+      // (`{ status, request, get }`, Vue's Ref-unwrap twin) — a caller relying on the resolved
+      // value must see the exact same response the reactive `status` getter settles on, not two
+      // independently-resolved results that could disagree.
+      const permissions = await mountPermissions();
+      await vi.waitFor(() => expect(permissions.status).toEqual(GRANTED));
+
+      requestTrackingPermissionsAsync.mockResolvedValueOnce(DENIED);
+      const resolved = await permissions.request();
+
+      expect(resolved).toEqual(DENIED);
+      expect(permissions.status).toEqual(DENIED);
+    });
+
+    it('get() resolves with the fresh response AND updates reactive status to the same value', async () => {
+      // why: same return-value/reactive-status agreement as request(), for the re-fetch path.
+      const permissions = await mountPermissions();
+      await vi.waitFor(() => expect(permissions.status).toEqual(GRANTED));
+
+      getTrackingPermissionsAsync.mockResolvedValueOnce(DENIED);
+      const resolved = await permissions.get();
+
+      expect(resolved).toEqual(DENIED);
+      expect(permissions.status).toEqual(DENIED);
+    });
   });
 
-  it('fetches the permission status once on mount', async () => {
-    const permissions = await mountPermissions();
+  describe('Negative (the mount fetch has no caller to reject to)', () => {
+    it('surfaces a mount-fetch rejection as `error` instead of leaving it unhandled', async () => {
+      // why: the $effect's fetch used to be `void get()`, so a native rejection escaped the rune
+      // entirely as an unhandled promise rejection and left `status` at null — indistinguishable
+      // from "still fetching".
+      getTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
 
-    await vi.waitFor(() => expect(permissions.status).toEqual(GRANTED));
-    expect(getTrackingPermissionsAsync).toHaveBeenCalledTimes(1);
-  });
+      const [permissions, unhandled] = await collectUnhandledRejections(mountPermissions);
 
-  it('request() delegates to requestTrackingPermissionsAsync and updates the status', async () => {
-    const permissions = await mountPermissions();
-    await vi.waitFor(() => expect(permissions.status).toEqual(GRANTED));
+      await vi.waitFor(() => expect(permissions.error?.message).toBe('native call failed'));
+      expect(unhandled).toEqual([]);
+      // null status + non-null error is the pair a consumer reads as "the fetch failed"
+      expect(permissions.status).toBe(null);
+    });
 
-    requestTrackingPermissionsAsync.mockResolvedValueOnce(DENIED);
-    await permissions.request();
+    it('clears the recorded error once a later get() succeeds', async () => {
+      // why: a consumer that retries by hand after a failed mount fetch must end up with a clean
+      // slate — a stale error next to a freshly fetched status would keep reading as "broken".
+      getTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
+      const permissions = await mountPermissions();
+      await vi.waitFor(() => expect(permissions.error).not.toBe(null));
 
-    expect(permissions.status).toEqual(DENIED);
-  });
+      await permissions.get();
 
-  it('get() re-fetches and updates the status', async () => {
-    const permissions = await mountPermissions();
-    await vi.waitFor(() => expect(permissions.status).toEqual(GRANTED));
-
-    getTrackingPermissionsAsync.mockResolvedValueOnce(DENIED);
-    await permissions.get();
-
-    expect(permissions.status).toEqual(DENIED);
+      expect(permissions.error).toBe(null);
+      expect(permissions.status).toEqual(GRANTED);
+    });
   });
 });

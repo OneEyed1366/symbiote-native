@@ -1,5 +1,11 @@
-// Co-located Angular-driven test (ADR 0025) for LocalesService. See packages/battery's
-// battery-state.service.test.ts for the shared rationale.
+// Co-located Angular-driven test (ADR 0025) for LocalesService. `core` is mocked wholesale (the
+// real getLocales/addLocaleListener delegation is covered once in
+// packages/localization/src/core/localization.test.ts), this file proves only connect()'s own
+// read/subscribe/recompute/unsubscribe lifecycle — see packages/battery's
+// battery-state.service.test.ts for the shared mounting rationale.
+//
+// No Negative group: connect() has no guard clause or throwing path — getLocales() is a
+// synchronous, always-succeeding native read.
 
 import '@angular/compiler';
 import { Component, inject, type Signal } from '@angular/core';
@@ -94,12 +100,17 @@ afterEach(() => {
 
 describe('LocalesService.connect', () => {
   it('reads the current locales synchronously', () => {
+    // why: getLocales() is a synchronous native read — the signal must hold the real value on
+    // the very first read, with no "loading" gap.
     mount(ROOT_TAG, LocalesHost);
 
     expect(capturedResult?.()).toEqual(FAKE_LOCALES_INITIAL);
   });
 
   it('recomputes the signal when the registered listener fires', async () => {
+    // why: locale settings can change while the app runs (device Language & Region change) —
+    // the signal must re-read getLocales() off the native invalidation event, not cache the
+    // initial snapshot forever.
     mount(ROOT_TAG, LocalesHost);
     await tick();
 
@@ -111,6 +122,8 @@ describe('LocalesService.connect', () => {
   });
 
   it('removes the subscription when the host component is unmounted', async () => {
+    // why: a leaked subscription keeps re-reading locales for a signal no component observes,
+    // and leaks the native listener — the effect's onCleanup must run on teardown.
     mount(ROOT_TAG, LocalesHost);
     await tick();
 

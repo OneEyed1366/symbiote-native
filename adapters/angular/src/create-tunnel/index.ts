@@ -1,25 +1,22 @@
 // createTunnel for @symbiote-native/angular — the Angular twin of the React/Vue cross-surface tunnel
 // (adapters/react/src/create-tunnel.tsx, adapters/vue/src/create-tunnel.ts — read their
-// headers for the full "why not just extend the portal across surfaces" rationale; same prior
-// art: pmndrs/tunnel-rat, facebook/react#17147). `TunnelOut` lives in whichever component should
-// PAINT the content; its OWN read of the shared store drives that surface's own normal render
-// cycle — no cross-surface reach-in, no rootTag lookup, works whether TunnelIn and TunnelOut
-// share a surface or not.
+// headers for the "why not just extend the portal across surfaces" rationale; same prior art:
+// pmndrs/tunnel-rat, facebook/react#17147). `TunnelOut` lives in whichever component should PAINT
+// the content; its own read of the shared store drives that surface's own normal render cycle —
+// no cross-surface reach-in, works whether TunnelIn and TunnelOut share a surface or not.
 //
-// Angular cannot mirror React's/Vue's shape verbatim: both of those build a FRESH `In`/`Out`
-// pair per `createTunnel()` call (a closure-scoped class in Vue, closure-scoped functions in
-// React). Angular components can't be synthesized at runtime — there is no JIT compiler under
-// Metro/Hermes (see modules/animated/create-animated-component.ts's header for the same
+// Angular cannot mirror React's/Vue's shape verbatim: both build a FRESH `In`/`Out` pair per
+// `createTunnel()` call, and Angular components can't be synthesized at runtime — no JIT compiler
+// under Metro/Hermes (see modules/animated/create-animated-component.ts's header for the same
 // constraint). So here `createTunnel()` returns only a plain reactive STORE (a signal);
 // `TunnelInDirective` and `TunnelOut` are ONE static, pre-authored, AOT-compilable pair,
-// parameterized by that store through an input — same relationship `VListOutletDirective` has
-// to the per-cell template it stamps, generalized to an open-ended, changing SET of templates.
+// parameterized by that store through an input — the relationship `VListOutletDirective` has to
+// the per-cell template it stamps, generalized to an open-ended, changing SET of templates.
 //
-// TunnelInDirective is a STRUCTURAL directive (`*tunnelIn="overlayTunnel"`), not a component
-// that takes a separate `<ng-template>` + `[content]` binding — matching `*portal` (see
-// create-portal.ts's header for why that reads as native Angular and the two-step form
-// doesn't). `TunnelOut` stays a plain component (`<tunnel-out>`) — it's a rendering SLOT, the
-// same shape as Angular's own `<router-outlet>`, not content that needs a structural directive.
+// TunnelInDirective is a STRUCTURAL directive (`*tunnelIn="overlayTunnel"`), matching `*portal`
+// (see create-portal.ts's header for why that reads as native Angular). `TunnelOut` stays a plain
+// component (`<tunnel-out>`) — a rendering SLOT, the same shape as Angular's own
+// `<router-outlet>`, not content that needs a structural directive.
 //
 // App code stays fully declarative — no ViewContainerRef/imperative rendering — by putting
 // `*tunnelIn` directly on the portable content, the same way `*ngIf` sits directly on an

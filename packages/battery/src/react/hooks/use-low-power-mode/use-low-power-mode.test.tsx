@@ -1,5 +1,8 @@
 // Co-located React-driven test (ADR 0025) for useLowPowerMode. See use-battery-level's test for
-// the shared rationale (mocks `core`, not expo-modules-core internals).
+// the shared rationale (mocks `core`, not expo-modules-core internals; native delegation is
+// covered once in packages/battery/src/core/battery.test.ts).
+//
+// No Negative group: the hook has no guard clause or throwing path.
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -43,18 +46,24 @@ afterEach(() => unmount(ROOT_TAG));
 
 describe('useLowPowerMode', () => {
   it('reports false before the initial fetch resolves', () => {
+    // why: false is the documented "assume off until proven otherwise" sentinel — must show on
+    // the synchronous first render, before the effect's async fetch settles.
     mount(ROOT_TAG, createElement(Probe));
 
     expect(results[results.length - 1]).toBe(false);
   });
 
   it('reports the fetched value once the initial isLowPowerModeEnabledAsync() resolves', async () => {
+    // why: proves the one-shot seed fetch actually reaches a re-render.
     mount(ROOT_TAG, createElement(Probe));
 
     await vi.waitFor(() => expect(results[results.length - 1]).toBe(true));
   });
 
   it('updates when the native listener fires', async () => {
+    // why: toggling low-power mode must come from the native event, not a second fetch — proves
+    // the listener drives a re-render independent of the seed value (seed=false, event flips it
+    // to true, isolating the two code paths).
     isLowPowerModeEnabledAsync.mockResolvedValue(false);
     mount(ROOT_TAG, createElement(Probe));
     await vi.waitFor(() => expect(results[results.length - 1]).toBe(false));
@@ -66,6 +75,8 @@ describe('useLowPowerMode', () => {
   });
 
   it('unsubscribes from the native listener on unmount', () => {
+    // why: the effect's cleanup must run on unmount or the native listener leaks past the
+    // component's lifetime.
     mount(ROOT_TAG, createElement(Probe));
 
     unmount(ROOT_TAG);

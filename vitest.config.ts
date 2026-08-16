@@ -1,14 +1,11 @@
 import { defineConfig } from 'vitest/config';
 
-// Root unit/integration runner. Tests are co-located with what they exercise:
-// pure engine/components logic next to `core/*/src`, framework-driven pipeline tests next to
-// the adapter source. `@symbiote-native/*` packages resolve to raw `src/*.ts` (their package
-// `main`), so they must be inlined for Vitest to transform them. examples/* left the pnpm
-// workspace (2026-07, standalone npm installs) and no longer shares this install/lockfile,
-// so its tests are out of scope here — run them from inside the example app itself.
-// A single `react` copy across the monorepo is enforced by the `overrides` in
-// pnpm-workspace.yaml (the adapter's reconciler and the app's hooks must share one instance,
-// else "Invalid hook call"); no Vitest-side dedupe/alias is needed on top of that.
+// Root unit/integration runner. Tests are co-located with what they exercise. `@symbiote-native/*`
+// packages resolve to raw `src/*.ts` (their package `main`), so they must be inlined for Vitest
+// to transform them. examples/* left the pnpm workspace (2026-07, standalone npm installs) and is
+// out of scope here — run its tests from inside the example app itself. A single `react` copy is
+// enforced by pnpm-workspace.yaml's `overrides` (else "Invalid hook call"), so no Vitest-side
+// dedupe/alias is needed.
 
 const INCLUDE_ALL = [
   'core/**/src/**/*.test.{ts,tsx}',
@@ -44,23 +41,19 @@ const SHARED = {
   test: { environment: 'node' as const, server: { deps: { inline: [/@symbiote-native\//] } } },
 };
 
-// `svelte`'s package.json "." export splits on a `browser` condition (client runtime,
-// `mount()`/`unmount()` etc.) vs `default`/`worker` (the SSR runtime, where `mount()` throws
-// `lifecycle_function_unavailable`). Vite/Vitest's default Node conditions pick the SSR build,
-// which crashes the FIRST call the Svelte adapter's `render.ts` makes — caught by
-// adapters/svelte/src/mount-pipeline.smoke.test.ts. Both `resolve` and `ssr.resolve` are needed:
-// Vitest executes test files through Vite's SSR module graph, which reads `ssr.resolve.conditions`
-// (defaulting to Node conditions), NOT the plain `resolve.conditions`. Metro (the real production
-// bundler) needs the equivalent `conditionNames` fix in whatever app config bundles
-// adapters/svelte for a device; tracked in the svelte-adapter-dom-shim skill.
+// svelte's package.json "." export splits on a `browser` condition (client runtime, mount()/
+// unmount()) vs `default`/`worker` (SSR runtime, where mount() throws `lifecycle_function_
+// unavailable`). Vite/Vitest's default Node conditions pick the SSR build, which crashes the
+// first call adapters/svelte/src/render.ts makes. Both `resolve` and `ssr.resolve` are needed —
+// Vitest runs test files through Vite's SSR module graph, which reads `ssr.resolve.conditions`,
+// not the plain `resolve.conditions`. Metro needs the equivalent `conditionNames` fix for a real
+// device build; tracked in the svelte-adapter-dom-shim skill.
 //
-// SCOPED TO THE SVELTE PROJECT ON PURPOSE — it used to be global and that broke unrelated
-// packages (2026-08-14). `less`, `sass` and `stylus` each declare a `browser` key FIRST in their
-// `exports`, so a global browser condition resolves them to their BROWSER bundles, which fail to
-// load under Node; core/css-parser's preprocessor tests then died in `loadLess`'s catch with the
-// misleading "less is required for .less files. Install it" (it WAS installed). Reordering our
-// conditions array cannot fix that — Node/Vite pick the first matching key in the PACKAGE's own
-// declaration order, not ours — so the condition has to be narrowed to the tests that need it.
+// Scoped to the svelte project on purpose (was global, broke unrelated packages 2026-08-14):
+// `less`/`sass`/`stylus` each declare a `browser` key first in their own exports, so a global
+// browser condition resolves them to browser bundles that fail to load under Node — reordering
+// our conditions array can't fix that, since Node/Vite pick the first matching key in the
+// PACKAGE's own declaration order. So the condition is narrowed to just the tests that need it.
 const BROWSER_CONDITIONS = {
   resolve: { conditions: ['browser'] },
   ssr: { resolve: { conditions: ['browser'] } },

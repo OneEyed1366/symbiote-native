@@ -65,13 +65,22 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// This layer owns ONLY Angular lifecycle wiring over core (effect → fetch + subscribe, onCleanup
+// → unsubscribe) — core's own validation/platform-branch logic is exhaustively covered by
+// screen-orientation.test.ts and must not be re-asserted here. No Negative group: connect() has
+// no guard clause of its own — it has nothing to throw, only a signal to keep in sync with core.
 describe('ScreenOrientationService.connect', () => {
+  // why: a caller reads the signal before the async initial fetch settles — connect() must
+  // expose a real, documented UNKNOWN state rather than `undefined`/a stale value during that
+  // window
   it('reports Orientation/OrientationLock UNKNOWN before the initial fetch resolves', async () => {
     mount(ROOT_TAG, ScreenOrientationHost);
 
     expect(capturedResult?.()).toEqual({ orientation: 0, orientationLock: 9 });
   });
 
+  // why: connect() must actually apply the values core's one-shot getters resolve to, not just
+  // call them
   it('reports the fetched state once getOrientationAsync()/getOrientationLockAsync() resolve', async () => {
     mount(ROOT_TAG, ScreenOrientationHost);
     await tick();
@@ -79,6 +88,9 @@ describe('ScreenOrientationService.connect', () => {
     expect(capturedResult?.()).toEqual({ orientation: 1, orientationLock: 0 });
   });
 
+  // why: the whole point of subscribing inside the effect is staying in sync with device
+  // rotation after the initial read — a signal that only reflects the one-shot fetch would go
+  // stale immediately
   it('updates the signal when the registered listener fires', async () => {
     mount(ROOT_TAG, ScreenOrientationHost);
     await tick();
@@ -89,6 +101,8 @@ describe('ScreenOrientationService.connect', () => {
     expect(capturedResult?.()).toEqual({ orientation: 3, orientationLock: 5 });
   });
 
+  // why: a destroyed host must not keep a live native subscription — the effect's onCleanup is
+  // the only thing standing between component teardown and a leaked listener
   it('removes the subscription when the host component is unmounted', async () => {
     mount(ROOT_TAG, ScreenOrientationHost);
     await tick();

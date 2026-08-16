@@ -24,9 +24,18 @@
 // indirection, which is what the interpolation case ended up doing (AnimatedInterpolation now
 // lives in graph.ts next to the base class it extends).
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 
@@ -142,7 +151,111 @@ function analyze(file: string): IModuleFacts {
   return { registrations, bareImports, valueImportedNames, exportedNames };
 }
 
+// No Negative group in the classic throw/reject sense: this static analysis never throws on
+// malformed input, it reports findings via a returned/asserted string. "Negative" here means the
+// shape the detector must FLAG (the 2026-08-14 bug pattern); "Positive" means the shapes that are
+// known-safe and must NOT be flagged, or the false positive itself defeats the whole guard.
 describe('load-time registrations survive an inline-requires production bundle', () => {
+  describe('detector correctness on synthetic fixtures', () => {
+    // A fresh scratch directory per test proves the detector's verdict from its own scan, not
+    // from residual state — collectSourceFiles/analyze operate on real files on disk by design
+    // (they parse actual module graphs), so a temp fixture tree is the only way to drive them
+    // without touching real source.
+    let scratchDir: string;
+
+    beforeEach(() => {
+      scratchDir = mkdtempSync(join(tmpdir(), 'load-time-registration-fixture-'));
+    });
+
+    afterEach(() => {
+      rmSync(scratchDir, { recursive: true, force: true });
+    });
+
+    function writeModule(relativePath: string, contents: string): void {
+      const full = join(scratchDir, relativePath);
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, contents, 'utf8');
+    }
+
+    function scanScratchDir(): string[] {
+      const files: string[] = [];
+      collectSourceFiles(scratchDir, files);
+      const facts = new Map(files.map(file => [file, analyze(file)]));
+
+      const bareImported = new Set<string>();
+      const namedAsValue = new Set<string>();
+      for (const { bareImports, valueImportedNames } of facts.values()) {
+        for (const target of bareImports) bareImported.add(target);
+        for (const name of valueImportedNames) namedAsValue.add(name);
+      }
+
+      return [...facts]
+        .filter(
+          ([file, fact]) =>
+            fact.registrations.length > 0 &&
+            !bareImported.has(file) &&
+            !fact.exportedNames.some(name => namedAsValue.has(name)),
+        )
+        .map(([file]) => relative(scratchDir, file));
+    }
+
+    // why: this is the literal 2026-08-14 shape — registerFactory() at module scope, the only
+    // path to the module is a barrel `export { Thing } from './thing'`, and nothing ever names
+    // Thing as a value. Without this fixture, the real-repo test above passing proves nothing: it
+    // would pass identically whether the detector works or is silently broken, since the repo
+    // currently has zero violations either way.
+    it('flags a registration reachable only through a barrel re-export', () => {
+      writeModule(
+        'thing.ts',
+        "import { registerFactory } from './registry';\nregisterFactory('thing', {});\nexport const Thing = 1;\n",
+      );
+      writeModule(
+        'registry.ts',
+        'export function registerFactory(name: string, impl: unknown): void {}\n',
+      );
+      writeModule('barrel.ts', "export { Thing } from './thing';\n");
+      writeModule(
+        'consumer.ts',
+        "import type { Thing } from './barrel';\nexport type { Thing };\n",
+      );
+
+      expect(scanScratchDir()).toEqual(['thing.ts']);
+    });
+
+    // why: this is the shape the repo's own fix landed on for AnimatedInterpolation — a bare
+    // side-effect import gives inline-requires a real use site with no binding to defer, so it
+    // must NOT be flagged even though nothing ever names the export as a value.
+    it('does not flag a registration reached via a bare side-effect import', () => {
+      writeModule(
+        'thing.ts',
+        "import { registerFactory } from './registry';\nregisterFactory('thing', {});\nexport const Thing = 1;\n",
+      );
+      writeModule(
+        'registry.ts',
+        'export function registerFactory(name: string, impl: unknown): void {}\n',
+      );
+      writeModule('entry.ts', "import './thing';\n");
+
+      expect(scanScratchDir()).toEqual([]);
+    });
+
+    // why: an ordinary named value import materializes the require at that use site under
+    // inline-requires — this is the everyday, unremarkable safe case the detector must not flag.
+    it('does not flag a registration reached via an ordinary value import', () => {
+      writeModule(
+        'thing.ts',
+        "import { registerFactory } from './registry';\nregisterFactory('thing', {});\nexport const Thing = 1;\n",
+      );
+      writeModule(
+        'registry.ts',
+        'export function registerFactory(name: string, impl: unknown): void {}\n',
+      );
+      writeModule('consumer.ts', "import { Thing } from './thing';\nconsole.log(Thing);\n");
+
+      expect(scanScratchDir()).toEqual([]);
+    });
+  });
+
   it('is never reachable only through a lazy re-export', () => {
     const files: string[] = [];
     for (const root of SCANNED_ROOTS) collectSourceFiles(join(REPO_ROOT, root), files);

@@ -120,7 +120,12 @@ function deferred(): IDeferred {
   return { promise, resolve };
 }
 
+// No Negative group: mount() never throws in async mode either — every scenario below is the
+// offscreen-fragment machinery running correctly, not an input being rejected.
 describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', () => {
+  // why: a live branch swap after the first render must route through the offscreen fragment
+  // without leaving a stale or duplicate node — the exact §17-adjacent bug class this repo has
+  // already been bitten by once (detachFromParent never unlinking the engine node).
   it('swaps branches through the OFFSCREEN fragment when a new promise arrives post-mount', async () => {
     const Awaiter = await compileComponent(
       `<script>
@@ -165,6 +170,9 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "two"))');
   });
 
+  // why: a top-level `await` inside a boundary must render into the live anchor, get moved
+  // offscreen while its promise is pending, and be spliced back exactly once when it settles —
+  // never left visible during the pending window and never committed twice.
   it('shows a boundary pending snippet, then splices the awaited child in from its offscreen fragment', async () => {
     // A component with top-level `await` suspends to the nearest boundary carrying a `pending`
     // snippet. That drives boundary.js's `#render`: children render into the LIVE anchor first,
@@ -214,6 +222,9 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "resolved"))');
   });
 
+  // why: a sibling that already committed synchronously must ALSO be genuinely removed from the
+  // native tree when move_effect parks it offscreen — not merely detached from the shim tree
+  // while its engine node keeps painting underneath the pending snippet.
   it('hides an ALREADY-PAINTED sibling that move_effect drags into the offscreen fragment', async () => {
     // The sharpest version of the previous test. Here the boundary's children include a plain
     // element that renders SYNCHRONOUSLY into the live anchor before the awaiting child bumps the

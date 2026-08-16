@@ -1,35 +1,25 @@
 <script lang="ts" module>
-  // VirtualizedList: real windowing over a hand-authored minimal scroll host. Only the cells whose
-  // computed offset falls inside the visible window (plus a leading/trailing buffer) are rendered;
-  // everything above/below collapses into two spacer symbiote-view nodes.
+  // VirtualizedList: real windowing over a hand-authored minimal scroll host. Only cells whose
+  // computed offset falls inside the visible window (plus a leading/trailing buffer) render;
+  // the rest collapses into two spacer symbiote-view nodes.
   //
-  // The orchestration — window recompute, edge-reached, viewability, batch fill, MVCP, the
-  // imperative scrolls — is the framework-agnostic `reduceList` state machine in
-  // @symbiote-native/components (state/virtualized-list-reducer), shared verbatim with React/Vue.
-  // This file supplies only Svelte's lifecycle: it turns native events into ACTIONS, holds ONE
-  // plain (non-reactive) state cell (`listState`, the Svelte twin of Vue's plain listState / React's
-  // stateRef), runs the returned EFFECTS with Svelte primitives (dispatchViewCommand, a callback, a
-  // setTimeout, a `version` bump), and renders the windowed slice with `{#each plan.cells}` — Svelte's
-  // own idiomatic dynamic-list construct, per the svelte-adapter-dom-shim skill §15 finding that
-  // Lists have no Descriptor render fn and were always meant to be hand-assembled with the
-  // framework's native loop.
+  // The orchestration - window recompute, edge-reached, viewability, batch fill, MVCP, imperative
+  // scrolls - is the framework-agnostic `reduceList` state machine in @symbiote-native/components
+  // (state/virtualized-list-reducer), shared verbatim with React/Vue. This file supplies only
+  // Svelte's lifecycle: turns native events into ACTIONS, holds one plain (non-reactive) state cell
+  // (`listState`), runs the returned EFFECTS with Svelte primitives, and renders the windowed slice
+  // with `{#each plan.cells}` (Lists have no Descriptor render fn, per svelte-adapter-dom-shim §15).
   //
-  // A real ScrollView.svelte now exists in this adapter, but this file still hand-authors the raw
-  // `symbiote-scroll-view`/`symbiote-scroll-content` intrinsics directly — the same pair React's
-  // ScrollView wraps internally (adapters/react/src/components/scroll-view/shared.ts
-  // selectScrollIntrinsics) — rather than being swapped over to render <ScrollView> the way
-  // React's/Vue's VirtualizedList render THEIR ScrollView component. `onContentSizeChange` remains
-  // the one honest gap left from that; everything else a bare intrinsic host would miss —
-  // nestedScrollEnabled, the Android RefreshControl wrap style-split, JS sticky-header wrapping —
-  // is now wired directly in this file instead (unlike ScrollView.svelte, this file walks an
-  // indexable `plan.cells` list rather than an opaque children Snippet, so it CAN auto-wrap sticky
-  // cells itself; see the sticky wiring below).
+  // This file hand-authors the raw `symbiote-scroll-view`/`symbiote-scroll-content` intrinsics
+  // directly rather than rendering <ScrollView>: unlike ScrollView.svelte, it walks an indexable
+  // `plan.cells` list instead of an opaque children Snippet, so it can auto-wrap sticky cells
+  // itself. `onContentSizeChange` remains the one gap left from that; nestedScrollEnabled, the
+  // Android RefreshControl wrap style-split, and JS sticky-header wrapping are all wired directly
+  // here instead.
   //
-  // RefreshControl IS wired (onRefresh/refreshing/progressViewOffset): it attaches directly to
-  // these raw scroll intrinsics — a real `RefreshControl.svelte` sibling before the content on iOS,
-  // wrapping the whole scroll view on Android (PLATFORM.refreshControlMode) — the same sibling/wrap
-  // shape ScrollView's own index.svelte uses, just against the raw intrinsic instead of a
-  // `<ScrollView>` component reference.
+  // RefreshControl attaches directly to these raw scroll intrinsics: a sibling before the content
+  // on iOS, wrapping the whole scroll view on Android (PLATFORM.refreshControlMode) - the same
+  // shape ScrollView's own index.svelte uses.
   //
   // `<svelte:element>` remains legal under the custom-renderer API (svelte-adapter-custom-renderer
   // skill §7 — only its a11y check is skipped, the dynamic-tag mechanism itself is untouched), but
@@ -110,7 +100,7 @@
   // already the real, dispatchable engine node the moment `{@attach}` below runs.
   let hostRef = $state.raw<IHostInstance | null>(null);
 
-  // See View.svelte's note on `{@attach}` — bound to the scroll host, the node a caller
+  // See View.svelte's note on `{@attach}` - bound to the scroll host, the node a caller
   // means by "the list" (the same node getScrollNode()/scrollTo drive).
   const syncAttachments = createAttachmentsSync();
   $effect(() => {
@@ -121,8 +111,8 @@
   // hostRef is still null). Fresh object identity each push so the commit path re-applies it even
   // when the numeric value repeats. undefined = none pending.
   let commandedOffset = $state.raw<{ x: number; y: number } | undefined>(undefined);
-  // Bumped when a transition changes render-relevant state, so `metrics` (and the markup that reads
-  // it) re-run — listState is a PLAIN object (not $state), mutating it triggers nothing itself.
+  // Bumped on a render-relevant change so `metrics` re-runs - listState is a PLAIN object
+  // (not $state), mutating it triggers nothing on its own.
   let version = $state(0);
   let separatorVersion = $state(0);
 
@@ -134,18 +124,13 @@
   let viewableTimer: ReturnType<typeof setTimeout> | null = null;
   let batchTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Sticky headers: this file hand-rolls the raw scroll intrinsic instead of rendering
-  // <ScrollView> (see this file's own header comment), so it can't lean on ScrollView.svelte's
-  // sticky wiring — but unlike ScrollView (which only ever sees an opaque children Snippet, see
-  // scroll-view-props.ts's KNOWN GAP), THIS file already walks an indexable `plan.cells` list, so
-  // auto-wrapping by stickyHeaderIndices is actually possible here. Mirrors ScrollView.svelte's
-  // own scrollAnimatedValue/attachStickyScroll/context wiring, applied per-windowed-cell below
-  // instead of via manual composition.
+  // Sticky headers: this file hand-rolls the raw scroll intrinsic (see the header comment), so it
+  // can't lean on ScrollView.svelte's sticky wiring directly - it mirrors the same
+  // scrollAnimatedValue/attachStickyScroll/context wiring here, applied per windowed cell.
   const scrollAnimatedValue = new AnimatedValue(0);
   let viewportHeight = $state<number | undefined>(undefined);
-  // y of each measured sticky header, keyed by ORIGINAL list index (RN's _headerLayoutYs) — plain,
-  // not $state, mutated in place; stickyVersion (below) drives re-derivation of the collision math
-  // that reads it.
+  // y of each measured sticky header, keyed by ORIGINAL list index (RN's _headerLayoutYs) - plain,
+  // not $state; stickyVersion (below) drives re-derivation of the collision math that reads it.
   const headerLayoutYs = new Map<number, number>();
   let stickyVersion = $state(0);
 
@@ -157,8 +142,7 @@
 
   const narrowed = $derived.by(() => {
     // extraData has no field of its own; reading it tracks it so a change forces this derived to
-    // re-run (RN's extraData contract) — see virtualized-list-props.ts's comment on why Svelte's
-    // fine-grained reactivity mostly makes the wiring a formality.
+    // re-run (RN's extraData contract).
     void props.extraData;
     return {
       data: props.data,
@@ -308,9 +292,8 @@
     if (result.changed) version += 1;
   }
 
-  // The single derive-per-render: the window is recomputed exactly once here (refresh-metrics),
-  // cached until `version` or `narrowed` change — the Svelte twin of Vue's `metrics` computed /
-  // React's `reduceList(state, {kind:'refresh-metrics'}, inputs)` call in the render body.
+  // The window is recomputed exactly once here (refresh-metrics), cached until `version` or
+  // `narrowed` change - the Svelte twin of Vue's `metrics` computed.
   const metrics = $derived.by(() => {
     void version;
     reduceList(listState, { kind: 'refresh-metrics' }, buildInputs());
@@ -325,19 +308,13 @@
   const hasStickyHeaders = $derived(
     narrowed.stickyHeaderIndices !== undefined && narrowed.stickyHeaderIndices.length > 0,
   );
-  // Resolved dynamically, exactly like React (adapters/react/.../scroll-view/shared.ts:267). This
-  // was hardcoded `false` on the theory that making `scrollAnimatedValue` native up front
-  // "deadlocks" the header, because AnimatedWithChildren stops cascading listeners into a native
-  // subtree. RN has the IDENTICAL gate (AnimatedWithChildren.js:74 `if (!this.__isNative)`) and
-  // streams native values back only for AnimatedValue, never for an interpolation — so under RN
-  // that listener goes quiet too, and sticky headers still work. It works because the listener
-  // does NOT drive the visible pin: the pin is the native transform, and the listener only feeds
-  // the debounced committed transform used for hit-testing. Staying on the JS path to keep that
-  // listener alive traded the whole native driver for a hit-testing detail — the pin then rode the
-  // JS thread, which is why the header lagged on iOS and failed outright on Android (where the
-  // commit debounce is 15ms vs iOS's 64ms — render-scroll-sticky.ts).
+  // Resolved dynamically, exactly like React (adapters/react/.../scroll-view/shared.ts:267). Do
+  // not hardcode this false to keep the JS listener alive - RN gates native the same way
+  // (AnimatedWithChildren.js:74 `if (!this.__isNative)`) and the pin is the native transform, not
+  // the listener, so forcing JS mode only trades away the native driver: header lag on iOS,
+  // outright failure on Android (commit debounce 15ms vs iOS's 64ms - render-scroll-sticky.ts).
   const nativeStickyAvailable = $derived(hasStickyHeaders && isNativeAnimatedAvailable());
-  // RN's FlatList/SectionList expose no invertStickyHeaders of their own (only ScrollView does) —
+  // RN's FlatList/SectionList expose no invertStickyHeaders of their own (only ScrollView does) -
   // sticky headers always pin to the top here, matching RN.
   const forwarding = $derived(
     resolveScrollForwarding({
@@ -357,8 +334,8 @@
   });
 
   // Drive the sticky scroll value on the native UI thread once the scroll host commits (mirrors
-  // ScrollView.svelte). No-op on a host without the native animated module — the JS fallback below
-  // still keeps headers pinned via onScroll.
+  // ScrollView.svelte). No-op without the native animated module - the JS fallback below still
+  // keeps headers pinned via onScroll.
   $effect(() => {
     if (!nativeStickyAvailable) {
       dlog('VirtualizedList sticky attachStickyScroll skipped: nativeStickyAvailable=false');
@@ -382,8 +359,7 @@
   }
 
   // sticky-js: no native Animated module, so the scroll value is driven off the JS thread via the
-  // same wrapped-listener shape ScrollView.svelte uses. sticky-native/plain: forward untouched (the
-  // native driver attaches the value on the UI thread for sticky-native).
+  // same wrapped-listener shape ScrollView.svelte uses. sticky-native/plain: forward untouched.
   const onScroll = $derived.by(() => {
     if (forwarding.mode !== 'sticky-js') return handleScroll;
     return animatedEvent(
@@ -404,17 +380,14 @@
   }
 
   // Records a sticky header's measured y (RN's _headerLayoutYs) so the NEXT sticky header down the
-  // list can compute its collision point — without this every header would stick indefinitely
+  // list can compute its collision point - without this every header would stick indefinitely
   // instead of being pushed off by the one behind it.
   function recordHeaderY(index: number, event: ISymbioteEvent): void {
     const y = readLayoutNumber(event, 'y');
     if (y === undefined) return;
-    // DIAGNOSTIC (2026-08-13, tracking the collision hand-off bug — both sticky headers vanishing
-    // permanently at the moment they "meet"): the cross-talk map is the ONLY source of
-    // nextHeaderLayoutY for every header ahead of this one; if a later header's onLayout never
-    // fires (e.g. windowing drops its cell) this map entry never lands and the collision math
-    // upstream falls back to the `?? 0` default (a collisionPoint of `-layoutHeight`), which is
-    // almost certainly wrong.
+    // This map is the ONLY source of nextHeaderLayoutY for every header ahead of this one; if a
+    // later header's onLayout never fires (windowing drops its cell) the collision math upstream
+    // falls back to `?? 0` (collisionPoint = -layoutHeight), which is almost certainly wrong.
     dlog(`VirtualizedList recordHeaderY index=${index} y=${y}`);
     headerLayoutYs.set(index, y);
     stickyVersion += 1;
@@ -428,15 +401,13 @@
     };
   }
 
-  // Only a header that is MOUNTED RIGHT NOW can collide with this one. React derives it the same
-  // way — its ScrollView receives `renderedStickyIndices`, not the full section list
-  // (adapters/react/.../virtualized-list/index.ts:732) — and that difference was the whole sticky
-  // bug on this adapter: `headerLayoutYs` is append-only, so passing the FULL index list kept
-  // handing a header the stale y of a next header that had long since scrolled out of the window
-  // and unmounted. The header then pinned itself against an obstacle that no longer existed and
-  // froze there. Proven by sticky-collision-parity.test.ts, which diffs this exact input against
-  // the React reference across a scroll path. The map itself is deliberately NOT pruned (React
-  // does not prune either): a measured y stays valid for when that header scrolls back in.
+  // Only a header MOUNTED RIGHT NOW can collide with this one, matching React (its ScrollView
+  // receives `renderedStickyIndices`, not the full section list -
+  // adapters/react/.../virtualized-list/index.ts:732). Passing the full index list instead let a
+  // header collide against a stale y from one that had already scrolled out and unmounted,
+  // freezing it in place - proven by sticky-collision-parity.test.ts against the React reference.
+  // The map itself is deliberately NOT pruned (React doesn't either): a measured y stays valid for
+  // when that header scrolls back in.
   function nextStickyHeaderYFor(index: number): number | undefined {
     void stickyVersion;
     const indices = narrowed.stickyHeaderIndices;
@@ -495,8 +466,7 @@
 
   // ---- imperative handle: component instance exports, the Svelte twin of Vue's expose() /
   // React's useImperativeHandle. A parent does `<VirtualizedList bind:this={ref} .../>` and calls
-  // `ref.scrollToIndex(...)`. Instance exports remain valid in runes mode (only `export let` for
-  // props is replaced by $props()). ----
+  // `ref.scrollToIndex(...)`. ----
   export function scrollToOffset(params: { offset: number; animated?: boolean }): void {
     dispatch({ kind: 'scroll-to-offset', offset: params.offset, animated: params.animated ?? true });
   }
@@ -550,8 +520,8 @@
 
   // ---- after-commit pass: runs the deferred effects (batch fill, edge-reached, viewability,
   // initial-scroll, MVCP) whenever the windowing signature changes. $effect runs after the DOM
-  // update lands (proven by Switch's snap-back $effect + switch.smoke.test.ts), the same
-  // after-commit timing Vue's `flush: 'post'` watcher and React's layout effect give the reducer. ----
+  // update lands, the same after-commit timing Vue's `flush: 'post'` watcher and React's layout
+  // effect give the reducer. ----
   $effect(() => {
     void commitSignature;
     const inputs = buildInputs();
@@ -560,8 +530,8 @@
   });
 
   // Clear pending timers on unmount (RN ViewabilityHelper.dispose + the fill timer). A bare
-  // `$effect` with no reactive reads in its body runs once on mount; its returned cleanup runs on
-  // destroy — the Svelte twin of Vue's onBeforeUnmount.
+  // `$effect` with no reactive reads runs once on mount; its returned cleanup runs on destroy -
+  // the Svelte twin of Vue's onBeforeUnmount.
   $effect(() => {
     return () => {
       if (viewableTimer !== null) clearTimeout(viewableTimer);
@@ -582,10 +552,10 @@
       : scrollViewIntrinsics.contentStyle,
   );
 
-  // Android wrap mode only: mirrors ScrollView's own index.svelte (same reasoning there) — RN's
-  // splitLayoutProps routes LAYOUT props (margin/flex/size/position/...) onto the wrapping
-  // AndroidSwipeRefreshLayout, VISUAL props (background/padding/border/...) onto the inner scroll
-  // view, instead of leaving the wrapper unstyled (which collapses it to zero height).
+  // Android wrap mode only: mirrors ScrollView's own index.svelte - RN's splitLayoutProps routes
+  // LAYOUT props (margin/flex/size/position/...) onto the wrapping AndroidSwipeRefreshLayout,
+  // VISUAL props (background/padding/border/...) onto the inner scroll view, instead of leaving
+  // the wrapper unstyled (which collapses it to zero height).
   const layoutSplit = $derived(
     shouldWrapRefreshControl
       ? splitLayoutProps([resolveSvelteClass(narrowed.class), resolvedStyle])
@@ -596,12 +566,10 @@
     const bag: Record<string, unknown> = {
       style: [scrollViewIntrinsics.scrollViewBaseStyle, layoutSplit !== undefined ? layoutSplit.inner : resolvedStyle],
       horizontal: narrowed.horizontal,
-      // RN defaults nested scrolling ON (ScrollView.js `nestedScrollEnabled ?? true`, mirrored by
-      // this adapter's own ScrollView.svelte). VirtualizedList hand-rolls the raw scroll intrinsic
-      // instead of rendering <ScrollView> (see this file's header comment), so it never inherited
-      // that default — on Android, a FlatList/SectionList nested inside a page ScrollView (the
-      // canary's own App.svelte shape) never got nested-scroll gesture arbitration and only the
-      // outer page scrolled.
+      // RN defaults nested scrolling ON (ScrollView.js `nestedScrollEnabled ?? true`). This file
+      // hand-rolls the raw scroll intrinsic instead of rendering <ScrollView>, so it never
+      // inherited that default - on Android, a list nested inside a page ScrollView never got
+      // nested-scroll gesture arbitration and only the outer page scrolled.
       nestedScrollEnabled: true,
       onScroll,
       onLayout: onViewportLayout,
@@ -609,8 +577,8 @@
     if (layoutSplit === undefined) bag.class = narrowed.class;
     if (commandedOffset !== undefined) bag.contentOffset = commandedOffset;
     // forwarding.scrollEventThrottle (not the raw prop): folds in the sticky-mode default
-    // (1 native / 16 JS-fallback, see resolveScrollForwarding) when the user hasn't set one —
-    // without it, a sticky header rebuilt off too-sparse scroll events pins/collides late.
+    // (1 native / 16 JS-fallback) when unset - without it a sticky header rebuilt off too-sparse
+    // scroll events pins/collides late.
     if (forwarding.scrollEventThrottle !== undefined) bag.scrollEventThrottle = forwarding.scrollEventThrottle;
     if (narrowed.onScrollBeginDrag !== undefined) bag.onScrollBeginDrag = narrowed.onScrollBeginDrag;
     if (narrowed.onScrollEndDrag !== undefined) bag.onScrollEndDrag = narrowed.onScrollEndDrag;
@@ -624,7 +592,6 @@
     if (narrowed.maintainVisibleContentPosition !== undefined) {
       bag.maintainVisibleContentPosition = narrowed.maintainVisibleContentPosition;
     }
-    // The list's accessibility/testID/aria surface rides down onto the raw scroll intrinsic —
     // Object.assign merges a bag already built field-by-field (pickAccessibilityProps), not a raw
     // spread of `props`, because `pickAccessibilityProps` is shared by every list forwarding hop
     // (FlatList/SectionList/VirtualizedSectionList -> VirtualizedList), each of which folds it
@@ -652,8 +619,8 @@
     };
   });
   // iOS: RefreshControl is a childless sibling before the content container. Android: it WRAPS the
-  // whole scroll view (an Android ScrollView accepts only one child) — same PLATFORM.
-  // refreshControlMode ScrollView's own index.svelte reads, reused here rather than duplicated.
+  // whole scroll view (an Android ScrollView accepts only one child) - same PLATFORM.
+  // refreshControlMode ScrollView's own index.svelte reads.
   const shouldWrapRefreshControl = $derived(
     PLATFORM.refreshControlMode === 'wrap' && refreshControlProps !== undefined,
   );
@@ -689,14 +656,11 @@
       hasSeparators: props.separator !== undefined,
     });
   });
-  // forcedStickyCell prepended to the window cells so BOTH walk through the SAME keyed
-  // {#each} — a Svelte {#if}/{#each} split, unlike React/Vue's single flat children array,
-  // is two entirely different template positions with no shared component identity, so a
-  // header toggling between "forced ahead of the window" and "inside the window" across
-  // {#if}/{#each} would get destroyed and recreated on every such toggle (losing its
-  // measured layout, landing back at its unmeasured default translateY) — exactly the
-  // flicker-then-freeze this whole forcedStickyCell mechanism exists to prevent. One keyed
-  // list keeps the SAME component instance across that transition, matching cell.key.
+  // forcedStickyCell prepended to the window cells so BOTH walk through the SAME keyed {#each}.
+  // A Svelte {#if}/{#each} split is two different template positions with no shared component
+  // identity, so a header toggling between "forced ahead of the window" and "inside the window"
+  // would get destroyed and recreated (losing its measured layout, back to its default
+  // translateY) - one keyed list keeps the SAME instance across that transition, by cell.key.
   const allCells = $derived(
     plan?.forcedStickyCell !== undefined && plan !== null
       ? [plan.forcedStickyCell, ...plan.cells]
@@ -707,8 +671,8 @@
   );
 
   // Reads separatorVersion so a .highlight()/.unhighlight()/.updateProps() call (ISeparators, above)
-  // reactively refreshes this exact cell's separator props — a plain per-cell object literal inlined
-  // in the template would NOT re-track separatorOverrides (a non-reactive Map) on its own.
+  // reactively refreshes this cell's separator props - a plain object literal inlined in the
+  // template would NOT re-track separatorOverrides (a non-reactive Map) on its own.
   function separatorPropsFor(index: number): ISeparatorProps<ItemT> {
     void separatorVersion;
     const overrides = separatorOverrides.get(index);

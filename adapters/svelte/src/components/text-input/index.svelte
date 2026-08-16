@@ -4,22 +4,31 @@
   // its returned Descriptor's `.props` is spread onto whichever of the two literal host tags
   // `isMultiline` picks below. NOT `<svelte:element this={descriptor.type}>`: a dynamic tag
   // compiles through Svelte's generic setAttribute path, not the custom-element `p=` property-set
-  // codegen every symbiote-* tag used to need under the DOM shim (see svelte-adapter-dom-shim
-  // skill §15) — under the official custom-renderer API every element goes through the ordinary
-  // per-attribute path regardless (svelte-adapter-custom-renderer skill §5), but the tag still
-  // needs to be a literal for the `{@attach}` ref-capture idiom below. Reuses the shared logic
-  // verbatim (resolveTextInputProps / foldText / textFromChange / eventCountFromChange /
-  // shouldCommandText), exactly like React's useState+useRef+useLayoutEffect+useImperativeHandle
-  // and Vue's ref+shallowRef+watch+expose(). Runes: `$state.raw` holds the host node reference by
-  // IDENTITY (imperative commands read the RAW node — see switch/index.svelte's header comment for
-  // why `$state()` would break the engine's WeakMap-keyed identity lookup), `$state` tracks the
-  // acknowledged event count, and `$effect` drives the controlled-write command — the TextInput
-  // twin of Switch's snap-back effect. Nodes are bound eagerly via `{@attach}` (svelte-adapter-
-  // custom-renderer skill §4), so `hostRef` is already the real, dispatchable engine node the
-  // instant it fires — no more `.engineNode` indirection. The imperative handle
-  // (focus/blur/clear/isFocused/setSelection) is exposed the Svelte 5 way: plain functions
-  // declared in the INSTANCE script (not here in `<script module>`, which is shared across every
-  // instance) become callable off a parent's `bind:this` target.
+  // codegen every symbiote-* tag used to need under the DOM shim — under the official
+  // custom-renderer API every element goes through the ordinary per-attribute path regardless
+  // (svelte-adapter-custom-renderer skill §5), but the tag still needs to be a literal for the
+  // `{@attach}` ref-capture idiom below. Reuses the shared logic verbatim (resolveTextInputProps
+  // / foldText / textFromChange / eventCountFromChange / shouldCommandText), exactly like React's
+  // useState+useRef+useLayoutEffect+useImperativeHandle and Vue's ref+shallowRef+watch+expose().
+  // Runes: `$state.raw` holds the host node reference by IDENTITY (imperative commands read the
+  // RAW node — see switch/index.svelte's header comment for why `$state()` would break the
+  // engine's WeakMap-keyed identity lookup), `$state` tracks the acknowledged event count, and
+  // `$effect` drives the controlled-write command — the TextInput twin of Switch's snap-back
+  // effect. Nodes are bound eagerly via `{@attach}` (svelte-adapter-custom-renderer skill §4), so
+  // `hostRef` is already the real, dispatchable engine node the instant it fires — no more
+  // `.engineNode` indirection. The imperative handle (focus/blur/clear/isFocused/setSelection) is
+  // exposed the Svelte 5 way: plain functions declared in the INSTANCE script (not here in
+  // `<script module>`, which is shared across every instance) become callable off a parent's
+  // `bind:this` target.
+  //
+  // `value` is `$bindable()`: `<TextInput bind:value={x}>` round-trips a native edit into `x`
+  // with no adapter-side translation beyond the one-line echo in handleChange, GATED on
+  // `onValueChange` being absent. Ungated, it would defeat the controlled-write correction below
+  // for every plain `value`+`onValueChange` consumer too, not just bind: ones: a `$bindable`
+  // prop with no `bind:` caller still caches the child's own write as a local override (verified
+  // against svelte's real `prop()` runtime, `reactivity/props.js`), so an unconditional echo
+  // would make `value` agree with `lastNativeText` on every native report and silently
+  // short-circuit `shouldCommandText` — even for a parent that never once accepts.
   import type { ITextInputProps } from './text-input-props';
 
   export type { ITextInputProps };
@@ -57,7 +66,6 @@
   // props already folded below). `class`/`style` are deliberately NOT here, same as Vue's
   // HANDLED_ATTRS, so they forward like every other adapter's TextInput.
   const HANDLED_KEYS: readonly string[] = [
-    'value',
     'defaultValue',
     'multiline',
     'selection',
@@ -82,26 +90,25 @@
     'underlineColorAndroid',
   ];
 
-  // `resolveAccessibilityProps` only transforms accessibility*/aria-*/role fields — every other
-  // field passes through untouched — so it is applied HERE, once, at the one place that needs the
-  // folded result (the forwarded passthrough), rather than wrapped around the whole props object
-  // in an outer $derived. Reading `rawProps.value`/`.onValueChange`/etc directly everywhere else
-  // keeps every derived/effect's dependency tracking a plain, direct property read on the raw
-  // `$props()` proxy — no intermediate derived recomputation to reason about. `source` is a
-  // closed interface (no index signature), so `Object.keys` + bracket-indexing would need an `as`
-  // cast to read it back; `Object.entries` instead falls onto TS's `entries(o: {}): [string,
-  // any][]` overload, which needs no cast (mirrors why Vue's twin, `forwardAttrs`, gets away with
-  // a plain `Record<string, unknown>` — its attrs are already untyped there).
-  function forwardProps(source: ITextInputProps): Record<string, unknown> {
+  // `resolveAccessibilityProps` only transforms accessibility*/aria-*/role fields, so it's
+  // applied HERE, once, at the one place that needs the folded result, rather than wrapped
+  // around the whole props object in an outer $derived — every other derived/effect keeps a
+  // plain, direct property read on the raw `$props()` proxy. `source` is a closed interface (no
+  // index signature), so `Object.keys` + bracket-indexing would need an `as` cast; `Object.entries`
+  // falls onto TS's `entries(o: {}): [string, any][]` overload instead, which needs no cast.
+  function forwardProps(source: Omit<ITextInputProps, 'value'>): Record<string, unknown> {
     const resolved = resolveAccessibilityProps(source);
     const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(resolved)) {
-      if (!HANDLED_KEYS.includes(key)) result[key] = value;
+    for (const [key, propValue] of Object.entries(resolved)) {
+      if (!HANDLED_KEYS.includes(key)) result[key] = propValue;
     }
     return result;
   }
 
-  const rawProps: ITextInputProps = $props();
+  // `value` is $bindable() (see the module-script header for the full reasoning); everything
+  // else keeps flowing through `rest`, the exact twin of the old whole-object `rawProps` for
+  // every non-`value` field.
+  let { value = $bindable(), ...rest }: ITextInputProps = $props();
 
   // $state.raw, NOT $state: identity concern, see the module-script header above.
   let hostRef = $state.raw<IHostInstance | null>(null);
@@ -113,7 +120,7 @@
   // `text` prop already carries it down via the bag, so the FIRST controlled value is not a
   // divergence and must NOT re-command. Bookkeeping, not render state: a plain `let`, same as
   // Vue's setup-scope `let lastNativeText`.
-  let lastNativeText = foldText(rawProps.value, rawProps.defaultValue);
+  let lastNativeText = foldText(value, rest.defaultValue);
   // JS-side focus state, mirrored from the focus/blur events for isFocused(): native exposes no
   // synchronous focus getter (RN's TextInputState keeps the same).
   let focused = false;
@@ -121,26 +128,26 @@
   // an intrinsic swap between single/multiline) doesn't re-focus.
   let autoFocused = false;
 
-  const isMultiline = $derived(rawProps.multiline === true);
-  const text = $derived(foldText(rawProps.value, rawProps.defaultValue));
+  const isMultiline = $derived(rest.multiline === true);
+  const text = $derived(foldText(value, rest.defaultValue));
   const folded = $derived(
     resolveTextInputProps({
-      inputMode: rawProps.inputMode,
-      keyboardType: rawProps.keyboardType,
-      enterKeyHint: rawProps.enterKeyHint,
-      returnKeyType: rawProps.returnKeyType,
-      readOnly: rawProps.readOnly,
-      editable: rawProps.editable,
-      submitBehavior: rawProps.submitBehavior,
-      blurOnSubmit: rawProps.blurOnSubmit,
+      inputMode: rest.inputMode,
+      keyboardType: rest.keyboardType,
+      enterKeyHint: rest.enterKeyHint,
+      returnKeyType: rest.returnKeyType,
+      readOnly: rest.readOnly,
+      editable: rest.editable,
+      submitBehavior: rest.submitBehavior,
+      blurOnSubmit: rest.blurOnSubmit,
       multiline: isMultiline,
-      cursorColor: rawProps.cursorColor,
-      selectionColor: rawProps.selectionColor,
-      selectionHandleColor: rawProps.selectionHandleColor,
-      autoComplete: rawProps.autoComplete,
-      textContentType: rawProps.textContentType,
-      showSoftInputOnFocus: rawProps.showSoftInputOnFocus,
-      underlineColorAndroid: rawProps.underlineColorAndroid,
+      cursorColor: rest.cursorColor,
+      selectionColor: rest.selectionColor,
+      selectionHandleColor: rest.selectionHandleColor,
+      autoComplete: rest.autoComplete,
+      textContentType: rest.textContentType,
+      showSoftInputOnFocus: rest.showSoftInputOnFocus,
+      underlineColorAndroid: rest.underlineColorAndroid,
     }),
   );
 
@@ -157,7 +164,12 @@
       // Record the text first, then bump the acknowledged count, so the count never runs ahead
       // of the text it stands for.
       lastNativeText = changedText;
-      rawProps.onValueChange?.(changedText, event);
+      rest.onValueChange?.(changedText, event);
+      // $bindable() sugar: with no onValueChange nothing could reject this report, so mirror it
+      // straight into the bound value. A caller that ALSO supplies onValueChange keeps full
+      // accept/reject control via the controlled-write effect below — see the module-script
+      // header for why echoing unconditionally would break that for it too.
+      if (rest.onValueChange === undefined) value = changedText;
     }
     const count = eventCountFromChange(event);
     if (count !== undefined) mostRecentEventCount = count;
@@ -167,13 +179,13 @@
     focused = true;
     // Track focus app-wide so Keyboard.dismiss can blur this input without a ref.
     if (hostRef !== null) setInputFocused(hostRef);
-    rawProps.onFocus?.(event);
+    rest.onFocus?.(event);
   }
 
   function handleBlur(event: ISymbioteEvent): void {
     focused = false;
     if (hostRef !== null) setInputBlurred(hostRef);
-    rawProps.onBlur?.(event);
+    rest.onBlur?.(event);
   }
 
   // Controlled write: when JS-side `value` diverges from what native reported, command the new
@@ -187,18 +199,19 @@
   // event-count-only change would then silently fail to retrigger this effect (same class of bug
   // Switch's snap-back effect avoids by reading `switchState` unconditionally too). `hostRef` is
   // bound eagerly by `{@attach}` (svelte-adapter-custom-renderer skill §4), always populated by
-  // the time this first runs — no more commit-timing guard needed here.
+  // the time this first runs — no more commit-timing guard needed here. The local `currentValue`
+  // (rather than reusing the name `value`) avoids shadowing the outer, now-`$bindable()`, prop.
   $effect(() => {
     const node = hostRef;
-    const value = rawProps.value;
+    const currentValue = value;
     const count = mostRecentEventCount;
     if (node === null) return;
-    if (!shouldCommandText(lastNativeText, value)) return;
-    const selStart = rawProps.selection?.start ?? SELECTION_NONE;
-    const selEnd = rawProps.selection?.end ?? rawProps.selection?.start ?? SELECTION_NONE;
-    dlog(`TextInput setTextAndSelection count=${count} text=${JSON.stringify(value)}`);
-    dispatchViewCommand(node, 'setTextAndSelection', [count, value, selStart, selEnd]);
-    lastNativeText = value;
+    if (!shouldCommandText(lastNativeText, currentValue)) return;
+    const selStart = rest.selection?.start ?? SELECTION_NONE;
+    const selEnd = rest.selection?.end ?? rest.selection?.start ?? SELECTION_NONE;
+    dlog(`TextInput setTextAndSelection count=${count} text=${JSON.stringify(currentValue)}`);
+    dispatchViewCommand(node, 'setTextAndSelection', [count, currentValue, selStart, selEnd]);
+    lastNativeText = currentValue;
   });
 
   // autoFocus is driven in JS, not as a native prop: once the host node first goes live, command
@@ -207,7 +220,7 @@
   // effect above relies on.
   $effect(() => {
     const node = hostRef;
-    if (autoFocused || node === null || rawProps.autoFocus !== true) return;
+    if (autoFocused || node === null || rest.autoFocus !== true) return;
     autoFocused = true;
     dlog('TextInput autoFocus -> focus command');
     dispatchViewCommand(node, 'focus', []);
@@ -253,10 +266,10 @@
       multiline: isMultiline,
       text,
       mostRecentEventCount,
-      selection: rawProps.selection,
+      selection: rest.selection,
       folded,
       passthrough: {
-        ...forwardProps(rawProps),
+        ...forwardProps(rest),
         onChange: handleChange,
         onFocus: handleFocus,
         onBlur: handleBlur,
@@ -272,10 +285,11 @@
     syncChildren(hostRef, descriptor.children);
   });
 
-  // See View.svelte's note on `{@attach}`.
+  // See View.svelte's note on `{@attach}`. `rest` (not `value`, which never carries a symbol
+  // key) is the same attachment-bearing bag `rawProps` used to be.
   const syncAttachments = createAttachmentsSync();
   $effect(() => {
-    syncAttachments(hostRef, rawProps);
+    syncAttachments(hostRef, rest);
   });
 
   // `style` collides with Svelte's own special-cased attribute name (renderer.ts's

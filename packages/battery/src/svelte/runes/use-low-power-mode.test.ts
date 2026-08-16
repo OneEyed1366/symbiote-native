@@ -91,34 +91,47 @@ async function mountLowPowerMode(): Promise<boolean[]> {
   return values;
 }
 
+// No Negative group: the effect body has no guard clause or conditional throw — every path
+// through it (the one-shot fetch, the native listener, the teardown) only ever writes
+// `lowPowerMode` or unsubscribes. There is nothing here that is meant to reject/throw.
 describe('useLowPowerMode (Svelte)', () => {
-  it('starts at false before the initial fetch resolves', async () => {
-    const values = await mountLowPowerMode();
+  describe('Positive — boxed value tracks the fetch, the native listener, and unmount', () => {
+    // why: `false` (not enabled) is the safe default before the device is actually asked — a
+    // consumer must never see a stale "true" before the first real check has happened.
+    it('starts at false before the initial fetch resolves', async () => {
+      const values = await mountLowPowerMode();
 
-    expect(values[0]).toBe(false);
-  });
+      expect(values[0]).toBe(false);
+    });
 
-  it('updates to the fetched value once isLowPowerModeEnabledAsync() resolves', async () => {
-    const values = await mountLowPowerMode();
+    // why: matches upstream useLowPowerMode — a one-shot fetch seeds the real device state before
+    // the first native event, so a consumer never reads the default longer than the fetch takes.
+    it('updates to the fetched value once isLowPowerModeEnabledAsync() resolves', async () => {
+      const values = await mountLowPowerMode();
 
-    await vi.waitFor(() => expect(values[values.length - 1]).toBe(true));
-  });
+      await vi.waitFor(() => expect(values[values.length - 1]).toBe(true));
+    });
 
-  it('updates the boxed value when the native listener fires', async () => {
-    isLowPowerModeEnabledAsyncMock.mockResolvedValue(false);
-    const values = await mountLowPowerMode();
-    await vi.waitFor(() => expect(values[values.length - 1]).toBe(false));
+    // why: low-power mode can be toggled by the user at any time — the rune exists to stay in
+    // sync with that live device signal, not just report a one-time snapshot at mount.
+    it('updates the boxed value when the native listener fires', async () => {
+      isLowPowerModeEnabledAsyncMock.mockResolvedValue(false);
+      const values = await mountLowPowerMode();
+      await vi.waitFor(() => expect(values[values.length - 1]).toBe(false));
 
-    registeredListener?.({ lowPowerMode: true });
+      registeredListener?.({ lowPowerMode: true });
 
-    await vi.waitFor(() => expect(values[values.length - 1]).toBe(true));
-  });
+      await vi.waitFor(() => expect(values[values.length - 1]).toBe(true));
+    });
 
-  it('removes the subscription on unmount', async () => {
-    await mountLowPowerMode();
+    // why: a rune that outlives its subscription leaks a live native listener into a scope Svelte
+    // already considers destroyed — the effect's teardown is what prevents that leak.
+    it('removes the subscription on unmount', async () => {
+      await mountLowPowerMode();
 
-    unmount(ROOT_TAG);
+      unmount(ROOT_TAG);
 
-    expect(removeMock).toHaveBeenCalledTimes(1);
+      expect(removeMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

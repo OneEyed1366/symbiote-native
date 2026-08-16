@@ -1,5 +1,8 @@
 // Co-located Vue-driven test (ADR 0025) for useBatteryState. See use-battery-level's test for
-// the shared rationale.
+// the shared rationale (native delegation is covered once in
+// packages/battery/src/core/battery.test.ts).
+//
+// No Negative group: the composable has no guard clause or throwing path.
 
 import { defineComponent, h, type Ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -57,18 +60,23 @@ function mountBatteryState(): Ref<number> {
 
 describe('useBatteryState (Vue)', () => {
   it('starts at UNKNOWN (0) before the initial fetch resolves', () => {
+    // why: BatteryState.UNKNOWN is the documented "can't tell yet" sentinel — must hold
+    // synchronously at setup, before onMounted's async fetch settles.
     const batteryState = mountBatteryState();
 
     expect(batteryState.value).toBe(0);
   });
 
   it('updates to the fetched value once getBatteryStateAsync() resolves', async () => {
+    // why: proves the one-shot seed fetch actually reaches the ref.
     const batteryState = mountBatteryState();
 
     await vi.waitFor(() => expect(batteryState.value).toBe(2));
   });
 
   it('updates the ref when the native listener fires', async () => {
+    // why: state transitions must come from the native event, not a second fetch — proves the
+    // listener registered in onMounted writes the ref.
     const batteryState = mountBatteryState();
     await vi.waitFor(() => expect(batteryState.value).toBe(2));
 
@@ -78,6 +86,8 @@ describe('useBatteryState (Vue)', () => {
   });
 
   it('removes the subscription on unmount', () => {
+    // why: onUnmounted must call subscription.remove(), or the native listener leaks past the
+    // component's lifetime.
     mountBatteryState();
     unmount(ROOT_TAG);
 

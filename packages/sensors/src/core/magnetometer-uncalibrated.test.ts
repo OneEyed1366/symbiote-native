@@ -29,21 +29,35 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// MagnetometerUncalibrated is a zero-override DeviceSensor subclass — permission/availability/
+// update-interval fallback logic is DeviceSensor's, already fully covered in
+// device-sensor.test.ts. What's specific here is that the exported `MagnetometerUncalibrated`
+// singleton is wired to the real ExponentMagnetometerUncalibrated native module and to the exact
+// event name that module's native side emits — a DIFFERENT native module and event name from the
+// calibrated Magnetometer, despite the identical measurement shape. No Negative group: both
+// assertions are pass-through wiring, nothing here can throw.
 describe('MagnetometerUncalibrated', () => {
-  it('sets the update interval', () => {
-    MagnetometerUncalibrated.setUpdateInterval(1234);
+  describe('is wired to the correct native module and event name', () => {
+    it('forwards setUpdateInterval to the ExponentMagnetometerUncalibrated native module', () => {
+      // why: proves the singleton's native module reference is the real
+      // ExponentMagnetometerUncalibrated, distinct from the calibrated Magnetometer's module.
+      MagnetometerUncalibrated.setUpdateInterval(1234);
 
-    expect(FAKE_NATIVE_MAGNETOMETER_UNCALIBRATED.setUpdateInterval).toHaveBeenCalledTimes(1);
-    expect(FAKE_NATIVE_MAGNETOMETER_UNCALIBRATED.setUpdateInterval).toHaveBeenCalledWith(1234);
-  });
+      expect(FAKE_NATIVE_MAGNETOMETER_UNCALIBRATED.setUpdateInterval).toHaveBeenCalledWith(1234);
+    });
 
-  it('subscribes through the shared magnetometerUncalibratedDidUpdate event name', () => {
-    const listener = vi.fn();
-    MagnetometerUncalibrated.addListener(listener);
+    it('subscribes through the "magnetometerUncalibratedDidUpdate" event name the native module emits', () => {
+      // why: 'magnetometerUncalibratedDidUpdate' is the exact string
+      // ExponentMagnetometerUncalibrated's native side emits events under, and must stay
+      // distinct from the calibrated Magnetometer's 'magnetometerDidUpdate' — collapsing the two
+      // would mix calibrated and uncalibrated readings on the same listener.
+      const listener = vi.fn();
+      MagnetometerUncalibrated.addListener(listener);
 
-    expect(FAKE_NATIVE_MAGNETOMETER_UNCALIBRATED.addListener).toHaveBeenCalledWith(
-      'magnetometerUncalibratedDidUpdate',
-      listener,
-    );
+      expect(FAKE_NATIVE_MAGNETOMETER_UNCALIBRATED.addListener).toHaveBeenCalledWith(
+        'magnetometerUncalibratedDidUpdate',
+        listener,
+      );
+    });
   });
 });

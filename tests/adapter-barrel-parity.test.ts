@@ -78,7 +78,16 @@ function actualGaps(): Map<string, IAdapter[]> {
   return gaps;
 }
 
+// No Negative group: this is a static consistency check over four barrel files, not code with a
+// guard clause to reject bad input — every claim below is Positive ("the barrels currently agree
+// with the declared contract"). An unagreed drift is reported as a test FAILURE (the mechanism
+// this suite exists to provide), not asserted as an expected throw.
 describe('adapter barrel parity', () => {
+  // why: enforces <adapters_reach_full_feature_parity> (CLAUDE.md, P0) at the barrel-export level
+  // — a shared engine/components name has to reach every adapter's public surface identically, or
+  // an app on one framework silently loses an API another framework has. Equality (not
+  // containment) against KNOWN_GAPS means closing a gap without deleting its entry fails too, so
+  // the allowlist can't quietly widen to cover new drift the way a containment check would allow.
   it('exposes the shared surface identically, except for the recorded gaps', () => {
     const gaps = actualGaps();
     const problems: string[] = [];
@@ -108,6 +117,12 @@ describe('adapter barrel parity', () => {
     expect(problems.sort().join('\n')).toBe('');
   });
 
+  // why: enforces <runtime_modules_layering> (CLAUDE.md) — these modules carry no visual and no
+  // framework lifecycle, so unlike a component's prop surface there is never a legitimate
+  // per-framework reason for one adapter to lag on one. Kept as a hardcoded name list rather than
+  // reusing sharedNames/actualGaps above: these are re-exports of adapter-owned thin wrappers
+  // (Keyboard-shaped, native-bridge modules per <runtime_modules_layering>), not names sourced
+  // from the two SHARED_BARRELS, so they fall outside that mechanism entirely.
   it('keeps every adapter on the same imperative runtime modules', () => {
     // The engine-owned modules of <runtime_modules_layering>: no visual, no lifecycle, so there
     // is never a per-framework reason for one adapter to skip one.

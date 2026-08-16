@@ -61,63 +61,80 @@ function numberFromEvent(event: ISymbioteEvent): number | undefined {
 }
 
 describe('React-driven derived RNCSlider', () => {
-  it('renders the raw RNCSlider and passes plain props through', () => {
-    mount(
-      ROOT_TAG,
-      createElement('RNCSlider', { value: 0.5, minimumValue: 0, maximumValue: 1, step: 0.1 }),
-    );
-    const props = sliderNode().props;
-    expect(props.value).toBe(0.5);
-    expect(props.minimumValue).toBe(0);
-    expect(props.maximumValue).toBe(1);
-    expect(props.step).toBe(0.1);
-  });
+  // Positive only: ViewConfig derivation always resolves — an unregistered name simply gets no
+  // processing (covered by other suites' default-passthrough behavior), which is not a throw
+  // this component's own tests exercise. No Negative group applies here.
+  describe('Positive', () => {
+    // why: <third_party_rn_packages_are_react_only> — a third-party Fabric view must work with
+    // ZERO symbiote-specific wrapper, driven purely by its own codegen ViewConfig; plain
+    // attributes (no `process`) must pass through unmodified.
+    it('renders the raw RNCSlider and passes plain props through', () => {
+      mount(
+        ROOT_TAG,
+        createElement('RNCSlider', { value: 0.5, minimumValue: 0, maximumValue: 1, step: 0.1 }),
+      );
+      const props = sliderNode().props;
+      expect(props.value).toBe(0.5);
+      expect(props.minimumValue).toBe(0);
+      expect(props.maximumValue).toBe(1);
+      expect(props.step).toBe(0.1);
+    });
 
-  it('runs tint props through the derived processor', () => {
-    mount(
-      ROOT_TAG,
-      createElement('RNCSlider', {
-        value: 0.2,
-        minimumTrackTintColor: '#ff0000',
-        maximumTrackTintColor: '#00ff00',
-        thumbTintColor: '#0000ff',
-      }),
-    );
-    const props = sliderNode().props;
-    expect(props.minimumTrackTintColor).toBe('processed(#ff0000)');
-    expect(props.maximumTrackTintColor).toBe('processed(#00ff00)');
-    expect(props.thumbTintColor).toBe('processed(#0000ff)');
-  });
+    // why: an attribute declared with `{ process: fn }` in validAttributes must run through
+    // that processor before reaching Fabric — this is what lets a third-party ViewConfig ask
+    // for platform color processing without the engine knowing anything about tint colors.
+    it('runs tint props through the derived processor', () => {
+      mount(
+        ROOT_TAG,
+        createElement('RNCSlider', {
+          value: 0.2,
+          minimumTrackTintColor: '#ff0000',
+          maximumTrackTintColor: '#00ff00',
+          thumbTintColor: '#0000ff',
+        }),
+      );
+      const props = sliderNode().props;
+      expect(props.minimumTrackTintColor).toBe('processed(#ff0000)');
+      expect(props.maximumTrackTintColor).toBe('processed(#00ff00)');
+      expect(props.thumbTintColor).toBe('processed(#0000ff)');
+    });
 
-  it('dispatches derived bubbling events to their handler', () => {
-    let changed: number | undefined;
-    const onChange = (event: ISymbioteEvent): void => {
-      changed = numberFromEvent(event);
-    };
-    mount(
-      ROOT_TAG,
-      createElement('RNCSlider', { value: 0.2, onChange, onRNCSliderValueChange: onChange }),
-    );
-    const node = sliderNode();
-    fabric.fireEvent(node.instanceHandle, 'topChange', { value: 0.7 });
-    expect(changed).toBe(0.7);
-    // The other value rail, derived from bubblingEventTypes, must reach the same handler.
-    fabric.fireEvent(node.instanceHandle, 'topRNCSliderValueChange', { value: 0.42 });
-    expect(changed).toBe(0.42);
-  });
+    // why: bubblingEventTypes can register MULTIPLE native event names onto the same handler
+    // prop (RNCSlider's own `topRNCSliderValueChange` alongside the generic `topChange`) — both
+    // rails derived from the ViewConfig must reach the SAME onChange-shaped handler.
+    it('dispatches derived bubbling events to their handler', () => {
+      let changed: number | undefined;
+      const onChange = (event: ISymbioteEvent): void => {
+        changed = numberFromEvent(event);
+      };
+      mount(
+        ROOT_TAG,
+        createElement('RNCSlider', { value: 0.2, onChange, onRNCSliderValueChange: onChange }),
+      );
+      const node = sliderNode();
+      fabric.fireEvent(node.instanceHandle, 'topChange', { value: 0.7 });
+      expect(changed).toBe(0.7);
+      // The other value rail, derived from bubblingEventTypes, must reach the same handler.
+      fabric.fireEvent(node.instanceHandle, 'topRNCSliderValueChange', { value: 0.42 });
+      expect(changed).toBe(0.42);
+    });
 
-  it('dispatches a derived direct event (slidingComplete) to its handler', () => {
-    let completedAt: number | undefined;
-    mount(
-      ROOT_TAG,
-      createElement('RNCSlider', {
-        value: 0.2,
-        onRNCSliderSlidingComplete: (event: ISymbioteEvent): void => {
-          completedAt = numberFromEvent(event);
-        },
-      }),
-    );
-    fabric.fireEvent(sliderNode().instanceHandle, 'topRNCSliderSlidingComplete', { value: 0.9 });
-    expect(completedAt).toBe(0.9);
+    // why: directEventTypes (non-bubbling, e.g. "sliding complete") is a SEPARATE derivation
+    // path from bubblingEventTypes — this proves the engine derives BOTH event families from
+    // the same injected ViewConfig, not just the bubbling one exercised above.
+    it('dispatches a derived direct event (slidingComplete) to its handler', () => {
+      let completedAt: number | undefined;
+      mount(
+        ROOT_TAG,
+        createElement('RNCSlider', {
+          value: 0.2,
+          onRNCSliderSlidingComplete: (event: ISymbioteEvent): void => {
+            completedAt = numberFromEvent(event);
+          },
+        }),
+      );
+      fabric.fireEvent(sliderNode().instanceHandle, 'topRNCSliderSlidingComplete', { value: 0.9 });
+      expect(completedAt).toBe(0.9);
+    });
   });
 });

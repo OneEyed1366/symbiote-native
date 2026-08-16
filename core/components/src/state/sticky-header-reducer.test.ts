@@ -9,6 +9,11 @@ import {
 // The reducer holds NO timer: the debounce is a `schedule-debounce` EFFECT the adapter executes with
 // its own setTimeout, so the reducer only ever emits the delay as data — there is no real (or fake)
 // time to inject here. Every assertion is over the pure transition + emitted effects.
+//
+// why: reduceSticky has no throwing path (no `throw` in sticky-header-reducer.ts) — every action
+// kind resolves to a state, so there is no Negative (toThrow) group below. Groups are instead named
+// after the mechanic each guards (redundant-geometry, zero-swallow gate, cross-talk...), which is
+// the contract-accurate split for a total, non-throwing reducer.
 
 const IOS_DEBOUNCE_MS = 64;
 const ANDROID_DEBOUNCE_MS = 15;

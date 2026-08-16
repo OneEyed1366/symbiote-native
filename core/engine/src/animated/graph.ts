@@ -17,6 +17,7 @@ import {
   type IPlatformConfig,
 } from './native/native-animated';
 import { checkValidRanges, createInterpolation, type IInterpolationConfig } from './interpolation';
+import { dlog } from '../debug';
 
 // Most nodes emit a scalar; a composite node (AnimatedColor) emits its rasterized
 // string (an rgba() value). The payload is the union so one listener map serves
@@ -229,7 +230,20 @@ export class AnimatedWithChildren extends AnimatedNode {
     super.__callListeners(value);
     // A native-driven node's children are updated natively; don't also walk them
     // here (their values aren't tracked in JS while native owns the animation).
-    if (this.isNative) return;
+    //
+    // Diagnostic seam, permanent: this early return is what silences a JS listener sitting on a
+    // CHILD of a value that was made native (a sticky header's interpolation under a natively
+    // attached scroll value). A consumer whose only driver is that listener then goes dead with no
+    // other symptom - see the sticky-header bootstrap notes. Logged only when children are
+    // actually being skipped, so a childless native value stays quiet.
+    if (this.isNative) {
+      if (this.children.length > 0) {
+        dlog(
+          `STICKY[cascade] native value silences ${this.children.length} child JS listener(s) value=${String(value)}`,
+        );
+      }
+      return;
+    }
     for (const child of this.children) {
       child.__callListeners(numericValueOf(child));
     }

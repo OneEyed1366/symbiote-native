@@ -1,6 +1,6 @@
 ---
 title: 'How to: two-way bind a value'
-description: Vue v-model and Angular [(value)] on controlled components.
+description: Vue v-model, Angular [(value)], and Svelte $bindable() on controlled components.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
@@ -61,16 +61,14 @@ wiring your own change handler by hand.
     (`value` + `valueChange`), which is exactly what `[(x)]` expects.
   </TabItem>
   <TabItem label="Svelte">
-    Svelte is in the same boat as React here. React's controlled-component idiom
-    (`value` + `onValueChange`, both explicit) is already the two-way binding —
-    Svelte uses that exact same shape, and there is no `[(value)]`/`v-model`
-    shorthand to reach for. Svelte's own element `bind:` directive is a
-    different mechanism (it targets a DOM element's own properties), and this
-    adapter doesn't implement it — app code never authors a raw host element,
-    only these framework components, and none of them declare a `$bindable()`
-    prop today. `Switch`/`TextInput` come from `@symbiote-native/svelte`; `Slider`
-    ships from the separate [`@symbiote-native/slider`](/docs/packages/slider/)
-    wrapper package (`@symbiote-native/slider/svelte`), not the adapter's own barrel:
+    This is Svelte 5's own `$bindable()` mechanism — a component opts a prop
+    into `bind:` by declaring it `let { value = $bindable() } = $props()`.
+    `Switch`, `TextInput`, and `Slider` all declare `value` this way, so
+    `bind:value` works with no adapter-side plumbing: Svelte's compiler
+    generates the two-way sync at the call site. `Switch`/`TextInput` come
+    from `@symbiote-native/svelte`; `Slider` ships from the separate
+    [`@symbiote-native/slider`](/docs/packages/slider/) wrapper package
+    (`@symbiote-native/slider/svelte`), not the adapter's own barrel:
 
     ```svelte
     <script lang="ts">
@@ -82,15 +80,21 @@ wiring your own change handler by hand.
       let volume = $state(0.5);
     </script>
 
-    <Switch value={enabled} onValueChange={(next) => (enabled = next)} />
-    <TextInput value={name} onValueChange={(next) => (name = next)} />
-    <Slider
-      value={volume}
-      onValueChange={(next) => (volume = next)}
-      minimumValue={0}
-      maximumValue={1}
-    />
+    <Switch bind:value={enabled} />
+    <TextInput bind:value={name} />
+    <Slider bind:value={volume} minimumValue={0} maximumValue={1} />
     ```
+
+    The explicit `value` + `onValueChange` pair — Svelte's own equivalent of
+    React's controlled-component idiom — still works exactly as before and is
+    still the right choice when you need to see or reject a change before it
+    lands (the "rejecting parent" case in [Why this isn't
+    fragile](#why-this-isnt-fragile) below). One caveat specific to
+    `$bindable()`: supplying your own `onValueChange` on the same instance as
+    `bind:value` silently takes over — the component can't tell whether an
+    instance is bound from the inside, so it only echoes the native-reported
+    value back into your bound variable when `onValueChange` is absent. Pass
+    one or the other, not both, on the same control.
   </TabItem>
 </Tabs>
 
@@ -99,6 +103,6 @@ wiring your own change handler by hand.
 The controlled-write correction (native reports a change, you don't update
 `value`, SymbioteNative commands native back to the JS value) is shared logic in
 `@symbiote-native/components`, not reimplemented per adapter or per binding style —
-`v-model`/`[(value)]` are sugar on top of the same contract described in the
-[Events guide](/docs/learn/events/#controlled-components) and the
-[Vue API reference](/docs/api/vue/#model-bindings-v-model).
+`v-model`/`[(value)]`/`$bindable()` are all sugar on top of the same contract
+described in the [Events guide](/docs/learn/events/#controlled-components) and
+the [Vue API reference](/docs/api/vue/#model-bindings-v-model).

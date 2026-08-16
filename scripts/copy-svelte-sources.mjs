@@ -1,20 +1,15 @@
-// tsc --build silently DROPS every .svelte file — TypeScript only ever processes/emits
-// .ts/.tsx/.d.ts, so a package whose components are authored as .svelte (currently only
-// @symbiote-native/svelte) ends up with build/**/*.d.ts + build/**/*.js for every sibling .ts
-// file, but no build/**/*.svelte at all. That's silent, not an error: `tsc --build` exits 0.
+// tsc --build silently drops every .svelte file — TypeScript only processes/emits .ts/.tsx/.d.ts,
+// so a package whose components are authored as .svelte (currently only @symbiote-native/svelte)
+// gets build/**/*.js for every sibling .ts file but no build/**/*.svelte at all, and `tsc --build`
+// still exits 0.
 //
-// Unlike Vue's adapter (whose own components are plain .ts/.tsx render functions — see
-// adapters/vue/src/components/switch/index.ts), Svelte has no non-SFC authoring form: the
-// adapter's own components genuinely ARE .svelte files (adapters/svelte/src/components/switch/
-// index.svelte), so the package must ship the RAW .svelte source in build/ for a consuming app's
-// own Metro bundler to compile — the exact same @symbiote-native/svelte/metro-svelte-transformer
-// a consumer already needs for its OWN .svelte files, applied transparently by Metro to anything
-// matching .svelte under node_modules too (Metro's transform step doesn't distinguish app code
-// from node_modules by extension). This mirrors how examples/vue-sfc's own *.vue screens ship as
-// raw source for the CONSUMING app's metro-vue-transformer, just one layer inward (package source
-// instead of app source).
+// Unlike Vue's adapter (plain .ts/.tsx render functions), Svelte has no non-SFC authoring form —
+// the adapter's own components genuinely ARE .svelte files, so the package must ship the raw
+// .svelte source in build/ for a consuming app's own Metro bundler to compile it, via the same
+// metro-svelte-transformer the consumer already needs for its own .svelte files (Metro's
+// transform step doesn't distinguish node_modules from app code by extension).
 //
-// Runs over every publishable package (not just svelte by name) so a future package authored the
+// Runs over every publishable package, not just svelte by name, so a future package authored the
 // same way is covered automatically — same discovery mechanism as fix-esm-extensions.mjs.
 import fs from 'node:fs';
 import path from 'node:path';

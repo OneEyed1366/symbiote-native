@@ -1,33 +1,29 @@
 <script lang="ts" module>
-  // ScrollView — CLAUDE.md's own "most feature-heavy component in the codebase" (sticky headers,
-  // RefreshControl, the imperative scroll handle, maintainVisibleContentPosition, native
-  // scroll-attach). Per core/components/src/index.ts's own comment above the ScrollView exports,
-  // there is NO renderScrollView Descriptor factory — no 3-layer split, no descriptorToSvelte
-  // bridge (none exists anywhere in this adapter, see the svelte-adapter-dom-shim skill §15's
-  // fixed-shape-render note). This component hand-assembles markup and wires refs/effects
-  // directly, calling the SAME framework-agnostic helpers React's usePreparedScrollView / Vue's
-  // createScrollView call: resolveDecelerationRate, selectScrollIntrinsics, readLayoutDimension,
-  // didContentSizeChange, resolveScrollForwarding, buildScrollViewHandle, attachStickyScroll,
-  // forwardScrollEvent, resolveAccessibilityProps (all @symbiote-native/components /
-  // @symbiote-native/engine).
+  // ScrollView: sticky headers, RefreshControl, the imperative scroll handle,
+  // maintainVisibleContentPosition, native scroll-attach. There is NO renderScrollView Descriptor
+  // factory (no 3-layer split, no descriptorToSvelte bridge exists anywhere in this adapter — see
+  // svelte-adapter-dom-shim skill §15's fixed-shape-render note). This component hand-assembles
+  // markup and wires refs/effects directly, calling the SAME framework-agnostic helpers React's
+  // usePreparedScrollView / Vue's createScrollView call: resolveDecelerationRate,
+  // selectScrollIntrinsics, readLayoutDimension, didContentSizeChange, resolveScrollForwarding,
+  // buildScrollViewHandle, attachStickyScroll, forwardScrollEvent, resolveAccessibilityProps.
   //
   // Fabric tree shape: a scroll view wraps a content view holding the children (RN's own
-  // ScrollView.js shape). Svelte cannot pick a host tag name dynamically without `<svelte:element>`
-  // (untested/unverified under the DOM shim, and not exercised elsewhere in this adapter — see the
-  // svelte-adapter-dom-shim skill §4), so the horizontal/vertical tag choice is a static
+  // ScrollView.js shape). Svelte cannot pick a host tag name dynamically without
+  // `<svelte:element>` (unverified under the DOM shim, not exercised elsewhere in this adapter —
+  // see svelte-adapter-dom-shim skill §4), so the horizontal/vertical tag choice is a static
   // `{#if isHorizontal}` branch instead of a data-driven `createElement(scrollViewIntrinsic, …)`
   // call the way React/Vue do it.
   //
-  // RefreshControl attachment (item 3 of the task's priority list): iOS renders the REAL
-  // `RefreshControl.svelte` (adapters/svelte/src/components/RefreshControl.svelte, already built —
-  // not duplicated here) as a childless SIBLING before the content container. Android WRAPS the
-  // scroll view with it (`refreshControl` becomes the parent, scroll view nested inside) —
-  // structurally possible in Svelte (unlike React's cloneElement / Vue's VNode re-invocation)
-  // because `refreshControl` is typed as RefreshControl's OWN PROPS BAG here (scroll-view-props.ts),
-  // not a pre-rendered element/snippet: ScrollView itself instantiates `<RefreshControl>` in the
-  // right position and puts the scroll view INSIDE it on Android via plain markup nesting.
+  // RefreshControl: iOS renders the real `RefreshControl.svelte` as a childless SIBLING before
+  // the content container. Android WRAPS the scroll view with it (`refreshControl` becomes the
+  // parent, scroll view nested inside) — structurally possible in Svelte (unlike React's
+  // cloneElement / Vue's VNode re-invocation) because `refreshControl` is typed as
+  // RefreshControl's OWN PROPS BAG here (scroll-view-props.ts), not a pre-rendered
+  // element/snippet: ScrollView itself instantiates `<RefreshControl>` in the right position and
+  // puts the scroll view INSIDE it on Android via plain markup nesting.
   //
-  // KNOWN GAPS (all reported honestly — see the task's priority list):
+  // KNOWN GAPS:
   //  1. `stickyHeaderIndices` / `invertStickyHeaders` are NOT auto-honored (see scroll-view-props.ts
   //     and sticky-header.svelte's header comments for the full reasoning). Compose the exported
   //     `ScrollViewStickyHeader` manually instead; it auto-wires to THIS ScrollView's scroll offset
@@ -130,13 +126,12 @@
 
   // Android wrap mode only: RN's ScrollView.js splits the flattened style across the two boxes —
   // LAYOUT props (margin/flex/size/position/...) drive the outer AndroidSwipeRefreshLayout frame,
-  // VISUAL props (background/padding/border/...) paint the inner scroll view. Mirrors React's/Vue's
-  // index.android.ts (splitLayoutProps), ported here since Svelte handles both platforms in one
-  // file. Splitting on the resolved [class, style] pair (not `style` alone): a class-only layout
-  // prop (flex/height/gap/...) is invisible to `style` until resolveClassName runs, so splitting on
-  // `style` alone would starve the wrapper of its layout style and it would collapse to nothing —
-  // e.g. App.svelte's `class="screen"` (flex:1) on the top-level ScrollView, which left the
-  // AndroidSwipeRefreshLayout wrapper with no height for its content to grow into.
+  // VISUAL props (background/padding/border/...) paint the inner scroll view (mirrors React's/
+  // Vue's index.android.ts splitLayoutProps). Splitting on the resolved [class, style] pair, not
+  // `style` alone: a class-only layout prop (flex/height/gap/...) is invisible to `style` until
+  // resolveClassName runs, so splitting on `style` alone would starve the wrapper of its layout
+  // style and collapse it to nothing — e.g. App.svelte's `class="screen"` (flex:1) on the
+  // top-level ScrollView, which left the wrapper with no height for its content to grow into.
   const layoutSplit = $derived(
     shouldWrapRefreshControl ? splitLayoutProps([resolveSvelteClass(className), style]) : undefined,
   );
@@ -158,19 +153,16 @@
     getViewportHeight: (): number | undefined => viewportHeight,
   });
 
-  // Resolved dynamically, exactly like React (adapters/react/.../scroll-view/shared.ts:267).
-  // Previously hardcoded `false`: `attachStickyScroll` makes `scrollAnimatedValue` native up front,
-  // and once a value is native AnimatedWithChildren stops cascading listeners into its subtree, so
-  // the header's interpolation listener never fires (device-confirmed 2026-08-13: attach CONNECTS
-  // but no `animated-tick` arrives). That observation was right; the conclusion drawn from it was
-  // not. RN carries the SAME gate (AnimatedWithChildren.js:74) and streams values back only for
-  // AnimatedValue, never an interpolation — so the listener is silent under RN too, and sticky
-  // headers work anyway: the listener never drove the visible pin. The pin IS the native transform;
-  // the listener only feeds the debounced committed transform for hit-testing
-  // (ScrollViewStickyHeader.js adds it solely `if (isFabric)`). Forcing the JS path to keep it
-  // alive gave up the native driver to preserve a hit-testing detail, putting the pin on the JS
-  // thread — visible as drift on iOS and outright failure on Android, whose commit debounce is 15ms
-  // against iOS's 64ms (render-scroll-sticky.ts).
+  // Resolved dynamically, exactly like React (adapters/react/.../scroll-view/shared.ts:267). Do
+  // not hardcode this false to keep the JS listener alive: `attachStickyScroll` makes
+  // `scrollAnimatedValue` native up front, and once native AnimatedWithChildren stops cascading
+  // listeners into its subtree — but RN carries the SAME gate (AnimatedWithChildren.js:74) and
+  // streams values back only for AnimatedValue, never an interpolation, so the listener is silent
+  // under RN too and sticky headers still work: the pin IS the native transform, the listener
+  // only feeds the debounced committed transform for hit-testing (ScrollViewStickyHeader.js adds
+  // it solely `if (isFabric)`). Forcing the JS path to keep that listener alive only gives up the
+  // native driver, putting the pin on the JS thread — drift on iOS, outright failure on Android
+  // (commit debounce 15ms vs iOS's 64ms — render-scroll-sticky.ts).
   const nativeStickyAvailable = $derived(hasStickyHeaders && isNativeAnimatedAvailable());
 
   // Native sticky-scroll attach (RN attachNativeEvent / _updateAnimatedNodeAttachment) — NOT used

@@ -109,42 +109,72 @@ async function mountScreenOrientation(values: IScreenOrientationState[]): Promis
   await tick();
 }
 
+// No Negative group: useScreenOrientation has no guard clause and no throwing path — it seeds a
+// value, awaits two native calls, and forwards listener events. Every scenario below is
+// Positive; the second axis is "what the effect does instead of erroring" (seed -> fetch ->
+// listen -> cleanup), not a rejection path.
 describe('useScreenOrientation (Svelte)', () => {
-  it('starts at Orientation/OrientationLock UNKNOWN before the initial fetch resolves', async () => {
-    // Never-settling fetches pin the state at its seed value, so this asserts the seed rather
-    // than racing the mocks' own resolution.
-    getOrientationAsyncMock.mockReturnValue(new Promise<number>(() => {}));
-    getOrientationLockAsyncMock.mockReturnValue(new Promise<number>(() => {}));
-    const values: IScreenOrientationState[] = [];
-    await mountScreenOrientation(values);
+  describe('Positive (seed, dual fetch, listener updates, lifecycle)', () => {
+    it('seeds at Orientation.UNKNOWN/OrientationLock.UNKNOWN before the initial fetch resolves', async () => {
+      // why: never-settling fetches pin the state at its seed value forever, proving the UNKNOWN
+      // pair is the rune's OWN initial value rather than a value that happens to arrive before
+      // the mocks resolve in a race.
+      getOrientationAsyncMock.mockReturnValue(new Promise<number>(() => {}));
+      getOrientationLockAsyncMock.mockReturnValue(new Promise<number>(() => {}));
+      const values: IScreenOrientationState[] = [];
+      await mountScreenOrientation(values);
 
-    expect(values[values.length - 1]).toEqual({ orientation: 0, orientationLock: 9 });
-  });
+      expect(values[values.length - 1]).toEqual({ orientation: 0, orientationLock: 9 });
+    });
 
-  it('updates to the fetched value once getOrientationAsync()/getOrientationLockAsync() resolve', async () => {
-    const values: IScreenOrientationState[] = [];
-    await mountScreenOrientation(values);
+    it('updates to the fetched value once BOTH getOrientationAsync() and getOrientationLockAsync() resolve', async () => {
+      // why: orientation and its lock come from two independent one-shot calls (Promise.all); the
+      // caller must see the combined pair, not just whichever settles first.
+      const values: IScreenOrientationState[] = [];
+      await mountScreenOrientation(values);
 
-    await vi.waitFor(() =>
-      expect(values[values.length - 1]).toEqual({ orientation: 1, orientationLock: 0 }),
-    );
-  });
+      await vi.waitFor(() =>
+        expect(values[values.length - 1]).toEqual({ orientation: 1, orientationLock: 0 }),
+      );
+    });
 
-  it('updates the state when the native listener fires', async () => {
-    const values: IScreenOrientationState[] = [];
-    await mountScreenOrientation(values);
-    await vi.waitFor(() => expect(values[values.length - 1].orientation).toBe(1));
+    it('subscribes to the native listener exactly once, even as the state it writes changes', async () => {
+      // why: the source comment claims the effect touches `screenOrientation` write-only, so it
+      // has no dependency on its own output and never re-runs. Proving `addOrientationChangeListener`
+      // stays at one call — across BOTH the fetch resolving and a listener event landing — is what
+      // actually verifies that claim, not merely asserting it once at mount.
+      const values: IScreenOrientationState[] = [];
+      await mountScreenOrientation(values);
+      await vi.waitFor(() => expect(values[values.length - 1].orientation).toBe(1));
 
-    registeredListener?.({ orientationLock: 5, orientationInfo: { orientation: 3 } });
-    await tick();
+      registeredListener?.({ orientationLock: 5, orientationInfo: { orientation: 3 } });
+      await tick();
 
-    expect(values[values.length - 1]).toEqual({ orientation: 3, orientationLock: 5 });
-  });
+      expect(addListenerMock).toHaveBeenCalledTimes(1);
+    });
 
-  it('removes the subscription on unmount', async () => {
-    await mountScreenOrientation([]);
-    unmount(ROOT_TAG);
+    it('updates the state when the native listener fires, taking both fields from the SAME event', async () => {
+      // why: a rotation event carries orientation and lock together (orientationInfo.orientation +
+      // orientationLock) — the rune must fold them into one state write, not two independent ones
+      // that could observably tear.
+      const values: IScreenOrientationState[] = [];
+      await mountScreenOrientation(values);
+      await vi.waitFor(() => expect(values[values.length - 1].orientation).toBe(1));
 
-    expect(removeMock).toHaveBeenCalledTimes(1);
+      registeredListener?.({ orientationLock: 5, orientationInfo: { orientation: 3 } });
+      await tick();
+
+      expect(values[values.length - 1]).toEqual({ orientation: 3, orientationLock: 5 });
+    });
+
+    it('removes the subscription exactly once on unmount', async () => {
+      // why: a leaked native listener across mount/unmount cycles would keep firing into an
+      // unmounted component's closed-over state — the effect's cleanup is the only thing
+      // preventing that, the twin of Vue's onUnmounted.
+      await mountScreenOrientation([]);
+      unmount(ROOT_TAG);
+
+      expect(removeMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

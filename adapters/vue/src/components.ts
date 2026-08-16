@@ -22,12 +22,9 @@ import { normalizeVueAttrs } from './utils/normalize-attrs';
 
 export interface IViewProps extends IAccessibilityProps, IAriaProps, IResponderProps {
   style?: IStyleProp<IViewStyle>;
-  // Vue's own template idiom for a registered class name (twin of React's `className`, added
-  // the same session — see IViewProps.className there). Resolved through the shared style
-  // registry by routeProp's centralized class+style merge (core/engine/src/node.ts). Scoped to
-  // View/Text only for now, matching React's exact scope — extending it to every other
-  // component (Image, ScrollView, Pressable, …) is real, deliberately deferred follow-up work,
-  // not a gap left by oversight.
+  // Resolved through the shared style registry by routeProp's centralized class+style merge
+  // (core/engine/src/node.ts). Scoped to View/Text only for now, matching React's exact scope -
+  // extending it to every other component is deliberately deferred follow-up work.
   class?: IClassNameValue;
   onPress?: (event: ISymbioteEvent) => void;
   onPressIn?: (event: ISymbioteEvent) => void;
@@ -50,7 +47,7 @@ export interface IViewProps extends IAccessibilityProps, IAriaProps, IResponderP
 
 export interface ITextProps extends IAccessibilityProps, IAriaProps {
   style?: IStyleProp<ITextStyle>;
-  // See IViewProps.class — same registry, same merge precedence, same View/Text-only scope.
+  // See IViewProps.class - same registry, same merge precedence, same View/Text-only scope.
   class?: IClassNameValue;
   onPress?: (event: ISymbioteEvent) => void;
   onLongPress?: (event: ISymbioteEvent) => void;
@@ -74,8 +71,6 @@ function hostComponent<Props extends object>(
   intrinsic: string,
   name: string,
 ): FunctionalComponent<Props> {
-  // A functional component's ctx is Omit<SetupContext, 'expose'> (no instance to expose); let the
-  // FunctionalComponent target infer the param types rather than annotate SetupContext.
   // normalizeVueAttrs folds kebab template props (:accessibility-label) to the RN camelCase contract.
   const component: FunctionalComponent<Props> = (_props, { slots, attrs }) =>
     h(
@@ -91,5 +86,5 @@ function hostComponent<Props extends object>(
 export const View = hostComponent<IViewProps>('symbiote-view', 'View');
 export const Text = hostComponent<ITextProps>('symbiote-text', 'Text');
 // Image is NOT a bare host primitive: it needs the shared fold (source/src/srcSet resolution,
-// width/height → style, alt → accessibility) + the Image statics, so it lives in ./image as a
+// width/height -> style, alt -> accessibility) + the Image statics, so it lives in ./image as a
 // functional component over renderImage. View/Text stay bare; they forward attrs verbatim.

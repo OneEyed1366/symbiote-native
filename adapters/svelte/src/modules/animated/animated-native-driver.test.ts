@@ -10,6 +10,17 @@
 // same pattern as components/switch/switch.smoke.test.ts: write the compiled output CO-LOCATED
 // with the real source (its own `import ... from './animated-props-runtime'` / `'../../dom-shim'`
 // resolve relative to wherever the compiled file lives), then dynamic-import it.
+//
+// Scope note: the value graph / interpolation math / native-tag minting this exercises belongs to
+// core/engine (already covered by core/engine/src/animated/*.test.ts) and is used, not
+// re-verified, here — this file's job is proving the SVELTE side of the wiring: that mounting
+// AnimatedView through the real component tree produces a committed Fabric view whose tag is what
+// gets bound, at the moment `bind:this`/the reconcile $effect actually run.
+//
+// No Negative group: there is no invalid input this path rejects — `timing(...).start()` on an
+// unmounted-but-committed view is the one supported shape. The counterpart of this scenario (no
+// native module installed, so the same style prop drives through the JS-only fallback instead) is
+// animated-view.smoke.test.ts, not duplicated here.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -173,7 +184,12 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-describe('Animated.View (real compiled source) native driver', () => {
+describe('Animated.View (real compiled source) native driver (Positive)', () => {
+  // why: a native-driven animation must bind to the SAME Fabric tag the Svelte adapter actually
+  // committed, not a tag the test hardcodes — proving the reconcile $effect reads a real,
+  // just-mounted host node (svelte-adapter-dom-shim skill §15's `bind:this` timing question) and
+  // that the JS-side prop stays frozen at handoff while native owns the frame-by-frame value,
+  // syncing back only on completion.
   it('mirrors the value graph into native and binds it to the committed view', async () => {
     const DriverParent = await loadParent();
     const opacity = new AnimatedValue(0);

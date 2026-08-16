@@ -3,6 +3,13 @@
 // never changes shape (see drawer-router-state.ts's header): only which route is focused
 // (`index`) and whether the panel is open (`isOpen`) can change, so every action here is a
 // jumpTo/open/close/toggle over a FIXED route array.
+//
+// No Negative group: drawerRouterReducer never throws - every action either updates state or
+// no-ops back to the SAME reference (asserted explicitly below, not just "didn't crash"). The
+// reducer's `default: return state` branch is unreachable through the exported
+// IDrawerRouterAction union without an `as` cast to fabricate an unknown action type, which is
+// out of the unit's type contract (see the project's no-`as`-casts-in-tests rule) - left N/A
+// rather than tested.
 
 import { describe, expect, it } from 'vitest';
 import { createInitialDrawerRouterState, drawerRouterReducer, focusedDrawerRoute } from './index';

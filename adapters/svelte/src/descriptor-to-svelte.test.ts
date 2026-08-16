@@ -51,99 +51,196 @@ function mountRoot(): { root: ISymbioteNode; surface: SymbioteSurface } {
 }
 
 describe('mountDescriptorChildren', () => {
-  it('creates the child tree once and commits it under the live parent', () => {
-    const { root, surface } = mountRoot();
+  describe('Positive', () => {
+    it('creates the child tree once and commits it under the live parent', () => {
+      // why: the baseline this whole bridge exists to provide — a Descriptor tree from
+      // core/components' render-*.ts must reach a real committed Fabric node, matching
+      // React's descriptorToReact / Vue's descriptorToVue.
+      const { root, surface } = mountRoot();
 
-    const children: IDescriptorChild[] = [
-      { type: 'symbiote-activity-indicator', props: { animating: true }, children: [] },
-    ];
-    mountDescriptorChildren(root, children);
-    surface.commit();
+      const children: IDescriptorChild[] = [
+        { type: 'symbiote-activity-indicator', props: { animating: true }, children: [] },
+      ];
+      mountDescriptorChildren(root, children);
+      surface.commit();
 
-    const appRoot = fabric.appRoot();
-    const view = appRoot.children[0];
-    expect(view?.children[0]?.viewName).toBe('ActivityIndicatorView');
-    expect(view?.children[0]?.props.animating).toBe(true);
-  });
+      const appRoot = fabric.appRoot();
+      const view = appRoot.children[0];
+      expect(view?.children[0]?.viewName).toBe('ActivityIndicatorView');
+      expect(view?.children[0]?.props.animating).toBe(true);
+    });
 
-  it('reuses the same native node identity across an update — no recreate', () => {
-    const { root, surface } = mountRoot();
+    it('reuses the same native node identity across an update — no recreate', () => {
+      // why: the entire reason this bridge is shape-stable instead of a rebuild-every-call
+      // walker — a fresh native view per update would break any imperative command / native-
+      // owned state (focus, dispatchViewCommand) tied to the old identity.
+      const { root, surface } = mountRoot();
 
-    const mounted = mountDescriptorChildren(root, [
-      {
-        type: 'symbiote-activity-indicator',
-        props: { animating: true, color: 'red' },
-        children: [],
-      },
-    ]);
-    surface.commit();
-    const createdBefore = fabric.counts.createNode;
+      const mounted = mountDescriptorChildren(root, [
+        {
+          type: 'symbiote-activity-indicator',
+          props: { animating: true, color: 'red' },
+          children: [],
+        },
+      ]);
+      surface.commit();
+      const createdBefore = fabric.counts.createNode;
 
-    mounted.update([
-      {
-        type: 'symbiote-activity-indicator',
-        props: { animating: false, color: 'red' },
-        children: [],
-      },
-    ]);
-    surface.commit();
-
-    // Only the changed prop should have moved; no new createNode call, same tag.
-    expect(fabric.counts.createNode).toBe(createdBefore);
-    const appRoot = fabric.appRoot();
-    const child = appRoot.children[0]?.children[0];
-    expect(child?.props.animating).toBe(false);
-    expect(child?.props.color).toBe('red');
-  });
-
-  it('syncs a nested multi-level tree by position', () => {
-    const { root, surface } = mountRoot();
-
-    const mounted = mountDescriptorChildren(root, [
-      {
-        type: 'symbiote-view',
-        props: { style: { flex: 1 } },
-        children: [{ type: 'symbiote-text', props: {}, children: ['hello'] }],
-      },
-    ]);
-    surface.commit();
-
-    mounted.update([
-      {
-        type: 'symbiote-view',
-        props: { style: { flex: 2 } },
-        children: [{ type: 'symbiote-text', props: {}, children: ['world'] }],
-      },
-    ]);
-    surface.commit();
-
-    const wrapper = fabric.appRoot().children[0]?.children[0];
-    expect(wrapper?.props.flex).toBe(2);
-    const text = wrapper?.children[0];
-    expect(text?.viewName).toBe('RCTText');
-    expect(text?.children[0]?.viewName).toBe('RCTRawText');
-    expect(text?.children[0]?.props.text).toBe('world');
-  });
-
-  it('throws on a root child-count shape change instead of silently rebuilding', () => {
-    const { root, surface } = mountRoot();
-
-    const mounted = mountDescriptorChildren(root, [
-      { type: 'symbiote-view', props: {}, children: [] },
-    ]);
-    surface.commit();
-
-    expect(() =>
       mounted.update([
+        {
+          type: 'symbiote-activity-indicator',
+          props: { animating: false, color: 'red' },
+          children: [],
+        },
+      ]);
+      surface.commit();
+
+      // Only the changed prop should have moved; no new createNode call, same tag.
+      expect(fabric.counts.createNode).toBe(createdBefore);
+      const appRoot = fabric.appRoot();
+      const child = appRoot.children[0]?.children[0];
+      expect(child?.props.animating).toBe(false);
+      expect(child?.props.color).toBe('red');
+    });
+
+    it('syncs a nested multi-level tree by position', () => {
+      // why: a render-*.ts Descriptor can nest (e.g. ImageBackground's View-wrapping-Image) —
+      // the per-position cache has to walk down, not just diff the root's own immediate props.
+      const { root, surface } = mountRoot();
+
+      const mounted = mountDescriptorChildren(root, [
+        {
+          type: 'symbiote-view',
+          props: { style: { flex: 1 } },
+          children: [{ type: 'symbiote-text', props: {}, children: ['hello'] }],
+        },
+      ]);
+      surface.commit();
+
+      mounted.update([
+        {
+          type: 'symbiote-view',
+          props: { style: { flex: 2 } },
+          children: [{ type: 'symbiote-text', props: {}, children: ['world'] }],
+        },
+      ]);
+      surface.commit();
+
+      const wrapper = fabric.appRoot().children[0]?.children[0];
+      expect(wrapper?.props.flex).toBe(2);
+      const text = wrapper?.children[0];
+      expect(text?.viewName).toBe('RCTText');
+      expect(text?.children[0]?.viewName).toBe('RCTRawText');
+      expect(text?.children[0]?.props.text).toBe('world');
+    });
+
+    it('mounts and updates a bare string child directly under the parent', () => {
+      // why: buildChild/syncChild's `typeof child === 'string'` branch has only ever been
+      // exercised nested inside an element (the "nested multi-level tree" case above) — a
+      // Descriptor's OWN top-level children array can hold a bare string too (e.g. Text's
+      // render fn), and that is a structurally different call path (root-level cache entry,
+      // not a recursive one).
+      const { root, surface } = mountRoot();
+
+      const mounted = mountDescriptorChildren(root, ['hello']);
+      surface.commit();
+      expect(fabric.appRoot().children[0]?.children[0]?.props.text).toBe('hello');
+
+      mounted.update(['world']);
+      surface.commit();
+      expect(fabric.appRoot().children[0]?.children[0]?.props.text).toBe('world');
+    });
+  });
+
+  // Every throw here enforces the SAME product rule: a render-*.ts Descriptor is assumed
+  // shape-stable across renders, and this bridge's whole no-rebuild cost model depends on that.
+  // A shape change is therefore always a real bug in the CALLER, never a case to silently paper
+  // over — so the contract is "throw loudly", not "best-effort reconcile".
+  describe('Negative', () => {
+    it('throws when the root child count changes', () => {
+      const { root, surface } = mountRoot();
+
+      const mounted = mountDescriptorChildren(root, [
         { type: 'symbiote-view', props: {}, children: [] },
+      ]);
+      surface.commit();
+
+      expect(() =>
+        mounted.update([
+          { type: 'symbiote-view', props: {}, children: [] },
+          { type: 'symbiote-view', props: {}, children: [] },
+        ]),
+      ).toThrow(/shape changed/);
+    });
+
+    it('throws when a nested child count changes', () => {
+      const { root, surface } = mountRoot();
+
+      const mounted = mountDescriptorChildren(root, [
+        {
+          type: 'symbiote-view',
+          props: {},
+          children: [{ type: 'symbiote-text', props: {}, children: [] }],
+        },
+      ]);
+      surface.commit();
+
+      expect(() =>
+        mounted.update([
+          {
+            type: 'symbiote-view',
+            props: {},
+            children: [
+              { type: 'symbiote-text', props: {}, children: [] },
+              { type: 'symbiote-text', props: {}, children: [] },
+            ],
+          },
+        ]),
+      ).toThrow(/shape changed/);
+    });
+
+    it('throws when an element child is replaced by a text child at the same position', () => {
+      const { root, surface } = mountRoot();
+
+      const mounted = mountDescriptorChildren(root, [
         { type: 'symbiote-view', props: {}, children: [] },
-      ]),
-    ).toThrow(/shape changed/);
+      ]);
+      surface.commit();
+
+      expect(() => mounted.update(['not a view anymore'])).toThrow(/shape changed/);
+    });
+
+    it('throws when a text child is replaced by an element child at the same position', () => {
+      const { root, surface } = mountRoot();
+
+      const mounted = mountDescriptorChildren(root, ['hello']);
+      surface.commit();
+
+      expect(() => mounted.update([{ type: 'symbiote-view', props: {}, children: [] }])).toThrow(
+        /shape changed/,
+      );
+    });
+
+    it('throws when the element tag name changes at the same position', () => {
+      const { root, surface } = mountRoot();
+
+      const mounted = mountDescriptorChildren(root, [
+        { type: 'symbiote-view', props: {}, children: [] },
+      ]);
+      surface.commit();
+
+      expect(() => mounted.update([{ type: 'symbiote-text', props: {}, children: [] }])).toThrow(
+        /shape changed/,
+      );
+    });
   });
 });
 
 describe('createDescriptorChildrenSync', () => {
   it('is a no-op before the host ref is live, then mounts once it is', () => {
+    // why: the wiring's own usage contract — `$effect(() => syncChildren(hostRef,
+    // descriptor.children))` can fire before `{@attach}` populates hostRef, and must not
+    // throw or mount anything in that window.
     const { root, surface } = mountRoot();
     const syncChildren = createDescriptorChildrenSync();
 
@@ -161,6 +258,10 @@ describe('createDescriptorChildrenSync', () => {
   });
 
   it("is a harmless no-op loop for an always-empty children array (Switch/TextInput's case)", () => {
+    // why: Switch/TextInput route every prop through their own root spread and have no
+    // Descriptor children at all — they still call this wiring uniformly (one uniform shape
+    // for every category-1 component), so an empty array must cost nothing and mount nothing
+    // across repeated calls, not just on the first one.
     const { root, surface } = mountRoot();
     const syncChildren = createDescriptorChildrenSync();
 

@@ -28,27 +28,38 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('React Counter on the engine', () => {
-  it('mounts View > Text > RawText under a box-none AppContainer', () => {
-    mount(ROOT_TAG, <Counter />);
-    expect(fabric.serialize(fabric.appRoot().children)).toBe(
-      'RCTView(RCTText(RCTRawText "count: 0"))',
-    );
-  });
+  // Positive only: mount/commit/recommit have no throwing contract on valid React trees —
+  // there is nothing here for a Negative group to assert against.
+  describe('Positive', () => {
+    // why: proves the FIRST commit already produces the real Fabric shape (View->Text->RawText)
+    // wrapped by the synthetic AppContainer, not just "something got created".
+    it('mounts View > Text > RawText under a box-none AppContainer', () => {
+      mount(ROOT_TAG, <Counter />);
+      expect(fabric.serialize(fabric.appRoot().children)).toBe(
+        'RCTView(RCTText(RCTRawText "count: 0"))',
+      );
+    });
 
-  it('a tap increments the counter and recommits', () => {
-    mount(ROOT_TAG, <Counter />);
+    // why: proves the full round-trip — a native touch event reaches React state, state drives
+    // a re-render, and the engine's clone-on-write recommit lands the new tree on Fabric. This is
+    // the one test that exercises event->state->recommit end to end, not just initial paint.
+    it('a tap increments the counter and recommits', () => {
+      mount(ROOT_TAG, <Counter />);
 
-    // The app's own View is the non-box-none RCTView (the box-none one is the AppContainer).
-    const view = fabric.find(n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none');
-    expect(view, 'app View was created').toBeDefined();
+      // The app's own View is the non-box-none RCTView (the box-none one is the AppContainer).
+      const view = fabric.find(
+        n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+      );
+      expect(view, 'app View was created').toBeDefined();
 
-    // A press is an honest gesture: a touch that starts and ends on the same node. Fabric
-    // hands the View's instanceHandle straight back.
-    fabric.fireEvent(view!.instanceHandle, 'topTouchStart');
-    fabric.fireEvent(view!.instanceHandle, 'topTouchEnd');
+      // A press is an honest gesture: a touch that starts and ends on the same node. Fabric
+      // hands the View's instanceHandle straight back.
+      fabric.fireEvent(view!.instanceHandle, 'topTouchStart');
+      fabric.fireEvent(view!.instanceHandle, 'topTouchEnd');
 
-    expect(fabric.serialize(fabric.appRoot().children)).toBe(
-      'RCTView(RCTText(RCTRawText "count: 1"))',
-    );
+      expect(fabric.serialize(fabric.appRoot().children)).toBe(
+        'RCTView(RCTText(RCTRawText "count: 1"))',
+      );
+    });
   });
 });

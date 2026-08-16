@@ -107,45 +107,75 @@ async function mountNetworkState(values: INetworkState[]): Promise<void> {
   await tick();
 }
 
+// No Negative group: useNetworkState has no guard clause and no throwing path — it seeds a
+// value, awaits one native call, and forwards listener events. Every scenario below is a
+// Positive one; the second axis is "what the effect does instead of erroring" (seed → fetch →
+// listen → cleanup), not a rejection path.
 describe('useNetworkState (Svelte)', () => {
-  it('starts at an empty object before the initial fetch resolves', async () => {
-    // A never-settling fetch pins the state at its seed value, so this asserts the seed rather
-    // than racing the mock's own resolution.
-    getNetworkStateAsyncMock.mockReturnValue(new Promise<INetworkState>(() => {}));
-    const values: INetworkState[] = [];
-    await mountNetworkState(values);
+  describe('Positive (seed, fetch, listener updates, lifecycle)', () => {
+    it('seeds at an empty object before the initial fetch resolves', async () => {
+      // why: a never-settling fetch pins the state at its seed value forever, proving `{}` is the
+      // rune's OWN initial value rather than a value that happens to arrive before the mock
+      // resolves in a race.
+      getNetworkStateAsyncMock.mockReturnValue(new Promise<INetworkState>(() => {}));
+      const values: INetworkState[] = [];
+      await mountNetworkState(values);
 
-    expect(values[values.length - 1]).toEqual({});
-  });
+      expect(values[values.length - 1]).toEqual({});
+    });
 
-  it('updates to the fetched value once getNetworkStateAsync() resolves', async () => {
-    const values: INetworkState[] = [];
-    await mountNetworkState(values);
+    it('updates to the fetched value once getNetworkStateAsync() resolves', async () => {
+      // why: the seed must not be the last word — the one-shot fetch has to actually reach the
+      // caller, matching upstream's useNetworkState and the Vue composable's onMounted half.
+      const values: INetworkState[] = [];
+      await mountNetworkState(values);
 
-    await vi.waitFor(() =>
-      expect(values[values.length - 1]).toEqual({
-        type: 'WIFI',
-        isConnected: true,
-        isInternetReachable: true,
-      }),
-    );
-  });
+      await vi.waitFor(() =>
+        expect(values[values.length - 1]).toEqual({
+          type: 'WIFI',
+          isConnected: true,
+          isInternetReachable: true,
+        }),
+      );
+    });
 
-  it('updates the state when the native listener fires', async () => {
-    const values: INetworkState[] = [];
-    await mountNetworkState(values);
-    await vi.waitFor(() => expect(values[values.length - 1].type).toBe('WIFI'));
+    it('subscribes to the native listener exactly once, even as the state it writes changes', async () => {
+      // why: the source comment claims the effect touches `networkState` write-only, so it has no
+      // dependency on its own output and never re-runs. Proving `addNetworkStateListener` stays
+      // at one call — across BOTH the fetch resolving and a listener event landing — is what
+      // actually verifies that claim; asserting it once at mount wouldn't catch an accidental
+      // re-subscription triggered by the rune's own state writes.
+      const values: INetworkState[] = [];
+      await mountNetworkState(values);
+      await vi.waitFor(() => expect(values[values.length - 1].type).toBe('WIFI'));
 
-    registeredListener?.({ type: 'CELLULAR', isConnected: true, isInternetReachable: false });
-    await tick();
+      registeredListener?.({ type: 'CELLULAR', isConnected: true, isInternetReachable: false });
+      await tick();
 
-    expect(values[values.length - 1].type).toBe('CELLULAR');
-  });
+      expect(addListenerMock).toHaveBeenCalledTimes(1);
+    });
 
-  it('removes the subscription on unmount', async () => {
-    await mountNetworkState([]);
-    unmount(ROOT_TAG);
+    it('updates the state when the native listener fires', async () => {
+      // why: ongoing connectivity changes (wifi -> cellular) must reach the caller live, not only
+      // the one-shot initial read.
+      const values: INetworkState[] = [];
+      await mountNetworkState(values);
+      await vi.waitFor(() => expect(values[values.length - 1].type).toBe('WIFI'));
 
-    expect(removeMock).toHaveBeenCalledTimes(1);
+      registeredListener?.({ type: 'CELLULAR', isConnected: true, isInternetReachable: false });
+      await tick();
+
+      expect(values[values.length - 1].type).toBe('CELLULAR');
+    });
+
+    it('removes the subscription exactly once on unmount', async () => {
+      // why: a leaked native listener across mount/unmount cycles would keep firing into an
+      // unmounted component's closed-over state — the effect's cleanup is the only thing
+      // preventing that, the twin of Vue's onUnmounted.
+      await mountNetworkState([]);
+      unmount(ROOT_TAG);
+
+      expect(removeMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

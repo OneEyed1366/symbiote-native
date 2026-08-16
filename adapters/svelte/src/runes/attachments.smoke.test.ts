@@ -10,22 +10,10 @@
 // on later insertion — svelte-adapter-custom-renderer skill §2/§4), so there is no separate
 // engine-node field to unwrap anymore.
 //
-// KNOWN FAILING (out of this file's fix scope, root-caused, not a test-writing bug): every test
-// below in the `{@attach} on a Symbiote component` describe block currently observes the
-// forwarded attachment invoked TWICE on the SAME node (verified: `events[0].node ===
-// events[1].node`), because View.svelte spreads `{...rest}` directly onto `<symbiote-view>` AND
-// separately calls `createAttachmentsSync()`'s own `$effect(() => syncAttachments(hostRef,
-// rest))` on the SAME `rest` object. Both now invoke the SAME symbol-keyed attachment: Svelte's
-// own `set_attributes` (dom/elements/attributes.js) already calls `attach(element, () => n)` for
-// any `ATTACHMENT_KEY`-tagged entry in a spread object — confirmed by reading that source — which
-// makes `createAttachmentsSync` redundant for props that are ALSO spread as `{...rest}` onto the
-// same element. Under the retired DOM-shim, spreading onto a custom element went through
-// `set_custom_element_data`, which has no such automatic attachment handling, so
-// `createAttachmentsSync` was load-bearing there; it is not anymore. Fixing this requires editing
-// `View.svelte`/`Text.svelte`/`components/switch/index.svelte` and/or `runes/attachments.ts` —
-// all explicitly out of scope for this pass (owned by a parallel component-migration effort). The
-// assertions below assert the CORRECT single-fire behavior on purpose, left red as a documented,
-// root-caused pointer to that fix rather than adjusted to accept the duplicate.
+// No Negative group: neither `createAttachmentsSync` nor `pickAttachmentProps` has a throwing
+// path — both are total over their input (an object with or without symbol-keyed attachment
+// props). The one non-happy-path branch (a null/undefined host) is a documented no-op, covered
+// under Positive below rather than invented as a "rejects" case that doesn't exist.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -36,7 +24,7 @@ import { installFabric } from '@symbiote-native/test-utils';
 import { createAttachmentKey } from 'svelte/attachments';
 import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
 import { mount, unmount } from '../render';
-import { pickAttachmentProps } from './attachments';
+import { createAttachmentsSync, pickAttachmentProps } from './attachments';
 
 if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
@@ -156,9 +144,24 @@ afterEach(() => {
   rmSync(TOUCHABLE_PARENT_OUT, { force: true });
 });
 
+describe('Positive — createAttachmentsSync', () => {
+  // why: `createAttachmentsSync` is wired from `$effect(() => syncAttachments(hostShim, rest))`,
+  // and the host ref can legitimately be null/undefined before `bind:this` settles or after
+  // teardown — the sync function must be a safe no-op there rather than throwing on a nullable
+  // ref every component that adopts this pattern passes through on every mount.
+  it('is a no-op when the host is null or undefined, and calls nothing', () => {
+    const sync = createAttachmentsSync();
+    const attachmentKey = createAttachmentKey();
+    const props = { [attachmentKey]: (): void => {} };
+
+    expect(() => sync(null, props)).not.toThrow();
+    expect(() => sync(undefined, props)).not.toThrow();
+  });
+});
+
 // The forwarding helper the list family and Animated.ScrollView rely on: those rebuild their
 // child's props by name (or through a string-keyed Record), which drops symbol keys silently.
-describe('pickAttachmentProps', () => {
+describe('Positive — pickAttachmentProps', () => {
   it('carries the attachment keys across and leaves everything else behind', () => {
     const attachmentKey = createAttachmentKey();
     const otherSymbol = Symbol('not-an-attachment');
@@ -173,9 +176,21 @@ describe('pickAttachmentProps', () => {
     expect(Object.keys(picked)).toEqual([]);
     expect(picked[attachmentKey]).toBe(attachment);
   });
+
+  // why: an ordinary Symbol (not one created by createAttachmentKey) must NOT be forwarded — the
+  // filter keys off the attachment marker's description, not "any symbol", or an unrelated
+  // symbol-keyed prop would silently leak through the forwarding helper.
+  it('drops a symbol key that carries no attachment marker', () => {
+    const otherSymbol = Symbol('not-an-attachment');
+    const picked = pickAttachmentProps({ [otherSymbol]: 'ignored' });
+    expect(Object.getOwnPropertySymbols(picked)).toEqual([]);
+  });
 });
 
-describe('{@attach} on a Symbiote component', () => {
+describe('Positive — {@attach} on a Symbiote component', () => {
+  // why: the attachment must receive the real, COMMITTED host node — not a template prototype,
+  // not a detached clone — since every real use (dispatching a command, reading a Fabric tag)
+  // needs the live node. Unmount must fire the teardown, or every attachment leaks its cleanup.
   it('invokes the attachment with the committed real host node, and tears it down on unmount', async () => {
     compileToFile(SWAP_PARENT, 'Parent.svelte', PARENT_OUT);
     const Parent = await loadComponent(PARENT_OUT);
@@ -198,6 +213,11 @@ describe('{@attach} on a Symbiote component', () => {
     expect(events.map(entry => entry.name)).toEqual(['attach:first', 'teardown:first']);
   });
 
+  // why: a DYNAMIC attachment expression (`which === 'first' ? first : second`) compiles to a
+  // STABLE prop whose VALUE never changes — the read that changes lives inside the wrapper body.
+  // Delegating to Svelte's own `attach()` is what makes the swap observable at all; a hand-rolled
+  // identity-diff on the prop would never see it (this is the exact bug the file's own header
+  // comment records having hit first).
   it('tears down only the attachment that changed, then runs the new one on the same node', async () => {
     compileToFile(SWAP_PARENT, 'Parent.svelte', PARENT_OUT);
     const Parent = await loadComponent(PARENT_OUT);
@@ -218,10 +238,11 @@ describe('{@attach} on a Symbiote component', () => {
     expect(events[2].node).toBe(events[0].node);
   });
 
-  // The delegating half of the wiring: TouchableOpacity owns no host tag of its own, it spreads
-  // `...rest` onto Pressable. Symbol keys survive a component spread (spread_props' ownKeys trap
-  // walks Object.getOwnPropertySymbols), so the attachment lands on Pressable's host node with no
-  // per-component forwarding code — this is what makes the touchable family and Button free.
+  // why: TouchableOpacity owns no host tag of its own — it spreads `...rest` onto Pressable.
+  // Symbol keys survive a component spread (spread_props' ownKeys trap walks
+  // Object.getOwnPropertySymbols), so the attachment must land on Pressable's host node with NO
+  // per-component forwarding code. This is the "free" category from the adapter's own attachment
+  // design (skill §22c category 2) — a real, not assumed, proof it stays free.
   it('reaches the host node through a component that only re-spreads its rest props', async () => {
     compileToFile(
       readFileSync(join(COMPONENTS_DIR, 'pressable', 'index.svelte'), 'utf8'),
@@ -256,6 +277,10 @@ describe('{@attach} on a Symbiote component', () => {
     expect(events[0].node.props.testID).toBe('touchable-target');
   });
 
+  // why: `fromAction` is the sanctioned bridge for a third-party Svelte ACTION (the ecosystem's
+  // own `use:` idiom) into this adapter, since `use:` itself is illegal on a component. Init,
+  // update-on-param-change, and destroy-on-unmount are the three calls a real action author
+  // expects — all three must actually fire, not just the first.
   it('round-trips a real Svelte action through fromAction', async () => {
     compileToFile(ACTION_PARENT, 'ActionParent.svelte', ACTION_OUT);
     const Parent = await loadComponent(ACTION_OUT);

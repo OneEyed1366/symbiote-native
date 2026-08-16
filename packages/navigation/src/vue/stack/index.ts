@@ -35,6 +35,7 @@ import {
   createNavigationEmitter,
   isRecord,
   navigatorReducer,
+  reconcileStackRoutes,
   resolveScreenRenderPlan,
   resolveStackProps,
 } from '../../core';
@@ -173,8 +174,22 @@ const StackImpl = defineComponent<IStackProps>(
 
     const state = shallowRef<INavigatorState>(initialState);
 
+    // The screen names the render pass below last saw in the slot. A PLAIN local, not a ref: it is
+    // a cache of what was just rendered, never a reactive source, so refreshing it from inside the
+    // render closure is not a state write during render (which would re-trigger the very render
+    // effect that produced it).
+    let registeredNames: readonly string[] = [];
+
+    // A <Stack.Screen> marker can vanish from the slot while its route is still in the pushed
+    // history, which would leave that entry with nothing to render (reconcileStackRoutes' header).
+    // Reconciling on READ rather than writing the ref keeps the repair out of the render pass; the
+    // dispatch below then persists it, so the next push builds on the pruned history.
+    function currentState(): INavigatorState {
+      return reconcileStackRoutes(state.value, registeredNames);
+    }
+
     function dispatch(action: Parameters<typeof navigatorReducer>[1]): void {
-      state.value = navigatorReducer(state.value, action);
+      state.value = navigatorReducer(currentState(), action);
     }
 
     const handle: INavigatorHandle = {
@@ -185,7 +200,7 @@ const StackImpl = defineComponent<IStackProps>(
       replace: (name, params) => dispatch({ type: 'replace', route: createRoute(name, params) }),
       setParams: (params, key) => dispatch({ type: 'setParams', key, params }),
       reset: nextState => dispatch({ type: 'reset', state: nextState }),
-      canGoBack: () => state.value.routes.length > 1,
+      canGoBack: () => currentState().routes.length > 1,
     };
     expose(handle);
 
@@ -195,18 +210,20 @@ const StackImpl = defineComponent<IStackProps>(
     // useEffect, which must be deferred past render to avoid a descendant setState-during-render):
     // Vue's provide/inject + shallowRef.value writes are safe to perform directly inside the
     // render closure below, so the broadcast happens right there, once per render.
-    function broadcastState(): void {
-      for (const route of state.value.routes) {
-        emitterFor(route.key).emit(NAVIGATION_EVENT_STATE, state.value);
+    function broadcastState(current: INavigatorState): void {
+      for (const route of current.routes) {
+        emitterFor(route.key).emit(NAVIGATION_EVENT_STATE, current);
       }
       for (const routeKey of emitters.keys()) {
-        if (!state.value.routes.some(route => route.key === routeKey)) emitters.delete(routeKey);
+        if (!current.routes.some(route => route.key === routeKey)) emitters.delete(routeKey);
       }
     }
 
     return () => {
-      broadcastState();
       const registry = collectRegistry(slots.default?.() ?? []);
+      registeredNames = [...registry.keys()];
+      const current = currentState();
+      broadcastState(current);
       const screenOptions = asScreenOptions(attrs.screenOptions);
 
       // Investigation instrumentation (flicker-on-focus bug): STACK_ON_FINISH_TRANSITIONING is
@@ -221,7 +238,7 @@ const StackImpl = defineComponent<IStackProps>(
         },
       });
 
-      const children = state.value.routes.map((route, index) => {
+      const children = current.routes.map((route, index) => {
         const entry = registry.get(route.name);
         if (entry === undefined) {
           dlog(`Stack: no screen registered for route name "${route.name}"`);
@@ -230,12 +247,12 @@ const StackImpl = defineComponent<IStackProps>(
 
         const screenOptionsArgs: IScreenOptionsArgs = { route, navigation: handle };
         const mergedOptions = resolveScreenOptions(entry, screenOptionsArgs, screenOptions);
-        const activityState = computeActivityState(index, state.value.routes.length);
+        const activityState = computeActivityState(index, current.routes.length);
         // Investigation instrumentation (flicker-on-focus bug): fires on EVERY Stack render, not
         // just on transitions, so the log stream shows whether a route's activityState/index ever
         // changes outside of a push/pop dispatch. Kept behind DEBUG, never removed.
         dlog(
-          `Stack: render route "${route.name}" index=${index}/${state.value.routes.length - 1} ` +
+          `Stack: render route "${route.name}" index=${index}/${current.routes.length - 1} ` +
             `activityState=${activityState} at t=${Date.now()}`,
         );
 
@@ -245,7 +262,7 @@ const StackImpl = defineComponent<IStackProps>(
         const plan = resolveScreenRenderPlan({
           screenId: route.key,
           index,
-          routeCount: state.value.routes.length,
+          routeCount: current.routes.length,
           options: mergedOptions,
           platform: NAVIGATOR_PLATFORM,
           isAndroid: Platform.OS === 'android',

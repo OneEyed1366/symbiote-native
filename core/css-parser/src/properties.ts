@@ -50,9 +50,9 @@ export const PROPERTY_TABLE: Record<string, IPropertyMapping> = {
   overflow: { rnProperty: 'overflow', kind: 'raw' },
   // Only `flex`/`none` are valid RN values; passed through unvalidated per spec.
   display: { rnProperty: 'display', kind: 'raw' },
-  // A genuine 1:1 CSS property (unlike transform/shadow — no shape mismatch), just missing
-  // from the initial table. `2 / 3` string ratios are not accepted here (`parseNumeric`
-  // requires a plain number) — CSS `aspect-ratio: 0.667` works, `aspect-ratio: 2/3` doesn't yet.
+  // A genuine 1:1 CSS property (unlike transform/shadow, no shape mismatch). `2 / 3` string
+  // ratios are not accepted here (`parseNumeric` requires a plain number) — CSS
+  // `aspect-ratio: 0.667` works, `aspect-ratio: 2/3` doesn't yet.
   'aspect-ratio': { rnProperty: 'aspectRatio', kind: 'number' },
   gap: { rnProperty: 'gap', kind: 'dimension' },
   'row-gap': { rnProperty: 'rowGap', kind: 'dimension' },

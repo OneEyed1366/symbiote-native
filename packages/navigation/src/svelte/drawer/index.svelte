@@ -186,11 +186,14 @@
     dispatch({ type: 'toggleDrawer' });
   }
   export function jumpTo(name: string): void {
-    // Captured BEFORE dispatch: `state` is recomputed synchronously from the reassigned
-    // `dispatchedState`, so reading it after would already see the reducer's own isOpen: false.
+    // Both sides of the dispatch, because an unregistered name is a documented reducer no-op that
+    // hands the SAME state back: animating off the pre-dispatch snapshot alone would slide the
+    // panel shut while the router still says isOpen. `state` is a $derived recomputed
+    // synchronously off the reassigned `dispatchedState`, so the second read is already the
+    // reducer's own answer.
     const wasOpen = state.isOpen;
     dispatch({ type: 'jumpTo', name });
-    if (wasOpen) animateProgressTo(false);
+    if (wasOpen && !state.isOpen) animateProgressTo(false);
   }
 
   const handle: IDrawerNavigatorHandle = { openDrawer, closeDrawer, toggleDrawer, jumpTo };

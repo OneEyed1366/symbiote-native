@@ -140,6 +140,12 @@ const digestLengths: Record<CryptoDigestAlgorithm, number> = {
   [CryptoDigestAlgorithm.MD5]: 16,
 };
 
+// UPSTREAM-BUG(expo): .vendors/expo/packages/expo-crypto/src/Crypto.ts:205 - digest() has none
+// of digestStringAsync's guards, so an unknown algorithm leaves digestLengths[algorithm]
+// undefined and new Uint8Array(undefined) zero-length.
+// The caller gets an empty ArrayBuffer resolved as SUCCESS - no throw, nothing to catch, a hash
+// that silently is not one.
+// Ported verbatim for parity; do NOT fix without recording a deliberate divergence.
 /**
  * Generates a digest of the supplied `TypedArray`/`ArrayBuffer` of bytes with the provided digest
  * `algorithm`. Prefers the native async `digestAsync` when present; otherwise falls back to

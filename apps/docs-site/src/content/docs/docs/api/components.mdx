@@ -60,12 +60,15 @@ the framework-shaped surface:
 - `TextInput` — `onValueChange` maps to `@value-change` on Vue and `(valueChange)`
   on Angular; Svelte keeps the RN name unchanged as a plain callback prop,
   `onValueChange={(text, event) => …}` — the same shape as React, no
-  translation layer. The controlled write handshake (event-count-gated
-  `setTextAndSelection` command) is shared logic across all four.
+  translation layer. `value` is also `$bindable()`, so `bind:value={x}` works
+  as sugar on top (Vue's `v-model` equivalent). The controlled write handshake
+  (event-count-gated `setTextAndSelection` command) is shared logic across all
+  four.
 - `Switch` — `onValueChange` maps to `@value-change` on Vue and `(valueChange)`
   on Angular; Svelte again keeps `onValueChange` as a plain callback prop,
-  React-shaped. Controlled snap-back (`dispatchViewCommand` when native
-  reports a value the parent rejects) is shared logic.
+  React-shaped, with `value` also `$bindable()` for `bind:value={x}`.
+  Controlled snap-back (`dispatchViewCommand` when native reports a value the
+  parent rejects) is shared logic.
 - `ActivityIndicator` — Mostly shared render-only props. Svelte calls
   `renderActivityIndicator()` directly and syncs its one child through the
   generic `descriptorToSvelte` bridge (`mountDescriptorChildren`) rather than
@@ -159,11 +162,14 @@ counterpart to carve out.
 
 Svelte's own two-way-binding primitive, the nearest equivalent to Vue's
 `v-model`, is `$bindable()` (`let { value = $bindable() } = $props()`, wired
-with `bind:value={x}` at the call site) — a supported authoring pattern for
-your own components. The shipped `TextInput`/`Switch` do not use it: they
-keep the same controlled `value` + `onValueChange` callback handshake React
-uses, so a Svelte app writes `<TextInput value={x} onValueChange={setX} />`,
-not `bind:value`.
+with `bind:value={x}` at the call site). The shipped `TextInput`/`Switch`
+(and `Slider`, from the separate `@symbiote-native/slider` package) declare
+`value` this way, so both styles work: `<TextInput bind:value={x} />` and the
+explicit `<TextInput value={x} onValueChange={setX} />` that Svelte shares
+with React. Supplying `onValueChange` on the same instance as `bind:value`
+takes over the echo — the component can't detect binding from the inside, so
+pass one or the other, not both, on one control. See [How to: two-way bind a
+value](/docs/howtos/two-way-binding/) for the full picture.
 
 ## Framework event idioms side by side
 

@@ -101,8 +101,16 @@ The chain `source → ngc --compilationMode partial → @angular/compiler-cli/li
 
 ```js
 template: function AppComponent_Template(rf, ctx) {
-  if (rf & 1) { i0.ɵɵdomElementStart(0, "View")(1, "Text"); i0.ɵɵtext(2); i0.ɵɵdomElementEnd()(); }
-  if (rf & 2) { i0.ɵɵstyleMap(ctx.boxStyle); i0.ɵɵadvance(2); i0.ɵɵtextInterpolate1("Hello ", ctx.name); }
+  if (rf & 1) {
+    i0.ɵɵdomElementStart(0, 'View')(1, 'Text');
+    i0.ɵɵtext(2);
+    i0.ɵɵdomElementEnd()();
+  }
+  if (rf & 2) {
+    i0.ɵɵstyleMap(ctx.boxStyle);
+    i0.ɵɵadvance(2);
+    i0.ɵɵtextInterpolate1('Hello ', ctx.name);
+  }
 }
 ```
 
@@ -178,18 +186,19 @@ conditional `exports`, and builds that artifact ITSELF via a `prepare` script.**
 ```
 
 Why each condition resolves to the right thing with ZERO consumer-side configuration:
+
 - **`"types"`** — TypeScript's module resolution (with `moduleResolution: "Bundler"` or
   `node16`/`nodenext`) always checks the `"types"` condition first, before any other
   condition, when resolving a `.d.ts` for an import — regardless of what other conditions are
   present. So `ngc`/`tsc` in ANY downstream package (`packages/slider`, `examples/angular`)
   automatically gets the prebuilt Ivy declaration. **No `tsconfig.angular.json` `paths`
   override needed anywhere** — this is exactly what was crashing ngc with `TS500: Cannot
-  destructure property 'pos' of 'file.referencedFiles[index]'` (a known cross-tool bug:
+destructure property 'pos' of 'file.referencedFiles[index]'` (a known cross-tool bug:
   angular-cli#32281, #31649, angular#57850, nx#33876 — raw-source resolution confuses ngc's
   diagnostic explainer). Once `exports` routes `"types"` to the prebuilt `.d.ts` unconditionally,
   ngc never sees the raw decorated source through this path and the crash class disappears.
 - **`"react-native"`** — Metro (`@react-native/metro-config`) sets `unstable_enablePackageExports:
-  true` and `unstable_conditionNames: ['react-native']` **by default** (verified against the
+true` and `unstable_conditionNames: ['react-native']` **by default** (verified against the
   installed `@react-native/metro-config@0.86.0` + `metro-resolver@0.84.4` in this repo — no
   config needed). So Metro automatically picks the prebuilt partial-Ivy JS for both
   `@symbiote-native/angular` and `@symbiote-native/slider/angular` with **no `resolveRequest` override at
@@ -213,6 +222,34 @@ unconditionally, same trust level as the app's own source). So: `pnpm install` a
 root is sufficient to produce `adapters/angular/build/angular` and
 `packages/slider/build-ngc/angular` in the correct order — **no consumer ever runs another
 package's `ng:build`.**
+
+**But `prepare` is "build if MISSING", not "build if STALE" — and that difference eats source
+fixes silently in the dev loop.** The script is
+`node -e "existsSync('build/angular/index.js')||process.exit(1)" || pnpm run ng:build`: once
+`build/angular/` exists from any earlier build, it never rebuilds, no matter how old that output
+is relative to `src/`. `pnpm pack` runs `prepare`, so **a tarball can ship ngc output from days
+ago while every headless signal is green** — `tsc --build` and vitest read `src/`, not
+`build/angular/`.
+
+It is worse than a plain stale-artifact problem because the package emits TWO trees and only one
+of them is what an app loads. `tsc --build` (the `typecheck` script) writes `build/**`; `ngc`
+writes `build/angular/**`; the `exports` map's `react-native` condition points at
+`build/angular/**`. So a `typecheck` run refreshes the copy nobody loads and leaves the copy Metro
+resolves untouched — grepping the installed package for your change finds it, in the wrong tree,
+and looks like proof it shipped. Measured 2026-08-16: a sticky-header fix was present in
+`build/components/scroll-view/shared.js` and absent from
+`build/angular/components/scroll-view/shared.js` in the same tarball.
+
+**So before `pnpm pack` on any Angular-shipping package after a source change, run
+`pnpm run ng:build` explicitly** (it is `clean && ngc`, so it deletes `build/` first — the orphan
+protection §11c describes). Then verify against the tree the `exports` map actually names:
+
+```
+grep -c '<a string only your change introduces>' build/angular/<path>/<file>.js
+```
+
+Checking `build/**` instead of `build/angular/**` is the specific mistake this paragraph exists to
+stop.
 
 **A consuming app's `ng:build` script therefore does exactly ONE thing: compile ITS OWN
 source** (`"ng:build": "ngc -p tsconfig.angular.json"`, no `pnpm --filter` chain). This is not
@@ -372,12 +409,20 @@ plain background `child_process.spawn`, and let `react-native start` stay the so
 process, inheriting stdin directly from the real terminal with no wrapper in between — same
 principle as the original bash version (`&` + `trap EXIT`), just cross-platform and shared
 across every Angular canary instead of duplicated per app:
+
 ```js
 const initialBuild = spawnSync('ngc', ['-p', TSCONFIG], { stdio: 'inherit', shell: true });
-const ngcWatch = spawn('ngc', ['-p', watchTsconfigPath, '--watch'], { stdio: 'inherit', shell: true });
+const ngcWatch = spawn('ngc', ['-p', watchTsconfigPath, '--watch'], {
+  stdio: 'inherit',
+  shell: true,
+});
 const metro = spawn('react-native', ['start', ...metroArgs], { stdio: 'inherit', shell: true });
-metro.on('exit', code => { ngcWatch.kill(); process.exit(code ?? 0); });
+metro.on('exit', code => {
+  ngcWatch.kill();
+  process.exit(code ?? 0);
+});
 ```
+
 `package.json`'s `dev`/`start` just call `symbiote-angular-dev` (`--reset-cache` passed through
 as CLI args for `dev`). This generalizes to any future case in this repo of "run a background
 watcher alongside an interactive foreground CLI": plain background spawn + kill-on-exit, not a
@@ -393,7 +438,7 @@ source, not by inference: `@angular/compiler-cli`'s watch mode
 
 ```js
 const watcher = chokidar.watch(options.basePath, {
-  ignored: (p) => /((^[\/\\])\..)|(\.js$)|(\.map$)|(\.metadata\.json|node_modules)/.test(p),
+  ignored: p => /((^[\/\\])\..)|(\.js$)|(\.map$)|(\.metadata\.json|node_modules)/.test(p),
   ignoreInitial: true,
   persistent: true,
 });
@@ -460,7 +505,7 @@ composable pieces:
    `tsconfig.angular.json` via `ts.readConfigFile()` (TypeScript's own JSONC-aware parser — avoids
    a fragile hand-rolled comment-stripper), and if `angularCompilerOptions.basePath` is relative,
    writes a throwaway `{extends: <absolute real tsconfig path>, angularCompilerOptions: {basePath:
-   <resolved absolute>}}` override and points `ngc --watch` at THAT — the checked-in tsconfig
+<resolved absolute>}}` override and points `ngc --watch` at THAT — the checked-in tsconfig
    itself stays fully portable. The initial one-shot build (both the script's own pre-watch build
    and the standalone `ng:build` script) keeps using the real tsconfig directly; a relative
    `basePath` is fine cold, only the incremental-reuse path needs the override.
@@ -503,7 +548,7 @@ was only re-run inside `examples/angular` (the app's own AOT compile), which rea
 **only** regenerated by the adapter package's own `prepare`/`ng:build`. Editing
 `adapters/angular/src/**` does not touch that artifact; Metro has no Fast Refresh path back
 to it outside an active `ngc --watch` (§3). The app's own `ng:build` succeeding proves nothing
-about whether the *dependency* rebuilt — it just recompiles the app against whatever
+about whether the _dependency_ rebuilt — it just recompiles the app against whatever
 `build/angular/` already contains, stale or not.
 
 **Fast diagnostic**: if a source fix in `adapters/angular/src/**` (or any Angular-shipping
@@ -560,9 +605,11 @@ was the SAME class of staleness §4 describes (`examples/angular` reads
 `packages/navigation/build-ngc/angular/*.js` — only regenerated by that package's own
 `ng:build`/`prepare`), but from a DIFFERENT, not-yet-documented source: the repo ROOT's
 `package.json` `"prepublish-build"` script —
+
 ```jsonc
 "prepublish-build": "pnpm run typecheck && pnpm run fix-esm-extensions && pnpm --filter @symbiote-native/angular --filter @symbiote-native/slider run ng:build"
 ```
+
 — named `@symbiote-native/angular` and `@symbiote-native/slider` by hand and never named
 `@symbiote-native/navigation`, even though that package has had its own `ng:build`/`prepare`/
 conditional-`exports` triad (§2's shape) since 2026-07-09. Running `pnpm build` (`build` →
@@ -581,9 +628,11 @@ trigger `prepare` (only `pnpm install` does), so a workflow of "edit source → 
 `prepare`.
 
 **Fix — stop naming packages by hand, run the script everywhere it exists:**
+
 ```jsonc
 "prepublish-build": "pnpm run typecheck && pnpm run fix-esm-extensions && pnpm --filter './{core,adapters,packages}/*' --if-present run ng:build"
 ```
+
 `--if-present` makes pnpm silently skip any workspace package under `core/`, `adapters/`, or
 `packages/` that has no `ng:build` script, instead of erroring — so this never needs another
 manual edit when a new Angular-shipping package is added (or an existing one gains `ng:build`
@@ -638,24 +687,24 @@ files from the real build in the first place. Trust `pnpm run typecheck` (which 
 `vitest run` (which actually executes them) as the real gates; don't chase this "never" narrowing
 error in a scratch check without first proving it isn't already there on the baseline.
 
-| Failure | Cause | Fix |
-|---|---|---|
-| `ngc` crashes with `TS500: Cannot destructure property 'pos' of 'file.referencedFiles[index]'` | ngc resolved a dependency's raw decorated source instead of its prebuilt `.d.ts` | Add/fix that dependency's `"types"` condition in `exports` |
-| Same `TS500` crash, but ONLY during `changeset publish` on a consumer package (`slider`/`navigation`) while `prepublish-build` just passed | `changeset publish` runs prepares CONCURRENTLY; `@symbiote-native/angular`'s `prepare` `clean` (`rm -rf build`) transiently deletes `build/angular/index.d.ts` mid-build, so the consumer's concurrent `ngc` falls through to angular's raw `src` | §2b: guard angular's `prepare` to skip the rebuild when `build/angular/index.js` already exists — never widen `rootDir` |
-| Metro throws `SyntaxError: decorators isn't currently enabled` | Metro resolved a package's raw decorated `src/` instead of the linked `build/angular` output | Add/fix that dependency's `"react-native"` condition in `exports`, ensure its `prepare` ran |
-| Fast Refresh reloads but shows old code | `symbiote-angular-dev`'s `ngc --watch` isn't running (crashed, or `dev`/`start` bypassed it), so `build/angular/` is stale | Confirm `ngc --watch` is still alive in the process list; if it crashed, see §3a for EMFILE/TS500 |
-| Metro's `r`/`j`/`d` keypresses do nothing during `dev` | `concurrently`/`npm-run-all` (or similar) is wrapping stdin and breaking raw TTY passthrough to Metro | Run the watcher as a plain background child process (not a process-manager package), keep `react-native start` the sole foreground process — see `symbiote-angular-dev.cjs` |
-| A new Angular dependency needs consumers' `metro.config.js`/`tsconfig.angular.json`/`ng:build` edited | It is missing its own `prepare` script + conditional `exports` | Give it `tsconfig.angular.json` + `ng:build` + `prepare` + `exports`, per §2's template — never patch consumers |
-| A source fix in `adapters/angular/src/**` (or `packages/slider/src/angular/**`) passes tests/tsc/the app's own `ngc` build, but a real-device symptom is unchanged | Only the consuming app's `ng:build` was re-run; the ADAPTER's own precompiled `build/angular/` (§2's `"react-native"` export target) never rebuilt | `cd adapters/angular && pnpm run ng:build` (or `pnpm install` at root) before retesting on device — see §4 |
-| Linker throws an assertVersion/Babel error after a dependency bump | `@babel/core` moved off the ^7 line, or Babel 8 (ESM-only) got pulled in | Pin `@babel/core` ^7 for the linker; do not adopt Babel 8 |
-| ngc fails with `TS5011` on a fresh TS version | TS 6.0 needs an explicit `rootDir` in the Angular tsconfig | Add `rootDir` to `tsconfig.angular.json` |
-| Template compiles but `<View>`/`<Text>` fail schema validation | Custom tags without a hyphen aren't accepted by `CUSTOM_ELEMENTS_SCHEMA` | Declare `View`/`Text`/… as real Angular components/directives with those selectors (not `NO_ERRORS_SCHEMA`) |
-| A consuming app's typecheck still resolves an OLD export name after a rename/delete under a package's `src/angular/**` | `ngc`'s `build-ngc/angular/` output is incremental and doesn't clean up files whose source moved/vanished; the consumer's `package.json` `exports["./angular"].types` points at that stale `.d.ts`, not live source | `pnpm run ng:build` in the renamed package, then `rm -rf` the stale generated subdirectory if `ngc` left one behind, before trusting any consumer's typecheck |
-| A source fix in `packages/navigation/src/angular/**` (or any Angular-shipping package) passes tests/tsc/`examples/angular`'s own `ngc` build, but `pnpm build && pnpm dev` shows no change on device | ROOT `prepublish-build` hand-named packages in its `--filter` list and missed this one — `pnpm build` doesn't trigger `prepare` the way `pnpm install` does | `--filter '...glob...' --if-present` instead of a hand-maintained list, per §5 |
-| `ngc` fails with `TS6307: File 'X' is not listed within the file list of project` on a file that clearly exists | `tsconfig.angular.json`'s `include` names an explicit flat file path (e.g. `"src/register.ts"`) that a folder-as-module refactor (ADR 0026, `symbiote-file-layout` skill) turned into a folder (`src/register/index.ts`) — the old path no longer resolves, so ngc silently drops it from the program even though something else imports it | Update the stale entry to a glob over the new folder (`"src/register/**/*.ts"`); after any folder-as-module refactor, grep every Angular-shipping package's `tsconfig.angular.json` `include` array for flat paths that moved |
-| `symbiote-angular-dev`'s `ngc --watch` crashes with `EMFILE: too many open files, watch` | `perform_watch.js`'s chokidar watches `angularCompilerOptions.basePath` (defaults to the tsconfig's own directory) recursively, filtered only by a hardcoded regex that never excludes `ios`/`android`/`build` — those full native platform trees are siblings of the tsconfig and blow the fd/watch-handle limit | §3a: move the app's real source into `src/`, narrow `angularCompilerOptions.basePath` to `"src"` |
-| `ngc --watch` runs fine on the first compile, then throws `TS500: Error: Internal Error: absoluteFrom(<value>): path is not absolute` on the SECOND+ file change | The incremental-reuse compile path calls `absoluteFrom()` on `angularCompilerOptions.basePath` directly and needs it pre-resolved to absolute, unlike the cold-compile path which tolerates a relative value | §3a: let `symbiote-angular-dev.cjs` resolve it to absolute at spawn time via a generated override config — never hardcode an absolute path in the checked-in tsconfig |
-| Editing an Angular source file never triggers Fast Refresh, on React/Vue apps too (not Angular-specific) | Metro's OWN watcher (via Watchman) is degraded on the relevant root, unrelated to `ngc`'s internal chokidar | §3a: `watchman debug-status` → if `recrawl_info.warning` shows `MustScanSubDirs`/climbing count, `watchman watch-del <root> && watchman watch-project <root>` |
+| Failure                                                                                                                                                                                              | Cause                                                                                                                                                                                                                                                                                                                                       | Fix                                                                                                                                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ngc` crashes with `TS500: Cannot destructure property 'pos' of 'file.referencedFiles[index]'`                                                                                                       | ngc resolved a dependency's raw decorated source instead of its prebuilt `.d.ts`                                                                                                                                                                                                                                                            | Add/fix that dependency's `"types"` condition in `exports`                                                                                                                                                                    |
+| Same `TS500` crash, but ONLY during `changeset publish` on a consumer package (`slider`/`navigation`) while `prepublish-build` just passed                                                           | `changeset publish` runs prepares CONCURRENTLY; `@symbiote-native/angular`'s `prepare` `clean` (`rm -rf build`) transiently deletes `build/angular/index.d.ts` mid-build, so the consumer's concurrent `ngc` falls through to angular's raw `src`                                                                                           | §2b: guard angular's `prepare` to skip the rebuild when `build/angular/index.js` already exists — never widen `rootDir`                                                                                                       |
+| Metro throws `SyntaxError: decorators isn't currently enabled`                                                                                                                                       | Metro resolved a package's raw decorated `src/` instead of the linked `build/angular` output                                                                                                                                                                                                                                                | Add/fix that dependency's `"react-native"` condition in `exports`, ensure its `prepare` ran                                                                                                                                   |
+| Fast Refresh reloads but shows old code                                                                                                                                                              | `symbiote-angular-dev`'s `ngc --watch` isn't running (crashed, or `dev`/`start` bypassed it), so `build/angular/` is stale                                                                                                                                                                                                                  | Confirm `ngc --watch` is still alive in the process list; if it crashed, see §3a for EMFILE/TS500                                                                                                                             |
+| Metro's `r`/`j`/`d` keypresses do nothing during `dev`                                                                                                                                               | `concurrently`/`npm-run-all` (or similar) is wrapping stdin and breaking raw TTY passthrough to Metro                                                                                                                                                                                                                                       | Run the watcher as a plain background child process (not a process-manager package), keep `react-native start` the sole foreground process — see `symbiote-angular-dev.cjs`                                                   |
+| A new Angular dependency needs consumers' `metro.config.js`/`tsconfig.angular.json`/`ng:build` edited                                                                                                | It is missing its own `prepare` script + conditional `exports`                                                                                                                                                                                                                                                                              | Give it `tsconfig.angular.json` + `ng:build` + `prepare` + `exports`, per §2's template — never patch consumers                                                                                                               |
+| A source fix in `adapters/angular/src/**` (or `packages/slider/src/angular/**`) passes tests/tsc/the app's own `ngc` build, but a real-device symptom is unchanged                                   | Only the consuming app's `ng:build` was re-run; the ADAPTER's own precompiled `build/angular/` (§2's `"react-native"` export target) never rebuilt                                                                                                                                                                                          | `cd adapters/angular && pnpm run ng:build` (or `pnpm install` at root) before retesting on device — see §4                                                                                                                    |
+| Linker throws an assertVersion/Babel error after a dependency bump                                                                                                                                   | `@babel/core` moved off the ^7 line, or Babel 8 (ESM-only) got pulled in                                                                                                                                                                                                                                                                    | Pin `@babel/core` ^7 for the linker; do not adopt Babel 8                                                                                                                                                                     |
+| ngc fails with `TS5011` on a fresh TS version                                                                                                                                                        | TS 6.0 needs an explicit `rootDir` in the Angular tsconfig                                                                                                                                                                                                                                                                                  | Add `rootDir` to `tsconfig.angular.json`                                                                                                                                                                                      |
+| Template compiles but `<View>`/`<Text>` fail schema validation                                                                                                                                       | Custom tags without a hyphen aren't accepted by `CUSTOM_ELEMENTS_SCHEMA`                                                                                                                                                                                                                                                                    | Declare `View`/`Text`/… as real Angular components/directives with those selectors (not `NO_ERRORS_SCHEMA`)                                                                                                                   |
+| A consuming app's typecheck still resolves an OLD export name after a rename/delete under a package's `src/angular/**`                                                                               | `ngc`'s `build-ngc/angular/` output is incremental and doesn't clean up files whose source moved/vanished; the consumer's `package.json` `exports["./angular"].types` points at that stale `.d.ts`, not live source                                                                                                                         | `pnpm run ng:build` in the renamed package, then `rm -rf` the stale generated subdirectory if `ngc` left one behind, before trusting any consumer's typecheck                                                                 |
+| A source fix in `packages/navigation/src/angular/**` (or any Angular-shipping package) passes tests/tsc/`examples/angular`'s own `ngc` build, but `pnpm build && pnpm dev` shows no change on device | ROOT `prepublish-build` hand-named packages in its `--filter` list and missed this one — `pnpm build` doesn't trigger `prepare` the way `pnpm install` does                                                                                                                                                                                 | `--filter '...glob...' --if-present` instead of a hand-maintained list, per §5                                                                                                                                                |
+| `ngc` fails with `TS6307: File 'X' is not listed within the file list of project` on a file that clearly exists                                                                                      | `tsconfig.angular.json`'s `include` names an explicit flat file path (e.g. `"src/register.ts"`) that a folder-as-module refactor (ADR 0026, `symbiote-file-layout` skill) turned into a folder (`src/register/index.ts`) — the old path no longer resolves, so ngc silently drops it from the program even though something else imports it | Update the stale entry to a glob over the new folder (`"src/register/**/*.ts"`); after any folder-as-module refactor, grep every Angular-shipping package's `tsconfig.angular.json` `include` array for flat paths that moved |
+| `symbiote-angular-dev`'s `ngc --watch` crashes with `EMFILE: too many open files, watch`                                                                                                             | `perform_watch.js`'s chokidar watches `angularCompilerOptions.basePath` (defaults to the tsconfig's own directory) recursively, filtered only by a hardcoded regex that never excludes `ios`/`android`/`build` — those full native platform trees are siblings of the tsconfig and blow the fd/watch-handle limit                           | §3a: move the app's real source into `src/`, narrow `angularCompilerOptions.basePath` to `"src"`                                                                                                                              |
+| `ngc --watch` runs fine on the first compile, then throws `TS500: Error: Internal Error: absoluteFrom(<value>): path is not absolute` on the SECOND+ file change                                     | The incremental-reuse compile path calls `absoluteFrom()` on `angularCompilerOptions.basePath` directly and needs it pre-resolved to absolute, unlike the cold-compile path which tolerates a relative value                                                                                                                                | §3a: let `symbiote-angular-dev.cjs` resolve it to absolute at spawn time via a generated override config — never hardcode an absolute path in the checked-in tsconfig                                                         |
+| Editing an Angular source file never triggers Fast Refresh, on React/Vue apps too (not Angular-specific)                                                                                             | Metro's OWN watcher (via Watchman) is degraded on the relevant root, unrelated to `ngc`'s internal chokidar                                                                                                                                                                                                                                 | §3a: `watchman debug-status` → if `recrawl_info.warning` shows `MustScanSubDirs`/climbing count, `watchman watch-del <root> && watchman watch-project <root>`                                                                 |
 
 ## Scope boundary
 
@@ -674,5 +723,5 @@ siblings by topic:
 - **`angular-adapter-lists`** — `FlatList`/`SectionList`/`ScrollView` projection bugs.
 - **`angular-adapter-portal`** — `createPortal`/`createTunnel`/`AppRegistry`.
 
-If the work is about how Angular *code becomes runnable JS* — this skill. If it's about
-what that JS *does at runtime* — one of the siblings above.
+If the work is about how Angular _code becomes runnable JS_ — this skill. If it's about
+what that JS _does at runtime_ — one of the siblings above.

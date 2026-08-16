@@ -5,6 +5,23 @@
 // it, and asserts the wrapper/image shape plus the dimension-proxy behavior renderImageBackground
 // exists to produce: the inner Image inherits the wrapper's explicit width/height so it fills
 // the box instead of collapsing to the source's intrinsic size.
+//
+// Coverage ledger (per CLAUDE.md's <components_split_logic_view_lifecycle>):
+//   - renderImageBackground()'s own fold logic (absolute-fill positioning, wrapper-dimension
+//     proxy onto the inner Image, source resolution) — N/A for the fold's INTERNAL branches:
+//     covered directly at core/components/src/__tests__/wave1-core.test.ts's `renderImageBackground`
+//     describe block (structural child shape, absolute-fill, dimension proxy, source/resizeMode
+//     forwarding). This file instead proves index.svelte actually CALLS that function and wires
+//     its two fixed positions (`descriptor.props` / `descriptor.children[0].props`) onto the two
+//     literal host tags — covered below.
+//   - live `children` (the marker View) landing as a real sibling AFTER the image, not swallowed
+//     or reordered — covered below.
+//   - the §16 whitespace hazard between the literal `<symbiote-image>` and `{@render children}`
+//     tags (a real bug this exact test caught and got fixed alongside, per the file header) —
+//     covered below implicitly: an exact 2-child assertion (image then marker) would fail if a
+//     stray whitespace text node were reintroduced between them.
+//   - `imageStyle` as a bare className string resolving through `resolveClassName` (adapter-owned
+//     code — the ternary in index.svelte, not core/components') — covered below.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -12,6 +29,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
@@ -21,7 +39,11 @@ if (globalThis.navigator === undefined) {
 
 const ROOT_TAG = 91_501;
 const OUT = join(__dirname, '.smoke-compiled-image-background.mjs');
+// Node's import() caches by resolved file path (svelte-adapter-dom-shim skill §15), so a second
+// scenario baking a DIFFERENT markup string into the compiled parent needs its OWN filename or it
+// silently re-imports the first scenario's stale module.
 const PARENT_OUT = join(__dirname, '.smoke-compiled-image-background-parent.mjs');
+const PARENT_STYLE_OUT = join(__dirname, '.smoke-compiled-image-background-parent-style.mjs');
 // Co-located next to the REAL View.svelte (one level up) so a relative import from PARENT_OUT
 // resolves it, following button.smoke.test.ts's precedent for pulling in a real sibling.
 const VIEW_OUT = join(__dirname, '..', '.smoke-compiled-view-for-image-background.mjs');
@@ -31,12 +53,14 @@ const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0))
 
 beforeEach(() => {
   fabric.reset();
+  clearGlobalStyles();
 });
 
 afterEach(() => {
   unmount(ROOT_TAG);
   rmSync(OUT, { force: true });
   rmSync(PARENT_OUT, { force: true });
+  rmSync(PARENT_STYLE_OUT, { force: true });
   rmSync(VIEW_OUT, { force: true });
 });
 
@@ -52,7 +76,7 @@ function compileToFile(source: string, filename: string, outPath: string): void 
   writeFileSync(outPath, result.js.code);
 }
 
-async function loadMountable(): Promise<Component> {
+async function loadMountable(imageStyle?: string): Promise<Component> {
   const source = readFileSync(join(__dirname, 'index.svelte'), 'utf8');
   compileToFile(source, 'ImageBackground.svelte', OUT);
 
@@ -61,6 +85,9 @@ async function loadMountable(): Promise<Component> {
     'View.svelte',
     VIEW_OUT,
   );
+
+  const imageStyleAttr = imageStyle === undefined ? '' : ` imageStyle="${imageStyle}"`;
+  const parentOut = imageStyle === undefined ? PARENT_OUT : PARENT_STYLE_OUT;
 
   // No whitespace anywhere between the </script> and the markup, or between sibling elements —
   // Svelte's whitespace-collapse turns any indentation between siblings into a real
@@ -71,12 +98,12 @@ async function loadMountable(): Promise<Component> {
       "  import ImageBackground from './.smoke-compiled-image-background.mjs';\n" +
       "  import View from '../.smoke-compiled-view-for-image-background.mjs';\n" +
       '</script>' +
-      '<ImageBackground style={{ width: 200, height: 100 }} source={{ uri: \'https://example.test/x.png\' }}><View testID="marker" /></ImageBackground>',
+      `<ImageBackground style={{ width: 200, height: 100 }}${imageStyleAttr} source={{ uri: 'https://example.test/x.png' }}><View testID="marker" /></ImageBackground>`,
     'Parent.svelte',
-    PARENT_OUT,
+    parentOut,
   );
 
-  const mod: unknown = await import(`file://${PARENT_OUT}`);
+  const mod: unknown = await import(`file://${parentOut}`);
   if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
     throw new Error('Parent.svelte produced no default export');
   }
@@ -103,29 +130,58 @@ function findInCommittedTree(predicate: (node: IFakeNode) => boolean): IFakeNode
 }
 
 describe('ImageBackground (real compiled index.svelte)', () => {
-  it('commits View(RCTImageView, marker) with the wrapper dimensions proxied onto the Image', async () => {
-    const Parent = await loadMountable();
-    mount(ROOT_TAG, Parent);
-    await tick();
-    await tick();
+  // No Negative group: ImageBackground is a pure render-only composition (renderImageBackground()
+  // + two literal host tags) with no guard clause and no throwing path.
+  describe('Positive (composes the wrapper/image/children shape and resolves styles)', () => {
+    // why: proves index.svelte calls the real renderImageBackground() and destructures its fixed
+    // Descriptor shape onto the two literal host tags, AND that live `children` land as a real
+    // sibling after the image with no stray whitespace text node between them (svelte-adapter-
+    // dom-shim skill §16 — an exact 2-child read fails immediately if that regresses).
+    it('commits View(RCTImageView, marker) with the wrapper dimensions proxied onto the Image', async () => {
+      const Parent = await loadMountable();
+      mount(ROOT_TAG, Parent);
+      await tick();
+      await tick();
 
-    const wrapper = findInCommittedTree(
-      node => node.viewName === 'RCTView' && node.children.some(c => c.viewName === 'RCTImageView'),
-    );
-    expect(wrapper).toBeDefined();
-    if (wrapper === undefined) return;
+      const wrapper = findInCommittedTree(
+        node =>
+          node.viewName === 'RCTView' && node.children.some(c => c.viewName === 'RCTImageView'),
+      );
+      expect(wrapper).toBeDefined();
+      if (wrapper === undefined) return;
 
-    const image = wrapper.children[0];
-    expect(image?.viewName).toBe('RCTImageView');
-    // renderImageBackground's whole point: an explicit wrapper width/height is proxied onto the
-    // absolute-fill Image so it fills the box (RN copies these; the Image would otherwise
-    // collapse to the source's intrinsic size).
-    expect(image?.props.width).toBe(200);
-    expect(image?.props.height).toBe(100);
-    expect(image?.props.position).toBe('absolute');
+      const image = wrapper.children[0];
+      expect(image?.viewName).toBe('RCTImageView');
+      // renderImageBackground's whole point: an explicit wrapper width/height is proxied onto the
+      // absolute-fill Image so it fills the box (RN copies these; the Image would otherwise
+      // collapse to the source's intrinsic size).
+      expect(image?.props.width).toBe(200);
+      expect(image?.props.height).toBe(100);
+      expect(image?.props.position).toBe('absolute');
 
-    const marker = wrapper.children[1];
-    expect(marker?.viewName).toBe('RCTView');
-    expect(marker?.props.testID).toBe('marker');
+      expect(wrapper.children).toHaveLength(2);
+      const marker = wrapper.children[1];
+      expect(marker?.viewName).toBe('RCTView');
+      expect(marker?.props.testID).toBe('marker');
+    });
+
+    // why: a bare `imageStyle` string is a registered class name, not literal CSS — index.svelte
+    // must resolve it through the shared style registry (resolveClassName) and MERGE it onto the
+    // inner Image, after the dimension proxy, rather than forwarding the raw string to native
+    // (which Fabric cannot consume as a style value).
+    it('resolves a string imageStyle through the class registry and merges it onto the Image', async () => {
+      registerStyles({ ibTint: { opacity: 0.5 } });
+      const Parent = await loadMountable('ibTint');
+      mount(ROOT_TAG, Parent);
+      await tick();
+      await tick();
+
+      const image = fabric.find(node => node.viewName === 'RCTImageView');
+      expect(image).toBeDefined();
+      // Both survive: the registry-resolved opacity, and the dimension proxy this component
+      // applies independently of imageStyle.
+      expect(image?.props.opacity).toBe(0.5);
+      expect(image?.props.width).toBe(200);
+    });
   });
 });

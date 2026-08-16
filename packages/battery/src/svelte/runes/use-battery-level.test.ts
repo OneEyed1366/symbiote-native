@@ -104,33 +104,46 @@ async function mountBatteryLevel(): Promise<number[]> {
   return values;
 }
 
+// No Negative group: the effect body has no guard clause or conditional throw — every path
+// through it (the one-shot fetch, the native listener, the teardown) only ever writes
+// `batteryLevel` or unsubscribes. There is nothing here that is meant to reject/throw.
 describe('useBatteryLevel (Svelte)', () => {
-  it('starts at -1 before the initial fetch resolves', async () => {
-    const values = await mountBatteryLevel();
+  describe('Positive — boxed value tracks the fetch, the native listener, and unmount', () => {
+    // why: core/battery.ts documents -1 as the sentinel for "this device cannot report a battery
+    // level" — the rune must expose that sentinel, not undefined/0, before the seed settles.
+    it('starts at -1 before the initial fetch resolves', async () => {
+      const values = await mountBatteryLevel();
 
-    expect(values[0]).toBe(-1);
-  });
+      expect(values[0]).toBe(-1);
+    });
 
-  it('updates to the fetched value once getBatteryLevelAsync() resolves', async () => {
-    const values = await mountBatteryLevel();
+    // why: matches upstream useBatteryLevel — a one-shot fetch seeds real state before the first
+    // native event, so a consumer never reads the sentinel longer than the fetch actually takes.
+    it('updates to the fetched value once getBatteryLevelAsync() resolves', async () => {
+      const values = await mountBatteryLevel();
 
-    await vi.waitFor(() => expect(values[values.length - 1]).toBe(0.42));
-  });
+      await vi.waitFor(() => expect(values[values.length - 1]).toBe(0.42));
+    });
 
-  it('updates the boxed value when the native listener fires', async () => {
-    const values = await mountBatteryLevel();
-    await vi.waitFor(() => expect(values[values.length - 1]).toBe(0.42));
+    // why: battery level is a live device signal — the rune exists to stay in sync with native
+    // change events for as long as the component is mounted, not just report a one-time snapshot.
+    it('updates the boxed value when the native listener fires', async () => {
+      const values = await mountBatteryLevel();
+      await vi.waitFor(() => expect(values[values.length - 1]).toBe(0.42));
 
-    registeredListener?.({ batteryLevel: 0.1 });
+      registeredListener?.({ batteryLevel: 0.1 });
 
-    await vi.waitFor(() => expect(values[values.length - 1]).toBe(0.1));
-  });
+      await vi.waitFor(() => expect(values[values.length - 1]).toBe(0.1));
+    });
 
-  it('removes the subscription on unmount', async () => {
-    await mountBatteryLevel();
+    // why: a rune that outlives its subscription leaks a live native listener into a scope Svelte
+    // already considers destroyed — the effect's teardown is what prevents that leak.
+    it('removes the subscription on unmount', async () => {
+      await mountBatteryLevel();
 
-    unmount(ROOT_TAG);
+      unmount(ROOT_TAG);
 
-    expect(removeMock).toHaveBeenCalledTimes(1);
+      expect(removeMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

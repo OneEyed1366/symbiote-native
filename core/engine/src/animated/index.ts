@@ -81,6 +81,7 @@ export {
 // no React/Vue). They live here with the rest of the graph; every adapter's
 // createAnimatedComponent + Animated namespace re-exports them.
 export { AnimatedProps } from './props';
+export { createAnimatedLeafLifecycle, type IAnimatedLeafLifecycle } from './leaf-lifecycle';
 export { AnimatedStyle, AnimatedTransform } from './style';
 export { AnimatedMock } from './mock';
 // Framework-agnostic createAnimatedComponent helpers. Both adapters import them.

@@ -138,65 +138,74 @@ const VueRoot = {
   },
 };
 
+// No Negative group: this is a cross-adapter structural invariant, not a unit with a throwing
+// contract — the only outcome that matters is whether the two committed trees agree.
 describe('native node production per adapter, same UI', () => {
-  it('differs from Vue by exactly one constant root wrapper, nothing per-element', async () => {
-    const SvelteRoot = await compileComponent(SVELTE_SOURCE, 'ParityRoot');
+  describe('Positive', () => {
+    it('differs from Vue by exactly one constant root wrapper, nothing per-element', async () => {
+      // why: the product rule this file locks in — the Svelte shim must not inflate native
+      // Fabric node count beyond its one constant root-wrapper cost (see the file header for
+      // the investigation that ruled out every other explanation for the measured RSS gap). A
+      // regression here means the shim started emitting extra native nodes per element, which
+      // is exactly the class of bug §16 (stray whitespace -> real RCTRawText) already caused.
+      const SvelteRoot = await compileComponent(SVELTE_SOURCE, 'ParityRoot');
 
-    svelteMount(SVELTE_ROOT, SvelteRoot);
-    await tick();
-    await tick();
-    const svelteCreated = [...fabric.created];
-    const svelteTree = fabric.serialize([fabric.appRoot()]);
-    // Captured NOW, before `fabric.reset()` + the Vue mount below reassign what `fabric.appRoot()`
-    // resolves to — `IFakeNode` objects are plain, independent of the recorder's own arrays, so
-    // holding this reference across the reset is safe.
-    const svelteWrapper = fabric.appRoot().children[0];
+      svelteMount(SVELTE_ROOT, SvelteRoot);
+      await tick();
+      await tick();
+      const svelteCreated = [...fabric.created];
+      const svelteTree = fabric.serialize([fabric.appRoot()]);
+      // Captured NOW, before `fabric.reset()` + the Vue mount below reassign what
+      // `fabric.appRoot()` resolves to — `IFakeNode` objects are plain, independent of the
+      // recorder's own arrays, so holding this reference across the reset is safe.
+      const svelteWrapper = fabric.appRoot().children[0];
 
-    fabric.reset();
+      fabric.reset();
 
-    vueMount(VUE_ROOT, VueRoot);
-    await tick();
-    await tick();
-    const vueCreated = [...fabric.created];
-    const vueTree = fabric.serialize([fabric.appRoot()]);
+      vueMount(VUE_ROOT, VueRoot);
+      await tick();
+      await tick();
+      const vueCreated = [...fabric.created];
+      const vueTree = fabric.serialize([fabric.appRoot()]);
 
-    // render.ts's mount() puts a wrapper `symbiote-view` between the engine's synthetic box-none
-    // AppContainer and the app's own root, because Svelte's mount() needs a real target node to
-    // insert into rather than handing us a root node the way Vue/React do. It carries flex:1 so a
-    // flex:1 app root still fills the screen (mount-pipeline.smoke.test.ts covers that). Below
-    // that wrapper, the app's own root view carries the two Svelte-bootstrap empty-text anchors
-    // at DIFFERENT depths (one as its own trailing child from the `{#each}` block's own anchor,
-    // one as the wrapper's OTHER child from `_mount_inner`'s own anchor) — `serializeWithout
-    // BootstrapAnchors` strips both, recursively, wherever they land. Peeling ONE layer off Vue's
-    // tree and recursively-filtering-then-joining the wrapper's real children must leave
-    // identical trees.
-    expect(svelteWrapper, 'the render.ts wrapper committed').toBeDefined();
-    const svelteContentTree = (svelteWrapper?.children ?? [])
-      .filter(child => !isSvelteBootstrapAnchor(child))
-      .map(serializeWithoutBootstrapAnchors)
-      .join('');
-    expect(svelteContentTree, 'tree below the adapter wrappers').toBe(stripOuter(vueTree));
+      // render.ts's mount() puts a wrapper `symbiote-view` between the engine's synthetic
+      // box-none AppContainer and the app's own root, because Svelte's mount() needs a real
+      // target node to insert into rather than handing us a root node the way Vue/React do. It
+      // carries flex:1 so a flex:1 app root still fills the screen (mount-pipeline.smoke.test.ts
+      // covers that). Below that wrapper, the app's own root view carries the two Svelte-
+      // bootstrap empty-text anchors at DIFFERENT depths (one as its own trailing child from the
+      // `{#each}` block's own anchor, one as the wrapper's OTHER child from `_mount_inner`'s own
+      // anchor) — `serializeWithoutBootstrapAnchors` strips both, recursively, wherever they
+      // land. Peeling ONE layer off Vue's tree and recursively-filtering-then-joining the
+      // wrapper's real children must leave identical trees.
+      expect(svelteWrapper, 'the render.ts wrapper committed').toBeDefined();
+      const svelteContentTree = (svelteWrapper?.children ?? [])
+        .filter(child => !isSvelteBootstrapAnchor(child))
+        .map(serializeWithoutBootstrapAnchors)
+        .join('');
+      expect(svelteContentTree, 'tree below the adapter wrappers').toBe(stripOuter(vueTree));
 
-    const bootstrapAnchors = svelteCreated.filter(isSvelteBootstrapAnchor);
-    expect(
-      bootstrapAnchors,
-      'exactly two Svelte-internal empty-text bootstrap anchors',
-    ).toHaveLength(2);
+      const bootstrapAnchors = svelteCreated.filter(isSvelteBootstrapAnchor);
+      expect(
+        bootstrapAnchors,
+        'exactly two Svelte-internal empty-text bootstrap anchors',
+      ).toHaveLength(2);
 
-    const svelteTally = byViewName(svelteCreated.filter(node => !isSvelteBootstrapAnchor(node)));
-    const vueTally = byViewName(vueCreated);
-    expect(
-      svelteTally,
-      'excluding the two bootstrap anchors, the only difference is one extra RCTView',
-    ).toEqual({
-      ...vueTally,
-      RCTView: (vueTally.RCTView ?? 0) + 1,
+      const svelteTally = byViewName(svelteCreated.filter(node => !isSvelteBootstrapAnchor(node)));
+      const vueTally = byViewName(vueCreated);
+      expect(
+        svelteTally,
+        'excluding the two bootstrap anchors, the only difference is one extra RCTView',
+      ).toEqual({
+        ...vueTally,
+        RCTView: (vueTally.RCTView ?? 0) + 1,
+      });
+
+      // Stated as a constant, not a ratio, on purpose: if this ever starts scaling with ROWS the
+      // assertion breaks loudly, which is exactly the regression worth catching. +1 for
+      // render.ts's own wrapper, +2 for Svelte's own mount-bootstrap anchors (this file's
+      // header) — neither component of this fixed cost scales with ROWS.
+      expect(svelteCreated.length, 'total native nodes created').toBe(vueCreated.length + 3);
     });
-
-    // Stated as a constant, not a ratio, on purpose: if this ever starts scaling with ROWS the
-    // assertion breaks loudly, which is exactly the regression worth catching. +1 for render.ts's
-    // own wrapper, +2 for Svelte's own mount-bootstrap anchors (this file's header) — neither
-    // component of this fixed cost scales with ROWS.
-    expect(svelteCreated.length, 'total native nodes created').toBe(vueCreated.length + 3);
   });
 });

@@ -29,21 +29,32 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// Magnetometer is a zero-override DeviceSensor subclass — permission/availability/update-interval
+// fallback logic is DeviceSensor's, already fully covered in device-sensor.test.ts. What's
+// specific here is that the exported `Magnetometer` singleton is wired to the real
+// ExponentMagnetometer native module and to the exact event name that module's native side emits.
+// No Negative group: both assertions are pass-through wiring, nothing here can throw.
 describe('Magnetometer', () => {
-  it('sets the update interval', () => {
-    Magnetometer.setUpdateInterval(1234);
+  describe('is wired to the correct native module and event name', () => {
+    it('forwards setUpdateInterval to the ExponentMagnetometer native module', () => {
+      // why: proves the singleton's native module reference is the real ExponentMagnetometer,
+      // not an accidental stand-in shared with another sensor (e.g. MagnetometerUncalibrated).
+      Magnetometer.setUpdateInterval(1234);
 
-    expect(FAKE_NATIVE_MAGNETOMETER.setUpdateInterval).toHaveBeenCalledTimes(1);
-    expect(FAKE_NATIVE_MAGNETOMETER.setUpdateInterval).toHaveBeenCalledWith(1234);
-  });
+      expect(FAKE_NATIVE_MAGNETOMETER.setUpdateInterval).toHaveBeenCalledWith(1234);
+    });
 
-  it('subscribes through the shared magnetometerDidUpdate event name', () => {
-    const listener = vi.fn();
-    Magnetometer.addListener(listener);
+    it('subscribes through the "magnetometerDidUpdate" event name the native module emits', () => {
+      // why: 'magnetometerDidUpdate' is the exact string ExponentMagnetometer's native side
+      // emits events under — a typo here means the listener is registered for an event that
+      // never fires. It must also stay distinct from 'magnetometerUncalibratedDidUpdate'.
+      const listener = vi.fn();
+      Magnetometer.addListener(listener);
 
-    expect(FAKE_NATIVE_MAGNETOMETER.addListener).toHaveBeenCalledWith(
-      'magnetometerDidUpdate',
-      listener,
-    );
+      expect(FAKE_NATIVE_MAGNETOMETER.addListener).toHaveBeenCalledWith(
+        'magnetometerDidUpdate',
+        listener,
+      );
+    });
   });
 });

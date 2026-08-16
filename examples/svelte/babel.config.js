@@ -5,9 +5,9 @@
 // and baked into every transformed module (the app entry and the shared source).
 const debugFlag = process.env.DEBUG === '1' ? '1' : '0';
 
-function inlineDebugFlag({ types: t }) {
+function inlineFlags({ types: t }) {
   return {
-    name: 'inline-debug-flag',
+    name: 'inline-flags',
     visitor: {
       MemberExpression(path) {
         if (path.matchesPattern('process.env.DEBUG')) {
@@ -20,5 +20,5 @@ function inlineDebugFlag({ types: t }) {
 
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
-  plugins: [inlineDebugFlag],
+  plugins: [inlineFlags],
 };

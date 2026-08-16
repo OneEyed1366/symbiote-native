@@ -34,6 +34,13 @@ export async function lockAsync(orientationLock: OrientationLock): Promise<void>
   _lastOrientationLock = orientationLock;
 }
 
+// UPSTREAM-BUG(expo): .vendors/expo/packages/expo-screen-orientation/src/ScreenOrientation.ts:81
+// and :112 - TWO falsy traps, and Android's SCREEN_ORIENTATION_LANDSCAPE is 0: the truthiness
+// check skips the assignment, and even with that one fixed, !platformOrientationParam still
+// rejects the assigned 0. Fixing only the first trap changes nothing.
+// The caller gets a TypeError and the call never reaches native, so landscape cannot be locked
+// on Android through this API.
+// Ported verbatim for parity; do NOT fix without recording a deliberate divergence.
 /** Locks the screen to a platform-specific orientation param — Android constant, iOS
  * orientation array, or web `WebOrientationLock`. */
 export async function lockPlatformAsync(options: PlatformOrientationInfo): Promise<void> {

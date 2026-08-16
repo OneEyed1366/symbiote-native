@@ -8,8 +8,12 @@
 </script>
 
 <script lang="ts">
-  import { isNativeAnimatedAvailable, reduceProps, readPassthroughStyle } from '@symbiote-native/engine';
-  import { createAnimatedReconcileRuntime } from './animated-props-runtime';
+  import {
+    createAnimatedLeafLifecycle,
+    isNativeAnimatedAvailable,
+    reduceProps,
+    readPassthroughStyle,
+  } from '@symbiote-native/engine';
   import { createAttachmentsSync } from '../../runes/attachments';
   import { toTemplateSafeProps } from '../../renderer';
   import type { IHostInstance } from '@symbiote-native/engine';
@@ -36,7 +40,7 @@
     return toTemplateSafeProps(out);
   });
 
-  const runtime = createAnimatedReconcileRuntime();
+  const runtime = createAnimatedLeafLifecycle('AnimatedText');
 
   $effect(() => {
     const currentRest = rest;

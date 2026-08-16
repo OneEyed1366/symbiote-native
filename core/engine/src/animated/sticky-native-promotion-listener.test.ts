@@ -47,39 +47,51 @@ beforeEach(() => {
   });
 });
 
+// No Negative group: neither __attach() nor __makeNative() has a guard clause here — promotion
+// silently changes what a listener receives, it never throws. Both scenarios below are Positive
+// claims about what the listener DOES see, not error-path claims.
 describe('a JS listener on an interpolation across native promotion', () => {
-  it('receives ticks while the chain is still JS-driven', () => {
-    const scroll = new AnimatedValue(0);
-    const translateY = scroll.interpolate({ inputRange: [0, 100], outputRange: [0, -100] });
-    // What AnimatedView does when it mounts this node into a style: attaching is what puts the
-    // interpolation into its parent's children list, which is what makes the cascade reach it.
-    translateY.__attach();
-    const seen: number[] = [];
-    translateY.addListener(({ value }) => {
-      if (typeof value === 'number') seen.push(value);
+  describe('Positive', () => {
+    // why: this is the control case — a JS-driven chain must still feed listeners, or the second
+    // test below (silence after promotion) would be indistinguishable from "listeners are broken".
+    it('receives ticks while the chain is still JS-driven', () => {
+      const scroll = new AnimatedValue(0);
+      const translateY = scroll.interpolate({ inputRange: [0, 100], outputRange: [0, -100] });
+      // What AnimatedView does when it mounts this node into a style: attaching is what puts the
+      // interpolation into its parent's children list, which is what makes the cascade reach it.
+      translateY.__attach();
+      const seen: number[] = [];
+      translateY.addListener(({ value }) => {
+        if (typeof value === 'number') seen.push(value);
+      });
+
+      scroll.setValue(50);
+      expect(seen, 'JS-driven chain feeds the interpolation listener').toEqual([-50]);
     });
 
-    scroll.setValue(50);
-    expect(seen, 'JS-driven chain feeds the interpolation listener').toEqual([-50]);
-  });
+    // why: this is the exact trap the Svelte sticky header fell into (see file header) — the
+    // listener going quiet on promotion is INTENDED, RN-matching behavior (AnimatedWithChildren.js
+    // gates __callListeners cascade on `!this.__isNative`), not a deadlock to work around by
+    // forcing the JS path. Confirmed against RN source, so this pins a verified product rule, not
+    // an open question — it stays out of a characterization group.
+    it('goes silent once the chain is promoted to the native driver — same as RN', () => {
+      const scroll = new AnimatedValue(0);
+      const translateY = scroll.interpolate({ inputRange: [0, 100], outputRange: [0, -100] });
+      translateY.__attach();
+      const seen: number[] = [];
+      translateY.addListener(({ value }) => {
+        if (typeof value === 'number') seen.push(value);
+      });
 
-  it('goes silent once the chain is promoted to the native driver — same as RN', () => {
-    const scroll = new AnimatedValue(0);
-    const translateY = scroll.interpolate({ inputRange: [0, 100], outputRange: [0, -100] });
-    translateY.__attach();
-    const seen: number[] = [];
-    translateY.addListener(({ value }) => {
-      if (typeof value === 'number') seen.push(value);
+      scroll.setValue(50);
+      expect(seen.length, 'baseline tick before promotion').toBe(1);
+
+      // AnimatedInterpolation.__makeNative promotes its PARENT first (graph.ts), so the shared
+      // scroll value goes native too — after which JS sees no per-frame value at all.
+      translateY.__makeNative();
+      scroll.setValue(75);
+
+      expect(seen.length, 'no further JS ticks once native owns the frames').toBe(1);
     });
-
-    scroll.setValue(50);
-    expect(seen.length, 'baseline tick before promotion').toBe(1);
-
-    // AnimatedInterpolation.__makeNative promotes its PARENT first (interpolation-node.ts:51), so
-    // the shared scroll value goes native too — after which JS sees no per-frame value at all.
-    translateY.__makeNative();
-    scroll.setValue(75);
-
-    expect(seen.length, 'no further JS ticks once native owns the frames').toBe(1);
   });
 });

@@ -46,14 +46,11 @@
   // identity-stable, so a no-op transition — including this effect's own first run on mount —
   // triggers no extra render.
   //
-  // Measured (modal.smoke.test.ts): under this adapter's microtask-coalesced requestCommit()
-  // (element.ts's `p` setter), Svelte settles the whole visible->hidden cascade — this effect's
-  // own re-render included — within the SAME microtask flush that processes the triggering prop
-  // change, before any awaited tick observes an in-between state. So the keep-alive frame is
-  // real (the sequencing above genuinely happens: a render sees isVisible=false with
-  // isRendered still true before this effect flips it) but is not independently observable as
-  // its own committed Fabric frame the way React's per-render synchronous commit makes it —
-  // Vue's flush:'post' watch is architecturally the same shape and likely collapses identically.
+  // Under this adapter's microtask-coalesced requestCommit() (element.ts's `p` setter), Svelte
+  // settles the whole visible->hidden cascade within the SAME microtask flush that processes the
+  // triggering prop change, so the keep-alive frame genuinely happens (a render sees
+  // isVisible=false with isRendered still true before this effect flips it) but isn't observable
+  // as its own committed Fabric frame the way React's per-render synchronous commit makes it.
   $effect(() => {
     state = modalReducer(state, isVisible ? { type: 'show' } : { type: 'hide' });
   });

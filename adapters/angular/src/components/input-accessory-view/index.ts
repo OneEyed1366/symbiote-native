@@ -11,11 +11,15 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   ChangeDetectionStrategy,
   Component,
+  computed,
   ElementRef,
   EventEmitter,
   inject,
   Input,
   Output,
+  signal,
+  type DoCheck,
+  type OnChanges,
 } from '@angular/core';
 import {
   renderInputAccessoryView,
@@ -34,6 +38,7 @@ import {
   anchorHostStyle,
   InputAccessoryViewHost,
   SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
 } from '../../primitives';
 
 // Mirrors React's IInputAccessoryViewProps minus children (Angular takes children via
@@ -56,12 +61,13 @@ export type IAngularInputAccessoryViewInputs = Omit<
 @Component({
   selector: 'InputAccessoryView',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [InputAccessoryViewHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <symbiote-input-accessory-view
-      [symbioteHostProps]="hostProps"
+      [symbioteHostProps]="hostProps()"
       (accessibilityAction)="emit(accessibilityAction, $event)"
       (accessibilityTap)="emit(accessibilityTap, $event)"
       (magicTap)="emit(magicTap, $event)"
@@ -71,7 +77,7 @@ export type IAngularInputAccessoryViewInputs = Omit<
     </symbiote-input-accessory-view>
   `,
 })
-export class InputAccessoryView implements IAngularInputAccessoryViewInputs {
+export class InputAccessoryView implements IAngularInputAccessoryViewInputs, OnChanges, DoCheck {
   @Input() nativeID?: string;
   @Input() backgroundColor?: string;
   @Input() style?: IStyleProp<IViewStyle>;
@@ -135,12 +141,44 @@ export class InputAccessoryView implements IAngularInputAccessoryViewInputs {
     });
   }
 
+  // Bridges the non-reactive fields `hostProps` reads into the reactive graph, so it can memoize.
+  // Plain fields read inside a computed() are UNTRACKED - something must signal "a dependency
+  // changed" or the bag goes stale. Signal inputs would do this natively, but `input()` is visible
+  // only to the AOT compiler and this package's unit suite runs on JIT (see the
+  // `angular-adapter-change-detection` skill, §6); `signal()`/`computed()` are plain runtime APIs.
+  private readonly hostPropsRevision = signal(0);
+  // What the anchor's class-derived style was when the bag was last built (identity, not value).
+  private lastAnchorStyle: unknown;
+
+  ngOnChanges(): void {
+    // The single moment Angular has finished writing every changed @Input for this pass.
+    this.hostPropsRevision.update(revision => revision + 1);
+  }
+
+  // The anchor's class-derived style is NOT an @Input: `class="..."`/`[ngClass]` at the use site
+  // resolves through the renderer's addClass onto this component's anchor host (see
+  // anchorHostStyle's doc comment), so it never shows up in SimpleChanges and ngOnChanges alone
+  // would leave a later class toggle stranded. ngDoCheck runs at exactly the cadence the old
+  // getter was re-read, and bumps only on a real identity change.
+  ngDoCheck(): void {
+    const anchorStyle = anchorHostStyle(this.elementRef);
+    if (anchorStyle === this.lastAnchorStyle) return;
+    this.lastAnchorStyle = anchorStyle;
+    this.hostPropsRevision.update(revision => revision + 1);
+  }
+
   // The anchor's class-derived style goes FIRST, the Descriptor's resolved style SECOND —
   // flattenStyle's later-wins collapse keeps an explicit [style] winning over its ambient class.
-  get hostProps(): Record<string, unknown> {
+  //
+  // A computed(), not a getter: Angular re-reads a template getter on every refresh of this view
+  // and `[symbioteHostProps]` compares by REFERENCE, so a freshly rebuilt (but identical) bag
+  // re-pushes every key through renderer.setProperty -> the engine's prop routing - and this one
+  // re-runs renderInputAccessoryView to build it.
+  readonly hostProps = computed<Record<string, unknown>>(() => {
+    this.hostPropsRevision();
     const descriptorProps = this.descriptor.props;
     return { ...descriptorProps, style: [anchorHostStyle(this.elementRef), descriptorProps.style] };
-  }
+  });
 
   // Typed as the a11y intersection WITH the string index (the bag renderInputAccessoryView spreads
   // into the host props), so resolveAccessibilityProps's result stays assignable to passthrough.

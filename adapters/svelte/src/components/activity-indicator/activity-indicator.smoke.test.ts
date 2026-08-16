@@ -5,6 +5,22 @@
 // asserts against a real fake-Fabric recorder — proving both that the wrapper/spinner shape
 // still commits correctly AND that a reactive prop change updates the SAME native node
 // (no recreate) rather than a fresh one, following switch.smoke.test.ts's exact pattern.
+//
+// Coverage ledger (per CLAUDE.md's <components_split_logic_view_lifecycle> — the shared
+// reducer/render logic is core/components' own job, this file proves the SVELTE LIFECYCLE
+// wiring around it):
+//   - renderActivityIndicator()'s own fold logic (size enum translation, platform default
+//     color, hidesWhenStopped) — N/A here: covered directly at
+//     adapters/react/src/descriptor-to-react/descriptor-bridge.test.ts's `renderActivityIndicator`
+//     describe block. Re-asserting size/color fold branches here would duplicate that suite
+//     instead of proving Svelte-specific behavior.
+//   - index.svelte calls renderActivityIndicator() (not a hand-duplicated bag) and materializes
+//     its children through createDescriptorChildrenSync — covered below.
+//   - `bind:this` binds hostShim before the first commit, and $state.raw keeps it as a raw
+//     ShimElement (not deep-proxied) so createDescriptorChildrenSync's identity-based diff
+//     actually finds the same node on update — covered below (the no-recreate assertion).
+//   - a reactive prop change re-renders the SAME native node via cloneNodeWithNewProps, not a
+//     destroy+recreate — covered below.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -92,44 +108,56 @@ async function loadMountable(): Promise<Component> {
 }
 
 describe('ActivityIndicator (real compiled index.svelte)', () => {
-  it('commits the wrapper/spinner shape with the resolved size + color props', async () => {
-    const Parent = await loadMountable();
-    mount(ROOT_TAG, Parent, { initialAnimating: true });
-    await tick();
-    await tick();
+  // No Negative group: ActivityIndicator is a pure render-only wrapper over
+  // renderActivityIndicator() with no guard clause and no throwing path — every
+  // IActivityIndicatorProps value the type allows produces a committed tree, never a rejection.
+  describe('Positive (mounts and stays reactive through the Svelte lifecycle)', () => {
+    // why: proves index.svelte actually CALLS renderActivityIndicator() and forwards its
+    // Descriptor through the real render pipeline, rather than hand-duplicating the size/color
+    // fold (the exact bug class svelte-adapter-dom-shim skill §15 found and fixed here once).
+    it('commits the wrapper/spinner shape with the resolved size + color props', async () => {
+      const Parent = await loadMountable();
+      mount(ROOT_TAG, Parent, { initialAnimating: true });
+      await tick();
+      await tick();
 
-    const spinner = findLive(fabric.appRoot(), node => node.viewName === 'ActivityIndicatorView');
-    expect(spinner).toBeDefined();
-    expect(spinner?.props.animating).toBe(true);
-    expect(spinner?.props.color).toBe('#123456');
-    expect(spinner?.props.size).toBe('small');
-  });
-
-  it('updates the SAME native node on a reactive prop change, not a new one', async () => {
-    let setAnimating: ISetAnimating | null = null;
-    const Parent = await loadMountable();
-    mount(ROOT_TAG, Parent, {
-      initialAnimating: true,
-      onCapture: (setter: ISetAnimating) => {
-        setAnimating = setter;
-      },
+      const spinner = findLive(fabric.appRoot(), node => node.viewName === 'ActivityIndicatorView');
+      expect(spinner).toBeDefined();
+      expect(spinner?.props.animating).toBe(true);
+      expect(spinner?.props.color).toBe('#123456');
+      expect(spinner?.props.size).toBe('small');
     });
-    await tick();
-    await tick();
 
-    expect(setAnimating, 'setter captured after mount').not.toBeNull();
-    const before = findLive(fabric.appRoot(), node => node.viewName === 'ActivityIndicatorView');
-    expect(before).toBeDefined();
-    const createdBefore = fabric.counts.createNode;
+    // why: `$state.raw` (not `$state`) holds `hostShim` for exactly this reason — a deep-proxied
+    // ref would break createDescriptorChildrenSync's identity lookup and force a rebuild on
+    // every render. This is the product rule §19 documents; asserting createNode count instead
+    // of "it still works" is what makes the claim falsifiable.
+    it('updates the SAME native node on a reactive prop change, not a new one', async () => {
+      let setAnimating: ISetAnimating | null = null;
+      const Parent = await loadMountable();
+      mount(ROOT_TAG, Parent, {
+        initialAnimating: true,
+        onCapture: (setter: ISetAnimating) => {
+          setAnimating = setter;
+        },
+      });
+      await tick();
+      await tick();
 
-    setAnimating?.(false);
-    await tick();
-    await tick();
+      expect(setAnimating, 'setter captured after mount').not.toBeNull();
+      const before = findLive(fabric.appRoot(), node => node.viewName === 'ActivityIndicatorView');
+      expect(before).toBeDefined();
+      const createdBefore = fabric.counts.createNode;
 
-    // The real proof of "reused, not recreated": no NEW createNode call happened at all —
-    // a rebuild would have shown counts.createNode grow by 2 (wrapper + spinner).
-    expect(fabric.counts.createNode).toBe(createdBefore);
-    const after = findLive(fabric.appRoot(), node => node.viewName === 'ActivityIndicatorView');
-    expect(after?.props.animating).toBe(false);
+      setAnimating?.(false);
+      await tick();
+      await tick();
+
+      // The real proof of "reused, not recreated": no NEW createNode call happened at all —
+      // a rebuild would have shown counts.createNode grow by 2 (wrapper + spinner).
+      expect(fabric.counts.createNode).toBe(createdBefore);
+      const after = findLive(fabric.appRoot(), node => node.viewName === 'ActivityIndicatorView');
+      expect(after?.props.animating).toBe(false);
+    });
   });
 });

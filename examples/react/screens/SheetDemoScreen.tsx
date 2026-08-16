@@ -10,30 +10,19 @@ import { ActionButton } from '../components/ActionButton';
 export const sheetDemoScreenOptions: IScreenOptions = {
   title: 'Sheet Demo',
   headerShown: true,
-  // NOT translucent, unlike every other screen's headerStyle: formSheet has its own separate
-  // header-height accounting in react-native-screens (RNSScreenContentWrapper's
-  // headerHeightErrata walk). An opaque headerStyle still gets a dark, on-theme bar without
-  // touching that formSheet sizing path.
+  // NOT translucent, unlike other screens: formSheet has its own header-height accounting in
+  // react-native-screens (RNSScreenContentWrapper's headerHeightErrata walk). An opaque
+  // headerStyle still gets a dark, on-theme bar without touching that sizing path.
   //
-  // headerTranslucent was originally suspected as the cause of the sheet's content rendering
-  // blank/translucent-with-nothing-on-top — but that same symptom persisted with headerTranslucent
-  // left unset, which ruled it out. The real cause was stack.ts's RNSScreenContentWrapper style:
-  // it hardcoded `{ flex: 1 }` for every presentation, but react-native-screens' own
-  // ScreenStackItem.tsx never does that for formSheet (see resolveScreenContentWrapperStyle in
-  // core/render-stack.ts) — `flex: 1` (`bottom: 0`) forces React to set a strict frame on every
-  // native shadow-state update during a detent drag, which is the visible flicker PR #1870 fixed
-  // by switching formSheet to `absoluteWithNoBottom` instead (sized bottom-up from content). The
-  // screen below wraps its content in a ScrollView specifically because of that: react-native-
-  // screens' own native fix for "content should still fill a taller detent" only resizes a
-  // ScrollView child directly (RNSScreenContentWrapper.mm's
-  // coerceChildScrollViewComponentSizeToSize), bypassing Yoga/flex entirely — a plain View would
-  // stay sized to its own content and leave a plain-background gap below it on the 60%/100%
-  // detents. The ScrollView must be the FIRST direct child of RNSScreenContentWrapper for that
-  // native search to find it (childRCTScrollViewComponentAndContentContainer walks
-  // self.subviews, or — iOS 26+ only — one level into react-native-screens' OWN internal
-  // RNSSafeAreaViewComponentView) — an app-level SafeAreaView (react-native-safe-area-context's
-  // unrelated native class) in between hides the ScrollView from that search entirely, so this
-  // screen skips SafeAreaView on purpose, unlike every other demo screen.
+  // The content below is a ScrollView, not a View, and must stay the FIRST direct child of
+  // RNSScreenContentWrapper with no SafeAreaView in between: react-native-screens' native fix for
+  // "content should still fill a taller detent" (PR #1870, switching formSheet from a hardcoded
+  // `flex: 1` to `absoluteWithNoBottom`, sized bottom-up from content — see
+  // resolveScreenContentWrapperStyle in core/render-stack.ts) only resizes a ScrollView child it
+  // finds by walking self.subviews (or, iOS 26+, one level into its own
+  // RNSSafeAreaViewComponentView). An app-level SafeAreaView in between hides the ScrollView from
+  // that search, leaving a plain-background gap on the taller detents — so this screen skips
+  // SafeAreaView on purpose.
   headerTintColor: LINE_COLOR.presentation,
   headerTitleColor: '#ffffff',
   headerStyle: { backgroundColor: '#0b1622' },

@@ -1,17 +1,12 @@
-// Image: the Vue lifecycle half. The full fold (source / src / srcSet resolution, the
-// width/height → style fold, resizeMode/tintColor, alt → accessibility, and the native source
-// array) lives framework-agnostic in @symbiote-native/components and is shared verbatim with React;
-// here Vue only narrows the untyped attrs into renderImage's typed view, folds aria/role, bridges
-// the Descriptor to a vnode, and carries the Image statics (getSize / prefetch / queryCache / …).
+// Image: the Vue lifecycle half. The full fold (source/src/srcSet resolution, width/height ->
+// style fold, resizeMode/tintColor, alt -> accessibility, and the native source array) lives
+// framework-agnostic in @symbiote-native/components, shared verbatim with React; Vue narrows the
+// untyped attrs into renderImage's typed view, folds aria/role, bridges the Descriptor to a
+// vnode, and carries the Image statics (getSize/prefetch/queryCache/...).
 //
-// FUNCTIONAL, not a stateful defineComponent: Image is render-only, and Animated.Image wraps it
-// via createAnimatedComponent, which captures the host
-// node through a ref that only falls through on a functional component (a defineComponent's ref
-// resolves to a useless component proxy; see components.ts). So Image must stay functional.
-//
-// Inputs arrive as attrs (untyped). The typed transform fields are narrowed with runtime guards;
-// the forward-only rest (events, blurRadius, capInsets, testID, accessibility*) is typed as the
-// a11y intersection so resolveAccessibilityProps folds aria-* into accessibility* over it.
+// FUNCTIONAL, not a stateful defineComponent: Animated.Image wraps it via createAnimatedComponent,
+// which captures the host node through a ref that only falls through on a functional component
+// (a defineComponent's ref resolves to a useless component proxy; see components.ts).
 
 import type { FunctionalComponent } from '@vue/runtime-core';
 import {
@@ -38,10 +33,8 @@ export type {
   IImageCacheStatus,
 } from '@symbiote-native/components';
 
-// Vue's own idiom for a registered class name (mirrors IViewProps.class) — a per-adapter field
-// per <prop_types_split_agnostic_vs_per_adapter>, not part of the shared agnostic base. Not in
-// HANDLED_ATTRS below, so it forwards via forwardAttrs like any other untyped attr and resolves
-// through the shared style registry the same way View's `class` does.
+// Vue's own idiom for a registered class name (mirrors IViewProps.class) - a per-adapter field
+// per <prop_types_split_agnostic_vs_per_adapter>, not part of the shared agnostic base.
 export type IImageProps = IImageBaseProps & { class?: IClassNameValue };
 
 function asString(value: unknown): string | undefined {
@@ -52,8 +45,6 @@ function asNumber(value: unknown): number | undefined {
   return typeof value === 'number' ? value : undefined;
 }
 
-// A source is a structured object/array or an opaque require() id (number) the engine's injected
-// resolver expands; any object/array/number is a valid source to forward (IImageSource is all-optional).
 function asSource(value: unknown): IImageSourceProp | undefined {
   if (typeof value === 'number') return value;
   if (typeof value === 'object' && value !== null) return value;
@@ -78,13 +69,10 @@ function asCrossOrigin(value: unknown): 'anonymous' | 'use-credentials' | undefi
   return value === 'anonymous' || value === 'use-credentials' ? value : undefined;
 }
 
-// Object OR array (a style list) passes through; readStyleString flattens either, and arrays must
-// survive so `style={[a, b]}` reaches Fabric (parity with React, which preserves the StyleProp).
 function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
   return typeof value === 'object' && value !== null;
 }
 
-// The typed transform fields renderImage folds; everything else forwards via passthrough.
 const HANDLED_ATTRS = [
   'source',
   'defaultSource',
@@ -101,9 +89,6 @@ const HANDLED_ATTRS = [
   'referrerPolicy',
 ];
 
-// The forwarded bag carries the aria/role aliases, so it is typed as the a11y intersection (a
-// genuine narrowing: the accumulator is BUILT at that type, not cast) so resolveAccessibilityProps
-// can fold aria-* into accessibility* before it reaches the host image.
 type IForwardBag = IAccessibilityProps & IAriaProps & Record<string, unknown>;
 
 function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
@@ -138,8 +123,7 @@ const ImageComponent: FunctionalComponent<IImageProps> = (_props, { attrs: rawAt
 ImageComponent.displayName = 'Image';
 ImageComponent.inheritAttrs = false;
 
-// Statics attached like RN (Image.getSize / prefetch / …), shared verbatim with React via
-// the engine-resolved imageStatics. The component value doubles as the statics namespace.
+// Statics attached like RN (Image.getSize/prefetch/...), shared verbatim with React.
 export const Image: FunctionalComponent<IImageProps> & IImageStatics = Object.assign(
   ImageComponent,
   imageStatics,

@@ -6,6 +6,9 @@
 // `nativeFabricUIManager`. No `@sveltejs/vite-plugin-svelte` is wired into this repo's vitest
 // config yet, so compiled output is written to a real temp file and dynamic-imported rather than
 // transformed by a loader — see `compileComponent` below.
+//
+// No Negative group: `mount`/`unmount` validate nothing of their own — a malformed
+// `RootComponent` would throw from Svelte's own `mount()`, not from this adapter's contract.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -29,8 +32,12 @@ if (globalThis.navigator === undefined) {
 const ROOT_TAG = 91_001;
 // Under `build/`: already git-ignored repo-wide, and inside adapters/svelte's own
 // node_modules resolution chain so the compiled output's `import 'svelte/internal/client'`
-// resolves without extra wiring.
-const TMP_DIR = join(__dirname, '../build/__smoke__');
+// resolves without extra wiring. Its own subfolder (not the bare `__smoke__` dir every smoke
+// file used to share) — vitest runs test FILES in parallel, and a shared directory meant one
+// file's afterEach `rmSync(..., {recursive:true})` could delete a `.mjs` another file's test
+// had just written but not yet dynamic-imported, an intermittent "Cannot find module" failure
+// with nothing wrong in either file's own logic.
+const TMP_DIR = join(__dirname, '../build/__smoke__/mount-pipeline');
 
 const fabric = installFabric();
 const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
@@ -116,5 +123,54 @@ describe('svelte adapter mount pipeline (real compiled output, real fake-Fabric)
     // in once it reaches nativeFabricUIManager.
     const wrapper = fabric.appRoot().children[0];
     expect(wrapper.props.flex).toBe(1);
+  });
+
+  it('re-mounting the same rootTag tears down the previous app before mounting the new one', async () => {
+    // why: Fast Refresh and focus-lifecycle restart a surface reusing the same rootTag
+    // (render.ts's own header comment) — mount() must self-teardown rather than stacking a
+    // second Svelte app onto the same target, or the tree would carry both components'
+    // committed nodes side by side.
+    const Hello = await compileComponent('<symbiote-text>hello</symbiote-text>', 'HelloA');
+    mount(ROOT_TAG, Hello);
+    await tick();
+    await tick();
+    expect(fabric.serialize([fabric.appRoot()])).toContain('RCTRawText "hello"');
+
+    const Goodbye = await compileComponent('<symbiote-text>goodbye</symbiote-text>', 'GoodbyeA');
+    mount(ROOT_TAG, Goodbye);
+    await tick();
+    await tick();
+
+    const serialized = fabric.serialize([fabric.appRoot()]);
+    expect(serialized).toContain('RCTRawText "goodbye"');
+    expect(serialized).not.toContain('hello');
+  });
+
+  it('wires global.RN$stopSurface so a real C++-side surface stop reaches unmount()', async () => {
+    // why: global.RN$stopSurface is the JSI hook AppRegistryBinding::stopSurface calls
+    // directly — RN's own renderer installs it, and this adapter REPLACES that renderer, so
+    // without this wiring a real device throws "Global was not installed" on every surface
+    // stop and the screen goes blank (render.ts's own header comment on
+    // installStopSurfaceGlobal). Proven end to end: stopping via the global, then mounting a
+    // fresh component on the same rootTag, must show ONLY the fresh content — the same
+    // teardown a direct unmount() call produces, reached through the C++ entry point instead.
+    expect(typeof globalThis.RN$stopSurface).toBe('function');
+
+    const Hello = await compileComponent('<symbiote-text>hello</symbiote-text>', 'HelloB');
+    mount(ROOT_TAG, Hello);
+    await tick();
+    await tick();
+
+    globalThis.RN$stopSurface?.(ROOT_TAG);
+    await tick();
+
+    const Goodbye = await compileComponent('<symbiote-text>goodbye</symbiote-text>', 'GoodbyeB');
+    mount(ROOT_TAG, Goodbye);
+    await tick();
+    await tick();
+
+    const serialized = fabric.serialize([fabric.appRoot()]);
+    expect(serialized).toContain('RCTRawText "goodbye"');
+    expect(serialized).not.toContain('hello');
   });
 });

@@ -1,0 +1,100 @@
+---
+title: 'How to: catch render errors with <svelte:boundary>'
+description: A real Svelte-only error boundary — a failed snippet and reset(), sourced from the adapter's own smoke test.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Svelte 5 ships a real error-boundary primitive, `<svelte:boundary>`. This is
+currently **Svelte-only** in this project: React's class-component
+`componentDidCatch` boundary is not exposed as a documented pattern in the
+[React API](/docs/api/react/), and Vue's nearest tool, `onErrorCaptured`, is a
+different shape — a hook you write yourself, not a template construct with
+its own fallback UI. If you need the same fallback-UI behavior on those
+adapters today, you're on your own.
+
+## Basic usage
+
+Wrap the part of the tree that might throw during render, and provide a
+`failed` snippet as the fallback:
+
+```svelte
+<svelte:boundary onerror={(error, reset) => console.error(error)}>
+  <Child />
+
+  {#snippet failed(error, reset)}
+    <View testID="failed">
+      <Text>{error.message}</Text>
+    </View>
+  {/snippet}
+</svelte:boundary>
+```
+
+- Nothing throws → the boundary paints no native node of its own; children
+  commit exactly as if it weren't there.
+- A child throws during render → its subtree is torn down completely (not
+  just hidden), `onerror(error, reset)` fires once, and the `failed` snippet
+  takes its place.
+- Calling `reset()` — handed to you by both `onerror` and the `failed` snippet
+  — tears the failed subtree back down and re-mounts the children.
+
+Source: `adapters/svelte/src/boundary.smoke.test.ts`, run against the real
+Svelte compiler and asserted against the exact committed Fabric tree, not a
+mock — these examples are transcribed from its real markup.
+
+## Capturing `reset()` for a retry button
+
+The trap: `reset` arrives as a snippet parameter, and this looks reasonable
+but silently doesn't work:
+
+```svelte
+{#snippet failed(error, reset)}
+  {@const captured = capture(reset)}
+  ...
+{/snippet}
+```
+
+`{@const}` compiles to `$.derived(...)`, and a derived value nothing reads is
+never evaluated — the capture silently never runs. Route it through a prop
+bag expression instead, since `set_custom_element_data` always evaluates its
+argument:
+
+```svelte
+{#snippet failed(error, reset)}
+  <symbiote-view p={control.failedBag(reset)}>
+    <symbiote-text p={{}}>{error.message}</symbiote-text>
+  </symbiote-view>
+{/snippet}
+```
+
+where `failedBag` is a plain function stashing `reset` somewhere a retry
+button can reach it:
+
+```ts
+failedBag: reset => {
+  control.reset = reset;
+  return { testID: 'failed' };
+},
+```
+
+<Aside type="note">
+  Snippet parameters also arrive as thunks in the compiled output — a
+  `reset` captured this way is called as `reset()`, not read as `reset`.
+</Aside>
+
+## What's proven, not just compiled
+
+`<svelte:boundary>` was compile-verified only before this — the preprocessor
+allowed it and `tsc --build` saw nothing, but nothing in the repo had ever run
+`$.boundary` for real. The smoke test covers, against exact committed child
+lists rather than `toBeDefined()`:
+
+- transparent render when nothing throws — the boundary contributes no native
+  node of its own;
+- a child component throwing during its own init: the `failed` snippet
+  renders, `onerror` fires exactly once, and the thrown subtree is fully
+  gone, not merely hidden behind the fallback;
+- `reset()` called from inside the `failed` snippet restores the children,
+  without leaving the failed subtree behind as a duplicate;
+- a boundary wrapping a real `{#each}` list survives a reorder + grow +
+  shrink in one update without losing track of its own anchor.

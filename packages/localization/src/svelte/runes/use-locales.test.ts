@@ -137,29 +137,41 @@ async function mountLocales(values: Locale[][]): Promise<void> {
   await tick();
 }
 
+// No Negative group: getLocales() is a synchronous native read with no guard clause — the effect
+// only ever writes `locales` from it (at mount, and again on each native event) or unsubscribes.
+// Nothing here is meant to reject/throw.
 describe('useLocales (Svelte)', () => {
-  it('reads the current locales at rune-call time', async () => {
-    const values: Locale[][] = [];
-    await mountLocales(values);
+  describe('Positive — boxed value tracks a re-read on mount, the native listener, and unmount', () => {
+    // why: the device locale can change between when this function was called and when its
+    // effect actually runs — re-reading on mount is what keeps the very first observed value
+    // honest rather than trusting a possibly-stale call-time snapshot.
+    it('reads the current locales at rune-call time', async () => {
+      const values: Locale[][] = [];
+      await mountLocales(values);
 
-    expect(values[0]).toEqual(FAKE_LOCALES_INITIAL);
-  });
+      expect(values[0]).toEqual(FAKE_LOCALES_INITIAL);
+    });
 
-  it('recomputes the state when the native listener fires', async () => {
-    const values: Locale[][] = [];
-    await mountLocales(values);
+    // why: locale (language/region/currency formatting) can change while the app is running — the
+    // rune exists to stay in sync with that live device signal, not just report a mount-time read.
+    it('recomputes the state when the native listener fires', async () => {
+      const values: Locale[][] = [];
+      await mountLocales(values);
 
-    getLocalesMock.mockReturnValue(FAKE_LOCALES_UPDATED);
-    registeredListener?.();
-    await tick();
+      getLocalesMock.mockReturnValue(FAKE_LOCALES_UPDATED);
+      registeredListener?.();
+      await tick();
 
-    expect(values[values.length - 1]).toEqual(FAKE_LOCALES_UPDATED);
-  });
+      expect(values[values.length - 1]).toEqual(FAKE_LOCALES_UPDATED);
+    });
 
-  it('removes the subscription on unmount', async () => {
-    await mountLocales([]);
-    unmount(ROOT_TAG);
+    // why: a rune that outlives its subscription leaks a live native listener into a scope Svelte
+    // already considers destroyed — the effect's teardown is what prevents that leak.
+    it('removes the subscription on unmount', async () => {
+      await mountLocales([]);
+      unmount(ROOT_TAG);
 
-    expect(removeMock).toHaveBeenCalledTimes(1);
+      expect(removeMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

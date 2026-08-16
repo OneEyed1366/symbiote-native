@@ -4,12 +4,11 @@
 // setColor/setTranslucent, same module name ('StatusBarManager'). Metro picks this on an
 // Android host; iOS keeps its own shape. Each adapter wraps these with its declarative component.
 //
-// History: this used to be a no-op. Driving the window flags from our bridgeless surface
-// blanked the app: a status-bar relayout triggered stopSurface, which threw "Global was
-// not installed" because RN installs global.RN$stopSurface from its own renderer, which we
-// replace. Now that render.ts installs RN$stopSurface and tears surfaces down cleanly, the
-// relayout survives and the bar updates without blanking (verified on device: show/hide +
-// light/dark text). See render.ts's installStopSurfaceGlobal.
+// Driving window flags from our bridgeless surface used to blank the app: a status-bar
+// relayout triggered stopSurface, which threw "Global was not installed" because RN's
+// own renderer installs global.RN$stopSurface and we replace that renderer. Fixed by
+// render.ts installing RN$stopSurface itself (see installStopSurfaceGlobal) - verified
+// on device: show/hide + light/dark text survive the relayout without blanking.
 
 import { getNativeModule } from '../native-modules';
 import { dlog } from '../debug';

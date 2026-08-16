@@ -11,6 +11,7 @@ export {
   anchorStyleProp,
   stableAnchorStyle,
   SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
 } from './shared';
 
 @Component({

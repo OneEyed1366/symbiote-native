@@ -7,6 +7,20 @@
 // scrollToOffset / scrollToIndex lands as the native scrollTo view command. Vue reactivity is
 // async, so each driving step is followed by a macrotask `tick` that drains the engine's
 // coalesced commit and the post-flush watchers before the assert reads the committed tree.
+//
+// This file is the Vue ADAPTER's responsibility, not the shared reducer's: buildListPlan/
+// buildWindow's own branch logic (window math, sticky-forced-cell selection, MVCP offset
+// arithmetic) is proven once at core/components/src/state/virtualized-list.test.ts — closed there
+// as `covered`, N/A here with that reason. What this file proves instead is that Vue's async,
+// microtask-batched reactivity correctly DRIVES that shared logic end to end: props reach
+// FlatList, a scroll/layout native event reaches the reducer, its output reaches the committed
+// Fabric tree, and an imperative ref method reaches a real native command — the seam
+// vue-adapter-reactivity's async-commit-timing gotcha warns can silently no-op if unwired.
+//
+// No Positive/Negative split: every scenario here is a Positive "the adapter wires this correctly"
+// claim, including onScrollToIndexFailed — that's RN's own documented FAILURE CALLBACK contract
+// (not a JS exception), so asserting it fires with no scrollTo dispatched is still a positive
+// claim about correct behavior, not a throw/reject to catch.
 
 import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -215,6 +229,9 @@ async function mountWithViewport(
 }
 
 describe('Vue VirtualizedList virtualization on the engine', () => {
+  // why: a 1000-row list committing all 1000 native views would defeat the entire point of
+  // virtualization (memory/paint cost). The adapter must hand the reducer's bounded window
+  // through to the real committed Fabric tree, not just hold it in Vue reactive state.
   it('windows to a bounded prefix with a trailing spacer and no leading spacer at the top', async () => {
     await mountWithViewport();
 
@@ -229,6 +246,9 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
     expect(hasTrailingSpacer(), 'a trailing spacer reserves the content below').toBe(true);
   });
 
+  // why: this is the recommit path, not just the initial mount — a native `topScroll` event has
+  // to reach the reducer through Vue's microtask-batched commit and produce a NEW committed tree,
+  // proving the adapter re-drives the shared window logic on every scroll, not only once at mount.
   it('shifts the window and grows a leading spacer when scrolled deep', async () => {
     const scrollView = await mountWithViewport();
     scrollTo(scrollView.instanceHandle, DEEP_OFFSET);
@@ -243,6 +263,9 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
     expect(hasLeadingSpacer(), 'a leading spacer grew after scrolling deep').toBe(true);
   });
 
+  // why: onViewableItemsChanged is a user-supplied prop callback, not a DOM/native event — the
+  // adapter has to invoke it itself from the reducer's viewability computation. A wiring gap here
+  // means analytics/impression tracking silently never fires, with no type error to catch it.
   it('fires onViewableItemsChanged for the visible cells', async () => {
     await mountWithViewport({
       onViewableItemsChanged: (info: { viewableItems: IViewToken[] }) => {
@@ -259,6 +282,10 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
     ).toBe(true);
   });
 
+  // why: scrollToOffset/scrollToIndex are the IMPERATIVE ref-handle half of the component's
+  // contract (vue-adapter-reactivity's identity/timing gotcha: a native command dispatched before
+  // the node is committed silently no-ops). Proving it reaches a real dispatchCommand call, with
+  // the right args in the right order, is the only way to catch that class of regression.
   it('routes an imperative scrollToOffset through the native scrollTo command', async () => {
     await mountWithViewport();
     expect(listRef.value, 'FlatList handle attached').not.toBeNull();
@@ -275,6 +302,9 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
     expect(scrolls[1].args[2]).toBe(false);
   });
 
+  // why: scrollToIndex is a distinct public method from scrollToOffset with its own index->offset
+  // resolution step (via getItemLayout) before it reaches the same native command — a regression
+  // that broke only the index path would slip past the offset test above.
   it('routes an imperative scrollToIndex through scrollTo at the measured offset', async () => {
     await mountWithViewport();
     expect(listRef.value, 'FlatList handle attached').not.toBeNull();
@@ -322,6 +352,12 @@ function makeStickyList(): ReturnType<typeof defineComponent> {
 }
 
 describe('Vue VirtualizedList sticky header force-mount', () => {
+  // why: regression coverage for the same on-device bug the Angular twin
+  // (virtualized-list-sticky-forced-cell.test.ts) and the core buildListPlan repro guard — a
+  // pinned section header must stay mounted once scrolling carries its origin index out of
+  // [first,last], or it gets destroyed/recreated (losing layout, flickering) every time the
+  // window slides back over it. Proven here specifically through Vue's own commit path, since
+  // the reducer producing forcedStickyCell is already proven correct at the core layer.
   it('keeps the nearest sticky header resident once the window scrolls past its origin index', async () => {
     mount(ROOT_TAG, makeStickyList());
     await tick();
@@ -393,6 +429,9 @@ function makeFailList(): ReturnType<typeof defineComponent> {
 }
 
 describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex failure', () => {
+  // why: minIndexForVisible has to account for a #header slot the caller never counts in its own
+  // index space (the header occupies committed child 0) — an unadjusted pass-through would anchor
+  // the wrong row the moment a header is present, breaking RN's native MVCP semantics.
   it('forwards maintainVisibleContentPosition to the scroll view, bumping minIndexForVisible for the header', async () => {
     await mountWithViewport(
       { maintainVisibleContentPosition: { minIndexForVisible: 1, autoscrollToTopThreshold: 10 } },
@@ -419,6 +458,9 @@ describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex f
     ).toBe(10);
   });
 
+  // why: native MVCP only compensates for content it can see; content prepended INTO the leading
+  // spacer (still off-window) is invisible to it, so the adapter's JS-side reactive watcher must
+  // dispatch a compensating instant scrollTo itself, or the visually-anchored row jumps on prepend.
   it('shifts the scroll offset to keep the anchored row put when rows are prepended above the window', async () => {
     const scrollView = await mountWithComponent(makeMvcpList());
     scrollTo(scrollView.instanceHandle, MVCP_SCROLL_OFFSET);
@@ -441,6 +483,9 @@ describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex f
     expect(scrolls[0].args[2], 'the MVCP correction is instant').toBe(false);
   });
 
+  // why: RN's documented contract for an unresolvable scrollToIndex is the onScrollToIndexFailed
+  // callback, never a fabricated best-guess scroll — dispatching an estimated scrollTo instead
+  // would silently land the viewport somewhere wrong with no signal to the caller that it failed.
   it('fires onScrollToIndexFailed for an unmeasured cell and dispatches no scrollTo', async () => {
     mount(ROOT_TAG, makeFailList());
     await tick();

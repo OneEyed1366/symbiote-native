@@ -1,26 +1,20 @@
 <script lang="ts">
   // Symbiote Svelte canary app entry: composes the native stack navigator
-  // (@symbiote-native/navigation/svelte, driven by react-native-screens' RNSScreen/RNSScreenStack
-  // native views) over the full demo screen surface. Menu is the initial route — a menu of buttons,
-  // one per navigator/feature @symbiote-native/navigation exports; Canary is the app's OWN former
-  // root content (every @symbiote-native/svelte primitive), unchanged and reachable from the menu's
-  // first row. Details has no menu row of its own — it's the DeepLinking demo's resolution target
-  // (symbiotecanarysvelte://details/:id), reached only through that tour stop. Svelte twin of
-  // examples/vue-sfc/App.vue: `<Screen>` (not the dotted `Stack.Screen`) is the same marker every
-  // ./screens component imports standalone — @symbiote-native/navigation/svelte exports it at the
-  // top level precisely so templates never need a dotted tag reference.
+  // (@symbiote-native/navigation/svelte) over the full demo screen surface. Menu is the initial
+  // route; Canary is the app's own former root content, reachable from the menu's first row.
+  // Details has no menu row of its own — it's the DeepLinking demo's resolution target
+  // (symbiotecanarysvelte://details/:id). Svelte twin of examples/vue-sfc/App.vue.
   //
-  // HOW THE SCREENS ARE DISCOVERED differs from every other adapter, and it shows here: Svelte
-  // hands a component its children as an opaque Snippet, so <Stack> cannot scan them the way React
-  // reads a children array or Vue scans slot vnodes. Each <Screen> marker registers ITSELF on a
-  // collector the navigator publishes on the context (packages/navigation/src/svelte/
-  // screen-registry.ts). Authoring is unchanged; only the mechanism underneath is inverted.
+  // Screen discovery differs from every other adapter: Svelte hands a component its children as
+  // an opaque Snippet, so <Stack> can't scan them the way React reads a children array or Vue
+  // scans slot vnodes. Each <Screen> marker registers ITSELF on a collector the navigator
+  // publishes on context (packages/navigation/src/svelte/screen-registry.ts).
   //
   // useLinkingIntegration takes a GETTER over the Stack's `bind:this` target, not the resolved
-  // handle: a Svelte component's script runs exactly once and `bind:this` only lands during mount,
-  // so the rune reads it inside its own $effect. Declaring the target with `$state.raw` makes that
-  // read tracked, so the wiring re-runs the moment the binding resolves — no mount-ordering
-  // guarantee needed at all. See packages/navigation/src/svelte/linking.svelte.ts's header.
+  // handle: a Svelte component's script runs exactly once and `bind:this` only lands during
+  // mount, so the rune reads it inside its own $effect. `$state.raw` makes that read tracked, so
+  // the wiring re-runs the moment the binding resolves — no mount-ordering guarantee needed. See
+  // packages/navigation/src/svelte/linking.svelte.ts's header.
   //
   // MARKUP FORMATTING IS LOAD-BEARING: sibling markers are packed edge-to-edge with zero
   // whitespace between them (svelte-adapter-dom-shim skill §16). The navigator parks the markers
@@ -97,21 +91,14 @@
     // NOT translucent, unlike every other screen's headerStyle: formSheet has its own separate
     // header-height accounting in react-native-screens (RNSScreenContentWrapper's
     // headerHeightErrata walk). An opaque headerStyle still gets a dark, on-theme bar without
-    // touching that formSheet sizing path.
+    // touching that sizing path.
     //
-    // The real cause of a blank/translucent formSheet was never headerTranslucent but stack.ts's
-    // RNSScreenContentWrapper style: it used to hardcode `{ flex: 1 }` for every presentation,
-    // which react-native-screens' own ScreenStackItem.tsx never does for formSheet (see
-    // resolveScreenContentWrapperStyle in core/render-stack.ts) — `flex: 1` (`bottom: 0`) forces a
-    // strict frame on every native shadow-state update during a detent drag, the visible flicker
-    // PR #1870 fixed by switching formSheet to `absoluteWithNoBottom` (sized bottom-up from
-    // content). SheetDemoScreen wraps its content in a ScrollView specifically because of that:
-    // react-native-screens' native fix for "content should still fill a taller detent" only
-    // resizes a ScrollView child directly (RNSScreenContentWrapper.mm's
-    // coerceChildScrollViewComponentSizeToSize), bypassing Yoga/flex entirely — a plain View would
-    // stay sized to its own content and leave a plain-background gap below it on the 60%/100%
-    // detents. The ScrollView must be the FIRST direct child of RNSScreenContentWrapper for that
-    // native search to find it, which is why that screen skips SafeAreaView on purpose.
+    // SheetDemoScreen wraps its content in a ScrollView on purpose: react-native-screens only
+    // resizes a ScrollView child directly to fill a taller detent
+    // (RNSScreenContentWrapper.mm's coerceChildScrollViewComponentSizeToSize), bypassing
+    // Yoga/flex entirely — a plain View stays sized to its own content and leaves a gap on the
+    // 60%/100% detents. The ScrollView must be the FIRST direct child of RNSScreenContentWrapper
+    // for that native search to find it, which is why the screen skips SafeAreaView.
     headerTintColor: LINE_COLOR.presentation,
     headerTitleColor: '#ffffff',
     headerStyle: { backgroundColor: HEADER_BACKGROUND },

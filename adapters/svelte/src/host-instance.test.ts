@@ -5,7 +5,8 @@
 // callable methods (RefApiDemo's whole reason for existing), not just typed lies. Real compiled
 // source, same compile-then-dynamic-import pattern as every other smoke test here; the node under
 // test is captured through a real `{@attach}` (svelte-adapter-custom-renderer skill §4), not a
-// hand-rolled fake object.
+// hand-rolled fake object. hostInstance's null/undefined branches are plain unit tests below —
+// there is no more "not-yet-live" shim state to cover (nodes are eagerly bound, skill §2).
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -90,6 +91,14 @@ describe('hostInstance (real compiled source)', () => {
       return node.children.some(findLive);
     }
     expect(findLive(fabric.appRoot())).toBe(true);
+  });
+
+  // hostInstance has no throwing path — an absent ref is a normal, expected situation (a
+  // `{@attach}` target reads null before Svelte's first mount pass populates it), so the
+  // contract is "resolve to undefined", not "throw".
+  it('returns undefined for a null or undefined ref', () => {
+    expect(hostInstance(null)).toBeUndefined();
+    expect(hostInstance(undefined)).toBeUndefined();
   });
 });
 

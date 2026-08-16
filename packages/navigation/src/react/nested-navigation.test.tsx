@@ -4,6 +4,9 @@
 // Tab can call useNavigation().getParent() to reach the enclosing Stack's handle. Mirrors
 // stack.test.tsx's fixture (an injected codegen-shaped RNSScreen ViewConfig) since a real Stack is
 // part of this composition; Tab needs no ViewConfig of its own (tabs.test.tsx).
+//
+// No Negative group: getParent() is a plain optional lookup (`parent?.navigation`), never a throw -
+// "no ambient navigator" is itself one of the two scenarios this file proves, not an error case.
 
 import { act, createElement, createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -79,67 +82,75 @@ function StackDetailsScreen(): ReturnType<typeof createElement> {
 }
 
 describe('nested navigators (Context parent chain)', () => {
-  it("a root Stack screen's useNavigation().getParent() is undefined (no ambient navigator above it)", () => {
-    let capturedParent: IAnyNavigatorHandle | undefined;
-    let getParentCalled = false;
-    function RootScreen(): ReturnType<typeof createElement> {
-      capturedParent = useNavigation().getParent();
-      getParentCalled = true;
-      return createElement('symbiote-text', {}, 'root');
-    }
+  describe('Positive', () => {
+    // why: a navigator at the root of the tree has no ambient NavigationContext to read - getParent()
+    // must resolve to `undefined` there rather than throwing or returning a stale/wrong handle.
+    it("a root Stack screen's useNavigation().getParent() is undefined (no ambient navigator above it)", () => {
+      let capturedParent: IAnyNavigatorHandle | undefined;
+      let getParentCalled = false;
+      function RootScreen(): ReturnType<typeof createElement> {
+        capturedParent = useNavigation().getParent();
+        getParentCalled = true;
+        return createElement('symbiote-text', {}, 'root');
+      }
 
-    mount(
-      ROOT_TAG,
-      createElement(
-        Stack,
-        { initialRouteName: 'Root' },
-        createElement(Stack.Screen, { name: 'Root', component: RootScreen }),
-      ),
-    );
-
-    expect(getParentCalled).toBe(true);
-    expect(capturedParent).toBeUndefined();
-  });
-
-  it('useNavigation().getParent() from inside a Tab screen nested in a Stack screen reaches the enclosing Stack, and pushing through it adds a Stack route', () => {
-    let capturedParent: IAnyNavigatorHandle | undefined;
-
-    function NestedTabHomeScreen(): ReturnType<typeof createElement> {
-      capturedParent = useNavigation().getParent();
-      return createElement('symbiote-text', {}, 'tab-home');
-    }
-
-    // The Stack screen's own component: a Tab navigator, nested exactly the way a real app
-    // composes navigators (a Stack screen's content IS another navigator).
-    function RootScreenRendersTab(): ReturnType<typeof createElement> {
-      return createElement(
-        Tab,
-        { initialRouteName: 'TabHome' },
-        createElement(Tab.Screen, { name: 'TabHome', component: NestedTabHomeScreen }),
+      mount(
+        ROOT_TAG,
+        createElement(
+          Stack,
+          { initialRouteName: 'Root' },
+          createElement(Stack.Screen, { name: 'Root', component: RootScreen }),
+        ),
       );
-    }
 
-    const ref = createRef<INavigatorHandle>();
-    mount(
-      ROOT_TAG,
-      createElement(
-        Stack,
-        { ref, initialRouteName: 'Root' },
-        createElement(Stack.Screen, { name: 'Root', component: RootScreenRendersTab }),
-        createElement(Stack.Screen, { name: 'Details', component: StackDetailsScreen }),
-      ),
-    );
+      expect(getParentCalled).toBe(true);
+      expect(capturedParent).toBeUndefined();
+    });
 
-    expect(findAllText(fabric.committed)).toContain('tab-home');
+    // why: a navigator rendered AS another navigator's screen content (Stack screen -> Tab) must
+    // thread the ambient Context it read on its own mount down to its OWN screens, so a component
+    // several navigators deep can still reach any enclosing navigator's real, live handle (not a
+    // snapshot) - proven here by actually pushing through the recovered parent handle.
+    it('useNavigation().getParent() from inside a Tab screen nested in a Stack screen reaches the enclosing Stack, and pushing through it adds a Stack route', () => {
+      let capturedParent: IAnyNavigatorHandle | undefined;
 
-    if (!capturedParent) throw new Error('getParent() returned undefined');
-    if (!('push' in capturedParent)) {
-      throw new Error('parent handle is not a Stack handle (missing push)');
-    }
-    // capturedParent is now narrowed to INavigatorHandle by the 'push in' guard above.
-    act(() => capturedParent.push('Details'));
+      function NestedTabHomeScreen(): ReturnType<typeof createElement> {
+        capturedParent = useNavigation().getParent();
+        return createElement('symbiote-text', {}, 'tab-home');
+      }
 
-    expect(findAllText(fabric.committed)).toContain('stack-details');
-    expect(ref.current?.canGoBack()).toBe(true);
+      // The Stack screen's own component: a Tab navigator, nested exactly the way a real app
+      // composes navigators (a Stack screen's content IS another navigator).
+      function RootScreenRendersTab(): ReturnType<typeof createElement> {
+        return createElement(
+          Tab,
+          { initialRouteName: 'TabHome' },
+          createElement(Tab.Screen, { name: 'TabHome', component: NestedTabHomeScreen }),
+        );
+      }
+
+      const ref = createRef<INavigatorHandle>();
+      mount(
+        ROOT_TAG,
+        createElement(
+          Stack,
+          { ref, initialRouteName: 'Root' },
+          createElement(Stack.Screen, { name: 'Root', component: RootScreenRendersTab }),
+          createElement(Stack.Screen, { name: 'Details', component: StackDetailsScreen }),
+        ),
+      );
+
+      expect(findAllText(fabric.committed)).toContain('tab-home');
+
+      if (!capturedParent) throw new Error('getParent() returned undefined');
+      if (!('push' in capturedParent)) {
+        throw new Error('parent handle is not a Stack handle (missing push)');
+      }
+      // capturedParent is now narrowed to INavigatorHandle by the 'push in' guard above.
+      act(() => capturedParent.push('Details'));
+
+      expect(findAllText(fabric.committed)).toContain('stack-details');
+      expect(ref.current?.canGoBack()).toBe(true);
+    });
   });
 });

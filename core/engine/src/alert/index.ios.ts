@@ -90,6 +90,16 @@ function prompt(
       if (btn.isPreferred) {
         preferredButtonKey = String(index);
       }
+      // UPSTREAM-BUG(react-native): Libraries/Alert/Alert.js:173 - a TRAILING button with no text
+      // is left out of the native buttons array while its onPress still occupies callbacks[index],
+      // so that handler can never fire: native has no id to return for a button it was never told
+      // about. Only the last button, only when textless, which reads more like leftover
+      // length - 1 bookkeeping than an intended "omit a blank trailing button" affordance.
+      // Ported for parity; do NOT fix without recording a deliberate divergence.
+      //
+      // The `!== undefined` here IS a deliberate divergence from upstream's truthy `btn.text`:
+      // an explicit `text: ''` is a caller asking for a blank label, not an omission, and this
+      // codebase treats falsy-vs-absent as distinct on principle. Upstream drops that button.
       if (btn.text !== undefined || index < callbackOrButtons.length - 1) {
         buttons.push({ [index]: btn.text ?? '' });
       }

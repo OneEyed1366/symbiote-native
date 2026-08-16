@@ -6,4 +6,11 @@
 
 export { hide, isVisible } from '../core';
 export { useHideAnimation } from './runes/use-hide-animation.svelte';
-export type { IHideAnimationConfig, IHideAnimationResult, IManifest, IHideConfig } from '../core';
+export type {
+  IHideAnimationConfig,
+  IHideAnimationFailure,
+  IHideAnimationFailureStage,
+  IHideAnimationResult,
+  IManifest,
+  IHideConfig,
+} from '../core';

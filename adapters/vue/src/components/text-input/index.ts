@@ -1,17 +1,13 @@
-// TextInput, the Vue lifecycle half. The folds/maps (value->text, the W3C/alias resolution)
-// and the controlled-write predicate live in @symbiote-native/components/state, the render (intrinsic
-// + native-prop mapping) in @symbiote-native/components/view, both shared verbatim with the React
-// adapter. Here Vue supplies only the reactivity: a shallowRef holds the host node, a ref holds
-// the acknowledged event count (so the exposed handle echoes the latest), setup-scope `let`s
-// hold the last native text + focus flag, a post-flush watch runs the controlled-write command,
-// and expose() wires the imperative handle. The Vue twin of the React useState/useRef +
-// useLayoutEffect + useImperativeHandle.
+// TextInput, the Vue lifecycle half. The folds/maps (value->text, W3C/alias resolution) and the
+// controlled-write predicate live in @symbiote-native/components/state, the render in
+// @symbiote-native/components/view, both shared verbatim with React. Vue supplies only the
+// reactivity: a shallowRef holds the host node, a ref holds the acknowledged event count, setup-
+// scope `let`s hold the last native text + focus flag, a post-flush watch runs the
+// controlled-write command, and expose() wires the imperative handle.
 //
-// Inputs arrive as attrs (untyped), so each is narrowed with a runtime guard rather than a cast.
-// onValueChange MUST be stripped from the forwarded attrs: it is not a ViewConfig event (it's
-// derived from the native onChange), so leaking it would reach Fabric as a function prop and
-// crash Android's folly::dynamic. The imperative module (blurTextInput / setInput*) is imported
-// from @symbiote-native/engine, the same framework-agnostic singleton both adapters share.
+// Inputs arrive as attrs (untyped), so each is narrowed with a runtime guard, never a cast.
+// onValueChange MUST be stripped from the forwarded attrs: it is not a ViewConfig event, so
+// leaking it would reach Fabric as a function prop and crash Android's folly::dynamic.
 
 import { defineComponent, onBeforeUnmount, ref, shallowRef, watch } from '@vue/runtime-core';
 import {
@@ -44,9 +40,8 @@ import { descriptorToVue } from '../../descriptor-to-vue';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 import { resolveModelValue, emitModelUpdate } from '../../utils/model-binding';
 
-// ITextInputProps lives framework-agnostic in @symbiote-native/components; `class` can't join it
-// there, so it's added locally, exactly like Image's IImageProps. Not in HANDLED_ATTRS below
-// (neither is `style`), so it rides through forwardAttrs onto the SAME host node style targets.
+// `class` can't join ITextInputBaseProps since it's framework-agnostic, so it's added locally
+// (like Image's IImageProps). Not in HANDLED_ATTRS below, so it rides through forwardAttrs.
 export type ITextInputProps = Omit<ITextInputBaseProps, 'onValueChange' | 'onFocus' | 'onBlur'> & {
   modelValue?: string;
   class?: IClassNameValue;
@@ -77,7 +72,6 @@ function asBoolean(value: unknown): boolean | undefined {
   return typeof value === 'boolean' ? value : undefined;
 }
 
-// selection arrives untyped; keep only the numeric start/end the render fn + controlled write read.
 function normalizeSelection(value: unknown): ITextInputSelection | undefined {
   if (!isRecord(value)) return undefined;
   if (typeof value.start !== 'number') return undefined;
@@ -86,9 +80,7 @@ function normalizeSelection(value: unknown): ITextInputSelection | undefined {
   return selection;
 }
 
-// The prop/handler keys the lifecycle consumes itself (mirrors the React adapter's destructure);
-// everything else (placeholder, secureTextEntry, the remaining native events, accessibility,
-// testID, style…) forwards onto the host node. onFocus/onBlur are re-supplied as our wrapped
+// Everything else forwards onto the host node. onFocus/onBlur are re-supplied as our wrapped
 // handlers; onValueChange is pure JS and must never reach Fabric.
 const HANDLED_ATTRS = [
   'value',
@@ -127,45 +119,37 @@ function forwardAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
 
 export const TextInput = defineComponent<ITextInputProps, ITextInputEmits>(
   (_props, { attrs: rawAttrs, emit, expose }) => {
-    // shallowRef, NOT ref: the engine node must be held by IDENTITY. A plain ref() runs the node
-    // through Vue's toReactive(), handing back a reactive Proxy, a different object than the raw
-    // node the engine's WeakMap mirror is keyed on, so every imperative command
-    // (dispatchViewCommand / focus / blur / setTextAndSelection) would miss and silently no-op.
-    // Same rule applies to the Switch / ScrollView host node.
+    // shallowRef, NOT ref: a plain ref() would hand back a reactive Proxy the engine's WeakMap
+    // mirror doesn't recognize, so every imperative command would silently no-op. Same rule as
+    // the Switch / ScrollView host node.
     const nodeRef = shallowRef<ISymbioteNode | null>(null);
     const setNodeRef = (el: unknown): void => {
       nodeRef.value = isSymbioteNode(el) ? el : null;
     };
 
-    // The count native last acknowledged. A ref so the render echoes it back as
-    // mostRecentEventCount and the exposed handle reads the latest; the controlled write commands
-    // it so native's eventLag lands on 0.
+    // The count native last acknowledged. A ref so render echoes it as mostRecentEventCount; the
+    // controlled write commands it so native's eventLag lands on 0.
     const mostRecentEventCount = ref(INITIAL_EVENT_COUNT);
-    // The last text native holds, as far as JS knows. Seeded from the mount-time value (the `text`
-    // prop already carries it down via createNode, so the FIRST controlled value is not a
-    // divergence and must NOT re-command). A setup-scope `let`: no render needed when it changes.
+    // Seeded from the mount-time value (the `text` prop already carries it down via createNode,
+    // so the FIRST controlled value is not a divergence and must NOT re-command).
     let lastNativeText = foldText(
       resolveModelValue(rawAttrs, isString),
       asString(rawAttrs.defaultValue),
     );
-    // JS-side focus state, mirrored from the focus/blur events for isFocused(): native exposes no
-    // synchronous focus getter (RN's TextInputState holds the same).
+    // Mirrored from focus/blur events for isFocused(): native exposes no synchronous focus getter.
     let focused = false;
-    // autoFocus fires once when the node first commits; guard so a later node identity change does
-    // not re-focus.
+    // Guard so a later node identity change does not re-focus.
     let autoFocused = false;
 
     const handleChange = (event: ISymbioteEvent): void => {
-      // Event seam: the controlled handshake hinges on the change payload carrying `text`
-      // (+ `eventCount`). iOS and Android Fabric can key these differently, so log the actual shape.
+      // iOS and Android Fabric can key the change payload differently, so log the actual shape.
       dlog(
         `TextInput change keys=[${Object.keys(event.nativeEvent).join(',')}] ` +
           `text=${JSON.stringify(event.nativeEvent.text)} count=${JSON.stringify(event.nativeEvent.eventCount)}`,
       );
       const text = textFromChange(event);
       if (text !== undefined) {
-        // Record the text first, then the count, so the count never runs ahead of the text it
-        // stands for.
+        // Record the text first, so the count never runs ahead of the text it stands for.
         lastNativeText = text;
         emit('valueChange', text, event);
         emitModelUpdate<string>(emit, text);
@@ -190,10 +174,8 @@ export const TextInput = defineComponent<ITextInputProps, ITextInputEmits>(
     };
 
     // Controlled write: when JS-side `value` diverges from what native reported, command the new
-    // text down with the acknowledged count; a plain prop re-push would race the user's
-    // keystrokes. Watching `value` covers every divergence (the parent only rewrites `value` after
-    // a change). flush:'post' so the engine has committed the node before the command reads its
-    // Fabric handle; the predicate makes it a no-op on mount (value === the seed).
+    // text down with the acknowledged count - a plain prop re-push would race the user's
+    // keystrokes. flush:'post' so the node is committed before the command reads its Fabric handle.
     watch(
       () => resolveModelValue(rawAttrs, isString),
       value => {
@@ -217,11 +199,10 @@ export const TextInput = defineComponent<ITextInputProps, ITextInputEmits>(
       { flush: 'post' },
     );
 
-    // autoFocus is driven in JS, not as a native prop: once the node first commits, command `focus`
-    // down once (RN does the same via TextInputState.focusInput). The watch fires when nodeRef is
-    // set (mount), but under Vue's async-batched commit the node has no Fabric tag yet at post-flush,
-    // so the focus command would be skipped with no retry. whenCommitted defers it to the commit that
-    // assigns the tag. Cancelled on unmount so an un-committed pending focus can't leak.
+    // autoFocus is driven in JS: once the node first commits, command `focus` down once. Under
+    // Vue's async-batched commit the node has no Fabric tag yet at post-flush, so
+    // whenCommitted defers it to the commit that assigns the tag. Cancelled on unmount so an
+    // un-committed pending focus can't leak.
     let cancelAutoFocus: (() => void) | undefined;
     watch(
       nodeRef,
@@ -235,10 +216,8 @@ export const TextInput = defineComponent<ITextInputProps, ITextInputEmits>(
     );
     onBeforeUnmount(() => cancelAutoFocus?.());
 
-    // The imperative API RN exposes on the ref. The methods read nodeRef.value / the count LIVE,
-    // so no stale capture: the Vue twin of React's useImperativeHandle. focus/blur drive native
-    // view commands; clear and setSelection reuse setTextAndSelection (the same stale-safe path as
-    // a controlled write) echoing the acknowledged event count.
+    // Methods read nodeRef.value / the count LIVE, so no stale capture. clear/setSelection reuse
+    // setTextAndSelection, the same path as a controlled write.
     expose({
       focus: (): void => {
         const node = nodeRef.value;

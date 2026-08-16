@@ -1,18 +1,15 @@
 // headerSearchBarOptions.ref (SearchBarCommands: focus/blur/clearText/setText/cancelSearch/
-// toggleCancelButton) lives on the OPTIONS object, resolved by the Stack itself, BEFORE
-// HeaderOptionsScreen.svelte's own script ever runs (Stack calls the resolver while building this
-// route's screen props, one step ahead of mounting the screen component itself) — a different
-// scope than the screen component below. A module-scope cell is what lets both share the SAME
-// stable object: the options resolver hands it to the navigator via ISvelteSearchBarOptions.ref,
-// the screen component's buttons read it back to drive the search bar imperatively. Fine for a
-// single demo screen instance; a multi-instance screen would need the cell threaded through some
-// other shared owner instead.
+// toggleCancelButton) lives on the OPTIONS object, resolved by the Stack itself BEFORE
+// HeaderOptionsScreen.svelte's own script runs — a different scope than the screen component
+// below. A module-scope cell is what lets both share the SAME stable object: the resolver hands
+// it to the navigator via ISvelteSearchBarOptions.ref, the screen's buttons read it back to drive
+// the search bar imperatively. Fine for a single demo screen instance; a multi-instance screen
+// would need the cell threaded through some other shared owner instead.
 //
-// A plain `{ current }` object, not a `$state` rune: Svelte's ref shape here is an app-owned
-// mutable cell by design (see screen-props.ts's ISvelteSearchBarOptions), and nothing renders
-// off it — the buttons only read `.current` at press time. A `.svelte.ts` file with `$state`
-// would buy reactivity nobody consumes. Svelte twin of examples/vue-sfc/screens/
-// header-options-screen-options.ts's module-scope `ref`.
+// A plain `{ current }` object, not a `$state` rune: nothing renders off it, the buttons only
+// read `.current` at press time, so a `.svelte.ts` file with `$state` would buy reactivity nobody
+// consumes. Svelte twin of examples/vue-sfc/screens/header-options-screen-options.ts's
+// module-scope `ref`.
 
 import type { ISearchBarCommands } from '@symbiote-native/navigation';
 import type { IScreenOptionsResolver } from '@symbiote-native/navigation/svelte';

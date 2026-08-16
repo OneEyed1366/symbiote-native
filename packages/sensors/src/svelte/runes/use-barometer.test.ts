@@ -103,45 +103,95 @@ async function mountBarometer(
 }
 
 describe('useBarometer (Svelte)', () => {
-  it('starts null before any measurement arrives', async () => {
-    const values: (IBarometerMeasurement | null)[] = [];
-    await mountBarometer(values);
+  // No Negative group: useBarometer has no guard clause or throwing path — every accepted
+  // updateIntervalMs value (or its absence) and every IBarometerMeasurement the native listener
+  // can deliver reaches `current` unchanged. Only the shared lifecycle wiring (subscribe once on
+  // mount, replace state on each event, unsubscribe on unmount) is under test here; DeviceSensor's
+  // own methods are not called by this rune at all and are covered by core/barometer.test.ts.
+  describe('Positive (subscribe -> update -> cleanup lifecycle)', () => {
+    // why: a consumer renders BEFORE the first native event can possibly arrive, so `current`
+    // must expose a real "no reading yet" value rather than staying `undefined` or throwing.
+    it('starts null before any measurement arrives', async () => {
+      const values: (IBarometerMeasurement | null)[] = [];
+      await mountBarometer(values);
 
-    expect(values[values.length - 1]).toBeNull();
-  });
+      expect(values[values.length - 1]).toBeNull();
+    });
 
-  it('updates the state when the native listener fires', async () => {
-    const values: (IBarometerMeasurement | null)[] = [];
-    await mountBarometer(values);
-    const reading: IBarometerMeasurement = {
-      pressure: 1013.25,
-      relativeAltitude: 12.3,
-      timestamp: 123,
-    };
+    // why: the effect body writes `measurement` but never reads it, so it must run exactly once
+    // on mount and never re-subscribe on its own — a double subscription would mean double
+    // native event delivery per commit.
+    it('subscribes to the native module exactly once on mount', async () => {
+      await mountBarometer([]);
 
-    registeredListener?.(reading);
-    await tick();
+      expect(addListenerMock).toHaveBeenCalledTimes(1);
+    });
 
-    expect(values[values.length - 1]).toEqual(reading);
-  });
+    // why: the whole point of the rune is to mirror the native module's push events into
+    // reactive state, so a fired event must be visible through `current`.
+    it('updates the state when the native listener fires', async () => {
+      const values: (IBarometerMeasurement | null)[] = [];
+      await mountBarometer(values);
+      const reading: IBarometerMeasurement = {
+        pressure: 1013.25,
+        relativeAltitude: 12.3,
+        timestamp: 123,
+      };
 
-  it('removes the subscription on unmount', async () => {
-    await mountBarometer([]);
-    unmount(ROOT_TAG);
+      registeredListener?.(reading);
+      await tick();
 
-    expect(removeMock).toHaveBeenCalledTimes(1);
-  });
+      expect(values[values.length - 1]).toEqual(reading);
+    });
 
-  it('sets the update interval once at subscribe time when provided', async () => {
-    await mountBarometer([], 50);
+    // why: `relativeAltitude` is iOS-only and optional (core/barometer.ts's header comment) — an
+    // Android-shaped event that omits it must fully REPLACE an earlier iOS-shaped reading, not
+    // merge and leave a stale `relativeAltitude` behind. `measurement = next` is a plain
+    // reassignment, and this is the scenario that would expose a merge bug.
+    it('drops a stale relativeAltitude when a later event omits it', async () => {
+      const values: (IBarometerMeasurement | null)[] = [];
+      await mountBarometer(values);
+      const iosReading: IBarometerMeasurement = {
+        pressure: 1013.25,
+        relativeAltitude: 12.3,
+        timestamp: 123,
+      };
+      const androidReading: IBarometerMeasurement = { pressure: 1009.5, timestamp: 456 };
 
-    expect(setUpdateIntervalMock).toHaveBeenCalledWith(50);
-    expect(setUpdateIntervalMock).toHaveBeenCalledTimes(1);
-  });
+      registeredListener?.(iosReading);
+      await tick();
+      registeredListener?.(androidReading);
+      await tick();
 
-  it('does not touch the update interval when omitted', async () => {
-    await mountBarometer([]);
+      expect(values[values.length - 1]).toEqual(androidReading);
+      expect(values[values.length - 1]).not.toHaveProperty('relativeAltitude');
+    });
 
-    expect(setUpdateIntervalMock).not.toHaveBeenCalled();
+    // why: an active native subscription after the consuming component is gone leaks a listener
+    // and keeps the sensor powered on the device for nothing.
+    it('removes the subscription on unmount', async () => {
+      await mountBarometer([]);
+      unmount(ROOT_TAG);
+
+      expect(removeMock).toHaveBeenCalledTimes(1);
+    });
+
+    // why: the caller-supplied sample rate must reach the native module, applied once at subscribe
+    // time (not on every render) per the rune's header comment on why `updateIntervalMs` is a
+    // plain number, not a reactive getter.
+    it('sets the update interval once at subscribe time when provided', async () => {
+      await mountBarometer([], 50);
+
+      expect(setUpdateIntervalMock).toHaveBeenCalledWith(50);
+      expect(setUpdateIntervalMock).toHaveBeenCalledTimes(1);
+    });
+
+    // why: an omitted interval must leave the native module's own default sample rate alone —
+    // calling setUpdateInterval with an undefined/fallback value would silently override it.
+    it('does not touch the update interval when omitted', async () => {
+      await mountBarometer([]);
+
+      expect(setUpdateIntervalMock).not.toHaveBeenCalled();
+    });
   });
 });

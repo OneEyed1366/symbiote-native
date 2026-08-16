@@ -30,6 +30,92 @@ function unescapeIdentifier(value: string): string {
   return value.replace(/\\(.)/g, '$1');
 }
 
+const GLOBAL_PSEUDO_OPEN = ':global(';
+
+// Index of the `)` closing the `(` at `openIndex`, or -1 if the selector is unbalanced. Counting
+// depth rather than reaching for the next `)` is what keeps `:global(.a:not(.b))` in one piece.
+function closingParenIndex(value: string, openIndex: number): number {
+  let depth = 0;
+
+  for (let index = openIndex; index < value.length; index++) {
+    if (value[index] === '(') depth++;
+    else if (value[index] === ')' && --depth === 0) return index;
+  }
+
+  return -1;
+}
+
+/**
+ * Erase every `:global(...)` wrapper, leaving its payload in place: `.card :global(.legacy) span`
+ * becomes `.card .legacy span`.
+ *
+ * `:global()` says a part of the selector lives outside the file's scope; it never changes which
+ * classes an element must carry for the rule to match. So the wrapper is gone before any selector
+ * shape is recognized below, and its payload participates exactly as if it had been written bare.
+ * Which of the resulting tokens then gets a scope suffix is a separate, caller-side question that
+ * `globalClassTokensIn` (../global-selectors.ts) answers, off the payloads {@link globalPayloadsIn}
+ * hands back.
+ *
+ * This follows SVELTE, not Vue, and the two genuinely disagree. Svelte erases the wrapper per
+ * relative selector and keeps the rest of the chain scoped (`.vendors/svelte-5.53.12-src/compiler/
+ * phases/3-transform/css/index.js`, `ComplexSelector`: a part flagged `is_global` keeps its inner
+ * selectors and only skips the scope class; `css-prune.js`'s `apply_selector` sets
+ * `metadata.scoped` on every part that is not an outer `:global`). Vue's `pluginScoped` instead
+ * does `selector.replaceWith(n.nodes[0])` on `:global` (`.vendors/vue/packages/compiler-sfc/src/
+ * style/pluginScoped.ts`), which throws the REST of the chain away — `.card :global(.reset)`
+ * degrades to a stylesheet-wide `.reset`. One registry serves React, Vue, Angular and Svelte
+ * alike, so the rule that silently widens a rule's reach beyond what the author wrote is the
+ * wrong one to standardize on; Vue itself steers the reach-into-a-child case to `:deep()`.
+ */
+function stripGlobalWrappers(selector: string): string {
+  let result = selector;
+  let start = result.indexOf(GLOBAL_PSEUDO_OPEN);
+
+  while (start !== -1) {
+    const close = closingParenIndex(result, start + GLOBAL_PSEUDO_OPEN.length - 1);
+    // Unbalanced: leave the text alone and let the pseudo-class guard below drop the whole rule,
+    // the same answer any other unparseable selector gets.
+    if (close === -1) return result;
+
+    const payload = result.slice(start + GLOBAL_PSEUDO_OPEN.length, close).trim();
+    result = result.slice(0, start) + payload + result.slice(close + 1);
+    // Re-search from the same offset: a payload may itself hold a `:global(...)`, and each pass
+    // removes one wrapper, so this terminates.
+    start = result.indexOf(GLOBAL_PSEUDO_OPEN, start);
+  }
+
+  return result;
+}
+
+/**
+ * The payload of every `:global(...)` in a selector, wrapper removed and in source order:
+ * `.card :global(.legacy) span` → `['.legacy']`, `:global(.a):global(.b)` → `['.a', '.b']`.
+ *
+ * The inverse view of {@link stripGlobalWrappers}: that one keeps everything BUT the wrappers,
+ * this one keeps only what they held. Both share {@link closingParenIndex}, so "where does this
+ * `:global(` end" has a single answer — the caller-side scope-suffix question needs to know which
+ * tokens came out of a payload, and re-finding them with a second regex is how the two would
+ * drift apart on `:global(.a:not(.b))`.
+ *
+ * A nested wrapper is left inside the payload it sits in; tokenizing the payload erases it.
+ */
+export function globalPayloadsIn(selector: string): string[] {
+  const payloads: string[] = [];
+  let start = selector.indexOf(GLOBAL_PSEUDO_OPEN);
+
+  while (start !== -1) {
+    const close = closingParenIndex(selector, start + GLOBAL_PSEUDO_OPEN.length - 1);
+    // Unbalanced: the same answer stripGlobalWrappers gives — stop, and let the selector reach
+    // the pseudo-class guard that drops the whole rule.
+    if (close === -1) return payloads;
+
+    payloads.push(selector.slice(start + GLOBAL_PSEUDO_OPEN.length, close).trim());
+    start = selector.indexOf(GLOBAL_PSEUDO_OPEN, close + 1);
+  }
+
+  return payloads;
+}
+
 /**
  * Extract a camelCase class name from a CSS selector, or `null` if the selector has no RN
  * equivalent (pseudo-classes/-elements, bare element selectors, the universal selector — RN has
@@ -41,6 +127,7 @@ function unescapeIdentifier(value: string): string {
  * - `.card .title` / `.card > .title` → `'cardTitle'` (descendant/child, flattened)
  * - `[data-theme]` → `'dataTheme'` (attribute)
  * - `.my-class-name` → `'myClassName'` (kebab → camel)
+ * - `.card :global(.reset)` → `'cardReset'` (the `:global()` wrapper is erased, its payload kept)
  */
 export function extractClassName(selector: string): string | null {
   const tokens = extractClassTokens(selector);
@@ -64,22 +151,19 @@ function joinClassTokens(tokens: string[]): string {
  * `<style>` block): the markup those callers rewrite says `class="btn primary"`, so `btn` and
  * `primary` are the names they must recognize as locally defined — the collapsed `btnPrimary`
  * key appears nowhere in the markup and would leave both tokens unscoped.
+ *
+ * Tokens from inside a `:global(...)` are included here too, since the rule still only matches an
+ * element carrying them. They are the ones a caller must NOT suffix, which is a distinction this
+ * list does not carry — `globalClassTokensIn` (../global-selectors.ts) is where it lives.
  */
 export function extractClassTokens(selector: string): string[] | null {
-  const trimmed = selector.trim();
+  // Erased first, ahead of every guard below: `:global(...)` legitimately carries a colon that
+  // the pseudo-class guards would otherwise trip over, and its payload has to reach the shape
+  // checks as ordinary selector text.
+  const trimmed = stripGlobalWrappers(selector.trim()).trim();
 
   if (/^[a-z]+$/i.test(trimmed)) return null;
   if (trimmed === '*') return null;
-
-  // `:global(...)` (Vue `<style scoped>` escape hatch) opts a selector out of scope-suffixing —
-  // a caller concern outside this package. Here it just needs unwrapping: when the WHOLE trimmed
-  // selector is one `:global(...)` wrapper, recurse on its inner text and return whatever that
-  // resolves to, reusing every selector shape below instead of duplicating it. Checked before the
-  // "starts with :" / "any colon anywhere" guards, since `:global(...)` legitimately contains a
-  // colon that must not trigger them. Known gap: a `:global(...)` wrapping only PART of a larger
-  // compound/descendant selector (e.g. `.card :global(.reset)`) is NOT unwrapped by this check.
-  const globalMatch = trimmed.match(/^:global\(\s*(.+?)\s*\)$/);
-  if (globalMatch?.[1]) return extractClassTokens(globalMatch[1]);
 
   if (trimmed.startsWith(':')) return null;
 
@@ -111,9 +195,15 @@ export function extractClassTokens(selector: string): string[] | null {
     const classNames: string[] = [];
 
     for (const part of parts) {
-      const classMatch = part.match(/\.((?:[a-zA-Z0-9_-]|\\.)+)/);
-      if (classMatch?.[1]) {
-        classNames.push(unescapeIdentifier(classMatch[1]));
+      // Every class of the part, not just the first: a chain link may itself be compound
+      // (`.card .btn.primary`, and now `.card :global(.btn.primary)` after the erase above), and
+      // an element has to carry BOTH names for the rule to apply. Taking only `.btn` would
+      // register the rule under a key that a `class="btn primary"` element never resolves to.
+      const classMatches = [...part.matchAll(/\.((?:[a-zA-Z0-9_-]|\\.)+)/g)];
+      if (classMatches.length > 0) {
+        for (const match of classMatches) {
+          if (match[1]) classNames.push(unescapeIdentifier(match[1]));
+        }
         continue;
       }
       const idMatch = part.match(/#((?:[a-zA-Z0-9_-]|\\.)+)/);

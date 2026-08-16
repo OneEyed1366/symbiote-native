@@ -3,6 +3,10 @@
 // frameworks, not that an internal detail moved. The sibling style-registry.test.ts covers the
 // registry's own API surface; this file covers what a component author is entitled to expect.
 //
+// No Negative group: resolveClassName has no throwing path, scoped or not — every scenario
+// below is Positive (a rule applies) or a documented divergence (a rule deliberately does not
+// apply, and returns `{}` rather than erroring).
+//
 // Sources (read 2026-08-14):
 //   Vue, https://vuejs.org/api/sfc-css-features.html — `.example { }` + `<div class="example">`
 //     compiles to `.example[data-v-f3f3eg9] { }` + `<div class="example" data-v-f3f3eg9>`. The
@@ -225,13 +229,47 @@ describe('documented divergences from web CSS', () => {
     registerStyles({ aB: { padding: 1 } });
     expect(resolveClassName('a b c d e')).toEqual({});
   });
+});
 
-  it('does not resolve a compound rule mixing a scoped and a global token', () => {
-    // `.card.big` where `.big` lives in App.css: there is no single suffix to factor out of
-    // `card__<scope> big`, so the rule is unreachable. On the web it would match, because both
-    // classes sit on the element as separate tokens. Fixing it needs a registry indexed by token
-    // SET rather than by concatenated key.
-    registerStyles({ [scopedKey('cardBig', SVELTE_SCOPE)]: { padding: 16 } });
-    expect(resolveClassName(`${scopedKey('card', SVELTE_SCOPE)} big`)).toEqual({});
+// The registry half of `:global()`. The compiler half - erasing the wrapper, exempting its
+// payload from the scope suffix - lives in @symbiote-native/css-parser; what arrives here is the
+// result: a key suffixed as a whole, against markup where only the component's own tokens are.
+describe('a partial :global() reaches the markup it was written for', () => {
+  it('resolves a scoped selector whose :global() half is unsuffixed in the markup', () => {
+    // `.card :global(.reset) { padding: 16 }` in a scoped block. The rule as a whole belongs to
+    // the file (`.card` is its own), so its collapsed key is suffixed; `reset` names markup the
+    // file does not own, so the token is not. Both halves have to meet at lookup time.
+    //
+    // The divergence this buys, deliberately: a fully-scoped `.card.reset` collapses to the very
+    // same key, so a `reset` handed down from a parent matches it too. The key format cannot tell
+    // the author's own token from a foreign one - that needs a registry indexed by token set,
+    // with per-token scope.
+    registerStyles({ [scopedKey('cardReset', SVELTE_SCOPE)]: { padding: 16 } });
+    expect(resolveClassName(`${scopedKey('card', SVELTE_SCOPE)} reset`)).toEqual({ padding: 16 });
+  });
+
+  it('applies the global token’s own rule underneath the scoped compound', () => {
+    // `reset` still resolves against the global registry on its own - the compound layers over
+    // it rather than replacing it, exactly as an all-scoped compound does.
+    registerStyles({
+      reset: { margin: 0, padding: 4 },
+      [scopedKey('cardReset', SVELTE_SCOPE)]: { padding: 16 },
+    });
+    expect(resolveClassName(`${scopedKey('card', SVELTE_SCOPE)} reset`)).toEqual({
+      margin: 0,
+      padding: 16,
+    });
+  });
+
+  it('still refuses to bridge two different scopes', () => {
+    // The unscoped token is what has no scope to disagree with. Two tokens that each carry a
+    // DIFFERENT suffix have no single one to factor out, and no rule legitimately spans two
+    // components - that stays unmatched.
+    registerStyles({ [scopedKey('cardReset', SVELTE_SCOPE)]: { padding: 16 } });
+    expect(
+      resolveClassName(
+        `${scopedKey('card', SVELTE_SCOPE)} ${scopedKey('reset', 'svelte-99999999')}`,
+      ),
+    ).toEqual({});
   });
 });
