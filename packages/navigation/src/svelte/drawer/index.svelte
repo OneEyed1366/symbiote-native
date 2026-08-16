@@ -26,6 +26,7 @@
   import { onDestroy, tick } from 'svelte';
   import { AnimatedValue, Dimensions, PanResponder, dlog, timing } from '@symbiote-native/engine';
   import type { IPanResponderGestureState, ISymbioteEvent } from '@symbiote-native/engine';
+  import { toTemplateSafeProps } from '@symbiote-native/svelte/renderer';
   // The ONLY import from the adapter's main barrel: `Animated.View` is a compiled `.svelte`
   // component, so unlike PanResponder/Dimensions/AnimatedValue (pure engine re-exports, taken
   // from the engine directly here) it has no `.svelte`-free home to import from.
@@ -82,6 +83,12 @@
     children,
     drawerContent,
   }: IDrawerProps = $props();
+
+  // `style` collides with Svelte's own special-cased attribute name (svelte-adapter-custom-
+  // renderer skill §6 / renderer.ts's TEMPLATE_KEY_UNMANGLE) — this bag carries a literal `style`
+  // key and is spread straight onto a `symbiote-*` intrinsic below, so it is renamed once, up
+  // front; `setAttributeOp`'s `realPropName()` reverses it right before `routeProp`.
+  const SCREEN_REGISTRY_TEMPLATE_PROPS = toTemplateSafeProps(SCREEN_REGISTRY_HOST_PROPS);
 
   // Read BEFORE this Drawer establishes its own per-screen NavigationScope - becomes the `parent`
   // link a nested screen's useNavigation().getParent() walks. undefined at the nesting root.
@@ -391,13 +398,18 @@
     return map;
   });
 
-  const rootProps = $derived<Record<string, unknown>>({
-    style: root.props.style,
-    ...panResponder.panHandlers,
-  });
+  // `style` collides with Svelte's own special-cased attribute name (svelte-adapter-custom-
+  // renderer skill §6 / renderer.ts's TEMPLATE_KEY_UNMANGLE) — renamed before the spread;
+  // `setAttributeOp`'s `realPropName()` reverses it right before `routeProp`.
+  const rootProps = $derived(
+    toTemplateSafeProps({
+      style: root.props.style,
+      ...panResponder.panHandlers,
+    }),
+  );
 </script>
 
-{#snippet screenContent()}{#if focusedScreen !== undefined}{@const FocusedComponent = focusedScreen.component}<NavigationScope value={focusedScreen.scope}><FocusedComponent /></NavigationScope>{/if}{/snippet}{#snippet contentSlot()}{@const descriptor = slotDescriptors.content}{#if descriptor !== undefined}{#if contentStyle !== undefined}<Animated.View {...descriptor.props} style={[descriptor.props.style, contentStyle]}>{@render screenContent()}</Animated.View>{:else}<symbiote-view p={descriptor.props}>{@render screenContent()}</symbiote-view>{/if}{/if}{/snippet}{#snippet overlaySlot()}{@const descriptor = slotDescriptors.overlay}{#if descriptor !== undefined}{#if overlayStyle !== undefined}<Animated.View {...descriptor.props} style={[descriptor.props.style, overlayStyle]} />{:else}<symbiote-view p={descriptor.props} />{/if}{/if}{/snippet}{#snippet panelSlot()}{@const descriptor = slotDescriptors.panel}{#if descriptor !== undefined}{#if panelStyle !== undefined}<Animated.View {...descriptor.props} style={[descriptor.props.style, panelStyle]}>{@render drawerContent?.({ state, descriptors, navigation: handle })}</Animated.View>{:else}<symbiote-view p={descriptor.props}>{@render drawerContent?.({ state, descriptors, navigation: handle })}</symbiote-view>{/if}{/if}{/snippet}<symbiote-view p={rootProps}><symbiote-text p={SCREEN_REGISTRY_HOST_PROPS}>{@render children?.()}</symbiote-text>{#each order as slot (slot)}{#if slot === 'content'}{@render contentSlot()}{:else if slot === 'overlay'}{@render overlaySlot()}{:else}{@render panelSlot()}{/if}{/each}</symbiote-view>
+{#snippet screenContent()}{#if focusedScreen !== undefined}{@const FocusedComponent = focusedScreen.component}<NavigationScope value={focusedScreen.scope}><FocusedComponent /></NavigationScope>{/if}{/snippet}{#snippet contentSlot()}{@const descriptor = slotDescriptors.content}{#if descriptor !== undefined}{#if contentStyle !== undefined}<Animated.View {...descriptor.props} style={[descriptor.props.style, contentStyle]}>{@render screenContent()}</Animated.View>{:else}<symbiote-view {...toTemplateSafeProps(descriptor.props)}>{@render screenContent()}</symbiote-view>{/if}{/if}{/snippet}{#snippet overlaySlot()}{@const descriptor = slotDescriptors.overlay}{#if descriptor !== undefined}{#if overlayStyle !== undefined}<Animated.View {...descriptor.props} style={[descriptor.props.style, overlayStyle]} />{:else}<symbiote-view {...toTemplateSafeProps(descriptor.props)} />{/if}{/if}{/snippet}{#snippet panelSlot()}{@const descriptor = slotDescriptors.panel}{#if descriptor !== undefined}{#if panelStyle !== undefined}<Animated.View {...descriptor.props} style={[descriptor.props.style, panelStyle]}>{@render drawerContent?.({ state, descriptors, navigation: handle })}</Animated.View>{:else}<symbiote-view {...toTemplateSafeProps(descriptor.props)}>{@render drawerContent?.({ state, descriptors, navigation: handle })}</symbiote-view>{/if}{/if}{/snippet}<symbiote-view {...rootProps}><symbiote-text {...SCREEN_REGISTRY_TEMPLATE_PROPS}>{@render children?.()}</symbiote-text>{#each order as slot (slot)}{#if slot === 'content'}{@render contentSlot()}{:else if slot === 'overlay'}{@render overlaySlot()}{:else}{@render panelSlot()}{/if}{/each}</symbiote-view>
 
 <!-- --- Explicit gap list vs the real react-native-gesture-handler + react-native-reanimated
      @react-navigation/drawer (confirmed against its current docs, mirrored verbatim from the

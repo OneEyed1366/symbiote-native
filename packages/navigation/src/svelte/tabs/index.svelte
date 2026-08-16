@@ -20,8 +20,8 @@
 <script lang="ts">
   import type { Component } from 'svelte';
   import { onDestroy, tick } from 'svelte';
-  import { dlog } from '@symbiote-native/engine';
-  import type { ShimElement } from '@symbiote-native/svelte/native-view-bridge';
+  import { dlog, type IHostInstance } from '@symbiote-native/engine';
+  import { toTemplateSafeProps } from '@symbiote-native/svelte/renderer';
   import {
     NAVIGATION_EVENT_BLUR,
     NAVIGATION_EVENT_FOCUS,
@@ -53,6 +53,15 @@
   import type { ITabProps } from './tab-props';
 
   let { initialRouteName, screenOptions, children }: ITabProps = $props();
+
+  // `style` collides with Svelte's own special-cased attribute name (svelte-adapter-custom-
+  // renderer skill §6 / renderer.ts's TEMPLATE_KEY_UNMANGLE) — each of these root-level bags
+  // carries a literal `style` key and is spread straight onto a `symbiote-*` intrinsic below, so
+  // they are renamed once, up front; `setAttributeOp`'s `realPropName()` reverses it right before
+  // `routeProp`.
+  const TAB_ROOT_TEMPLATE_PROPS = toTemplateSafeProps(TAB_ROOT_PROPS);
+  const TAB_CONTENT_TEMPLATE_PROPS = toTemplateSafeProps(TAB_CONTENT_PROPS);
+  const SCREEN_REGISTRY_TEMPLATE_PROPS = toTemplateSafeProps(SCREEN_REGISTRY_HOST_PROPS);
 
   // Read BEFORE this Tab establishes its own per-screen NavigationScope - becomes the `parent`
   // link a nested screen's useNavigation().getParent() walks. undefined at the nesting root.
@@ -205,6 +214,10 @@
   const tabBar = $derived.by<IDescriptor>(() =>
     renderTabBar({ items, style: focusedOptions?.tabBarStyle, passthrough: {} }),
   );
+  // See this file's header note on `toTemplateSafeProps` — the bar root's own props ride a
+  // literal template spread below, so `style` needs the same rename `tabBar.children` doesn't
+  // (that subtree is mounted through the JS-only descriptor bridge, unaffected by this).
+  const tabBarTemplateProps = $derived(toTemplateSafeProps(tabBar.props));
 
   // Only the focused route's screen is ever mounted (unlike Stack, which keeps every pushed route
   // alive), so a fresh NavigationScope per focus change is sufficient - the previous screen's
@@ -227,11 +240,11 @@
     },
   );
 
-  // The bar's ROOT stays a literal template tag (so `bind:this` has a statically known tag) and
+  // The bar's ROOT stays a literal template tag (so `{@attach}` has a statically known host) and
   // only its children go through the Descriptor bridge - the uniform shape every Svelte component
-  // consuming a `render-*.ts` uses (svelte-adapter-dom-shim skill §19). The item count varies with
-  // the registry, hence the shape-change-tolerant wrapper rather than the raw bridge.
-  let tabBarHost = $state.raw<ShimElement | null>(null);
+  // consuming a `render-*.ts` uses (svelte-adapter-custom-renderer skill). The item count varies
+  // with the registry, hence the shape-change-tolerant wrapper rather than the raw bridge.
+  let tabBarHost = $state.raw<IHostInstance | null>(null);
   const syncTabBarChildren = createDescriptorSubtreeSync();
   $effect(() => {
     const host = tabBarHost;
@@ -240,4 +253,4 @@
   });
 </script>
 
-<symbiote-view p={TAB_ROOT_PROPS}><symbiote-text p={SCREEN_REGISTRY_HOST_PROPS}>{@render children?.()}</symbiote-text><symbiote-view p={TAB_CONTENT_PROPS}>{#if focusedScreen !== undefined}{@const FocusedComponent = focusedScreen.component}<NavigationScope value={focusedScreen.scope}><FocusedComponent /></NavigationScope>{/if}</symbiote-view><symbiote-view p={tabBar.props} bind:this={tabBarHost}></symbiote-view></symbiote-view>
+<symbiote-view {...TAB_ROOT_TEMPLATE_PROPS}><symbiote-text {...SCREEN_REGISTRY_TEMPLATE_PROPS}>{@render children?.()}</symbiote-text><symbiote-view {...TAB_CONTENT_TEMPLATE_PROPS}>{#if focusedScreen !== undefined}{@const FocusedComponent = focusedScreen.component}<NavigationScope value={focusedScreen.scope}><FocusedComponent /></NavigationScope>{/if}</symbiote-view><symbiote-view {...tabBarTemplateProps} {@attach (node) => (tabBarHost = node)}></symbiote-view></symbiote-view>

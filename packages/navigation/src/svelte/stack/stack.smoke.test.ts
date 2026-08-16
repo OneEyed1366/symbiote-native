@@ -101,9 +101,9 @@ const HOME_SOURCE = `<script lang="ts">
      const route = useRoute();
      const focused = useIsFocused();
    </script>
-   <symbiote-view p={{ testID: 'home', accessibilityLabel: route.current.name + ':' + String(focused.current) }} />`;
+   <symbiote-view testID="home" accessibilityLabel={route.current.name + ':' + String(focused.current)} />`;
 
-const DETAILS_SOURCE = `<symbiote-view p={{ testID: 'details' }} />`;
+const DETAILS_SOURCE = `<symbiote-view testID="details" />`;
 
 // The app-level markers are written on SEPARATE LINES on purpose: that is how any reasonable
 // author formats them, and it is exactly the shape svelte-adapter-dom-shim skill §16 turns into
@@ -138,9 +138,9 @@ async function mountStack(
   screenAttributes = '',
 ): Promise<INavigatorHandle> {
   const dir = __dirname;
-  harness.compileSource(dir, 'home-fixture', HOME_SOURCE);
-  harness.compileSource(dir, 'details-fixture', DETAILS_SOURCE);
-  const app = harness.compileSource(
+  await harness.compileSource(dir, 'home-fixture', HOME_SOURCE);
+  await harness.compileSource(dir, 'details-fixture', DETAILS_SOURCE);
+  const app = await harness.compileSource(
     dir,
     `stack-app-${variant}`,
     appSource(stackAttributes, screenAttributes),
@@ -262,9 +262,9 @@ describe('Stack (real compiled index.svelte)', () => {
   it('mounts the search bar and wires its imperative ref to real view commands', async () => {
     const searchBarRef: { current: ISearchBarCommands | null } = { current: null };
     const dir = __dirname;
-    harness.compileSource(dir, 'home-fixture', HOME_SOURCE);
-    harness.compileSource(dir, 'details-fixture', DETAILS_SOURCE);
-    const app = harness.compileSource(
+    await harness.compileSource(dir, 'home-fixture', HOME_SOURCE);
+    await harness.compileSource(dir, 'details-fixture', DETAILS_SOURCE);
+    const app = await harness.compileSource(
       dir,
       'stack-search-app',
       `<script lang="ts">
@@ -314,11 +314,11 @@ describe('Stack (real compiled index.svelte)', () => {
 
   // The package's OWN templates must be packed edge-to-edge (skill §16); the app fixture above
   // deliberately is not, which is why this compiles the real sources through a fresh harness.
-  it('compiles every navigator template with no stray whitespace text nodes', () => {
+  it('compiles every navigator template with no stray whitespace text nodes', async () => {
     const audit = createSvelteHarness('stack-audit');
-    audit.compileFile(join(__dirname, 'index.svelte'));
-    audit.compileFile(join(__dirname, '../navigation-scope.svelte'));
-    audit.compileFile(join(__dirname, '../screen.svelte'));
+    await audit.compileFile(join(__dirname, 'index.svelte'));
+    await audit.compileFile(join(__dirname, '../navigation-scope.svelte'));
+    await audit.compileFile(join(__dirname, '../screen.svelte'));
     expect(audit.strayWhitespaceCount()).toBe(0);
     audit.cleanup();
   });

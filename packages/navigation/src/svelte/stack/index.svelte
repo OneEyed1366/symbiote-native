@@ -28,6 +28,7 @@
 <script lang="ts">
   import type { Component } from 'svelte';
   import { dlog } from '@symbiote-native/engine';
+  import { toTemplateSafeProps } from '@symbiote-native/svelte/renderer';
   import {
     NAVIGATION_EVENT_STATE,
     RNS_SCREEN_STACK_VIEW_NAME,
@@ -52,6 +53,14 @@
   import type { IScreenProps, ISvelteScreenOptions } from '../screen-props';
   import StackScreen from './stack-screen.svelte';
   import type { IStackProps } from './stack-props';
+
+  // `style` collides with Svelte's own special-cased attribute name (svelte-adapter-custom-
+  // renderer skill §6 / renderer.ts's TEMPLATE_KEY_UNMANGLE) — both of these root-level bags carry
+  // a literal `style` key and are spread straight onto a `symbiote-*` intrinsic below, so they are
+  // renamed once, up front; `setAttributeOp`'s `realPropName()` reverses it right before
+  // `routeProp`.
+  const STACK_ROOT_TEMPLATE_PROPS = toTemplateSafeProps(STACK_ROOT_PROPS);
+  const SCREEN_REGISTRY_TEMPLATE_PROPS = toTemplateSafeProps(SCREEN_REGISTRY_HOST_PROPS);
 
   let { initialRouteName, screenOptions, children }: IStackProps = $props();
 
@@ -214,4 +223,4 @@
   }
 </script>
 
-<symbiote-view p={STACK_ROOT_PROPS}><symbiote-text p={SCREEN_REGISTRY_HOST_PROPS}>{@render children?.()}</symbiote-text><svelte:element this={RNS_SCREEN_STACK_VIEW_NAME} {@attach hostProps(stackProps)}>{#each state.routes as route, index (route.key)}{@const screenComponent = componentFor(route)}{#if screenComponent !== undefined}<StackScreen {route} {index} routeCount={state.routes.length} options={optionsFor(route)} navigation={handle} emitter={emitterFor(route.key)} parentScope={parentScope?.current} component={screenComponent} onPopRequested={popOne} />{/if}{/each}</svelte:element></symbiote-view>
+<symbiote-view {...STACK_ROOT_TEMPLATE_PROPS}><symbiote-text {...SCREEN_REGISTRY_TEMPLATE_PROPS}>{@render children?.()}</symbiote-text><svelte:element this={RNS_SCREEN_STACK_VIEW_NAME} {@attach hostProps(stackProps)}>{#each state.routes as route, index (route.key)}{@const screenComponent = componentFor(route)}{#if screenComponent !== undefined}<StackScreen {route} {index} routeCount={state.routes.length} options={optionsFor(route)} navigation={handle} emitter={emitterFor(route.key)} parentScope={parentScope?.current} component={screenComponent} onPopRequested={popOne} />{/if}{/each}</svelte:element></symbiote-view>

@@ -47,12 +47,22 @@ export function findLiveByTestId(root: unknown, testID: string): IFabricNode | u
   return found;
 }
 
+// Svelte's own mount bootstrap and block-boundary codegen (`{#if}`/`{#each}`/component-root
+// dynamic blocks) create real, empty `RCTRawText` nodes as positional markers — never touched by
+// `setText` again after creation (svelte-adapter-custom-renderer skill, native-node-parity.test.ts's
+// `isSvelteBootstrapAnchor`). They commit like any other node (the engine's `isAnchor` check only
+// recognizes `createComment`/`createAnchor` nodes, not an empty-string raw text node), so they'd
+// otherwise pollute every outline assertion in this file's consumers with test-irrelevant noise.
+function isSvelteBootstrapAnchor(node: IFabricNode): boolean {
+  return node.viewName === 'RCTRawText' && node.props?.text === '';
+}
+
 // A depth-indented `viewName` outline, for asserting the exact committed SHAPE (which is what
 // catches a stray whitespace text node, an extra wrapper, or a missing header).
 export function outline(root: unknown): string[] {
   const lines: string[] = [];
   const visit = (node: unknown, depth: number): void => {
-    if (!isFabricNode(node)) return;
+    if (!isFabricNode(node) || isSvelteBootstrapAnchor(node)) return;
     lines.push(`${'  '.repeat(depth)}${String(node.viewName)}`);
     for (const child of node.children ?? []) visit(child, depth + 1);
   };

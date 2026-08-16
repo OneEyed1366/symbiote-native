@@ -81,7 +81,7 @@ const PROBE_SOURCE = `<script lang="ts">
      String(navigation.current.getParent() === undefined),
    ].join('|'));
  </script>
- <symbiote-view p={{ testID: 'probe', accessibilityLabel: label }} />`;
+ <symbiote-view testID="probe" accessibilityLabel={label} />`;
 
 const MISMATCH_PROBE_SOURCE = `<script lang="ts">
    import { useTabNavigation } from './use-tab-navigation.svelte';
@@ -95,12 +95,12 @@ const MISMATCH_PROBE_SOURCE = `<script lang="ts">
      }
    });
  </script>
- <symbiote-view p={{ testID: 'mismatch', accessibilityLabel: message }} />`;
+ <symbiote-view testID="mismatch" accessibilityLabel={message} />`;
 
 async function mountWithScreen(variant: string, screenSource: string): Promise<unknown> {
   const dir = __dirname;
-  harness.compileSource(dir, `${variant}-screen`, screenSource);
-  const app = harness.compileSource(
+  await harness.compileSource(dir, `${variant}-screen`, screenSource);
+  const app = await harness.compileSource(
     dir,
     `${variant}-app`,
     `<script lang="ts">
@@ -187,7 +187,7 @@ describe('navigation runes (real compiled components)', () => {
 
   it('throws when a rune is used outside any navigator', async () => {
     const dir = __dirname;
-    const app = harness.compileSource(
+    const app = await harness.compileSource(
       dir,
       'orphan-app',
       `<script lang="ts">
@@ -199,7 +199,7 @@ describe('navigation runes (real compiled components)', () => {
            message = error instanceof Error ? error.message : 'unknown';
          }
        </script>
-       <symbiote-view p={{ testID: 'orphan', accessibilityLabel: message }} />`,
+       <symbiote-view testID="orphan" accessibilityLabel={message} />`,
     );
     mount(ROOT_TAG, await loadComponent(app));
     await tick();

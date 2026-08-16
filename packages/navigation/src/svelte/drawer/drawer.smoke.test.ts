@@ -86,7 +86,7 @@ function screenSource(testID: string): string {
      const route = useRoute();
      const focused = useIsFocused();
    </script>
-   <symbiote-view p={{ testID: '${testID}', accessibilityLabel: route.current.name + ':' + String(focused.current) }} />`;
+   <symbiote-view {...{ testID: '${testID}', accessibilityLabel: route.current.name + ':' + String(focused.current) }} />`;
 }
 
 function appSource(drawerAttributes: string): string {
@@ -100,7 +100,7 @@ function appSource(drawerAttributes: string): string {
      $effect(() => { if (navigator !== null) onReady?.(navigator); });
    </script>
    <Drawer bind:this={navigator} ${drawerAttributes}>
-     {#snippet drawerContent(slot)}<symbiote-view p={{ testID: 'drawer-panel-content', accessibilityLabel: String(slot.state.routes.length) + ':' + String(slot.state.isOpen) + ':' + String(Object.keys(slot.descriptors).length) + ':' + String(typeof slot.navigation.openDrawer) }} />{/snippet}
+     {#snippet drawerContent(slot)}<symbiote-view {...{ testID: 'drawer-panel-content', accessibilityLabel: String(slot.state.routes.length) + ':' + String(slot.state.isOpen) + ':' + String(Object.keys(slot.descriptors).length) + ':' + String(typeof slot.navigation.openDrawer) }} />{/snippet}
      <DrawerScreen name="inbox" component={Inbox} />
      <DrawerScreen name="settings" component={Settings} options={{ drawerLabel: 'Settings' }} />
    </Drawer>`;
@@ -115,15 +115,19 @@ async function mountDrawer(
   drawerAttributes = '',
 ): Promise<IDrawerNavigatorHandle> {
   const dir = __dirname;
-  const animatedView = harness.compileFile(ANIMATED_VIEW_SOURCE);
+  const animatedView = await harness.compileFile(ANIMATED_VIEW_SOURCE);
   writeFileSync(
     ANIMATED_ALIAS,
     `import AnimatedView from ${JSON.stringify(relative(dir, animatedView))};\n` +
       'export const Animated = { View: AnimatedView };\n',
   );
-  harness.compileSource(dir, 'inbox-fixture', screenSource('inbox'));
-  harness.compileSource(dir, 'settings-fixture', screenSource('settings'));
-  const app = harness.compileSource(dir, `drawer-app-${variant}`, appSource(drawerAttributes));
+  await harness.compileSource(dir, 'inbox-fixture', screenSource('inbox'));
+  await harness.compileSource(dir, 'settings-fixture', screenSource('settings'));
+  const app = await harness.compileSource(
+    dir,
+    `drawer-app-${variant}`,
+    appSource(drawerAttributes),
+  );
   const App = await loadComponent(app);
   let handle: unknown = null;
   mount(ROOT_TAG, App, {
@@ -235,12 +239,12 @@ describe('Drawer (real compiled index.svelte)', () => {
     expect(findLiveByTestId(fabric.appRoot(), 'inbox')).toBeUndefined();
   });
 
-  it('compiles every navigator template with no stray whitespace text nodes', () => {
+  it('compiles every navigator template with no stray whitespace text nodes', async () => {
     const audit = createSvelteHarness('drawer-audit', {
       '@symbiote-native/svelte': ANIMATED_ALIAS,
     });
-    audit.compileFile(join(__dirname, 'index.svelte'));
-    audit.compileFile(join(__dirname, '../drawer-screen.svelte'));
+    await audit.compileFile(join(__dirname, 'index.svelte'));
+    await audit.compileFile(join(__dirname, '../drawer-screen.svelte'));
     expect(audit.strayWhitespaceCount()).toBe(0);
     audit.cleanup();
   });

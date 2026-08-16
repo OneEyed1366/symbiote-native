@@ -43,7 +43,7 @@ function screenSource(testID: string): string {
      const route = useRoute();
      const focused = useIsFocused();
    </script>
-   <symbiote-view p={{ testID: '${testID}', accessibilityLabel: route.current.name + ':' + String(focused.current) }} />`;
+   <symbiote-view {...{ testID: '${testID}', accessibilityLabel: route.current.name + ':' + String(focused.current) }} />`;
 }
 
 function appSource(tabAttributes: string): string {
@@ -68,9 +68,9 @@ function isTabHandle(value: unknown): value is ITabNavigatorHandle {
 
 async function mountTab(variant = 'default', tabAttributes = ''): Promise<ITabNavigatorHandle> {
   const dir = __dirname;
-  harness.compileSource(dir, 'feed-fixture', screenSource('feed'));
-  harness.compileSource(dir, 'profile-fixture', screenSource('profile'));
-  const app = harness.compileSource(dir, `tab-app-${variant}`, appSource(tabAttributes));
+  await harness.compileSource(dir, 'feed-fixture', screenSource('feed'));
+  await harness.compileSource(dir, 'profile-fixture', screenSource('profile'));
+  const app = await harness.compileSource(dir, `tab-app-${variant}`, appSource(tabAttributes));
   const App = await loadComponent(app);
   let handle: unknown = null;
   mount(ROOT_TAG, App, {
@@ -84,10 +84,17 @@ async function mountTab(variant = 'default', tabAttributes = ''): Promise<ITabNa
   return handle;
 }
 
+// Svelte's own mount bootstrap and block-boundary codegen create real, empty `RCTRawText`
+// markers alongside real content — see fabric-tree.test-helper.ts's `outline()` for the same
+// filter (svelte-adapter-custom-renderer skill).
 function tabBarLabels(): string[] {
   const labels: string[] = [];
   walkLive(fabric.appRoot(), node => {
-    if (node.viewName === 'RCTRawText' && typeof node.props?.text === 'string') {
+    if (
+      node.viewName === 'RCTRawText' &&
+      typeof node.props?.text === 'string' &&
+      node.props.text !== ''
+    ) {
       labels.push(node.props.text);
     }
   });
@@ -152,10 +159,10 @@ describe('Tab (real compiled index.svelte)', () => {
     expect(countLive(fabric.appRoot(), 'RCTView')).toBe(before);
   });
 
-  it('compiles every navigator template with no stray whitespace text nodes', () => {
+  it('compiles every navigator template with no stray whitespace text nodes', async () => {
     const audit = createSvelteHarness('tabs-audit');
-    audit.compileFile(join(__dirname, 'index.svelte'));
-    audit.compileFile(join(__dirname, '../tab-screen.svelte'));
+    await audit.compileFile(join(__dirname, 'index.svelte'));
+    await audit.compileFile(join(__dirname, '../tab-screen.svelte'));
     expect(audit.strayWhitespaceCount()).toBe(0);
     audit.cleanup();
   });

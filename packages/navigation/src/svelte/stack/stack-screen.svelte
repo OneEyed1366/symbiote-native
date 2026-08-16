@@ -19,10 +19,12 @@
   //
   // Every react-native-screens view here goes through `<svelte:element this={'RNSScreen'}>`
   // rather than a literal tag: their Fabric names are capitalized and un-hyphenated, so a literal
-  // tag would parse as a COMPONENT reference in a Svelte template. Their props ride an
-  // `{@attach hostProps(...)}` attachment rather than an attribute, because a dynamic tag
-  // compiles through Svelte's generic setAttribute path and never the custom-element property-SET
-  // path the object bag depends on - see ../attachments.ts for the full reasoning.
+  // tag would parse as a COMPONENT reference in a Svelte template (svelte:element is the one
+  // construct the custom-renderer compiler leaves untouched, per svelte-adapter-custom-renderer
+  // skill §7). Their props ride an `{@attach hostProps(...)}` attachment rather than a per-key
+  // spread, because several of these leaves also need a live ref onto the real host node
+  // alongside their props (the search bar's imperative handle below) - see ../attachments.ts for
+  // the full reasoning.
   //
   // The whole per-route tree is packed edge-to-edge with zero whitespace between sibling tags:
   // svelte-adapter-dom-shim skill §16, where a stray space would become a real RCTRawText child
