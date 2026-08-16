@@ -457,12 +457,29 @@ its suffix (`/^(?:data-v|svelte)-[0-9a-z]+$/`), never by "there is a `__`
 somewhere in the name". BEM is `card__title`. Splitting on a bare `__` would
 merge `.card`'s declarations into every BEM element class in the codebase.
 
-**Known remaining limit (not fixed, low value):** a compound rule where one
-token is scoped and the other is global (`:global(...)`-exempt, or a class
-that only exists in App.css) has no single suffix to factor out and still
-does not resolve. On the web it would, because the element carries both
-classes as separate tokens. Reaching it needs a registry that indexes by
-token set rather than by concatenated key.
+**Mixed scoped/global tokens — FIXED 2026-08-15 (was "low value", turned out
+to be the whole partial-`:global()` feature).** A compound rule where one
+token is scoped and the other is not (`:global(...)`-exempt, or a class that
+only exists in App.css, or one handed down from a parent component) used to
+have "no single suffix to factor out" and bail. That is exactly what a partial
+`:global()` produces: `.card :global(.legacy)` registers the collapsed key
+`cardLegacy__<scope>` (the rule still only applies where the file's own
+`.card` does, so the KEY is scoped) against markup `card__<scope> legacy` (the
+escape hatch exempts the TOKEN). Both halves were individually correct and
+could never meet. `scopedCompoundKey` now treats an unscoped token as
+contributing its own name and no scope, so the one scope present is still
+factorable; two tokens carrying DIFFERENT suffixes still bail, because no rule
+legitimately spans two components.
+
+**The divergence that buys:** a fully-scoped `.card.reset` collapses to the
+same key as `.card :global(.reset)`, so a foreign `reset` now matches a rule
+its author scoped to their own. The key format cannot tell them apart —
+separating them needs a registry indexed by token SET, with per-token scope.
+Asserted in `scoped-conformance.test.ts` beside the behavior it comes with, so
+it stays deliberate. End-to-end proof (real preprocess + compile + mount, both
+halves meeting at the registry) lives in
+`adapters/svelte/src/components/scoped-styles.smoke.test.ts`, "partial
+`:global()` under scope".
 
 **Checking it on a device needs THREE re-packed tarballs, not one.** `@symbiote-native/css-parser`
 is a regular dependency of every adapter, so an example that pins only the adapter and the engine

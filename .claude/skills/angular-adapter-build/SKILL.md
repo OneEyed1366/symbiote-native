@@ -214,6 +214,34 @@ root is sufficient to produce `adapters/angular/build/angular` and
 `packages/slider/build-ngc/angular` in the correct order — **no consumer ever runs another
 package's `ng:build`.**
 
+**But `prepare` is "build if MISSING", not "build if STALE" — and that difference eats source
+fixes silently in the dev loop.** The script is
+`node -e "existsSync('build/angular/index.js')||process.exit(1)" || pnpm run ng:build`: once
+`build/angular/` exists from any earlier build, it never rebuilds, no matter how old that output
+is relative to `src/`. `pnpm pack` runs `prepare`, so **a tarball can ship ngc output from days
+ago while every headless signal is green** — `tsc --build` and vitest read `src/`, not
+`build/angular/`.
+
+It is worse than a plain stale-artifact problem because the package emits TWO trees and only one
+of them is what an app loads. `tsc --build` (the `typecheck` script) writes `build/**`; `ngc`
+writes `build/angular/**`; the `exports` map's `react-native` condition points at
+`build/angular/**`. So a `typecheck` run refreshes the copy nobody loads and leaves the copy Metro
+resolves untouched — grepping the installed package for your change finds it, in the wrong tree,
+and looks like proof it shipped. Measured 2026-08-16: a sticky-header fix was present in
+`build/components/scroll-view/shared.js` and absent from
+`build/angular/components/scroll-view/shared.js` in the same tarball.
+
+**So before `pnpm pack` on any Angular-shipping package after a source change, run
+`pnpm run ng:build` explicitly** (it is `clean && ngc`, so it deletes `build/` first — the orphan
+protection §11c describes). Then verify against the tree the `exports` map actually names:
+
+```
+grep -c '<a string only your change introduces>' build/angular/<path>/<file>.js
+```
+
+Checking `build/**` instead of `build/angular/**` is the specific mistake this paragraph exists to
+stop.
+
 **A consuming app's `ng:build` script therefore does exactly ONE thing: compile ITS OWN
 source** (`"ng:build": "ngc -p tsconfig.angular.json"`, no `pnpm --filter` chain). This is not
 optional cleanup — an app hand-listing its dependencies' build commands is precisely the leak

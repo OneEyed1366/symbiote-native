@@ -753,15 +753,78 @@ those.
 
 ### Two-way binding is supported, via `$bindable()` — not a gap
 
+**Implemented for real 2026-08-15** (`components/text-input/index.svelte`,
+`components/switch/index.svelte`). This section was recorded as a DECISION on
+2026-08-11 but never actually built — `grep -rn "bindable" adapters/svelte/src`
+returned zero matches until this date. Kept here rather than deleted, per this
+skill's own "logs are an asset, correct don't delete" convention (§16/§17 do the
+same for their own earlier-wrong drafts).
+
 `bind:` is not a blanket-forbidden feature. Every prior adapter already has a
 two-way-binding convention on its own controlled components — Vue's `v-model`
 (`modelValue` prop + `update:modelValue` emit, `adapters/vue/src/utils/model-binding.ts`)
 and Angular's banana-in-a-box `[(value)]` (`@Input() value` + `@Output() valueChange`,
 `adapters/angular/src/components/text-input.ts:244`). Svelte's own native mechanism
-for the same shape is `$bindable()`: `TextInput.svelte` declares
-`let { value = $bindable() } = $props()` and `<TextInput bind:value={x}>` works with
-no adapter-side plumbing at all — Svelte's compiler wires the two-way sync itself.
-This is a normal, supported authoring path, not a workaround.
+for the same shape is `$bindable()`: both components declare
+`let { value = $bindable(), ...rest } = $props()` and `<TextInput bind:value={x}>` /
+`<Switch bind:value={x}>` work, Svelte's compiler wiring the two-way sync itself.
+
+**⚠️ Corrected: "no adapter-side plumbing at all" was wrong.** A real
+implementation attempt (and a direct read of svelte's `reactivity/props.js`
+`prop()`) found that an UNGATED echo — reassigning the bindable `value` on every
+native report, unconditionally — breaks BOTH existing components' own
+controlled-write correction (`shouldCommandText` / `shouldSnapBack`), for every
+consumer, bound or not, not just `bind:` ones. The mechanism: `prop()`'s
+non-bound branch wraps the prop in a `derived` with a local override flag — an
+assignment marks `overridden = true` and the override survives until the
+PARENT's own underlying signal genuinely changes. For a plain
+`value={x} onValueChange={() => {}}` consumer whose `x` never changes (exactly
+`text-input.smoke.test.ts`'s and `switch.smoke.test.ts`'s own "rejecting
+parent" tests), an unconditional echo makes the child's own `value` read agree
+with what native just reported FOREVER, since there is no future push to reset
+it — `shouldCommandText`/`shouldSnapBack` then never see a divergence again,
+and the existing snap-back command silently stops firing. Proven with a
+throwaway probe component before touching the real components (three
+consecutive ticks all showed the child's own polluted echo, never reset absent
+a genuine external push) and independently re-derived from `prop()`'s bound
+vs. non-bound branches: a BOUND consumer's write flows straight into the
+parent's own signal (no local override at all, by construction), so it does
+not have this problem — only the non-bound, plain-contract path does, and it
+shares the exact same `value` destructuring `bind:` needs, so the two cannot
+be told apart by inspecting `value` alone.
+
+There is also no supported way to detect "is this instance bound" from inside
+the component — `$$props` is a compile error in runes mode
+(`Cannot use $$props in runes mode`), `$bindable()` only compiles when it
+destructures `$props()` directly (`$props()` itself can only be called ONCE
+per component — `props_duplicate` — so there is no second, unpolluted read of
+the same key either).
+
+**The actual fix, both components: gate the echo on `onValueChange` being
+absent.** In `handleChange`, right after calling `onValueChange`:
+
+```ts
+// $bindable() sugar: with no onValueChange there is nothing that could reject this report, so
+// mirror it straight into the bound value. A caller that ALSO supplies onValueChange keeps full
+// accept/reject control via the existing correction effect; echoing here too would defeat it.
+if (rest.onValueChange === undefined) value = changedText;
+```
+
+If the caller supplies `onValueChange` (whether or not they also write
+`bind:value`), the echo is skipped and the existing plain contract is
+byte-for-byte unchanged — proven by both existing "rejecting parent" tests
+staying green with no changes to their own assertions. If the caller uses
+`bind:value` with NO `onValueChange`, nothing else could reject the report
+anyway, so the echo is unconditionally correct and `bind:value` round-trips
+with no correction command dispatched — proven by a new test in each
+`*.smoke.test.ts` file (`round-trips a native … into a \`bind:value\` variable
+with no correction command`). **The one real, documented limit:** combining
+`bind:value` with a caller-supplied `onValueChange` on the SAME instance
+silently disables the bind: echo (onValueChange's own logic governs
+acceptance instead) — pick one authoring style per instance, matching how a
+raw DOM `<input bind:value>` has no built-in interception either; if you need
+both, mirror what `bind:` would do inside your own handler
+(`onValueChange={(v) => (x = v)}`).
 
 ### Mechanism for the one real gap — DECIDED: build-time preprocessor
 
