@@ -140,7 +140,7 @@ one barrel and forgetting the rest fails with the adapters named, and closing a 
 deleting its entry also fails - so the list cannot rot into an allowlist that permits new drift.
 When you add a shared name to one adapter, add it to all four in the same commit.
 
-**In `packages/*` the same duplication has a cheaper fix: `export * from '../core'`.** Each
+**In `packages/*` the same duplication first had a cheaper fix: `export * from '../core'`.** Each
 package ships `src/{core,react,vue,svelte,angular}/index.ts`, and the framework barrels used to
 list the ENTIRE core surface by name - 4 copies to keep in sync, per package. 15 packages already
 used `export *`; the 6 that didn't (battery, brightness, keep-awake, localization, network,
@@ -154,6 +154,50 @@ Two packages deliberately expose a SUBSET of core and must NOT be converted blin
 wraps). `navigation` and `slider` are not passthrough at all (slider's barrel carries the
 load-bearing `import '../register'` side effect - see the Metro `inlineRequires` note in
 CLAUDE.md). Check what a barrel omits before starring it.
+
+**2026-08-17: that fix was itself incomplete for one sub-case, and got superseded there —
+`export * from '../core'` is still correct wherever a physical file must exist for some other
+reason, but for a subpath that needs NOTHING beyond core, not even that one line should exist.**
+The unit of the decision is one adapter SUBPATH, not the whole package - ask whether it is
+genuinely and PERMANENTLY stateless (plain sync/async free functions, enums, constants; no
+per-instance state, no event/subscription stream, so categorically nothing a hook/composable/rune
+could ever wrap - the distinguishing feature vs. `sensors`' real hook is exactly that
+subscribable stream). When it is, delete the physical `src/<fw>/index.ts` and point the subpath
+directly at core in both `exports` and `publishConfig.exports`:
+
+```json
+"exports": {
+  ".": "./src/core/index.ts",
+  "./vue": "./src/core/index.ts",
+  "./react": "./src/core/index.ts",
+  "./svelte": "./src/core/index.ts",
+  "./angular": { "types": "./build-ngc/angular/index.d.ts", "react-native": "./build-ngc/angular/index.js", "default": "./src/angular/index.ts" }
+}
+```
+
+(`publishConfig.exports` mirrors it: `./react`/`./vue`/`./svelte` get the exact value `.` has,
+`{ "types": "./build/core/index.d.ts", "default": "./build/core/index.js" }`.) 12 packages were
+converted this way 2026-08-17: `sharing`, `sms`, `store-review`, `web-browser`, `local-auth`,
+`secure-store`, `device`, `crypto`, `standard-web-crypto`, `system-ui`, `application`, `haptics`.
+`standard-web-crypto`'s three barrels each also had `export { default as webCrypto } from
+'../core'` (`export *` never forwards a default export) - that alias moved into
+`src/core/index.ts` itself once, instead of surviving as three identical copies.
+
+`./angular` is NEVER folded into this, categorically, regardless of statelessness - it builds via
+a separate ngc/AOT pipeline (`build-ngc/`, `symbiote-release-publishing`) with its own tsconfig
+and linker step, so the export target structurally cannot be a bare path like the other three.
+Keep its own conditional-exports block and its own `src/angular/index.ts` even when that file's
+content is also just a re-export.
+
+The same "do NOT convert blindly" exceptions above still gate this - a subpath that withholds
+part of core, carries a load-bearing side effect, or adds real per-framework lifecycle
+(a hook/composable/rune/service subfolder for that adapter) keeps its physical file. This is also
+why "drop all framework subpaths everywhere and make every consuming app hand-write its own
+wrapper" is NOT the right generalization: for the hook/composable/rune-bearing tier, collapsing
+the subpath onto app code would mean every consumer re-implements the same subscription/lifecycle
+logic - exactly what `runtime_modules_layering` / `components_split_logic_view_lifecycle` exist to
+prevent by centralizing it once in the SDK. Only the genuinely-stateless tier gets the direct-alias
+treatment; the lifecycle-bearing tier keeps the subpath-plus-physical-file pattern.
 
 ## 5. Smoke
 

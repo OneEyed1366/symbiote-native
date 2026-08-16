@@ -45,18 +45,18 @@ your app automatically.
 src/core/                 the whole API: open/dismiss, the auth session, and the Custom Tabs
                           service functions. native-module.ts resolves ExpoWebBrowser through
                           expo-modules-core's requireNativeModule.
-src/react/                @symbiote-native/web-browser/react
-src/vue/                  @symbiote-native/web-browser/vue
 src/angular/              @symbiote-native/web-browser/angular
 ```
 
-All three adapter entries are plain re-exports of `core/`. Every export is a stateless free
-function; the one piece of live state — the Android auth-session polyfill's redirect subscription —
-belongs to a single in-flight promise inside the core and never surfaces as something a caller
-subscribes to or tears down. So there is nothing for a hook, composable, or service to wrap, the
-same reason [`@symbiote-native/secure-store`](../secure-store) re-exports rather than wraps. Import
-from `@symbiote-native/web-browser` directly if you don't care which adapter you're on; the
-per-adapter subpaths exist so every wrapper package has the same import surface.
+`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
+physical per-framework file. Every export is a stateless free function; the one piece of live
+state — the Android auth-session polyfill's redirect subscription — belongs to a single in-flight
+promise inside the core and never surfaces as something a caller subscribes to or tears down. So
+there is nothing for a hook, composable, or service to wrap, the same reason
+[`@symbiote-native/secure-store`](../secure-store) does the same. `./angular` stays a physical
+file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`). Import from
+`@symbiote-native/web-browser` directly if you don't care which adapter you're on; the per-adapter
+subpaths exist so every wrapper package has the same import surface.
 
 ## Use it
 

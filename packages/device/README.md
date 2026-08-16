@@ -53,13 +53,12 @@ src/core/     Eager constants (isDevice, brand, manufacturer, modelId, modelName
               isSideLoadingEnabledAsync / getPlatformFeaturesAsync / hasPlatformFeatureAsync,
               and the DeviceType enum. native-module.ts resolves the native module via
               expo-modules-core's requireNativeModule.
-src/react/    @symbiote-native/device/react   — export * from '../core'
-src/vue/      @symbiote-native/device/vue     — export * from '../core'
 src/angular/  @symbiote-native/device/angular — export * from '../core'
 ```
 
-No per-adapter lifecycle wrapper exists because there's nothing to subscribe to or clean up —
-each adapter entry is a single-file re-export.
+`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
+physical per-framework file, since there's nothing to subscribe to or clean up. `./angular` stays
+a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
 

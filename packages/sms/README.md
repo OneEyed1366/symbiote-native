@@ -60,17 +60,17 @@ This is the least invasive of the Expo wrappers here:
 ```
 src/core/                 the whole API: sendSMSAsync + isAvailableAsync. native-module.ts
                           resolves ExpoSMS through expo-modules-core's requireNativeModule.
-src/react/                @symbiote-native/sms/react
-src/vue/                  @symbiote-native/sms/vue
 src/angular/              @symbiote-native/sms/angular
 ```
 
-All three adapter entries are plain re-exports of `core/`. Both exports are stateless free
-functions — `sendSMSAsync` resolves once the composer closes and holds nothing afterwards, and
-there is no event stream — so there is nothing for a hook, composable, or service to wrap, the
-same reason [`@symbiote-native/secure-store`](../secure-store) re-exports rather than wraps.
-Import from `@symbiote-native/sms` directly if you don't care which adapter you're on; the
-per-adapter subpaths exist so every wrapper package has the same import surface.
+`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
+physical per-framework file. Both exports are stateless free functions — `sendSMSAsync` resolves
+once the composer closes and holds nothing afterwards, and there is no event stream — so there is
+nothing for a hook, composable, or service to wrap, the same reason
+[`@symbiote-native/secure-store`](../secure-store) does the same. `./angular` stays a physical
+file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`). Import from
+`@symbiote-native/sms` directly if you don't care which adapter you're on; the per-adapter
+subpaths exist so every wrapper package has the same import surface.
 
 ## Use it
 

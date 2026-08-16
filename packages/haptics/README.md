@@ -47,14 +47,13 @@ src/core/     notificationAsync / impactAsync / selectionAsync / performAndroidH
               plus NotificationFeedbackType / ImpactFeedbackStyle / AndroidHaptics.
               native-module.ts resolves the ExpoHaptics native module via
               expo-modules-core's requireNativeModule.
-src/react/    @symbiote-native/haptics/react   — plain re-export of core.
-src/vue/      @symbiote-native/haptics/vue     — plain re-export of core.
 src/angular/  @symbiote-native/haptics/angular — plain re-export of core.
 ```
 
 Upstream ships four async functions and three enums, not a subscribable sensor — there's
-nothing per-framework to add, so all three adapter entry points are identical re-exports of
-`core`.
+nothing per-framework to add, so `./react`, `./vue`, and `./svelte` are `exports`-map aliases
+straight onto `src/core/` (no physical per-framework file). `./angular` stays a physical
+file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
 

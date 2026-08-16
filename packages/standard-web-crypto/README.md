@@ -28,15 +28,17 @@ No further native wiring is needed for this package itself — it has no native 
 ## Shape
 
 ```
-src/core/     web-crypto.ts — the Crypto class + webCrypto singleton (default export) and
-              polyfillWebCrypto(), delegating to @symbiote-native/crypto's getRandomValues.
-src/react/    @symbiote-native/standard-web-crypto/react   — export * from '../core'
-src/vue/      @symbiote-native/standard-web-crypto/vue     — export * from '../core'
+src/core/     web-crypto.ts — the Crypto class + webCrypto singleton (default export, also
+              re-exported as the named `webCrypto`) and polyfillWebCrypto(), delegating to
+              @symbiote-native/crypto's getRandomValues.
 src/angular/  @symbiote-native/standard-web-crypto/angular — export * from '../core'
 ```
 
-No per-adapter lifecycle wrapper exists because there's nothing to subscribe to or clean up —
-each adapter entry is a single-file re-export.
+`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
+physical per-framework file, since there's nothing to subscribe to or clean up. (The `webCrypto`
+named re-export used to live only in those three per-framework barrels; it now lives once in
+`src/core/index.ts` instead.) `./angular` stays a physical file/subpath since Angular ships
+through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
 

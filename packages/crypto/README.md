@@ -48,13 +48,12 @@ src/core/     getRandomBytes / getRandomBytesAsync / getRandomValues / randomUUI
               option/result types, and the CryptoError validation-error class.
               native-module.ts resolves the native module via expo-modules-core's
               requireNativeModule.
-src/react/    @symbiote-native/crypto/react   — export * from '../core'
-src/vue/      @symbiote-native/crypto/vue     — export * from '../core'
 src/angular/  @symbiote-native/crypto/angular — export * from '../core'
 ```
 
-No per-adapter lifecycle wrapper exists because there's nothing to subscribe to or clean up —
-each adapter entry is a single-file re-export.
+`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
+physical per-framework file, since there's nothing to subscribe to or clean up. `./angular` stays
+a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
 

@@ -19,9 +19,9 @@
   "types": "src/core/index.ts",
   "exports": {
     ".": "./src/core/index.ts",
-    "./vue": "./src/vue/index.ts",
-    "./react": "./src/react/index.ts",
-    "./svelte": "./src/svelte/index.ts",
+    "./vue": "./src/core/index.ts",
+    "./react": "./src/core/index.ts",
+    "./svelte": "./src/core/index.ts",
     "./angular": {
       "types": "./build-ngc/angular/index.d.ts",
       "react-native": "./build-ngc/angular/index.js",
@@ -48,16 +48,16 @@
         "default": "./build/core/index.js"
       },
       "./vue": {
-        "types": "./build/vue/index.d.ts",
-        "default": "./build/vue/index.js"
+        "types": "./build/core/index.d.ts",
+        "default": "./build/core/index.js"
       },
       "./react": {
-        "types": "./build/react/index.d.ts",
-        "default": "./build/react/index.js"
+        "types": "./build/core/index.d.ts",
+        "default": "./build/core/index.js"
       },
       "./svelte": {
-        "types": "./build/svelte/index.d.ts",
-        "default": "./build/svelte/index.js"
+        "types": "./build/core/index.d.ts",
+        "default": "./build/core/index.js"
       },
       "./angular": {
         "types": "./build-ngc/angular/index.d.ts",

@@ -26,11 +26,18 @@ apart.
 `export { X } from '@symbiote-native/engine'`). 31 of them were deleted 2026-08-15;
 a pure passthrough belongs in the barrel itself.
 
-**In `packages/*`, a framework barrel that re-exports its whole core writes
-`export * from '../core'`** - not a hand-listed copy in each of the four. Check
-first that the barrel isn't deliberately narrowing: `sensors` and `splash-screen`
-withhold part of core on purpose, and `slider`'s barrel carries a load-bearing
-`import '../register'` side effect.
+**In `packages/*`, decide PER SUBPATH, not per package.** If a `./react`/`./vue`/
+`./svelte` subpath is genuinely and permanently stateless (plain sync/async free
+functions, no event/subscription stream a hook/composable/rune could ever wrap),
+don't write a physical barrel file at all - point that subpath directly at
+`./src/core/index.ts` in both `exports` and `publishConfig.exports` (same value
+`.` already has) and delete `src/<fw>/index.ts`. Only write the physical
+`export * from '../core'` file when the subpath needs to exist for some other
+reason - it withholds part of core (`sensors`, `splash-screen`), carries a
+load-bearing side effect (`slider`'s `import '../register'`), or adds real
+per-framework lifecycle (a hook/composable/rune/service for that adapter).
+`./angular` is NEVER aliased this way, regardless of statelessness - it always
+keeps its own ngc/AOT conditional-exports block and its own `src/angular/index.ts`.
 
 Full rationale - why the facade stays, which argument for it is false, and the
 measured numbers: invoke the `symbiote-parity-check` skill (§4b).

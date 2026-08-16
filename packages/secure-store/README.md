@@ -62,17 +62,16 @@ describe the rule files).
 src/core/                 the whole API: seven keychain-accessibility constants plus the
                           get/set/delete surface. native-module.ts resolves ExpoSecureStore
                           through expo-modules-core's requireNativeModule.
-src/react/                @symbiote-native/secure-store/react
-src/vue/                  @symbiote-native/secure-store/vue
 src/angular/              @symbiote-native/secure-store/angular
 ```
 
-All three adapter entries are plain re-exports of `core/`. Upstream ships free functions and
-constants — no per-instance state, no event stream — so there is nothing for a hook, composable,
-or service to wrap, the same reason [`@symbiote-native/local-auth`](../local-auth) re-exports
-rather than wraps. Import from `@symbiote-native/secure-store` directly if you don't care which
-adapter you're on; the per-adapter subpaths exist so every wrapper package has the same import
-surface.
+`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
+physical per-framework file. Upstream ships free functions and constants — no per-instance state,
+no event stream — so there is nothing for a hook, composable, or service to wrap, the same reason
+[`@symbiote-native/local-auth`](../local-auth) does the same. `./angular` stays a physical
+file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`). Import from
+`@symbiote-native/secure-store` directly if you don't care which adapter you're on; the
+per-adapter subpaths exist so every wrapper package has the same import surface.
 
 ## Use it
 
