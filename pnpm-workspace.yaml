@@ -18,9 +18,6 @@ packages:
   - 'core/*'
   - 'adapters/*'
   - 'packages/*'
-  # WIP, deliberately untracked (see the symbiote-devtools-inspector skill) — excluded so an
-  # install never regenerates the lockfile against it while it sits unfinished on disk.
-  - '!packages/devtools'
   - 'apps/*'
 allowBuilds:
   '@parcel/watcher': true
