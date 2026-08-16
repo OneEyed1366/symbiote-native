@@ -3166,3 +3166,87 @@ precisely so no consuming app needs local wiring). Any other app on
 - needs this same line added by hand today, or it hits the identical
 silent-no-op bug. A `@symbiote-native/svelte/metro-config` helper shipping
 this the way the transformer is shipped has not been done.
+
+## §29. `prettier-plugin-svelte --write` reintroduces §16's whitespace bug, plus a separate svelte-check regression - MEASURED 2026-08-17
+
+`examples/svelte` had no Prettier support for `.svelte` at all before this date (no
+parser registered, `prettier --check` failed with "No parser could be inferred").
+Adding `prettier-plugin-svelte` and running `prettier --write` across the example
+(28 files) reformatted every file - and among those changes, silently reintroduced
+exactly the two bugs §16 already named, in real shipped code, not a contrived case:
+
+1. **3 stray whitespace-only text nodes between siblings**, all in
+   `components/ParityDemo.svelte`, all at points where the source was originally
+   packed edge-to-edge (`></Text><SectionList` with zero characters between) and
+   Prettier's line-wrapping inserted a real newline + indent between two sibling
+   tags while wrapping a long line - the exact §16 hazard, produced by the
+   formatter meant to keep the file tidy.
+2. **13 sentences wrapped across multiple source lines inside a single `<Text>`
+   node**, across 10 files - including one in `CanaryScreen.svelte` sitting
+   *right next to an existing HTML-comment guard* warning against exactly this
+   ("one physical line on purpose: unlike Vue's template compiler, Svelte does
+   NOT condense whitespace inside a text node..."). Prettier's printWidth-driven
+   text wrapping does not read source comments and reflowed it anyway.
+3. **A separate, non-DOM regression**: reformatting a `<SectionList>`'s two
+   `{#snippet}` children from one packed line into individual indented lines
+   changed nothing about the committed Fabric tree (snippet declarations are not
+   DOM siblings, §16 already covers why) but broke `svelte-check`
+   (`0 errors` -> `'children' does not exist in type 'IVirtualizedSectionListProps'`),
+   apparently by changing how `svelte2tsx` attributes the two named snippets.
+   Reverting that one block to a single physical line fixed it with no other
+   change. Not fully root-caused; recorded as a measured fact, not a theory.
+
+**Practical rule: `prettier --write` on any file under `examples/svelte` (or this
+package's own `.svelte` sources) is not safe to trust blind.** After any Prettier
+run - manual, editor-on-save, or scripted - both of:
+
+```
+node scripts/audit-svelte-stray-whitespace.mjs <path>   # must report 0 / 0
+cd examples/svelte && npm run typecheck                  # svelte-check must stay 0 errors
+```
+
+A 0/0 audit result does not imply svelte-check is also clean - (3) is invisible
+to the audit script entirely, since it never touches the DOM tree. Both checks
+are required, not either. `.prettierrc.js` registers `prettier-plugin-svelte` with
+`htmlWhitespaceSensitivity` left at its default (`css`) - switching it to `strict`
+was considered as a hardening measure but not verified to eliminate case (1); do not
+assume it does without re-running both checks above against a real reformat.
+
+## §30. `collapseTextWhitespace` - the manual one-line-text discipline is now AUTOMATED, verified on device (2026-08-17)
+
+§16 and §29 both describe the bug and demand hand discipline ("a text node's content stays on
+ONE source line, however long"; pack siblings edge-to-edge). A third preprocessor,
+`adapters/svelte/src/preprocessor/collapse-text-whitespace.ts` (`collapseTextWhitespace()`),
+now closes the wrapped-sentence half of that automatically, mirroring what Vue's template
+compiler already does - so an author CAN wrap a long sentence across source lines for
+readability and it no longer ships a literal `\n` + indent into the native text content.
+
+Mechanism: walks every `Text` AST node (same `nestedNodes` walk shape as the other two
+preprocessors) and collapses any whitespace run (`[ \t\r\n]+`) to a single space. A node that
+becomes ENTIRELY whitespace after collapsing is deleted outright (0 characters) if the original
+contained a newline - closing §16's between-siblings hazard too, for the common case of writing
+each sibling on its own line - but is left as a single collapsed space if it had no newline,
+preserving an intentional same-line space (`<Text>{a} {b}</Text>`). The one residual, documented
+gap: a whitespace-only gap between two siblings written on ONE line with no newline is not
+caught (indistinguishable from the intentional-space case without knowing whether the parent
+renders raw text) - `scripts/audit-svelte-stray-whitespace.mjs` remains the safety net for that
+narrow case and should still be run, not skipped.
+
+Registered in both `svelte.config.js` files (adapter's own and every consumer's, e.g.
+`examples/svelte/svelte.config.js`) AFTER `scopedStyles()`, and wired into
+`metro-svelte-transformer.cjs` as a third lazy-loaded preprocessor in the same chain - so it
+protects both svelte-check/editor diagnostics and the real Metro build, matching the other two.
+
+**Verified past the unit-test level, on the actual Metro bundle and a real simulator**: a
+throwaway `TextWrapProbeScreen.svelte` (two `<Text>` blocks, one deliberately wrapped across
+source lines, one on one line) rendered IDENTICALLY on an iOS 26.5 / iPhone 17 simulator after
+this preprocessor was wired in and `@symbiote-native/svelte` was repacked and reinstalled into
+`examples/svelte` - before this preprocessor existed, the wrapped block visibly showed a forced
+line break plus stray leading spaces mid-sentence, exactly as §29 predicted from the compiled
+`$.text(...)` call alone; the fetched real `index.bundle` was independently grepped and
+confirmed zero embedded `\n` in either block's compiled string.
+
+Line numbers are NOT preserved past an edited node (see the preprocessor's own header for why
+this is a deliberate, unavoidable tradeoff here, unlike `scopedStyles`'s line-preserving
+`blankOut` trick) - a diagnostic below an edited node may point a few lines off. No source map
+is emitted, matching the other two preprocessors.
