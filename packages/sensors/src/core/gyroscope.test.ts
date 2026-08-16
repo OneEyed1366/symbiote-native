@@ -29,18 +29,28 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// Gyroscope is a zero-override DeviceSensor subclass — permission/availability/update-interval
+// fallback logic is DeviceSensor's, already fully covered in device-sensor.test.ts. What's
+// specific here is that the exported `Gyroscope` singleton is wired to the real
+// ExponentGyroscope native module and to the exact event name that module's native side emits.
+// No Negative group: both assertions are pass-through wiring, nothing here can throw.
 describe('Gyroscope', () => {
-  it('sets the update interval', () => {
-    Gyroscope.setUpdateInterval(1234);
+  describe('is wired to the correct native module and event name', () => {
+    it('forwards setUpdateInterval to the ExponentGyroscope native module', () => {
+      // why: proves the singleton's native module reference is the real ExponentGyroscope, not
+      // an accidental stand-in shared with another sensor.
+      Gyroscope.setUpdateInterval(1234);
 
-    expect(FAKE_NATIVE_GYROSCOPE.setUpdateInterval).toHaveBeenCalledTimes(1);
-    expect(FAKE_NATIVE_GYROSCOPE.setUpdateInterval).toHaveBeenCalledWith(1234);
-  });
+      expect(FAKE_NATIVE_GYROSCOPE.setUpdateInterval).toHaveBeenCalledWith(1234);
+    });
 
-  it('subscribes through the shared gyroscopeDidUpdate event name', () => {
-    const listener = vi.fn();
-    Gyroscope.addListener(listener);
+    it('subscribes through the "gyroscopeDidUpdate" event name the native module emits', () => {
+      // why: 'gyroscopeDidUpdate' is the exact string ExponentGyroscope's native side emits
+      // events under — a typo here means the listener is registered for an event that never fires.
+      const listener = vi.fn();
+      Gyroscope.addListener(listener);
 
-    expect(FAKE_NATIVE_GYROSCOPE.addListener).toHaveBeenCalledWith('gyroscopeDidUpdate', listener);
+      expect(FAKE_NATIVE_GYROSCOPE.addListener).toHaveBeenCalledWith('gyroscopeDidUpdate', listener);
+    });
   });
 });

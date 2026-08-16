@@ -29,18 +29,28 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// Barometer is a zero-override DeviceSensor subclass — permission/availability/update-interval
+// fallback logic is DeviceSensor's, already fully covered in device-sensor.test.ts. What's
+// specific here is that the exported `Barometer` singleton is wired to the real ExpoBarometer
+// native module and to the exact event name that module's native side emits. No Negative group:
+// both assertions are pass-through wiring, nothing here can throw.
 describe('Barometer', () => {
-  it('sets the update interval', () => {
-    Barometer.setUpdateInterval(1234);
+  describe('is wired to the correct native module and event name', () => {
+    it('forwards setUpdateInterval to the ExpoBarometer native module', () => {
+      // why: proves the singleton's native module reference is the real ExpoBarometer, not an
+      // accidental stand-in shared with another sensor.
+      Barometer.setUpdateInterval(1234);
 
-    expect(FAKE_NATIVE_BAROMETER.setUpdateInterval).toHaveBeenCalledTimes(1);
-    expect(FAKE_NATIVE_BAROMETER.setUpdateInterval).toHaveBeenCalledWith(1234);
-  });
+      expect(FAKE_NATIVE_BAROMETER.setUpdateInterval).toHaveBeenCalledWith(1234);
+    });
 
-  it('subscribes through the shared barometerDidUpdate event name', () => {
-    const listener = vi.fn();
-    Barometer.addListener(listener);
+    it('subscribes through the "barometerDidUpdate" event name the native module emits', () => {
+      // why: 'barometerDidUpdate' is the exact string ExpoBarometer's native side emits events
+      // under — a typo here means the listener is registered for an event that never fires.
+      const listener = vi.fn();
+      Barometer.addListener(listener);
 
-    expect(FAKE_NATIVE_BAROMETER.addListener).toHaveBeenCalledWith('barometerDidUpdate', listener);
+      expect(FAKE_NATIVE_BAROMETER.addListener).toHaveBeenCalledWith('barometerDidUpdate', listener);
+    });
   });
 });

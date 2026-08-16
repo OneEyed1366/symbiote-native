@@ -1,5 +1,9 @@
 // Co-located React-driven test (ADR 0025) for useLocales. Mocks `core`, not expo-modules-core
-// internals — same pattern packages/battery's hook tests use.
+// internals — same pattern packages/battery's hook tests use. Native delegation is covered once
+// in packages/localization/src/core/localization.test.ts.
+//
+// No Negative group: the hook has no guard clause or throwing path — getLocales() is a
+// synchronous, always-succeeding native read.
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -82,12 +86,17 @@ afterEach(() => unmount(ROOT_TAG));
 
 describe('useLocales', () => {
   it('reads the current locales synchronously on first render', () => {
+    // why: getLocales() is a synchronous native read — useMemo must compute the real value on
+    // the very first render, with no "loading" gap.
     mount(ROOT_TAG, createElement(Probe));
 
     expect(results[results.length - 1]).toEqual(FAKE_LOCALES_INITIAL);
   });
 
   it('recomputes locales when the native listener fires', async () => {
+    // why: the hook's whole mechanism is a useReducer invalidation counter driving useMemo — the
+    // registered listener must actually bump that counter, or a real device locale-settings
+    // change would never reach the component.
     mount(ROOT_TAG, createElement(Probe));
 
     const invalidate = addListener.mock.calls[0][0];
@@ -98,6 +107,8 @@ describe('useLocales', () => {
   });
 
   it('unsubscribes from the native listener on unmount', () => {
+    // why: the effect's cleanup must run on unmount or the native listener leaks past the
+    // component's lifetime.
     mount(ROOT_TAG, createElement(Probe));
 
     unmount(ROOT_TAG);

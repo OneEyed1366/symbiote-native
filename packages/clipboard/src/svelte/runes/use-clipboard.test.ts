@@ -110,27 +110,39 @@ async function mountClipboard(): Promise<(IClipboardEvent | null)[]> {
   return values;
 }
 
+// No Negative group: unlike battery/brightness/cellular, this rune has no one-shot fetch either —
+// it only ever subscribes, writes on event, and unsubscribes. No guard clause, nothing meant to
+// reject/throw.
 describe('useClipboard (Svelte)', () => {
-  it('starts null before any clipboard-change event arrives', async () => {
-    const values = await mountClipboard();
+  describe('Positive — boxed value tracks the native listener and unmount', () => {
+    // why: unlike battery/locales/calendars there is no synchronous or one-shot-async clipboard
+    // read on mount (clipboard content is push-only) — so the contract is genuinely "no event
+    // yet", not a fetched sentinel, and null is the only honest starting value.
+    it('starts null before any clipboard-change event arrives', async () => {
+      const values = await mountClipboard();
 
-    expect(values[0]).toBeNull();
-  });
+      expect(values[0]).toBeNull();
+    });
 
-  it('updates the boxed value when the native listener fires', async () => {
-    const values = await mountClipboard();
-    const fired: IClipboardEvent = { contentTypes: [ContentType.IMAGE] };
+    // why: the rune's whole purpose is surfacing clipboard-change events as they happen — a
+    // consumer that only read the initial null would never see anything the user copies.
+    it('updates the boxed value when the native listener fires', async () => {
+      const values = await mountClipboard();
+      const fired: IClipboardEvent = { contentTypes: [ContentType.IMAGE] };
 
-    registeredListener?.(fired);
+      registeredListener?.(fired);
 
-    await vi.waitFor(() => expect(values[values.length - 1]).toEqual(fired));
-  });
+      await vi.waitFor(() => expect(values[values.length - 1]).toEqual(fired));
+    });
 
-  it('removes the subscription on unmount', async () => {
-    await mountClipboard();
+    // why: a rune that outlives its subscription leaks a live native listener into a scope Svelte
+    // already considers destroyed — the effect's teardown is what prevents that leak.
+    it('removes the subscription on unmount', async () => {
+      await mountClipboard();
 
-    unmount(ROOT_TAG);
+      unmount(ROOT_TAG);
 
-    expect(removeMock).toHaveBeenCalledTimes(1);
+      expect(removeMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

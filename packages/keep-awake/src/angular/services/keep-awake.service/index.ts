@@ -1,10 +1,6 @@
 import { effect, inject, Injectable, Injector } from '@angular/core';
-import {
-  activateKeepAwakeAsync,
-  addListener,
-  deactivateKeepAwake,
-  type KeepAwakeOptions,
-} from '../../../core';
+import { activateKeepAwakeAsync, deactivateKeepAwake, type KeepAwakeOptions } from '../../../core';
+import { createKeepAwakeListenerAttachment } from '../../../core/listener-attachment';
 
 // Angular twin of React's `useKeepAwake` hook and Vue's `useKeepAwake` composable. See
 // LowPowerModeService (packages/battery) for the `connect()`/`effect()` pattern rationale — same
@@ -24,15 +20,16 @@ export class KeepAwakeService {
 
     effect(
       onCleanup => {
+        // Per effect run: onCleanup releases this exact attachment, so a re-run always starts
+        // from a fresh one rather than reviving a released attach.
+        const attachment = createKeepAwakeListenerAttachment(tagOrDefault, options?.listener);
+
         activateKeepAwakeAsync(tagOrDefault)
-          .then(() => {
-            if (options?.listener) {
-              addListener(tagOrDefault, options.listener);
-            }
-          })
+          .then(() => attachment.attach())
           .catch(() => {});
 
         onCleanup(() => {
+          attachment.release();
           if (options?.suppressDeactivateWarnings) {
             deactivateKeepAwake(tagOrDefault).catch(() => {});
           } else {

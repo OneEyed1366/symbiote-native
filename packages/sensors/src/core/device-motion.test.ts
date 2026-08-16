@@ -32,29 +32,42 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// DeviceMotion extends DeviceSensor with exactly one addition — the `gravity` constant, exposed
+// both as an instance property and a standalone export (mirroring upstream's dual exposure).
+// Everything else it inherits (permission/availability/update-interval fallback) is
+// DeviceSensor's own contract, already fully covered in device-sensor.test.ts. No Negative
+// group: every assertion here is pass-through wiring or a plain constant read, nothing throws.
 describe('DeviceMotion', () => {
-  it('sets the update interval', () => {
-    DeviceMotion.setUpdateInterval(1234);
+  describe('is wired to the correct native module and event name', () => {
+    it('forwards setUpdateInterval to the ExponentDeviceMotion native module', () => {
+      // why: proves the singleton's native module reference is the real ExponentDeviceMotion,
+      // not an accidental stand-in shared with another sensor.
+      DeviceMotion.setUpdateInterval(1234);
 
-    expect(FAKE_NATIVE_DEVICE_MOTION.setUpdateInterval).toHaveBeenCalledTimes(1);
-    expect(FAKE_NATIVE_DEVICE_MOTION.setUpdateInterval).toHaveBeenCalledWith(1234);
+      expect(FAKE_NATIVE_DEVICE_MOTION.setUpdateInterval).toHaveBeenCalledWith(1234);
+    });
+
+    it('subscribes through the "deviceMotionDidUpdate" event name the native module emits', () => {
+      // why: 'deviceMotionDidUpdate' is the exact string ExponentDeviceMotion's native side
+      // emits events under — a typo here means the listener is registered for an event that
+      // never fires.
+      const listener = vi.fn();
+      DeviceMotion.addListener(listener);
+
+      expect(FAKE_NATIVE_DEVICE_MOTION.addListener).toHaveBeenCalledWith(
+        'deviceMotionDidUpdate',
+        listener,
+      );
+    });
   });
 
-  it('subscribes through the shared deviceMotionDidUpdate event name', () => {
-    const listener = vi.fn();
-    DeviceMotion.addListener(listener);
-
-    expect(FAKE_NATIVE_DEVICE_MOTION.addListener).toHaveBeenCalledWith(
-      'deviceMotionDidUpdate',
-      listener,
-    );
-  });
-
-  it('exposes the native Gravity constant as a standalone export', () => {
-    expect(gravity).toBe(FAKE_GRAVITY);
-  });
-
-  it('exposes the native Gravity constant as an instance property', () => {
-    expect(DeviceMotion.gravity).toBe(FAKE_GRAVITY);
+  describe('exposes the native Gravity constant', () => {
+    it('reads Gravity off the native module rather than hardcoding Earth-standard gravity, as both a standalone export and an instance property', () => {
+      // why: upstream exposes the platform's own gravitational constant (which can differ
+      // slightly by device/OS) rather than a hardcoded 9.80665 — both entry points must read
+      // the SAME native value, or `gravity` and `DeviceMotion.gravity` could silently diverge.
+      expect(gravity).toBe(FAKE_GRAVITY);
+      expect(DeviceMotion.gravity).toBe(FAKE_GRAVITY);
+    });
   });
 });

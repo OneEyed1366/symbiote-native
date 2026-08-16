@@ -108,29 +108,41 @@ async function mountCalendars(values: Calendar[][]): Promise<void> {
   await tick();
 }
 
+// No Negative group: getCalendars() is a synchronous native read with no guard clause — the
+// effect only ever writes `calendars` from it (at mount, and again on each native event) or
+// unsubscribes. Nothing here is meant to reject/throw.
 describe('useCalendars (Svelte)', () => {
-  it('reads the current calendars at rune-call time', async () => {
-    const values: Calendar[][] = [];
-    await mountCalendars(values);
+  describe('Positive — boxed value tracks a re-read on mount, the native listener, and unmount', () => {
+    // why: calendar settings (24h clock, first weekday, time zone) can differ between when this
+    // function was called and when its effect actually runs — re-reading on mount is what keeps
+    // the very first value honest rather than trusting a possibly-stale call-time snapshot.
+    it('reads the current calendars at rune-call time', async () => {
+      const values: Calendar[][] = [];
+      await mountCalendars(values);
 
-    expect(values[0]).toEqual(FAKE_CALENDARS_INITIAL);
-  });
+      expect(values[0]).toEqual(FAKE_CALENDARS_INITIAL);
+    });
 
-  it('recomputes the state when the native listener fires', async () => {
-    const values: Calendar[][] = [];
-    await mountCalendars(values);
+    // why: calendar settings can change while the app is running (locale/region change) — the
+    // rune exists to stay in sync with that live device signal, not just report a mount-time read.
+    it('recomputes the state when the native listener fires', async () => {
+      const values: Calendar[][] = [];
+      await mountCalendars(values);
 
-    getCalendarsMock.mockReturnValue(FAKE_CALENDARS_UPDATED);
-    registeredListener?.();
-    await tick();
+      getCalendarsMock.mockReturnValue(FAKE_CALENDARS_UPDATED);
+      registeredListener?.();
+      await tick();
 
-    expect(values[values.length - 1]).toEqual(FAKE_CALENDARS_UPDATED);
-  });
+      expect(values[values.length - 1]).toEqual(FAKE_CALENDARS_UPDATED);
+    });
 
-  it('removes the subscription on unmount', async () => {
-    await mountCalendars([]);
-    unmount(ROOT_TAG);
+    // why: a rune that outlives its subscription leaks a live native listener into a scope Svelte
+    // already considers destroyed — the effect's teardown is what prevents that leak.
+    it('removes the subscription on unmount', async () => {
+      await mountCalendars([]);
+      unmount(ROOT_TAG);
 
-    expect(removeMock).toHaveBeenCalledTimes(1);
+      expect(removeMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

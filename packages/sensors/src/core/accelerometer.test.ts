@@ -29,21 +29,34 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// Accelerometer is a zero-override DeviceSensor subclass — its own permission/availability/
+// update-interval fallback logic is DeviceSensor's, already fully covered in
+// device-sensor.test.ts. What is specific to THIS file, and can't be proven generically, is that
+// the exported `Accelerometer` singleton is wired to the real ExponentAccelerometer native
+// module and to the exact event name that module's native side actually emits — get either
+// wrong and every listener silently never fires. No Negative group: nothing here can throw:
+// both assertions are pass-through wiring, not a guard clause.
 describe('Accelerometer', () => {
-  it('sets the update interval', () => {
-    Accelerometer.setUpdateInterval(1234);
+  describe('is wired to the correct native module and event name', () => {
+    it('forwards setUpdateInterval to the ExponentAccelerometer native module', () => {
+      // why: proves the singleton's native module reference is the real
+      // ExponentAccelerometer, not an accidental stand-in shared with another sensor.
+      Accelerometer.setUpdateInterval(1234);
 
-    expect(FAKE_NATIVE_ACCELEROMETER.setUpdateInterval).toHaveBeenCalledTimes(1);
-    expect(FAKE_NATIVE_ACCELEROMETER.setUpdateInterval).toHaveBeenCalledWith(1234);
-  });
+      expect(FAKE_NATIVE_ACCELEROMETER.setUpdateInterval).toHaveBeenCalledWith(1234);
+    });
 
-  it('subscribes through the shared accelerometerDidUpdate event name', () => {
-    const listener = vi.fn();
-    Accelerometer.addListener(listener);
+    it('subscribes through the "accelerometerDidUpdate" event name the native module emits', () => {
+      // why: 'accelerometerDidUpdate' is the exact string ExponentAccelerometer.web.ts emits
+      // events under (.vendors/expo/packages/expo-sensors) — a typo here means the listener is
+      // registered for an event that never fires.
+      const listener = vi.fn();
+      Accelerometer.addListener(listener);
 
-    expect(FAKE_NATIVE_ACCELEROMETER.addListener).toHaveBeenCalledWith(
-      'accelerometerDidUpdate',
-      listener,
-    );
+      expect(FAKE_NATIVE_ACCELEROMETER.addListener).toHaveBeenCalledWith(
+        'accelerometerDidUpdate',
+        listener,
+      );
+    });
   });
 });

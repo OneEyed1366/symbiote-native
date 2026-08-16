@@ -1,5 +1,8 @@
 // Co-located Vue-driven test (ADR 0025) for useLowPowerMode. See use-battery-level's test for
-// the shared rationale.
+// the shared rationale (native delegation is covered once in
+// packages/battery/src/core/battery.test.ts).
+//
+// No Negative group: the composable has no guard clause or throwing path.
 
 import { defineComponent, h, type Ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -56,18 +59,23 @@ function mountLowPowerMode(): Ref<boolean> {
 
 describe('useLowPowerMode (Vue)', () => {
   it('starts at false before the initial fetch resolves', () => {
+    // why: false is the documented "assume off until proven otherwise" sentinel — must hold
+    // synchronously at setup, before onMounted's async fetch settles.
     const lowPowerMode = mountLowPowerMode();
 
     expect(lowPowerMode.value).toBe(false);
   });
 
   it('updates to the fetched value once isLowPowerModeEnabledAsync() resolves', async () => {
+    // why: proves the one-shot seed fetch actually reaches the ref.
     const lowPowerMode = mountLowPowerMode();
 
     await vi.waitFor(() => expect(lowPowerMode.value).toBe(true));
   });
 
   it('updates the ref when the native listener fires', async () => {
+    // why: toggling low-power mode must come from the native event, not the seed — asserting a
+    // seed=false → event-driven true isolates the listener path from the fetch path.
     isLowPowerModeEnabledAsyncMock.mockResolvedValue(false);
     const lowPowerMode = mountLowPowerMode();
     await vi.waitFor(() => expect(lowPowerMode.value).toBe(false));
@@ -78,6 +86,8 @@ describe('useLowPowerMode (Vue)', () => {
   });
 
   it('removes the subscription on unmount', () => {
+    // why: onUnmounted must call subscription.remove(), or the native listener leaks past the
+    // component's lifetime.
     mountLowPowerMode();
     unmount(ROOT_TAG);
 

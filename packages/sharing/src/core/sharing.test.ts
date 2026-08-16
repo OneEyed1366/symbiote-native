@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const FAKE_NATIVE_SHARING = {
+import type { INativeSharingModule } from './native-module';
+
+const FAKE_NATIVE_SHARING: INativeSharingModule = {
   shareAsync: vi.fn(async () => undefined),
 };
 
@@ -28,35 +30,40 @@ const LOCAL_FILE_URL = 'file:///tmp/report.pdf';
 
 afterEach(() => {
   vi.clearAllMocks();
+  Reflect.deleteProperty(FAKE_NATIVE_SHARING, 'isAvailableAsync');
+  FAKE_NATIVE_SHARING.shareAsync = vi.fn(async () => undefined);
 });
 
-describe('isAvailableAsync', () => {
-  it('reports availability from the presence of the native share method', async () => {
+// why: isAvailableAsync has no guard clause and never rejects — every scenario resolves a
+// boolean, so there is no Negative group for it (see the package-level Negative group below,
+// which covers shareAsync's actual throwing paths).
+describe('positive — isAvailableAsync always resolves a boolean, never throws', () => {
+  // why: neither native module implements isAvailableAsync in expo-sharing@57.0.8 (see
+  // native-module.ts), so on-device availability is read from whether shareAsync itself exists.
+  it('resolves true from the presence of the native share method when no native check exists', async () => {
     await expect(isAvailableAsync()).resolves.toBe(true);
   });
 
-  it('reports unavailable when the native module cannot share', async () => {
-    const { shareAsync: native } = FAKE_NATIVE_SHARING;
-    // @ts-expect-error -- simulating a platform where the native module has no such method
+  it('resolves false when neither a native check nor the native share method exists', async () => {
     FAKE_NATIVE_SHARING.shareAsync = undefined;
 
     await expect(isAvailableAsync()).resolves.toBe(false);
-
-    FAKE_NATIVE_SHARING.shareAsync = native;
   });
 
-  it('defers to the native check when the module implements one', async () => {
+  // why: if the native module ever DOES implement isAvailableAsync (the web module already
+  // does), that check must win over the shareAsync-presence fallback rather than being ignored.
+  it('defers to the native check when the module implements one, even if it disagrees with presence', async () => {
     const nativeCheck = vi.fn(async () => false);
     Object.assign(FAKE_NATIVE_SHARING, { isAvailableAsync: nativeCheck });
 
+    // shareAsync is still present (would report true via the fallback), but the native check
+    // says false and must be the one that decides.
     await expect(isAvailableAsync()).resolves.toBe(false);
     expect(nativeCheck).toHaveBeenCalled();
-
-    Reflect.deleteProperty(FAKE_NATIVE_SHARING, 'isAvailableAsync');
   });
 });
 
-describe('shareAsync', () => {
+describe('positive — shareAsync delegates a valid call to the native module', () => {
   it('passes the url and options straight through', async () => {
     await shareAsync(LOCAL_FILE_URL, { mimeType: 'application/pdf', dialogTitle: 'Send report' });
     expect(FAKE_NATIVE_SHARING.shareAsync).toHaveBeenCalledWith(LOCAL_FILE_URL, {
@@ -65,41 +72,47 @@ describe('shareAsync', () => {
     });
   });
 
-  it('defaults the options to an empty object', async () => {
+  // why: options is an optional param — omitting it must not reach the native module as
+  // `undefined`, which several native SDKs reject outright.
+  it('defaults the options to an empty object when omitted', async () => {
     await shareAsync(LOCAL_FILE_URL);
     expect(FAKE_NATIVE_SHARING.shareAsync).toHaveBeenCalledWith(LOCAL_FILE_URL, {});
   });
 
+  // why: anchor is a nested rectangle for the iPad popover — a flattening refactor (spreading
+  // its fields onto the top-level options) would silently break the iPad presentation.
   it('forwards the iPad anchor rectangle unflattened', async () => {
     const anchor = { x: 10, y: 20, width: 1, height: 1 };
     await shareAsync(LOCAL_FILE_URL, { anchor });
     expect(FAKE_NATIVE_SHARING.shareAsync).toHaveBeenCalledWith(LOCAL_FILE_URL, { anchor });
   });
+});
 
-  it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
-    const { shareAsync: native } = FAKE_NATIVE_SHARING;
-    // @ts-expect-error -- simulating a platform where the native module has no such method
+describe('negative — shareAsync rejects before or instead of a native call', () => {
+  // why: an empty or non-string url surfaces on-device as an opaque argument-conversion failure
+  // (iOS) or a generic "Failed to share the file" (Android) — both far from the call site. The
+  // guard fails early with the caller's own argument named instead.
+  describe('invalid url rejected before any native call', () => {
+    it('rejects an empty url', async () => {
+      await expect(shareAsync('')).rejects.toThrow(/Invalid url provided to Sharing/);
+      expect(FAKE_NATIVE_SHARING.shareAsync).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-string url', async () => {
+      // @ts-expect-error -- the guard exists precisely for callers without type checking
+      await expect(shareAsync(undefined)).rejects.toThrow(/Invalid url provided to Sharing/);
+      expect(FAKE_NATIVE_SHARING.shareAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  // why: throwing a named UnavailabilityError instead of letting `undefined(...)` blow up with a
+  // raw TypeError lets a caller distinguish "platform doesn't support sharing" from a real
+  // share-sheet failure.
+  it('throws an UnavailabilityError naming itself and the native module when shareAsync is absent', async () => {
     FAKE_NATIVE_SHARING.shareAsync = undefined;
 
     await expect(shareAsync(LOCAL_FILE_URL)).rejects.toThrow(
       'shareAsync is not available on expo-sharing',
     );
-
-    FAKE_NATIVE_SHARING.shareAsync = native;
-  });
-});
-
-// Validation happens before the native call so a bad url fails with a readable message here
-// rather than as an argument-conversion failure on iOS or a generic share failure on Android.
-describe('url validation', () => {
-  it('rejects an empty url', async () => {
-    await expect(shareAsync('')).rejects.toThrow(/Invalid url provided to Sharing/);
-    expect(FAKE_NATIVE_SHARING.shareAsync).not.toHaveBeenCalled();
-  });
-
-  it('rejects a non-string url before reaching the native module', async () => {
-    // @ts-expect-error -- the guard exists precisely for callers without type checking
-    await expect(shareAsync(undefined)).rejects.toThrow(/Invalid url provided to Sharing/);
-    expect(FAKE_NATIVE_SHARING.shareAsync).not.toHaveBeenCalled();
   });
 });

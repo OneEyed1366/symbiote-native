@@ -1,17 +1,14 @@
-// Svelte lifecycle wiring over the framework-agnostic Accelerometer singleton (core/) — mirrors
-// the lifecycle-bucket naming convention of adapters/svelte/src/runes and the onMounted/onUnmounted
-// shape of the Vue composable's subscription handle. `updateIntervalMs` is a PLAIN number, not a
-// getter (unlike splash-screen's useHideAnimation): the Vue and React twins both apply it once at
-// subscribe time and never react to a later change, so a getter here would add a reactive
-// dependency neither other adapter has.
+// Svelte lifecycle wiring over the framework-agnostic Accelerometer singleton (core/).
+// `.svelte.ts` (not `.ts`): runes ($state/$effect) only work in files with this extension
+// outside an actual `.svelte` component; `runes/` is the framework's own lifecycle-bucket term
+// (CLAUDE.md's <adapter_src_follows_framework_idioms>).
 //
-// `.svelte.ts` (not `.ts`): runes ($state/$effect) are only usable in files with this extension
-// outside an actual `.svelte` component. `runes/` is Svelte's own term for the lifecycle bucket,
-// per CLAUDE.md's <adapter_src_follows_framework_idioms> — React calls it `hooks/`, Vue
-// `composables/`. Returns a boxed getter object, NOT a bare `$state`: Svelte 5 reactivity is
-// lexically scoped to the declaring module and does not survive being returned as a raw value
-// from a plain function, so the caller reads `.current` exactly like unwrapping Vue's `Ref`
-// via `.value`.
+// Returns a boxed getter, not a bare `$state`: Svelte 5 reactivity is lexically scoped to the
+// declaring module and doesn't survive being returned as a raw value, so callers read `.current`
+// like unwrapping Vue's `Ref.value`.
+//
+// `updateIntervalMs` is a plain number, not a getter: it applies once at subscribe time and
+// never reacts to a later change, matching the Vue/React twins.
 import { Accelerometer, type EventSubscription, type IAccelerometerMeasurement } from '../../core';
 
 export function useAccelerometer(updateIntervalMs?: number): {

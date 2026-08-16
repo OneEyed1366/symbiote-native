@@ -50,92 +50,118 @@ afterEach(() => {
 });
 
 describe('isAvailableAsync', () => {
-  it('delegates to the native module', async () => {
-    await expect(isAvailableAsync()).resolves.toBe(true);
-    expect(FAKE_NATIVE_SMS.isAvailableAsync).toHaveBeenCalledTimes(1);
-  });
-
-  it('reports unavailable rather than throwing when the native method is absent', async () => {
-    const { isAvailableAsync: native } = FAKE_NATIVE_SMS;
-    // @ts-expect-error -- simulating a platform where the native module has no such method
-    FAKE_NATIVE_SMS.isAvailableAsync = undefined;
-
-    await expect(isAvailableAsync()).resolves.toBe(false);
-
-    FAKE_NATIVE_SMS.isAvailableAsync = native;
-  });
-});
-
-describe('sendSMSAsync recipients', () => {
-  it('normalizes a single address into an array', async () => {
-    await sendSMSAsync('0123456789', 'test');
-    expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {});
-  });
-
-  it('passes an array of addresses through unchanged', async () => {
-    await sendSMSAsync(['0123456789', '9876543210'], 'test');
-    expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(
-      ['0123456789', '9876543210'],
-      'test',
-      {},
-    );
-  });
-
-  it('resolves with the native result', async () => {
-    await expect(sendSMSAsync('0123456789', 'test')).resolves.toEqual({ result: 'sent' });
-  });
-
-  it('rejects a non-string recipient before reaching the native module', async () => {
-    // @ts-expect-error -- the guard exists precisely for callers without type checking
-    await expect(sendSMSAsync(['0123456789', null], 'test')).rejects.toThrow(TypeError);
-    expect(FAKE_NATIVE_SMS.sendSMSAsync).not.toHaveBeenCalled();
-  });
-});
-
-describe('sendSMSAsync attachments', () => {
-  it('omits the attachments key entirely when none are given', async () => {
-    await sendSMSAsync('0123456789', 'test', {});
-    expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {});
-  });
-
-  it('normalizes a single attachment into an array', async () => {
-    await sendSMSAsync('0123456789', 'test', { attachments: IMAGE_ATTACHMENT });
-    expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {
-      attachments: [IMAGE_ATTACHMENT],
+  describe('Positive', () => {
+    it('delegates to the native module', async () => {
+      // why: the wrapper carries no capability logic of its own — availability is whatever the
+      // device's native module reports, so a Messages-app-less simulator or non-telephony
+      // Android device must see that answer unchanged.
+      await expect(isAvailableAsync()).resolves.toBe(true);
+      expect(FAKE_NATIVE_SMS.isAvailableAsync).toHaveBeenCalledTimes(1);
     });
-  });
 
-  it('keeps every attachment on iOS', async () => {
-    await sendSMSAsync('0123456789', 'test', {
-      attachments: [IMAGE_ATTACHMENT, AUDIO_ATTACHMENT],
-    });
-    expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {
-      attachments: [IMAGE_ATTACHMENT, AUDIO_ATTACHMENT],
-    });
-  });
+    it('reports unavailable rather than throwing when the native method is absent', async () => {
+      // why: an older native binary without this method must degrade to "can't send", not crash
+      // the caller — the optional-chain fallback is the documented contract, not a missing guard.
+      const { isAvailableAsync: native } = FAKE_NATIVE_SMS;
+      // @ts-expect-error -- simulating a platform where the native module has no such method
+      FAKE_NATIVE_SMS.isAvailableAsync = undefined;
 
-  it('keeps only the first attachment on Android', async () => {
-    FAKE_PLATFORM.OS = 'android';
+      await expect(isAvailableAsync()).resolves.toBe(false);
 
-    await sendSMSAsync('0123456789', 'test', {
-      attachments: [IMAGE_ATTACHMENT, AUDIO_ATTACHMENT],
-    });
-    expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {
-      attachments: [IMAGE_ATTACHMENT],
+      FAKE_NATIVE_SMS.isAvailableAsync = native;
     });
   });
 });
 
-describe('sendSMSAsync without the native method', () => {
-  it('throws an UnavailabilityError-shaped error', async () => {
-    const { sendSMSAsync: native } = FAKE_NATIVE_SMS;
-    // @ts-expect-error -- simulating a platform where the native module has no such method
-    FAKE_NATIVE_SMS.sendSMSAsync = undefined;
+describe('sendSMSAsync', () => {
+  describe('Positive', () => {
+    it('normalizes a single address into an array', async () => {
+      // why: the public API accepts a lone recipient for caller convenience, but the native side
+      // only decodes a list — the wrapper is the single place that reconciles the two shapes.
+      await sendSMSAsync('0123456789', 'test');
+      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {});
+    });
 
-    await expect(sendSMSAsync('0123456789', 'test')).rejects.toThrow(
-      'sendSMSAsync is not available on expo-sms',
-    );
+    it('passes an array of addresses through unchanged', async () => {
+      await sendSMSAsync(['0123456789', '9876543210'], 'test');
+      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(
+        ['0123456789', '9876543210'],
+        'test',
+        {},
+      );
+    });
 
-    FAKE_NATIVE_SMS.sendSMSAsync = native;
+    it('resolves with the native result', async () => {
+      // why: the composer result (sent/cancelled/unknown) is the caller's only signal that a
+      // message left the composer — it must flow back unmodified.
+      await expect(sendSMSAsync('0123456789', 'test')).resolves.toEqual({ result: 'sent' });
+    });
+
+    it('omits the attachments key entirely when none are given', async () => {
+      // why: the native options type marks `attachments` optional — sending an empty array
+      // instead of omitting the key would misrepresent "no attachment" as "an empty attachment
+      // list" to the native decoder.
+      await sendSMSAsync('0123456789', 'test', {});
+      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {});
+    });
+
+    it('normalizes a single attachment into an array', async () => {
+      await sendSMSAsync('0123456789', 'test', { attachments: IMAGE_ATTACHMENT });
+      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {
+        attachments: [IMAGE_ATTACHMENT],
+      });
+    });
+
+    it('keeps every attachment on iOS', async () => {
+      // why: iOS's composer can carry more than one attachment, so nothing should be dropped
+      // there — the truncation below is Android-specific hardware/API behavior, not a general
+      // product limit.
+      await sendSMSAsync('0123456789', 'test', {
+        attachments: [IMAGE_ATTACHMENT, AUDIO_ATTACHMENT],
+      });
+      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {
+        attachments: [IMAGE_ATTACHMENT, AUDIO_ATTACHMENT],
+      });
+    });
+
+    it('keeps only the first attachment on Android', async () => {
+      // why: Android's SMSModule has a single `Intent.EXTRA_STREAM` slot on the composer intent —
+      // a second attachment would silently never arrive, so the wrapper drops it before the
+      // native call rather than let the caller ship a dead attachment.
+      FAKE_PLATFORM.OS = 'android';
+
+      await sendSMSAsync('0123456789', 'test', {
+        attachments: [IMAGE_ATTACHMENT, AUDIO_ATTACHMENT],
+      });
+      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {
+        attachments: [IMAGE_ATTACHMENT],
+      });
+    });
+  });
+
+  describe('Negative', () => {
+    it('rejects a non-string recipient before reaching the native module', async () => {
+      // why: the native side decodes a plain string list — a non-string recipient would fail as
+      // an opaque conversion error far from its cause, so a caller without type checking (plain
+      // JS) must get a clear TypeError instead, and the native module must never see the bad call.
+      // @ts-expect-error -- the guard exists precisely for callers without type checking
+      await expect(sendSMSAsync(['0123456789', null], 'test')).rejects.toThrow(TypeError);
+      expect(FAKE_NATIVE_SMS.sendSMSAsync).not.toHaveBeenCalled();
+    });
+
+    it('throws an UnavailabilityError-shaped error when the native method is absent', async () => {
+      // why: unlike isAvailableAsync's graceful fallback, sending has no safe default — a caller
+      // that doesn't check availability first must get a named, catchable error instead of the
+      // call silently doing nothing.
+      const { sendSMSAsync: native } = FAKE_NATIVE_SMS;
+      // @ts-expect-error -- simulating a platform where the native module has no such method
+      FAKE_NATIVE_SMS.sendSMSAsync = undefined;
+
+      await expect(sendSMSAsync('0123456789', 'test')).rejects.toThrow(
+        'sendSMSAsync is not available on expo-sms',
+      );
+
+      FAKE_NATIVE_SMS.sendSMSAsync = native;
+    });
   });
 });

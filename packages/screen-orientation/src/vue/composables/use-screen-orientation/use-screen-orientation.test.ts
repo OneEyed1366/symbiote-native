@@ -65,13 +65,23 @@ function mountScreenOrientation(): Ref<IScreenOrientationState> {
   return screenOrientation;
 }
 
+// This layer owns ONLY Vue lifecycle wiring over core (onMounted → fetch + subscribe,
+// onUnmounted → unsubscribe) — core's own validation/platform-branch logic is exhaustively
+// covered by screen-orientation.test.ts and must not be re-asserted here. No Negative group: the
+// composable has no guard clause of its own — it has nothing to throw, only a ref to keep in
+// sync with core.
 describe('useScreenOrientation (Vue)', () => {
+  // why: a caller reads the ref before the async initial fetch settles — the composable must
+  // expose a real, documented UNKNOWN state rather than `undefined`/a stale value during that
+  // window
   it('starts at Orientation/OrientationLock UNKNOWN before the initial fetch resolves', () => {
     const screenOrientation = mountScreenOrientation();
 
     expect(screenOrientation.value).toEqual({ orientation: 0, orientationLock: 9 });
   });
 
+  // why: the composable must actually apply the values core's one-shot getters resolve to, not
+  // just call them
   it('updates to the fetched value once getOrientationAsync()/getOrientationLockAsync() resolve', async () => {
     const screenOrientation = mountScreenOrientation();
 
@@ -80,6 +90,8 @@ describe('useScreenOrientation (Vue)', () => {
     );
   });
 
+  // why: the whole point of subscribing on mount is staying in sync with device rotation after
+  // the initial read — a ref that only reflects the one-shot fetch would go stale immediately
   it('updates the ref when the native listener fires', async () => {
     const screenOrientation = mountScreenOrientation();
     await vi.waitFor(() => expect(screenOrientation.value.orientation).toBe(1));
@@ -89,6 +101,8 @@ describe('useScreenOrientation (Vue)', () => {
     expect(screenOrientation.value).toEqual({ orientation: 3, orientationLock: 5 });
   });
 
+  // why: an unmounted component must not keep a live native subscription — that would leak a
+  // listener that outlives the component and can update a detached ref after unmount
   it('removes the subscription on unmount', () => {
     mountScreenOrientation();
     unmount(ROOT_TAG);

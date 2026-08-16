@@ -103,41 +103,88 @@ async function mountLightSensor(
 }
 
 describe('useLightSensor (Svelte)', () => {
-  it('starts null before any measurement arrives', async () => {
-    const values: (ILightSensorMeasurement | null)[] = [];
-    await mountLightSensor(values);
+  // No Negative group: useLightSensor has no guard clause or throwing path — every accepted
+  // updateIntervalMs value (or its absence) and every ILightSensorMeasurement the native listener
+  // can deliver reaches `current` unchanged. Only the shared lifecycle wiring (subscribe once on
+  // mount, replace state on each event, unsubscribe on unmount) is under test here; DeviceSensor's
+  // own methods are not called by this rune at all and are covered by core/light-sensor.test.ts.
+  // (LightSensor is Android-only in practice — core/light-sensor.ts's header — but that platform
+  // branch lives in the exponent-light-sensor iOS stub, not in this rune, so it is out of scope
+  // here too.)
+  describe('Positive (subscribe -> update -> cleanup lifecycle)', () => {
+    // why: a consumer renders BEFORE the first native event can possibly arrive, so `current`
+    // must expose a real "no reading yet" value rather than staying `undefined` or throwing.
+    it('starts null before any measurement arrives', async () => {
+      const values: (ILightSensorMeasurement | null)[] = [];
+      await mountLightSensor(values);
 
-    expect(values[values.length - 1]).toBeNull();
-  });
+      expect(values[values.length - 1]).toBeNull();
+    });
 
-  it('updates the state when the native listener fires', async () => {
-    const values: (ILightSensorMeasurement | null)[] = [];
-    await mountLightSensor(values);
-    const reading: ILightSensorMeasurement = { illuminance: 42, timestamp: 123 };
+    // why: the effect body writes `measurement` but never reads it, so it must run exactly once
+    // on mount and never re-subscribe on its own — a double subscription would mean double
+    // native event delivery per commit.
+    it('subscribes to the native module exactly once on mount', async () => {
+      await mountLightSensor([]);
 
-    registeredListener?.(reading);
-    await tick();
+      expect(addListenerMock).toHaveBeenCalledTimes(1);
+    });
 
-    expect(values[values.length - 1]).toEqual(reading);
-  });
+    // why: the whole point of the rune is to mirror the native module's push events (ambient
+    // light level in lux) into reactive state, so a fired event must be visible through `current`.
+    it('updates the state when the native listener fires', async () => {
+      const values: (ILightSensorMeasurement | null)[] = [];
+      await mountLightSensor(values);
+      const reading: ILightSensorMeasurement = { illuminance: 42, timestamp: 123 };
 
-  it('removes the subscription on unmount', async () => {
-    await mountLightSensor([]);
-    unmount(ROOT_TAG);
+      registeredListener?.(reading);
+      await tick();
 
-    expect(removeMock).toHaveBeenCalledTimes(1);
-  });
+      expect(values[values.length - 1]).toEqual(reading);
+    });
 
-  it('sets the update interval once at subscribe time when provided', async () => {
-    await mountLightSensor([], 50);
+    // why: `measurement = next` is a plain reassignment, not a merge — a second event (e.g. the
+    // room lighting changing) must fully REPLACE the first illuminance reading, not average or
+    // retain it.
+    it('replaces the previous reading, not merges it, on a second native event', async () => {
+      const values: (ILightSensorMeasurement | null)[] = [];
+      await mountLightSensor(values);
+      const first: ILightSensorMeasurement = { illuminance: 42, timestamp: 123 };
+      const second: ILightSensorMeasurement = { illuminance: 890, timestamp: 456 };
 
-    expect(setUpdateIntervalMock).toHaveBeenCalledWith(50);
-    expect(setUpdateIntervalMock).toHaveBeenCalledTimes(1);
-  });
+      registeredListener?.(first);
+      await tick();
+      registeredListener?.(second);
+      await tick();
 
-  it('does not touch the update interval when omitted', async () => {
-    await mountLightSensor([]);
+      expect(values[values.length - 1]).toEqual(second);
+    });
 
-    expect(setUpdateIntervalMock).not.toHaveBeenCalled();
+    // why: an active native subscription after the consuming component is gone leaks a listener
+    // and keeps the sensor powered on the device for nothing.
+    it('removes the subscription on unmount', async () => {
+      await mountLightSensor([]);
+      unmount(ROOT_TAG);
+
+      expect(removeMock).toHaveBeenCalledTimes(1);
+    });
+
+    // why: the caller-supplied sample rate must reach the native module, applied once at subscribe
+    // time (not on every render) per the rune's header comment on why `updateIntervalMs` is a
+    // plain number, not a reactive getter.
+    it('sets the update interval once at subscribe time when provided', async () => {
+      await mountLightSensor([], 50);
+
+      expect(setUpdateIntervalMock).toHaveBeenCalledWith(50);
+      expect(setUpdateIntervalMock).toHaveBeenCalledTimes(1);
+    });
+
+    // why: an omitted interval must leave the native module's own default sample rate alone —
+    // calling setUpdateInterval with an undefined/fallback value would silently override it.
+    it('does not touch the update interval when omitted', async () => {
+      await mountLightSensor([]);
+
+      expect(setUpdateIntervalMock).not.toHaveBeenCalled();
+    });
   });
 });
