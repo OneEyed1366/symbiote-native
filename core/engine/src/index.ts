@@ -56,14 +56,7 @@ export type {
 export type { ISymbioteNode, ISymbioteEvent, IListener } from './node';
 
 export { SymbioteSurface, createSurface } from './surface';
-// Devtools-inspector building block: the set of currently-mounted surfaces, kept up to
-// date by createSurface/disposeRoot with zero adapter-side wiring.
-export { getActiveSurfaces } from './surface-registry';
 export { setEventDispatcher } from './dispatch';
-// registerPostCommit lets a future consumer (the devtools inspector) know when to
-// re-read getActiveSurfaces; runPostCommitHooks stays internal-callable too since other
-// engine modules already invoke it.
-export { registerPostCommit, runPostCommitHooks } from './post-commit';
 export {
   setColorProcessor,
   processColor,
