@@ -21,22 +21,20 @@
 // a correct, non-approximated preprocessor pipeline can't run here today. Those files still get
 // basic (non-literal) type coverage from the project's ambient `.css` fallback declaration and
 // from `css-dts`'s on-disk generation at pretypecheck time — just without live per-class
-// completion in the plugin. A real follow-up, not a silent gap: recorded here, not hidden.
+// completion in the plugin.
 //
 // SCOPE, second cut: only a SIMPLE `.foo { ... }` class selector is recognized correctly — a
 // compound (`.btn.primary`) or descendant (`.card .title`) selector, which the real
 // src/parser.ts's extractClassName merges into ONE key (`btnPrimary`/`cardTitle`), gets
-// extracted here as TWO separate (wrong, non-existent) keys instead. This is an accepted
-// limitation of the regex-based approach — complex selectors may not be detected correctly.
+// extracted here as TWO separate (wrong, non-existent) keys instead.
 //
 // Hand-written plain CommonJS, NOT compiled from a `.ts`/`.cts` source — same convention already
 // used for each adapter's metro-css-parser.cjs shim. tsserver loads a plugin via a synchronous
 // `require()`, which cannot load this package's own ESM build output; a `.cts` source was tried
-// first and rejected because
-// this package's shared tsconfig (`moduleResolution: "Bundler"`, needed for the rest of the
-// package) doesn't apply the classic .cts→CJS format-forcing TypeScript otherwise gives Node16/
-// NodeNext projects — carving out a second tsconfig/project reference just for one file was more
-// machinery than a ~150-line, dependency-free plugin warrants.
+// first and rejected because this package's shared tsconfig (`moduleResolution: "Bundler"`,
+// needed for the rest of the package) doesn't apply the classic .cts→CJS format-forcing
+// TypeScript otherwise gives Node16/NodeNext projects — carving out a second tsconfig/project
+// reference just for one file was more machinery than a ~150-line, dependency-free plugin warrants.
 'use strict';
 
 const fs = require('node:fs');
@@ -70,7 +68,7 @@ function generateDts(classNames) {
 
   const fields = [...classNames]
     .sort()
-    .map((name) => {
+    .map(name => {
       const key = IDENTIFIER_RE.test(name) ? name : JSON.stringify(name);
       return `  readonly ${key}: string;`;
     })
@@ -118,12 +116,14 @@ function init(modules) {
     const originalGetScriptSnapshot = host.getScriptSnapshot.bind(host);
     const originalResolveModuleNameLiterals = host.resolveModuleNameLiterals;
 
-    host.getScriptKind = (fileName) =>
+    host.getScriptKind = fileName =>
       isCssModuleFile(fileName)
         ? typescript.ScriptKind.TS
-        : (originalGetScriptKind ? originalGetScriptKind(fileName) : typescript.ScriptKind.Unknown);
+        : originalGetScriptKind
+          ? originalGetScriptKind(fileName)
+          : typescript.ScriptKind.Unknown;
 
-    host.getScriptSnapshot = (fileName) =>
+    host.getScriptSnapshot = fileName =>
       isCssModuleFile(fileName)
         ? typescript.ScriptSnapshot.fromString(getDtsForCssFile(fileName))
         : originalGetScriptSnapshot(fileName);

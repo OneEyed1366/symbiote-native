@@ -227,7 +227,6 @@ function configureNext(
   };
 
   dlog(`LayoutAnimation.configureNext: dispatching config (duration=${config.duration})`);
-  // Default to a no-op when the caller doesn't supply one.
   manager.configureNextLayoutAnimation(config, onComplete, onAnimationDidFail ?? (() => {}));
 }
 

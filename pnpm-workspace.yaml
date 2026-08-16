@@ -19,10 +19,6 @@ packages:
   - 'adapters/*'
   - 'packages/*'
   - 'apps/*'
-  # Gitignored dev harness — listing it lets pnpm manage it as a real workspace project
-  # (bin-linking, .pnpm-store symlinks) instead of the ad-hoc node_modules it otherwise
-  # ends up with.
-  - '.examples/*'
 allowBuilds:
   '@parcel/watcher': true
   detox: true
@@ -85,10 +81,34 @@ catalog:
   '@vue/babel-plugin-jsx': ^1.5.0
   vue: ^3.5.38
   vue-tsc: ^2.2.12
-  '@angular/core': ^22
-  '@angular/common': ^22
-  '@angular/compiler': ^22
-  '@angular/compiler-cli': ^22
+  # PINNED to 22.0.x, deliberately — NOT a lazy pin, and do not widen it back to `^22` without
+  # reading the next paragraph. `@angular/compiler-cli@22.1.0` moved its own `@babel/core`
+  # dependency 7.29.7 -> 8.0.1 and flipped the linker plugin to `api.assertVersion(8)`
+  # (bundles/linker/babel/index.js). Metro/`@react-native/babel-preset` 0.86 is Babel 7.29.7, so
+  # the linker — which we load INSIDE Metro's Babel as stage B of Angular AOT — refuses to run:
+  #   [BABEL] Requires Babel "^8.0.0-0", but was loaded with "7.29.7"
+  # This is not just a version guard we could stub out: the bundle does `import { types } from
+  # '@babel/core'`, resolving to compiler-cli's OWN nested @babel/core@8, so a stubbed
+  # assertVersion would have Babel-8-built AST nodes spliced into a Babel-7 program.
+  # All four must move in lock-step — compiler-cli peer-requires @angular/compiler at an EXACT
+  # version. The unpin condition is RN shipping a Babel 8 preset, or moving the linker out of
+  # Metro into a post-`ngc` pass run under Angular's own Babel 8 (see the angular-adapter skill).
+  '@angular/core': ~22.0.8
+  '@angular/common': ~22.0.8
+  '@angular/compiler': ~22.0.8
+  '@angular/compiler-cli': ~22.0.8
+  # Same lock-step family as the four above — @angular/forms has no runtime Babel/linker
+  # entanglement of its own, but pinning it to the same patch avoids a second, independent
+  # version drift source on top of the one already being managed here.
+  '@angular/forms': ~22.0.8
+  # Measured against 5.56.8 in svelte-adapter-dom-shim (2026-08-10) — `fragments: 'tree'`
+  # (mandatory, §2 of that skill) needs >=5.33. Confirmed a real published npm release:
+  # `pnpm install` resolved this range to 5.56.8 (2026-08-11).
+  svelte: ^5.56.0
+  # Declaration emit for the raw `.svelte` sources we publish (scripts/emit-svelte-declarations.mjs).
+  # Same library `svelte-package` uses for the job; it is also what `svelte-check` runs on internally,
+  # so it moves with `svelte` above, not independently.
+  svelte2tsx: ^0.7.61
 
   # type packages
   '@types/react': ^19.2.0
@@ -132,7 +152,7 @@ catalog:
   # Published @symbiote-native/* packages. examples/* left the pnpm workspace (2026-07) to
   # become standalone `npm install`-able apps free of pnpm's blockExoticSubdeps guard — its
   # package.json files now carry literal versions/pkg.pr.new URLs directly, not `catalog:`.
-  # These entries remain for .examples/angular's own css-parser dep and stay in lock-step
+  # These entries remain for examples/angular's own css-parser dep and stay in lock-step
   # with each package's release train; internal cross-package deps between
   # core/adapters/packages stay workspace:* (see .syncpackrc.json).
   '@symbiote-native/react': latest

@@ -45,6 +45,14 @@ surface as the call site:
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    Svelte has no same-surface portal primitive at all — not even a partial one.
+    `createPortal` is react-reconciler's own Fiber-level `HostPortal`, and Vue's `Teleport` is a
+    separate Vue-runtime relocation feature; neither has anything for a framework with no
+    reconciler to hook into, and there's no `*portal`-style directive to reach for either. Skip
+    straight to `createTunnel` below — it's the only cross-content primitive this adapter has,
+    and it happens to work same-surface too.
+  </TabItem>
 </Tabs>
 
 Use a state/ref callback (`useState`, not `useRef`, on React) so the target
@@ -101,6 +109,33 @@ surface, use `createTunnel()` instead — a shared store, not a node reference:
     <tunnel-out [tunnel]="overlayTunnel" />
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <!-- Svelte — module-level singleton, importable from any surface -->
+    <script lang="ts" module>
+      import { createTunnel } from '@symbiote-native/svelte';
+
+      export const overlayTunnel = createTunnel();
+    </script>
+    ```
+
+    ```svelte
+    <!-- wherever it should paint: -->
+    <TunnelOut tunnel={overlayTunnel} />
+
+    <!-- wherever the content originates, any surface: -->
+    {#if toastVisible}
+      <TunnelIn tunnel={overlayTunnel}>
+        {#snippet children()}<ToastCard />{/snippet}
+      </TunnelIn>
+    {/if}
+    ```
+
+    `TunnelIn`/`TunnelOut` take the tunnel as an explicit `tunnel` prop instead of
+    `tunnel.In`/`tunnel.Out` — a `.svelte` file compiles to one fixed, top-level component, so
+    there's no per-call factory `createTunnel()` could bake a registry into via closure the way
+    Vue's `defineComponent` can.
+  </TabItem>
 </Tabs>
 
 `In`/`Out` are components, not hooks/composables — an earlier hook-based
@@ -117,6 +152,8 @@ As separate components, `Out`'s forced re-render never bounces back into
   always-on-top system surface) → `createTunnel`.
 
 Import both from your adapter's package (`@symbiote-native/react`, `@symbiote-native/vue`,
-`@symbiote-native/angular`). Angular exposes the same two mechanisms as
+`@symbiote-native/angular`, `@symbiote-native/svelte`). Angular exposes the same two mechanisms as
 directives instead of components/hooks: `*portal`/`*tunnelIn` and
-`<tunnel-out>`.
+`<tunnel-out>`. Svelte exposes only the second mechanism — `createTunnel`, as `TunnelIn`/
+`TunnelOut` components taking an explicit `tunnel` prop — it has no same-surface portal
+primitive at all.

@@ -153,22 +153,19 @@ three files, every time: `settings.gradle` (automatic via the exclude-list, no e
 nothing prompts for it), `MainApplication.kt` (import + map entry — manual). Verify by actually
 running `:app:compileDebugKotlin` (or the equivalent Gradle task), not just a JS typecheck.
 
-Per this repo's stated convention, wire this into `.examples/<app>` only, never the public
-`examples/<app>` — see `symbiote-dev-examples`. **Correction (2026-07-27, verified by reading
-both trees directly): the accelerometer bring-up documented below actually landed in the public
-`examples/react` (undotted), not `.examples/react`.** `.examples/react` currently exists only as
-a bare, unwired RN scaffold (no `use_expo_modules!`, no Gradle fallback, doesn't even depend on
-`@symbiote-native/sensors`) — every `.examples/react` path in the narrative below describes
+Wire this into `examples/<app>`. `examples/react` currently exists only as a bare, unwired RN
+scaffold (no `use_expo_modules!`, no Gradle fallback, doesn't even depend on
+`@symbiote-native/sensors`) — every `examples/react` path in the narrative below describes
 where the work *should* live per convention, not where it *does* live on disk today. Before
-repeating any step below, `grep -n -i expo` the Podfile of whichever tree you intend to use to
-confirm which one actually has the wiring — don't assume the convention held. Once wired once at
+repeating any step below, `grep -n -i expo` the Podfile to confirm the wiring is actually
+there — don't assume the convention held. Once wired once at
 the app level, any *future* expo-modules-core-based package is auto-discovered with zero further
 app changes — unlike the per-package `react-native.config.cjs`/podspec proxy the native-view
 skill requires for every new RN-CLI-autolinked wrapper.
 
 **iOS — done and verified end-to-end (2026-07, accelerometer pilot).** Three separate hard
 requirements surfaced that the original plan didn't anticipate; all three are reproduced
-directly in `.examples/react/ios/Podfile` rather than worked around:
+directly in `examples/react/ios/Podfile` rather than worked around:
 
 1. **`use_expo_modules!` itself has to be reproduced, not just called.** It isn't a Podfile
    DSL method `expo-modules-autolinking` exposes — that thin wrapper (`def
@@ -194,16 +191,16 @@ directly in `.examples/react/ios/Podfile` rather than worked around:
    monkey-patched in the Podfile (reopen `module ::Expo`, redefine each method, point the
    require string at `expo-modules-autolinking/bin/expo-modules-autolinking` directly).
 
-3. **`.examples/react/package.json` needs `expo-modules-autolinking` as a direct
+3. **`examples/react/package.json` needs `expo-modules-autolinking` as a direct
    dependency** (now present, pinned to the same `57.0.5` as the catalog) — without it, pnpm
-   never hoists it into `.examples/react/node_modules` (`shamefully-hoist` only hoists what's
+   never hoists it into `examples/react/node_modules` (`shamefully-hoist` only hoists what's
    actually reachable from a project's own dependency graph), so the Podfile's
    `require.resolve('expo-modules-autolinking/...')` fails even though `packages/sensors`
    itself resolves `expo-sensors`/`expo-modules-core` fine. `expo-sensors`/`expo-modules-core`
    themselves do **not** need to be added — they resolve transitively through
    `@symbiote-native/sensors` exactly as designed; only the autolinking *tool* needed the
    direct edge. Verified: `node .../expo-modules-autolinking/bin/expo-modules-autolinking.js
-   resolve --platform ios --json` from `.examples/react` lists `expo-sensors`
+   resolve --platform ios --json` from `examples/react` lists `expo-sensors`
    (`AccelerometerModule`, `BarometerModule`, `DeviceMotionModule`, `GyroscopeModule`,
    `MagnetometerModule`, `MagnetometerUncalibratedModule`, `PedometerModule`), each with
    `appDelegateSubscribers: []`.
@@ -251,7 +248,7 @@ it calls (`AppContext`/`EXAppContext`, `EXHostWrapper`, `EXReactSchedulerDispatc
 `expo-modules-core`-only (verified by grep across both packages' source trees), so the hook
 itself needed reproducing, not importing:
 
-`.examples/react/ios/Canary/SymbioteExpoModulesFactory.h` + `.mm` subclass
+`examples/react/ios/Canary/SymbioteExpoModulesFactory.h` + `.mm` subclass
 `RCTReactNativeFactory` (react-native's own stock factory) and implement
 `host:didInitializeRuntime:` — Objective-C++, not Swift, since Swift can't express
 `facebook::jsi::Runtime&` directly — creating an `EXAppContext`, wiring the runtime +
@@ -325,7 +322,7 @@ not `expo-modules-autolinking`) already ships a first-class fallback for exactly
 `withAutolinkingPlugin`) whenever the `expoAutolinkingSettingsPlugin` Gradle extra-property
 isn't set, and that fallback's `AutolinkingIntegrationImpl.getExpoDependency()` is just
 `project.rootProject.findProject(":$name")` — i.e. it expects the consuming app to `include()`
-the Expo module projects itself, by hand. So `.examples/react/android` does exactly that,
+the Expo module projects itself, by hand. So `examples/react/android` does exactly that,
 without ever touching `expo-autolinking-settings`:
 
 - `settings.gradle`: `pluginManagement {}` (must stay the file's first statement — Gradle
@@ -341,7 +338,7 @@ without ever touching `expo-autolinking-settings`:
   `expo-modules-autolinking`'s resolver walks `node_modules` by directory and reports all of it
   back (`expo`, `@expo/dom-webview`, `@expo/log-box`, `expo-asset`, `expo-constants`,
   `expo-file-system`, `expo-font`, `expo-keep-awake`) alongside the two wanted packages. Verified
-  directly: `cd .examples/react && ./node_modules/.bin/expo-modules-autolinking resolve
+  directly: `cd examples/react && ./node_modules/.bin/expo-modules-autolinking resolve
   --platform android --json` lists all 10; only `expo-modules-core`/`expo-sensors` get
   `include()`-d.
 - `android/build.gradle`: added `classpath("expo.modules:expo-module-gradle-plugin")` to the
@@ -391,9 +388,9 @@ without ever touching `expo-autolinking-settings`:
   dependency of `:app` — same as any other native Android library dependency.
 
 Verified end-to-end, in this order:
-1. `cd .examples/react && ./node_modules/.bin/expo-modules-autolinking resolve --platform
+1. `cd examples/react && ./node_modules/.bin/expo-modules-autolinking resolve --platform
    android --json` → lists `expo-sensors` (and `expo-modules-core`) among the resolved modules.
-2. `cd .examples/react/android && ./gradlew projects` → `Root project 'Canary'` lists
+2. `cd examples/react/android && ./gradlew projects` → `Root project 'Canary'` lists
    `Project ':expo-modules-core'` and `Project ':expo-sensors'` as real included subprojects,
    alongside `Included build ':expo-module-gradle-plugin'`.
 3. `./gradlew :app:assembleDebug` → `BUILD SUCCESSFUL` (233 tasks, real device/simulator-grade
@@ -517,7 +514,7 @@ new core test for any package that throws `UnavailabilityError` or reads `Platfo
 ALLOW-list — every future package needs a new name added to that filter by hand. Confirmed
 this doesn't scale past a handful of packages (2026-07-28, adding `expo-haptics`/
 `expo-clipboard`/`expo-battery` to all four `examples/expo-*` canaries — the public,
-tarball-installed app family, not `.examples/react`): the allow-list fix alone left the new
+tarball-installed app family, not `examples/react`): the allow-list fix alone left the new
 packages silently unlinked (project simply not included), a different symptom from the
 runtime "Cannot find native module" error below but with the same root cause — a filter that
 must be told about every new package by name.
@@ -578,7 +575,7 @@ packages/<lib>/
 For `@symbiote-native/sensors` specifically: hooks/composables/services ship from day one (not
 deferred to a later pass — decided explicitly over a core-only-v1 alternative), iOS+Android only
 (upstream's `.web.ts` variants are not ported). First adapter to verify end-to-end (native
-linking + hooks on a real/simulated device) is `.examples/react`, per this repo's "prove the
+linking + hooks on a real/simulated device) is `examples/react`, per this repo's "prove the
 pattern in React first" convention (see the Workstream B pilot-order precedent for
 `core/components`); Vue/Angular are wired and demoed afterward using the hooks/composables/
 services that already exist from day one.
@@ -705,7 +702,7 @@ before spending hours on the native side. The `Bundle`/`Map` converter asymmetry
 and worth reporting upstream someday, but treat "screen went blank" as a JS null-safety bug by
 default, not a JSI marshaling bug, until proven otherwise by an actual A/B test like this one.
 
-Current demo state (`.examples/react`'s `SensorsScreen.tsx`): `DeviceMotion` is wired in as a
+Current demo state (`examples/react`'s `SensorsScreen.tsx`): `DeviceMotion` is wired in as a
 first-class sensor alongside Accelerometer/Gyroscope/Magnetometer/Pedometer, on the fully
 unpatched native module — no `pnpm patch`, no native fork. It renders both `interval` (flat) and
 `rotation` (nested, `deviceMotion?.rotation`-guarded) live on screen.
@@ -943,16 +940,16 @@ never hits this; it's purely a local-tarball-dev-loop trap.
 2. Port `core/device-sensor.ts`, per-sensor core class + native-module resolution + types, the
    `react/hooks`/`vue/composables`/`angular/services` lifecycle wrapper per sensor, and tests
    adapting upstream's mock-native-module pattern (§6) — see §7 for the two shape variants.
-3. One-time `.examples/react` native wiring: Podfile `use_expo_modules!`, Android Gradle
+3. One-time `examples/react` native wiring: Podfile `use_expo_modules!`, Android Gradle
    autolinking apply, `NSMotionUsageDescription` in Info.plist, AppDelegate/MainApplication
    bootstrap, Android runtime permission — see §4 (`SymbioteExpoModulesFactory` on iOS) and the
    dedicated Android section above this checklist.
 4. Verify: `pod install` then grep `Pods.xcodeproj/project.pbxproj` for the native module
    class; Android Gradle autolinking generation succeeds; `xcodebuild`/`gradlew assembleDebug`
    both build; simulator install+launch with no crash.
-5. Demo screen in `.examples/react`, confirm on simulator/device (final word per ADR-0012 —
+5. Demo screen in `examples/react`, confirm on simulator/device (final word per ADR-0012 —
    real device, not headless).
-6. Wire the same hooks/composables/services into `.examples/vue-*` and `.examples/angular`.
+6. Wire the same hooks/composables/services into `examples/vue-*` and `examples/angular`.
 
 ## References
 
@@ -966,8 +963,6 @@ never hits this; it's purely a local-tarball-dev-loop trap.
   packages (§2 above).
 - `packages/splash-screen` — the package-shape template (exports map, core/adapter split) for
   a non-view wrapper.
-- `symbiote-dev-examples` — why native wiring goes in `.examples/<app>`, never the public
-  `examples/<app>`.
 - `packages/expo-modules-link` - the app-level registration aggregator (§9) that generates the
   `app/build.gradle`/`MainApplication.kt` blocks from every installed package's
   `native-link.json`; read its own README for the manifest shape and the app-side setup.

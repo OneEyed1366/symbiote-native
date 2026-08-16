@@ -1,3 +1,10 @@
+# Git exports GIT_DIR to every hook, and in a linked worktree it is an ABSOLUTE path. Any git
+# call a child process then makes from a subdirectory treats THAT subdirectory as the work-tree
+# root instead of discovering the real one. `changeset status` runs its diff with cwd=.changeset,
+# so under a worktree it sees an empty diff, reports "no changesets were found" and fails the push
+# even when the branch carries dozens. Discovery from the repo root is what we actually want.
+unset GIT_DIR GIT_WORK_TREE
+
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 
 case "$current_branch" in

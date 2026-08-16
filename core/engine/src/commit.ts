@@ -36,9 +36,7 @@ import { registerPostCommit, runPostCommitHooks } from './post-commit';
 import { fabricProps } from './fabric-props';
 import { isRecord } from './type-guards';
 
-// processColor/setColorProcessor now live in ./platform-color (the stable color-processing
-// leaf every color-touching module imports from); re-exported here so nothing outside this
-// module needs to change its import path.
+// Re-exported from ./platform-color so callers don't need to change their import path.
 export { processColor, setColorProcessor } from './platform-color';
 
 // Per-commit work counters, surfaced via dlog so a device run can prove the
@@ -217,8 +215,6 @@ function reconcile(
   const props = fabricProps(node);
   const childInText = node.isText || hasTextAncestor;
   const committed = mirror.get(node);
-  // The children that actually reach Fabric. Anchors are filtered out here so the
-  // whole walk (child-set emission, identity diff, mirror) is anchor-blind.
   const kids = renderableChildren(node);
 
   // First mount, or the view kind flipped (RCTText <-> RCTVirtualText when a

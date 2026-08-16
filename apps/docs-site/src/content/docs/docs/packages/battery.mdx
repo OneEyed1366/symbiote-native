@@ -24,6 +24,7 @@ three separate hooks, not one.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 <Aside type="note">
   `isBatteryOptimizationEnabledAsync()` is Android-only — it always resolves `false` on iOS, since
@@ -100,6 +101,18 @@ versions — never install either yourself, and never add the `expo` meta-packag
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text } from '@symbiote-native/svelte';
+      import { useBatteryLevel } from '@symbiote-native/battery/svelte';
+
+      const batteryLevel = useBatteryLevel(); // { readonly current: number }, -1 until the first reading arrives
+    </script>
+
+    <Text>{batteryLevel.current}</Text>
+    ```
+  </TabItem>
 </Tabs>
 
 ### Battery state
@@ -151,6 +164,19 @@ versions — never install either yourself, and never add the `expo` meta-packag
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text } from '@symbiote-native/svelte';
+      import { useBatteryState } from '@symbiote-native/battery/svelte';
+      import { BatteryState } from '@symbiote-native/battery';
+
+      const batteryState = useBatteryState(); // { readonly current: BatteryState }, seeded UNKNOWN
+    </script>
+
+    <Text>{batteryState.current === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</Text>
+    ```
+  </TabItem>
 </Tabs>
 
 ### Low power mode
@@ -195,6 +221,18 @@ versions — never install either yourself, and never add the `expo` meta-packag
     export class LowPowerBadge {
       readonly lowPowerMode = inject(LowPowerModeService).connect();
     }
+    ```
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text } from '@symbiote-native/svelte';
+      import { useLowPowerMode } from '@symbiote-native/battery/svelte';
+
+      const lowPowerMode = useLowPowerMode(); // { readonly current: boolean }, seeded false
+    </script>
+
+    <Text>{lowPowerMode.current ? 'Low Power Mode is on' : null}</Text>
     ```
   </TabItem>
 </Tabs>
@@ -293,12 +331,13 @@ packages/battery/src/
 │                       `ExpoBattery` native module via expo-modules-core's requireNativeModule
 ├── react/hooks/        @symbiote-native/battery/react   — useBatteryLevel, useBatteryState, useLowPowerMode
 ├── vue/composables/    @symbiote-native/battery/vue     — useBatteryLevel, useBatteryState, useLowPowerMode (same names)
+├── svelte/runes/       @symbiote-native/battery/svelte  — useBatteryLevel, useBatteryState, useLowPowerMode (same names)
 └── angular/services/   @symbiote-native/battery/angular — BatteryLevelService, BatteryStateService, LowPowerModeService
 ```
 
-Each adapter's hook/composable/service is a thin lifecycle wrapper — seed from the one-shot call,
-subscribe on mount, unsubscribe on unmount — over the same `core` functions; the subscription and
-seeding logic is written once and shared by all three, the same logic/lifecycle split as every
+Each adapter's hook/composable/rune/service is a thin lifecycle wrapper — seed from the one-shot
+call, subscribe on mount, unsubscribe on unmount — over the same `core` functions; the subscription
+and seeding logic is written once and shared by all four, the same logic/lifecycle split as every
 other SymbioteNative component (see [how it works](/docs/how-it-works/)). The native code itself
 is never vendored or copied — `expo-modules-autolinking` resolves it straight out of
 `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "build"
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+  "references": [
+    { "path": "../../core/engine" },
+    { "path": "../../core/components" },
+    // src/preprocessor/scoped-styles.ts is the first TS (not .cjs) file here to import
+    // @symbiote-native/css-parser. Without the reference, tsc follows its `main` into
+    // core/css-parser/src and re-checks that package's source under THIS project's options,
+    // which lack its `allowImportingTsExtensions` — the reference redirects the import to the
+    // built .d.ts instead.
+    { "path": "../../core/css-parser" }
+  ]
+}

@@ -20,9 +20,8 @@ adapters/
   react/       @symbiote-native/react       — react-reconciler host config (reference adapter)
   vue/         @symbiote-native/vue          — @vue/runtime-core createRenderer
 examples/
-  react/  vue-sfc/  vue-tsx/  angular/  — PUBLIC canary apps, @symbiote-native/* always catalog: (published)
-.examples/       — same four apps, PRIVATE dev harness, @symbiote-native/* always workspace:*, gitignored
-                    (see symbiote-dev-examples — never wire dev work into examples/ instead)
+  react/  vue-sfc/  vue-tsx/  angular/  — canary + dev apps, OUTSIDE the pnpm workspace,
+                    @symbiote-native/* as literal npm versions or a local `pnpm pack`+`file:` tarball
 packages/
   slider/      a third-party-style package;  android/  native host shims
 .docs/         decision records (ADRs) + e2e cases

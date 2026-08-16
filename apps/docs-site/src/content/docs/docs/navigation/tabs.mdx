@@ -119,6 +119,36 @@ there is no `push`/`pop`, only `jumpTo` between the existing tabs.
     (React/Vue), the same as [Stack's screens](/docs/navigation/stack/). `HomeTabScreen`/
     `SearchTabScreen` read theirs the same way.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Tab, TabScreen } from '@symbiote-native/navigation/svelte';
+      import TabHomeScreen from './TabHomeScreen.svelte';
+      import TabSearchScreen from './TabSearchScreen.svelte';
+    </script>
+
+    <Tab initialRouteName="Home"
+      ><TabScreen
+        name="Home"
+        component={TabHomeScreen}
+        options={{ tabBarLabel: 'Home', tabBarIcon: '🏠', tabBarActiveTintColor: '#4fd1a5' }}
+      /><TabScreen
+        name="Search"
+        component={TabSearchScreen}
+        options={{ tabBarLabel: 'Search', tabBarIcon: '🔍', tabBarBadge: 3 }}
+      /></Tab
+    >
+    ```
+
+    `TabScreen` is exported both as `Tab.Screen` and standalone (`examples/svelte` uses the
+    standalone form throughout, matching Vue's `TabScreen`). Screens are discovered the same way
+    Stack's are — Svelte hands `<Tab>` its children as an opaque `Snippet`, so each `<TabScreen>`
+    registers itself on a context-based collector rather than being read from a children scan; the
+    markup still reads declaratively. A screen that needs its own `route`/`navigation` reads them
+    with `useRoute()`/`useTabNavigation()` — both return a boxed getter, unwrapped via `.current` —
+    the same as [Stack's screens](/docs/navigation/stack/). `TabHomeScreen.svelte`/
+    `TabSearchScreen.svelte` read theirs the same way.
+  </TabItem>
 </Tabs>
 
 <Aside type="note">

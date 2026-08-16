@@ -6,8 +6,6 @@
 // android branch (cloneElement(refreshControl, {style}, <ScrollView nestedScrollEnabled
 // style={flex:1}>{content}</ScrollView>)). Metro picks this on an Android host; no
 // Platform.OS read.
-// device-verify-pending: the wrap shape mirrors RN, proven on a real host by the absence
-// of the "addViewAt: failed to insert" crash.
 
 import { cloneElement, createElement, forwardRef, useImperativeHandle, useRef } from 'react';
 import { dlog, type ISymbioteNode } from '@symbiote-native/engine';

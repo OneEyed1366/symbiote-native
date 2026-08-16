@@ -71,6 +71,7 @@ export class SymbioteSurface {
 
 export function createSurface(rootTag: IRootTag): SymbioteSurface {
   installEventHandler();
+  const surface = new SymbioteSurface(rootTag);
   dlog(`surface created root=${rootTag}`);
-  return new SymbioteSurface(rootTag);
+  return surface;
 }

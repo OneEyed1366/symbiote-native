@@ -28,7 +28,7 @@ import {
   type IMeasuredFrame,
 } from '@symbiote-native/components';
 import { View, type IViewProps } from '../../components';
-import { Keyboard, KEYBOARD_EVENT } from '../../modules/keyboard';
+import { Keyboard, KEYBOARD_EVENT } from '@symbiote-native/engine';
 import type { IAccessibilityProps, IAriaProps } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 

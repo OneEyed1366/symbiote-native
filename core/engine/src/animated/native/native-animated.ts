@@ -175,6 +175,7 @@ export const nativeAnimated = {
     module()?.stopAnimation(animationId);
   },
   setAnimatedNodeValue(nodeTag: number, value: number): void {
+    dlog(`native: setAnimatedNodeValue node=${nodeTag} value=${value}`);
     module()?.setAnimatedNodeValue(nodeTag, value);
   },
   setAnimatedNodeOffset(nodeTag: number, offset: number): void {

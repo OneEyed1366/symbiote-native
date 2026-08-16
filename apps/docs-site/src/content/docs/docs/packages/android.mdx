@@ -27,8 +27,9 @@ native observers RN already ships, independent of which renderer drives the view
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
-All three adapters are listed as live because none of them import this package. They reach it
+All four adapters are listed as live because none of them import this package. They reach it
 through their existing `Keyboard` and `Settings` exports, which resolve a native module by name —
 this package is what makes that name resolve on Android.
 
@@ -55,9 +56,9 @@ in that config) and no manifest permission to merge — the shipped `AndroidMani
 
 There is nothing to import from this package — see [API](#api) below. Using it means
 using `Keyboard` and `Settings` from your adapter's own barrel, exactly as you would on iOS.
-Both are re-exported by [React](/docs/api/react/), [Vue](/docs/api/vue/), and
-[Angular](/docs/api/angular/) from `@symbiote-native/engine`, so the JS is identical across all
-three and across both platforms.
+Both are re-exported by [React](/docs/api/react/), [Vue](/docs/api/vue/), [Angular](/docs/api/angular/),
+and Svelte from `@symbiote-native/engine`, so the JS is identical across all four and across both
+platforms.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
@@ -163,6 +164,38 @@ three and across both platforms.
 
     There's no service to `inject()` — `Keyboard` and `Settings` are plain objects off the
     adapter barrel, same as on React and Vue.
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { KEYBOARD_EVENT, Keyboard, Settings, Text, View } from '@symbiote-native/svelte';
+
+      let height = $state(0);
+
+      $effect(() => {
+        const shown = Keyboard.addListener(KEYBOARD_EVENT.didShow, () => {
+          height = Keyboard.metrics()?.height ?? 0;
+        });
+        const hidden = Keyboard.addListener(KEYBOARD_EVENT.didHide, () => (height = 0));
+
+        // Persisted through SharedPreferences on Android, NSUserDefaults on iOS.
+        Settings.set({ lastSeenKeyboard: Date.now() });
+
+        return () => {
+          shown.remove();
+          hidden.remove();
+        };
+      });
+    </script>
+
+    <View>
+      <Text>Keyboard height: {height}</Text>
+    </View>
+    ```
+
+    `Keyboard` and `Settings` are plain objects off the adapter barrel here too, same as on
+    every other adapter — the `$effect`'s returned function is the teardown, taking the place of
+    React's `useEffect` cleanup and Vue's separate `onUnmounted`.
   </TabItem>
 </Tabs>
 

@@ -7,20 +7,4 @@
 export { useBatteryLevel } from './composables/use-battery-level';
 export { useBatteryState } from './composables/use-battery-state';
 export { useLowPowerMode } from './composables/use-low-power-mode';
-export {
-  isAvailableAsync,
-  getBatteryLevelAsync,
-  getBatteryStateAsync,
-  isLowPowerModeEnabledAsync,
-  isBatteryOptimizationEnabledAsync,
-  getPowerStateAsync,
-  addBatteryLevelListener,
-  addBatteryStateListener,
-  addLowPowerModeListener,
-  BatteryState,
-  type PowerState,
-  type BatteryLevelEvent,
-  type BatteryStateEvent,
-  type PowerModeEvent,
-  type EventSubscription,
-} from '../core';
+export * from '../core';

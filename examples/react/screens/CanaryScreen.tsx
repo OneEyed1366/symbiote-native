@@ -45,6 +45,7 @@ import { RefApiDemo } from '../components/RefApiDemo';
 import { PlatformColorDemo } from '../components/PlatformColorDemo';
 import { AccessibilityDemo } from '../components/AccessibilityDemo';
 import { ResponderDemo } from '../components/ResponderDemo';
+import { CompoundClassDemo } from '../components/CompoundClassDemo';
 import { ParityDemo } from '../components/ParityDemo';
 import { nativeNumber } from '../components/event-utils';
 import { ROUTE_NAME } from '../routes';
@@ -428,6 +429,9 @@ export function CanaryScreen() {
 
         {/* Responder: drag-vs-tap + mid-gesture transfer (move-should-set / takeover) */}
         <ResponderDemo />
+
+        {/* Compound class rule: `.badge.loud` layers over `.badge`, static and dynamic */}
+        <CompoundClassDemo />
 
         {/* Parity checks: longPress · Keyboard.dismiss · animated scroll · sticky · a11y focus */}
         <ParityDemo />

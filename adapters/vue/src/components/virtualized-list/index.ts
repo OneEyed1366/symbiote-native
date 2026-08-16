@@ -61,6 +61,7 @@ import {
   reduceList,
   resolveItemKey,
   type IListAction,
+  type IListCellPlan,
   type IListEffect,
   type IListReducerInputs,
   type IListState,
@@ -745,8 +746,10 @@ export const VirtualizedList = defineComponent(
             ? INVERTED_X_STYLE
             : INVERTED_Y_STYLE
           : undefined;
-        for (let cellPos = 0; cellPos < plan.cells.length; cellPos += 1) {
-          const cell = plan.cells[cellPos];
+
+        // Wraps one cell identically whether it's the force-mounted sticky cell ahead of the
+        // window or an in-window cell from the loop below — same measuring View, same key shape.
+        const pushCell = (cell: IListCellPlan): void => {
           const item = p.getItem(p.data, cell.index);
           const content = p.renderItem?.({
             item,
@@ -764,10 +767,30 @@ export const VirtualizedList = defineComponent(
               [content],
             ),
           );
+        };
+
+        // The nearest sticky section header below the window (RN _ensureClosestStickyHeader):
+        // force-mounted so it never gets destroyed/recreated while pinned off-window. Rendered
+        // ahead of the main window loop, with its own gap spacer to the window's first cell.
+        if (plan.forcedStickyCell !== undefined) {
+          pushCell(plan.forcedStickyCell);
+          if (plan.gapExtent > EMPTY_OFFSET) {
+            children.push(
+              h('symbiote-view', {
+                key: 'spacer-gap',
+                style: p.horizontal ? { width: plan.gapExtent } : { height: plan.gapExtent },
+              }),
+            );
+          }
+        }
+
+        for (let cellPos = 0; cellPos < plan.cells.length; cellPos += 1) {
+          const cell = plan.cells[cellPos];
+          pushCell(cell);
           if (cell.index < m.last) {
             const separator = renderSeparatorElement(
               p.itemSeparatorComponent,
-              item,
+              p.getItem(p.data, cell.index),
               p.getItem(p.data, cell.index + 1),
               separatorOverrides.get(cell.index),
             );

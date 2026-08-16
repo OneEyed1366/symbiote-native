@@ -1,5 +1,11 @@
-// Co-located Angular-driven test (ADR 0025) for CalendarsService. See locales.service.test.ts for
-// the shared rationale.
+// Co-located Angular-driven test (ADR 0025) for CalendarsService. See locales.service.test.ts
+// for the shared rationale: `core` is mocked wholesale (the real getCalendars/addCalendarListener
+// delegation is covered once in packages/localization/src/core/localization.test.ts), this file
+// proves only connect()'s own read/subscribe/recompute/unsubscribe lifecycle.
+//
+// No Negative group: connect() has no guard clause or throwing path — getCalendars() is a
+// synchronous, always-succeeding native read (unlike battery's async fetch, there is no "before
+// resolve" state to seed a placeholder for).
 
 import '@angular/compiler';
 import { Component, inject, type Signal } from '@angular/core';
@@ -74,12 +80,17 @@ afterEach(() => {
 
 describe('CalendarsService.connect', () => {
   it('reads the current calendars synchronously', () => {
+    // why: unlike battery's async seed, getCalendars() is synchronous — the signal must hold
+    // the real value on the very first read, with no "loading" gap at all.
     mount(ROOT_TAG, CalendarsHost);
 
     expect(capturedResult?.()).toEqual(FAKE_CALENDARS_INITIAL);
   });
 
   it('recomputes the signal when the registered listener fires', async () => {
+    // why: calendar settings can change while the app runs (device settings change) — the
+    // signal must re-read getCalendars() off the native invalidation event, not cache the
+    // initial snapshot forever.
     mount(ROOT_TAG, CalendarsHost);
     await tick();
 
@@ -91,6 +102,8 @@ describe('CalendarsService.connect', () => {
   });
 
   it('removes the subscription when the host component is unmounted', async () => {
+    // why: a leaked subscription keeps re-reading calendars for a signal no component observes,
+    // and leaks the native listener — the effect's onCleanup must run on teardown.
     mount(ROOT_TAG, CalendarsHost);
     await tick();
 

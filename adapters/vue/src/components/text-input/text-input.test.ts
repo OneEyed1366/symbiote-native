@@ -296,4 +296,79 @@ describe('Vue TextInput on the engine', () => {
     expect(selected!.args[2]).toBe(2);
     expect(selected!.args[3]).toBe(5);
   });
+
+  // why: vue-adapter-reactivity Gotcha 2 — Vue's commit is coalesced onto a microtask, so the
+  // node has no Fabric tag yet when the post-flush autoFocus watch first fires. A bare
+  // dispatchViewCommand there would read no tag and silently no-op with no retry; whenCommitted
+  // is what makes autoFocus land at all instead of shipping dead on Vue while working on React.
+  it('commands focus once via whenCommitted when autoFocus is set, despite the async-commit race', async () => {
+    mount(
+      ROOT_TAG,
+      defineComponent({ setup: () => () => h(TextInput, { value: 'x', autoFocus: true }) }),
+    );
+    await tick();
+
+    const focusCommands = commands.filter(c => c.name === 'focus');
+    expect(focusCommands, 'exactly one focus command from the autoFocus guard').toHaveLength(1);
+  });
+
+  it('does not command focus when autoFocus is unset', async () => {
+    mount(ROOT_TAG, defineComponent({ setup: () => () => h(TextInput, { value: 'x' }) }));
+    await tick();
+    expect(commands.some(c => c.name === 'focus')).toBe(false);
+  });
+
+  // why: foldText's second branch — an uncontrolled TextInput (no value/modelValue) seeds from
+  // defaultValue instead of an empty string, matching RN's own uncontrolled-input contract.
+  it('falls back to defaultValue when neither value nor modelValue is set', async () => {
+    mount(
+      ROOT_TAG,
+      defineComponent({ setup: () => () => h(TextInput, { defaultValue: 'seeded' }) }),
+    );
+    await tick();
+    expect(inputNode(SINGLELINE).props.text).toBe('seeded');
+  });
+
+  // why: textFromChange returns undefined for a native change event carrying no string `text` —
+  // handleChange's `if (text !== undefined)` guard must swallow that instead of emitting a bogus
+  // value or overwriting lastNativeText with undefined (which would desync the next controlled-
+  // write comparison).
+  it('ignores a native change event with no text field, emitting nothing', async () => {
+    let changed: string | undefined;
+    mount(
+      ROOT_TAG,
+      defineComponent({
+        setup: () => () =>
+          h(TextInput, { value: 'x', onValueChange: (text: string) => (changed = text) }),
+      }),
+    );
+    await tick();
+    fabric.fireEvent(inputNode(SINGLELINE).instanceHandle, 'topChange', { eventCount: 1 });
+    await tick();
+    expect(changed).toBeUndefined();
+  });
+
+  // why: resolveTextInputProps' runtime guards (asString/asBoolean) are the ONLY thing standing
+  // between a caller's attrs and Fabric's native prop names — proving one representative value
+  // per guard reaches the committed node is what tells a dropped/renamed guard apart from a
+  // passthrough that happens to also work.
+  it('forwards keyboardType/editable/returnKeyType through resolveTextInputProps guards', async () => {
+    mount(
+      ROOT_TAG,
+      defineComponent({
+        setup: () => () =>
+          h(TextInput, {
+            value: 'x',
+            keyboardType: 'numeric',
+            editable: false,
+            returnKeyType: 'done',
+          }),
+      }),
+    );
+    await tick();
+    const props = inputNode(SINGLELINE).props;
+    expect(props.keyboardType).toBe('numeric');
+    expect(props.editable).toBe(false);
+    expect(props.returnKeyType).toBe('done');
+  });
 });

@@ -8,13 +8,9 @@ export type IActionButtonProps = {
   testID?: string;
 };
 
-// Drop-in replacement for RN's stock <Button> (same title/onPress/color/testID surface) —
-// a bare Button renders as unstyled tinted text on iOS, visually indistinguishable from a body
-// Text line, which was the single biggest source of "looks messy" across the demo app (2026-07
-// cohesion pass). One consistent bordered pill, tinted in the caller's own `color` exactly like
-// Button already took, so every screen's per-feature color-coding is preserved — only the chrome
-// becomes consistent. Reads `props.*` inside the render closure (not destructured at setup-time)
-// so a later prop change (a new `color`/`onPress` from the caller) stays reactive — Vue's twin of
+// Drop-in replacement for RN's stock <Button> (same title/onPress/color/testID surface) as a
+// consistent bordered pill instead of unstyled tinted text. Reads `props.*` inside the render
+// closure (not destructured at setup-time) so a later prop change stays reactive — Vue's twin of
 // React re-rendering this component fresh on every parent render.
 export const ActionButton = defineComponent<IActionButtonProps>(
   props => {

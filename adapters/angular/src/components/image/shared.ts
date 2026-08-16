@@ -1,4 +1,4 @@
-import { EventEmitter } from '@angular/core';
+import { EventEmitter, computed, signal } from '@angular/core';
 import {
   imageStatics,
   renderImage,
@@ -473,7 +473,39 @@ export abstract class ImageBase {
     };
   }
 
-  get imageProps(): Record<string, unknown> {
+  // Bridges the non-reactive @Input fields into the reactive graph so imageProps below can be a
+  // memoized computed(). Signal inputs would make this unnecessary, but `input()` is visible only
+  // to the AOT compiler and this package's unit suite runs on JIT - see the
+  // `angular-adapter-change-detection` skill, §6. `signal()`/`computed()` are plain runtime APIs
+  // and need no compiler support, which is what makes this bridge possible at all.
+  //
+  // ImageBase is deliberately UNdecorated, so the ngOnChanges that bumps this lives on each
+  // platform @Component instead of here.
+  //
+  // Every dependency of the bag below is an @Input, which Angular always routes through
+  // ngOnChanges. State assigned OUTSIDE that path needs its OWN signal - never widen this one to
+  // "bump on everything", which silently un-memoizes the bag. The platform anchor style is exactly
+  // such a dependency and carries its own signal.
+  protected readonly inputsRevision = signal(0);
+
+  protected bumpInputsRevision(): void {
+    this.inputsRevision.update(revision => revision + 1);
+  }
+
+  // MEASURED 2026-08-16: as a getter this rebuilt the bag on every refresh of this view, so
+  // `[symbioteHostProps]`'s reference check failed every time and every key was re-pushed through
+  // Renderer2 -> routeProp - pure waste when nothing changed. computed() returns the SAME object
+  // until a tracked dependency actually changes, and the input setter then skips the whole spread.
+  //
+  // A computed FIELD cannot be overridden by a subclass accessor the way a getter can, so the
+  // platform components override buildImageProps() below and this stays the single memoization
+  // point for every platform.
+  readonly imageProps = computed<Record<string, unknown>>(() => {
+    this.inputsRevision();
+    return this.buildImageProps();
+  });
+
+  protected buildImageProps(): Record<string, unknown> {
     return resolveImageProps(this.imageInputProps);
   }
 }

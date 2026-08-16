@@ -8,11 +8,18 @@
 import { describe, expect, it } from 'vitest';
 import { createElement, type ISymbioteEvent } from '@symbiote-native/engine';
 import {
+  computePressOutWait,
   createTouchableFeedbackHandlers,
   createTouchableFeedbackRuntime,
   DEFAULT_MIN_PRESS_DURATION_MS,
   type ITouchableFeedbackConfig,
 } from './touchable';
+
+// No Negative group: every symbol here is a total function over its input (scheduling math,
+// object construction, timer bookkeeping) with no guard clause and nothing that can throw or
+// reject. The scenarios below are all Positive — the machine's only two failure modes (a leaked
+// timer, an out-of-order activate/deactivate) show up as a WRONG value/order, not a throw, so
+// they are asserted as such rather than invented as a "should throw" case.
 
 // A deterministic clock + one-shot scheduler: time only moves when the test calls advance(); a
 // scheduled callback fires once when the clock reaches its due time, and its returned canceller
@@ -99,7 +106,37 @@ function baseConfig(
   };
 }
 
-describe('createTouchableFeedbackHandlers', () => {
+describe('computePressOutWait (Positive — the RN _deactivate floor)', () => {
+  // why: RN holds the active visual for at least minPressDuration past activation, so a very fast
+  // tap still flashes it — heldFor already covers most of the floor, so little wait remains.
+  it('waits the remaining min-press-duration when it exceeds delayPressOut', () => {
+    expect(computePressOutWait(50, 130, 0)).toBe(80);
+  });
+
+  // why: a tap held longer than minPressDuration must not wait NEGATIVE time — delayPressOut (here
+  // 0) is the other floor, so the wait clamps at 0 rather than going negative.
+  it('never returns a negative wait when the press was already held past the minimum', () => {
+    expect(computePressOutWait(200, 130, 0)).toBe(0);
+  });
+
+  // why: delayPressOut is an independent floor RN applies regardless of activation timing — it
+  // wins even when minPressDuration alone would already be satisfied.
+  it('floors on delayPressOut when it exceeds the remaining min-press-duration hold', () => {
+    expect(computePressOutWait(130, 130, 40)).toBe(40);
+  });
+});
+
+describe('createTouchableFeedbackRuntime (Positive)', () => {
+  // why: a fresh runtime must start with no in-flight timer and no activation stamp, or the very
+  // first pressOut would compute a bogus heldFor against a stale activatedAt.
+  it('starts with no pending timer and no activation stamp', () => {
+    const runtime = createTouchableFeedbackRuntime();
+    expect(runtime.pressInTimerCancel).toBeUndefined();
+    expect(runtime.activatedAt).toBeUndefined();
+  });
+});
+
+describe('createTouchableFeedbackHandlers (Positive)', () => {
   it('activates synchronously on pressIn when no delay, deactivates on pressOut', () => {
     const clock = makeClock();
     const cb = makeCallbacks();

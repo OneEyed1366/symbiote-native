@@ -21,6 +21,10 @@ let lastAndroidShare: {
 let lastActionSheetOptions: Record<string, unknown> | null;
 let registeredModuleNames: string[];
 
+function isPresent<T>(value: unknown): value is T {
+  return value !== null && value !== undefined;
+}
+
 beforeEach(async () => {
   completeNextShare = true;
   lastAndroidShare = null;
@@ -68,16 +72,36 @@ afterEach(() => {
   globalThis.__turboModuleProxy = undefined;
 });
 
-function isPresent<T>(value: unknown): value is T {
-  return value !== null && value !== undefined;
-}
-
 describe('Share action constants', () => {
   it('both builds expose dismissedAction / sharedAction', () => {
     expect(iosShare.dismissedAction).toBe('dismissedAction');
     expect(iosShare.sharedAction).toBe('sharedAction');
     expect(androidShare.dismissedAction).toBe('dismissedAction');
     expect(androidShare.sharedAction).toBe('sharedAction');
+  });
+});
+
+describe('content validation — shared across both platforms', () => {
+  // why: the throw IS the contract (validateContent's whole job) — a Negative test must
+  // assert the SPECIFIC message, not just "it rejected something".
+  it('content with neither message nor url rejects with the exact validation message', async () => {
+    // JSON.parse yields an untyped value so the deliberately-invalid shape needs no cast.
+    const invalidContent: IShareContent = JSON.parse('{"title":"only a title"}');
+    await expect(iosShare.share(invalidContent)).rejects.toThrow(
+      'At least one of URL or message is required',
+    );
+  });
+
+  // why: validateContent's FIRST guard (non-object content) is a distinct branch from the
+  // missing-url/message guard — both must be provably reachable, not just one of the two.
+  it('null content rejects with "must be a valid object"', async () => {
+    const nullContent: IShareContent = JSON.parse('null');
+    await expect(iosShare.share(nullContent)).rejects.toThrow(
+      'Content to share must be a valid object',
+    );
+    await expect(androidShare.share(nullContent)).rejects.toThrow(
+      'Content to share must be a valid object',
+    );
   });
 });
 
@@ -93,12 +117,42 @@ describe('Share (iOS build -> ActionSheetManager)', () => {
     completeNextShare = false;
     const dismissed = await iosShare.share({ message: 'hi' });
     expect(dismissed.action).toBe('dismissedAction');
+    expect(dismissed.activityType).toBeNull();
   });
 
-  it('content with neither message nor url rejects', async () => {
-    // JSON.parse yields an untyped value so the deliberately-invalid shape needs no cast.
-    const invalidContent: IShareContent = JSON.parse('{"title":"only a title"}');
-    await expect(iosShare.share(invalidContent)).rejects.toBeDefined();
+  // why: showShareActionSheetWithOptions's FAILURE callback path (a native share-sheet
+  // error) was previously untested — only the success path was — and must reject, not hang
+  // or resolve, with the native error's own message.
+  it('a native failure callback rejects with the native error message', async () => {
+    globalThis.__turboModuleProxy = <T>(name: string): T | null => {
+      if (name !== 'ActionSheetManager') return null;
+      const failingManager = {
+        showShareActionSheetWithOptions: (
+          _options: Record<string, unknown>,
+          failureCallback: (error: { message: string }) => void,
+        ): void => {
+          failureCallback({ message: 'user cancelled' });
+        },
+      };
+      return isPresent<T>(failingManager) ? failingManager : null;
+    };
+    vi.resetModules();
+    const fresh = await import('./index.ios');
+
+    await expect(fresh.Share.share({ message: 'hi' })).rejects.toThrow('user cancelled');
+  });
+
+  // why: a device without ActionSheetManager linked (unlikely on iOS, but the module is
+  // resolved lazily and defensively) must reject explicitly rather than return a Promise
+  // that never settles.
+  it('rejects with a specific message when ActionSheetManager is not resolvable', async () => {
+    globalThis.__turboModuleProxy = <T>(_name: string): T | null => null;
+    vi.resetModules();
+    const fresh = await import('./index.ios');
+
+    await expect(fresh.Share.share({ message: 'hi' })).rejects.toThrow(
+      'Share: ActionSheetManager native module unavailable',
+    );
   });
 
   // Regression net for the action-sheet-ios/share contract merge: Share must keep resolving
@@ -128,5 +182,52 @@ describe('Share (Android build -> ShareModule)', () => {
     expect(lastAndroidShare?.content.message).toBe('body');
     expect(lastAndroidShare?.content.title).toBe('T');
     expect(lastAndroidShare?.dialogTitle).toBe('Pick one');
+  });
+
+  // why: Android has no dismiss signal from the OS — a native result reporting the literal
+  // 'dismissedAction' string must still map through, or the app could never observe a
+  // dismissal on Android.
+  it('maps a native dismissedAction result to dismissedAction', async () => {
+    globalThis.__turboModuleProxy = <T>(name: string): T | null => {
+      if (name !== 'ShareModule') return null;
+      const dismissingModule = {
+        share: (): Promise<{ action: string }> => Promise.resolve({ action: 'dismissedAction' }),
+      };
+      return isPresent<T>(dismissingModule) ? dismissingModule : null;
+    };
+    vi.resetModules();
+    const fresh = await import('./index.android');
+
+    const result = await fresh.Share.share({ message: 'hi' });
+    expect(result.action).toBe('dismissedAction');
+  });
+
+  // why: `isShareResult` narrows an untyped native return value — a result missing a string
+  // `action` is exactly the malformed-payload case the guard exists to catch, and must
+  // reject with a specific message rather than crash on `result.action`.
+  it('rejects with a specific message when the native result is missing a string action', async () => {
+    globalThis.__turboModuleProxy = <T>(name: string): T | null => {
+      if (name !== 'ShareModule') return null;
+      const malformedModule = {
+        share: (): Promise<unknown> => Promise.resolve({ notAction: true }),
+      };
+      return isPresent<T>(malformedModule) ? malformedModule : null;
+    };
+    vi.resetModules();
+    const fresh = await import('./index.android');
+
+    await expect(fresh.Share.share({ message: 'hi' })).rejects.toThrow(
+      'Share: ShareModule returned an unexpected result',
+    );
+  });
+
+  it('rejects with a specific message when ShareModule is not resolvable', async () => {
+    globalThis.__turboModuleProxy = <T>(_name: string): T | null => null;
+    vi.resetModules();
+    const fresh = await import('./index.android');
+
+    await expect(fresh.Share.share({ message: 'hi' })).rejects.toThrow(
+      'Share: ShareModule native module unavailable',
+    );
   });
 });

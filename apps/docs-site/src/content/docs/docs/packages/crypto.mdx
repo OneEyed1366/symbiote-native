@@ -23,6 +23,7 @@ of scope for this pass.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Installation
 
@@ -48,8 +49,8 @@ hashing touch no protected device capability.
 
 ## Usage
 
-All three adapters — React, Vue, Angular — re-export the exact same free functions; there is no
-per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+All four adapters — React, Vue, Angular, Svelte — re-export the exact same free functions; there
+is no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
 subscription.
 
 <Tabs syncKey="framework">
@@ -163,6 +164,44 @@ subscription.
     There's no per-instance service to `inject()` here — every function is a plain free function
     off the core package.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text, View } from '@symbiote-native/svelte';
+      import {
+        CryptoDigestAlgorithm,
+        digestStringAsync,
+        randomUUID,
+      } from '@symbiote-native/crypto/svelte';
+
+      let uuid = $state('');
+      let hash = $state('');
+
+      $effect(() => {
+        uuid = randomUUID();
+      });
+
+      function handleHash(): void {
+        digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(value => {
+          hash = value;
+        });
+      }
+    </script>
+
+    <View>
+      <Text>UUID: {uuid}</Text>
+      <Pressable onPress={handleHash}>
+        <Text>Hash a string</Text>
+      </Pressable>
+      {#if hash}
+        <Text>SHA-256: {hash}</Text>
+      {/if}
+    </View>
+    ```
+
+    There's no per-instance rune to reach for here either — every function is a plain free
+    function off the core package.
+  </TabItem>
 </Tabs>
 
 ## API
@@ -230,6 +269,7 @@ packages/crypto/src/
 │             # module via expo-modules-core's requireNativeModule
 ├── react/    # @symbiote-native/crypto/react   — export * from '../core'
 ├── vue/      # @symbiote-native/crypto/vue     — export * from '../core'
+├── svelte/   # @symbiote-native/crypto/svelte  — export * from '../core'
 └── angular/  # @symbiote-native/crypto/angular — export * from '../core'
 ```
 

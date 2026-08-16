@@ -10,10 +10,24 @@
 // existing props (real Fabric C++ behavior; the shared recorder replaces) so the base
 // width survives the opacity-only per-frame diff, installed before any mount because the
 // engine destructures slot methods off the global on its first commit.
+//
+// SCOPE: the shared press-timing/scheduling machine (computePressOutWait,
+// createTouchableFeedbackRuntime/Handlers) is fully unit-tested in
+// core/components/src/state/touchable.test.ts — that ownership is N/A here (covered elsewhere).
+// This file proves the React-side WIRING: that each Touchable* variant actually drives its real
+// visual mechanism (Animated for Opacity, a style-function overlay for Highlight, nothing for
+// WithoutFeedback) through the real engine commit path. No Negative group: none of the three
+// components has a throwing path — a bad prop just produces different visuals, not a rejection.
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, TouchableOpacity } from '@symbiote-native/react';
+import {
+  mount,
+  unmount,
+  TouchableOpacity,
+  TouchableHighlight,
+  TouchableWithoutFeedback,
+} from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 120;
@@ -130,6 +144,9 @@ function asNumber(value: unknown, label: string): number {
 }
 
 describe('React TouchableOpacity animated feedback', () => {
+  // why: RN drives TouchableOpacity's feedback with a real Animated.timing (not a discrete style
+  // swap), so it fades — a static opacity flip would be a regression to a cheaper, wrong
+  // implementation. This proves the fade actually runs and lands on the committed native node.
   it('animates opacity to activeOpacity on press-in and back to 1 on press-out', async () => {
     let pressIns = 0;
     let pressOuts = 0;
@@ -181,6 +198,10 @@ describe('React TouchableOpacity animated feedback', () => {
     expect(pressOuts).toBe(1);
   });
 
+  // why: delayPressIn lets a component defer its "pressed" feedback past a quick swipe-through,
+  // exactly like Pressable's unstable_pressDelay — this proves the adapter actually threads the
+  // prop into the shared scheduling machine rather than ignoring it (the machine's own timing
+  // math is unit-tested at core; this is the wiring proof).
   it('defers onPressIn past touch-down with delayPressIn', async () => {
     const DELAY = 30;
     let deferredPressIns = 0;
@@ -202,5 +223,67 @@ describe('React TouchableOpacity animated feedback', () => {
     expect(deferredPressIns).toBe(0);
     await new Promise(resolve => setTimeout(resolve, DELAY + 20));
     expect(deferredPressIns).toBe(1);
+  });
+});
+
+describe('React TouchableHighlight underlay feedback', () => {
+  // why: RN paints TouchableHighlight's feedback with a synchronous style overlay (not
+  // Animated), unlike TouchableOpacity above — this proves the adapter's `pressedStyle` function
+  // (wired through Pressable's style-as-function prop) actually composes highlightPressedStyle's
+  // [style, overlay] tuple onto the real committed node while pressed, and drops back to the bare
+  // style on release. `highlightPressedStyle` itself has no core-level unit test anywhere in the
+  // repo, so this integration test is its only current coverage, not merely wiring proof.
+  it('paints underlayColor + activeOpacity while pressed, and clears on release', () => {
+    mount(
+      ROOT_TAG,
+      <TouchableHighlight
+        underlayColor="#abc"
+        activeOpacity={0.5}
+        style={{ width: 10 }}
+        onPress={() => {}}
+      />,
+    );
+    const handle = responderHandle();
+
+    const rest = feedbackProps();
+    expect(rest.backgroundColor).toBeUndefined();
+    expect(rest.width).toBe(10);
+
+    fabric.fireEvent(handle, TOUCH_START);
+    const pressed = feedbackProps();
+    expect(pressed.backgroundColor).toBe('#abc');
+    expect(pressed.opacity).toBe(0.5);
+    expect(pressed.width).toBe(10);
+
+    fabric.fireEvent(handle, TOUCH_END);
+    const released = feedbackProps();
+    expect(released.backgroundColor).toBeUndefined();
+  });
+});
+
+describe('React TouchableWithoutFeedback', () => {
+  // why: RN's TouchableWithoutFeedback is a pure press-wiring passthrough with NO visual
+  // reaction at all — proves it still synthesizes onPress (it is not merely an inert View) while
+  // deliberately never touching backgroundColor/opacity the way its Highlight/Opacity siblings do.
+  it('fires onPress with no visual feedback applied', () => {
+    let presses = 0;
+    mount(
+      ROOT_TAG,
+      <TouchableWithoutFeedback
+        style={{ width: 10 }}
+        onPress={() => {
+          presses++;
+        }}
+      >
+        <></>
+      </TouchableWithoutFeedback>,
+    );
+    const handle = responderHandle();
+    fabric.fireEvent(handle, TOUCH_START);
+    const pressed = feedbackProps();
+    expect(pressed.backgroundColor).toBeUndefined();
+    expect(pressed.opacity).toBeUndefined();
+    fabric.fireEvent(handle, TOUCH_END);
+    expect(presses).toBe(1);
   });
 });

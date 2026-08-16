@@ -1,5 +1,9 @@
 // Co-located Angular-driven test (ADR 0025) for BatteryStateService. See
-// battery-level.service.test.ts for the shared rationale.
+// battery-level.service.test.ts for the shared rationale: `core` is mocked wholesale (the real
+// native delegation is covered once in packages/battery/src/core/battery.test.ts), this file
+// proves only connect()'s own seed/subscribe/update/unsubscribe lifecycle.
+//
+// No Negative group: connect() has no guard clause or throwing path.
 
 import '@angular/compiler';
 import { Component, inject, type Signal } from '@angular/core';
@@ -57,12 +61,15 @@ afterEach(() => {
 
 describe('BatteryStateService.connect', () => {
   it('reports UNKNOWN (0) before the initial fetch resolves', async () => {
+    // why: BatteryState.UNKNOWN is the documented "can't tell yet" sentinel — must be visible
+    // immediately on mount, before the async seed fetch settles.
     mount(ROOT_TAG, BatteryStateHost);
 
     expect(capturedResult?.()).toBe(0);
   });
 
   it('reports the fetched state once getBatteryStateAsync() resolves', async () => {
+    // why: proves the one-shot seed fetch actually reaches the signal.
     mount(ROOT_TAG, BatteryStateHost);
     await tick();
 
@@ -70,6 +77,8 @@ describe('BatteryStateService.connect', () => {
   });
 
   it('updates the signal when the registered listener fires', async () => {
+    // why: after the initial seed, state transitions (charging → unplugged, etc.) must come
+    // from the native event, not a second fetch — proves the listener is wired to the signal.
     mount(ROOT_TAG, BatteryStateHost);
     await tick();
 
@@ -80,6 +89,8 @@ describe('BatteryStateService.connect', () => {
   });
 
   it('removes the subscription when the host component is unmounted', async () => {
+    // why: a leaked subscription keeps updating a signal no component reads, and leaks the
+    // native listener — the effect's onCleanup must actually run on teardown.
     mount(ROOT_TAG, BatteryStateHost);
     await tick();
 

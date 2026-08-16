@@ -67,26 +67,42 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
+// Scope: the Vue-specific lifecycle seam (createAnimatedComponent's onMounted reconcile racing
+// the async commit). The attach/no-op decision itself (native handler vs JS fallback) is
+// framework-agnostic logic in core/engine/src/animated/event.ts's attachNativeEventHandler and
+// carries its own coverage there — not re-proven here.
+//
+// No Negative group: there is no invalid input this seam rejects; it is a wiring proof, not a
+// validating function.
 describe('Vue Animated component native event', () => {
-  it('binds a native Animated.event to the committed view tag', async () => {
-    const scrollY = new Animated.Value(0);
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(Animated.View, {
-            style: { height: 10 },
-            onScroll: Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-              useNativeDriver: true,
+  describe('Positive (native event bind through Vue lifecycle)', () => {
+    // why: this is the actual Gotcha-2 race, not a simulation of it. createAnimatedComponent's own
+    // onMounted → reconcile → attachEvents runs synchronously inside Vue's mount() call, before the
+    // requestCommit microtask that assigns the view's Fabric tag has run — so attachNativeEventHandler
+    // is first invoked with no tag. Without the whenCommitted retry in attachNativeEventHandler, this
+    // would leave `addAnimatedEventToView` never called: the assertion below (length 1, correct tag)
+    // fails the moment that retry is removed, which a synchronous-only assertion (no `await tick()`)
+    // could not catch.
+    it('binds a native Animated.event to the committed view tag', async () => {
+      const scrollY = new Animated.Value(0);
+      mount(
+        ROOT_TAG,
+        defineComponent({
+          setup: () => () =>
+            h(Animated.View, {
+              style: { height: 10 },
+              onScroll: Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+                useNativeDriver: true,
+              }),
             }),
-          }),
-      }),
-    );
-    await tick();
+        }),
+      );
+      await tick();
 
-    const attach = callsOf('addAnimatedEventToView');
-    expect(attach, 'the native event attaches to the view').toHaveLength(1);
-    expect(attach[0].args[0], 'bound to the committed view tag').toBe(animatedViewNode().tag);
-    expect(attach[0].args[1]).toBe('onScroll');
+      const attach = callsOf('addAnimatedEventToView');
+      expect(attach, 'the native event attaches to the view').toHaveLength(1);
+      expect(attach[0].args[0], 'bound to the committed view tag').toBe(animatedViewNode().tag);
+      expect(attach[0].args[1]).toBe('onScroll');
+    });
   });
 });

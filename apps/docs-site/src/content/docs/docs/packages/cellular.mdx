@@ -23,6 +23,7 @@ cellular is that almost the entire carrier/SIM surface is Android-only — iOS e
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 <Aside type="caution" title="Every field except generation is Android-only">
   `allowsVoipAsync`, `getIsoCountryCodeAsync`, `getCarrierNameAsync`, `getMobileCountryCodeAsync`,
@@ -132,6 +133,27 @@ adapter, with no hook/composable/service in the way:
     There's no per-instance service to `inject()` here — every function is a plain free function
     off the core package, same as `@symbiote-native/local-auth`.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text } from '@symbiote-native/svelte';
+      import { CellularGeneration, getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
+
+      let generation = $state<CellularGeneration | null>(null);
+      let carrierName = $state<string | null>(null);
+
+      $effect(() => {
+        getCellularGenerationAsync().then(value => (generation = value));
+        getCarrierNameAsync().then(value => (carrierName = value)); // Android only — always null on iOS
+      });
+    </script>
+
+    <Text>{carrierName ?? `generation ${generation}`}</Text>
+    ```
+
+    There's no per-instance rune to reach for here either — every function is a plain free
+    function off the core package, called straight from `$effect`.
+  </TabItem>
 </Tabs>
 
 ### Permission
@@ -143,13 +165,13 @@ adapter, with no hook/composable/service in the way:
     import { usePermissions } from '@symbiote-native/cellular/react';
 
     export default function CellularPermission() {
-      const [status, request] = usePermissions();
+      const [status, request, get, error] = usePermissions();
 
       return (
         <>
-          <Text>{status?.status ?? 'checking…'}</Text>
-          <Pressable onPress={() => request()}>
-            <Text>Request permission</Text>
+          <Text>{error ? `check failed: ${error.message}` : (status?.status ?? 'checking…')}</Text>
+          <Pressable onPress={() => (error ? get() : request())}>
+            <Text>{error ? 'Retry check' : 'Request permission'}</Text>
           </Pressable>
         </>
       );
@@ -161,13 +183,13 @@ adapter, with no hook/composable/service in the way:
     <script setup lang="ts">
     import { usePermissions } from '@symbiote-native/cellular/vue';
 
-    const { status, request } = usePermissions();
+    const { status, error, request, get } = usePermissions();
     </script>
 
     <template>
-      <Text>{{ status?.status ?? 'checking…' }}</Text>
-      <Pressable @press="request">
-        <Text>Request permission</Text>
+      <Text>{{ error ? `check failed: ${error.message}` : (status?.status ?? 'checking…') }}</Text>
+      <Pressable @press="error ? get() : request()">
+        <Text>{{ error ? 'Retry check' : 'Request permission' }}</Text>
       </Pressable>
     </template>
     ```
@@ -182,19 +204,42 @@ adapter, with no hook/composable/service in the way:
       standalone: true,
       imports: [Pressable, Text],
       template: `
-        <Text>{{ status()?.status ?? 'checking…' }}</Text>
-        <Pressable (press)="permissions.request()">
-          <Text>Request permission</Text>
+        <Text>{{ error() ? 'check failed: ' + error()?.message : (status()?.status ?? 'checking…') }}</Text>
+        <Pressable (press)="error() ? permissions.get() : permissions.request()">
+          <Text>{{ error() ? 'Retry check' : 'Request permission' }}</Text>
         </Pressable>
       `,
     })
     export class CellularPermission {
       readonly permissions = inject(PermissionsService);
       readonly status = this.permissions.connect();
+      readonly error = this.permissions.error;
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text } from '@symbiote-native/svelte';
+      import { usePermissions } from '@symbiote-native/cellular/svelte';
+
+      const permissions = usePermissions();
+    </script>
+
+    <Text>
+      {permissions.error
+        ? `check failed: ${permissions.error.message}`
+        : (permissions.status?.status ?? 'checking…')}
+    </Text>
+    <Pressable onPress={() => (permissions.error ? permissions.get() : permissions.request())}>
+      <Text>{permissions.error ? 'Retry check' : 'Request permission'}</Text>
+    </Pressable>
+    ```
+  </TabItem>
 </Tabs>
+
+`status` stays `null` both while the first fetch is in flight and after it fails, so `error` is what
+tells those two apart; `get()` re-runs the check without prompting the user.
 
 ## API
 
@@ -213,12 +258,37 @@ adapter, with no hook/composable/service in the way:
 
 ### `usePermissions()`
 
-| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Signature | Returns |
-| --- | --- | --- | --- | --- |
-| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `()` | React: `[PermissionResponse \| null, request, get]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `request()`/`get()` as separate service methods |
+| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Svelte (`/svelte`) | Signature | Returns |
+| --- | --- | --- | --- | --- | --- |
+| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions` | `()` | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null` |
+
+### `usePermissions()` return value
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `status` | `PermissionResponse \| null` | The permission status last read, `null` until the first fetch resolves |
+| `error` | `Error \| null` | Why the automatic fetch left `status` at `null`. Cleared by the next successful `get()`/`request()` |
+| `request` | `() => Promise<PermissionResponse>` | Asks the user for the permission, then updates `status` and clears `error`. Rejects to its caller when the native call fails |
+| `get` | `() => Promise<PermissionResponse>` | Re-reads the current status without prompting. Same update and rejection behavior as `request` |
+
+React hands those back positionally, as `[status, request, get, error]`, so existing two- and
+three-element destructuring keeps working. Vue wraps `status` and `error` in refs; Angular exposes
+`status` through `connect()` and `error` as a separate readonly signal on the service; Svelte
+returns both as getters, read as `permissions.status` / `permissions.error`.
+
+Read together, the two fields separate the three states:
+
+| `status` | `error` | Meaning |
+| --- | --- | --- |
+| `null` | `null` | Not fetched yet |
+| `null` | `Error` | The automatic fetch failed |
+| `PermissionResponse` | `null` | Fetched |
 
 Every variant auto-fetches the current permission status once on mount/`connect()`, and updates
-again whenever `request`/`get` resolves. Byte-for-byte the same shape as
+again whenever `request`/`get` resolves. A failure in that automatic fetch lands in `error` instead
+of escaping as an unhandled rejection; `get()`/`request()` called by hand still reject to their
+caller. Angular's auto-fetch is latched to at most one run per service instance, so a later
+`connect()` never re-fetches: call `get()` to retry. Byte-for-byte the same shape as
 [brightness](/docs/packages/brightness/#usepermissions)'s `usePermissions`.
 
 ### `CellularGeneration`
@@ -263,12 +333,13 @@ packages/cellular/src/
 │                                 expo-modules-core's requireNativeModule
 ├── react/hooks/use-permissions   @symbiote-native/cellular/react
 ├── vue/composables/use-permissions @symbiote-native/cellular/vue
+├── svelte/runes/use-permissions  @symbiote-native/cellular/svelte
 └── angular/services/permissions.service @symbiote-native/cellular/angular
 ```
 
 `usePermissions` is written once as a shared pattern and reapplied identically in
 [brightness](/docs/packages/brightness/#how-the-wrapper-works); every other export is a stateless
-free function, re-exported verbatim by all three adapters, same as
+free function, re-exported verbatim by all four adapters, same as
 [local-auth](/docs/packages/local-auth/). The native code itself is never vendored or copied —
 `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
 guide](/docs/howtos/expo-native-module-setup/)).

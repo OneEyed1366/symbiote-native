@@ -272,10 +272,9 @@ PHASE 4  Tests             state/X.test.ts (reducer), render-X.test.ts (Descript
 PHASE 5  PARITY CHECK      prove X on Y matches X on React → the symbiote-parity-check skill
 ```
 
-Wire up and smoke-test every phase in the matching `.examples/<app>` (never
-`examples/<app>` — that's the public catalog-pinned canary, see
-`symbiote-dev-examples`). `examples/<app>` only picks up X later, deliberately,
-after `@symbiote-native/components`/adapter is actually published.
+Wire up and smoke-test every phase in `examples/<app>`, using a `pnpm pack` tarball
+installed via `file:` for the in-progress package (CLAUDE.md's
+`<examples_vs_dot_examples>`) — swap back to the real published version once released.
 
 **If this component work scaffolds a brand-new publishable package** (a new
 adapter under `adapters/`, or a new third-party wrapper under `packages/`),
@@ -298,8 +297,8 @@ each bridge identically; a device run of the REFERENCE adapter (React) then exer
 the one thing headless fakes — the real native loop (scroll→window→recycle, real
 onLayout measure, visual MVCP anchor, imperative scroll-to). Reference-on-device +
 green headless = defensible "done"; the other adapters on device is extra rigor, not
-a gate — and it is gated on the `.examples/<app>` being relinked to `workspace:*` with
-the §5b metro fix (see `symbiote-dev-examples`), which most are NOT by default. This
+a gate — and it is gated on `examples/<app>` having a `pnpm pack`+`file:`-installed
+local build of the changed package, which most don't have by default. This
 applies ONLY when the core half is genuinely shared; a per-adapter behavior (a
 framework-specific bridge quirk) still needs that adapter on device.
 
@@ -345,7 +344,7 @@ optimize `adapters/react` component code, prompted by evaluating Million.js's
 real-DOM-bound (`cloneNode`, `innerHTML`, DOM `Text` nodes — see
 `.vendors/million/packages/million/dom.ts`), nothing in it is reusable against
 Fabric's shadow tree. React Compiler has no such DOM dependency and is a genuine
-candidate — confirmed working for plain app code (wired into `.examples/react`'s
+candidate — confirmed working for plain app code (wired into `examples/react`'s
 `babel.config.js`, first in `plugins`) — but two real findings when pointed at
 `adapters/react` itself:
 

@@ -1,14 +1,12 @@
 // Sticky headers: the JS layer RN implements in ScrollView.js / ScrollViewStickyHeader.js.
 //
-// VERDICT (source-based): RN does stickiness PURELY IN JS. ScrollView.js (render, ~line
-// 1690) wraps each child whose index is in `stickyHeaderIndices` in a ScrollViewStickyHeader,
-// fed by a single `_scrollAnimatedValue` an Animated.event drives from `onScroll`
-// (ScrollView.js ~line 1095). The native Fabric scroll view does NOT honor the index array on
-// its own. Forwarding `stickyHeaderIndices` to native is a silent no-op. So we replicate the
-// JS layer: subscribe each flagged child to the scroll offset and translate it to stay pinned.
-// The interpolation mirrors ScrollViewStickyHeader.js (non-inverted + inverted branches) and now
-// lives, framework-agnostic, in @symbiote-native/components (computeStickyInterpolation); this
-// file holds the React component shell, the layout state, and the child-wrapping.
+// RN does stickiness purely in JS: ScrollView.js (~line 1690) wraps each flagged child in a
+// ScrollViewStickyHeader, fed by a single `_scrollAnimatedValue` that Animated.event drives
+// from `onScroll` (~line 1095). The native Fabric scroll view does not honor the index array,
+// so forwarding `stickyHeaderIndices` to native would be a silent no-op - we replicate the JS
+// layer instead. The interpolation mirrors ScrollViewStickyHeader.js and now lives,
+// framework-agnostic, in @symbiote-native/components (computeStickyInterpolation); this file
+// holds only the React component shell, layout state, and child-wrapping.
 
 import {
   Children,

@@ -1,9 +1,9 @@
 // Tab, the React lifecycle half. The focused-index router (tab-router-state) and the tab-bar
 // Descriptor builder (render-tabs) live in @symbiote-native/navigation core, shared verbatim
-// with the Vue/Angular adapters; here React supplies the lifecycle - useReducer for the focused
-// index, useId for route-key generation, useImperativeHandle for the jumpTo/setParams handle -
-// plus the descriptor bridge for the tab-bar leaf, exactly like Stack bridges its header config
-// (react/stack.ts). Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints ordinary
+// with the Vue/Angular adapters; here React supplies the lifecycle - useState for the dispatched
+// router state, useId for route-key generation, useImperativeHandle for the jumpTo/setParams
+// handle - plus the descriptor bridge for the tab-bar leaf, exactly like Stack bridges its header
+// config (react/stack.ts). Unlike Stack, a bottom-tabs bar is a PURE-JS UI: it paints ordinary
 // `symbiote-view`/`symbiote-text` primitives via the shared render fn, so there is no
 // react-native-screens ViewConfig to register here - Tab needs no `../register` import.
 
@@ -17,7 +17,7 @@ import {
   useId,
   useImperativeHandle,
   useMemo,
-  useReducer,
+  useState,
 } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { descriptorToReact } from '@symbiote-native/react';
@@ -28,10 +28,18 @@ import {
   createInitialTabState,
   createNavigationEmitter,
   isFocusedRoute,
+  reconcileTabRoutes,
   renderTabBar,
   tabRouterReducer,
 } from '../../core';
-import type { IRoute, ITabBarItemView, ITabNavigatorHandle, ITabOptions } from '../../core';
+import type {
+  IRoute,
+  ITabBarItemView,
+  ITabNavigatorHandle,
+  ITabOptions,
+  ITabRouterAction,
+  ITabRouterState,
+} from '../../core';
 import { collectRegistry } from '../collect-registry';
 import { NavigationContext } from '../navigation-context';
 import { TabScreen } from '../tab-screen';
@@ -84,19 +92,44 @@ const TabImpl = forwardRef<ITabNavigatorHandle, ITabProps>((props, forwardedRef)
     [registry, routeIdPrefix],
   );
 
-  const [state, dispatch] = useReducer(tabRouterReducer, undefined, () =>
-    createInitialTabState(routes, props.initialRouteName),
+  // A <Tab.Screen> can appear or disappear after mount (a marker behind a conditional, a
+  // data-driven screen list), so the route list is re-derived from `children` on every render and
+  // the STORED state is reconciled against it (reconcileTabRoutes, core - it preserves each
+  // surviving route's key and accumulated params and keeps focus on the same route NAME) rather
+  // than staying frozen at whatever the first render saw. `null` means no marker had registered
+  // yet: seeding an empty list would resolve initialRouteName against nothing and lose it, so the
+  // state stays derived until either a marker arrives or something dispatches.
+  const [storedState, setStoredState] = useState<ITabRouterState | null>(() =>
+    routes.length === 0 ? null : createInitialTabState(routes, props.initialRouteName),
   );
+
+  const resolveState = useCallback(
+    (stored: ITabRouterState | null): ITabRouterState =>
+      stored === null
+        ? createInitialTabState(routes, props.initialRouteName)
+        : reconcileTabRoutes(stored, routes),
+    [routes, props.initialRouteName],
+  );
+
+  const state = resolveState(storedState);
 
   if (routes.length === 0) dlog('Tab: no <Tab.Screen> children registered');
 
+  // The updater re-resolves rather than closing over `state` so that two dispatches batched into
+  // one render still compose: the second reduces over the first's result, not a stale snapshot.
+  const dispatch = useCallback(
+    (action: ITabRouterAction) =>
+      setStoredState(current => tabRouterReducer(resolveState(current), action)),
+    [resolveState],
+  );
+
   const jumpTo = useCallback(
     (name: string, params?: unknown) => dispatch({ type: 'jumpTo', name, params }),
-    [],
+    [dispatch],
   );
   const setParams = useCallback(
     (params: unknown, key: string) => dispatch({ type: 'setParams', key, params }),
-    [],
+    [dispatch],
   );
 
   const handle = useMemo<ITabNavigatorHandle>(() => ({ jumpTo, setParams }), [jumpTo, setParams]);

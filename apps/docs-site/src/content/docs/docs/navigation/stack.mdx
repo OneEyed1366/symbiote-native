@@ -21,6 +21,7 @@ here is a JS-simulated animation.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Usage
 
@@ -160,6 +161,57 @@ here is a JS-simulated animation.
     `injectStackNavigation()` returns a concretely-typed Stack handle. Any component under the
     stack reads them the same way, at any nesting depth. See [Hooks & focus](/docs/navigation/hooks/).
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <!-- HomeScreen.svelte -->
+    <script lang="ts">
+      import { useStackNavigation } from '@symbiote-native/navigation/svelte';
+      import ActionButton from './ActionButton.svelte';
+
+      const navigation = useStackNavigation();
+    </script>
+
+    <ActionButton title="Go to Details" onPress={() => navigation.current.push('Details', { id: 42 })} />
+    ```
+
+    ```svelte
+    <!-- DetailsScreen.svelte -->
+    <script lang="ts">
+      import { useStackNavigation } from '@symbiote-native/navigation/svelte';
+      import ActionButton from './ActionButton.svelte';
+
+      const navigation = useStackNavigation();
+    </script>
+
+    <ActionButton title="Back" onPress={() => navigation.current.pop()} />
+    ```
+
+    ```svelte
+    <!-- App.svelte -->
+    <script lang="ts">
+      import { Screen, Stack } from '@symbiote-native/navigation/svelte';
+      import HomeScreen from './HomeScreen.svelte';
+      import DetailsScreen from './DetailsScreen.svelte';
+    </script>
+
+    <Stack initialRouteName="Home"
+      ><Screen name="Home" component={HomeScreen} options={{ title: 'Home' }}
+      /><Screen name="Details" component={DetailsScreen} options={{ title: 'Details' }}
+    /></Stack
+    >
+    ```
+
+    `<Screen>`'s `component` prop takes a compiled Svelte `Component` (an ordinary `.svelte`
+    file's default export), not a render prop — the navigator mounts it itself. `<Screen>` is
+    exported both as `Stack.Screen` and standalone, matching Vue's `Screen`/`Stack.Screen` pair
+    (`examples/svelte` uses the standalone form throughout). `HomeScreen.svelte`/
+    `DetailsScreen.svelte` read their `route`/`navigation` with `useRoute()`/`useStackNavigation()` —
+    both return a **boxed getter** (`{ readonly current }`), unwrapped with `.current` inside a
+    `$derived`/template/`$effect`, the same pattern as Vue's `ComputedRef.value`.
+    `useStackNavigation()` hands back a concretely-typed Stack handle, no union to narrow. Any
+    component under the stack reads them the same way, at any nesting depth. See
+    [Hooks & focus](/docs/navigation/hooks/).
+  </TabItem>
 </Tabs>
 
 ### Getting the navigator handle imperatively
@@ -190,6 +242,31 @@ here is a JS-simulated animation.
 
     `Stack` implements `INavigatorHandle` directly — the component instance reached through the
     template reference variable **is** the handle, no separate ref/ForwardRef indirection needed.
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import type { INavigatorHandle } from '@symbiote-native/navigation/svelte';
+
+      let stackInstance = $state.raw<unknown>(null);
+
+      function isNavigatorHandle(value: unknown): value is INavigatorHandle {
+        return typeof value === 'object' && value !== null && 'push' in value;
+      }
+    </script>
+
+    <!-- <Stack bind:this={stackInstance}>...</Stack> -->
+    {#if isNavigatorHandle(stackInstance)}
+      <!-- stackInstance.push('Details') -->
+    {/if}
+    ```
+
+    Unlike Vue's `ref<INavigatorHandle | null>`, a Svelte `bind:this` target for `Stack` types as
+    `unknown`, not `INavigatorHandle | null` — `Stack` ships as a raw `.svelte` file, and
+    TypeScript resolves an imported `.svelte` module through svelte's ambient
+    `declare module '*.svelte'` fallback, which erases the `export function` surface `bind:this`
+    actually hands back. Bind to `unknown` and narrow with a runtime guard on read, the same
+    pattern `examples/svelte/App.svelte` uses for its own linking integration.
   </TabItem>
 </Tabs>
 

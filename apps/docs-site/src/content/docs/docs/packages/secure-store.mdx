@@ -23,6 +23,7 @@ wrap — the React, Vue, and Angular entry points are plain re-exports of the sa
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Installation
 
@@ -65,7 +66,7 @@ install; neither overwrites a value your app already set.
 
 ## Usage
 
-All three adapters re-export the exact same functions; there is no per-adapter
+All four adapters re-export the exact same functions; there is no per-adapter
 hook/composable/service to reach for, since nothing here holds live state or a subscription.
 
 <Tabs syncKey="framework">
@@ -163,6 +164,38 @@ hook/composable/service to reach for, since nothing here holds live state or a s
     There's no per-instance service to `inject()` here — every function is a plain export off the
     core package, called straight from a template event binding.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Button, Text, View } from '@symbiote-native/svelte';
+      import { deleteItemAsync, getItemAsync, setItemAsync } from '@symbiote-native/secure-store/svelte';
+
+      let token = $state<string | null>(null);
+
+      function onSave(): void {
+        void setItemAsync('session-token', 'abc123');
+      }
+
+      function onRead(): void {
+        void getItemAsync('session-token').then(value => (token = value));
+      }
+
+      function onForget(): void {
+        void deleteItemAsync('session-token').then(() => (token = null));
+      }
+    </script>
+
+    <View>
+      <Text>{token ?? 'no token stored'}</Text>
+      <Button title="Save" onPress={onSave} />
+      <Button title="Read" onPress={onRead} />
+      <Button title="Forget" onPress={onForget} />
+    </View>
+    ```
+
+    There's no per-instance rune to reach for here either — every function is a plain export off
+    the core package, called straight from `onPress`.
+  </TabItem>
 </Tabs>
 
 Values are strings. JSON-encode anything else:
@@ -255,12 +288,13 @@ packages/secure-store/src/
 │             # constants. native-module.ts resolves ExpoSecureStore via requireNativeModule
 ├── react/    # @symbiote-native/secure-store/react   — export * from '../core'
 ├── vue/      # @symbiote-native/secure-store/vue     — export * from '../core'
+├── svelte/   # @symbiote-native/secure-store/svelte  — export * from '../core'
 └── angular/  # @symbiote-native/secure-store/angular — export * from '../core'
 ```
 
 Same shape as [store review](/docs/packages/store-review/)'s and
-[local auth](/docs/packages/local-auth/)'s three adapter entries: single-file re-exports with no
+[local auth](/docs/packages/local-auth/)'s four adapter entries: single-file re-exports with no
 lifecycle code, since every export is a stateless free function — there is nothing for a hook,
-composable, or service to subscribe to or clean up. The native code itself is never vendored or
+composable, rune, or service to subscribe to or clean up. The native code itself is never vendored or
 copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native
 setup guide](/docs/howtos/expo-native-module-setup/)).

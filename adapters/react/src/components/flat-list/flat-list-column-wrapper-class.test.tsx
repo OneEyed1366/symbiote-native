@@ -40,8 +40,13 @@ function rowsWithFlexDirection(): IFakeNode[] {
   return rows;
 }
 
-describe('React FlatList columnWrapperStyle class-name resolution', () => {
+// No Negative group: columnWrapperStyle accepts either a class-name string or a plain style
+// object — both are valid inputs the type allows, so there is no reject path.
+describe('React FlatList columnWrapperStyle class-name resolution (Positive)', () => {
   it('resolves a class-name string onto the row wrapper', () => {
+    // why: columnWrapperStyle is typed as `IStyleProp<IViewStyle> | string`, deliberately
+    // widened past the full IClassNameValue union — a bare string must resolve through the
+    // SAME shared style registry as `className`, onto the auto-generated flex-row row view.
     registerStyles({ rowGap: { columnGap: 4 } });
     mount(
       ROOT_TAG,
@@ -61,6 +66,9 @@ describe('React FlatList columnWrapperStyle class-name resolution', () => {
   });
 
   it('still accepts a plain style object unchanged', () => {
+    // why: widening the prop type to accept a string must not break the pre-existing plain
+    // style-object path — a regression here would be a silent breaking change for every caller
+    // that already passes `{ columnGap: ... }` directly.
     mount(
       ROOT_TAG,
       createElement(FlatList<IRow>, {

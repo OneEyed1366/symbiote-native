@@ -61,7 +61,13 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('ClipboardService.connect', () => {
+// connect() has no throwing path of its own — it only wires core's addClipboardListener into an
+// effect()-scoped signal, so there is no Negative group here (core's own native-absent/throw
+// contract is covered by packages/clipboard/src/core/clipboard.test.ts, not re-derived here).
+describe('ClipboardService.connect — lifecycle wiring over core, no throwing path', () => {
+  // why: a subscriber connecting mid-session must not see stale/undefined state before the
+  // first native event — Angular consumers rely on `null` meaning "no clipboard change observed
+  // yet", exactly like the React/Vue equivalents
   it('reports null before any clipboard-change event fires', async () => {
     mount(ROOT_TAG, ClipboardHost);
     await tick();
@@ -69,6 +75,8 @@ describe('ClipboardService.connect', () => {
     expect(capturedResult?.()).toBeNull();
   });
 
+  // why: the signal must reflect whatever core's listener callback receives, unmodified — any
+  // transformation here would duplicate core's own event-shaping responsibility
   it('updates the signal when the registered listener fires with an event', async () => {
     mount(ROOT_TAG, ClipboardHost);
     await tick();
@@ -80,6 +88,8 @@ describe('ClipboardService.connect', () => {
     expect(capturedResult?.()).toEqual(EVENT);
   });
 
+  // why: an unmounted host must not keep a live native subscription — effect()'s injector-scoped
+  // cleanup is what's actually under test here, not just a bare unsubscribe call
   it('removes the subscription when the host component is unmounted', async () => {
     mount(ROOT_TAG, ClipboardHost);
     await tick();

@@ -44,7 +44,7 @@ const symbiotes = [
   { id: 'react', label: 'React', live: true },
   { id: 'vue', label: 'Vue', live: true },
   { id: 'angular', label: 'Angular', live: true },
-  { id: 'svelte', label: 'Svelte', live: false },
+  { id: 'svelte', label: 'Svelte', live: true },
   { id: 'solid', label: 'Solid', live: false },
 ];
 ---
@@ -93,7 +93,8 @@ const symbiotes = [
     <script is:inline>
       try {
         var s = localStorage.getItem('symbiote');
-        document.documentElement.dataset.symbiote = s === 'vue' || s === 'angular' ? s : 'react';
+        document.documentElement.dataset.symbiote =
+          s === 'vue' || s === 'angular' || s === 'svelte' ? s : 'react';
       } catch (e) {}
     </script>
   </head>
@@ -326,8 +327,8 @@ const symbiotes = [
             <p>
               <code>createPortal</code> renders into another node in the same
               tree — a real Fiber-level portal, possible because Fabric runs
-              in mutation mode here. <code>createTunnel</code> goes further:
-              content painted by one independently mounted surface,
+              in mutation mode here (React, Angular today). <code>createTunnel</code> goes further,
+              and reaches every adapter: content painted by one independently mounted surface,
               registered from a totally different one, joined by nothing but
               a shared store.
             </p>
@@ -335,6 +336,7 @@ const symbiotes = [
               <li data-fw="react">React</li>
               <li data-fw="vue">Vue</li>
               <li data-fw="angular">Angular</li>
+              <li data-fw="svelte">Svelte</li>
             </ul>
           </article>
 
@@ -343,14 +345,16 @@ const symbiotes = [
             <h3>Sugar where the framework expects it</h3>
             <p>
               <code>v-model</code> and <code>v-show</code> work on native
-              views in Vue. Angular gets real @<code>Output()</code>
-              <code>EventEmitter</code>s and <code>[(value)]</code> two-way
-              binding. Neither is a callback surface borrowed from React —
+              views in Vue. Angular gets real @<code>Output()</code> <code>EventEmitter</code>s
+              and <code>[(value)]</code> two-way binding. Svelte 5's own <code>$bindable()</code> rune
+              gives <code>bind:value</code> the same sugar, no adapter plumbing involved. Neither is
+              a callback surface borrowed from React —
               each adapter speaks its own framework's grammar.
             </p>
             <ul class="trait-fws" aria-label="Available on">
               <li data-fw="vue">Vue</li>
               <li data-fw="angular">Angular</li>
+              <li data-fw="svelte">Svelte</li>
             </ul>
           </article>
 
@@ -362,33 +366,37 @@ const symbiotes = [
               style objects at build time — add <code>scoped</code> and it's
               scoped to the component, <code>:global(...)</code> still
               escapes out, the same semantics real Vue gives you in the
-              browser. CSS Modules and plain <code>.css</code> imports go
-              further: <code>import styles from './Card.module.css'</code>
-              resolves through the same shared class registry from React,
-              Vue, or Angular.
+              browser. Svelte's own <code>&lt;style&gt;</code> block is
+              scoped by default, through the same compile-time pipeline. CSS
+              Modules and plain <code>.css</code> imports go further: <code>import styles from
+              './Card.module.css'</code> resolves
+              through the same shared class registry from React, Vue,
+              Angular, or Svelte.
             </p>
             <ul class="trait-fws" aria-label="Available on">
               <li data-fw="react">React</li>
               <li data-fw="vue">Vue</li>
               <li data-fw="angular">Angular</li>
+              <li data-fw="svelte">Svelte</li>
             </ul>
           </article>
 
           <article class="trait">
             <span class="tag">Testing</span>
-            <h3>One e2e spec, three adapters</h3>
+            <h3>One e2e spec, four adapters</h3>
             <p>
               Headless <code>vitest</code> covers component and integration
               logic with no simulator involved. <code>Detox</code> drives the
               real app end to end — and because it attaches below the
               renderer SymbioteNative replaces, the identical spec file runs
-              unmodified against the React, Vue SFC, and Vue TSX canaries.
-              Angular has its own real-device Detox suite too.
+              unmodified against the React, Vue SFC, Vue TSX, and Svelte
+              canaries. Angular has its own real-device Detox suite too.
             </p>
             <ul class="trait-fws" aria-label="Available on">
               <li data-fw="react">React</li>
               <li data-fw="vue">Vue</li>
               <li data-fw="angular">Angular</li>
+              <li data-fw="svelte">Svelte</li>
             </ul>
           </article>
         </div>
@@ -397,12 +405,13 @@ const symbiotes = [
       <section class="demo" aria-labelledby="demo-title">
         <div class="demo-copy">
           <span class="eyebrow">Same surface, different host</span>
-          <h2 id="demo-title">Three symbiotes, one native core.</h2>
+          <h2 id="demo-title">Four symbiotes, one native core.</h2>
           <p>
             React is the reference canary. Vue proves the native core is no longer
             tied to React's reconciler. Angular proves it again, through a completely
-            different rendering model. All three flow through the same engine and
-            the same stock Fabric host.
+            different rendering model. Svelte proves it a third time, with no
+            host-renderer seam to hook at all. All four flow through the same engine
+            and the same stock Fabric host.
           </p>
         </div>
         <!--
@@ -419,6 +428,7 @@ const symbiotes = [
               { id: 'react', label: 'React', file: 'react-demo' },
               { id: 'vue', label: 'Vue', file: 'vue-demo' },
               { id: 'angular', label: 'Angular', file: 'angular-demo' },
+              { id: 'svelte', label: 'Svelte', file: 'svelte-demo' },
             ].map((demo) => (
               <figure data-fw={demo.id} class={demo.id === 'react' ? 'is-active' : undefined}>
                 <video
@@ -452,7 +462,7 @@ const symbiotes = [
         <span class="eyebrow">The seam</span>
         <h2 id="seam-title">Framework → adapter → engine → Fabric.</h2>
         <ol class="pipeline" aria-label="SymbioteNative render pipeline">
-          <li>Vue · React · future adapters</li>
+          <li>React · Vue · Angular · Svelte</li>
           <li>thin reconciler</li>
           <li>@symbiote-native/engine</li>
           <li>nativeFabricUIManager</li>
@@ -482,7 +492,7 @@ const symbiotes = [
           <li data-fw="svelte">
             <span class="dot" aria-hidden="true"></span>
             <strong>Svelte</strong>
-            <span class="state">future adapter over the same seam</span>
+            <span class="state">DOM-shim adapter — full component parity</span>
           </li>
           <li data-fw="solid">
             <span class="dot" aria-hidden="true"></span>
@@ -500,7 +510,7 @@ const symbiotes = [
     </footer>
 
     <script is:inline>
-      const LIVE_SYMBIOTES = ['react', 'vue', 'angular'];
+      const LIVE_SYMBIOTES = ['react', 'vue', 'angular', 'svelte'];
       const LABEL = {
         react: 'React',
         vue: 'Vue',

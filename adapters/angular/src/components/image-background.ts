@@ -37,7 +37,7 @@ import {
   type IViewStyle,
 } from '@symbiote-native/engine';
 import { Image } from './image';
-import { anchorHostStyle, ViewHost } from '../primitives';
+import { anchorHostStyle, SymbioteStyleInputDirective, ViewHost } from '../primitives';
 
 // Mirrors React's IImageBackgroundProps minus children (Angular takes children via <ng-content>):
 // every forwarding Image prop flows onto the inner image; `style` is the WRAPPER View style and
@@ -68,6 +68,7 @@ export type IAngularImageBackgroundInputs = Omit<
 @Component({
   selector: 'ImageBackground',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [Image, ViewHost],
   changeDetection: ChangeDetectionStrategy.OnPush,

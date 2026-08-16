@@ -11,11 +11,11 @@
 // Housing the registry here rather than inline in `renderer/index.ts` keeps it out of the require
 // cycle (cheap insurance against a load-order strand). The bug that actually surfaced this,
 // though, was STALE BUILD ARTIFACTS, not the cycle: `ngc -p` never deletes orphaned outputs, so
-// after the renderer moved `renderer.ts` → `renderer/index.ts` the orphaned `build/angular/
+// after the renderer moved `renderer.ts` -> `renderer/index.ts` the orphaned `build/angular/
 // renderer.js` lingered and SHADOWED `build/angular/renderer/index.js` (a file beats a folder in
 // Node/Metro resolution), giving the bundle a second, stale registry Set — fixed by cleaning
 // `build/` before every ngc build (see each Angular package's `clean` script). Full record:
-// angular-adapter §11c, symbiote-dev-examples §5e.
+// angular-adapter §11c.
 
 // Lowercased at construction — isAnchorHostComponent and registerComposedComponent both normalize
 // to lowercase (Angular lowercases a dynamically-mounted component's selector at runtime, see

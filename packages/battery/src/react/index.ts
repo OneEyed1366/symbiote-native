@@ -7,20 +7,4 @@
 export { useBatteryLevel } from './hooks/use-battery-level';
 export { useBatteryState } from './hooks/use-battery-state';
 export { useLowPowerMode } from './hooks/use-low-power-mode';
-export {
-  isAvailableAsync,
-  getBatteryLevelAsync,
-  getBatteryStateAsync,
-  isLowPowerModeEnabledAsync,
-  isBatteryOptimizationEnabledAsync,
-  getPowerStateAsync,
-  addBatteryLevelListener,
-  addBatteryStateListener,
-  addLowPowerModeListener,
-  BatteryState,
-  type PowerState,
-  type BatteryLevelEvent,
-  type BatteryStateEvent,
-  type PowerModeEvent,
-  type EventSubscription,
-} from '../core';
+export * from '../core';

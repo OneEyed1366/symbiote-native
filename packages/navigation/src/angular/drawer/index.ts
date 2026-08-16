@@ -221,12 +221,14 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
     this.dispatch({ type: 'toggleDrawer' });
   };
   readonly jumpTo = (name: string): void => {
-    // Captured BEFORE dispatch, mirroring vue/drawer/index.ts's jumpTo: a signal (like Vue's ref)
-    // mutates synchronously inside dispatch, so reading isOpen after it would already see the
-    // reducer's own isOpen: false and never animate the panel closed.
+    // Both sides of the dispatch, mirroring vue/drawer/index.ts's jumpTo: an unregistered name is
+    // a documented reducer no-op that hands the SAME state back, so animating off the pre-dispatch
+    // snapshot alone would slide the panel shut while the router still says isOpen. The signal is
+    // set synchronously inside dispatch, so the second read is already the reducer's own answer.
     const wasOpen = this.stateSignal()?.isOpen ?? false;
     this.dispatch({ type: 'jumpTo', name });
-    if (wasOpen) this.animateProgressTo(false);
+    const isOpenNow = this.stateSignal()?.isOpen ?? false;
+    if (wasOpen && !isOpenNow) this.animateProgressTo(false);
   };
 
   readonly panResponder = PanResponder.create({

@@ -2,6 +2,13 @@
 // why this exists). The key thing under test is the ABSENCE of an index signature: unlike Volar's
 // `Record<string, string> & {known keys}` for inline `<style module>` blocks, an unknown key
 // here must not type-check at all.
+//
+// classNamesToDtsSource has no throwing path (pure string formatting) — its scenarios are
+// Positive-only. generateModuleDts DOES have one real failure mode (a malformed preprocessor
+// source), covered under its own Negative group below. `.module.styl` is left uncovered here: its
+// preprocessing correctness already belongs to preprocessors.test.ts (real stylus compiler,
+// nesting/variables/mixins); duplicating a stylus fixture here would only re-prove `compile()` is
+// called, which the `.module.scss` case already establishes for the shared code path.
 
 import { describe, expect, it } from 'vitest';
 import { classNamesToDtsSource, generateModuleDts } from './index';
@@ -61,5 +68,20 @@ describe('generateModuleDts', () => {
     const dts = await generateModuleDts(':global(.reset) { margin: 0; }', 'Card.module.css');
 
     expect(dts).toContain('readonly reset: string;');
+  });
+
+  // why: Less nesting is a DIFFERENT preprocessor code path than SCSS (a separate lazy-loaded
+  // compiler in preprocessors.ts) — this proves generateModuleDts's language dispatch actually
+  // reaches it, not just SCSS.
+  it('preprocesses a .module.less file the same way', async () => {
+    const dts = await generateModuleDts('.card { .title { padding: 10px; } }', 'Card.module.less');
+
+    expect(dts).toContain('readonly cardTitle: string;');
+  });
+
+  // why: a malformed preprocessor source must REJECT, not resolve to a bogus/empty .d.ts that
+  // silently ships wrong types — generateModuleDts must not swallow the compiler's own error.
+  it('rejects when the source is malformed for its declared preprocessor language', async () => {
+    await expect(generateModuleDts('.card { padding: 10px', 'Card.module.scss')).rejects.toThrow();
   });
 });

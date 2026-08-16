@@ -1,7 +1,6 @@
-// Button: the shared render half (framework-agnostic). Rendered in RN's iOS shape (Button.js): a
-// TouchableOpacity wrapping a Text. The pure pieces: the base text style, the role constant, and
-// the color fold (caller color tints the label; disabled greys it) live here so every adapter
-// paints the identical button. The adapter only composes its TouchableOpacity + Text around them.
+// Button: shared render half (framework-agnostic), matching RN's iOS shape (Button.js): a
+// TouchableOpacity wrapping a Text. Each adapter composes its own TouchableOpacity + Text
+// around the pieces below.
 
 import type { ITextStyle, ISymbioteEvent } from '@symbiote-native/engine';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';

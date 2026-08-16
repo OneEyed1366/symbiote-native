@@ -9,6 +9,11 @@ import {
 // The reducer holds NO timer: the debounce is a `schedule-debounce` EFFECT the adapter executes with
 // its own setTimeout, so the reducer only ever emits the delay as data — there is no real (or fake)
 // time to inject here. Every assertion is over the pure transition + emitted effects.
+//
+// why: reduceSticky has no throwing path (no `throw` in sticky-header-reducer.ts) — every action
+// kind resolves to a state, so there is no Negative (toThrow) group below. Groups are instead named
+// after the mechanic each guards (redundant-geometry, zero-swallow gate, cross-talk...), which is
+// the contract-accurate split for a total, non-throwing reducer.
 
 const IOS_DEBOUNCE_MS = 64;
 const ANDROID_DEBOUNCE_MS = 15;
@@ -91,6 +96,135 @@ describe('reduceSticky layout — rebuild-interpolation ranges', () => {
     expect(tick.effects.some(effect => effect.kind === 'rebuild-interpolation')).toBe(false);
     const settle = reduceSticky(tick.state, { kind: 'debounce-fired', value: 5 }, topInputs());
     expect(settle.effects.some(effect => effect.kind === 'rebuild-interpolation')).toBe(false);
+  });
+
+  it('does NOT rebuild when inputs-changed re-fires with inputs that resolve to the SAME ranges', () => {
+    const measured = reduceSticky(
+      createInitialStickyState(),
+      { kind: 'layout', y: 100, height: 40 },
+      topInputs(),
+    ).state;
+
+    const first = reduceSticky(
+      measured,
+      { kind: 'inputs-changed' },
+      topInputs({ nextHeaderLayoutY: 300 }),
+    );
+    expect(first.effects.some(effect => effect.kind === 'rebuild-interpolation')).toBe(true);
+
+    // A parent re-render can re-dispatch 'inputs-changed' off a freshly-recomputed
+    // nextHeaderLayoutY (e.g. VirtualizedList re-deriving it from its cross-talk Map on every
+    // reactive pass) even when the VALUE is identical — this must NOT rebuild again, or a
+    // native-driven header would reconnect on every unrelated parent update (device-confirmed
+    // 2026-08-13: this was a second, independent source of the effect_update_depth_exceeded loop
+    // the 'layout' guard alone didn't cover).
+    const redundant = reduceSticky(
+      first.state,
+      { kind: 'inputs-changed' },
+      topInputs({ nextHeaderLayoutY: 300 }),
+    );
+    expect(redundant.effects).toEqual([]);
+    expect(redundant.changed).toBe(false);
+  });
+
+  // REGRESSION (2026-08-14). The redundant-ranges guard above compares freshly derived ranges
+  // against the ones already in state — and the INITIAL state holds the identity ranges, which is
+  // exactly what an unmeasured header derives. So the guard, as first written, swallowed the very
+  // FIRST dispatch: Angular's ScrollViewStickyHeader sends `inputs-changed` from ngOnInit before
+  // any layout has happened, got `changed: false` with no effects, never ran change detection, and
+  // never committed its wrapper at all — `scroll-view-projection.test.ts` went red looking for a
+  // `collapsable: false` node that was never created. "Derives the same values as the initial
+  // placeholder" is not the same as "has already been emitted", and only the latter may skip.
+  it('DOES emit the first rebuild even though an unmeasured header derives the identity ranges', () => {
+    const initial = createInitialStickyState();
+    const first = reduceSticky(initial, { kind: 'inputs-changed' }, topInputs());
+
+    expect(first.effects, 'the first inputs-changed must still emit a rebuild').toEqual([
+      {
+        kind: 'rebuild-interpolation',
+        inputRange: initial.inputRange,
+        outputRange: initial.outputRange,
+      },
+    ]);
+    expect(first.changed).toBe(true);
+
+    // ...and only the SECOND identical dispatch is the one the guard exists to swallow.
+    const second = reduceSticky(first.state, { kind: 'inputs-changed' }, topInputs());
+    expect(second.effects).toEqual([]);
+    expect(second.changed).toBe(false);
+  });
+
+  it('still rebuilds when inputs-changed re-fires with a genuinely different nextHeaderLayoutY', () => {
+    const measured = reduceSticky(
+      createInitialStickyState(),
+      { kind: 'layout', y: 100, height: 40 },
+      topInputs(),
+    ).state;
+
+    const first = reduceSticky(
+      measured,
+      { kind: 'inputs-changed' },
+      topInputs({ nextHeaderLayoutY: 300 }),
+    );
+    // reduceSticky mutates `state` in place and returns the SAME object — snapshot the range
+    // before the next call overwrites it, or this comparison would read the same live reference
+    // twice.
+    const firstInputRange = [...first.state.inputRange];
+    const moved = reduceSticky(
+      first.state,
+      { kind: 'inputs-changed' },
+      topInputs({ nextHeaderLayoutY: 400 }),
+    );
+    expect(moved.effects.some(effect => effect.kind === 'rebuild-interpolation')).toBe(true);
+    expect(moved.state.inputRange).not.toEqual(firstInputRange);
+  });
+});
+
+describe('reduceSticky layout — redundant-geometry guard', () => {
+  it('does not rebuild the interpolation when a second layout reports the SAME y/height', () => {
+    const first = reduceSticky(
+      createInitialStickyState(),
+      { kind: 'layout', y: 100, height: 40 },
+      topInputs(),
+    );
+    expect(first.effects.some(effect => effect.kind === 'rebuild-interpolation')).toBe(true);
+
+    // Yoga legitimately re-fires onLayout with identical geometry (relayout passes, sibling
+    // changes, a native-driven prop commit) — a redundant rebuild here is what let a native-driven
+    // AnimatedView commit provoke another relayout, an unbounded same-tick ping-pong that crashed
+    // with Svelte's effect_update_depth_exceeded (device-confirmed 2026-08-13).
+    const redundant = reduceSticky(
+      first.state,
+      { kind: 'layout', y: 100, height: 40 },
+      topInputs(),
+    );
+    expect(redundant.effects.some(effect => effect.kind === 'rebuild-interpolation')).toBe(false);
+    expect(redundant.changed).toBe(false);
+  });
+
+  it('still rebuilds when a second layout reports DIFFERENT geometry', () => {
+    const first = reduceSticky(
+      createInitialStickyState(),
+      { kind: 'layout', y: 100, height: 40 },
+      topInputs(),
+    );
+    const moved = reduceSticky(first.state, { kind: 'layout', y: 120, height: 40 }, topInputs());
+    expect(moved.effects.some(effect => effect.kind === 'rebuild-interpolation')).toBe(true);
+    expect(moved.state.layoutY).toBe(120);
+  });
+
+  it('still records cross-talk on a redundant layout even though it skips the rebuild', () => {
+    const first = reduceSticky(
+      createInitialStickyState(),
+      { kind: 'layout', y: 100, height: 40 },
+      topInputs({ index: 2 }),
+    );
+    const redundant = reduceSticky(
+      first.state,
+      { kind: 'layout', y: 100, height: 40 },
+      topInputs({ index: 2 }),
+    );
+    expect(redundant.effects).toEqual([{ kind: 'record-header-y', index: 2, y: 100 }]);
   });
 });
 

@@ -6,7 +6,14 @@
 
 import { createElement, createRef, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FlatList, mount, unmount, type IFlatListHandle } from '@symbiote-native/react';
+import {
+  FlatList,
+  mount,
+  unmount,
+  type IFlatListHandle,
+  type ISeparatorProps,
+  type IViewableItemsChangedInfo,
+} from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 21;
@@ -131,8 +138,14 @@ function mountWithViewport(): IFakeNode {
   return scrollView;
 }
 
-describe('React FlatList virtualization on the engine', () => {
+// No Negative group: virtualization (windowing, onEndReached/onStartReached gating, the
+// imperative handle) is a rendering/orchestration concern, not a validation boundary — FlatList
+// has no guard clause here that rejects an input.
+describe('React FlatList virtualization on the engine (Positive)', () => {
   it('windows to a bounded prefix anchored at the top', () => {
+    // why: over 1000 items, only a viewport's worth may ever be committed — an unbounded
+    // window defeats the entire point of virtualization (1000 live native views instead of a
+    // few dozen), and the window must start at row-0, not mid-list.
     mountWithViewport();
 
     const labels = collectRowLabels();
@@ -149,6 +162,9 @@ describe('React FlatList virtualization on the engine', () => {
   });
 
   it('shifts the window when scrolled deep', () => {
+    // why: the window must SHIFT, not just grow — a list that only ever appends rows as you
+    // scroll leaks native views and eventually degrades to the unbounded case this whole
+    // feature exists to avoid.
     const scrollView = mountWithViewport();
     scrollTo(scrollView.instanceHandle, DEEP_OFFSET);
 
@@ -161,6 +177,10 @@ describe('React FlatList virtualization on the engine', () => {
   });
 
   it('gates onEndReached on the last cell being rendered', () => {
+    // why: onEndReached must gate on the last cell actually being resident in the window, not
+    // on a distance-from-end estimate — the old count-based gating could misfire mid-list. It
+    // must also fire exactly once per arrival at the bottom, not once per scroll event, or an
+    // infinite-scroll consumer double-fetches its next page.
     const scrollView = mountWithViewport();
 
     // Mid-list: the trailing buffer does NOT yet reach the last row, so onEndReached must
@@ -180,6 +200,10 @@ describe('React FlatList virtualization on the engine', () => {
   });
 
   it('exposes the RN imperative handle methods', () => {
+    // why: FlatList's ref is documented to be RN-API-compatible (scrollTo*, flashScrollIndicators,
+    // getNativeScrollRef, ...) — a caller migrating existing RN code expects the same imperative
+    // surface, and getNativeScrollRef must hand back the real inner ScrollView handle, not a
+    // stand-in, or its own imperative methods (e.g. flashScrollIndicators) are unreachable.
     mountWithViewport();
 
     const handle = listRef.current;
@@ -201,6 +225,9 @@ describe('React FlatList virtualization on the engine', () => {
   });
 
   it('fires onStartReached when scrolling back to the top', () => {
+    // why: onStartReached is onEndReached's mirror for backward-infinite lists (e.g. a chat
+    // history loading older messages) — it must re-arm after moving away from the top and fire
+    // exactly once per arrival, not once per scroll event at the top.
     const scrollView = mountWithViewport();
 
     // Park at the bottom so onStartReached is re-armed, then return to the very top.
@@ -217,5 +244,118 @@ describe('React FlatList virtualization on the engine', () => {
     const startAfterReturn = startReachedCount();
     scrollTo(scrollView.instanceHandle, 0);
     expect(startReachedCount()).toBe(startAfterReturn);
+  });
+});
+
+// The multi-column (numColumns > 1) path packs items into rows and virtualizes ROWS, not
+// items — chunkIntoRows/rowKeyExtractor/expandRowViewability/firstItemOfRow/lastItemOfRow
+// (core/components/src/state/flat-list.ts) are the pure transform behind it, shared by every
+// adapter, but have NO dedicated core/components test yet — a gap in core coverage, not
+// something this suite should paper over by skipping the composition. The row-element creation
+// itself (the flex-row wrapper + per-cell flex:1 View) is genuinely React-adapter-only code
+// (index.ts's renderRow), never delegated to a shared render fn.
+describe('React FlatList multi-column composition (Positive)', () => {
+  const COLUMN_COUNT = 2;
+  const MULTI_COLUMN_ROOT_TAG = 24;
+  const multiColumnData = DATA.slice(0, 6); // -> 3 full rows of 2, no partial row
+
+  const separatorCalls: Array<{ leadingLabel?: string; trailingLabel?: string }> = [];
+  function RowSeparator(props: ISeparatorProps<IRow>): ReactElement {
+    separatorCalls.push({
+      leadingLabel: props.leadingItem?.label,
+      trailingLabel: props.trailingItem?.label,
+    });
+    return createElement('symbiote-view', { style: { height: 1 } });
+  }
+
+  const viewableReports: IViewableItemsChangedInfo<IRow>[] = [];
+
+  function MultiColumnApp(): ReactElement {
+    return createElement(FlatList<IRow>, {
+      data: multiColumnData,
+      numColumns: COLUMN_COUNT,
+      keyExtractor: (item: IRow) => `mc-${item.id}`,
+      ItemSeparatorComponent: RowSeparator,
+      viewabilityConfig: { itemVisiblePercentThreshold: 0 },
+      onViewableItemsChanged: (info: IViewableItemsChangedInfo<IRow>) => {
+        viewableReports.push(info);
+      },
+      renderItem: ({ item }: { item: IRow }) =>
+        createElement('symbiote-text', { key: item.id }, item.label),
+    });
+  }
+
+  beforeEach(() => {
+    separatorCalls.length = 0;
+    viewableReports.length = 0;
+  });
+  afterEach(() => unmount(MULTI_COLUMN_ROOT_TAG));
+
+  function findRowWrappers(): IFakeNode[] {
+    const rows: IFakeNode[] = [];
+    walk(fabric.committed, node => {
+      if (node.viewName === 'symbiote-view' || node.viewName === 'RCTView') {
+        if (node.props.flexDirection === 'row') rows.push(node);
+      }
+    });
+    return rows;
+  }
+
+  function mountMultiColumnWithViewport(): IFakeNode {
+    mount(MULTI_COLUMN_ROOT_TAG, <MultiColumnApp />);
+    const scrollView = fabric.find(n => n.viewName === 'RCTScrollView');
+    expect(scrollView, 'an RCTScrollView was created').toBeDefined();
+    fabric.fireEvent(scrollView!.instanceHandle, 'topLayout', {
+      layout: { x: 0, y: 0, width: 320, height: VIEWPORT_HEIGHT },
+    });
+    return scrollView!;
+  }
+
+  it('packs items into flex-row cells, numColumns items per row', () => {
+    // why: the virtualized stream must be ROWS (chunkIntoRows), so every rendered row wrapper
+    // carries exactly `numColumns` cells — packing the wrong count per row would misalign every
+    // row after the first.
+    mountMultiColumnWithViewport();
+
+    const rows = findRowWrappers();
+    expect(rows.length, 'three rows for 6 items in 2 columns').toBe(3);
+    for (const row of rows) {
+      expect(row.children.length, 'cells per row').toBe(COLUMN_COUNT);
+    }
+  });
+
+  it('wraps the separator with the real flanking items, not the IRow wrapper', () => {
+    // why: RN's divider between rows must show real items (last of the row above, first of the
+    // row below) — a caller's ItemSeparatorComponent is typed on ItemT, so leaking the internal
+    // IRow<ItemT> wrapper here would be a type-contract violation invisible to a plain smoke test.
+    mountMultiColumnWithViewport();
+
+    expect(separatorCalls.length, 'at least one separator rendered between rows').toBeGreaterThan(
+      0,
+    );
+    for (const call of separatorCalls) {
+      // Every captured item is a real row-0/1's label ("row-N"), never something shaped like an
+      // IRow (which has no `.label` of its own).
+      expect(call.leadingLabel).toMatch(/^row-\d+$/);
+      expect(call.trailingLabel).toMatch(/^row-\d+$/);
+    }
+    // The first separator sits between row 0 (items row-0/row-1) and row 1 (items row-2/row-3):
+    // leading = last item of row 0, trailing = first item of row 1.
+    expect(separatorCalls[0]).toEqual({ leadingLabel: 'row-1', trailingLabel: 'row-2' });
+  });
+
+  it('expands row-level viewability to one token per real item, not one per row', () => {
+    // why: the underlying VirtualizedList windows ROWS, but onViewableItemsChanged is typed on
+    // ItemT — a caller must see item-level visibility (6 tokens for 6 items across 3 rows), not
+    // 3 row-wrapper tokens, or every viewability-driven feature (analytics, lazy-load) miscounts.
+    mountMultiColumnWithViewport();
+
+    const allViewable = viewableReports.flatMap(report => report.viewableItems);
+    expect(allViewable.length, 'one viewable token per item, not per row').toBe(
+      multiColumnData.length,
+    );
+    const labels = new Set(allViewable.map(token => token.item.label));
+    expect(labels.has('row-0')).toBe(true);
+    expect(labels.has('row-5')).toBe(true);
   });
 });

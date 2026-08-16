@@ -24,6 +24,7 @@ updates, the same seed-then-subscribe shape as battery's own hooks — everythin
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 <Aside type="note">
   `NetworkStateType.BLUETOOTH`, `WIMAX`, `VPN`, and `OTHER` are Android-only — iOS never reports
@@ -97,6 +98,18 @@ versions — never install either yourself, and never add the `expo` meta-packag
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text } from '@symbiote-native/svelte';
+      import { useNetworkState } from '@symbiote-native/network/svelte';
+
+      const networkState = useNetworkState(); // { readonly current: NetworkState }, {} until the first reading arrives
+    </script>
+
+    <Text>{networkState.current.isConnected ? `Connected via ${networkState.current.type}` : 'Offline'}</Text>
+    ```
+  </TabItem>
 </Tabs>
 
 ### One-shot functions
@@ -124,9 +137,9 @@ const airplaneMode = await isAirplaneModeEnabledAsync();
 
 ### `useNetworkState()` / `NetworkStateService.connect()`
 
-| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Signature | Returns |
-| --- | --- | --- | --- | --- |
-| `useNetworkState` | `useNetworkState` | `NetworkStateService.connect()` | `()` | Live `NetworkState` — plain value (React), `Ref<NetworkState>` (Vue), `Signal<NetworkState>` (Angular), seeded `{}` |
+| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Svelte (`/svelte`) | Signature | Returns |
+| --- | --- | --- | --- | --- | --- |
+| `useNetworkState` | `useNetworkState` | `NetworkStateService.connect()` | `useNetworkState` | `()` | Live `NetworkState` — plain value (React), `Ref<NetworkState>` (Vue), `Signal<NetworkState>` (Angular), `{ readonly current: NetworkState }` (Svelte, read as `.current`), seeded `{}` |
 
 ### `NetworkState` / `NetworkStateEvent`
 
@@ -188,6 +201,7 @@ packages/network/src/
 │                                  requireNativeModule
 ├── react/hooks/use-network-state   @symbiote-native/network/react
 ├── vue/composables/use-network-state @symbiote-native/network/vue
+├── svelte/runes/use-network-state  @symbiote-native/network/svelte
 └── angular/services/network-state.service @symbiote-native/network/angular
 ```
 

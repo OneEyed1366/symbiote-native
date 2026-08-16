@@ -53,6 +53,7 @@ import type {
   IDrawerDescriptorMap,
   IDrawerNavigatorHandle,
   IDrawerOptions,
+  IDrawerRouterAction,
   IDrawerRouterState,
   IDrawerScreenOptions,
   IDrawerSlot,
@@ -163,8 +164,10 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
   optionsRef.current = options;
   const screenWidthRef = useRef(screenWidth);
   screenWidthRef.current = screenWidth;
-  const isOpenRef = useRef(state.isOpen);
-  isOpenRef.current = state.isOpen;
+  // The whole router state, not just its isOpen bit: jumpTo below has to re-run the reducer to
+  // learn what the dispatch actually produced, and that needs the routes too.
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const animateProgressTo = useCallback(
     (open: boolean): void => {
@@ -190,23 +193,31 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
   const handle = useMemo<IDrawerNavigatorHandle>(
     () => ({
       openDrawer: () => {
-        dlog(`Drawer: openDrawer() called, isOpen=${isOpenRef.current} at t=${Date.now()}`);
+        dlog(`Drawer: openDrawer() called, isOpen=${stateRef.current.isOpen} at t=${Date.now()}`);
         animateProgressTo(true);
         dispatch({ type: 'openDrawer' });
       },
       closeDrawer: () => {
-        dlog(`Drawer: closeDrawer() called, isOpen=${isOpenRef.current} at t=${Date.now()}`);
+        dlog(`Drawer: closeDrawer() called, isOpen=${stateRef.current.isOpen} at t=${Date.now()}`);
         animateProgressTo(false);
         dispatch({ type: 'closeDrawer' });
       },
       toggleDrawer: () => {
-        dlog(`Drawer: toggleDrawer() called, isOpen=${isOpenRef.current} at t=${Date.now()}`);
-        animateProgressTo(!isOpenRef.current);
+        dlog(`Drawer: toggleDrawer() called, isOpen=${stateRef.current.isOpen} at t=${Date.now()}`);
+        animateProgressTo(!stateRef.current.isOpen);
         dispatch({ type: 'toggleDrawer' });
       },
       jumpTo: (name: string) => {
-        dispatch({ type: 'jumpTo', name });
-        if (isOpenRef.current) animateProgressTo(false);
+        // An unregistered name is a documented reducer no-op that hands the SAME state back, so
+        // animating off `isOpen` alone would slide the panel shut while the router still says
+        // open. useReducer's dispatch is async - stateRef only catches up on the next render - so
+        // the reducer (a pure function) is re-run here to learn what the dispatch produces, and
+        // the animation runs only on a genuine open -> closed transition.
+        const action: IDrawerRouterAction = { type: 'jumpTo', name };
+        const current = stateRef.current;
+        const next = drawerRouterReducer(current, action);
+        dispatch(action);
+        if (current.isOpen && !next.isOpen) animateProgressTo(false);
       },
     }),
     [animateProgressTo],
@@ -224,7 +235,7 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
           event,
           gestureState,
           screenWidthRef.current,
-          isOpenRef.current,
+          stateRef.current.isOpen,
           optionsRef.current,
           'start',
         ),
@@ -236,13 +247,13 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
           event,
           gestureState,
           screenWidthRef.current,
-          isOpenRef.current,
+          stateRef.current.isOpen,
           optionsRef.current,
           'move',
         ),
       onPanResponderGrant: (): void => {
         dlog('Drawer: gesture grant');
-        dragStartProgress.current = isOpenRef.current ? 1 : 0;
+        dragStartProgress.current = stateRef.current.isOpen ? 1 : 0;
       },
       onPanResponderMove: (
         _event: ISymbioteEvent,
@@ -259,7 +270,11 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
         _event: ISymbioteEvent,
         gestureState: IPanResponderGestureState,
       ): void => {
-        const intent = resolveSwipeIntent(gestureState, isOpenRef.current, optionsRef.current);
+        const intent = resolveSwipeIntent(
+          gestureState,
+          stateRef.current.isOpen,
+          optionsRef.current,
+        );
         const open = intent === 'open';
         dlog(`Drawer: gesture release -> ${open ? 'open' : 'close'}`);
         animateProgressTo(open);
@@ -267,7 +282,7 @@ const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forw
       },
       onPanResponderTerminate: (): void => {
         dlog('Drawer: gesture terminated, snapping back');
-        animateProgressTo(isOpenRef.current);
+        animateProgressTo(stateRef.current.isOpen);
       },
     }),
   ).current;

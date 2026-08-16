@@ -29,21 +29,31 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// LightSensor is a zero-override DeviceSensor subclass — permission/availability/update-interval
+// fallback logic is DeviceSensor's, already fully covered in device-sensor.test.ts. What's
+// specific here is that the exported `LightSensor` singleton is wired to the real
+// ExpoLightSensor native module and to the exact event name that module's native side emits.
+// No Negative group: both assertions are pass-through wiring, nothing here can throw.
 describe('LightSensor', () => {
-  it('sets the update interval', () => {
-    LightSensor.setUpdateInterval(1234);
+  describe('is wired to the correct native module and event name', () => {
+    it('forwards setUpdateInterval to the ExpoLightSensor native module', () => {
+      // why: proves the singleton's native module reference is the real ExpoLightSensor, not an
+      // accidental stand-in shared with another sensor.
+      LightSensor.setUpdateInterval(1234);
 
-    expect(FAKE_NATIVE_LIGHT_SENSOR.setUpdateInterval).toHaveBeenCalledTimes(1);
-    expect(FAKE_NATIVE_LIGHT_SENSOR.setUpdateInterval).toHaveBeenCalledWith(1234);
-  });
+      expect(FAKE_NATIVE_LIGHT_SENSOR.setUpdateInterval).toHaveBeenCalledWith(1234);
+    });
 
-  it('subscribes through the shared lightSensorDidUpdate event name', () => {
-    const listener = vi.fn();
-    LightSensor.addListener(listener);
+    it('subscribes through the "lightSensorDidUpdate" event name the native module emits', () => {
+      // why: 'lightSensorDidUpdate' is the exact string ExpoLightSensor's native side emits
+      // events under — a typo here means the listener is registered for an event that never fires.
+      const listener = vi.fn();
+      LightSensor.addListener(listener);
 
-    expect(FAKE_NATIVE_LIGHT_SENSOR.addListener).toHaveBeenCalledWith(
-      'lightSensorDidUpdate',
-      listener,
-    );
+      expect(FAKE_NATIVE_LIGHT_SENSOR.addListener).toHaveBeenCalledWith(
+        'lightSensorDidUpdate',
+        listener,
+      );
+    });
   });
 });

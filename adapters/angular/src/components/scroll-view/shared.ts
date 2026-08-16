@@ -1,33 +1,35 @@
-// ScrollView, the Angular lifecycle half. The Fabric tree is nested: a scroll view
-// wraps a content view that holds the children (RN's ScrollView.js shape). The platform-invariant
-// math (decelerationRate, the per-axis intrinsics/base style, the content-size dedupe, the
-// imperative handle, the native sticky scroll-attach, the aria/role fold) lives in
-// @symbiote-native/components, shared verbatim with React/Vue. Here Angular supplies only the lifecycle:
-// the host node held by IDENTITY through a directive's ElementRef, a forwarded-prop bag set onto
-// that node through Renderer2 (-> routeProp), the imperative handle (scrollTo/scrollToEnd/
-// flashScrollIndicators), the content-size dedupe, and the native sticky scroll-attach wired
-// through whenCommitted. This is the Angular twin of the React useRef + Vue shallowRef host.
+// ScrollView, the Angular lifecycle half. The Fabric tree is nested: a scroll view wraps a
+// content view holding the children (RN's ScrollView.js shape). The platform-invariant math
+// (decelerationRate, per-axis intrinsics, content-size dedupe, imperative handle, native sticky
+// scroll-attach, aria/role fold) lives in @symbiote-native/components, shared with React/Vue.
+// Angular supplies only the lifecycle: the host node held by IDENTITY through a directive's
+// ElementRef, a forwarded-prop bag set via Renderer2 (-> routeProp), and the native sticky attach
+// wired through whenCommitted.
 //
-// What diverges per platform, how a RefreshControl integrates, stays in the
-// .ios/.android files (Metro filename-selected): iOS renders the RefreshControl as a SIBLING
-// before the content container; on Android an AndroidSwipeRefreshLayout WRAPS the scroll view.
+// RefreshControl integration diverges per platform (.ios/.android, Metro filename-selected): iOS
+// renders it as a SIBLING before the content container; Android WRAPS the scroll view in an
+// AndroidSwipeRefreshLayout.
 //
-// Angular cannot transform <ng-content> children in the template the way React children.map /
-// Vue slots() can, so ScrollView owns a tiny projection bridge: the content host registers a
-// ScrollViewProjectionController with the Angular renderer, and the renderer wraps direct projected
-// children whose indices match stickyHeaderIndices. Android RefreshControl projection is handled by
-// re-rendering the projected component's native prop surface as the wrapper around the scroll view
-// (RN's Android shape), while excluding the original projected node from the content slot.
+// Angular cannot transform <ng-content> children the way React children.map / Vue slots() can, so
+// ScrollView owns a projection bridge: the content host registers a ScrollViewProjectionController
+// with the Angular renderer, which wraps projected children whose indices match
+// stickyHeaderIndices. Android RefreshControl projection re-renders the projected component as the
+// wrapper around the scroll view (RN's Android shape), excluding it from the content slot.
 
 import {
   Directive,
+  computed,
+  signal,
   ElementRef,
   EventEmitter,
   Output,
   ViewChild,
   ContentChild,
   inject,
+  type AfterContentChecked,
   type AfterViewInit,
+  type DoCheck,
+  type OnChanges,
   type OnDestroy,
 } from '@angular/core';
 import {
@@ -60,7 +62,7 @@ import {
   type ISymbioteNode,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { SymbioteHostPropsDirective } from '../../primitives';
+import { anchorHostStyle, SymbioteHostPropsDirective } from '../../primitives';
 import { RefreshControl } from '../refresh-control';
 import { ScrollViewProjectionController } from './projection';
 
@@ -158,12 +160,10 @@ export const SCROLL_VIEW_INPUTS = [
   'aria-valuetext',
 ];
 
-// The Angular-facing prop surface. React's IScrollViewProps is React-coupled (ReactNode children,
-// ReactElement refreshControl); Angular takes children via <ng-content> and composes the
-// RefreshControl through projection / an outer wrap, so this mirrors the same pass-through surface
-// minus those, declared per-adapter over the shared accessibility base since a framework element/ref
-// field can't live in a shared agnostic type. Every prop is accepted and typed against the full
-// React surface so app code type-checks against parity now.
+// The Angular-facing prop surface: React's IScrollViewProps minus the React-coupled fields
+// (ReactNode children, ReactElement refreshControl) — Angular takes children via <ng-content> and
+// composes RefreshControl through projection instead. Declared per-adapter over the shared
+// accessibility base since a framework element/ref field can't live in a shared agnostic type.
 export interface IAngularScrollViewProps extends IAccessibilityProps, IAriaProps {
   style?: IStyleProp<IViewStyle>;
   // A bare string resolves through the shared style registry, like `class` on the host node.
@@ -287,7 +287,15 @@ export class ScrollViewProjectionDirective {
 // ngtsc rejects the inherited hooks/queries (NG2007). The concrete platform @Components add ONLY a
 // decorator + their platform template; all behavior lives here.
 @Directive()
-export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterViewInit, OnDestroy {
+export abstract class ScrollViewBase
+  implements
+    IAngularScrollViewInputs,
+    AfterContentChecked,
+    AfterViewInit,
+    DoCheck,
+    OnChanges,
+    OnDestroy
+{
   style: IStyleProp<IViewStyle> | undefined;
   contentContainerStyle: IStyleProp<IViewStyle> | string | undefined;
   horizontal: boolean | undefined;
@@ -393,6 +401,20 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
 
   @ContentChild(RefreshControl) protected projectedRefreshControl?: RefreshControl;
 
+  // This component's OWN anchor host — where a `class="..."` at the use site resolves (see
+  // anchorHostStyle's doc comment) — NOT `#host` in the platform templates, which targets the real
+  // inner scroll-view primitive one level down. Injected in the BASE because both platform
+  // subclasses merged the identical anchor style into their `scrollProps` override.
+  private readonly elementRef = inject<ElementRef<unknown>>(ElementRef);
+
+  // The anchor's class-derived style is written by the RENDERER (addClass/removeClass ->
+  // commitClassStyle), never through an @Input, so `inputsRevision` cannot cover it and a bag
+  // memoized on plain reads of it would keep a stale class forever. It gets its own signal, polled
+  // in ngDoCheck below: that hook runs on exactly the checks that could have changed it (Angular
+  // applies the parent's class bindings before flushing this directive's pre-order hooks), which is
+  // the same cadence the old `scrollProps` getter was re-read at.
+  protected readonly anchorStyle = signal<unknown>(undefined);
+
   // A single AnimatedValue tracks the scroll offset and drives every sticky header's translateY
   // (RN's _scrollAnimatedValue). A stable field (allocated once, held by identity — Angular does
   // not proxy class fields, so no markRaw needed); the native attach below feeds it on the UI
@@ -404,6 +426,9 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
   private lastContentSize: IContentSize | null = null;
   // Inverted sticky headers stick to the BOTTOM, so they need the viewport height (RN _handleLayout).
   private viewportHeight: number | undefined = undefined;
+  // What the projection controller was last told about the projected RefreshControl, so
+  // ngAfterContentChecked can tell a real content change from an ordinary check.
+  private lastHasProjectedRefreshControl = false;
 
   protected readonly projectionController = new ScrollViewProjectionController({
     stickyHeaderIndices: undefined,
@@ -421,6 +446,9 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
   // bind runs now if committed, else after the commit that assigns the tag. Detached on destroy.
   private detachStickyScroll: (() => void) | undefined;
   private cancelStickyBind: (() => void) | undefined;
+  // What the current attach was made for, so a re-run that changes nothing stays a no-op.
+  private stickyAttachedEnabled = false;
+  private stickyAttachedNode: ISymbioteNode | null = null;
 
   private lastLoggedIsHorizontal: boolean | undefined = undefined;
 
@@ -433,7 +461,14 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
   // (see AnimatedComponentBase.reconcile()'s identical warning).
   private readonly handleInvertedStickyLayout = (event: ISymbioteEvent): void => {
     const height = readLayoutDimension(event, 'height');
-    if (height !== undefined) this.viewportHeight = height;
+    // The projection controller is pushed from here rather than picked up on the next prop-bag
+    // read: viewportHeight is internal mutable state, so once `scrollProps` became a memoized
+    // computed nothing would re-read it. Guarded on a real change - an onLayout that reports the
+    // same height must not cost a sticky reconcile walk.
+    if (height !== undefined && height !== this.viewportHeight) {
+      this.viewportHeight = height;
+      this.updateProjectionController();
+    }
     this.layout.emit(event);
   };
 
@@ -449,14 +484,11 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
     this.contentSizeChange.emit({ width, height });
   };
 
-  // Memoizes the wrapper each `emitterCallback` builds, keyed by the emitter it closes over
-  // (identity holds across ScrollViewBase's own @Output()s and a projected RefreshControl's,
-  // since a WeakMap key is just object identity). Without this, `scrollProps`/`refreshControlProps`
-  // handed a fresh `(event) => emitter.emit(event)` closure to the forwarded prop bag on every
-  // evaluation — the same jsonEqual/Object.is function-leaf problem as the arrow fields above, one
-  // level further removed. `.observed` is checked BEFORE the cache so an unbound event still
-  // resolves to `undefined` (the "nobody cares" contract `emitterCallback`'s own comment documents),
-  // not a stale cached wrapper from before the last subscriber unsubscribed.
+  // Memoizes the wrapper each `emitterCallback` builds, keyed by the emitter it closes over.
+  // Without this, `scrollProps`/`refreshControlProps` would hand a fresh closure to the forwarded
+  // prop bag on every evaluation — the same jsonEqual/Object.is function-leaf problem as the arrow
+  // fields above. `.observed` is checked BEFORE the cache so an unbound event still resolves to
+  // `undefined` rather than a stale wrapper from before the last unsubscribe.
   private readonly emitterCallbackCache = new WeakMap<
     EventEmitter<ISymbioteEvent>,
     IScrollHandler
@@ -500,12 +532,35 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
       .scrollViewBaseStyle;
   }
 
+  // Bridges non-reactive @Input fields into the reactive graph, so a computed() can memoize a
+  // bag derived from them. Signal inputs would make this unnecessary, but `input()` is visible
+  // only to the AOT compiler and this package's unit suite runs on JIT - see the
+  // `angular-adapter-change-detection` skill, §6. `signal()`/`computed()` themselves are plain
+  // runtime APIs and need no compiler support, which is what makes this bridge possible at all.
+  //
+  // ONLY safe for a bag whose every dependency is an @Input. A bag that also reads internal
+  // mutable state (viewportHeight, lastContentSize, the anchor's class-derived style) would go
+  // stale, because nothing bumps this for those - make that state its own signal (see
+  // `anchorStyle`) instead of widening this one.
+  private readonly inputsRevision = signal(0);
+
   // The forwarded host-prop bag for the scroll-view node: aria/role folded, the native pass-through
   // families, the scroll-event callbacks, then the lifecycle-managed overrides (nestedScrollEnabled
   // default ON, horizontal when defined, decelerationRate resolved per-platform, the sticky onScroll
   // path). Base style UNDER user style so an explicit user value still wins. Mirrors Vue's outerProps
   // + scrollProps assembly.
-  get scrollProps(): Record<string, unknown> {
+  //
+  // MEASURED 2026-08-16: as a getter this rebuilt the whole bag on every refresh of this view, so
+  // the `symbioteHostProps` reference check failed every time and every key was re-pushed through
+  // the renderer - once per scroll frame per host binding (2 before `contentProps` was memoized,
+  // 1 after, 0 now; the pin lives in prop-bag-stability.test.ts).
+  //
+  // It is a `computed` on the BASE and no longer overridable: a subclass getter cannot override a
+  // field. The platform subclasses used to override it with byte-identical bodies (merge the
+  // anchor's class-derived style ahead of the resolved style), so that merge moved down here
+  // rather than into a `decorateScrollProps` hook both of them would implement the same way.
+  readonly scrollProps = computed<Record<string, unknown>>(() => {
+    this.inputsRevision();
     const bag: Record<string, unknown> = compact({
       ...resolveAccessibilityProps(this.accessibilityInputs()),
       scrollEnabled: this.scrollEnabled,
@@ -563,14 +618,11 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
     }
 
     // onScroll: when sticky headers are active, the offset must reach the AnimatedValue (RN
-    // _scrollAnimatedValueAttachment). With the native module, the value is driven on the UI thread
-    // by the post-commit attach below, so onScroll forwards to the user with throttle 1
-    // (ScrollView.js:1798). Without it, Animated.event drives the value each frame (the JS jitter)
-    // and forwards the user handler as the listener passthrough.
-    // The scroll-forwarding DECISIONS (which onScroll path, the 1/16 throttle defaults, whether to
-    // capture the viewport height) are folded out to the shared resolveScrollForwarding; here Angular
-    // only EXECUTES them, keeping its stable-reference handlers (stickyOnScrollHandler /
-    // handleInvertedStickyLayout / emitterCallback) so a fresh closure never forces a re-clone cascade.
+    // _scrollAnimatedValueAttachment). With the native module, the post-commit attach below drives
+    // it on the UI thread (throttle 1, ScrollView.js:1798); without it, Animated.event drives the
+    // value each frame (JS jitter). The DECISIONS (which path, throttle defaults, whether to
+    // capture viewport height) are folded out to the shared resolveScrollForwarding; Angular only
+    // EXECUTES them, keeping stable-reference handlers so a fresh closure never forces a re-clone.
     const nativeStickyAvailable = this.hasStickyHeaders && isNativeAnimatedAvailable();
     const forwarding = resolveScrollForwarding({
       hasStickyHeaders: this.hasStickyHeaders,
@@ -599,41 +651,62 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
       if (layoutCallback !== undefined) bag.onLayout = layoutCallback;
     }
 
+    // Thunks, not strings: an eagerly built message would be paid with logging off (see dlog's own
+    // comment). Less often than it used to fire now that this bag is memoized, but the recompute
+    // still rides every real input change.
     dlog(
-      `Angular ScrollView -> ${this.isHorizontal ? 'horizontal' : 'vertical'} (sticky=${this.hasStickyHeaders})`,
+      () =>
+        `Angular ScrollView -> ${this.isHorizontal ? 'horizontal' : 'vertical'} (sticky=${this.hasStickyHeaders})`,
+    );
+    dlog(
+      () =>
+        `STICKY[sv] forwarding mode=${forwarding.mode} throttle=${forwarding.scrollEventThrottle} ` +
+        `nativeStickyAvailable=${nativeStickyAvailable} onScrollBound=${bag.onScroll !== undefined}`,
     );
 
-    bag.style = [this.scrollViewBaseStyle, this.style];
-    this.updateProjectionController();
+    // The anchor's class-derived style goes FIRST: flattenStyle's later-wins collapse keeps an
+    // explicit [style] winning over the ambient class. Flat rather than the nested
+    // `[anchor, [base, style]]` the platform overrides used to build - flattenStyle folds nested
+    // arrays in the same order, so the resolved value is unchanged.
+    bag.style = [this.anchorStyle(), this.scrollViewBaseStyle, this.style];
     return bag;
-  }
+  });
 
   // Overridable hook, NOT `this.style` directly: `splitLayoutProps` below decides which layout
   // properties (flex/height/gap/…) go on the Android outer refresh-control wrapper vs. the inner
-  // scroll view. `this.style` alone only ever carries the explicit `[style]` @Input — a composed
-  // component's OWN anchor host (see anchorHostStyle's doc comment in primitives/shared.ts) can
-  // hold ADDITIONAL class-derived layout style that's otherwise invisible to this split, so its
-  // wrapper never gets its needed layout (collapses to zero size — the Android outer wrapper
-  // shows literally nothing on screen). This mirrors the Vue adapter's identical
-  // `layoutSplitStyle` field and the real Android device bug it fixes; the Angular Android
-  // ScrollView (index.android.ts) overrides this to merge in `anchorHostStyle`. Default here is
-  // `this.style` alone, preserving current behavior for anything that doesn't override it.
+  // scroll view. `this.style` alone only carries the explicit `[style]` @Input — a composed
+  // component's own anchor host can hold ADDITIONAL class-derived layout style invisible to this
+  // split, so the wrapper collapses to zero size on real Android devices. Angular's Android
+  // ScrollView (index.android.ts) overrides this to merge in `anchorHostStyle` (mirrors Vue's
+  // identical `layoutSplitStyle` field and the device bug it fixes).
   protected get layoutSplitStyle(): IStyleProp<IViewStyle> {
     return this.style;
   }
 
-  get androidWrappedScrollProps(): Record<string, unknown> {
-    const props = { ...this.scrollProps };
+  // Memoizable for the same reasons `scrollProps` is: `layoutSplitStyle` resolves to @Input `style`
+  // plus (on Android) the `anchorStyle` signal, both covered. The anchor style is deliberately NOT
+  // re-merged into `props.style` here - `splitLayoutProps` already routed its layout half to the
+  // outer refresh-control wrapper and left the rest in `inner`.
+  readonly androidWrappedScrollProps = computed<Record<string, unknown>>(() => {
+    this.inputsRevision();
+    const props = { ...this.scrollProps() };
     const { inner, outer } = splitLayoutProps(this.layoutSplitStyle);
     dlog(
-      `Angular ScrollView splitProbe layoutSplitStyle=${JSON.stringify(this.layoutSplitStyle)} ` +
+      () =>
+        `Angular ScrollView splitProbe layoutSplitStyle=${JSON.stringify(this.layoutSplitStyle)} ` +
         `outer=${JSON.stringify(outer)} inner=${JSON.stringify(inner)}`,
     );
     props.style = [this.scrollViewBaseStyle, inner];
     props.nestedScrollEnabled = true;
     return props;
-  }
+  });
 
+  // Deliberately still GETTERS, unlike every other bag on this class. Their whole content comes
+  // from the PROJECTED RefreshControl's own @Input()s (refreshing, tintColor, colors, …), which
+  // Angular routes through THAT component's ngOnChanges - `inputsRevision` here never moves for
+  // them. Memoizing on it would freeze `refreshing` at its first value and strand the native
+  // spinner forever, which is exactly the silent-staleness class this file avoids elsewhere.
+  // Making them memoizable means giving RefreshControl its own revision signal to read here.
   get iosRefreshControlProps(): Record<string, unknown> {
     return this.refreshControlProps();
   }
@@ -641,7 +714,8 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
   get androidRefreshControlProps(): Record<string, unknown> {
     const { outer } = splitLayoutProps(this.layoutSplitStyle);
     dlog(
-      `Angular ScrollView refreshControlProbe outer=${JSON.stringify(outer)} ` +
+      () =>
+        `Angular ScrollView refreshControlProbe outer=${JSON.stringify(outer)} ` +
         `hasRefresh=${this.projectedRefreshControl !== undefined}`,
     );
     return this.refreshControlProps(outer);
@@ -685,7 +759,8 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
   // children of a scroll view that hosts exactly one — an addViewAt crash). collapsableChildren
   // false preserves the cell views maintainVisibleContentPosition/snapToAlignment anchor against.
   // onLayout synthesizes onContentSizeChange (deduped). iOS never flattens; both are no-ops there.
-  get contentProps(): Record<string, unknown> {
+  readonly contentProps = computed<Record<string, unknown>>(() => {
+    this.inputsRevision();
     const { contentStyle } = selectScrollIntrinsics(
       this.isHorizontal,
       this.resolvedContentContainerStyle,
@@ -696,13 +771,18 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
     }
     bag.onLayout = this.handleContentLayout;
     return bag;
-  }
+  });
 
   // Wraps an @Output() as a plain callback only while it has a subscriber, so an unbound event
   // still leaves the forwarded prop bag key absent — the same "undefined means nobody cares"
   // contract the old @Input() callbacks had. Mirrors Pressable's emitterHandler. The wrapper itself
   // is memoized per emitter (emitterCallbackCache) rather than rebuilt on every call: see that
   // field's comment for why an unstable closure here breaks the forwarded prop bag.
+  //
+  // `.observed` is NOT reactive, and `scrollProps` memoizes over it. That is sound because Angular
+  // subscribes a template's (event) listeners in its CREATION pass, before any input is written and
+  // before this component's own view is first refreshed - so `observed` is already settled at the
+  // first evaluation and cannot flip afterwards without destroying the whole component.
   private emitterCallback(emitter: EventEmitter<ISymbioteEvent>): IScrollHandler | undefined {
     if (!emitter.observed) return undefined;
     let cached = this.emitterCallbackCache.get(emitter);
@@ -762,23 +842,98 @@ export abstract class ScrollViewBase implements IAngularScrollViewInputs, AfterV
   }
 
   ngAfterViewInit(): void {
+    dlog('STICKY[sv] ngAfterViewInit');
+    // Runs once the template has bound the content node, so this is the reconcile that actually
+    // wraps the sticky children (the ngOnChanges one above fires before the content node exists).
     this.updateProjectionController();
     this.attachSticky();
   }
 
-  // Wire the native sticky-scroll attach after the view exists. Re-attaches if the node identity
-  // changes; no-op when sticky is off or the native module is absent.
+  // Re-read the anchor's class-derived style. It is written by the renderer's addClass/removeClass,
+  // never through an @Input, so this poll is the only thing that can invalidate a bag holding it -
+  // ngOnChanges alone would strand a class toggled after mount (covered by
+  // scroll-view-class-style.test.ts's toggle case, which goes red the moment this hook stops
+  // polling). ngDoCheck is the right hook, not a near-enough one: render3's `callHooks` flushes a
+  // node's pre-order hooks at the next `ɵɵadvance` PAST it, which is after the parent wrote this
+  // element's `ɵɵclassProp` and before this component's own view refreshes. It also runs under
+  // `setActiveConsumer(null)`, so the write registers no dependency on the caller's view and cannot
+  // throw NG0600. And `commitClassStyle` allocates a fresh style array only when a class token
+  // actually moved, so `signal.set`'s own Object.is check makes an unchanged poll dirty nothing.
+  ngDoCheck(): void {
+    this.anchorStyle.set(anchorHostStyle(this.elementRef));
+  }
+
+  // The projected RefreshControl is a @ContentChild, not an @Input, so ngOnChanges never fires when
+  // one is added or removed at the use site - and `excludeRefreshControl` decides whether the
+  // projection walk pulls it out of the scroll content. Angular resolves the query before this
+  // hook. Guarded on the flag itself so a check that changed nothing skips the reconcile walk,
+  // which the old getter-driven update could not do.
+  ngAfterContentChecked(): void {
+    if (this.hasProjectedRefreshControl === this.lastHasProjectedRefreshControl) return;
+    this.lastHasProjectedRefreshControl = this.hasProjectedRefreshControl;
+    this.updateProjectionController();
+  }
+
+  // `stickyHeaderIndices` is an ordinary @Input, so it can arrive AFTER the first change-detection
+  // pass - any app deriving it from data rather than writing a literal in the template does exactly
+  // that. ngAfterViewInit runs once, so without this the native attach below would be skipped on
+  // that first pass and never retried: the wrapper still projects (that half self-heals), the
+  // header sits at the right place with the right z-index, and simply never moves. Device-reported
+  // 2026-08-16, regression-covered in sticky-native-attach.test.ts. The other three adapters never
+  // had this hole because they re-run the attach from a reactive effect keyed on the same
+  // condition (Svelte's `$effect` in index.svelte, React's useEffect deps, Vue's watcher).
+  ngOnChanges(): void {
+    dlog('STICKY[sv] ngOnChanges');
+    // Every computed() prop bag below reads plain @Input fields, which are NOT reactive on their
+    // own - this bump is what tells them an input changed. It must stay in ngOnChanges: that is
+    // the single moment Angular has finished writing every changed input for this pass.
+    this.inputsRevision.update(revision => revision + 1);
+    // stickyHeaderIndices / invertStickyHeaders / StickyHeaderComponent are @Inputs, so this is
+    // where the projection controller learns about them. It used to be a side effect of reading
+    // the `scrollProps` getter - which a memoized computed no longer performs per pass.
+    this.updateProjectionController();
+    this.attachSticky();
+  }
+
+  // Wire the native sticky-scroll attach once the view exists AND sticky is actually on. Re-runs
+  // on every input change, so it must be idempotent: see the guard below.
   private attachSticky(): void {
+    const wantsAttach = this.hasStickyHeaders && isNativeAnimatedAvailable();
+    const node = wantsAttach ? this.hostNode : null;
+    dlog(
+      () =>
+        `STICKY[sv] attachSticky indices=${JSON.stringify(this.stickyHeaderIndices)} ` +
+        `hasSticky=${this.hasStickyHeaders} nativeAvailable=${isNativeAnimatedAvailable()} ` +
+        `wantsAttach=${wantsAttach} hasNode=${node !== null} ` +
+        `wasEnabled=${this.stickyAttachedEnabled} nodeChanged=${node !== this.stickyAttachedNode}`,
+    );
+    // Nothing that decides the attach has changed - return rather than detach and rebind the
+    // native scroll event, which every unrelated @Input change would otherwise churn now that
+    // ngOnChanges drives this too.
+    if (wantsAttach === this.stickyAttachedEnabled && node === this.stickyAttachedNode) {
+      dlog('STICKY[sv] attachSticky skipped (nothing about the attach changed)');
+      return;
+    }
+
     this.cancelStickyBind?.();
     this.cancelStickyBind = undefined;
     if (this.detachStickyScroll !== undefined) {
       this.detachStickyScroll();
       this.detachStickyScroll = undefined;
     }
-    if (!this.hasStickyHeaders || !isNativeAnimatedAvailable()) return;
-    const node = this.hostNode;
-    if (node === null) return;
+    // Recorded even when the node is not resolved yet, so the NEXT call (which will see a real
+    // node) reads as a change and attaches.
+    this.stickyAttachedEnabled = wantsAttach;
+    this.stickyAttachedNode = node;
+    if (!wantsAttach || node === null) {
+      dlog(
+        `STICKY[sv] attachSticky NOT attaching (wantsAttach=${wantsAttach} hasNode=${node !== null})`,
+      );
+      return;
+    }
+    dlog('STICKY[sv] attachSticky waiting for commit to bind the native scroll event');
     this.cancelStickyBind = whenCommitted(node, () => {
+      dlog('STICKY[sv] attachSticky node committed -> attachStickyScroll');
       this.detachStickyScroll = attachStickyScroll(node, this.scrollAnimatedValue);
     });
   }

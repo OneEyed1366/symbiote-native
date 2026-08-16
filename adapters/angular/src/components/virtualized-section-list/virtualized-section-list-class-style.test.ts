@@ -49,6 +49,10 @@ afterEach(() => {
 });
 
 describe('VirtualizedSectionList anchor class= resolution', () => {
+  // why: VirtualizedSectionList is its own ANCHOR_HOST_COMPONENTS entry, two levels above the
+  // ScrollView it ultimately composes through VirtualizedList — neither of those inner fixes
+  // transitively covers this component's OWN use-site class=, since each anchor resolves
+  // independently against its own ElementRef.
   it('resolves a class= on the VirtualizedSectionList use site onto the real committed scroll host', async () => {
     mount(ROOT_TAG, VirtualizedSectionListClassHost);
     await tick();

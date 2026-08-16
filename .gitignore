@@ -8,6 +8,16 @@ dist/
 # unpublished package into a standalone examples/* app before it has a real npm release)
 *.tgz
 
+# co-located svelte-compiler output a *.smoke.test.ts writes next to the real .svelte source
+# it's compiling (so the compiled file's own relative imports resolve without copying its
+# sibling .ts dependencies) — always cleaned up in afterEach, this is insurance against a
+# crash leaving one behind.
+.smoke-compiled-*.mjs
+
+# scripts/emit-svelte-declarations.mjs stages svelte2tsx's whole-package emit here before copying
+# only the *.svelte.d.ts across to build/ — removed in a finally, this covers a crashed run.
+.svelte-dts/
+
 # Native source vendored into a package's proxy podspec at pod-install time (CocoaPods'
 # Dir.glob never crosses a symlink, so a pnpm .pnpm-store symlink breaks pointing
 # source_files at the nested lib in place — see symbiote-third-party-native-view skill).

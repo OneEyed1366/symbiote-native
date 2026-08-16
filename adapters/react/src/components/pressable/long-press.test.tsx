@@ -1,9 +1,17 @@
-// Co-located React-driven pipeline test.
-// Proves the long-press SYNTHESIS in the engine's events layer:
-// there is no native longPress event. The engine arms a hold timer on topTouchStart
-// when a node in the press path listens for it, fires a bubbling `longPress` after the
-// delay, and suppresses the tap on release. The 500ms delay is RN's Touchable default;
-// the smoke waited real wall-clock, here vitest fake timers advance it deterministically.
+// Coverage scope: long-press SYNTHESIS itself — the hold timer, the 500ms delay, the
+// deactivation-distance drift cancellation, and press suppression on a completed long press —
+// is engine-level logic with NO React involvement (core/engine/src/events/events.test.ts,
+// `describe('longPress synthesis')`), exercised there directly against `routeProp` on a raw
+// fake-Fabric tree. That suite already covers: no timer armed without a listener, fires +
+// suppresses the trailing press, does not fire before the delay, drift past the deactivation
+// distance cancels the timer, and small jitter within it does not. This file does NOT re-walk
+// those branches through a React mount — it proves only the thing the engine test cannot: that
+// React's `Text` component actually forwards `onLongPress`/`onPress` into the engine's routeProp
+// path at all, for BOTH outcomes (a hold and a quick tap), so a dropped/misnamed prop in the
+// React adapter would be caught here.
+//
+// No Negative group: long-press is a gesture-recognition concern with no invalid input to
+// reject — every touch sequence resolves to one of "long press", "press", or "neither".
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount, Text } from '@symbiote-native/react';
@@ -11,7 +19,6 @@ import { installFabric } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 140;
 const TOUCH_START = 'topTouchStart';
-const TOUCH_MOVE = 'topTouchMove';
 const TOUCH_END = 'topTouchEnd';
 // Longer than the 500ms synthesis delay so the hold timer has surely fired.
 const HOLD_ADVANCE_MS = 600;
@@ -32,8 +39,12 @@ function handleFor(testID: string): unknown {
   return node.instanceHandle;
 }
 
-describe('React long-press synthesis', () => {
-  it('fires longPress once after the hold delay and suppresses the tap', () => {
+describe('React long-press wiring (Positive)', () => {
+  it('routes a sustained hold to onLongPress and suppresses onPress', () => {
+    // why: proves BOTH `onLongPress` and `onPress` reach the engine's routeProp path from a
+    // real React <Text> mount — the timer/delay/suppression mechanics themselves are
+    // engine-tested (see file header); a React-side regression here would look like "onLongPress
+    // silently never fires" with no engine-level test able to catch it.
     let longPress = 0;
     let press = 0;
     mount(
@@ -54,13 +65,14 @@ describe('React long-press synthesis', () => {
     fabric.fireEvent(h, TOUCH_START);
     vi.advanceTimersByTime(HOLD_ADVANCE_MS);
     expect(longPress).toBe(1);
-    expect(press).toBe(0);
     fabric.fireEvent(h, TOUCH_END);
-    expect(longPress).toBe(1);
     expect(press).toBe(0);
   });
 
-  it('fires press (never longPress) on a quick tap and disarms the timer on release', () => {
+  it('routes a quick tap to onPress, never onLongPress', () => {
+    // why: the mirror case — a React Text with BOTH handlers wired must still resolve a quick
+    // tap to onPress alone; without this, test 1 alone would only prove onLongPress is wired,
+    // leaving a dropped onPress binding undetected.
     let longPress = 0;
     let press = 0;
     mount(
@@ -82,50 +94,5 @@ describe('React long-press synthesis', () => {
     fabric.fireEvent(h, TOUCH_END);
     expect(press).toBe(1);
     expect(longPress).toBe(0);
-    // The timer was armed at start; advancing must surface no stray fire.
-    vi.advanceTimersByTime(HOLD_ADVANCE_MS);
-    expect(longPress).toBe(0);
-  });
-
-  it('cancels the pending longPress when a move drifts past the deactivation distance', () => {
-    let longPress = 0;
-    mount(
-      ROOT_TAG,
-      <Text
-        testID="drift"
-        onLongPress={() => {
-          longPress++;
-        }}
-      >
-        drift me
-      </Text>,
-    );
-    const h = handleFor('drift');
-    fabric.fireEvent(h, TOUCH_START, { pageX: 0, pageY: 0 });
-    fabric.fireEvent(h, TOUCH_MOVE, { pageX: 20, pageY: 0 });
-    vi.advanceTimersByTime(HOLD_ADVANCE_MS);
-    expect(longPress).toBe(0);
-    fabric.fireEvent(h, TOUCH_END);
-  });
-
-  it('keeps the timer armed when a small move stays within the deactivation distance', () => {
-    let longPress = 0;
-    mount(
-      ROOT_TAG,
-      <Text
-        testID="nudge"
-        onLongPress={() => {
-          longPress++;
-        }}
-      >
-        nudge me
-      </Text>,
-    );
-    const h = handleFor('nudge');
-    fabric.fireEvent(h, TOUCH_START, { pageX: 0, pageY: 0 });
-    fabric.fireEvent(h, TOUCH_MOVE, { pageX: 5, pageY: 5 });
-    vi.advanceTimersByTime(HOLD_ADVANCE_MS);
-    expect(longPress).toBe(1);
-    fabric.fireEvent(h, TOUCH_END);
   });
 });

@@ -24,6 +24,7 @@ per-instance state.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Installation
 
@@ -49,7 +50,7 @@ carries no runtime or manifest permission.
 
 ## Usage
 
-All three adapters — React, Vue, Angular — re-export the exact same constants and free
+All four adapters — React, Vue, Angular, Svelte — re-export the exact same constants and free
 functions; there is no per-adapter hook/composable/service to reach for, since nothing here holds
 live state or a subscription.
 
@@ -154,6 +155,37 @@ live state or a subscription.
     There's no per-instance service to `inject()` here — every function is a plain free function
     off the core package, called straight from the constructor.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Platform, Text, View } from '@symbiote-native/svelte';
+      import {
+        applicationId,
+        applicationName,
+        getInstallationTimeAsync,
+        nativeApplicationVersion,
+        nativeBuildVersion,
+      } from '@symbiote-native/application/svelte';
+
+      let installedAt = $state<Date | null>(null);
+
+      $effect(() => {
+        getInstallationTimeAsync().then(value => (installedAt = value));
+      });
+    </script>
+
+    <View>
+      <Text>{applicationName} ({applicationId})</Text>
+      <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+      {#if Platform.OS === 'android' && installedAt}
+        <Text>Installed {installedAt.toLocaleDateString()}</Text>
+      {/if}
+    </View>
+    ```
+
+    There's no per-instance rune to reach for here either — every function is a plain free
+    function off the core package, called straight from `$effect`.
+  </TabItem>
 </Tabs>
 
 ## API
@@ -221,6 +253,7 @@ packages/application/src/
 │             # via expo-modules-core's requireNativeModule
 ├── react/    # @symbiote-native/application/react   — export * from '../core'
 ├── vue/      # @symbiote-native/application/vue     — export * from '../core'
+├── svelte/   # @symbiote-native/application/svelte  — export * from '../core'
 └── angular/  # @symbiote-native/application/angular — export * from '../core'
 ```
 

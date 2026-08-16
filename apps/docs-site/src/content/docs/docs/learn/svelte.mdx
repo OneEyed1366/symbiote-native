@@ -1,0 +1,101 @@
+---
+title: Svelte guide
+description: How to write SymbioteNative apps with the Svelte adapter.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Two known gaps">
+  Full component parity, the DOM-shim renderer seam, and native bootstrap are
+  implemented and tested against `examples/svelte`, and Svelte is on the live
+  framework switcher on the landing page. Two gaps worth knowing about today:
+  `AppRegistry.setWrapperComponentProvider` is re-exported but currently
+  ignored (a compiled `.svelte` file has no runtime factory to compose a
+  wrapper around the root the way Vue's `h(wrapper, ...)` can), and
+  `Animated.FlatList`/`Animated.SectionList` have no Svelte wrapper yet.
+  Wrapper packages have followed: [Slider](/docs/packages/slider/) ships a
+  Svelte build too — see the [status page](/docs/project/status/) for the
+  exact line.
+</Aside>
+
+The Svelte adapter drives the same native Fabric engine as React, Vue, and
+Angular — but through a different seam than any of them. Svelte has no
+official custom-renderer API yet (`createRenderer` from `svelte/renderer` is
+still an unmerged proposal upstream), so instead of a framework-provided
+rendering hook, this adapter patches a handful of `globalThis` DOM classes:
+stock, unmodified compiled Svelte output believes it's talking to the real
+DOM, while every call it makes actually routes into
+`@symbiote-native/engine`'s mutation API. Components are ordinary `.svelte`
+files — nothing about authoring one is adapter-specific beyond the prop/event
+shape below.
+
+<video poster={`${import.meta.env.BASE_URL}/svelte-demo.webp`} aria-label="Svelte driving a native SymbioteNative demo" width="260" height="564" preload="none" autoplay muted loop playsinline>
+  <source src={`${import.meta.env.BASE_URL}/svelte-demo.mp4`} type="video/mp4" />
+  <source src={`${import.meta.env.BASE_URL}/svelte-demo.webm`} type="video/webm" />
+</video>
+
+*The `examples/svelte` canary — the same component surface and engine as the
+React, Vue, and Angular canaries, driven through the DOM shim instead.*
+
+## Minimal component
+
+```svelte
+<!-- App.svelte -->
+<script lang="ts">
+  import { Pressable, Text, View } from '@symbiote-native/svelte';
+
+  let count = $state(0);
+</script>
+
+<View class="root">
+  <Pressable onPress={() => (count += 1)}>
+    <Text class="label">Count is {count}</Text>
+  </Pressable>
+</View>
+
+<style>
+  .root {
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+  }
+  .label {
+    font-size: 24px;
+  }
+</style>
+```
+
+A component's own `<style>` block is scoped by default, the same as real
+Svelte — no CSS-file import needed here, though one still works identically.
+`StyleSheet.create` works too if you'd rather keep style objects inline — see
+the [Styling guide](/docs/learn/styling/) for both paths.
+
+## Svelte contract
+
+- every component event is a real camelCase **prop** — `onPress={onTap}`,
+  `onLongPress={...}`, `onValueChange={...}`, `onLayout={...}` — not a `on:x`
+  directive and not kebab-cased like Vue's templates;
+- children arrive as a `children` prop typed `Snippet`, rendered internally
+  via `{@render children?.()}` — Svelte 4's `<slot />` has no place here.
+  A component that hands state back to its children (`Pressable`'s
+  `pressed`) is consumed with a named `{#snippet children(state)}` block,
+  Svelte's own twin of a scoped slot;
+- `TextInput`, `Switch`, and the Slider wrapper accept `bind:value` on top of
+  their existing `value`/`onValueChange` contract — `value = $bindable()` is
+  the declaration a wrapper author reaches for to add the same sugar to their
+  own controlled component;
+- Symbiote components forward no `bind:this` of their own — `{@attach fn}` is
+  the way to reach a host node from app code, since it's the one
+  directive-shaped construct the Svelte compiler accepts on a component at
+  all (`use:`/`class:`/`style:` are rejected there);
+- `<svelte:boundary>` is a real, Svelte-exclusive error-boundary primitive
+  among the four adapters today — wrap a subtree, provide a `failed` snippet,
+  and a thrown child tears down cleanly instead of leaving the app in a
+  broken state;
+- Metro needs `@symbiote-native/svelte/metro-svelte-transformer` wired as the
+  Babel transformer for `.svelte` files, plus
+  `resolver.unstable_conditionNames: ['browser']` — without it Metro resolves
+  Svelte's server-side build and `mount()` throws
+  `lifecycle_function_unavailable` on the very first call.
+
+Read the exact API surface in the [Svelte API reference](/docs/api/svelte/).

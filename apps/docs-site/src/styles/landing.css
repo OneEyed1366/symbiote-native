@@ -689,6 +689,9 @@ section {
 .trait-fws li[data-fw='angular'] {
   --fw: #e40035;
 }
+.trait-fws li[data-fw='svelte'] {
+  --fw: #ff3e00;
+}
 
 .demo {
   display: grid;
@@ -705,7 +708,7 @@ section {
 
 .demo-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 18px;
 }
 
@@ -763,6 +766,9 @@ figcaption .dot[data-fw='vue'] {
 }
 figcaption .dot[data-fw='angular'] {
   background: #e40035;
+}
+figcaption .dot[data-fw='svelte'] {
+  background: #ff3e00;
 }
 
 /* seam / pipeline — the one real sequence, so it keeps arrows */

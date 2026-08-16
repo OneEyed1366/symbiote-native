@@ -17,6 +17,5 @@ export function processFontVariant(
     return fontVariant.split(' ').filter(Boolean);
   }
 
-  // Neither an array nor a string: nothing to split, hand back an empty variant list.
   return [];
 }

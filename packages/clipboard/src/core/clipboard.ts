@@ -52,7 +52,12 @@ export async function setStringAsync(
  * Returns whether the clipboard has text content. Returns `true` for both plain text and rich
  * text (e.g. HTML).
  */
-export function hasStringAsync(): Promise<boolean> {
+// DELIBERATE DIVERGENCE from expo: Clipboard.ts:57 declares this one plain `function`, not
+// `async` like its 8 siblings, so on a build without the native method the UnavailabilityError
+// escapes synchronously at the call site and `hasStringAsync().catch(handler)` never catches it.
+// Parity would hand callers a guard that fires differently from every other method in this API,
+// so we add `async` here instead of tagging it. Everything else stays a verbatim port.
+export async function hasStringAsync(): Promise<boolean> {
   if (!expoClipboard.hasStringAsync) {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'hasStringAsync');
   }

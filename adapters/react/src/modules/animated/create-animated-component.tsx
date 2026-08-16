@@ -17,15 +17,15 @@
 import {
   createElement,
   useEffect,
-  useMemo,
   useRef,
   type ComponentType,
   type ReactElement,
   type Ref,
 } from 'react';
 import {
-  AnimatedProps,
-  attachNativeEventHandler,
+  createAnimatedLeafLifecycle,
+  isSymbioteNode,
+  type IAnimatedLeafLifecycle,
   isNativeAnimatedAvailable,
   reduceProps,
   readPassthroughStyle,
@@ -68,80 +68,44 @@ export function createAnimatedComponent<P extends IAnimatableProps>(
     // headless / unsupported hosts keep the JS flush path (and the existing JS smokes green).
     const wantsNative = passthrough != null && isNativeAnimatedAvailable();
 
-    // One AnimatedProps leaf per distinct props object. Rebuilt when props change,
-    // so a newly-added animated value joins the graph; the effect below swaps the
-    // graph attachment to match.
-    const animatedProps = useMemo(() => new AnimatedProps(rest), [rest]);
+    // The leaf lifecycle - build/swap/bind/detach, native event rebinding, and the
+    // rebuild-vs-skip decision - is the engine's, shared by every adapter
+    // (core/engine/src/animated/leaf-lifecycle.ts). React owns only WHEN to run it.
+    //
+    // This used to be `useMemo(() => new AnimatedProps(rest), [rest])`, which reads like the same
+    // guard but never was one: `rest` comes out of a rest-destructure, so it is a fresh object on
+    // every render and the memo's dependency always differed. The real content check now lives in
+    // the shared lifecycle.
+    const lifecycleRef = useRef<IAnimatedLeafLifecycle | null>(null);
+    lifecycleRef.current ??= createAnimatedLeafLifecycle('react');
+    const lifecycle = lifecycleRef.current;
 
-    // The leaf currently wired into the value graph. Tracked across renders so a swap
-    // can attach the new leaf BEFORE detaching the old one.
-    const attached = useRef<AnimatedProps | null>(null);
-
-    // The committed host node, captured by the ref below. Needed in the event-attach
-    // effect (a native event binds to the node's tag, not the AnimatedProps leaf).
+    // The committed host node, captured by the ref below - a native event binds to the node's
+    // tag, not the AnimatedProps leaf.
     const nodeRef = useRef<unknown>(null);
 
-    // Swap the graph attachment to the current leaf, attaching the new one FIRST and
-    // detaching the previous one SECOND. Order is load-bearing: a shared Value node
-    // self-detaches (and drops its native animation node) the instant its child count
-    // hits zero, so detaching the old leaf before the new one is attached would kill a
-    // running native-driven animation on any unrelated re-render. Detaching here (not
-    // in a cleanup, which React runs BEFORE the next setup) keeps the new-before-old
-    // order, mirroring RN's AnimatedComponent._attachProps.
+    // Reconcile after every commit. No dependency array on purpose: the props object is rebuilt
+    // by every render anyway, so a dependency list could only ever say "always" - the real
+    // rebuild-vs-skip decision is the lifecycle's, and it compares CONTENT by key identity.
     useEffect(() => {
-      animatedProps.__attach();
-      const previous = attached.current;
-      attached.current = animatedProps;
-      if (previous !== null && previous !== animatedProps) {
-        previous.__detach();
-      }
-    }, [animatedProps]);
+      lifecycle.reconcile(
+        rest,
+        isSymbioteNode(nodeRef.current) ? nodeRef.current : null,
+        wantsNative,
+      );
+    });
 
-    // Native-driver trigger. Runs after attach: push the leaf -> style -> transform
-    // -> interpolation -> value chain native so the props animate on the UI thread (no JS lag).
-    // Cascades down to the source value; the scroll event attaches to that same value
-    // (idempotent). __makeNative is idempotent, so re-firing on a leaf swap is safe.
+    // Final teardown: detach the last-attached leaf and any native event bindings on unmount.
     useEffect(() => {
-      if (wantsNative) animatedProps.__makeNative();
-    }, [animatedProps, wantsNative]);
-
-    // Final teardown: detach the last-attached leaf when the component unmounts.
-    useEffect(() => {
-      return () => {
-        if (attached.current !== null) {
-          attached.current.__detach();
-          attached.current = null;
-        }
-      };
-    }, []);
-
-    // Native-attach any Animated.event prop, e.g. onScroll={Animated.event(…,
-    // {useNativeDriver:true})}, to the committed node, so the event drives its values on
-    // the UI thread. attachNativeEventHandler no-ops (returns undefined) unless the prop is
-    // a native event handler with a committed tag, so the JS path stays the fallback. The
-    // __makeNative cascade then carries the bound interpolations/props native too. Keyed on
-    // animatedProps (rebuilt with rest) so a new inline event re-attaches; cleanup detaches.
-    useEffect(() => {
-      const node = nodeRef.current;
-      if (node === null) return;
-      const detachers: Array<() => void> = [];
-      for (const key of Object.keys(rest)) {
-        const attachment = attachNativeEventHandler(node, key, rest[key]);
-        if (attachment !== undefined) detachers.push(attachment.detach);
-      }
-      return () => {
-        for (const detach of detachers) detach();
-      };
-    }, [animatedProps]);
+      return () => lifecycle.teardown();
+    }, [lifecycle]);
 
     // Callback ref: when the base component mounts, capture its public instance, resolve
     // it to the underlying host node (unwrapping a scroll-container handle), record THAT
     // for the event-attach effect and bind it to the leaf, but forward the ORIGINAL
     // instance to the caller, who expects the component's public handle (scrollTo, …).
     const captureRef = (instance: unknown): void => {
-      const node = resolveHostNode(instance);
-      nodeRef.current = node;
-      animatedProps.setNativeView(node);
+      nodeRef.current = resolveHostNode(instance);
       assignRef(forwardedRef, instance);
     };
 

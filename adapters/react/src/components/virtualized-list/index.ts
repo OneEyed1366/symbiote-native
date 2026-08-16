@@ -612,6 +612,41 @@ export function VirtualizedList<ItemT>(
       );
     }
 
+    // The force-mounted sticky cell (RN _ensureClosestStickyHeader): the nearest sticky index
+    // below the window, kept alive outside [first,last] so it never gets destroyed/recreated
+    // as the window slides back over its origin index. Rendered exactly like an in-window
+    // cell — same measuring wrapper, same key format (so a transition between forced and
+    // in-window rendering of the SAME index keeps the same React key and never remounts).
+    if (plan.forcedStickyCell !== undefined) {
+      const forcedIndex = plan.forcedStickyCell.index;
+      const forcedItem = getItem(data, forcedIndex);
+      const forcedCell = renderItem({
+        item: forcedItem,
+        index: forcedIndex,
+        separators: makeSeparators(forcedIndex),
+      });
+      children.push(
+        createElement(
+          'symbiote-view',
+          {
+            key: `cell-${plan.forcedStickyCell.key}`,
+            onLayout: makeCellMeasure(forcedIndex),
+            style: inverted ? (horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE) : undefined,
+          },
+          forcedCell,
+        ),
+      );
+    }
+
+    if (plan.gapExtent > EMPTY_OFFSET) {
+      children.push(
+        createElement('symbiote-view', {
+          key: 'spacer-gap',
+          style: horizontal ? { width: plan.gapExtent } : { height: plan.gapExtent },
+        }),
+      );
+    }
+
     for (const planCell of plan.cells) {
       const item = getItem(data, planCell.index);
       // renderItem gets a separators handle so a row can highlight/update its own dividers.

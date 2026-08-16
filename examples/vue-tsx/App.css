@@ -780,3 +780,25 @@
 .menu-row-hint-routing {
   color: var(--line-routing);
 }
+
+/* Compound-class demo (components/CompoundClassDemo) — the ONE place this app leans on a
+   compound selector. `.badge.loud` restates only the two colours, so `.badge`'s padding and
+   radius have to survive on an element carrying both tokens; a resolver that returned the
+   compound rule alone instead of layering it would blank the pill's shape. `.loud` deliberately
+   has no standalone rule. The Vue-SFC and Svelte canaries express the same three rules inside a
+   per-component scoped style block instead — same law, different scoping. */
+.badge {
+  padding: 8px;
+  border-radius: 999px;
+  border-width: 1px;
+  border-color: #41506a;
+  background-color: var(--paper);
+}
+.badge.loud {
+  border-color: var(--line-primitives);
+  background-color: #0f2a20;
+}
+.badge-text {
+  font-size: 13px;
+  color: var(--chalk);
+}

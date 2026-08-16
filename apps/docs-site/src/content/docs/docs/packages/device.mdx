@@ -24,6 +24,7 @@ live-subscription surface.
 | React               | ✅ live |
 | Vue                 | ✅ live |
 | Angular             | ✅ live |
+| Svelte              | ✅ live |
 
 ## Installation
 
@@ -49,7 +50,7 @@ reads plain system/build information, nothing gated by a permission prompt.
 
 ## Usage
 
-All three adapters — React, Vue, Angular — re-export the exact same constants and free
+All four adapters — React, Vue, Angular, Svelte — re-export the exact same constants and free
 functions; there is no per-adapter hook/composable/service to reach for, since nothing here
 holds live state or a subscription.
 
@@ -178,6 +179,43 @@ holds live state or a subscription.
     There's no per-instance service to `inject()` here — every constant/function is a plain
     export off the core package, read straight in the constructor or class-field initializer.
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text, View } from '@symbiote-native/svelte';
+      import {
+        brand,
+        deviceName,
+        getMaxMemoryAsync,
+        getUptimeAsync,
+        isDevice,
+        modelName,
+        osName,
+        osVersion,
+      } from '@symbiote-native/device/svelte';
+
+      let uptime = $state<number | null>(null);
+      let maxMemory = $state<number | null>(null);
+
+      $effect(() => {
+        getUptimeAsync().then(value => (uptime = value));
+        getMaxMemoryAsync().then(value => (maxMemory = value));
+      });
+    </script>
+
+    <View>
+      <Text>{isDevice ? 'Real device' : 'Simulator/emulator'}</Text>
+      <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
+      <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
+      <Text>{deviceName ?? 'unnamed device'}</Text>
+      <Text>{uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}</Text>
+      <Text>{maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes`}</Text>
+    </View>
+    ```
+
+    There's no per-instance rune to reach for here either — every constant/function is a plain
+    export off the core package, read straight in the script block or an `$effect`.
+  </TabItem>
 </Tabs>
 
 ## API
@@ -251,6 +289,7 @@ packages/device/src/
 │             # resolves the native module via expo-modules-core's requireNativeModule
 ├── react/    # @symbiote-native/device/react   — export * from '../core'
 ├── vue/      # @symbiote-native/device/vue     — export * from '../core'
+├── svelte/   # @symbiote-native/device/svelte  — export * from '../core'
 └── angular/  # @symbiote-native/device/angular — export * from '../core'
 ```
 

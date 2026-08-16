@@ -333,8 +333,8 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
     };
   }
 
-  // Sticky headers are a pure-JS layer (the native scroll view ignores stickyHeaderIndices);
-  // wrap the flagged children so they pin to the scroll offset. No-op when none are flagged.
+  // Wrap the flagged children so they pin to the scroll offset (see the sticky-headers note
+  // above); no-op when none are flagged.
   const contentChildren = hasStickyHeaders
     ? wrapStickyHeaders(
         children,

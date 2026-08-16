@@ -4,6 +4,9 @@
 // deep inside the nested Tab can call useNavigation().getParent() to reach the enclosing Stack's
 // handle. Mirrors stack.test.ts's fixture (an injected codegen-shaped RNSScreen ViewConfig) since
 // a real Stack is part of this composition; Tab needs no ViewConfig of its own (tabs.test.ts).
+//
+// No Negative group: getParent() is a plain optional lookup (`parent?.navigation`), never a throw -
+// "no ambient navigator" is itself one of the two scenarios this file proves, not an error case.
 
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -80,76 +83,84 @@ function StackDetailsScreen() {
 }
 
 describe('nested navigators (scope parent chain)', () => {
-  it("a root Stack screen's useNavigation().getParent() is undefined (no ambient navigator above it)", async () => {
-    let capturedParent: IAnyNavigatorHandle | undefined;
-    let getParentCalled = false;
-    // Plain functions used as `component:` are stateless functional components - Vue calls them
-    // fresh on every render and treats their return value as vnodes directly, NOT as a "setup
-    // returns a render fn" component. A screen calling a composable needs a real setup-based
-    // component, hence defineComponent here instead of a bare function.
-    const RootScreen = defineComponent(() => {
-      const navigation = useNavigation();
-      capturedParent = navigation.value.getParent();
-      getParentCalled = true;
-      return () => h('symbiote-text', {}, 'root');
+  describe('Positive', () => {
+    // why: a navigator at the root of the tree has no ambient scope to read - getParent() must
+    // resolve to `undefined` there rather than throwing or returning a stale/wrong handle.
+    it("a root Stack screen's useNavigation().getParent() is undefined (no ambient navigator above it)", async () => {
+      let capturedParent: IAnyNavigatorHandle | undefined;
+      let getParentCalled = false;
+      // Plain functions used as `component:` are stateless functional components - Vue calls them
+      // fresh on every render and treats their return value as vnodes directly, NOT as a "setup
+      // returns a render fn" component. A screen calling a composable needs a real setup-based
+      // component, hence defineComponent here instead of a bare function.
+      const RootScreen = defineComponent(() => {
+        const navigation = useNavigation();
+        capturedParent = navigation.value.getParent();
+        getParentCalled = true;
+        return () => h('symbiote-text', {}, 'root');
+      });
+
+      mount(
+        ROOT_TAG,
+        defineComponent({
+          setup: () => () =>
+            h(Stack, { initialRouteName: 'Root' }, () => [
+              h(Stack.Screen, { name: 'Root', component: RootScreen }),
+            ]),
+        }),
+      );
+      await tick();
+
+      expect(getParentCalled).toBe(true);
+      expect(capturedParent).toBeUndefined();
     });
 
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(Stack, { initialRouteName: 'Root' }, () => [
-            h(Stack.Screen, { name: 'Root', component: RootScreen }),
-          ]),
-      }),
-    );
-    await tick();
+    // why: a navigator rendered AS another navigator's screen content (Stack screen -> Tab) must
+    // thread the ambient scope it read on its own mount down to its OWN screens, so a component
+    // several navigators deep can still reach any enclosing navigator's real, live handle (not a
+    // snapshot) - proven here by actually pushing through the recovered parent handle.
+    it('useNavigation().getParent() from inside a Tab screen nested in a Stack screen reaches the enclosing Stack, and pushing through it adds a Stack route', async () => {
+      let capturedParent: IAnyNavigatorHandle | undefined;
 
-    expect(getParentCalled).toBe(true);
-    expect(capturedParent).toBeUndefined();
-  });
+      const NestedTabHomeScreen = defineComponent(() => {
+        const navigation = useNavigation();
+        capturedParent = navigation.value.getParent();
+        return () => h('symbiote-text', {}, 'tab-home');
+      });
 
-  it('useNavigation().getParent() from inside a Tab screen nested in a Stack screen reaches the enclosing Stack, and pushing through it adds a Stack route', async () => {
-    let capturedParent: IAnyNavigatorHandle | undefined;
+      // The Stack screen's own component: a Tab navigator, nested exactly the way a real app
+      // composes navigators (a Stack screen's content IS another navigator). No composable of its
+      // own, so a plain function (returning vnodes directly) is fine here.
+      function RootScreenRendersTab() {
+        return h(Tab, { initialRouteName: 'TabHome' }, () => [
+          h(Tab.Screen, { name: 'TabHome', component: NestedTabHomeScreen }),
+        ]);
+      }
 
-    const NestedTabHomeScreen = defineComponent(() => {
-      const navigation = useNavigation();
-      capturedParent = navigation.value.getParent();
-      return () => h('symbiote-text', {}, 'tab-home');
+      const handleRef = ref<INavigatorHandle | null>(null);
+      mount(
+        ROOT_TAG,
+        defineComponent({
+          setup: () => () =>
+            h(Stack, { ref: handleRef, initialRouteName: 'Root' }, () => [
+              h(Stack.Screen, { name: 'Root', component: RootScreenRendersTab }),
+              h(Stack.Screen, { name: 'Details', component: StackDetailsScreen }),
+            ]),
+        }),
+      );
+      await tick();
+
+      expect(findAllText(fabric.committed)).toContain('tab-home');
+
+      if (!capturedParent) throw new Error('getParent() returned undefined');
+      if (!('push' in capturedParent)) {
+        throw new Error('parent handle is not a Stack handle (missing push)');
+      }
+      capturedParent.push('Details');
+      await tick();
+
+      expect(findAllText(fabric.committed)).toContain('stack-details');
+      expect(handleRef.value?.canGoBack()).toBe(true);
     });
-
-    // The Stack screen's own component: a Tab navigator, nested exactly the way a real app
-    // composes navigators (a Stack screen's content IS another navigator). No composable of its
-    // own, so a plain function (returning vnodes directly) is fine here.
-    function RootScreenRendersTab() {
-      return h(Tab, { initialRouteName: 'TabHome' }, () => [
-        h(Tab.Screen, { name: 'TabHome', component: NestedTabHomeScreen }),
-      ]);
-    }
-
-    const handleRef = ref<INavigatorHandle | null>(null);
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(Stack, { ref: handleRef, initialRouteName: 'Root' }, () => [
-            h(Stack.Screen, { name: 'Root', component: RootScreenRendersTab }),
-            h(Stack.Screen, { name: 'Details', component: StackDetailsScreen }),
-          ]),
-      }),
-    );
-    await tick();
-
-    expect(findAllText(fabric.committed)).toContain('tab-home');
-
-    if (!capturedParent) throw new Error('getParent() returned undefined');
-    if (!('push' in capturedParent)) {
-      throw new Error('parent handle is not a Stack handle (missing push)');
-    }
-    capturedParent.push('Details');
-    await tick();
-
-    expect(findAllText(fabric.committed)).toContain('stack-details');
-    expect(handleRef.value?.canGoBack()).toBe(true);
   });
 });

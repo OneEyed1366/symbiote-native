@@ -8,10 +8,8 @@
 // engine so React and Vue share one definition.
 //
 // The node -> tag resolution itself belongs to the engine (getNativeTag, keyed on the raw
-// node in the commit mirror); this only adapts the Vue-shaped inputs onto it. Accepts, in
-// RN's idempotent spirit: a bare number (passes through), an engine host node (a ref's
-// .value), a Vue Ref carrying either (unwrapped), or null / undefined (-> null). An
-// uncommitted or unknown input has no tag yet and surfaces as null.
+// node in the commit mirror); this only unwraps the Vue-shaped inputs (a Ref or a bare node)
+// onto it. An uncommitted or unknown input has no tag yet and surfaces as null.
 
 import { isRef, toRaw } from '@vue/runtime-core';
 import { getNativeTag, isSymbioteNode, dlog } from '@symbiote-native/engine';

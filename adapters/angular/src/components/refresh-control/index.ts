@@ -1,12 +1,12 @@
 // RefreshControl, the Angular lifecycle half. On iOS this is the PullToRefreshView Fabric node that
 // lives INSIDE a ScrollView (a childless sibling before the content container); on Android it is
-// AndroidSwipeRefreshLayout and WRAPS the scroll view, receiving it through <ng-content>.
-// The Angular twin of the React/Vue RefreshControl. There is no JS-side platform renaming and no
-// shared render fn — every prop forwards straight to the native node, which reads the ones it
-// understands and ignores the rest, so the Android-only and iOS-only families ride down harmlessly
-// on both. So this folds aria/role through the shared resolveAccessibilityProps and maps the native
-// props + a11y + onRefresh straight onto the symbiote-refresh-control host, children via <ng-content>.
-// No platform branch (one composed component both platforms), so this stays a flat single file.
+// AndroidSwipeRefreshLayout and WRAPS the scroll view, receiving it through <ng-content>. There is
+// no JS-side platform renaming and no shared render fn — every prop forwards straight to the
+// native node, which reads what it understands and ignores the rest, so Android-only and iOS-only
+// prop families ride down harmlessly on both. This folds aria/role through the shared
+// resolveAccessibilityProps and maps the native props + a11y + onRefresh onto the
+// symbiote-refresh-control host, children via <ng-content>. One composed component covers both
+// platforms, so this stays a flat single file.
 //
 // `refreshing` is a controlled prop: the parent owns it and pushes it down each commit; native
 // reports the gesture via the direct `topRefresh` event, which the engine routes to the host's
@@ -16,13 +16,16 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   ChangeDetectionStrategy,
   Component,
+  computed,
   ElementRef,
   EventEmitter,
   inject,
   Input,
   Output,
+  signal,
   ViewChild,
   type AfterViewInit,
+  type DoCheck,
   type OnChanges,
   type OnInit,
   type SimpleChanges,
@@ -42,7 +45,12 @@ import {
   type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { anchorHostStyle, RefreshControlHost, SymbioteHostPropsDirective } from '../../primitives';
+import {
+  anchorHostStyle,
+  RefreshControlHost,
+  SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
+} from '../../primitives';
 
 // Record<string, unknown> already tolerates `style` holding the [anchorHostStyle, this.style]
 // array anchorHostStyle's merge produces (see hostProps below) — no widening needed.
@@ -89,13 +97,14 @@ export type IAngularRefreshControlInputs = Omit<
 @Component({
   selector: 'RefreshControl',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [RefreshControlHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <symbiote-refresh-control
       #host
-      [symbioteHostProps]="hostProps"
+      [symbioteHostProps]="hostProps()"
       (refresh)="handleRefresh()"
       (accessibilityAction)="emit(accessibilityAction, $event)"
       (accessibilityTap)="emit(accessibilityTap, $event)"
@@ -107,7 +116,7 @@ export type IAngularRefreshControlInputs = Omit<
   `,
 })
 export class RefreshControl
-  implements IAngularRefreshControlInputs, OnInit, OnChanges, AfterViewInit
+  implements IAngularRefreshControlInputs, OnInit, OnChanges, DoCheck, AfterViewInit
 {
   // Controlled prop the parent owns; required to match the React reference surface.
   @Input({ required: true }) refreshing!: boolean;
@@ -175,6 +184,18 @@ export class RefreshControl
   private lastNativeRefreshing = false;
   private refreshNativeNode: unknown;
 
+  // Bridges the non-reactive @Input fields `hostProps` reads into the reactive graph, so it can
+  // memoize. Plain fields read inside a computed() are UNTRACKED - something must signal "a
+  // dependency changed" or the bag goes stale. Signal inputs would do this natively, but `input()`
+  // is visible only to the AOT compiler and this package's unit suite runs on JIT (see the
+  // `angular-adapter-change-detection` skill, §6); `signal()`/`computed()` are plain runtime APIs.
+  // Safe here because `refreshing` is a CONTROLLED @Input - the parent owns it, nothing in this
+  // class assigns it. The internal `lastNativeRefreshing` / `refreshNativeNode` fields drive the
+  // native handshake only; neither is read by the bag, so neither may bump this.
+  private readonly hostPropsRevision = signal(0);
+  // What the anchor's class-derived style was when the bag was last built (identity, not value).
+  private lastAnchorStyle: unknown;
+
   ngOnInit(): void {
     dlog('RefreshControl -> PullToRefreshView');
     dlog(`RefreshControl refreshing=${String(this.refreshing)}`);
@@ -188,6 +209,9 @@ export class RefreshControl
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    // Before the `refreshing`-only early-return below: this is the single moment Angular has
+    // finished writing every changed @Input, and `hostProps` depends on the whole input surface.
+    this.hostPropsRevision.update(revision => revision + 1);
     const refreshing = changes.refreshing;
     if (refreshing === undefined) return;
     if (refreshing.firstChange) {
@@ -220,11 +244,29 @@ export class RefreshControl
     if (isSymbioteEvent(event)) emitter.emit(event);
   }
 
+  // The anchor's class-derived style is NOT an @Input: `class="..."`/`[ngClass]` at the use site
+  // resolves through the renderer's addClass onto this component's anchor host (see
+  // anchorHostStyle's doc comment), so it never shows up in SimpleChanges and ngOnChanges alone
+  // would leave a later class toggle stranded. ngDoCheck runs at exactly the cadence the old
+  // getter was re-read, and bumps only on a real identity change.
+  ngDoCheck(): void {
+    const anchorStyle = anchorHostStyle(this.elementRef);
+    if (anchorStyle === this.lastAnchorStyle) return;
+    this.lastAnchorStyle = anchorStyle;
+    this.hostPropsRevision.update(revision => revision + 1);
+  }
+
   // The full native + a11y prop bag applied onto the host in one shot via
   // [symbioteHostProps], instead of enumerating each key as its own template binding. The
   // anchor's class-derived style goes FIRST, this component's own explicit `style` @Input SECOND
   // — flattenStyle's later-wins collapse keeps an explicit [style] winning over its ambient class.
-  get hostProps(): IHostProps {
+  //
+  // A computed(), not a getter: Angular re-reads a template getter on every refresh of this view
+  // and `[symbioteHostProps]` compares by REFERENCE, so a freshly rebuilt (but identical) bag
+  // re-pushes every key through renderer.setProperty -> the engine's prop routing. A pull gesture
+  // dirties this view through its own `(refresh)` binding, which is exactly when that waste hit.
+  readonly hostProps = computed<IHostProps>(() => {
+    this.hostPropsRevision();
     return {
       refreshing: this.refreshing,
       tintColor: this.tintColor,
@@ -241,7 +283,7 @@ export class RefreshControl
       accessible: this.accessible,
       ...this.folded,
     };
-  }
+  });
 
   // Fold the web aria-*/role aliases into the canonical accessibility* props once per render, so the
   // host node never sees an aria-* key (native ignores them) — the shared transform every adapter runs.

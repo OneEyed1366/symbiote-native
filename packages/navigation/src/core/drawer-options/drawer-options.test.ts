@@ -3,22 +3,35 @@
 // IDrawerOptions surface, so the full matrix (4 drawerTypes x 2 drawerPositions for the geometry,
 // both edges for the swipe gates) is exercised directly, without the fake-touch-event plumbing
 // react/drawer.test.tsx needs to drive the same math through a live gesture.
+//
+// No Negative group anywhere in this file: every symbol here is a total function over its input
+// type (no guard clause, no throw). A "rejected" gesture/geometry situation surfaces as a `false`/
+// zero return, not an exception, so it is asserted inline within that symbol's own describe block
+// rather than split into a separate Negative section.
 
 import { describe, expect, it } from 'vitest';
 import { createElement } from '@symbiote-native/engine';
 import type { IPanResponderGestureState, ISymbioteEvent } from '@symbiote-native/engine';
 import {
+  DRAWER_DEFAULT_POSITION,
+  DRAWER_DEFAULT_TYPE,
   DRAWER_DEFAULT_WIDTH,
   clamp01,
+  isDrawerAnimated,
+  isDrawerOverlayVisible,
   isHorizontalDrag,
   isSwipeStartInEdge,
   resolveDragProgress,
   resolveDrawerGeometry,
+  resolveDrawerPosition,
+  resolveDrawerSlotInterpolation,
+  resolveDrawerType,
+  resolveDrawerWidth,
   resolveSwipeIntent,
   shouldClaimDrawerSwipe,
   startPageXOf,
 } from './index';
-import type { IDrawerOptions } from './index';
+import type { IDrawerGeometry, IDrawerOptions } from './index';
 
 // A real branded RCTView node so no cast is needed (mirrors
 // core/engine/src/pan-responder/pan-responder.test.ts's own targetNode) - the gesture math here
@@ -51,6 +64,36 @@ function gestureState(overrides: Partial<IPanResponderGestureState>): IPanRespon
     ...overrides,
   };
 }
+
+describe('resolveDrawerWidth / resolveDrawerType / resolveDrawerPosition', () => {
+  // why: geometry, swipe-edge and drag-progress math all read these through the same `?? DEFAULT`
+  // fallback (resolveDrawerWidth etc.) instead of each re-deriving its own default, so a caller
+  // that omits an option gets the SAME behavior everywhere - proven directly here rather than only
+  // implied by every other describe block passing a full IDrawerOptions.
+  it('resolveDrawerWidth falls back to the documented default (280) when unset', () => {
+    expect(resolveDrawerWidth({})).toBe(DRAWER_DEFAULT_WIDTH);
+  });
+
+  it('resolveDrawerWidth honors an explicit width over the default', () => {
+    expect(resolveDrawerWidth({ drawerWidth: 320 })).toBe(320);
+  });
+
+  it('resolveDrawerType falls back to the documented default ("front") when unset', () => {
+    expect(resolveDrawerType({})).toBe(DRAWER_DEFAULT_TYPE);
+  });
+
+  it('resolveDrawerType honors an explicit type over the default', () => {
+    expect(resolveDrawerType({ drawerType: 'slide' })).toBe('slide');
+  });
+
+  it('resolveDrawerPosition falls back to the documented default ("left") when unset', () => {
+    expect(resolveDrawerPosition({})).toBe(DRAWER_DEFAULT_POSITION);
+  });
+
+  it('resolveDrawerPosition honors an explicit position over the default', () => {
+    expect(resolveDrawerPosition({ drawerPosition: 'right' })).toBe('right');
+  });
+});
 
 describe('resolveDrawerGeometry', () => {
   const WIDTH = DRAWER_DEFAULT_WIDTH;
@@ -155,6 +198,78 @@ describe('resolveDrawerGeometry', () => {
       drawerWidth: 200,
     };
     expect(resolveDrawerGeometry(options).panelTranslateXClosed).toBe(-200);
+  });
+});
+
+describe('isDrawerAnimated', () => {
+  // why: 'permanent' is the ONLY type with no gesture/animation - callers gate the whole
+  // interpolation + PanResponder setup behind this before touching resolveDrawerGeometry's
+  // (comment-flagged-inaccurate, see above) non-zero permanent output.
+  it('is true for every animated type (front/back/slide)', () => {
+    expect(isDrawerAnimated({ drawerType: 'front' })).toBe(true);
+    expect(isDrawerAnimated({ drawerType: 'back' })).toBe(true);
+    expect(isDrawerAnimated({ drawerType: 'slide' })).toBe(true);
+  });
+
+  it('is false for permanent', () => {
+    expect(isDrawerAnimated({ drawerType: 'permanent' })).toBe(false);
+  });
+
+  it('defaults to animated ("front") when drawerType is unset', () => {
+    expect(isDrawerAnimated({})).toBe(true);
+  });
+});
+
+describe('isDrawerOverlayVisible', () => {
+  // why: matches resolveDrawerGeometry's own overlayOpacityOpen split - front/slide fade in an
+  // overlay, back/permanent never do (back's stationary panel sits fully behind the content, so
+  // nothing needs dimming).
+  it('is true for front and slide (the overlay-fading types)', () => {
+    expect(isDrawerOverlayVisible({ drawerType: 'front' })).toBe(true);
+    expect(isDrawerOverlayVisible({ drawerType: 'slide' })).toBe(true);
+  });
+
+  it('is false for back and permanent (no overlay)', () => {
+    expect(isDrawerOverlayVisible({ drawerType: 'back' })).toBe(false);
+    expect(isDrawerOverlayVisible({ drawerType: 'permanent' })).toBe(false);
+  });
+});
+
+describe('resolveDrawerSlotInterpolation', () => {
+  // A hand-built geometry (not routed through resolveDrawerGeometry) with every field distinct,
+  // so a slot that reads the WRONG field of the geometry fails loudly instead of coincidentally
+  // matching thanks to two fields sharing a value.
+  const geometry: IDrawerGeometry = {
+    panelTranslateXClosed: -280,
+    panelTranslateXOpen: 0,
+    contentTranslateXClosed: 0,
+    contentTranslateXOpen: 140,
+    overlayOpacityClosed: 0,
+    overlayOpacityOpen: 1,
+  };
+
+  it('content slot interpolates its own translateX field only', () => {
+    expect(resolveDrawerSlotInterpolation(geometry, 'content')).toEqual({
+      translateX: { inputRange: [0, 1], outputRange: [0, 140] },
+    });
+  });
+
+  it('panel slot interpolates its own translateX field only', () => {
+    expect(resolveDrawerSlotInterpolation(geometry, 'panel')).toEqual({
+      translateX: { inputRange: [0, 1], outputRange: [-280, 0] },
+    });
+  });
+
+  // why: the file's own header comment calls out this asymmetry - overlay's translateX tracks
+  // CONTENT's delta, not its own (there is no "overlay" field on IDrawerGeometry at all), because
+  // for `slide` the content itself moves away and an overlay pinned full-screen would stop
+  // covering it. Asserting against panelTranslateX* (140 vs -280) proves it is content's number,
+  // not a coincidence of the fixture.
+  it('overlay slot interpolates opacity AND a translateX that tracks CONTENT, not panel', () => {
+    expect(resolveDrawerSlotInterpolation(geometry, 'overlay')).toEqual({
+      opacity: { inputRange: [0, 1], outputRange: [0, 1] },
+      translateX: { inputRange: [0, 1], outputRange: [0, 140] },
+    });
   });
 });
 

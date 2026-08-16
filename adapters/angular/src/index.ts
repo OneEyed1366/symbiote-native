@@ -27,6 +27,7 @@ export {
   stableAnchorStyle,
   Switch,
   SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
   Text,
   TextInput,
   TouchableHighlight,
@@ -249,7 +250,6 @@ export type {
 } from '@symbiote-native/engine';
 export {
   dlog,
-  flattenStyle,
   isDebug,
   Platform,
   processColor,
@@ -259,3 +259,32 @@ export {
   StyleSheet,
 } from '@symbiote-native/engine';
 export type { IRootTag, ISymbioteEvent, ISymbioteNode } from '@symbiote-native/engine';
+// The agnostic style / platform / view-config types behind the values above. Angular takes its
+// component props as @Input()s and exports no per-component prop type, but an app still needs
+// these to type a style object or a Platform.select spec.
+export type {
+  IViewStyle,
+  ITextStyle,
+  IFlexAlign,
+  IFlexJustify,
+  IPlatformStatic,
+  IPlatformOSType,
+  IPlatformConstantsIOS,
+  IPlatformConstantsAndroid,
+  IPlatformSelectSpec,
+  INativeViewConfig,
+  INativeViewConfigSource,
+} from '@symbiote-native/engine';
+export type {
+  IAccessibilityProps,
+  IAriaProps,
+  IAccessibilityRole,
+  IRole,
+  IAccessibilityStateValue,
+  IAccessibilityValue,
+  IAccessibilityActionInfo,
+  IResponderProps,
+  IPressState,
+  IPressableAndroidRippleConfig,
+  IImageStatics,
+} from '@symbiote-native/components';

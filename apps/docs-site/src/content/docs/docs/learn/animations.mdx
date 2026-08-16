@@ -85,20 +85,59 @@ which framework renders them.
     }
     ```
   </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Animated } from '@symbiote-native/svelte';
+
+      // Animated.View is dotted, so it can't be a template tag — aliased to a
+      // plain identifier first, same reason as Vue.
+      const AnimatedView = Animated.View;
+
+      const pulse = new Animated.Value(0);
+
+      $effect(() => {
+        const heartbeat = Animated.loop(
+          Animated.timing(pulse, { toValue: 1, duration: 1400, useNativeDriver: true }),
+        );
+        heartbeat.start();
+        return () => heartbeat.stop();
+      });
+
+      const scale = pulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.3, 1] });
+    </script>
+
+    <AnimatedView style={{ transform: [{ scale }] }} />
+    ```
+  </TabItem>
 </Tabs>
 
 <Aside type="caution" title="Two different reasons for one workaround">
-  Vue and Angular both need a plain identifier instead of `Animated.View`, but
-  for different reasons. Vue templates simply can't parse a dotted tag name.
-  Angular's reason is deeper: `ngc`'s AOT partial-mode compiler statically
-  evaluates template type-checking and can't trace a component class through
-  property access on an external, pre-compiled namespace object — only through
-  a direct named import binding. `@symbiote-native/angular` exports `AnimatedView`,
-  `AnimatedText`, `AnimatedImage`, `AnimatedScrollView`, `AnimatedFlatList`,
-  and `AnimatedSectionList` as top-level named symbols for exactly this
-  reason; plain `tsc`/Vitest won't catch a dotted alias slipping through, only
-  a real `ngc` build does.
+  Vue, Svelte, and Angular all need a plain identifier instead of
+  `Animated.View`, but not for the same reason. Vue and Svelte templates
+  simply can't parse a dotted tag name, so both alias it to a local const
+  before use. Angular's reason is deeper: `ngc`'s AOT partial-mode compiler
+  statically evaluates template type-checking and can't trace a component
+  class through property access on an external, pre-compiled namespace
+  object — only through a direct named import binding. `@symbiote-native/angular`
+  exports `AnimatedView`, `AnimatedText`, `AnimatedImage`, `AnimatedScrollView`,
+  `AnimatedFlatList`, and `AnimatedSectionList` as top-level named symbols for
+  exactly this reason; plain `tsc`/Vitest won't catch a dotted alias slipping
+  through, only a real `ngc` build does.
 </Aside>
+
+## Why not Svelte's `transition:`/`animate:`/`in:`/`out:`?
+
+Those directives — along with `use:`, `class:`, and `style:` — are Svelte's own
+**element**-only directives: the compiler itself rejects them on a component tag
+("This type of directive is not valid on components"), the same as it would for
+any third-party Svelte component library, not just SymbioteNative's. Every
+SymbioteNative primitive (`View`, `Text`, …) is a component reference in app code,
+never a raw DOM element, so `<View transition:fade>` simply doesn't compile — this
+is Svelte's own component/element split, not an adapter limitation. `{@attach fn}`
+is the one directive in that family that *is* legal on a component, and it's your
+route to the underlying host node when you need it; for animation itself, reach
+for the same `Animated` API and `$effect`-driven lifecycle shown above.
 
 ## JS driver vs native driver
 

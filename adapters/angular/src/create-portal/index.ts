@@ -1,38 +1,32 @@
 // createPortal for @symbiote-native/angular — the Angular twin of the React/Vue same-surface portal
-// (create-portal.ts / Teleport in runtime-helpers.ts). Scope is identical: the target must be
-// an already-mounted location WITHIN THE SAME SURFACE as the portal's call site — moving content
-// across independently-mounted surfaces has no safe host-level primitive to hook into, so
-// createTunnel (create-tunnel.ts) covers that cross-surface case instead.
+// (create-portal.ts / Teleport in runtime-helpers.ts). Scope is identical: the target must be an
+// already-mounted location WITHIN THE SAME SURFACE as the portal's call site — moving content
+// across independently-mounted surfaces has no safe host-level primitive, so createTunnel
+// (create-tunnel.ts) covers that cross-surface case instead.
 //
-// React/Vue implement this as a thin validating wrapper around a mechanism the FRAMEWORK
-// ITSELF already has (react-reconciler's Fiber-level HostPortal, Vue's own <Teleport>) — all
-// the actual node-moving is handled generically by the engine's insert/remove, which those
-// frameworks already call. Angular has no such built-in: there is no `@angular/cdk` dependency
-// here (core-only, see package.json), and physically moving an EmbeddedView's already-created
-// root nodes via Renderer2 after the fact is NOT safe — Angular's own view-destroy path removes
-// a view's nodes from wherever ITS OWN bookkeeping thinks they live (the container's insertion
-// point), not from wherever a node was manually moved to afterwards, so a raw Renderer2 move
-// would desync Angular's internals from the retained tree.
+// React/Vue implement this as a thin validating wrapper around a mechanism the framework itself
+// already has (react-reconciler's Fiber-level HostPortal, Vue's own <Teleport>). Angular has no
+// such built-in (no `@angular/cdk` dependency here, core-only — see package.json), and physically
+// moving an EmbeddedView's already-created root nodes via Renderer2 after the fact is NOT safe —
+// Angular's own view-destroy path removes a view's nodes from wherever ITS OWN bookkeeping thinks
+// they live, not from wherever a node was manually moved to, so a raw Renderer2 move would desync
+// Angular's internals from the retained tree.
 //
-// PortalDirective is a STRUCTURAL directive (`*portal="overlayHost"`), not a component that
-// takes a separate `<ng-template>` + `[content]` binding — that two-step reads as foreign to
-// anyone used to `*ngIf`/`*ngFor`/`*ngTemplateOutlet`, where the directive sits directly on the
-// content and its TemplateRef comes from injection, not a passed-in reference. `*portal="x"`
-// desugars the same way `*ngIf` does: Angular wraps the host element in an `<ng-template>` and
-// injects that template's own TemplateRef into the directive automatically.
+// PortalDirective is a STRUCTURAL directive (`*portal="overlayHost"`), not a component taking a
+// separate `<ng-template>` + `[content]` binding — that two-step reads as foreign next to
+// `*ngIf`/`*ngFor`/`*ngTemplateOutlet`. `*portal="x"` desugars the same way `*ngIf` does: Angular
+// wraps the host element in an `<ng-template>` and injects that template's own TemplateRef into
+// the directive automatically.
 //
 // The safe, fully-public-API mechanism: create the embedded view DIRECTLY inside a
 // ViewContainerRef anchored at the destination, so there is nothing to move at all. That
-// ViewContainerRef has to come from somewhere in the destination's own template — hence
-// `PortalOutletDirective`, a marker placed on the target host (`<View portalOutlet
-// #overlayHost="portalOutlet">`) purely to expose its ViewContainerRef, the same
-// export-as-template-variable idiom `#form="ngForm"` uses. This also replaces the
-// `isSymbioteNode` runtime guard React/Vue need: there `to` is an arbitrary JS value at
-// runtime (a wrong ref, a string, a plain object all type-check as `any`/`unknown` until
-// validated), but here `to` is typed as `PortalOutletDirective` — the only way to construct
-// one is Angular's own template compiler resolving a template reference variable, so
-// `strictTemplates` rejects anything else at compile time and there is nothing left to guard
-// against at runtime.
+// ViewContainerRef comes from `PortalOutletDirective`, a marker placed on the target host
+// (`<View portalOutlet #overlayHost="portalOutlet">`) purely to expose its ViewContainerRef, the
+// same export-as-template-variable idiom `#form="ngForm"` uses. This also replaces the
+// `isSymbioteNode` runtime guard React/Vue need (there `to` is an arbitrary JS value until
+// validated): here `to` is typed as `PortalOutletDirective` — the only way to construct one is
+// Angular's own template compiler resolving a template reference variable, so `strictTemplates`
+// rejects anything else at compile time and there is nothing left to guard at runtime.
 
 import {
   Directive,
