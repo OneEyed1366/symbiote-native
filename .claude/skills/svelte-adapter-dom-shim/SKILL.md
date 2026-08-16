@@ -3040,3 +3040,51 @@ global base) and the BEM trap in recognizing a scope suffix, are all recorded
 in the `symbiote-sfc-style-compiler` skill, §5b. Read that before touching
 `preprocessor/scoped-styles.ts`'s `localNames`, `core/css-parser`'s
 `extractClassTokens` / `classTokensIn`, or the engine's compound lookup.
+
+## §27. The `p={bag}` rule is load-bearing for THREE bug classes — now enforced by a test (2026-08-16)
+
+Prompted by a report of four real Svelte-side bugs from a parallel line of
+work. Audited against this adapter: three of the four are unreachable here,
+and all three for the SAME reason — props never touch Svelte's attribute or
+spread machinery, they ride to the host as one object property. Written out so
+nobody "simplifies" `<symbiote-view p={bag}>` into `<symbiote-view {...bag}>`
+and reopens all three at once:
+
+- **An `on`-prefixed PROP eaten as an event.** `onTintColor` is a real iOS
+  Switch colour, not a listener. A spread hands each key to Svelte, which
+  infers events from the `on` prefix. Through `p=` Svelte never sees a key, and
+  the engine decides prop-vs-listener from the ViewConfig (`view-config.ts`),
+  which declares `change` as Switch's only event.
+- **An object `style` stringified to `"[object Object]"`.**
+  `set_custom_element_data` stringifies scalars and hard-excludes `style`
+  (§3g(c), and `dom-shim/element.ts`'s header). An object always satisfies
+  `value && typeof value === 'object'`, so `p={bag}` lands as a property SET
+  and the object survives intact.
+- **A forwarded `{@attach}` invoked twice.** Svelte's own spread path invokes
+  attachment-symbol props when they land on an ELEMENT. Spreading onto a
+  COMPONENT does not, so `createAttachmentsSync` stays the single caller.
+  `applyBagDiff` walks `Object.keys`, so the symbols riding inside the bag are
+  ignored on the way through.
+
+Spreading onto a **component** stays legal and is used widely (`<Pressable
+{...rest}>`, `<VirtualizedList {...attachments}>`).
+
+The fourth bug in that report — an engine mutation that skipped
+`requestCommit()` — is structurally impossible here for a different reason:
+the commit request lives in the SHIM's own mutation methods, not in their
+callers (`shim-node.ts` `insertOne`/`removeChild`/`detachFromParent`,
+`element.ts`'s `set p`). `makeLive` assigns `surface` BEFORE `engineNode`, so
+`this.surface?.requestCommit()` can never be swallowed on a live node.
+
+**Enforcement**: `adapters/svelte/src/host-tag-invariants.test.ts` parses every
+shipped `.svelte` source with the real compiler and fails on a spread onto a
+`symbiote-*` element or a `<svelte:element>`, and on a `p=` ATTRIBUTE on a
+dynamic tag (§15's silent-failure trap — use `{@attach hostProps(bag)}`). It
+scans `adapters/svelte/src` plus every `packages/*/src/svelte`. Parsed, not
+grepped: a text scan cannot tell an element from a same-named component, and
+would trip over any doc comment spelling the forbidden shape out.
+
+Coverage added with it: `switch.smoke.test.ts` now pins `onTintColor` /
+`tintColor` / `thumbTintColor` and a flattened object `style` on a real
+compiled mount. React, Vue and Angular each already pinned the colour mapping;
+Svelte did not, and the seam it depends on is the Svelte-specific one.
