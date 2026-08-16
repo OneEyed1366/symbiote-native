@@ -30,6 +30,12 @@ describe('detectLanguage', () => {
   it('falls back to css for an unrecognized extension', () => {
     expect(detectLanguage('theme.txt')).toBe('css');
   });
+
+  // why: Metro/the OS filesystem may hand this a mixed-case path (a case-insensitive filesystem,
+  // or a filename literally typed uppercase) — the recognition table must match regardless.
+  it('matches an uppercase extension the same as lowercase', () => {
+    expect(detectLanguage('Theme.SCSS')).toBe('scss');
+  });
 });
 
 describe('isStyleFile', () => {
@@ -41,6 +47,10 @@ describe('isStyleFile', () => {
 
   it('rejects a non-style extension', () => {
     expect(isStyleFile('App.tsx')).toBe(false);
+  });
+
+  it('recognizes an uppercase extension the same as lowercase', () => {
+    expect(isStyleFile('Theme.CSS')).toBe(true);
   });
 });
 
@@ -83,6 +93,14 @@ $spacing: 10px;
     const css = await compileSass(SASS_SOURCE, 'Card.sass');
     const styles = parseCSS(css, { filename: 'Card.sass' });
     expect(styles.card).toEqual({ padding: 10, color: 'red' });
+  });
+
+  // why: filePath is optional (only used for loadPaths' relative @use/@import base and picking
+  // indented-vs-SCSS syntax) — a caller compiling a source string with no file of its own (e.g. an
+  // inline block a future adapter hands over directly) must still compile plain SCSS successfully.
+  it('compiles without a filePath, defaulting to SCSS syntax with no import base', async () => {
+    const css = await compileScss('.card { padding: 10px; }');
+    expect(css).toContain('padding: 10px');
   });
 });
 
@@ -161,6 +179,23 @@ describe('compile — unified entry point', () => {
     expect(await compile('.card { padding: 10px; }', 'scss', 'Card.scss')).toContain('padding');
     expect(await compile('.card { padding: 10px; }', 'less', 'Card.less')).toContain('padding');
     expect(await compile('.card\n  padding 10px\n', 'stylus', 'Card.styl')).toContain('padding');
+  });
+});
+
+describe('malformed source (Negative — the real compiler rejects, distinct from a missing package)', () => {
+  // why: an author's actual syntax mistake (unclosed brace) must surface as a real compiler
+  // error the Metro build fails loudly on — not get swallowed into empty/wrong CSS that ships
+  // silently broken styles.
+  it('compileScss rejects unclosed SCSS', async () => {
+    await expect(compileScss('.card { padding: 10px', 'Card.scss')).rejects.toThrow();
+  });
+
+  it('compileLess rejects a syntax error', async () => {
+    await expect(compileLess('.card { .padded(); }', 'Card.less')).rejects.toThrow();
+  });
+
+  it('compileStylus rejects a syntax error', async () => {
+    await expect(compileStylus('.card\n  padding: : 10px\n', 'Card.styl')).rejects.toThrow();
   });
 });
 
