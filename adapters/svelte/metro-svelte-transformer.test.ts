@@ -1,8 +1,9 @@
-// Covers compileSvelteFile's compiler-option contract with the DOM shim (svelte-adapter-dom-shim
-// skill §2/§10): fragments:'tree' must produce from_tree(), never from_html(), and the generated
-// module must import from 'svelte/internal/client' with zero framework-import rewriting (unlike
-// metro-vue-transformer.cjs, which retargets every `from 'vue'`). The rest of the transformer
-// (upstream delegation, style-file routing) is exercised by the canary build itself, mirroring
+// Covers compileSvelteFile's compiler-option contract with the official custom-renderer API
+// (svelte-adapter-custom-renderer skill): `experimental.customRenderer` must produce output that
+// imports our renderer and dispatches through it, and the generated module must import from
+// 'svelte/internal/client' with zero framework-import rewriting (unlike metro-vue-transformer.cjs,
+// which retargets every `from 'vue'`). The rest of the transformer (upstream delegation,
+// style-file routing) is exercised by the canary build itself, mirroring
 // metro-vue-transformer.test.ts's own scoping note.
 import { describe, expect, it } from 'vitest';
 import metroSvelteTransformer from './metro-svelte-transformer.cjs';
@@ -12,8 +13,8 @@ const {
   compileSvelteModuleFile,
   transform,
 }: {
-  compileSvelteFile: (src: string, filename: string) => string;
-  compileSvelteModuleFile: (src: string, filename: string) => string;
+  compileSvelteFile: (src: string, filename: string) => Promise<string>;
+  compileSvelteModuleFile: (src: string, filename: string) => Promise<string>;
   transform: (params: {
     filename: string;
     src: string;
@@ -26,34 +27,33 @@ const COMPONENT_SOURCE = `
   let { label }: { label: string } = $props();
 </script>
 
-<symbiote-view p={{}}>
-  <symbiote-text p={{}}>{label}</symbiote-text>
+<symbiote-view>
+  <symbiote-text>{label}</symbiote-text>
 </symbiote-view>
 `;
 
 describe('compileSvelteFile', () => {
-  it('imports the client runtime, never the server/SSR build', () => {
-    const code = compileSvelteFile(COMPONENT_SOURCE, 'Demo.svelte');
+  it('imports the client runtime, never the server/SSR build', async () => {
+    const code = await compileSvelteFile(COMPONENT_SOURCE, 'Demo.svelte');
     expect(code).toContain("from 'svelte/internal/client'");
     expect(code).not.toContain('svelte/internal/server');
   });
 
-  it('emits from_tree (fragments: "tree"), never from_html', () => {
-    const code = compileSvelteFile(COMPONENT_SOURCE, 'Demo.svelte');
-    expect(code).toContain('from_tree(');
-    expect(code).not.toContain('from_html(');
+  it('imports our renderer and pushes it at the top of the compiled component', async () => {
+    const code = await compileSvelteFile(COMPONENT_SOURCE, 'Demo.svelte');
+    expect(code).toContain("import $renderer from '@symbiote-native/svelte/renderer'");
+    expect(code).toContain('push_renderer($renderer)');
   });
 
-  it('routes symbiote-* custom-element props through set_custom_element_data', () => {
-    const code = compileSvelteFile(COMPONENT_SOURCE, 'Demo.svelte');
-    expect(code).toContain("set_custom_element_data(symbiote_view, 'p'");
-    expect(code).toContain("set_custom_element_data(symbiote_text, 'p'");
+  it('routes symbiote-* props through the renderer, never set_custom_element_data', async () => {
+    const code = await compileSvelteFile(COMPONENT_SOURCE, 'Demo.svelte');
+    expect(code).not.toContain('set_custom_element_data');
   });
 
-  it('strips <script lang="ts"> types with no external file resolution', () => {
+  it('strips <script lang="ts"> types with no external file resolution', async () => {
     // Unlike @vue/compiler-sfc's compileScript, this never needs registerTS/a real `fs` for a
     // type-only import from another file — Svelte 5's compiler erases TS structurally.
-    const code = compileSvelteFile(COMPONENT_SOURCE, 'Demo.svelte');
+    const code = await compileSvelteFile(COMPONENT_SOURCE, 'Demo.svelte');
     expect(code).not.toContain(': string');
     expect(code).not.toContain('$props<');
   });
@@ -86,9 +86,9 @@ describe('transform', () => {
 // svelte/index-client.js's dev-guard export and throws `rune_outside_svelte` at runtime. Before
 // this fix, filename.endsWith('.svelte') was false for these files, so they fell through to the
 // plain upstream transformer and shipped uncompiled. Deliberately includes real TS syntax
-// (return type, import type) — compileModule() cannot parse TypeScript at all (verified directly
-// against svelte@5.56.8: it throws js_parse_error on a bare return-type annotation regardless of
-// the .ts filename), so this also exercises the ts.transpileModule() strip step in front of it.
+// (return type, import type) — compileModule() cannot parse TypeScript at all (verified directly:
+// it throws js_parse_error on a bare return-type annotation regardless of the .ts filename), so
+// this also exercises the ts.transpileModule() strip step in front of it.
 const RUNE_MODULE_SOURCE = `
 import type { Ref } from './types';
 export function useCounter(): number {
@@ -101,8 +101,8 @@ export function useCounter(): number {
 `;
 
 describe('compileSvelteModuleFile', () => {
-  it('strips TS types and desugars $state/$effect into real svelte/internal/client calls', () => {
-    const code = compileSvelteModuleFile(RUNE_MODULE_SOURCE, 'use-counter.svelte.ts');
+  it('strips TS types and desugars $state/$effect into real svelte/internal/client calls', async () => {
+    const code = await compileSvelteModuleFile(RUNE_MODULE_SOURCE, 'use-counter.svelte.ts');
     expect(code).toContain("from 'svelte/internal/client'");
     expect(code).not.toContain('$state(');
     expect(code).not.toContain('$effect(');
@@ -122,12 +122,11 @@ describe('transform (.svelte.ts / .svelte.js)', () => {
   });
 });
 
-// The web-only-construct guard is registered in svelte.config.js's `preprocess` too, but that
-// only reaches tooling that reads svelte.config.js — svelte-check, the language server. A
-// consuming app bundles through THIS function, so the gate has to hold here or an app whose own
-// config never registers the preprocessor ships a screen that renders nothing. `{@html}` is the
-// case that made this mandatory rather than nice-to-have: it is not inert, it compiles fine and
-// then paints nothing (svelte-adapter-dom-shim skill §22d).
+// The compiler itself now rejects these constructs at compile time (`experimental.
+// customRenderer` — svelte-adapter-custom-renderer skill), replacing the retired
+// forbid-web-only-constructs.ts preprocessor. `{@html}` is the case that made a build-time gate
+// mandatory rather than nice-to-have in the old shim world: it was not inert there, it compiled
+// fine and then painted nothing. Under the real API it is a hard compile error instead.
 describe('transform rejects web-only constructs at build time', () => {
   const options = { dev: true, minify: false, platform: 'ios', projectRoot: process.cwd() };
 
@@ -155,5 +154,15 @@ describe('transform rejects web-only constructs at build time', () => {
         options,
       }),
     ).rejects.toThrow(/svelte:head/);
+  });
+
+  it('rejects bind:this on a raw host tag, which the custom renderer cannot support', async () => {
+    await expect(
+      transform({
+        filename: 'BadBind.svelte',
+        src: `<script lang="ts">let hostRef = $state.raw(null);</script><symbiote-view bind:this={hostRef} />`,
+        options,
+      }),
+    ).rejects.toThrow(/bind:/);
   });
 });

@@ -1,7 +1,7 @@
 {
   "name": "@symbiote-native/svelte",
   "version": "0.1.0",
-  "description": "SymbioteNative's Svelte adapter — a DOM shim over stock compiled Svelte output driving real native iOS/Android views through the same engine as every other adapter.",
+  "description": "SymbioteNative's Svelte adapter — Svelte's official custom-renderer API driving real native iOS/Android views through the same engine as every other adapter.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -21,7 +21,7 @@
     ".": "./src/index.ts",
     "./bootstrap": "./src/bootstrap.ts",
     "./native-view-bridge": "./src/native-view-bridge.ts",
-    "./preprocessor": "./src/preprocessor/forbid-web-only-constructs.ts",
+    "./renderer": "./src/renderer.ts",
     "./scoped-styles": "./src/preprocessor/scoped-styles.ts",
     "./style-scope": "./src/style-scope.ts",
     "./scope-token": "./src/scope-token.ts",

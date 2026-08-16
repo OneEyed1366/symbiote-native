@@ -21,47 +21,55 @@
 // shape-stable and needs its own fix, not a workaround here.
 
 import type { IDescriptorChild } from '@symbiote-native/components';
-import { getShimDocument } from './dom-shim';
-import type { ShimElement, ShimText } from './dom-shim';
+import {
+  appendChild as engineAppendChild,
+  routeProp,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
+import { descriptorFor } from '@symbiote-native/components';
+import { createElementNode, createTextNodeOp, requestActiveCommit, setTextOp } from './renderer';
 
 type ICachedChild =
-  | { readonly kind: 'text'; readonly shim: ShimText }
-  | { readonly kind: 'element'; readonly shim: ShimElement; readonly children: ICachedChild[] };
+  | { readonly kind: 'text'; readonly node: ISymbioteNode }
+  | { readonly kind: 'element'; readonly node: ISymbioteNode; readonly children: ICachedChild[] };
 
 function shapeChangedMessage(detail: string): string {
   return (
     `descriptorToSvelte: Descriptor shape changed between renders (${detail}) — a ` +
-    `render-*.ts fn is expected to produce a CONSTANT tree shape (svelte-adapter-dom-shim ` +
-    `skill §15/§19); only prop values may vary between calls.`
+    `render-*.ts fn is expected to produce a CONSTANT tree shape (svelte-adapter-custom-renderer ` +
+    `skill); only prop values may vary between calls.`
   );
 }
 
+function applyProps(node: ISymbioteNode, props: Record<string, unknown>): void {
+  for (const [key, value] of Object.entries(props)) routeProp(node, key, value);
+}
+
 function buildChild(child: IDescriptorChild): ICachedChild {
-  const document = getShimDocument();
   if (typeof child === 'string') {
-    return { kind: 'text', shim: document.createTextNode(child) };
+    return { kind: 'text', node: createTextNodeOp(child) };
   }
-  const shim = document.createElement(child.type);
-  shim.p = child.props;
+  const node = createElementNode(child.type);
+  applyProps(node, child.props);
   const children = child.children.map(grandchild => {
     const cached = buildChild(grandchild);
-    shim.appendChild(cached.shim);
+    engineAppendChild(node, cached.node);
     return cached;
   });
-  return { kind: 'element', shim, children };
+  return { kind: 'element', node, children };
 }
 
 function syncChild(cached: ICachedChild, child: IDescriptorChild): void {
   if (typeof child === 'string') {
     if (cached.kind !== 'text') throw new Error(shapeChangedMessage('text/element'));
-    if (cached.shim.data !== child) cached.shim.data = child;
+    setTextOp(cached.node, child);
     return;
   }
-  if (cached.kind !== 'element' || cached.shim.tagName !== child.type) {
-    const was = cached.kind === 'element' ? cached.shim.tagName : 'text';
+  if (cached.kind !== 'element' || cached.node.component !== descriptorFor(child.type).component) {
+    const was = cached.kind === 'element' ? cached.node.component : 'text';
     throw new Error(shapeChangedMessage(`${was} -> ${child.type}`));
   }
-  cached.shim.p = child.props;
+  applyProps(cached.node, child.props);
   if (cached.children.length !== child.children.length) {
     throw new Error(shapeChangedMessage('child count'));
   }
@@ -73,49 +81,56 @@ export type IDescriptorChildrenMount = {
 };
 
 // Materializes `descriptor.children` onto an already-live `parent` ONCE, then reuses the same
-// shim nodes by position on every `update()`. `parent` is expected to already be live (has an
-// `engineNode`) — the normal case, since it is reached via a component's own `bind:this`
-// inside an `$effect` that runs after mount, matching every other imperative-command use in
-// this adapter (Switch's snap-back, TextInput's controlled write).
+// engine nodes by position on every `update()` — a JS-only imperative tree builder, so it never
+// goes through Svelte template compilation (routeProp disambiguates on-prefixed props/events at
+// runtime here, unlike compiled markup — see renderer.ts's header).
 export function mountDescriptorChildren(
-  parent: ShimElement,
+  parent: ISymbioteNode,
   children: IDescriptorChild[],
 ): IDescriptorChildrenMount {
   const cached = children.map(child => {
     const built = buildChild(child);
-    parent.appendChild(built.shim);
+    engineAppendChild(parent, built.node);
     return built;
   });
+  // These mutations go through the engine's raw appendChild/routeProp, not renderer.ts's own
+  // insert/setAttribute wrappers (this bridge is JS-only, outside template compilation — see the
+  // header) — so nothing else schedules a commit for them. Without this, a subtree built here
+  // (e.g. a third-party view mounted via mountDescriptorChildren) lands in the retained tree but
+  // never reaches Fabric (found 2026-08-16 debugging packages/slider's Svelte wrapper).
+  requestActiveCommit();
   return {
     update(next: IDescriptorChild[]): void {
       if (cached.length !== next.length) throw new Error(shapeChangedMessage('root child count'));
       cached.forEach((c, index) => syncChild(c, next[index]));
+      requestActiveCommit();
     },
   };
 }
 
 // The uniform wiring every category-1 component repeats: mount `mountDescriptorChildren` once
-// (as soon as the root shim is live) and update() it thereafter — the "call the bridge" half of
+// (as soon as the root ref is live) and update() it thereafter — the "call the bridge" half of
 // React's `descriptorToReact(useXLogic(...))` / Vue's `descriptorToVue(...)`. Root tags with an
-// empty `children` array (Switch, TextInput — every prop rides the root's own `p`) still call
-// this, for the SAME reason React still routes them through `descriptorToReact`: one uniform
-// shape for every category-1 component, not two different idioms picked by child count. Usage:
+// empty `children` array (Switch, TextInput — every prop rides the root's own attributes) still
+// call this, for the SAME reason React still routes them through `descriptorToReact`: one
+// uniform shape for every category-1 component, not two different idioms picked by child count.
+// Usage:
 //
 //   const syncChildren = createDescriptorChildrenSync();
-//   $effect(() => { syncChildren(hostShim, descriptor.children); });
+//   $effect(() => { syncChildren(hostRef, descriptor.children); });
 //
-// `hostShim` and `descriptor.children` are read unconditionally at the top of the effect body —
-// same dependency-tracking discipline as every other $effect in this adapter (skill's TextInput
-// note): a guard placed before the read would drop it from the tracked set on a guarded run.
+// `hostRef` and `descriptor.children` are read unconditionally at the top of the effect body —
+// same dependency-tracking discipline as every other $effect in this adapter: a guard placed
+// before the read would drop it from the tracked set on a guarded run.
 export function createDescriptorChildrenSync(): (
-  hostShim: ShimElement | null,
+  hostRef: ISymbioteNode | null,
   children: IDescriptorChild[],
 ) => void {
   let mounted: IDescriptorChildrenMount | undefined;
-  return (hostShim, children) => {
-    if (hostShim === null) return;
+  return (hostRef, children) => {
+    if (hostRef === null) return;
     if (mounted === undefined) {
-      mounted = mountDescriptorChildren(hostShim, children);
+      mounted = mountDescriptorChildren(hostRef, children);
     } else {
       mounted.update(children);
     }

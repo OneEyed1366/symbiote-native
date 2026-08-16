@@ -1,15 +1,21 @@
-// Proves the fix in dom-shim/element.ts's createEngineNode(): every host node now gets
-// toPublicInstance() grafted at creation, so hostInstance(shim).measure()/setNativeProps() are
-// real, callable methods (RefApiDemo's whole reason for existing), not just typed lies. Real
-// compiled source, same compile-then-dynamic-import pattern as every other smoke test here.
+// Proves hostInstance()/findNodeHandle() are thin, correct passthroughs over a real
+// ISymbioteNode — renderer.ts's createElementNode() grafts toPublicInstance() onto every host
+// node AT CREATION under the official custom-renderer API (eager binding, no more lazy
+// ShimElement to translate), so hostInstance(node).measure()/setNativeProps() must be real,
+// callable methods (RefApiDemo's whole reason for existing), not just typed lies. Real compiled
+// source, same compile-then-dynamic-import pattern as every other smoke test here; the node under
+// test is captured through a real `{@attach}` (svelte-adapter-custom-renderer skill §4), not a
+// hand-rolled fake object.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric } from '@symbiote-native/test-utils';
+import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import type { ISymbioteNode } from '@symbiote-native/engine';
 import { mount, unmount } from './render';
+import { findNodeHandle, hostInstance } from './host-instance';
 
 if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
@@ -28,23 +34,26 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
-
 function compileToFile(source: string, filename: string, outPath: string): void {
-  const result = compile(source, { ...COMPILE_OPTIONS, filename });
+  const result = compile(source, {
+    generate: 'client',
+    filename,
+    fragments: 'tree',
+    css: 'external',
+    experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+  });
   writeFileSync(outPath, result.js.code);
 }
 
 async function loadMountable(): Promise<Component> {
   compileToFile(
     `<script lang="ts">
-       import { hostInstance } from './host-instance.ts';
-       import type { ShimElement } from './dom-shim';
-       let { onCapture }: { onCapture: (box: ShimElement) => void } = $props();
-       let box = $state.raw<ShimElement | null>(null);
+       import type { ISymbioteNode } from '@symbiote-native/engine';
+       let { onCapture }: { onCapture: (box: ISymbioteNode) => void } = $props();
+       let box = $state.raw<ISymbioteNode | null>(null);
        $effect(() => { if (box !== null) onCapture(box); });
      </script>
-     <symbiote-view p={{ testID: 'ref-box' }} bind:this={box} />`,
+     <symbiote-view testID="ref-box" {@attach (node) => (box = node)} />`,
     'RefParent.svelte',
     PARENT_OUT,
   );
@@ -56,13 +65,12 @@ async function loadMountable(): Promise<Component> {
 }
 
 describe('hostInstance (real compiled source)', () => {
-  it('grafts a real, callable measure/setNativeProps handle onto a bind:this host ref', async () => {
-    const { hostInstance } = await import('./host-instance');
+  it('grafts a real, callable measure/setNativeProps handle onto an {@attach}-captured host node', async () => {
     const Parent = await loadMountable();
 
-    let captured: import('./dom-shim').ShimElement | undefined;
+    let captured: ISymbioteNode | undefined;
     mount(ROOT_TAG, Parent, {
-      onCapture: (box: import('./dom-shim').ShimElement) => (captured = box),
+      onCapture: (box: ISymbioteNode) => (captured = box),
     });
     await tick();
     await tick();
@@ -75,13 +83,38 @@ describe('hostInstance (real compiled source)', () => {
     instance?.setNativeProps({ style: { backgroundColor: '#f6ad55' } });
     await tick();
 
-    // fabric.find() walks the CREATION log, which never reflects a later clone's props
-    // (svelte-adapter-dom-shim skill's documented gotcha) — a live-value assertion must
-    // instead walk the currently COMMITTED tree.
-    function findLive(node: import('@symbiote-native/test-utils').IFakeNode): boolean {
+    // fabric.find() walks the CREATION log, which never reflects a later clone's props — a
+    // live-value assertion must instead walk the currently COMMITTED tree.
+    function findLive(node: IFakeNode): boolean {
       if (node.props.testID === 'ref-box') return node.props.backgroundColor === '#f6ad55';
       return node.children.some(findLive);
     }
     expect(findLive(fabric.appRoot())).toBe(true);
+  });
+});
+
+describe('findNodeHandle (real compiled source)', () => {
+  it('resolves a real host node to its committed Fabric tag', async () => {
+    const Parent = await loadMountable();
+
+    let captured: ISymbioteNode | undefined;
+    mount(ROOT_TAG, Parent, {
+      onCapture: (box: ISymbioteNode) => (captured = box),
+    });
+    await tick();
+    await tick();
+
+    const committed = fabric.find(node => node.props.testID === 'ref-box');
+    expect(committed).toBeDefined();
+
+    const handle = findNodeHandle(captured);
+    expect(handle).not.toBeNull();
+    expect(handle).toBe(committed?.tag);
+  });
+
+  it('passes a numeric handle through unchanged, and null/undefined to null', () => {
+    expect(findNodeHandle(42)).toBe(42);
+    expect(findNodeHandle(null)).toBeNull();
+    expect(findNodeHandle(undefined)).toBeNull();
   });
 });

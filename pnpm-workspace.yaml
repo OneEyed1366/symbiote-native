@@ -97,10 +97,13 @@ catalog:
   '@angular/common': ~22.0.8
   '@angular/compiler': ~22.0.8
   '@angular/compiler-cli': ~22.0.8
-  # Measured against 5.56.8 in svelte-adapter-dom-shim (2026-08-10) — `fragments: 'tree'`
-  # (mandatory, §2 of that skill) needs >=5.33. Confirmed a real published npm release:
-  # `pnpm install` resolved this range to 5.56.8 (2026-08-11).
-  svelte: ^5.56.0
+  # TEMPORARY pin (2026-08-16, svelte-adapter-custom-renderer skill) on sveltejs/svelte PR
+  # #18042's `svelte-custom-renderer` branch — the official `createRenderer` API
+  # (`svelte/renderer`) this adapter now drives instead of the retired DOM-shim. The PR is still
+  # OPEN/unmerged, so no npm release carries this API yet; `main`/`module`/`types` all point at
+  # committed source (no build step required — verified `types/index.d.ts` is checked in, not
+  # gitignored). Swap back to a real semver range the moment #18042 ships.
+  svelte: github:sveltejs/svelte#dd148ebb74f326b9cd4f9c49b785a12518858b6a&path:/packages/svelte
   # Declaration emit for the raw `.svelte` sources we publish (scripts/emit-svelte-declarations.mjs).
   # Same library `svelte-package` uses for the job; it is also what `svelte-check` runs on internally,
   # so it moves with `svelte` above, not independently.

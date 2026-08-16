@@ -3,59 +3,52 @@
 // with this adapter's own compiler options, then hand the generated client JS to RN's own babel
 // transformer. This is the Metro twin of adapters/vue/metro-vue-transformer.cjs.
 //
-// Unlike Vue's transformer, this does NOT rewrite any framework import: the whole
-// svelte-adapter-dom-shim strategy is that STOCK compiled Svelte client output (its own
-// `import * as $ from 'svelte/internal/client'`) runs completely unchanged against a globalThis
-// DOM shim — there is no @symbiote-native/svelte/runtime-helpers retarget the way Vue needs one.
-// Verified against the installed svelte@5.56.8: compiling a trivial component with
-// {fragments:'tree', css:'external', generate:'client'} produces exactly
-// `import * as $ from 'svelte/internal/client'` + `$.from_tree(...)` + `$.set_custom_element_data`
-// calls — the same shape the dom-shim's init_operations patches already target.
+// Unlike Vue's transformer, this does NOT rewrite any framework import: compiled output already
+// dispatches every node operation to whatever `current_renderer` `mount()` was given
+// (svelte-adapter-custom-renderer skill) — there is no @symbiote-native/svelte/runtime-helpers
+// retarget the way Vue needs one.
 //
 // Ships as a package-level export (`@symbiote-native/svelte/metro-svelte-transformer`) rather
 // than living in each consuming app: a consumer's own metro.config.js just points
 // babelTransformerPath at it.
 
-const { compile, compileModule } = require('svelte/compiler');
+// Lazy + dynamic import, not a top-level `require('svelte/compiler')`: our git-pinned checkout
+// (svelte-adapter-custom-renderer skill — sveltejs/svelte PR #18042 is unreleased, no npm build
+// artifact) ships no prebuilt `compiler/index.js` CJS bundle (that is `rollup -c`'s output, and
+// we install from source). The package's `require` export condition points AT that missing file,
+// so `require('svelte/compiler')` throws MODULE_NOT_FOUND under Metro/Node's CJS resolution —
+// `import()` instead resolves the `default`/`types` condition (`./src/compiler/index.js`, real
+// ESM source Node loads directly, no build step). Re-check this the moment the pin moves to a
+// real npm release, which ships the built bundle and makes `require` viable again.
+let compilerPromise;
+function compiler() {
+  compilerPromise ??= import('svelte/compiler');
+  return compilerPromise;
+}
+
 const ts = require('typescript');
 const { compileCssFile, isStyleFile, resolveUpstreamTransformer } = require('@symbiote-native/css-parser');
 
 const upstreamTransformer = resolveUpstreamTransformer();
 
-// Mirrors adapters/svelte/svelte.config.js's own compilerOptions exactly (fragments:'tree' is
-// mandatory per svelte-adapter-dom-shim skill §2 — it makes the compiler emit from_tree(),
-// element-by-element via document.createElement, never from_html()'s innerHTML-on-a-<template>,
-// so the shim needs no HTML parser; css:'external' keeps Svelte from injecting a <style> into a
-// document.head that doesn't meaningfully exist). Duplicated here rather than imported from that
-// file: svelte.config.js is ESM (`export default`, loaded directly by Node-native tooling —
+// Mirrors adapters/svelte/svelte.config.js's own compilerOptions exactly. `experimental.
+// customRenderer` is what actually enables the custom-renderer compile path — see that file's
+// header and the svelte-adapter-custom-renderer skill for why the string value itself is inert
+// (mount() supplies the real renderer object separately) and for what the compiler now rejects
+// at compile time as a direct result of enabling it. Duplicated here rather than imported from
+// that file: svelte.config.js is ESM (`export default`, loaded directly by Node-native tooling —
 // svelte-check, the language server, Vite), while this file is `require()`d by Metro directly
 // and must stay pure CommonJS with no build step of its own, exactly like
 // metro-vue-transformer.cjs.
-const COMPILER_OPTIONS = { fragments: 'tree', css: 'external', generate: 'client' };
+const COMPILER_OPTIONS = {
+  fragments: 'tree',
+  css: 'external',
+  generate: 'client',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+};
 
-// The web-only-construct guard (svelte-adapter-dom-shim skill §7/§22) RUNS HERE, on every
-// `.svelte` Metro compiles. It used to be skipped, on the reasoning that `svelte-check` and the
-// language server already run the same pass over the same source, and that the constructs it
-// guards are inert rather than wrong even if one slipped through. **That reasoning stopped
-// holding when `{@html}` joined the list**: `{@html}` is not inert — it compiles to `$.html()`,
-// which assigns to an `innerHTML` the shim does not define, so the content silently never
-// renders. And editor-time tooling only covers a developer who HAS that tooling wired up; a
-// consuming app whose own `svelte.config.js` never registers the preprocessor would still ship
-// the broken bundle. A build-time gate is the only one nobody can be missing.
-//
-// Resolved by package self-reference rather than a relative path so the same line works from
-// `src/*.ts` in this workspace and from `build/*.js` in a published install — `exports` and
-// `publishConfig.exports` each map `./preprocessor` at their own target. Loaded lazily and once:
-// `require()` cannot pull an ESM/TS module, but `transform` is already async.
-let preprocessorPromise;
-function webOnlyConstructGuard() {
-  preprocessorPromise ??= import('@symbiote-native/svelte/preprocessor').then(mod =>
-    mod.forbidWebOnlyConstructs(),
-  );
-  return preprocessorPromise;
-}
-
-// The `<style>` preprocessor, loaded the same lazy way and for the same reason. Unlike the guard
+// The `<style>` preprocessor, loaded lazily (require() cannot pull an ESM/TS module, but
+// `transform` is already async) and once. Unlike the retired web-only-construct guard
 // above (which only throws and hands the source back untouched), this one REWRITES the source —
 // it compiles the style block into registerStyles() output and scopes every `class` in the
 // component's own markup — so its returned `code` is what compile() must be given. See
@@ -72,7 +65,8 @@ function scopedStylesPreprocessor() {
 // resolution needed (unlike @vue/compiler-sfc's compileScript, which needs registerTS + a real
 // `fs` for a type-only import from another file) — so no TypeScript/filesystem wiring is needed
 // here the way metro-vue-transformer.cjs needs it.
-function compileSvelteFile(src, filename) {
+async function compileSvelteFile(src, filename) {
+  const { compile } = await compiler();
   const { js } = compile(src, { ...COMPILER_OPTIONS, filename });
   return js.code;
 }
@@ -102,7 +96,8 @@ function stripTypeScript(src, filename) {
   return outputText;
 }
 
-function compileSvelteModuleFile(src, filename) {
+async function compileSvelteModuleFile(src, filename) {
+  const { compileModule } = await compiler();
   const { js } = compileModule(stripTypeScript(src, filename), { generate: 'client', filename });
   return js.code;
 }
@@ -114,19 +109,20 @@ module.exports.compileSvelteModuleFile = compileSvelteModuleFile;
 
 module.exports.transform = async function transform(params) {
   if (params.filename.endsWith('.svelte')) {
-    // Throws with a message naming the RN alternative. Deliberately BEFORE compile(), so the
-    // author sees the real diagnosis rather than a downstream symptom.
-    (await webOnlyConstructGuard()).markup({ content: params.src, filename: params.filename });
+    // The web-only-construct guard this used to run here (bind:/transition:/<svelte:head|
+    // window|body|document>) is gone: `experimental.customRenderer` above makes the compiler
+    // itself reject every one of those at compile time (svelte-adapter-custom-renderer skill) —
+    // a real compile error, not a hand-maintained preprocessor pass.
     const preprocessed = await (
       await scopedStylesPreprocessor()
     ).markup({ content: params.src, filename: params.filename });
-    const code = compileSvelteFile(preprocessed.code, params.filename);
+    const code = await compileSvelteFile(preprocessed.code, params.filename);
     // Re-label as .tsx so RN's transformer processes the module exactly like app source; Metro
     // tracks the real path separately. Matches metro-vue-transformer.cjs's identical trick.
     return upstreamTransformer.transform({ ...params, src: code, filename: params.filename + '.tsx' });
   }
   if (params.filename.endsWith('.svelte.ts') || params.filename.endsWith('.svelte.js')) {
-    const code = compileSvelteModuleFile(params.src, params.filename);
+    const code = await compileSvelteModuleFile(params.src, params.filename);
     return upstreamTransformer.transform({ ...params, src: code, filename: params.filename + '.tsx' });
   }
   // A standalone style file (as opposed to a component's own <style> block, handled by the

@@ -1,14 +1,24 @@
-// Does the dom-shim RELEASE its nodes, or does it retain them after they leave the tree?
+// Does the adapter RELEASE its nodes, or does it retain them after they leave the tree?
 //
-// This was the last hypothesis standing for the ~20 MB device-RSS gap between examples/svelte
-// and examples/vue-sfc on an equivalent screen, after the cheap ones were measured and killed
-// (svelte-adapter-dom-shim §11b + native-node-parity.test.ts). A constant overhead cannot
-// produce a multi-megabyte gap; a leak can, and it grows with interaction — which fits a number
-// read after scrolling a list around rather than at cold start.
+// This was the last hypothesis standing for a ~20 MB device-RSS gap between examples/svelte and
+// examples/vue-sfc on an equivalent screen, measured back when this adapter went through a
+// DOM-shim layer (svelte-adapter-dom-shim §11b, superseded) — a separate wrapper object per node,
+// distinct from the engine node it drove. A constant overhead cannot produce a multi-megabyte
+// gap; a leak can, and it grows with interaction — which fits a number read after scrolling a
+// list around rather than at cold start.
 //
-// ANSWER, locked in below: not a leak. Retention after gc is a small CONSTANT that does not move
-// when the list gets 5x bigger, so it is the tail of the last commit's child set, not per-node
-// accumulation.
+// UNDER THE OFFICIAL CUSTOM-RENDERER API (svelte-adapter-custom-renderer skill) THERE IS NO SHIM
+// LAYER LEFT TO SUSPECT — `renderer.ts`'s `createElementNode`/`createTextNodeOp` hand Svelte the
+// real `ISymbioteNode` directly, the exact object passed to Fabric's `createNode` as
+// `instanceHandle`. That makes this test MORE direct than its dom-shim-era original, not less: it
+// now tracks retention of the actual engine node itself, so a leak in the engine's own retained
+// tree (not merely a wrapper) would show up here too. The question survives the redesign
+// unmodified — does removing rows from a keyed `{#each}` actually let their nodes go — so the
+// mechanics below are unchanged from before.
+//
+// ANSWER, locked in below (re-verified against the custom-renderer rewrite): not a leak.
+// Retention after gc is a small CONSTANT that does not move when the list gets 5x bigger, so it
+// is the tail of the last commit's child set, not per-node accumulation.
 //
 // THE ASSERTION IS DELIBERATELY ABOUT SCALING, NOT ABOUT ZERO. `WeakRef` + `gc()` is not a
 // precise instrument — V8 makes no promise that a given object is reclaimed by a given cycle,
@@ -55,6 +65,7 @@ async function compileComponent(source: string, name: string): Promise<Component
     filename: `${name}.svelte`,
     fragments: 'tree',
     css: 'external',
+    experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
   });
   const file = join(TMP_DIR, `${name}.mjs`);
   writeFileSync(file, result.js.code);
@@ -103,7 +114,7 @@ function shrinkingList(size: number): string {
   let rows = $state(Array.from({length: ${size}}, (_, i) => i));
   $effect(() => { if (rows.length > 0) rows = []; });
 </script>
-<symbiote-view p={{}}>{#each rows as row (row)}<symbiote-view p={{}}><symbiote-text p={{}}>row {row}</symbiote-text></symbiote-view>{/each}</symbiote-view>`;
+<symbiote-view>{#each rows as row (row)}<symbiote-view><symbiote-text>row {row}</symbiote-text></symbiote-view>{/each}</symbiote-view>`;
 }
 
 // Renders `size` rows, empties the list, drops every strong reference, and reports how many of
@@ -115,8 +126,8 @@ async function survivorsAfterShrink(size: number, rootTag: number): Promise<numb
   await tick();
   await tick();
 
-  // `instanceHandle` is the shim node the engine was driven from, so this tracks the shim layer
-  // itself, not merely the fake Fabric's own bookkeeping.
+  // `instanceHandle` is the real `ISymbioteNode` renderer.ts created and handed to Fabric's
+  // createNode — this tracks the actual engine node's retention, not a proxy for it.
   const handles = fabric.created
     .filter(node => node.viewName === 'RCTRawText')
     .map(node => node.instanceHandle)
@@ -134,7 +145,7 @@ async function survivorsAfterShrink(size: number, rootTag: number): Promise<numb
   return handles.filter(ref => ref.deref() !== undefined).length;
 }
 
-describe('shim node release', () => {
+describe('engine node release', () => {
   it('retains a constant, not a per-node accumulation, after nodes leave the tree', async () => {
     const smallSurvivors = await survivorsAfterShrink(SMALL, 93_001);
     const largeSurvivors = await survivorsAfterShrink(LARGE, 93_002);

@@ -1,11 +1,11 @@
-// The first REAL execution of the Svelte DOM-shim pipeline (patchGlobals -> shim tree ->
-// engine -> fake Fabric), not just a typecheck. Every other file in this package has only ever
-// been proven by `tsc --build`; this compiles REAL `.svelte` source through the real
-// `svelte/compiler` (same `fragments: 'tree'` / `css: 'external'` options as svelte.config.js),
-// mounts the output through this adapter's own `mount()`, and asserts on what actually landed
-// in a faked `nativeFabricUIManager`. No `@sveltejs/vite-plugin-svelte` is wired into this
-// repo's vitest config yet, so compiled output is written to a real temp file and dynamic-
-// imported rather than transformed by a loader — see `compileComponent` below.
+// The first REAL execution of the Svelte custom-renderer pipeline (renderer.ts -> engine ->
+// fake Fabric), not just a typecheck. Every other file in this package has only ever been proven
+// by `tsc --build`; this compiles REAL `.svelte` source through the real `svelte/compiler` (same
+// `experimental.customRenderer` option as svelte.config.js), mounts the output through this
+// adapter's own `mount()`, and asserts on what actually landed in a faked
+// `nativeFabricUIManager`. No `@sveltejs/vite-plugin-svelte` is wired into this repo's vitest
+// config yet, so compiled output is written to a real temp file and dynamic-imported rather than
+// transformed by a loader — see `compileComponent` below.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -17,10 +17,8 @@ import { mount, unmount } from './render';
 
 // RN's own bootstrap (setUpGlobals.js / setUpNavigator.js, verified against
 // .vendors/react-native) sets these before any app code runs — `global.window = global` and
-// `global.navigator = {product: 'ReactNative'}`. Neither is patched by patchGlobals() itself
-// (patch-globals.ts's header comment, verified true above), so a bare vitest/Node sandbox
-// needs this same one-time setup to faithfully stand in for a real RN JS runtime; svelte's
-// own `init_operations()` reads both at first mount.
+// `global.navigator = {product: 'ReactNative'}`. A bare vitest/Node sandbox needs this same
+// one-time setup to faithfully stand in for a real RN JS runtime.
 if (globalThis.window === undefined) {
   Object.assign(globalThis, { window: globalThis });
 }
@@ -55,6 +53,7 @@ async function compileComponent(source: string, name: string): Promise<Component
     filename: `${name}.svelte`,
     fragments: 'tree',
     css: 'external',
+    experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
   });
   compileCounter += 1;
   const file = join(TMP_DIR, `${name}-${String(compileCounter)}.mjs`);
@@ -68,7 +67,7 @@ async function compileComponent(source: string, name: string): Promise<Component
 
 describe('svelte adapter mount pipeline (real compiled output, real fake-Fabric)', () => {
   it('mounts a static symbiote-text and commits it under the root symbiote-view', async () => {
-    const Hello = await compileComponent('<symbiote-text p={{}}>hello</symbiote-text>', 'Hello');
+    const Hello = await compileComponent('<symbiote-text>hello</symbiote-text>', 'Hello');
 
     mount(ROOT_TAG, Hello);
     await tick();
@@ -88,7 +87,7 @@ describe('svelte adapter mount pipeline (real compiled output, real fake-Fabric)
          let count = $state(0);
          $effect(() => { if (count < 1) count = count + 1; });
        </script>
-       <symbiote-text p={{}}>count {count}</symbiote-text>`,
+       <symbiote-text>count {count}</symbiote-text>`,
       'Counter',
     );
 
@@ -99,15 +98,14 @@ describe('svelte adapter mount pipeline (real compiled output, real fake-Fabric)
     expect(fabric.serialize([fabric.appRoot()])).toContain('RCTRawText "count 1"');
   });
 
-  // root-element.ts's wrapper ShimElement sits between the engine's synthetic flex:1
-  // box-none AppContainer (appRoot()) and the mounted Svelte component's own real
-  // root — unlike Vue/React, which mount their app's root node directly onto the
-  // surface. Without flex:1 on this wrapper, a flex:1-styled app root inside it has no
-  // resolved parent height to grow into and the whole tree collapses to 0x0 (blank,
-  // untappable screen; every prop still commits correctly, which is why this only
-  // shows up visually, never as a thrown error).
+  // render.ts's root wrapper node sits between the engine's synthetic flex:1 box-none
+  // AppContainer (appRoot()) and the mounted Svelte component's own real root — unlike Vue/
+  // React, which mount their app's root node directly onto the surface. Without flex:1 on this
+  // wrapper, a flex:1-styled app root inside it has no resolved parent height to grow into and
+  // the whole tree collapses to 0x0 (blank, untappable screen; every prop still commits
+  // correctly, which is why this only shows up visually, never as a thrown error).
   it('gives the root wrapper flex:1 so a flex:1 app root actually fills the screen', async () => {
-    const Hello = await compileComponent('<symbiote-text p={{}}>hello</symbiote-text>', 'Hello');
+    const Hello = await compileComponent('<symbiote-text>hello</symbiote-text>', 'Hello');
 
     mount(ROOT_TAG, Hello);
     await tick();

@@ -2,24 +2,36 @@
 // create for the same intended UI?
 //
 // Why this exists: `examples/svelte` measured ~20 MB more device RSS than `examples/vue-sfc` on
-// an equivalent screen, and every cheap explanation died under measurement — the Svelte iOS dev
-// bundle is the SMALLEST of the three adapters (5.9M vs Vue's 6.0M), and the dom-shim's own JS
-// cost is 548 B/node, about 1 MB for a realistic screen (svelte-adapter-dom-shim §11b). An RN
-// process's footprint is dominated by NATIVE memory — shadow nodes and views — not JS objects,
-// so the question that actually matters is whether the shim makes the engine emit more native
-// nodes than Vue's renderer does for identical markup.
+// an equivalent screen, and every cheap explanation died under measurement (originally against
+// the DOM-shim strategy, svelte-adapter-dom-shim §11b, now superseded). An RN process's footprint
+// is dominated by NATIVE memory — shadow nodes and views — not JS objects, so the question that
+// actually matters is whether the adapter makes the engine emit more native nodes than Vue's
+// renderer does for identical markup.
 //
-// ANSWER, locked in below: no. Svelte emits exactly ONE extra node in total — a constant root
-// wrapper — and the rest of the tree is node-for-node identical. That is a fixed cost of about
-// half a kilobyte, so this file is the proof that native node inflation is NOT the explanation
-// for a multi-megabyte gap. Do not go looking here again; measure JS heap on device instead.
+// ANSWER, RE-MEASURED against the official custom-renderer API (2026-08-16): still no per-element
+// inflation — the rest of the tree below the wrappers is node-for-node identical — but the fixed
+// per-mount overhead is now THREE nodes, not one, and two of the three are NOT this adapter's own
+// doing. `render.ts`'s own `symbiote-view` wrapper accounts for one (unchanged rationale — Svelte
+// mounts through an anchor rather than handing us a root node the way Vue/React do). The other
+// two are real, empty `create_text('')` calls made by SVELTE'S OWN internal bootstrap whenever
+// `mount()` is called without an explicit `anchor` option (`render.ts` never passes one):
+// `_mount_inner`'s own `anchor_node` (`render.js`) and — for a component whose own top-level
+// content has no static leading element, true of this file's fixture — the compiler's `$.comment()`
+// wrapper's trailing range-end marker (`dom/template.js`). Both are dispatched to our renderer
+// exactly like any other text node (confirmed by reading `render.js`/`dom/template.js` directly);
+// `isAnchor()` only skips a node built via `createComment`/`createAnchor`, not an empty raw-text
+// node, so the engine's commit walk does not skip them either. `isSvelteBootstrapAnchor` below
+// filters them out of the STRUCTURAL comparison (so the two extra empty nodes don't look like a
+// per-element regression) while still counting them explicitly in the tally/total assertions, so
+// this fixed cost stays visible and measured rather than silently hidden. Do not go looking here
+// again for a multi-megabyte explanation; measure JS heap on device instead.
 //
 // `counts.createNode` is the honest instrument: the fake Fabric counts real createNode calls and
 // excludes clones, so this measures native node PRODUCTION, not commit churn.
 //
-// The Svelte template is packed edge-to-edge deliberately (§16): whitespace between siblings
-// compiles to real RCTRawText nodes, and leaving it in would measure that known hazard instead
-// of the structural question being asked here.
+// The Svelte template is packed edge-to-edge deliberately: whitespace between siblings compiles
+// to real RCTRawText nodes, and leaving it in would measure that known hazard instead of the
+// structural question being asked here.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -61,6 +73,7 @@ async function compileComponent(source: string, name: string): Promise<Component
     filename: `${name}.svelte`,
     fragments: 'tree',
     css: 'external',
+    experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
   });
   const file = join(TMP_DIR, `${name}.mjs`);
   writeFileSync(file, result.js.code);
@@ -85,10 +98,30 @@ function stripOuter(tree: string): string {
   return tree.slice(open + 1, -1);
 }
 
+// See this file's header: two real, empty `create_text('')` calls from Svelte's OWN mount
+// bootstrap always land somewhere in the tree — one as a trailing sibling of the `{#each}`
+// block's own rendered items (`$.comment()`'s own anchor pair, needed for the block's insertion
+// point even though the ENCLOSING element is static), the other as a trailing sibling of the
+// app's own root view directly under render.ts's wrapper (`_mount_inner`'s own `anchor_node`).
+// Neither is nested consistently enough for a fixed-depth `stripOuter` to peel off, so both the
+// STRUCTURAL comparison and the raw creation list filter by this predicate instead.
+function isSvelteBootstrapAnchor(node: IFakeNode): boolean {
+  return node.viewName === 'RCTRawText' && node.props.text === '';
+}
+
+// Mirrors fake-fabric.ts's own `serializeNode`, recursively dropping bootstrap anchors at every
+// level rather than just the top one.
+function serializeWithoutBootstrapAnchors(node: IFakeNode): string {
+  const text = node.viewName === 'RCTRawText' ? ` "${String(node.props.text)}"` : '';
+  const kids = node.children.filter(child => !isSvelteBootstrapAnchor(child));
+  const kidsStr = kids.length ? `(${kids.map(serializeWithoutBootstrapAnchors).join('')})` : '';
+  return `${node.viewName}${text}${kidsStr}`;
+}
+
 // Same intended UI on both sides: an outer view wrapping five rows, each row holding a label
 // with an interpolated value and a static suffix.
 const SVELTE_SOURCE = `<script>const rows = [${ROWS.join(', ')}];</script>
-<symbiote-view p={{}}>{#each rows as row}<symbiote-view p={{}}><symbiote-text p={{}}>row {row}</symbiote-text><symbiote-text p={{}}>ok</symbiote-text></symbiote-view>{/each}</symbiote-view>`;
+<symbiote-view>{#each rows as row}<symbiote-view><symbiote-text>row {row}</symbiote-text><symbiote-text>ok</symbiote-text></symbiote-view>{/each}</symbiote-view>`;
 
 const VueRoot = {
   render() {
@@ -114,6 +147,10 @@ describe('native node production per adapter, same UI', () => {
     await tick();
     const svelteCreated = [...fabric.created];
     const svelteTree = fabric.serialize([fabric.appRoot()]);
+    // Captured NOW, before `fabric.reset()` + the Vue mount below reassign what `fabric.appRoot()`
+    // resolves to — `IFakeNode` objects are plain, independent of the recorder's own arrays, so
+    // holding this reference across the reset is safe.
+    const svelteWrapper = fabric.appRoot().children[0];
 
     fabric.reset();
 
@@ -123,24 +160,43 @@ describe('native node production per adapter, same UI', () => {
     const vueCreated = [...fabric.created];
     const vueTree = fabric.serialize([fabric.appRoot()]);
 
-    // root-element.ts puts a wrapper ShimElement between the engine's synthetic box-none
-    // AppContainer and the app's own root, because Svelte's compiled output mounts through an
-    // anchor rather than handing us a root node the way Vue/React do. It carries flex:1 so a
-    // flex:1 app root still fills the screen (mount-pipeline.smoke.test.ts covers that). Peeling
-    // BOTH layers off the Svelte tree and ONE off Vue's must leave identical trees.
-    expect(stripOuter(stripOuter(svelteTree)), 'tree below the adapter wrappers').toBe(
-      stripOuter(vueTree),
-    );
+    // render.ts's mount() puts a wrapper `symbiote-view` between the engine's synthetic box-none
+    // AppContainer and the app's own root, because Svelte's mount() needs a real target node to
+    // insert into rather than handing us a root node the way Vue/React do. It carries flex:1 so a
+    // flex:1 app root still fills the screen (mount-pipeline.smoke.test.ts covers that). Below
+    // that wrapper, the app's own root view carries the two Svelte-bootstrap empty-text anchors
+    // at DIFFERENT depths (one as its own trailing child from the `{#each}` block's own anchor,
+    // one as the wrapper's OTHER child from `_mount_inner`'s own anchor) — `serializeWithout
+    // BootstrapAnchors` strips both, recursively, wherever they land. Peeling ONE layer off Vue's
+    // tree and recursively-filtering-then-joining the wrapper's real children must leave
+    // identical trees.
+    expect(svelteWrapper, 'the render.ts wrapper committed').toBeDefined();
+    const svelteContentTree = (svelteWrapper?.children ?? [])
+      .filter(child => !isSvelteBootstrapAnchor(child))
+      .map(serializeWithoutBootstrapAnchors)
+      .join('');
+    expect(svelteContentTree, 'tree below the adapter wrappers').toBe(stripOuter(vueTree));
 
-    const svelteTally = byViewName(svelteCreated);
+    const bootstrapAnchors = svelteCreated.filter(isSvelteBootstrapAnchor);
+    expect(
+      bootstrapAnchors,
+      'exactly two Svelte-internal empty-text bootstrap anchors',
+    ).toHaveLength(2);
+
+    const svelteTally = byViewName(svelteCreated.filter(node => !isSvelteBootstrapAnchor(node)));
     const vueTally = byViewName(vueCreated);
-    expect(svelteTally, 'the only difference is one extra RCTView').toEqual({
+    expect(
+      svelteTally,
+      'excluding the two bootstrap anchors, the only difference is one extra RCTView',
+    ).toEqual({
       ...vueTally,
       RCTView: (vueTally.RCTView ?? 0) + 1,
     });
 
     // Stated as a constant, not a ratio, on purpose: if this ever starts scaling with ROWS the
-    // assertion breaks loudly, which is exactly the regression worth catching.
-    expect(svelteCreated.length, 'total native nodes created').toBe(vueCreated.length + 1);
+    // assertion breaks loudly, which is exactly the regression worth catching. +1 for render.ts's
+    // own wrapper, +2 for Svelte's own mount-bootstrap anchors (this file's header) — neither
+    // component of this fixed cost scales with ROWS.
+    expect(svelteCreated.length, 'total native nodes created').toBe(vueCreated.length + 3);
   });
 });

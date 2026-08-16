@@ -1,14 +1,14 @@
-// @symbiote-native/svelte: a DOM-shim adapter over @symbiote-native/engine. Stock compiled
-// Svelte output believes it is talking to the real DOM (svelte-adapter-dom-shim skill);
-// underneath, every DOM call routes into the same mutation API every other adapter drives.
-// All Fabric clone-on-write lives in the engine, shared cross-adapter. App code names only
-// @symbiote-native/svelte.
+// @symbiote-native/svelte: drives @symbiote-native/engine through Svelte's OFFICIAL
+// custom-renderer API (`svelte/renderer`, sveltejs/svelte#18042 — svelte-adapter-custom-renderer
+// skill), which replaced this adapter's original DOM-shim strategy. Every node operation the
+// compiler emits dispatches straight to `renderer.ts`'s Renderer object, which drives the same
+// mutation API every other adapter drives. All Fabric clone-on-write lives in the engine, shared
+// cross-adapter. App code names only @symbiote-native/svelte.
 //
-// Full component parity with React/Vue/Angular landed 2026-08-11 (svelte-adapter-dom-shim
-// skill §15): every `core/components` render function has a fixed tree shape, so no
-// `descriptorToSvelte` bridge was ever needed — each component below is hand-authored Svelte
-// markup mirroring its render-*.ts, reusing only the pure state/render logic. See skill §17/§18
-// for the one open async-exception repro and the honest cross-cutting gap list.
+// Full component parity with React/Vue/Angular: every `core/components` render function has a
+// fixed tree shape, so each component below is hand-authored Svelte markup mirroring its
+// render-*.ts, reusing only the pure state/render logic — see the skill for what's verified and
+// what's still open.
 
 export { mount, unmount } from './render';
 export { AppRegistry, setHostRegistrar } from './modules/app-registry';
@@ -257,17 +257,12 @@ export type {
 
 // findNodeHandle: RN's ref -> native reactTag lookup, the Svelte twin of the React/Vue
 // adapters' own (host-instance.ts / host-instance/index.ts). hostInstance: the typed
-// measure/setNativeProps/focus/blur accessor off a `bind:this` ShimElement ref (see
-// host-instance.ts's header — React/Vue get this for free off a plain ref value; Svelte's ref is
-// a ShimElement wrapper, so it needs its own typed unwrap).
+// measure/setNativeProps/focus/blur accessor off a `{@attach}` host ref (see host-instance.ts's
+// header — React/Vue get this for free off a plain ref value; Svelte's own attach machinery
+// hands back the real engine node directly since the custom-renderer rewrite, so this is now a
+// thin typed passthrough rather than a shim-to-engine-node translation).
 export { findNodeHandle, hostInstance } from './host-instance';
 export type { IHostInstance } from './host-instance';
-// ShimElement: the `bind:this` value type a raw `symbiote-*` host tag hands back (see
-// host-instance.ts's header) — public so app code can type its own `$state.raw<ShimElement |
-// null>` ref, the same escape hatch Switch/Pressable/ActivityIndicator use internally, for a
-// component (RefApiDemo-style measure/setNativeProps/AccessibilityInfo target) whose public
-// wrapper (View/Text) forwards no bind:this of its own.
-export type { ShimElement } from './dom-shim';
 
 // The generic Descriptor -> shim-tree bridge (svelte-adapter-dom-shim skill §19) — the Svelte
 // twin of Vue's `descriptorToVue` / React's `descriptorToReact`, which a downstream package

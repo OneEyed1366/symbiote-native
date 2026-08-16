@@ -1,27 +1,25 @@
-// §2 of svelte-adapter-dom-shim: `fragments: 'tree'` is mandatory, not a preference — it makes
-// the compiler emit `from_tree()` (element-by-element via document.createElement), never
-// `from_html()` (innerHTML on a <template>), so the shim needs no HTML parser. `css: 'external'`
-// keeps Svelte from injecting <style> into a document.head that does not meaningfully exist —
-// styling goes through @symbiote-native/css-parser + the class registry instead, the same path
-// Vue SFC <style> blocks already use.
-
-// `forbid-web-only-constructs.ts` is TS-authored, like the rest of this package's source.
-// svelte.config.js itself is loaded directly by Node (svelte-check, the language server,
-// Vite/Metro tooling) with no build step of its own. Importing the `.ts` source by its real
-// extension works because Node >=23.6 strips erasable TypeScript syntax natively with no
-// flag or loader (verified against the installed Node 24.15.0, which loaded this file and
-// resolved the import without error) — a `.js`-suffixed specifier pointing at nonexistent
-// build output does NOT work, confirmed by the same check.
-import { forbidWebOnlyConstructs } from './src/preprocessor/forbid-web-only-constructs.ts';
+// `experimental.customRenderer` (sveltejs/svelte#18042) is what actually wires our adapter in —
+// see svelte-adapter-custom-renderer skill. The value is a plain string tag, never resolved as a
+// module path by our own tooling (mount() gets the real renderer object separately, via
+// `{ renderer }`); it only needs to be a stable, non-empty identifier, matching how Svelte's own
+// custom-renderer test suite uses an arbitrary file path for the same field. Once enabled, the
+// compiler itself rejects `bind:`/`transition:`/`animate:`/`<svelte:head|window|body|document>`
+// on an element at COMPILE TIME — the retired `forbid-web-only-constructs.ts` preprocessor caught
+// the same constructs by hand; deleting it in favor of the compiler's own errors is the whole
+// point of moving off the DOM shim. `fragments: 'tree'` is no longer load-bearing (the shim's
+// from_tree/clone-on-write dance is gone — a custom renderer never clones, per the same PR) but
+// is harmless to keep; `css: 'external'` stays mandatory (now enforced by the compiler, not just
+// convention) — styling goes through @symbiote-native/css-parser + the class registry, the same
+// path Vue SFC <style> blocks already use.
 import { scopedStyles } from './src/preprocessor/scoped-styles.ts';
 
 export default {
   compilerOptions: {
     fragments: 'tree',
     css: 'external',
+    experimental: {
+      customRenderer: '@symbiote-native/svelte/renderer',
+    },
   },
-  // Order matters: the guard throws on a construct that cannot work at all, so it runs before
-  // anything rewrites the source it would report offsets against. `scopedStyles` then compiles
-  // the `<style>` block away — see its header for why Svelte's own CSS output is unusable here.
-  preprocess: [forbidWebOnlyConstructs(), scopedStyles()],
+  preprocess: [scopedStyles()],
 };

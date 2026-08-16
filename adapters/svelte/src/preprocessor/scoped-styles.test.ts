@@ -193,7 +193,7 @@ describe('scopedStyles preprocessor', () => {
     const packageRoot = join(__dirname, '../..');
     const script = [
       "const cfg = (await import('./svelte.config.js')).default;",
-      "const out = await cfg.preprocess[1].markup({ content: '<View class=\"card\" /><style>.card{padding:2px}</style>', filename: '/x/A.svelte' });",
+      "const out = await cfg.preprocess[0].markup({ content: '<View class=\"card\" /><style>.card{padding:2px}</style>', filename: '/x/A.svelte' });",
       'process.stdout.write(out.code);',
     ].join('\n');
 
