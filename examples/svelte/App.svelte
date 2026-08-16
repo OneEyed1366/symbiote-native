@@ -21,8 +21,15 @@
   // inside a collapsed symbiote-text so a stray space could not crash a device, but the audit
   // (`node scripts/audit-svelte-stray-whitespace.mjs`) still expects zero.
   import './App.css';
-  import { Screen, Stack, useLinkingIntegration } from '@symbiote-native/navigation/svelte';
-  import type { INavigatorHandle, IScreenOptions } from '@symbiote-native/navigation/svelte';
+  import {
+    Screen,
+    Stack,
+    useLinkingIntegration,
+  } from '@symbiote-native/navigation/svelte';
+  import type {
+    INavigatorHandle,
+    IScreenOptions,
+  } from '@symbiote-native/navigation/svelte';
   import { hide } from '@symbiote-native/splash-screen/svelte';
 
   import MenuScreen from './screens/MenuScreen.svelte';
@@ -69,7 +76,10 @@
     headerUserInterfaceStyle: 'dark',
   };
 
-  const canaryScreenOptions: IScreenOptions = darkHeader('Symbiote Canary', LINE_COLOR.primitives);
+  const canaryScreenOptions: IScreenOptions = darkHeader(
+    'Symbiote Canary',
+    LINE_COLOR.primitives,
+  );
 
   const detailsScreenOptions: IScreenOptions = {
     title: 'Navigation Demo',
@@ -110,8 +120,14 @@
     sheetInitialDetentIndex: 0,
   };
 
-  const tabsDemoScreenOptions: IScreenOptions = darkHeader('Tabs Demo', LINE_COLOR.structure);
-  const drawerDemoScreenOptions: IScreenOptions = darkHeader('Drawer Demo', LINE_COLOR.structure);
+  const tabsDemoScreenOptions: IScreenOptions = darkHeader(
+    'Tabs Demo',
+    LINE_COLOR.structure,
+  );
+  const drawerDemoScreenOptions: IScreenOptions = darkHeader(
+    'Drawer Demo',
+    LINE_COLOR.structure,
+  );
   const nestedNavigatorsScreenOptions: IScreenOptions = darkHeader(
     'Nested Navigators',
     LINE_COLOR.structure,
@@ -120,7 +136,10 @@
     'Hooks Demo',
     LINE_COLOR.introspection,
   );
-  const deepLinkingScreenOptions: IScreenOptions = darkHeader('Deep Linking', LINE_COLOR.routing);
+  const deepLinkingScreenOptions: IScreenOptions = darkHeader(
+    'Deep Linking',
+    LINE_COLOR.routing,
+  );
   const statePersistenceScreenOptions: IScreenOptions = darkHeader(
     'State Persistence',
     LINE_COLOR.routing,
@@ -135,7 +154,12 @@
   let stackInstance = $state.raw<unknown>(null);
 
   function isNavigatorHandle(value: unknown): value is INavigatorHandle {
-    return typeof value === 'object' && value !== null && 'push' in value && 'replace' in value;
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'push' in value &&
+      'replace' in value
+    );
   }
 
   useLinkingIntegration(APP_LINKING_CONFIG, () =>
@@ -152,9 +176,18 @@
 </script>
 
 <Stack bind:this={stackInstance} initialRouteName={ROUTE_NAME.Menu}
-  ><Screen name={ROUTE_NAME.Menu} component={MenuScreen} options={menuScreenOptions}
-  /><Screen name={ROUTE_NAME.Canary} component={CanaryScreen} options={canaryScreenOptions}
-  /><Screen name={ROUTE_NAME.Details} component={DetailsScreen} options={detailsScreenOptions}
+  ><Screen
+    name={ROUTE_NAME.Menu}
+    component={MenuScreen}
+    options={menuScreenOptions}
+  /><Screen
+    name={ROUTE_NAME.Canary}
+    component={CanaryScreen}
+    options={canaryScreenOptions}
+  /><Screen
+    name={ROUTE_NAME.Details}
+    component={DetailsScreen}
+    options={detailsScreenOptions}
   /><Screen
     name={ROUTE_NAME.HeaderOptions}
     component={HeaderOptionsScreen}
@@ -163,7 +196,10 @@
     name={ROUTE_NAME.SheetDemo}
     component={SheetDemoScreen}
     options={sheetDemoScreenOptions}
-  /><Screen name={ROUTE_NAME.TabsDemo} component={TabsDemoScreen} options={tabsDemoScreenOptions}
+  /><Screen
+    name={ROUTE_NAME.TabsDemo}
+    component={TabsDemoScreen}
+    options={tabsDemoScreenOptions}
   /><Screen
     name={ROUTE_NAME.DrawerDemo}
     component={DrawerDemoScreen}

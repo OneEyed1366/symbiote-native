@@ -172,7 +172,10 @@
   );
 
   // 0..5, so the keyed {#each} matches the TSX's index-keyed Array.from(length: 6).
-  const scrollRows = Array.from({ length: SCROLL_ROW_COUNT }, (_unused, index) => index);
+  const scrollRows = Array.from(
+    { length: SCROLL_ROW_COUNT },
+    (_unused, index) => index,
+  );
 
   // Tier B runtime modules, read live: the runes pull from Dimensions/Appearance, appState tracks
   // foreground/background through AppState's device events.
@@ -207,10 +210,13 @@
 
   // native -> JS: AppState pushes lifecycle changes; read the current phase live.
   $effect(() => {
-    const subscription = AppState.addEventListener('change', (...args: unknown[]) => {
-      const next = args[0];
-      if (typeof next === 'string') appState = next;
-    });
+    const subscription = AppState.addEventListener(
+      'change',
+      (...args: unknown[]) => {
+        const next = args[0];
+        if (typeof next === 'string') appState = next;
+      },
+    );
     return () => subscription.remove();
   });
 
@@ -240,7 +246,10 @@
   // JS->native StatusBar window flags (Android). setBackgroundColor/setTranslucent imperative drives.
   function onToggleStatusBarRed(): void {
     statusBarRed = !statusBarRed;
-    StatusBar.setBackgroundColor(statusBarRed ? STATUS_BAR_RED : STATUS_BAR_DEFAULT, true);
+    StatusBar.setBackgroundColor(
+      statusBarRed ? STATUS_BAR_RED : STATUS_BAR_DEFAULT,
+      true,
+    );
   }
   function onToggleStatusBarTranslucent(): void {
     statusBarTranslucent = !statusBarTranslucent;
@@ -250,7 +259,10 @@
   // JS -> native imperative modules. A Promise reject (no native module / user cancel) is
   // expected, so it's swallowed; this is a demo, not a flow to handle.
   function onShare(): void {
-    void Share.share({ message: 'Sent from symbiote', url: 'https://svelte.com' }).catch(() => {});
+    void Share.share({
+      message: 'Sent from symbiote',
+      url: 'https://svelte.com',
+    }).catch(() => {});
   }
   function onAlert(): void {
     Alert.alert('symbiote', 'Native AlertManager reached.', [
@@ -282,10 +294,13 @@
   function onPrepend(): void {
     mvcpHead -= PREPEND_COUNT;
     const head = mvcpHead;
-    const prepended = Array.from({ length: PREPEND_COUNT }, (_unused, index) => {
-      const n = head + index;
-      return { id: `row-${n}`, label: `item ${n}` };
-    });
+    const prepended = Array.from(
+      { length: PREPEND_COUNT },
+      (_unused, index) => {
+        const n = head + index;
+        return { id: `row-${n}`, label: `item ${n}` };
+      },
+    );
     mvcpItems = [...prepended, ...mvcpItems];
   }
 
@@ -312,24 +327,34 @@
       hidden={statusBarHidden}
       animated
     /><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
+      ><Text class="line-tag-text"
+        >{`${lineInfo.code} · ${lineInfo.label}`}</Text
+      ></View
     ><View class="hero-card"
-      ><View class="hero-badge"><Text class="hero-badge-text">{lineInfo.code}</Text></View><View
-        class="hero-copy"
-        ><Text class="hero-title">All primitives</Text><!-- one physical line on purpose: unlike
+      ><View class="hero-badge"
+        ><Text class="hero-badge-text">{lineInfo.code}</Text></View
+      ><View class="hero-copy"
+        ><Text class="hero-title">All primitives</Text
+        ><!-- one physical line on purpose: unlike
         Vue's template compiler, Svelte does NOT condense whitespace inside a text node, so a
         wrapped sentence would ship its newline + indent straight into RCTText.
-        --><Text class="hero-body">Every @symbiote-native/svelte primitive, driven straight onto Fabric — no react-native renderer in the path.</Text
+        --><Text
+          class="hero-body"
+          >Every @symbiote-native/svelte primitive, driven straight onto Fabric — no react-native renderer in the path.</Text
         ></View
       ></View
     ><!-- native->JS: keyboard height pushed from the device hub, read live --><Text
       class="header-note"
-      >{keyboardHeight > 0 ? `keyboard up · ${keyboardHeight}px` : 'keyboard down'}</Text
+      >{keyboardHeight > 0
+        ? `keyboard up · ${keyboardHeight}px`
+        : 'keyboard down'}</Text
     ><!-- Tier A runtime modules, live. The border below IS the hairline. --><Text
       class="hairline-note"
       style={{ borderTopWidth: StyleSheet.hairlineWidth }}>{hairlineText}</Text
-    ><!-- Tier B runtime modules, live. --><Text class="header-note">{dimensionsText}</Text
-    ><!-- JS->native StatusBar controls: watch the top strip react --><View class="row"
+    ><!-- Tier B runtime modules, live. --><Text class="header-note"
+      >{dimensionsText}</Text
+    ><!-- JS->native StatusBar controls: watch the top strip react --><View
+      class="row"
       ><View class="flex1"
         ><ActionButton
           title={statusBarHidden ? 'Show status bar' : 'Hide status bar'}
@@ -344,7 +369,8 @@
         /></View
       ></View
     ><!-- Android-only window flags: the blank-risk pair. PASS: the top strip turns red / goes
-         translucent and the app STAYS rendered. -->{#if Platform.OS === 'android'}<View class="row"
+         translucent and the app STAYS rendered. -->{#if Platform.OS === 'android'}<View
+        class="row"
         ><View class="flex1"
           ><ActionButton
             title={statusBarRed ? 'BG default' : 'BG red'}
@@ -360,27 +386,48 @@
         ></View
       >{/if}<!-- JS->native imperative modules: tap to fire the real native UI / haptics. --><View
       class="row"
-      ><View class="flex1"><ActionButton title="Alert" onPress={onAlert} color={accent} /></View
+      ><View class="flex1"
+        ><ActionButton title="Alert" onPress={onAlert} color={accent} /></View
       ><!-- ActionSheetIOS is iOS-only by design (no Android native module exists).
-      -->{#if Platform.OS !== 'android'}<View class="flex1"
-          ><ActionButton title="Action sheet" onPress={onActionSheet} color={accent} /></View
+      -->{#if Platform.OS !== 'android'}<View
+          class="flex1"
+          ><ActionButton
+            title="Action sheet"
+            onPress={onActionSheet}
+            color={accent}
+          /></View
         >{/if}</View
     ><View class="row"
-      ><View class="flex1"><ActionButton title="Share" onPress={onShare} color={accent} /></View
       ><View class="flex1"
-        ><ActionButton title="Vibrate" onPress={() => Vibration.vibrate()} color={accent} /></View
+        ><ActionButton title="Share" onPress={onShare} color={accent} /></View
+      ><View class="flex1"
+        ><ActionButton
+          title="Vibrate"
+          onPress={() => Vibration.vibrate()}
+          color={accent}
+        /></View
       ></View
-    ><ActionButton title="Open svelte.com" onPress={onOpenUrl} color={accent} /><!--
+    ><ActionButton
+      title="Open svelte.com"
+      onPress={onOpenUrl}
+      color={accent}
+    /><!--
       The native UIRefreshControl spinner only shows while iOS holds the pull-down; our full
       re-commit snaps the offset back, so we drive our OWN indicator from `refreshing`.
-    -->{#if refreshing}<View class="refresh-row"
-        ><ActivityIndicator color={accent} /><Text class="accent-note">Refreshing…</Text></View
-      >{:else}<Text class="muted-center">{`pull to refresh · refreshed ${refreshes}×`}</Text
+    -->{#if refreshing}<View
+        class="refresh-row"
+        ><ActivityIndicator color={accent} /><Text class="accent-note"
+          >Refreshing…</Text
+        ></View
+      >{:else}<Text class="muted-center"
+        >{`pull to refresh · refreshed ${refreshes}×`}</Text
       >{/if}<!-- View + press-to-increment --><View
       testID="counter-card"
       onPress={() => (count += 1)}
       class="counter-card"
-      ><Text testID="counter-value" class="counter-text">{`tapped ${count}×`}</Text></View
+      ><Text testID="counter-value" class="counter-text"
+        >{`tapped ${count}×`}</Text
+      ></View
     ><!-- TextInput + greeting --><TextInput
       testID="greeting-input"
       value={name}
@@ -404,8 +451,11 @@
       size="large"
     /><!-- Slider: the @react-native-community/slider native view via @symbiote-native/slider/svelte.
          The engine derives its events + tint processors from the library's ViewConfig; the same
-         wrapper backs the React canary. --><View class="section-tight"
-      ><Text class="switch-label">{`volume · ${Math.round(volume * 100)}%`}</Text><Slider
+         wrapper backs the React canary. --><View
+      class="section-tight"
+      ><Text class="switch-label"
+        >{`volume · ${Math.round(volume * 100)}%`}</Text
+      ><Slider
         value={volume}
         onValueChange={next => (volume = next)}
         minimumValue={0}
@@ -429,7 +479,8 @@
     /><!-- Component-local style block: compound selector, static and dynamic class
     --><CompoundClassDemo
     /><!-- Parity checks: longPress · Keyboard.dismiss · animated scroll · sticky · a11y focus
-    --><ParityDemo /><!-- Opens a Modal --><ActionButton
+    --><ParityDemo
+    /><!-- Opens a Modal --><ActionButton
       testID="modal-open"
       title="Open modal"
       onPress={() => (modalVisible = true)}
@@ -461,12 +512,17 @@
         index,
       })}
       class="chip-list"
-      >{#snippet item({ item })}<!-- width/marginRight stay dynamic — they reference the
+      >{#snippet item({
+        item,
+      })}<!-- width/marginRight stay dynamic — they reference the
         CHIP_WIDTH/CHIP_GAP script consts (also used by getItemLayout above), which a CSS selector
         has no way to read; backgroundColor is per-chip (item.color). --><View
           class="chip-card"
-          style={{ width: CHIP_WIDTH, marginRight: CHIP_GAP, backgroundColor: item.color }}
-          ><Text class="chip-number">{item.index}</Text></View
+          style={{
+            width: CHIP_WIDTH,
+            marginRight: CHIP_GAP,
+            backgroundColor: item.color,
+          }}><Text class="chip-number">{item.index}</Text></View
         >{/snippet}</FlatList
     ><!-- ===== feature-parity device checks =====
 
@@ -487,7 +543,9 @@
     ><!-- maintainVisibleContentPosition. PASS: scroll down a bit, tap Prepend: the rows you are
          looking at DO NOT jump; new items appear above without shifting the viewport. FAIL: the
          list jumps to the top. box-list160 is shared with the Animated.ScrollView below.
-    --><Text class="section-label">MVCP · prepend without jump</Text><FlatList
+    --><Text
+      class="section-label">MVCP · prepend without jump</Text
+    ><FlatList
       testID="mvcp-list"
       data={mvcpItems}
       keyExtractor={item => item.id}
@@ -496,7 +554,11 @@
       >{#snippet item({ item })}<View class="mvcp-row"
           ><Text class="list-row-text">{item.label}</Text></View
         >{/snippet}</FlatList
-    ><ActionButton title="Prepend 5" color={accent} onPress={onPrepend} /><!--
+    ><ActionButton
+      title="Prepend 5"
+      color={accent}
+      onPress={onPrepend}
+    /><!--
       Animated.ScrollView scroll-driven header (native driver). PASS: drag INSIDE the box below
       (not the page): the bright bar above SMOOTHLY fades to near-invisible and lifts, on the UI
       thread (no jank, no per-frame JS). Proves Animated.ScrollView + Animated.event native attach.
@@ -506,7 +568,8 @@
         opacity: parityHeaderOpacity,
         transform: [{ translateY: parityHeaderTranslateY }],
       }}
-      ><Text class="parity-header-text">HEADER — fades as you scroll ↓</Text></AnimatedView
+      ><Text class="parity-header-text">HEADER — fades as you scroll ↓</Text
+      ></AnimatedView
     ><!-- box-list160 is shared with the MVCP FlatList above. --><AnimatedScrollView
       class="box-list160"
       scrollEventThrottle={SCROLL_EVENT_THROTTLE_MS}
@@ -514,13 +577,19 @@
       >{#each scrollRows as row (row)}<View class="scroll-demo-row"
           ><Text class="list-row-text">{`scroll me · row ${row}`}</Text></View
         >{/each}</AnimatedScrollView
-    ><Text class="tiny-center">↑ drag inside the box — the bar above reacts</Text><!--
+    ><Text class="tiny-center"
+      >↑ drag inside the box — the bar above reacts</Text
+    ><!--
       Native-driver proof for Animated.event: tap to JAM the JS thread 3s, then drag the box above
       DURING the freeze. If the bar keeps fading/lifting while JS is frozen, the scroll event
       drives parityScrollY on the UI thread (native attach). If it sticks until the thread frees,
       it was JS-driven.
-    --><ActionButton title="Freeze JS 3s — then scroll the box ↑" color={WARN} onPress={freezeJs}
-    /><Text class="tiny-center">tap Freeze, then immediately drag the box — bar should still move</Text
+    --><ActionButton
+      title="Freeze JS 3s — then scroll the box ↑"
+      color={WARN}
+      onPress={freezeJs}
+    /><Text class="tiny-center"
+      >tap Freeze, then immediately drag the box — bar should still move</Text
     ><!-- Modern style props reaching Fabric's C++ parser. Each is an A/B so the effect is
          unmistakable on the dark theme. boxShadow: a FLAME glow (a black shadow is invisible on
          the near-black bg). PASS: a soft orange halo bleeds out around the panel. --><View
@@ -528,10 +597,10 @@
       style={{ boxShadow: `0px 0px 22px 3px ${accent}88` }}
       ><Text class="note-text">boxShadow · flame glow</Text></View
     ><!-- filter: same base colour both sides; the right one is darkened by brightness(0.5).
-         PASS: the right panel is clearly darker than the left. --><View class="row"
-      ><View class="filter-tile"><Text class="tile-text">no filter</Text></View><View
-        class="filter-tile"
-        style={{ filter: [{ brightness: 0.5 }] }}
+         PASS: the right panel is clearly darker than the left. --><View
+      class="row"
+      ><View class="filter-tile"><Text class="tile-text">no filter</Text></View
+      ><View class="filter-tile" style={{ filter: [{ brightness: 0.5 }] }}
         ><Text class="tile-text">brightness 0.5</Text></View
       ></View
     ><!-- transformOrigin: the panel rotates around its TOP-LEFT corner, not its centre.
@@ -542,7 +611,8 @@
     ><!-- background-image: a CSS `linear-gradient(...)` authored entirely in App.css
          (.gradient-card), proving @symbiote-native/css-parser's `background-image` → RN's
          `experimental_backgroundImage` raw passthrough works end to end. PASS: the panel shows a
-         flame-to-peach gradient sweeping left to right. --><View class="gradient-card"
+         flame-to-peach gradient sweeping left to right. --><View
+      class="gradient-card"
       ><Text class="tile-text">background-image · linear-gradient</Text></View
     ><!-- Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
          width/height→style); a screen reader reads "Svelte logo" (alt→accessibilityLabel). --><Image
@@ -553,7 +623,8 @@
       class="web-image"
     /><!-- KeyboardAvoidingView enabled toggle. PASS: with enabled ON, focusing the field lifts it
          above the keyboard AND the keyboard is the email layout (proves autoComplete/inputMode
-         fold); with enabled OFF the keyboard covers the field. --><View class="switch-row"
+         fold); with enabled OFF the keyboard covers the field. --><View
+      class="switch-row"
       ><Text class="switch-label">avoid keyboard</Text><Switch
         value={kavEnabled}
         onValueChange={next => (kavEnabled = next)}
@@ -570,8 +641,10 @@
         placeholderTextColor={PLACEHOLDER_COLOR}
         class="text-input"
       /></KeyboardAvoidingView
-    ><Image source={{ uri: 'https://svelte.dev/favicon.png' }} class="logo-image" /><View
-      class="bottom-card"
+    ><Image
+      source={{ uri: 'https://svelte.dev/favicon.png' }}
+      class="logo-image"
+    /><View class="bottom-card"
       ><Text class="bottom-text">↑ you scrolled to the bottom</Text></View
     ><!-- Modal overlays its own window --><Modal
       visible={modalVisible}
@@ -579,9 +652,11 @@
       animationType="fade"
       onRequestClose={() => (modalVisible = false)}
       >{#snippet children()}<!-- transparent modal => paint our own dim layer (the RN pattern)
-        --><View class="modal-overlay"
+        --><View
+          class="modal-overlay"
           ><View testID="modal-card" class="modal-card"
-            ><Text class="modal-title">It's a Modal</Text><Text class="modal-body"
+            ><Text class="modal-title">It's a Modal</Text><Text
+              class="modal-body"
               >Rendered through ModalHostView — its own native window, same Fabric tree.</Text
             ><ActionButton
               testID="modal-close"
@@ -601,8 +676,11 @@
       onPress={() => (tunnelToastVisible = true)}
       color={accent}
     />{#if tunnelToastVisible}<TunnelIn tunnel={overlayTunnel}
-        >{#snippet children()}<View testID="tunnel-toast-card" class="modal-card"
-            ><Text class="modal-body">Ported via createTunnel ✦</Text><ActionButton
+        >{#snippet children()}<View
+            testID="tunnel-toast-card"
+            class="modal-card"
+            ><Text class="modal-body">Ported via createTunnel ✦</Text
+            ><ActionButton
               testID="tunnel-toast-dismiss"
               title="Dismiss"
               onPress={() => (tunnelToastVisible = false)}
@@ -615,7 +693,6 @@
        (the toast card). --><View
     testID="overlay-host"
     pointerEvents="box-none"
-    class="overlay-host"
-    ><TunnelOut tunnel={overlayTunnel} /></View
+    class="overlay-host"><TunnelOut tunnel={overlayTunnel} /></View
   ></SafeAreaView
 >

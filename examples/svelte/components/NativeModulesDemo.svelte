@@ -3,7 +3,13 @@
   // real host: I18nManager (RTL layout constants), Settings (a value round-tripped
   // through iOS NSUserDefaults via SettingsManager), and Image's static methods
   // (getSize / queryCache / prefetch, which hit the ImageLoader native module).
-  import { View, Text, Image, I18nManager, Settings } from '@symbiote-native/svelte';
+  import {
+    View,
+    Text,
+    Image,
+    I18nManager,
+    Settings,
+  } from '@symbiote-native/svelte';
   import ActionButton from './ActionButton.svelte';
 
   const LOGO_URI = 'https://svelte.dev/favicon.png';
@@ -64,8 +70,30 @@
 </script>
 
 <!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16. -->
-<View class="section-nested"><Text class="section-label">Runtime modules · I18nManager / Settings / Image statics</Text><Text class="info-text">{`RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`}</Text><ActionButton
+<View class="section-nested"
+  ><Text class="section-label"
+    >Runtime modules · I18nManager / Settings / Image statics</Text
+  ><Text class="info-text"
+    >{`RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`}</Text
+  ><ActionButton
     title={rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'}
     onPress={() => I18nManager.forceRTL(!rtl.isRTL)}
     color="#7fb5ff"
-  /><Text testID="persist-count" class="info-text">{`persisted taps: ${persisted} · survives relaunch`}</Text><ActionButton testID="persist-btn" title="Persist a tap" onPress={persistTap} color="#7fb5ff" /><View class="row-align-center"><Image source={{ uri: LOGO_URI }} class="logo-thumb" /><Text testID="logo-size" class="info-text-flex">{`logo size: ${imageSize}`}</Text></View><Text class="info-text">{`prefetch cache: ${cacheState}`}</Text><ActionButton title="Prefetch logo" onPress={prefetchLogo} color="#7fb5ff" /></View>
+  /><Text testID="persist-count" class="info-text"
+    >{`persisted taps: ${persisted} · survives relaunch`}</Text
+  ><ActionButton
+    testID="persist-btn"
+    title="Persist a tap"
+    onPress={persistTap}
+    color="#7fb5ff"
+  /><View class="row-align-center"
+    ><Image source={{ uri: LOGO_URI }} class="logo-thumb" /><Text
+      testID="logo-size"
+      class="info-text-flex">{`logo size: ${imageSize}`}</Text
+    ></View
+  ><Text class="info-text">{`prefetch cache: ${cacheState}`}</Text><ActionButton
+    title="Prefetch logo"
+    onPress={prefetchLogo}
+    color="#7fb5ff"
+  /></View
+>

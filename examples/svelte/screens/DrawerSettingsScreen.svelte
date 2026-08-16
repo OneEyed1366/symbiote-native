@@ -16,9 +16,10 @@
 <SafeAreaView class="screen"
   ><View class="section"
     ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
-    ><Text class="section-label">Drawer demo · Settings</Text
-    ><ActionButton
+      ><Text class="line-tag-text"
+        >{`${lineInfo.code} · ${lineInfo.label}`}</Text
+      ></View
+    ><Text class="section-label">Drawer demo · Settings</Text><ActionButton
       testID="drawer-close-from-settings"
       title="Close drawer"
       onPress={() => navigation.current.closeDrawer()}

@@ -24,14 +24,22 @@
      the aria-label/role=button card proves the web-alias FOLD (a raw aria-label attribute must
      never reach the native node); the third card's accessibilityState expects
      enabled=false/selected=true in uiautomator. -->
-<View class="section-nested"><Text class="section-label">Accessibility · props → native · aria/role transform · AccessibilityInfo</Text><Text class="info-text">{`screen reader: ${screenReader}`}</Text><View
+<View class="section-nested"
+  ><Text class="section-label"
+    >Accessibility · props → native · aria/role transform · AccessibilityInfo</Text
+  ><Text class="info-text">{`screen reader: ${screenReader}`}</Text><View
     accessible
     accessibilityRole="header"
     accessibilityLabel="a11y-canonical-label"
     class="a11y-card"
-  ><Text class="info-text">canonical label + role=header</Text></View><View accessible role="button" aria-label="a11y-aria-label" class="a11y-card"><Text class="info-text">aria-label + role=button</Text></View><View
+    ><Text class="info-text">canonical label + role=header</Text></View
+  ><View accessible role="button" aria-label="a11y-aria-label" class="a11y-card"
+    ><Text class="info-text">aria-label + role=button</Text></View
+  ><View
     accessible
     accessibilityLabel="a11y-state"
     accessibilityState={{ disabled: true, selected: true }}
     class="a11y-card"
-  ><Text class="info-text">state: disabled + selected</Text></View></View>
+    ><Text class="info-text">state: disabled + selected</Text></View
+  ></View
+>

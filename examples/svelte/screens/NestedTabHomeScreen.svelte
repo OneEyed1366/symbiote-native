@@ -22,16 +22,22 @@
 <SafeAreaView class="screen"
   ><View class="section"
     ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
+      ><Text class="line-tag-text"
+        >{`${lineInfo.code} · ${lineInfo.label}`}</Text
+      ></View
     ><View class="hero-card"
-      ><View class="hero-badge" style={{ backgroundColor: LINE_COLOR.structure }}
+      ><View
+        class="hero-badge"
+        style={{ backgroundColor: LINE_COLOR.structure }}
         ><Text class="hero-badge-text">NN</Text></View
       ><View class="hero-copy"
-        ><Text class="hero-title">Nested navigators</Text
-        ><Text class="hero-body">A Tab navigator nested inside a Stack screen, reaching its parent's own navigation handle through getParent().</Text
+        ><Text class="hero-title">Nested navigators</Text><Text
+          class="hero-body"
+          >A Tab navigator nested inside a Stack screen, reaching its parent's own navigation handle through getParent().</Text
+        ></View
       ></View
-    ></View
-    ><Text class="info-text">{`parent navigator reachable via getParent(): ${canPopParent ? 'yes (Stack)' : 'no'}`}</Text
+    ><Text class="info-text"
+      >{`parent navigator reachable via getParent(): ${canPopParent ? 'yes (Stack)' : 'no'}`}</Text
     ><ActionButton
       testID="nested-pop-parent"
       title="Pop parent Stack (via getParent)"

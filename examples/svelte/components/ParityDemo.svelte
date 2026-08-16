@@ -35,7 +35,10 @@
   }));
   // Tall sections (taller than the list viewport) so the sticky cross-talk is visible: as you
   // scroll, the next section header should reach the top and PUSH the pinned one off.
-  function sectionData(prefix: string, label: string): { id: string; label: string }[] {
+  function sectionData(
+    prefix: string,
+    label: string,
+  ): { id: string; label: string }[] {
     return Array.from({ length: 8 }, (_unused, index) => ({
       id: `${prefix}${index}`,
       label: `${label} ${index}`,
@@ -56,7 +59,8 @@
   // platforms (enable TalkBack/VoiceOver to feel the focus jump).
   function onFocusTitle(): void {
     const instance = hostInstance(titleRef);
-    if (instance !== undefined) AccessibilityInfo.sendAccessibilityEvent(instance, 'focus');
+    if (instance !== undefined)
+      AccessibilityInfo.sendAccessibilityEvent(instance, 'focus');
   }
 </script>
 
@@ -66,16 +70,18 @@
   ><Text
     onLongPress={() => (longPressMsg = 'long press! (tap was suppressed)')}
     onPress={() => (longPressMsg = 'tap')}
-    class="long-press-row"
-    >{longPressMsg}</Text
+    class="long-press-row">{longPressMsg}</Text
   ><TextInput
     placeholder="focus me…"
     placeholderTextColor="#41506a"
     onFocus={() => (dismissMsg = 'keyboard up — tap Hide keyboard')}
     onBlur={() => (dismissMsg = 'blurred (keyboard down)')}
     class="focus-input"
-  /><Text class="note-text">{dismissMsg}</Text
-  ><ActionButton title="Hide keyboard" onPress={() => Keyboard.dismiss()} color="#7fb5ff" /><Text class="section-label">FlatList · animated scrollToOffset</Text
+  /><Text class="note-text">{dismissMsg}</Text><ActionButton
+    title="Hide keyboard"
+    onPress={() => Keyboard.dismiss()}
+    color="#7fb5ff"
+  /><Text class="section-label">FlatList · animated scrollToOffset</Text
   ><FlatList
     bind:this={listRef}
     data={parityRows}
@@ -86,24 +92,45 @@
       index,
     })}
     class="parity-list"
-    >{#snippet item({ item })}<View class="parity-row" style={{ height: PARITY_ROW_H }}><Text class="info-text">{`row ${item.n}`}</Text></View>{/snippet}</FlatList
+    >{#snippet item({ item })}<View
+        class="parity-row"
+        style={{ height: PARITY_ROW_H }}
+        ><Text class="info-text">{`row ${item.n}`}</Text></View
+      >{/snippet}</FlatList
   ><View class="row"
-    ><View class="flex1"><ActionButton
+    ><View class="flex1"
+      ><ActionButton
         title="Scroll ▼ animated"
-        onPress={() => listRef?.scrollToOffset({ offset: 20 * PARITY_ROW_H, animated: true })}
+        onPress={() =>
+          listRef?.scrollToOffset({
+            offset: 20 * PARITY_ROW_H,
+            animated: true,
+          })}
         color="#7fb5ff"
-      /></View><View class="flex1"><ActionButton
+      /></View
+    ><View class="flex1"
+      ><ActionButton
         title="Top · instant"
         onPress={() => listRef?.scrollToOffset({ offset: 0, animated: false })}
         color="#7fb5ff"
-      /></View></View
-  ><Text class="section-label">SectionList · sticky (scroll: next header should push prev off)</Text
+      /></View
+    ></View
+  ><Text class="section-label"
+    >SectionList · sticky (scroll: next header should push prev off)</Text
   ><SectionList
     testID="sticky-section-list"
     sections={paritySections}
     keyExtractor={item => item.id}
     stickySectionHeadersEnabled
     class="section-list"
-    >{#snippet sectionHeader({ section })}<Text class="section-header">{section.title}</Text>{/snippet}{#snippet item({ item })}<View class="parity-row" style={{ height: PARITY_ROW_H }}><Text class="info-text">{item.label}</Text></View>{/snippet}</SectionList
-  ><ActionButton title="Focus the panel title (a11y)" onPress={onFocusTitle} color="#7fb5ff" /></View
+    >{#snippet sectionHeader({ section })}<Text class="section-header">{section.title}</Text>{/snippet}{#snippet item({ item })}<View
+        class="parity-row"
+        style={{ height: PARITY_ROW_H }}
+        ><Text class="info-text">{item.label}</Text></View
+      >{/snippet}</SectionList
+  ><ActionButton
+    title="Focus the panel title (a11y)"
+    onPress={onFocusTitle}
+    color="#7fb5ff"
+  /></View
 >
