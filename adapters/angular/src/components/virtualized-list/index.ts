@@ -35,9 +35,12 @@ import {
   Input,
   Output,
   ViewChild,
+  computed,
   inject,
+  signal,
   type AfterViewChecked,
   type DoCheck,
+  type OnChanges,
   type OnDestroy,
 } from '@angular/core';
 import {
@@ -86,7 +89,7 @@ import {
 } from '@symbiote-native/engine';
 import { ScrollView } from '../scroll-view';
 import { RefreshControl } from '../refresh-control';
-import { anchorHostStyle, ViewHost } from '../../primitives';
+import { anchorHostStyle, SymbioteStyleInputDirective, ViewHost } from '../../primitives';
 import {
   VListEmptyDirective,
   VListFooterDirective,
@@ -202,6 +205,7 @@ interface IWindowCell<ItemT> {
 @Component({
   selector: 'VirtualizedList',
   standalone: true,
+  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [ScrollView, RefreshControl, VListOutletDirective, ViewHost],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -210,30 +214,30 @@ interface IWindowCell<ItemT> {
       [horizontal]="isHorizontal"
       [style]="resolvedStyle"
       [contentContainerStyle]="resolvedContentContainerStyle"
-      [testID]="foldedAccessibility.testID"
-      [nativeID]="foldedAccessibility.nativeID"
-      [accessible]="foldedAccessibility.accessible"
-      [accessibilityLabel]="foldedAccessibility.accessibilityLabel"
-      [accessibilityHint]="foldedAccessibility.accessibilityHint"
-      [accessibilityRole]="foldedAccessibility.accessibilityRole"
-      [accessibilityState]="foldedAccessibility.accessibilityState"
-      [accessibilityValue]="foldedAccessibility.accessibilityValue"
-      [accessibilityActions]="foldedAccessibility.accessibilityActions"
-      [accessibilityLabelledBy]="foldedAccessibility.accessibilityLabelledBy"
-      [importantForAccessibility]="foldedAccessibility.importantForAccessibility"
-      [accessibilityLiveRegion]="foldedAccessibility.accessibilityLiveRegion"
-      [screenReaderFocusable]="foldedAccessibility.screenReaderFocusable"
-      [accessibilityViewIsModal]="foldedAccessibility.accessibilityViewIsModal"
-      [accessibilityElementsHidden]="foldedAccessibility.accessibilityElementsHidden"
-      [accessibilityIgnoresInvertColors]="foldedAccessibility.accessibilityIgnoresInvertColors"
-      [accessibilityLanguage]="foldedAccessibility.accessibilityLanguage"
+      [testID]="foldedAccessibility().testID"
+      [nativeID]="foldedAccessibility().nativeID"
+      [accessible]="foldedAccessibility().accessible"
+      [accessibilityLabel]="foldedAccessibility().accessibilityLabel"
+      [accessibilityHint]="foldedAccessibility().accessibilityHint"
+      [accessibilityRole]="foldedAccessibility().accessibilityRole"
+      [accessibilityState]="foldedAccessibility().accessibilityState"
+      [accessibilityValue]="foldedAccessibility().accessibilityValue"
+      [accessibilityActions]="foldedAccessibility().accessibilityActions"
+      [accessibilityLabelledBy]="foldedAccessibility().accessibilityLabelledBy"
+      [importantForAccessibility]="foldedAccessibility().importantForAccessibility"
+      [accessibilityLiveRegion]="foldedAccessibility().accessibilityLiveRegion"
+      [screenReaderFocusable]="foldedAccessibility().screenReaderFocusable"
+      [accessibilityViewIsModal]="foldedAccessibility().accessibilityViewIsModal"
+      [accessibilityElementsHidden]="foldedAccessibility().accessibilityElementsHidden"
+      [accessibilityIgnoresInvertColors]="foldedAccessibility().accessibilityIgnoresInvertColors"
+      [accessibilityLanguage]="foldedAccessibility().accessibilityLanguage"
       [accessibilityRespondsToUserInteraction]="
-        foldedAccessibility.accessibilityRespondsToUserInteraction
+        foldedAccessibility().accessibilityRespondsToUserInteraction
       "
       [accessibilityShowsLargeContentViewer]="
-        foldedAccessibility.accessibilityShowsLargeContentViewer
+        foldedAccessibility().accessibilityShowsLargeContentViewer
       "
-      [accessibilityLargeContentTitle]="foldedAccessibility.accessibilityLargeContentTitle"
+      [accessibilityLargeContentTitle]="foldedAccessibility().accessibilityLargeContentTitle"
       (accessibilityAction)="accessibilityActionTick($event)"
       (accessibilityTap)="accessibilityTapTick($event)"
       (magicTap)="magicTapTick($event)"
@@ -324,6 +328,7 @@ export class VirtualizedList<ItemT = unknown>
     IVirtualizedListHandle,
     DoCheck,
     AfterViewChecked,
+    OnChanges,
     OnDestroy
 {
   // The list's edge/viewability/failure events as real Angular events: `(endReached)="…"`, not
@@ -477,6 +482,9 @@ export class VirtualizedList<ItemT = unknown>
   private batchTimer: ReturnType<typeof setTimeout> | null = null;
   // Dedupes the after-commit effects: they run only when the windowing signature changed.
   private lastEffectSignature = '';
+  // Dedupes dispatch's markForCheck against the RENDERED window (see dispatch below). Distinct from
+  // lastEffectSignature, which gates the batch-fill timer and deliberately includes scrollOffset.
+  private lastRenderSignature = '';
   // Dedupes ngDoCheck's own recompute. WITHOUT this, recomputeView() unconditionally rebuilds
   // windowCells (and each cell's `separators` handle — fresh closures every call) on EVERY CD pass,
   // including ones triggered by something else entirely in the app. A fresh context object flows
@@ -496,7 +504,27 @@ export class VirtualizedList<ItemT = unknown>
   // inner `<ScrollView>` one level down (itself its own separate anchor host).
   private readonly elementRef = inject(ElementRef);
 
-  get foldedAccessibility(): IAccessibilityProps & IAriaProps & Record<string, unknown> {
+  // Bridges the non-reactive @Input fields into the reactive graph so the computed below can
+  // memoize a bag derived from them (the same bridge ScrollView's shared.ts uses - read its comment
+  // for why signal inputs are not an option while this package's unit suite runs on JIT).
+  //
+  // ONLY safe for a bag whose every dependency is an @Input. This list's window machinery
+  // (listState, renderVersion, windowCells, the measured metrics) is driven from scroll/layout
+  // callbacks that never touch ngOnChanges, so nothing derived from it may ride this signal - it
+  // would memoize a window that stops re-computing mid-scroll. Make that state its own signal
+  // instead of widening this one.
+  private readonly inputsRevision = signal(0);
+
+  // MEASURED: the template feeds 20 separate <ScrollView> inputs off this one bag, and Angular does
+  // not cache a getter across binding expressions - as a getter it rebuilt the object 20 times per
+  // refresh, and every consumer saw a fresh reference, so all 20 reported "changed" and wrote
+  // through to the ScrollView. A computed evaluates once and hands back the SAME object until an
+  // input actually changes. Every dependency below is an @Input, which is what makes
+  // inputsRevision a complete dependency set here.
+  readonly foldedAccessibility = computed<
+    IAccessibilityProps & IAriaProps & Record<string, unknown>
+  >(() => {
+    this.inputsRevision();
     return resolveAccessibilityProps({
       testID: this.testID,
       nativeID: this.nativeID,
@@ -534,7 +562,7 @@ export class VirtualizedList<ItemT = unknown>
       'aria-valuenow': this.ariaValueNow,
       'aria-valuetext': this.ariaValueText,
     });
-  }
+  });
 
   get shouldRenderRefreshControl(): boolean {
     return this.refreshRequested ?? this.refresh.observed;
@@ -651,10 +679,22 @@ export class VirtualizedList<ItemT = unknown>
     const inputs = this.buildInputs();
     const result = reduceList(this.listState, action, inputs);
     this.runEffects(result.effects, inputs);
-    if (result.changed) {
-      this.renderVersion += 1;
-      this.cdr.markForCheck();
-    }
+    if (!result.changed) return;
+    this.renderVersion += 1;
+    // The reducer reports `changed` for EVERY scroll offset - it has to, since the offset feeds
+    // end-reached distance, viewability and the batch-fill timer, all handled above in runEffects.
+    // The TEMPLATE reads none of those; it reads the window. Marking on the offset repainted the
+    // whole ancestor chain 60 times a second on a sticky screen for a window that had not moved.
+    const signature = this.renderSignature();
+    if (signature === this.lastRenderSignature) return;
+    this.lastRenderSignature = signature;
+    this.cdr.markForCheck();
+  }
+
+  // The window, not the offset: exactly the metrics recomputeView turns into cells and spacers.
+  private renderSignature(): string {
+    const m = this.listState.metrics;
+    return `${m.first}|${m.last}|${m.count}|${m.total}`;
   }
 
   private runEffects(effects: IListEffect<ItemT>[], inputs: IListReducerInputs<ItemT>): void {
@@ -710,6 +750,14 @@ export class VirtualizedList<ItemT = unknown>
     }
   }
 
+  // foldedAccessibility reads plain @Input fields, which are NOT reactive on their own - this bump
+  // is what tells that computed an input changed. It must stay in ngOnChanges: that is the single
+  // moment Angular has finished writing every changed input for this pass, and it runs before
+  // ngDoCheck below, so the recompute already sees the current values.
+  ngOnChanges(): void {
+    this.inputsRevision.update(revision => revision + 1);
+  }
+
   // Once-per-CD recompute, BEFORE the template bindings are read (so the freshly computed
   // template-bound fields render this pass — computing them in ngAfterContentChecked instead would
   // trip ExpressionChangedAfterItHasBeenChecked). The dedup guard runs refresh-metrics (which owns
@@ -730,6 +778,10 @@ export class VirtualizedList<ItemT = unknown>
       this.stickyHeaderIndices,
       this.maintainVisibleContentPosition,
       this.style,
+      // `recomputeView` folds this into the committed style, but it arrives through
+      // addClass/removeClass, never as an @Input - so without it here no entry moves on a class
+      // toggle and the gate skips the recompute forever. Reference-stable, so the dedup holds.
+      anchorHostStyle(this.elementRef),
       this.contentContainerStyle,
       // Folds scroll / layout / measure / batch-tick: dispatch bumps renderVersion on any change.
       this.renderVersion,
@@ -829,6 +881,12 @@ export class VirtualizedList<ItemT = unknown>
       stickySet !== undefined && plan.stickyChildPositions.length > 0
         ? plan.stickyChildPositions
         : undefined;
+    dlog(
+      `STICKY[list] stickySet=${stickySet === undefined ? 'undefined' : JSON.stringify([...stickySet])} ` +
+        `childPositions=${JSON.stringify(plan.stickyChildPositions)} ` +
+        `forcedStickyCell=${plan.forcedStickyCell === undefined ? 'none' : plan.forcedStickyCell.index} ` +
+        `window=[${m.first},${m.last}] hasHeader=${this.headerDir !== undefined}`,
+    );
 
     this.forcedStickyCell =
       plan.forcedStickyCell !== undefined
