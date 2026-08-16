@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/expo-modules-link",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Native-module registration for apps using expo-modules-core wrapper packages (sensors, local-auth, haptics, ...). One app-level postinstall scans node_modules for every installed package's native-link.json and regenerates the app's app/build.gradle and MainApplication.kt registration blocks, so a new native module never needs a hand-edit.",
   "license": "MIT",
   "repository": {

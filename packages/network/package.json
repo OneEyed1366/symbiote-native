@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/network",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "expo-network wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. Network state (type/connected/internet-reachable) with a change listener, device IP address, and airplane-mode detection.",
   "license": "MIT",
   "repository": {

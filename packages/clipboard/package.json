@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/clipboard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "expo-clipboard wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. Reads and writes clipboard text, URLs, and images, plus a clipboard-change listener.",
   "license": "MIT",
   "repository": {

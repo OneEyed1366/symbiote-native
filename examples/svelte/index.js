@@ -17,4 +17,5 @@ if (__DEV__) {
   require('@symbiote-native/devtools/react-native');
 }
 
+
 createApp(App).mount(appName);

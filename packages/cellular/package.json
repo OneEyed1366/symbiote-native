@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/cellular",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "expo-cellular wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. Cellular generation (2G/3G/4G/5G), carrier/SIM info on Android (ISO country code, carrier name, MCC/MNC), VoIP-support detection, and the permission get/request pair gating carrier info on Android.",
   "license": "MIT",
   "repository": {

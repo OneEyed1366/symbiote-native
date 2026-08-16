@@ -3088,3 +3088,81 @@ Coverage added with it: `switch.smoke.test.ts` now pins `onTintColor` /
 `tintColor` / `thumbTintColor` and a flattened object `style` on a real
 compiled mount. React, Vue and Angular each already pinned the colour mapping;
 Svelte did not, and the seam it depends on is the Svelte-specific one.
+
+## §28. HMR silently no-ops on `.svelte` files - react-refresh misreads a compiled component as a React one, FIXED 2026-08-17
+
+Symptom: edit a `.svelte` file while Metro dev server is running - nothing
+happens on device, no error, no reload. Confirmed working for Vue/React/Angular
+in this monorepo; broken only for Svelte, which is why it reads as "Svelte in
+general has no HMR" rather than an app bug.
+
+Root cause, traced through the served dev bundle (`examples/svelte`, Metro
+0.84.4, `curl .../index.bundle?platform=ios&dev=true`), not guessed:
+
+1. Svelte 5's compiler (`generate: 'client'`) compiles every `.svelte` file to
+   a plain top-level function named after the file - `function App($$anchor,
+   $$props) {...}` - the module's default export.
+2. Metro's bundled HMR runtime (`metro-runtime/src/polyfills/require.js`,
+   `metroHotUpdateModule`) decides per module whether an update can hot-patch
+   in place or must fall back to a full reload, via
+   `isReactRefreshBoundary(Refresh, moduleExports)` ->
+   `Refresh.isLikelyComponentType(moduleExports)`.
+3. `isLikelyComponentType` (from `react-refresh/runtime`, bundled into every
+   RN dev build) is a pure shape heuristic with zero framework awareness:
+   `typeof export === 'function'` and (empty prototype or none) and
+   `/^[A-Z]/.test(export.name)`. It has no way to tell whether react-reconciler
+   is even running.
+4. A Svelte-compiled component matches exactly - function, capitalized name
+   from the filename - so Metro treats it as a refresh boundary, calls
+   `Refresh.register(...)`, then `Refresh.performReactRefresh()`.
+5. `performReactRefresh()` walks React's own Fiber tree (via the DevTools
+   global hook) for live instances of that "family" to patch. This adapter
+   never runs react-reconciler - there is no Fiber tree - so the walk finds
+   nothing and the update is silently swallowed. No exception: react-refresh
+   believes the refresh succeeded.
+
+Vue and Angular dodge the same machinery for opposite reasons: Vue's compiled
+SFC default-exports a plain object (`{ setup, render, ... }`), which fails the
+`typeof === 'function'` check outright; Angular's compiled output is a class.
+Both fall through Metro's inverse-dependency walk to "No root boundary" (the
+entry module has no parents) -> a real `DevSettings.reload()` full reload -
+what actually makes HMR visible for those two today. React gets genuine
+incremental Fast Refresh because a real Fiber tree exists to patch
+(react-reconciler is actually in the path there). Svelte is the one adapter
+whose compiled shape happens to look like a React component to a shape-only
+heuristic, with no Fiber tree underneath to back it up.
+
+**Fix**, in `examples/svelte/metro.config.js`'s `resolver`:
+
+```js
+unstable_forceFullRefreshPatterns: [/\.svelte$/],
+```
+
+Metro's own escape hatch for this exact false positive
+(`resolver.unstable_forceFullRefreshPatterns: ReadonlyArray<RegExp>`) -
+embedded into the bundle prelude as a literal global assignment by
+`metro/src/lib/getPreludeCode.js`, read by `metroHotUpdateModule` before the
+react-refresh boundary check runs. Matches against the module's Metro
+`verboseName`, confirmed via the served bundle to be the plain source-relative
+path (a top-level `App.svelte` registers as `verboseName === "App.svelte"`),
+so a bare `/\.svelte$/` suffix match is correct regardless of subdirectory.
+Every `.svelte` update now forces `performFullRefresh` unconditionally,
+landing on the same `DevSettings.reload()` path that already works for
+Vue/Angular.
+
+Verified by rebuilding the dev bundle after the config change and grepping it:
+the prelude contains `__unstable_forceFullRefreshPatterns=[/\.svelte$/]`, and
+`metroHotUpdateModule`'s pattern-match branch reads that exact global. Not
+verified on a running simulator/device - confirmed the fix reaches the
+bundle/runtime wiring, not confirmed by watching a live screen update.
+
+**Gap, not yet closed**: this line lives only in
+`examples/svelte/metro.config.js` - a per-app `resolver` option, matching how
+`sourceExts`, `unstable_conditionNames`, and the `esm-env` `resolveRequest`
+redirect already live per-example rather than centralized (unlike the
+transformer, shipped as `@symbiote-native/svelte/metro-svelte-transformer`
+precisely so no consuming app needs local wiring). Any other app on
+`@symbiote-native/svelte` - including the future `create-symbiote` scaffolder
+- needs this same line added by hand today, or it hits the identical
+silent-no-op bug. A `@symbiote-native/svelte/metro-config` helper shipping
+this the way the transformer is shipped has not been done.

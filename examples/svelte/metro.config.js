@@ -71,6 +71,20 @@ const config = {
       }
       return context.resolveRequest(context, moduleName, platform);
     },
+    // Metro's dev-server HMR runtime decides per updated module whether to hot-patch in place or
+    // fall back to a full reload, via react-refresh's own heuristic (isLikelyComponentType):
+    // typeof export === 'function' and its name starts with an uppercase letter. Svelte 5 compiles
+    // every .svelte file to exactly that shape - `function App($$anchor, $$props) {...}`, named
+    // after the file - so it's misread as a hot-patchable React component. react-refresh then
+    // calls performReactRefresh(), which walks React's own Fiber tree (via the devtools hook) for
+    // live instances to patch; this adapter never registers one (no react-reconciler in the path),
+    // so the walk finds nothing and the update is silently swallowed - no error, no visible change.
+    // Vue's compiled SFC (`export default { setup, render }`, an object) and Angular's (a class)
+    // both fail the same heuristic the other way and correctly fall through to Metro's "no
+    // boundary found" full-reload path - the path that actually makes HMR work for every other
+    // adapter. `unstable_forceFullRefreshPatterns` is Metro's own escape hatch for this false
+    // positive: force every `.svelte` update straight to a full reload, skipping the boundary check.
+    unstable_forceFullRefreshPatterns: [/\.svelte$/],
   },
 };
 

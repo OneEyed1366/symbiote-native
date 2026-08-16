@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/keep-awake",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "expo-keep-awake wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. Keeps the screen awake for the lifetime of a mounted component/composable/service, with an optional listener for keep-awake state changes.",
   "license": "MIT",
   "repository": {
