@@ -1,4 +1,5 @@
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+const { withRozenite } = require('@rozenite/metro');
 const path = require('node:path');
 
 const projectRoot = __dirname;
@@ -24,14 +25,12 @@ const config = {
   // adapters/svelte/metro-svelte-transformer.cjs).
   transformer: {
     babelTransformerPath: require.resolve('@symbiote-native/svelte/metro-svelte-transformer'),
-    // @react-native/metro-config defaults inlineRequires to true — every top-level
-    // import/require gets rewritten to a lazy, per-call-site require() instead of running once
-    // at module-load time. Svelte's internal client runtime (svelte/internal/client/**) is a
-    // large graph of small files wired together via module-scope singleton reactivity state
-    // (the "current effect"/signal graph) and Node's #imports subpath aliases (#client/constants
-    // etc.) — under inlineRequires this graph re-enters itself during mount and blows the JS
-    // stack (`Maximum call stack size exceeded` inside metroRequire, first hit trying to run
-    // this example on a real device/simulator). Disabled here; app code doesn't rely on
+    // @react-native/metro-config defaults inlineRequires to true — every top-level import gets
+    // rewritten to a lazy, per-call-site require(). Svelte's internal client runtime
+    // (svelte/internal/client/**) is a graph of small files wired via module-scope singleton
+    // reactivity state (the "current effect"/signal graph) — under inlineRequires this graph
+    // re-enters itself during mount and blows the JS stack (`Maximum call stack size exceeded`
+    // inside metroRequire, on a real device/simulator). Disabled here; app code doesn't rely on
     // inlineRequires for cold-start perf at this example's size.
     getTransformOptions: async () => ({
       transform: { experimentalImportSupport: false, inlineRequires: false },
@@ -53,23 +52,19 @@ const config = {
     // see the root vitest.config.ts's `resolve.conditions: ['browser']` /
     // `ssr.resolve.conditions: ['browser']` (svelte-adapter-dom-shim skill §15).
     unstable_conditionNames: ['browser'],
-    // svelte/internal/client/dom/operations.js's init_operations() (the very function our own
-    // dom-shim patches) gates an extra block on esm-env's DEV export: when true, it calls
+    // svelte/internal/client/dom/operations.js's init_operations() (the function our own
+    // dom-shim patches) gates a block on esm-env's DEV export: when true it calls
     // init_array_prototype_warnings(), which monkey-patches the REAL global
-    // Array.prototype.indexOf/lastIndexOf/includes for the lifetime of the app. DEV resolves via
-    // esm-env's "./development" conditional export, which — with no custom `development`/
-    // `production` condition set (Metro doesn't set either by default) — falls back to reading
-    // process.env.NODE_ENV, which is 'development' in every --dev build, so this patch is ALWAYS
-    // active in dev today. That global Array.prototype mutation is real-DOM-debugging tooling
-    // (built for a real browser's Array.from(document.querySelectorAll(...)) proxy-equality
-    // checks) with zero relevance under our DOM shim, and is the prime suspect for a repeatable
-    // native SIGSEGV (null pointer deref deep in libhermesvm.so, inside
-    // RuntimeScheduler_Modern::performMicrotaskCheckpoint, ~1-2 minutes into every run on a real
-    // device/emulator) — Hermes's JIT/inline-caching for built-in Array methods is not expected
-    // to tolerate the prototype being swapped out from under it. Force esm-env's DEV to resolve
-    // false by redirecting its one physical import site, without touching global condition
-    // resolution (which would affect every other package's dev/prod export choice, not just
-    // this one file).
+    // Array.prototype.indexOf/lastIndexOf/includes for the app's lifetime. DEV falls back to
+    // process.env.NODE_ENV (Metro sets no custom development/production condition), which is
+    // 'development' in every --dev build, so this patch is ALWAYS active in dev today. That
+    // global Array.prototype mutation is real-DOM-debugging tooling with zero relevance under our
+    // DOM shim, and is the prime suspect for a repeatable native SIGSEGV (null pointer deref deep
+    // in libhermesvm.so, inside RuntimeScheduler_Modern::performMicrotaskCheckpoint, ~1-2 minutes
+    // into every run on a real device/emulator) — Hermes's JIT/inline-caching for built-in Array
+    // methods doesn't tolerate the prototype being swapped out from under it. Force esm-env's DEV
+    // to resolve false by redirecting its one physical import site, without touching global
+    // condition resolution (which would affect every other package's dev/prod export choice).
     resolveRequest: (context, moduleName, platform) => {
       if (moduleName === 'esm-env/development') {
         return { type: 'sourceFile', filePath: esmEnvFalseFile };
@@ -79,4 +74,18 @@ const config = {
   },
 };
 
-module.exports = mergeConfig(defaultConfig, config);
+// Rozenite (github.com/callstackincubator/rozenite) wires custom React Native DevTools panels
+// into Metro's dev-server middleware. It only touches `watchFolders`/`resolver.extraNodeModules`/
+// `resolver.resolveRequest` (chaining through to whatever resolveRequest is already there, ours
+// included) and `server.enhanceMiddleware` — it never touches `transformer`, so the Svelte
+// babelTransformerPath/getTransformOptions above are untouched.
+//
+// On by default for any dev build, off for release — this is a development-time tool, not a
+// diagnostic you opt into (unlike the DEBUG log flag, which stays opt-in even in dev). RN CLI's
+// own `bundle` command sets `process.env.NODE_ENV = args.dev ? 'development' : 'production'`
+// (@react-native/community-cli-plugin's buildBundle.js) BEFORE this config is evaluated, so
+// `--dev false`/a release bundle reliably disables it. `react-native start` (the everyday dev
+// server) never touches NODE_ENV at all, so it stays enabled there by default too.
+module.exports = withRozenite(mergeConfig(defaultConfig, config), {
+  enabled: process.env.NODE_ENV !== 'production',
+});

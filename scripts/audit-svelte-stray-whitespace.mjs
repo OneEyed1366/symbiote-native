@@ -7,13 +7,11 @@
 // real ShimText -> RCTRawText engine node -> native shadow node. Inside a non-Text parent that
 // is also an invalid Fabric child. Detected in the compiled from_tree([...]) array.
 //
-// INSIDE one text node (found 2026-08-14 while bringing examples/svelte's canary to Vue
-// parity) — a DIFFERENT bug with the same cause. Svelte trims a text node's leading and
-// trailing whitespace but does NOT condense whitespace inside it, unlike Vue's template
-// compiler. So a sentence wrapped across source lines ships its literal newline + indent into
-// the RCTText: the device renders a line break and a run of spaces mid-sentence where the
-// author only meant a soft wrap. Not caught by the §16 check (that one only sees text nodes
-// that are ENTIRELY whitespace), so it is a separate pass over the parsed source.
+// INSIDE one text node — a different bug, same cause. Svelte trims a text node's leading/
+// trailing whitespace but does not condense whitespace inside it (unlike Vue's compiler), so a
+// sentence wrapped across source lines ships its literal newline + indent into the RCTText: the
+// device renders a line break and a run of spaces mid-sentence. Not caught by the §16 check
+// (that one only sees text nodes that are ENTIRELY whitespace), so it's a separate pass.
 
 import { readFileSync } from 'node:fs';
 import { globSync } from 'node:fs';
@@ -41,10 +39,9 @@ function collectWrappedText(node, found) {
   return found;
 }
 
-// `packages/**` is in the default set on purpose. It used to be missing, so `@symbiote-native/
-// slider`'s Svelte entry was never audited once, and `@symbiote-native/navigation`'s 8 `.svelte`
-// files would only have been covered by someone remembering to pass a root argument. A default
-// that silently under-scans reads as "clean" and is worse than no default at all.
+// `packages/**` is in the default set on purpose — omitting it silently under-scans (slider and
+// navigation's .svelte files went unaudited until someone remembered to pass a root), and a
+// default that silently under-scans reads as "clean", which is worse than no default at all.
 const roots = process.argv.slice(2);
 const patterns = (
   roots.length > 0

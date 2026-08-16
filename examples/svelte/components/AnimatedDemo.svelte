@@ -1,13 +1,12 @@
 <script lang="ts">
-  // Animated, both drivers side by side. The pulse runs on the NATIVE driver: the
-  // curve lives in NativeAnimated, so zero JS runs per frame (DEBUG shows a single
-  // `native: startAnimatingNode`, no per-frame commits). The two slide dots run the
-  // SAME timing on different drivers: the JS one commits a clone every frame (DEBUG
-  // logs `commit … incremental` ~60×/run), the native one offloads it. Each dot keeps
-  // its own Animated.Value so a JS run and a native run never touch the same node.
+  // Animated, both drivers side by side. The pulse runs on the NATIVE driver: the curve lives in
+  // NativeAnimated, so zero JS runs per frame (DEBUG shows a single `native: startAnimatingNode`,
+  // no per-frame commits). The two slide dots run the SAME timing on different drivers: the JS
+  // one commits a clone every frame (DEBUG logs `commit … incremental` ~60x/run), the native one
+  // offloads it. Each dot keeps its own Animated.Value so a JS run and a native run never touch
+  // the same node.
   //
-  // Animated.View is dotted, so it can't be a template tag — aliased to <AnimatedView>,
-  // same as every other adapter's port of this demo.
+  // Animated.View is dotted, so it can't be a template tag — aliased to <AnimatedView>.
   import { View, Text, Animated } from '@symbiote-native/svelte';
   import ActionButton from './ActionButton.svelte';
 
@@ -82,9 +81,7 @@
   };
 </script>
 
-<!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16. Order: native-driven
-     perpetual pulse; JS-driven slide (a commit per frame) + its button; native-driven slide
-     (offloaded, zero JS frames) + its button; freeze-JS-thread proof button. -->
+<!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16. -->
 <View class="section-nested"><Text class="section-label">Animated · JS vs native driver</Text><View class="pulse-frame"><AnimatedView
       testID="pulse-dot"
       class="pulse-dot"

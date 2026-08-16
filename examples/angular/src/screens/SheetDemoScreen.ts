@@ -26,13 +26,10 @@ export const sheetDemoScreenOptions: IAngularScreenOptions = {
 };
 
 /**
- * Sheet presentation demo: this screen is PUSHED with stackPresentation: 'formSheet' and three
- * sheetAllowedDetents (30% / 60% / full height) — drag the grabber between them. "Present" is the
- * Menu screen's push onto this route; "Dismiss" below is this route's own pop, both driving the
- * native sheet the same way a real app would toggle it from a button. Angular twin of
- * ../../react/screens/SheetDemoScreen.tsx — skips SafeAreaView on purpose, same reasoning as the
- * React screen (react-native-screens' formSheet content-sizing search only walks ScrollView's
- * direct native subviews).
+ * Screen is PUSHED with stackPresentation: 'formSheet'; drag the grabber between the three
+ * detents. Angular twin of ../../react/screens/SheetDemoScreen.tsx — skips SafeAreaView on
+ * purpose: react-native-screens' formSheet content-sizing search only walks ScrollView's direct
+ * native subviews.
  */
 @Component({
   selector: 'SheetDemoScreen',

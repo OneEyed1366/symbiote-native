@@ -71,6 +71,40 @@ callback `@Input()`s (`[onScroll]="handler"`) because they can carry an
 `Animated.event(...)` marker for native-driven scroll, and `@Output()` only
 binds a template listener expression, never an arbitrary value.
 
+## Forms (`@angular/forms`)
+
+`TextInput` and `Switch` each implement `ControlValueAccessor` directly — the
+same shape `@angular/material`'s `MatInput`/`MatSelect` use — so
+`@angular/forms`' own directives work with no extra import beyond the one
+you'd already reach for on a native `<input>`:
+
+```ts
+import { Component } from '@angular/core';
+import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Switch, TextInput } from '@symbiote-native/angular';
+
+@Component({
+  standalone: true,
+  imports: [ReactiveFormsModule, Switch, TextInput],
+  template: `
+    <TextInput [formControl]="email" placeholder="email" />
+    <Switch [formControl]="notify" />
+  `,
+})
+export class Example {
+  readonly email = new FormControl('', [Validators.required, Validators.email]);
+  readonly notify = new FormControl(false);
+}
+```
+
+`[(ngModel)]` works the same way with `FormsModule`. Only value-bearing
+components implement `ControlValueAccessor` — `[formControl]` on any other
+component is a plain unbound `@Input`, not a forms integration.
+[`Slider`](/docs/packages/slider/) is the same story, one level down in the
+package that ships it — see its own Angular usage. React and Vue have no
+equivalent (their controlled-value idiom is plain `value`/`onChangeText` and
+`v-model`) — see their own API references.
+
 ## Refs and handles
 
 ```ts

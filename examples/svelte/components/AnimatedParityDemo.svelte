@@ -76,9 +76,7 @@
   };
 </script>
 
-<!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16. Order: ValueXY drag
-     box (PanResponder); tracking lead+follower dots + button; diffClamp collapsing header +
-     scroll buttons. -->
+<!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16. -->
 <View class="section-nested"><Text class="section-label">Animated · ValueXY / tracking / diffClamp</Text><Text class="drag-hint">drag the purple box →</Text><View class="xy-frame"><AnimatedView
       {...panResponder.panHandlers}
       class="xy-box"

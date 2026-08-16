@@ -33,42 +33,27 @@ export const NAV_LINE = {
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
 
+// One color per @symbiote-native/* package demo. Most colors are shared across every expo-*
+// app for consistency; a few are called out below where the pick has to dodge a near neighbor.
 export const LINE_COLOR: Record<INavLine, string> = {
-  // @symbiote-native/sensors demo — its own warm amber.
   [NAV_LINE.Sensors]: '#f6ad55',
-  // @symbiote-native/local-auth demo — its own tour stop, distinct from the amber above.
   [NAV_LINE.LocalAuth]: '#ef4444',
-  // @symbiote-native/haptics demo — violet, shared across every expo-* app for consistency.
   [NAV_LINE.Haptics]: '#8b5cf6',
-  // @symbiote-native/clipboard demo — teal, shared across every expo-* app for consistency.
   [NAV_LINE.Clipboard]: '#14b8a6',
-  // @symbiote-native/battery demo — green, shared across every expo-* app for consistency.
   [NAV_LINE.Battery]: '#22c55e',
-  // @symbiote-native/brightness demo — gold, shared across every expo-* app for consistency.
   [NAV_LINE.Brightness]: '#facc15',
-  // @symbiote-native/cellular demo — blue, shared across every expo-* app for consistency.
   [NAV_LINE.Cellular]: '#3b82f6',
-  // @symbiote-native/network demo — cyan, shared across every expo-* app for consistency.
   [NAV_LINE.Network]: '#06b6d4',
-  // @symbiote-native/device demo — slate, shared across every expo-* app for consistency.
   [NAV_LINE.Device]: '#64748b',
-  // @symbiote-native/application demo — pink, shared across every expo-* app for consistency.
   [NAV_LINE.Application]: '#ec4899',
-  // @symbiote-native/crypto demo — indigo, shared across every expo-* app for consistency.
   [NAV_LINE.Crypto]: '#6366f1',
-  // @symbiote-native/standard-web-crypto demo — orange, its own tour stop distinct from crypto's indigo.
+  // Orange — @symbiote-native/standard-web-crypto. Its own tour stop, distinct from Crypto's indigo.
   [NAV_LINE.StandardWebCrypto]: '#f97316',
-  // @symbiote-native/system-ui demo — purple, shared across every expo-* app for consistency.
   [NAV_LINE.SystemUi]: '#a855f7',
-  // @symbiote-native/store-review demo — lime, shared across every expo-* app for consistency.
   [NAV_LINE.StoreReview]: '#84cc16',
-  // @symbiote-native/keep-awake demo — sky, shared across every expo-* app for consistency.
   [NAV_LINE.KeepAwake]: '#0ea5e9',
-  // @symbiote-native/screen-orientation demo — rose, shared across every expo-* app for consistency.
   [NAV_LINE.ScreenOrientation]: '#f43f5e',
-  // @symbiote-native/localization demo — emerald, shared across every expo-* app for consistency.
   [NAV_LINE.Localization]: '#10b981',
-  // @symbiote-native/tracking-transparency demo — stone, shared across every expo-* app for consistency.
   [NAV_LINE.TrackingTransparency]: '#78716c',
   // Bronze — @symbiote-native/secure-store. Reads as a vault next to LocalAuth's crimson,
   // and stays clear of Brightness' gold and StandardWebCrypto's orange.

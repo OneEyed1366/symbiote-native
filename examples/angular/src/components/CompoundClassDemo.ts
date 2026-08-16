@@ -22,7 +22,7 @@ import './CompoundClassDemo.css';
   standalone: true,
   imports: [View, Text, ActionButton],
   template: `
-    <View class="section">
+    <View class="section-nested">
       <Text class="section-label">Compound class · component stylesheet</Text>
       <View class="row">
         <View class="badge" testID="angular-compound-badge-plain">

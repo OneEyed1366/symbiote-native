@@ -5,9 +5,13 @@
 // and baked into every transformed module (the app entry and the shared source).
 const debugFlag = process.env.DEBUG === '1' ? '1' : '0';
 
-function inlineDebugFlag({ types: t }) {
+// The devtools inspector (packages/devtools) used to have its own WITH_ROZENITE env-var flag
+// inlined the same way — dropped in favor of index.js checking RN's own `__DEV__` runtime
+// global directly (no build-time inlining needed for that one; see index.js and
+// metro.config.js's withRozenite() gate, both now default on for any dev build).
+function inlineFlags({ types: t }) {
   return {
-    name: 'inline-debug-flag',
+    name: 'inline-flags',
     visitor: {
       MemberExpression(path) {
         if (path.matchesPattern('process.env.DEBUG')) {
@@ -20,5 +24,5 @@ function inlineDebugFlag({ types: t }) {
 
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
-  plugins: [inlineDebugFlag],
+  plugins: [inlineFlags],
 };

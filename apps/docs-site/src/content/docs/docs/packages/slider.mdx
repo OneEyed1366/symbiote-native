@@ -127,6 +127,12 @@ as a workspace dependency the same way the examples do.
     `[(value)]` is Angular's banana-in-a-box two-way binding over the same
     `value` input + `valueChange` output pair — write `[value]="volume()"
     (valueChange)="volume.set($event)"` instead if you need the explicit form.
+
+    `Slider` also implements `ControlValueAccessor` directly, so it plugs
+    straight into `@angular/forms` — `[formControl]="volumeControl"` (from
+    `ReactiveFormsModule`) works the same way it does on `TextInput`/`Switch`,
+    no extra import needed. See the [Angular API reference's Forms
+    section](/docs/api/angular/#forms-angularforms) for the full pattern.
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -137,8 +143,7 @@ as a workspace dependency the same way the examples do.
     </script>
 
     <Slider
-      value={volume}
-      onValueChange={next => (volume = next)}
+      bind:value={volume}
       minimumValue={0}
       maximumValue={1}
       step={0.05}
@@ -147,9 +152,13 @@ as a workspace dependency the same way the examples do.
     />
     ```
 
-    Svelte has no two-way-binding sugar for this component — `value`/`onValueChange` is the
-    explicit, only form, same as writing out React's or Vue's `:value`/`@value-change` pair by
-    hand.
+    `value` is declared `$bindable()`, so `bind:value={x}` works as Svelte's own
+    two-way-binding sugar — the compiler wires the sync at the call site, no
+    adapter plumbing involved. The explicit `value={x} onValueChange={setX}`
+    form still works too and is required if you need to see or react to every
+    reported value yourself; don't pass both on the same instance, since
+    supplying `onValueChange` takes over and the bound variable stops updating
+    from native reports.
   </TabItem>
 </Tabs>
 
