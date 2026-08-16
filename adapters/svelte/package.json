@@ -23,6 +23,7 @@
     "./native-view-bridge": "./src/native-view-bridge.ts",
     "./preprocessor": "./src/preprocessor/forbid-web-only-constructs.ts",
     "./scoped-styles": "./src/preprocessor/scoped-styles.ts",
+    "./collapse-text-whitespace": "./src/preprocessor/collapse-text-whitespace.ts",
     "./style-scope": "./src/style-scope.ts",
     "./scope-token": "./src/scope-token.ts",
     "./metro-svelte-transformer": "./metro-svelte-transformer.cjs",
@@ -58,6 +59,10 @@
       "./scoped-styles": {
         "types": "./build/preprocessor/scoped-styles.d.ts",
         "default": "./build/preprocessor/scoped-styles.js"
+      },
+      "./collapse-text-whitespace": {
+        "types": "./build/preprocessor/collapse-text-whitespace.d.ts",
+        "default": "./build/preprocessor/collapse-text-whitespace.js"
       },
       "./style-scope": {
         "types": "./build/style-scope.d.ts",
