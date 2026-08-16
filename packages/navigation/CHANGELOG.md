@@ -1,5 +1,76 @@
 # @symbiote-native/navigation
 
+## 2.1.0
+
+### Minor Changes
+
+- 388c353: Declare the adapter peer dependencies as ranges instead of exact versions. Every package listed
+  `@symbiote-native/{react,vue,angular,svelte}` as `workspace:*` under `peerDependencies`, which
+  packs to whatever version was current at build time — so `@symbiote-native/battery@0.1.0` shipped
+  demanding exactly `@symbiote-native/react@0.2.8`, and an app on any other adapter version could
+  not install it without a peer conflict. They now read `>=<version>`, matching the shape
+  `@symbiote-native/engine` has carried since the singleton-peer rule was written.
+
+  The `workspace:*` entries under `devDependencies` are unchanged — those are what pnpm links for
+  in-repo development, and the engine rule requires them.
+
+  This also keeps release versioning honest. Changesets bumps a package to major whenever one of its
+  peer dependencies is bumped, so an exact peer pin turned every adapter release into a major bump
+  for all 25 packages regardless of what actually changed. With ranges plus
+  `onlyUpdatePeerDependentsWhenOutOfRange`, an adapter bump that stays inside the declared range no
+  longer forces one.
+
+- 388c353: Keep the navigators in step with their registered screens, and stop the drawer from disagreeing
+  with its own animation.
+
+  **Tabs kept a tab for a screen that had gone.** The router state was seeded once from the
+  registered `<Tab.Screen>` markers and never reconciled, so a screen unregistered after mount left
+  its tab in the bar forever - rendering a passthrough item labelled with the raw route name. A new
+  shared `reconcileTabRoutes` (modelled on `@react-navigation/routers`' `TabRouter.getStateForRoute-
+NamesChange`) takes membership and order from the live registry while a surviving route keeps its
+  key and accumulated params; focus follows the previously focused route by NAME and falls back to
+  the first route when that one is gone. All four adapters consume it.
+
+  **Stack kept a phantom entry.** Its route list is navigation history, not a projection of the
+  markers, so unregistering the marker for a route already pushed left the entry in place with
+  nothing to render - a blank screen with no way back. `reconcileStackRoutes` filters history by
+  registered name, preserves surviving routes by reference (a stack key is counter-derived, so
+  re-deriving would re-key and remount live screens), and repairs focus to the nearest survivor,
+  which is where a `pop()` would have landed. It deliberately returns the state unchanged rather than
+  emptying the list: minting a replacement route key belongs to the caller, and an empty registry is
+  usually just markers mid-re-registration.
+
+  **`jumpTo` to an unregistered route left the drawer open while animating it shut.** The animation
+  ran off a snapshot of `isOpen` taken before dispatching, but the reducer treats an unknown route
+  name as a no-op and returns the same state. State said open, the panel slid closed, and nothing
+  reconciled them. Each adapter now drives the animation from what the reducer actually produced.
+
+- 388c353: Add a `./svelte` entry point to every package, so a Svelte app reaches the same surface React, Vue
+  and Angular already have. The split follows each package's existing shape rather than a uniform
+  template: packages whose surface is free async functions with no per-instance state
+  (`application`, `crypto`, `device`, `haptics`, `local-auth`, `secure-store`, `sharing`, `sms`,
+  `standard-web-crypto`, `store-review`, `system-ui`, `web-browser`) re-export the same core
+  verbatim, exactly as their React/Vue/Angular entry points already do.
+
+  Packages carrying live state or an event subscription get a runes-based lifecycle instead — the
+  Svelte twin of the React hook and the Vue composable, written as `*.svelte.ts` so `$state` and
+  `$effect` are compiled: `battery`, `brightness`, `cellular`, `clipboard`, `keep-awake`,
+  `localization`, `network`, `screen-orientation`, `sensors`, `slider`, `splash-screen`,
+  `tracking-transparency`, and the `navigation` stack/tabs/drawer family.
+
+  The core stays untouched in every case — the entry point supplies only the lifecycle, so the
+  Svelte surface cannot drift from the other adapters' by construction.
+
+### Patch Changes
+
+- 80ed828: Stop publishing co-located test files. These packages ship `src/` because the Angular entry's
+  `default` export condition resolves back into it, which also swept in every `*.test.ts` beside
+  those sources — 24% of tracking-transparency's unpacked size, 11% of web-browser's. `files` now
+  excludes the `.test.`/`.spec.`/`.detox.` suffixes, and an eslint rule keeps them out.
+- Updated dependencies [388c353]
+- Updated dependencies [388c353]
+  - @symbiote-native/components@0.4.0
+
 ## 2.0.3
 
 ### Patch Changes

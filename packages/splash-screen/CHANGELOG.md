@@ -1,5 +1,76 @@
 # @symbiote-native/splash-screen
 
+## 3.1.0
+
+### Minor Changes
+
+- 388c353: Declare the adapter peer dependencies as ranges instead of exact versions. Every package listed
+  `@symbiote-native/{react,vue,angular,svelte}` as `workspace:*` under `peerDependencies`, which
+  packs to whatever version was current at build time — so `@symbiote-native/battery@0.1.0` shipped
+  demanding exactly `@symbiote-native/react@0.2.8`, and an app on any other adapter version could
+  not install it without a peer conflict. They now read `>=<version>`, matching the shape
+  `@symbiote-native/engine` has carried since the singleton-peer rule was written.
+
+  The `workspace:*` entries under `devDependencies` are unchanged — those are what pnpm links for
+  in-repo development, and the engine rule requires them.
+
+  This also keeps release versioning honest. Changesets bumps a package to major whenever one of its
+  peer dependencies is bumped, so an exact peer pin turned every adapter release into a major bump
+  for all 25 packages regardless of what actually changed. With ranges plus
+  `onlyUpdatePeerDependentsWhenOutOfRange`, an adapter bump that stays inside the declared range no
+  longer forces one.
+
+- 388c353: Stop a failed `hide()` from stranding the app under a splash it can never dismiss. The readiness
+  gate marks itself fired before `hide()` settles, so a rejection meant `animate()` never ran and no
+  later layout or load event could retry - the caller's overlay stayed up over a working app, with
+  the failure swallowed by a bare `.catch(() => {})`. `animate()` now runs on both paths. The worst
+  case becomes a fade-out over a native splash that may still be showing; it used to be the whole
+  app.
+
+  This is a deliberate divergence from react-native-bootsplash, which swallows the same rejection.
+  A second `.catch` covers the caller's own `animate()` throwing, so that cannot become an unhandled
+  rejection either.
+
+  New optional `config.onError?: (failure: IHideAnimationFailure) => void`, where `failure.stage` is
+  `'hide'` or `'animate'`. It is the channel an app actually hears about this on - the `dlog` at the
+  same seam is DEBUG-gated and therefore the developer's, not the app's.
+
+  A MISSING native module still throws, unchanged and on purpose. `RNBootSplash` is acquired through
+  `TurboModuleRegistry.getEnforcing`, which fails loudly at import by design, and upstream reads its
+  constants unguarded for the same reason: an absent native module is a build error, not a runtime
+  condition to degrade around. Softening it would hide exactly the failure this repo already
+  documents - `npm install` deleting the `.rn-bootsplash/` sources the podspec vendors at
+  pod-install time.
+
+  `HideAnimationController` now reads the native constants once and exposes them as `readonly
+constants`, so no adapter reads them itself.
+
+- 388c353: Add a `./svelte` entry point to every package, so a Svelte app reaches the same surface React, Vue
+  and Angular already have. The split follows each package's existing shape rather than a uniform
+  template: packages whose surface is free async functions with no per-instance state
+  (`application`, `crypto`, `device`, `haptics`, `local-auth`, `secure-store`, `sharing`, `sms`,
+  `standard-web-crypto`, `store-review`, `system-ui`, `web-browser`) re-export the same core
+  verbatim, exactly as their React/Vue/Angular entry points already do.
+
+  Packages carrying live state or an event subscription get a runes-based lifecycle instead — the
+  Svelte twin of the React hook and the Vue composable, written as `*.svelte.ts` so `$state` and
+  `$effect` are compiled: `battery`, `brightness`, `cellular`, `clipboard`, `keep-awake`,
+  `localization`, `network`, `screen-orientation`, `sensors`, `slider`, `splash-screen`,
+  `tracking-transparency`, and the `navigation` stack/tabs/drawer family.
+
+  The core stays untouched in every case — the entry point supplies only the lifecycle, so the
+  Svelte surface cannot drift from the other adapters' by construction.
+
+### Patch Changes
+
+- 80ed828: Stop publishing co-located test files. These packages ship `src/` because the Angular entry's
+  `default` export condition resolves back into it, which also swept in every `*.test.ts` beside
+  those sources — 24% of tracking-transparency's unpacked size, 11% of web-browser's. `files` now
+  excludes the `.test.`/`.spec.`/`.detox.` suffixes, and an eslint rule keeps them out.
+- Updated dependencies [388c353]
+- Updated dependencies [388c353]
+  - @symbiote-native/components@0.4.0
+
 ## 3.0.3
 
 ### Patch Changes
