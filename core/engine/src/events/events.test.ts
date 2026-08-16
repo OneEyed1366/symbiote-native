@@ -159,7 +159,7 @@ describe('longPress synthesis', () => {
   // actually listens for it -- arming it unconditionally would be wasted timers on
   // every touch in the app, including plain non-interactive views.
   it('does not arm a timer when nothing in the path listens for longPress', () => {
-    let longPresses = 0;
+    const longPresses = 0;
     // No onLongPress registered anywhere in the path.
     fabric.fireEvent(tree.button, 'topTouchStart');
     vi.advanceTimersByTime(600);
