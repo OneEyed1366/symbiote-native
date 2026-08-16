@@ -35,6 +35,7 @@ import { nextTag } from './tags';
 import { registerPostCommit, runPostCommitHooks } from './post-commit';
 import { fabricProps } from './fabric-props';
 import { isRecord } from './type-guards';
+import { unregisterSurface } from './surface-registry';
 
 // Re-exported from ./platform-color so callers don't need to change their import path.
 export { processColor, setColorProcessor } from './platform-color';
@@ -373,6 +374,7 @@ function rootContainerFor(rootTag: IRootTag): ISymbioteNode {
 // container would re-clone dead handles into the new surface -> a blank screen. The old
 // container's descendants fall out of every reference and their mirror entries GC.
 export function disposeRoot(rootTag: IRootTag): void {
+  unregisterSurface(rootTag);
   if (rootContainers.delete(rootTag)) dlog(`root container disposed root=${rootTag}`);
 }
 

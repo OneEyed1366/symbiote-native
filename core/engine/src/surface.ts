@@ -7,6 +7,7 @@ import { commitChildren } from './commit';
 import { dlog } from './debug';
 import { installEventHandler } from './events';
 import type { ISymbioteNode } from './node';
+import { registerSurface } from './surface-registry';
 
 export class SymbioteSurface {
   readonly rootTag: IRootTag;
@@ -72,6 +73,7 @@ export class SymbioteSurface {
 export function createSurface(rootTag: IRootTag): SymbioteSurface {
   installEventHandler();
   const surface = new SymbioteSurface(rootTag);
+  registerSurface(surface);
   dlog(`surface created root=${rootTag}`);
   return surface;
 }

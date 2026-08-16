@@ -75,6 +75,21 @@ catalog:
   react: 19.2.3
   react-native: 0.86.0
   react-reconciler: ^0.33.0
+  # react-dom is used ONLY by packages/devtools's panel — a plain browser React bundle
+  # (React Native DevTools renders it inside an iframe), never RN's own render target. Paired
+  # with the `react` version above.
+  react-dom: 19.2.3
+  '@types/react-dom': ^19.2.0
+  # Rozenite (github.com/callstackincubator/rozenite) DevTools plugin toolchain — used ONLY by
+  # packages/devtools. @rozenite/vite-plugin peers `vite: ^7.3.1`; `vite` itself is otherwise
+  # unused in this repo (Metro is the RN app bundler — see root CLAUDE.md's "Not Vite" note,
+  # which is about the app bundle, not this separate browser-iframe panel artifact).
+  '@rozenite/plugin-bridge': ^2.1.0
+  '@rozenite/vite-plugin': ^2.1.0
+  vite: ^7.3.1
+  # @rozenite/vite-plugin's react-native build target aliases bare `react-native` imports (pulled
+  # in transitively by @rozenite/plugin-bridge) to this, for the panel's plain-browser bundle.
+  react-native-web: ^0.21.2
   '@vue/runtime-core': ^3.5.13
   '@vue/compiler-sfc': ^3.5.13
   '@vue/compiler-core': ^3.5.13

@@ -1,4 +1,5 @@
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+const { withRozenite } = require('@rozenite/metro');
 const path = require('node:path');
 
 const projectRoot = __dirname;
@@ -73,4 +74,18 @@ const config = {
   },
 };
 
-module.exports = mergeConfig(defaultConfig, config);
+// Rozenite (github.com/callstackincubator/rozenite) wires custom React Native DevTools panels
+// into Metro's dev-server middleware. It only touches `watchFolders`/`resolver.extraNodeModules`/
+// `resolver.resolveRequest` (chaining through to whatever resolveRequest is already there, ours
+// included) and `server.enhanceMiddleware` — it never touches `transformer`, so the Svelte
+// babelTransformerPath/getTransformOptions above are untouched.
+//
+// On by default for any dev build, off for release — this is a development-time tool, not a
+// diagnostic you opt into (unlike the DEBUG log flag, which stays opt-in even in dev). RN CLI's
+// own `bundle` command sets `process.env.NODE_ENV = args.dev ? 'development' : 'production'`
+// (@react-native/community-cli-plugin's buildBundle.js) BEFORE this config is evaluated, so
+// `--dev false`/a release bundle reliably disables it. `react-native start` (the everyday dev
+// server) never touches NODE_ENV at all, so it stays enabled there by default too.
+module.exports = withRozenite(mergeConfig(defaultConfig, config), {
+  enabled: process.env.NODE_ENV !== 'production',
+});
