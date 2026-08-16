@@ -147,5 +147,9 @@ export function attachStickyScroll(node: ISymbioteNode, value: AnimatedValue): (
   const attachment = attachNativeEvent(node, 'onScroll', [
     { nativeEvent: { contentOffset: { y: value } } },
   ]);
-  return () => attachment.detach();
+  dlog(`STICKY[attach] attachStickyScroll onScroll -> value#${value.__getNativeTag?.() ?? 'js'}`);
+  return () => {
+    dlog('STICKY[attach] attachStickyScroll detached');
+    attachment.detach();
+  };
 }

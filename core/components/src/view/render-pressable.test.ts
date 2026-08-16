@@ -1,14 +1,20 @@
-// Co-located unit test for the 3 agnostic gating predicates buildPressableListeners is built
-// from. These are also the predicates the Angular Pressable calls directly (it has no listener
-// bag to spread onto - see adapters/angular/src/components/pressable/index.ts), so this file is
-// the single source of truth for the disabled/cancelable semantics both sides must agree on.
+// DUPLICATE-CANDIDATE (found during a coverage sweep, not deleted here): there is no flat
+// `view/render-pressable.ts` source file — only `view/render-pressable/index.ts` exists — so this
+// flat test's `./render-pressable` specifier resolves as a DIRECTORY import to the exact same live
+// module as `./render-pressable/render-pressable.test.ts`. Both files are genuinely live; the
+// folder version is treated as canonical here (fuller suite, and folder-form matches this repo's
+// ADR-0026 file-layout migration target) — this flat file duplicates a SUBSET of it and is flagged
+// as a deletion candidate, not removed. See this task's report for the full collision finding.
+//
+// Co-located unit test for Pressable's 3 agnostic gating predicates. These are also the
+// predicates the Angular Pressable calls directly (it has no listener bag to spread onto - see
+// adapters/angular/src/components/pressable/index.ts), so the canonical file (the folder sibling
+// of this one) is the single source of truth for the disabled/cancelable semantics both sides
+// must agree on; this file keeps only the 3-predicate subset for backward compatibility with
+// whatever still imports this path.
 
 import { describe, expect, it } from 'vitest';
-import {
-  isTerminationAllowed,
-  shouldClaimResponder,
-  shouldSuppressPress,
-} from './render-pressable';
+import { isTerminationAllowed, shouldClaimResponder, shouldSuppressPress } from './render-pressable';
 
 describe('shouldSuppressPress', () => {
   it('suppresses when disabled is true', () => {

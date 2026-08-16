@@ -20,7 +20,6 @@ import { dlog } from '../debug';
 // The one event symbiote observes: an incoming deep link. RN's LinkingEventDefinitions.
 const URL_EVENT = 'url';
 
-// The payload native delivers with the `url` event.
 export interface IUrlEvent {
   url: string;
 }
@@ -44,7 +43,6 @@ export interface INativeLinkingModule extends IEventEmitterModule {
   removeListeners(count: number): void;
 }
 
-// What every platform's Linking exposes to app code.
 export interface ILinkingStatic {
   addEventListener(
     eventType: typeof URL_EVENT,

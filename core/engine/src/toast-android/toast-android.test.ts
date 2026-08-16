@@ -1,7 +1,9 @@
 // Co-located unit test for the ToastAndroid module: JS->native only. A fake
 // __turboModuleProxy returns a ToastAndroid module that records show / showWithGravity /
 // showWithGravityAndOffset and exposes getConstants. The module resolves its native module +
-// constants at load time, so the fake is installed BEFORE the (fresh) import.
+// constants at load time, so the fake is installed BEFORE the (fresh) import. Every method
+// degrades to a no-op when the module is absent — never throws — so there is no Negative
+// group; "no module" is its own describe below instead.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -81,6 +83,33 @@ describe('ToastAndroid (module present)', () => {
   it('showWithGravityAndOffset forwards all args', () => {
     ToastAndroid.showWithGravityAndOffset('off', ToastAndroid.SHORT, ToastAndroid.BOTTOM, 25, 50);
     expect(offsetArgs).toEqual(['off', ToastAndroid.SHORT, ToastAndroid.BOTTOM, 25, 50]);
+  });
+});
+
+describe('ToastAndroid (module present, malformed constants payload)', () => {
+  // why: readConstant falls back PER KEY, not all-or-nothing — a native getConstants() that
+  // is missing a key or returns the wrong type for one key must still yield a fully-numeric
+  // constants object, with only the bad/missing keys defaulted.
+  it('falls back to the RN-conventional default for a missing or non-numeric key, keeps the valid ones', async () => {
+    const partialToast = {
+      getConstants: (): Record<string, unknown> => ({ SHORT: 'not-a-number', LONG: 2 }),
+      show: (): void => undefined,
+      showWithGravity: (): void => undefined,
+      showWithGravityAndOffset: (): void => undefined,
+    };
+    const registeredModules: Record<string, unknown> = { ToastAndroid: partialToast };
+    globalThis.__turboModuleProxy = <T>(name: string): T | null => {
+      const module = registeredModules[name];
+      return isPresent<T>(module) ? module : null;
+    };
+    vi.resetModules();
+    const fresh = await import('./index');
+
+    expect(fresh.ToastAndroid.SHORT).toBe(0); // fallback: getConstants() gave a string, not a number
+    expect(fresh.ToastAndroid.LONG).toBe(2); // native value used as-is
+    expect(fresh.ToastAndroid.TOP).toBe(48); // fallback: key entirely absent from native payload
+    expect(fresh.ToastAndroid.BOTTOM).toBe(80);
+    expect(fresh.ToastAndroid.CENTER).toBe(17);
   });
 });
 

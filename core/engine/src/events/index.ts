@@ -555,7 +555,6 @@ function bubble(
   while (node) {
     const listener = isAnchor(node) ? undefined : node.listeners?.get(listenerName);
     if (listener) {
-      // engine owner adds currentTarget + stopPropagation to SymbioteEvent
       const event: ISymbioteEvent = {
         type: listenerName,
         target,
@@ -578,7 +577,6 @@ function deliverDirect(
 ): void {
   const listener = target.listeners?.get(listenerName);
   if (!listener) return;
-  // engine owner adds currentTarget + stopPropagation to SymbioteEvent
   listener({
     type: listenerName,
     target,

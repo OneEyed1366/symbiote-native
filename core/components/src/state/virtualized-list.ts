@@ -138,8 +138,6 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null ? { ...value } : undefined;
 }
 
-// onScroll -> the offset along the scroll axis. Vertical reads contentOffset.y,
-// horizontal reads contentOffset.x.
 export function readScrollOffset(event: ISymbioteEvent, horizontal: boolean): number | undefined {
   const native = asRecord(event.nativeEvent);
   if (native === undefined) return undefined;
@@ -148,7 +146,6 @@ export function readScrollOffset(event: ISymbioteEvent, horizontal: boolean): nu
   return readNumber(offset, horizontal ? 'x' : 'y');
 }
 
-// onLayout -> the cross-section length of the box along the scroll axis.
 export function readLayoutLength(event: ISymbioteEvent, horizontal: boolean): number | undefined {
   const native = asRecord(event.nativeEvent);
   if (native === undefined) return undefined;

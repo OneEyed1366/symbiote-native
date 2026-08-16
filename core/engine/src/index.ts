@@ -56,7 +56,14 @@ export type {
 export type { ISymbioteNode, ISymbioteEvent, IListener } from './node';
 
 export { SymbioteSurface, createSurface } from './surface';
+// Devtools-inspector building block: the set of currently-mounted surfaces, kept up to
+// date by createSurface/disposeRoot with zero adapter-side wiring.
+export { getActiveSurfaces } from './surface-registry';
 export { setEventDispatcher } from './dispatch';
+// registerPostCommit lets a future consumer (the devtools inspector) know when to
+// re-read getActiveSurfaces; runPostCommitHooks stays internal-callable too since other
+// engine modules already invoke it.
+export { registerPostCommit, runPostCommitHooks } from './post-commit';
 export {
   setColorProcessor,
   processColor,
@@ -132,6 +139,8 @@ export type { IPlatformStatic, IPlatformOSType, IPlatformSelectSpec } from './pl
 export type { IPlatformConstantsIOS } from './platform/index.ios';
 export type { IPlatformConstantsAndroid } from './platform/index.android';
 export { dlog, isDebug } from './debug';
+export { reportUncaughtError } from './report-error';
+export type { IUncaughtErrorInfo } from './report-error';
 
 export { getNativeModule, getEnforcingNativeModule } from './native-modules';
 export { installDeviceEventHub, NativeEventEmitter, setDeviceEventSource } from './native-events';
@@ -186,6 +195,7 @@ export {
   nativeAnimated,
   isNativeAnimatedAvailable,
   AnimatedProps,
+  createAnimatedLeafLifecycle,
   AnimatedStyle,
   AnimatedTransform,
   AnimatedMock,
@@ -195,6 +205,7 @@ export {
   resolveHostNode,
 } from './animated';
 export type {
+  IAnimatedLeafLifecycle,
   IValueXY,
   IRgbaValue,
   IColorInput,

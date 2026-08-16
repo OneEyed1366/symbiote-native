@@ -1,3 +1,15 @@
+// No Negative group: reduceList is total over its IListAction union (a switch with no default/
+// throw) — every action kind produces a state+effects pair, never a rejection. All scenarios below
+// are Positive (successful transitions); an invalid `action.kind` is unreachable through the typed
+// union, so there is no "must throw" case to invent.
+//
+// Coverage gap (not fabricated): commitList's maintainVisibleContentPosition 'shift' and
+// 'autoscroll-top' branches (virtualized-list.ts computeMvcpAdjustment, called from here) are not
+// exercised — only the 'none'/first-commit-records-anchor branch is. Triggering 'shift' requires a
+// genuinely virtualized window (committedWindow.first > 0) PLUS a real prepend across two commits;
+// building that without re-deriving computeWindow's own throttling arithmetic would make the
+// assertion a restatement of the implementation rather than an independently-checkable fact, so it
+// is left as an open gap rather than a characterization.
 import { describe, it, expect } from 'vitest';
 import {
   reduceList,
@@ -117,6 +129,17 @@ describe('reduceList metrics transitions', () => {
     expect(result.changed).toBe(false);
     expect(result.state.hasInteracted).toBe(true);
   });
+
+  // why: the refill timer firing must itself ask for a re-render (changed: true) — that render's
+  // own refresh-metrics is what actually grows the throttled window one batch step. If batch-tick
+  // did not report changed, a lagging window would never catch up to its target.
+  it('batch-tick reports changed so the adapter re-renders and grows the window', () => {
+    const inputs = baseInputs();
+    const before = settled(inputs);
+    const result = reduceList(before, { kind: 'batch-tick' }, inputs);
+    expect(result.changed).toBe(true);
+    expect(result.state).toBe(before);
+  });
 });
 
 describe('reduceList commit — onEndReached', () => {
@@ -140,11 +163,26 @@ describe('reduceList commit — onEndReached', () => {
 });
 
 describe('reduceList commit — onStartReached', () => {
-  it('fires at the top edge when a listener is active', () => {
+  it('fires at the top edge when a listener is active, then dedups on the next commit', () => {
     const inputs = baseInputs({ onStartReachedActive: true });
     const state = settled(inputs);
+    const first = reduceList(state, { kind: 'commit' }, inputs);
+    expect(first.effects).toContainEqual({ kind: 'fire-start-reached', distanceFromStart: 0 });
+
+    // why: onStartReached must fire once per content length, exactly like onEndReached — the
+    // adapters used to independently re-derive this dedup and drift; a repeat commit at the same
+    // edge must stay silent.
+    const second = reduceList(first.state, { kind: 'commit' }, inputs);
+    expect(second.effects.some(effect => effect.kind === 'fire-start-reached')).toBe(false);
+  });
+
+  // why: the mirror of onEndReached's "stays silent" case — no adapter callback is wired, so the
+  // reducer must not compute or fire the edge event at all.
+  it('stays silent when no onStartReached listener is active', () => {
+    const inputs = baseInputs({ onStartReachedActive: false });
+    const state = settled(inputs);
     const result = reduceList(state, { kind: 'commit' }, inputs);
-    expect(result.effects).toContainEqual({ kind: 'fire-start-reached', distanceFromStart: 0 });
+    expect(result.effects.some(effect => effect.kind === 'fire-start-reached')).toBe(false);
   });
 });
 
@@ -277,6 +315,24 @@ describe('reduceList imperative scrolls', () => {
       inputs,
     );
     expect(result.effects).toEqual([{ kind: 'scroll-to', offset: 200, animated: false }]);
+  });
+
+  // why: without getItemLayout the target must still resolve normally — the failure guard is only
+  // for a target the list has never measured, not a blanket "no getItemLayout" rejection.
+  it('scroll-to-index resolves normally without getItemLayout when the target was measured', () => {
+    const inputs = baseInputs({ getItemLayout: undefined });
+    const measuredOnce = reduceList(
+      settled(inputs),
+      { kind: 'measure', index: 0, length: 100 },
+      inputs,
+    ).state;
+    const measuredState = stepTo(measuredOnce, { kind: 'measure', index: 1, length: 100 }, inputs);
+    const result = reduceList(
+      measuredState,
+      { kind: 'scroll-to-index', index: 1, animated: true, viewPosition: 0, viewOffset: 0 },
+      inputs,
+    );
+    expect(result.effects).toEqual([{ kind: 'scroll-to', offset: 100, animated: true }]);
   });
 });
 

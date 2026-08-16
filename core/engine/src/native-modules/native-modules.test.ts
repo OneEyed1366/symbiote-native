@@ -5,7 +5,7 @@
 // captures the device hub so installDeviceEventHub() doesn't throw.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDeviceEventModule } from './index';
+import { createDeviceEventModule, getEnforcingNativeModule, getNativeModule } from './index';
 
 interface IDeviceHub {
   emit: (eventType: string, ...args: unknown[]) => void;
@@ -22,12 +22,78 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.__turboModuleProxy = undefined;
+  globalThis.nativeModuleProxy = undefined;
   globalThis.RN$registerCallableModule = undefined;
 });
 
 function isPresent<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
 }
+
+describe('getNativeModule (Positive)', () => {
+  // why: this IS the New Architecture (non-bridgeless) resolution path -- most
+  // hosts today resolve every module through this function proxy.
+  it('resolves via the __turboModuleProxy function when it returns a module', () => {
+    const fakeModule = { ping: (): string => 'pong' };
+    globalThis.__turboModuleProxy = <T>(name: string): T | null =>
+      name === 'TurboOnly' && isPresent<T>(fakeModule) ? fakeModule : null;
+
+    expect(getNativeModule<typeof fakeModule>('TurboOnly')).toBe(fakeModule);
+  });
+
+  // why: bridgeless hosts (RCTHost) install modules as a HostObject keyed by name
+  // INSTEAD of the function proxy -- this is what RN's own NativeModules resolves
+  // to in bridgeless, so it must be a real fallback, not dead code.
+  it('falls back to nativeModuleProxy (bridgeless HostObject) when __turboModuleProxy is absent', () => {
+    const fakeModule = { ping: (): string => 'pong' };
+    globalThis.nativeModuleProxy = { BridgelessOnly: fakeModule };
+
+    expect(getNativeModule<typeof fakeModule>('BridgelessOnly')).toBe(fakeModule);
+  });
+
+  // why: a HostObject access for an unlinked name can THROW natively (per the
+  // module's own comment) -- that throw must be swallowed here, or a single missing
+  // module would blank the whole render tree instead of degrading to null.
+  it('swallows a throw from the bridgeless proxy and resolves to null', () => {
+    globalThis.nativeModuleProxy = new Proxy(
+      {},
+      {
+        get(): never {
+          throw new Error('native HostObject: no such module');
+        },
+      },
+    );
+
+    expect(() => getNativeModule('AnythingAtAll')).not.toThrow();
+    expect(getNativeModule('AnythingAtAll')).toBeNull();
+  });
+
+  it('resolves to null when neither proxy is installed (headless, nothing linked)', () => {
+    expect(getNativeModule('Nothing')).toBeNull();
+  });
+});
+
+describe('getEnforcingNativeModule', () => {
+  // why: the caller trades "graceful null" for "throw" on modules the app
+  // hard-depends on -- when the module DOES resolve, it must behave identically to
+  // getNativeModule, not wrap or alter the value.
+  it('returns the resolved module, same as getNativeModule', () => {
+    const fakeModule = { ping: (): string => 'pong' };
+    globalThis.__turboModuleProxy = <T>(name: string): T | null =>
+      name === 'MustExist' && isPresent<T>(fakeModule) ? fakeModule : null;
+
+    expect(getEnforcingNativeModule<typeof fakeModule>('MustExist')).toBe(fakeModule);
+  });
+
+  // why: this is the entire reason the "enforcing" variant exists -- a hard
+  // dependency missing from the binary must fail LOUDLY with the module name in
+  // the message, not silently degrade like the plain getNativeModule.
+  it('throws naming the module when it is not registered', () => {
+    expect(() => getEnforcingNativeModule('DefinitelyMissing')).toThrow(
+      /DefinitelyMissing.*not registered/,
+    );
+  });
+});
 
 describe('createDeviceEventModule', () => {
   it('resolves the native module once and caches it across repeated getModule() calls', () => {
@@ -98,6 +164,25 @@ describe('createDeviceEventModule', () => {
     expect(fakeModule.addListener).toHaveBeenCalledWith('someEvent');
     sub.remove();
     expect(fakeModule.removeListeners).toHaveBeenCalledWith(1);
+  });
+
+  // why: hasEventEmitterShape is a RUNTIME guard, distinct from the `bindModuleToEmitter:
+  // false` config below -- a module that resolves but genuinely lacks addListener/
+  // removeListeners (e.g. Dimensions' DeviceInfo, which only has getConstants) must
+  // not be bound even when binding is requested (the default), since calling a
+  // missing method would crash.
+  it('does not bind a resolved module that lacks the observe-counter methods', () => {
+    const shapelessModule = { getConstants: (): Record<string, never> => ({}) };
+    globalThis.__turboModuleProxy = <T>(name: string): T | null =>
+      name === 'ShapelessModule' && isPresent<T>(shapelessModule) ? shapelessModule : null;
+
+    const deviceEventModule = createDeviceEventModule<typeof shapelessModule>({
+      moduleName: 'ShapelessModule',
+      moduleLogPrefix: 'ShapelessModule: module',
+    });
+
+    expect(() => deviceEventModule.getEmitter().addListener('someEvent', () => {})).not.toThrow();
+    expect(deviceEventModule.getModule()).toBe(shapelessModule);
   });
 
   it('bindModuleToEmitter: false never pings the module counters, even though the module resolved', () => {

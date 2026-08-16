@@ -192,16 +192,30 @@ function compoundKeysFor(subset: string[]): string[] {
 // (`.card.big` -> `cardBig__svelte-h`) — the compiler collapses the selector to one name and
 // suffixes that. Those two operations do not commute, so the key built from the raw tokens
 // (`card__svelte-hBig__svelte-h`) can never match and every scoped compound rule was dead.
-// Rebuild the key the way registration did: strip the shared suffix, join the bases, re-append
-// once. Requires all tokens of the subset to carry the SAME scope — a mix of scoped and global
-// tokens has no single suffix to factor out, and the unsuffixed key is already tried alongside.
+// Rebuild the key the way registration did: strip the suffix, join the bases, re-append once.
+//
+// An UNSCOPED token in the subset contributes its own name and no scope, rather than aborting.
+// That is the `:global()` case, and it is why a partial `:global()` reaches the markup it was
+// written for: `.card :global(.reset)` registers the key `cardReset`, which the scoper suffixes
+// as a whole (the escape hatch exempts the `reset` MARKUP TOKEN, not the collapsed key), while
+// the element carries `card__svelte-h reset`. The same shape covers a class handed down from a
+// parent component, which likewise arrives unsuffixed.
+//
+// Widening, stated so it stays deliberate: a fully-scoped `.card.reset` collapses to that same
+// key, so an element carrying a FOREIGN `reset` now matches a rule the author scoped to their
+// own. The key format cannot tell the two apart — telling them apart needs a registry indexed by
+// token set, with per-token scope. The scopes still have to agree: two tokens from two different
+// components have no single suffix to factor out and stay unmatched.
 function scopedCompoundKey(subset: string[]): string | null {
   const bases: string[] = [];
   let scope: string | undefined;
 
   for (const token of subset) {
     const split = splitScopedToken(token);
-    if (split === null) return null;
+    if (split === null) {
+      bases.push(token);
+      continue;
+    }
     if (scope !== undefined && split.scope !== scope) return null;
     scope = split.scope;
     bases.push(split.base);

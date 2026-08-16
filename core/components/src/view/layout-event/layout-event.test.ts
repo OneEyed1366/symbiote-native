@@ -1,6 +1,19 @@
+// STALE-DUPLICATE CANDIDATE (found during a coverage sweep, not deleted here): this file's target,
+// ./index.ts, is currently UNREACHABLE from any real import. Both production importers
+// (render-scroll-view.ts, render-scroll-sticky.ts) resolve the bare specifier `./layout-event` to
+// the sibling FLAT file `../layout-event.ts` — Node/TS module resolution tries the exact file
+// before it tries a same-named directory's index — so this folder's index.ts is a byte-identical
+// duplicate (only the self-import line differs) that nothing ever executes in production. The
+// canonical, live copy of this test is `../layout-event.test.ts`. Flagging for cleanup, not
+// removing: see this task's report for the collision finding.
+//
 // Co-located unit test: readLayoutField pulls a numeric field out of an onLayout event's
 // nativeEvent.layout without a cast. Shared by render-scroll-view's dimension read (width/height)
 // and render-scroll-sticky's position read (y/height) - one guard, tested once.
+//
+// No Negative group: readLayoutField is total over ISymbioteEvent — a malformed/missing layout
+// yields `undefined`, per its own header comment ("no-op"), never a throw. Every scenario below is
+// Positive: either a genuine successful read, or the documented safe-fallback outcome.
 
 import { createElement, type ISymbioteEvent } from '@symbiote-native/engine';
 import { describe, expect, it } from 'vitest';
@@ -33,6 +46,9 @@ describe('readLayoutField', () => {
     expect(readLayoutField(event, 'y')).toBe(42);
   });
 
+  // why: nativeEvent is Record<string, unknown> by contract (no compile-time guarantee it ever
+  // carries `layout`) — an event that predates layout, or one from an unrelated event type, must
+  // degrade to undefined rather than crash the caller's render/effect.
   it('returns undefined when nativeEvent.layout is missing', () => {
     const event = makeEvent({});
     expect(readLayoutField(event, 'width')).toBeUndefined();
@@ -48,6 +64,9 @@ describe('readLayoutField', () => {
     expect(readLayoutField(event, 'y')).toBeUndefined();
   });
 
+  // why: this is the narrowing the header comment promises in place of a cast — a `layout` object
+  // with the right key but the wrong runtime type must still be rejected, not coerced or returned
+  // as-is (which would hand a caller doing arithmetic a string instead of a number).
   it('returns undefined when the requested key is not a number', () => {
     const event = makeEvent({ layout: { width: 'oops' } });
     expect(readLayoutField(event, 'width')).toBeUndefined();

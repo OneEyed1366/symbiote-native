@@ -9,17 +9,14 @@ export type IEasingFunction = (t: number) => number;
 let cachedEase: IEasingFunction | undefined;
 
 export const Easing = {
-  // A stepping function: 1 for any positive n, else 0.
   step0(n: number): number {
     return n > 0 ? 1 : 0;
   },
 
-  // A stepping function: 1 once n >= 1, else 0.
   step1(n: number): number {
     return n >= 1 ? 1 : 0;
   },
 
-  // Linear, f(t) = t.
   linear(t: number): number {
     return t;
   },
@@ -32,12 +29,10 @@ export const Easing = {
     return cachedEase(t);
   },
 
-  // Quadratic, f(t) = t * t.
   quad(t: number): number {
     return t * t;
   },
 
-  // Cubic, f(t) = t * t * t.
   cubic(t: number): number {
     return t * t * t;
   },
@@ -47,17 +42,14 @@ export const Easing = {
     return t => Math.pow(t, n);
   },
 
-  // Sinusoidal.
   sin(t: number): number {
     return 1 - Math.cos((t * Math.PI) / 2);
   },
 
-  // Circular.
   circle(t: number): number {
     return 1 - Math.sqrt(1 - t * t);
   },
 
-  // Exponential.
   exp(t: number): number {
     return Math.pow(2, 10 * (t - 1));
   },

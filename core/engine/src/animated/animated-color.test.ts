@@ -1,12 +1,18 @@
-// Unit test for AnimatedColor: input forms parse to r/g/b/a channels, __getValue() is the rgba() string the
-// commit color path expects, driving a channel re-pulls it, setValue fires listeners ONCE with
-// the FINAL color and commits each bound leaf ONCE, and useNativeDriver mirrors a `color` node
-// referencing the four channel tags. A fake native module records the native config.
+// Unit test for AnimatedColor: input forms parse to r/g/b/a channels, __getValue() is the rgba()
+// string the commit color path expects, driving a channel re-pulls it, setValue fires listeners
+// ONCE with the FINAL color and commits each bound leaf ONCE, offset methods fan out per channel,
+// and useNativeDriver mirrors a `color` node referencing the four channel tags. A fake native
+// module records the native config.
+//
+// No Negative group: every AnimatedColor input path (constructor, setValue) resolves through
+// `normalizeColor(...) ?? DEFAULT_COLOR` — an unparseable string never throws, it silently
+// falls back to opaque black. There is no invalid input this unit rejects; the "Fallback" group
+// below covers that defensive behavior instead of inventing a throw that doesn't exist.
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { AnimatedColor, AnimatedValue, AnimatedWithChildren } from '@symbiote-native/engine';
 
-describe('AnimatedColor — input forms parse to channels', () => {
+describe('AnimatedColor — Positive (input forms parse to channels)', () => {
   it('parses a 6-digit hex', () => {
     expect(new AnimatedColor('#ff8800').__getValue()).toBe('rgba(255, 136, 0, 1)');
   });
@@ -23,18 +29,87 @@ describe('AnimatedColor — input forms parse to channels', () => {
     expect(new AnimatedColor({ r: 1, g: 2, b: 3, a: 1 }).__getValue()).toBe('rgba(1, 2, 3, 1)');
   });
 
-  it('falls back to default black on an unparseable named color (never throws)', () => {
-    expect(new AnimatedColor('rebeccapurple').__getValue()).toBe('rgba(0, 0, 0, 1)');
+  // why: an omitted constructor argument must default to opaque black, matching RN's
+  // AnimatedColor default, not an unset/undefined channel that would break __getValue's rgba()
+  // formatting.
+  it('defaults to opaque black when constructed with no value', () => {
+    expect(new AnimatedColor().__getValue()).toBe('rgba(0, 0, 0, 1)');
   });
-});
 
-describe('AnimatedColor — driving a channel re-pulls the string', () => {
   it('re-pulls the composed string when a channel value changes', () => {
     const red = new AnimatedValue(0);
     const color = new AnimatedColor({ r: red, g: 0, b: 0, a: 1 });
     expect(color.__getValue()).toBe('rgba(0, 0, 0, 1)');
     red.setValue(200);
     expect(color.__getValue()).toBe('rgba(200, 0, 0, 1)');
+  });
+
+  // why: setOffset/flattenOffset/extractOffset fan out per channel exactly like a plain
+  // AnimatedValue's own offset API — an animated-color transition can be offset the same way a
+  // scalar value can.
+  it('setOffset applies per channel on top of each channel base value', () => {
+    const color = new AnimatedColor({ r: 10, g: 10, b: 10, a: 0.5 });
+    color.setOffset({ r: 5, g: 0, b: 0, a: 0 });
+    expect(color.__getValue()).toBe('rgba(15, 10, 10, 0.5)');
+  });
+
+  it('flattenOffset folds each channel offset into its base, output unchanged', () => {
+    const color = new AnimatedColor({ r: 10, g: 10, b: 10, a: 0.5 });
+    color.setOffset({ r: 5, g: 0, b: 0, a: 0 });
+    color.flattenOffset();
+    expect(color.__getValue()).toBe('rgba(15, 10, 10, 0.5)');
+    color.setOffset({ r: 0, g: 0, b: 0, a: 0 });
+    expect(color.__getValue()).toBe('rgba(15, 10, 10, 0.5)'); // fold really happened
+  });
+
+  it('extractOffset moves each channel base into its offset, output unchanged', () => {
+    const color = new AnimatedColor({ r: 10, g: 20, b: 30, a: 1 });
+    color.extractOffset();
+    expect(color.__getValue()).toBe('rgba(10, 20, 30, 1)');
+  });
+
+  it('stopAnimation invokes its callback with the current composed color', () => {
+    const color = new AnimatedColor({ r: 1, g: 2, b: 3, a: 1 });
+    let observed: string | undefined;
+    color.stopAnimation(v => {
+      observed = v;
+    });
+    expect(observed).toBe('rgba(1, 2, 3, 1)');
+  });
+
+  // why: __attach/__detach wire ALL FOUR channels as this color's graph children — a color
+  // gaining its first downstream consumer must register on every channel (not just r), or a g/b/a
+  // change alone would never propagate to the leaf.
+  it('__attach registers the color as a child of all four channels; __detach removes it from all four', () => {
+    const r = new AnimatedValue(0);
+    const g = new AnimatedValue(0);
+    const b = new AnimatedValue(0);
+    const a = new AnimatedValue(1);
+    const color = new AnimatedColor({ r, g, b, a });
+    const consumer = new AnimatedWithChildren();
+    // AnimatedColor attaches lazily: only once something downstream starts listening.
+    color.__addChild(consumer);
+
+    expect(r.__getChildren()).toContain(color);
+    expect(g.__getChildren()).toContain(color);
+    expect(b.__getChildren()).toContain(color);
+    expect(a.__getChildren()).toContain(color);
+
+    color.__removeChild(consumer);
+    expect(r.__getChildren()).not.toContain(color);
+    expect(g.__getChildren()).not.toContain(color);
+    expect(b.__getChildren()).not.toContain(color);
+    expect(a.__getChildren()).not.toContain(color);
+  });
+});
+
+describe('AnimatedColor — Fallback (silent default instead of throwing — see file header)', () => {
+  it('falls back to default black on an unparseable named color', () => {
+    expect(new AnimatedColor('rebeccapurple').__getValue()).toBe('rgba(0, 0, 0, 1)');
+  });
+
+  it('never throws for an unparseable color: constructing and reading it is safe inside a render', () => {
+    expect(() => new AnimatedColor('rebeccapurple').__getValue()).not.toThrow();
   });
 });
 
@@ -52,9 +127,10 @@ class CommitCountingLeaf extends AnimatedWithChildren {
 }
 
 describe('AnimatedColor — setValue fires once with the final color and commits once', () => {
-  // AnimatedColor.setValue drives all four channels; without the _withSuspendedCallbacks guard,
-  // one setValue would fire color listeners four times (each an intermediate rgba) and re-commit
-  // each bound leaf four times.
+  // why: AnimatedColor.setValue drives all four channels; without the _withSuspendedCallbacks
+  // guard, one setValue would fire color listeners four times (each an intermediate rgba) and
+  // re-commit each bound leaf four times — an observable perf/correctness regression this test
+  // guards against structurally, not just "it still works".
   it('fires the listener exactly once with the final color and commits the leaf once', () => {
     const observed = new AnimatedColor({ r: 0, g: 0, b: 0, a: 1 });
     const leaf = new CommitCountingLeaf(observed);
@@ -137,5 +213,22 @@ describe('AnimatedColor — native color node references the four channel tags',
         expect(typeof Reflect.get(colorConfig, channel)).toBe('number');
       }
     }
+  });
+
+  // why: __makeNative must cascade to ALL FOUR channels — a color node that is native but whose
+  // channels aren't would leave native driving a color with no live inputs.
+  it('__makeNative marks all four channels native too', () => {
+    const r = new AnimatedValue(0);
+    const g = new AnimatedValue(0);
+    const b = new AnimatedValue(0);
+    const a = new AnimatedValue(1);
+    const color = new AnimatedColor({ r, g, b, a });
+
+    color.__makeNative();
+
+    expect(r.__isNative()).toBe(true);
+    expect(g.__isNative()).toBe(true);
+    expect(b.__isNative()).toBe(true);
+    expect(a.__isNative()).toBe(true);
   });
 });

@@ -152,7 +152,7 @@ export function reduceSticky(
   inputs: IStickyReducerInputs,
 ): IStickyReduceResult {
   dlog(
-    `reduceSticky[${headerTag(state)}] action=${action.kind}` +
+    `STICKY[reducer ${headerTag(state)}] action=${action.kind}` +
       (action.kind === 'layout' ? ` y=${action.y} height=${action.height}` : '') +
       (action.kind === 'animated-tick' || action.kind === 'debounce-fired'
         ? ` value=${action.value}`
@@ -184,13 +184,13 @@ export function reduceSticky(
         effects.push({ kind: 'record-header-y', index: inputs.index, y: action.y });
       }
       if (alreadyAtThisGeometry && state.rangesEmitted) {
-        dlog(`reduceSticky[${headerTag(state)}] layout: redundant geometry, skipped rebuild`);
+        dlog(`STICKY[reducer ${headerTag(state)}] layout: redundant geometry, skipped rebuild`);
         return { state, effects, changed: effects.length > 0 };
       }
       const { inputRange, outputRange } = deriveRanges(state, inputs);
       state.rangesEmitted = true;
       dlog(
-        `reduceSticky[${headerTag(state)}] layout: measured=true inputRange=${JSON.stringify(inputRange)} ` +
+        `STICKY[reducer ${headerTag(state)}] layout: measured=true inputRange=${JSON.stringify(inputRange)} ` +
           `outputRange=${JSON.stringify(outputRange)}`,
       );
       effects.push({ kind: 'rebuild-interpolation', inputRange, outputRange });
@@ -226,11 +226,11 @@ export function reduceSticky(
         arraysEqual(previousInputRange, inputRange) &&
         arraysEqual(previousOutputRange, outputRange)
       ) {
-        dlog(`reduceSticky[${headerTag(state)}] inputs-changed: ranges unchanged, skipped rebuild`);
+        dlog(`STICKY[reducer ${headerTag(state)}] inputs-changed: ranges unchanged, skipped rebuild`);
         return { state, effects: [], changed: false };
       }
       dlog(
-        `reduceSticky[${headerTag(state)}] inputs-changed: inputRange ${JSON.stringify(previousInputRange)}->` +
+        `STICKY[reducer ${headerTag(state)}] inputs-changed: inputRange ${JSON.stringify(previousInputRange)}->` +
           `${JSON.stringify(inputRange)} outputRange ${JSON.stringify(previousOutputRange)}->` +
           `${JSON.stringify(outputRange)}`,
       );
@@ -247,12 +247,12 @@ export function reduceSticky(
       if (action.value === 0 && !state.haveReceivedInitialZeroTranslateY) {
         state.haveReceivedInitialZeroTranslateY = true;
         dlog(
-          `reduceSticky[${headerTag(state)}] animated-tick: swallowed re-emitted zero translateY`,
+          `STICKY[reducer ${headerTag(state)}] animated-tick: swallowed re-emitted zero translateY`,
         );
         return { state, effects: [], changed: false };
       }
       dlog(
-        `reduceSticky[${headerTag(state)}] animated-tick: scheduling debounce delay=${stickyDebounceMs(inputs.os)} ` +
+        `STICKY[reducer ${headerTag(state)}] animated-tick: scheduling debounce delay=${stickyDebounceMs(inputs.os)} ` +
           `value=${action.value}`,
       );
       return {
@@ -267,7 +267,7 @@ export function reduceSticky(
       // The debounce completed: commit the settled translateY. Once a NON-zero value commits, re-arm
       // the swallow gate so the next interpolation rebuild's spurious 0 is dropped (RN).
       dlog(
-        `reduceSticky[${headerTag(state)}] debounce-fired: committing translateY=${action.value}`,
+        `STICKY[reducer ${headerTag(state)}] debounce-fired: committing translateY=${action.value}`,
       );
       state.translateY = action.value;
       if (action.value !== 0) state.haveReceivedInitialZeroTranslateY = false;
