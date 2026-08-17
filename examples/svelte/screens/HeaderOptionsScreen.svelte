@@ -19,7 +19,9 @@
     lastSearchBarEvent?: string;
   };
 
-  function isHeaderOptionsParams(value: unknown): value is IHeaderOptionsParams {
+  function isHeaderOptionsParams(
+    value: unknown,
+  ): value is IHeaderOptionsParams {
     return typeof value === 'object' && value !== null;
   }
 
@@ -33,21 +35,31 @@
 <SafeAreaView class="screen"
   ><View class="section"
     ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
+      ><Text class="line-tag-text"
+        >{`${lineInfo.code} · ${lineInfo.label}`}</Text
+      ></View
     ><View class="hero-card"
-      ><View class="hero-badge" style={{ backgroundColor: LINE_COLOR.presentation }}
+      ><View
+        class="hero-badge"
+        style={{ backgroundColor: LINE_COLOR.presentation }}
         ><Text class="hero-badge-text">HD</Text></View
       ><View class="hero-copy"
-        ><Text class="hero-title">Header options</Text
-        ><Text class="hero-body">Bar buttons, a right-side menu, a native search bar, and headerLargeTitle — every headerSearchBarOptions callback wired to a live control below.</Text
+        ><Text class="hero-title">Header options</Text><Text class="hero-body"
+          >Bar buttons, a right-side menu, a native search bar, and headerLargeTitle — every headerSearchBarOptions callback wired to a live control below.</Text
+        ></View
       ></View
-    ></View
-    ><Text class="info-text">headerLargeTitle · headerTintColor · headerStyle.backgroundColor</Text
-    ><Text testID="header-last-action" class="info-text">{`last header action: ${params.lastHeaderAction ?? 'none yet — tap a bar button or menu item'}`}</Text
-    ><Text testID="header-search-text" class="info-text">{`last search text: ${params.lastSearchText ?? 'none yet — pull down and type'}`}</Text
-    ><Text testID="header-search-submitted" class="info-text">{`last search submitted: ${params.lastSearchSubmitted ?? 'none yet — type and press search'}`}</Text
-    ><Text testID="header-search-event" class="info-text">{`last search bar event: ${params.lastSearchBarEvent ?? 'none yet — focus/blur/cancel the search bar'}`}</Text
-    ><Text class="note-text">Pull down to reveal the search bar (headerSearchBarOptions), or use the buttons below to drive it imperatively through its SearchBarCommands ref.</Text
+    ><Text class="info-text"
+      >headerLargeTitle · headerTintColor · headerStyle.backgroundColor</Text
+    ><Text testID="header-last-action" class="info-text"
+      >{`last header action: ${params.lastHeaderAction ?? 'none yet — tap a bar button or menu item'}`}</Text
+    ><Text testID="header-search-text" class="info-text"
+      >{`last search text: ${params.lastSearchText ?? 'none yet — pull down and type'}`}</Text
+    ><Text testID="header-search-submitted" class="info-text"
+      >{`last search submitted: ${params.lastSearchSubmitted ?? 'none yet — type and press search'}`}</Text
+    ><Text testID="header-search-event" class="info-text"
+      >{`last search bar event: ${params.lastSearchBarEvent ?? 'none yet — focus/blur/cancel the search bar'}`}</Text
+    ><Text class="note-text"
+      >Pull down to reveal the search bar (headerSearchBarOptions), or use the buttons below to drive it imperatively through its SearchBarCommands ref.</Text
     ><ActionButton
       testID="search-bar-focus"
       title="Focus search bar"

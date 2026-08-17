@@ -13,15 +13,19 @@
 <SafeAreaView class="screen"
   ><View class="section"
     ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
+      ><Text class="line-tag-text"
+        >{`${lineInfo.code} · ${lineInfo.label}`}</Text
+      ></View
     ><View class="hero-card"
-      ><View class="hero-badge" style={{ backgroundColor: LINE_COLOR.structure }}
+      ><View
+        class="hero-badge"
+        style={{ backgroundColor: LINE_COLOR.structure }}
         ><Text class="hero-badge-text">TB</Text></View
       ><View class="hero-copy"
-        ><Text class="hero-title">Tabs</Text
-        ><Text class="hero-body">A bottom-tabs navigator — icon, badge, and tint, each tab a real native view.</Text
+        ><Text class="hero-title">Tabs</Text><Text class="hero-body"
+          >A bottom-tabs navigator — icon, badge, and tint, each tab a real native view.</Text
+        ></View
       ></View
-    ></View
     ><Text class="info-text">{`focused: ${isFocused.current}`}</Text></View
   ></SafeAreaView
 >

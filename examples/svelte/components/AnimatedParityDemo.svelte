@@ -62,7 +62,11 @@
   // --- diffClamp: a header that collapses as you scroll down, reveals on up ---
   const scroll = new Animated.Value(0);
   let scrollPos = 0;
-  const headerOffset = Animated.diffClamp(scroll, 0, HEADER_COLLAPSE).interpolate({
+  const headerOffset = Animated.diffClamp(
+    scroll,
+    0,
+    HEADER_COLLAPSE,
+  ).interpolate({
     inputRange: [0, HEADER_COLLAPSE],
     outputRange: [0, -HEADER_COLLAPSE],
   });
@@ -77,17 +81,49 @@
 </script>
 
 <!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16. -->
-<View class="section-nested"><Text class="section-label">Animated · ValueXY / tracking / diffClamp</Text><Text class="drag-hint">drag the purple box →</Text><View class="xy-frame"><AnimatedView
+<View class="section-nested"
+  ><Text class="section-label">Animated · ValueXY / tracking / diffClamp</Text
+  ><Text class="drag-hint">drag the purple box →</Text><View class="xy-frame"
+    ><AnimatedView
       {...panResponder.panHandlers}
       class="xy-box"
       style={{ transform: xy.getTranslateTransform() }}
-    /></View><View class="track-row"><AnimatedView class="lead-dot" style={{ transform: [{ translateX: lead }] }} /></View><View class="track-row"><AnimatedView
+    /></View
+  ><View class="track-row"
+    ><AnimatedView
+      class="lead-dot"
+      style={{ transform: [{ translateX: lead }] }}
+    /></View
+  ><View class="track-row"
+    ><AnimatedView
       testID="follow-dot"
       class="follow-dot"
       style={{ transform: [{ translateX: follow }] }}
-    /></View><ActionButton
+    /></View
+  ><ActionButton
     testID="track-btn"
     title="Move target (follower chases)"
     onPress={moveLead}
     color="#4299e1"
-  /><View class="collapse-frame"><AnimatedView class="collapse-header" style={{ transform: [{ translateY: headerOffset }] }}><Text class="collapse-header-text">collapsing header</Text></AnimatedView></View><View class="row-tight"><View class="flex1"><ActionButton title="Scroll ↓" onPress={() => scrollBy(40)} color="#38b2ac" /></View><View class="flex1"><ActionButton title="Scroll ↑" onPress={() => scrollBy(-40)} color="#38b2ac" /></View></View></View>
+  /><View class="collapse-frame"
+    ><AnimatedView
+      class="collapse-header"
+      style={{ transform: [{ translateY: headerOffset }] }}
+      ><Text class="collapse-header-text">collapsing header</Text></AnimatedView
+    ></View
+  ><View class="row-tight"
+    ><View class="flex1"
+      ><ActionButton
+        title="Scroll ↓"
+        onPress={() => scrollBy(40)}
+        color="#38b2ac"
+      /></View
+    ><View class="flex1"
+      ><ActionButton
+        title="Scroll ↑"
+        onPress={() => scrollBy(-40)}
+        color="#38b2ac"
+      /></View
+    ></View
+  ></View
+>

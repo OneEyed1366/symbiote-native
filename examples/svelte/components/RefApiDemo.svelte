@@ -14,7 +14,13 @@
   // whitespace between tags: Svelte keeps whitespace strictly BETWEEN sibling nodes as a real text
   // node, which would land as an invalid RCTRawText child of a non-Text host
   // (svelte-adapter-dom-shim skill §16 — a real bug already found this way in shipped code).
-  import { View, Text, findNodeHandle, hostInstance, type ShimElement } from '@symbiote-native/svelte';
+  import {
+    View,
+    Text,
+    findNodeHandle,
+    hostInstance,
+    type ShimElement,
+  } from '@symbiote-native/svelte';
   import ActionButton from './ActionButton.svelte';
 
   let box = $state.raw<ShimElement | null>(null);
@@ -49,4 +55,27 @@
   }
 </script>
 
-<View class="section-nested"><Text class="section-label">Imperative ref · measure / setNativeProps / findNodeHandle</Text><symbiote-view p={{ testID: 'ref-box', class: 'ref-box' }} bind:this={box}><Text class="ref-box-text">{`native tag ${tag ?? '—'}`}</Text></symbiote-view><Text testID="measure-frame" class="info-text">{`frame: ${frame}`}</Text><View class="row"><View class="flex1"><ActionButton testID="measure-btn" title="Measure" onPress={onMeasure} color="#7fb5ff" /></View><View class="flex1"><ActionButton title="Flash (setNativeProps)" onPress={onFlash} color="#f6ad55" /></View></View></View>
+<View class="section-nested"
+  ><Text class="section-label"
+    >Imperative ref · measure / setNativeProps / findNodeHandle</Text
+  ><symbiote-view p={{ testID: 'ref-box', class: 'ref-box' }} bind:this={box}
+    ><Text class="ref-box-text">{`native tag ${tag ?? '—'}`}</Text
+    ></symbiote-view
+  ><Text testID="measure-frame" class="info-text">{`frame: ${frame}`}</Text
+  ><View class="row"
+    ><View class="flex1"
+      ><ActionButton
+        testID="measure-btn"
+        title="Measure"
+        onPress={onMeasure}
+        color="#7fb5ff"
+      /></View
+    ><View class="flex1"
+      ><ActionButton
+        title="Flash (setNativeProps)"
+        onPress={onFlash}
+        color="#f6ad55"
+      /></View
+    ></View
+  ></View
+>

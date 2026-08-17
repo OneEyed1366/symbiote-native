@@ -22,12 +22,12 @@
     "@symbiote-native/components": "^0.4.0",
     "@symbiote-native/engine": "^0.2.0",
     "@symbiote-native/navigation": "^2.1.0",
-    "@symbiote-native/svelte": "^0.2.0",
     "@symbiote-native/slider": "^5.1.0",
     "@symbiote-native/splash-screen": "^3.1.0",
-    "svelte": "^5.56.0",
+    "@symbiote-native/svelte": "^0.2.0",
     "react": "19.2.3",
-    "react-native": "0.86.0"
+    "react-native": "0.86.0",
+    "svelte": "^5.56.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -51,9 +51,10 @@
     "jest": "^29.7.0",
     "jest-circus": "^29.7.0",
     "prettier": "^3.9.1",
+    "prettier-plugin-svelte": "^4.1.1",
+    "svelte-check": "^4.0.0",
     "ts-jest": "^29.4.11",
-    "typescript": "~6.0.0",
-    "svelte-check": "^4.0.0"
+    "typescript": "~6.0.0"
   },
   "engines": {
     "node": ">= 22.11.0"

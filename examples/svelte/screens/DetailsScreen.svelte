@@ -4,7 +4,10 @@
   // route.params round-tripping through the navigator handle. Svelte twin of
   // examples/vue-sfc/screens/DetailsScreen.vue.
   import { SafeAreaView, Text, View } from '@symbiote-native/svelte';
-  import { useRoute, useStackNavigation } from '@symbiote-native/navigation/svelte';
+  import {
+    useRoute,
+    useStackNavigation,
+  } from '@symbiote-native/navigation/svelte';
   import ActionButton from '../components/ActionButton.svelte';
   import { LINE_COLOR } from '../navigation-lines';
 
@@ -16,7 +19,9 @@
 
   const paramsLabel = $derived.by<string>(() => {
     const params = route.current.params;
-    return typeof params === 'object' && params !== null && 'openedFrom' in params
+    return typeof params === 'object' &&
+      params !== null &&
+      'openedFrom' in params
       ? String(params.openedFrom)
       : 'none';
   });
@@ -24,9 +29,10 @@
 
 <SafeAreaView class="screen"
   ><View class="section"
-    ><Text class="section-label">Navigation demo · Details screen</Text
-    ><Text class="info-text">{`route.params: ${paramsLabel}`}</Text
-    ><Text class="info-text">{`canGoBack: ${navigation.current.canGoBack()}`}</Text
+    ><Text class="section-label">Navigation demo · Details screen</Text><Text
+      class="info-text">{`route.params: ${paramsLabel}`}</Text
+    ><Text class="info-text"
+      >{`canGoBack: ${navigation.current.canGoBack()}`}</Text
     ><ActionButton
       testID="nav-pop"
       title="← Pop back"

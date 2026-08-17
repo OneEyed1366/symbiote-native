@@ -68,6 +68,18 @@ function scopedStylesPreprocessor() {
   );
   return scopedStylesPromise;
 }
+
+// Collapses whitespace inside Text node content the same way a browser/Vue's template compiler
+// would (svelte-adapter-dom-shim skill §16/§29) — without it, a sentence an author wrapped across
+// source lines for readability ships a literal newline + indent into the native text content and
+// renders as a forced line break on device. Loaded lazily for the same reason as the two above.
+let collapseTextWhitespacePromise;
+function collapseTextWhitespacePreprocessor() {
+  collapseTextWhitespacePromise ??= import('@symbiote-native/svelte/collapse-text-whitespace').then(
+    mod => mod.collapseTextWhitespace(),
+  );
+  return collapseTextWhitespacePromise;
+}
 //
 // Svelte 5's compiler strips <script lang="ts"> types structurally, with no external type
 // resolution needed (unlike @vue/compiler-sfc's compileScript, which needs registerTS + a real
@@ -116,9 +128,12 @@ module.exports.transform = async function transform(params) {
     // Throws with a message naming the RN alternative. Deliberately BEFORE compile(), so the
     // author sees the real diagnosis rather than a downstream symptom.
     (await webOnlyConstructGuard()).markup({ content: params.src, filename: params.filename });
-    const preprocessed = await (
+    const stylePreprocessed = await (
       await scopedStylesPreprocessor()
     ).markup({ content: params.src, filename: params.filename });
+    const preprocessed = await (
+      await collapseTextWhitespacePreprocessor()
+    ).markup({ content: stylePreprocessed.code, filename: params.filename });
     const code = compileSvelteFile(preprocessed.code, params.filename);
     // Re-label as .tsx so RN's transformer processes the module exactly like app source; Metro
     // tracks the real path separately. Matches metro-vue-transformer.cjs's identical trick.

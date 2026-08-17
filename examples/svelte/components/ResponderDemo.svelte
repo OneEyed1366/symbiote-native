@@ -23,7 +23,9 @@
   let activeChip = $state<number | null>(null);
   let chipDx = $state(0);
   let rowDx = $state(0);
-  let status = $state('tap a chip · drag it to move · drag far → strip steals it');
+  let status = $state(
+    'tap a chip · drag it to move · drag far → strip steals it',
+  );
   let transfer = $state('');
   // useRef-equivalent scratch values: read/written imperatively inside handlers, never meant to
   // drive a re-render themselves — plain closure-scoped `let`, not `$state`.
@@ -32,12 +34,17 @@
   let grabbed: number | null = null;
 </script>
 
-<View class="section-tight"><Text class="section-label">Responder · drag a chip vs hand-off to the strip</Text><Text class="info-text">{status}</Text><Text
+<View class="section-tight"
+  ><Text class="section-label"
+    >Responder · drag a chip vs hand-off to the strip</Text
+  ><Text class="info-text">{status}</Text><Text
     class="transfer-text"
     style={{ color: transfer ? '#f6ad55' : '#41506a' }}
-  >{transfer || 'transfer: —'}</Text><View
+    >{transfer || 'transfer: —'}</Text
+  ><View
     onMoveShouldSetResponder={(event: ISymbioteEvent) =>
-      grabbed !== null && Math.abs(firstTouchX(event) - startX) > RESPONDER_STEAL_DX}
+      grabbed !== null &&
+      Math.abs(firstTouchX(event) - startX) > RESPONDER_STEAL_DX}
     onResponderGrant={(event: ISymbioteEvent) => {
       transfer = `↯ strip stole the gesture from chip ${grabbed ?? '?'}`;
       activeChip = null;
@@ -45,7 +52,8 @@
       panStartX = firstTouchX(event);
       status = 'strip panning';
     }}
-    onResponderMove={(event: ISymbioteEvent) => (rowDx = firstTouchX(event) - panStartX)}
+    onResponderMove={(event: ISymbioteEvent) =>
+      (rowDx = firstTouchX(event) - panStartX)}
     onResponderRelease={() => {
       rowDx = 0;
       status = 'strip released';
@@ -86,8 +94,9 @@
           style={{
             borderColor: activeChip === index ? '#7fb5ff' : 'transparent',
             transform: [{ translateX: activeChip === index ? chipDx : 0 }],
-          }}
-        ><Text class="chip-text">{index}</Text></View>
+          }}><Text class="chip-text">{index}</Text></View
+        >
       {/each}
     </View>
-  </View></View>
+  </View></View
+>

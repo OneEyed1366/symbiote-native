@@ -20,11 +20,18 @@
 // only other components — see the preprocessor's own header). Order matters: the guard throws on
 // a construct that cannot work at all, so it runs before anything rewrites the source it reports
 // offsets against.
+//
+// `collapseTextWhitespace()` collapses whitespace inside a Text node the way a browser or Vue's
+// compiler would — Svelte doesn't, so a sentence wrapped across source lines for readability
+// otherwise ships a literal newline into the native text content (svelte-adapter-dom-shim skill
+// §16/§29/§30). Metro runs it too, so the bundle is correct either way; registering it here is
+// what surfaces the fix in svelte-check and the editor.
 import { forbidWebOnlyConstructs } from '@symbiote-native/svelte/preprocessor';
 import { scopedStyles } from '@symbiote-native/svelte/scoped-styles';
+import { collapseTextWhitespace } from '@symbiote-native/svelte/collapse-text-whitespace';
 
 export default {
-  preprocess: [forbidWebOnlyConstructs(), scopedStyles()],
+  preprocess: [forbidWebOnlyConstructs(), scopedStyles(), collapseTextWhitespace()],
   compilerOptions: {
     fragments: 'tree',
     css: 'external',

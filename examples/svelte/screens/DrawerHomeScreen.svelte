@@ -15,16 +15,21 @@
 <SafeAreaView class="screen"
   ><View class="section"
     ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
+      ><Text class="line-tag-text"
+        >{`${lineInfo.code} · ${lineInfo.label}`}</Text
+      ></View
     ><View class="hero-card"
-      ><View class="hero-badge" style={{ backgroundColor: LINE_COLOR.structure }}
+      ><View
+        class="hero-badge"
+        style={{ backgroundColor: LINE_COLOR.structure }}
         ><Text class="hero-badge-text">DR</Text></View
       ><View class="hero-copy"
-        ><Text class="hero-title">Drawer</Text
-        ><Text class="hero-body">A swipeable drawer sliding in from the right, driven by the navigator's own gesture handler.</Text
+        ><Text class="hero-title">Drawer</Text><Text class="hero-body"
+          >A swipeable drawer sliding in from the right, driven by the navigator's own gesture handler.</Text
+        ></View
       ></View
-    ></View
-    ><Text class="info-text">drawerPosition: right · drawerType: slide — swipe from the RIGHT edge, or use a button</Text
+    ><Text class="info-text"
+      >drawerPosition: right · drawerType: slide — swipe from the RIGHT edge, or use a button</Text
     ><ActionButton
       testID="drawer-open"
       title="Open drawer"
