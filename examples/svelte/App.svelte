@@ -44,6 +44,7 @@
   import HooksDemoScreen from './screens/HooksDemoScreen.svelte';
   import DeepLinkingScreen from './screens/DeepLinkingScreen.svelte';
   import StatePersistenceScreen from './screens/StatePersistenceScreen.svelte';
+  import BenchmarkScreen from './screens/BenchmarkScreen.svelte';
   import { APP_LINKING_CONFIG } from './navigation-linking';
   import { ROUTE_NAME } from './routes';
   import { LINE_COLOR } from './navigation-lines';
@@ -53,7 +54,7 @@
   const HEADER_BACKGROUND = '#1a1a1a';
   const DETAILS_TRANSITION_DURATION_MS = 300;
 
-  // Seven of the nine tour stops carry a byte-identical header apart from title and tint, so they
+  // Eight of the ten tour stops carry a byte-identical header apart from title and tint, so they
   // share this builder. Menu, Details, HeaderOptions and SheetDemo each deviate on purpose (no
   // headerShown, a transition, a large title, formSheet sizing) and are written out in full below.
   function darkHeader(title: string, headerTintColor: string): IScreenOptions {
@@ -144,6 +145,10 @@
     'State Persistence',
     LINE_COLOR.routing,
   );
+  const benchmarkScreenOptions: IScreenOptions = darkHeader(
+    'Benchmark',
+    LINE_COLOR.performance,
+  );
 
   // `unknown` + a runtime guard, not `INavigatorHandle | null` directly. @symbiote-native/navigation
   // ships Stack as a raw `.svelte` file, and TypeScript resolves an imported `.svelte` module from
@@ -220,5 +225,9 @@
     name={ROUTE_NAME.StatePersistence}
     component={StatePersistenceScreen}
     options={statePersistenceScreenOptions}
+  /><Screen
+    name={ROUTE_NAME.Benchmark}
+    component={BenchmarkScreen}
+    options={benchmarkScreenOptions}
   /></Stack
 >

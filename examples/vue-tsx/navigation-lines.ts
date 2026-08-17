@@ -1,17 +1,19 @@
 import { ROUTE_NAME } from './routes';
 import type { IRouteName } from './routes';
 
-// The @symbiote-native/navigation demo suite groups its 9 tour screens into 5 thematic "lines" —
-// which part of the package each screen exercises — carried through MenuScreen's row badges, each
-// demo screen's own line tag, and (where the native header/tab bar already takes a tint color)
-// the OS chrome itself. Kept in sync by hand with App.css's `:root` `--line-*` tokens — CSS
-// custom properties and this module are different runtimes with no shared import path.
+// The demo suite groups its tour screens into thematic "lines" — which part of the package each
+// screen exercises, plus a Performance line for the benchmark stop — carried through MenuScreen's
+// row badges, each demo screen's own line tag, and (where the native header/tab bar already takes
+// a tint color) the OS chrome itself. Kept in sync by hand with App.css's `:root` `--line-*`
+// tokens — CSS custom properties and this module are different runtimes with no shared import
+// path.
 export const NAV_LINE = {
   Primitives: 'primitives',
   Presentation: 'presentation',
   Structure: 'structure',
   Introspection: 'introspection',
   Routing: 'routing',
+  Performance: 'performance',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -26,6 +28,9 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.Structure]: '#4fd1a5',
   [NAV_LINE.Introspection]: '#b18cf5',
   [NAV_LINE.Routing]: '#f2789a',
+  // Amber — the only warm hue in the set, so a timing screen never reads as one of the
+  // navigation lines at a glance.
+  [NAV_LINE.Performance]: '#f5a524',
 };
 
 export type INavLineInfo = {
@@ -35,7 +40,7 @@ export type INavLineInfo = {
 };
 
 // Every route reachable from MenuScreen, minus Menu itself. Deliberately excludes Details — it's a
-// plain push-target off Canary, not one of the 9 tour stops.
+// plain push-target off Canary, not one of the 10 tour stops.
 export type ITourRouteName = Exclude<IRouteName, typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details>;
 
 export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
@@ -48,4 +53,5 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.HooksDemo]: { line: NAV_LINE.Introspection, code: 'HK', label: 'INTROSPECTION LINE' },
   [ROUTE_NAME.DeepLinking]: { line: NAV_LINE.Routing, code: 'DL', label: 'ROUTING LINE' },
   [ROUTE_NAME.StatePersistence]: { line: NAV_LINE.Routing, code: 'SP', label: 'ROUTING LINE' },
+  [ROUTE_NAME.Benchmark]: { line: NAV_LINE.Performance, code: 'BM', label: 'PERFORMANCE LINE' },
 };

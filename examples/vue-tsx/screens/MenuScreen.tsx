@@ -21,6 +21,7 @@ const MENU_ITEMS: readonly IMenuItem[] = [
   { label: 'Hooks', route: ROUTE_NAME.HooksDemo, hint: 'useFocusEffect / useIsFocused / useNavigationState' },
   { label: 'Deep linking', route: ROUTE_NAME.DeepLinking, hint: 'resolveRouteFromUrl against a typed URL' },
   { label: 'State persistence', route: ROUTE_NAME.StatePersistence, hint: 'serialize/deserialize the Stack state' },
+  { label: 'Benchmark', route: ROUTE_NAME.Benchmark, hint: 'js-framework-benchmark ops + JS-thread FPS' },
 ];
 
 /**
@@ -28,7 +29,7 @@ const MENU_ITEMS: readonly IMenuItem[] = [
  * each pushing its own dedicated demo screen onto the same root Stack. Replaces Canary as the
  * initial route; Canary itself is unchanged and reachable from the first row.
  *
- * Rows are grouped into 5 thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
+ * Rows are grouped into 6 thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
  * 2-letter badge per line, carried through onto each demo screen's own line tag — so the tour
  * reads as one system instead of a flat bag of unrelated test screens.
  */
@@ -40,10 +41,11 @@ export const MenuScreen = defineComponent(
         <ScrollView testID="menu-scroll" class="screen" contentContainerStyle="scroll-content">
           <View class="menu-hero">
             <Text class="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
-            <Text class="menu-hero-title">Nine stops along the stack</Text>
+            <Text class="menu-hero-title">Ten stops along the stack</Text>
             <Text class="menu-hero-subtitle">
               Each row below drives a different line of @symbiote-native/navigation — Primitives,
-              Presentation, Structure, Introspection, Routing — on a real native stack.
+              Presentation, Structure, Introspection, Routing — on a real native stack, plus a
+              Performance stop timing the engine's own commit path.
             </Text>
           </View>
           {MENU_ITEMS.map(item => {

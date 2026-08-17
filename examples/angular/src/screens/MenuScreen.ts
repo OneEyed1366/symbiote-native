@@ -22,6 +22,7 @@ const MENU_ITEMS: readonly IMenuItem[] = [
   { label: 'Deep linking', route: ROUTE_NAME.DeepLinking, hint: 'resolveRouteFromUrl against a typed URL' },
   { label: 'State persistence', route: ROUTE_NAME.StatePersistence, hint: 'serialize/deserialize the Stack state' },
   { label: 'Reactive style', route: ROUTE_NAME.ReactiveStyle, hint: 'one tap must repaint every tile' },
+  { label: 'Benchmark', route: ROUTE_NAME.Benchmark, hint: 'js-framework-benchmark ops + JS-thread FPS' },
 ];
 
 /**
@@ -46,7 +47,8 @@ const MENU_ITEMS: readonly IMenuItem[] = [
           <Text class="menu-hero-title">Ten stops along the stack</Text>
           <Text class="menu-hero-subtitle">
             Each row below drives a different @symbiote-native/navigation line — Primitives,
-            Presentation, Structure, Introspection, Routing — on a real native stack.
+            Presentation, Structure, Introspection, Routing — on a real native stack, plus a
+            Performance stop timing the engine's own commit path.
           </Text>
         </View>
         @for (item of menuItems; track item.route) {
