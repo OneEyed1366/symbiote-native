@@ -55,331 +55,308 @@ Read this BEFORE:
 
 ## Bug 1 — bare `<ng-content>` passthrough breaks `@ContentChild` across a second re-projection hop
 
-`FlatList`'s single-column path and `SectionList` (a pure forwarder) both did:
-
-```html
-<VirtualizedList ...><ng-content></ng-content></VirtualizedList>
-<VirtualizedSectionList ...><ng-content></ng-content></VirtualizedSectionList>
 ```
-
-banking on the (WRONG) claim that "Angular content queries traverse projected content."
-They don't, across a **second** `<ng-content>` re-projection hop: `@ContentChild` on the
-INNER component resolves against whatever was projected directly onto ITS OWN tag in the
-template that instantiates it — here, that template is the WRAPPER's own (`FlatList`'s /
-`SectionList`'s), and `<ng-content>` is only a placeholder there, not real template nodes.
-The real app-authored `<ng-template vListItem>` (etc.) lives one level further out and
-never resolves.
-
-**Result:** `itemDir`/`headerDir`/etc. stay `undefined` inside `VirtualizedList`/
-`VirtualizedSectionList`, `VListOutletDirective` gets an `undefined` `templateRef`, and
-every cell renders as an EMPTY wrapper view — no exception, no red banner, just blank rows
-against whatever background color the list container has (easy to mistake for "the list is
-invisible" rather than "the list is empty").
-
-**Fix:** never `<ng-content>`-passthrough into a component whose OWN `@ContentChild` needs
-to see the app's directive. Instead, the WRAPPER captures the app's templates with its OWN
-`@ContentChild` (a single, direct hop — this always resolves) and RE-AUTHORS equivalent
-`<ng-template>`s on the inner component, each forwarding the captured `templateRef` + a
-freshly-built context through `VListOutletDirective` — exactly the pattern
-`VirtualizedSectionList` already used correctly for ITS OWN inner `VirtualizedList` (the
-multi-column `FlatList` path already did this too; only the single-column `FlatList` path
-and all of `SectionList` had the broken passthrough).
-
-When a `[vListOutletContext]` object literal needs a field typed `ItemT` (e.g. a
-separator's `leadingItem`/`trailingItem`) but the only available value is a template
-`let-` binding (typed `unknown` — Angular cannot preserve a generic structural directive's
-type parameter across this kind of reuse), route it through a tiny named
-`asItem<ItemT>(value): ItemT | undefined` cast helper (see `flat-list/index.ts` /
-`section-list/index.ts`) — the narrowest legitimate `as` boundary, not a general license to
-cast.
-
-**Precedent for a future adapter or component:** `VListOutletDirective` — capture with your
-own `@ContentChild`, re-author `<ng-template>` on the inner component, forward via a
-template-outlet directive — is the same shape `create-tunnel`'s `TunnelOut` uses for
-cross-surface content sharing; see the Scope boundary section below.
+§bug1_contentchild_reprojection := {
+  bug: "FlatList's single-column path + SectionList (pure forwarder) did
+        <VirtualizedList><ng-content></ng-content></VirtualizedList> /
+        <VirtualizedSectionList><ng-content></ng-content></VirtualizedSectionList>,
+        banking on the WRONG claim that Angular content queries traverse projected content",
+  root_cause: "@ContentChild on the INNER component resolves against whatever was projected
+               directly onto ITS OWN tag in the template that instantiates it — that
+               template is the WRAPPER's own, where <ng-content> is only a placeholder, not
+               real template nodes. The real app-authored <ng-template vListItem> lives one
+               level further out and never resolves — breaks across a SECOND <ng-content>
+               re-projection hop specifically",
+  symptom: "itemDir/headerDir/etc. stay undefined inside VirtualizedList/
+            VirtualizedSectionList, VListOutletDirective gets an undefined templateRef,
+            every cell renders as an EMPTY wrapper view — no exception, no red banner, just
+            blank rows (reads as 'list is invisible', not 'list is empty')",
+  fix: "WRAPPER captures the app's templates with its OWN @ContentChild (single direct hop,
+        always resolves) and RE-AUTHORS equivalent <ng-template>s on the inner component,
+        forwarding the captured templateRef + a freshly-built context through
+        VListOutletDirective — the pattern VirtualizedSectionList already used correctly for
+        its own inner VirtualizedList (multi-column FlatList path already did this too; only
+        single-column FlatList + all of SectionList had the broken passthrough)",
+  cast_helper: "asItem<ItemT>(value): ItemT | undefined (flat-list/index.ts,
+                section-list/index.ts) — narrowest legitimate `as` boundary, for when a
+                [vListOutletContext] literal needs a field typed ItemT (e.g. separator's
+                leadingItem/trailingItem) but the only value available is a template `let-`
+                binding typed unknown (generic structural-directive type param not
+                preserved across this reuse). Not a general license to cast",
+  precedent: "VListOutletDirective (capture w/ own @ContentChild → re-author <ng-template>
+              → forward via template-outlet directive) is the shape create-tunnel's TunnelOut
+              uses for cross-surface content sharing — see Scope boundary below",
+}
+```
 
 ## Bug 2 — `VirtualizedList.ngDoCheck()` recomputed `windowCells` unconditionally, causing a genuine infinite render loop
 
-`recomputeView()` rebuilds `windowCells` (and each cell's `separators` handle — brand-new
-closures every call) from scratch on every single `ngDoCheck`, with no memoization at all,
-unlike `VirtualizedSectionList`'s OWN `ngDoCheck` (which already gates on
-`sections`/`hasSectionSeparator` unchanged). A fresh context object every tick flows into
-`VListOutletDirective`, whose `context` `@Input()` therefore "changes" every tick by
-reference — correctly triggering `ngOnChanges` → `viewRef.markForCheck()` → the zoneless
-scheduler's `notify()` (`render.ts`'s `SymbioteChangeDetectionScheduler`) → another
-`detectChanges()` tick on the NEXT microtask → `ngDoCheck` runs again → rebuilds fresh
-again → repeat forever.
+```
+§bug2_infinite_recompute_loop := {
+  bug: "recomputeView() rebuilt windowCells (+ each cell's `separators` handle — brand-new
+        closures every call) from scratch on EVERY ngDoCheck, no memoization at all —
+        unlike VirtualizedSectionList's own ngDoCheck, which already gates on
+        sections/hasSectionSeparator unchanged",
+  mechanism: "fresh context object every tick -> VListOutletDirective's `context` @Input()
+              'changes' by reference every tick -> ngOnChanges -> viewRef.markForCheck()
+              -> zoneless scheduler's notify() (render.ts's
+              SymbioteChangeDetectionScheduler) -> detectChanges() next microtask ->
+              ngDoCheck runs again -> rebuilds fresh again -> repeat forever",
+  dormant_until: "present in VirtualizedList since it was written but invisible until Bug 1
+                  fixed — with itemDir always undefined, VListOutletDirective's embedded
+                  view was never created, so markForCheck() was never called from there",
+  symptom_device: "'списки появились, но приложение намертво висит' (lists appeared, app
+                   hard-froze) + broken layout — JS thread pegged in perpetual re-render
+                   churn, layout/paint starved",
+  fix: "ngDoCheck() now snapshots every input recomputeMetrics/recomputeView actually
+        depend on — data, extraData, getItemLayout, keyExtractor, horizontal, inverted,
+        windowSize, initialNumToRender, maxToRenderPerBatch, stickyHeaderIndices,
+        maintainVisibleContentPosition, style, contentContainerStyle, scrollOffset,
+        viewportLength, measureVersion, + 4 header/footer/empty/separator
+        directive-presence booleans — skips recompute entirely when every value is
+        reference-identical to the previous check. Explicit state changes (scroll, layout,
+        a cell measurement, a genuine data swap) still bump a tracked value and trigger a
+        fresh recompute",
+  generalize: "any future component with an unconditional ngDoCheck/ngOnChanges feeding
+               fresh object identities into a child @Input() needs the same
+               dependency-snapshot guard — not list-specific. See
+               angular-adapter-change-detection (Scope boundary below)",
+}
 
-This is a genuine infinite render loop, present in `VirtualizedList` since it was written,
-but **completely dormant and invisible** until Bug 1 was fixed — with `itemDir` always
-undefined, `VListOutletDirective`'s embedded view was never created, so `markForCheck()`
-was never called from there, so the loop never started. The moment lists actually render
-content (Bug 1 fixed), the app pegs the JS thread in a perpetual re-render churn — on
-device this presented as "списки появились, но приложение намертво висит" (lists
-appeared, but the app hard-froze) plus broken layout (starved layout/paint while JS never
-idles).
-
-**Fix:** `ngDoCheck()` now computes a snapshot of every input `recomputeMetrics`/
-`recomputeView` actually depend on (`data`, `extraData`, `getItemLayout`, `keyExtractor`,
-`horizontal`, `inverted`, `windowSize`, `initialNumToRender`, `maxToRenderPerBatch`,
-`stickyHeaderIndices`, `maintainVisibleContentPosition`, `style`, `contentContainerStyle`,
-`scrollOffset`, `viewportLength`, `measureVersion`, and the four header/footer/empty/
-separator directive-presence booleans) and skips the recompute entirely when every value
-is reference-identical to the previous check — so a CD pass triggered by something else
-entirely in the app reuses the same `windowCells` identities, `VListOutletDirective` sees
-no real change, and the loop never starts. Explicit state changes (scroll, layout, a cell
-measurement, a genuine data swap) still correctly bump one of the tracked values and
-trigger a fresh recompute.
-
-**Generalize this:** any future component with a similarly unconditional `ngDoCheck`/
-`ngOnChanges` that feeds fresh object identities into a child's `@Input()` should get the
-same kind of dependency-snapshot guard — this is not unique to lists, just first
-discovered here. See `angular-adapter-change-detection` for the broader CD-mechanics
-material this generalizes into (Scope boundary below).
-
-### Gotcha — a JIT-only quirk, not a production bug
-
-A THIRD, separate issue surfaced purely in JIT/vitest and is NOT a production bug:
-`VListItemDirective`/`VListHeaderDirective`/etc. (and the `VSection*Directive` family)
-originally took their `TemplateRef`/`ViewContainerRef` via constructor-parameter injection
-(`constructor(public readonly templateRef: TemplateRef<T>) {}`), which threw `NG0202`
-under vitest's JIT compilation (Angular's JIT DI needs `Reflect`-based
-`design:paramtypes` metadata that oxc's legacy-decorator lowering doesn't reliably emit
-for a generic class) — but compiled to a correct, fully-static
-`deps: [{ token: i0.TemplateRef }]` under the REAL `ngc --compilationMode partial` build
-(confirmed by inspecting `adapters/angular/build/angular/**/directives.js`), so it was
-never actually broken on device.
-
-Converted to `inject()` field style anyway (`readonly templateRef =
-inject<TemplateRef<T>>(TemplateRef);`) — matches the rest of the codebase's own DI
-convention and, as a side effect, is what made these directives headless-testable at all.
-
-A SEPARATE, still-unresolved JIT-only quirk (`SectionList` wrapping
-`VirtualizedSectionList` throws "Can't construct a query for the property ... since the
-query selector wasn't defined" under vitest specifically — confirmed absent when mounting
-`VirtualizedSectionList` directly, and the real `ngc` build of `SectionList` compiles with
-0 errors) means `SectionList` itself still has no passing headless test as of this
-session; treat that as a known gap, not evidence the component is broken — verify
-`SectionList` changes via a real device/simulator run until this JIT quirk is tracked
-down.
+§gotcha_jit_only_not_production := {
+  issue: "VListItemDirective/VListHeaderDirective/etc. + VSection*Directive family
+          originally took TemplateRef/ViewContainerRef via constructor-param injection
+          (constructor(public readonly templateRef: TemplateRef<T>) {}) -> threw NG0202
+          under vitest JIT (Angular JIT DI needs Reflect-based design:paramtypes metadata
+          oxc's legacy-decorator lowering doesn't reliably emit for a generic class)",
+  not_broken_on_device: "compiled to correct, fully-static
+                         deps: [{ token: i0.TemplateRef }] under real
+                         `ngc --compilationMode partial` build (confirmed inspecting
+                         adapters/angular/build/angular/**/directives.js)",
+  fix_anyway: "converted to inject() field style (readonly templateRef =
+               inject<TemplateRef<T>>(TemplateRef);) — matches codebase DI convention,
+               side effect: made these directives headless-testable at all",
+  open: "SEPARATE, still-unresolved JIT-only quirk — SectionList wrapping
+         VirtualizedSectionList throws \"Can't construct a query for the property ...
+         since the query selector wasn't defined\" under vitest specifically — confirmed
+         absent mounting VirtualizedSectionList directly; real ngc build of SectionList
+         compiles 0 errors -> SectionList has no passing headless test as of this
+         session — known gap, not evidence of a broken component; verify SectionList
+         changes on a real device/simulator until tracked down",
+}
+```
 
 ## Bug 3 — `(event)="x.emit($event)"` forwarding permanently poisons an inner component's `.observed` gate
 
-Every list wrapper (`FlatList`, `SectionList`, `VirtualizedSectionList`) forwards its
-inner `VirtualizedList`'s `refresh` event outward via a template binding:
-`(refresh)="refresh.emit()"` (or `resolvedOnRefresh?.()`). **The mere presence of that
-binding subscribes to the inner component's `refresh` `@Output()`, unconditionally,
-regardless of what the handler expression does** — so `VirtualizedList`'s own
-`refresh.observed` getter is permanently `true` the moment it is used INSIDE any wrapper,
-even when the app itself never listens to `(refresh)` on the outermost `<FlatList>`/
-`<SectionList>`. `VirtualizedList`'s template gated `<RefreshControl>` rendering on
-`@if (refresh.observed)`, so this made **every single list in the app render a
-`RefreshControl` / `PullToRefreshView`, always** — confirmed on-device via `DEBUG=1` log:
-every `RCTScrollView` (all 5 in the app, including ones with no `(refresh)` binding
-anywhere in the app's own code) showed `SCROLL-MULTI!!` (`core/engine/src/commit.ts`'s
-diagnostic for "a ScrollView has more than one direct child") with an unconditional
-`PullToRefreshView` child.
+```
+§bug3_observed_forwarding_poison := {
+  bug: "every list wrapper (FlatList, SectionList, VirtualizedSectionList) forwards its
+        inner VirtualizedList's `refresh` event via (refresh)=\"refresh.emit()\" (or
+        resolvedOnRefresh?.()). The MERE PRESENCE of that binding subscribes to the inner
+        component's `refresh` @Output() unconditionally, regardless of the handler
+        expression -> VirtualizedList's own `refresh.observed` getter is permanently true
+        the moment it's used inside ANY wrapper, even when the app never listens to
+        (refresh) on the outermost <FlatList>/<SectionList>",
+  symptom: "VirtualizedList's template gated <RefreshControl> on @if (refresh.observed) ->
+            EVERY list in the app renders RefreshControl/PullToRefreshView, always —
+            confirmed on-device via DEBUG=1 log: every RCTScrollView (all 5 in app,
+            including ones with no (refresh) binding anywhere in app code) showed
+            SCROLL-MULTI!! (core/engine/src/commit.ts diagnostic: 'ScrollView has more
+            than one direct child') with an unconditional PullToRefreshView child",
+  misdiagnosis: "this is the ACTUAL cause of the device freeze/RAM-growth symptom reported
+                 AFTER Bug 1 + Bug 2 were fixed, originally misattributed to Bug 2's loop
+                 guard being wrong. Real chain: extra always-present PullToRefreshView (+
+                 a permanently-uncommitted #anchor#NEW sibling, never resolving to a
+                 stable Fabric tag in the log) destabilized native scroll/layout ->
+                 onLayout/onScroll kept firing with shifting values -> correctly (per
+                 Bug 2's working memoization) kept triggering fresh legitimate recomputes
+                 forever. Bug 2's guard was never wrong; the values it watched genuinely
+                 never settled. Check for an .observed-forwarding leak BEFORE re-opening
+                 Bug 2's memoization on a similar symptom",
+  fix: ".observed cannot be trusted as a 'does anyone actually want this' gate on a
+        component that is ALWAYS wrapped and internally forwarded — the wrapping layer's
+        forwarding subscription poisons it. Added explicit @Input() refreshRequested?:
+        boolean to VirtualizedList (+ VirtualizedSectionList, identical problem one layer
+        up), computed shouldRenderRefreshControl = this.refreshRequested ??
+        this.refresh.observed (falls back to own .observed for direct unwrapped usage,
+        unchanged there). Each wrapper passes [refreshRequested]=\"refresh.observed\" —
+        its OWN public output's .observed, the one signal that genuinely reflects 'did
+        the APP subscribe' — down the chain: FlatList -> VirtualizedList, SectionList ->
+        VirtualizedSectionList -> VirtualizedList",
+  generalize: "any future wrapper forwarding a child's @Output() via
+               (event)=\"x.emit($event)\" then reading that SAME child's .observed to
+               gate behavior has this exact bug — the forwarding binding is itself an
+               observer. Fix pattern (explicit override input, falling back to local
+               .observed) generalizes directly",
+}
+```
 
-### This is the ACTUAL cause of a device freeze originally misdiagnosed as Bug 2's loop guard being wrong
-
-This is what actually caused the on-device freeze/RAM-growth symptom reported AFTER
-Bug 1 and Bug 2 above were fixed — the extra always-present `PullToRefreshView` (+ a
-permanently-uncommitted `#anchor#NEW` sibling, never resolving to a stable Fabric tag in
-the log) destabilized native scroll/layout enough that `onLayout`/`onScroll` kept firing
-with shifting values, which correctly (per Bug 2's now-working memoization) kept
-triggering fresh, legitimate recomputes forever — **Bug 2's loop guard was never wrong;
-the values it was watching were genuinely never settling, because of this RefreshControl
-leak.** Do not re-open or second-guess Bug 2's memoization fix when chasing a similar
-symptom — check for an `.observed`-forwarding leak like this one first.
-
-**Fix:** `.observed` cannot be trusted as a "does anyone actually want this" gate on a
-component that is ALWAYS wrapped and ALWAYS internally forwarded — the WRAPPING layer's
-forwarding subscription poisons it. Added an explicit `@Input() refreshRequested?:
-boolean` to `VirtualizedList` (and to `VirtualizedSectionList`, which has the identical
-problem one layer up), computed from `shouldRenderRefreshControl = this.refreshRequested
-?? this.refresh.observed` (falls back to the component's own `.observed` for direct,
-unwrapped usage — unchanged behavior there). Each wrapper now passes
-`[refreshRequested]="refresh.observed"` — ITS OWN public output's `.observed`, the one
-signal that genuinely still reflects "did the APP subscribe" — down to the next layer in
-(`FlatList` → `VirtualizedList`, `SectionList` → `VirtualizedSectionList` →
-`VirtualizedList`).
-
-**Generalize this:** any future wrapper that forwards a child component's event via
-`(event)="x.emit($event)"` and then reads that SAME child's `.observed` to gate behavior
-has this exact bug — the forwarding binding is itself an observer. The fix pattern (an
-explicit override input, falling back to local `.observed`) generalizes directly.
+See `angular-adapter-events`'s Landmine 3 for the sibling case of this same
+`VirtualizedList`→`ScrollView`/`RefreshControl` forwarding chain breaking prop-to-event
+conversion (`NG8002`) — a different symptom, same forwarding structure.
 
 ## ScrollView — `<ng-content>` duplicated across `@if`/`@else` branches, cells land outside the ScrollView (FIXED 2026-07)
 
-The bug (device-confirmed on iOS, "FlatList · 24 chips, windowed" demo in
-`examples/angular/App.ts`): a horizontal `FlatList`'s item cells rendered as a full-width
-vertical stack at the app root instead of a small horizontal strip — looked like "styles
-not applied", but the styles were correct; the cells were structurally outside the
-ScrollView entirely (siblings of `RCTScrollView`, not children of its
-`RCTScrollContentView`). Every OTHER list on the same screen (plain `FlatList`,
-`SectionList` with sticky headers, MVCP prepend-without-jump) was unaffected.
+```
+§scrollview_root_cause := {
+  symptom: "horizontal FlatList's item cells rendered as a full-width vertical stack at
+            the app root instead of a small horizontal strip (device-confirmed iOS,
+            'FlatList · 24 chips, windowed' demo in examples/angular/App.ts) — looked like
+            'styles not applied' but styles were correct; cells structurally outside
+            ScrollView (siblings of RCTScrollView, not children of RCTScrollContentView).
+            Other lists on same screen (plain FlatList, SectionList w/ sticky headers,
+            MVCP prepend-without-jump) unaffected",
+  root_cause: "ScrollView's iOS template (scroll-view/index.ios.ts) branched its ENTIRE
+               host structure on @if (isHorizontal) {...<ng-content>...} @else
+               {...<ng-content>...} — <ng-content> declared TWICE. Angular limitation:
+               content projected into the FIRST (@if) branch of a two-branch conditional
+               never gets native 'catch-up' placement; only the SECOND (@else) branch
+               does",
+  confirmed_by: "own DEBUG=1 trace + upstream angular/angular#53310 ('@if syntax does not
+                 display projected content'), #54840 ('Conditionals and content
+                 projection', same with legacy *ngIf/else); angular.dev docs state it as a
+                 hard rule: 'You should not conditionally include <ng-content> with @if,
+                 @for, or @switch' — general workaround is <ng-template> +
+                 ViewContainerRef/NgTemplateOutlet",
+  mechanism_trace: "vertical (@else, second) branch: Angular's native catch-up
+                    (applyProjection) fires immediately after RCTScrollContentView is
+                    created — real appendChild/insertBefore land already-built cell
+                    row-wrappers BEFORE ScrollViewProjectionController.bindContentNode()
+                    runs (confirmed: bindContentNode preExistingChildren=29). horizontal
+                    (@if, first): catch-up never fires — bindContentNode
+                    preExistingChildren=0 forever, even after a real topLayout event +
+                    multiple settle-ticks",
+}
 
-### Root cause — a documented Angular limitation, not a SymbioteNative-specific bug
+§scrollview_ios_fix := {
+  fix: "iOS has ONE native intrinsic pair regardless of axis —
+        symbiote-scroll-view/symbiote-horizontal-scroll-view (+ -content counterparts)
+        both resolve to the same Fabric view (RCTScrollView/RCTScrollContentView,
+        confirmed in trace logs). shared.ts's scrollProps getter already forwards axis as
+        a plain prop (if (this.horizontal !== undefined) bag.horizontal =
+        this.horizontal — comment: 'iOS needs horizontal to flip RCTScrollView's axis;
+        Android's dedicated manager ignores it'), so the @if/@else-over-two-tag-pairs
+        shape was ALWAYS redundant — written to mirror Android's genuinely-necessary
+        branching, for authoring symmetry, not because iOS needed it",
+  change: "removed the conditional entirely — index.ios.ts renders ONE
+           <symbiote-scroll-view>/<symbiote-scroll-content> structure unconditionally
+           (dropped HorizontalScrollView/HorizontalScrollContentView imports from this
+           file only, still exported from primitives/index.ts for index.android.ts),
+           <ng-content> declared exactly once. hasProjectedRefreshControl's own @if
+           untouched (doesn't wrap <ng-content>, never part of this bug)",
+  verified: "pnpm ng:build (from adapters/angular) clean; adapters/angular/src suite
+             57/57 passing, zero regressions — incl. the 3 scroll-view-projection.test.ts
+             vertical-scenario tests that DID break under the ruled-out swap below
+             (confirms this fix, unlike the swap, doesn't trade one axis for the other).
+             flat-list-scroll-containment.test.ts's pinned regression test flipped
+             it.fails -> it, passes for real",
+}
 
-`ScrollView`'s iOS template (`scroll-view/index.ios.ts`) used to branch its ENTIRE host
-structure on `@if (isHorizontal) { ...horizontal tags + <ng-content>... } @else {
-...vertical tags + <ng-content>... }` — declaring `<ng-content>` TWICE, once per branch.
-Angular's own content projection has a known limitation with this shape: **content
-projected into the FIRST (`@if`) branch of a two-branch conditional never receives
-Angular's native "catch-up" placement; only the SECOND (`@else`) branch does.** Confirmed
-both by our own headless `DEBUG=1` trace (below) AND by upstream Angular issues describing
-the identical symptom:
-[angular/angular#53310](https://github.com/angular/angular/issues/53310) ("@if syntax
-does not display projected content" — "When the @if condition is true, the projected
-content is not displayed... but when the condition is false, the projected content in the
-@else block displays correctly"), [#54840](https://github.com/angular/angular/issues/54840)
-("Conditionals and content projection" — same interaction with legacy `*ngIf`/`else`, not
-new-control-flow-specific). Angular's own official docs state it as a hard rule: **"You
-should not conditionally include `<ng-content>` with `@if`, `@for`, or `@switch`"**
-(angular.dev/guide/components/content-projection) — the general-purpose recommended
-workaround is `<ng-template>` + explicit `ViewContainerRef`/`NgTemplateOutlet` rendering,
-for cases that truly need conditional projection.
+§scrollview_ruled_out_ios_swap := {
+  tried: "swapped index.ios.ts to @if (!isHorizontal) {...vertical...} @else
+          {...horizontal...} (semantically identical, just reordered which block is
+          textually first)",
+  result: "horizontal chip test flipped to passing (confirms first/second-branch theory)
+           BUT 3 previously-green scroll-view-projection.test.ts tests +
+           flat-list.test.ts's header/footer test immediately broke (vertical content now
+           empty: RCTScrollView(RCTScrollContentView) with nothing inside)",
+  conclusion: "bug is purely positional, not horizontal-vs-vertical semantics —
+               reordering only relocates it onto whichever axis ends up first. Do not
+               retry a plain reorder as 'the fix'",
+}
 
-Since our symptom was axis-specific (horizontal broken, vertical fine) rather than an
-obviously-conditional `<ng-content>`, it took a headless `DEBUG=1` trace to see the
-mechanism: for the vertical (`@else`, second) branch, Angular's native catch-up
-(`applyProjection`) fires immediately after `RCTScrollContentView` is created — real
-`appendChild`/`insertBefore` calls land the already-built cell row-wrappers into it BEFORE
-`ScrollViewProjectionController.bindContentNode()` even runs (confirmed:
-`bindContentNode preExistingChildren=29`). For horizontal (`@if`, first), that same
-catch-up never fires — `bindContentNode preExistingChildren=0`, forever, even after a real
-`topLayout` event and multiple settle-ticks.
+§scrollview_android := {
+  worse_shape: "index.android.ts same bug class, FOUR call sites (nested @if
+                (isHorizontal) { @if (hasProjectedRefreshControl) {...} @else {...} }
+                @else { @if (hasProjectedRefreshControl) {...} @else {...} }), one
+                additionally used <ng-content select=\"*:not(RefreshControl)\"> where
+                others didn't",
+  dead_weight: "that selector was dead weight, not a real inconsistency —
+                ScrollViewProjectionController.reconcileStickyRecords() (projection.ts:315)
+                already strips a projected <RefreshControl> from content records whenever
+                excludeRefreshControl is set, regardless of <ng-content select> (confirmed
+                by reading the code); fix drops the selector",
+  android_constraint: "cannot reuse iOS's 'collapse to one tag' — genuinely needs a
+                       different Fabric view per axis for BOTH the outer scroll container
+                       (RCTScrollView vertical-only; AndroidHorizontalScrollView a
+                       dedicated ViewManager) AND the inner content view (RN's
+                       *ScrollContentViewNativeComponents.js: vertical = plain Android
+                       View; horizontal = AndroidHorizontalScrollContentView, carries its
+                       own ShadowNode::layout() override participating in scroll
+                       content-size math, NOT cosmetic — confirmed reading
+                       AndroidHorizontalScrollContentViewShadowNode.h in
+                       .vendors/react-native, so downgrading horizontal content to a plain
+                       RCTView is not a safe shortcut)",
+}
 
-### The iOS fix — collapse to a single unconditional host tag
+§scrollview_android_attempt1_ruled_out := {
+  tried: "<ng-template> PER AXIS (two templates), each with its own <ng-content>,
+          outletted into the correct @if/@else branch via a custom
+          [symbioteTemplateOutlet] directive (ViewContainerRef.createEmbeddedView, a
+          local @angular/core-only twin of @angular/common's NgTemplateOutlet — adapter
+          deliberately has no @angular/common dep, see package.json). Literally Angular's
+          own documented workaround (angular.dev: 'configure component to accept an
+          <ng-template> element... will not initialize content until explicitly
+          rendered') — still failed, still declared <ng-content> TWICE (once per axis
+          template)",
+  result: "broke DIFFERENTLY depending on which of the two <ng-template> blocks was
+           declared LAST in template source order — whichever declared last received
+           projected content, the other got NOTHING (zero appendChild calls, confirmed
+           DEBUG=1 headless trace: bindContentNode preExistingChildren=0, reconcile
+           records=0 forever). Swapping branch ORDER inside @if/@else did NOT change
+           this — only swapping which <ng-template> was declared last did",
+  key_finding: "rule is NOT 'first @if branch loses catch-up' (iOS's framing, too
+                narrow) — it's 'a component with TWO TEXTUALLY DISTINCT unqualified
+                <ng-content> declarations anywhere in its own compiled template reliably
+                projects into only ONE (the one declared last in source), regardless of
+                @if/@else wrapping, <ng-template> deferral, or
+                ViewContainerRef.createEmbeddedView/NgTemplateOutlet outletting.' Matches
+                title of angular/angular#22972 ('Strange behaviour with multiple
+                <ng-content> and *ngIf'). Nesting a second distinct COMPONENT with its own
+                single <ng-content> doesn't dodge this — count that matters is 'how many
+                distinct <ng-content> declarations in the ONE component whose caller
+                supplied the content'; delegating axis choice to a child component just
+                relocates that same count into the child's template",
+}
 
-Unlike Android, iOS has only ONE native intrinsic pair regardless of axis —
-`symbiote-scroll-view`/`symbiote-horizontal-scroll-view` (and their `-content`
-counterparts) both resolve to the exact same Fabric view (`RCTScrollView`/
-`RCTScrollContentView`, confirmed in trace logs). `shared.ts`'s `scrollProps` getter
-ALREADY forwards the axis as a plain prop — `if (this.horizontal !== undefined)
-bag.horizontal = this.horizontal;` (its own comment: "iOS needs `horizontal` to flip
-RCTScrollView's axis; Android's dedicated manager ignores it"). So the `@if`/`@else`-
-over-two-tag-pairs shape in `index.ios.ts` was ALWAYS redundant with that existing prop
-forwarding — written to mirror Android's genuinely-necessary branching, for authoring
-symmetry, not because iOS needed it.
-
-Removed the conditional entirely: `index.ios.ts` now renders ONE
-`<symbiote-scroll-view>`/`<symbiote-scroll-content>` structure unconditionally (dropped
-the `HorizontalScrollView`/`HorizontalScrollContentView` imports from this file only —
-they're still exported from `primitives/index.ts` for `index.android.ts`), with
-`<ng-content>` declared exactly once. `hasProjectedRefreshControl`'s own `@if` is
-untouched (it doesn't wrap `<ng-content>`, so it was never part of this bug).
-
-**Verified:** rebuilt (`pnpm ng:build` from `adapters/angular`), full `adapters/angular/src`
-suite: **57/57 passing, zero regressions** — including the 3
-`scroll-view-projection.test.ts` vertical-scenario tests that DID break under the ruled-out
-swap below, confirming this fix (unlike the swap) doesn't trade one axis for the other.
-`flat-list-scroll-containment.test.ts`'s pinned regression test flipped from `it.fails` to
-a plain `it` and passes for real.
-
-### TESTED AND RULED OUT — naive branch-order swap (iOS)
-
-Before finding the real fix, swapped `index.ios.ts` to `@if (!isHorizontal) {
-...vertical... } @else { ...horizontal... }` (semantically identical, just reordered which
-block is textually first). Result: the horizontal chip test flipped to passing (confirmed
-the first-branch/second-branch theory) — but 3 previously-green
-`scroll-view-projection.test.ts` tests and `flat-list.test.ts`'s header/footer test
-immediately broke (vertical content now empty: `RCTScrollView(RCTScrollContentView)` with
-nothing inside). **Proves the bug is purely positional, not about horizontal vs vertical
-semantics — reordering only relocates it onto whichever axis ends up first.** Do not retry
-a plain reorder as "the fix."
-
-### Android — same class of bug, worse (four call sites), FIXED after two attempts were ruled out
-
-`index.android.ts` had the same class of bug — investigated and FIXED 2026-07, after two
-earlier attempts were RULED OUT. Android's template has the SAME `<ng-content>`-per-branch
-shape, but WORSE — FOUR call sites (nested `@if (isHorizontal) { @if
-(hasProjectedRefreshControl) {...} @else {...} } @else { @if
-(hasProjectedRefreshControl) {...} @else {...} }`), one of which additionally used
-`<ng-content select="*:not(RefreshControl)">` where the others didn't. That selector was
-DEAD WEIGHT, not a real inconsistency to preserve:
-`ScrollViewProjectionController.reconcileStickyRecords()` (`projection.ts:315`) already
-strips a projected `<RefreshControl>` out of the content records whenever
-`excludeRefreshControl` is set, regardless of any `<ng-content select>` — confirmed by
-reading the code, not just inference; the fix drops the selector.
-
-Android CANNOT reuse the iOS fix's "collapse to one tag" approach — it genuinely needs a
-different Fabric view per axis for BOTH the outer scroll container (`RCTScrollView` is
-vertical-only; `AndroidHorizontalScrollView` is a dedicated ViewManager) AND the inner
-content view (RN's `*ScrollContentViewNativeComponents.js`: vertical content is a plain
-Android `View`; horizontal content is `AndroidHorizontalScrollContentView`, which carries
-its own `ShadowNode::layout()` override participating in scroll content-size math — NOT a
-cosmetic/optional class, confirmed by reading
-`AndroidHorizontalScrollContentViewShadowNode.h` in `.vendors/react-native`, so silently
-downgrading horizontal content to a plain `RCTView` is not a safe shortcut).
-
-**Attempt 1 — RULED OUT: `<ng-template>` PER AXIS (two templates), each with its own
-`<ng-content>`.** Declared exactly one `<ng-content>` per axis inside its own top-level
-`<ng-template>`, outletted into the correct `@if`/`@else` branch via a custom
-`[symbioteTemplateOutlet]` directive (`ViewContainerRef.createEmbeddedView`, a local
-`@angular/core`-only twin of `@angular/common`'s `NgTemplateOutlet` — the adapter
-deliberately has no `@angular/common` dependency, see `package.json`). This is literally
-Angular's own documented workaround ("configure that component to accept an
-`<ng-template>` element... Angular will not initialize the content... until that element
-is explicitly rendered", angular.dev/guide/components/content-projection) — and it still
-failed, because it still declared `<ng-content>` TWICE (once per axis template).
-
-Built, rebuilt, tested: BROKE DIFFERENTLY depending on which of the two `<ng-template>`
-blocks was declared LAST in template source order — whichever was declared last received
-projected content, the other got NOTHING appended at all (not "wrong position", genuinely
-zero `appendChild` calls for that content, confirmed via a `DEBUG=1` headless trace:
-`bindContentNode preExistingChildren=0`, `reconcile records=0` forever). Swapping branch
-ORDER inside `@if`/`@else` did NOT change this — only swapping which `<ng-template>` was
-declared last in the template string did.
-
-**This produced the key finding:** the rule is not "first `@if` branch loses catch-up"
-(that was iOS's framing, and it's too narrow) — it's "a component with TWO TEXTUALLY
-DISTINCT unqualified `<ng-content>` declarations anywhere in its own compiled template
-reliably projects into only ONE of them (the one declared last in source), regardless of
-whether they're wrapped in `@if`/`@else`, deferred into an `<ng-template>`, or outletted
-via `ViewContainerRef.createEmbeddedView`/`NgTemplateOutlet`." Matches the *title* of a
-related upstream issue, [angular/angular#22972](https://github.com/angular/angular/issues/22972)
-("Strange behaviour with multiple `<ng-content>` and `*ngIf`"). Nesting a second, distinct
-COMPONENT with its own single `<ng-content>` doesn't dodge this either — the count that
-matters is "how many distinct `<ng-content>` declarations exist in the ONE component whose
-caller supplied the content", and delegating the axis choice to a child component just
-relocates that same count into the child's own template.
-
-**The fix — Attempt 3 (2026-07): ONE shared `<ng-template>`, referenced by outlet from all
-four branches, not one-per-axis.** The insight Attempt 1 missed: the "only last one wins"
-rule fires on `<ng-content>` DECLARATION COUNT, not on how many places
-reference/instantiate that declaration. So `index.android.ts` now declares a SINGLE
-top-level `<ng-template #sharedContent><ng-content></ng-content></ng-template>` — one
-`<ng-content>` occurrence, period — and every one of the four structural branches contains
-`<ng-container [symbioteTemplateOutlet]="sharedContent"></ng-container>` instead of its own
-`<ng-content>`. `SymbioteTemplateOutletDirective` (the same minimal `@angular/common`-free
-twin of `NgTemplateOutlet` from Attempt 1, now exported from `index.android.ts` — `ngtsc`'s
-partial-mode compiler requires an imported symbol referenced by a component's `imports`
-array to be exported from its declaring file, confirmed via a real `NG3004` build error)
-instantiates that one `TemplateRef` via `ViewContainerRef.createEmbeddedView` wherever the
-active branch places it. Since only one branch is ever live, only one embedded view of
-`sharedContent` exists at a time — but the DECLARATION itself, textually, is singular, so
-the "last one wins" limitation never triggers in the first place. Angular local template
-variables (`#sharedContent`) are hoisted across the whole component template regardless of
-DOM position, so declaring it before the `@if` is valid and the four outlet references
-below it all resolve correctly.
-
-**Verified:** `pnpm ng:build` (AOT partial→linker) clean, monorepo `tsc --build` clean,
-ESLint clean. New permanent regression test
-`scroll-view/android-scroll-view-axis-projection.test.ts` covers all four static axis x
-refresh-control combinations PLUS a runtime vertical→horizontal axis switch (a
-signal-driven `@if` re-evaluation) — all pass. Full `adapters/angular/src` suite: **61/61
-passing, zero regressions** (57 pre-existing + 4 new), including
-`scroll-view-projection.test.ts`'s Android refresh-control case and
-`flat-list-scroll-containment.test.ts`. NOT tested on an Android device/emulator (headless
-vitest + AOT build only) — worth a real-device smoke before shipping, but the headless
-mechanism match with the now-fixed iOS case (same engine, same commit path) is strong
-evidence.
-
-**Attempt 2 (imperative relocation via `ScrollViewProjectionController`) was never
-attempted** — Attempt 3 above resolved it declaratively first and is simpler; keep
-Attempt 2's approach on file as a fallback ONLY if a future Angular version changes the
-outlet-reuse behavior Attempt 3 relies on.
+§scrollview_android_attempt3_fix := {
+  fix: "ONE shared <ng-template>, referenced by outlet from all four branches, not
+        one-per-axis. Insight Attempt 1 missed: 'only last one wins' fires on
+        <ng-content> DECLARATION COUNT, not how many places reference/instantiate it.
+        index.android.ts declares SINGLE top-level
+        <ng-template #sharedContent><ng-content></ng-content></ng-template> — one
+        <ng-content> occurrence — every one of four structural branches contains
+        <ng-container [symbioteTemplateOutlet]=\"sharedContent\"></ng-container> instead
+        of its own <ng-content>",
+  directive: "SymbioteTemplateOutletDirective (same minimal @angular/common-free twin of
+              NgTemplateOutlet from Attempt 1, now exported from index.android.ts —
+              ngtsc partial-mode compiler requires a symbol referenced in a component's
+              imports array to be exported from its declaring file, confirmed via real
+              NG3004 build error) instantiates the one TemplateRef via
+              ViewContainerRef.createEmbeddedView wherever the active branch places it.
+              Only one branch ever live -> only one embedded view of sharedContent at a
+              time, but DECLARATION is textually singular so 'last one wins' never
+              triggers. Angular local template vars (#sharedContent) hoisted across the
+              whole component template regardless of DOM position, so declaring before
+              @if is valid and all four outlet references resolve correctly",
+  verified: "pnpm ng:build (AOT partial->linker) clean, monorepo tsc --build clean,
+             ESLint clean. New permanent regression test
+             scroll-view/android-scroll-view-axis-projection.test.ts covers all four
+             static axis x refresh-control combinations PLUS a runtime
+             vertical->horizontal axis switch (signal-driven @if re-evaluation) — all
+             pass. Full adapters/angular/src suite: 61/61 passing zero regressions (57
+             pre-existing + 4 new), incl. scroll-view-projection.test.ts's Android
+             refresh-control case + flat-list-scroll-containment.test.ts",
+  open: "NOT tested on real Android device/emulator (headless vitest + AOT build only) —
+         worth a real-device smoke before shipping; headless mechanism match with the
+         now-fixed iOS case (same engine, same commit path) is strong evidence",
+  attempt2_never_tried: "imperative relocation via ScrollViewProjectionController never
+                         attempted — Attempt 3 resolved it declaratively first and is
+                         simpler; keep Attempt 2's approach on file as fallback ONLY if a
+                         future Angular version changes the outlet-reuse behavior
+                         Attempt 3 relies on",
+}
+```
 
 ## Verification checklist
 
@@ -446,8 +423,14 @@ nothing else about these components' props, styling, or general architecture.
   change-detection-mechanics problem wearing a list-specific costume. Read that skill for
   the general CD model this bug is one instance of, or when a similar unconditional-
   recompute pattern shows up outside the list family.
+- **`angular-adapter-events`** — its Landmine 3 documents the SAME `FlatList`→
+  `VirtualizedList`→`ScrollView`/`RefreshControl` wrapped-forwarding chain that Bug 3
+  above exploits, but from the callback-`@Input()`-to-`@Output()` conversion angle
+  (`NG8002` on an inner wrapped component's prop) rather than the `.observed`-poisoning
+  angle. Read that skill when converting a new callback prop through this same chain.
 
 Reach for the right skill by what the work is actually about: LIST CELLS/CONTENT-
 PROJECTION/REFRESH-LEAK → this skill, CROSS-SURFACE CONTENT SHARING → `angular-adapter-
-portal`, GENERAL CD MECHANICS/SIGNALS → `angular-adapter-change-detection`, ANYTHING ELSE
-→ `angular-adapter`.
+portal`, GENERAL CD MECHANICS/SIGNALS → `angular-adapter-change-detection`, CALLBACK-
+PROP-TO-`@Output()` CONVERSION → `angular-adapter-events`, ANYTHING ELSE →
+`angular-adapter`.

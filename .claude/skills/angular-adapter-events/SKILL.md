@@ -110,77 +110,65 @@ recognized backlog item, not something to silently carry forward unexamined.
 
 ## Landmine 1 — the anchor double-fire bug (SymbioteRenderer.listen())
 
-**Symptom**: naming an `@Output()` the SAME as a native event fired by a node INSIDE
-that same component's own template double-fires the handler.
-
-**Root cause**: Angular's component-output binding subscribes to the `EventEmitter`
-directly (correct), but the adapter's own `SymbioteRenderer.listen()`
-(`adapters/angular/src/renderer.ts`) ALSO gets called by Angular for that same
-binding and registers a REDUNDANT native listener on the component's own host
-element — which, for components in `ANCHOR_HOST_COMPONENTS` (Pressable, Button, every
-Touchable included), is a real `#anchor` node sitting as the PARENT of the component's
-own template content in the retained tree. When the inner template's native event
-(e.g. Pressable's own `<symbiote-view (pressIn)="handlePressIn($event)">`) fires and
-bubbles up past that anchor, it hits the redundant phantom listener and refires the
-same callback a second time.
-
-**Fix**: fixed generically, once, in the engine — not per component.
-`core/engine/src/events/index.ts`'s `bubble()` now treats anchor nodes as transparent
-to listener lookup (`isAnchor(node) ? undefined : node.listeners?.get(...)`) in both
-the capture and bubble phases, since an anchor "never paints, has no native view"
-already by definition (`core/engine/src/node.ts`) and Angular's real Output delivery
-never depended on that phantom registration anyway.
-
-**Any future `@Output()` conversion is safe** — this was a one-time engine fix, proven
-across 6 components, not something each new component needs to work around. Do NOT
-"fix" a double-fire by trying to force `provideZonelessChangeDetection()` into the
-bootstrap — that is a different, resolved, non-issue (see `angular-adapter-change-
-detection`); this landmine is only about the public component event shape.
+```
+landmine1_anchor_double_fire := {
+  symptom: "@Output() named same as a native event fired inside that component's own
+            template ⟶ handler fires twice",
+  root_cause: "SymbioteRenderer.listen() (adapters/angular/src/renderer.ts) also registers a
+               REDUNDANT native listener on the host, alongside Angular's own EventEmitter
+               subscription. ANCHOR_HOST_COMPONENTS members (Pressable, Button, every
+               Touchable) have a real #anchor node as PARENT of their own template content —
+               an inner native event (e.g. Pressable's own
+               <symbiote-view (pressIn)=\"handlePressIn($event)\">) bubbles past the anchor
+               and hits the phantom listener too",
+  fix: "core/engine/src/events/index.ts bubble() treats anchor nodes as transparent to
+        listener lookup (isAnchor(node) ? undefined : node.listeners?.get(...)), both
+        capture+bubble phases — anchors never paint / have no native view
+        (core/engine/src/node.ts). One-time engine fix, not per component",
+  verified: "6 converted components; future @Output() conversions safe by construction",
+  do_not_confuse_with: "provideZonelessChangeDetection() bootstrap — separate resolved
+                        non-issue (angular-adapter-change-detection)"
+}
+```
 
 ## Landmine 2 — @Directive() required the moment an abstract base gains a decorated member
 
-**Symptom**: `ngc`'s AOT build (NOT plain `tsc --build`) fails with `NG2007: Class is
-using Angular features but is not decorated`.
-
-**Root cause**: a `@Directive()` decorator becomes REQUIRED on an abstract base class
-the moment it gains a decorated member. `SwitchBase` originally held plain,
-undecorated fields (its concrete `@Component` referenced the field names via an
-`inputs: [...]` metadata array instead). Converting a field to
-`@Output() readonly x = new EventEmitter()` puts a real decorator on the abstract
-class itself, and `ngc` then rejects it unless the base class also gets a bare
-`@Directive()`. `ScrollViewBase` already had this right (it predates this pass).
-
-**General rule**: any abstract base class that is composed into a `@Component` via
-inheritance — not just via an `inputs`/`outputs` metadata array pointing at plain
-fields — needs `@Directive()` the instant ANY of its own members carry an Angular
-decorator (`@Input()`, `@Output()`, `@ViewChild`, ...). `tsc --build` will not catch
-this; only `ngc` (or the app's real AOT build) does — another instance of the AOT-only
-`strictTemplates` gap documented in the main `angular-adapter` skill's §4.
+```
+landmine2_directive_required_on_abstract_base := {
+  symptom: "ngc AOT build (NOT tsc --build) fails: NG2007 'Class is using Angular features
+            but is not decorated'",
+  root_cause: "SwitchBase held plain undecorated fields (its @Component referenced them via
+               an inputs: [...] metadata array). Converting a field to
+               @Output() readonly x = new EventEmitter() puts a real decorator on the abstract
+               class ⟶ ngc requires the base class itself to also carry a bare @Directive().
+               ScrollViewBase already had this right (predates this pass)",
+  general_rule: "an abstract base composed into a @Component via inheritance needs
+                @Directive() the instant ANY of its own members carries an Angular decorator
+                (@Input(), @Output(), @ViewChild, ...) — not just via inputs/outputs metadata",
+  caught_by: "ngc / real AOT build only, not tsc --build — AOT-only strictTemplates gap
+             (main angular-adapter skill's §4)"
+}
+```
 
 ## Landmine 3 — wrapped-component forwarding breakage (NG8002)
 
-**Symptom**: `ngc` AOT build fails with `NG8002: Binding to event property 'foo' is
-disallowed for security reasons` — a real AOT-only compile error, not a runtime
-symptom.
-
-**Root cause**: several components in this adapter build another component into their
-own template and forward props straight through it: `FlatList`/`SectionList`/
-`VirtualizedSectionList` each render an inner `VirtualizedList`; `VirtualizedList`
-itself renders an inner `ScrollView` and conditionally a `RefreshControl`;
-`ImageBackground` renders an inner `Image`. Converting the INNER component's prop from
-`@Input()` to `@Output()` silently breaks the OUTER component's forwarding binding,
-because Angular's template compiler treats `[foo]="bar"` (now targeting an
-`@Output()`) as `NG8002`. Concretely hit during this pass: `VirtualizedList` forwards
-`onLayout`/`onAccessibilityAction`/etc. into its inner `<ScrollView>` and `onRefresh`
-into its inner `<RefreshControl>` via `[prop]="tickField"` bindings — none of this is
-visible by reading the `ScrollView` or `RefreshControl` files alone, only by reading
-what wraps them.
-
-**Fix**: mechanical but must be done explicitly, per wrapper — change the forwarding
-from a value binding to a listener that re-emits: `[foo]="bar"` →
-`(foo)="bar($event)"` (or `(foo)="bar?.($event)"` where the forwarded value is an
-`.observed`-gated getter, as `VirtualizedSectionList`'s `resolvedOnRefresh`-style
-fields already were).
+```
+landmine3_ng8002_wrapped_forwarding := {
+  symptom: "ngc AOT build fails: NG8002 'Binding to event property 'foo' is disallowed for
+            security reasons' — AOT-only, no runtime symptom",
+  root_cause: "components that wrap another component and forward its props straight
+              through: FlatList/SectionList/VirtualizedSectionList each render an inner
+              VirtualizedList; VirtualizedList renders an inner ScrollView + conditionally a
+              RefreshControl; ImageBackground renders an inner Image. Converting the INNER
+              prop @Input()→@Output() breaks the OUTER forwarding binding — Angular treats
+              [foo]=\"bar\" against an @Output() as NG8002",
+  concretely_hit: "VirtualizedList forwards onLayout/onAccessibilityAction/etc into
+                  <ScrollView>, onRefresh into <RefreshControl>, via [prop]=\"tickField\" —
+                  invisible reading ScrollView/RefreshControl alone, only visible in wrappers",
+  fix: "per wrapper: [foo]=\"bar\" → (foo)=\"bar($event)\" (or (foo)=\"bar?.($event)\" for an
+       .observed-gated getter, as VirtualizedSectionList's resolvedOnRefresh already was)"
+}
+```
 
 **Practical checklist before converting any component's `@Input()` to `@Output()`**:
 
@@ -202,27 +190,21 @@ fields already were).
 
 ## Landmine 4 — output name collides with an existing class method (focus/blur)
 
-**Symptom**: a natural output name (`focus`, `blur`) collides with an existing
-imperative method of the same name; a class can't have a property and a method share
-a name.
-
-**Root cause**: `TextInput` already had `focus(): void` / `blur(): void` methods (the
-RN ref API, called via `@ViewChild(TextInput)`) before `onFocus`/`onBlur` were
-converted.
-
-**Fix**: alias the `@Output()` to a differently-named internal field:
-
-```ts
-@Output('focus') readonly focusEvent = new EventEmitter<...>();
-@Output('blur') readonly blurEvent = new EventEmitter<...>();
 ```
-
-The public template binding stays `(focus)="…"` / `(blur)="…"` (Angular's output
-ALIAS, the first argument to `@Output()`, not the class member name) — only the
-internal field name differs. This is the same aliasing trick already used for
-`@Input('aria-label') ariaLabel` elsewhere in this adapter — reach for it any time a
-natural output name collides with an existing class member, rather than renaming
-either one.
+landmine4_output_name_collision := {
+  symptom: "natural output name (focus, blur) collides with an existing imperative method of
+            the same name — a class can't have a property and a method share a name",
+  root_cause: "TextInput already had focus(): void / blur(): void (RN ref API, called via
+              @ViewChild(TextInput)) before onFocus/onBlur were converted",
+  fix: "alias to a differently-named internal field:
+       @Output('focus') readonly focusEvent = new EventEmitter<...>();
+       @Output('blur') readonly blurEvent = new EventEmitter<...>();
+       public binding stays (focus)=\"…\" / (blur)=\"…\" — Angular's output ALIAS (first arg
+       to @Output(), not the member name) — only the internal field name differs",
+  precedent: "same trick as @Input('aria-label') ariaLabel elsewhere in this adapter — reach
+             for it on any output-name collision instead of renaming either member"
+}
+```
 
 ## Current coverage
 
@@ -293,6 +275,10 @@ permanent scroll-callback exception. It does NOT own:
   overall implementation status. Read the main `angular-adapter` skill's §0 (status)
   and §1 (seam mapping) for that; this skill only interacts with `listen()` at the
   point where the anchor double-fire landmine lives.
+- **The engine's own event normalization** — `routeProp`'s onX→event-vs-prop
+  dispatch, `setEventListener`, and the capture/bubble mechanism Landmine 1's fix
+  lives inside. Read `symbiote-engine-core` for that; this skill only documents the
+  one anchor-transparency consequence it has for Angular's `@Output()` binding.
 - **Change detection mechanics** — a converted `(event)="..."` binding gets CD for
   free via Angular's own listener wrapper (the zoneless scheduler notices the
   `EventEmitter` fire and schedules a check), but the mechanism that makes that work

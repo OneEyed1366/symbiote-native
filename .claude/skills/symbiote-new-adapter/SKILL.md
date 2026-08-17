@@ -30,6 +30,11 @@ Svelte    a tiny set of DOM-ish ops you provide
 Solid     its universal/runtime custom renderer
 ```
 
+Svelte has no stable official custom-renderer API yet — our adapter instead patches
+`globalThis` DOM classes so compiled Svelte output runs unchanged, a deliberate
+coupling to Svelte's private internals. Different mechanism than the nodeOps table
+below; read `svelte-adapter-dom-shim` before building on that seam.
+
 ## 2. The nodeOps mapping (Vue, literal — your template)
 
 Every method does its mutation + (for coalesced adapters) `surface.requestCommit()`.
@@ -90,6 +95,8 @@ a deep ref (`vue-adapter-reactivity` §1).
     (or host-config.ts)
 [ ] src/components.ts         thin wrappers per primitive + the re-export barrel
 [ ] src/descriptor-to-<fw>.ts the Descriptor → framework element bridge (h() / createElement / imperative)
+                              // children/cells via renderItem-style props? check `vue-adapter-slots` first —
+                              // on Vue those became scoped slots, not a React-style render-prop duality
 [ ] src/host-instance(/.ts)   findNodeHandle(ref) → native tag (framework-shaped ref input)
 [ ] src/<hooks|composables>/  framework-idiomatic lifecycle: use-color-scheme, use-window-dimensions, …
 [ ] one-time wiring           setEventDispatcher(run => …) once at app entry (see React render.ts:
@@ -132,7 +139,8 @@ installed via `file:` for the in-progress adapter (CLAUDE.md's
   `adapters/{react,vue}/src/render.ts` (mount/unmount + `RN$stopSurface`).
 - Angular's Renderer2 mapping, AOT-under-Metro, version floor: the `angular-adapter` skill.
 - Async-commit landmines on a coalesced adapter: `vue-adapter-reactivity`.
-- Component parity (L4): the `symbiote-add-component` skill.
+- Component parity (L4): the `symbiote-add-component` skill; verify it landed with `symbiote-parity-check`
+  (prop-by-prop diff against React, the reference surface).
 - Prior art: `wolf-tui/packages/{react,vue,svelte,solid,angular}` (same architecture, ANSI target).
 - Decisions: `.docs/decisions/0002` (adapter seam), `0007` (build in layers), `0008`
   (React goes through the engine in mutation mode, not native persistent mode).

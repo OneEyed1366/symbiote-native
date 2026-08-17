@@ -8,7 +8,9 @@ description: "Symbiote raw-Vue-TSX (.tsx, @vue/babel-plugin-jsx) typecheck setup
 `examples/vue-tsx` (and any future raw-TSX Vue app in this monorepo — NOT `.vue` SFC apps like
 `examples/vue-sfc`, which vue-tsc typechecks correctly out of the box via its Volar language
 service plugin) had **no working typecheck** until this was diagnosed: adding a naive `vue-tsc
---noEmit` produced ~786 errors, every one shaped like React demanding the file be React.
+--noEmit` produced ~786 errors, every one shaped like React demanding the file be React. This is
+a JSX-factory resolution bug, distinct from Volar payload-inference errors on event emits/props
+(e.g. a slot or emit typing as `any`) — for those see `vue-adapter-events`.
 
 ## Root cause: jsxFactory-namespace lookup order, not a declaration-merge conflict
 
@@ -97,10 +99,10 @@ silently no-ops the fix and you're back to the default `React.createElement` loo
 
 ## A note on live diagnostics during this investigation
 
-IDE/LSP "new-diagnostics" style live feedback lagged real file state significantly during and
-after heavy concurrent file writes (multiple agents editing the same package tree) — it kept
-reporting already-fixed errors (`Cannot find module './stack'` for files that existed and
-typechecked cleanly; this exact JSX collision, minutes after the fix landed) for several turns
-after the underlying files were correct. Always re-verify with a fresh, direct `tsc --build` /
-`vue-tsc --noEmit` run rather than trusting a live diagnostics stream at face value, especially
-right after a burst of concurrent edits.
+```
+§diag_lag := {
+  symptom: "IDE/LSP live-diagnostics feed lagged real file state during/after heavy concurrent file writes (multiple agents editing the same package tree)",
+  stale_reports: ["Cannot find module './stack'" (files existed, typechecked clean), "this exact JSX-factory collision, minutes after the fix landed"],
+  fix: "re-verify with a fresh, direct `tsc --build` / `vue-tsc --noEmit` run — never trust the live diagnostics stream at face value, esp. right after a burst of concurrent edits",
+}
+```

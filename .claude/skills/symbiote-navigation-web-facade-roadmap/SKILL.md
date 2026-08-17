@@ -11,20 +11,16 @@ vendoring 4 router libs, a 5-agent Expo test audit, a go/no-go stress test).
 
 ## The idea (and why it's shelved)
 
-**Goal:** break React's monopoly on native via DX — "transfer your framework knowledge from
-web." Make each navigation adapter feel like that framework's WEB router (react-router for
-React, vue-router for Vue, `@angular/router` for Angular) instead of the current
-**React-Navigation** shape the package ships today (`Stack.Screen name`,
-`useNavigation().navigate('Name')`, `useRoute`/`useFocusEffect`/`useIsFocused`).
-
-**Why deferred:** in beta the real bottleneck is *"you can't yet build a real (non-demo)
-app"* — the priority is shipping the minimal package set. The facade optimizes the
-**evaluator-conversion funnel** (5-minute-demo familiarity), which is ~empty in beta.
-The monopoly-break is delivered by **the adapter existing at all** (Vue/Angular can already
-drive native); the facade is DX polish on top, never a blocker.
-
-**Revisit when** the bottleneck shifts from "nobody can build a real app" to "people try it
-and bounce because navigation feels foreign."
+```
+§defer_decision := {
+  decision: "defer web-router facade (react-router/vue-router/@angular-router feel) for nav adapters",
+  goal: "break React's native monopoly via DX — 'transfer web framework knowledge' (react-router→React, vue-router→Vue, @angular/router→Angular)",
+  current_shape: "ships React-Navigation shape today: Stack.Screen name, useNavigation().navigate('Name'), useRoute/useFocusEffect/useIsFocused",
+  rationale: "beta bottleneck = 'can't build a real non-demo app' ⟶ ship minimal package set first; facade only optimizes evaluator-conversion funnel (5-min-demo familiarity), ~empty value in beta",
+  monopoly_break_source: "the adapter existing at all (Vue/Angular already drive native) — facade is DX polish, never the blocker",
+  revisit_when: "bottleneck shifts from 'nobody can build a real app' to 'people try it and bounce because navigation feels foreign'",
+}
+```
 
 ## The strategic framing (keep this — it's the crux)
 
@@ -64,6 +60,8 @@ shape below.
    match that maintenance, hence lean + honest.
 
 ## Vendored reference sources (under `~/projects/vendors`, symlinked `.vendors`)
+
+Read-only reference, none ship as a runtime dependency — `symbiote-web-lib-portability-check` covers why react-router's matchPath/matchRoutes was rejected for this same package's deep-linking layer (DOM-only exports, react-dom peerDependency).
 
 | Lib | Path | Use |
 |---|---|---|
@@ -127,6 +125,7 @@ Menu context menu — deferred).
 Start order when resumed: the lean verbs — #1, #2, #4, #5, #6, #7 (+ Vue/Angular
 equivalents). Prove it in ONE live example, feel it (familiar or uncanny valley?), THEN
 decide whether to extend across all adapters and whether loaders earn their keep.
+Tasks 4-17 are per-framework seams over the same core — `symbiote-new-adapter` covers the general framework-seam-mapping pattern they follow.
 
 ## First step when resumed (concrete)
 

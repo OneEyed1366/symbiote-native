@@ -137,23 +137,23 @@ lives in `adapters/angular/src/modules/app-registry/index.ts`, built on two addi
 `render.ts`'s `mount()`: an `IMountOptions` with `initialProps` (applied via
 `cmpRef.setInput`) and `wrapperComponent` (RN's `setWrapperComponentProvider`).
 
-**A latent bug this surfaced and fixed**: `SymbioteRenderer.selectRootElement()`
-(`renderer.ts`) was hardcoded to `return this.surface`, silently ignoring its
-`selectorOrNode` argument. It only "worked" because the sole prior caller (`mount()`)
-always passed `surface` itself as `hostElement`, so the ignored return value coincidentally
-matched. It broke the moment a second, distinct host node was introduced. Angular's
-`locateHostElement` ALWAYS routes `createComponent()`'s `hostElement` through
-`renderer.selectRootElement(hostElement, preserveContent)` — never bypassed just because a
-real object (not a selector string) was passed. Fixed: `return typeof selectorOrNode ===
-'string' ? this.surface : selectorOrNode`. General lesson: any Angular renderer method that
-looks unconditionally hardcoded, ignoring its own parameter, is suspect for the same
-reason — it may only work by coincidence of the single current caller.
+```
+§AppRegistry_selectRootElement := {
+  bug: "SymbioteRenderer.selectRootElement() (renderer.ts) hardcoded `return this.surface`, ignoring selectorOrNode",
+  masked_by: "sole prior caller mount() always passed `surface` as hostElement — ignored return coincidentally matched",
+  trigger: "AppRegistry's 2nd distinct host node ⟶ locateHostElement always routes createComponent()'s hostElement
+            through selectRootElement(hostElement, preserveContent), never bypassed for a real object vs selector string",
+  fix: "return typeof selectorOrNode === 'string' ? this.surface : selectorOrNode",
+  lesson: "an Angular renderer method that ignores its own param is suspect — may work only by coincidence of the sole caller",
+}
+```
 
 **Composing two dynamically-created components without JIT** (needed for
 `wrapperComponentProvider`, which wraps the root app in a host-supplied context provider):
 create the root with an explicit synthetic host node — `createDetachedViewHost()` in
 `render.ts`, a bare `symbiote-view` built directly via `@symbiote-native/engine`'s
-`createElement`/`toPublicInstance` + `descriptorFor('View')` from `@symbiote-native/components`,
+`createElement`/`toPublicInstance` mutation API (see `symbiote-engine-core` for the full
+API surface) + `descriptorFor('View')` from `@symbiote-native/components`,
 **not** through Angular's own `Renderer2.createElement`, which only resolves known symbiote
 primitives and throws on an arbitrary component's own selector (`Unknown symbiote component
 type: <selector>`). Then create the wrapper via `createComponent(wrapperType, { hostElement:

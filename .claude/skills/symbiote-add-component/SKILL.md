@@ -259,6 +259,10 @@ Any stateful Vue component that grabs the host node hits both:
 Both are the `vue-adapter-reactivity` skill — read it before writing the Vue lifecycle. If the
 component renders children with scope (an item, a press state, a section) read `vue-adapter-slots`
 too: Vue exposes that as a typed scoped slot, never a React-style `renderItem` / `*Component` prop.
+Any Vue lifecycle that reads multi-word options off raw `attrs` (this codebase never declares a
+formal `props` schema) needs `normalizeVueAttrs` per `vue-adapter-attrs-normalization`, or a
+kebab-case template prop silently falls back to its default. Deciding whether an `onX` prop becomes
+a typed `emit` or stays a raw passthrough listener is `vue-adapter-events`.
 
 ## 6. The sequence
 
@@ -302,20 +306,16 @@ local build of the changed package, which most don't have by default. This
 applies ONLY when the core half is genuinely shared; a per-adapter behavior (a
 framework-specific bridge quirk) still needs that adapter on device.
 
-**Component-conformance status (2026-07-16 — audit complete, no violators left).**
-A five-domain parallel audit of all 19 components confirmed the whole component
-layer now conforms to the three-layer split. The last two holdouts were extracted
-this date: `touchable` (the TouchableOpacity/Highlight press-scheduling machine was
-triplicated line-for-line) and `scroll-view` sticky headers (the per-header effect
-machine, hand-written in every adapter and TWICE in Angular — component +
-`StickyProjectionWrapper`). ScrollView PROPER already conformed — its imperative
-handle is core-owned (`buildScrollViewHandle`), scroll-offset is native-owned, MVCP
-/ RefreshControl are legit seams, so it never needed a `reduceScroll`. There are now
-three enriched-machine instances to copy from: `reduceList`
-(`state/virtualized-list-reducer.ts`), `reduceSticky` (`state/sticky-header-reducer.ts`),
-and `createTouchableFeedbackHandlers` (`state/touchable.ts`). The list family
-(flat/section/virtualized-section) conforms purely by COMPOSING VirtualizedList — no
-per-list reducer needed. Do not re-audit these; extend the map if a NEW component lands.
+```
+§6a_conformance_audit := {
+  date: "2026-07-16", result: "5-domain parallel audit of all 19 components — full component layer now conforms to the three-layer split, no violators left",
+  last_holdouts_extracted: ["touchable — TouchableOpacity/Highlight press-scheduling machine triplicated line-for-line", "scroll-view sticky headers — per-header effect machine, hand-written in every adapter and TWICE in Angular (component + StickyProjectionWrapper)"],
+  scroll_view_proper: "already conformed pre-audit — imperative handle core-owned (buildScrollViewHandle), scroll-offset native-owned, MVCP/RefreshControl are legit seams ⟶ never needed a reduceScroll",
+  enriched_machine_instances: { reduceList: "state/virtualized-list-reducer.ts", reduceSticky: "state/sticky-header-reducer.ts", createTouchableFeedbackHandlers: "state/touchable.ts" },
+  list_family: "flat/section/virtualized-section conform purely by COMPOSING VirtualizedList — no per-list reducer needed",
+  directive: "do not re-audit these; extend the map only if a NEW component lands"
+}
+```
 
 **Enriched-machine extraction conventions (learned across the three instances).**
 When you extract a stateful effect machine into core:
@@ -338,125 +338,55 @@ Adding a component to a brand-new adapter that has no renderer yet? Do
 
 ## 7. React Compiler compatibility (React adapter only, 2026-07)
 
-Investigated whether `babel-plugin-react-compiler` (Meta's React Compiler) can
-optimize `adapters/react` component code, prompted by evaluating Million.js's
-"Block Virtual DOM" first — ruled out immediately and permanently: it's 100%
-real-DOM-bound (`cloneNode`, `innerHTML`, DOM `Text` nodes — see
-`.vendors/million/packages/million/dom.ts`), nothing in it is reusable against
-Fabric's shadow tree. React Compiler has no such DOM dependency and is a genuine
-candidate — confirmed working for plain app code (wired into `examples/react`'s
-`babel.config.js`, first in `plugins`) — but two real findings when pointed at
-`adapters/react` itself:
+Investigated whether `babel-plugin-react-compiler` can optimize `adapters/react`
+component code. Million.js's "Block Virtual DOM" was evaluated first and ruled out
+permanently: 100% real-DOM-bound (`cloneNode`, `innerHTML`, DOM `Text` nodes — see
+`.vendors/million/packages/million/dom.ts`), nothing reusable against Fabric's
+shadow tree. React Compiler has no such DOM dependency, confirmed working for plain
+app code (wired into `examples/react`'s `babel.config.js`, first in `plugins`), but
+two real findings against `adapters/react` itself:
 
-**Finding 1 — a `createX(platform)` factory defeats component/hook detection.**
-React Compiler's default `'infer'` mode only walks TOP-LEVEL declarations
-(function declarations / const-assigned arrows at Program scope). The OLD Switch
-shape — `createSwitch(platform)` returning an anonymous closure — is invisible to
-it: from the compiler's per-file view, `createSwitch` is just a lowercase factory
-function; the actual component is a NESTED closure with no name of its own in that
-scope. Renaming the closure (`return function Switch(rawProps) {…}`) does NOT fix
-it either — still nested, still invisible. The fix that DOES work (verified via
-the compiler's own `logger` option, not by grepping a minified bundle — React's own
-dispatcher always exports `useMemoCache`, so its bare presence in a bundle is not
-proof of anything): give each platform file its own TOP-LEVEL named function that
-calls a plain hook, per §2's Layer-3 code above. Confirmed `CompileSuccess` on the
-wrapper (`memoSlots: 3`) after this rewrite — this is why Switch's React lifecycle
-is a `useXLogic` hook + a top-level `function X` per platform file now, not a
-factory. Vue's `createSwitch(platform) => defineComponent` factory is UNCHANGED —
-this is a React Compiler-only concern, not a general anti-pattern.
+```
+§7_finding1_factory_defeats_detection := {
+  bug: "createX(platform) factory returning an anonymous closure is invisible to React Compiler's default 'infer' mode (walks only TOP-LEVEL decls/const arrows at Program scope) — OLD createSwitch(platform): the factory is top-level, the real component is a nested unnamed closure",
+  ruled_out: "renaming the closure (return function Switch(rawProps){…}) — still nested, still invisible",
+  fix: "top-level named function per platform file calling a plain hook (§2 Layer-3 shape)",
+  verified: "via compiler's own `logger` option (NOT bundle-grepping — dispatcher always exports useMemoCache regardless, proves nothing); CompileSuccess on wrapper, memoSlots: 3",
+  scope: "why Switch's React lifecycle is useXLogic hook + top-level function X per platform file now, not a factory. Vue's createSwitch(platform)=>defineComponent is UNCHANGED — React-Compiler-only concern"
+}
 
-**Finding 2 — passing `ref` through `passthrough` into `renderX()` is a
-permanent, structural incompatibility, not fixable by code shape.** Even after
-Finding 1's fix, the actual hook body (`useSwitchLogic`) still fails to compile:
-`CompileError`, category `"Refs"`, `"Cannot access refs during render"` /
-`"Passing a ref to a function may read its value during render"`, pointing at
-exactly the `passthrough: { ...rest, ref, onChange }` line. Root cause: React
-Compiler analyzes ONE FILE at a time (Babel plugins don't do cross-file dataflow
-analysis); `renderX()` lives in a DIFFERENT PACKAGE (`@symbiote-native/components`),
-so the compiler can't verify it never reads `ref.current` synchronously and
-conservatively bails the whole containing function. Tried and confirmed NONE of
-these change the outcome: passing a ref CALLBACK instead of the raw `RefObject`
-(the compiler traces the closure and flags it anyway), and the `"use no memo"`
-directive (a no-op here because `panicThreshold: 'none'`, the default, already
-silently skips optimizing a function with a Rules-of-React violation — the
-directive only matters for suppressing the diagnostic, not for unlocking
-anything). There is no restructuring within `<components_split_logic_view_lifecycle>`
-that avoids this: `ref` flowing `useRef → passthrough → renderX() (cross-package)
-→ Descriptor → descriptorToReact → createElement` is exactly the shape every
-stateful/imperative component uses (measure, focus, `dispatchViewCommand` all need
-a host ref this same way) — so this isn't a Switch quirk, it recurs for every such
-component, and the only real fix would be to stop threading the live ref through
-`renderX()` at all (a cross-component architectural change, unproven payoff on
-mobile where Fabric/Yoga native layout — not JS reconciliation — is the actual
-cost center).
+§7_finding2_ref_through_passthrough := {
+  bug: "ref through `passthrough` into renderX() is a PERMANENT structural incompatibility — even after Finding-1's fix, useSwitchLogic still fails",
+  error: 'CompileError category "Refs": "Cannot access refs during render" / "Passing a ref to a function may read its value during render", at `passthrough: { ...rest, ref, onChange }`',
+  root_cause: "compiler analyzes ONE FILE at a time (no cross-file dataflow); renderX() lives in a DIFFERENT PACKAGE (@symbiote-native/components) ⟶ can't verify it never reads ref.current synchronously ⟶ bails the whole containing function",
+  ruled_out: ["ref callback instead of raw RefObject — compiler traces the closure, flags it anyway", "\"use no memo\" directive — no-op: panicThreshold:'none' (default) already skips optimizing a Rules-of-React violation; only suppresses the diagnostic"],
+  generality: "recurs for every stateful/imperative component: useRef → passthrough → renderX()(cross-package) → Descriptor → descriptorToReact → createElement is the exact shape measure/focus/dispatchViewCommand all need",
+  open: "only real fix: stop threading the live ref through renderX() at all — cross-component architectural change, unproven payoff (Fabric/Yoga native layout, not JS reconciliation, is the actual cost center on mobile)"
+}
 
-**Net:** React Compiler on `adapters/react` gives a real but small win (the
-top-level wrapper memoizes) and cannot touch the part that matters (the stateful
-hook) without a bigger architectural change than a compiler adoption should
-require. Don't re-attempt Findings 1/2 from scratch — this is the answer.
+§7_net := "real but small win (top-level wrapper memoizes); can't touch the stateful hook without a bigger architectural change than compiler adoption should require. Don't re-attempt Findings 1/2 from scratch."
+```
 
 **Finding 3 — full-component survey (2026-07): only `ActivityIndicator` was a
-genuine Finding-1 twin; the Refs wall is bigger than `renderX()`.** Surveyed
-every `adapters/react/src/components/*` folder against Findings 1/2 (via the
-compiler's `logger`, real Metro bundle, not bundle-grepping):
+genuine Finding-1 twin; the Refs wall is bigger than `renderX()`.** Surveyed every
+`adapters/react/src/components/*` folder against Findings 1/2 via the compiler's
+`logger` on a real Metro bundle (not bundle-grepping):
 
-- **Applied the Finding-1 rewrite to `activity-indicator`** (`createActivity-
-  Indicator(platform) => closure` → top-level `useActivityIndicatorLogic` hook +
-  top-level `ActivityIndicator` per platform file, same shape as Switch). It had
-  no ref in its `passthrough` at all, so unlike Switch it compiles genuinely
-  clean end to end — `CompileSuccess` on the wrapper, and the logic hook has no
-  hook calls of its own to fail on. This is the one other component that was a
-  pure Finding-1 case (factory shape, zero ref) — done, verified, tests green.
-- **`text-input`** is a Switch twin, but its `forwardRef((props, ref) => {…})`
-  closure is ALREADY top-level-detected (a `forwardRef(fn)` call is not a custom
-  factory — the compiler special-cases it, unlike `createSwitch(platform)`'s
-  hand-rolled factory). Its real blocker is layered: first a `CompileError`
-  category `"Suppression"` (an `eslint-disable-next-line react-hooks/exhaustive-
-  deps` on the mount-only `autoFocus` effect trips an automatic bail-out — React
-  Compiler treats ANY disabled Rules-of-React lint rule as proof it can't trust
-  the function). Removing just that comment (tested, then reverted — it's a
-  deliberate, correct suppression for a legitimate mount-only effect and removing
-  it for real would need restructuring the effect, not just deleting a comment)
-  unmasks the SAME Finding-2 Refs error underneath, at its own `passthrough: {
-  ...rest, ref, onChange, onFocus, onBlur }` → `renderTextInput()` line. No
-  extraction needed or worth doing here — it is already at the Switch end-state
-  with one extra layer, not a case Finding 1's fix improves.
-- **The Refs wall is not specific to `renderX()` — it fires on ANY function call
-  that receives a ref**, cross-package or not: `pressable` and `touchable` (both
-  `CompileError`/`Refs`) pass their `viewRef` straight into `createElement(View,
-  viewProps)`, no `renderX()` involved at all, and still bail for the identical
-  reason (`createElement` is itself an opaque function call from the compiler's
-  point of view). `scroll-view` mixes both outcomes in the same file (some of its
-  hooks are ref-free and compile; the ones threading the scroll-node ref through
-  `createElement`/`dispatchViewCommand`-adjacent calls don't).
-- **Two components hit a DIFFERENT compiler limitation — category `"Todo"`
-  (an unsupported syntax shape, not a Rules-of-React violation) — and it's worth
-  telling apart from Findings 1/2 because it can look fixable at first glance:**
-  `virtualized-list` uses `stateRef.current ??= createInitialListState(...)`
-  (nullish-assignment lowering unsupported by the compiler's HIR builder), and
-  `keyboard-avoiding-view` declares `function renderWrapper(...)` textually AFTER
-  its own `return` statements (legal via hoisting, but the compiler's builder
-  flags code after a `return` as unreachable and won't look inside it for the
-  declaration). Both LOOK like a quick syntax tweak away from compiling. Tested
-  the `keyboard-avoiding-view` one for real: moved `renderWrapper`'s declaration
-  above its call sites (functionally identical, hoisting doesn't change
-  semantics) — the Todo error is gone, but it immediately reveals the same
-  Finding-2 Refs error underneath (`initialHeightRef.current` read into
-  `resolveKeyboardAvoidingLayout()`, and `renderWrapper` itself closes over a
-  ref). Reverted the edit — it fixed a cosmetic blocker only to hit the real,
-  permanent one, so it was a change with no compilation payoff, not worth
-  carrying. Treat any `"Todo"` category compiler error on a component that also
-  threads a ref through `passthrough`/`createElement` as very likely the same
-  dead end one layer down — verify with the logger before spending effort on the
-  syntax-level fix.
-- **Everything else surveyed either has no `renderX()`/ref involvement to begin
-  with** (`flat-list`, `section-list`, `virtualized-section-list`, `refresh-
-  control`, `safe-area-view`, `touchable-native-feedback`, `button.ts` — plain
-  top-level composition, nothing for Finding 1 to fix) **or was already top-level
-  with no ref in its render call** (`image`, `image-background`, `input-
-  accessory-view`, `modal` — confirmed `modal` compiles clean via the logger;
-  the other three weren't reachable from the canary's bundle graph to confirm
-  directly, but match the same shape).
+```
+§7_finding3_survey := {
+  activity_indicator: "Finding-1 rewrite applied (createActivityIndicator(platform)=>closure → top-level useActivityIndicatorLogic hook + top-level ActivityIndicator per platform file, Switch's shape). No ref in passthrough at all ⟶ compiles clean end to end, CompileSuccess on wrapper. Only other pure Finding-1 case (factory shape, zero ref) — done, verified, tests green",
+  text_input: "Switch twin, but forwardRef((props,ref)=>{…}) is ALREADY top-level-detected (compiler special-cases forwardRef(fn), unlike a hand-rolled factory). Real blocker layered: first CompileError category \"Suppression\" (eslint-disable-next-line react-hooks/exhaustive-deps on the mount-only autoFocus effect trips an automatic bail-out — ANY disabled Rules-of-React lint rule ⟶ compiler distrusts the function). Removing that comment (tested, then reverted — deliberate correct suppression, removing for real needs restructuring the effect) unmasks the SAME Finding-2 Refs error at `passthrough: { ...rest, ref, onChange, onFocus, onBlur }` → renderTextInput(). No extraction worth doing — already at Switch end-state, one extra layer",
+  refs_wall_not_renderX_specific: "fires on ANY function call receiving a ref, cross-package or not: pressable/touchable (both CompileError/Refs) pass viewRef straight into createElement(View, viewProps), no renderX() involved, same bail (createElement is itself opaque to the compiler). scroll-view mixes both outcomes in one file — ref-free hooks compile, ones threading the scroll-node ref through createElement/dispatchViewCommand-adjacent calls don't",
+  todo_category_dead_ends: {
+    what: 'a DIFFERENT limitation — category "Todo" (unsupported syntax shape, not Rules-of-React) — looks fixable at first glance, isn\'t',
+    virtualized_list: "stateRef.current ??= createInitialListState(...) — nullish-assignment lowering unsupported by compiler's HIR builder",
+    keyboard_avoiding_view: "declares function renderWrapper(...) textually AFTER its own return statements (legal via hoisting; builder flags post-return code unreachable, won't look inside for the declaration). Tested moving the declaration above call sites (hoisting-safe, semantics unchanged) — Todo error gone, but immediately reveals the SAME Finding-2 Refs error underneath (initialHeightRef.current read into resolveKeyboardAvoidingLayout(), renderWrapper itself closes over a ref). Reverted — no compilation payoff",
+    rule: "any \"Todo\" category error on a component that also threads a ref through passthrough/createElement is very likely the same dead end one layer down — verify with the logger before spending effort on the syntax-level fix"
+  },
+  no_renderX_or_ref_involvement: ["flat-list", "section-list", "virtualized-section-list", "refresh-control", "safe-area-view", "touchable-native-feedback", "button.ts"],
+  already_top_level_no_ref_in_render_call: { confirmed_via_logger: "modal — compiles clean", unconfirmed_same_shape: ["image", "image-background", "input-accessory-view"] ⟵ "not reachable from the canary's bundle graph to confirm directly" }
+}
+```
 
 ## Reference
 

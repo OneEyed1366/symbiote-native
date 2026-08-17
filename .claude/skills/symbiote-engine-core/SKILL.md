@@ -221,6 +221,10 @@ delete (`<keep_logs_gate_behind_DEBUG>`).
 - Public barrel (what `@symbiote-native/engine` exports): `core/engine/src/index.ts`.
 - Reactive-adapter manifestations of §3/§6: the `vue-adapter-reactivity` and
   `angular-adapter` skills. Building a NEW adapter on this API: `symbiote-new-adapter`.
+- §2's structural-adapter split (`setEventListener` called directly vs routed
+  through `routeProp`) in practice: `angular-adapter-events` (`Renderer2.listen`'s
+  anchor-transparency double-fire cause) and `svelte-adapter-dom-shim` (the
+  custom-element codegen path).
 - Decisions: `.docs/decisions/0010` (incremental clone-on-write), `0002`
   (adapter seam + shared retained tree).
 </content>

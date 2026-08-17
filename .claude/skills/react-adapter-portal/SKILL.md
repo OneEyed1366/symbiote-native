@@ -298,58 +298,51 @@ for the two-`mount()` proof.
 
 ### Why `In`/`Out` are components, not hooks — a real bug, not a style choice
 
-Confirmed, not hypothetical: an EARLIER version exposed this as
-`useTunnelIn(children)`/`useTunnelOut()` hooks, called directly inside one
-component (`App`) in `examples/react/App.tsx`. That produced a **silent
-white screen on device**, no thrown error, no `console.error`, from the very
-first commit (not just after tapping the demo button). Root cause, traced
-end to end:
-
-1. `useTunnelIn`'s sync effect wrote `children` into the shared Map and
-   called `notify()` on every render, with nothing to compare against.
-2. `useTunnelOut()`, called from the SAME component (`App`), subscribes via
-   `useSyncExternalStore` — `notify()` forces a re-render of THAT component.
-3. `App` re-renders → `useTunnelIn` runs again → `notify()` fires again →
-   step 2 repeats. Forever. This custom renderer's synchronous commit loop
-   (`updateContainerSync` + `flushSyncWork()`, no React concurrent
-   scheduler) has no "Maximum update depth exceeded" guard to catch it and
-   throw — it just hangs the JS thread.
-
-Two tempting hook-level non-fixes were considered and rejected:
-- **`useMemo`-stabilize the JSX before passing it in** — does NOT reliably
-  fix it: React documents `useMemo`'s cache as a discardable performance
-  optimization, not a correctness guarantee, so relying on its reference
-  staying stable across renders is fragile.
-- **An explicit `useTunnelIn(children, deps)` dependency list** (the
-  `useEffect`/`useMemo` contract) — works, but only patches the symptom: it
-  still lets a caller reintroduce the exact same class of bug by forgetting
-  `deps`, or by listing an incomplete dependency set.
-
-**The actual fix is structural, not a comparison to get right**: make `In`
-and `Out` SEPARATE COMPONENTS. `useSyncExternalStore`'s only lever is
-"force-rerender the component that subscribed" — as long as that's `Out`
-alone, the forced update has nowhere to bounce back to, even when `In` and
-`Out` are direct siblings under the SAME parent (confirmed by
-`create-tunnel.test.tsx`'s "does NOT loop" test, which renders both as
-children of one component and drives a toggle through a real native event —
-`onLayout`/`topLayout`, the same dispatch path `modal.test.tsx`/
-`switch.test.ts` use — asserting the render count stays bounded). This is
-also why the Vue twin never had this bug at all: Vue's `In`/`Out` were
-ALREADY separate components with independent reactive scopes from the
-start — the same structural property, arrived at for a different reason
-(a composable can't accept template markup).
-
-**Vue's `createTunnel` twin needs none of this** — not a smaller version of
-the same fix, structurally immune. `In` and `Out` are separate Vue
-components, each with its OWN reactive scope; writing to the shared
-`reactive` Map from `In` only re-triggers whichever component actually READS
-that Map in ITS OWN render (`Out`) — never `In` itself, even when `In` and
-`Out` are both descendants of the same parent. React's version has no
-per-hook reactive scope to isolate the update to — `useSyncExternalStore`'s
-only lever is "re-render the WHOLE component that called it," which is
-exactly `App` here, the same component that also calls `useTunnelIn`. This is
-the concrete reason the two adapters' `createTunnel` APIs are shaped
-differently, not just a naming/idiom choice.
+```
+tunnel_hooks_bug := {
+  history: "earlier createTunnel exposed useTunnelIn(children)/useTunnelOut()
+            hooks, called directly in one component (App, examples/react/App.tsx)",
+  symptom: "silent white screen on device, no thrown error/console.error,
+            from the first commit — not just after tapping the demo button",
+  root_cause: [
+    "useTunnelIn's sync effect writes children into the shared Map + calls
+     notify() every render, nothing to compare against",
+    "useTunnelOut(), called from the SAME component, subscribes via
+     useSyncExternalStore ⟶ notify() forces that component's re-render",
+    "App re-renders ⟶ useTunnelIn runs again ⟶ notify() fires again ⟶
+     infinite loop",
+  ],
+  why_uncaught: "this renderer's sync commit loop (updateContainerSync +
+                 flushSyncWork(), no React concurrent scheduler) has no
+                 'Maximum update depth exceeded' guard — hangs the JS
+                 thread instead of throwing",
+  ruled_out: [
+    "useMemo-stabilize the JSX ⟶ not reliable — React docs: useMemo's cache
+     is a discardable perf optimization, not a correctness guarantee",
+    "explicit useTunnelIn(children, deps) dep-list ⟶ works but only patches
+     the symptom — a caller can still forget/underspecify deps and
+     reintroduce the same bug",
+  ],
+  fix: "structural: In and Out are SEPARATE components. useSyncExternalStore's
+        only lever is 're-render the component that subscribed' — confined
+        to Out alone, the forced update has nowhere to bounce back, even
+        when In/Out are siblings under the same parent",
+  verified: "create-tunnel.test.tsx 'does NOT loop' test — In/Out rendered as
+             children of one component, toggled via a real native event
+             (onLayout/topLayout, same dispatch path as modal.test.tsx/
+             switch.test.ts) — asserts bounded render count",
+  vue_twin: "Vue's createTunnel never hit this: In/Out were ALREADY separate
+             components with independent reactive scopes (for an unrelated
+             reason — a composable can't accept template markup) ⟶ writing
+             to the shared reactive Map from In only re-triggers whoever
+             READS it (Out), never In itself, even as siblings. React's
+             useSyncExternalStore has no per-hook reactive scope — it
+             re-renders the WHOLE calling component, which for the hook
+             version was also the caller of useTunnelIn (App). This is why
+             the two adapters' createTunnel APIs are shaped differently,
+             not a naming/idiom choice.",
+}
+```
 
 ## See also
 
@@ -359,7 +352,7 @@ differently, not just a naming/idiom choice.
   composable can't accept template markup; only a component has a slot),
   but land on the SAME components-not-hooks shape this file's React version
   needed for correctness, not just idiom.
-- `angular-adapter` (§15) — the Angular twins, `PortalDirective`/
+- `angular-adapter-portal` — the Angular twins, `PortalDirective`/
   `PortalOutletDirective` and `createTunnel`'s `TunnelInDirective`/
   `TunnelOut`. Neither can be a per-call factory like React's/Vue's —
   Angular has no runtime component synthesis (no JIT under Metro/Hermes) —

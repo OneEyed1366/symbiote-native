@@ -8,6 +8,10 @@ description: "Symbiote docs-site package-page template — read BEFORE writing o
 One canonical section order for every `apps/docs-site/src/content/docs/docs/packages/<pkg>.mdx`
 page, so a reader who's used one package page already knows where to look on the next.
 
+This is the doc-writing step reached at the end of `symbiote-third-party-native-view` (a
+native-VIEW wrapper) or `symbiote-expo-native-module` (a native-MODULE wrapper) — both produce a
+`@symbiote-native/PKG` package that then needs a page following this template.
+
 ## Section order
 
 1. Frontmatter: `title` (the package's short display name, e.g. "Splash screen") + `description`
@@ -18,7 +22,8 @@ page, so a reader who's used one package page already knows where to look on the
 3. OS-platform support table + framework-adapter support table (`| OS platform | Support |` /
    `| Framework adapter | Support |`) — copy verbatim shape from either reference page.
 4. `## Installation` — the real npm install command, per `docs-site.md`'s install-snippet rule
-   (never `workspace:*` in a snippet).
+   (never `workspace:*` in a snippet — the published version comes from the Changesets flow in
+   `symbiote-release-publishing`).
 5. `## Usage` — a single `<Tabs syncKey="framework">` block (from `@astrojs/starlight/components`)
    with one `<TabItem label="React">` / `<TabItem label="Vue">` / `<TabItem label="Angular">`
    each, `label` bare (no subtitle — a shared site-wide script matches tabs across every page by
@@ -68,40 +73,46 @@ needs a better name or a code comment first.
 
 ## Angular-parity check — a real bug pattern found repeatedly (2026-07)
 
-A site-wide sweep converting per-framework doc sections into `<Tabs syncKey="framework">` (see
-above) found the SAME real bug independently in 5+ files: **Angular's `<TabItem>` was demoted to
-an import-only line or a prose-only sentence while React's and Vue's siblings showed full,
-working code** — not a stylistic gap, an ACCURACY gap. Concretely found and fixed this pass:
-
-- `packages/splash-screen.mdx`'s animated-case Angular example bound `[style]`/`[source]` but
-  omitted `imports: [View, Image]` and the `(layout)`/`(loadEnd)` event outputs — without them
-  the readiness gate (`layoutReady`/`logoReady` in `HideAnimationController`) never flips true,
-  so `hide()` never fires. Angular has no generic prop-spread (unlike React's `{...container}` /
-  Vue's `v-bind`), so every readiness callback needs an EXPLICIT output binding — silently easy
-  to forget when transcribing from the React/Vue version.
-- `howtos/splash-screen.mdx`'s Angular tab showed only `import { hide } from '...'` plus a prose
-  sentence ("called once from ngOnInit") with no actual `ngOnInit(): void { hide(); }` call.
-- `howtos/portals-and-tunnels.mdx`'s Tabs had ONLY React+Vue `<TabItem>`s — Angular's real
-  `*portal`/`portalOutlet` directives and `createTunnel()`/`*tunnelIn`/`<tunnel-out>` existed
-  (see the `angular-adapter-portal` skill) but were mentioned only in one trailing prose
-  sentence, never shown as code.
-- `examples/text-input.mdx` claimed the imperative handle needed `@ViewChild(..., { read:
-  ElementRef })`; the real pattern is that `TextInput` the component class itself implements
-  the handle interface (`@ViewChild(TextInput)` directly).
-- Two architecture diagrams (`docs/index.mdx`, `docs/how-it-works.mdx`) listed Angular under
-  "future adapters" alongside genuinely-unstarted Svelte/Solid, contradicting the prose stating
-  Angular is a shipped, tested adapter (M4, done).
-
-**Why this keeps happening**: React is the oldest/most-documented adapter, Vue came second, and
-Angular is newest — a doc author (or an agent transcribing a pattern from React/Vue) reaches for
-the same shape and either skips Angular's real mechanism (it's less familiar) or writes
-plausible-looking Angular syntax without verifying it against the real adapter source.
-
-**The check, whenever writing or reviewing an Angular `<TabItem>` (or ANY Angular-specific doc
-claim)**: never trust prose or a plausible-looking snippet alone — cross-check the exact
-component/directive/selector/prop/event name against the real source
-(`adapters/angular/src/`, `packages/*/src/angular/`) or the matching `angular-adapter*` project
-skill before publishing. If Angular's real mechanism differs structurally from React/Vue's (no
-prop-spread, structural directives instead of factories, DI instead of hooks — see
-`angular-adapter-portal`), show THAT real mechanism, never a guessed React/Vue-shaped
-approximation of it.
+```
+§docs_angular_tabitem_demoted := {
+  trigger: "site-wide sweep converting per-framework doc sections into <Tabs syncKey=\"framework\">",
+  bug: "Angular's <TabItem> demoted to an import-only line or a prose-only sentence while React's
+        and Vue's siblings showed full working code — an ACCURACY gap, not stylistic, found
+        independently in 5+ files",
+  instances: [
+    {file: "packages/splash-screen.mdx",
+     gap: "animated-case Angular example bound [style]/[source] but omitted
+           imports: [View, Image] and the (layout)/(loadEnd) event outputs — readiness gate
+           (layoutReady/logoReady in HideAnimationController) never flips true, hide() never fires",
+     root_cause: "Angular has no generic prop-spread (unlike React {...container} / Vue v-bind) —
+                  every readiness callback needs an EXPLICIT output binding"},
+    {file: "howtos/splash-screen.mdx",
+     gap: "Angular tab showed only import { hide } from '...' plus prose (\"called once from
+           ngOnInit\"), no actual ngOnInit(): void { hide(); } call"},
+    {file: "howtos/portals-and-tunnels.mdx",
+     gap: "Tabs had ONLY React+Vue <TabItem>s — Angular's real *portal/portalOutlet directives and
+           createTunnel()/*tunnelIn/<tunnel-out> (see angular-adapter-portal skill) existed but
+           were mentioned only in one trailing prose sentence, never shown as code"},
+    {file: "examples/text-input.mdx",
+     gap: "claimed the imperative handle needed @ViewChild(..., { read: ElementRef }); real
+           pattern: the TextInput component class itself implements the handle interface —
+           @ViewChild(TextInput) directly"},
+    {file: "docs/index.mdx, docs/how-it-works.mdx",
+     gap: "two architecture diagrams listed Angular under \"future adapters\" alongside
+           genuinely-unstarted Svelte/Solid, contradicting the prose stating Angular is a shipped,
+           tested adapter (M4, done)"},
+  ],
+  why_recurs: "React is oldest/most-documented, Vue came second, Angular is newest — a doc author
+               (or an agent transcribing a pattern from React/Vue) reaches for the same shape and
+               either skips Angular's real, less-familiar mechanism or writes plausible-looking
+               Angular syntax without verifying it against the real adapter source",
+  fix: "whenever writing/reviewing an Angular <TabItem> (or ANY Angular-specific doc claim), never
+        trust prose or a plausible-looking snippet alone — cross-check the exact
+        component/directive/selector/prop/event name against real source
+        (adapters/angular/src/, packages/*/src/angular/) or the matching angular-adapter* project
+        skill before publishing; if Angular's real mechanism differs structurally from React/Vue's
+        (no prop-spread, structural directives instead of factories, DI instead of hooks — see
+        angular-adapter-portal), show THAT real mechanism, never a guessed React/Vue-shaped
+        approximation",
+}
+```

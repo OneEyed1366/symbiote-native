@@ -7,46 +7,21 @@ description: "Symbiote Svelte adapter — the DOM-shim strategy and its exact ha
 
 ## §0. Status, provenance, and how to trust this file
 
-**Status (2026-08-11): DECISION RECORDED, IMPLEMENTATION STARTING.** No
-`adapters/svelte` exists yet, and `svelte` appears nowhere in `pnpm-workspace.yaml`.
-This skill is the measured groundwork so implementation does not have to
-rediscover any of it.
-
-**PoC scope, DECIDED (2026-08-11):** the first target is the primitives only —
-`View` / `Text` / `Image` through the shim (`patchGlobals` + `from_tree` + the
-object-bag → `routeProp`). This proves the shim mechanism itself, the same order
-Vue and Angular bootstrapped in. A `core/components` three-layer component
-(Switch, TextInput, …) is a deliberate later step, once the bare mount/commit path
-is green — mirroring Workstream B's own pilot order (ActivityIndicator → Switch).
-
-**Superseded same day:** this PoC scope was the STARTING point, not where the
-branch landed. By end of 2026-08-11 all 24 components (View/Text/Switch plus the
-21 built across a 6-agent parallel dispatch) are implemented, wired into the
-public `@symbiote-native/svelte` barrel, `tsc --build` clean, and smoke-tested
-against the real compiler — see §15/§18 for what's verified and what's still open.
-
-**Branch scope note:** this shim track is being implemented on
-`feature/47-svelte-support`. A PoC against the still-unmerged official
-`customRenderer` API (sveltejs/svelte#18042 — confirmed OPEN,
-`reviewDecision: REVIEW_REQUIRED`, no release, as of 2026-08-11) is explicitly a
-**separate, later branch**, not a blocker or prerequisite for this one.
-
-**Measured against exact versions** — every `file:line` below was read from real
-source, not from docs or memory:
-
-- `svelte` **5.56.8** (`sveltejs/svelte` `main` @ `26786e9`, 2026-08-07)
-- `react-native` **0.86.0** (tag `v0.86.0`; the pin in `pnpm-workspace.yaml:80`)
-- `wolf-tui` (`OneEyed1366/wolf-tui`, `packages/svelte/src/renderer/`)
-
-**Verification (2026-08-10).** This document was checked twice before being
-committed: once by a zero-context comprehension pass (does a newcomer understand
-it?) and once by an adversarial fact-check of every citation against the cloned
-sources. Both found real defects, which are corrected here. Findings that
-**reversed an earlier conclusion** are called out inline with a ⚠️ marker so a
-future reader does not "re-fix" them back. §13 records what remains unverified.
-
-If a version has moved, **re-measure before trusting a line number** — §11 has
-the commands.
+§0_status := {
+  status: "2026-08-11: decision recorded, implementation started; adapters/svelte did not exist yet at that point and svelte was absent from pnpm-workspace.yaml",
+  poc_scope_decided_2026-08-11: "primitives first — View/Text/Image through the shim (patchGlobals + from_tree + object-bag→routeProp), same bootstrap order Vue and Angular used. A core/components three-layer component (Switch, TextInput, …) was planned as a deliberate later step, mirroring Workstream B's pilot order (ActivityIndicator → Switch)",
+  superseded_same_day: "by end of 2026-08-11 all 24 components (View/Text/Switch + 21 built across a 6-agent parallel dispatch) were implemented, wired into the @symbiote-native/svelte barrel, tsc --build clean, and smoke-tested against the real compiler — see §15/§18",
+  branch: "feature/47-svelte-support",
+  official_api_poc: "a separate, later branch — sveltejs/svelte#18042 confirmed OPEN, reviewDecision=REVIEW_REQUIRED, no release (as of 2026-08-11) — NOT a blocker or prerequisite for this track",
+  measured_versions: [
+    "svelte 5.56.8 (sveltejs/svelte main @ 26786e9, 2026-08-07)",
+    "react-native 0.86.0 (tag v0.86.0; pin in pnpm-workspace.yaml:80)",
+    "wolf-tui (OneEyed1366/wolf-tui, packages/svelte/src/renderer/)",
+  ],
+  verified_2026-08-10: "this document was checked twice — a zero-context comprehension pass and an adversarial fact-check of every citation against the cloned sources. Both found real defects, corrected inline; conclusions that were REVERSED are marked ⚠️ so a future reader does not 're-fix' them back",
+  open: "§13 records what remains unverified",
+  reminder: "if a version has moved, RE-MEASURE before trusting any file:line here — §11 has the commands",
+}
 
 ---
 
@@ -756,80 +731,20 @@ is already closed either by "app code cannot reach it" or by "the TS/Svelte
 compiler already errors on it for free" — no bespoke detection code needed for
 those.
 
-### Two-way binding is supported, via `$bindable()` — not a gap
+### Two-way binding via `$bindable()` — not a gap
 
-**Implemented for real 2026-08-15** (`components/text-input/index.svelte`,
-`components/switch/index.svelte`). This section was recorded as a DECISION on
-2026-08-11 but never actually built — `grep -rn "bindable" adapters/svelte/src`
-returned zero matches until this date. Kept here rather than deleted, per this
-skill's own "logs are an asset, correct don't delete" convention (§16/§17 do the
-same for their own earlier-wrong drafts).
-
-`bind:` is not a blanket-forbidden feature. Every prior adapter already has a
-two-way-binding convention on its own controlled components — Vue's `v-model`
-(`modelValue` prop + `update:modelValue` emit, `adapters/vue/src/utils/model-binding.ts`)
-and Angular's banana-in-a-box `[(value)]` (`@Input() value` + `@Output() valueChange`,
-`adapters/angular/src/components/text-input.ts:244`). Svelte's own native mechanism
-for the same shape is `$bindable()`: both components declare
-`let { value = $bindable(), ...rest } = $props()` and `<TextInput bind:value={x}>` /
-`<Switch bind:value={x}>` work, Svelte's compiler wiring the two-way sync itself.
-
-**⚠️ Corrected: "no adapter-side plumbing at all" was wrong.** A real
-implementation attempt (and a direct read of svelte's `reactivity/props.js`
-`prop()`) found that an UNGATED echo — reassigning the bindable `value` on every
-native report, unconditionally — breaks BOTH existing components' own
-controlled-write correction (`shouldCommandText` / `shouldSnapBack`), for every
-consumer, bound or not, not just `bind:` ones. The mechanism: `prop()`'s
-non-bound branch wraps the prop in a `derived` with a local override flag — an
-assignment marks `overridden = true` and the override survives until the
-PARENT's own underlying signal genuinely changes. For a plain
-`value={x} onValueChange={() => {}}` consumer whose `x` never changes (exactly
-`text-input.smoke.test.ts`'s and `switch.smoke.test.ts`'s own "rejecting
-parent" tests), an unconditional echo makes the child's own `value` read agree
-with what native just reported FOREVER, since there is no future push to reset
-it — `shouldCommandText`/`shouldSnapBack` then never see a divergence again,
-and the existing snap-back command silently stops firing. Proven with a
-throwaway probe component before touching the real components (three
-consecutive ticks all showed the child's own polluted echo, never reset absent
-a genuine external push) and independently re-derived from `prop()`'s bound
-vs. non-bound branches: a BOUND consumer's write flows straight into the
-parent's own signal (no local override at all, by construction), so it does
-not have this problem — only the non-bound, plain-contract path does, and it
-shares the exact same `value` destructuring `bind:` needs, so the two cannot
-be told apart by inspecting `value` alone.
-
-There is also no supported way to detect "is this instance bound" from inside
-the component — `$$props` is a compile error in runes mode
-(`Cannot use $$props in runes mode`), `$bindable()` only compiles when it
-destructures `$props()` directly (`$props()` itself can only be called ONCE
-per component — `props_duplicate` — so there is no second, unpolluted read of
-the same key either).
-
-**The actual fix, both components: gate the echo on `onValueChange` being
-absent.** In `handleChange`, right after calling `onValueChange`:
-
-```ts
-// $bindable() sugar: with no onValueChange there is nothing that could reject this report, so
-// mirror it straight into the bound value. A caller that ALSO supplies onValueChange keeps full
-// accept/reject control via the existing correction effect; echoing here too would defeat it.
-if (rest.onValueChange === undefined) value = changedText;
-```
-
-If the caller supplies `onValueChange` (whether or not they also write
-`bind:value`), the echo is skipped and the existing plain contract is
-byte-for-byte unchanged — proven by both existing "rejecting parent" tests
-staying green with no changes to their own assertions. If the caller uses
-`bind:value` with NO `onValueChange`, nothing else could reject the report
-anyway, so the echo is unconditionally correct and `bind:value` round-trips
-with no correction command dispatched — proven by a new test in each
-`*.smoke.test.ts` file (`round-trips a native … into a \`bind:value\` variable
-with no correction command`). **The one real, documented limit:** combining
-`bind:value`with a caller-supplied`onValueChange`on the SAME instance
-silently disables the bind: echo (onValueChange's own logic governs
-acceptance instead) — pick one authoring style per instance, matching how a
-raw DOM`<input bind:value>`has no built-in interception either; if you need
-both, mirror what`bind:` would do inside your own handler
-(`onValueChange={(v) => (x = v)}`).
+§7_bindable := {
+  status: "implemented 2026-08-15 (components/text-input/index.svelte, components/switch/index.svelte); recorded as a decision on 2026-08-11 but unbuilt until this date (grep 'bindable' returned 0 matches until 2026-08-15) — kept per this skill's logs-are-an-asset convention (§16/§17 do the same)",
+  mechanism: "bind: is NOT blanket-forbidden — every prior adapter has its own two-way-binding convention (Vue v-model: modelValue prop + update:modelValue emit, adapters/vue/src/utils/model-binding.ts; Angular banana-in-a-box [(value)]: @Input() value + @Output() valueChange, adapters/angular/src/components/text-input.ts:244). Svelte's native equivalent is $bindable(): both components declare `let { value = $bindable(), ...rest } = $props()`, and `<TextInput bind:value={x}>`/`<Switch bind:value={x}>` work via the compiler's own two-way wiring",
+  wrong_claim: "'no adapter-side plumbing at all' — corrected after a real implementation attempt",
+  root_cause: "an UNGATED echo — reassigning the bindable `value` on every native report, unconditionally — breaks BOTH components' controlled-write correction (shouldCommandText/shouldSnapBack) for EVERY consumer, bound or not",
+  mechanism_detail: "svelte's reactivity/props.js prop()'s non-bound branch wraps the prop in a derived with a local override flag; an assignment sets overridden=true, surviving until the PARENT's own signal genuinely changes. A plain `value={x} onValueChange={() => {}}` consumer whose x never changes (exactly text-input.smoke.test.ts's / switch.smoke.test.ts's 'rejecting parent' tests) gets its child value permanently agreeing with what native just reported — no future push resets it — so shouldCommandText/shouldSnapBack never see a divergence again and the snap-back command silently stops firing",
+  detection_gap: "no supported way to detect 'is this instance bound' from inside the component: $$props is a compile error in runes mode (Cannot use $$props in runes mode); $bindable() only compiles when destructuring $props() directly; $props() itself can only be called ONCE per component (props_duplicate), so there is no second, unpolluted read of the same key either",
+  proof: "throwaway probe component: 3 consecutive ticks all showed the child's polluted echo, never reset absent a genuine external push. Independently re-derived from prop()'s bound vs. non-bound branches: a BOUND consumer's write flows straight into the parent's own signal (no local override, by construction), so only the non-bound plain-contract path has this problem — and it shares the exact `value` destructuring bind: needs, so the two cannot be told apart by inspecting `value` alone",
+  fix: "gate the echo on `onValueChange` being absent, in handleChange right after calling it: `if (rest.onValueChange === undefined) value = changedText;`",
+  verified: "caller supplies onValueChange (with or without bind:value) ⟶ echo skipped, existing plain contract byte-for-byte unchanged — both existing 'rejecting parent' tests stay green with no assertion changes. Caller uses bind:value with NO onValueChange ⟶ echo unconditionally correct, round-trips with no correction command dispatched — new test per component ('round-trips a native … into a `bind:value` variable with no correction command')",
+  open: "combining bind:value with a caller-supplied onValueChange on the SAME instance silently disables the bind: echo (onValueChange's own logic governs acceptance instead) — pick one authoring style per instance, matching a raw DOM `<input bind:value>`'s lack of built-in interception; to get both, mirror bind: inside your own handler (onValueChange={(v) => (x = v)})",
+}
 
 ### Mechanism for the one real gap — DECIDED: build-time preprocessor
 
@@ -1017,143 +932,51 @@ Record the measured `svelte` version (`packages/svelte/package.json`) in §0.
 
 ---
 
-## §11b. The shim's memory cost — MEASURED (2026-08-13): 548 B/node, i.e. ~1 MB, NOT the thing to blame
+## §11b. The shim's memory cost — MEASURED: 548 B/node, ~1 MB total, NOT the thing to blame
 
 Do not reach for "the DOM shim eats memory" to explain a multi-megabyte gap against another
 adapter. It was measured, and it is too small for that:
 
-```
-ShimElement (detached, n=100_000)            548.5 bytes/node
-plain {parent, children, engineNode, tagName}  119.9 bytes/node
-```
-
-~430 B of the delta is structural, and most of it is the two `Map`s `ShimElement`'s constructor
-allocates EAGERLY (`attributes`, `domListeners`) — almost always empty, because Symbiote
-intrinsics take everything through the single `p` object bag (§3g(c)) and `on*` handlers ride
-inside that bag, not through `addEventListener`. Making them lazy is the obvious win if node
-counts ever get large; at a realistic screen's few thousand elements the whole shim layer is
-about **1 MB**, so it cannot account for a 20 MB difference.
-
-Two related claims that are WRONG and were corrected here:
-
-- _"Vue keeps one object per element, Svelte keeps two."_ No. `@vue/runtime-core` still builds
-  and retains a **VNode tree** above the host nodes. Both adapters carry two retained layers;
-  the shim is not a uniquely extra one, it just replaces VNodes with a DOM-shaped tree.
-- _"A smaller bundle means less RAM."_ Measured on the iOS dev bundles (2026-08-13):
-  `vue-sfc 6.0M · svelte 5.9M · angular 8.4M` (879 / 967 / 1331 modules). Svelte's is the
-  SMALLEST of the three while its device RSS is higher than Vue's — so bundle size does not
-  order the RAM numbers and is not the explanation.
-
-Method note for whoever picks this up next: RN **dev-build RSS is a weak instrument** for
-adapter comparison (no bytecode precompilation, full source retained for stack traces, live
-debugger connection, GC timing). Before attributing a delta, split JS heap from native memory
-(Hermes heap snapshot via RN DevTools) and confirm the delta survives a release build — native
-shadow nodes / views, not JS objects, dominate an RN process's footprint.
-
-**That split was then actually measured (2026-08-14), and it settles the "is the shim leaking"
-question — it is not.** Two Hermes heap snapshots of `examples/svelte`, same screen, minutes
-apart, run through `scripts/analyze-heap-snapshot.mjs <early> <later>`:
-
-```
-JS heap total          55.86 MB  ->  55.90 MB      (+0.04, and see below)
-engine nodes             1746   ->    1746
-ShimComment              1216   ->    1216
-ShimElement               463   ->     463
-ShimDocumentFragment      273   ->     273
-ShimText                  267   ->     267
-```
-
-Every adapter-owned class is IDENTICAL across the two. The whole shim layer is ~0.17 MB and the
-engine's retained nodes ~0.13 MB. The +0.04 MB is not mystery growth either — the new strings in
-the diff are literally the tester's own input (`"Hello, Andrew"`, `"volume · 100%"`), i.e. the
-interaction performed between snapshots.
-
-Two durable lessons from that session:
-
-- **Growth that PLATEAUS is not a leak.** Device RSS climbed to ~200 MB and stopped while idle.
-  A leak does not stop. The thing filling up is visible in the same dump: `CodeBlock` — Hermes'
-  lazily-compiled bytecode — is 45.92 MB across 8263 objects, ~82% of the JS heap, because a DEV
-  bundle compiles each function on first execution and keeps it. Touch more code paths, get more
-  CodeBlocks, then it saturates.
-- **JS flat + RSS moving means the movement is NATIVE.** RSS spiked to ~224 MB while tapping and
-  came back down, with the JS heap unmoved — that is Fabric clone-on-write commit churn and
-  UIKit views, not our objects. Do not go looking in JS for it.
-
-Take snapshots with **Heap snapshot**, not Allocation sampling/timeline (a timeline cannot be
-diffed for retention), and force GC (the trash icon) before each, or you are measuring garbage.
-
-### The question this section opened with, ANSWERED (2026-08-14): in release the adapters are level
-
-Measured with `scripts/measure-simulator-footprint.sh`, iPhone 17 Pro simulator, RELEASE builds
-(`npm run ios:release`), each held until the number stopped moving — 16 consecutive identical
-samples on both sides:
-
-```
-                        svelte    vue-sfc
-footprint (plateau)      76 MB     74 MB
-  untagged (VM_ALLOCATE) 26 MB     26 MB   <- Hermes GC heap: IDENTICAL
-  MALLOC_SMALL           26 MB     23 MB
-  CoreAnimation         8176 KB    11 MB   <- vue higher: it renders inside a navigator
-  __DATA                5195 KB   5080 KB
-```
-
-**The gap is 2 MB, 2.7% — and it points the other way from the dev reading.** The dev-build
-numbers that started this whole investigation (svelte 189 MB vs vue 167 MB, "Svelte should be
-lighter, why is it heavier") were measuring the dev harness, not the adapters: a dev bundle's
-lazily-compiled `CodeBlock` bytecode alone was 45.9 MB of a 55.9 MB JS heap. Release drops the
-same app from ~200 MB to 76 MB.
-
-What is left cannot be attributed to the adapter either: `examples/vue-sfc` runs its screen
-inside a `Stack` navigator (react-native-screens' native RNSScreen layers) while
-`examples/svelte` is a bare ScrollView, which is exactly where vue's extra 3 MB of
-`CoreAnimation` comes from. The Hermes heaps are the same size to the megabyte.
-
-So: the DOM shim does not cost what the web intuition predicts here, and **no adapter-level
-memory work is warranted on this evidence**. If someone reopens this, re-measure in release
-first — a dev-build comparison is not evidence.
+§11b_memory := {
+  per_node_cost_2026-08-13: { ShimElement_detached_n100k: "548.5 B/node", plain_baseline: "119.9 B/node ({parent, children, engineNode, tagName})" },
+  delta_source: "~430B is structural, mostly the 2 Maps (attributes, domListeners) ShimElement's constructor allocates EAGERLY — almost always empty, since Symbiote intrinsics take everything through the single `p` bag (§3g(c)) and on* handlers ride inside it, not addEventListener. Lazy alloc is the obvious win at scale; at a realistic screen (few thousand elements) the whole shim layer is ~1MB, so it cannot account for a 20MB difference",
+  wrong_claims_corrected: [
+    "'Vue keeps 1 object/element, Svelte keeps 2' — NO: @vue/runtime-core also retains a VNode tree above host nodes; both adapters carry 2 retained layers, the shim just replaces VNodes with a DOM-shaped tree",
+    "'smaller bundle = less RAM' — measured iOS dev bundles 2026-08-13: vue-sfc 6.0M (879 modules) / svelte 5.9M (967) / angular 8.4M (1331); svelte SMALLEST but device RSS HIGHER than vue's — bundle size does not order RAM",
+  ],
+  method_note: "RN dev-build RSS is a WEAK instrument (no bytecode precompilation, full source retained for stack traces, live debugger, GC timing) — split JS heap from native memory (Hermes heap snapshot via RN DevTools) and confirm any delta survives a release build before attributing it; native shadow nodes/views dominate RN footprint, not JS objects",
+  heap_split_2026-08-14: {
+    method: "2 Hermes heap snapshots of examples/svelte, same screen, minutes apart, via scripts/analyze-heap-snapshot.mjs <early> <later>",
+    result: "JS heap 55.86MB->55.90MB (+0.04, = the tester's own typed input strings); engine nodes 1746->1746; ShimComment 1216->1216; ShimElement 463->463; ShimDocumentFragment 273->273; ShimText 267->267 — every adapter-owned class IDENTICAL across both",
+    breakdown: "whole shim layer ~0.17MB, engine retained nodes ~0.13MB",
+    verdict: "not leaking",
+  },
+  lessons: [
+    "growth that PLATEAUS is not a leak — device RSS climbed to ~200MB then stopped idle (a leak doesn't stop). The actual filler: CodeBlock (Hermes lazily-compiled bytecode) 45.92MB / 8263 objects, ~82% of the JS heap — a DEV bundle compiles each fn on first execution and keeps it",
+    "JS heap flat + RSS moving ⟶ movement is NATIVE — RSS spiked to ~224MB while tapping then returned, JS heap unmoved = Fabric clone-on-write commit churn + UIKit views, not adapter objects",
+  ],
+  snapshot_method: "use Heap snapshot, NOT Allocation sampling/timeline (can't be diffed for retention); force GC before each",
+  release_measurement_2026-08-14: {
+    method: "scripts/measure-simulator-footprint.sh, iPhone 17 Pro simulator, RELEASE builds (npm run ios:release), held until plateau (16 identical samples)",
+    result: "footprint svelte 76MB / vue-sfc 74MB; untagged(VM_ALLOCATE, Hermes GC heap) 26MB/26MB IDENTICAL; MALLOC_SMALL 26MB/23MB; CoreAnimation 8176KB/11MB (vue higher — renders inside a Stack navigator); __DATA 5195KB/5080KB",
+    gap: "2MB, 2.7% — points OPPOSITE the dev-build reading",
+  },
+  root_cause_of_dev_gap: "the dev numbers that started this investigation (svelte 189MB vs vue 167MB) were measuring the DEV HARNESS, not the adapters — lazily-compiled CodeBlock bytecode alone was 45.9MB of a 55.9MB JS heap; release drops the app from ~200MB to 76MB",
+  residual_gap_explained: "examples/vue-sfc runs its screen inside a Stack navigator (react-native-screens' native RNSScreen layers) while examples/svelte is a bare ScrollView — exactly where vue's extra 3MB CoreAnimation comes from; Hermes heaps are equal to the megabyte",
+  conclusion: "DOM shim does not cost what web intuition predicts; no adapter-level memory work warranted on this evidence",
+  open: "if reopened, re-measure in RELEASE first — a dev-build comparison is not evidence",
+}
 
 ## §11c. An EMPTY text node is an ANCHOR, not text — FIXED 2026-08-14, found by cross-adapter diffing
 
-`dom-shim/text.ts`'s `createEngineNode()` used to call `createRawText(this.value)`
-unconditionally. Svelte builds every block/component boundary anchor with `create_text()`, i.e.
-`document.createTextNode('')` — so **every `{#if}`, `{#each}`, `{@render}` and component
-instance in the app was committing a real `RCTRawText ""` Fabric node** where Vue and Angular
-commit nothing at all.
-
-Three costs, ascending: a real extra shadow node per block/instance (it scales with list items,
-since each item instance carries its own anchor); an empty `RCTRawText` actually **paints** in
-Fabric (precisely why the Vue renderer's `createText` has always read
-`text === '' ? createAnchor() : createRawText(text)` — `renderer/index.ts`); and a raw-text child
-of a non-Text parent is the invalid "text outside `<Text>`" shape §16 also warns about. The shim
-was simply missing the mapping Vue had from the start.
-
-**Why "empty means anchor" is sound and not a heuristic:** template text always carries at least
-one character. A dynamic interpolation compiles to a literal `' '` placeholder inside the
-`from_tree` template and is overwritten by `set_text` afterwards — verified by reading the
-compiled output of `{#each rows as row}…{row}…{/each}`:
-
-```js
-var root = $.from_tree([['symbiote-view', null, ['symbiote-text', null, ' ']]], 2);
-//                                                                        ^^^ not ''
-$.template_effect(() => $.set_text(text, `row ${$.get(row) ?? ''}`));
-```
-
-So `''` at creation time only ever means anchor.
-
-**The one wrinkle, handled:** a node that mounts empty becomes an anchor, and the engine has no
-anchor→text conversion (an anchor is a distinct component). If such a node is later given real
-content, `set data` PROMOTES it — removes the anchor from the parent engine node and inserts a
-fresh raw text at the same position, anchoring before the first _live_ following sibling exactly
-as `ShimNode.insertOne` does. The reverse is deliberately NOT done: a node that once had content
-and is set back to `''` stays a raw text, because that is genuine empty text content and is what
-React commits there too, and demoting would churn the tree on every binding that empties.
-
-**How it was found, and the method worth reusing:** `adapters/svelte/src/native-node-parity.test.ts`
-mounts the same intended UI through the Svelte and Vue adapters into one fake Fabric and diffs
-the committed native tree STRING. The extra nodes showed up immediately as trailing
-`RCTRawText ""` entries Vue's tree simply did not have. A count alone would not have located
-them; the serialized shape did. That test now also locks in the remaining, legitimate difference
-— Svelte commits exactly ONE extra node in total, the constant `root-element.ts` wrapper.
+§11c_empty_text_anchor := {
+  bug: "dom-shim/text.ts's createEngineNode() called createRawText(this.value) unconditionally",
+  trigger: "Svelte builds every block/component boundary anchor via create_text() = document.createTextNode('') — every {#if}, {#each}, {@render} and component instance was committing a real RCTRawText \"\" Fabric node where Vue/Angular commit nothing",
+  cost: ["extra shadow node per block/instance, scales with list items", "an empty RCTRawText actually PAINTS in Fabric (same reason Vue's createText reads text===''?createAnchor():createRawText(text), renderer/index.ts)", "a raw-text child of a non-Text parent is the invalid 'text outside <Text>' shape §16 warns about"],
+  why_sound_not_heuristic: "template text always carries ≥1 char; a dynamic interpolation compiles to a literal ' ' placeholder inside the from_tree template, overwritten by set_text afterwards — verified against compiled `{#each rows as row}…{row}…{/each}`: `$.from_tree([['symbiote-view', null, ['symbiote-text', null, ' ']]], 2); $.template_effect(() => $.set_text(text, ...))` — so '' at creation time only ever means anchor",
+  handling: "the engine has no anchor→text conversion, so a node that mounts empty and is later given content gets PROMOTED by `set data` — anchor removed from the parent engine node, fresh raw text inserted at the same position (anchored before the first live following sibling, same as ShimNode.insertOne). Reverse NOT done: content set back to '' stays raw text (genuine empty text content, what React commits too; demoting would churn the tree on every emptying binding)",
+  found_via: "adapters/svelte/src/native-node-parity.test.ts — mounts the same UI through the Svelte and Vue adapters into one fake Fabric, diffs the committed native tree STRING; extra trailing RCTRawText \"\" entries showed up immediately (a count alone would not have located them, the serialized shape did). Test now locks in the one remaining legitimate difference: Svelte commits exactly ONE extra node total, the constant root-element.ts wrapper",
+}
 
 ## §12. Size estimate, and what NOT to port from wolf-tui
 
@@ -1259,6 +1082,14 @@ sit here was stale by the time this line was written and has been removed.
   already do, reusing only the pure logic/computation exports.
 - `symbiote-web-lib-portability-check` — the project's position on web libraries
   that "work by accident"; directly relevant to §6e.
+- `symbiote-file-layout` — the `runes/` bucket (§21, §25) is this adapter's
+  framework-idiomatic lifecycle folder, the Svelte twin of React's `hooks/` and
+  Vue's `composables/`; the `preprocessor/` folder follows the same
+  folder-as-module placement rules.
+- `symbiote-third-party-native-view` — the wrapper pattern §21's slider port and
+  the `<svelte:element>` native-Fabric-tag section both extend to Svelte; read it
+  for the package-shape and ViewConfig-registration rules this adapter's own
+  wrappers follow.
 - The `examples/*` dev-harness split is RETIRED (2026-08-11, CLAUDE.md's
   `<examples_vs_dot_examples>`) — the Svelte canary lives in `examples/svelte`,
   the same single tree as every other adapter now. Local iteration against this
@@ -1302,42 +1133,30 @@ filename directly.
 
 ### Three real bugs this caught that `tsc --build` structurally cannot
 
-1. **`svelte`'s package.json exports split on a `browser` condition** — `.` resolves
-   to `src/index-client.js` under `browser`, but to the SSR build
-   (`src/index-server.js`) under `default`/`worker`, and Vite/Vitest's default Node
-   conditions pick the SSR build. Calling `mount()` there throws
-   `lifecycle_function_unavailable: mount(...) is not available on the server` — a
-   HARD CRASH on literally the first line `render.ts`'s `mount()` executes. Fixed
-   for the test suite in the root `vitest.config.ts` (`resolve.conditions:
-['browser']` AND `ssr.resolve.conditions: ['browser']` — Vitest runs test files
-   through Vite's SSR module graph, so the plain `resolve.conditions` alone was not
-   enough). **Metro-side fix (2026-08-12): `examples/svelte/metro.config.js` sets
-   `resolver.unstable_conditionNames: ['browser']`.** Confirmed this is genuinely
-   needed, not a maybe: `@react-native/metro-config`'s own default is
-   `unstable_conditionNames: []` with `unstable_conditionsByPlatform: { web:
-['browser'] }` — the `browser` condition is ONLY applied for the `web` platform
-   by default, so iOS/Android would silently resolve svelte's SSR build without this
-   override (read straight out of the installed `metro-config/src/defaults/index.js`,
-   not guessed). Still open: nobody has verified this against a real Metro bundle
-   yet — see the `examples/svelte` bring-up work for the actual proof.
-2. **`ShimNode` never implemented `remove()`** — the real `Node.prototype.remove()`
-   convenience method (`this.parentNode?.removeChild(this)`), distinct from our own
-   `removeChild`. Svelte's effect-teardown and anchor-management paths
-   (`internal/client/reactivity/effects.js`, `dom/operations.js`) call it directly
-   on the node being torn down. Missing it crashed the very first unmount/re-render.
-   Fixed in `shim-node.ts`.
-3. **`customElements` was never patched, and must be** — `set_custom_element_data`
-   (svelte's `dom/elements/attributes.js`) reads the BARE global `customElements`
-   unconditionally (`!customElements || customElements.get(...)`), with no `typeof`
-   guard. An undeclared global throws `ReferenceError`, not `undefined` — so
-   `patchGlobals()` MUST assign a real (fake) `CustomElementRegistry`-shaped object,
-   not merely leave the global absent. RN/Hermes has no Custom Elements API to
-   collide with (unlike `navigator`/`window`, both verified present at RN's own
-   bootstrap — see patch-globals.ts's header comment), so this is safe to patch
-   unconditionally. `get()` always returns `undefined` (we never call
-   `customElements.define()`), which is exactly what steers
-   `set_custom_element_data` down the object-bag "set as property" branch §3g(c)
-   depends on. Fixed in `patch-globals.ts`.
+§15_real_bugs := [
+  {
+    n: 1,
+    bug: "svelte's package.json exports split on a browser condition — '.' resolves to src/index-client.js under browser, but to the SSR build (src/index-server.js) under default/worker, and Vite/Vitest's default Node conditions pick the SSR build",
+    symptom: "calling mount() throws `lifecycle_function_unavailable: mount(...) is not available on the server` — a HARD CRASH on the first line render.ts's mount() executes",
+    fix_tests: "root vitest.config.ts: `resolve.conditions: ['browser']` AND `ssr.resolve.conditions: ['browser']` (Vitest runs test files through Vite's SSR module graph, so plain resolve.conditions alone was not enough)",
+    fix_metro_2026-08-12: "examples/svelte/metro.config.js sets `resolver.unstable_conditionNames: ['browser']` — confirmed necessary, not a maybe: @react-native/metro-config's own default is `unstable_conditionNames: []` with `unstable_conditionsByPlatform: { web: ['browser'] }`, i.e. browser is ONLY applied for the web platform by default (read from the installed metro-config/src/defaults/index.js), so iOS/Android would silently resolve svelte's SSR build without this override",
+    open: "not yet verified against a real Metro bundle at the time this was written — see the examples/svelte bring-up work for the actual proof",
+  },
+  {
+    n: 2,
+    bug: "ShimNode never implemented remove() — the real Node.prototype.remove() convenience method (this.parentNode?.removeChild(this)), distinct from our own removeChild",
+    trigger: "Svelte's effect-teardown and anchor-management paths (internal/client/reactivity/effects.js, dom/operations.js) call it directly on the node being torn down",
+    symptom: "crashed the very first unmount/re-render",
+    fix: "shim-node.ts",
+  },
+  {
+    n: 3,
+    bug: "customElements was never patched, and must be — set_custom_element_data (svelte's dom/elements/attributes.js) reads the BARE global customElements unconditionally (`!customElements || customElements.get(...)`), no typeof guard",
+    consequence: "an undeclared global throws ReferenceError, not undefined — patchGlobals() MUST assign a real (fake) CustomElementRegistry-shaped object, not leave the global absent",
+    safety: "RN/Hermes has no Custom Elements API to collide with (unlike navigator/window, both verified present at RN's own bootstrap), so patching unconditionally is safe. get() always returns undefined (customElements.define() is never called), which is exactly what steers set_custom_element_data down the object-bag 'set as property' branch §3g(c) depends on",
+    fix: "patch-globals.ts",
+  },
+]
 
 A fourth item is NOT a shim bug, just a harness-fidelity gap: a bare Node/vitest
 sandbox has neither `window` nor `navigator` at all, while real RN sets both before
@@ -1348,39 +1167,23 @@ touching `patchGlobals()`/`mount()`.
 
 ### Three harness gotchas, independently rediscovered by four separate agents
 
-Worth stating once here rather than re-deriving per component:
-
-- **`fabric.find()` (from `@symbiote-native/test-utils`) walks the CREATION log, not
-  the current tree.** A node it returns stays "found" forever, even after the shim
-  removes it from the live tree — its `props` reflect whatever they were at creation
-  or last mutation, not necessarily what's currently committed. To assert against
-  the LIVE tree (e.g. "this node is gone after a state change", or "this prop is
-  CURRENTLY this value"), walk `fabric.appRoot().children` recursively yourself
-  instead of trusting `fabric.find()`'s result past the first render.
-- **Node's `import()` caches by file path/URL.** Writing a NEW compiled `.mjs` to the
-  SAME path a previous `import()` call already used and re-importing it returns the
-  STALE cached module, not the new content — even after the file on disk changed.
-  Every smoke test in this adapter that compiles more than one variant (e.g. two
-  differently-configured parent wrappers) gives each variant its OWN output
-  filename. `switch.smoke.test.ts` gets away with one shared path per component
-  because its variance travels through `mount()`'s `props` argument at runtime, not
-  through different compiled source strings.
-- **`root-element.ts`'s own mount target is an UNLABELED `symbiote-view` (RCTView,
-  `{}` props) sitting between the AppContainer and your component's real host node.**
-  A committed tree is at minimum THREE RCTView-family levels deep:
-  `AppContainer(box-none) -> root mount target({}) -> your component's own root`. A
-  test that searches by `viewName === 'RCTView'` alone (excluding only the box-none
-  AppContainer) matches the EMPTY mount target first, since it is a plain depth-first
-  pre-order search and the mount target is the shallower match — found while
-  building Animated.View's own smoke tests (`adapters/svelte/src/modules/animated/
-animated-view.smoke.test.ts` and friends), where `appView().props.opacity` read as
-  `undefined` even though the real node one level deeper carried the right value.
-  Fix: key the search on a prop only YOUR component's root carries (a `testID` set
-  in the test), not on the generic `viewName`/`pointerEvents` shape alone — the same
-  discipline `activity-indicator.smoke.test.ts`'s `findLive` already uses by
-  searching for a component-specific `viewName` (`'ActivityIndicatorView'`, unique
-  to that component) rather than the generic `'RCTView'` every plain View/wrapper
-  shares.
+§15_harness_gotchas := [
+  {
+    gotcha: "fabric.find() (from @symbiote-native/test-utils) walks the CREATION log, not the current tree",
+    detail: "a node it returns stays 'found' forever, even after the shim removes it from the live tree — its props reflect whatever they were at creation or last mutation, not necessarily what's currently committed",
+    fix: "to assert against the LIVE tree (node gone after a state change, prop CURRENTLY this value), walk fabric.appRoot().children recursively yourself instead of trusting fabric.find()'s result past the first render",
+  },
+  {
+    gotcha: "Node's import() caches by file path/URL",
+    detail: "writing a NEW compiled .mjs to the SAME path a previous import() call already used and re-importing it returns the STALE cached module, not the new content — even after the file on disk changed",
+    fix: "every smoke test compiling more than one variant gives each variant its OWN output filename. switch.smoke.test.ts gets away with one shared path per component because its variance travels through mount()'s props argument at runtime, not through different compiled source strings",
+  },
+  {
+    gotcha: "root-element.ts's own mount target is an UNLABELED symbiote-view (RCTView, {} props) sitting between the AppContainer and your component's real host node",
+    detail: "a committed tree is at minimum THREE RCTView-family levels deep: AppContainer(box-none) -> root mount target({}) -> your component's own root. A test searching by viewName==='RCTView' alone (excluding only the box-none AppContainer) matches the EMPTY mount target first — a plain depth-first pre-order search finds the shallower match. Found building Animated.View's own smoke tests (adapters/svelte/src/modules/animated/animated-view.smoke.test.ts and friends), where appView().props.opacity read as undefined even though the real node one level deeper carried the right value",
+    fix: "key the search on a prop only YOUR component's root carries (a testID set in the test), not the generic viewName/pointerEvents shape — same discipline activity-indicator.smoke.test.ts's findLive already uses (searching for a component-specific viewName, 'ActivityIndicatorView', rather than the generic 'RCTView' every plain View/wrapper shares)",
+  },
+]
 
 ### The fixed-shape-render insight — no GENERIC `descriptorToSvelte` walker needed
 
@@ -1403,50 +1206,15 @@ h()-style hyperscript) would need a Svelte equivalent, built on the shim (walk a
   fn") — they were always meant to be hand-assembled per adapter using the
   framework's native loop, which for Svelte is `{#each}`.
 
-**CORRECTED 2026-08-12 — the conclusion drawn from that insight was wrong and shipped
-a real bug.** The first pass of this section said to skip consuming a `render-*.ts`
-function's output "altogether" and hand-author equivalent markup, reusing only the
-pure logic pieces. That is NOT what "fixed shape" licenses: it licenses skipping the
-generic WALKER, not the function CALL. `Switch/index.svelte`, `activity-indicator/
-index.svelte`, and `text-input/index.svelte` were all written this way — each
-hand-copied its `render-*.ts`'s prop-assembly logic (constants, fold helpers, the
-exact field list) instead of calling `renderSwitch()`/`renderActivityIndicator()`/
-`renderTextInput()` and destructuring the returned `Descriptor.props` onto the known
-literal host tag(s). Found by re-reading the actual `.svelte` source against its
-`core/components` twin (grepping for the render function's name in the `.svelte`
-file — a `NONE` result on a component whose `core/components` counterpart exists is
-the tell) after the user pushed back with "мы копипастим код из core/components?".
-Consequence exactly as `<components_split_logic_view_lifecycle>` predicts: a future
-fix to `render-text-input.ts` (shared by React/Vue/Angular) would silently NOT reach
-Svelte. Fixed in all three (see their `index.svelte` for the corrected pattern): call
-the `render*()` fn, get back `{type, props, children}`, and since the shape is
-statically known, index straight into it —`descriptor.props` for the root,
-`descriptor.children[0]` (narrowed with a `typeof child === 'string'` guard, no `as`)
-for a known single child.
-
-**One more gotcha this surfaced: `<svelte:element this={descriptor.type}>` is NOT
-the bridge, even though it looks like the obvious one.** A dynamic tag compiles
-through Svelte's generic `setAttribute`/property-diffing codegen, NOT the
-custom-element `p=` property-SET path §3g(c) documents — so `p={descriptor.props}`
-silently fails to land as a real prop when the tag is dynamic (proven by a real
-regression: TextInput's controlled-write and focus/blur commands stopped firing
-under `<svelte:element>`, 3 of 6 smoke-test assertions failed). The correct pattern
-keeps the host tag LITERAL in the template (`{#if isMultiline}<symbiote-text-input-
-multiline p={descriptor.props} .../>{:else}<symbiote-text-input p={descriptor.props}
-.../>{/if}`) and only sources its **props** from the called render fn — never make
-the tag name itself dynamic.
-
-**Net effect, corrected:** none of the components need new GENERIC bridge
-infrastructure to reach Svelte parity (that part of the original insight holds), but
-every component whose `core/components/src/view/render-*.ts` counterpart exists
-MUST call it — verify this on every new component before considering it done, not
-just on the three caught here. Components without a `render-*.ts` (Pressable's
-press-state machine, ScrollView's math, the list family, Button, KeyboardAvoidingView)
-are correctly adapter-assembled per `component-render-fn-boundary.md`'s 3-category
-rule — confirmed by reading each: they already call their core STATE/helper
-functions (`highlightPressedStyle`, `backgroundProps`/`selectableBackground`,
-`resolveButtonTextStyle`, the sticky-header reducer, the list reducers), just not a
-`renderX()` Descriptor factory, because none exists for them by design.
+§15_fixedshape_correction := {
+  bug: "the first pass of this section said to skip consuming a render-*.ts function's output ALTOGETHER and hand-author equivalent markup, reusing only pure logic pieces — wrong: 'fixed shape' licenses skipping the generic WALKER, not the function CALL",
+  affected: "Switch/index.svelte, activity-indicator/index.svelte, text-input/index.svelte all hand-copied their render-*.ts's prop-assembly logic instead of calling renderSwitch()/renderActivityIndicator()/renderTextInput() and destructuring the returned Descriptor.props onto the known literal host tag(s)",
+  found_via: "re-reading the actual .svelte source against its core/components twin (grepping for the render function's name in the .svelte file — a NONE result on a component whose core/components counterpart exists is the tell), after the user pushed back with 'мы копипастим код из core/components?'",
+  consequence: "exactly as <components_split_logic_view_lifecycle> predicts: a future fix to render-text-input.ts (shared by React/Vue/Angular) would silently NOT reach Svelte",
+  fix: "call the render*() fn, get back {type, props, children}, and since the shape is statically known, index straight into it — descriptor.props for the root, descriptor.children[0] (narrowed with a `typeof child === 'string'` guard, no `as`) for a known single child",
+  bonus_finding: "<svelte:element this={descriptor.type}> is NOT the bridge, even though it looks like the obvious one — a dynamic tag compiles through Svelte's generic setAttribute/property-diffing codegen, NOT the custom-element p= property-SET path §3g(c) documents, so p={descriptor.props} silently fails to land when the tag is dynamic. Proven by a real regression: TextInput's controlled-write and focus/blur commands stopped firing under <svelte:element>, 3 of 6 smoke-test assertions failed. Correct pattern keeps the host tag LITERAL in the template and sources only its PROPS from the render fn",
+  net: "no GENERIC bridge infrastructure needed to reach Svelte parity (original insight holds), but every component whose render-*.ts counterpart exists MUST call it — verify on every new component. Components without a render-*.ts (Pressable, ScrollView, the list family, Button, KeyboardAvoidingView) are correctly adapter-assembled per component-render-fn-boundary.md's 3-category rule — confirmed by reading each: they call their core STATE/helper functions directly, not a renderX() Descriptor factory, because none exists for them by design",
+}
 
 ### Switch as the proven reference (`adapters/svelte/src/components/switch/`)
 
@@ -1462,7 +1230,8 @@ comment:
 
 - **`$state.raw`, not `$state`, for the engine-node/shim-element identity** — same
   concern as Vue's `shallowRef` (documented in `adapters/vue/src/components/switch/
-shared.ts`): `$state()` deep-proxies an assigned object, and `dispatchViewCommand`
+shared.ts`, and generalized in the `vue-adapter-reactivity` skill's IDENTITY
+  gotcha): `$state()` deep-proxies an assigned object, and `dispatchViewCommand`
   needs the RAW `ShimElement` the engine's mirror actually knows, or every
   imperative command silently misses.
 - **`bind:this` timing vs. the shim's lazy engine-node binding** — the open question
@@ -1482,230 +1251,53 @@ pattern rather than re-deriving it.
 
 ## §16. Whitespace between sibling `symbiote-*` tags becomes a REAL text-node child
 
-Found and fixed 2026-08-11 while building the List family (`adapters/svelte/src/
-components/virtualized-list/index.svelte`), caught only by a smoke test asserting an
-exact windowed child count, not by `tsc --build` or compile warnings.
+§16_sibling_whitespace := {
+  found: "2026-08-11, building the List family (adapters/svelte/src/components/virtualized-list/index.svelte); caught by a smoke test asserting exact windowed child count (10 expected vs 24 actual), NOT by tsc --build or compile warnings",
+  mechanism: "verified against installed 5.56.8 (compiler/phases/3-transform/utils.js's clean_nodes): Svelte trims LEADING/TRAILING whitespace of every sibling fragment, but whitespace strictly BETWEEN two non-text sibling nodes collapses to a single-space TEXT node and is KEPT — same rule a browser applies to literal HTML, NOT specific to hyphenated custom elements (a disproven hypothesis: can_remove_entirely is false for our tags, same as any <div>)",
+  safe_case: "a same-parent single-child context (one element wrapping one {@render} or one nested block) is safe — the render tag is both first and last child, so leading/trailing trim strips both sides",
+  hazard_case: "MULTIPLE siblings inside the same parent (cell+separator, chained {#if} chrome blocks)",
+  why_correctness_not_cosmetic: "the collapsed space becomes a real document.createTextNode(' ') → ShimText → RCTRawText engine node landing as a sibling of the symbiote-* parent; dom-shim/text.ts's header states raw text is valid only inside RCTText, so this is exactly RN's 'Text strings must be rendered within a <Text> component' shape. The shim does not validate this (unlike Vue adapter's insert()), so it fails SILENTLY — no compiler/tsc error, clean mount in any headless smoke not counting children exactly; only a real device or an exact-child-count test catches it",
+  fix_SUPERSEDED_2026-08-19: "was 'pack edge-to-edge, zero chars' — NO LONGER REQUIRED, §30's collapseTextWhitespace() deletes a whitespace-only node that spans a newline, which is every gap normal formatting produces. Write ordinary readable Svelte; see §31. Only a same-LINE gap (`<View><A /> <B /></View>`) still reaches the tree. Whitespace INSIDE a single-child context was always safe. An HTML comment is inert (clean_nodes filters Comment nodes before the whitespace pass, verified) so a doc comment placed directly adjacent doesn't reintroduce the hazard — see listBody()'s worked example in virtualized-list/index.svelte",
+  audit_script_SUPERSEDED_2026-08-19: "the inline snippet below compiled RAW source and is therefore wrong now — it reports every readable file as an offender. scripts/audit-svelte-stray-whitespace.mjs runs preprocess() first as of 2026-08-19; see §31. Kept only to show the detection shape:\n```js\nconst { compile } = require('svelte/compiler');\nconst result = compile(source, { generate: 'client', fragments: 'tree', css: 'external', filename });\nconst strayCount = (result.js.code.match(/,\\s*'\\s+'\\s*,/g) || []).length; // must be 0\n```",
+  check_rule: "any new component with multiple sibling symbiote-* children in one parent needs a smoke test asserting the EXACT child count, not 'greater than zero'",
+  confirmed_app_level_2026-08-12: "same pattern reproduces through the PUBLIC component API (<View>/<Text>/<ActionButton>, not raw symbiote-* tags) — View/Text/etc are thin wrappers over a literal symbiote-* root, so their CHILDREN (the children snippet) still land in the same custom-element codegen path one layer down. examples/svelte's App.svelte + 8 demo components had up to 8 stray single-space entries in one file; every file audited via the script above and fixed to 0. The 'pack every multi-sibling region edge-to-edge' rule that followed is SUPERSEDED — see §31",
+  known_unfixed_2026-08-12: "adapters/svelte/src/components/scroll-view/index.svelte compiles with exactly 1 stray-space entry — its own test suite passes (gap not asserted by any existing assertion), NOT blocking but a real latent bug; locate via the audit script, apply the edge-to-edge fix before it ships to device",
+  real_production_bug_2026-08-12: "image-background/index.svelte's template had `<symbiote-image .../>\\n  {@render children?.()}` — whitespace between the Image and the live-children render call became a real RCTRawText \" \" sibling inside a non-Text symbiote-view. Caught only because image-background.smoke.test.ts asserted the wrapper's committed child SHAPE, not just that an Image existed. Fixed by packing the tag onto one line. Audit any component mixing multiple symbiote-* siblings with {@render} — passed tsc --build clean before being caught at runtime",
+}
 
-**The mechanism (verified against the installed 5.56.8 source,
-`compiler/phases/3-transform/utils.js`'s `clean_nodes`):** Svelte trims LEADING and
-TRAILING whitespace of every sibling fragment, but whitespace strictly BETWEEN two
-non-text sibling nodes (two adjacent elements, an element next to an `{#if}`/`{#each}`
-block, two adjacent blocks) collapses to a single-space TEXT node and is KEPT — the
-same rule a browser applies to literal HTML, and nothing specific to hyphenated custom
-elements (an earlier hypothesis during debugging, since disproven by reading the
-source: `can_remove_entirely` is false for our tags, same as any `<div>`). A
-same-parent, single-child context (an element whose only content is one `{@render}` or
-one nested block, e.g. `View.svelte`'s `<symbiote-view>{@render children?.()}
-</symbiote-view>`) is safe — the render tag is BOTH first and last child, so the
-leading/trailing trim strips the whitespace on both sides. The hazard is specifically
-MULTIPLE siblings inside the same parent — exactly what `VirtualizedList`'s cell +
-separator, or three top-level `{#if}` chrome blocks (header/body/footer), are.
+### A SECOND whitespace bug, same cause: INSIDE one text node (2026-08-14)
 
-**Why this is a correctness bug, not a cosmetic one:** the collapsed single space
-becomes a REAL `document.createTextNode(' ')` call → a REAL `ShimText` → a REAL
-`RCTRawText` engine node, landing as a sibling child of whatever `symbiote-*` parent
-contains it. `dom-shim/text.ts`'s own header comment states raw text is only valid
-inside `RCTText`; a raw-text child of `symbiote-view`/`symbiote-scroll-content` is
-exactly the "text outside a Text component" shape that throws on real Fabric (the RN
-error "Text strings must be rendered within a <Text> component" family). The shim
-itself does not validate this (unlike the Vue adapter's `insert()`, which does — see
-that comment), so it fails SILENTLY here: no compiler error, no `tsc` error, a clean
-mount in every headless smoke that does not count children exactly — only a real
-device, or a test asserting an exact child count, catches it.
-
-**The fix:** eliminate ALL whitespace between sibling `symbiote-*`-producing
-constructs (adjacent elements, and elements adjacent to `{#if}`/`{#each}`/`{:else}`
-boundaries) at the same nesting level — pack them edge-to-edge with zero characters
-between a closing tag/`{/if}`/`{/each}` and the next opening tag/`{#if}`/`{#each}`.
-Whitespace INSIDE a single-child context (one element wrapping one `{@render}` or one
-block) stays safe and may be formatted normally. An HTML comment (`<!-- ... -->`) is
-inert here — `clean_nodes` filters `Comment` nodes out before the whitespace pass runs
-(verified), so a documentation comment placed directly adjacent (no surrounding
-whitespace itself) does not reintroduce the hazard; see the top of `listBody()` in
-`virtualized-list/index.svelte` for the worked example and its own guard comment.
-
-**Check on any new component with multiple sibling `symbiote-*` children in one
-parent:** write a smoke test that asserts the EXACT child count (not just "greater
-than zero" or "defined") — that is what caught this (10 expected vs. 24 actual in the
-first `virtualized-list.smoke.test.ts` run, before the fix).
-
-**CONFIRMED to hit APP-LEVEL composed markup too, not just adapter-internal
-`symbiote-*` literal tags (2026-08-12).** Building `examples/svelte`'s canary
-components (`App.svelte` + 8 demo components under `examples/svelte/components/`)
-reproduced the exact same pattern using the PUBLIC component API
-(`<View>`/`<Text>`/`<ActionButton>`, not raw `symbiote-*` tags): multiple sibling
-components inside one `<View>`, each on its own indented line, compiled to
-`from_tree([..., ' ', ..., ' ', ...])` with up to 8 stray single-space entries in one
-file. This makes sense once traced through — `View`/`Text`/etc. are themselves thin
-wrappers over a literal `symbiote-*` root tag, so their CHILDREN (passed as the
-`children` snippet) still land inside that same custom-element codegen path one layer
-down; using the framework-agnostic component API instead of the raw tag does not
-exempt you. Verified via a direct script (compile each `.svelte` file, grep the
-compiled output for `,\s*'\s+'\s*,` inside a `from_tree([...])` array) rather than
-guessing — every file in `examples/svelte` was audited this way and fixed to 0 stray
-entries. **Practical rule for `examples/svelte/**` (and any future app-level Svelte
-code in this project): pack every multi-sibling region — everything between one
-`<View>`'s opening tag and its closing tag when it holds 2+ children — edge-to-edge
-with zero whitespace, exactly like `virtualized-list/index.svelte`'s own internal
-rule.** A one-line auditing snippet (Node, given `svelte/compiler`):
-
-```js
-const { compile } = require('svelte/compiler');
-const result = compile(source, {
-  generate: 'client',
-  fragments: 'tree',
-  css: 'external',
-  filename,
-});
-const strayCount = (result.js.code.match(/,\s*'\s+'\s*,/g) || []).length; // must be 0
-```
-
-**One pre-existing adapter component still has this gap, found by the same audit but
-NOT yet fixed (2026-08-12), flagged rather than silently patched under time pressure:**
-`adapters/svelte/src/components/scroll-view/index.svelte` compiles with exactly 1
-stray-space entry. Its own test suite passes today (the affected sibling gap doesn't
-happen to be counted by any existing assertion), so this is NOT blocking, but it is a
-real latent bug — locate it with the audit script above, then apply the same
-edge-to-edge fix, before it silently ships to a real device.
-
-**Not just a list-family / test-harness gotcha — a real bug found in shipped
-production code (2026-08-12):** `image-background/index.svelte`'s own template had
-`<symbiote-image .../>\n  {@render children?.()}` — whitespace between the Image and
-the live-children render call, indented normally as any reasonable formatter would
-write it. Under a real compiled mount this becomes an actual `RCTRawText " "` sibling
-inside a `symbiote-view` that is not a Text — the exact invalid-child case
-`text.ts`'s header comment warns about. Caught only because
-`image-background.smoke.test.ts` (written alongside the same-day
-`renderImageBackground()` call-vs-duplicate fix) asserted the wrapper's committed
-child SHAPE, not just that an Image existed. Fixed by packing the whole tag onto one
-line, same as `listBody()`'s worked example. **Audit any component whose template
-mixes multiple `symbiote-*` siblings with `{@render}`** — this is a live risk, not
-hypothetical, and passed `tsc --build` clean before being caught at runtime.
-
-### A SECOND whitespace bug with the same cause: INSIDE one text node (2026-08-14)
-
-Everything above is about whitespace BETWEEN siblings. There is a separate one, found while
-bringing `examples/svelte`'s canary to Vue parity: **Svelte trims a text node's leading and
-trailing whitespace but never condenses the whitespace INSIDE it — unlike Vue's template
-compiler, which collapses runs of whitespace including newlines.** So a sentence an author
-wrapped across source lines for readability:
-
-```svelte
-<Text class="hero-body">Every @symbiote-native/svelte primitive, driven straight onto Fabric —
-  no react-native renderer in the path.</Text>
-```
-
-ships its literal `\n` plus the indent into the `RCTText`. On device that is a hard line break
-and a run of spaces mid-sentence where the author meant a soft wrap. It is invisible in every
-headless test (the text node exists and its content matches if you compare trimmed), invisible
-to `tsc`, invisible to `svelte-check`, and — importantly — **invisible to the §16 check above**,
-which only ever sees text nodes that are ENTIRELY whitespace.
-
-`scripts/audit-svelte-stray-whitespace.mjs` now runs both passes and reports them separately;
-the second walks `parse()`'s AST for a `Text` node whose `data.trim()` still contains a newline.
-Verified to actually fire against a synthetic wrapped-sentence component, not just to pass on a
-clean tree. **Practical rule: a text node's content stays on ONE source line, however long.**
+§16b_intratext_whitespace := {
+  found: "bringing examples/svelte's canary to Vue parity",
+  bug: "Svelte trims a text node's leading/trailing whitespace but never condenses whitespace INSIDE it — unlike Vue's template compiler, which collapses internal whitespace runs including newlines",
+  symptom: "a sentence wrapped across source lines for readability ships its literal \\n + indent into RCTText — a hard line break plus a mid-sentence run of spaces on device, where the author meant a soft wrap",
+  invisibility: ["headless tests (text node content matches when compared trimmed)", "tsc", "svelte-check", "the §16 check above (only sees text nodes ENTIRELY whitespace)"],
+  fix: "scripts/audit-svelte-stray-whitespace.mjs now runs a second pass, walking parse()'s AST for a Text node whose data.trim() still contains a newline — verified to fire against a synthetic wrapped-sentence component, not just pass on a clean tree",
+  rule_SUPERSEDED_2026-08-17: "was 'a text node's content stays on ONE source line, however long' — automated away by §30's collapseTextWhitespace(); wrap freely",
+}
 
 ---
 
 ## §17. RESOLVED (2026-08-12) — `ShimNode.before()` threw instead of no-op on a parentless node
 
-Found 2026-08-11 during post-integration verification (running every parallel agent's
-smoke tests together); root-caused and fixed 2026-08-12 while building `createTunnel`
-(a SEPARATE feature, hit the identical crash signature independently — see the repro
-below and `create-tunnel/create-tunnel.test.ts`'s own history).
-
-**Root cause**: `shim-node.ts`'s `before()` THREW when `this.parent === null`. The real
-DOM spec says otherwise — `ChildNode.before()`'s steps are literally "let parent be
-this's parent; if parent is null, then return" (a silent no-op, not an exception).
-Svelte's own `BranchManager` (`svelte/internal/client/dom/blocks/branches.js` — the
-machinery behind `{#each}`/`{#if}`/`{@render}`'s DEFERRED/batched updates, used whenever
-a block updates OUTSIDE the initial synchronous mount pass) genuinely relies on this
-spec no-op: it allocates an offscreen `DocumentFragment` + a placeholder anchor
-(`create_text()`), schedules the real content to render into that anchor via
-`branch(() => fn(target))`, and SEPARATELY may promote/discard that offscreen fragment
-via `#commit`'s `offscreen.fragment.lastChild.remove()` — which can detach the
-placeholder anchor BEFORE the scheduled effect actually runs its own
-`anchor.before(realContent)` call. In real DOM this races harmlessly (the stale
-`.before()` call is simply dropped); this shim's throw turned that harmless race into a
-hard crash.
-
-**Fix**: `before()` returns early (spec no-op) instead of throwing when parentless —
-one line, `shim-node.ts:114`.
-
-**Proven by both a minimal isolated repro AND the real bug**: a throwaway
-`{#each map as [id, content] (id)}{@render content()}{/each}` component, mounted with
-the map populated SYNCHRONOUSLY (parent script, before mount) — passes both before and
-after the fix. The SAME component with the map instead populated via a POST-MOUNT
-`$effect` (e.g. `$effect(() => { items.set(1, a); items.set(2, b); })`) — crashes with
-the exact §17 signature before the fix, passes clean after. This is the general
-condition: **any component populating a reactive `{#each}`-driven list from an effect
-that runs after the initial mount** (not just VirtualizedList's specific windowing math,
-not just `createTunnel`) was exposed to this — an extremely common pattern (e.g. any
-list backed by an async fetch), so this was not a narrow edge case.
-
-**Verified**: full repo-wide `npx vitest run` — 1906/1910 passing (the remaining 4 are
-the pre-existing, unrelated `less`-package-not-installed failures in
-`core/css-parser`), zero unexpected errors. `adapters/svelte` alone: 16 test files, 45
-tests, 0 errors — the VirtualizedList window-growth test's previously-logged uncaught
-exception is GONE, not just tolerated.
-
-Original repro record kept below for anyone cross-checking the signature.
-
-**Repro:** `adapters/svelte/src/components/virtualized-list/virtualized-list.smoke.test.ts`'s
-second test ("grows the window toward the target as onLayout reports a real
-viewport") — mount `VirtualizedList` with 100 items and an empty cell snippet, fire a
-real `topLayout` event on the scroll view (300×600), await two macrotask ticks. The
-test's own assertions PASS (the windowed child count really does grow past the
-pre-layout `initialNumToRender` bound), but vitest ALSO reports one uncaught
-exception per run:
-
-```
-Error: ShimNode.before() called on a node with no parent
-  at ShimText.before shim-node.ts:115
-  at .../virtualized-list/.smoke-compiled-virtualized-list.mjs:217  ($.append($$anchor, fragment_3), inside the `{#each plan.cells as cell (cell.key)}` block)
-```
-
-**Ruled out, with direct evidence, not just reasoning:**
-
-- **NOT a `batchTimer`/`viewableTimer` leak past `unmount()`.** Instrumented both the
-  `schedule-refill` timer-set call and the destroy-effect's cleanup with logging:
-  `batchTimer`/`viewableTimer` were `null` at cleanup time in every run — the
-  `schedule-refill`/`fire-viewable` effect branches never fired at all during this
-  test. Ruled out by direct observation, not inference.
-- **NOT caused by `unmount()`/teardown.** Reproduces identically with the test's
-  `afterEach` unmount call temporarily removed entirely (component left mounted,
-  never torn down) — same error, same location, same "grows the window" test.
-- **NOT a settle-time/impatience issue.** Reproduces identically with the two
-  `await tick()` calls (macrotask, 0ms) replaced by a single 400ms wait.
-- **NOT cross-test leakage.** Reproduces running ONLY this one test in isolation
-  (`vitest run ... -t "grows the window"`, the sibling test skipped).
-
-**What that leaves:** the crash happens somewhere in the SAME synchronous-or-microtask
-window as the `topLayout`-triggered re-render itself (the `{#each}` block growing from
-`initialNumToRender` cells to covering the whole unmeasured viewport in one pass, per
-the test's own comment) — not from anything this adapter's own code schedules
-asynchronously. The failure site (`$.append($$anchor, fragment_3)` inside the keyed
-`{#each}`'s per-item render callback, immediately preceded in the compiled output by
-an `$.if(...)` handling the optional per-cell separator) suggests an ordering issue
-between the OUTER each-block's keyed diff and an INNER conditional block's own anchor
-management when a large number of cells are inserted in a single pass — but this is
-not confirmed, only the most likely remaining explanation given everything else ruled
-out above. Diagnosing further would need either instrumenting Svelte's own compiled
-`{#each}`/`{#if}` internals directly, or a minimal non-Symbiote reproduction against
-real DOM/jsdom to determine whether this is Svelte-core behavior our shim merely
-exposes (most likely, given the shim's `insertBefore`/`removeChild ` implementations
-are the same ones every other passing smoke test already exercises) or a shim gap
-specific to large-batch insertion.
-
-**Practical impact right now:** the windowing math itself is proven correct (the
-test's assertions pass); this is an async exception logged alongside a passing test,
-not a failed assertion. Given `DEFAULT_MAX_TO_RENDER_PER_BATCH` normally grows a
-window incrementally (10 cells at a time) rather than in one large jump — the shape
-this specific test drives via a single big `topLayout` delta specifically to prove
-"windowing is live," not the typical incremental-scroll case — this may be narrower in
-practice than the test makes it look. Still: DO NOT clear this line without either
-fixing it or getting a real repro on-device proving it does not occur there.
+§17_shimnode_before := {
+  bug: "ShimNode.before() throws when this.parent === null",
+  spec_gap: "DOM spec ChildNode.before(): 'let parent be this's parent; if parent is null, then return' — a silent no-op, not an exception",
+  trigger: "Svelte's BranchManager (svelte/internal/client/dom/blocks/branches.js — the {#each}/{#if}/{@render} deferred/batched-update machinery) allocates an offscreen DocumentFragment + placeholder anchor (create_text()), schedules real content via branch(() => fn(target)), and may separately promote/discard that fragment via #commit's offscreen.fragment.lastChild.remove() — which can detach the placeholder anchor BEFORE the scheduled effect calls its own anchor.before(realContent). Real DOM drops the stale call harmlessly; the shim's throw turned the race into a hard crash",
+  fix: "shim-node.ts:114 — before() returns early (spec no-op) instead of throwing when parentless",
+  blast_radius: "ANY component populating a reactive {#each}-driven list from a post-mount $effect (e.g. an async fetch) — a common pattern, not narrow to VirtualizedList's windowing math or createTunnel (which hit the identical signature independently while a separate feature)",
+  repro: "adapters/svelte/src/components/virtualized-list/virtualized-list.smoke.test.ts, test 'grows the window toward the target as onLayout reports a real viewport' — mount VirtualizedList (100 items, empty cell snippet), fire a real topLayout event (300×600), await 2 macrotask ticks. Assertions PASS but vitest reports one uncaught exception: `Error: ShimNode.before() called on a node with no parent` at `ShimText.before shim-node.ts:115`, inside the compiled {#each plan.cells as cell (cell.key)} block ($.append($$anchor, fragment_3))",
+  ruled_out: [
+    "timer leak — batchTimer/viewableTimer instrumented, both null at cleanup in every run; schedule-refill/fire-viewable effects never fired during this test",
+    "unmount/teardown — reproduces identically with afterEach unmount removed (component never torn down)",
+    "settle-time/impatience — reproduces identically with the two 0ms tick() awaits replaced by a 400ms wait",
+    "cross-test leakage — reproduces running only this one test in isolation",
+  ] ⟶ each disproven by direct instrumentation, not inference,
+  hypothesis_unconfirmed: "failure site ($.append inside the keyed {#each}, immediately preceded by an $.if(...) for the optional per-cell separator) suggests an ordering issue between the outer each-block's keyed diff and an inner conditional block's own anchor management on a large single-pass insert — NOT confirmed, just the most likely explanation given everything else ruled out",
+  verified: "repo-wide npx vitest run: 1906/1910 (4 pre-existing unrelated `less`-package failures in core/css-parser), zero unexpected errors; adapters/svelte alone: 16 files/45 tests/0 errors — the VirtualizedList window-growth test's previously-logged uncaught exception is GONE",
+  practical_impact: "windowing math itself proven correct (assertions pass) — this was an async exception alongside a passing test. DEFAULT_MAX_TO_RENDER_PER_BATCH normally grows a window incrementally (10 cells/batch); this test's single large topLayout jump specifically stresses 'windowing is live,' so real incremental scroll may be narrower risk in practice",
+  open: "large-batch {#each}+{#if} insert may still race under different conditions — unconfirmed; would need instrumenting Svelte's compiled {#each}/{#if} internals directly, or a minimal non-Symbiote real-DOM/jsdom repro, to settle whether this is Svelte-core behavior the shim merely exposes (likely, since the shim's insertBefore/removeChild are already exercised by every other passing smoke test) or a shim gap specific to large-batch insertion. DO NOT clear this line without fixing it or getting a real on-device repro proving it does not occur there",
+}
 
 ---
 
@@ -1721,100 +1313,31 @@ silently-reduced surface. `tsc --build` is clean and every component's own smoke
 test passes (see each `*.smoke.test.ts`). Cross-cutting gaps, consolidated here so
 they don't get lost in six separate agent transcripts:
 
-- **No `Animated.View` (or any native-Animated binding) exists yet for this
-  adapter.** Flagged independently by BOTH the Touchable batch (TouchableOpacity's
-  press-fade is a self-contained `setTimeout`-driven tween reproducing
-  `Animated.timing`'s curve, NOT wired into the native Animated node graph — no
-  `useNativeDriver` capability) and the ScrollView batch (sticky headers render the
-  reducer's debounced `translateY` as a plain style update, stepped rather than
-  per-frame-smooth). Building a real Svelte `Animated.View` binding is prerequisite
-  work for both to reach true parity, not a Svelte-specific problem — it's simply
-  not been ported yet.
-- **`core/components/src/view/render-image/index.ts`'s prop-mapping helpers are
-  module-private** (`normalizeSource`, `headersFromAliases`, `expandSrcSet`,
-  `resolveSourceArray`, `readStyleString`, `readSourceUri` — not exported even from
-  that file). `renderImage()` itself IS called from `image/index.svelte` (verified
-  2026-08-12 — this one is fine); the private helpers are a separate, narrower gap:
-  code inside `render-image/index.ts` that `renderImage()` calls internally but that
-  a hand-written skeleton for a DIFFERENT component (or a future generic bridge, see
-  §19) can't reach without its own copy. Recommend exporting these from
-  `render-image/index.ts` (not necessarily the top barrel) so nothing has to
-  triple-duplicate the same logic.
-- **ScrollView has no RefreshControl/`onContentSizeChange` wiring INSIDE
-  VirtualizedList's own minimal scroll host** — VirtualizedList was built before
-  ScrollView landed (parallel agents), so it hand-authors a deliberately reduced raw
-  `symbiote-scroll-view` host rather than rendering the real `ScrollView` component.
-  Now that `ScrollView` exists (`adapters/svelte/src/components/scroll-view/`),
-  swapping VirtualizedList to render it (picking up RefreshControl,
-  `onContentSizeChange`, and native sticky-header wrapping for free) is follow-up
-  work, not done yet — a comment to this effect is already left in
-  `virtualized-list/index.svelte`.
-- **`stickyHeaderIndices`/`invertStickyHeaders` auto-wrap is not implemented** on
-  ScrollView — Svelte hands a component only an opaque `Snippet`, with no
-  `Children.toArray`(React)/`slots.default()`(Vue) equivalent to mechanically pull
-  "child at index N" out of it. Compose `ScrollViewStickyHeader` manually instead
-  (the sticky-header Svelte context auto-wires it to the parent's scroll offset, so
-  this is low-friction, just not automatic).
-- **RESOLVED (post-2026-08-11): `RefreshControl.svelte` now has a `style` field**
-  (`refresh-control-props.ts`), so ScrollView's Android RefreshControl wrap DOES
-  split layout-vs-visual style via `splitLayoutProps`, the same as elsewhere
-  (`scroll-view/index.svelte`: `layoutSplit = shouldWrapRefreshControl ?
-splitLayoutProps(...) : undefined`, applied as `style={layoutSplit?.outer}` on
-  the wrapping `<RefreshControl>`). This paragraph originally flagged the gap as
-  open; verified closed 2026-08-15 while auditing `api/components.mdx` for the
-  docs-site Svelte-parity sweep — kept here (not deleted) as a record that the
-  gap existed and was later closed, per this skill's "logs are an asset, never
-  deleted" convention.
-- **SectionList/VirtualizedSectionList and multi-column FlatList are compile-verified
-  only** (via `svelte/compiler` directly), not execution-verified by a smoke test —
-  unlike VirtualizedList/FlatList's single-column path, which caught a real bug
-  (§16) specifically BECAUSE a smoke test existed. Real bugs could still be lurking
-  there the same way.
-- **§15's Metro-side `browser`-condition fix is now applied** (2026-08-12,
-  `examples/svelte/metro.config.js`) alongside a real `metro-svelte-transformer.cjs`
-  (`adapters/svelte/metro-svelte-transformer.cjs`, exported as
-  `@symbiote-native/svelte/metro-svelte-transformer` — the Svelte twin of
-  `adapters/vue/metro-vue-transformer.cjs`: `svelte/compiler`'s `compile()` with this
-  adapter's own `{fragments:'tree', css:'external', generate:'client'}`, no framework-
-  import rewriting needed unlike Vue, delegated to `@react-native/metro-babel-
-transformer` via `resolveUpstreamTransformer()`). Unit-tested
-  (`adapters/svelte/metro-svelte-transformer.test.ts`, 6 tests: client-runtime-only
-  import, `from_tree` not `from_html`, `set_custom_element_data` routing, TS erasure
-  with no filesystem resolution needed, full transform() through the upstream
-  transformer). **VERIFIED end-to-end (2026-08-12)**: `examples/svelte` (a minimal
-  canary — `View`/`Text`/`Switch`/`Pressable`/`ScrollView`, no navigation/third-party
-  native views yet, per explicit project scoping) built via a real local tarball
-  (`pnpm pack` from `adapters/svelte` + `file:` dependency, per
-  `<examples_vs_dot_examples>`) and bundled headlessly with the real RN CLI —
-  `npx react-native bundle --platform ios|android --entry-file index.js` — on BOTH
-  platforms, zero transform errors. Confirmed the output bundle contains
-  `svelte/internal/client` + `from_tree`/`set_custom_element_data` calls and
-  contains NO `lifecycle_function_unavailable` (the SSR-build crash string), proving
-  `unstable_conditionNames: ['browser']` actually resolved the client build on a
-  real Metro run, not just in Vitest. `svelte-check` on the example: 385 files, 0
-  errors, 0 warnings. Real simulator/device boot is the next stretch goal, not done
-  in this pass — a headless bundle is not proof the app actually renders on-device.
+§18_gaps := [
+  { gap: "no Animated.View (or any native-Animated binding)", evidence: "flagged independently by the Touchable batch (press-fade is a self-contained setTimeout tween reproducing Animated.timing's curve, no useNativeDriver) and the ScrollView batch (sticky headers render the reducer's debounced translateY as a stepped plain style update)", status: "not Svelte-specific — prerequisite for both, just not ported yet" },
+  { gap: "core/components/src/view/render-image/index.ts's prop-mapping helpers are module-private (normalizeSource, headersFromAliases, expandSrcSet, resolveSourceArray, readStyleString, readSourceUri)", status: "renderImage() itself IS called from image/index.svelte (verified 2026-08-12, fine) — the private helpers are a narrower gap: unreachable by a hand-written skeleton for a different component or a future generic bridge (§19) without its own copy", recommendation: "export from render-image/index.ts (not necessarily the top barrel)" },
+  { gap: "ScrollView's RefreshControl/onContentSizeChange wiring not INSIDE VirtualizedList's own minimal scroll host", cause: "VirtualizedList built before ScrollView landed (parallel agents), hand-authors a reduced raw symbiote-scroll-view host", followup: "swap VirtualizedList to render the real ScrollView component (picks up RefreshControl, onContentSizeChange, native sticky-header wrapping for free) — comment already left in virtualized-list/index.svelte" },
+  { gap: "stickyHeaderIndices/invertStickyHeaders auto-wrap not implemented on ScrollView", cause: "Svelte hands a component only an opaque Snippet — no Children.toArray(React)/slots.default()(Vue) equivalent to pull 'child at index N'", workaround: "compose ScrollViewStickyHeader manually — sticky-header context auto-wires to the parent's scroll offset, low-friction not automatic" },
+  { gap: "RefreshControl had no style field, so Android's wrap didn't split layout-vs-visual style", status: "RESOLVED post-2026-08-11 — refresh-control-props.ts now has style, scroll-view/index.svelte splits via splitLayoutProps same as elsewhere; verified closed 2026-08-15 during the docs-site Svelte-parity sweep, kept here per this skill's logs-are-an-asset convention" },
+  { gap: "SectionList/VirtualizedSectionList and multi-column FlatList compile-verified only (via svelte/compiler), not execution-verified by a smoke test", risk: "unlike VirtualizedList/FlatList's single-column path, which caught a real bug (§16) specifically BECAUSE a smoke test existed — real bugs could still be lurking" },
+  { gap: "Metro-side browser-condition fix + metro-svelte-transformer.cjs", status: "APPLIED 2026-08-12 (examples/svelte/metro.config.js), unit-tested (6 tests: client-runtime-only import, from_tree not from_html, set_custom_element_data routing, TS erasure, full upstream-transformer transform()). VERIFIED end-to-end: examples/svelte built via a real local tarball, bundled headlessly with the real RN CLI on iOS+Android, zero transform errors; output bundle confirmed to contain svelte/internal/client + from_tree/set_custom_element_data and NO lifecycle_function_unavailable; svelte-check 385 files/0 errors/0 warnings", open: "real simulator/device boot is the next stretch goal, not done in this pass — a headless bundle is not proof the app renders on-device" },
+]
 
-  **A second real bug this surfaced, orthogonal to the `browser`-condition one**:
-  `tsc --build` silently DROPS every `.svelte` file — it only ever emits
-  `.ts`→`.js`/`.d.ts`, so `adapters/svelte/build/components/switch/` had every
-  sibling `.ts` file compiled but no `index.svelte` at all, even though the
-  package's own compiled barrel (`build/components/index.js`) still literally
-  contains `export { default as Switch } from './switch/index.svelte'` — `tsc`
-  passes the specifier through unresolved without erroring (an ambient `declare
-module '*.svelte'` satisfies its type check) but never copies the file the
-  specifier points at. Exit code 0, no warning — this is NOT the same gap as
-  Vue's: Vue's own components are plain `.ts`/`.tsx` render functions
-  (`adapters/vue/src/components/switch/index.ts`), so Vue never hits this; Svelte
-  has no non-SFC authoring form, so every one of this adapter's own 24 components
-  IS a `.svelte` file that must ship as raw source for a CONSUMING app's own Metro
-  transformer to compile (same principle as `examples/vue-sfc`'s own `*.vue`
-  screens shipping as raw source, one layer inward). Fixed generically — not
-  Svelte-specific by name — via `scripts/copy-svelte-sources.mjs` (mirrors
-  `scripts/fix-esm-extensions.mjs`'s pattern: discovers every publishable package
-  via `publishablePackageEntries()`, copies any `src/**/*.svelte` to the matching
-  `build/` path), wired into root `prepublish-build` right after `fix-esm-
-extensions`. A future package authored the same way is covered automatically.
+**A second real bug, orthogonal to the browser-condition one:** `tsc --build`
+silently DROPS every `.svelte` file — it only emits `.ts`→`.js`/`.d.ts`, so
+`adapters/svelte/build/components/switch/` had every sibling `.ts` compiled
+but no `index.svelte`, even though the compiled barrel
+(`build/components/index.js`) still literally contains
+`export { default as Switch } from './switch/index.svelte'` — `tsc` passes an
+unresolved specifier through without erroring (an ambient `declare module
+'*.svelte'` satisfies its type check) but never copies the file. Exit code 0,
+no warning. **Not the same gap as Vue's** (Vue's components are plain
+`.ts`/`.tsx`, never hit this) — Svelte has no non-SFC authoring form, so every
+one of this adapter's 24 components IS a `.svelte` file that must ship as raw
+source. **Fixed** generically via `scripts/copy-svelte-sources.mjs` (mirrors
+`scripts/fix-esm-extensions.mjs`'s pattern: discovers every publishable
+package, copies `src/**/*.svelte` to the matching `build/` path), wired into
+root `prepublish-build` right after `fix-esm-extensions`.
 
 ## §19. `descriptorToSvelte` — BUILT (2026-08-12): `adapters/svelte/src/descriptor-to-svelte.ts`
 
@@ -2150,67 +1673,29 @@ Real simulator/device boot remains the next, not-yet-taken step.
 
 ## Sticky headers must ride the NATIVE driver — never force the JS path (2026-08-13)
 
-`nativeStickyAvailable` is resolved dynamically in both `scroll-view/index.svelte` and
-`virtualized-list/index.svelte`, mirroring React (`hasStickyHeaders && isNativeAnimatedAvailable()`).
-It was previously hardcoded `false`, and that single line was the Android sticky failure.
-
-The reasoning that led there was half right. The observation is real and device-confirmed: attach
-the scroll value to the native driver up front and the sticky header's interpolation listener never
-fires again, because `AnimatedWithChildren.__callListeners` stops cascading into a native subtree.
-The wrong step was concluding the header therefore needs the JS path.
-
-**Check RN before treating an engine behavior as a defect.** RN carries the identical gate
-(`AnimatedWithChildren.js:74 if (!this.__isNative)`), and native-to-JS value streaming
-(`startListeningToAnimatedNodeValue`) lives ONLY on `AnimatedValue`, never on an interpolation node
-— so that listener is silent under RN too, and RN's sticky headers work regardless. The reason:
-**the listener never drove the pin.** The visible pin IS the native transform; the listener only
-feeds the debounced committed transform used for hit-testing, which is why
-`ScrollViewStickyHeader.js` registers it solely `if (isFabric)`.
-
-Forcing the JS path to keep that listener alive trades the whole native driver for a hit-testing
-detail and puts the pin on the JS thread. Symptom split by platform, because the commit debounce is
-platform-specific (`render-scroll-sticky.ts`): 64ms on iOS so the pin merely drifts and reads as
-"mostly fine"; 15ms on Android where it fails outright. **A platform-split symptom in an otherwise
-shared component points at a platform-tuned constant, not at framework-specific code.**
-
-Locked in by `core/engine/src/animated/sticky-native-promotion-listener.test.ts`, a CHARACTERIZATION
-test asserting the listener DOES go quiet after promotion. It looks like it is asserting a bug; it
-is asserting RN parity. Do not "fix" the engine to make it tick — that is the divergence, and it
-would re-open the door to hardcoding the JS path again.
+§stickyheaders_native_driver := {
+  bug: "nativeStickyAvailable was hardcoded false in scroll-view/index.svelte and virtualized-list/index.svelte — the Android sticky-header failure",
+  fix: "resolve it dynamically, mirroring React: hasStickyHeaders && isNativeAnimatedAvailable()",
+  half_right_reasoning: "attaching the scroll value to the native driver up front DOES silence the sticky header's interpolation listener (AnimatedWithChildren.__callListeners stops cascading into a native subtree) — that observation is real and device-confirmed",
+  wrong_conclusion: "that the header therefore needs the JS path",
+  check_before_fixing: "RN carries the IDENTICAL gate (AnimatedWithChildren.js:74 `if (!this.__isNative)`), and native-to-JS value streaming (startListeningToAnimatedNodeValue) lives ONLY on AnimatedValue, never an interpolation node — so the listener is silent under RN too, and RN's sticky headers work regardless. The listener never drove the pin: the visible pin IS the native transform; the listener only feeds the debounced committed transform used for hit-testing (ScrollViewStickyHeader.js registers it solely `if (isFabric)`)",
+  cost_of_forcing_js: "trades the whole native driver for a hit-testing detail, puts the pin on the JS thread",
+  platform_split_explained: "commit debounce is platform-specific (render-scroll-sticky.ts): 64ms iOS ⟶ pin merely drifts, reads 'mostly fine'; 15ms Android ⟶ fails outright. A platform-split symptom in an otherwise-shared component points at a platform-tuned constant, not framework-specific code",
+  locked_in_by: "core/engine/src/animated/sticky-native-promotion-listener.test.ts — a CHARACTERIZATION test asserting the listener DOES go quiet after promotion. It looks like it asserts a bug; it asserts RN parity",
+  do_not: "'fix' the engine to make the listener tick — that IS the divergence, and would re-open the door to hardcoding the JS path again",
+}
 
 ## Never store Svelte's rest-props object as "previous state" (2026-08-13)
 
-Svelte hands a component the **same** rest-props object on every reactive tick — it mutates what
-the keys resolve to instead of allocating a new one. Any memo/skip/dirty-check that keeps `rest`
-itself as its previous value therefore compares that proxy **against itself**, reading the same
-current values through both sides, and can never report a change:
-
-```ts
-lastRest = rest; // WRONG — same proxy next tick
-const changed = !shallowEqual(lastRest, rest); // structurally always false
-lastRest = { ...rest }; // RIGHT — snapshot of the values
-```
-
-This shipped in `modules/animated/animated-props-runtime.ts` and cost most of a debugging session.
-Effect: `reconcile` skipped forever after the first call, so each rebuilt `AnimatedInterpolation`
-(a brand-new node on every `rebuild-interpolation`) never reached the native graph. The view stayed
-wired to the FIRST interpolation, built before measurement with range `[-1,0,0,1] -> [0,0,0,1]` —
-one pixel of travel, which on device reads as "the sticky header ignores scrolling entirely".
-
-Why it hid for so long: on the JS-driven path a constant stream of passthrough ticks changed other
-props, so `reconcile` re-ran anyway and eventually picked the new node up. Moving sticky headers to
-the native driver removed that noise and exposed the dead comparison. **A skip that only works
-because something else is churning is not working.**
-
-Deep comparison is NOT the fix and would break it further: `rest.style` holds live `AnimatedNode`s
-in a circular parent↔children graph (hence `describeTransform` instead of `JSON.stringify`), and
-the signal being detected is _"this is a different node object"_ — identity, not value equality.
-Two interpolations with similar fields must count as a change.
-
-Locked in by `modules/animated/animated-props-rest-proxy.test.ts`. Note `wantsNative: true` there
-is load-bearing: the skip is gated on the leaf already being native, so a JS-only reconcile never
-skips and would not reproduce the bug at all — an earlier version of that test passed against the
-broken code for exactly this reason.
+§restprops_identity := {
+  root_cause: "Svelte hands a component the SAME rest-props object every reactive tick — it mutates what the keys resolve to instead of allocating a new one. Any memo/skip/dirty-check keeping `rest` itself as its previous value compares that proxy AGAINST ITSELF, reading the same current values through both sides, and can never report a change",
+  wrong_vs_right: "```ts\nlastRest = rest; // WRONG — same proxy next tick\nconst changed = !shallowEqual(lastRest, rest); // structurally always false\nlastRest = { ...rest }; // RIGHT — snapshot of the values\n```",
+  shipped_in: "modules/animated/animated-props-runtime.ts — cost most of a debugging session",
+  effect: "reconcile skipped forever after the first call, so each rebuilt AnimatedInterpolation (a brand-new node on every rebuild-interpolation) never reached the native graph. The view stayed wired to the FIRST interpolation, built before measurement, range [-1,0,0,1]->[0,0,0,1] — one pixel of travel, reading on device as 'the sticky header ignores scrolling entirely'",
+  why_it_hid: "on the JS-driven path a constant stream of passthrough ticks changed other props, so reconcile re-ran anyway and eventually picked up the new node. Moving sticky headers to the native driver removed that noise and exposed the dead comparison — a skip that only works because something else is churning is not working",
+  not_the_fix: "deep comparison — rest.style holds live AnimatedNodes in a circular parent↔children graph (hence describeTransform instead of JSON.stringify); the signal being detected is 'this is a different node object' — IDENTITY, not value equality. Two interpolations with similar fields must still count as a change",
+  locked_in_by: "modules/animated/animated-props-rest-proxy.test.ts — `wantsNative: true` there is load-bearing: the skip is gated on the leaf already being native, so a JS-only reconcile never skips and would not reproduce the bug at all (an earlier version of the test passed against the broken code for exactly this reason)",
+}
 
 ## §22. Directives, clsx `class`, and `{@attach}` — the element-vs-component split (2026-08-14)
 
@@ -2714,52 +2199,19 @@ produce when they break):
 - `adapters/svelte/src/async-blocks.smoke.test.ts` — the same two constructs compiled with
   `experimental: { async: true }`.
 
-### Why the async-mode file has to exist separately
+§await_boundary_async_gate := {
+  why_separate_file: "should_defer_append() (dom/operations.js:227) returns false unless async_mode_flag is set, so BranchManager's offscreen branch and <svelte:boundary>'s pending snippet — the document.createDocumentFragment() calls at dom/blocks/boundary.js:272/305 and dom/blocks/branches.js:142/192 — are UNREACHABLE under this repo's own svelte.config.js options. The flag is a module side effect the compiler injects (import 'svelte/internal/flags/async') with no supported way back within a process, so those cases need their own file; vitest isolates each file's module registry and the full run confirms no leakage",
+}
 
-`should_defer_append()` (`dom/operations.js:227`) returns `false` unless `async_mode_flag` is set,
-so `BranchManager`'s offscreen branch and `<svelte:boundary>`'s `pending` snippet — i.e. the
-`document.createDocumentFragment()` calls at `dom/blocks/boundary.js:272/305` and
-`dom/blocks/branches.js:142/192` — are UNREACHABLE with this repo's own `svelte.config.js` options.
-The flag is turned on by a module side effect the compiler injects
-(`import 'svelte/internal/flags/async'`) and there is no supported way back within a process, so
-those cases need their own file; vitest isolates each test file's module registry, and the full run
-confirms no leakage.
-
-### The bug: `detachFromParent` never unlinked the ENGINE node
-
-`shim-node.ts`'s module-level `detachFromParent()` removed a node from its shim parent's `children`
-array and nulled `parent`, but left the `ISymbioteNode` attached to the old engine parent. It went
-unnoticed because the common path hides it: `insertOne` immediately calls
-`engineAppendChild(newParent, …)`, and the engine's own `appendChild`/`insertBefore`
-(`core/engine/src/node.ts:277/283`) start with a `detach(child)` — so a live→live move self-heals.
-
-It does NOT self-heal when the new parent has no engine node of its own. That is exactly a live node
-appended into an offscreen `DocumentFragment`: `insertOne`'s whole engine half is skipped, so
-nothing ever unlinks the old attachment and **Fabric keeps painting a subtree Svelte believes is
-offscreen**. Real DOM's `fragment.append(liveNode)` takes the node out of the document; the shim's
-did not.
-
-Svelte does that move in three places — all of them the deferred machinery §17 already burned us
-in: `dom/blocks/branches.js:142` (an onscreen branch parked for a later batch),
-`dom/blocks/each.js:156` (`destroy_effects` preserving an item a pending batch still needs), and
-`dom/blocks/boundary.js:306` (`move_effect` of the main effect while a `pending` snippet shows).
-
-**Fix**: `detachFromParent()` now calls `engineRemoveChild(parentEngineNode, engineNode)` and
-`parent.surface?.requestCommit()` when both node and parent are live. The commit request is not
-optional — when the destination is a fragment, nothing downstream asks for one, so without it the
-removal would sit uncommitted.
-
-**Pinned by** `adapters/svelte/src/dom-shim/offscreen-fragment.test.ts`, driven against the shim API
-directly rather than through a compiled component: the Svelte-side trigger needs a specific
-multi-batch race, while the contract is one line of the DOM spec and is worth its own regression.
-Its second test covers the live→live reorder, so the extra unlink can never turn a keyed `{#each}`
-reorder into a drop.
-
-**Generalize this.** Same class as §17 and §11c: every one of these was the shim quietly diverging
-from a DOM rule in the offscreen/anchor machinery, and every one was invisible to `tsc`, to
-`svelte-check`, and to any assertion weaker than an exact committed-child list. When touching
-`shim-node.ts`, ask what the real DOM does with a node that is already in the document — not just
-what makes the current test pass.
+§await_boundary_offscreen_bug := {
+  bug: "shim-node.ts's module-level detachFromParent() removed a node from its shim parent's children array and nulled parent, but left the ISymbioteNode attached to the OLD engine parent",
+  why_hidden: "the common path self-heals: insertOne immediately calls engineAppendChild(newParent, …), and the engine's own appendChild/insertBefore (core/engine/src/node.ts:277/283) start with detach(child) — so a live→live move self-heals",
+  trigger: "does NOT self-heal when the new parent has no engine node of its own — exactly a live node appended into an offscreen DocumentFragment: insertOne's whole engine half is skipped, so nothing unlinks the old attachment and Fabric keeps painting a subtree Svelte believes is offscreen. Real DOM's fragment.append(liveNode) takes the node out of the document; the shim's did not",
+  reachable_from: ["dom/blocks/branches.js:142 (onscreen branch parked for a later batch)", "dom/blocks/each.js:156 (destroy_effects preserving an item a pending batch still needs)", "dom/blocks/boundary.js:306 (move_effect of the main effect while a pending snippet shows)"],
+  fix: "detachFromParent() now also calls engineRemoveChild(parentEngineNode, engineNode) and parent.surface?.requestCommit() when both node and parent are live — the commit request is not optional: when the destination is a fragment, nothing downstream asks for one, so without it the removal sits uncommitted",
+  pinned_by: "adapters/svelte/src/dom-shim/offscreen-fragment.test.ts, driven against the shim API directly (the Svelte-side trigger needs a specific multi-batch race; the contract is one line of the DOM spec). Its second test covers the live→live reorder, so the extra unlink can never turn a keyed {#each} reorder into a drop",
+  generalize: "same class as §17 and §11c — every one of these was the shim quietly diverging from a DOM rule in the offscreen/anchor machinery, invisible to tsc/svelte-check and to any assertion weaker than an exact committed-child list. When touching shim-node.ts, ask what real DOM does with a node already in the document — not just what makes the current test pass",
+}
 
 ### A harness note worth reusing: `{@const}` in a snippet is LAZY
 
@@ -3091,162 +2543,62 @@ Svelte did not, and the seam it depends on is the Svelte-specific one.
 
 ## §28. HMR silently no-ops on `.svelte` files - react-refresh misreads a compiled component as a React one, FIXED 2026-08-17
 
-Symptom: edit a `.svelte` file while Metro dev server is running - nothing
-happens on device, no error, no reload. Confirmed working for Vue/React/Angular
-in this monorepo; broken only for Svelte, which is why it reads as "Svelte in
-general has no HMR" rather than an app bug.
-
-Root cause, traced through the served dev bundle (`examples/svelte`, Metro
-0.84.4, `curl .../index.bundle?platform=ios&dev=true`), not guessed:
-
-1. Svelte 5's compiler (`generate: 'client'`) compiles every `.svelte` file to
-   a plain top-level function named after the file - `function App($$anchor,
-   $$props) {...}` - the module's default export.
-2. Metro's bundled HMR runtime (`metro-runtime/src/polyfills/require.js`,
-   `metroHotUpdateModule`) decides per module whether an update can hot-patch
-   in place or must fall back to a full reload, via
-   `isReactRefreshBoundary(Refresh, moduleExports)` ->
-   `Refresh.isLikelyComponentType(moduleExports)`.
-3. `isLikelyComponentType` (from `react-refresh/runtime`, bundled into every
-   RN dev build) is a pure shape heuristic with zero framework awareness:
-   `typeof export === 'function'` and (empty prototype or none) and
-   `/^[A-Z]/.test(export.name)`. It has no way to tell whether react-reconciler
-   is even running.
-4. A Svelte-compiled component matches exactly - function, capitalized name
-   from the filename - so Metro treats it as a refresh boundary, calls
-   `Refresh.register(...)`, then `Refresh.performReactRefresh()`.
-5. `performReactRefresh()` walks React's own Fiber tree (via the DevTools
-   global hook) for live instances of that "family" to patch. This adapter
-   never runs react-reconciler - there is no Fiber tree - so the walk finds
-   nothing and the update is silently swallowed. No exception: react-refresh
-   believes the refresh succeeded.
-
-Vue and Angular dodge the same machinery for opposite reasons: Vue's compiled
-SFC default-exports a plain object (`{ setup, render, ... }`), which fails the
-`typeof === 'function'` check outright; Angular's compiled output is a class.
-Both fall through Metro's inverse-dependency walk to "No root boundary" (the
-entry module has no parents) -> a real `DevSettings.reload()` full reload -
-what actually makes HMR visible for those two today. React gets genuine
-incremental Fast Refresh because a real Fiber tree exists to patch
-(react-reconciler is actually in the path there). Svelte is the one adapter
-whose compiled shape happens to look like a React component to a shape-only
-heuristic, with no Fiber tree underneath to back it up.
-
-**Fix**, in `examples/svelte/metro.config.js`'s `resolver`:
-
-```js
-unstable_forceFullRefreshPatterns: [/\.svelte$/],
-```
-
-Metro's own escape hatch for this exact false positive
-(`resolver.unstable_forceFullRefreshPatterns: ReadonlyArray<RegExp>`) -
-embedded into the bundle prelude as a literal global assignment by
-`metro/src/lib/getPreludeCode.js`, read by `metroHotUpdateModule` before the
-react-refresh boundary check runs. Matches against the module's Metro
-`verboseName`, confirmed via the served bundle to be the plain source-relative
-path (a top-level `App.svelte` registers as `verboseName === "App.svelte"`),
-so a bare `/\.svelte$/` suffix match is correct regardless of subdirectory.
-Every `.svelte` update now forces `performFullRefresh` unconditionally,
-landing on the same `DevSettings.reload()` path that already works for
-Vue/Angular.
-
-Verified by rebuilding the dev bundle after the config change and grepping it:
-the prelude contains `__unstable_forceFullRefreshPatterns=[/\.svelte$/]`, and
-`metroHotUpdateModule`'s pattern-match branch reads that exact global. Not
-verified on a running simulator/device - confirmed the fix reaches the
-bundle/runtime wiring, not confirmed by watching a live screen update.
-
-**Gap, not yet closed**: this line lives only in
-`examples/svelte/metro.config.js` - a per-app `resolver` option, matching how
-`sourceExts`, `unstable_conditionNames`, and the `esm-env` `resolveRequest`
-redirect already live per-example rather than centralized (unlike the
-transformer, shipped as `@symbiote-native/svelte/metro-svelte-transformer`
-precisely so no consuming app needs local wiring). Any other app on
-`@symbiote-native/svelte` - including the future `create-symbiote` scaffolder
-- needs this same line added by hand today, or it hits the identical
-silent-no-op bug. A `@symbiote-native/svelte/metro-config` helper shipping
-this the way the transformer is shipped has not been done.
+§28_hmr_noop := {
+  symptom: "edit a .svelte file while Metro dev server runs — nothing happens on device, no error, no reload. Confirmed working for Vue/React/Angular; broken only for Svelte",
+  root_cause_chain: [
+    "Svelte 5's compiler (generate:'client') compiles every .svelte file to a plain top-level function named after the file — `function App($$anchor, $$props) {...}` — the module's default export",
+    "Metro's bundled HMR runtime (metro-runtime/src/polyfills/require.js, metroHotUpdateModule) decides per-module hot-patch vs full-reload fallback via isReactRefreshBoundary(Refresh, moduleExports) -> Refresh.isLikelyComponentType(moduleExports)",
+    "isLikelyComponentType (react-refresh/runtime, bundled into every RN dev build) is a pure shape heuristic with ZERO framework awareness: typeof export==='function' AND (empty/no prototype) AND /^[A-Z]/.test(export.name) — no way to tell whether react-reconciler is even running",
+    "a Svelte-compiled component matches exactly, so Metro treats it as a refresh boundary and calls Refresh.register(...) then Refresh.performReactRefresh()",
+    "performReactRefresh() walks React's own Fiber tree (via the DevTools global hook) for live instances to patch. This adapter never runs react-reconciler — no Fiber tree — so the walk finds nothing and the update is silently swallowed, with NO exception (react-refresh believes it succeeded)",
+  ],
+  why_vue_angular_dodge_it: "Vue's compiled SFC default-exports a plain object ({setup, render, ...}), failing typeof==='function' outright; Angular's compiled output is a class. Both fall through Metro's inverse-dependency walk to 'No root boundary' -> a real DevSettings.reload() full reload — what actually makes HMR visible for them today. React gets genuine incremental Fast Refresh because a real Fiber tree exists to patch. Svelte is the one adapter whose compiled shape happens to LOOK like a React component to a shape-only heuristic, with no Fiber tree underneath to back it up",
+  fix: "examples/svelte/metro.config.js resolver: `unstable_forceFullRefreshPatterns: [/\\.svelte$/]` — Metro's own escape hatch for this false positive, embedded into the bundle prelude by metro/src/lib/getPreludeCode.js and read by metroHotUpdateModule before the react-refresh boundary check. Matches against the module's Metro verboseName (confirmed via the served bundle to be the plain source-relative path, e.g. a top-level App.svelte registers as verboseName==='App.svelte'), so a bare /\\.svelte$/ suffix match is correct regardless of subdirectory — every .svelte update now forces performFullRefresh, landing on the same DevSettings.reload() path already working for Vue/Angular",
+  verified: "rebuilt the dev bundle after the config change and grepped it: prelude contains `__unstable_forceFullRefreshPatterns=[/\\.svelte$/]`, and metroHotUpdateModule's pattern-match branch reads that exact global",
+  not_verified: "not confirmed on a running simulator/device — confirmed the fix reaches the bundle/runtime wiring, not confirmed by watching a live screen update",
+  open: "the fix line lives ONLY in examples/svelte/metro.config.js — a per-app resolver option (matching how sourceExts, unstable_conditionNames, and the esm-env resolveRequest redirect already live per-example), unlike the transformer which ships centrally as @symbiote-native/svelte/metro-svelte-transformer. Any other app on @symbiote-native/svelte — including the future create-symbiote scaffolder — needs this same line added by hand today or hits the identical silent-no-op bug. A @symbiote-native/svelte/metro-config helper shipping this centrally has not been done",
+}
 
 ## §29. `prettier-plugin-svelte --write` reintroduces §16's whitespace bug, plus a separate svelte-check regression - MEASURED 2026-08-17
 
-`examples/svelte` had no Prettier support for `.svelte` at all before this date (no
-parser registered, `prettier --check` failed with "No parser could be inferred").
-Adding `prettier-plugin-svelte` and running `prettier --write` across the example
-(28 files) reformatted every file - and among those changes, silently reintroduced
-exactly the two bugs §16 already named, in real shipped code, not a contrived case:
-
-1. **3 stray whitespace-only text nodes between siblings**, all in
-   `components/ParityDemo.svelte`, all at points where the source was originally
-   packed edge-to-edge (`></Text><SectionList` with zero characters between) and
-   Prettier's line-wrapping inserted a real newline + indent between two sibling
-   tags while wrapping a long line - the exact §16 hazard, produced by the
-   formatter meant to keep the file tidy.
-2. **13 sentences wrapped across multiple source lines inside a single `<Text>`
-   node**, across 10 files - including one in `CanaryScreen.svelte` sitting
-   *right next to an existing HTML-comment guard* warning against exactly this
-   ("one physical line on purpose: unlike Vue's template compiler, Svelte does
-   NOT condense whitespace inside a text node..."). Prettier's printWidth-driven
-   text wrapping does not read source comments and reflowed it anyway.
-3. **A separate, non-DOM regression**: reformatting a `<SectionList>`'s two
-   `{#snippet}` children from one packed line into individual indented lines
-   changed nothing about the committed Fabric tree (snippet declarations are not
-   DOM siblings, §16 already covers why) but broke `svelte-check`
-   (`0 errors` -> `'children' does not exist in type 'IVirtualizedSectionListProps'`),
-   apparently by changing how `svelte2tsx` attributes the two named snippets.
-   Reverting that one block to a single physical line fixed it with no other
-   change. Not fully root-caused; recorded as a measured fact, not a theory.
-
-**Practical rule: `prettier --write` on any file under `examples/svelte` (or this
-package's own `.svelte` sources) is not safe to trust blind.** After any Prettier
-run - manual, editor-on-save, or scripted - both of:
-
-```
-node scripts/audit-svelte-stray-whitespace.mjs <path>   # must report 0 / 0
-cd examples/svelte && npm run typecheck                  # svelte-check must stay 0 errors
-```
-
-A 0/0 audit result does not imply svelte-check is also clean - (3) is invisible
-to the audit script entirely, since it never touches the DOM tree. Both checks
-are required, not either. `.prettierrc.js` registers `prettier-plugin-svelte` with
-`htmlWhitespaceSensitivity` left at its default (`css`) - switching it to `strict`
-was considered as a hardening measure but not verified to eliminate case (1); do not
-assume it does without re-running both checks above against a real reformat.
+§29_prettier_regression := {
+  setup: "examples/svelte had NO Prettier support for .svelte before this date (no parser registered, `prettier --check` failed with 'No parser could be inferred')",
+  action: "added prettier-plugin-svelte, ran `prettier --write` across the example (28 files)",
+  findings: [
+    { n: 1, bug: "3 stray whitespace-only text nodes between siblings, all in components/ParityDemo.svelte", cause: "source was originally packed edge-to-edge (`></Text><SectionList` zero chars); Prettier's line-wrapping inserted a real newline+indent between two sibling tags while wrapping a long line — exactly §16's hazard, produced by the formatter meant to keep the file tidy" },
+    { n: 2, bug: "13 sentences wrapped across multiple source lines inside a single <Text> node, across 10 files", note: "including one in CanaryScreen.svelte sitting RIGHT NEXT TO an existing HTML-comment guard warning against exactly this ('one physical line on purpose: unlike Vue's template compiler, Svelte does NOT condense whitespace inside a text node...'). Prettier's printWidth-driven text wrapping does not read source comments and reflowed it anyway" },
+    { n: 3, bug: "a separate, non-DOM regression — reformatting a SectionList's two {#snippet} children from one packed line into individual indented lines changed NOTHING about the committed Fabric tree (snippet declarations aren't DOM siblings, §16 already covers why) but broke svelte-check: `0 errors` -> `'children' does not exist in type 'IVirtualizedSectionListProps'`, apparently by changing how svelte2tsx attributes the two named snippets. Reverting that one block to a single physical line fixed it with no other change", status: "NOT fully root-caused — recorded as a measured fact, not a theory" },
+  ],
+  findings_1_and_2_SUPERSEDED_2026-08-17: "both are the whitespace shapes §30's collapseTextWhitespace() now fixes at build time — Prettier's line-wrapping and text reflow are no longer hazards. Finding (3) is NOT superseded and remains the reason this section exists",
+  rule: "`prettier --write` on any file under examples/svelte (or this package's own .svelte sources) is not safe to trust blind — because of finding (3), a svelte-check regression the preprocessor cannot touch. After any Prettier run (manual, editor-on-save, or scripted), run BOTH:\n```\nnode scripts/audit-svelte-stray-whitespace.mjs <path>   # must report 0 / 0\ncd examples/svelte && npm run typecheck                  # svelte-check must stay 0 errors\n```",
+  caveat: "a 0/0 audit result does NOT imply svelte-check is also clean — finding (3) is invisible to the audit script entirely (never touches the DOM tree). Both checks are required, not either",
+  config_note: ".prettierrc.js registers prettier-plugin-svelte with htmlWhitespaceSensitivity left at its default (css) — switching to strict was considered as a hardening measure but NOT verified to eliminate case (1); do not assume it does without re-running both checks against a real reformat",
+}
 
 ## §30. `collapseTextWhitespace` - the manual one-line-text discipline is now AUTOMATED, verified on device (2026-08-17)
 
-§16 and §29 both describe the bug and demand hand discipline ("a text node's content stays on
-ONE source line, however long"; pack siblings edge-to-edge). A third preprocessor,
-`adapters/svelte/src/preprocessor/collapse-text-whitespace.ts` (`collapseTextWhitespace()`),
-now closes the wrapped-sentence half of that automatically, mirroring what Vue's template
-compiler already does - so an author CAN wrap a long sentence across source lines for
-readability and it no longer ships a literal `\n` + indent into the native text content.
+§30_collapse_text_whitespace := {
+  context: "§16 and §29 both describe the intra-text-node bug and demand hand discipline ('a text node's content stays on ONE source line')",
+  fix: "third preprocessor, adapters/svelte/src/preprocessor/collapse-text-whitespace.ts (collapseTextWhitespace()), mirrors what Vue's template compiler already does — an author CAN wrap a long sentence across source lines for readability and it no longer ships a literal \\n + indent into native text content",
+  mechanism: "walks every Text AST node (same nestedNodes walk shape as the other two preprocessors), collapses any whitespace run ([ \\t\\r\\n]+) to a single space. A node that becomes ENTIRELY whitespace after collapsing is deleted outright if the original contained a newline — closing §16's between-siblings hazard too, for the common case of writing each sibling on its own line — but is left as a single collapsed space if it had no newline, preserving an intentional same-line space (<Text>{a} {b}</Text>)",
+  residual_gap: "a whitespace-only gap between two siblings written on ONE line with no newline is not caught (indistinguishable from the intentional-space case without knowing whether the parent renders raw text) — scripts/audit-svelte-stray-whitespace.mjs remains the safety net for that narrow case and should still be run",
+  wiring: "registered in both svelte.config.js files (adapter's own and every consumer's, e.g. examples/svelte/svelte.config.js) AFTER scopedStyles(), and in metro-svelte-transformer.cjs as a third lazy-loaded preprocessor in the same chain",
+  verified: "past unit-test level, on the real Metro bundle and a real simulator: a throwaway TextWrapProbeScreen.svelte (two <Text> blocks, one deliberately wrapped across source lines, one on one line) rendered IDENTICALLY on iOS 26.5/iPhone 17 after the preprocessor was wired in and @symbiote-native/svelte repacked+reinstalled into examples/svelte. Before the preprocessor existed, the wrapped block visibly showed a forced line break plus stray leading spaces mid-sentence, exactly as §29 predicted; the fetched real index.bundle was independently grepped and confirmed zero embedded \\n in either block's compiled string",
+  known_limit: "line numbers are NOT preserved past an edited node (deliberate, unavoidable tradeoff here — unlike scopedStyles's line-preserving blankOut trick), so a diagnostic below an edited node may point a few lines off. No source map is emitted, matching the other two preprocessors",
+}
 
-Mechanism: walks every `Text` AST node (same `nestedNodes` walk shape as the other two
-preprocessors) and collapses any whitespace run (`[ \t\r\n]+`) to a single space. A node that
-becomes ENTIRELY whitespace after collapsing is deleted outright (0 characters) if the original
-contained a newline - closing §16's between-siblings hazard too, for the common case of writing
-each sibling on its own line - but is left as a single collapsed space if it had no newline,
-preserving an intentional same-line space (`<Text>{a} {b}</Text>`). The one residual, documented
-gap: a whitespace-only gap between two siblings written on ONE line with no newline is not
-caught (indistinguishable from the intentional-space case without knowing whether the parent
-renders raw text) - `scripts/audit-svelte-stray-whitespace.mjs` remains the safety net for that
-narrow case and should still be run, not skipped.
+---
 
-Registered in both `svelte.config.js` files (adapter's own and every consumer's, e.g.
-`examples/svelte/svelte.config.js`) AFTER `scopedStyles()`, and wired into
-`metro-svelte-transformer.cjs` as a third lazy-loaded preprocessor in the same chain - so it
-protects both svelte-check/editor diagnostics and the real Metro build, matching the other two.
+## §31. The audit script was compiling RAW source — which is why the packed style survived §30 (2026-08-19)
 
-**Verified past the unit-test level, on the actual Metro bundle and a real simulator**: a
-throwaway `TextWrapProbeScreen.svelte` (two `<Text>` blocks, one deliberately wrapped across
-source lines, one on one line) rendered IDENTICALLY on an iOS 26.5 / iPhone 17 simulator after
-this preprocessor was wired in and `@symbiote-native/svelte` was repacked and reinstalled into
-`examples/svelte` - before this preprocessor existed, the wrapped block visibly showed a forced
-line break plus stray leading spaces mid-sentence, exactly as §29 predicted from the compiled
-`$.text(...)` call alone; the fetched real `index.bundle` was independently grepped and
-confirmed zero embedded `\n` in either block's compiled string.
-
-Line numbers are NOT preserved past an edited node (see the preprocessor's own header for why
-this is a deliberate, unavoidable tradeoff here, unlike `scopedStyles`'s line-preserving
-`blankOut` trick) - a diagnostic below an edited node may point a few lines off. No source map
-is emitted, matching the other two preprocessors.
+§31_audit_skipped_preprocess := {
+  bug: "scripts/audit-svelte-stray-whitespace.mjs called compile(rawSource) and never ran preprocess() ⟶ it reported exactly the two shapes §30 fixes at build time",
+  consequence: "§16's edge-to-edge rule and §16b's one-line-text rule outlived the preprocessor that obsoleted them, because the tool everyone verified against still said they were violations. Measured on one file: 32 stray separators + 2 wrapped text nodes reported, ZERO of them real",
+  fix: "preprocess(raw, collapseTextWhitespace(), {filename}) → compile(preprocessed). Imports adapters/svelte/build/preprocessor/collapse-text-whitespace.js directly — the package's own './collapse-text-whitespace' export points at the .ts source for in-repo consumers (Metro/tsc read live TS) and plain node cannot load it",
+  guard: "exits 2 when adapters/svelte/build/ is absent ⟶ never silently degrades to auditing raw source, which is the failure that caused this",
+  after: "97 files scanned · 0 stray separators · 0 wrapped text nodes (default roots)",
+  style_rule_now: "write ORDINARY readable Svelte — real indentation, siblings on their own lines, long sentences wrapped. Same as Vue. The packed edge-to-edge markup still in older files is legacy, not a requirement",
+  verified: "examples/svelte/screens/BenchmarkScreen.svelte rewritten readably (whole markup, ~200 lines) then compiled through the real preprocess chain: 0 whitespace-only literals, 0 text nodes carrying a newline. svelte-check 601 files / 0 errors / 0 warnings",
+  still_uncaught: "same-LINE whitespace-only gap between two siblings (`<View><A /> <B /></View>`) — indistinguishable from an intentional inline space; normal formatting does not produce one",
+  also_updated: ".claude/rules/svelte-prettier-whitespace-safety.md — it claimed the sibling-gap case still needed hand-enforcing, which was wrong for the cross-line case",
+}
