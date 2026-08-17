@@ -4,7 +4,7 @@
 // canary: a known-good driver exercising shared end to end.
 
 import createReconciler from 'react-reconciler';
-import { createContext } from 'react';
+import { createContext, version as reactVersion } from 'react';
 import {
   appendChild,
   createElement,
@@ -211,5 +211,33 @@ const reconciler = createReconciler<
   suspendInstance: () => {},
   waitForCommitToBeReady: () => null,
 });
+
+// react-dom registers into React DevTools' global hook automatically; a custom
+// react-reconciler renderer does not get this for free (react-three-fiber, ink,
+// react-pixi all call this explicitly). Without it, __REACT_DEVTOOLS_GLOBAL_HOOK__
+// stays installed (RN's own setUpReactDevTools.js does that unconditionally in
+// every __DEV__ bundle) but its `renderers` map stays empty, so the Components/
+// Profiler tabs show "Loading React Element Tree..." forever even though we have
+// a real Fiber tree to show. findFiberByHostInstance is omitted: it powers
+// click-to-select "inspect element" only, and needs a Fiber<->ISymbioteNode
+// lookup we don't have yet.
+//
+// Read off globalThis, not the bare `__DEV__` identifier: RN owns that global
+// (declared `const __DEV__: boolean` inside `declare global` in its own
+// globals.d.ts) but only Metro/RN's runtime ever installs it — under vitest
+// (no Metro, no RN bootstrap) the bare identifier throws ReferenceError,
+// which broke 61 of 68 test suites in this package the first time this was
+// tried. `globalThis.__DEV__` doesn't typecheck either: TS only merges `var`
+// globals into `typeof globalThis`, and RN declares this one `const`. Reflect.get
+// + a runtime guard sidesteps both, per this repo's ambient-global-declarations
+// rule for a global RN already owns.
+const isDevBuild: unknown = Reflect.get(globalThis, '__DEV__');
+if (isDevBuild === true) {
+  reconciler.injectIntoDevTools({
+    bundleType: 1,
+    version: reactVersion,
+    rendererPackageName: '@symbiote-native/react',
+  });
+}
 
 export default reconciler;
