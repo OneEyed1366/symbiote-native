@@ -12,6 +12,15 @@
 // sentence wrapped across source lines ships its literal newline + indent into the RCTText: the
 // device renders a line break and a run of spaces mid-sentence. Not caught by the §16 check
 // (that one only sees text nodes that are ENTIRELY whitespace), so it's a separate pass.
+//
+// BOTH passes run on PREPROCESSED source, which is the only thing that makes this audit mean
+// anything. `collapseTextWhitespace()` is registered in every svelte.config.js, so it is part of
+// the real build: it deletes a whitespace-only node that spans a newline and collapses a wrapped
+// sentence. Auditing raw source reports both shapes as offences even though the build fixes them,
+// and that false positive is what forced .svelte markup here to be written packed edge-to-edge for
+// a while. What survives preprocessing is the genuinely uncaught case: a whitespace-only gap
+// between two siblings on ONE line (`<View><A /> <B /></View>`), which the preprocessor cannot
+// tell from an intentional inline space.
 
 import { readFileSync } from 'node:fs';
 import { globSync } from 'node:fs';
@@ -21,7 +30,28 @@ import { relative } from 'node:path';
 // pnpm keeps node_modules isolated per package, and `svelte` is a devDependency of
 // adapters/svelte — not of the repo root — so resolve from there, not from this script.
 const require = createRequire(new URL('../adapters/svelte/package.json', import.meta.url));
-const { compile, parse } = require('svelte/compiler');
+const { compile, parse, preprocess } = require('svelte/compiler');
+
+// The package's own `./collapse-text-whitespace` export points at the .ts source for in-repo
+// consumers (Metro and tsc read live TS), which plain node cannot load — so reach for the build
+// output. Missing build = auditing raw source = every readable file reported as an offender, so
+// this fails loudly rather than producing a wrong report.
+const COLLAPSE_BUILD = new URL(
+  '../adapters/svelte/build/preprocessor/collapse-text-whitespace.js',
+  import.meta.url,
+);
+let collapseTextWhitespace;
+try {
+  ({ collapseTextWhitespace } = await import(COLLAPSE_BUILD.href));
+} catch {
+  console.error(
+    'audit-svelte-stray-whitespace: adapters/svelte build output missing.\n' +
+      'Run `pnpm typecheck` (which emits build/) first — auditing raw source would report every\n' +
+      'normally-formatted file as an offender.',
+  );
+  process.exit(2);
+}
+const collapse = collapseTextWhitespace();
 
 // Walks any parsed node shape looking for Text nodes whose real content spans source lines.
 // Reads the AST through plain structural checks rather than a pinned type, the same discipline
@@ -57,7 +87,8 @@ const offenders = [];
 const wrapped = [];
 
 for (const file of files.sort()) {
-  const source = readFileSync(file, 'utf8');
+  const raw = readFileSync(file, 'utf8');
+  const { code: source } = await preprocess(raw, collapse, { filename: file });
   // Same options svelte.config.js uses — `fragments: 'tree'` is what emits the from_tree([...])
   // array the stray single-space entries show up in.
   const result = compile(source, {
