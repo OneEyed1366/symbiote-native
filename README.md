@@ -43,23 +43,26 @@ core, N thin adapters.
 ## Why Not NativeScript, Lynx, or Just React Native?
 
 Every existing answer to "native UI without React lock-in" forces a trade this project
-doesn't. The demand is real — ByteDance built an entire rendering engine (Lynx) around
-exactly this promise — but each option gives up something structural:
+doesn't. The demand is real - Tencent's Hippy and ByteDance's Lynx both ship multi-framework
+native UI at real production scale - but each option gives up something structural:
 
-|                      | Native layer                                                                           | Frameworks                                                                          | Native-module ecosystem                                               | The trade you make                                               |
-| -------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| **React Native**     | Fabric / Yoga / Hermes — the most battle-tested stack, maintained by Meta              | React only                                                                          | Thousands of packages: payments, maps, analytics are an `npm install` | React lock-in                                                    |
-| **NativeScript**     | Its own runtime + its own JS↔native bindings, carried by the NS team alone             | Vue, Angular, Svelte, React — flavors historically lag the core                     | Its own, far smaller and shrinking                                    | You leave the RN ecosystem behind entirely                       |
-| **Lynx** (ByteDance) | Its own new engine (PrimJS, dual-thread)                                               | Framework-agnostic on paper; ReactLynx is the only mature layer                     | Minimal — common integrations mean hand-written native bridging       | A ~1-year-old ecosystem and evolving APIs                        |
-| **SymbioteNative**   | **Stock, unforked React Native** — Meta keeps maintaining it, you keep upstream merges | React, Vue 3, Angular, Svelte shipping today; Solid is the same thin-adapter recipe | RN's own, inherited at the native-view level                          | Solid adapter still pending; no `create-symbiote` scaffolder yet |
+|                       | Native layer                                                                            | Frameworks                                                                                             | Native-module ecosystem                                                    | The trade you make                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| **React Native**      | Fabric / Yoga / Hermes, the most battle-tested stack, maintained by Meta                 | React only                                                                                                 | Thousands of packages: payments, maps, analytics are an `npm install`         | React lock-in                                                         |
+| **NativeScript**      | Its own runtime + bindings, maintained by nstudio (core last commit Aug 14, 2026, releases every 2-4 weeks) | Angular active (`@nativescript/angular` 21.0.0, Jan 2026); Vue quiet since `3.0.2` in Oct 2025; Svelte's community fork stalled since Dec 2025, and the original `svelte-native` package hasn't shipped since Nov 2024 | Its own, real but a fraction of RN's                                          | Leave RN's ecosystem, and framework support quality varies sharply by which one you pick |
+| **Hippy** (Tencent)   | Its own C++ DOM + its own Flex layout engine, maintained by Tencent                      | React and Vue, both officially supported, shipping in QQ, QQ Music, and Tencent News (releases through Aug 2025) | Its own, real production scale but a separate ecosystem from RN's             | Leave RN's ecosystem for Tencent's, solid Vue support but on their roadmap |
+| **Lynx** (ByteDance)  | Its own new engine (PrimJS, dual-thread), launched March 2025                            | ReactLynx is the only framework that actually ships; Vue support is an unfinished community prototype     | Minimal, most integrations mean hand-written native bridging                  | A year-old ecosystem, and "framework-agnostic" is still a roadmap item, not what ships today |
+| **SymbioteNative**    | **Stock, unforked React Native**, Meta keeps maintaining it, you keep upstream merges   | React, Vue 3, Angular, Svelte shipping today; Solid is the same thin-adapter recipe                        | RN's own, inherited at the native-view level                                  | Solid adapter still pending; no `create-symbiote` scaffolder yet      |
 
-Read the table by its empty cell: NativeScript gives you multi-framework _without_ RN's
-ecosystem. Lynx gives you a new engine _without_ an ecosystem at all. React Native gives
-you the ecosystem — _only if you write React_. SymbioteNative is the only project sitting in the
-intersection: **any framework × React Native's proven native stack and ecosystem.** And
-because the native core is never forked, everything that hooks RN's internals — Detox,
-the debugger, native modules, the whole toolchain — works unchanged for every adapter
-(see [Testing](#testing)).
+NativeScript and Hippy each prove multi-framework native UI works at real scale, carrying
+their own native runtime alone. Lynx, a year into its own new engine, still ships React
+only. SymbioteNative is, as far as we've verified, the only one of these reusing React
+Native's own unforked Fabric/JSI/Yoga pipeline as the shared native backend - everyone
+else wrote their native layer from scratch. Different bet, not automatically a bigger
+one: it buys Meta's maintenance and the existing RN ecosystem, at the cost of staying
+inside what Fabric can already do. And because the native core is never forked, every
+tool that hooks RN's internals - Detox, the debugger, native modules - works unchanged
+across every adapter (see [Testing](#testing)).
 
 One honest caveat: a third-party RN package's _JS component_ is React-only by nature (it
 calls hooks internally), so non-React adapters reach third-party _native views_ through
