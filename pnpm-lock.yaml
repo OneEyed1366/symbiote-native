@@ -180,12 +180,6 @@ catalogs:
     pkg-pr-new:
       specifier: ^0.0.75
       version: 0.0.75
-    postcss:
-      specifier: ^8.4.49
-      version: 8.5.16
-    postcss-value-parser:
-      specifier: ^4.2.0
-      version: 4.2.0
     prettier:
       specifier: ^3.9.1
       version: 3.9.4
@@ -522,12 +516,6 @@ importers:
       lightningcss:
         specifier: 'catalog:'
         version: 1.32.0
-      postcss:
-        specifier: 'catalog:'
-        version: 8.5.16
-      postcss-value-parser:
-        specifier: 'catalog:'
-        version: 4.2.0
     devDependencies:
       '@types/less':
         specifier: 'catalog:'
@@ -14291,7 +14279,8 @@ snapshots:
       cssesc: 3.0.0
       util-deprecate: 1.0.2
 
-  postcss-value-parser@4.2.0: {}
+  postcss-value-parser@4.2.0:
+    optional: true
 
   postcss@8.5.16:
     dependencies:

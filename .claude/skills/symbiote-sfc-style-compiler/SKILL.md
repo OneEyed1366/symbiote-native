@@ -284,7 +284,9 @@ ONLY the properties that truly vary with press state —
 ```tsx
 <Pressable
   className="pressable-card"
-  style={({ pressed }) => ({ backgroundColor: pressed ? '#13243a' : '#0f1e30' })}
+  style={({ pressed }) => ({
+    backgroundColor: pressed ? '#13243a' : '#0f1e30',
+  })}
 />
 ```
 
@@ -407,7 +409,13 @@ came from inside a `:global()` wrapper, since `parseCSS`'s return shape
 from suffixing and from `__localScopedClassNames`, registering exactly like
 an unscoped class.
 
-## 5b. Compound selectors under scope — FIXED 2026-08-14 (was silently dead in Vue AND Svelte)
+## 5b. Compound selectors under scope — fixed for TWO of four forms 2026-08-14, the rest 2026-08-19
+
+> **Correction, 2026-08-19.** The 2026-08-14 fix below closed Vue `<style scoped>` and Svelte
+> `<style>` only. Compound rules stayed DEAD in **both CSS-Modules forms** — a standalone
+> `.module.css` and Vue's `<style module>` — for five more days, and the conformance test was
+> green the whole time because it covered `data-v-` (7 cases) and `svelte-` (8) and `__module__`
+> zero times. See §9 for the mechanism and the fix.
 
 **Symptom:** a `.card.big { }` rule inside a `<style scoped>` block (Vue) or a
 `<style>` block (Svelte) never applied. No warning, no error — the rule
@@ -583,6 +591,44 @@ hash of the file's own path (`core/css-parser/src/file-scope-id.ts`'s
 `compileScript({id})` convention, unrelated to a plain file's scope id; both
 share the same hash algorithm so it isn't duplicated).
 
+**2026-08-20 — `.module.*` renaming is lightningcss's job now, not ours.**
+`compileCssFile`'s module branch runs `lightningcss.transform({ cssModules:
+{ pattern: '[local]__module__<hashFilePath>' } })` and hands the RENAMED css
+to `parseCSS`; the hand-rolled suffix loop, the compound-only-token export
+loop, and the module path's `globalClassNamesIn`/`globalClassTokensIn` calls
+are gone (both helpers stay — the Vue transformer and the Svelte
+preprocessor still use them, and those are on their own scoping shapes).
+lightningcss is MPL-2.0 against our MIT: depend, never vendor or patch.
+
+Four consequences worth knowing before reading a `.module.*` snapshot:
+
+- **The scope tail is still `hashFilePath`, deliberately NOT lightningcss's
+  own `[hash]`.** Its hash is mixed-case (`qZnRla`) and the runtime
+  registry's `SCOPE_TAIL_PATTERN` alphabet is lowercase base36, so `[hash]`
+  would silently kill scoped-token base layering. A literal in the pattern
+  string works, so all three scoping shapes keep one hash algorithm.
+- **A compound/descendant rule registers a DIFFERENT key shape.** parseCSS
+  now collapses already-renamed tokens: `.card.big` →
+  `card__module__hBig__module__h`, not `cardBig__module__h`. Both resolve —
+  the registry's `compoundKeysFor` tries the raw concatenation alongside the
+  refactored `scopedCompoundKey`, and the new shape hits the first.
+  `metro-css-module/module-runtime.test.ts` pins that both halves meet.
+- **The export map only carries classes the AUTHOR wrote.** `:global(.reset)`
+  is no longer exported (`styles.reset` is `undefined` — write the literal
+  `"reset"`, the unsuffixed key is registered), and the synthesized collapsed
+  compound key is gone too (`styles.badgeLoud` → write
+  `` `${styles.badge} ${styles.loud}` ``). Both match every other CSS Modules
+  implementation.
+- **`composes` works, and the emitted token order is composed-first.**
+  `.inherited { composes: card }` exports `"card__module__h
+inherited__module__h"` — the registry merges a class string left to right,
+  so composed-last would let the base override the composer. Chains are
+  flattened on our side; lightningcss reports one hop.
+- **`exports` is a Rust HashMap and its iteration order is randomized PER
+  PROCESS** (measured: three runs, three orders). The map is emitted
+  key-sorted; do not "simplify" that away or Metro's content cache churns on
+  every build.
+
 Metro wiring: each example's own `metro.config.js` adds `'css'`, `'scss'`,
 `'sass'`, `'less'`, and `'styl'` to `resolver.sourceExts` and points
 `transformer.babelTransformerPath` at a tiny per-app wiring file built on
@@ -653,7 +699,8 @@ location:
 
 ```js
 const path = require('path');
-const metroConfigPkgPath = require.resolve('@react-native/metro-config/package.json');
+const metroConfigPkgPath =
+  require.resolve('@react-native/metro-config/package.json');
 const upstreamTransformer = require(
   require.resolve('@react-native/metro-babel-transformer', {
     paths: [path.dirname(metroConfigPkgPath)],
@@ -1147,3 +1194,467 @@ trust "the class exists in App.css" as proof a screen renders it correctly —
 grep for a SECOND definition of the same class name anywhere else in the
 app's CSS sources, and if the visual symptom is "padding/spacing missing but
 no build error", check the live device element tree (accessibility-tree`x`/`width` bounds), not just source.
+
+## 9. Migrating the parse layer to lightningcss — decision and measurements (2026-08-19)
+
+### Why: four silent, shipped bugs in one session
+
+All four were found by accident while porting components, never by a test. Every one compiled
+clean, registered, and produced a wrong screen or no rule at all:
+
+| Bug                                             | Symptom                                                                                 |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------- |
+| compound dead in both `__module__` forms        | `.badge.loud` never applied from a `.module.css` or a Vue `<style module>`              |
+| compound-only token missing from the export map | `styles.loud` is `undefined`; the element carries the literal string "undefined"        |
+| multi-value shorthand truncated                 | `padding: 8px 16px` → `{padding: 8}`; `1px 2px 3px 4px` → `{padding: 1}`                |
+| `calc()` with `%`/`vw` truncated                | `calc(100% - 24px)` → `{width: 100}` — RN reads 100 POINTS, element renders ~100px wide |
+
+The pattern is one thing, not four: a hand-rolled evaluator handles the cases it was written for
+and mis-handles the rest **silently**, because the property is in `PROPERTY_TABLE` so nothing
+reaches a `warnOnce`. The conclusion recorded here: **hand nothing to ourselves that a
+battle-tested parser already does.**
+
+### The decisive measurement — the visitor returns a TYPED value tree
+
+Probed against the installed `lightningcss@1.32.0`, not from docs:
+
+```
+padding: 8px 16px        -> {top:8px, right:16px, bottom:8px, left:16px}   already expanded
+margin: 1px 2px 3px 4px  -> {top:1, right:2, bottom:3, left:4}             already expanded
+width: calc(100% - 24px) -> {calc: sum[percentage(1), dimension(-24px)]}   structured
+color: grey              -> {type:'rgb', r:128, g:128, b:128, alpha:1}     resolved
+flex-direction: row      -> 'row'
+```
+
+and `Rule.style` hands selector AST and declarations together, descending into `@media`:
+
+```
+.card.big > .title:hover
+ -> [{class card},{class big},{combinator child},{class title},{pseudo-class hover}]
+```
+
+**Two of the four bugs above die by construction**: the shorthand never reaches us as a string,
+and `calc` becomes an explicit "percentage minus length" we can refuse LOUDLY instead of
+truncating to a number. That is why the pipeline consumes the **visitor**, not a text round-trip.
+
+`cssModules: { pattern: '[local]__module__[hash]' }` reproduces our existing scoped-name shape
+exactly, so the runtime's scope-tail parsing is unaffected; `:global(.reset)` stays unsuffixed and
+`composes` is resolved into the exports map.
+
+### What was rejected, and why — do not re-litigate without new evidence
+
+| Option                                    | Why not                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `react-native-css` (nativewind) wholesale | its runtime is React-only; no CSS Modules, no scoped CSS; and it **silently drops** `>`/`+`/`~` with an empty `warnings()` because it has no parent pointers. We DO have a retained tree with `parent` — adopting it would lock us into a weaker model than our own architecture supports.                                                              |
+| NativeWind                                | hard `tailwindcss` peer, v4 and v5                                                                                                                                                                                                                                                                                                                      |
+| Unistyles                                 | does not parse CSS at all — a `StyleSheet.create` superset in C++/JSI. Its win is bypassing re-render, which our architecture already has.                                                                                                                                                                                                              |
+| Stylo / `selectors` crate for the RUNTIME | **Hermes has no WebAssembly.** Verified: 0 hits in RN 0.84–0.87 release notes and in Hermes' own `doc/Features.md`; the only WASM-adjacent code is a 2021 asm.js path behind a custom-build flag, "unsupported, trusted code only" (facebook/hermes#429, still open). A Callstack webinar page claims otherwise — contradicted by every primary source. |
+| Stylo standalone at build time            | 48 deps, `links=`, Gecko-shaped `ComputedValues`; Blitz needed ~140 KB of glue AND relicensed that glue crate to MPL. It would deliver a browser cascade we don't want.                                                                                                                                                                                 |
+
+### The one thing no library can give us
+
+**The matcher and the specificity ordering are ours on every path**, because the thing being
+matched is a live Fabric node inside Hermes. A parser only ever answers "who reads the selector
+string". lightningcss does not expose specificity (0 hits in its `.d.ts`), and
+`@csstools/selector-specificity` is typed against postcss-selector-parser's AST, not this one —
+so specificity is a small counting function over the visitor's selector AST. Counting, not parsing.
+
+### Licence
+
+lightningcss is **MPL-2.0**, we are MIT. Depending is fine — MPL copyleft is file-level (Mozilla
+FAQ Q11) and nothing propagates to our files; the §3.2 source-availability duty is met by the
+upstream npm tarball, and the parser never enters the app bundle. **Never vendor, copy, or patch
+its sources** — a copied file becomes MPL. Port by reading behaviour, never by pasting. Same rule
+for `selectors`/`cssparser` if their algorithms are ever used as reference.
+
+### Staging, and the gate each stage must pass
+
+A golden-snapshot harness pins today's emitted bytes over the real corpus plus 11 fixtures:
+`core/css-parser/src/golden-corpus/`. It is proven non-vacuous (dropping `padding` from
+`PROPERTY_TABLE` fails 38 named files; changing the module separator fails exactly the two
+`.module.*` ones). **It pins today's behaviour INCLUDING the bugs above — that is deliberate.
+Do not "fix" a snapshot.**
+
+```
+1   .module.css -> lightningcss cssModules     snapshot fails on .module.* ONLY, and every diff
+                                               must be (a) hash algorithm, (b) value
+                                               normalization, or (c) composes now resolved
+1b  plain .css                                 snapshot fails only by value normalization
+1c  Vue / Svelte transformers onto the SAME    their scope hash is SHARED with the template
+    transform() call — one mechanism, three     rewriter — it must be read from `exports`, not
+    `pattern` strings (below)                   recomputed, or styles and markup silently diverge
+2   visitor instead of text + invert registry  postcss and postcss-value-parser leave the tree
+3   specificity (a,b,c) + source order         replaces approximating the cascade by spread order
+4   combinators                                moves resolution out of routeProp into the commit
+                                               walk, because `parent` is only linked in appendChild
+```
+
+Stages 1c and 2 are the only ones that change a contract; 1/1b are byte-verifiable.
+
+### Stage 1c in full: one transform(), three patterns
+
+Decided 2026-08-20. Every scoping shape this repo has is the SAME operation with a different
+suffix, so all of them are lightningcss's `cssModules` renaming — there is no second mechanism to
+write:
+
+```
+standalone .module.*   pattern: [local]__module__<hash>      already migrated (stage 1)
+Vue <style module>     pattern: [local]__module__<hash>
+Vue <style scoped>     pattern: [local]__data-v-<hash>
+Svelte <style>         pattern: [local]__svelte-<hash>       migrated 2026-08-20
+```
+
+**A SCOPED block must parse the ORIGINAL css and re-key it per token — NOT parse lightningcss's
+renamed output, the way the `.module.*` path does.** Measured 2026-08-20: `parseCSS` camelCases
+every class name, and a `-` before a letter is what it converts, so a scope tail whose base36 hash
+starts with a LETTER is mangled — `card__svelte-p4np8c` registers as `card__svelteP4np8c` while
+the markup carries the literal form. A single token survives that on the registry's kebab->camel
+fallback; a COMPOUND does not (`tryCompoundLookup` reads the map directly), so every compound rule
+in roughly half the files would silently die, and camelCasing the markup token to match instead
+would kill scoped-base layering (`splitScopedToken` stops recognising the tail). `__module__<hash>`
+only escapes this by having no `-` in its tail. `compileScopedCss`
+(`core/css-parser/src/scoped-classes.ts`) is the seam that does it right: one `renameClasses` call
+for the names, `parseCSS` + `classTokensIn` over the original for the values, and the collapsed key
+rebuilt from the RENAMED tokens (`.card.big` -> `card__svelte-hBig__svelte-h`, which is what the
+registry's raw-token compound path already builds).
+
+The runtime needs no change: `SCOPE_TAIL_PATTERN` already accepts all three tails and `hashFilePath`
+already feeds all three. What the migration DELETES is the point of it — both hand-rolled renaming
+loops (`adapters/vue/metro-vue-transformer.cjs` ~line 191, `adapters/svelte/src/preprocessor/
+scoped-styles.ts`) and the whole of `core/css-parser/src/global-selectors.ts`, which exists only
+because postcss does not understand `:global()` and lightningcss's `cssModules` does.
+
+What legitimately stays per-framework is the MARKUP rewriter — Vue edits `class`/`:class` in the
+template AST, Svelte edits its markup, a standalone `.css` has no markup at all. The point is that
+it stops being a second, independent implementation of "what is this class called now" and becomes
+a reader of `exports`. That kills the entire bug class where the two halves computed the same name
+differently.
+
+**We deviate from vanilla Vue/Svelte scoping on purpose, and `cssModules` matches OUR scheme, not
+theirs.** In a browser Vue scopes with an attribute selector (`.card[data-v-abc]` + a `data-v-abc`
+attribute) and Svelte with a second class (`.card.svelte-abc`). RN has no CSS engine — no attribute
+selectors, and the registry is a flat map keyed by ONE class token — so both would have nothing to
+match. We rename the class instead, which gives the same isolation. Verified 2026-08-20 that the
+cascade guarantee survives the rename:
+
+```
+registerStyles({ card:{padding:1}, 'card__data-v-aaaaaaaa':{margin:2}, 'card__svelte-bbbbbbbb':{margin:3} })
+
+card                   -> {padding:1}
+card__data-v-aaaaaaaa  -> {padding:1, margin:2}    own file layers over the global base
+card__svelte-bbbbbbbb  -> {padding:1, margin:3}    another file's scope stays invisible
+```
+
+The one observable difference: the element carries one token instead of two, so a selector on the
+bare scope marker (`.svelte-abc` alone) matches nothing. Only Svelte's own compiler writes those.
+
+Order of work: the three end-to-end conformance tests (Vue / Svelte / standalone-CSS-per-adapter)
+land FIRST — they are the net the migration falls into. Before them there was no proof any of these
+forms worked end to end, which is how a compound rule stayed dead in both `__module__` shapes for
+five days under a green suite.
+
+Those three suites (Vue 21 / Svelte 19 / standalone 50 tests, all proven non-vacuous by real
+breaks) found two things worth keeping even after the migration erases their cause.
+
+**Vue `<style module>` was dead in a TEMPLATE, and a source comment said otherwise.** Measured
+2026-08-20: `<template><View :class="$style.card"/></template>` + `<style module>` warns `Property
+"$style" was accessed during render but is not defined on instance` and then throws `Cannot read
+properties of undefined (reading 'card')` — the mount fails. The transformer emitted the map as a
+module-scope `const`, and `metro-vue-transformer.cjs`'s own comment claimed it was "usable both
+from the inlined template and from `<script setup>` code itself". Only the second half was true:
+Vue's template compiler resolves a `$`-prefixed identifier off the component INSTANCE, from
+`instance.type.__cssModules`, which nothing set (`.docs/framework-api-surface/vue.md:195` had
+already recorded `__cssModules` as unset, but only about `useCssModule()` — nobody joined it to the
+template path). `module="classes"` failed identically. No example app writes `$style` in a template,
+so it shipped uncovered; the existing transformer test asserted the emitted const and the registry
+map, never a mount. Same lesson as `.claude/rules/dotted-component-tags.md`: a capability claim in
+a source header outlives the person who could have checked it — compile the two-line probe.
+
+**The two export maps were mutually incompatible, which is the concrete cost of two renamers.**
+Measured on identical CSS through `compileSfc` vs `compileCssFile`:
+
+```
+.card.loud        Vue <style module> -> key cardLoud__module__<h>;  map has cardLoud, NOT loud
+                  standalone .module -> key card__module__<h>Loud__module__<h>; map has loud, NOT cardLoud
+:global(.reset)   Vue                -> exported
+                  standalone         -> not exported until fixed 2026-08-20 (see below)
+composes          Vue                -> unhandled
+                  standalone         -> composed-first token order
+```
+
+Both key shapes resolve — the collapsed one through `scopedCompoundKey`, the per-token one through
+the raw `toCompoundKey` concatenation — so this was a NAMING divergence, not a second dead-compound
+bug. But `styles.card + ' ' + styles.loud` written against a `.module.css` does not port to a Vue
+`<style module>`, which needs `$style.cardLoud`. Unifying the renamer is what makes the two the
+same contract.
+
+**Two decisions about the export map that are ours, not CSS Modules'.** Both were made 2026-08-20
+and both are supersets, so nothing that worked before stops working:
+
+1. `:global()` names ARE exported, keyed as themselves with no scope suffix. lightningcss,
+   css-loader and postcss-modules all omit them (nothing was renamed, so they have nothing to map).
+   Omitting forces the author back to a bare `class="legacy-reset"` string literal, which throws
+   away the typed `styles.x` access the map exists for.
+2. Every key is camelCase — `exportLocalsConvention: 'camelCase'` in css-loader's vocabulary.
+   lightningcss keeps the authored spelling, so a mixed map is the real hazard: `.legacy-reset`
+   would key as `legacy-reset` while the `:global` backfill arrives already camelCased, and which
+   spelling a class answers to would depend on which half of the compiler produced it. The VALUE
+   keeps lightningcss's literal name; the runtime registry's own kebab→camel fallback resolves it.
+   A collision (`.legacy-reset` and `.legacyReset` in one file) warns rather than silently
+   overwriting.
+
+The `.d.ts` generator must read its names from that same map — `moduleClassNames` in
+`core/css-parser/src/metro-css-module/index.ts`. It used to derive them from `parseCSS` over the raw
+source, and after the migration those two sets diverged, making the generated type wrong in BOTH
+directions at once: `styles.cardBig` (a collapsed registry key naming no class) type-checked and was
+`undefined` at runtime, while the valid `styles.big` was a TS2339.
+
+Stage 4 is bigger than "unsupported": measured 2026-08-20, `.a.b` / `.a .b` / `.a > .b` /
+`.a + .b` / `.a ~ .b` all compile to the SAME key `aB`, and colliding rules MERGE their
+declarations rather than one winning. So a descendant rule never fires where it was meant to and
+does fire where it was not — see the sixth trap in `.claude/rules/style-registry-collisions.md`.
+Turn on `nonStandard: { deepSelectorCombinator: true }` in that stage and `>>>` / `/deep/` stop
+being dropped as "Invalid dangling combinator" and arrive as `deep-descendant` / `deep`; Vue's
+`::v-deep` and Angular's `::ng-deep` already parse as a pseudo-element between two descendant
+combinators, and `:deep(...)` as a custom-function over a raw token stream. The flag is inert
+before stage 4 — nothing consumes a combinator today.
+
+### Runtime cost, measured before touching anything
+
+`resolveClassName` has **no cache** and runs from `routeProp` on every class-prop set, per node.
+Measured (Node/V8, 20k iterations, warmed, registry of 60 rules):
+
+```
+1 class                     0.09 us
+2 classes                   0.58 us
+3 classes                   1.89 us
+4 classes (miss)           15.53 us     <- 60 candidate keys built and all missed
+5 classes                   0.35 us     <- FASTER, because the compound branch is skipped entirely
+```
+
+The 5-class row is the tell: `parts.length <= COMPOUND_MAX_PARTS` is not a perf cap, it is a
+silent correctness cliff. The inverted index (`Map<token, Rule[]>`) removes exactly the dominant
+work — building 60 strings and missing 120 map lookups — and removes the cliff with it, because
+nothing needs reversing. Re-run this benchmark after stage 2 so "faster" is a number.
+
+### Stage 2 as decided 2026-08-20: no key normalization anywhere, keys as authored
+
+The staging table above called stage 2 "visitor instead of text + invert registry". Measured that
+day, it is bigger and simpler than that: **the key stops being DERIVED from the selector at all.**
+
+Today's key comes from `extractClassName` — camelCase, drop what it does not understand, collapse
+tokens into one string. Every lossy step maps two different selectors onto one key and the later
+rule overwrites the earlier per property, silently, on every path (seventh trap in
+`.claude/rules/style-registry-collisions.md`). lightningcss hands back everything that guessing
+was reconstructing, so the pipeline becomes: css -> lightningcss AST -> our engine primitives,
+with nothing in between. Probed against `lightningcss@1.32.0`:
+
+```
+padding: 8px 16px       {top:8px,right:16px,bottom:8px,left:16px}   4th trap gone — expansion is free
+calc(100% - 24px)       typed sum [percentage 1, dimension -24px]   5th trap becomes warn+drop
+color: red              {type:'rgb',r:255,g:0,b:0}
+.card .title            [class, combinator 'descendant', class]     6th/7th become DATA
+.card:hover[data-x]     pseudo-class 'hover' + attribute 'data-x'   droppable with a reason
+```
+
+Three consequences, all decided:
+
+1. **Registry keys are the authored names** (`card-title`, plus whatever the scoping rename
+   appended). The kebab->camel fallback in `resolveClassName` is not load-bearing: measured over
+   `examples/` + `apps/`, 761 kebab class names in CSS and ZERO of them written camelCase in
+   markup (the ten grep hits are JS identifiers). It stays only as back-compat.
+2. **The export map / `$style` map keys are authored too** — `styles['card-title']`, not
+   `styles.cardTitle`. This REVERSES decision 2 of "Two decisions about the export map" above:
+   camelCase existed only to make dot access legal, and it merged `.legacy-reset` with
+   `.legacyReset` into one key (hence the collision warn at `metro-css-module/index.ts:145`, which
+   the reversal deletes rather than fixes). `classNamesToDtsSource`'s `formatKey`
+   (`generate-dts/index.ts:18`) already quotes a non-identifier key, so `styles['card-title']`
+   type-checks today with no generator change.
+3. **A rule is `{tokens, specificity, order, style}` and the registry indexes `Map<token, Rule[]>`,
+   matching when a rule's tokens are a SUBSET of the element's.** That deletes `toCompoundKey`, the
+   permutation generator, `COMPOUND_MAX_PARTS` (a correctness cliff, not a perf cap) and
+   `scopedCompoundKey`'s suffix factoring in one move, and gives stage 3 (specificity) for free
+   because the AST carries it. `splitScopedToken` STAYS — scoped-base layering still needs it.
+
+### `customAtRules` — the extension seam we have and have not used (measured 2026-08-20)
+
+Measured on the installed 1.32.0, and the earlier "at-rules only" phrasing was too strong: what
+cannot be extended is the GRAMMAR, but every extension point CSS's own tokenizer already tolerates
+arrives as RAW TOKENS, and parsing them is ours to write.
+
+```
+.a:symbiote-platform(ios)   pseudo-class custom-function + token stream   parse it yourself
+.a::symbiote-thing          pseudo-element custom                         same
+.a:symbiote-flag            pseudo-class custom                           same
+width: platform(ios,10px)   visitor.Function, arguments as tokens         same
+@blue #056ef0;              Rule.unknown, prelude as tokens               same
+@platform ios { … }         Rule.unknown — but the BODY NEVER ARRIVES     needs customAtRules
+.a %% .b                    rule vanishes (errorRecovery ate it)          impossible
+```
+
+So `:global()` / `:deep()` are not special cases — anything shaped `:name(...)` / `::name` /
+`name(...)` / `@name` reaches us. What is genuinely impossible is a new combinator or new
+punctuation, which is exactly why `>>>` needed its own flag inside the Rust parser.
+
+The trap: an UNDECLARED `@platform ios { .a { color: red } }` loses its whole body — the inner
+style rule reaches no visitor at all. Declaring `customAtRules: { platform: { prelude:
+'<custom-ident>', body: 'rule-list' } }` is what makes the body parse; prelude grammar is a CSS
+syntax string (the `@property` grammar), body is `declaration-list` / `rule-list` / `style-block`.
+
+The full visitor set (`node/index.d.ts:184-214`): StyleSheet · Rule · Declaration · Url · Color ·
+Image · Length · Angle · Ratio · Resolution · Time · CustomIdent · DashedIdent · MediaQuery ·
+SupportsCondition · Selector · Token · Function · Variable · EnvironmentVariable — plus a
+`{ raw: '…' }` return that lightningcss re-parses into the AST, and `composeVisitors` for plugins.
+`nonStandard.deepSelectorCombinator` covers `>>>` and `/deep/` ONLY; `::v-deep` / `::ng-deep` come
+through as a custom pseudo-ELEMENT between two synthetic descendant combinators, and Vue's
+`:deep(...)` as the custom-function form. All four measured, all four folded to one `deep`.
+
+What the seam would buy SymbioteNative, none of it built yet: `@platform ios { … }` (a platform
+branch expressed in CSS — today only `Platform.select` in JS), `@mixin`/`@apply` (the docs' own
+example: a visitor stores the block in a Map, `@apply` inlines it — `composes` without a
+preprocessor), `@theme` design tokens inlined at build. `addDependency({type:'file'|'glob'})` is
+the matching cache-invalidation hook for anything such a rule pulls in from another file.
+
+The cost, stated by the docs and worth respecting: a JS visitor makes compilation **~2x slower**
+than the pure-Rust path. Build time only, per file, behind Metro's cache — but it means work
+expressible as a table (`PROPERTY_TABLE`) must stay a table, never a visitor callback.
+
+**`@platform ios { … }` is buildable today — verified end to end 2026-08-20.** The trap above is
+only about leaving the rule UNDECLARED. Declared, it works:
+
+```js
+customAtRules: { platform: { prelude: '<custom-ident>', body: 'rule-list' } }
+visitor: { Rule: { custom: { platform(rule) { /* rule.prelude, rule.body.value */ return []; } } } }
+```
+```
+rule.prelude       {type:'custom-ident', value:'ios'}    typed, validated by the parser
+rule.body.value    real style rules, declarations already expanded (padding -> 4 sides)
+return []          strips the rule from the emitted css
+```
+
+So the block's contents flow through the SAME selector + declaration mapping as any other rule;
+the at-rule contributes only a platform tag. At runtime it is not a per-node branch — register
+only the branch matching `Platform.OS` at module eval, one `if` per file.
+
+Two decisions to make when it is actually built, neither forced by lightningcss: whether the
+prelude is one platform (`<custom-ident>`) or a list (`<custom-ident>+`), and how it cascades — a
+rule inside `@platform` and its twin outside have EQUAL CSS specificity, so "the platform one
+wins" has to come from registration order, not from the specificity triple.
+
+**Why a per-platform CSS FILE is not the obvious alternative it looks like** (read before choosing
+between `App.ios.css` and `@platform`). Measured in `metro-resolver@0.84.4`, `resolve.js:511`:
+
+```
+resolveSourceFile():
+  1. resolveSourceFileForAllExts(context, "")   <- no platform arg: the EXACT path resolves first
+  2. per sourceExt:  .<platform><ext>  ->  .native<ext>  ->  <ext>
+```
+
+So `import './App.css'` resolves at step 1 and `App.ios.css` is never even probed. Platform
+variants only apply to an EXTENSIONLESS request (`import './App'`) — and there `sourceExts` lists
+js/ts before css, so a sibling `App.tsx` wins the request instead (exactly the layout every
+example app has). Making it work needs a basename no JS file shares (`app-styles.css` +
+`app-styles.ios.css`, imported as `./app-styles`), which is no longer "the same as .ios.ts".
+
+And a Vue/Svelte SFC `<style>` block cannot be split by filename at all — the component is one
+file — which is where most of this repo's styling actually lives. That, not ergonomics, is the
+argument for `@platform`: it reaches the surface the file split cannot. Neither is needed today
+(no example carries a platform style delta); this exists so the trade-off is not re-derived.
+
+### Four things the lightningcss visitor does that the docs do not say (measured 2026-08-20)
+
+All four cost real debugging during the stage-2 wiring; none is guessable from the API surface.
+
+**1. Under `cssModules`, the visitor sees the ORIGINAL class names.** The rename happens AFTER the
+visitor walk. So one `transform()` yields both the authored tokens (from the AST) and their renamed
+spelling (from `exports`) — the renamed CSS text never has to be parsed a second time, which is
+what the old `.module.*` path did and what mangled a scope tail whose base36 hash began with a
+letter.
+
+**2. `:global()` does not disappear under `cssModules` — it CHANGES SHAPE.**
+
+```
+cssModules OFF  {kind:'custom-function', name:'global', arguments:[…raw token stream…]}
+cssModules ON   {kind:'global', selector:[{type:'class', name:'reset'}]}   ← fully parsed
+```
+
+Handling only the raw form silently killed every `:global()` rule in a `.module.*` file — no
+warning, an empty `.d.ts`, nothing registered. `:deep()` has NO such split (lightningcss implements
+no `:deep()`, so cssModules has nothing to resolve): identical raw form in both modes.
+
+**3. A style rule nested in `@media`/`@supports`/`@container` reaches `Rule.style` HOISTED OUT of
+its condition.** Take it at face value and a `@media (min-width: 900px)` rule paints on every
+phone — strictly worse than the old parser, which dropped it by never walking in. Returning `[]`
+from the at-rule's own visitor removes it BEFORE the walk descends, which is how the rules inside
+stay dropped; we warn once per at-rule kind so the loss is visible. `@keyframes` / `@font-face`
+need no entry — neither emits a style rule.
+
+**4. `errorRecovery: true` drops a malformed rule SILENTLY unless you read `result.warnings`.**
+Found via a real incident: `examples/angular/src/screens/ApiPlaygroundScreen.css` opened with a
+comment containing `.hero-*/`, whose `*/` closed the comment three lines early. Everything after it
+was live CSS, so a garbage selector (the prose `… already exist in App.css` — where `App.css` reads
+as a class `.css`) swallowed the real `.pg-subsection-label` rule after it. postcss "recovered" by
+registering the garbage under a phantom key AND the real class; lightningcss dropped the whole
+rule, taking the real class with it. Both were wrong; only the warning surface tells anyone. We now
+funnel `result.warnings` through the same `warnOnce` as every other drop.
+
+### Stage 2 landed — what the pipeline is now, and the numbers (2026-08-20)
+
+```
+STAGE   STATUS
+1/1b/1c DONE   every scoping shape is one lightningcss cssModules rename
+2       DONE   selector AST -> {tokens, specificity, combinators}; typed declarations ->
+               engine primitives; registry keyed by TOKEN SET over an inverted index
+3       DONE-BY-CONSEQUENCE  the compiler supplies real specificity and the registry already
+               sorted by (a,b,c) -> epoch -> order, so the cascade landed with the wiring
+4       OPEN   combinators ride along in the rule but nothing consumes them; real matching
+               needs parent pointers, i.e. resolution moves into the engine's commit walk
+```
+
+The old path is GONE, not deprecated: `parser/index.ts` (postcss + `parseCSS` + `extractClassName`
+and friends), `global-selectors.ts`, `renameClasses`, and in the engine `registerStyles`, the flat
+map, `toCompoundKey`, the permutation generator, `COMPOUND_MIN/MAX_PARTS` and `scopeClassName`.
+`postcss` and `postcss-value-parser` are out of the manifest and out of the repo's source entirely.
+`splitScopedToken` STAYS — scoped-base layering still needs it.
+
+Re-measured after the removal (20k warmed iterations, 60-rule registry, µs/op; cold uses a unique
+filler token per iteration so the memo cannot answer):
+
+```
+            cold-hit  cold-miss  warm     |  BEFORE (flat map + permutations)
+1 class       0.486     0.270    0.011    |   0.09
+2 classes     0.562     0.302    0.015    |   0.58
+3 classes     0.679     0.398    0.011    |   1.89
+4 classes     0.801     0.497    0.011    |  15.53   <- the cliff
+5 classes     0.881     0.571    0.012    |   0.35   <- faster than 4: the cap silently gave up
+```
+
+Cold is now flat and linear in token count, ~19x better on the 4-token miss, and 5 tokens costs
+slightly MORE than 4 — which is the shape a correct implementation has. The old 5<4 inversion was
+the tell that `COMPOUND_MAX_PARTS` was a correctness cliff, not a perf cap.
+
+**One behaviour genuinely changed, and it is a fix.** A rule `.card__<S> :global(.reset)` against an
+element carrying `card__<S> reset__<other>` used to resolve to `{}` — an artifact of the collapsed
+key having no single suffix to factor out. Per-token rules match it now, which is also what the web
+does (`class="reset svelte-other"` is matched by `.reset`). The inverse widening the old
+`scopedCompoundKey` comment flagged as known-wrong — a foreign `reset` matching a fully-scoped
+`.card.reset` — is gone with it.
+
+**And one false green worth remembering.** `golden-corpus.test.ts`'s `PREAMBLE_LINE_SHAPES` decides
+which emitted lines get snapshotted by matching each line and BREAKING at the first miss. Its
+`/^registerStyles\(\{.*\}\);$/` stopped matching when the emitter switched to `registerRules([…])`,
+so the registration line silently fell out of every SFC snapshot — 54 tests still green, covering
+one line less. A filter that selects what to assert must be updated with the thing it selects, or
+it degrades into asserting nothing.
+
+**Before the device pass on `feature/solidjs`: sticky headers are KNOWN-BROKEN on this branch and
+are NOT a CSS regression.** The math is fixed and verified on `feature/millionjs`
+(`e5f283c3` "keep sticky-header updates linear as the window shifts", alongside `84c04903`
+"skip untouched subtrees in the commit walk via dirty marking"), which merges into this work
+later. A canary built from THIS branch's tarballs will show it. Do not spend a debugging pass
+attributing a sticky-header misplacement to the rules pipeline — check the branch first.
+
+Merge overlap to expect when millionjs lands: both commits touch `core/engine/src/{commit.ts,
+node.ts,index.ts}`, and the stage-2 work touched `index.ts` (the `registerRules`/`IStyleRule`
+exports, and `registerStyles`/`scopeClassName` REMOVED from it) plus `styles.ts`. Conflicts there
+are expected in the barrel, not in the walk itself.
