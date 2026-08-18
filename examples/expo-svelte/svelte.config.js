@@ -11,7 +11,7 @@
 // the bundle is protected either way; registering it here is what puts the diagnosis in the
 // editor and in `svelte-check` instead of only at bundle time.
 //
-// `scopedStyles()` compiles a component's own <style> block into registerStyles() output and
+// `scopedStyles()` compiles a component's own <style> block into registerRules() output and
 // scopes every class in that component's markup. Metro's transformer runs it itself too, so the
 // bundle is correct either way; registering it HERE (matching examples/svelte/svelte.config.js)
 // is what stops svelte-check and the editor from reporting `css_unused_selector` on every rule

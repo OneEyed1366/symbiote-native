@@ -1,7 +1,7 @@
 /*
  * Styling by CSS class is the convention across every canary (see CLAUDE.md's styling note):
  * @symbiote-native/css-parser compiles this file at build time via Metro's babelTransformerPath
- * into a registerStyles() call, and the engine's routeProp resolves the `class` attribute against
+ * into a registerRules() call, and the engine's routeProp resolves the `class` attribute against
  * that registry. The path is cross-adapter, not per-framework — React's `className`, Vue's `class`
  * and Angular's `[class]` all land in the same place, and Solid's `class` joins them unchanged.
  *

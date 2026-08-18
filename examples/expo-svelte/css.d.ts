@@ -1,6 +1,6 @@
 // Ambient module for a plain, side-effect-only `.css` import (`import './App.css'`) —
 // @symbiote-native/css-parser compiles it at build time (Metro's babelTransformerPath, see
-// metro.config.js) into a registerStyles() call; there's no runtime export to type. Mirrors
+// metro.config.js) into a registerRules() call; there's no runtime export to type. Mirrors
 // examples/svelte/css.d.ts and examples/expo-vue-sfc/css.d.ts.
 declare module '*.css';
 

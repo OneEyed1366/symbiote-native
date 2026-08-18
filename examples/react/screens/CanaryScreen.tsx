@@ -686,7 +686,7 @@ export function CanaryScreen() {
         {/* background-image: a CSS `linear-gradient(...)` authored entirely in App.css
           (.gradient-card), proving @symbiote-native/css-parser's `background-image` → RN's
           `experimental_backgroundImage` raw passthrough works end to end (css-parser →
-          registerStyles → routeProp → core/engine/src/process-background-image → Fabric).
+          registerRules → routeProp → core/engine/src/process-background-image → Fabric).
           PASS: the panel shows a blue-to-orange gradient sweeping left to right. */}
         <View className="gradient-card">
           <Text className="tile-text">background-image · linear-gradient</Text>
