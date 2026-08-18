@@ -88,6 +88,7 @@ import {
   type ISymbioteNode,
   type IViewStyle,
 } from '@symbiote-native/engine';
+import { countAngular } from '../../diagnostics';
 import { ScrollView } from '../scroll-view';
 import { RefreshControl } from '../refresh-control';
 import {
@@ -645,6 +646,7 @@ export class VirtualizedList<ItemT = unknown>
   // flow through it, which an @Output() can't carry), so this is a stable arrow field passed
   // straight to [onScroll]. onLayout is a real @Output() now, bound via (layout)="onLayoutTick($event)".
   onScrollTick = (event: ISymbioteEvent): void => {
+    countAngular('scrollTicks');
     const offset = readScrollOffset(event, this.isHorizontal);
     if (offset === undefined) return;
     dlog(`Angular VirtualizedList onScroll offset=${offset}`);
@@ -737,6 +739,7 @@ export class VirtualizedList<ItemT = unknown>
     const signature = this.renderSignature();
     if (signature === this.lastRenderSignature) return;
     this.lastRenderSignature = signature;
+    countAngular('listMarks');
     this.cdr.markForCheck();
   }
 
@@ -819,6 +822,7 @@ export class VirtualizedList<ItemT = unknown>
   // grows exactly one step per meaningful CD. The projected templates (ContentChild) are resolved
   // from the second CD on; the first paint (count/viewport still 0) corrects on the layout-driven CD.
   ngDoCheck(): void {
+    countAngular('listChecks');
     const recomputeInputs: unknown[] = [
       this.data,
       this.extraData,
@@ -854,6 +858,7 @@ export class VirtualizedList<ItemT = unknown>
       return;
     }
     // The single derive-per-CD: recompute the window off the current state before the view reads it.
+    countAngular('listRecomputes');
     reduceList(this.listState, { kind: 'refresh-metrics' }, this.buildInputs());
     this.recomputeView();
   }

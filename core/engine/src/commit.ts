@@ -27,6 +27,7 @@ import {
   debugNodeId,
   isAnchor,
   isEmptyRawText,
+  markDirty,
   VIRTUAL_TEXT_COMPONENT,
   type ISymbioteNode,
 } from './node';
@@ -43,6 +44,15 @@ export { processColor, setColorProcessor } from './platform-color';
 // Per-commit work counters, surfaced via dlog so a device run can prove the
 // engine is incremental (created=0 with clones after the first mount).
 const stats = { created: 0, cloneProps: 0, cloneChildren: 0, reused: 0 };
+
+// Cumulative cost of the reconcile walk. Unlike `stats` (per-commit, zeroed at the top of every
+// commit), this ACCUMULATES: one scroll frame produces a burst of commits and the frame's real cost
+// is only visible as their sum. Read-and-zeroed via readCommitProfile().
+//
+// Deliberately NOT gated behind isDebug(): two performance.now() calls per commit are noise next to
+// the walk they measure, and the number is only meaningful from a RELEASE build - dev-mode JS
+// drowns the signal. The dlog below stays gated as usual.
+const profile = { commits: 0, walkMs: 0, nodesVisited: 0 };
 
 // Diagnostic (gated): Fabric serializes props to folly::dynamic, which rejects a JS
 // Symbol or function with "JS Symbols are not convertible to dynamic". A hard native
@@ -193,8 +203,15 @@ function renderableChildren(node: ISymbioteNode): readonly ISymbioteNode[] {
 
   const children: ISymbioteNode[] = [];
   for (const child of node.children) {
-    if (isAnchor(child)) children.push(...renderableChildren(child));
-    else if (!isEmptyRawText(child)) children.push(child);
+    if (isSkippedAtCommit(child)) {
+      // A skipped child is flattened away here and never reaches reconcile, so this is the only
+      // place that can clear its dirty flag. Leaving it set would be a silent stale-UI bug:
+      // markDirty stops at the first dirty ancestor, so a permanently-dirty skipped node swallows
+      // every later mark - from an anchor's subtree, or from the setText that turns an empty raw
+      // text back into real content - and the real parent never learns anything changed.
+      child.dirty = false;
+      if (isAnchor(child)) children.push(...renderableChildren(child));
+    } else children.push(child);
   }
   return children;
 }
@@ -228,6 +245,21 @@ function logScrollChildren(
   );
 }
 
+// The failure mode dirty-marking introduces: a mutation path that forgets to markDirty leaves a
+// node whose desired props have drifted from what Fabric holds, and the screen silently keeps
+// showing the old value - no error, no crash, nothing to grep for. So under DEBUG pay back the full
+// price just saved and verify the skip was honest, naming the node loudly enough to find the
+// missing mark.
+function warnIfStale(node: ISymbioteNode, committed: IMirror): void {
+  if (!isDebug()) return;
+  const fresh = fabricProps(node);
+  if (propsEqual(committed.props, fresh)) return;
+  dlog(
+    `DIRTY-MISS ${committed.viewName}#${committed.tag} node=${debugNodeId(node)} skipped as clean ` +
+      `but props differ: committed=${JSON.stringify(committed.props)} desired=${JSON.stringify(fresh)}`,
+  );
+}
+
 function reconcile(
   slot: ReturnType<typeof getSlot>,
   node: ISymbioteNode,
@@ -236,10 +268,30 @@ function reconcile(
   renderableParent: ISymbioteNode | undefined,
   forceFreshFamily: boolean,
 ): IReconciled {
+  profile.nodesVisited += 1;
   const viewName = viewNameFor(node, hasTextAncestor);
+  const committed = mirror.get(node);
+
+  // Nothing under here changed: hand back the committed handle without rebuilding this node's
+  // Fabric props or descending into it at all. The walk below costs ~13 us/node on device, and an
+  // untouched sibling subtree would pay it on every commit. `committed.parent` is re-checked rather
+  // than trusted to the flag because a MOVED node can still be legitimately clean (see node.ts's
+  // structural ops), and a reparent must fall through to the fresh-family path below.
+  if (
+    !forceFreshFamily &&
+    !node.dirty &&
+    committed !== undefined &&
+    committed.parent === renderableParent &&
+    committed.viewName === viewName
+  ) {
+    stats.reused += 1;
+    warnIfStale(node, committed);
+    return { handle: committed.handle, changed: false };
+  }
+  node.dirty = false;
+
   const props = fabricProps(node);
   const childInText = node.isText || hasTextAncestor;
-  const committed = mirror.get(node);
   const kids = renderableChildren(node);
 
   // First mount, or the view kind flipped (RCTText <-> RCTVirtualText when a
@@ -436,6 +488,14 @@ function commitContainer(rootTag: IRootTag): void {
   const slot = getSlot();
   const container = rootContainerFor(rootTag);
 
+  // The synthetic container is dirtied here, at the one entry point, because markDirty can never
+  // bubble up to it: a surface's top-level nodes carry `parent === undefined` (surface.ts sets it
+  // deliberately), so a mark stops at the top-level node and the container above it stays clean -
+  // it would then early-exit and swallow the whole commit. Marking unconditionally costs one node's
+  // props rebuild per commit and closes the hole for both callers, mutation commit and
+  // setNativeProps alike.
+  markDirty(container);
+
   stats.created = 0;
   stats.cloneProps = 0;
   stats.cloneChildren = 0;
@@ -445,7 +505,11 @@ function commitContainer(rootTag: IRootTag): void {
   // tree walk); if `start` itself never prints, the stall is upstream: React's commit
   // phase or the mutation ops before we are even called.
   dlog(`commit root=${rootTag} start children=${container.children.length}`);
+  const walkStart = performance.now();
   const result = reconcile(slot, container, rootTag, false, undefined, false);
+  const walkMs = performance.now() - walkStart;
+  profile.walkMs += walkMs;
+  profile.commits += 1;
   // Boundary seam: prints once reconcile returns. If a commit hangs and this line
   // never appears, the stall is inside reconcile (JS); if it appears but the
   // post-completeRoot line below never does, the stall is inside the native commit.
@@ -474,9 +538,32 @@ function commitContainer(rootTag: IRootTag): void {
     dlog(
       `commit root=${rootTag} ${mode} ` +
         `created=${stats.created} cloneProps=${stats.cloneProps} ` +
-        `cloneChildren=${stats.cloneChildren} reused=${stats.reused}`,
+        `cloneChildren=${stats.cloneChildren} reused=${stats.reused} ` +
+        `walk=${walkMs.toFixed(3)}ms`,
     );
   }
+}
+
+// What the reconcile walk cost on this host since the last read. Hermes on a device is materially
+// slower than V8 on a laptop and sizing that multiplier is the whole reason this exists; `commits`
+// separates one expensive commit from a burst of cheap ones inside a frame. Reading zeroes the
+// accumulator, so a sampler on an interval gets disjoint windows rather than a growing total.
+export interface ICommitProfile {
+  commits: number;
+  walkMs: number;
+  nodesVisited: number;
+}
+
+export function readCommitProfile(): ICommitProfile {
+  const snapshot = {
+    commits: profile.commits,
+    walkMs: profile.walkMs,
+    nodesVisited: profile.nodesVisited,
+  };
+  profile.commits = 0;
+  profile.walkMs = 0;
+  profile.nodesVisited = 0;
+  return snapshot;
 }
 
 // Targeted per-frame prop write for the JS-driven Animated path. RN flushes an
@@ -508,6 +595,8 @@ export function setNativeProps(
       node.props[key] = value;
     }
   }
+  // Writes node.props directly rather than through setProp, so it owes its own mark.
+  markDirty(node);
   dlog(
     `setNativeProps root=${record.rootTag} tag=${record.tag} keys=${Object.keys(partial)}`,
   );

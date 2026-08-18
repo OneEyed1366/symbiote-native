@@ -97,8 +97,10 @@ mount → inserts → requestCommit() schedules completeRoot on a microtask  (ta
 ```
 
 React's `react-reconciler` commits **synchronously** (`resetAfterCommit → surface.commit()`),
-so by the time a React effect runs the tag exists. **Vue is the only adapter that
-races its own commit.** A native imperative call that reads the tag at lifecycle
+so by the time a React effect runs the tag exists. **Vue was the first adapter to
+race its own commit this way** — Angular's zoneless change detection inherited the
+identical timing gap verbatim (`.claude/skills/angular-adapter-change-detection/SKILL.md`
+§1). A native imperative call that reads the tag at lifecycle
 time and bails on `undefined` — with no retry — silently no-ops, and the feature is
 **dead on device** while the JS-path / headless smoke (which never needs the tag)
 stays green.
@@ -184,6 +186,10 @@ from `$attrs`, so adding `emits` without a bridge can break native event routing
 ## Reference
 
 - Vue event typing + attrs routing: `.claude/skills/vue-adapter-events/SKILL.md`.
+- Full engine mutation API, mirror mechanics, and the commit pipeline this skill's
+  two gotchas sit on top of: `.claude/skills/symbiote-engine-core/SKILL.md`.
+- `v-show`'s runtime-helper shim also drives `setNativeProps` on a host node — same
+  identity/timing rules apply: `.claude/skills/vue-adapter-directives/SKILL.md`.
 - Engine mirror + imperative APIs: `core/engine/src/commit.ts`.
 - Async commit batching: `core/engine/src/surface.ts` (`requestCommit`),
   `adapters/vue/src/renderer.ts` (the microtask-coalesced recommit).

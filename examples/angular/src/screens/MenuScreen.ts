@@ -73,6 +73,16 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     route: ROUTE_NAME.ReactiveStyle,
     hint: 'one tap must repaint every tile',
   },
+  {
+    label: 'Benchmark',
+    route: ROUTE_NAME.Benchmark,
+    hint: 'js-framework-benchmark ops + JS-thread FPS',
+  },
+  {
+    label: 'Angular probe',
+    route: ROUTE_NAME.Probe,
+    hint: 'change-detection passes, renderer writes, cell views',
+  },
 ];
 
 /**
@@ -98,11 +108,12 @@ const MENU_ITEMS: readonly IMenuItem[] = [
       >
         <View class="menu-hero">
           <Text class="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
-          <Text class="menu-hero-title">Ten stops along the stack</Text>
+          <Text class="menu-hero-title">Thirteen stops along the stack</Text>
           <Text class="menu-hero-subtitle">
             Each row below drives a different @symbiote-native/navigation line —
             Primitives, Presentation, Structure, Introspection, Routing — on a
-            real native stack.
+            real native stack, plus a Performance stop timing the engine's own
+            commit path.
           </Text>
         </View>
         @for (item of menuItems; track item.route) {

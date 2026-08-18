@@ -28,17 +28,30 @@ import { relative } from 'node:path';
 
 // pnpm keeps node_modules isolated per package, and `svelte` is a devDependency of
 // adapters/svelte — not of the repo root — so resolve from there, not from this script.
-const require = createRequire(new URL('../adapters/svelte/package.json', import.meta.url));
+const require = createRequire(
+  new URL('../adapters/svelte/package.json', import.meta.url),
+);
 const { parse } = require('svelte/compiler');
 
 // The built preprocessor, not the .ts source: this script is plain node with no TS loader, and
-// the build output is what a consuming app actually runs.
-const { collapseTextWhitespace } = await import(
-  new URL(
-    '../adapters/svelte/build/preprocessor/collapse-text-whitespace.js',
-    import.meta.url,
-  ).href
+// the build output is what a consuming app actually runs. A missing build would mean auditing
+// raw source — every normally-formatted file reported as an offender — so fail loudly instead of
+// producing a wrong report.
+const COLLAPSE_BUILD = new URL(
+  '../adapters/svelte/build/preprocessor/collapse-text-whitespace.js',
+  import.meta.url,
 );
+let collapseTextWhitespace;
+try {
+  ({ collapseTextWhitespace } = await import(COLLAPSE_BUILD.href));
+} catch {
+  console.error(
+    'audit-svelte-stray-whitespace: adapters/svelte build output missing.\n' +
+      'Run `pnpm typecheck` (which emits build/) first — auditing raw source would report every\n' +
+      'normally-formatted file as an offender.',
+  );
+  process.exit(2);
+}
 const collapse = collapseTextWhitespace();
 
 // Walks any parsed node shape looking for Text nodes whose real content spans source lines.

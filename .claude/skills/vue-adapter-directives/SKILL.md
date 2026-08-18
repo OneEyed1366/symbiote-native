@@ -84,7 +84,8 @@ A directive hook runs OUTSIDE the renderer's own `patchProp` path (see
 `SymbioteSurface` to call `requestCommit()` on. Do not invent new plumbing to work
 around this. `setNativeProps(node, partial)` (`core/engine/src/commit.ts`, ~line
 603) already exists for exactly this shape of problem — the JS-driven Animated
-native-frame path uses it for the same reason. It:
+native-frame path uses it for the same reason (full imperative/native-bridge
+surface: `symbiote-engine-core`). It:
 
 - looks up the node's own `rootTag` via the engine's internal `mirror` WeakMap and
   re-commits that root directly — no surface reference needed by the caller;
@@ -156,7 +157,9 @@ error. `isSymbioteNode` (`core/engine/src/node.ts`, exported from
 `@symbiote-native/engine`) is the engine's OWN branded-object check (a private `unique
 symbol` marker set by `createElement`/`createRawText`/`createAnchor`) — reuse it
 rather than inventing a new identity check; it is the SAME guard React's
-`createPortal` twin uses (`adapters/react/src/create-portal.ts`).
+`createPortal` twin uses (`adapters/react/src/create-portal.ts`). Node-identity
+mechanics generally (why a node must be held by identity, the WeakMap mirror
+this check backs) live in `symbiote-engine-core`.
 
 **Scope — same-surface targets only** (mirrors the React `createPortal` twin):
 the target must be a node already mounted in the SAME surface as the Teleport
@@ -169,12 +172,20 @@ crash. Cross-surface support is a deliberate non-goal for v1, not an oversight.
 
 ## Live examples — SFC vs TSX get the guard differently
 
-The demo lives in each app's `screens/CanaryScreen.*`, not `App.*` — both moved
-one level deeper into the nav tree once `@symbiote-native/navigation` gave each app a
-real Menu as its initial route (2026-07). This same move is why the demo went
-missing for a while: `examples/react`/`examples/vue-sfc`/`examples/vue-tsx` had
-only a Modal demo post-move, while `examples/angular/screens/CanaryScreen.ts`
-kept its `*portal`/`*tunnelIn` twin the whole time — brought back to parity here.
+The demo lives in each app's `screens/CanaryScreen.*`, not `App.*`.
+
+```
+§demo_relocation_regression := {
+  cause: "CanaryScreen moved one level deeper into the nav tree when
+          @symbiote-native/navigation gave each app a real Menu as its
+          initial route (2026-07)",
+  regression: "examples/react, examples/vue-sfc, examples/vue-tsx post-move
+               kept only a Modal demo; examples/angular/screens/CanaryScreen.ts
+               kept its *portal/*tunnelIn twin throughout, unaffected",
+  fix: "Teleport/createTunnel demo restored to examples/vue-sfc's
+        CanaryScreen.vue, brought back to parity with Angular",
+}
+```
 
 `examples/vue-sfc/screens/CanaryScreen.vue` has a "Show toast (Teleport)"
 button: the overlay host is a persistent, empty `<View pointer-events="box-none">`
@@ -242,7 +253,7 @@ imported into `CanaryScreen.tsx` rather than declared inline.
   this: `facebook/react#17147` and `pmndrs/tunnel-rat` show the React
   ecosystem hit and solved this exact class of problem the same way — see
   `react-adapter-portal`'s matching section for the full writeup and sources.
-  Angular has both twins too (`angular-adapter` §15) — `PortalDirective`/
+  Angular has both twins too (`angular-adapter-portal`) — `PortalDirective`/
   `PortalOutletDirective` and `createTunnel`'s `TunnelInDirective`/
   `TunnelOut` — but neither can be a per-call factory like this file's
   `In`/`Out`: Angular can't synthesize components at runtime (no JIT under

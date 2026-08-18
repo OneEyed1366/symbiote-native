@@ -80,6 +80,22 @@ Generalised: when a value is a DURATION, the test that pins it must be the one t
 If every test in the file awaits something first, the duration is uncovered no matter how many
 tests there are.
 
+## 6. A verification COMMAND that reports a false green — `prettier --check` through the rtk wrapper
+
+Measured 2026-08-20 during the millionjs merge: `prettier --check` run through this environment's
+`rtk` shell wrapper printed `All files formatted correctly` in the SAME run that emitted `[warn]`
+lines naming dirty files. The wrapper summarizes and the summary contradicts the detail; whichever
+is right, the output cannot be trusted as a gate.
+
+This is the same failure class as the five above, one level out: not a test that passes for the
+wrong reason, but a CHECK that reports success while its own output says otherwise. The habit that
+catches it is the same — read the detail lines, not the summary, and confirm a clean result a
+second way (the prettier Node API, or `--list-different`, which prints paths and nothing else)
+before believing a formatting gate.
+
+Generalised: when a tool's summary line and its detail lines disagree, believe the details. A
+summary is a claim; the details are the measurement.
+
 ## The rule this leaves
 
 **Every new test gets broken once.** Change the thing it guards, run it, read the failure message,

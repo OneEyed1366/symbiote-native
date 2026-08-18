@@ -14,12 +14,14 @@ import {
   isValidElement,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useReducer,
   useRef,
   useState,
   type ComponentType,
   type ReactElement,
   type ReactNode,
+  type Ref,
 } from 'react';
 import {
   AnimatedInterpolation,
@@ -45,8 +47,25 @@ import { Animated } from '../../modules/animated';
 // The props RN passes a sticky header wrapper (ScrollViewStickyHeader.js): the framework-agnostic
 // fields (IStickyHeaderProps) plus the React children slot. A custom StickyHeaderComponent must
 // accept the same shape.
+// What a mounted sticky header exposes to its ScrollView (RN's ScrollView.js:402 ref interface).
+// The parent pushes the NEXT header's measured y straight in here, so one header measuring costs
+// one call instead of a parent re-render.
+export type IStickyHeaderHandle = {
+  setNextHeaderY: (y: number) => void;
+};
+
+// How the ScrollView and its sticky headers exchange measurements (RN's _headerLayoutYs +
+// _stickyHeaderRefs, ScrollView.js:750-754). Grouped so the wrapper below keeps a readable
+// parameter list.
+export type IStickyCrossTalk = {
+  headerLayoutYs: ReadonlyMap<number, number>;
+  onHeaderLayoutY: (index: number, y: number) => void;
+  onHeaderRef: (index: number, handle: IStickyHeaderHandle | null) => void;
+};
+
 export type IStickyHeaderComponentProps = IStickyHeaderProps & {
   children?: ReactNode;
+  ref?: Ref<IStickyHeaderHandle>;
 };
 
 export type IStickyHeaderComponentType =
@@ -80,7 +99,29 @@ export const ScrollViewStickyHeader: IStickyHeaderComponentType = props => {
     scrollAnimatedValue,
     nextHeaderLayoutY,
     children,
+    ref,
   } = props;
+
+  // The next header's y lives HERE, not in a prop the parent re-renders to update (RN keeps it in
+  // the child too, ScrollViewStickyHeader.js:65). The prop only seeds the first render; afterwards
+  // the ScrollView pushes updates through setNextHeaderY. That keeps the cost linear - a
+  // parent-state round trip re-renders every child on every header's layout, so N headers cost N
+  // re-renders of N children. At N=200 it churned enough native animated nodes to trip Fabric's view
+  // registry ("Attempt to dequeue already registered component") seconds after mount.
+  const [nextHeaderY, setNextHeaderY] = useState<number | undefined>(
+    nextHeaderLayoutY,
+  );
+  useImperativeHandle(ref, () => ({ setNextHeaderY }), []);
+
+  // The imperative push is a fast path, not the source of truth. When the parent DOES re-render
+  // with a different value the prop wins, because the successor may be gone: a VirtualizedList
+  // unmounts headers as they scroll out, and a value pushed in earlier would otherwise stick
+  // around as a collision point that no longer exists.
+  const lastNextHeaderProp = useRef(nextHeaderLayoutY);
+  if (lastNextHeaderProp.current !== nextHeaderLayoutY) {
+    lastNextHeaderProp.current = nextHeaderLayoutY;
+    setNextHeaderY(nextHeaderLayoutY);
+  }
 
   // The one folded state cell (RN's scattered useState/useRef collapsed into IStickyHeaderState),
   // mutated in place by reduceSticky. Lazily created once.
@@ -109,13 +150,13 @@ export const ScrollViewStickyHeader: IStickyHeaderComponentType = props => {
     os: Platform.OS,
     inverted,
     scrollViewHeight,
-    nextHeaderLayoutY,
+    nextHeaderLayoutY: nextHeaderY,
   });
   inputsRef.current = {
     os: Platform.OS,
     inverted,
     scrollViewHeight,
-    nextHeaderLayoutY,
+    nextHeaderLayoutY: nextHeaderY,
   };
 
   // dispatch reaches through a ref because the effect executors dispatch follow-up actions
@@ -187,7 +228,7 @@ export const ScrollViewStickyHeader: IStickyHeaderComponentType = props => {
   // dispatches 'layout' itself); also does the initial identity build on mount.
   useEffect(() => {
     dispatchRef.current({ kind: 'inputs-changed' });
-  }, [inverted, scrollViewHeight, nextHeaderLayoutY, scrollAnimatedValue]);
+  }, [inverted, scrollViewHeight, nextHeaderY, scrollAnimatedValue]);
 
   // Detach the listener + clear the debounce on unmount.
   useEffect(
@@ -259,9 +300,9 @@ export function wrapStickyHeaders(
   invertStickyHeaders: boolean | undefined,
   scrollViewHeight: number | undefined,
   StickyHeaderComponent: IStickyHeaderComponentType | undefined,
-  headerLayoutYs: ReadonlyMap<number, number>,
-  onHeaderLayoutY: (index: number, y: number) => void,
+  crossTalk: IStickyCrossTalk,
 ): ReactNode {
+  const { headerLayoutYs, onHeaderLayoutY, onHeaderRef } = crossTalk;
   if (stickyHeaderIndices === undefined || stickyHeaderIndices.length === 0)
     return children;
   const Wrapper = StickyHeaderComponent ?? ScrollViewStickyHeader;
@@ -283,6 +324,11 @@ export function wrapStickyHeaders(
       Wrapper,
       {
         key: child.key ?? `sticky-${index}`,
+        // Registers this header so the ScrollView can push the NEXT header's y straight in
+        // (RN ScrollView.js:1109). Without it a measurement would have to travel through parent
+        // state, re-rendering every child.
+        ref: (handle: IStickyHeaderHandle | null): void =>
+          onHeaderRef(index, handle),
         nextHeaderLayoutY,
         // RN _onStickyHeaderLayout: record this header's own y, then push it to the previous
         // header as its nextHeaderLayoutY. We record into the parent map; the lookup above feeds

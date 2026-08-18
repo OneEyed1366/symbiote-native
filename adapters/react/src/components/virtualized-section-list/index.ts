@@ -64,6 +64,16 @@ export interface IVirtualizedSectionListProps<ItemT>
   SectionSeparatorComponent?:
     ComponentType<Record<string, never>> | ReactElement;
   keyExtractor?: (item: ItemT, index: number) => string;
+  // Fixed-layout fast path, FLAT like RN's: the SECTIONS array plus a flat entry index, where every
+  // section contributes two rows beyond its items (header, footer) and the caller accounts for them.
+  // A `({ section, index })` form would be our invention, not parity - `VirtualizedSectionList.js`
+  // has no getItemLayout code at all, the prop rides through `passThroughProps`; that shape is the
+  // community react-native-section-list-get-item-layout, layered on top. Without it a fast scroll
+  // outruns measurement and leaves blank windows.
+  getItemLayout?: (
+    data: ReadonlyArray<ISection<ItemT>> | null,
+    index: number,
+  ) => { length: number; offset: number; index: number };
   // Stick each section header to the top as the next section scrolls up. Routed to the inner
   // VirtualizedList's stickyHeaderIndices. Defaults to `Platform.OS === 'ios'` (RN
   // SectionList.js:243-244); Android does not stick by default. Pass true/false to override.
@@ -128,6 +138,9 @@ export function VirtualizedSectionList<ItemT>(
     // streams ISectionEntry<ItemT>, so we wrap it to unwrap each entry back to its ItemT.
     ItemSeparatorComponent,
     keyExtractor,
+    // Also pulled out of `rest`: the inner list streams entries, the user's callback expects
+    // sections. See entryItemLayout below.
+    getItemLayout,
     stickySectionHeadersEnabled,
     ...rest
   } = props;
@@ -247,6 +260,24 @@ export function VirtualizedSectionList<ItemT>(
     index: number,
   ): string => sectionEntryKey(entry, index, keyExtractor);
 
+  // Hand the callback `sections`, not the entries: RN's inner VirtualizedList gets
+  // `data={this.props.sections}` (VirtualizedSectionList.js:216) while ours streams the FLATTENED
+  // entries, so the same user code would otherwise see a different argument here than on RN.
+  //
+  // UPSTREAM-DIVERGENCE(react-native): the flat INDEX matches RN's (two rows per section, header
+  // and footer) only while SectionSeparatorComponent is unset. With it, flattenSections emits an
+  // extra 'section-separator' row per boundary that RN renders inside the neighbouring cell, so
+  // indices shift by one per boundary from the second section on. Deliberate - that row is how this
+  // adapter paints the separator; a caller combining the two must account for it.
+  const entryItemLayout =
+    getItemLayout === undefined
+      ? undefined
+      : (
+          _entries: unknown,
+          index: number,
+        ): { length: number; offset: number; index: number } =>
+          getItemLayout(sections, index);
+
   return createElement(VirtualizedList<ISectionEntry<ItemT>>, {
     ref: listRef,
     data: entries,
@@ -255,6 +286,7 @@ export function VirtualizedSectionList<ItemT>(
     getItemCount: (): number => entries.length,
     renderItem: renderEntry,
     keyExtractor: entryKeyExtractor,
+    getItemLayout: entryItemLayout,
     stickyHeaderIndices,
     ItemSeparatorComponent: entrySeparatorComponent,
     ...rest,

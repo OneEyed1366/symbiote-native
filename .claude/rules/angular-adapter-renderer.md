@@ -6,6 +6,15 @@ paths:
 
 # Angular adapter/renderer source — read `angular-adapter` first
 
+A new `@Component` here defaults to **CheckAlways** — Angular 22 assigns `LViewFlags.CheckAlways`
+unless the def is signal-based or OnPush (`view/construction.ts:263`), and a Global tick refreshes
+every CheckAlways view (`change_detection.ts:464`). The 15 primitives in `primitives/index.ts`
+(`ViewHost`/`TextHost`/…) are all CheckAlways today, so one tick walks the screen's whole primitive
+tree — the measured cause of Angular alone dropping the UI thread and starting at 250+ MB. Do not
+"fix" it by flipping OnPush component-by-component: `SymbioteStyleInputDirective` and the `ngDoCheck`
+polls exist because `[style]`/`class` never dirty a view, and CheckAlways is what currently covers
+that gap. Style/class get a signal path first. Full evidence and migration order: `angular-adapter` §21.
+
 Any composed `@Component` used as a plain `<Tag>` (adapter-authored, app-authored, or
 navigation-package-authored) MUST be in `ANCHOR_HOST_COMPONENTS`, or it silently paints
 wrong/invisible on a real device — never provable via vitest/tsc/ngc alone. The registry

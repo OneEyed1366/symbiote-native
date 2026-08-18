@@ -246,6 +246,9 @@ async function measureStickyHeaders(): Promise<void> {
       layout: { x: 0, y: index * ITEM_HEIGHT, width: 320, height: ITEM_HEIGHT },
     });
   }
+  // Two turns: the first drains the coalesced cross-talk flush (React's ScrollView batches a burst
+  // of header layouts into one handoff), the second lets the resulting state land.
+  await tick();
   await tick();
 }
 

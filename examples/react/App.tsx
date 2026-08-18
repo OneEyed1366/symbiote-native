@@ -39,6 +39,7 @@ import { HooksDemoScreen } from './screens/HooksDemoScreen';
 import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
 import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
+import { BenchmarkScreen } from './screens/BenchmarkScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
@@ -207,6 +208,19 @@ function App() {
             title: 'API Playground',
             headerShown: true,
             headerTintColor: LINE_COLOR.introspection,
+            headerTranslucent: true,
+            headerTitleColor: '#ffffff',
+            headerStyle: { backgroundColor: '#0b1622' },
+            headerUserInterfaceStyle: 'dark',
+          }}
+        />
+        <Stack.Screen
+          name={ROUTE_NAME.Benchmark}
+          component={BenchmarkScreen}
+          options={{
+            title: 'Benchmark',
+            headerShown: true,
+            headerTintColor: LINE_COLOR.performance,
             headerTranslucent: true,
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },

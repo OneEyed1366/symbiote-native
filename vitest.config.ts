@@ -21,6 +21,16 @@ const INCLUDE_ALL = [
   'tests/**/*.test.{ts,tsx}',
 ];
 
+// `vitest bench` files, co-located next to the tests of the thing they time. Scoped
+// explicitly because both projects below would otherwise match the same file by default and
+// run every benchmark twice.
+const BENCH_ALL = [
+  'core/**/src/**/*.bench.ts',
+  'adapters/**/src/**/*.bench.ts',
+  'packages/**/src/**/*.bench.ts',
+];
+const SVELTE_BENCH = ['adapters/svelte/**/*.bench.ts'];
+
 // `**/e2e/**` keeps the Detox on-device suite (jest-based) out of the vitest run.
 // Its `*.test.ts` files import `detox` and drive a real device, not the fake-Fabric slot.
 const EXCLUDE_ALL = ['**/node_modules/**', '**/build/**', '**/e2e/**'];
@@ -94,6 +104,7 @@ export default defineConfig({
           name: 'svelte',
           include: SVELTE_TESTS,
           exclude: EXCLUDE_ALL,
+          benchmark: { include: SVELTE_BENCH, exclude: EXCLUDE_ALL },
         },
       },
       {
@@ -113,6 +124,10 @@ export default defineConfig({
           name: 'default',
           include: INCLUDE_ALL,
           exclude: [...EXCLUDE_ALL, ...SVELTE_TESTS, ...SOLID_TESTS],
+          benchmark: {
+            include: BENCH_ALL,
+            exclude: [...EXCLUDE_ALL, ...SVELTE_BENCH],
+          },
         },
       },
     ],

@@ -12,6 +12,7 @@ export const NAV_LINE = {
   Structure: 'structure',
   Introspection: 'introspection',
   Routing: 'routing',
+  Performance: 'performance',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -26,6 +27,9 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.Structure]: '#4fd1a5',
   [NAV_LINE.Introspection]: '#b18cf5',
   [NAV_LINE.Routing]: '#f2789a',
+  // The only warm hue in the set — the benchmark stop is not a navigation line and should not
+  // read as one at a glance.
+  [NAV_LINE.Performance]: '#f5a524',
 };
 
 export type INavLineInfo = {
@@ -96,5 +100,15 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     line: NAV_LINE.Primitives,
     code: 'AP',
     label: 'PRIMITIVES LINE',
+  },
+  [ROUTE_NAME.Benchmark]: {
+    line: NAV_LINE.Performance,
+    code: 'BM',
+    label: 'PERFORMANCE LINE',
+  },
+  [ROUTE_NAME.Probe]: {
+    line: NAV_LINE.Performance,
+    code: 'PR',
+    label: 'PERFORMANCE LINE',
   },
 };

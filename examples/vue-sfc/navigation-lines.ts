@@ -1,12 +1,13 @@
 import { ROUTE_NAME } from './routes';
 import type { IRouteName } from './routes';
 
-// The @symbiote-native/navigation demo suite groups 9 of its 10 tour screens into 5 thematic
-// "lines" — which part of the package each screen exercises — carried through MenuScreen's row
-// badges, each demo screen's own line tag, and (where the native header/tab bar already takes a
-// tint color) the OS chrome itself. One color per line replaces the single flat accent every
-// row/button used to share. Kept in sync by hand with App.css's `:root` `--line-*` tokens — CSS
-// custom properties and this module are different runtimes with no shared import path.
+// The @symbiote-native/navigation demo suite groups 10 of its 11 tour screens into 6 thematic
+// "lines" — which part of the package each screen exercises, plus a Performance line for the
+// benchmark stop — carried through MenuScreen's row badges, each demo screen's own line tag, and
+// (where the native header/tab bar already takes a tint color) the OS chrome itself. One color per
+// line replaces the single flat accent every row/button used to share. Kept in sync by hand with
+// App.css's `:root` `--line-*` tokens — CSS custom properties and this module are different
+// runtimes with no shared import path.
 //
 // Composition is the odd one out: ApiPlayground doesn't exercise @symbiote-native/navigation at
 // all — it's a live demo of Vue's OWN template/Composition API surface running under Symbiote's
@@ -19,6 +20,7 @@ export const NAV_LINE = {
   Introspection: 'introspection',
   Routing: 'routing',
   Composition: 'composition',
+  Performance: 'performance',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -35,9 +37,12 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.Structure]: '#4fd1a5',
   [NAV_LINE.Introspection]: '#b18cf5',
   [NAV_LINE.Routing]: '#f2789a',
-  // Warm amber — visually distinct from every navigation-package line above, since this line
-  // isn't about @symbiote-native/navigation at all.
-  [NAV_LINE.Composition]: '#f5a623',
+  // Warm orange — visually distinct from every navigation-package line above, since this line
+  // isn't about @symbiote-native/navigation at all. Deliberately lighter than Performance's
+  // amber below: the two sit next to each other in the menu and must read apart.
+  [NAV_LINE.Composition]: '#f6ad55',
+  // Amber — the only line color tied to timing rather than to a package feature.
+  [NAV_LINE.Performance]: '#f5a524',
 };
 
 export type INavLineInfo = {
@@ -47,7 +52,7 @@ export type INavLineInfo = {
 };
 
 // Every route reachable from MenuScreen, minus Menu itself. Deliberately excludes Details — it's a
-// plain push-target off Canary, not one of the 9 tour stops.
+// plain push-target off Canary, not one of the 11 tour stops.
 export type ITourRouteName = Exclude<
   IRouteName,
   typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details
@@ -103,5 +108,10 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     line: NAV_LINE.Composition,
     code: 'AP',
     label: 'COMPOSITION LINE',
+  },
+  [ROUTE_NAME.Benchmark]: {
+    line: NAV_LINE.Performance,
+    code: 'BM',
+    label: 'PERFORMANCE LINE',
   },
 };

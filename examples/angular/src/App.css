@@ -34,6 +34,9 @@
   --line-structure: #4fd1a5;
   --line-introspection: #b18cf5;
   --line-routing: #f2789a;
+  /* the only warm hue in the set — the benchmark stop is not a navigation line and should
+     not read as one at a glance. */
+  --line-performance: #f5a524;
 }
 
 /* shared / common. .section is the outermost content wrapper directly inside a demo screen's
@@ -461,6 +464,9 @@
 .line-tag-routing {
   background-color: var(--line-routing);
 }
+.line-tag-performance {
+  background-color: var(--line-performance);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -505,6 +511,10 @@
   border-left-width: 3px;
   border-left-color: var(--line-routing);
 }
+.menu-row-performance {
+  border-left-width: 3px;
+  border-left-color: var(--line-performance);
+}
 
 .menu-badge {
   width: 34px;
@@ -527,6 +537,9 @@
 }
 .menu-badge-routing {
   background-color: var(--line-routing);
+}
+.menu-badge-performance {
+  background-color: var(--line-performance);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -561,4 +574,7 @@
 }
 .menu-row-hint-routing {
   color: var(--line-routing);
+}
+.menu-row-hint-performance {
+  color: var(--line-performance);
 }

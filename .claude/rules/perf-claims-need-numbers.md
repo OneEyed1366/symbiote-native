@@ -1,0 +1,63 @@
+---
+paths:
+  - "core/engine/src/commit.ts"
+  - "**/*.bench.ts"
+  - "examples/*/screens/BenchmarkScreen.*"
+  - "examples/*/components/JsFrameRateMeter.*"
+---
+
+# A performance claim needs a number, and the right number
+
+Invoke the `symbiote-perf-measurement` skill before optimizing this path or
+changing a benchmark. The must-apply points:
+
+- **A per-adapter spread cannot come from shared engine code.** `reconcile` sits
+  behind all four adapters, so it adds the same term to each. React 2 frames /
+  Vue 1 / Svelte 0 on one screen means the variable part lives above the engine.
+  This bounds the walk from ABOVE only — it never proves the walk is cheap.
+- **Measured, desktop V8, after dirty-marking landed (2026-08-18):** a no-op commit
+  on 9761 nodes is ~0.001 ms and one prop deep in a 10 005-node sectioned screen is
+  ~0.063 ms (was 3.4 / 3.2 ms). An unmarked full-tree walk was ~0.5 us/node and ~77%
+  of a commit; if a number drifts back toward that, a `markDirty` went missing.
+- **A FLAT benchmark tree cannot show a subtree-skip win, and krausest's is flat** —
+  a flat parent re-appends all N child handles on any change, which is Fabric's
+  protocol, not our walk. Always keep a bushy/sectioned case beside the flat one.
+- **Benchmarks run `pnpm bench`** (sets `--max-semi-space-size=64`; without it
+  `fabricProps`'s props-object-per-node-per-commit garbage makes results useless:
+  105 ms ±91% vs 4.7 ms ±1.6%). Read `min`, not p75 or mean, on the create-shaped rows — GC makes their p75 swing
+  ±5% to ±85% run to run.
+- **`Remove row` and `Append 1 000` are NOT comparable across adapters yet** — the screen does not
+  pin press order, so each acts on whatever row count happened to be on screen. Same adapter, same
+  build, two runs: Remove 87-107 ms vs 418.6 ms, Append 953 vs 1678 ms, while Create / Replace /
+  Partial / Select / Swap reproduced inside 1-3%. Compare on the reproducible rows and the meter.
+- **Operations come verbatim from js-framework-benchmark (krausest)** so numbers
+  stay comparable to Vue/Svelte/Solid/Million. Do not invent a nicer set.
+- **Device numbers require a release build** — dev-mode JS drowns the signal, by 3-9x. Measured
+  2026-08-18, iOS 26.5 simulator, `examples/react`, ~2 000 rows / 17 991 native views:
+  Select row 9.3 ms · Partial update 31.8 ms · Create 1 000 rows 254.7 ms · Append 1 000 rows
+  345.9 ms (the Debug figures for the same ops are 83 / 140 / 836 / 953 ms).
+- **A `DEBUG=1` build measures the logging, not the code.** `dlog` is gated, not free once on: the
+  sticky path alone emits ~6 lines per wrapper rebuild, all through the RN bridge into a DevTools
+  console that RETAINS every message. Measured 2026-08-18: one drag down `examples/angular`'s
+  benchmark screen produced **8 000+ console lines** and drove JS to 1 fps — and a JS thread that
+  starved cannot advance a `VirtualizedList` window, so the list goes BLANK while native scrolling
+  keeps working. That reads exactly like a rendering bug and is not one.
+- **Instrumentation density is NOT a proxy for log volume — read the console's hidden-message counter
+  instead.** Counting `dlog` SITES predicts nothing: `adapters/*/src/components/scroll-view` holds 34
+  on Angular vs 5 on React, which predicted ~7x the traffic, and the measured per-gesture volume for
+  the same drag came out **8 000+ (Angular) vs 6 815 (React)** — 17% apart. Almost all of it
+  originates in the SHARED core (303 `dlog` sites there), which both adapters walk. So "adapter X is
+  more instrumented" is not an explanation for anything; DevTools' `N hidden` count on an identical
+  gesture is the measurement, and it is free to take.
+- **When two adapters starve IDENTICALLY, stop measuring throughput and start measuring RECOVERY.**
+  Same gesture, same ~7k lines: React AND Angular both bottom out at 1 fps under a hard drag, so the
+  stall is the shared logging load and carries no adapter signal at all. What differs is afterwards —
+  React renders every cell once the thread catches up; Angular's list stays permanently blank with
+  JS and UI both back at 60 fps. A fault that survives the return to idle is a dropped update that
+  never re-converges, NOT a slow path, and no amount of optimizing will remove it. Chasing the fps
+  number here wastes the run; the question is whether the final state is correct.
+- **The walk is no longer the bottleneck, so stop optimizing it.** Same run, idle/scrolling:
+  the reconcile walk is **0.1% of the window, 75 nodes/commit, 0.4 ms/commit** at 60 fps. What
+  still costs is native view creation and the flat-parent child-set re-append — Fabric's
+  persistent-tree protocol, not our JS. Visible in one comparison: `Select row` 9.3 ms
+  (props-only clone) vs `Remove row` 103.3 ms (structural → re-append every child handle).

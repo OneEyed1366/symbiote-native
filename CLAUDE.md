@@ -258,6 +258,21 @@ Fix: `rm -rf ios/Pods/React-Core-prebuilt ios/Pods/ReactNativeCore-artifacts` th
 and re-run the probe above to confirm the debug flavor landed BEFORE spending another build on
 it. Do NOT reach for `RCT_USE_PREBUILT_RNCORE=0` (RN's documented build-from-source escape hatch)
 first — it costs a 30-minute from-source build to work around a stale download.
+
+**But first check whether there is anything to fix at all — the swap is AUTOMATIC, and the probe
+reading "debug" is the normal resting state.** The podspec's `source` URL is hardcoded to the
+`-debug` tarball, so a fresh `pod install` ALWAYS leaves the debug flavor extracted, whatever you
+intend to build. RN then swaps it per build: `React-Core-prebuilt` carries a `before_compile`
+script phase, `[RNCore] Replace React Native Core for the right configuration`, which reads
+`DEBUG=1` out of `GCC_PREPROCESSOR_DEFINITIONS` and runs
+`react-native/scripts/replace-rncore-version.js -c Release|Debug`. Both tarballs sit side by side
+in `Pods/ReactNativeCore-artifacts/`, so the swap is local — no network, no re-download.
+
+Verified 2026-08-18 on `examples/react`: probe before `npm run ios:release` = 131MB / 80 symbols
+(debug); the Release build succeeded and the same probe after = **24MB / 0 symbols** (release).
+So "Pods holds debug while I am building Release" is NOT the bug and clearing pods over it wastes
+a build. The failure above is specifically a stale or missing DOWNLOAD, and its signature is a
+LINKER error naming `facebook::react::Sealable` / `getDebug*` — not a probe result on its own.
 </examples_vs_dot_examples>
 
 <components_split_logic_view_lifecycle>

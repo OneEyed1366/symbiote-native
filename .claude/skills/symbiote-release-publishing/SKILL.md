@@ -17,6 +17,10 @@ zero-build in-repo dev loop (Metro resolving `src/*.ts` directly today).
 > already works (in-repo dev), which is why it's a `publishConfig` overlay, not
 > a rewrite of `main`/`exports`.
 
+For a brand-new package, decide the publish tier (bare-skeleton / core-only /
+full parity) FIRST — see `symbiote-new-package-skeleton` — before wiring any
+of the mechanism below onto it.
+
 ## The mechanism — one sentence
 
 **`main`/`module`/`types`/`exports` stay pointed at `src/index.ts` (unchanged,
@@ -98,142 +102,135 @@ for the native-only package.
 
 ## Gotcha (fixed 2026-07): the hidden-folder `.gitignore` rule ate `.github/` itself
 
-`.gitignore` had `.*/` to keep local-only dotfolders (`.claude`, `.docs`,
-`.notes`, `.vendors`, …) out of git. That pattern also matches `.github/` —
-so `.github/workflows/release.yml` existed on disk, was described by this very
-skill, and `git status`/`git add -A` never showed it as untracked (blanket
-dir-ignore, not a per-file miss) — it was **never committed, never pushed,
-never run**, for as long as that rule existed. `git check-ignore -v <path>`
-is what surfaces this; plain `git status` looks clean because an ignored
-directory just doesn't appear at all, ignored or not-yet-tracked look
-identical from a glance. Fixed with an explicit re-include after the blanket
-rule:
-
 ```
-.*/
-!.github/
+§gitignore_ate_github := {
+  bug: ".gitignore's `.*/` (meant for .claude/.docs/.notes/.vendors) also matches `.github/`",
+  scope: ".github/workflows/release.yml existed on disk, described by this skill,
+          never committed/pushed/run — blanket dir-ignore, not a per-file miss",
+  symptom: "git status / git add -A show nothing — an ignored dir just doesn't appear,
+            ignored vs not-yet-tracked look identical at a glance",
+  diagnose: "git check-ignore -v <path> (or `git status --porcelain -- <dir>` showing ??)",
+  fix: [".gitignore: `.*/` then `!.github/`"],
+  open: "verify any FUTURE blanket dir-ignore rule the same way before trusting it"
+}
 ```
-
-**Lesson for any FUTURE blanket-ignore rule in this repo**: verify with
-`git check-ignore -v <path>` (or `git status --porcelain -- <dir>` showing
-`??`) that it isn't also swallowing something that must ship — a directory
-pattern that "obviously" only means local scratch dirs can silently net a
-real one too.
 
 ## Gotcha (found 2026-07 via the canary-release CI work): `fix-esm-extensions` and a publishable package's `build/` (argument list since removed — read to the end)
 
-`fix-esm-extensions` (see `scripts/fix-esm-extensions.mjs`'s own header
-comment for why it exists at all — `tsc --build` emits relative imports with
-no extension, which Node's own ESM loader rejects outside a bundler) only
-rewrites the `build/` directories passed to it as CLI args in the root
-`fix-esm-extensions` script. `core/test-utils/build` was missing from that
-argument list since the package was first published — every published
-version (0.1.1 through 0.1.3) shipped a `build/index.js` doing
-`export * from './fake-fabric'` (no `.js`), which fails at import time for
-any REAL npm consumer (`Cannot find module '.../build/fake-fabric'`) while
-looking completely fine in-repo, because Metro/Vitest resolve `src/*.ts`
-directly and never touch `build/` at all. Caught only because adding a
-`test` job to CI (running `pnpm run test` against `examples/*`'s real
-`catalog:`-installed `@symbiote-native/test-utils`) turned it from
-"invisible" to "one failing suite, 833/834 passing." Fixed by adding
-`core/test-utils/build` to the list; see the `test-utils-esm-extension`
-changeset for the republish.
+```
+§fix_esm_extensions_arglist_GONE_2026_08_17 := {
+  status: "the hand-maintained argument list is GONE — do not go looking for it.
+           Re-verified 2026-08-17 against scripts/fix-esm-extensions.mjs (`const dirs =
+           process.argv.slice(2).length > 0 ? process.argv.slice(2) : esmExtensionBuildDirs()`)
+           and the root script, which passes no args",
+  mechanism_now: "the forget-one-package failure mode below was closed STRUCTURALLY, not by
+                  discipline: with no CLI args the script derives every directory from each
+                  publishable package's OWN publishConfig (scripts/lib/build-dirs.mjs's
+                  esmExtensionBuildDirs(), filtered on !pkg.private via publishable-packages.mjs).
+                  A new publishable package is covered automatically; CLI args survive only as a
+                  manual override for running the script over one directory",
+  what_a_new_package_still_needs: "publishConfig pointing under ./build/ — that string match is
+                                   what makes it visible to the sweep — and `private` NOT set,
+                                   which is also the repo's gate for 'not publishable yet'
+                                   (adapters/solid uses it while below feature parity)",
+  genuinely_per_package: "the emitted EXTENSION. The sweep understands .js and .jsx (EMITTED_EXTS,
+                          added 2026-08-17 for adapters/solid, which builds with jsx:'preserve' so
+                          tsc type-checks JSX and emits it untouched for the consuming app's Babel
+                          to compile). BOTH directions matter — a file has to be SCANNED and
+                          RESOLVED TO — so a package emitting some third extension needs it added
+                          in all three places (listEmittedFiles, hasPlatformSibling,
+                          resolveSpecifier) plus EXT_RE",
+  symptom_of_a_missing_extension: "identical to the original gotcha: UNRESOLVED at the publish
+                                   gate, or a silently unscanned file — invisible in-repo because
+                                   local resolution never touches build/",
+}
+```
 
-**The hand-maintained argument list is GONE — do not go looking for it
-(re-verified 2026-08-17).** The forget-one-package failure mode was closed
-structurally, not by discipline: with no CLI args the script derives every
-directory from each publishable package's OWN `publishConfig`
-(`scripts/lib/build-dirs.mjs`'s `esmExtensionBuildDirs()`, filtered on
-`!pkg.private` via `publishable-packages.mjs`). A new publishable package is
-therefore covered automatically, and CLI args remain only as a manual override
-for running the script over one directory. What a new package DOES still need
-is `publishConfig` pointing under `./build/` — that string match is what makes
-it visible to the sweep — and `private` NOT set, which is also the repo's gate
-for "not publishable yet" (`adapters/solid` uses it while below feature parity).
-
-**What genuinely is per-package: the emitted EXTENSION.** The sweep understands
-`.js` and `.jsx` (`EMITTED_EXTS`, added 2026-08-17 for `adapters/solid`, which
-builds with `jsx: 'preserve'` so tsc type-checks JSX and emits it untouched for
-the consuming app's Babel to compile). Both directions matter — the file has to
-be SCANNED and RESOLVED TO — so a package emitting some third extension needs
-that extension added in all three places (`listEmittedFiles`,
-`hasPlatformSibling`, `resolveSpecifier`) plus `EXT_RE`. Symptom of a missing
-one is identical to the original gotcha: `UNRESOLVED` at the publish gate, or a
-silently unscanned file, invisible in-repo because local resolution never touches
-`build/`.
+```
+§fix_esm_extensions_missing_pkg := {
+  mechanism_AT_THE_TIME: "scripts/fix-esm-extensions.mjs rewrites extension-less relative
+              imports tsc --build emits (Node ESM loader rejects them outside a bundler) —
+              back then ONLY for build/ dirs passed as CLI args in the root
+              `fix-esm-extensions` script; not inferred from files/publishConfig, a flat
+              easy-to-forget list. SUPERSEDED — see the block above",
+  bug: "core/test-utils/build missing from that arg list since first publish",
+  scope: "every published version 0.1.1-0.1.3 shipped build/index.js doing
+          `export * from './fake-fabric'` (no .js)",
+  symptom: "real npm consumer: Cannot find module '.../build/fake-fabric';
+            invisible in-repo — Metro/Vitest resolve src/*.ts directly, never touch build/",
+  how_found: "adding a `test` CI job (pnpm run test against examples/*'s real
+              catalog:-installed @symbiote-native/test-utils) → 833/834 passing, 1 failing suite",
+  fix: "add core/test-utils/build to the arg list; republished via
+        the `test-utils-esm-extension` changeset",
+  rule_SUPERSEDED: "was 'adding a new publishable package with its own build/ → add it to
+         this script's argument list in the SAME change'; there is no argument list now —
+         give the package a publishConfig under ./build/ and leave `private` unset"
+}
+```
 
 ## Gotcha (found 2026-07-23 via a `sensors` canary that shipped with no `build/` at all): a mixed-mechanism package's `clean` script must target `build-ngc`, never `build`
 
-Any package with the **mixed mechanism** (a plain `publishConfig` override for
-`.`/`./react`/`./vue` pointed at `build/{core,react,vue}/...`, PLUS a
-conditional `./angular` export pointed at a _separate_ `build-ngc/angular/...`
-— `slider`, `navigation`, `splash-screen`, `sensors`) runs `prepublish-build`
-as `typecheck && fix-esm-extensions && ng:build`, in that order. `typecheck`
-(`tsc --build`) emits the plain `build/` tree first; `ng:build` runs after it
-as `pnpm run clean && ngc -p tsconfig.angular.json`. If that package's own
-`clean` script reads `"rm -rf build"` (copy-pasted from `@symbiote-native/
-angular`, where it's CORRECT — see below), it deletes the `build/` tree
-`typecheck` just produced, `ngc` only ever repopulates `build-ngc/`, and
-nothing regenerates `build/` afterward. The packed tarball ships `build-ngc/`
-but no `build/`, while `exports["."]`/`exports["./react"]`/`exports["./vue"]`
-still point at `./build/...` — every consumer's `Cannot find module
-'@symbiote-native/<pkg>/react'` (Metro AND `tsc`/`vue-tsc` alike; confirmed via
-a real Metro bundle attempt, not just a type-checker false positive). Silent
-in-repo: `workspace:*` resolution never touches a package's own `build/` at
-all, so this is invisible until a real packed install (canary or npm).
-
-**`@symbiote-native/angular` itself is NOT affected and must NOT get this
-fix** — its own `ngc` outDir is `build/angular` (a SUBFOLDER of `build`, not a
-sibling `build-ngc`), and its `exports` never reference plain `build/*.js`
-directly, only `build/angular/*` — so `clean: "rm -rf build"` there correctly
-wipes the whole tree before `ngc` regenerates just the `angular/` subfolder.
-Check each package's own `tsconfig.angular.json` `outDir` before assuming
-which fix applies — `build-ngc` (sibling, needs this fix) vs `build/angular`
-(subfolder, already correct).
-
-Fixed 2026-07-23 in `packages/{sensors,navigation,slider,splash-screen}/
-package.json`: `"clean": "rm -rf build-ngc"`. Verified by deleting both dirs,
-running `npx tsc --build packages/sensors` (repopulates `build/{core,react,
-vue,angular}`), then `pnpm run ng:build` inside the package (confirms `build/`
-still has all 4 subfolders afterward, `build-ngc/` also regenerates). Any
-FUTURE mixed-mechanism package must get `clean` pointed at `build-ngc`, not
-`build`, from the start — check this the moment a new package.json copies the
-`ng:build`/`clean` pair from an existing one.
+```
+§clean_wipes_build_before_ngc := {
+  affected: ["slider", "navigation", "splash-screen", "sensors"],
+  mechanism: "mixed-mechanism package: plain publishConfig for ./ + ./react + ./vue →
+              build/{core,react,vue}/..., PLUS conditional ./angular export →
+              separate build-ngc/angular/...;
+              prepublish-build runs `typecheck && fix-esm-extensions && ng:build` in order;
+              ng:build = `pnpm run clean && ngc -p tsconfig.angular.json`",
+  bug: "clean script copy-pasted `rm -rf build` from @symbiote-native/angular (correct THERE,
+        see below) — deletes the build/ tree typecheck just produced;
+        ngc only ever repopulates build-ngc/, nothing regenerates build/ after",
+  symptom: "tarball ships build-ngc/ but no build/, while
+            exports['.']/['./react']/['./vue'] still point at ./build/...
+            → Cannot find module '@symbiote-native/<pkg>/react' (Metro AND tsc/vue-tsc,
+            confirmed via real Metro bundle, not just a type-checker false positive)",
+  why_silent_in_repo: "workspace:* resolution never touches a package's own build/ —
+                       invisible until a real packed install (canary or npm)",
+  ruled_out_angular_itself: "@symbiote-native/angular's ngc outDir is build/angular
+                             (SUBFOLDER of build, not sibling build-ngc); its exports
+                             only ever reference build/angular/* — so its own
+                             `clean: rm -rf build` is CORRECT and must NOT get this fix.
+                             Check tsconfig.angular.json's outDir per package before assuming",
+  fix: "packages/{sensors,navigation,slider,splash-screen}/package.json:
+        `clean: rm -rf build-ngc`",
+  verified: "delete both dirs → `npx tsc --build packages/sensors` repopulates
+             build/{core,react,vue,angular} → `pnpm run ng:build` inside package
+             confirms build/ still has all 4 subfolders, build-ngc/ also regenerates",
+  rule: "any FUTURE mixed-mechanism package copying the ng:build/clean pair
+         must point clean at build-ngc, not build, from the start"
+}
+```
 
 ### `pre-push` must `unset GIT_DIR` or every push from a worktree fails (2026-08-16)
 
-`.husky/pre-push` gates a branch on `pnpm exec changeset status --since=master`.
-From a **linked git worktree** that gate failed with a lie:
-
 ```
-error Some packages have been changed but no changesets were found.
-husky - pre-push script failed (code 1)
+§prepush_gitdir_worktree := {
+  bug: ".husky/pre-push gates on `pnpm exec changeset status --since=master`;
+        fails from a LINKED git worktree with a lie",
+  symptom: "error Some packages have been changed but no changesets were found.
+            husky - pre-push script failed (code 1)
+            — despite 34 .changeset/*.md files present, and the SAME command
+            run by hand in the same dir exits 0",
+  root_cause: "git exports GIT_DIR to every hook; in a linked worktree it's
+               ABSOLUTE (<main>/.git/worktrees/<name>), not the relative .git a
+               normal checkout gets. GIT_DIR set + no GIT_WORK_TREE ⟶ git skips
+               discovery, treats CWD as work-tree root. @changesets/read's
+               filterChangesetsSinceRef runs its diff with cwd=<root>/.changeset,
+               so git rooted the tree at .changeset/ and returned README.md
+               instead of .changeset/*.md ⟶ regex /.changeset\\/[^/]+\\.md$/
+               matches nothing ⟶ changesets.length===0 ⟶ the error above
+               (changesets-cli.cjs.js, changedPackages.length>0 &&
+               changesets.length===0 branch). Main checkout's exported .git is
+               relative, fails to resolve from .changeset/, falls back to
+               discovery — only worktrees hit this",
+  fix: "top of .husky/pre-push: `unset GIT_DIR GIT_WORK_TREE`",
+  repro: "git push --dry-run runs pre-push for real; running the hook body by
+          hand does NOT reproduce it — the env var only exists under git",
+  scope: "same trap applies to any hook shelling out to a tool that runs git
+          from a subdirectory"
+}
 ```
-
-while the branch carried 34 `.changeset/*.md` files and the SAME command run by
-hand in the same directory exited 0. The difference is the environment, not the
-state: git exports `GIT_DIR` to every hook, and in a linked worktree that value
-is ABSOLUTE (`<main>/.git/worktrees/<name>`), not the relative `.git` a normal
-checkout gets. With `GIT_DIR` set and no `GIT_WORK_TREE`, git skips discovery and
-treats the CURRENT DIRECTORY as the work-tree root. `@changesets/read` runs its
-diff with `cwd = <root>/.changeset` (`filterChangesetsSinceRef`), so git rooted
-the work tree at `.changeset/` and returned `README.md` instead of
-`.changeset/*.md`. Its regex `/.changeset\/[^/]+\.md$/` matched nothing ->
-`changesets.length === 0` -> the error above (`changesets-cli.cjs.js`, the
-`changedPackages.length > 0 && changesets.length === 0` branch). In the main
-checkout the exported `.git` is relative, fails to resolve from `.changeset/`,
-and git falls back to discovery - which is why this only ever bites worktrees.
-
-Fix, at the top of the hook:
-
-```sh
-unset GIT_DIR GIT_WORK_TREE
-```
-
-Reproduce without pushing: `git push --dry-run` runs pre-push for real. Running
-the hook body by hand does NOT reproduce it - the env var is only there under
-git. The same trap applies to any hook that shells out to a tool which runs git
-from a subdirectory.
 
 ## Changesets config (`.changeset/config.json`)
 
@@ -294,56 +291,44 @@ re-registration first, or every publish from it 404s (npm returns 404, not
 
 ## Gotcha (found 2026-08-06 during the 18-package first-publish run): `pnpm publish` never completes npm's browser 2FA flow — pack with pnpm, upload with npm
 
-npm now requires 2FA for direct publishing even with a token in `~/.npmrc` (the
-`npm notice ... tokens that bypass 2FA are being restricted for account changes
-and direct publishing` banner). The 2FA flow prints an auth URL, the user
-approves it in a browser, and the CLI long-polls
-`registry.npmjs.org/-/v1/done?authId=…` for the result.
-
-**`pnpm publish` never picks up that result.** It prints the URL, the browser
-approval succeeds, and the CLI waits forever. Rule out the network, the proxy
-and the account in one step: run `npm trust list <pkg>`, which drives the
-identical flow against the identical registry through the identical proxy. If it
-completes while the publish hangs, the tool is what differs.
-
-**But `npm publish` cannot replace `pnpm publish` directly.** Two things only
-pnpm does when packing:
-
-1. Resolves `catalog:` and `workspace:*` specifiers into real versions. 31 of
-   the 34 publishable packages use them; npm understands neither and would ship
-   `"expo-modules-core": "catalog:"` verbatim — an uninstallable package.
-2. Applies the `publishConfig` overlay (`main`/`module`/`types`/`exports` →
-   `build/`). npm's own `publishConfig` support does not cover these field
-   overrides, so an npm-packed tarball keeps `main: src/index.ts`.
-
-So split the job — pnpm owns the manifest, npm owns the upload:
-
-```js
-const packed = execFileSync('pnpm', ['pack', '--pack-destination', tmpdir()], {
-  cwd: dir,
-  encoding: 'utf8',
-});
-const tarball = packed.trim().split('\n').filter(Boolean).pop(); // pnpm prints the path last
-execFileSync('npm', ['publish', tarball, '--access', 'public'], { stdio: 'inherit' });
 ```
-
-This is what `scripts/trust-publishers.mjs` does. Verify a tarball before
-trusting the split: `main` must read `./build/...` and no `catalog:`/`workspace:`
-string may survive anywhere in the packed `package.json`.
-
-Two more things that look like failures in that script's output and are not:
-
-- **`E409` from `npm trust github`** means the package already carries this trust
-  config — expected on every re-run over an already-published repo. The script
-  treats it as "already configured, skipping".
-- **A fresh publish 404s on read for minutes.** `npm view` and even an anonymous
-  `curl https://registry.npmjs.org/<pkg>` return 404 while the write side already
-  knows the package (`npm trust` succeeds against it and returns a server-issued
-  UUID). In the 2026-08-06 run, 17 packages read as missing immediately after
-  publishing and 9 minutes later only the alphabetically-last 9 still did — they
-  were landing in publish order. Do NOT re-publish or debug on the strength of a
-  post-publish 404; re-check after a few minutes. Beware also that a verification
-  loop of ~34 `npm view` calls rotates `~/.npmrc`'s `_logs` (default `logs-max` 10) and destroys the publish logs you would want to read afterwards.
+§pnpm_publish_2fa_hang := {
+  context: "npm now requires 2FA for direct publish even with a token in ~/.npmrc
+            ('tokens that bypass 2FA are being restricted...' banner);
+            flow prints an auth URL, browser approves, CLI long-polls
+            registry.npmjs.org/-/v1/done?authId=…",
+  bug: "pnpm publish never picks up the poll result — prints the URL, browser
+        approval succeeds, CLI waits forever",
+  isolate: "`npm trust list <pkg>` drives the identical flow/registry/proxy;
+            if IT completes while publish hangs, the tool is what differs",
+  why_npm_publish_cant_replace_it: [
+    "pnpm resolves catalog:/workspace:* specifiers into real versions —
+     31/34 publishable packages use them; npm ships e.g.
+     \"expo-modules-core\": \"catalog:\" verbatim, uninstallable",
+    "pnpm applies the publishConfig overlay (main/module/types/exports→build/);
+     npm's own publishConfig support doesn't cover field overrides,
+     npm-packed tarball keeps main: src/index.ts"
+  ],
+  fix: "split the job — pnpm owns the manifest, npm owns the upload:
+        `pnpm pack --pack-destination <tmpdir>` (it prints the tarball path LAST, so take the
+        last non-empty stdout line) then `npm publish <tarball> --access public`;
+        this is what scripts/trust-publishers.mjs does",
+  verify: "packed tarball's main must read ./build/..., no catalog:/workspace:
+           string anywhere in packed package.json",
+  non_failures: [
+    "E409 from `npm trust github` = trust config already set, expected on
+     every re-run over an already-published repo — script treats as skip",
+    "fresh publish 404s on read for minutes: npm view / anonymous curl
+     registry.npmjs.org/<pkg> return 404 while write side (npm trust) already
+     knows it, server-issued UUID. 2026-08-06 run: 17 packages missing
+     immediately, 9 min later only alphabetically-last 9 still did (landing
+     in publish order). Don't re-publish/debug on a post-publish 404,
+     recheck after a few minutes"
+  ],
+  side_effect: "a ~34-call npm view verification loop rotates ~/.npmrc's
+                _logs (default logs-max 10), destroys the publish logs"
+}
+```
 
 ## CI (`.github/workflows/release.yml` + `checks.yml`)
 
@@ -409,40 +394,39 @@ GitHub App installed on this repo (github.com/apps/pkg-pr-new).
 
 ### A real-npm `canary` dist-tag was tried and reverted the same day (2026-07-24)
 
-For one day this mechanism went through a REAL npm publish instead — Changesets
-snapshot mode (`changeset version --snapshot canary && changeset publish --tag
-canary`), producing versions like `0.0.0-canary-<timestamp>` under a real
-`canary` dist-tag on npmjs.com. The motivation was real: `examples/*/package.json`
-committing `"@symbiote-native/<pkg>": "canary"` as a literal, git-tracked npm
-dependency value (npm/pnpm support a dist-tag string as a dependency specifier)
-would always resolve live and survive branch switches — something pkg.pr.new's
-ephemeral per-commit URLs can't give.
-
-It got as far as a real, working publish pipeline (including a fix for
-Changesets' default `0.0.0` snapshot base colliding with CocoaPods' semver-
-prerelease exclusion — `snapshot.useCalculatedVersion` preserves the package's
-real version instead) before hitting an unfixable wall: **real npm's
-`unpublish` and `deprecate` both require an interactive OTP that a headless CI
-job can never supply.** This was confirmed empirically against this repo's own
-packages, not just from docs — even a granular access token with "Bypass 2FA"
-explicitly enabled still hit `EOTP: This operation requires a one-time
-password` on both commands. npm's 2FA-bypass token feature only ever covers
-`npm publish`; unpublish and deprecate stay OTP-gated by design (an anti-abuse
-measure — a leaked CI token shouldn't be able to yank packages). A locally-
-generated TOTP code (computing it from the account's raw 2FA secret via
-`otplib`/`otpauth`, then passing `--otp=<code>`) would technically work, but
-means storing the actual 2FA seed as a CI secret — full account-level 2FA
-bypass for everything (password change, adding maintainers, …), not a scoped,
-revocable token. That trade was rejected as materially worse than the problem
-it would solve.
-
-Without a working `unpublish`/`deprecate`, every snapshot version would have
-stayed forever visible on the real npmjs.com registry (immutable, un-deletable)
-with no automated retention — exactly the outcome a "canary" mechanism exists
-to avoid. Reverted back to pkg.pr.new the same day. **Do not re-attempt a real-
-npm canary snapshot mechanism without first finding an actual answer to the
-unpublish/deprecate OTP problem** — it is the one unresolved blocker, not a
-detail that was overlooked.
+```
+§real_npm_canary_reverted := {
+  motivation: "examples/*/package.json committing
+              \"@symbiote-native/<pkg>\": \"canary\" as a literal git-tracked
+              dist-tag specifier resolves live and survives branch switches —
+              pkg.pr.new's ephemeral per-commit URLs can't give that",
+  tried: "Changesets snapshot mode: `changeset version --snapshot canary &&
+          changeset publish --tag canary` → versions like
+          0.0.0-canary-<timestamp> under a real `canary` dist-tag on npmjs.com",
+  got_working: "full publish pipeline, incl. a fix for Changesets' default 0.0.0
+               snapshot base colliding with CocoaPods' semver-prerelease
+               exclusion — snapshot.useCalculatedVersion preserves the real
+               version instead",
+  blocker: "real npm's unpublish AND deprecate both require an interactive OTP
+            no headless CI job can supply — confirmed empirically against this
+            repo's own packages: even a granular token with 'Bypass 2FA'
+            explicit still hit `EOTP: This operation requires a one-time
+            password` on both commands. npm's 2FA-bypass token only ever
+            covers `npm publish`; unpublish/deprecate stay OTP-gated by
+            design (anti-abuse — a leaked CI token shouldn't yank packages)",
+  rejected_alternative: "a locally-generated TOTP from the account's raw 2FA
+                         secret (otplib/otpauth) would technically work, but
+                         means storing the actual 2FA seed as a CI secret —
+                         full account-level bypass, not a scoped revocable
+                         token; rejected as worse than the problem",
+  consequence: "without unpublish/deprecate, every snapshot version stays
+               forever visible/immutable/un-deletable on real npmjs.com with
+               no retention — the opposite of what 'canary' is for",
+  decision: "reverted to pkg.pr.new same day",
+  open: "do not re-attempt a real-npm canary snapshot mechanism without first
+         solving the unpublish/deprecate OTP problem"
+}
+```
 
 ### Mechanism (current, pkg.pr.new)
 
@@ -513,57 +497,57 @@ so no `--access` flag juggling is needed by hand.
 4. Move `examples/*` onto the freshly published versions — see the section
    below. This is part of the release, not a follow-up: an example left behind
    keeps running pre-release code while looking updated.
+5. If the release touches a wrapper package with a docs-site page, refresh its
+   version snippet — see `symbiote-docs-site-package-template`.
 
 ## Post-release: moving `examples/*` forward is TWO edits, and the second one is invisible (2026-08-16)
 
-A release leaves every example manifest stale in two different ways, and doing
-only the obvious one silently ships examples pinned to the previous release.
-
-**Edit 1, the obvious one — the `file:` tarballs.** Local iteration points an
-example at `file:../../core/engine/symbiote-native-engine-0.1.7.tgz`
-(`<examples_vs_dot_examples>`). Swap each back to `^<published version>`.
-
-**Edit 2, the one that hides — stale carets on 0.x packages.** The examples
-also carry ordinary `^` specifiers, and `npm install` will NOT move them:
-**a caret on a 0.x version pins the MINOR**, so `^0.1.0` never resolves to a
-freshly published `0.2.0`, and `^0.2.8` never picks up `0.3.0`. Only packages
-past 1.0 (`navigation ^2.0.3`, `splash-screen ^3.0.3`) float on their own.
-
-Measured on the 2026-08-16 release: 55 tarball specifiers vs **127** stale
-carets across the same 10 examples. Skipping edit 2 would have left the four
-`expo-*` examples entirely on pre-release code — installing cleanly, reporting
-`added N packages`, and looking done.
-
-Rewrite EVERY `@symbiote-native/*` specifier to the version that package
-carries in the monorepo after `changeset version` (which equals what was just
-published). Read the versions from `{core,adapters,packages}/*/package.json`,
-never from the tarball filenames — those are the OLD numbers.
-
-**Reinstall: keep the lockfile.** `<examples_vs_dot_examples>` says to delete
-`package-lock.json` — that rule is for re-packing the SAME version, where the
-specifier does not change and npm short-circuits on a stale integrity hash.
-Here the specifier itself changes (`file:` -> `^x.y.z`), so npm must
-re-resolve, and keeping the lockfile holds the diff to the affected entries.
-`rm -rf node_modules/@symbiote-native && npm install` per example is enough.
-
-**Verify what is EXTRACTED, not what the manifest says** — walk
-`examples/*/node_modules/@symbiote-native/*/package.json` and compare each
-`version` against the monorepo's. A manifest edit is not proof the bytes moved.
-
-Expect one honest surprise in the lock diff: swapping `splash-screen` from a
-tarball to a registry entry adds ~24 `@img/sharp-*` rows. They come from
-`sharp` via `react-native-bootsplash`; the tarball install collapsed sharp's
-per-platform binary matrix and the registry install records it in full. All but
-`@img/colour` are gated by `os`/`cpu`/`optional`. Not a dependency drift —
-confirm by diffing the lock for NON-symbiote version changes, which should be
-exactly zero.
+```
+§post_release_examples_two_edits := {
+  problem: "a release leaves every example manifest stale in TWO ways;
+            doing only the obvious one silently ships examples pinned to
+            the previous release",
+  edit_1_obvious: "file: tarballs — e.g.
+                   file:../../core/engine/symbiote-native-engine-0.1.7.tgz
+                   (<examples_vs_dot_examples>) — swap each to ^<published version>",
+  edit_2_hidden: "ordinary ^ specifiers npm install will NOT move: a caret on
+                 a 0.x version pins the MINOR, so ^0.1.0 never resolves to a
+                 freshly published 0.2.0, ^0.2.8 never picks up 0.3.0.
+                 Only packages past 1.0 (navigation ^2.0.3,
+                 splash-screen ^3.0.3) float on their own",
+  measured: "2026-08-16 release: 55 tarball specifiers vs 127 stale carets
+            across 10 examples; skipping edit 2 would leave the four expo-*
+            examples entirely on pre-release code — installs cleanly,
+            reports 'added N packages', looks done",
+  fix: "rewrite EVERY @symbiote-native/* specifier to the version that
+        package carries in the monorepo after `changeset version` (= what
+        was just published). Read from {core,adapters,packages}/*/package.json,
+        NEVER from tarball filenames — those are the OLD numbers",
+  reinstall: "KEEP the lockfile here — <examples_vs_dot_examples>'s
+             delete-package-lock.json rule is for re-packing the SAME
+             version (stale integrity hash short-circuit); here the
+             specifier itself changes (file: -> ^x.y.z) so npm must
+             re-resolve anyway. `rm -rf node_modules/@symbiote-native &&
+             npm install` per example is enough",
+  verify: "walk examples/*/node_modules/@symbiote-native/*/package.json,
+          compare version against the monorepo's — a manifest edit is not
+          proof the bytes moved",
+  expected_noise: "swapping splash-screen from tarball to registry adds
+                  ~24 @img/sharp-* rows (sharp via react-native-bootsplash;
+                  tarball collapsed the per-platform binary matrix, registry
+                  records it in full, all but @img/colour gated by
+                  os/cpu/optional) — not drift; confirm by diffing the lock
+                  for NON-symbiote version changes, should be exactly zero"
+}
+```
 
 ## Known pre-existing blocker (not caused by this setup)
 
 `pnpm run <any script>` triggers pnpm's dependency-status check, which can
 re-run every workspace package's `prepare` hook — including
 `@symbiote-native/angular`'s `ng:build`. While the Angular adapter has outstanding
-type errors (WIP, see `angular-adapter` skill), this makes `pnpm run release`
+type errors (WIP, see `angular-adapter` skill; for the `ng:build`/`prepare`
+mechanics themselves, see `angular-adapter-build`), this makes `pnpm run release`
 fail in CI. That's the correct, intended gate — Angular is one of the 7
 published packages, so the pipeline should refuse to release while it doesn't
 compile. Don't route around it; fix the Angular errors instead. For

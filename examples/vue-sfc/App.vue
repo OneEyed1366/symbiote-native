@@ -46,6 +46,7 @@ import HooksDemoScreen from './screens/HooksDemoScreen.vue';
 import DeepLinkingScreen from './screens/DeepLinkingScreen.vue';
 import StatePersistenceScreen from './screens/StatePersistenceScreen.vue';
 import ApiPlaygroundScreen from './screens/ApiPlaygroundScreen.vue';
+import BenchmarkScreen from './screens/BenchmarkScreen.vue';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
@@ -229,6 +230,19 @@ onMounted(() => hide());
         title: 'API Playground',
         headerShown: true,
         headerTintColor: LINE_COLOR.composition,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.Benchmark"
+      :component="BenchmarkScreen"
+      :options="{
+        title: 'Benchmark',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.performance,
         headerTranslucent: true,
         headerTitleColor: '#ffffff',
         headerStyle: { backgroundColor: '#0b1622' },

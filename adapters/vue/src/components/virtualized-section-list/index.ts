@@ -62,6 +62,16 @@ export interface IVirtualizedSectionListProps<ItemT> {
   // #separator / #sectionSeparator / #header / #footer / #empty), typed by
   // IVirtualizedSectionListSlots - not renderItem / renderSection* / *Component props.
   keyExtractor?: (item: ItemT, index: number) => string;
+  // Fixed-layout fast path, FLAT like RN's: the SECTIONS array plus a flat entry index, where every
+  // section contributes two rows beyond its items (header, footer) and the caller accounts for them.
+  // A `({ section, index })` form would be our invention, not parity - `VirtualizedSectionList.js`
+  // has no getItemLayout code at all, the prop rides through `passThroughProps`; that shape is the
+  // community react-native-section-list-get-item-layout, layered on top. Without it a fast scroll
+  // outruns measurement and leaves blank windows.
+  getItemLayout?: (
+    data: ReadonlyArray<ISection<ItemT>> | null,
+    index: number,
+  ) => { length: number; offset: number; index: number };
   // Routed to the inner VirtualizedList's stickyHeaderIndices. Defaults to
   // Platform.OS === 'ios'; Android does not stick by default.
   stickySectionHeadersEnabled?: boolean;
@@ -125,7 +135,14 @@ export type IVirtualizedSectionListEmits = {
 
 // Listed for the runtime `props` declaration (keyof can't derive it: the index signature widens
 // keyof to `string`). The three emit events are deliberately absent (declared as emits below).
-const PROP_KEYS = ['sections', 'keyExtractor', 'stickySectionHeadersEnabled'];
+// getItemLayout is declared here, not left to $attrs: falling through would hand the user's
+// callback the flattened ENTRIES as its `data` argument instead of the sections (see below).
+const PROP_KEYS = [
+  'sections',
+  'keyExtractor',
+  'getItemLayout',
+  'stickySectionHeadersEnabled',
+];
 
 const EMIT_KEYS = ['endReached', 'startReached', 'refresh'];
 
@@ -288,6 +305,27 @@ export const VirtualizedSectionList = defineComponent(
         index: number,
       ): string => sectionEntryKey(entry, index, keyExtractor);
 
+      // Hand the callback `sections`, not the entries: RN's inner VirtualizedList gets
+      // `data={this.props.sections}` (VirtualizedSectionList.js:216) while ours streams the
+      // FLATTENED entries, so the same user code would otherwise see a different argument here
+      // than on RN.
+      //
+      // UPSTREAM-DIVERGENCE(react-native): the flat INDEX matches RN's (two rows per section,
+      // header and footer) only while the #sectionSeparator slot is unset. With it,
+      // flattenSections emits an extra 'section-separator' row per boundary that RN renders inside
+      // the neighbouring cell, so indices shift by one per boundary from the second section on.
+      // Deliberate - that row is how this adapter paints the separator; a caller combining the two
+      // must account for it.
+      const getItemLayout = props.getItemLayout;
+      const entryItemLayout =
+        getItemLayout === undefined
+          ? undefined
+          : (
+              _entries: unknown,
+              index: number,
+            ): { length: number; offset: number; index: number } =>
+              getItemLayout(sections, index);
+
       // The three synthesized events become inner-VL handlers ONLY when listened, so the inner list
       // keeps gating (no parasitic RefreshControl / edge-reached work for an unlistened event).
       const endReached = listens('onEndReached')
@@ -312,6 +350,7 @@ export const VirtualizedSectionList = defineComponent(
             entries[index],
           getItemCount: (): number => entries.length,
           keyExtractor: entryKeyExtractor,
+          getItemLayout: entryItemLayout,
           stickyHeaderIndices,
           onEndReached: endReached,
           onStartReached: startReached,

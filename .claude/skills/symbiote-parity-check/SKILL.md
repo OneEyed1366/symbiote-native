@@ -117,45 +117,36 @@ app's manifest. `@symbiote-native/engine` is a peerDependency of every adapter a
 direct `dependencies` entry in all five example apps. It hides engine from app CODE only -
 exactly the split `<react_native_is_an_explicit_top_level_peer>` already states for `react-native`.
 
-**What IS redundant: the intermediate stub file.** React and Svelte each kept a
-`src/modules/<name>.ts` whose entire body was `export { X } from '@symbiote-native/engine'` - 16
-and 15 files. Vue and Angular re-export the same names straight from the barrel and prove the hop
-is unnecessary. All 31 were deleted 2026-08-15 with the public surface byte-identical
-(react 201->201, svelte 223->223). Do not reintroduce them: a passthrough belongs in the barrel.
+**What IS redundant: the intermediate stub file.** React/Svelte each kept 16/15
+`src/modules/<name>.ts` stub files whose whole body was `export { X } from '@symbiote-native/engine'`
+— Vue/Angular re-export straight from the barrel and prove the hop unnecessary. Deleted 2026-08-15,
+surface byte-identical (react 201->201, svelte 223->223). Do not reintroduce: passthrough belongs
+in the barrel.
 
-**The drift the facade hides is real and recurring.** A missing re-export is NOT a type error,
-so `tsc` is blind to it and it only surfaces when an app imports the name and cannot find it.
-`PanResponder` was absent from Svelte's barrel until 2026-08-12; the test below then found 22
-more of the same shape, all closed 2026-08-15 (barrel totals react 201->219, vue 226->232,
-angular 227->248, svelte 223->236). What they were:
+**The drift the facade hides is real and recurring** — a missing re-export is NOT a type error,
+`tsc` is blind to it, surfaces only when an app imports the name and can't find it:
 
-- Angular carried the VALUES but not their TYPES: `IViewStyle`/`ITextStyle`/`IFlex*`,
-  `IPlatform*`, `INativeViewConfig*`, `IAccessibility*`, `IResponderProps`, `IPressState`. It
-  takes props as `@Input()`s, but an app still needs these to type a style object or a
-  `Platform.select` spec.
-- The app-entry seams had split up: `setNativeViewConfigSource` was in all four,
-  `setColorProcessor` and `setDeviceEventSource` were not. The three travel together.
-- `dlog`/`isDebug` reached two adapters only, while `examples/vue-tsx` already imports `dlog`
-  FROM THE ADAPTER, so on the other three that path did not work at all.
-- Agnostic component-detail types, each having reached 1-2 barrels: `ICellLayout`,
-  `ISeparatorProps`, `ISeparators`, `IModalOrientationChangeEvent`,
-  `IPressableAndroidRippleConfig`, `IEnterKeyHint`, `IInputMode`, `ISubmitBehavior`,
-  `ITextInputSelection`, `IImageStatics`.
+```
+§4b2_missing_reexports_closed := {
+  found: "PanResponder absent from Svelte barrel until 2026-08-12; ratchet test found 22 more",
+  closed: "2026-08-15 — totals react 201->219, vue 226->232, angular 227->248, svelte 223->236",
+  items: [
+    "angular had VALUES but not TYPES (IViewStyle/ITextStyle/IFlex*, IPlatform*, INativeViewConfig*, IAccessibility*, IResponderProps, IPressState) — needed to type a style object/Platform.select spec despite props arriving as @Input()s",
+    "app-entry seam split: setNativeViewConfigSource in all four, setColorProcessor + setDeviceEventSource missing from some — the three travel together",
+    "dlog/isDebug reached only 2 adapters; examples/vue-tsx already imports dlog FROM THE ADAPTER, so on the other three that path did not work at all",
+    "component-detail types at 1-2 barrels only: ICellLayout, ISeparatorProps, ISeparators, IModalOrientationChangeEvent, IPressableAndroidRippleConfig, IEnterKeyHint, IInputMode, ISubmitBehavior, ITextInputSelection, IImageStatics",
+  ],
+}
+```
 
 **Two traps found while closing them, both worth re-reading before the next sweep:**
 
-1. **A name-level parity check has false positives.** `ITextInputProps` looked like a gap in
-   Angular, but React and Vue DECLARE their own (`ITextInputBaseProps & { className?: string }`)
-   rather than re-exporting the shared one - the per-adapter half of
-   `<prop_types_split_agnostic_vs_per_adapter>`, not drift. Before "closing" a gap, check whether
-   the other adapters re-export the shared type or redeclare it: parse the local file the barrel
-   points at and look for a `type`/`interface` DECLARATION of that name. Only `IImageProps`,
-   `ITextInputProps` and `IButtonProps` are redeclared this way today (react + vue).
-2. **`flattenStyle` was removed from Angular, not added to the other three** - reversing a
-   deliberate 2026-07-01 decision that exported it "for advanced users". It is the RAW collapse;
-   the public path is `StyleSheet.flatten`, which is the same collapse PLUS the registered style
-   preprocessors, so an app reaching for `flattenStyle` silently skips them. Nothing imported it
-   from the adapter (`packages/navigation`'s Angular drawer takes it from the engine directly).
+```
+§4b3_traps_while_closing := {
+  trap_1_false_positive: "ITextInputProps looked like an Angular gap, but React/Vue DECLARE their own (ITextInputBaseProps & { className?: string }) rather than re-exporting — per-adapter half of <prop_types_split_agnostic_vs_per_adapter>, not drift. Before closing a gap: check whether the barrel's target file DECLARES a type/interface of that name. Only IImageProps, ITextInputProps, IButtonProps redeclared this way (react+vue)",
+  trap_2_regression: "flattenStyle was REMOVED from Angular, not missing from the other three — reverses a deliberate 2026-07-01 decision exporting it 'for advanced users'. It's the raw collapse; public path is StyleSheet.flatten (same collapse + registered preprocessors), so using flattenStyle silently skips them. Nothing imported it from the adapter (packages/navigation's Angular drawer takes it from the engine directly)",
+}
+```
 
 `tests/adapter-barrel-parity.test.ts` is the ratchet. It parses the barrels as SOURCE (most
 drifting names are types, so a runtime `Object.keys(await import(...))` would see none of them),
@@ -169,9 +160,9 @@ When you add a shared name to one adapter, add it to all four in the same commit
 package ships `src/{core,react,vue,svelte,angular}/index.ts`, and the framework barrels used to
 list the ENTIRE core surface by name - 4 copies to keep in sync, per package. 15 packages already
 used `export *`; the 6 that didn't (battery, brightness, keep-awake, localization, network,
-screen-orientation) were converted 2026-08-15, −276 lines, surfaces verified identical against
-`git show HEAD:` and `ngc` green (the star survives into the AOT `.d.ts`/`.js`). This works
-because the package's `"."` export already points at core, so nothing is being newly exposed.
+screen-orientation) were converted 2026-08-15, −276 lines, verified identical against
+`git show HEAD:` and `ngc` green (star survives AOT `.d.ts`/`.js`) — works because the package's
+`"."` export already points at core, so nothing is newly exposed.
 
 Two packages deliberately expose a SUBSET of core and must NOT be converted blindly -
 `sensors` withholds 21 names (the `Accelerometer`/`Gyroscope`/`DeviceSensor` classes) and
@@ -239,7 +230,8 @@ detox (device/sim)               anything needing a real Fabric tag — native c
 A native-driven feature green in vitest but untested on a simulator is NOT proven
 at parity — the async-commit-timing class is invisible headless.
 
-Run the detox/simulator leg against `examples/<app>`.
+Run the detox/simulator leg against `examples/<app>`. Detox suite mechanics (canary journeys,
+flakiness fixes, the hittability workaround): `symbiote-detox-e2e`.
 
 ## 6. Verdict
 
@@ -358,12 +350,14 @@ Mechanics that matter (each one cost a debugging round when got wrong):
 - Cross-adapter imports are legitimate HERE (the P0 invariant defines parity as a diff "against
   the reference adapter"), as a **devDependency** only — the published `files` surface is `build`.
 
-Bug this found (2026-08-13, Svelte sticky headers): React hands its ScrollView
-`renderedStickyIndices` — only headers currently mounted — while Svelte's VirtualizedList passed
-the FULL section list into `nextStickyHeaderYFor`. Since `headerLayoutYs` is append-only, a header
-kept receiving the stale `y` of a next header that had already unmounted, pinned itself against an
-obstacle that no longer existed, and froze. One-line fix: filter the indices by the currently
-mounted cells.
+```
+§dit_svelte_sticky_freeze := {
+  date: "2026-08-13",
+  bug: "Svelte VirtualizedList passed the FULL section list into nextStickyHeaderYFor; React's ScrollView hands only renderedStickyIndices (currently mounted headers)",
+  root_cause: "headerLayoutYs is append-only ⟶ a header kept receiving the stale y of a next header already unmounted, pinned against a non-existent obstacle, froze",
+  fix: "filter indices by currently mounted cells (one line)",
+}
+```
 
 ## Reference
 
@@ -373,6 +367,7 @@ mounted cells.
   `adapters/vue/src/components/switch/*`; shared half in
   `core/components/src/{state,view}/switch*`.
 - Building the component this check gates: `symbiote-add-component`.
+- Building a brand-new adapter's seam before it can be parity-checked here: `symbiote-new-adapter`.
 - Native-only parity (tag-dependent features): `vue-adapter-reactivity` §2.
 - Testing strategy (vitest headless + detox on device): §5 above, and the live shape in
 any adapter's co-located `*.test.ts` / `examples/*/e2e/`. Do not cite a numbered ADR

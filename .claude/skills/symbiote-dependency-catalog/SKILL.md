@@ -119,6 +119,8 @@ It also runs in **lint-staged** (`lint-staged.config.js`) on any
 **Add a new package**
 - Reference shared deps with `catalog:` from the start. Peers stay as ranges
   (`>=…`). Local deps stay `workspace:*`. Never paste a literal version.
+- A bare-skeleton package (name-reservation only, no real deps yet) skips this
+  entirely — see `symbiote-new-package-skeleton` for which tier you're actually building.
 
 ## Gotchas
 
@@ -159,7 +161,8 @@ It also runs in **lint-staged** (`lint-staged.config.js`) on any
   isolate a workspace member from the shared resolution pass) — the only real fix is keeping
   exotic-URL dependencies out of the pnpm workspace altogether (see `examples/*` above) or
   disabling the guard repo-wide (`block-exotic-subdeps: false` — a real security-policy
-  tradeoff, don't flip it silently).
+  tradeoff, don't flip it silently). The pkg.pr.new URLs that trigger this are produced by the
+  canary publish flow — see `symbiote-release-publishing` for how/when they're generated.
 
 ## Verify
 

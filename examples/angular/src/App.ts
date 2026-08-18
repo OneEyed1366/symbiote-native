@@ -47,6 +47,8 @@ import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
 import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { ReactiveStyleScreen } from './screens/ReactiveStyleScreen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
+import { BenchmarkScreen } from './screens/BenchmarkScreen';
+import { ProbeScreen } from './screens/ProbeScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { LINE_COLOR } from './navigation-lines';
 // Static look lives in App.css — a plain global .css file, compiled at build time by
@@ -140,6 +142,18 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
         [component]="apiPlaygroundScreen"
         [options]="apiPlaygroundOptions"
       ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Benchmark"
+        [component]="benchmarkScreen"
+        [options]="benchmarkOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Probe"
+        [component]="probeScreen"
+        [options]="probeOptions"
+      ></ng-template>
     </Stack>
   `,
 })
@@ -160,6 +174,8 @@ export class AppComponent implements OnInit, AfterViewInit {
   readonly statePersistenceScreen = StatePersistenceScreen;
   readonly reactiveStyleScreen = ReactiveStyleScreen;
   readonly apiPlaygroundScreen = ApiPlaygroundScreen;
+  readonly benchmarkScreen = BenchmarkScreen;
+  readonly probeScreen = ProbeScreen;
 
   readonly menuOptions: IAngularScreenOptions = {
     title: 'Navigation Demos',
@@ -271,6 +287,26 @@ export class AppComponent implements OnInit, AfterViewInit {
     headerShown: true,
     headerTranslucent: true,
     headerTintColor: LINE_COLOR.primitives,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly benchmarkOptions: IAngularScreenOptions = {
+    title: 'Benchmark',
+    headerShown: true,
+    headerTranslucent: true,
+    headerTintColor: LINE_COLOR.performance,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly probeOptions: IAngularScreenOptions = {
+    title: 'Angular probe',
+    headerShown: true,
+    headerTranslucent: true,
+    headerTintColor: LINE_COLOR.performance,
     headerTitleColor: '#ffffff',
     headerStyle: DARK_HEADER_STYLE,
     headerUserInterfaceStyle: 'dark',

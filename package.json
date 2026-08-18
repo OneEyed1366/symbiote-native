@@ -20,6 +20,7 @@
     "check:bundle-isolation": "node scripts/check-bundle-framework-isolation.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
+    "bench": "NODE_OPTIONS=--max-semi-space-size=64 vitest bench --run",
     "docs:dev": "pnpm --filter @symbiote-native/docs-site dev",
     "docs:build": "pnpm --filter @symbiote-native/docs-site build",
     "docs:preview": "pnpm --filter @symbiote-native/docs-site preview",

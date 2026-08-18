@@ -53,6 +53,9 @@ export interface ISymbioteNode {
   listeners: Map<string, IListener> | undefined;
   children: ISymbioteNode[];
   parent: ISymbioteNode | undefined;
+  // "This node's own props changed, or something below it did." Read by the commit walk
+  // (commit.ts) to skip an untouched subtree wholesale. See markDirty.
+  dirty: boolean;
 }
 
 export function createElement(
@@ -67,6 +70,7 @@ export function createElement(
     listeners: undefined,
     children: [],
     parent: undefined,
+    dirty: true,
   };
 }
 
@@ -79,6 +83,7 @@ export function createRawText(text: string): ISymbioteNode {
     listeners: undefined,
     children: [],
     parent: undefined,
+    dirty: true,
   };
 }
 
@@ -130,6 +135,29 @@ export function isEmptyRawText(node: ISymbioteNode): boolean {
   return node.component === RAW_TEXT_COMPONENT && node.props.text === '';
 }
 
+// Dirty-marking: lets reconcile return an untouched subtree by reference instead of rebuilding
+// every node's Fabric props and deep-comparing them against the mirror. That walk costs ~13 us per
+// node on device (Hermes, iOS Debug, examples/react benchmark screen), so without the flag a
+// 1200-node tree burns a whole 16.6 ms frame no matter how small the change - the cost tracks TREE
+// SIZE, not change size.
+//
+// Marking walks up to the first ALREADY-dirty ancestor and stops, so a burst of mutations under one
+// subtree pays for one chain walk rather than one per mutation. Reconcile clears every node it
+// visits, which keeps the invariant "an ancestor of a dirty node is dirty" across commits.
+//
+// Listener changes deliberately do NOT mark. `node.listeners` never reaches Fabric (event dispatch
+// reads it straight off the retained node) and React hands us a fresh handler closure on nearly
+// every render, so marking there would re-dirty the whole tree every commit and hand the win back.
+// The one listener that DOES change a Fabric prop, `layout`, raises `onLayout` through setProp
+// below and is marked that way.
+export function markDirty(node: ISymbioteNode): void {
+  let current: ISymbioteNode | undefined = node;
+  while (current !== undefined && !current.dirty) {
+    current.dirty = true;
+    current = current.parent;
+  }
+}
+
 // A pure prop set: no event inference. `onTintColor` is a Switch prop and reaches
 // Fabric like any other; the event-vs-prop decision is made by routeProp, never by
 // the key's name.
@@ -143,6 +171,7 @@ export function setProp(
   } else {
     node.props[key] = value;
   }
+  markDirty(node);
 }
 
 // Fabric gates layout events behind a boolean prop (BaseViewProps.onLayout): unlike
@@ -297,20 +326,26 @@ export function routeProp(
 
 export function setText(node: ISymbioteNode, text: string): void {
   node.props.text = text;
+  markDirty(node);
 }
 
+// Structural ops mark the PARENT chain (both the old and the new one), never the moved child:
+// a child that only changed position may legitimately still be clean, and reconcile re-checks
+// `committed.parent` on its early-exit path, so a reparent is caught there rather than by a flag.
 function detach(child: ISymbioteNode): void {
   const parent = child.parent;
   if (!parent) return;
   const index = parent.children.indexOf(child);
   if (index >= 0) parent.children.splice(index, 1);
   child.parent = undefined;
+  markDirty(parent);
 }
 
 export function appendChild(parent: ISymbioteNode, child: ISymbioteNode): void {
   detach(child);
   child.parent = parent;
   parent.children.push(child);
+  markDirty(parent);
 }
 
 export function insertBefore(
@@ -322,10 +357,12 @@ export function insertBefore(
   child.parent = parent;
   const index = parent.children.indexOf(beforeChild);
   parent.children.splice(index < 0 ? parent.children.length : index, 0, child);
+  markDirty(parent);
 }
 
 export function removeChild(parent: ISymbioteNode, child: ISymbioteNode): void {
   const index = parent.children.indexOf(child);
   if (index >= 0) parent.children.splice(index, 1);
   child.parent = undefined;
+  markDirty(parent);
 }

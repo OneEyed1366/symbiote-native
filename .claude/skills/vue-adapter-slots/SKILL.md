@@ -174,7 +174,25 @@ re-checked workspace source uses `setTimeout`/`process`/`console`/`queueMicrotas
 
 **vue-tsx (JSX) full typecheck is NOT currently feasible:** `IViewProps`/`ITextProps` omit `children`
 by design (children go through slots — see the prop-type split), so Vue-JSX `View children /View`
-fails. That is a separate effort, not a quick win.
+fails. That is a separate effort, not a quick win. (A different, JSX-factory-level typecheck failure
+on raw Vue TSX is covered in `vue-adapter-tsx-typecheck` — don't conflate the two root causes.)
+
+## Rule 7 — a POSITIONAL child prop and a template `v-for` cannot be combined
+
+```
+§rule7_v_for_breaks_positional_children := {
+  prop: "stickyHeaderIndices — addresses default-slot children BY INDEX",
+  root_cause: "v-for compiles to ONE Fragment vnode, not N siblings ⟶ index N addresses nothing,
+               every child nests inside whichever wrapper index 0 produced",
+  symptom: "silent — nothing errors, the feature just doesn't happen",
+  fix: "index into children via h() (small local functional component), never v-for",
+  verified: "2026-08-18, 200-section block, ScrollView direct children: h() -> 800 correct |
+             v-for -> 1 (one Fragment)",
+  cross_adapter: "Svelte mirror hazard — Snippet is opaque, can't index at all ⟶
+                  ScrollView.stickyHeaderIndices is a documented KNOWN GAP there",
+  rule: "any 'child at index N' prop needs per-adapter verification before reliance",
+}
+```
 
 ## Anti-patterns
 
@@ -186,6 +204,7 @@ fails. That is a separate effort, not a quick win.
 | `h(Text, {}, title)` for a cell | Non-function default slot warn | `() => title` or a `template`/slot |
 | Adding `children` to `IViewProps` to make JSX typecheck | Breaks the prop-type split | Author cells via slots; JSX typecheck stays out of scope |
 | "Slots should be typed" without running vue-tsc | SFC isn't tsc-checked; `any` hides | Probe with vue-tsc (Rule 6) |
+| `v-for` for children a prop indexes into (`stickyHeaderIndices`) | The loop compiles to ONE Fragment vnode, so index N addresses nothing — silently inert | Build them with `h()` (Rule 7) |
 
 ## Verification checklist
 
@@ -203,8 +222,12 @@ fails. That is a separate effort, not a quick win.
 - `vue-adapter-events` — emits / `$attrs` routing (the OTHER half of the Vue public surface). Events
   are emits; children/cells are slots. The Rule 5 warning is about how children reach a component.
 - `symbiote-add-component` — the 3-layer split; a new component's Vue lifecycle wires slots here.
+- `vue-adapter-directives` — same-render content composition is a scoped slot (this skill);
+  cross-surface content sharing (Teleport/createTunnel) is out of scope here — read that skill
+  instead.
 - The load-bearing decision (slots, never renderItem) has no separate document — this skill
-  is it. Earlier revisions cited `.docs/decisions/0028`; that tree is local-only per
-  `.gitignore` and absent from a checkout, so the citation pointed at nothing.
+  is it. Earlier revisions cited `.docs/decisions/0028-vue-lists-scoped-slots-not-renderitem.md`;
+  that tree is local-only per `.gitignore` and absent from a checkout, so the citation pointed
+  at nothing.
 - prop-type split (`<prop_types_split_agnostic_vs_per_adapter>`): a slot type carries framework
   elements, so it is per-adapter (declared in the adapter), never moved verbatim to the shared layer.

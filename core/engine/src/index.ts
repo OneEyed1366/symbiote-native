@@ -73,7 +73,16 @@ export {
   measureInWindow,
   measureLayout,
   disposeRoot,
+  readCommitProfile,
 } from './commit';
+export type { ICommitProfile } from './commit';
+// "A commit just reached completeRoot." The one seam that means the same thing under every
+// adapter: React commits synchronously inside its own commit phase, while Vue / Svelte / Angular
+// schedule completeRoot on a microtask, so each framework's own after-render hook fires at a
+// DIFFERENT point relative to the native commit. Anything timing or comparing the commit path
+// across adapters has to hang off this, not off a per-framework lifecycle hook, or it measures a
+// different quantity in each one under the same name.
+export { registerPostCommit, unregisterPostCommit } from './post-commit';
 // The public instance grafted onto a host node by every adapter (React's getPublicInstance,
 // the Vue renderer's createElement): the imperative measure/setNativeProps/focus API. Lives
 // here because it depends only on engine internals, so all adapters inherit it identically.

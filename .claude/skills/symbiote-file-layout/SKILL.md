@@ -72,14 +72,20 @@ migrate `src/X.ts` → `src/X/index.ts`, the old `build/X.js` (+`.d.ts`/`.map`) 
 it lingers indefinitely because nothing regenerates that path. Two ways it bites, both
 non-obvious because the error never points at the real cause:
 
-- **`fix-esm-extensions.mjs` reported `UNRESOLVED … -> ./Something.css`** (2026-07, css-parser).
-  The script used to regex-scan EVERY `build/**/*.js` **including comments and string literals**,
-  so a stale flat file whose doc-comment held `import styles from './Card.module.css'` was flagged
-  as an unresolved import and exited 1 — the `.css` a red herring, the "import" a comment. FIXED
-  2026-07: it now walks the source with a string/comment/regex-aware scanner and only rewrites real
-  specifiers (see `scripts/fix-esm-extensions.test.mjs`). So a stale file no longer false-positives
-  on comments/strings — but it can still error on a REAL dead import, and it is pure garbage either
-  way. Prune it.
+- ```
+  §fix_esm_extensions_stale := {
+    bug: "fix-esm-extensions.mjs reported UNRESOLVED … -> ./Something.css",
+    when: "2026-07, css-parser package",
+    root_cause: "regex-scanned EVERY build/**/*.js including comments/string
+                 literals; a stale flat file's doc-comment held
+                 `import styles from './Card.module.css'` ⟶ false-positive
+                 UNRESOLVED, exit 1 (the .css a red herring, the \"import\" a comment)",
+    fix: "2026-07 — string/comment/regex-aware scanner, rewrites only real
+          specifiers (scripts/fix-esm-extensions.test.mjs)",
+    residual: "still errors on a REAL dead import; stale build output is
+               garbage either way — prune it",
+  }
+  ```
 - Diagnostic: a top-level `build/X.js` that ALSO has `build/X/index.js` beside it, with an
   OLD mtime, and NO `src/X.ts` (only `src/X/index.ts`) → it's stale.
 
@@ -170,4 +176,6 @@ The live sources, all of them in-repo:
   (`ISwitchProps`) re-exported at `adapters/react/src/components/switch/shared.ts`.
 - Adding a component into this layout: the `symbiote-add-component` skill.
 - Building a whole adapter's `src/`: the `symbiote-new-adapter` skill.
+- Scaffolding a new `packages/<name>` — how much to build before deciding where
+  files go: the `symbiote-new-package-skeleton` skill.
 </content>

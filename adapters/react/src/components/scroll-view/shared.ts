@@ -49,6 +49,7 @@ import type { IStyleProp, IViewStyle } from '../../utils/styles';
 import {
   wrapStickyHeaders,
   type IStickyHeaderComponentType,
+  type IStickyHeaderHandle,
 } from './sticky-header';
 
 export type { IScrollViewHandle } from '@symbiote-native/components';
@@ -242,12 +243,61 @@ export function usePreparedScrollView(
   const headerLayoutYsRef = useRef<Map<number, number> | null>(null);
   if (headerLayoutYsRef.current === null) headerLayoutYsRef.current = new Map();
   const headerLayoutYs = headerLayoutYsRef.current;
-  const [, bumpHeaderLayout] = useState(0);
+
+  // The mounted headers by child index (RN's _stickyHeaderRefs, ScrollView.js:750), so a fresh
+  // measurement reaches its predecessor directly.
+  const stickyHeaderRefsRef = useRef<Map<number, IStickyHeaderHandle> | null>(
+    null,
+  );
+  if (stickyHeaderRefsRef.current === null)
+    stickyHeaderRefsRef.current = new Map();
+  const stickyHeaderRefs = stickyHeaderRefsRef.current;
+
+  const onHeaderRef = (
+    index: number,
+    handle: IStickyHeaderHandle | null,
+  ): void => {
+    if (handle === null) stickyHeaderRefs.delete(index);
+    else stickyHeaderRefs.set(index, handle);
+  };
+
+  // Measurements waiting to be handed to their predecessors, flushed together (see below).
+  const pendingHeaderYsRef = useRef<Map<number, number> | null>(null);
+  if (pendingHeaderYsRef.current === null)
+    pendingHeaderYsRef.current = new Map();
+  const pendingHeaderYs = pendingHeaderYsRef.current;
+  const flushScheduledRef = useRef(false);
+
+  const flushHeaderYs = (): void => {
+    flushScheduledRef.current = false;
+    if (stickyHeaderIndices === undefined) return;
+    for (const [index, y] of pendingHeaderYs) {
+      const previousIndex =
+        stickyHeaderIndices[stickyHeaderIndices.indexOf(index) - 1];
+      if (previousIndex === undefined) continue;
+      stickyHeaderRefs.get(previousIndex)?.setNextHeaderY(y);
+    }
+    pendingHeaderYs.clear();
+  };
+
+  // RN _onStickyHeaderLayout (ScrollView.js:1136): record this header's y, then hand it to the
+  // PREVIOUS sticky header as its push-off collision point.
+  //
+  // The handoff is COALESCED rather than immediate, and that is the point. Cross-talk runs BACKWARDS
+  // (a header learns its collision point from the one after it), so a mount measures every header
+  // and walks the chain end to start. Pushing each value the moment it arrives makes every link its
+  // own update generation - a setState on the predecessor, whose effect setStates again - and React
+  // caps nested updates at 50: three headers go unnoticed, two hundred abort the app with "Maximum
+  // update depth exceeded", which reads like an infinite loop but is really depth. Draining on a
+  // microtask puts one burst of layouts into ONE render pass, so depth stops tracking header count.
   const onHeaderLayoutY = (index: number, y: number): void => {
     if (headerLayoutYs.get(index) === y) return;
     headerLayoutYs.set(index, y);
     dlog(`ScrollView sticky-header layoutY index=${index} y=${y}`);
-    bumpHeaderLayout(tick => tick + 1);
+    pendingHeaderYs.set(index, y);
+    if (flushScheduledRef.current) return;
+    flushScheduledRef.current = true;
+    void Promise.resolve().then(flushHeaderYs);
   };
 
   // A class-name string resolves through the shared registry before it reaches the
@@ -371,8 +421,7 @@ export function usePreparedScrollView(
         invertStickyHeaders,
         viewportHeight,
         StickyHeaderComponent,
-        headerLayoutYs,
-        onHeaderLayoutY,
+        { headerLayoutYs, onHeaderLayoutY, onHeaderRef },
       )
     : children;
 

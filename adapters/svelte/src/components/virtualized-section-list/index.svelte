@@ -96,6 +96,25 @@
     return sectionEntryKey(entry, index, props.keyExtractor);
   }
 
+  // Hand the callback `sections`, not the entries: RN's inner VirtualizedList gets
+  // `data={this.props.sections}` (VirtualizedSectionList.js:216) while ours streams the FLATTENED
+  // entries, so the same user code would otherwise see a different argument here than on RN.
+  //
+  // UPSTREAM-DIVERGENCE(react-native): the flat INDEX matches RN's (two rows per section, header
+  // and footer) only while the `sectionSeparator` snippet is unset. With it, flattenSections emits
+  // an extra 'section-separator' row per boundary that RN renders inside the neighbouring cell, so
+  // indices shift by one per boundary from the second section on. Deliberate - that row is how this
+  // adapter paints the separator; a caller combining the two must account for it.
+  const entryItemLayout = $derived.by(() => {
+    const getItemLayout = props.getItemLayout;
+    if (getItemLayout === undefined) return undefined;
+    return (
+      _entries: unknown,
+      index: number,
+    ): { length: number; offset: number; index: number } =>
+      getItemLayout(props.sections, index);
+  });
+
   function entrySeparatorProps(
     entryProps: ISeparatorProps<ISectionEntry<ItemT>>,
   ): ISeparatorProps<ItemT> {
@@ -203,6 +222,7 @@
   footer={props.footer}
   empty={props.empty}
   keyExtractor={entryKeyExtractor}
+  getItemLayout={entryItemLayout}
   {stickyHeaderIndices}
   inverted={props.inverted}
   extraData={props.extraData}

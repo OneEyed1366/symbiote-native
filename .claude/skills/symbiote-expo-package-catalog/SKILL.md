@@ -74,15 +74,15 @@ queue.
 async, 31 packages) is under way: `expo-secure-store` (#18), `expo-sharing` (#19),
 `expo-web-browser` (#23) and `expo-sms` (#24) all shipped 2026-08-05, 27 left.
 
-**Tier 2 brought the first package that needs more than the two Android registration points.**
-`expo-secure-store`'s upstream config plugin also sets `android:fullBackupContent` /
-`android:dataExtractionRules` on the app's own `<application>` element — Auto Backup would
-otherwise upload the encrypted entries without the Keystore keys that decrypt them, so a restore
-onto a new device yields unreadable values. `@symbiote-native/expo-modules-link` grew an
-`android.manifestApplicationAttributes` section for this (additive-only, app's own value wins).
-**Read the upstream `plugin/src/with<Name>.ts` before porting any tier-2 package** — that file is
-where Expo hides per-app native config a thin JS wrapper does not otherwise reveal, and it is the
-cheapest place to find out that a package needs one.
+```
+§secure_store_manifest_attrs := {
+  pkg: "expo-secure-store", scope: "first tier-2 pkg needing more than the 2 standard Android registration points",
+  gap: "upstream plugin also sets android:fullBackupContent / android:dataExtractionRules on <application>",
+  root_cause: "w/o them Auto Backup uploads encrypted entries without their Keystore keys ⟶ restore on new device = unreadable values",
+  fix: "@symbiote-native/expo-modules-link: android.manifestApplicationAttributes section (additive-only, app value wins)",
+  lesson: "read upstream plugin/src/with<Name>.ts before porting any tier-2 package — cheapest way to find per-app native config a thin wrapper hides"
+}
+```
 
 ## Priority queue — one continuous sequence, ranked by complexity + demand
 
@@ -180,5 +180,6 @@ from each package's `expo-module.config.json`.
    parity) before writing code.
 3. Follow `symbiote-expo-native-module` for **M** entries, `symbiote-third-party-native-view`
    for **V** entries.
-4. Update this table's tier/row (strike through or move to a "shipped" note) once a package
+4. Pin any new native npm dependency via a pnpm catalog entry, not a literal version — see `symbiote-dependency-catalog`.
+5. Update this table's tier/row (strike through or move to a "shipped" note) once a package
    lands — keep the queue reflecting reality, not the 2026-07-28 snapshot forever.
