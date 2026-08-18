@@ -1,6 +1,6 @@
 ---
 name: symbiote-third-party-native-view
-description: "Symbiote third-party native-VIEW wrapper workflow — read BEFORE making a React-Native library that ships a native VIEW component (@react-native-community/slider, react-native-*, any codegenNativeComponent) usable from a NON-React adapter (Vue/Angular/Svelte/Solid), or building/debugging a @symbiote-native/PKG wrapper package, or deciding where such a wrapper and its native dependency go. This is the realized track of ADR 0014 + the third_party_rn_packages_are_react_only invariant; the reference implementation is @symbiote-native/slider (packages/slider, ADR 0027). Covers: (1) WHY a wrapper at all — the library's default export is a React component (useState/hooks) that throws under a non-React adapter's null dispatcher; you reach the native view through the engine createNode-by-ViewConfig path instead, never by importing the React component. (2) PACKAGE SHAPE — a self-contained packages/PKG package (NOT core/components, NOT an adapter), one framework-agnostic src/core (pure folds + renderX returning a Descriptor) + one thin per-adapter entry (./vue, ./react, ./angular) via the exports map. (3) VIEWCONFIG REGISTRATION — package-level register.ts side-effect imports the codegen native-component SPEC (…/dist/XNativeComponent), pulled by barrels only. (4) ONE-DEPENDENCY NATIVE PROXY PACKAGING — the app lists ONLY @symbiote-native/PKG; @symbiote-native/PKG depends on the native RN library, ships react-native.config.cjs + a proxy podspec + codegenConfig, and autolinking sees @symbiote-native/PKG as the native package. Plain transitive native deps still do NOT autolink; the proxy files are the escape hatch. (5) prop-type split, no-`as` narrowing, headless tests, native simulator verification, and build/wiring checklist. Trigger on: wrap a native library for Vue/Angular, 'use X slider/picker/etc on a non-React adapter', a native view that renders on React but is blank/unlinked elsewhere, or any @symbiote-native/PKG packaging/dependency question."
+description: "Symbiote third-party native-VIEW wrapper workflow — read BEFORE making a React-Native library that ships a native VIEW component (@react-native-community/slider, react-native-*, any codegenNativeComponent) usable from a NON-React adapter (Vue/Angular/Svelte/Solid), or building/debugging a @symbiote-native/PKG wrapper package, or deciding where such a wrapper and its native dependency go. This is the realized track of the third_party_rn_packages_are_react_only invariant; the reference implementation is @symbiote-native/slider (packages/slider). Covers: (1) WHY a wrapper at all — the library's default export is a React component (useState/hooks) that throws under a non-React adapter's null dispatcher; you reach the native view through the engine createNode-by-ViewConfig path instead, never by importing the React component. (2) PACKAGE SHAPE — a self-contained packages/PKG package (NOT core/components, NOT an adapter), one framework-agnostic src/core (pure folds + renderX returning a Descriptor) + one thin per-adapter entry (./vue, ./react, ./angular) via the exports map. (3) VIEWCONFIG REGISTRATION — package-level register.ts side-effect imports the codegen native-component SPEC (…/dist/XNativeComponent), pulled by barrels only. (4) ONE-DEPENDENCY NATIVE PROXY PACKAGING — the app lists ONLY @symbiote-native/PKG; @symbiote-native/PKG depends on the native RN library, ships react-native.config.cjs + a proxy podspec + codegenConfig, and autolinking sees @symbiote-native/PKG as the native package. Plain transitive native deps still do NOT autolink; the proxy files are the escape hatch. (5) prop-type split, no-`as` narrowing, headless tests, native simulator verification, and build/wiring checklist. Trigger on: wrap a native library for Vue/Angular, 'use X slider/picker/etc on a non-React adapter', a native view that renders on React but is blank/unlinked elsewhere, or any @symbiote-native/PKG packaging/dependency question."
 ---
 
 # Symbiote — wrapping a third-party RN native VIEW for non-React adapters
@@ -12,7 +12,7 @@ the React dispatcher, so a non-React adapter (Vue/Angular/Svelte/Solid) renders 
 null dispatcher and it throws `Cannot read property 'useState' of null`. The
 `third_party_rn_packages_are_react_only` invariant states this; this skill is the realized
 way to make such a view work everywhere. Reference: **`@symbiote-native/slider`** (`packages/slider`,
-ADR 0027). SymbioteNative only makes the *native view* framework-agnostic — never the library's
+). SymbioteNative only makes the *native view* framework-agnostic — never the library's
 React *component*.
 
 The whole trick: the engine already derives a view's events + prop processors from RN's
@@ -182,7 +182,7 @@ Vue lifecycle reads untyped `attrs` (narrow with runtime guards, hold any engine
 (`resolveAccessibilityProps(rawProps)` then destructure handled fields, rest → passthrough),
 forwards a native ref via `forwardRef` → the host node.
 
-## Headless testing (ADR 0025)
+## Headless testing
 
 - Inject a codegen-shaped ViewConfig and assert the engine derived it. Mirror
   `adapters/react/src/__tests__/slider.test.tsx`: `installFabric()` +
@@ -196,7 +196,9 @@ forwards a native ref via `forwardRef` → the host node.
 - Cover: native props pass-through, the value-sanitation quirk, tint processing via the derived
   processor, BOTH value rails → `onValueChange`, sliding events, disabled-from-accessibilityState,
   the step overlay renders, and that the JS callback does NOT leak to the native node.
-- Native RENDER on device is the final word (ADR 0012 — headless fakes resolve any name).
+- Native RENDER on device is the final word — headless fakes resolve any name, so a wrong
+  native-module name passes every smoke and fails only on a real host (`CLAUDE.md`
+  `<native_module_name_is_platform_specific>`).
 
 ## Build / wiring checklist
 
@@ -359,9 +361,14 @@ forwards a native ref via `forwardRef` → the host node.
   functional code), core-only, or the full parity this skill otherwise assumes.
 - `packages/slider/**` — the reference implementation (core + vue + react + register + native
   proxy config/podspec + tests).
-- `.docs/decisions/0027-third-party-native-view-wrapper-package.md` — the decision + autolinking
-  citation; `0014` (third-party libs: no fork), `0012` (native module name correctness is
-  device-proven), `0025` (testing), `0026` (folder-as-module).
+- The rationale this skill used to cite as numbered ADRs is in-repo prose now, not a
+  `.docs/decisions/` path (that tree is local-only per `.gitignore` and absent from a
+  checkout): no-fork of third-party libs → `CLAUDE.md`
+  `<third_party_rn_packages_are_react_only>` + `<native_core_is_untouched>`;
+  native-module-name correctness is device-proven → `CLAUDE.md`
+  `<native_module_name_is_platform_specific>`; testing → `symbiote-parity-check` §5;
+  folder-as-module → `symbiote-file-layout` §2. The wrapper-package decision itself is
+  this skill.
 - Sibling skills: `symbiote-add-component` (SymbioteNative's OWN components — the contrast),
   `symbiote-dependency-catalog` (catalog rules), `vue-adapter-reactivity` (node identity / async
   commit), `symbiote-engine-core` (the mutation API + ViewConfig derivation), `symbiote-parity-check`.

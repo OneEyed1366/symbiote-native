@@ -400,9 +400,13 @@ bring-up step) should add a `dlog` at its seam as a matter of course.
   surface (shortest simulator loop on macOS, widest prop-edge coverage); Android
   is at canary parity. The `RCTFabricSurface` bootstrap and the Android native
   host-shims (`packages/android`) are both wired.
-- **Primitives:** `View` · `Text` · `Image` · `ScrollView` all done. `Text`
-  carries the only non-trivial nesting (`NativeText` vs `NativeVirtualText` via
-  `TextAncestorContext`).
+- **Primitives:** `View` · `Text` · `Image` · `ScrollView` all done. `Text` carries
+  the only position-dependent view name — a `<Text>` inside another `<Text>` commits
+  as `RCTVirtualText` instead of `RCTText` — and **no adapter implements that.** It is
+  resolved once in the engine's commit walk (`viewNameFor` in `core/engine/src/commit.ts`,
+  which threads `hasTextAncestor` down and re-creates the node when the kind flips);
+  every adapter emits a flat `symbiote-text` and stays out of it. React's original
+  `TextAncestorContext` is gone — do not reintroduce a per-adapter context for this.
 - **Styling — CSS classes are the convention; `StyleSheet.create` remains fully
   supported.** Every current example app (`examples/react`, `examples/vue-sfc`,
   `examples/vue-tsx`, `examples/angular`) styles its static look with a CSS class

@@ -230,9 +230,13 @@ function fragment_from_tree(structure, ns) {
     var element = create_element(name, namespace, attributes?.is);
     for (var key in attributes) set_attribute(element, key, attributes[key]);
     if (children.length > 0) {
-      var target = element.nodeName === TEMPLATE_TAG ? element.content : element;
+      var target =
+        element.nodeName === TEMPLATE_TAG ? element.content : element;
       target.append(
-        fragment_from_tree(children, element.nodeName === 'foreignObject' ? undefined : namespace),
+        fragment_from_tree(
+          children,
+          element.nodeName === 'foreignObject' ? undefined : namespace,
+        ),
       );
     }
     fragment.append(element);
@@ -256,7 +260,10 @@ if (node === undefined) {
   node = fragment_from_tree(structure, ns);
   if (!is_fragment) node = get_first_child(node);
 }
-var clone = use_import_node || is_firefox ? document.importNode(node, true) : node.cloneNode(true); // :245 — and DEEP-CLONED per instance
+var clone =
+  use_import_node || is_firefox
+    ? document.importNode(node, true)
+    : node.cloneNode(true); // :245 — and DEEP-CLONED per instance
 ```
 
 `get_first_child(clone)` (`:249`) goes through the cached descriptor;
@@ -320,7 +327,9 @@ late. Every Symbiote intrinsic is **hyphenated**, and
 ```js
 node.type === 'RegularElement' &&
   (node.name.includes('-') ||
-    node.attributes.some(attr => attr.type === 'Attribute' && attr.name === 'is'));
+    node.attributes.some(
+      attr => attr.type === 'Attribute' && attr.name === 'is',
+    ));
 ```
 
 So **every one of our host tags compiles down the custom-element path**, which
@@ -330,7 +339,8 @@ differs from the ordinary element path in two ways.
 
 ```js
 // compiler/phases/3-transform/client/visitors/RegularElement.js:58
-context.state.template.needs_import_node ||= name === 'video' || is_custom_element;
+context.state.template.needs_import_node ||=
+  name === 'video' || is_custom_element;
 ```
 
 → `visitors/Fragment.js:96,140-141` ORs in `TEMPLATE_USE_IMPORT_NODE` →
@@ -622,7 +632,10 @@ unconditionally in dev (`setUpDefaultReactNativeEnvironment.js:27-28`, under
 (`setUpReactDevTools.js:230-234`):
 
 ```js
-RCTNativeAppEventEmitter.addListener('RCTDevMenuShown', connectToWSBasedReactDevToolsFrontend);
+RCTNativeAppEventEmitter.addListener(
+  'RCTDevMenuShown',
+  connectToWSBasedReactDevToolsFrontend,
+);
 connectToWSBasedReactDevToolsFrontend(); // Try connecting once on load
 ```
 
@@ -888,6 +901,20 @@ ships a per-framework entry whose smokes drive the same `mount()`. Find newly ad
 6. **Module-level DOM access** — currently only the optional-chained `IS_XHTML`
    (`constants.js:80-83`), which imposes no ordering constraint (§3f). A new,
    non-optional one would.
+7. **The hand-written component body in `modules/animated/create-animated-component.ts`.**
+   It is a compiled component's shape written by hand, so it names nine private
+   functions: `attach` (`dom/elements/attachments.js`), `state`/`derived`/`get`/`set`
+   (`reactivity/{sources,deriveds}.js`), `user_effect` (`reactivity/effects.js`),
+   `push`/`pop` (`context.js`), and `spread_props` (`reactivity/props.js`), all declared
+   in `adapters/svelte/src/svelte-internal-client.d.ts`. Two things to re-verify on a bump,
+   neither of which TypeScript can see:
+   - `push(props, runes)` still DEFERS a `user_effect` created before `pop()` until mount.
+     If it stops, the wrapper's reconcile effect runs before the base has rendered and the
+     leaf binds to nothing — a silently dead animation, not an error.
+   - a component call still RETURNS its exports object, which is what forwards a list's
+     `scrollTo*`/`getScrollNode` handle through `bind:this`.
+     Cheapest check: compile the equivalent `.svelte` source with `svelte/compiler` and diff the
+     emitted calls against the file — that is how the current set was derived.
 
 **Suggested CI guard:** a test that imports Svelte's own `src/utils.js` and asserts
 `DELEGATED_EVENTS` is byte-identical to a vendored copy, so a bump fails CI rather
@@ -954,7 +981,10 @@ import {
   type SymbioteSurface,
 } from '@symbiote-native/engine';
 
-export function mount(rootTag: IRootTag, RootComponent: Component): SymbioteSurface {
+export function mount(
+  rootTag: IRootTag,
+  RootComponent: Component,
+): SymbioteSurface {
   const surface = createSurface(rootTag);
   // Eager, NOT lazy — unlike §9's template prototypes, the root element IS the
   // live surface, so it must have an ISymbioteNode from the start.
@@ -1133,7 +1163,10 @@ one character. A dynamic interpolation compiles to a literal `' '` placeholder i
 compiled output of `{#each rows as row}…{row}…{/each}`:
 
 ```js
-var root = $.from_tree([['symbiote-view', null, ['symbiote-text', null, ' ']]], 2);
+var root = $.from_tree(
+  [['symbiote-view', null, ['symbiote-text', null, ' ']]],
+  2,
+);
 //                                                                        ^^^ not ''
 $.template_effect(() => $.set_text(text, `row ${$.get(row) ?? ''}`));
 ```
@@ -1591,8 +1624,10 @@ compiler, which collapses runs of whitespace including newlines.** So a sentence
 wrapped across source lines for readability:
 
 ```svelte
-<Text class="hero-body">Every @symbiote-native/svelte primitive, driven straight onto Fabric —
-  no react-native renderer in the path.</Text>
+<Text class="hero-body"
+  >Every @symbiote-native/svelte primitive, driven straight onto Fabric — no
+  react-native renderer in the path.</Text
+>
 ```
 
 ships its literal `\n` plus the indent into the `RCTText`. On device that is a hard line break
@@ -1605,6 +1640,159 @@ which only ever sees text nodes that are ENTIRELY whitespace.
 the second walks `parse()`'s AST for a `Text` node whose `data.trim()` still contains a newline.
 Verified to actually fire against a synthetic wrapped-sentence component, not just to pass on a
 clean tree. **Practical rule: a text node's content stays on ONE source line, however long.**
+
+### §16b. STRUCTURAL FIX (2026-08-19) — hazard 2 now dies in the shim, not the source
+
+Everything above treats the source preprocessor as the guarantee. It no longer is, for the
+_stray sibling gap_ half. `dom-shim/text.ts`'s `createEngineNode()` now drops a whitespace-only
+text node whose parent cannot hold raw text:
+
+```ts
+if (this.value === '') return createAnchor();
+if (isFormattingWhitespace(this.value, this.parent)) return createAnchor();
+return createRawText(this.value);
+```
+
+**Why the parent makes this exact, not a heuristic.** Measured on svelte 5.56.8, a stray gap and
+an `{#each}` text placeholder are the SAME `' '` string in the `from_tree` template — they are
+indistinguishable at the string level and only the parent separates them:
+
+```
+stray gap     ['symbiote-view', null, [...], ' ', [...]]   parent takes no raw text -> drop
+placeholder   ['symbiote-text', null, ' ']                 parent IS a <Text>       -> keep
+```
+
+So `<Text><Text>a</Text> <Text>b</Text></Text>` correctly keeps its separator — there the space
+really is a word boundary. `makeLive()` binds a parent before its children, so the parent's
+engine node is always present when this runs; a fragment is unwrapped into the real parent
+before insertion, so it is never the parent seen here.
+
+**What this buys.** It closes the one shape the preprocessor's own comment admitted it could not
+catch (two siblings on ONE line, no newline) — by the time the shim sees it, Svelte has already
+normalized that form to the very same single space. And correctness stops depending on a
+consuming app registering the preprocessor in its `svelte.config.js`.
+
+**What did NOT move.** Hazard 1 (a wrapped sentence INSIDE one text node) still needs the
+preprocessor: it wants collapsing, not dropping, and only source can tell an authored newline
+from one a runtime value carries. The preprocessor's deletion half is now an optimization (the
+node is never built) plus svelte-check hygiene.
+
+**Cross-compiler context, measured the same day** — this was never a Svelte bug. Svelte is the
+only one of the four that defers whitespace normalization to the browser, which is correct for
+its target, because half of HTML's text model lives in CSS (`white-space`), i.e. in the
+renderer. We replaced the renderer.
+
+```
+Vue  baseParse/compileTemplate  default 'condense'  -> 0 whitespace-only text nodes
+                                'preserve'          -> 1
+Babel JSX  cross-line gap                           -> dropped
+           <Text>{a} {b}</Text>                     -> " " kept (intentional)
+Svelte     any form                                 -> collapsed to ' ', never dropped
+```
+
+No Svelte compiler option removes it: `preserveWhitespace` false is already the default and
+still emits `' '`. Prior art for the fix's SHAPE: svelte-native has no renderable text node at
+all — `ViewNode.updateText()` folds text children into the parent's `text` attribute, so a stray
+space sets a property nothing reads. NativeScript's XML path defaults `includeWhiteChars` to
+false; Angular defaults `preserveWhitespaces` to false. All three decide at the point where text
+meets its parent, which is exactly where this fix now sits.
+
+Regression net: `adapters/svelte/src/dom-shim/stray-whitespace.test.ts`, compiled deliberately
+WITHOUT the preprocessor (with it, the test could not fail). Both failure directions were
+verified by breaking the code: removing the rule gives `['a',' ','b']` vs `['a','b']`; ignoring
+the parent gives `['a','b']` vs `['a',' ','b']` on the word-separator case.
+
+**The character class is deliberately WIDER than Svelte's, and the preprocessor's is deliberately
+NARROWER. Do not "unify" the three.** Svelte's `phases/patterns.js` uses `/[^ \t\r\n]/` and says
+why: _"Not \S because that also removes explicit whitespace defined through things like
+`&nbsp;`"_. For Svelte the CHARACTER is the discriminator, so it must preserve a deliberate nbsp.
+For the shim the PARENT is the discriminator and has already proved the node cannot paint, so the
+class is `/^[\s\u200b-\u200d\ufeff]+$/` — `\s` plus the zero-width family it misses.
+
+Measured: every one of these arrives as its OWN text node in the from_tree template and the
+original `[ \t\r\n]` class missed all of them —
+
+```
+&nbsp; / U+00A0   ['symbiote-view', null, [...], '\u00a0', [...]]
+\f, \v, &emsp;, U+2009, U+2028, U+3000, U+FEFF, U+200B      each its own node
+&#32; / &#10; / &Tab;    decode to a plain space/newline — the old class already caught these
+```
+
+U+00A0 is the realistic one (Option+Space on macOS, a paste). `collapse-text-whitespace.ts` keeps
+the NARROW class on purpose: its class drives COLLAPSING runs inside real text content, where an
+`&nbsp;` is a character the author typed — folding it into a plain space would change what
+renders. The shim can be wider because it only ever DROPS, and only where nothing can paint.
+
+**Structural shapes that were probed and are all clean** (each arrives as a plain `' '` with the
+real parent bound): whitespace around `{#if}` / `{#each}` / `{#await}` / `{#key}` / `{@render}` /
+`{#snippet}`, between two COMPONENT tags, next to `<svelte:component|element|boundary>`, and in a
+multi-root component (the fragment is unwrapped in `normalizeInsertable` and `insertOne` sets
+`node.parent` BEFORE `makeLive`, so the parent check sees the real one). An HTML comment between
+siblings merges the two gaps into one `' '`; a whitespace-only node that is the ONLY child is
+dropped by Svelte itself.
+
+**When the official custom-renderer API lands, this moves.** sveltejs/svelte#18042 (open, not
+merged) says nothing about whitespace — its only `Text.js` change is a bidi warning, and its
+reference renderer does not filter. But its `custom-renderer/types.d.ts` declares the anchor as
+`createComment` (not an empty text) and gives `createTextNode(data)` NO parent — so the decision
+would have to move from `createEngineNode()` to `insert(parent, node, anchor)`. Prior art for the
+class itself: Angular's `ml_parser/html_whitespaces.ts` `WS_CHARS` is "\s with \u00a0 excluded",
+plus an `&ngsp;` escape hatch — which we do NOT need, because Angular drops whitespace
+unconditionally while we drop only where no space could render anyway.
+
+---
+
+### §16c. The repo-wide sweep that acted on §16b (2026-08-19)
+
+107 `.svelte` files were written edge-to-edge to satisfy §16. With §16b in place that is no
+longer required, so all of them were rewritten as ordinary indented markup. Facts worth keeping:
+
+**The cramming was prettier's own encoding, not hand-authoring.** `prettier-plugin-svelte`
+writes a dangling `>`, a split `</Tag\n>`, and `/><Tag` joins to mean "no whitespace here".
+
+**Prettier cannot undo it at any setting.** `htmlWhitespaceSensitivity` `css` / `ignore` /
+`strict` all produce byte-identical output on crammed source — it never ADDS whitespace between
+siblings. It DOES preserve a break you insert. So the sweep is: insert breaks, then let prettier
+lay out the rest, and it stays put under a later `--write`.
+
+**Insert breaks with the parser, not a regex.** Take each element's first/last child offsets
+from `parse()`. A `>` inside an attribute expression or a `lang="ts"` script is not a tag end;
+and an element exceeding `printWidth` with zero whitespace inside gets re-crammed unless its
+text content is broken out too. A regex pass got ~75 files partly done and stalled there.
+
+**Each example carries its OWN `.prettierrc.js`**, separate from the repo root — a root config
+change never reaches `examples/svelte` or `examples/expo-svelte`. All three now set
+`htmlWhitespaceSensitivity: 'ignore'` so newly written markup is not crammed again.
+
+**The obvious detector is wrong.** `^[[:space:]]*>` matches prettier's normal
+`bracketSameLine: false` bracket. Use the tightened pattern in
+`.claude/rules/svelte-prettier-whitespace-safety.md`. Final state: 0 markup hits across all four
+areas; the only residue is `>(() => {`, a multi-line TS generic inside `<script>`.
+
+**Gate every file on an AST compare** — whitespace-only Text nodes dropped, remaining Text
+collapsed AND TRIMMED. Svelte trims a text node's edges itself (`<p>x</p>` and `<p>\n  x\n</p>`
+compile byte-identical), so omitting the trim produces false refusals; that bug cost one agent a
+full hand-rolled workaround before it was fixed.
+
+**Two follow-on asymmetries this surfaced**, both fixed: `examples/expo-svelte/svelte.config.js`
+never registered `collapseTextWhitespace()` (Metro applies it unconditionally, so the device was
+safe, but `svelte-check` and the editor saw un-collapsed text — invisible until markup started
+producing multi-line text bodies); and `scripts/audit-svelte-stray-whitespace.mjs` was checking
+SOURCE, which after the sweep reported 41 files / 59 wrapped sentences, none of them a bug. It
+now runs the preprocessor first and checks the pipeline's OUTPUT. Proven live, not vacuous:
+preprocessor on -> 0/0, neutered -> 41/59. Its sibling-gap pass is deleted outright.
+
+**The navigation hygiene assertions moved with the invariant.** `stack`/`tabs`/`drawer` smoke
+tests asserted `strayWhitespaceCount() === 0` over compiled text; that counter is now
+deliberately non-zero, so it was removed from `svelte-compile.test-helper.ts` rather than left
+as a trap. Replaced by `rawTextsOutsideTextContainer()` in `fabric-tree.test-helper.ts`, which
+walks the COMMITTED tree with parent context and returns every `RCTRawText` whose parent is not
+`RCTText`/`RCTVirtualText` — the real §16b invariant. Four assertions cover the branchy
+templates the compile-time audit used to reach: stack base + `formSheet` modal, tabs +
+`jumpTo`, drawer + `openDrawer()`. Verified non-vacuous by emptying the text-container set:
+all four fail, restoring makes them pass.
+
+Final gates: 3875 tests pass, `tsc --build` clean, `format:check` clean, audit 0.
 
 ---
 
@@ -1897,7 +2085,9 @@ export function wNodeToSvelte(node: WNode): WolfieElement {
   const el = new WolfieElement(node.type);
   if (node.props.style) setStyle(el.domElement, node.props.style); // bypasses Svelte's setAttribute
   for (const child of node.children) {
-    el.appendChild(typeof child === 'string' ? new WolfieText(child) : wNodeToSvelte(child));
+    el.appendChild(
+      typeof child === 'string' ? new WolfieText(child) : wNodeToSvelte(child),
+    );
   }
   return el;
 }
@@ -2421,7 +2611,7 @@ stack screen does — the app's own screen component lives inside
 **What actually works, measured against the real compiler + the real shim:**
 
 ```svelte
-<svelte:element this={'RNSScreen'} {@attach hostProps(plan.screenProps)}>
+<svelte:element this={"RNSScreen"} {@attach hostProps(plan.screenProps)}>
   …ordinary framework children…
 </svelte:element>
 ```
@@ -2429,7 +2619,9 @@ stack screen does — the app's own screen component lives inside
 with
 
 ```ts
-export function hostProps(props: Record<string, unknown>): (node: unknown) => void {
+export function hostProps(
+  props: Record<string, unknown>,
+): (node: unknown) => void {
   return node => {
     if (isShimElement(node)) node.p = props;
   };
@@ -2806,14 +2998,24 @@ Same four moves Vue's `<style scoped>` already makes (`symbiote-sfc-style-compil
 from a compiler node-transform to a source rewrite because Svelte's compiler exposes **no AST
 hook** — a `markup()` preprocessor returning rewritten text is the only seam.
 
-1. Parse the block out; compile it through `@symbiote-native/css-parser`; register every class
-   under a per-file-suffixed key `card` -> `card__svelte-<hash>` in the same flat global registry
-   `App.css` and Vue SFC blocks already populate.
-2. Rewrite `class` in this file's own markup to name the suffixed key.
+1. Cut the block out TEXTUALLY (svelte's own `regex_style_tags`, the same extraction its official
+   `preprocess()` style hook uses) and compile it through `@symbiote-native/css-parser`'s
+   `compileScopedCss`: lightningcss renames every class to `card__svelte-<hash>` and hands back
+   the name map; the styles register under those names in the flat global registry `App.css` and
+   Vue SFC blocks already populate.
+2. Rewrite `class` in this file's own markup by READING that map — never by re-deriving the name.
 3. Delete the `<style>` block from the source handed on — so Svelte emits no
    `css_unused_selector` and adds no scope hash of its own.
-4. Append ONE `<script module>` line with the `registerStyles()` call and the two per-file
-   constants step 2 refers to.
+4. Append ONE `<script module>` line with the `registerStyles()` call and that same name map.
+
+**The block is located textually, and `parse()` runs on a copy with the block blanked to
+same-length whitespace (offsets preserved).** Reading `ast.css` instead — what this did until
+2026-08-20 — validates the block as CSS whatever `lang` says, so `<style lang="scss">$pad: 7px;
+…</style>` threw `css_expected_identifier` before the language table was ever consulted and only
+the SCSS that is already legal CSS (nesting) worked. scss / indented sass / stylus are covered in
+`style-forms-conformance.test.ts`; less has to be covered from `core/css-parser/src/
+svelte-less-style-block.test.ts`, because the `svelte` vitest project's `browser` resolve
+condition makes `less` load its browser bundle and die on `window is not defined`.
 
 Wired in BOTH places, for the same reason `forbid-web-only-constructs` is: `svelte.config.js`
 `preprocess` (svelte-check / language server) and `metro-svelte-transformer.cjs` (a consuming app
@@ -2832,7 +3034,8 @@ Svelte's own `.svelte-hash`) rather than Vue's `data-v-`, so a mixed app cannot 
 **Static vs dynamic `class` split.** A static `class="card"` is resolved at build time — the
 tokens are all visible, so no runtime call is emitted at all. Anything with an expression
 (`class={cond ? 'lit' : 'dim'}`, `class={['a', b && 'c']}`, the clsx object form, or an
-interpolated `class="card {extra}"`) is wrapped in `scopeSvelteClass(expr, names, id)`. An
+interpolated `class="card {extra}"`) is wrapped in `scopeSvelteClass(expr, names)`, `names` being
+the same build-time map the static rewrite read. An
 interpolated value is rebuilt as the template literal Svelte itself would have concatenated, so
 both shapes reduce to ONE expression. `scopeSvelteClass` normalizes through the adapter's own clsx
 boundary (`normalizeSvelteClass`, §22b) FIRST and scopes only what comes back as a string —
@@ -2851,8 +3054,14 @@ project a component renders only other components, so the web rule would make ev
 block a no-op — precisely the bug being fixed. The author-facing model still holds: "my `<style>`
 styles the markup I wrote".
 
-**`:global(.reset)`** registers unsuffixed and its markup token is left verbatim, via
-css-parser's existing `globalClassNamesIn` — same escape hatch, same code, as Vue.
+**`:global(.reset)`** registers unsuffixed and its markup token is left verbatim — lightningcss
+decides it, not a second selector walk: a name it did not rename is simply absent from the map, so
+every token of it passes through. (That is what retired `globalClassNamesIn` here.)
+
+**A compound rule's registered key is the collapse of the RENAMED tokens** (`.card.big` ->
+`card__svelte-hBig__svelte-h`), because renaming is per token. That is exactly the key the
+registry's raw-token compound path builds from the two tokens on the element; the older
+`cardBig__svelte-h` shape needed `scopedCompoundKey` to factor the suffix back out.
 
 ### 25d. Three implementation details that are not incidental
 
@@ -2999,8 +3208,13 @@ consumer with only the tarball in `node_modules`, and run `svelte-check` (borrow
   import { Stack } from '@symbiote-native/navigation/svelte';
   import type { INavigatorHandle } from '@symbiote-native/navigation/svelte';
   let navigator = $state<INavigatorHandle | null>(null);
-  $effect(() => { navigator?.push('Details'); navigator?.popToTop(); navigator?.reset({ routes: [] }); });
+  $effect(() => {
+    navigator?.push('Details');
+    navigator?.popToTop();
+    navigator?.reset({ routes: [] });
+  });
 </script>
+
 <Stack bind:this={navigator}>{''}</Stack>
 ```
 
@@ -3101,7 +3315,8 @@ Root cause, traced through the served dev bundle (`examples/svelte`, Metro
 
 1. Svelte 5's compiler (`generate: 'client'`) compiles every `.svelte` file to
    a plain top-level function named after the file - `function App($$anchor,
-   $$props) {...}` - the module's default export.
+   $$ props) {...}` - the module's default export.
+   $$
 2. Metro's bundled HMR runtime (`metro-runtime/src/polyfills/require.js`,
    `metroHotUpdateModule`) decides per module whether an update can hot-patch
    in place or must fall back to a full reload, via
@@ -3163,9 +3378,10 @@ redirect already live per-example rather than centralized (unlike the
 transformer, shipped as `@symbiote-native/svelte/metro-svelte-transformer`
 precisely so no consuming app needs local wiring). Any other app on
 `@symbiote-native/svelte` - including the future `create-symbiote` scaffolder
+
 - needs this same line added by hand today, or it hits the identical
-silent-no-op bug. A `@symbiote-native/svelte/metro-config` helper shipping
-this the way the transformer is shipped has not been done.
+  silent-no-op bug. A `@symbiote-native/svelte/metro-config` helper shipping
+  this the way the transformer is shipped has not been done.
 
 ## §29. `prettier-plugin-svelte --write` reintroduces §16's whitespace bug, plus a separate svelte-check regression - MEASURED 2026-08-17
 
@@ -3183,7 +3399,7 @@ exactly the two bugs §16 already named, in real shipped code, not a contrived c
    formatter meant to keep the file tidy.
 2. **13 sentences wrapped across multiple source lines inside a single `<Text>`
    node**, across 10 files - including one in `CanaryScreen.svelte` sitting
-   *right next to an existing HTML-comment guard* warning against exactly this
+   _right next to an existing HTML-comment guard_ warning against exactly this
    ("one physical line on purpose: unlike Vue's template compiler, Svelte does
    NOT condense whitespace inside a text node..."). Prettier's printWidth-driven
    text wrapping does not read source comments and reflowed it anyway.

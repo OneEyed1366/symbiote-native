@@ -1,6 +1,6 @@
 ---
 name: vue-adapter-slots
-description: "Symbiote Vue adapter scoped slots + slot typing — read BEFORE adding or changing how any Vue component (adapters/vue/**) renders children / cells / headers / separators, or when a slot scope types as `any` (e.g. Pressable `pressed`, a list `item`). Core rule: parametrized rendering on Vue is a SCOPED SLOT, never a React-style renderItem / ItemSeparatorComponent / render-prop — those are removed from the Vue public contract (no duality; ADR 0028). Use when converting a renderItem-prop component to slots, typing a slot scope so SFC `template #item=...` and JSX infer it (thread the slots type through ICtx Emits+Slots), wiring a slot to the shared render layer via slots-to-render-props, killing the `Non-function value encountered for default slot` warn, or wiring vue-tsc typecheck for an SFC example. Slot return type is VNode[] or VNode. Triggers: Vue slot typing, pressed is any, item is any in template, scoped slot, renderItem to slot, SlotsType, vue-tsc example typecheck."
+description: "Symbiote Vue adapter scoped slots + slot typing — read BEFORE adding or changing how any Vue component (adapters/vue/**) renders children / cells / headers / separators, or when a slot scope types as `any` (e.g. Pressable `pressed`, a list `item`). Core rule: parametrized rendering on Vue is a SCOPED SLOT, never a React-style renderItem / ItemSeparatorComponent / render-prop — those are removed from the Vue public contract (no duality — this skill is that decision). Use when converting a renderItem-prop component to slots, typing a slot scope so SFC `template #item=...` and JSX infer it (thread the slots type through ICtx Emits+Slots), wiring a slot to the shared render layer via slots-to-render-props, killing the `Non-function value encountered for default slot` warn, or wiring vue-tsc typecheck for an SFC example. Slot return type is VNode[] or VNode. Triggers: Vue slot typing, pressed is any, item is any in template, scoped slot, renderItem to slot, SlotsType, vue-tsc example typecheck."
 ---
 
 # Symbiote Vue adapter — scoped slots & slot typing
@@ -12,7 +12,7 @@ shape onto Vue is the cross-adapter symmetry `<adapter_src_follows_framework_idi
 it tripped a real Vue warning (see Rule 5). So:
 
 > **Parametrized rendering on Vue = scoped slot. The React render-prop family is REMOVED from the
-> Vue public contract — no duality (it kills DX). Decision: `.docs/decisions/0028`.**
+> Vue public contract — no duality (it kills DX). This skill IS that decision's text.**
 
 This is NOT a parity regression: the FEATURE (custom item/header/separator/empty rendering) is fully
 present, through the surface Vue authors expect. The shared `@symbiote-native/components` windowing/render
@@ -180,7 +180,7 @@ fails. That is a separate effort, not a quick win.
 
 | Avoid | Why | Instead |
 |---|---|---|
-| Keeping a `renderItem` prop on a Vue list | Duality kills DX (ADR 0028) | Slots only; bridge to the inner `renderItem` internally |
+| Keeping a `renderItem` prop on a Vue list | Duality kills DX | Slots only; bridge to the inner `renderItem` internally |
 | `slots: Object as SlotsType<…>` option for a generic component | Can't be generic over ItemT | `ICtx<E, S>` (function-generic form) |
 | Slot type returning only `VNode[]` | `satisfies` rejects a single-element slot fn | `VNode[] | VNode` |
 | `h(Text, {}, title)` for a cell | Non-function default slot warn | `() => title` or a `template`/slot |
@@ -203,6 +203,8 @@ fails. That is a separate effort, not a quick win.
 - `vue-adapter-events` — emits / `$attrs` routing (the OTHER half of the Vue public surface). Events
   are emits; children/cells are slots. The Rule 5 warning is about how children reach a component.
 - `symbiote-add-component` — the 3-layer split; a new component's Vue lifecycle wires slots here.
-- `.docs/decisions/0028-vue-lists-scoped-slots-not-renderitem.md` — the load-bearing decision.
+- The load-bearing decision (slots, never renderItem) has no separate document — this skill
+  is it. Earlier revisions cited `.docs/decisions/0028`; that tree is local-only per
+  `.gitignore` and absent from a checkout, so the citation pointed at nothing.
 - prop-type split (`<prop_types_split_agnostic_vs_per_adapter>`): a slot type carries framework
   elements, so it is per-adapter (declared in the adapter), never moved verbatim to the shared layer.

@@ -9,8 +9,8 @@ The engine is the shared half every adapter sits on. It does exactly two things:
 it holds a **retained, mutable shadow-tree** of `ISymbioteNode`s that adapters
 mutate cheaply, and it translates that tree into Fabric's **persistent,
 clone-on-write** child sets at commit. The mutable-tree → persistent-mirror
-trick is the R2 core (`.docs/decisions/0010`) and it lives ONCE here, so no
-adapter re-implements persistence (`<clone_on_write_lives_in_engine>`).
+trick is the R2 core and it lives ONCE here, so no adapter re-implements
+persistence (`<clone_on_write_lives_in_engine>`).
 
 If you are writing a renderer seam (React host config, Vue `createRenderer`,
 Angular `Renderer2`), your whole job is to map your framework's node ops onto the
@@ -221,7 +221,9 @@ delete (`<keep_logs_gate_behind_DEBUG>`).
 - Public barrel (what `@symbiote-native/engine` exports): `core/engine/src/index.ts`.
 - Reactive-adapter manifestations of §3/§6: the `vue-adapter-reactivity` and
   `angular-adapter` skills. Building a NEW adapter on this API: `symbiote-new-adapter`.
-- Decisions: `.docs/decisions/0010` (incremental clone-on-write), `0002`
-  (adapter seam + shared retained tree).
+Note: earlier revisions of this skill cited numbered ADRs under `.docs/decisions/`.
+That tree is local-only (`.gitignore`: "hidden folders are local-only") and is NOT
+present in a checkout, so those citations were unreadable. The live sources are the
+code paths above plus the sibling skills; do not re-add an ADR path.
 </content>
 </invoke>

@@ -1,6 +1,6 @@
 ---
 name: symbiote-parity-check
-description: "Symbiote parity-check workflow — verify a component reaches FULL feature-parity across adapters, the P0 'proven by a parity check' gate. Run it as the LAST phase of symbiote-add-component, or standalone to audit an existing component for drift. React is the REFERENCE surface (M1/M2 done, widest prop-edge coverage). Method: (1) enumerate X's complete surface on React — every prop, event, imperative method, and platform (.ios/.android) branch. (2) prop-by-prop DIFF against X on Vue (and each future adapter); any prop/event/method present on React but missing on the other is a P0 gap, NOT a follow-up. (3) confirm parity is STRUCTURAL — the shared half (reducer + renderX + prop resolution) lives in @symbiote-native/components and both adapters call it, rather than each re-implementing the surface (a hand-copied surface that happens to match today will drift). (4) confirm the agnostic public prop type (ISwitchProps etc.) is RE-EXPORTED from @symbiote-native/components by every adapter, never redeclared. (5) smoke both adapters headless (vitest, ADR 0025) + the co-located component tests. Trigger on parity verification, component audit, 'is X at parity across adapters', or finishing an add-component task."
+description: "Symbiote parity-check workflow — verify a component reaches FULL feature-parity across adapters, the P0 'proven by a parity check' gate. Run it as the LAST phase of symbiote-add-component, or standalone to audit an existing component for drift. React is the REFERENCE surface (M1/M2 done, widest prop-edge coverage). Method: (1) enumerate X's complete surface on React — every prop, event, imperative method, and platform (.ios/.android) branch. (2) prop-by-prop DIFF against X on Vue (and each future adapter); any prop/event/method present on React but missing on the other is a P0 gap, NOT a follow-up. (3) confirm parity is STRUCTURAL — the shared half (reducer + renderX + prop resolution) lives in @symbiote-native/components and both adapters call it, rather than each re-implementing the surface (a hand-copied surface that happens to match today will drift). (4) confirm the agnostic public prop type (ISwitchProps etc.) is RE-EXPORTED from @symbiote-native/components by every adapter, never redeclared. (5) smoke both adapters headless (vitest) + the co-located component tests. Trigger on parity verification, component audit, 'is X at parity across adapters', or finishing an add-component task."
 ---
 
 # Symbiote parity-check — proving full feature-parity
@@ -11,12 +11,37 @@ only when X on Y matches X everywhere else — **proven by a parity check**, not
 asserted. This skill is that check. It is the final phase of
 `symbiote-add-component` and a standalone drift audit.
 
-## 1. React is the reference surface
+## 1. React is the reference surface — for ONE of the two axes
 
 React is the validated, widest adapter (M1/M2 done, the reference prop-edge
-coverage). Parity is always measured **against React**: a prop/event/method that
+coverage). CROSS-ADAPTER parity is always measured **against React**: a prop/event/method that
 React's X exposes and another adapter's X does not is a gap to close, not a
 difference to accept.
+
+**But React is NOT the reference for RN conformance, and treating it as one hides the
+worst class of bug.** Measured 2026-08-19 on the Touchable family: an audit against
+`.vendors/react-native/.../Components/Touchable/*.js` found ten divergences from RN, and
+**nine of them were present in ALL FIVE adapters**. Every cross-adapter check was green
+throughout — five implementations agreed with each other and were uniformly wrong. The
+clearest instance: `DEFAULT_MIN_PRESS_DURATION_MS = 130` is Pressability's own default
+(`Pressability.js:264`), and both `TouchableOpacity.js:195` and `TouchableHighlight.js:203`
+override it with `minPressDuration: 0` — so 130 never applies to that family in RN, yet all
+five adapters applied it.
+
+So there are TWO axes, and only the first is what this skill's diff measures:
+
+```
+cross-adapter   do the five agree with each other?    → React is the reference
+RN conformance  do we agree with what we copied?      → .vendors/react-native is the reference
+```
+
+A component is not done because axis 1 is green. Read the RN source for the component you are
+porting — line by line, not by memory — and record every divergence you find even if you do not
+fix it (see §7).
+
+Corollary for tooling: a cross-adapter tree/output diff CANNOT find an axis-2 bug, because it
+reports five-way agreement as clean. Do not build one for this purpose — it would have been
+silent on nine of the ten findings above.
 
 ## 2. The diff — enumerate, then compare
 
@@ -202,7 +227,7 @@ treatment; the lifecycle-bearing tier keeps the subpath-plus-physical-file patte
 ## 5. Smoke
 
 ```
-pnpm test                        vitest headless — the co-located X tests on both adapters (ADR 0025)
+pnpm test                        vitest headless — the co-located X tests on both adapters
   state/X.test.ts                reducer + predicates (framework-free)
   view/render-X.test.ts          Descriptor snapshot
   components/X/X.test.*          per-adapter lifecycle (React + Vue + Angular)
@@ -223,6 +248,79 @@ PARITY        every React prop/event/method/platform-branch present + structural
 PARTIAL       enumerate the EXACT missing items → they are the remaining work (P0, not a follow-up)
 DRIFT         surfaces match but logic/view is hand-copied in an adapter → extract to core/components
 ```
+
+## 7. RN-conformance debt — the running backlog
+
+The project is beta BECAUSE full parity costs time; a dedicated 1-2 sprint alignment pass (no
+features, only RN conformance) is planned once Solid lands. Catching a divergence now is cheaper
+than then — but the point of this section is that a divergence you FIND must be recorded even
+when you do not fix it, or the alignment pass rediscovers it from zero.
+
+Record shape: what RN does (with `file:line` from `.vendors/react-native`), what we do, which
+adapters, why it was not fixed, and what would prove the fix.
+
+### Open — Touchable family (audit 2026-08-19)
+
+- **pressIn duration on responder grant.** RN fades over 0 ms when the press-in arrives with the
+  grant and 150 ms otherwise; we always use 150. UNREACHABLE today: the branch needs
+  `event.dispatchConfig.registrationName`, which our Pressable does not emit. Fixing it means
+  widening the event payload — an engine change, not an adapter one.
+- **Underlay style distribution.** RN puts `opacity` on the CHILD and `backgroundColor` on the
+  container (`TouchableHighlight.js`). React (`cloneElement`) and Vue (`cloneVNode`) now do this
+  and were verified to insert no extra node. **Angular and Solid still put both on the container**
+  — neither can reach the child without a permanent wrapper View, which reparents the child's
+  `flex`, and the fake Fabric does not run Yoga so headless cannot measure the damage. Visible
+  consequence: the underlay colour is itself dimmed by the opacity, so a pressed Touchable looks
+  different there than on React/Vue/RN. `resolveHighlightExtraStyles` already returns `underlay`
+  and `child` separately, so a layout-safe fix is unblocked — it just needs a DEVICE measurement.
+- **Three items ship unpinned** (implemented for parity, no test, device-only by nature):
+  `useNativeDriver: true` (headless has no native module, so both values behave identically);
+  `resetAnimation()` on teardown (root teardown already stops the leaf, so a test greens on broken
+  code too — one was written, proved vacuous, and deleted); and the visual→callback ORDER on
+  Angular (the visual only reaches the tree on a later async CD pass).
+- **No drift-back-in re-activation — all five adapters.** RN's Pressability has a state
+  `RESPONDER_INACTIVE_PRESS_OUT` and transitions back to `RESPONDER_ACTIVE_PRESS_IN` when the
+  finger leaves the retention region and returns, re-firing `onPressIn` (over 150 ms, not 0 —
+  that is the branch `OPACITY_ACTIVE_DURATION_MS` still exists for). Our engine dispatches
+  `pressIn` from exactly one place, `core/engine/src/events/index.ts:391` on topTouchStart, and
+  has no re-activation path at all: once the press drifts out, only pressOut can follow. Closing
+  this is a press-STATE-MACHINE change (`core/components/src/state/pressable.ts` plus the engine's
+  move stream), not an event-payload one — an earlier reading of this gap blamed a missing
+  `dispatchConfig.registrationName` and proposed widening `ISymbioteEvent`, which would not have
+  helped: with one origin the field would always carry the same value.
+- **Press timers are never cancelled on unmount — React, Vue, Angular, Svelte.** Found 2026-08-19
+  while migrating Svelte, OUTSIDE the original ten. `scheduleTimeout` returns a canceller and the
+  shared machine stores it (`runtime.pressDelayCancel`), but nothing calls it when the component
+  goes away: a pending `unstable_pressDelay` timer fires into an unmounted component, calling
+  `onPressIn` and starting an animation on a dead leaf. **Solid is the only adapter that closed
+  this**, via a `createTimeoutScheduler()` that keeps a Set of cancellers and clears them in
+  `onCleanup`. Port that shape to the other four. A test for it was written during the Svelte pass,
+  failed, and was DELETED rather than weakened — write it again with the fix.
+- **A stale header claiming an impossibility cost real work, twice in one day.** Svelte's
+  TouchableOpacity carried a homemade `tweenOpacity` over `setTimeout` and a header stating this
+  adapter has no Animated binding — untrue since `modules/animated` landed, so `useNativeDriver`
+  was structurally unreachable there until someone checked. Earlier the same day the Animated
+  namespace header claimed a generic `createAnimatedComponent` was impossible; a four-line probe
+  refuted it. Treat any header sentence of the form "X is impossible on this adapter" as an
+  untested claim with a date attached, not a finding.
+- **`Pressable` has no `minPressDuration` at all.** Surfaced by deleting
+  `DEFAULT_MIN_PRESS_DURATION_MS` (2026-08-19, once all five adapters had migrated): the constant
+  turned out to have NO production consumer — `core/components/src/state/pressable.ts` never
+  implements a press-duration floor, so RN's 130 ms Pressability default is simply absent for a
+  plain `Pressable`. The Touchable family is correct without it (RN overrides it with 0 there),
+  but a plain Pressable in RN does hold the active visual for 130 ms and ours does not.
+
+### How to run a conformance pass on a component
+
+1. Open the RN source for the component in `.vendors/react-native` and read it line by line. Not
+   from memory — memory is what produced the 130 ms bug in all five adapters at once.
+2. For every constant, default, and branch: find our equivalent and compare the VALUE, not just
+   the presence. A default that exists in both but differs is the easy one to miss.
+3. Check where RN puts each thing, not only what it computes — the underlay bug was a correct
+   value on the wrong node.
+4. Divergence found → fix it in the SHARED layer if every adapter shares it (the usual case: nine
+   of ten were), then migrate adapters additively so the tree never goes red mid-flight.
+5. Anything you cannot fix or cannot pin: append it to the backlog above with its reason.
 
 ## Differential input trace — when a bug reproduces on ONE adapter only
 
@@ -276,5 +374,7 @@ mounted cells.
   `core/components/src/{state,view}/switch*`.
 - Building the component this check gates: `symbiote-add-component`.
 - Native-only parity (tag-dependent features): `vue-adapter-reactivity` §2.
-- Testing strategy: `.docs/decisions/0025` (vitest + detox).
+- Testing strategy (vitest headless + detox on device): §5 above, and the live shape in
+any adapter's co-located `*.test.ts` / `examples/*/e2e/`. Do not cite a numbered ADR
+for it — `.docs/decisions/` is local-only per `.gitignore` and absent from a checkout.
 </content>

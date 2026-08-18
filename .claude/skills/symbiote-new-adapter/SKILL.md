@@ -112,7 +112,7 @@ engine). If adapter code starts growing any of these, it belongs in the engine
 
 ## 7. Build it in layers
 
-So a break localizes (the Vue/Angular plan, `.docs/decisions/0007`):
+So a break localizes (the Vue/Angular plan — and the Svelte and Solid ones after it):
 
 ```
 L1  Static paint   View/Text/Image, no reactivity  → surface paints
@@ -134,6 +134,9 @@ installed via `file:` for the in-progress adapter (CLAUDE.md's
 - Async-commit landmines on a coalesced adapter: `vue-adapter-reactivity`.
 - Component parity (L4): the `symbiote-add-component` skill.
 - Prior art: `wolf-tui/packages/{react,vue,svelte,solid,angular}` (same architecture, ANSI target).
-- Decisions: `.docs/decisions/0002` (adapter seam), `0007` (build in layers), `0008`
-  (React goes through the engine in mutation mode, not native persistent mode).
+- The layered order in §7, and React going through the engine in MUTATION mode rather
+  than its native persistent mode, are both stated as invariants in the repo root
+  `CLAUDE.md` (M1+M2 milestone note) — read there, not from an ADR number. The
+  `.docs/decisions/` tree those used to cite is local-only per `.gitignore` and is not
+  present in a checkout; do not re-add a path into it.
 </content>

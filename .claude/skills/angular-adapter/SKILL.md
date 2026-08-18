@@ -789,6 +789,31 @@ the component implements, with no extra wrapper field or getter needed. This is 
 `Drawer` pass themselves down to `NavigationScopeDirective` and to each mounted screen's
 `navigation` input post-refactor.
 
+## §23. Constructor PARAMETER decorators (`@Self()`/`@SkipSelf()`/`@Host()`/`@Optional()`/`@Inject()`) don't compile here — this project's tsconfig uses native/TC39 decorators, not `experimentalDecorators`
+
+Found building `examples/angular`'s API Playground screen (2026-08-17), trying to demo the
+DECORATOR form of DI scoping alongside `inject()`'s `InjectOptions`. `adapters/angular/
+tsconfig.angular.base.json` sets no `experimentalDecorators` flag under `target: "ES2022"` — every
+consuming app's `tsconfig.angular.json` extends it — so TypeScript compiles CLASS/PROPERTY/METHOD/
+ACCESSOR decorators (`@Component`, `@Injectable`, `@Input`, `@HostBinding`, `@ViewChild`, …) via the
+native TC39 decorators proposal, which structurally has no parameter-decorator position at all.
+Any constructor parameter decorator — not just DI ones, any of them — fails with `TS1206:
+Decorators are not valid here`, a plain parser-level error `ngc` reports before ngtsc even runs.
+
+This is consistent with what's ALREADY in this codebase, not a newly-introduced constraint:
+grep finds zero uses of `@Inject`/`@Optional`/`@Self`/`@SkipSelf`/`@Host` as constructor parameter
+decorators anywhere under `adapters/angular/src/` or `examples/angular/src/` — every DI site
+already uses field-initializer `inject(token, options?)` exclusively (`ColorSchemeService`,
+`descriptor-to-angular`, `renderer`, `create-portal`, every component). The API Playground screen's
+`PlaygroundDiConsumer` (`examples/angular/src/components/PlaygroundDI.ts`) demos `@Self()`/
+`@SkipSelf()`/`@Optional()` correctly via `inject(Token, { self: true })` /
+`{ skipSelf: true, optional: true }` / `{ optional: true }` — same InjectOptions object `inject()`
+always took, just no longer paired with a legacy constructor-decorator alternative in this repo.
+
+**Takeaway for future DI work here**: don't reach for a constructor parameter decorator as an
+alternative style to `inject()` — it will not compile under this project's tsconfig, regardless of
+whether the target is a component, directive, service, or plain injectable class.
+
 ## Reference
 
 - Vendored Angular source: `.vendors/angular` (= `~/projects/vendors/angular`, git

@@ -1,6 +1,6 @@
 ---
 name: symbiote-release-publishing
-description: "Symbiote npm publishing & versioning — read before touching .changeset/**, a publishable package's `publishConfig`/`files`/`exports`, .github/workflows/release.yml, or running `pnpm changeset`/`pnpm run release`. Versioning is Changesets (`pnpm changeset` → PR → 'Version Packages' PR → merge → CI publishes). Core trick: `main`/`exports` keep pointing at `src/index.ts` for in-repo dev (Metro/tsc resolve live TS, unchanged) — `publishConfig` overrides those to `build/` ONLY inside the tarball, never touching local resolution. No new bundler: `tsc --build` already emits `build/`, so `typecheck` IS the build. `@symbiote-native/angular`/`@symbiote-native/slider`'s `./angular` entry predate this, use a DIFFERENT mechanism (conditional `exports`, AOT build) — don't convert or copy that onto plain packages. Covers the mechanism table, the `files`-mandatory gotcha (`.gitignore` excludes `build/`), the `fix-esm-extensions` argument-list gotcha (a package missing from it ships an unimportable `build/` for every real npm consumer, invisible in-repo), changeset ignore list, release scripts, the `checks.yml` reusable-workflow CI gate (`ci.yml` + `release.yml` both call it, sequencing publish after lint/typecheck/test), and the canary preview flow — pkg.pr.new (never touches the real npm registry: no dist-tag, no version bump, nothing to clean up), triggered automatically via `workflow_run` after CI passes on a PR or manually via `workflow_dispatch`, publishing every publishable package every time (no per-package selection needed — pkg.pr.new never mutates shared registry state). A REAL npm `canary` dist-tag snapshot mechanism was tried instead (2026-07-24) and reverted the same day: real npm's `unpublish`/`deprecate` both require an interactive OTP no headless CI job can supply, even with a bypass-2FA granular token (that bypass only ever covers `publish`) — so cleanup could never actually run, and snapshots would have accumulated on the registry forever. See 'Canary releases' below for the full record. Also covers why a 'pnpm cache is not found' + 'Failed to save ... another job may be creating this cache' pair across checks.yml's parallel lint/typecheck/test jobs is an expected first-run/same-key race, not a broken cache (diagnose via job logs, not the Actions UI summary). Trigger: 'publish npm', 'release', 'changeset', 'version bump', 'publishConfig', 'canary release', 'CI publish', 'pkg.pr.new', 'canary dist-tag', 'trust:publishers', 'pnpm cache not found', 'actions cache'."
+description: "Symbiote npm publishing & versioning — read before touching .changeset/**, a publishable package's `publishConfig`/`files`/`exports`, .github/workflows/release.yml, or running `pnpm changeset`/`pnpm run release`. Versioning is Changesets (`pnpm changeset` → PR → 'Version Packages' PR → merge → CI publishes). Core trick: `main`/`exports` keep pointing at `src/index.ts` for in-repo dev (Metro/tsc resolve live TS, unchanged) — `publishConfig` overrides those to `build/` ONLY inside the tarball, never touching local resolution. No new bundler: `tsc --build` already emits `build/`, so `typecheck` IS the build. `@symbiote-native/angular`/`@symbiote-native/slider`'s `./angular` entry predate this, use a DIFFERENT mechanism (conditional `exports`, AOT build) — don't convert or copy that onto plain packages. Covers the mechanism table, the `files`-mandatory gotcha (`.gitignore` excludes `build/`), the `fix-esm-extensions` sweep (its hand-maintained argument list is GONE — dirs are derived from each publishable package's own `publishConfig`, so what a new package needs is `publishConfig` under `./build/` and no `private` flag; what IS still per-package is the emitted extension, `.js`/`.jsx`, a miss there shipping an unimportable `build/` for every real npm consumer while looking fine in-repo), changeset ignore list, release scripts, the `checks.yml` reusable-workflow CI gate (`ci.yml` + `release.yml` both call it, sequencing publish after lint/typecheck/test), and the canary preview flow — pkg.pr.new (never touches the real npm registry: no dist-tag, no version bump, nothing to clean up), triggered automatically via `workflow_run` after CI passes on a PR or manually via `workflow_dispatch`, publishing every publishable package every time (no per-package selection needed — pkg.pr.new never mutates shared registry state). A REAL npm `canary` dist-tag snapshot mechanism was tried instead (2026-07-24) and reverted the same day: real npm's `unpublish`/`deprecate` both require an interactive OTP no headless CI job can supply, even with a bypass-2FA granular token (that bypass only ever covers `publish`) — so cleanup could never actually run, and snapshots would have accumulated on the registry forever. See 'Canary releases' below for the full record. Also covers why a 'pnpm cache is not found' + 'Failed to save ... another job may be creating this cache' pair across checks.yml's parallel lint/typecheck/test jobs is an expected first-run/same-key race, not a broken cache (diagnose via job logs, not the Actions UI summary). Trigger: 'publish npm', 'release', 'changeset', 'version bump', 'publishConfig', 'canary release', 'CI publish', 'pkg.pr.new', 'canary dist-tag', 'trust:publishers', 'pnpm cache not found', 'actions cache'."
 ---
 
 # Symbiote npm publishing & versioning
@@ -27,20 +27,20 @@ local resolution never sees `publishConfig` at all.
 ```jsonc
 // core/engine/package.json — the plain-package pattern (4 of 7 packages)
 {
-  "main": "src/index.ts",              // ← Metro/tsc resolve this in-repo, unchanged
+  "main": "src/index.ts", // ← Metro/tsc resolve this in-repo, unchanged
   "module": "src/index.ts",
   "types": "src/index.ts",
   "exports": { ".": "./src/index.ts" },
-  "files": ["build"],                   // ← REQUIRED, see Gotchas
+  "files": ["build"], // ← REQUIRED, see Gotchas
   "publishConfig": {
     "access": "public",
-    "main": "./build/index.js",         // ← only these are what `npm install`ers get
+    "main": "./build/index.js", // ← only these are what `npm install`ers get
     "module": "./build/index.js",
     "types": "./build/index.d.ts",
     "exports": {
-      ".": { "types": "./build/index.d.ts", "default": "./build/index.js" }
-    }
-  }
+      ".": { "types": "./build/index.d.ts", "default": "./build/index.js" },
+    },
+  },
 }
 ```
 
@@ -66,15 +66,15 @@ to match its actual output 1:1 (verified by running it, not assumed).
 
 ## Which package uses which mechanism
 
-| Package | Mechanism | Why |
-|---|---|---|
-| `@symbiote-native/engine` | `publishConfig` override (above) | plain TS, no AOT need |
-| `@symbiote-native/components` | same | plain TS |
-| `@symbiote-native/react` | same | plain TS |
-| `@symbiote-native/vue` | same, **multi-entry** (`.` + `./runtime-helpers`, mirrored 1:1 in `publishConfig.exports`) | plain TS, two entry points |
-| `@symbiote-native/angular` | **pre-existing conditional `exports`** (`types`/`react-native`/`default`), built by `"prepare": "pnpm run ng:build"` (`ngc -p tsconfig.angular.json` → `build/angular/`) | needs real Angular AOT compilation, which `tsc --build` cannot do — only `publishConfig.access` was added, the exports block is untouched |
-| `@symbiote-native/slider` | its `./angular` sub-export uses the same conditional pattern as above (`build-ngc/angular/`); `.`/`./vue`/`./react` use the plain `publishConfig` override pointed at `build/{core,vue,react}/index.js` | mixed: one AOT entry + three plain entries in one package |
-| `@symbiote-native/android` | no build at all — ships tracked native `android/` source as-is | pure native module, no JS/TS to compile |
+| Package                       | Mechanism                                                                                                                                                                                               | Why                                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `@symbiote-native/engine`     | `publishConfig` override (above)                                                                                                                                                                        | plain TS, no AOT need                                                                                                                     |
+| `@symbiote-native/components` | same                                                                                                                                                                                                    | plain TS                                                                                                                                  |
+| `@symbiote-native/react`      | same                                                                                                                                                                                                    | plain TS                                                                                                                                  |
+| `@symbiote-native/vue`        | same, **multi-entry** (`.` + `./runtime-helpers`, mirrored 1:1 in `publishConfig.exports`)                                                                                                              | plain TS, two entry points                                                                                                                |
+| `@symbiote-native/angular`    | **pre-existing conditional `exports`** (`types`/`react-native`/`default`), built by `"prepare": "pnpm run ng:build"` (`ngc -p tsconfig.angular.json` → `build/angular/`)                                | needs real Angular AOT compilation, which `tsc --build` cannot do — only `publishConfig.access` was added, the exports block is untouched |
+| `@symbiote-native/slider`     | its `./angular` sub-export uses the same conditional pattern as above (`build-ngc/angular/`); `.`/`./vue`/`./react` use the plain `publishConfig` override pointed at `build/{core,vue,react}/index.js` | mixed: one AOT entry + three plain entries in one package                                                                                 |
+| `@symbiote-native/android`    | no build at all — ships tracked native `android/` source as-is                                                                                                                                          | pure native module, no JS/TS to compile                                                                                                   |
 
 **Do not cross the two mechanisms.** Conditional `exports` on a plain package
 would make Metro resolve `build/` even in-repo (conditions are evaluated
@@ -108,17 +108,19 @@ is what surfaces this; plain `git status` looks clean because an ignored
 directory just doesn't appear at all, ignored or not-yet-tracked look
 identical from a glance. Fixed with an explicit re-include after the blanket
 rule:
+
 ```
 .*/
 !.github/
 ```
+
 **Lesson for any FUTURE blanket-ignore rule in this repo**: verify with
 `git check-ignore -v <path>` (or `git status --porcelain -- <dir>` showing
 `??`) that it isn't also swallowing something that must ship — a directory
 pattern that "obviously" only means local scratch dirs can silently net a
 real one too.
 
-## Gotcha (found 2026-07 via the canary-release CI work): `fix-esm-extensions` must list EVERY publishable package's `build/`
+## Gotcha (found 2026-07 via the canary-release CI work): `fix-esm-extensions` and a publishable package's `build/` (argument list since removed — read to the end)
 
 `fix-esm-extensions` (see `scripts/fix-esm-extensions.mjs`'s own header
 comment for why it exists at all — `tsc --build` emits relative imports with
@@ -133,18 +135,38 @@ looking completely fine in-repo, because Metro/Vitest resolve `src/*.ts`
 directly and never touch `build/` at all. Caught only because adding a
 `test` job to CI (running `pnpm run test` against `examples/*`'s real
 `catalog:`-installed `@symbiote-native/test-utils`) turned it from
-"invisible" to "one failing suite, 833/834 passing." **When adding a new
-publishable package with its own `build/` output, add it to the
-`fix-esm-extensions` script's argument list in the SAME change** — it is not
-inferred from `files`/`publishConfig`, it's a flat, easy-to-forget list.
-Fixed by adding `core/test-utils/build` to the list; see the
-`test-utils-esm-extension` changeset for the republish.
+"invisible" to "one failing suite, 833/834 passing." Fixed by adding
+`core/test-utils/build` to the list; see the `test-utils-esm-extension`
+changeset for the republish.
+
+**The hand-maintained argument list is GONE — do not go looking for it
+(re-verified 2026-08-17).** The forget-one-package failure mode was closed
+structurally, not by discipline: with no CLI args the script derives every
+directory from each publishable package's OWN `publishConfig`
+(`scripts/lib/build-dirs.mjs`'s `esmExtensionBuildDirs()`, filtered on
+`!pkg.private` via `publishable-packages.mjs`). A new publishable package is
+therefore covered automatically, and CLI args remain only as a manual override
+for running the script over one directory. What a new package DOES still need
+is `publishConfig` pointing under `./build/` — that string match is what makes
+it visible to the sweep — and `private` NOT set, which is also the repo's gate
+for "not publishable yet" (`adapters/solid` uses it while below feature parity).
+
+**What genuinely is per-package: the emitted EXTENSION.** The sweep understands
+`.js` and `.jsx` (`EMITTED_EXTS`, added 2026-08-17 for `adapters/solid`, which
+builds with `jsx: 'preserve'` so tsc type-checks JSX and emits it untouched for
+the consuming app's Babel to compile). Both directions matter — the file has to
+be SCANNED and RESOLVED TO — so a package emitting some third extension needs
+that extension added in all three places (`listEmittedFiles`,
+`hasPlatformSibling`, `resolveSpecifier`) plus `EXT_RE`. Symptom of a missing
+one is identical to the original gotcha: `UNRESOLVED` at the publish gate, or a
+silently unscanned file, invisible in-repo because local resolution never touches
+`build/`.
 
 ## Gotcha (found 2026-07-23 via a `sensors` canary that shipped with no `build/` at all): a mixed-mechanism package's `clean` script must target `build-ngc`, never `build`
 
 Any package with the **mixed mechanism** (a plain `publishConfig` override for
 `.`/`./react`/`./vue` pointed at `build/{core,react,vue}/...`, PLUS a
-conditional `./angular` export pointed at a *separate* `build-ngc/angular/...`
+conditional `./angular` export pointed at a _separate_ `build-ngc/angular/...`
 — `slider`, `navigation`, `splash-screen`, `sensors`) runs `prepublish-build`
 as `typecheck && fix-esm-extensions && ng:build`, in that order. `typecheck`
 (`tsc --build`) emits the plain `build/` tree first; `ng:build` runs after it
@@ -221,9 +243,12 @@ from a subdirectory.
   "baseBranch": "master",
   "updateInternalDependencies": "patch",
   "ignore": [
-    "@symbiote-native/docs-site",    // apps/*, private
-    "Canary", "vue-sfc-canary", "vue-tsx-canary", "angular-canary"  // examples/*
-  ]
+    "@symbiote-native/docs-site", // apps/*, private
+    "Canary",
+    "vue-sfc-canary",
+    "vue-tsx-canary",
+    "angular-canary", // examples/*
+  ],
 }
 ```
 
@@ -294,8 +319,11 @@ pnpm does when packing:
 So split the job — pnpm owns the manifest, npm owns the upload:
 
 ```js
-const packed = execFileSync('pnpm', ['pack', '--pack-destination', tmpdir()], { cwd: dir, encoding: 'utf8' });
-const tarball = packed.trim().split('\n').filter(Boolean).pop();  // pnpm prints the path last
+const packed = execFileSync('pnpm', ['pack', '--pack-destination', tmpdir()], {
+  cwd: dir,
+  encoding: 'utf8',
+});
+const tarball = packed.trim().split('\n').filter(Boolean).pop(); // pnpm prints the path last
 execFileSync('npm', ['publish', tarball, '--access', 'public'], { stdio: 'inherit' });
 ```
 
@@ -315,8 +343,7 @@ Two more things that look like failures in that script's output and are not:
   publishing and 9 minutes later only the alphabetically-last 9 still did — they
   were landing in publish order. Do NOT re-publish or debug on the strength of a
   post-publish 404; re-check after a few minutes. Beware also that a verification
-  loop of ~34 `npm view` calls rotates `~/.npmrc`'s `_logs` (default `logs-max`
-  10) and destroys the publish logs you would want to read afterwards.
+  loop of ~34 `npm view` calls rotates `~/.npmrc`'s `_logs` (default `logs-max` 10) and destroys the publish logs you would want to read afterwards.
 
 ## CI (`.github/workflows/release.yml` + `checks.yml`)
 
@@ -331,6 +358,7 @@ workflow keeps them defined once instead of duplicated.
 
 `release.yml` has two `needs: checks` jobs gated by `if:`, mutually exclusive
 by trigger:
+
 - **`release`** (`if: github.event_name == 'push'`) — push to `master` →
   `changesets/action@v1` either opens/updates a `chore: version packages` PR
   (when unreleased changesets exist) or, once that PR is merged, runs
@@ -352,11 +380,12 @@ the job name. Since `checks.yml`'s three jobs run in PARALLEL against the
 identical lockfile, they always compute the identical cache key.
 
 Two log lines are BOTH benign, not evidence of a broken cache:
+
 - `pnpm cache is not found` on a job's restore step — expected the very
   first time a given lockfile hash runs after enabling/changing caching;
   nothing has been saved under that key yet.
 - `Failed to save: Unable to reserve cache with key ..., another job may be
-  creating this cache` on a job's save step — expected whenever 2+ parallel
+creating this cache` on a job's save step — expected whenever 2+ parallel
   jobs share one key: only one wins the race and actually saves (its log
   shows `Cache saved with the key: ...`), the rest lose harmlessly and still
   report job `success`.
@@ -368,7 +397,7 @@ is not found\|Cache saved\|Failed to save"`. Confirm at least ONE parallel
 job shows `Cache saved with the key: ...` at the end — if so, caching is
 working and the NEXT run with an unchanged lockfile should show `Cache
 restored from key: ...` in all jobs instead of `not found`. Only worth
-digging further if the SAME lockfile hash still misses on a *second* run.
+digging further if the SAME lockfile hash still misses on a _second_ run.
 
 ## Canary releases (pkg.pr.new preview publish, never touches the real npm registry)
 

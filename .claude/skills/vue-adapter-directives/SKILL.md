@@ -211,6 +211,19 @@ imported into `CanaryScreen.tsx` rather than declared inline.
 - **`<style>` blocks in SFCs** — no CSS meaning today; styles are JS
   `StyleSheet.create` objects (see project `CLAUDE.md`, Styling section). Not a
   directive concern.
+- **`<Transition>`/`<TransitionGroup>` are NOT shimmed, unlike `v-show`/
+  `Teleport`/`vModel*` above — confirmed 2026-08 by reading the installed
+  `@vue/runtime-core` type defs directly: neither is exported by that package
+  at all (unlike `KeepAlive`/`Suspense`, which ARE exported and are
+  renderer-agnostic per Vue's own architecture, built on the same generic
+  `move`/`insert` ops `renderer.ts` already implements — but still unwired/
+  untested against a real Fabric native view here). `import { Transition }
+  from 'vue'` through the same Metro rewrite this file documents resolves to
+  `undefined` — a hard failure, not a silent no-op like unshimmed `v-show`
+  used to be. Bringing either in would need the same runtime-helpers-shim
+  treatment as `v-show`, built on CSS-less enter/leave semantics (there is no
+  `transitionend` event or CSS class toggling to hook into) — not attempted
+  yet, tracked as a real gap, not a design decision.
 - **Teleport to a second, independently-mounted `SymbioteSurface`** —
   same-surface-only is Teleport's PERMANENT scope (see above), not a gap to
   eventually fill. For genuine cross-surface content sharing use

@@ -1,6 +1,6 @@
 ---
 name: symbiote-file-layout
-description: "Symbiote file layout & placement conventions — read BEFORE creating, moving, or renaming ANY file in the SymbioteNative monorepo, or deciding where a type / module / component goes. Covers (1) the MONOREPO MAP — core/{engine,components}, adapters/{react,vue}, examples/{react,vue-sfc,vue-tsx}, packages/{slider,android}, .docs/, .ng-spike/. (2) ADR 0026 FOLDER-AS-MODULE — a module that has platform (X.ios/X.android) and/or shared (X-shared) variants lives in its OWN folder X/ with an index barrel (X/index.ts base, X/index.ios.ts, X/index.android.ts, X/shared.ts, co-located X/X.test.ts); the real example is core/engine/src/vibration/. A SINGLE-file module with no variants STAYS FLAT (node.ts, commit.ts). The import contract is unchanged: from '.../X' resolves to the folder; only an explicit platform import changes ('.../X.ios' → '.../X/index.ios', '.../X-shared' → '.../X/shared'). (3) ADAPTER src/ BUCKETS — components/ modules/ utils/ carry the SAME name in every adapter; the lifecycle bucket is framework-idiomatic (React hooks/, Vue composables/ — a Vue hooks/ or React composables/ folder is WRONG); the reconciler wiring stays FLAT at package root (index, render, host-config/renderer, descriptor-to-X, components.ts barrel, *.d.ts). (4) the PROP-TYPE SPLIT — an all-agnostic public prop type (ISwitchProps, IActivityIndicatorProps) lives ONCE in @symbiote-native/components and every adapter RE-EXPORTS it verbatim (never redeclares); a type with a framework children/ref/render-callback (IViewProps, IPressableProps) is declared per-adapter over the shared agnostic base. (5) dlog gating, Metro filename platform-selection (ADR 0020). Trigger on any file-placement / move / rename / 'where does this go' / 'should this be a folder' decision."
+description: "Symbiote file layout & placement conventions — read BEFORE creating, moving, or renaming ANY file in the SymbioteNative monorepo, or deciding where a type / module / component goes. Covers (1) the MONOREPO MAP — core/{engine,components}, adapters/{react,vue}, examples/{react,vue-sfc,vue-tsx}, packages/{slider,android}, .docs/, .ng-spike/. (2) FOLDER-AS-MODULE — a module that has platform (X.ios/X.android) and/or shared (X-shared) variants lives in its OWN folder X/ with an index barrel (X/index.ts base, X/index.ios.ts, X/index.android.ts, X/shared.ts, co-located X/X.test.ts); the real example is core/engine/src/vibration/. A SINGLE-file module with no variants STAYS FLAT (node.ts, commit.ts). The import contract is unchanged: from '.../X' resolves to the folder; only an explicit platform import changes ('.../X.ios' → '.../X/index.ios', '.../X-shared' → '.../X/shared'). (3) ADAPTER src/ BUCKETS — components/ modules/ utils/ carry the SAME name in every adapter; the lifecycle bucket is framework-idiomatic (React hooks/, Vue composables/ — a Vue hooks/ or React composables/ folder is WRONG); the reconciler wiring stays FLAT at package root (index, render, host-config/renderer, descriptor-to-X, components.ts barrel, *.d.ts). (4) the PROP-TYPE SPLIT — an all-agnostic public prop type (ISwitchProps, IActivityIndicatorProps) lives ONCE in @symbiote-native/components and every adapter RE-EXPORTS it verbatim (never redeclares); a type with a framework children/ref/render-callback (IViewProps, IPressableProps) is declared per-adapter over the shared agnostic base. (5) dlog gating, Metro filename platform-selection. Trigger on any file-placement / move / rename / 'where does this go' / 'should this be a folder' decision."
 ---
 
 # Symbiote file layout & placement conventions
@@ -33,7 +33,7 @@ Code imports only `@symbiote-native/*` barrels. Internal grouping is invisible t
 consumers — moving a file between buckets never changes a package's public
 surface (the `src/index.ts` barrel is the only thing external code touches).
 
-## 2. ADR 0026 — folder-as-module (the big one)
+## 2. Folder-as-module (the big one)
 
 **A module gets its own folder ONLY if it has platform and/or shared variants.**
 A single-file module with no variants stays FLAT. This is the most common
@@ -47,7 +47,7 @@ core/engine/src/vibration/                  core/engine/src/node.ts
   index.ios.ts      (platform)               core/engine/src/debug.ts
   index.android.ts  (platform)
   shared.ts         (platform-invariant)     ← these have no .ios/.android/shared,
-  vibration.test.ts (co-located, ADR 0025)     so a folder would be noise
+  vibration.test.ts (co-located)               so a folder would be noise
 ```
 
 **The import contract is unchanged** — a folder is invisible to importers:
@@ -63,7 +63,7 @@ Inside a folder, a sibling is `./shared` / `./index.ios`; a package-root module 
 level up is `../debug` / `../node`. Real folder-form groups in `core/engine/src/`:
 `vibration/`, `alert/`, `share/`, `linking/`, `accessibility-info/`, `status-bar/`,
 `platform/`, `app-state/`, `dimensions/`. Platform selection is by **filename**, never
-a `Platform.OS` read (ADR 0020).
+a `Platform.OS` read.
 
 ### Migrating flat → folder leaves STALE build artifacts (prune them, or `pnpm build` fails)
 
@@ -108,7 +108,7 @@ flat at root     index.ts                          index.ts          ← public 
                  *.d.ts                              globals.d.ts
 ```
 
-A new component is a **folder under `components/`** in ADR 0026 form
+A new component is a **folder under `components/`** in folder-as-module form
 (`components/switch/{index.ts, index.ios.ts, index.android.ts, shared.ts}`). A new
 `use*` hook goes in `hooks/` (React) / `composables/` (Vue). A new imperative
 RN-namespace (no view) goes in `modules/`.
@@ -144,18 +144,25 @@ zero-cost when off, never deleted (`<keep_logs_gate_behind_DEBUG>`). Always
 `dlog`/`isDebug` from `@symbiote-native/engine`, never a bare `console.log`. Mechanism:
 the `symbiote-engine-core` skill §7.
 
-## 6. Decision records to cite
+## 6. Where these conventions are actually written down
 
-`.docs/decisions/` — the placement-relevant ones: **0020** (Metro filename
-platform-selection — why `.ios.ts`/`.android.ts`, no `Platform.OS`), **0026**
-(folder-as-module), **0025** (co-located tests — `X/X.test.ts`), **0013**
-(packaging — RN as explicit top-level peer). The CLAUDE.md invariants
-`<adapter_src_follows_framework_idioms>` and `<prop_types_split_agnostic_vs_per_adapter>`
-are the prose form of §3 and §4.
+Do NOT cite a numbered ADR for any of them. Earlier revisions pointed at
+`.docs/decisions/NNNN`; that tree is local-only (`.gitignore`: "hidden folders are
+local-only (.docs, .notes, .vendors, …)") and is absent from a checkout, so those
+citations named a file no reader could open.
+
+The live sources, all of them in-repo:
+
+| Convention | Where it is stated |
+|---|---|
+| Metro filename platform-selection (`.ios.ts`/`.android.ts`, no `Platform.OS` read) | §2 above; the repo root `CLAUDE.md` "Build & platform" bullet |
+| Folder-as-module | §2 above; `CLAUDE.md` "File layout" bullet; real example `core/engine/src/vibration/` |
+| Co-located tests (`X/X.test.ts`) | §2 above; every `*.test.ts` next to its module |
+| RN as an explicit top-level peer | `CLAUDE.md` `<react_native_is_an_explicit_top_level_peer>` |
+| Adapter bucket naming / prop-type split | `CLAUDE.md` `<adapter_src_follows_framework_idioms>` and `<prop_types_split_agnostic_vs_per_adapter>` — the prose form of §3 and §4 |
 
 ## Reference
 
-- ADR 0026 (real text): `.docs/decisions/0026-module-group-folder-layout.md`.
 - Folder-as-module example: `core/engine/src/vibration/`. Flat counter-example:
   `core/engine/src/node.ts`.
 - Adapter buckets: `adapters/react/src/` vs `adapters/vue/src/`.

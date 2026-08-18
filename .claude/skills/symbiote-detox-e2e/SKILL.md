@@ -25,7 +25,7 @@ three after any edit to confirm they still match.
 
 Sync is OFF for the whole file
 (`launchArgs: { detoxEnableSynchronization: 0 }`) because the canary runs a
-perpetual native `Animated.loop` heartbeat (ADR 0017 offload proof) — with
+perpetual native `Animated.loop` heartbeat (the native-driver offload proof) — with
 sync on, `launchApp` would hang forever waiting for the app to go idle, which
 it never does. This is the root cause of both fixed bugs below: with sync
 off, NOTHING auto-waits for anything, so every interaction that depends on an
