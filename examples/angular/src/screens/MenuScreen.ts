@@ -23,6 +23,7 @@ const MENU_ITEMS: readonly IMenuItem[] = [
   { label: 'State persistence', route: ROUTE_NAME.StatePersistence, hint: 'serialize/deserialize the Stack state' },
   { label: 'Reactive style', route: ROUTE_NAME.ReactiveStyle, hint: 'one tap must repaint every tile' },
   { label: 'Benchmark', route: ROUTE_NAME.Benchmark, hint: 'js-framework-benchmark ops + JS-thread FPS' },
+  { label: 'Angular probe', route: ROUTE_NAME.Probe, hint: 'change-detection passes, renderer writes, cell views' },
 ];
 
 /**

@@ -19,6 +19,7 @@ export const ROUTE_NAME = {
   StatePersistence: 'StatePersistence',
   ReactiveStyle: 'ReactiveStyle',
   Benchmark: 'Benchmark',
+  Probe: 'Probe',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

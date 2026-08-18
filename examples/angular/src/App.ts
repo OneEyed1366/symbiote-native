@@ -37,6 +37,7 @@ import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
 import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { ReactiveStyleScreen } from './screens/ReactiveStyleScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
+import { ProbeScreen } from './screens/ProbeScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
@@ -66,6 +67,7 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
       <ng-template symbioteScreen name="StatePersistence" [component]="statePersistenceScreen" [options]="statePersistenceOptions"></ng-template>
       <ng-template symbioteScreen name="ReactiveStyle" [component]="reactiveStyleScreen" [options]="reactiveStyleOptions"></ng-template>
       <ng-template symbioteScreen name="Benchmark" [component]="benchmarkScreen" [options]="benchmarkOptions"></ng-template>
+      <ng-template symbioteScreen name="Probe" [component]="probeScreen" [options]="probeOptions"></ng-template>
     </Stack>
   `,
 })
@@ -86,6 +88,7 @@ export class AppComponent implements OnInit, AfterViewInit {
   readonly statePersistenceScreen = StatePersistenceScreen;
   readonly reactiveStyleScreen = ReactiveStyleScreen;
   readonly benchmarkScreen = BenchmarkScreen;
+  readonly probeScreen = ProbeScreen;
 
   readonly menuOptions: IAngularScreenOptions = {
     title: 'Navigation Demos',
@@ -194,6 +197,16 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   readonly benchmarkOptions: IAngularScreenOptions = {
     title: 'Benchmark',
+    headerShown: true,
+    headerTranslucent: true,
+    headerTintColor: LINE_COLOR.performance,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly probeOptions: IAngularScreenOptions = {
+    title: 'Angular probe',
     headerShown: true,
     headerTranslucent: true,
     headerTintColor: LINE_COLOR.performance,

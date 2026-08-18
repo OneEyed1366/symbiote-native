@@ -54,4 +54,5 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.StatePersistence]: { line: NAV_LINE.Routing, code: 'SP', label: 'ROUTING LINE' },
   [ROUTE_NAME.ReactiveStyle]: { line: NAV_LINE.Primitives, code: 'RS', label: 'PRIMITIVES LINE' },
   [ROUTE_NAME.Benchmark]: { line: NAV_LINE.Performance, code: 'BM', label: 'PERFORMANCE LINE' },
+  [ROUTE_NAME.Probe]: { line: NAV_LINE.Performance, code: 'PR', label: 'PERFORMANCE LINE' },
 };
