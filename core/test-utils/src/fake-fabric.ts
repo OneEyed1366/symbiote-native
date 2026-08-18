@@ -29,7 +29,11 @@ export interface IFabricRecorder {
   /** Every node ever `createNode`'d this run (clones excluded). */
   created: IFakeNode[];
   /** Every imperative command dispatched at a committed Fabric node. */
-  commands: Array<{ node: IFakeNode; commandName: string; args: readonly unknown[] }>;
+  commands: Array<{
+    node: IFakeNode;
+    commandName: string;
+    args: readonly unknown[];
+  }>;
   /** Call counters, for tests that assert "exactly N native nodes were created". */
   counts: { createNode: number; completeRoot: number };
   /**
@@ -41,7 +45,11 @@ export interface IFabricRecorder {
   /** Find the first `createNode`'d node matching a predicate (e.g. the app's own View). */
   find(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined;
   /** Deliver a native event to the renderer's registered handler. */
-  fireEvent(handle: unknown, topLevelType: string, nativeEvent?: Record<string, unknown>): void;
+  fireEvent(
+    handle: unknown,
+    topLevelType: string,
+    nativeEvent?: Record<string, unknown>,
+  ): void;
   /** Serialize a node list to `RCTView(RCTText(RCTRawText "text"))` shorthand. */
   serialize(nodes: IFakeNode[]): string;
   /** Zero the counters and clear `committed` / `created` (the event handler survives). */
@@ -59,7 +67,11 @@ function mergeFabricProps(
 export function installFabric(): IFabricRecorder {
   let committed: IFakeNode[] = [];
   const created: IFakeNode[] = [];
-  const commands: Array<{ node: IFakeNode; commandName: string; args: readonly unknown[] }> = [];
+  const commands: Array<{
+    node: IFakeNode;
+    commandName: string;
+    args: readonly unknown[];
+  }> = [];
   const counts = { createNode: 0, completeRoot: 0 };
   let eventHandler: IEventHandler | undefined;
 
@@ -72,22 +84,41 @@ export function installFabric(): IFabricRecorder {
       instanceHandle: unknown,
     ): IFakeNode {
       counts.createNode += 1;
-      const node: IFakeNode = { tag, viewName, props, children: [], instanceHandle };
+      const node: IFakeNode = {
+        tag,
+        viewName,
+        props,
+        children: [],
+        instanceHandle,
+      };
       created.push(node);
       return node;
     },
-    cloneNodeWithNewProps: (node: IFakeNode, newProps: Record<string, unknown>): IFakeNode => ({
+    cloneNodeWithNewProps: (
+      node: IFakeNode,
+      newProps: Record<string, unknown>,
+    ): IFakeNode => ({
       ...node,
       props: mergeFabricProps(node.props, newProps),
     }),
-    cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({ ...node, children: [] }),
+    cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({
+      ...node,
+      children: [],
+    }),
     cloneNodeWithNewChildrenAndProps: (
       node: IFakeNode,
       newProps: Record<string, unknown>,
-    ): IFakeNode => ({ ...node, props: mergeFabricProps(node.props, newProps), children: [] }),
+    ): IFakeNode => ({
+      ...node,
+      props: mergeFabricProps(node.props, newProps),
+      children: [],
+    }),
     createChildSet: (): IFakeNode[] => [],
     appendChild(parent: IFakeNode, child: IFakeNode): IFakeNode {
-      if (child.parentFamilyTag !== undefined && child.parentFamilyTag !== parent.tag) {
+      if (
+        child.parentFamilyTag !== undefined &&
+        child.parentFamilyTag !== parent.tag
+      ) {
         throw new Error(
           `Fabric family reparent: child ${child.viewName}#${child.tag} already belongs to parent #${child.parentFamilyTag}, cannot append to ${parent.viewName}#${parent.tag}`,
         );
@@ -106,7 +137,11 @@ export function installFabric(): IFabricRecorder {
     registerEventHandler(handler: IEventHandler): void {
       eventHandler = handler;
     },
-    dispatchCommand(node: IFakeNode, commandName: string, args: readonly unknown[]): void {
+    dispatchCommand(
+      node: IFakeNode,
+      commandName: string,
+      args: readonly unknown[],
+    ): void {
       commands.push({ node, commandName, args });
     },
   };
@@ -114,8 +149,11 @@ export function installFabric(): IFabricRecorder {
   Object.assign(globalThis, { nativeFabricUIManager: slot });
 
   const serializeNode = (node: IFakeNode): string => {
-    const text = node.viewName === 'RCTRawText' ? ` "${String(node.props.text)}"` : '';
-    const kids = node.children.length ? `(${node.children.map(serializeNode).join('')})` : '';
+    const text =
+      node.viewName === 'RCTRawText' ? ` "${String(node.props.text)}"` : '';
+    const kids = node.children.length
+      ? `(${node.children.map(serializeNode).join('')})`
+      : '';
     return `${node.viewName}${text}${kids}`;
   };
 
@@ -139,7 +177,8 @@ export function installFabric(): IFabricRecorder {
       return created.find(predicate);
     },
     fireEvent(handle, topLevelType, nativeEvent = {}): void {
-      if (!eventHandler) throw new Error('no event handler registered by the renderer');
+      if (!eventHandler)
+        throw new Error('no event handler registered by the renderer');
       eventHandler(handle, topLevelType, nativeEvent);
     },
     serialize(nodes): string {

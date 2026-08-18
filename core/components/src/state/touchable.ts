@@ -4,19 +4,41 @@
 // feedback itself is framework (each adapter's Animated namespace), so it stays in the adapter;
 // only the timing constants + the pure wait computation live here.
 
-import { dlog, type ISymbioteEvent } from '@symbiote-native/engine';
+import {
+  dlog,
+  flattenStyle,
+  type ISymbioteEvent,
+} from '@symbiote-native/engine';
 
-// TouchableOpacity.js: _opacityActive(150)/_opacityInactive(250), activeOpacity 0.2.
+// TouchableOpacity.js: _opacityActive(0 | 150)/_opacityInactive(250), activeOpacity 0.2.
 export const DEFAULT_ACTIVE_OPACITY = 0.2;
+
+// RN picks the press-in fade duration from WHERE the press-in came from
+// (`TouchableOpacity.js:215-220`):
+//
+//   event.dispatchConfig.registrationName === 'onResponderGrant' ? 0 : 150
+//
+// The grant branch is an ordinary tap and it is INSTANT. `Pressability.js:453-468` shows why:
+// `onResponderGrant` calls `_receiveSignal('RESPONDER_GRANT')` and then, when delayPressIn is 0,
+// `_receiveSignal('DELAY', event)` SYNCHRONOUSLY with that same grant event — so the event that
+// reaches onPressIn still carries `onResponderGrant`. The 150 branch is a RE-activation: the
+// finger drifted outside and came back (RESPONDER_INACTIVE_PRESS_OUT -> RESPONDER_ACTIVE_PRESS_IN,
+// driven by onResponderMove).
+//
+// Our engine dispatches pressIn from exactly ONE place — `core/engine/src/events/index.ts:391`,
+// on topTouchStart, ahead of negotiateResponder — and has no drift-back-in re-activation at all.
+// So every pressIn we produce is the grant-equivalent, and 0 is the duration that applies. Using
+// 150 (which all five adapters did until 2026-08-19) makes every tap fade in visibly slower than
+// RN.
+export const OPACITY_ACTIVE_GRANT_DURATION_MS = 0;
+// The re-activation branch. Unreachable today — kept so the constant exists when the press
+// machine grows drift-back-in, and because it is the value RN uses there.
 export const OPACITY_ACTIVE_DURATION_MS = 150;
 export const OPACITY_INACTIVE_DURATION_MS = 250;
 export const RESTING_OPACITY = 1;
 // TouchableHighlight.js: child opacity 0.85, underlay 'black' when unset.
 export const DEFAULT_HIGHLIGHT_CHILD_OPACITY = 0.85;
 export const DEFAULT_UNDERLAY_COLOR = 'black';
-// RN's Pressability DEFAULT_MIN_PRESS_DURATION, the floor a press visual is held, so a very fast
-// tap still flashes the active feedback (Pressability.js).
-export const DEFAULT_MIN_PRESS_DURATION_MS = 130;
 
 export type ITouchableHandler = (event: ISymbioteEvent) => void;
 
@@ -96,7 +118,8 @@ export function createTouchableFeedbackHandlers(
   runtime: ITouchableFeedbackRuntime,
   callbacks: ITouchableFeedbackCallbacks,
 ): ITouchableFeedbackHandlers {
-  const { delayPressIn, delayPressOut, minPressDuration, schedule, now } = config;
+  const { delayPressIn, delayPressOut, minPressDuration, schedule, now } =
+    config;
   const { activate, deactivate } = callbacks;
 
   function clearPressInTimer(): void {
@@ -141,14 +164,155 @@ export function createTouchableFeedbackHandlers(
         clearPressInTimer();
         doActivate(event);
       }
-      const heldFor = runtime.activatedAt === undefined ? 0 : now() - runtime.activatedAt;
-      const wait = computePressOutWait(heldFor, minPressDuration, delayPressOut);
+      const heldFor =
+        runtime.activatedAt === undefined ? 0 : now() - runtime.activatedAt;
+      const wait = computePressOutWait(
+        heldFor,
+        minPressDuration,
+        delayPressOut,
+      );
       if (wait > 0) {
         dlog(`TouchableOpacity pressOut deferred ${wait}ms`);
         schedule(() => doDeactivate(event), wait);
         return;
       }
       doDeactivate(event);
+    },
+  };
+}
+
+// ---- RN-audited additions (2026-08-19) --------------------------------------------------------
+//
+// Measured against .vendors/react-native. Everything above predates that audit and is still what
+// the React, Vue, Svelte and Angular adapters call; the names below are the RN-accurate forms and
+// are additive on purpose, so the tree stays green while each adapter migrates.
+
+// RN's Touchable* family OVERRIDES Pressability's own floor with 0 — TouchableOpacity.js:195,
+// TouchableHighlight.js:203 and TouchableWithoutFeedback.js all pass `minPressDuration: 0`. So
+// Pressability's own default of 130 (Pressability.js:264) reaches a Touchable in RN NEVER: what holds the active visual there is the Animated fade's own duration,
+// not a press-duration floor. Adapters defaulting minPressDuration to 130 delay every press-out by
+// an eighth of a second RN does not.
+export const TOUCHABLE_MIN_PRESS_DURATION_MS = 0;
+
+// RN's _getChildStyleOpacityWithDefault (TouchableOpacity.js): the fade returns to the opacity the
+// CALLER's style asks for, not to a hard 1 — a Touchable styled `opacity: 0.6` must settle back at
+// 0.6, and its Animated.Value must START there or the first paint jumps to fully opaque. `unknown`
+// in, because a style prop is an arbitrarily nested array the engine's flattenStyle resolves.
+export function restingOpacityFromStyle(style: unknown): number {
+  const opacity = flattenStyle(style).opacity;
+  return typeof opacity === 'number' ? opacity : RESTING_OPACITY;
+}
+
+// RN's _hasPressHandler (TouchableHighlight.js): the underlay is painted ONLY for a Touchable that
+// actually handles a press. Without the gate a purely decorative TouchableHighlight flashes an
+// underlay on any touch that passes through it.
+export interface ITouchablePressHandlerProps {
+  onPress?: unknown;
+  onPressIn?: unknown;
+  onPressOut?: unknown;
+  onLongPress?: unknown;
+}
+
+export function hasTouchablePressHandler(
+  props: ITouchablePressHandlerProps,
+): boolean {
+  return (
+    props.onPress != null ||
+    props.onPressIn != null ||
+    props.onPressOut != null ||
+    props.onLongPress != null
+  );
+}
+
+// ---- the TouchableHighlight underlay machine --------------------------------------------------
+//
+// RN drives the underlay from three Pressability callbacks, not from a bare `pressed` flag, and the
+// difference is visible: `onPress` re-shows the underlay and holds it for delayPressOut, so a fast
+// tap still flashes. A `pressed`-derived style (what every adapter does today) cannot express that
+// hold — the flag is already false by then.
+//
+// Our engine emits press BEFORE pressOut (core/engine/src/events/index.ts — bubble(PRESS) then
+// bubble(PRESS_OUT)), which is what makes RN's guard work verbatim here: onPress arms the hide
+// timer, and onPressOut then sees a non-null timer and declines to hide. A cancelled tap never
+// gets onPress, so its onPressOut hides immediately.
+
+export interface IHighlightUnderlayRuntime {
+  // Cancels the in-flight post-press hide, or undefined when none is pending. A canceller, not a
+  // raw handle: timer scheduling is the adapter's half (core has no timer globals).
+  hideTimerCancel: (() => void) | undefined;
+}
+
+export function createHighlightUnderlayRuntime(): IHighlightUnderlayRuntime {
+  return { hideTimerCancel: undefined };
+}
+
+export interface IHighlightUnderlayConfig {
+  delayPressOut: number;
+  // RN's _hasPressHandler gate, resolved by the adapter over its live props.
+  hasPressHandler: boolean;
+  schedule: (callback: () => void, ms: number) => () => void;
+}
+
+export interface IHighlightUnderlayCallbacks {
+  // Flip the adapter's reactive cell that decides whether the extra styles are applied.
+  setShown: (shown: boolean) => void;
+  // RN's onShowUnderlay / onHideUnderlay props, fired only on a real transition.
+  onShowUnderlay?: () => void;
+  onHideUnderlay?: () => void;
+}
+
+export interface IHighlightUnderlayHandlers {
+  handlePressIn: ITouchableHandler;
+  handlePress: ITouchableHandler;
+  handlePressOut: ITouchableHandler;
+}
+
+export function createHighlightUnderlayHandlers(
+  config: IHighlightUnderlayConfig,
+  runtime: IHighlightUnderlayRuntime,
+  callbacks: IHighlightUnderlayCallbacks,
+): IHighlightUnderlayHandlers {
+  const { delayPressOut, hasPressHandler, schedule } = config;
+  const { setShown, onShowUnderlay, onHideUnderlay } = callbacks;
+
+  function clearHideTimer(): void {
+    if (runtime.hideTimerCancel !== undefined) {
+      runtime.hideTimerCancel();
+      runtime.hideTimerCancel = undefined;
+    }
+  }
+
+  function show(): void {
+    if (!hasPressHandler) return;
+    setShown(true);
+    onShowUnderlay?.();
+  }
+
+  function hide(): void {
+    clearHideTimer();
+    if (!hasPressHandler) return;
+    setShown(false);
+    onHideUnderlay?.();
+  }
+
+  return {
+    handlePressIn(): void {
+      clearHideTimer();
+      show();
+    },
+    // RN holds the underlay for delayPressOut past the tap, so a press too fast to see still
+    // flashes. The timer is what onPressOut below reads to know it must not hide yet.
+    handlePress(): void {
+      clearHideTimer();
+      show();
+      dlog(`TouchableHighlight underlay held ${delayPressOut}ms after press`);
+      runtime.hideTimerCancel = schedule(() => {
+        runtime.hideTimerCancel = undefined;
+        hide();
+      }, delayPressOut);
+    },
+    handlePressOut(): void {
+      if (runtime.hideTimerCancel === undefined) hide();
     },
   };
 }

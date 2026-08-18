@@ -16,7 +16,10 @@
 // shares. Ported from ScrollViewStickyHeader.js's effect.
 
 import { dlog } from '@symbiote-native/engine';
-import { computeStickyInterpolation, stickyDebounceMs } from '../view/render-scroll-sticky';
+import {
+  computeStickyInterpolation,
+  stickyDebounceMs,
+} from '../view/render-scroll-sticky';
 
 // The un-measured identity interpolation (RN: a fresh AnimatedInterpolation before the header has
 // measured its own y/height). Kept as the reset the initial state and every rebuild start from.
@@ -81,7 +84,11 @@ export type IStickyAction =
 // fires; `apply-passthrough` is the settled translateY to push into the committed transform;
 // `record-header-y` feeds this header's measured y into the parent cross-talk map (Angular projection).
 export type IStickyEffect =
-  | { kind: 'rebuild-interpolation'; inputRange: number[]; outputRange: number[] }
+  | {
+      kind: 'rebuild-interpolation';
+      inputRange: number[];
+      outputRange: number[];
+    }
   | { kind: 'schedule-debounce'; delay: number; value: number }
   | { kind: 'apply-passthrough'; translateY: number }
   | { kind: 'record-header-y'; index: number; y: number };
@@ -153,7 +160,9 @@ export function reduceSticky(
 ): IStickyReduceResult {
   dlog(
     `STICKY[reducer ${headerTag(state)}] action=${action.kind}` +
-      (action.kind === 'layout' ? ` y=${action.y} height=${action.height}` : '') +
+      (action.kind === 'layout'
+        ? ` y=${action.y} height=${action.height}`
+        : '') +
       (action.kind === 'animated-tick' || action.kind === 'debounce-fired'
         ? ` value=${action.value}`
         : '') +
@@ -175,16 +184,24 @@ export function reduceSticky(
       // fresh prop identity on every redundant layout, which can itself provoke another relayout pass —
       // an unbounded same-tick rebuild ping-pong that trips Svelte's effect_update_depth_exceeded guard.
       const alreadyAtThisGeometry =
-        state.measured && state.layoutY === action.y && state.layoutHeight === action.height;
+        state.measured &&
+        state.layoutY === action.y &&
+        state.layoutHeight === action.height;
       state.layoutY = action.y;
       state.layoutHeight = action.height;
       state.measured = true;
       const effects: IStickyEffect[] = [];
       if (inputs.index !== undefined) {
-        effects.push({ kind: 'record-header-y', index: inputs.index, y: action.y });
+        effects.push({
+          kind: 'record-header-y',
+          index: inputs.index,
+          y: action.y,
+        });
       }
       if (alreadyAtThisGeometry && state.rangesEmitted) {
-        dlog(`STICKY[reducer ${headerTag(state)}] layout: redundant geometry, skipped rebuild`);
+        dlog(
+          `STICKY[reducer ${headerTag(state)}] layout: redundant geometry, skipped rebuild`,
+        );
         return { state, effects, changed: effects.length > 0 };
       }
       const { inputRange, outputRange } = deriveRanges(state, inputs);
@@ -260,7 +277,11 @@ export function reduceSticky(
       return {
         state,
         effects: [
-          { kind: 'schedule-debounce', delay: stickyDebounceMs(inputs.os), value: action.value },
+          {
+            kind: 'schedule-debounce',
+            delay: stickyDebounceMs(inputs.os),
+            value: action.value,
+          },
         ],
         changed: false,
       };

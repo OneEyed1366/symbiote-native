@@ -42,10 +42,14 @@ const ANIMATION_PROPERTY = {
   scaleXY: 'scaleXY',
 } as const;
 
-export type ILayoutAnimationType = (typeof ANIMATION_TYPE)[keyof typeof ANIMATION_TYPE];
-export type ILayoutAnimationProperty = (typeof ANIMATION_PROPERTY)[keyof typeof ANIMATION_PROPERTY];
+export type ILayoutAnimationType =
+  (typeof ANIMATION_TYPE)[keyof typeof ANIMATION_TYPE];
+export type ILayoutAnimationProperty =
+  (typeof ANIMATION_PROPERTY)[keyof typeof ANIMATION_PROPERTY];
 
-export type ILayoutAnimationTypes = Readonly<Record<ILayoutAnimationType, ILayoutAnimationType>>;
+export type ILayoutAnimationTypes = Readonly<
+  Record<ILayoutAnimationType, ILayoutAnimationType>
+>;
 export type ILayoutAnimationProperties = Readonly<
   Record<ILayoutAnimationProperty, ILayoutAnimationProperty>
 >;
@@ -86,8 +90,12 @@ interface INativeLayoutAnimationUIManager {
 // type never has it either; this is the runtime feature-detect RN itself does
 // (`FabricUIManager?.configureNextLayoutAnimation` in LayoutAnimation.js) before
 // calling it, no `as` cast needed.
-function hasConfigureNextLayoutAnimation(value: unknown): value is INativeLayoutAnimationUIManager {
-  return isRecord(value) && typeof value.configureNextLayoutAnimation === 'function';
+function hasConfigureNextLayoutAnimation(
+  value: unknown,
+): value is INativeLayoutAnimationUIManager {
+  return (
+    isRecord(value) && typeof value.configureNextLayoutAnimation === 'function'
+  );
 }
 
 // Resolved FRESH on every configureNext, deliberately NOT memoized. Either mechanism can
@@ -102,14 +110,20 @@ function resolveUIManager(): INativeLayoutAnimationUIManager | null {
   // TurboModule lookup.
   const fabricUIManager = globalThis.nativeFabricUIManager;
   if (hasConfigureNextLayoutAnimation(fabricUIManager)) {
-    dlog('LayoutAnimation: resolved native UIManager via the Fabric global slot');
+    dlog(
+      'LayoutAnimation: resolved native UIManager via the Fabric global slot',
+    );
     return fabricUIManager;
   }
 
   // Mechanism 2: the TurboModule fallback (RN's non-Fabric path).
-  const module = getNativeModule<INativeLayoutAnimationUIManager>(NATIVE_UI_MANAGER_MODULE_NAME);
+  const module = getNativeModule<INativeLayoutAnimationUIManager>(
+    NATIVE_UI_MANAGER_MODULE_NAME,
+  );
   if (module !== null) {
-    dlog(`LayoutAnimation: resolved native UIManager via "${NATIVE_UI_MANAGER_MODULE_NAME}"`);
+    dlog(
+      `LayoutAnimation: resolved native UIManager via "${NATIVE_UI_MANAGER_MODULE_NAME}"`,
+    );
     return module;
   }
 
@@ -161,9 +175,15 @@ const Presets = {
   ),
   spring: {
     duration: PRESET_DURATION.spring,
-    create: { type: ANIMATION_TYPE.linear, property: ANIMATION_PROPERTY.opacity },
+    create: {
+      type: ANIMATION_TYPE.linear,
+      property: ANIMATION_PROPERTY.opacity,
+    },
     update: { type: ANIMATION_TYPE.spring, springDamping: SPRING_DAMPING },
-    delete: { type: ANIMATION_TYPE.linear, property: ANIMATION_PROPERTY.opacity },
+    delete: {
+      type: ANIMATION_TYPE.linear,
+      property: ANIMATION_PROPERTY.opacity,
+    },
   },
 } as const satisfies Readonly<Record<string, ILayoutAnimationConfig>>;
 
@@ -226,8 +246,14 @@ function configureNext(
     onAnimationDidEnd?.();
   };
 
-  dlog(`LayoutAnimation.configureNext: dispatching config (duration=${config.duration})`);
-  manager.configureNextLayoutAnimation(config, onComplete, onAnimationDidFail ?? (() => {}));
+  dlog(
+    `LayoutAnimation.configureNext: dispatching config (duration=${config.duration})`,
+  );
+  manager.configureNextLayoutAnimation(
+    config,
+    onComplete,
+    onAnimationDidFail ?? (() => {}),
+  );
 }
 
 // ---- the LayoutAnimation facade ------------------------------------------
@@ -235,7 +261,9 @@ function configureNext(
 class LayoutAnimationImpl {
   // Frozen so callers can't mutate the shared type/property tables.
   readonly Types: ILayoutAnimationTypes = Object.freeze({ ...ANIMATION_TYPE });
-  readonly Properties: ILayoutAnimationProperties = Object.freeze({ ...ANIMATION_PROPERTY });
+  readonly Properties: ILayoutAnimationProperties = Object.freeze({
+    ...ANIMATION_PROPERTY,
+  });
   readonly Presets = Presets;
 
   // Methods (not class fields) so they stay overridable under

@@ -26,6 +26,7 @@ import {
   createElement,
   debugNodeId,
   isAnchor,
+  isEmptyRawText,
   VIRTUAL_TEXT_COMPONENT,
   type ISymbioteNode,
 } from './node';
@@ -68,7 +69,12 @@ function firstNonSerializablePath(
     if (seen.has(value)) return undefined;
     seen.add(value);
     for (let index = 0; index < value.length; index += 1) {
-      const found = firstNonSerializablePath(value[index], `${path}[${index}]`, depth + 1, seen);
+      const found = firstNonSerializablePath(
+        value[index],
+        `${path}[${index}]`,
+        depth + 1,
+        seen,
+      );
       if (found !== undefined) return found;
     }
     return undefined;
@@ -87,16 +93,23 @@ function firstNonSerializablePath(
 
 // Name the offending prop before the JSI boundary throws. Gated, so the deep walk only
 // runs while debugging; in production the clone proceeds straight to native.
-function guardSerializable(propsDiff: IFabricProps, viewName: string, tag: number): void {
+function guardSerializable(
+  propsDiff: IFabricProps,
+  viewName: string,
+  tag: number,
+): void {
   if (!isDebug()) return;
   const bad = firstNonSerializablePath(propsDiff, '', 0, new WeakSet());
-  if (bad !== undefined) dlog(`NON-SERIALIZABLE prop on ${viewName}#${tag}: ${bad}`);
+  if (bad !== undefined)
+    dlog(`NON-SERIALIZABLE prop on ${viewName}#${tag}: ${bad}`);
 }
 
 function viewNameFor(node: ISymbioteNode, hasTextAncestor: boolean): string {
   // The only position-dependent name: a <Text> inside another <Text> becomes a
   // virtual span. Everything else is the component string the adapter chose.
-  return node.isText && hasTextAncestor ? VIRTUAL_TEXT_COMPONENT : node.component;
+  return node.isText && hasTextAncestor
+    ? VIRTUAL_TEXT_COMPONENT
+    : node.component;
 }
 
 // Fabric's clone*WithNewProps MERGES the raw payload onto the node's existing props,
@@ -164,18 +177,24 @@ interface IReconciled {
   changed: boolean;
 }
 
+function isSkippedAtCommit(node: ISymbioteNode): boolean {
+  return isAnchor(node) || isEmptyRawText(node);
+}
+
 function renderableChildren(node: ISymbioteNode): readonly ISymbioteNode[] {
   // Anchor nodes (Vue fragment/v-if/v-for placeholders, Angular component hosts that should
   // not paint) live in the retained tree for sibling ordering but never become Fabric views.
   // When an anchor owns children, flatten them into the parent's renderable list: this lets a
   // DOM-less framework use an anchor as a fragment/component host without adding a native
   // wrapper node. Fast path: no anchors reuses the array, so the common case allocates nothing.
-  if (!node.children.some(isAnchor)) return node.children;
+  // An empty raw text is skipped for a different reason and with no flattening: it has no
+  // children, and committing it aborts the app inside Fabric's text walk (isEmptyRawText).
+  if (!node.children.some(isSkippedAtCommit)) return node.children;
 
   const children: ISymbioteNode[] = [];
   for (const child of node.children) {
     if (isAnchor(child)) children.push(...renderableChildren(child));
-    else children.push(child);
+    else if (!isEmptyRawText(child)) children.push(child);
   }
   return children;
 }
@@ -193,14 +212,20 @@ function childrenIdentical(
 // host only one direct child". Logged after children reconcile so each child's
 // committed tag/view-name is resolved. A `MULTI!!` line names the exact extra
 // node (tag + view-name) that pushed the scroll view past one child.
-function logScrollChildren(node: ISymbioteNode, viewName: string, selfTag: number | string): void {
+function logScrollChildren(
+  node: ISymbioteNode,
+  viewName: string,
+  selfTag: number | string,
+): void {
   if (!viewName.includes('Scroll') || viewName.includes('Content')) return;
   const kids = node.children.map(child => {
     const committed = mirror.get(child);
     return `${committed?.viewName ?? child.component}#${committed?.tag ?? 'NEW'}`;
   });
   const flag = kids.length === 1 ? 'OK' : 'MULTI!!';
-  dlog(`SCROLL-${flag} ${viewName} tag=${selfTag} children(${kids.length})=[${kids.join(',')}]`);
+  dlog(
+    `SCROLL-${flag} ${viewName} tag=${selfTag} children(${kids.length})=[${kids.join(',')}]`,
+  );
 }
 
 function reconcile(
@@ -220,7 +245,8 @@ function reconcile(
   // First mount, or the view kind flipped (RCTText <-> RCTVirtualText when a
   // <Text> moves in or out of another <Text>): a different native component
   // can't be cloned across, so create a fresh node from scratch.
-  const parentChanged = committed !== undefined && committed.parent !== renderableParent;
+  const parentChanged =
+    committed !== undefined && committed.parent !== renderableParent;
 
   if (
     forceFreshFamily ||
@@ -238,7 +264,9 @@ function reconcile(
           : committed.viewName !== viewName
             ? 'view-kind'
             : 'reparent';
-    dlog(`commit root=${rootTag} createNode tag=${tag} view=${viewName} reason=${reason}`);
+    dlog(
+      `commit root=${rootTag} createNode tag=${tag} view=${viewName} reason=${reason}`,
+    );
     if (viewName === 'RCTView' || viewName === 'RCTText') {
       dlog(
         `commit root=${rootTag} colorProbe tag=${tag} view=${viewName} ` +
@@ -246,7 +274,10 @@ function reconcile(
           `opacity=${JSON.stringify(props.opacity)}`,
       );
     }
-    if (viewName === 'AndroidSwipeRefreshLayout' || viewName === 'RCTScrollView') {
+    if (
+      viewName === 'AndroidSwipeRefreshLayout' ||
+      viewName === 'RCTScrollView'
+    ) {
       dlog(
         `commit root=${rootTag} layoutProbe tag=${tag} view=${viewName} ` +
           `flex=${JSON.stringify(props.flex)} height=${JSON.stringify(props.height)} ` +
@@ -256,7 +287,10 @@ function reconcile(
     }
     const handle = slot.createNode(tag, viewName, rootTag, props, node);
     for (const child of kids) {
-      slot.appendChild(handle, reconcile(slot, child, rootTag, childInText, node, true).handle);
+      slot.appendChild(
+        handle,
+        reconcile(slot, child, rootTag, childInText, node, true).handle,
+      );
     }
     logScrollChildren(node, viewName, tag);
     // Investigation instrumentation (search-bar-ref "node not committed" bug): scoped to RNS* so
@@ -264,7 +298,9 @@ function reconcile(
     // log below — same debugNodeId on both sides proves/disproves an identity mismatch. Kept
     // behind DEBUG per <keep_logs_gate_behind_DEBUG>, never removed.
     if (viewName.startsWith('RNS')) {
-      dlog(`mirror.set (create) node=${debugNodeId(node)} tag=${tag} view=${viewName}`);
+      dlog(
+        `mirror.set (create) node=${debugNodeId(node)} tag=${tag} view=${viewName}`,
+      );
     }
     mirror.set(node, {
       handle,
@@ -289,7 +325,8 @@ function reconcile(
   }
   logScrollChildren(node, viewName, committed.tag);
 
-  const childrenChanged = !childrenIdentical(kids, committed.children) || descendantChanged;
+  const childrenChanged =
+    !childrenIdentical(kids, committed.children) || descendantChanged;
   const propsChanged = !propsEqual(committed.props, props);
 
   if (!childrenChanged && !propsChanged) {
@@ -303,7 +340,10 @@ function reconcile(
     if (propsChanged) {
       const propsDiff = diffProps(committed.props, props);
       guardSerializable(propsDiff, viewName, committed.tag);
-      handle = slot.cloneNodeWithNewChildrenAndProps(committed.handle, propsDiff);
+      handle = slot.cloneNodeWithNewChildrenAndProps(
+        committed.handle,
+        propsDiff,
+      );
     } else {
       handle = slot.cloneNodeWithNewChildren(committed.handle);
     }
@@ -320,7 +360,9 @@ function reconcile(
   // Investigation instrumentation (search-bar-ref "node not committed" bug): see the create-path
   // dlog above. Kept behind DEBUG per <keep_logs_gate_behind_DEBUG>, never removed.
   if (viewName.startsWith('RNS')) {
-    dlog(`mirror.set (update) node=${debugNodeId(node)} tag=${committed.tag} view=${viewName}`);
+    dlog(
+      `mirror.set (update) node=${debugNodeId(node)} tag=${committed.tag} view=${viewName}`,
+    );
   }
   // The clone keeps the node's family, so its reactTag is unchanged; carry it.
   mirror.set(node, {
@@ -373,10 +415,14 @@ function rootContainerFor(rootTag: IRootTag): ISymbioteNode {
 // container would re-clone dead handles into the new surface -> a blank screen. The old
 // container's descendants fall out of every reference and their mirror entries GC.
 export function disposeRoot(rootTag: IRootTag): void {
-  if (rootContainers.delete(rootTag)) dlog(`root container disposed root=${rootTag}`);
+  if (rootContainers.delete(rootTag))
+    dlog(`root container disposed root=${rootTag}`);
 }
 
-export function commitChildren(rootTag: IRootTag, children: readonly ISymbioteNode[]): void {
+export function commitChildren(
+  rootTag: IRootTag,
+  children: readonly ISymbioteNode[],
+): void {
   // The wrapper holds the surface's top-level children; reconcile walks from it so the
   // whole tree, synthetic root included, goes through the same clone-on-write path.
   rootContainerFor(rootTag).children = children.slice();
@@ -423,7 +469,8 @@ function commitContainer(rootTag: IRootTag): void {
   runPostCommitHooks();
 
   if (isDebug()) {
-    const mode = stats.created > 0 && stats.reused === 0 ? 'full' : 'incremental';
+    const mode =
+      stats.created > 0 && stats.reused === 0 ? 'full' : 'incremental';
     dlog(
       `commit root=${rootTag} ${mode} ` +
         `created=${stats.created} cloneProps=${stats.cloneProps} ` +
@@ -439,7 +486,10 @@ function commitContainer(rootTag: IRootTag): void {
 // node (props differ), bubbles the re-clone to the root, reuses every sibling subtree
 // by reference, and emits a single completeRoot. This is the "slow tier", viable for a
 // single shallow animation; driving the animation natively is the answer for scale.
-export function setNativeProps(node: ISymbioteNode, partial: Record<string, unknown>): void {
+export function setNativeProps(
+  node: ISymbioteNode,
+  partial: Record<string, unknown>,
+): void {
   const record = mirror.get(node);
   if (record === undefined) {
     dlog('setNativeProps skipped: node not committed');
@@ -450,12 +500,17 @@ export function setNativeProps(node: ISymbioteNode, partial: Record<string, unkn
       // A partial style override MERGES onto the declarative style (RN semantics):
       // setNativeProps({style:{backgroundColor}}) recolors without dropping height
       // or radius. Transient: the next React commit re-applies the full style.
-      node.props.style = { ...flattenStyle(node.props.style), ...flattenStyle(value) };
+      node.props.style = {
+        ...flattenStyle(node.props.style),
+        ...flattenStyle(value),
+      };
     } else {
       node.props[key] = value;
     }
   }
-  dlog(`setNativeProps root=${record.rootTag} tag=${record.tag} keys=${Object.keys(partial)}`);
+  dlog(
+    `setNativeProps root=${record.rootTag} tag=${record.tag} keys=${Object.keys(partial)}`,
+  );
   commitContainer(record.rootTag);
 }
 
@@ -481,7 +536,10 @@ registerPostCommit(() => {
 // Run `action` once `node` has a committed Fabric tag - immediately if it already does, else after
 // the commit that assigns it. The canonical fix for the Vue async-commit race: defer instead of
 // silently no-opping. Returns a cancel fn (drop the pending retry, e.g. on unmount).
-export function whenCommitted(node: ISymbioteNode, action: () => void): () => void {
+export function whenCommitted(
+  node: ISymbioteNode,
+  action: () => void,
+): () => void {
   const attempt = (): boolean => {
     if (mirror.get(node) === undefined) return false;
     action();
@@ -525,7 +583,10 @@ export function dispatchViewCommand(
 // Fabric path hands the public-instance handle to nativeFabricUIManager.sendAccessibilityEvent
 // with the STRING eventType; the C++ side maps it to the platform's accessibility-event kind.
 // A no-op (logged) until the node is committed; there is no handle yet.
-export function sendAccessibilityEvent(node: ISymbioteNode, eventType: string): void {
+export function sendAccessibilityEvent(
+  node: ISymbioteNode,
+  eventType: string,
+): void {
   const record = mirror.get(node);
   if (record === undefined) {
     dlog(`sendAccessibilityEvent "${eventType}" skipped: node not committed`);
@@ -538,7 +599,10 @@ export function sendAccessibilityEvent(node: ISymbioteNode, eventType: string): 
 // Imperative measurement against a node's CURRENT Fabric handle (the public-instance
 // measure family that reanimated / gesture-handler / scroll-to reach through). A
 // no-op with a dlog until the node is committed; there is no handle to measure yet.
-export function measure(node: ISymbioteNode, callback: IMeasureOnSuccess): void {
+export function measure(
+  node: ISymbioteNode,
+  callback: IMeasureOnSuccess,
+): void {
   const record = mirror.get(node);
   if (record === undefined) {
     dlog('measure skipped: node not committed');
@@ -547,7 +611,10 @@ export function measure(node: ISymbioteNode, callback: IMeasureOnSuccess): void 
   getSlot().measure(record.handle, callback);
 }
 
-export function measureInWindow(node: ISymbioteNode, callback: IMeasureInWindowOnSuccess): void {
+export function measureInWindow(
+  node: ISymbioteNode,
+  callback: IMeasureInWindowOnSuccess,
+): void {
   const record = mirror.get(node);
   if (record === undefined) {
     dlog('measureInWindow skipped: node not committed');
@@ -571,5 +638,10 @@ export function measureLayout(
     dlog('measureLayout skipped: a node is not committed');
     return;
   }
-  getSlot().measureLayout(record.handle, relativeRecord.handle, onFail, onSuccess);
+  getSlot().measureLayout(
+    record.handle,
+    relativeRecord.handle,
+    onFail,
+    onSuccess,
+  );
 }

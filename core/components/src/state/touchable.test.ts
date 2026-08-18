@@ -11,9 +11,20 @@ import {
   computePressOutWait,
   createTouchableFeedbackHandlers,
   createTouchableFeedbackRuntime,
-  DEFAULT_MIN_PRESS_DURATION_MS,
+  createHighlightUnderlayHandlers,
+  createHighlightUnderlayRuntime,
+  hasTouchablePressHandler,
+  restingOpacityFromStyle,
+  DEFAULT_HIGHLIGHT_CHILD_OPACITY,
+  DEFAULT_UNDERLAY_COLOR,
+  RESTING_OPACITY,
+  type IHighlightUnderlayConfig,
   type ITouchableFeedbackConfig,
 } from './touchable';
+
+// An arbitrary non-zero floor to exercise the hold; the value itself is not under test.
+const HOLD_MS = 130;
+import { resolveHighlightExtraStyles } from '../view/render-touchable-highlight';
 
 // No Negative group: every symbol here is a total function over its input (scheduling math,
 // object construction, timer bookkeeping) with no guard clause and nothing that can throw or
@@ -179,7 +190,10 @@ describe('createTouchableFeedbackHandlers (Positive)', () => {
     const cb = makeCallbacks();
     const runtime = createTouchableFeedbackRuntime();
     const { handlePressIn, handlePressOut } = createTouchableFeedbackHandlers(
-      baseConfig(clock, { delayPressIn: 30, minPressDuration: DEFAULT_MIN_PRESS_DURATION_MS }),
+      baseConfig(clock, {
+        delayPressIn: 30,
+        minPressDuration: HOLD_MS,
+      }),
       runtime,
       cb,
     );
@@ -194,7 +208,7 @@ describe('createTouchableFeedbackHandlers (Positive)', () => {
     // The original defer timer was cancelled; only the deactivate hold is pending.
     expect(clock.pending()).toBe(1);
 
-    clock.advance(DEFAULT_MIN_PRESS_DURATION_MS);
+    clock.advance(HOLD_MS);
     expect(cb.log).toEqual(['activate', 'deactivate']);
   });
 
@@ -256,5 +270,166 @@ describe('createTouchableFeedbackHandlers (Positive)', () => {
     handlePressOut(makeEvent());
     expect(cb.log).toEqual(['activate', 'deactivate']);
     expect(clock.pending()).toBe(0);
+  });
+});
+
+// ---- the RN-audited additions (2026-08-19) ----------------------------------------------------
+//
+// Everything below covers the API added after measuring the port against RN's own sources. It is
+// what the React/Vue/Svelte/Angular Touchables migrate onto, so the contract is pinned here rather
+// than re-discovered in each adapter.
+
+describe('restingOpacityFromStyle', () => {
+  // why: RN's fade settles at the CALLER's opacity, not at 1. Getting this wrong is invisible until
+  // someone styles a Touchable faded, and then every release jumps it to fully opaque.
+  it('reads opacity out of a style, including a nested array', () => {
+    expect(restingOpacityFromStyle({ opacity: 0.6 })).toBe(0.6);
+    expect(restingOpacityFromStyle([{ width: 1 }, [{ opacity: 0.25 }]])).toBe(
+      0.25,
+    );
+  });
+
+  // why: the fallback IS the common case (no opacity in the style at all), and a non-numeric
+  // opacity must not leak into an Animated.Value where it would produce NaN frames.
+  it('falls back to 1 when the style carries no numeric opacity', () => {
+    expect(restingOpacityFromStyle(undefined)).toBe(RESTING_OPACITY);
+    expect(restingOpacityFromStyle({ width: 1 })).toBe(RESTING_OPACITY);
+    expect(restingOpacityFromStyle({ opacity: 'half' })).toBe(RESTING_OPACITY);
+  });
+});
+
+describe('hasTouchablePressHandler', () => {
+  // why: RN's _hasPressHandler gate. Any ONE of the four counts — a Touchable with only
+  // onLongPress is still interactive and must still flash its underlay.
+  it('is true when any single press callback is supplied', () => {
+    expect(hasTouchablePressHandler({ onLongPress: () => {} })).toBe(true);
+    expect(hasTouchablePressHandler({ onPressIn: () => {} })).toBe(true);
+    expect(hasTouchablePressHandler({})).toBe(false);
+  });
+});
+
+describe('resolveHighlightExtraStyles', () => {
+  // why: THE bug this API replaces. RN puts the backgroundColor on the container and the lowered
+  // opacity on the CHILD; folding both onto one node fades the underlay it is meant to reveal.
+  // Asserting they come back as two separate objects is what keeps a caller from re-merging them
+  // by accident.
+  it('returns the underlay and child styles separately', () => {
+    const styles = resolveHighlightExtraStyles({
+      shown: true,
+      hasPressHandler: true,
+      underlayColor: '#abc',
+      activeOpacity: 0.5,
+    });
+    expect(styles).toEqual({
+      underlay: { backgroundColor: '#abc' },
+      child: { opacity: 0.5 },
+    });
+  });
+
+  it('defaults to RN black / 0.85', () => {
+    expect(
+      resolveHighlightExtraStyles({ shown: true, hasPressHandler: true }),
+    ).toEqual({
+      underlay: { backgroundColor: DEFAULT_UNDERLAY_COLOR },
+      child: { opacity: DEFAULT_HIGHLIGHT_CHILD_OPACITY },
+    });
+  });
+
+  // why: RN's `extraStyles: null` state, reachable two ways — not shown, or shown on a Touchable
+  // that handles no press at all.
+  it('paints nothing when not shown or when no press handler exists', () => {
+    expect(
+      resolveHighlightExtraStyles({ shown: false, hasPressHandler: true }),
+    ).toBeUndefined();
+    expect(
+      resolveHighlightExtraStyles({ shown: true, hasPressHandler: false }),
+    ).toBeUndefined();
+  });
+});
+
+describe('the TouchableHighlight underlay machine', () => {
+  function makeUnderlay(
+    clock: ReturnType<typeof makeClock>,
+    over: Partial<IHighlightUnderlayConfig> = {},
+  ): {
+    handlers: ReturnType<typeof createHighlightUnderlayHandlers>;
+    log: string[];
+  } {
+    const log: string[] = [];
+    const handlers = createHighlightUnderlayHandlers(
+      {
+        delayPressOut: 0,
+        hasPressHandler: true,
+        schedule: clock.schedule,
+        ...over,
+      },
+      createHighlightUnderlayRuntime(),
+      {
+        setShown: shown => log.push(shown ? 'show' : 'hide'),
+        onShowUnderlay: () => log.push('onShow'),
+        onHideUnderlay: () => log.push('onHide'),
+      },
+    );
+    return { handlers, log };
+  }
+
+  // why: the reason this is a machine and not a `pressed`-derived style. The engine emits press
+  // BEFORE pressOut, so onPress arms the hide timer and onPressOut must then decline to hide —
+  // that is what keeps a too-fast-to-see tap flashing for delayPressOut.
+  it('holds the underlay for delayPressOut past the tap', () => {
+    const clock = makeClock();
+    const { handlers, log } = makeUnderlay(clock, { delayPressOut: 40 });
+
+    handlers.handlePressIn(makeEvent());
+    handlers.handlePress(makeEvent());
+    handlers.handlePressOut(makeEvent());
+    expect(log, 'pressOut must not hide while the timer is armed').toEqual([
+      'show',
+      'onShow',
+      'show',
+      'onShow',
+    ]);
+
+    clock.advance(40);
+    expect(log.slice(-2)).toEqual(['hide', 'onHide']);
+  });
+
+  // why: a cancelled gesture never gets onPress, so nothing arms the timer and the underlay has to
+  // come off at once — otherwise a drift off the button leaves it stuck highlighted.
+  it('hides at once on a press-out with no preceding press', () => {
+    const clock = makeClock();
+    const { handlers, log } = makeUnderlay(clock);
+
+    handlers.handlePressIn(makeEvent());
+    handlers.handlePressOut(makeEvent());
+    expect(log).toEqual(['show', 'onShow', 'hide', 'onHide']);
+    expect(clock.pending()).toBe(0);
+  });
+
+  // why: RN's _hasPressHandler gate lives INSIDE show/hide, not at the call site — a decorative
+  // TouchableHighlight must stay inert even though the touch still reaches its handlers.
+  it('paints nothing at all without a press handler', () => {
+    const clock = makeClock();
+    const { handlers, log } = makeUnderlay(clock, { hasPressHandler: false });
+
+    handlers.handlePressIn(makeEvent());
+    handlers.handlePress(makeEvent());
+    clock.advance(1);
+    handlers.handlePressOut(makeEvent());
+    expect(log).toEqual([]);
+  });
+
+  // why: a second press-in arriving while a post-press hide is pending must cancel it, or the
+  // underlay blinks off in the middle of the next press.
+  it('cancels a pending hide when a new press begins', () => {
+    const clock = makeClock();
+    const { handlers, log } = makeUnderlay(clock, { delayPressOut: 40 });
+
+    handlers.handlePress(makeEvent());
+    handlers.handlePressIn(makeEvent());
+    expect(clock.pending(), 'the pending hide must be cancelled').toBe(0);
+
+    clock.advance(100);
+    expect(log.includes('hide'), 'no hide may land').toBe(false);
   });
 });

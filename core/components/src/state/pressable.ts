@@ -15,7 +15,12 @@ import { dlog, Platform, type ISymbioteEvent } from '@symbiote-native/engine';
 export const DEFAULT_DELAY_LONG_PRESS_MS = 500;
 // RN's default extra slop kept around a press once it is active, before a drift fires pressOut.
 // The PressRect extension (Pressability.js DEFAULT_PRESS_RECT_OFFSETS). Per-edge, deeper bottom.
-export const DEFAULT_PRESS_RECT_OFFSETS = { top: 20, left: 20, bottom: 30, right: 20 };
+export const DEFAULT_PRESS_RECT_OFFSETS = {
+  top: 20,
+  left: 20,
+  bottom: 30,
+  right: 20,
+};
 
 // Per-edge inset rect, the normalized shape every edge test reads (RN's Rect).
 export interface IEdgeInsets {
@@ -42,7 +47,8 @@ export interface IPressState {
 export type IPressHandler = (event: ISymbioteEvent) => void;
 
 // A scalar expands all four edges; the object form sets them per-edge. RN's hitSlop / pressRect.
-export type IRectOffset = number | { top?: number; left?: number; bottom?: number; right?: number };
+export type IRectOffset =
+  number | { top?: number; left?: number; bottom?: number; right?: number };
 
 // Native ripple config Android's ReactViewManager reads off the inner View (nativeBackground-
 // Android). `foreground` routes it to the foreground slot. Inert on iOS. RN's
@@ -107,9 +113,12 @@ export function isTouchWithinRegion(
 
 // Page coordinate of a single-touch native event, or undefined when it carried no numeric coords
 // (then the retention drift check is skipped, never guessed).
-export function readPoint(event: ISymbioteEvent): { x: number; y: number } | undefined {
+export function readPoint(
+  event: ISymbioteEvent,
+): { x: number; y: number } | undefined {
   const { pageX, pageY } = event.nativeEvent;
-  if (typeof pageX === 'number' && typeof pageY === 'number') return { x: pageX, y: pageY };
+  if (typeof pageX === 'number' && typeof pageY === 'number')
+    return { x: pageX, y: pageY };
   return undefined;
 }
 
@@ -122,7 +131,12 @@ export function computeRegion(
   pageY: number,
 ): IResponderRegion | undefined {
   if (!width && !height && !pageX && !pageY) return undefined;
-  return { left: pageX, top: pageY, right: pageX + width, bottom: pageY + height };
+  return {
+    left: pageX,
+    top: pageY,
+    right: pageX + width,
+    bottom: pageY + height,
+  };
 }
 
 // Build the Android native-feedback prop the inner View carries from the ripple config. RN runs
@@ -280,7 +294,9 @@ export function createPressHandlers(
     }
     const origin = runtime.pressOrigin;
     if (origin === undefined) return true;
-    return Math.hypot(point.x - origin.x, point.y - origin.y) <= fallbackThreshold;
+    return (
+      Math.hypot(point.x - origin.x, point.y - origin.y) <= fallbackThreshold
+    );
   }
 
   function clearLongPress(): void {

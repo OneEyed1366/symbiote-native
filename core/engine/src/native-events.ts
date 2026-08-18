@@ -18,7 +18,9 @@ declare global {
   var RN$registerCallableModule:
     | ((
         name: string,
-        factory: () => { emit: (eventType: string, ...args: unknown[]) => void },
+        factory: () => {
+          emit: (eventType: string, ...args: unknown[]) => void;
+        },
       ) => void)
     | undefined;
 
@@ -87,7 +89,10 @@ export function installDeviceEventHub(): void {
 // The host event bus the app injects: RN's DeviceEventEmitter, the JS module
 // native actually invokes. Its `addListener` returns a removable subscription.
 export interface IDeviceEventSource {
-  addListener(eventType: string, listener: (payload: unknown) => void): IEventSubscription;
+  addListener(
+    eventType: string,
+    listener: (payload: unknown) => void,
+  ): IEventSubscription;
 }
 
 let injectedSource: IDeviceEventSource | undefined;
@@ -119,7 +124,10 @@ export type INativeEventListener = (payload: unknown) => void;
 // would throw "undefined is not a function" — the `?.` guards the module, not a
 // missing method. Mirrors RN's NativeEventEmitter constructor probe.
 function hasObserveCounters(module: IEventEmitterModule): boolean {
-  return typeof module.addListener === 'function' && typeof module.removeListeners === 'function';
+  return (
+    typeof module.addListener === 'function' &&
+    typeof module.removeListeners === 'function'
+  );
 }
 
 // Subscribe to events for one native module. Mirrors RN's NativeEventEmitter: each
@@ -141,7 +149,10 @@ export class NativeEventEmitter {
     }
   }
 
-  addListener(eventType: string, listener: INativeEventListener): IEventSubscription {
+  addListener(
+    eventType: string,
+    listener: INativeEventListener,
+  ): IEventSubscription {
     // The module counter tells native to START observing; without it (module
     // unresolved) native may never emit. Logged to pinpoint a silent native side.
     const via = injectedSource !== undefined ? 'host-bus' : 'fallback-hub';

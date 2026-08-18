@@ -30,7 +30,9 @@ test('tap increments the counter', () => {
   const fabric = installFabric();
   mount(1, createElement(App));
 
-  const button = fabric.find((n) => n.viewName === 'RCTView' && n.props.testID === 'tap-target');
+  const button = fabric.find(
+    n => n.viewName === 'RCTView' && n.props.testID === 'tap-target',
+  );
   fabric.fireEvent(button!.instanceHandle, 'topClick', {});
 
   expect(fabric.serialize(fabric.committed)).toContain('Taps: 1');
@@ -81,5 +83,5 @@ test that depends on it.
 
 ## Test it
 
-This package has no tests of its own — it *is* the test double every other package's `vitest` suite
+This package has no tests of its own — it _is_ the test double every other package's `vitest` suite
 imports.
