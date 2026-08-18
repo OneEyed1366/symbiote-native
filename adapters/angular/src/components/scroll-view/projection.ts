@@ -15,6 +15,7 @@ import {
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
+import { countAngular } from '../../diagnostics';
 import {
   createInitialStickyState,
   readLayoutNumber,
@@ -341,6 +342,7 @@ export class ScrollViewProjectionController {
    * microtask queued during the pass.
    */
   private scheduleReconcile(notifyAll = false): void {
+    countAngular('projectionSchedules');
     this.shouldNotifyAll ||= notifyAll;
     if (this.isReconcilePending) return;
     this.isReconcilePending = true;
@@ -349,6 +351,7 @@ export class ScrollViewProjectionController {
 
   // Called by the renderer factory's end(). Public only for that seam.
   flushReconcile(): void {
+    countAngular('projectionFlushes');
     this.isReconcilePending = false;
     const notifyAll = this.shouldNotifyAll;
     this.shouldNotifyAll = false;
@@ -529,6 +532,7 @@ export class ScrollViewProjectionController {
       if (shouldWrap && record.wrapper === undefined) this.wrapRecord(record, childIndex);
       else if (!shouldWrap && record.wrapper !== undefined) this.unwrapRecord(record);
       else if (shouldWrap && record.stickyIndex !== childIndex) {
+        countAngular('stickyWrapperReuses');
         record.sticky?.setChildIndex(childIndex);
         record.stickyIndex = childIndex;
       } else if (shouldWrap && notifyAll) record.sticky?.rebuild();
@@ -591,6 +595,7 @@ export class ScrollViewProjectionController {
     else insertBefore(this.contentNode, wrapper, after);
     appendChild(wrapper, record.child);
     record.wrapper = wrapper;
+    countAngular('stickyWrapperCreates');
     record.sticky = new StickyProjectionWrapper(this, childIndex, wrapper);
     record.stickyIndex = childIndex;
     dlog(

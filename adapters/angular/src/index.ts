@@ -288,3 +288,13 @@ export type {
   IPressableAndroidRippleConfig,
   IImageStatics,
 } from '@symbiote-native/components';
+
+// Diagnostics: per-window Angular-side counters (change-detection passes, renderer writes, list
+// recomputes, cell views). The engine's readCommitProfile() prices the commit; these say how many
+// times anything ran at all - the number that exposes a change-detection free-run.
+export {
+  readAngularProfile,
+  readAngularProfileDetail,
+  setAngularProfileDetail,
+} from './diagnostics';
+export type { IAngularProfile, IAngularProfileDetail } from './diagnostics';

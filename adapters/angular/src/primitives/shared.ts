@@ -9,6 +9,7 @@ import {
   Renderer2,
   type SimpleChanges,
 } from '@angular/core';
+import { countAngular } from '../diagnostics';
 import {
   flattenStyle,
   isSymbioteNode,
@@ -166,9 +167,11 @@ export class SymbioteStyleInputDirective implements DoCheck, OnChanges {
   // check re-dirties the view every tick and free-runs CD, the hazard `stableAnchorStyle` above
   // prevents one level up.
   ngDoCheck(): void {
+    countAngular('styleChecks');
     const current = anchorHostStyle(this.elementRef);
     if (isAnchorStyleUnchanged(this.lastAnchorStyle, current)) return;
     this.lastAnchorStyle = current;
+    countAngular('styleMarks');
     this.cdr.markForCheck();
   }
 }
@@ -194,9 +197,16 @@ function isAnchorStyleUnchanged(previous: unknown, next: unknown): boolean {
  * custom renderer's `setProperty`, so the engine's `routeProp` handles them as usual.
  */
 @Directive()
-export abstract class SymbiotePrimitiveHost implements OnChanges {
+export abstract class SymbiotePrimitiveHost implements DoCheck, OnChanges {
   private readonly renderer = inject(Renderer2);
   private readonly elementRef = inject(ElementRef);
+
+  // Counting only. Angular calls this once per view per check, so it is the only honest measure of
+  // how much tree a tick walks - and with CheckAlways primitives that is the whole application, not
+  // the screen on top. One integer increment next to a template refresh is not measurable.
+  ngDoCheck(): void {
+    countAngular('viewsChecked');
+  }
 
   @Input() style?: IStyleProp<unknown>;
 
