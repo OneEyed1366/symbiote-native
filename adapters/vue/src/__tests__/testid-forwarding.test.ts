@@ -46,8 +46,13 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 // KeyboardAvoidingView subscribes to the native Keyboard hub in onMounted; without a device-event
 // hub that throws before the commit, so install the minimal fake hub + KeyboardObserver the
 // dedicated keyboard tests use. (This is harness setup, not part of the testID contract.)
-const fakeKeyboardObserver = { addListener: (): void => {}, removeListeners: (): void => {} };
-const fakeModules: Record<string, unknown> = { KeyboardObserver: fakeKeyboardObserver };
+const fakeKeyboardObserver = {
+  addListener: (): void => {},
+  removeListeners: (): void => {},
+};
+const fakeModules: Record<string, unknown> = {
+  KeyboardObserver: fakeKeyboardObserver,
+};
 Object.assign(globalThis, {
   __turboModuleProxy: (name: string): unknown => fakeModules[name] ?? null,
   RN$registerCallableModule: (): void => {},
@@ -56,7 +61,8 @@ Object.assign(globalThis, {
 const ROOT_TAG = 780;
 const fabric = installFabric();
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -72,7 +78,10 @@ const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
   ['View', id => h(View, { testID: id })],
   ['Text', id => h(Text, { testID: id }, 'x')],
   ['Image', id => h(Image, { testID: id, source: { uri: 'x' } })],
-  ['ImageBackground', id => h(ImageBackground, { testID: id, source: { uri: 'x' } }, textChild)],
+  [
+    'ImageBackground',
+    id => h(ImageBackground, { testID: id, source: { uri: 'x' } }, textChild),
+  ],
   ['ScrollView', id => h(ScrollView, { testID: id }, textChild)],
   ['TextInput', id => h(TextInput, { testID: id })],
   ['Switch', id => h(Switch, { testID: id, value: false })],
@@ -80,13 +89,28 @@ const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
   ['Button', id => h(Button, { testID: id, title: 'x' })],
   ['Pressable', id => h(Pressable, { testID: id }, textChild)],
   ['TouchableOpacity', id => h(TouchableOpacity, { testID: id }, textChild)],
-  ['TouchableHighlight', id => h(TouchableHighlight, { testID: id }, textChild)],
-  ['TouchableWithoutFeedback', id => h(TouchableWithoutFeedback, { testID: id }, () => [h(View)])],
-  ['TouchableNativeFeedback', id => h(TouchableNativeFeedback, { testID: id }, textChild)],
+  [
+    'TouchableHighlight',
+    id => h(TouchableHighlight, { testID: id }, textChild),
+  ],
+  [
+    'TouchableWithoutFeedback',
+    id => h(TouchableWithoutFeedback, { testID: id }, () => [h(View)]),
+  ],
+  [
+    'TouchableNativeFeedback',
+    id => h(TouchableNativeFeedback, { testID: id }, textChild),
+  ],
   ['SafeAreaView', id => h(SafeAreaView, { testID: id }, textChild)],
-  ['KeyboardAvoidingView', id => h(KeyboardAvoidingView, { testID: id }, textChild)],
+  [
+    'KeyboardAvoidingView',
+    id => h(KeyboardAvoidingView, { testID: id }, textChild),
+  ],
   ['Modal', id => h(Modal, { testID: id, visible: true }, textChild)],
-  ['InputAccessoryView', id => h(InputAccessoryView, { testID: id, nativeID: 'acc' }, textChild)],
+  [
+    'InputAccessoryView',
+    id => h(InputAccessoryView, { testID: id, nativeID: 'acc' }, textChild),
+  ],
   [
     // The cell renderer is a Vue scoped slot (#item), not a renderItem prop — passing renderItem
     // as a prop here would silently no-op (it falls into the untyped attrs passthrough), so it
@@ -96,7 +120,9 @@ const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
       h(
         FlatList,
         { testID: id, data: [1] },
-        { item: (info: { item: unknown }) => [h(Text, null, String(info.item))] },
+        {
+          item: (info: { item: unknown }) => [h(Text, null, String(info.item))],
+        },
       ),
   ],
   [
@@ -105,7 +131,9 @@ const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
       h(
         SectionList,
         { testID: id, sections: [{ title: 's', data: [1] }] },
-        { item: (info: { item: unknown }) => [h(Text, null, String(info.item))] },
+        {
+          item: (info: { item: unknown }) => [h(Text, null, String(info.item))],
+        },
       ),
   ],
   [
@@ -118,9 +146,12 @@ const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
           data: [1],
           getItem: (data: unknown, index: number) =>
             Array.isArray(data) ? data[index] : undefined,
-          getItemCount: (data: unknown) => (Array.isArray(data) ? data.length : 0),
+          getItemCount: (data: unknown) =>
+            Array.isArray(data) ? data.length : 0,
         },
-        { item: (info: { item: unknown }) => [h(Text, null, String(info.item))] },
+        {
+          item: (info: { item: unknown }) => [h(Text, null, String(info.item))],
+        },
       ),
   ],
   [
@@ -129,17 +160,28 @@ const cases: ReadonlyArray<readonly [string, (id: string) => VNode]> = [
       h(
         VirtualizedSectionList,
         { testID: id, sections: [{ title: 's', data: [1] }] },
-        { item: (info: { item: unknown }) => [h(Text, null, String(info.item))] },
+        {
+          item: (info: { item: unknown }) => [h(Text, null, String(info.item))],
+        },
       ),
   ],
-  ['RefreshControl', id => h(RefreshControl, { testID: id, refreshing: false })],
+  [
+    'RefreshControl',
+    id => h(RefreshControl, { testID: id, refreshing: false }),
+  ],
   ['Animated.View', id => h(Animated.View, { testID: id })],
   ['Animated.Text', id => h(Animated.Text, { testID: id }, 'x')],
-  ['Animated.Image', id => h(Animated.Image, { testID: id, source: { uri: 'x' } })],
+  [
+    'Animated.Image',
+    id => h(Animated.Image, { testID: id, source: { uri: 'x' } }),
+  ],
   // Animated.ScrollView is a LAZY memoized getter (deferred past module init to dodge a TDZ
   // cycle with ScrollView's own sticky-header import of this Animated namespace) — worth its own
   // case since a broken getter would be invisible to any test that only touches Animated.View/Text.
-  ['Animated.ScrollView', id => h(Animated.ScrollView, { testID: id }, textChild)],
+  [
+    'Animated.ScrollView',
+    id => h(Animated.ScrollView, { testID: id }, textChild),
+  ],
 ];
 
 // Positive only: forwarding testID has no rejecting/throwing path (every component either has an

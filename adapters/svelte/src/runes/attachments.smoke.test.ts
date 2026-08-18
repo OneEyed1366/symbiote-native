@@ -21,7 +21,8 @@ import { mount, unmount } from '../render';
 import { createAttachmentsSync, pickAttachmentProps } from './attachments';
 import type { ShimElement } from '../dom-shim';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -30,8 +31,14 @@ const ROOT_TAG = 91_902;
 // Next to the real View.svelte: the compiled output keeps View's own relative imports.
 const COMPONENTS_DIR = join(__dirname, '..', 'components');
 const VIEW_OUT = join(COMPONENTS_DIR, '.smoke-compiled-attachments-view.mjs');
-const PARENT_OUT = join(COMPONENTS_DIR, '.smoke-compiled-attachments-parent.mjs');
-const ACTION_OUT = join(COMPONENTS_DIR, '.smoke-compiled-attachments-action.mjs');
+const PARENT_OUT = join(
+  COMPONENTS_DIR,
+  '.smoke-compiled-attachments-parent.mjs',
+);
+const ACTION_OUT = join(
+  COMPONENTS_DIR,
+  '.smoke-compiled-attachments-action.mjs',
+);
 // Each compiled file sits next to its real source so that source's own relative imports still
 // resolve; a name unique to THIS suite keeps concurrently-running suites from racing on the path.
 const PRESSABLE_BASENAME = '.smoke-compiled-attachments-pressable.mjs';
@@ -47,13 +54,25 @@ const TOUCHABLE_PARENT_OUT = join(
   '.smoke-compiled-attachments-touchable-parent.mjs',
 );
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
-function compileToFile(source: string, filename: string, outPath: string): void {
-  writeFileSync(outPath, compile(source, { ...COMPILE_OPTIONS, filename }).js.code);
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
+  writeFileSync(
+    outPath,
+    compile(source, { ...COMPILE_OPTIONS, filename }).js.code,
+  );
 }
 
 async function loadComponent(outPath: string): Promise<Component> {
@@ -68,7 +87,11 @@ async function loadComponent(outPath: string): Promise<Component> {
 }
 
 function compileView(): void {
-  compileToFile(readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'), 'View.svelte', VIEW_OUT);
+  compileToFile(
+    readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'),
+    'View.svelte',
+    VIEW_OUT,
+  );
 }
 
 // Node caches import() by path, so each differently-SOURCED parent needs its own filename
@@ -199,7 +222,10 @@ describe('Positive — {@attach} on a Symbiote component', () => {
     expect(node.engineNode?.props.testID).toBe('attach-target');
 
     unmount(ROOT_TAG);
-    expect(events.map(entry => entry.name)).toEqual(['attach:first', 'teardown:first']);
+    expect(events.map(entry => entry.name)).toEqual([
+      'attach:first',
+      'teardown:first',
+    ]);
   });
 
   // why: a DYNAMIC attachment expression (`which === 'first' ? first : second`) compiles to a
@@ -238,11 +264,26 @@ describe('Positive — {@attach} on a Symbiote component', () => {
       'Pressable.svelte',
       PRESSABLE_OUT,
     );
+    // TouchableOpacity's feedback node is an Animated.View over the real View.svelte, so View is
+    // compiled here too and its specifier rewritten alongside Pressable's.
     compileToFile(
-      readFileSync(join(COMPONENTS_DIR, 'touchable-opacity', 'index.svelte'), 'utf8').replace(
-        "'../pressable/index.svelte'",
-        `'../pressable/${PRESSABLE_BASENAME}'`,
-      ),
+      readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8'),
+      'View.svelte',
+      VIEW_OUT,
+    );
+    compileToFile(
+      readFileSync(
+        join(COMPONENTS_DIR, 'touchable-opacity', 'index.svelte'),
+        'utf8',
+      )
+        .replace(
+          "'../pressable/index.svelte'",
+          `'../pressable/${PRESSABLE_BASENAME}'`,
+        )
+        .replace(
+          "'../View.svelte'",
+          "'../.smoke-compiled-attachments-view.mjs'",
+        ),
       'TouchableOpacity.svelte',
       TOUCHABLE_OUT,
     );
@@ -285,7 +326,10 @@ describe('Positive — {@attach} on a Symbiote component', () => {
     await tick();
     await tick();
 
-    expect(events.map(entry => entry.name)).toEqual(['action:init', 'action:update']);
+    expect(events.map(entry => entry.name)).toEqual([
+      'action:init',
+      'action:update',
+    ]);
     expect(events[1].value).toBe('two');
 
     unmount(ROOT_TAG);

@@ -15,7 +15,12 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { dlog, Platform, type ISymbioteEvent, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  dlog,
+  Platform,
+  type ISymbioteEvent,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
 import {
   flattenSections,
   resolveStickySectionHeaders,
@@ -33,14 +38,18 @@ import {
   type IVirtualizedListHandle,
 } from '../virtualized-list';
 import type { IScrollViewHandle } from '../scroll-view';
-import type { IAccessibilityProps, IAriaProps } from '@symbiote-native/components';
+import type {
+  IAccessibilityProps,
+  IAriaProps,
+} from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 
 export type { ISection } from '@symbiote-native/components';
 // Re-export the shared handle type so section-list imports it from '../virtualized-section-list'.
 export type { IVirtualizedSectionListHandle };
 
-export interface IVirtualizedSectionListProps<ItemT> extends IAccessibilityProps, IAriaProps {
+export interface IVirtualizedSectionListProps<ItemT>
+  extends IAccessibilityProps, IAriaProps {
   sections: ReadonlyArray<ISection<ItemT>>;
   renderItem: (info: {
     item: ItemT;
@@ -52,7 +61,8 @@ export interface IVirtualizedSectionListProps<ItemT> extends IAccessibilityProps
   renderSectionFooter?: (info: { section: ISection<ItemT> }) => ReactNode;
   // Painted between adjacent sections (after one section's footer, before the next section's
   // header). Mirrors RN's SectionSeparatorComponent.
-  SectionSeparatorComponent?: ComponentType<Record<string, never>> | ReactElement;
+  SectionSeparatorComponent?:
+    ComponentType<Record<string, never>> | ReactElement;
   keyExtractor?: (item: ItemT, index: number) => string;
   // Stick each section header to the top as the next section scrolls up. Routed to the inner
   // VirtualizedList's stickyHeaderIndices. Defaults to `Platform.OS === 'ios'` (RN
@@ -103,7 +113,9 @@ function resolveSeparator(
 }
 
 export function VirtualizedSectionList<ItemT>(
-  props: IVirtualizedSectionListProps<ItemT> & { ref?: Ref<IVirtualizedSectionListHandle> },
+  props: IVirtualizedSectionListProps<ItemT> & {
+    ref?: Ref<IVirtualizedSectionListHandle>;
+  },
 ): ReactElement {
   const {
     ref,
@@ -181,7 +193,8 @@ export function VirtualizedSectionList<ItemT>(
         listRef.current?.getScrollableNode() ?? null,
       getScrollResponder: (): IScrollViewHandle | null =>
         listRef.current?.getScrollResponder() ?? null,
-      getScrollNode: (): ISymbioteNode | null => listRef.current?.getScrollNode() ?? null,
+      getScrollNode: (): ISymbioteNode | null =>
+        listRef.current?.getScrollNode() ?? null,
       recordInteraction: (): void => {
         listRef.current?.recordInteraction();
       },
@@ -196,10 +209,14 @@ export function VirtualizedSectionList<ItemT>(
   }): ReactNode => {
     const entry = info.item;
     if (entry.kind === 'header') {
-      return renderSectionHeader ? renderSectionHeader({ section: entry.section }) : undefined;
+      return renderSectionHeader
+        ? renderSectionHeader({ section: entry.section })
+        : undefined;
     }
     if (entry.kind === 'footer') {
-      return renderSectionFooter ? renderSectionFooter({ section: entry.section }) : undefined;
+      return renderSectionFooter
+        ? renderSectionFooter({ section: entry.section })
+        : undefined;
     }
     if (entry.kind === 'section-separator') {
       return resolveSeparator(SectionSeparatorComponent);
@@ -214,7 +231,8 @@ export function VirtualizedSectionList<ItemT>(
 
   // The user's ItemSeparatorComponent is typed on ItemT; the inner stream is the entry wrapper, so
   // unwrap each entry back to its ItemT (shared unwrapEntryItem) before handing it to the user.
-  const entrySeparatorComponent: ComponentType<ISeparatorProps<ISectionEntry<ItemT>>> | undefined =
+  const entrySeparatorComponent:
+    ComponentType<ISeparatorProps<ISectionEntry<ItemT>>> | undefined =
     ItemSeparatorComponent === undefined
       ? undefined
       : (entryProps): ReactNode =>
@@ -224,13 +242,16 @@ export function VirtualizedSectionList<ItemT>(
             trailingItem: unwrapEntryItem(entryProps.trailingItem),
           });
 
-  const entryKeyExtractor = (entry: ISectionEntry<ItemT>, index: number): string =>
-    sectionEntryKey(entry, index, keyExtractor);
+  const entryKeyExtractor = (
+    entry: ISectionEntry<ItemT>,
+    index: number,
+  ): string => sectionEntryKey(entry, index, keyExtractor);
 
   return createElement(VirtualizedList<ISectionEntry<ItemT>>, {
     ref: listRef,
     data: entries,
-    getItem: (_source: unknown, index: number): ISectionEntry<ItemT> => entries[index],
+    getItem: (_source: unknown, index: number): ISectionEntry<ItemT> =>
+      entries[index],
     getItemCount: (): number => entries.length,
     renderItem: renderEntry,
     keyExtractor: entryKeyExtractor,

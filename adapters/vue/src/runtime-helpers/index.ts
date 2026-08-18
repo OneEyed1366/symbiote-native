@@ -13,8 +13,10 @@ export * from '@vue/runtime-core';
 
 import {
   defineComponent,
+  getCurrentInstance,
   h,
   Teleport as VueTeleport,
+  warn,
   type ObjectDirective,
 } from '@vue/runtime-core';
 import {
@@ -78,3 +80,173 @@ export const Teleport = defineComponent({
     };
   },
 });
+
+// `withModifiers`/`withKeys`/`useCssModule` are, like vShow above, template-directive helpers
+// Vue's SFC/render-function compiler imports from `'vue'` that upstream happens to define in
+// @vue/runtime-dom rather than the renderer-agnostic runtime-core — even though their own logic
+// never touches a DOM node. Copied here verbatim from runtime-dom's implementation (event-object
+// method calls and a plain instance-options read, nothing renderer-specific), so `v-on.stop`,
+// `v-on.self`, `v-on.{key}`, and `useCssModule()` resolve to a REAL shared implementation instead
+// of each call site hand-rolling its own copy.
+
+type ISystemModifier = 'ctrl' | 'shift' | 'alt' | 'meta';
+
+type IEventModifier =
+  | ISystemModifier
+  | 'stop'
+  | 'prevent'
+  | 'self'
+  | 'left'
+  | 'middle'
+  | 'right'
+  | 'exact';
+
+const SYSTEM_MODIFIERS: readonly ISystemModifier[] = [
+  'ctrl',
+  'shift',
+  'alt',
+  'meta',
+];
+
+type IModifierGuardableEvent = {
+  stopPropagation?: () => void;
+  preventDefault?: () => void;
+  target?: unknown;
+  currentTarget?: unknown;
+  button?: number;
+  ctrlKey?: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
+  metaKey?: boolean;
+};
+
+const MODIFIER_GUARDS: {
+  [K in IEventModifier]: (
+    event: IModifierGuardableEvent,
+    modifiers: readonly IEventModifier[],
+  ) => boolean;
+} = {
+  stop: event => {
+    event.stopPropagation?.();
+    return false;
+  },
+  prevent: event => {
+    event.preventDefault?.();
+    return false;
+  },
+  self: event => event.target !== event.currentTarget,
+  ctrl: event => !event.ctrlKey,
+  shift: event => !event.shiftKey,
+  alt: event => !event.altKey,
+  meta: event => !event.metaKey,
+  left: event => event.button !== 0,
+  middle: event => event.button !== 1,
+  right: event => event.button !== 2,
+  exact: (event, modifiers) =>
+    SYSTEM_MODIFIERS.some(
+      modifier =>
+        event[`${modifier}Key` as const] && !modifiers.includes(modifier),
+    ),
+};
+
+type IEventHandler<TEvent> = ((event: TEvent, ...args: never[]) => unknown) & {
+  _withMods?: Record<string, IEventHandler<TEvent>>;
+};
+
+/**
+ * Render-function/compiled-template equivalent of `v-on.stop`/`.prevent`/`.self`/etc. `fn` is
+ * typed as required, matching upstream Vue's own declaration — its runtime-only `!fn` guard below
+ * (for a compiler-generated call site that could pass a falsy handler) isn't reflected in the
+ * type there either.
+ */
+export function withModifiers<TEvent extends IModifierGuardableEvent>(
+  fn: IEventHandler<TEvent>,
+  modifiers: readonly IEventModifier[],
+): IEventHandler<TEvent> {
+  if (!fn) return fn;
+  const cache = fn._withMods ?? (fn._withMods = {});
+  const cacheKey = modifiers.join('.');
+  return (cache[cacheKey] ??= ((event: TEvent, ...args: never[]) => {
+    for (const modifier of modifiers) {
+      if (MODIFIER_GUARDS[modifier](event, modifiers)) return undefined;
+    }
+    return fn(event, ...args);
+  }) as IEventHandler<TEvent>);
+}
+
+const KEY_ALIASES: Record<string, string> = {
+  esc: 'escape',
+  space: ' ',
+  up: 'arrow-up',
+  left: 'arrow-left',
+  right: 'arrow-right',
+  down: 'arrow-down',
+  delete: 'backspace',
+};
+
+type IKeyedEvent = { key?: string };
+type IKeyedHandler<TEvent extends IKeyedEvent> = ((
+  event: TEvent,
+) => unknown) & {
+  _withKeys?: Record<string, (event: TEvent) => unknown>;
+};
+
+// \B (non-word-boundary), not a bare capture: without it, "Enter" hyphenates to "-enter" (a
+// leading dash) instead of "enter", since the very first character is otherwise still a match.
+function hyphenate(camelCase: string): string {
+  return camelCase.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+}
+
+/**
+ * Render-function/compiled-template equivalent of `v-on.enter`/`.esc`/etc. No-ops on any event
+ * without a `.key` field (e.g. Symbiote's Pressable `onPress`) — same as upstream Vue's own
+ * behavior on a non-keyboard DOM event, not a Symbiote-specific gap. `TextInput`'s `onKeyPress`
+ * carries `nativeEvent.key`, so that is the applicable Symbiote event shape.
+ */
+export function withKeys<TEvent extends IKeyedEvent>(
+  fn: IKeyedHandler<TEvent>,
+  modifiers: readonly string[],
+): (event: TEvent) => unknown {
+  const cache = fn._withKeys ?? (fn._withKeys = {});
+  const cacheKey = modifiers.join('.');
+  return (cache[cacheKey] ??= (event: TEvent) => {
+    if (event.key == null) return undefined;
+    const eventKey = hyphenate(event.key);
+    if (
+      modifiers.some(
+        modifier => modifier === eventKey || KEY_ALIASES[modifier] === eventKey,
+      )
+    ) {
+      return fn(event);
+    }
+    return undefined;
+  });
+}
+
+type ICssModuleMap = Record<string, Record<string, string>>;
+
+/**
+ * Reads the class map a `<style module>` SFC block compiles onto the component's own options
+ * (`__cssModules`, set by @symbiote-native/css-parser's SFC compiler — see the
+ * `symbiote-sfc-style-compiler` skill). Warns and returns an empty map exactly like upstream Vue
+ * does when the current component has no such block, rather than throwing.
+ */
+export function useCssModule(name: string = '$style'): Record<string, string> {
+  const instance = getCurrentInstance();
+  if (!instance) {
+    warn('useCssModule must be called inside setup()');
+    return {};
+  }
+  const modules = (instance.type as { __cssModules?: ICssModuleMap })
+    .__cssModules;
+  if (!modules) {
+    warn('Current instance does not have CSS modules injected.');
+    return {};
+  }
+  const cssModule = modules[name];
+  if (!cssModule) {
+    warn(`Current instance does not have CSS module named "${name}".`);
+    return {};
+  }
+  return cssModule;
+}

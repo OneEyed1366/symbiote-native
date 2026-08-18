@@ -32,6 +32,8 @@ import {
 import { View, Text } from '../../components';
 import { Image } from '../../components/image';
 import { ScrollView } from '../../components/scroll-view';
+import { FlatList } from '../../components/flat-list';
+import { SectionList } from '../../components/section-list';
 import { createAnimatedComponent } from './create-animated-component';
 
 export { createAnimatedComponent } from './create-animated-component';
@@ -42,13 +44,15 @@ const AnimatedView = createAnimatedComponent(View);
 const AnimatedText = createAnimatedComponent(Text);
 const AnimatedImage = createAnimatedComponent(Image);
 
-// LAZY, memoized getter, mirroring RN's `get ScrollView()`: ScrollView's module chain imports
-// this Animated namespace back (sticky headers), so a static createAnimatedComponent(ScrollView)
-// at init could read ScrollView inside its own TDZ. Deferring the wrap past module init avoids the cycle.
+// LAZY, memoized getters, mirroring RN's `get ScrollView()`. Every scrolling container reaches
+// scroll-view/sticky-header, which imports this Animated namespace back, so a wrap at module
+// scope captures whatever the half-evaluated cycle holds at that instant. Under a bundler's ESM
+// interop that is `undefined`, not a ReferenceError - the wrapper builds fine and then renders
+// nothing. Deferring past module init is what keeps it from firing. FlatList and SectionList
+// reach ScrollView through VirtualizedList, so they sit on the same cycle and take the same shape.
 let animatedScrollView: ReturnType<typeof createAnimatedComponent> | undefined;
-
-// Animated.FlatList / Animated.SectionList are intentionally OMITTED, not faked - a named gap,
-// not a silent drop.
+let animatedFlatList: ReturnType<typeof createAnimatedComponent> | undefined;
+let animatedSectionList: ReturnType<typeof createAnimatedComponent> | undefined;
 
 // The live, JS-driven driver namespace (real frames). RN's AnimatedImplementation.
 const liveDrivers = {
@@ -88,6 +92,14 @@ export const Animated = {
   get ScrollView(): ReturnType<typeof createAnimatedComponent> {
     animatedScrollView ??= createAnimatedComponent(ScrollView);
     return animatedScrollView;
+  },
+  get FlatList(): ReturnType<typeof createAnimatedComponent> {
+    animatedFlatList ??= createAnimatedComponent(FlatList);
+    return animatedFlatList;
+  },
+  get SectionList(): ReturnType<typeof createAnimatedComponent> {
+    animatedSectionList ??= createAnimatedComponent(SectionList);
+    return animatedSectionList;
   },
   createAnimatedComponent,
   ...drivers,

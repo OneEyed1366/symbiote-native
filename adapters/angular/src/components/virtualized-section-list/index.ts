@@ -64,7 +64,10 @@ import {
   type IVListSeparatorContext,
 } from '../virtualized-list';
 import { VListOutletDirective } from '../virtualized-list/directives';
-import { stableAnchorStyle, SymbioteStyleInputDirective } from '../../primitives';
+import {
+  stableAnchorStyle,
+  SymbioteStyleInputDirective,
+} from '../../primitives';
 import {
   VSectionFooterDirective,
   VSectionHeaderDirective,
@@ -92,7 +95,8 @@ export type { IVSectionContext, IVSectionItemContext } from './directives';
 // those are the per-adapter children/render fields and become `<ng-template>` directives in Angular.
 // Everything agnostic is the SAME surface as the
 // React/Vue adapters, including the a11y/aria prop family forwarded through VirtualizedList.
-export interface IVirtualizedSectionListProps<ItemT> extends IAccessibilityProps, IAriaProps {
+export interface IVirtualizedSectionListProps<ItemT>
+  extends IAccessibilityProps, IAriaProps {
   sections: ReadonlyArray<ISection<ItemT>>;
   keyExtractor?: (item: ItemT, index: number) => string;
   // Stick each section header to the top as the next section scrolls up. Routed to the inner
@@ -146,7 +150,9 @@ export type IVirtualizedSectionListInputs<ItemT> = Omit<
 @Component({
   selector: 'VirtualizedSectionList',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   imports: [
     VirtualizedList,
     VListItemDirective,
@@ -207,8 +213,12 @@ export type IVirtualizedSectionListInputs<ItemT> = Omit<
       [accessibilityElementsHidden]="accessibilityElementsHidden"
       [accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"
       [accessibilityLanguage]="accessibilityLanguage"
-      [accessibilityRespondsToUserInteraction]="accessibilityRespondsToUserInteraction"
-      [accessibilityShowsLargeContentViewer]="accessibilityShowsLargeContentViewer"
+      [accessibilityRespondsToUserInteraction]="
+        accessibilityRespondsToUserInteraction
+      "
+      [accessibilityShowsLargeContentViewer]="
+        accessibilityShowsLargeContentViewer
+      "
       [accessibilityLargeContentTitle]="accessibilityLargeContentTitle"
       (accessibilityAction)="resolvedOnAccessibilityAction?.($event)"
       (accessibilityTap)="resolvedOnAccessibilityTap?.($event)"
@@ -246,7 +256,9 @@ export type IVirtualizedSectionListInputs<ItemT> = Omit<
             ></ng-container>
           }
           @case ('section-separator') {
-            <ng-container [vListOutlet]="sectionSeparatorDir?.templateRef"></ng-container>
+            <ng-container
+              [vListOutlet]="sectionSeparatorDir?.templateRef"
+            ></ng-container>
           }
           @case ('item') {
             <ng-container
@@ -260,12 +272,16 @@ export type IVirtualizedSectionListInputs<ItemT> = Omit<
       <!-- list-level slots: forward the app's VirtualizedList directives to the inner list. -->
       @if (listHeaderDir !== undefined) {
         <ng-template vListHeader>
-          <ng-container [vListOutlet]="listHeaderDir.templateRef"></ng-container>
+          <ng-container
+            [vListOutlet]="listHeaderDir.templateRef"
+          ></ng-container>
         </ng-template>
       }
       @if (listFooterDir !== undefined) {
         <ng-template vListFooter>
-          <ng-container [vListOutlet]="listFooterDir.templateRef"></ng-container>
+          <ng-container
+            [vListOutlet]="listFooterDir.templateRef"
+          ></ng-container>
         </ng-template>
       }
       @if (listEmptyDir !== undefined) {
@@ -283,7 +299,9 @@ export type IVirtualizedSectionListInputs<ItemT> = Omit<
         >
           <ng-container
             [vListOutlet]="itemSeparatorDir.templateRef"
-            [vListOutletContext]="itemSeparatorContextOf(highlighted, leadingItem, trailingItem)"
+            [vListOutletContext]="
+              itemSeparatorContextOf(highlighted, leadingItem, trailingItem)
+            "
           ></ng-container>
         </ng-template>
       }
@@ -291,15 +309,22 @@ export type IVirtualizedSectionListInputs<ItemT> = Omit<
   `,
 })
 export class VirtualizedSectionList<ItemT = unknown>
-  implements IVirtualizedSectionListInputs<ItemT>, IVirtualizedSectionListHandle, DoCheck
+  implements
+    IVirtualizedSectionListInputs<ItemT>,
+    IVirtualizedSectionListHandle,
+    DoCheck
 {
   @Input({ required: true }) sections!: ReadonlyArray<ISection<ItemT>>;
   @Input() keyExtractor?: (item: ItemT, index: number) => string;
   @Input() stickySectionHeadersEnabled?: boolean;
   @Input() extraData?: unknown;
-  @Output() readonly endReached = new EventEmitter<{ distanceFromEnd: number }>();
+  @Output() readonly endReached = new EventEmitter<{
+    distanceFromEnd: number;
+  }>();
   @Input() onEndReachedThreshold?: number;
-  @Output() readonly startReached = new EventEmitter<{ distanceFromStart: number }>();
+  @Output() readonly startReached = new EventEmitter<{
+    distanceFromStart: number;
+  }>();
   @Input() onStartReachedThreshold?: number;
   @Output() readonly refresh = new EventEmitter<void>();
   @Input() refreshing?: boolean | null;
@@ -360,8 +385,10 @@ export class VirtualizedSectionList<ItemT = unknown>
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -393,20 +420,27 @@ export class VirtualizedSectionList<ItemT = unknown>
   // The section cell templates the app authors (the Angular twin of renderItem /
   // renderSectionHeader / renderSectionFooter / SectionSeparatorComponent), captured from projected
   // <ng-template> content and stamped by the synthesized vListItem dispatch.
-  @ContentChild(VSectionItemDirective) sectionItemDir?: VSectionItemDirective<ItemT>;
-  @ContentChild(VSectionHeaderDirective) sectionHeaderDir?: VSectionHeaderDirective<ItemT>;
-  @ContentChild(VSectionFooterDirective) sectionFooterDir?: VSectionFooterDirective<ItemT>;
-  @ContentChild(VSectionSeparatorDirective) sectionSeparatorDir?: VSectionSeparatorDirective;
+  @ContentChild(VSectionItemDirective)
+  sectionItemDir?: VSectionItemDirective<ItemT>;
+  @ContentChild(VSectionHeaderDirective)
+  sectionHeaderDir?: VSectionHeaderDirective<ItemT>;
+  @ContentChild(VSectionFooterDirective)
+  sectionFooterDir?: VSectionFooterDirective<ItemT>;
+  @ContentChild(VSectionSeparatorDirective)
+  sectionSeparatorDir?: VSectionSeparatorDirective;
 
   // list-level slots reuse VirtualizedList's own directives; VSL forwards them to the inner list.
   @ContentChild(VListHeaderDirective) listHeaderDir?: VListHeaderDirective;
   @ContentChild(VListFooterDirective) listFooterDir?: VListFooterDirective;
   @ContentChild(VListEmptyDirective) listEmptyDir?: VListEmptyDirective;
-  @ContentChild(VListSeparatorDirective) itemSeparatorDir?: VListSeparatorDirective<ItemT>;
+  @ContentChild(VListSeparatorDirective)
+  itemSeparatorDir?: VListSeparatorDirective<ItemT>;
 
   // The composed inner VirtualizedList. Its instance IS an IVirtualizedListHandle, so the section
   // handle delegates straight to it. Available from ngAfterViewInit; reads lazily, no-ops pre-commit.
-  @ViewChild(VirtualizedList) private list?: VirtualizedList<ISectionEntry<ItemT>>;
+  @ViewChild(VirtualizedList) private list?: VirtualizedList<
+    ISectionEntry<ItemT>
+  >;
 
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
   // onto (see anchorHostStyle's doc comment) — NOT `list` above, which targets the real inner
@@ -439,7 +473,10 @@ export class VirtualizedSectionList<ItemT = unknown>
     this.lastHasSectionSeparator = hasSectionSeparator;
 
     const sections = this.sections ?? [];
-    const { entries, headerIndices } = flattenSections(sections, hasSectionSeparator);
+    const { entries, headerIndices } = flattenSections(
+      sections,
+      hasSectionSeparator,
+    );
     this.flatEntries = entries;
     this.headerIndices = headerIndices;
 
@@ -458,7 +495,8 @@ export class VirtualizedSectionList<ItemT = unknown>
 
   // The derived flat-stream accessors handed to the inner VirtualizedList. Stable arrow fields so
   // the bindings keep a constant identity; they read the live flatEntries.
-  getEntry = (_source: unknown, index: number): ISectionEntry<ItemT> => this.flatEntries[index];
+  getEntry = (_source: unknown, index: number): ISectionEntry<ItemT> =>
+    this.flatEntries[index];
   getEntryCount = (): number => this.flatEntries.length;
   entryKeyExtractor = (entry: ISectionEntry<ItemT>, index: number): string =>
     sectionEntryKey(entry, index, this.keyExtractor);
@@ -467,33 +505,46 @@ export class VirtualizedSectionList<ItemT = unknown>
   // gated on `.observed` so an unlistened event forwards `undefined` — the same "nobody cares"
   // contract the old @Input() callback passthrough had (e.g. onRefresh presence gates whether a
   // RefreshControl is built downstream; see the Vue twin's `listens('onRefresh')` gate).
-  get resolvedOnEndReached(): ((info: { distanceFromEnd: number }) => void) | undefined {
-    return this.endReached.observed ? info => this.endReached.emit(info) : undefined;
+  get resolvedOnEndReached():
+    ((info: { distanceFromEnd: number }) => void) | undefined {
+    return this.endReached.observed
+      ? info => this.endReached.emit(info)
+      : undefined;
   }
 
-  get resolvedOnStartReached(): ((info: { distanceFromStart: number }) => void) | undefined {
-    return this.startReached.observed ? info => this.startReached.emit(info) : undefined;
+  get resolvedOnStartReached():
+    ((info: { distanceFromStart: number }) => void) | undefined {
+    return this.startReached.observed
+      ? info => this.startReached.emit(info)
+      : undefined;
   }
 
   get resolvedOnRefresh(): (() => void) | undefined {
     return this.refresh.observed ? () => this.refresh.emit() : undefined;
   }
 
-  get resolvedOnAccessibilityAction(): ((event: ISymbioteEvent) => void) | undefined {
+  get resolvedOnAccessibilityAction():
+    ((event: ISymbioteEvent) => void) | undefined {
     return this.accessibilityAction.observed
       ? event => this.accessibilityAction.emit(event)
       : undefined;
   }
 
-  get resolvedOnAccessibilityTap(): ((event: ISymbioteEvent) => void) | undefined {
-    return this.accessibilityTap.observed ? event => this.accessibilityTap.emit(event) : undefined;
+  get resolvedOnAccessibilityTap():
+    ((event: ISymbioteEvent) => void) | undefined {
+    return this.accessibilityTap.observed
+      ? event => this.accessibilityTap.emit(event)
+      : undefined;
   }
 
   get resolvedOnMagicTap(): ((event: ISymbioteEvent) => void) | undefined {
-    return this.magicTap.observed ? event => this.magicTap.emit(event) : undefined;
+    return this.magicTap.observed
+      ? event => this.magicTap.emit(event)
+      : undefined;
   }
 
-  get resolvedOnAccessibilityEscape(): ((event: ISymbioteEvent) => void) | undefined {
+  get resolvedOnAccessibilityEscape():
+    ((event: ISymbioteEvent) => void) | undefined {
     return this.accessibilityEscape.observed
       ? event => this.accessibilityEscape.emit(event)
       : undefined;
@@ -516,7 +567,10 @@ export class VirtualizedSectionList<ItemT = unknown>
     return { $implicit: value.section, section: value.section };
   }
 
-  itemContextOf(value: unknown, separators: ISeparators): IVSectionItemContext<ItemT> | undefined {
+  itemContextOf(
+    value: unknown,
+    separators: ISeparators,
+  ): IVSectionItemContext<ItemT> | undefined {
     if (!this.isEntry(value) || value.kind !== 'item') return undefined;
     return {
       $implicit: value.item,
@@ -539,8 +593,12 @@ export class VirtualizedSectionList<ItemT = unknown>
     return {
       $implicit: highlighted === true,
       highlighted: highlighted === true,
-      leadingItem: this.isEntry(leadingItem) ? unwrapEntryItem(leadingItem) : undefined,
-      trailingItem: this.isEntry(trailingItem) ? unwrapEntryItem(trailingItem) : undefined,
+      leadingItem: this.isEntry(leadingItem)
+        ? unwrapEntryItem(leadingItem)
+        : undefined,
+      trailingItem: this.isEntry(trailingItem)
+        ? unwrapEntryItem(trailingItem)
+        : undefined,
     };
   }
 

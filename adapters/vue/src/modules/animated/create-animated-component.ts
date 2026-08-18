@@ -33,7 +33,10 @@ const PASSTHROUGH_PROP = 'passthroughAnimatedPropExplicitValues';
 // Reads either a functional component's or a stateful defineComponent's display name, without a
 // cast, for the wrapper's devtools name.
 function baseName(component: Component): string {
-  if (component === null || (typeof component !== 'function' && typeof component !== 'object')) {
+  if (
+    component === null ||
+    (typeof component !== 'function' && typeof component !== 'object')
+  ) {
     return 'Anonymous';
   }
   const display = Reflect.get(component, 'displayName');
@@ -90,12 +93,17 @@ export function createAnimatedComponent(Component: Component) {
         new Proxy(Object.create(null), {
           get: (_target, key): unknown => {
             const instance = instanceRef.value;
-            if (instance === null || typeof instance !== 'object') return undefined;
+            if (instance === null || typeof instance !== 'object')
+              return undefined;
             return Reflect.get(instance, key);
           },
           has: (_target, key): boolean => {
             const instance = instanceRef.value;
-            return instance !== null && typeof instance === 'object' && Reflect.has(instance, key);
+            return (
+              instance !== null &&
+              typeof instance === 'object' &&
+              Reflect.has(instance, key)
+            );
           },
         }),
       );
@@ -126,14 +134,15 @@ export function createAnimatedComponent(Component: Component) {
         const passthroughStyle = readPassthroughStyle(passthrough);
         if (passthroughStyle !== undefined) {
           reduced.style =
-            reduced.style === undefined ? passthroughStyle : [reduced.style, passthroughStyle];
+            reduced.style === undefined
+              ? passthroughStyle
+              : [reduced.style, passthroughStyle];
         }
         reduced.ref = captureRef;
-        return h(
-          Component,
-          reduced,
-          slots.default !== undefined ? { default: slots.default } : undefined,
-        );
+        // Forward the WHOLE slots object, not just `default`: the list containers take their
+        // content through named scoped slots (`item`, `sectionHeader`, ...), which a default-only
+        // forward drops silently - Animated.FlatList would commit empty cells.
+        return h(Component, reduced, slots);
       };
     },
   });

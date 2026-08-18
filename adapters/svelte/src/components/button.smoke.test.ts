@@ -34,13 +34,26 @@ import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
 const ROOT_TAG = 91_004;
-const PRESSABLE_OUT = join(__dirname, 'pressable', '.smoke-compiled-pressable.mjs');
+// A name distinct from pressable.smoke.test.ts's own `.smoke-compiled-pressable.mjs` in that SAME
+// directory — Vitest runs test files concurrently, and that suite deletes its copy in afterEach
+// while also rewriting it with a `disabled` variant mid-run. Sharing the path meant this suite
+// could import a file the other one had just removed or replaced. Same reasoning, and the same
+// `-for-<consumer>` spelling, as flat-list.smoke.test.ts's LIST_OUT.
+const PRESSABLE_OUT = join(
+  __dirname,
+  'pressable',
+  '.smoke-compiled-pressable-for-button.mjs',
+);
+// TouchableOpacity's feedback node is an Animated.View wrapping the real View.svelte, so View
+// has to be compiled here too — `-for-button` for the same concurrency reason as PRESSABLE_OUT.
+const VIEW_OUT = join(__dirname, '.smoke-compiled-view-for-button.mjs');
 const TOUCHABLE_OPACITY_OUT = join(
   __dirname,
   'touchable-opacity',
@@ -49,22 +62,62 @@ const TOUCHABLE_OPACITY_OUT = join(
 const BUTTON_OUT = join(__dirname, '.smoke-compiled-button.mjs');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
+
+// TouchableOpacity's press feedback is a real Animated.timing (RN's own), and the drivers read
+// requestAnimationFrame off the host at call time, THROWING when it is absent
+// (core/engine/src/animated/animations/raf.ts). A setTimeout-backed frame is enough here: this
+// suite asserts the composition chain and the press callbacks, never the fade's own values.
+const pendingFrames = new Map<number, (time: number) => void>();
+let nextFrameId = 1;
+
+function installRequestAnimationFrame(): void {
+  Object.assign(globalThis, {
+    requestAnimationFrame(callback: (time: number) => void): number {
+      const id = nextFrameId++;
+      pendingFrames.set(id, callback);
+      setTimeout(() => {
+        const frame = pendingFrames.get(id);
+        if (frame === undefined) return;
+        pendingFrames.delete(id);
+        frame(id * 16);
+      }, 0);
+      return id;
+    },
+    cancelAnimationFrame(id: number): void {
+      pendingFrames.delete(id);
+    },
+  });
+}
 
 beforeEach(() => {
   fabric.reset();
+  pendingFrames.clear();
+  installRequestAnimationFrame();
 });
 
 afterEach(() => {
   unmount(ROOT_TAG);
+  Reflect.deleteProperty(globalThis, 'requestAnimationFrame');
+  Reflect.deleteProperty(globalThis, 'cancelAnimationFrame');
   rmSync(PRESSABLE_OUT, { force: true });
+  rmSync(VIEW_OUT, { force: true });
   rmSync(TOUCHABLE_OPACITY_OUT, { force: true });
   rmSync(BUTTON_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
@@ -79,13 +132,30 @@ async function loadButton(): Promise<Component> {
     'Pressable.svelte',
     PRESSABLE_OUT,
   );
+  compileToFile(
+    readFileSync(join(__dirname, 'View.svelte'), 'utf8'),
+    'View.svelte',
+    VIEW_OUT,
+  );
   const touchableOpacitySource = readFileSync(
     join(__dirname, 'touchable-opacity', 'index.svelte'),
     'utf8',
-  ).replace("'../pressable/index.svelte'", "'../pressable/.smoke-compiled-pressable.mjs'");
-  compileToFile(touchableOpacitySource, 'TouchableOpacity.svelte', TOUCHABLE_OPACITY_OUT);
+  )
+    .replace(
+      "'../pressable/index.svelte'",
+      "'../pressable/.smoke-compiled-pressable-for-button.mjs'",
+    )
+    .replace("'../View.svelte'", "'../.smoke-compiled-view-for-button.mjs'");
+  compileToFile(
+    touchableOpacitySource,
+    'TouchableOpacity.svelte',
+    TOUCHABLE_OPACITY_OUT,
+  );
 
-  const buttonSource = readFileSync(join(__dirname, 'button.svelte'), 'utf8').replace(
+  const buttonSource = readFileSync(
+    join(__dirname, 'button.svelte'),
+    'utf8',
+  ).replace(
     "'./touchable-opacity/index.svelte'",
     "'./touchable-opacity/.smoke-compiled-touchable-opacity.mjs'",
   );
@@ -106,7 +176,11 @@ function responderHandle(): unknown {
   const view = fabric.find(n => {
     if (n.viewName !== 'RCTView') return false;
     const handle = n.instanceHandle;
-    return isRecord(handle) && handle.listeners instanceof Map && handle.listeners.has('press');
+    return (
+      isRecord(handle) &&
+      handle.listeners instanceof Map &&
+      handle.listeners.has('press')
+    );
   });
   if (view === undefined) throw new Error('no Button responder RCTView found');
   return view.instanceHandle;
@@ -151,7 +225,11 @@ describe('Button (real compiled button.svelte -> TouchableOpacity -> Pressable)'
     // accessibility spread, so a caller cannot accidentally clobber them.
     it('gives the responder role=button, accessible, and a disabled a11y state', async () => {
       const Button = await loadButton();
-      mount(ROOT_TAG, Button, { title: 'Go', disabled: true, onPress: () => {} });
+      mount(ROOT_TAG, Button, {
+        title: 'Go',
+        disabled: true,
+        onPress: () => {},
+      });
       await tick();
       await tick();
 

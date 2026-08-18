@@ -20,7 +20,8 @@ interface IFakeNode {
 
 let committed: IFakeNode[] = [];
 let eventHandler:
-  ((handle: unknown, type: string, event: Record<string, unknown>) => void) | undefined;
+  | ((handle: unknown, type: string, event: Record<string, unknown>) => void)
+  | undefined;
 
 // Fabric-faithful merge: raw props layer onto the node's current props; a null value
 // resets that prop to its default (modelled here as removal).
@@ -43,14 +44,28 @@ const slot = {
     _r: number,
     props: Record<string, unknown>,
     instanceHandle: unknown,
-  ): IFakeNode => ({ viewName, props: { ...props }, children: [], instanceHandle }),
-  cloneNodeWithNewProps: (node: IFakeNode, raw: Record<string, unknown>): IFakeNode => ({
+  ): IFakeNode => ({
+    viewName,
+    props: { ...props },
+    children: [],
+    instanceHandle,
+  }),
+  cloneNodeWithNewProps: (
+    node: IFakeNode,
+    raw: Record<string, unknown>,
+  ): IFakeNode => ({
     ...node,
     props: mergeProps(node.props, raw),
     children: [...node.children],
   }),
-  cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({ ...node, children: [] }),
-  cloneNodeWithNewChildrenAndProps: (node: IFakeNode, raw: Record<string, unknown>): IFakeNode => ({
+  cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({
+    ...node,
+    children: [],
+  }),
+  cloneNodeWithNewChildrenAndProps: (
+    node: IFakeNode,
+    raw: Record<string, unknown>,
+  ): IFakeNode => ({
     ...node,
     props: mergeProps(node.props, raw),
     children: [],
@@ -67,7 +82,11 @@ const slot = {
     committed = childSet;
   },
   registerEventHandler: (
-    handler: (handle: unknown, type: string, event: Record<string, unknown>) => void,
+    handler: (
+      handle: unknown,
+      type: string,
+      event: Record<string, unknown>,
+    ) => void,
   ): void => {
     eventHandler = handler;
   },
@@ -92,11 +111,14 @@ function App(): ReactElement {
         testID: TEST_ID,
         onPress: () => setOpen(true),
         // pressed -> dim; released -> NO opacity key at all (TouchableOpacity's shape).
-        style: ({ pressed }: { pressed: boolean }) => (pressed ? { opacity: ACTIVE_OPACITY } : {}),
+        style: ({ pressed }: { pressed: boolean }) =>
+          pressed ? { opacity: ACTIVE_OPACITY } : {},
       },
       createElement(Text, null, 'tap'),
     ),
-    open ? createElement(View, null, createElement(Text, null, 'opened')) : null,
+    open
+      ? createElement(View, null, createElement(Text, null, 'opened'))
+      : null,
   );
 }
 
@@ -129,7 +151,9 @@ describe('clone-on-write prop removal', () => {
       const handle = button!.instanceHandle;
 
       eventHandler!(handle, 'topTouchStart', {});
-      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(ACTIVE_OPACITY);
+      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
+        ACTIVE_OPACITY,
+      );
 
       eventHandler!(handle, 'topTouchEnd', {});
       // The whole point: opacity must be GONE (reset), not stuck at 0.2 after the merge.

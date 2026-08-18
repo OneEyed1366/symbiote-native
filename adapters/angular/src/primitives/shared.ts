@@ -61,7 +61,9 @@ function isStyleValue<T>(value: unknown): value is IStyleProp<T> {
   );
 }
 
-export function anchorStyleProp<T>(elementRef: ElementRef<unknown>): IStyleProp<T> | undefined {
+export function anchorStyleProp<T>(
+  elementRef: ElementRef<unknown>,
+): IStyleProp<T> | undefined {
   const value = anchorHostStyle(elementRef);
   return isStyleValue<T>(value) ? value : undefined;
 }
@@ -70,7 +72,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function shallowStyleEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+function shallowStyleEqual(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): boolean {
   const aKeys = Object.keys(a);
   if (aKeys.length !== Object.keys(b).length) return false;
   return aKeys.every(key => a[key] === b[key]);
@@ -97,7 +102,9 @@ export function stableAnchorStyle(
   previous: unknown,
 ): Record<string, unknown> {
   const next = flattenStyle([anchorHostStyle(elementRef), explicitStyle]);
-  return isRecord(previous) && shallowStyleEqual(previous, next) ? previous : next;
+  return isRecord(previous) && shallowStyleEqual(previous, next)
+    ? previous
+    : next;
 }
 
 const ON_PREFIX = /^on[A-Z]/;
@@ -178,7 +185,9 @@ export class SymbioteStyleInputDirective implements DoCheck, OnChanges {
 // above into a CD loop.
 function isAnchorStyleUnchanged(previous: unknown, next: unknown): boolean {
   if (Object.is(previous, next)) return true;
-  return isRecord(previous) && isRecord(next) && shallowStyleEqual(previous, next);
+  return (
+    isRecord(previous) && isRecord(next) && shallowStyleEqual(previous, next)
+  );
 }
 
 /**
@@ -210,8 +219,18 @@ export abstract class SymbiotePrimitiveHost implements OnChanges {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!('style' in changes)) return;
-    const value = this.style === undefined ? undefined : flattenStyle(this.style);
-    this.renderer.setProperty(this.elementRef.nativeElement, 'style', value);
+    const value =
+      this.style === undefined ? undefined : flattenStyle(this.style);
+    this.setHostProp('style', value);
+  }
+
+  /**
+   * Push one resolved prop onto the host element. `protected` rather than exposing the injected
+   * Renderer2/ElementRef, so a subclass applying its own defaults (TextHost) uses the same single
+   * write path this base already uses for `style`.
+   */
+  protected setHostProp(key: string, value: unknown): void {
+    this.renderer.setProperty(this.elementRef.nativeElement, key, value);
   }
 }
 
@@ -246,7 +265,10 @@ export class SymbioteHostPropsDirective {
   // Reference stability is the point, not just the allocation: a fresh function on every push
   // defeats every downstream identity check on the bag, so nothing upstream could ever conclude
   // "this bag is unchanged" while a callback prop was in it.
-  private readonly wrappers = new WeakMap<object, (...args: unknown[]) => unknown>();
+  private readonly wrappers = new WeakMap<
+    object,
+    (...args: unknown[]) => unknown
+  >();
 
   get node(): unknown {
     return this.elementRef.nativeElement;
@@ -254,7 +276,11 @@ export class SymbioteHostPropsDirective {
 
   set symbioteHostProps(props: Record<string, unknown>) {
     for (const [key, value] of Object.entries(props)) {
-      this.renderer.setProperty(this.elementRef.nativeElement, key, this.wrapCallback(key, value));
+      this.renderer.setProperty(
+        this.elementRef.nativeElement,
+        key,
+        this.wrapCallback(key, value),
+      );
     }
   }
 

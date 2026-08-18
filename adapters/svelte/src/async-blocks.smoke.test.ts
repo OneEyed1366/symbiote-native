@@ -25,7 +25,8 @@ import type { Component } from 'svelte';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -35,7 +36,8 @@ const TMP_DIR = join(__dirname, '../build/__async_smoke__');
 const AWAITING_CHILD_MODULE = 'awaiting-child.mjs';
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -49,7 +51,11 @@ afterEach(() => {
 
 let compileCounter = 0;
 
-function compileToFile(source: string, name: string, fileName?: string): string {
+function compileToFile(
+  source: string,
+  name: string,
+  fileName?: string,
+): string {
   const result = compile(source, {
     generate: 'client',
     filename: `${name}.svelte`,
@@ -58,12 +64,18 @@ function compileToFile(source: string, name: string, fileName?: string): string 
     experimental: { async: true },
   });
   compileCounter += 1;
-  const file = join(TMP_DIR, fileName ?? `${name}-${String(compileCounter)}.mjs`);
+  const file = join(
+    TMP_DIR,
+    fileName ?? `${name}-${String(compileCounter)}.mjs`,
+  );
   writeFileSync(file, result.js.code);
   return file;
 }
 
-async function compileComponent(source: string, name: string): Promise<Component> {
+async function compileComponent(
+  source: string,
+  name: string,
+): Promise<Component> {
   const file = compileToFile(source, name);
   const mod: unknown = await import(`file://${file}`);
   if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
@@ -71,7 +83,9 @@ async function compileComponent(source: string, name: string): Promise<Component
   }
   const component: unknown = mod.default;
   if (typeof component !== 'function') {
-    throw new Error(`compiled ${name}.svelte default export is not a component`);
+    throw new Error(
+      `compiled ${name}.svelte default export is not a component`,
+    );
   }
   return component;
 }
@@ -119,7 +133,10 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
 
     const first = deferred();
     const second = deferred();
-    const control: { initial: Promise<string>; swap: (next: Promise<string>) => void } = {
+    const control: {
+      initial: Promise<string>;
+      swap: (next: Promise<string>) => void;
+    } = {
       initial: first.promise,
       swap: () => {},
     };
@@ -132,7 +149,9 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     await tick();
     await tick();
     expect(testIds()).toEqual(['then']);
-    expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "one"))');
+    expect(fabric.serialize(appChildren())).toBe(
+      'RCTView(RCTText(RCTRawText "one"))',
+    );
 
     // Back to pending, then forward again — each transition now runs inside an effect that has
     // already fired once, which is exactly the `REACTION_RAN` condition should_defer_append()
@@ -146,7 +165,9 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     await tick();
     await tick();
     expect(testIds()).toEqual(['then']);
-    expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "two"))');
+    expect(fabric.serialize(appChildren())).toBe(
+      'RCTView(RCTText(RCTRawText "two"))',
+    );
   });
 
   // why: a top-level `await` inside a boundary must render into the live anchor, get moved
@@ -189,7 +210,9 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     // Only the pending snippet may be committed: the child's own nodes were built, then moved
     // offscreen, and must not still be in the native tree.
     expect(testIds()).toEqual(['pending']);
-    expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "loading"))');
+    expect(fabric.serialize(appChildren())).toBe(
+      'RCTView(RCTText(RCTRawText "loading"))',
+    );
 
     gate.resolve('resolved');
     await tick();
@@ -198,7 +221,9 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
 
     // Exactly one child, once — not the child twice, and not pending plus child.
     expect(testIds()).toEqual(['child']);
-    expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "resolved"))');
+    expect(fabric.serialize(appChildren())).toBe(
+      'RCTView(RCTText(RCTRawText "resolved"))',
+    );
   });
 
   // why: a sibling that already committed synchronously must ALSO be genuinely removed from the

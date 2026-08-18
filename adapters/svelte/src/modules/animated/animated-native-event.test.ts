@@ -29,7 +29,8 @@ import { AnimatedValue, event as animatedEvent } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -60,7 +61,9 @@ const fakeNativeAnimated = {
   setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
   flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
   extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-  startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
+  startListeningToAnimatedNodeValue: record(
+    'startListeningToAnimatedNodeValue',
+  ),
   stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
   getValue: record('getValue'),
   addAnimatedEventToView: record('addAnimatedEventToView'),
@@ -73,7 +76,8 @@ Object.assign(globalThis, {
 const fabric = installFabric();
 const ROOT_TAG = 91_102;
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 // fabric.find() walks the CREATION log, which never reflects a later clone's props
 // (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must
@@ -82,7 +86,10 @@ const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0))
 // root-element.ts's own mount target is ITSELF an unlabeled `symbiote-view` (RCTView, {}
 // props), sitting between the AppContainer and AnimatedView's real host node — so the search
 // must key on a prop only our own AnimatedView carries (testID), not the generic viewName.
-function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeNode | undefined {
+function findLive(
+  node: IFakeNode,
+  predicate: (n: IFakeNode) => boolean,
+): IFakeNode | undefined {
   if (predicate(node)) return node;
   for (const child of node.children) {
     const found = findLive(child, predicate);
@@ -92,8 +99,12 @@ function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeN
 }
 
 function animatedViewNode(): IFakeNode {
-  const node = findLive(fabric.appRoot(), n => n.props.testID === 'animated-event-box');
-  if (node === undefined) throw new Error('no node with testID="animated-event-box" committed');
+  const node = findLive(
+    fabric.appRoot(),
+    n => n.props.testID === 'animated-event-box',
+  );
+  if (node === undefined)
+    throw new Error('no node with testID="animated-event-box" committed');
   return node;
 }
 
@@ -101,22 +112,37 @@ function callsOf(method: string): INativeCall[] {
   return nativeCalls.filter(call => call.method === method);
 }
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
-const VIEW_OUT = join(__dirname, '.smoke-compiled-animated-view-event.mjs');
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
+const COMPONENTS_DIR = join(__dirname, '..', '..', 'components');
+// The compiled base sits NEXT TO its real source, so its own relative imports resolve.
+const VIEW_OUT = join(
+  COMPONENTS_DIR,
+  '.smoke-compiled-animated-view-event.mjs',
+);
 const PARENT_OUT = join(__dirname, '.smoke-compiled-event-parent.mjs');
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
 
 async function loadParent(): Promise<Component> {
-  const viewSource = readFileSync(join(__dirname, 'AnimatedView.svelte'), 'utf8');
-  compileToFile(viewSource, 'AnimatedView.svelte', VIEW_OUT);
+  const viewSource = readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8');
+  compileToFile(viewSource, 'View.svelte', VIEW_OUT);
 
   compileToFile(
     `<script>
-       import AnimatedView from './.smoke-compiled-animated-view-event.mjs';
+       import View from '../../components/.smoke-compiled-animated-view-event.mjs';
+       import { createAnimatedComponent } from './create-animated-component';
+       const AnimatedView = createAnimatedComponent(View);
        let { style, onScroll } = $props();
      </script>
      <AnimatedView {style} {onScroll} testID="animated-event-box" />`,
@@ -152,16 +178,21 @@ describe('Animated.View (real compiled source) native event (Positive)', () => {
 
     mount(ROOT_TAG, EventParent, {
       style: { height: 10 },
-      onScroll: animatedEvent([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-        useNativeDriver: true,
-      }),
+      onScroll: animatedEvent(
+        [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+        {
+          useNativeDriver: true,
+        },
+      ),
     });
     await tick();
     await tick();
 
     const attach = callsOf('addAnimatedEventToView');
     expect(attach, 'the native event attaches to the view').toHaveLength(1);
-    expect(attach[0].args[0], 'bound to the committed view tag').toBe(animatedViewNode().tag);
+    expect(attach[0].args[0], 'bound to the committed view tag').toBe(
+      animatedViewNode().tag,
+    );
     expect(attach[0].args[1]).toBe('onScroll');
   });
 });

@@ -37,10 +37,15 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import {
+  installFabric,
+  type IFakeNode,
+  waitUntil,
+} from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -54,10 +59,14 @@ const PARENT_OUT = join(__dirname, '.smoke-compiled-parent.mjs');
 // Node's import() caches by resolved file path (svelte-adapter-dom-shim skill §15) — the
 // disabled-parent scenario bakes DIFFERENT markup into the compiled string, so it needs its own
 // output path or it would silently re-import PARENT_OUT's earlier cached module.
-const DISABLED_PARENT_OUT = join(__dirname, '.smoke-compiled-parent-disabled.mjs');
+const DISABLED_PARENT_OUT = join(
+  __dirname,
+  '.smoke-compiled-parent-disabled.mjs',
+);
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -70,9 +79,17 @@ afterEach(() => {
   rmSync(DISABLED_PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
@@ -118,9 +135,14 @@ function responderHandle(): unknown {
   const view = fabric.find(n => {
     if (n.viewName !== 'RCTView') return false;
     const handle = n.instanceHandle;
-    return isRecord(handle) && handle.listeners instanceof Map && handle.listeners.has('press');
+    return (
+      isRecord(handle) &&
+      handle.listeners instanceof Map &&
+      handle.listeners.has('press')
+    );
   });
-  if (view === undefined) throw new Error('no Pressable responder RCTView found');
+  if (view === undefined)
+    throw new Error('no Pressable responder RCTView found');
   return view.instanceHandle;
 }
 
@@ -144,7 +166,9 @@ function findInTree(
 function innerTestID(): unknown {
   const view = findInTree(
     fabric.appRoot(),
-    n => n.viewName === 'RCTView' && (n.props.testID === 'pressed' || n.props.testID === 'idle'),
+    n =>
+      n.viewName === 'RCTView' &&
+      (n.props.testID === 'pressed' || n.props.testID === 'idle'),
   );
   return view?.props.testID;
 }
@@ -180,18 +204,17 @@ describe('Pressable (real compiled index.svelte)', () => {
       const handle = responderHandle();
       expect(handle).toBeDefined();
 
+      // Wait on the EVENT, not on a tick count. The press machine defers pressOut by
+      // minPressDuration, so "two macrotasks" was a proxy that held only on an idle machine; under
+      // a loaded full-suite run it read as a press that produced nothing.
       fabric.fireEvent(handle, 'topTouchStart');
-      await tick();
-      await tick();
-      expect(pressIns).toBe(1);
+      await waitUntil(() => pressIns === 1, 'onPressIn after topTouchStart');
       expect(presses).toBe(0);
       expect(pressOuts).toBe(0);
 
       fabric.fireEvent(handle, 'topTouchEnd');
-      await tick();
-      await tick();
+      await waitUntil(() => presses === 1, 'onPress after topTouchEnd');
       expect(pressOuts).toBe(1);
-      expect(presses).toBe(1);
     });
 
     // why: proves the `IPressHost.setPressed` bridge actually reaches the parameterized
@@ -199,7 +222,11 @@ describe('Pressable (real compiled index.svelte)', () => {
     // with no equivalent in the framework-agnostic press-machine's own unit tests.
     it('flips the scoped-slot `pressed` state across the press-in/press-out cycle', async () => {
       const Parent = await loadMountable();
-      mount(ROOT_TAG, Parent, { onPress: () => {}, onPressIn: () => {}, onPressOut: () => {} });
+      mount(ROOT_TAG, Parent, {
+        onPress: () => {},
+        onPressIn: () => {},
+        onPressOut: () => {},
+      });
       await tick();
       await tick();
 
@@ -207,14 +234,16 @@ describe('Pressable (real compiled index.svelte)', () => {
 
       const handle = responderHandle();
       fabric.fireEvent(handle, 'topTouchStart');
-      await tick();
-      await tick();
-      expect(innerTestID()).toBe('pressed');
+      await waitUntil(
+        () => innerTestID() === 'pressed',
+        'scoped slot turns pressed',
+      );
 
       fabric.fireEvent(handle, 'topTouchEnd');
-      await tick();
-      await tick();
-      expect(innerTestID()).toBe('idle');
+      await waitUntil(
+        () => innerTestID() === 'idle',
+        'scoped slot returns to idle',
+      );
     });
 
     // why: closes the gap noted in the ledger above — `buildPressableListeners` and
@@ -223,7 +252,10 @@ describe('Pressable (real compiled index.svelte)', () => {
     // accessibilityState.disabled — RN's own contract for a disabled interactive element.
     it('suppresses the responder and folds accessibilityState.disabled when disabled', async () => {
       let presses = 0;
-      const disabledSource = readFileSync(join(__dirname, 'index.svelte'), 'utf8');
+      const disabledSource = readFileSync(
+        join(__dirname, 'index.svelte'),
+        'utf8',
+      );
       compileToFile(disabledSource, 'Pressable.svelte', PRESSABLE_OUT);
       compileToFile(
         `<script>
@@ -261,7 +293,9 @@ describe('Pressable (real compiled index.svelte)', () => {
       // nothing here.
       const handle = view?.instanceHandle;
       expect(
-        isRecord(handle) && handle.listeners instanceof Map && handle.listeners.has('press'),
+        isRecord(handle) &&
+          handle.listeners instanceof Map &&
+          handle.listeners.has('press'),
       ).toBe(false);
 
       fabric.fireEvent(handle, 'topTouchStart');

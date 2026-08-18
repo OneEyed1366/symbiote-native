@@ -46,7 +46,10 @@ import {
   type IAriaProps,
 } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
-import { wrapStickyHeaders, type IStickyHeaderComponentType } from './sticky-header';
+import {
+  wrapStickyHeaders,
+  type IStickyHeaderComponentType,
+} from './sticky-header';
 
 export type { IScrollViewHandle } from '@symbiote-native/components';
 
@@ -68,7 +71,12 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   bounces?: boolean;
   decelerationRate?: 'normal' | 'fast' | number;
   scrollEventThrottle?: number;
-  contentInset?: { top?: number; left?: number; bottom?: number; right?: number };
+  contentInset?: {
+    top?: number;
+    left?: number;
+    bottom?: number;
+    right?: number;
+  };
   contentOffset?: { x: number; y: number };
   refreshControl?: ReactElement<IClonableRefreshControl>;
   removeClippedSubviews?: boolean;
@@ -107,11 +115,17 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   alwaysBounceHorizontal?: boolean;
   alwaysBounceVertical?: boolean;
   centerContent?: boolean;
-  scrollIndicatorInsets?: { top?: number; left?: number; bottom?: number; right?: number };
+  scrollIndicatorInsets?: {
+    top?: number;
+    left?: number;
+    bottom?: number;
+    right?: number;
+  };
   indicatorStyle?: 'default' | 'black' | 'white';
   directionalLockEnabled?: boolean;
   automaticallyAdjustKeyboardInsets?: boolean;
-  contentInsetAdjustmentBehavior?: 'automatic' | 'scrollableAxes' | 'never' | 'always';
+  contentInsetAdjustmentBehavior?:
+    'automatic' | 'scrollableAxes' | 'never' | 'always';
   minimumZoomScale?: number;
   maximumZoomScale?: number;
   zoomScale?: number;
@@ -178,7 +192,9 @@ export interface IPreparedScrollView {
   nativeStickyAvailable: boolean;
 }
 
-export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScrollView {
+export function usePreparedScrollView(
+  rawProps: IScrollViewProps,
+): IPreparedScrollView {
   // ScrollView forwards its outer props straight to the native scroll view (not a View
   // wrapper), so it folds aria/role into accessibility* here before forwarding.
   const props = resolveAccessibilityProps(rawProps);
@@ -201,7 +217,8 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
   } = props;
 
   const isHorizontal = horizontal === true;
-  const hasStickyHeaders = stickyHeaderIndices !== undefined && stickyHeaderIndices.length > 0;
+  const hasStickyHeaders =
+    stickyHeaderIndices !== undefined && stickyHeaderIndices.length > 0;
 
   // A single AnimatedValue tracks the scroll offset and drives every sticky header's
   // translateY (RN's _scrollAnimatedValue). Stable across renders via a ref so the headers'
@@ -213,7 +230,9 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
   const scrollAnimatedValue = scrollAnimatedValueRef.current;
   // Inverted sticky headers stick to the BOTTOM, so they need the viewport height (RN reads
   // it in _handleLayout). Tracked here and fed back into the wrapped headers.
-  const [viewportHeight, setViewportHeight] = useState<number | undefined>(undefined);
+  const [viewportHeight, setViewportHeight] = useState<number | undefined>(
+    undefined,
+  );
 
   // Sticky-header cross-talk (RN ScrollView.js _headerLayoutYs, line 754): a child-index→measured-y
   // map the parent keeps so each header can learn where the NEXT sticky header starts (its push-off
@@ -241,8 +260,12 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
   // The per-axis intrinsics, base style, and content style come from the shared selector
   // (@symbiote-native/components): on Android horizontal resolves to its own ViewManager, on iOS both
   // map back to RCTScrollView; here we only pass the axis.
-  const { scrollViewIntrinsic, contentIntrinsic, scrollViewBaseStyle, contentStyle } =
-    selectScrollIntrinsics(isHorizontal, resolvedContentContainerStyle);
+  const {
+    scrollViewIntrinsic,
+    contentIntrinsic,
+    scrollViewBaseStyle,
+    contentStyle,
+  } = selectScrollIntrinsics(isHorizontal, resolvedContentContainerStyle);
 
   const outerProps: Record<string, unknown> = { ...outer };
   // className is pulled out above (unlike the rest of `...outer`) so `layoutSplitStyle` below can
@@ -310,8 +333,13 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
   // onContentSizeChange is synthesized from the content view's own onLayout (RN
   // _handleContentOnLayout): read width/height off nativeEvent.layout and fire only when the
   // size actually changed (dedupe via a ref, like RN). Composed with any content onLayout.
-  const lastContentSizeRef = useRef<{ width: number; height: number } | null>(null);
-  const contentProps: Record<string, unknown> = { style: contentStyle, collapsable: false };
+  const lastContentSizeRef = useRef<{ width: number; height: number } | null>(
+    null,
+  );
+  const contentProps: Record<string, unknown> = {
+    style: contentStyle,
+    collapsable: false,
+  };
   // maintainVisibleContentPosition (and Android snapToAlignment) anchor against the metrics
   // of MOUNTED cell views. Android Fabric view-flattens layout-only cells away, so the native
   // MaintainVisibleScrollPositionHelper has nothing to anchor to and the list jumps on prepend.
@@ -355,11 +383,18 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
   // its own NativeScrollContentView the same way (ScrollView.js, collapsable={false};
   // ReactScrollView.java: "the 'content' View … non-collapsable so it will never be
   // View-flattened away"). iOS doesn't flatten, so this is a no-op there.
-  const content = createElement(contentIntrinsic, contentProps, contentChildren);
+  const content = createElement(
+    contentIntrinsic,
+    contentProps,
+    contentChildren,
+  );
 
   // resolveClassName(undefined) is a cheap {} no-op, so this is safe with no className too.
   const resolvedClassName = isClassNameValue(className) ? className : undefined;
-  const layoutSplitStyle: IStyleProp<IViewStyle> = [resolveClassName(resolvedClassName), style];
+  const layoutSplitStyle: IStyleProp<IViewStyle> = [
+    resolveClassName(resolvedClassName),
+    style,
+  ];
 
   return {
     scrollViewIntrinsic,

@@ -37,7 +37,9 @@ function imageNode(): IFakeNode {
 
 beforeEach(() => {
   fabric.reset();
-  setImageSourceResolver(source => (source === ASSET_ID ? RESOLVED_ASSET : source));
+  setImageSourceResolver(source =>
+    source === ASSET_ID ? RESOLVED_ASSET : source,
+  );
 });
 afterEach(() => {
   unmount(ROOT_TAG);
@@ -51,7 +53,9 @@ describe('Image (React lifecycle + descriptor bridge)', () => {
       // (covered in core) — it proves the three pieces the React adapter is responsible for
       // wiring together actually produce a committed Fabric node.
       mount(ROOT_TAG, <Image source={{ uri: 'http://x/y.png' }} />);
-      expect(fabric.appRoot().children.map(n => n.viewName)).toContain('RCTImageView');
+      expect(fabric.appRoot().children.map(n => n.viewName)).toContain(
+        'RCTImageView',
+      );
     });
 
     it('runs the installed source resolver on a require()-style number before it reaches native', () => {
@@ -60,7 +64,9 @@ describe('Image (React lifecycle + descriptor bridge)', () => {
       // just through core's own internal wiring.
       mount(ROOT_TAG, <Image source={ASSET_ID} />);
       const source = imageNode().props.source;
-      expect(Array.isArray(source) ? source[0] : undefined).toEqual(RESOLVED_ASSET);
+      expect(Array.isArray(source) ? source[0] : undefined).toEqual(
+        RESOLVED_ASSET,
+      );
     });
 
     it('fires onLoad from the captured native topLoad event', () => {
@@ -92,7 +98,10 @@ describe('Image (React lifecycle + descriptor bridge)', () => {
       // through the SAME registerStyles/routeProp path View and ImageBackground use, landing as
       // flattened style props on the image node, not a literal `className` prop.
       registerStyles({ hero: { opacity: 0.75 } });
-      mount(ROOT_TAG, <Image source={{ uri: 'http://x/y.png' }} className="hero" />);
+      mount(
+        ROOT_TAG,
+        <Image source={{ uri: 'http://x/y.png' }} className="hero" />,
+      );
       expect(imageNode().props.opacity).toBe(0.75);
     });
   });

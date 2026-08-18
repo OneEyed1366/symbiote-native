@@ -22,16 +22,28 @@
 // (not a JS exception), so asserting it fires with no scrollTo dispatched is still a positive
 // claim about correct behavior, not a throw/reject to catch.
 
-import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
+import {
+  defineComponent,
+  h,
+  ref,
+  type FunctionalComponent,
+} from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FlatList, mount, unmount, type IFlatListHandle } from '@symbiote-native/vue';
+import {
+  FlatList,
+  mount,
+  unmount,
+  type IFlatListHandle,
+} from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 // FlatList (over the generic VirtualizedList) is a GENERIC component, so its value is a generic
 // construct signature that h()'s overloads can't resolve. These are runtime pipeline tests, not type
 // tests, so drive it through a loose functional-component handle (sanctioned cast — generic-component
 // limitation, test-only).
-const FlatListHost = FlatList as unknown as FunctionalComponent<Record<string, unknown>>;
+const FlatListHost = FlatList as unknown as FunctionalComponent<
+  Record<string, unknown>
+>;
 
 type ICommandCall = {
   name: string;
@@ -97,7 +109,8 @@ slot.dispatchCommand = (_node, name, args) => {
   commands.push({ name, args });
 };
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 const viewableBatches: IViewToken[][] = [];
 
@@ -132,7 +145,9 @@ function makeList(
           ...extra,
         },
         {
-          item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)],
+          item: ({ item }: { item: IRow }) => [
+            h('symbiote-text', {}, item.label),
+          ],
           ...extraSlots,
         },
       ),
@@ -155,12 +170,23 @@ function collectRowLabels(): Set<string> {
   return labels;
 }
 
-function findInCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findInCommitted(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   let found: IFakeNode | undefined;
   walk(fabric.committed, node => {
     if (found === undefined && predicate(node)) found = node;
   });
   return found;
+}
+
+// Does this committed subtree carry a raw-text payload anywhere inside it? Asks WHERE a node sits
+// rather than merely whether it exists — placement is geometry for a separator.
+function carriesText(node: IFakeNode, text: string): boolean {
+  return (
+    node.props.text === text ||
+    node.children.some(child => carriesText(child, text))
+  );
 }
 
 // A spacer is the ONLY childless RCTView carrying a numeric height: it reserves the off-window
@@ -179,7 +205,8 @@ function isSpacer(node: IFakeNode): boolean {
 function contentChildren(): IFakeNode[] {
   const content = findInCommitted(n => n.viewName === 'RCTScrollContentView');
   expect(content, 'scroll content view committed').toBeDefined();
-  if (content === undefined) throw new Error('unreachable: RCTScrollContentView missing');
+  if (content === undefined)
+    throw new Error('unreachable: RCTScrollContentView missing');
   return content.children;
 }
 
@@ -237,30 +264,112 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
 
     const labels = collectRowLabels();
     expect(labels.size, 'item rows committed').toBeGreaterThan(0);
-    expect(labels.size, 'window far smaller than the full data').toBeLessThan(WINDOW_CEILING);
+    expect(labels.size, 'window far smaller than the full data').toBeLessThan(
+      WINDOW_CEILING,
+    );
     expect(labels.has('row-0'), 'first row present at the top').toBe(true);
     expect(labels.has(DEEP_ROW), 'a deep row is absent at the top').toBe(false);
     // At the top the leading extent is 0 (no leading spacer); the trailing spacer reserves the
     // off-window content below.
     expect(hasLeadingSpacer(), 'no leading spacer at the top').toBe(false);
-    expect(hasTrailingSpacer(), 'a trailing spacer reserves the content below').toBe(true);
+    expect(
+      hasTrailingSpacer(),
+      'a trailing spacer reserves the content below',
+    ).toBe(true);
   });
 
   // why: this is the recommit path, not just the initial mount — a native `topScroll` event has
   // to reach the reducer through Vue's microtask-batched commit and produce a NEW committed tree,
   // proving the adapter re-drives the shared window logic on every scroll, not only once at mount.
+  // why: WHERE a separator sits, and WHAT decides to render it, are both geometry. RN renders
+  // ItemSeparatorComponent INSIDE the cell's own measuring wrapper
+  // (VirtualizedListCellRenderer.js:218-221) and gates it on the last index of the DATA
+  // (VirtualizedList.js:793). As a SIBLING it is an extra flex child, so the chrome between two
+  // cells is gap + separator + gap while a spacer collapsing that region contributes one gap — the
+  // leading spacer lands every cell below it short by (separator + gap). Gated on the WINDOW, a
+  // cell's own height changes as the window slides past it. Both were device-measured 2026-08-19 as
+  // the list jumping mid-scroll; see .claude/rules/list-geometry-feedback-loop.md.
+  it('renders the separator inside its cell rather than beside it', async () => {
+    await mountWithViewport(
+      {},
+      {
+        separator: () => [h('symbiote-text', {}, 'divider')],
+      },
+    );
+
+    const withDivider = contentChildren().filter(child =>
+      carriesText(child, 'divider'),
+    );
+    expect(withDivider.length, 'separators committed').toBeGreaterThan(0);
+    // A sibling separator shows up here as a child carrying the divider and no row label.
+    for (const [position, child] of withDivider.entries()) {
+      expect(
+        carriesText(child, `row-${position}`),
+        'the divider sits inside its own cell',
+      ).toBe(true);
+    }
+  });
+
+  // why: the window's last cell is mid-DATA, so it keeps its separator. This is the assertion that
+  // separates the two gates — under a window gate that cell is exactly the one that loses it.
+  it('keeps the separator on the window-last cell, which is mid-data', async () => {
+    await mountWithViewport(
+      {},
+      {
+        separator: () => [h('symbiote-text', {}, 'divider')],
+      },
+    );
+
+    const rendered = contentChildren().filter(child =>
+      DATA.some(row => carriesText(child, row.label)),
+    );
+    expect(rendered.length, 'cells committed').toBeGreaterThan(0);
+    expect(
+      carriesText(rendered[rendered.length - 1], 'divider'),
+      'the window-last cell is mid-data and keeps its separator',
+    ).toBe(true);
+  });
+
+  it('withholds the separator from the last item of the DATA', async () => {
+    const two = makeRows(0, 2);
+    await mountWithViewport(
+      { data: two },
+      {
+        separator: () => [h('symbiote-text', {}, 'divider')],
+      },
+    );
+
+    const cells = contentChildren();
+    const first = cells.find(child => carriesText(child, 'row-0'));
+    const last = cells.find(child => carriesText(child, 'row-1'));
+    expect(last, 'the last cell is rendered at all').toBeDefined();
+    expect(first === undefined ? false : carriesText(first, 'divider')).toBe(
+      true,
+    );
+    expect(last === undefined ? true : carriesText(last, 'divider')).toBe(
+      false,
+    );
+  });
+
   it('shifts the window and grows a leading spacer when scrolled deep', async () => {
     const scrollView = await mountWithViewport();
     scrollTo(scrollView.instanceHandle, DEEP_OFFSET);
     await tick();
 
     const labels = collectRowLabels();
-    expect(labels.size, 'window stays bounded after scroll').toBeLessThan(WINDOW_CEILING);
+    expect(labels.size, 'window stays bounded after scroll').toBeLessThan(
+      WINDOW_CEILING,
+    );
     expect(labels.has(DEEP_ROW), 'the deep row is now resident').toBe(true);
-    expect(labels.has('row-0'), 'early rows fell out of the window').toBe(false);
+    expect(labels.has('row-0'), 'early rows fell out of the window').toBe(
+      false,
+    );
     // A leading spacer now reserves the off-window content scrolled past above — it was absent at
     // the top.
-    expect(hasLeadingSpacer(), 'a leading spacer grew after scrolling deep').toBe(true);
+    expect(
+      hasLeadingSpacer(),
+      'a leading spacer grew after scrolling deep',
+    ).toBe(true);
   });
 
   // why: onViewableItemsChanged is a user-supplied prop callback, not a DOM/native event — the
@@ -273,7 +382,10 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
       },
     });
 
-    expect(viewableBatches.length, 'onViewableItemsChanged fired').toBeGreaterThan(0);
+    expect(
+      viewableBatches.length,
+      'onViewableItemsChanged fired',
+    ).toBeGreaterThan(0);
     const latest = viewableBatches[viewableBatches.length - 1];
     expect(latest.length, 'some items are viewable').toBeGreaterThan(0);
     expect(
@@ -346,7 +458,11 @@ function makeStickyList(): ReturnType<typeof defineComponent> {
           stickyHeaderIndices: [0, 10],
           windowSize: 1,
         },
-        { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+        {
+          item: ({ item }: { item: IRow }) => [
+            h('symbiote-text', {}, item.label),
+          ],
+        },
       ),
   });
 }
@@ -371,16 +487,23 @@ describe('Vue VirtualizedList sticky header force-mount', () => {
     // clear of both sticky origins (0 and 10). Only the force-mount keeps row-0 resident.
     fabric.fireEvent(scrollView.instanceHandle, 'topScroll', {
       contentOffset: { x: 0, y: 500 },
-      contentSize: { width: 320, height: STICKY_CELL_HEIGHT * STICKY_ITEM_COUNT },
+      contentSize: {
+        width: 320,
+        height: STICKY_CELL_HEIGHT * STICKY_ITEM_COUNT,
+      },
       layoutMeasurement: { width: 320, height: STICKY_VIEWPORT },
     });
     await tick();
 
     const labels = collectRowLabels();
-    expect(labels.has('row-5'), 'the in-window cell at the scroll position is resident').toBe(true);
-    expect(labels.has('row-0'), 'the force-mounted sticky header stays resident off-window').toBe(
-      true,
-    );
+    expect(
+      labels.has('row-5'),
+      'the in-window cell at the scroll position is resident',
+    ).toBe(true);
+    expect(
+      labels.has('row-0'),
+      'the force-mounted sticky header stays resident off-window',
+    ).toBe(true);
     expect(
       labels.has('row-10'),
       'the other sticky index (not the nearest one below the window) is not force-mounted',
@@ -406,7 +529,11 @@ function makeMvcpList(): ReturnType<typeof defineComponent> {
           }),
           maintainVisibleContentPosition: { minIndexForVisible: 0 },
         },
-        { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+        {
+          item: ({ item }: { item: IRow }) => [
+            h('symbiote-text', {}, item.label),
+          ],
+        },
       ),
   });
 }
@@ -421,9 +548,14 @@ function makeFailList(): ReturnType<typeof defineComponent> {
           ref: listRef,
           data: FAIL_DATA,
           keyExtractor: (item: IRow) => `k-${item.id}`,
-          onScrollToIndexFailed: (info: IScrollToIndexFailure) => failures.push(info),
+          onScrollToIndexFailed: (info: IScrollToIndexFailure) =>
+            failures.push(info),
         },
-        { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+        {
+          item: ({ item }: { item: IRow }) => [
+            h('symbiote-text', {}, item.label),
+          ],
+        },
       ),
   });
 }
@@ -434,7 +566,12 @@ describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex f
   // the wrong row the moment a header is present, breaking RN's native MVCP semantics.
   it('forwards maintainVisibleContentPosition to the scroll view, bumping minIndexForVisible for the header', async () => {
     await mountWithViewport(
-      { maintainVisibleContentPosition: { minIndexForVisible: 1, autoscrollToTopThreshold: 10 } },
+      {
+        maintainVisibleContentPosition: {
+          minIndexForVisible: 1,
+          autoscrollToTopThreshold: 10,
+        },
+      },
       // A #header slot occupies child 0, so RN bumps minIndexForVisible by 1 (1 -> 2).
       { header: () => [h('symbiote-text', {}, 'header')] },
     );
@@ -443,10 +580,14 @@ describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex f
     // can be stale after clone-on-write; the latest maintainVisibleContentPosition rides the clone.
     const scrollView = findInCommitted(n => /scroll/i.test(n.viewName));
     expect(scrollView, 'scroll view committed').toBeDefined();
-    if (scrollView === undefined) throw new Error('unreachable: scroll view missing');
+    if (scrollView === undefined)
+      throw new Error('unreachable: scroll view missing');
 
     const mvcp = scrollView.props.maintainVisibleContentPosition;
-    expect(typeof mvcp, 'maintainVisibleContentPosition forwarded as an object').toBe('object');
+    expect(
+      typeof mvcp,
+      'maintainVisibleContentPosition forwarded as an object',
+    ).toBe('object');
     expect(mvcp).not.toBeNull();
     expect(
       Reflect.get(Object(mvcp), 'minIndexForVisible'),
@@ -468,7 +609,10 @@ describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex f
 
     // Prepend rows with fresh ids ABOVE the viewport: the anchored row k-0 moves down by the
     // prepended count, into the leading spacer the native MVCP cannot see, so the JS shift fires.
-    mvcpData.value = [...makeRows(ITEM_COUNT, MVCP_PREPEND_COUNT), ...mvcpData.value];
+    mvcpData.value = [
+      ...makeRows(ITEM_COUNT, MVCP_PREPEND_COUNT),
+      ...mvcpData.value,
+    ];
     await tick();
 
     const scrolls = commands.filter(c => c.name === 'scrollTo');
@@ -490,14 +634,17 @@ describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex f
     mount(ROOT_TAG, makeFailList());
     await tick();
     expect(listRef.value, 'fail-path FlatList handle attached').not.toBeNull();
-    if (listRef.value === null) throw new Error('unreachable: FlatList handle missing');
+    if (listRef.value === null)
+      throw new Error('unreachable: FlatList handle missing');
 
     const scrollsBefore = commands.filter(c => c.name === 'scrollTo').length;
     listRef.value.scrollToIndex({ index: FAIL_TARGET_INDEX, animated: true });
     const scrollsAfter = commands.filter(c => c.name === 'scrollTo').length;
 
     expect(failures.length, 'onScrollToIndexFailed fires once').toBe(1);
-    expect(failures[0].index, 'failure index is the requested 50').toBe(FAIL_TARGET_INDEX);
+    expect(failures[0].index, 'failure index is the requested 50').toBe(
+      FAIL_TARGET_INDEX,
+    );
     expect(typeof failures[0].highestMeasuredFrameIndex).toBe('number');
     expect(typeof failures[0].averageItemLength).toBe('number');
     // An unmeasured scrollToIndex must NOT dispatch a fabricated scrollTo (an estimate).

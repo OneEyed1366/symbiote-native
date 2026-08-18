@@ -60,6 +60,7 @@ import {
   isSeparatorGapInRange,
   listEffectSignature,
   readLayoutLength,
+  readLayoutOffset,
   readScrollOffset,
   reduceList,
   resolveAccessibilityProps,
@@ -89,7 +90,11 @@ import {
 } from '@symbiote-native/engine';
 import { ScrollView } from '../scroll-view';
 import { RefreshControl } from '../refresh-control';
-import { anchorHostStyle, SymbioteStyleInputDirective, ViewHost } from '../../primitives';
+import {
+  anchorHostStyle,
+  SymbioteStyleInputDirective,
+  ViewHost,
+} from '../../primitives';
 import {
   VListEmptyDirective,
   VListFooterDirective,
@@ -126,7 +131,8 @@ export type { IVListItemContext, IVListSeparatorContext } from './directives';
 // element-returning props (renderItem, ListHeader/Footer/Empty Component, ItemSeparatorComponent):
 // those are the per-adapter children/render fields and become `<ng-template>` directives in Angular.
 // Everything agnostic is the SAME surface.
-export interface IVirtualizedListProps<ItemT> extends IAccessibilityProps, IAriaProps {
+export interface IVirtualizedListProps<ItemT>
+  extends IAccessibilityProps, IAriaProps {
   data: unknown;
   getItem: (data: unknown, index: number) => ItemT;
   getItemCount: (data: unknown) => number;
@@ -205,7 +211,9 @@ interface IWindowCell<ItemT> {
 @Component({
   selector: 'VirtualizedList',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [ScrollView, RefreshControl, VListOutletDirective, ViewHost],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -224,12 +232,20 @@ interface IWindowCell<ItemT> {
       [accessibilityValue]="foldedAccessibility().accessibilityValue"
       [accessibilityActions]="foldedAccessibility().accessibilityActions"
       [accessibilityLabelledBy]="foldedAccessibility().accessibilityLabelledBy"
-      [importantForAccessibility]="foldedAccessibility().importantForAccessibility"
+      [importantForAccessibility]="
+        foldedAccessibility().importantForAccessibility
+      "
       [accessibilityLiveRegion]="foldedAccessibility().accessibilityLiveRegion"
       [screenReaderFocusable]="foldedAccessibility().screenReaderFocusable"
-      [accessibilityViewIsModal]="foldedAccessibility().accessibilityViewIsModal"
-      [accessibilityElementsHidden]="foldedAccessibility().accessibilityElementsHidden"
-      [accessibilityIgnoresInvertColors]="foldedAccessibility().accessibilityIgnoresInvertColors"
+      [accessibilityViewIsModal]="
+        foldedAccessibility().accessibilityViewIsModal
+      "
+      [accessibilityElementsHidden]="
+        foldedAccessibility().accessibilityElementsHidden
+      "
+      [accessibilityIgnoresInvertColors]="
+        foldedAccessibility().accessibilityIgnoresInvertColors
+      "
       [accessibilityLanguage]="foldedAccessibility().accessibilityLanguage"
       [accessibilityRespondsToUserInteraction]="
         foldedAccessibility().accessibilityRespondsToUserInteraction
@@ -237,7 +253,9 @@ interface IWindowCell<ItemT> {
       [accessibilityShowsLargeContentViewer]="
         foldedAccessibility().accessibilityShowsLargeContentViewer
       "
-      [accessibilityLargeContentTitle]="foldedAccessibility().accessibilityLargeContentTitle"
+      [accessibilityLargeContentTitle]="
+        foldedAccessibility().accessibilityLargeContentTitle
+      "
       (accessibilityAction)="accessibilityActionTick($event)"
       (accessibilityTap)="accessibilityTapTick($event)"
       (magicTap)="magicTapTick($event)"
@@ -293,21 +311,29 @@ interface IWindowCell<ItemT> {
         @if (gapSpacerStyle !== null) {
           <symbiote-view [style]="gapSpacerStyle"></symbiote-view>
         }
+        <!-- The separator sits INSIDE the measuring view, as RN's own cell renderer places it
+             (VirtualizedListCellRenderer.js:218-221). As a sibling it is an extra flex child, so
+             the chrome between two cells is gap + separator + gap while a spacer collapsing that
+             region replaces it with a single gap — every cell below the leading spacer then lands
+             short by (separator + gap) and the content jumps by that much whenever the window's
+             first index moves. Measured at exactly 17px on device 2026-08-19; see
+             .claude/rules/list-geometry-feedback-loop.md. -->
         @for (cell of windowCells; track cell.key) {
-          <symbiote-view (layout)="handleCellLayout(cell.measure, $event)" [style]="cellStyle">
+          <symbiote-view
+            (layout)="handleCellLayout(cell.measure, $event)"
+            [style]="cellStyle"
+          >
             <ng-container
               [vListOutlet]="itemDir?.templateRef"
               [vListOutletContext]="cell.context"
             ></ng-container>
-          </symbiote-view>
-          @if (cell.separatorContext !== undefined) {
-            <symbiote-view>
+            @if (cell.separatorContext !== undefined) {
               <ng-container
                 [vListOutlet]="separatorDir?.templateRef"
                 [vListOutletContext]="cell.separatorContext"
               ></ng-container>
-            </symbiote-view>
-          }
+            }
+          </symbiote-view>
         }
         @if (trailingSpacerStyle !== null) {
           <symbiote-view [style]="trailingSpacerStyle"></symbiote-view>
@@ -334,10 +360,16 @@ export class VirtualizedList<ItemT = unknown>
   // The list's edge/viewability/failure events as real Angular events: `(endReached)="…"`, not
   // `[onEndReached]="…"`. See handleRefresh/accessibility*Tick below for how the still-callback-
   // shaped ScrollView/RefreshControl @Input()s are fed from these.
-  @Output() readonly endReached = new EventEmitter<{ distanceFromEnd: number }>();
-  @Output() readonly startReached = new EventEmitter<{ distanceFromStart: number }>();
+  @Output() readonly endReached = new EventEmitter<{
+    distanceFromEnd: number;
+  }>();
+  @Output() readonly startReached = new EventEmitter<{
+    distanceFromStart: number;
+  }>();
   @Output() readonly refresh = new EventEmitter<void>();
-  @Output() readonly viewableItemsChanged = new EventEmitter<IViewableItemsChangedInfo<ItemT>>();
+  @Output() readonly viewableItemsChanged = new EventEmitter<
+    IViewableItemsChangedInfo<ItemT>
+  >();
   @Output() readonly scrollToIndexFailed = new EventEmitter<{
     index: number;
     highestMeasuredFrameIndex: number;
@@ -371,7 +403,8 @@ export class VirtualizedList<ItemT = unknown>
   // (no wrapper) falls back to this component's own `.observed`, unchanged from before.
   @Input() refreshRequested?: boolean;
   @Input() viewabilityConfig?: IViewabilityConfig;
-  @Input() viewabilityConfigCallbackPairs?: IViewabilityConfigCallbackPair<ItemT>[];
+  @Input()
+  viewabilityConfigCallbackPairs?: IViewabilityConfigCallbackPair<ItemT>[];
   @Input() initialNumToRender?: number;
   @Input() initialScrollIndex?: number;
   @Input() maxToRenderPerBatch?: number;
@@ -402,8 +435,10 @@ export class VirtualizedList<ItemT = unknown>
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -435,7 +470,8 @@ export class VirtualizedList<ItemT = unknown>
   @ContentChild(VListHeaderDirective) headerDir?: VListHeaderDirective;
   @ContentChild(VListFooterDirective) footerDir?: VListFooterDirective;
   @ContentChild(VListEmptyDirective) emptyDir?: VListEmptyDirective;
-  @ContentChild(VListSeparatorDirective) separatorDir?: VListSeparatorDirective<ItemT>;
+  @ContentChild(VListSeparatorDirective)
+  separatorDir?: VListSeparatorDirective<ItemT>;
 
   // The composed inner scroll view. Its instance IS an IScrollViewHandle (scrollTo / scrollToEnd /
   // flashScrollIndicators / getScrollNode), so the imperative handle delegates straight to it.
@@ -462,7 +498,8 @@ export class VirtualizedList<ItemT = unknown>
   resolvedStyle: IViewStyle | undefined = undefined;
   resolvedContentContainerStyle: IStyleProp<IViewStyle> | undefined = undefined;
   resolvedMaintainVisibleContentPosition:
-    { minIndexForVisible: number; autoscrollToTopThreshold?: number } | undefined = undefined;
+    | { minIndexForVisible: number; autoscrollToTopThreshold?: number }
+    | undefined = undefined;
   // The offset we are imperatively driving native to before the scroll handle attaches (rides down
   // as contentOffset). A fresh object identity each push so the commit re-applies a repeated value.
   commandedOffset: { x: number; y: number } | undefined = undefined;
@@ -471,11 +508,18 @@ export class VirtualizedList<ItemT = unknown>
   // measured lengths, committed window, edge/viewability dedup, MVCP anchor — all in IListState,
   // driven by the shared reduceList. `renderVersion` bumps whenever a transition changes render
   // state, so ngDoCheck's recompute-dedup can detect it (listState is a plain object, not tracked).
-  private readonly listState: IListState<ItemT> = createInitialListState<ItemT>();
+  private readonly listState: IListState<ItemT> =
+    createInitialListState<ItemT>();
   private renderVersion = EMPTY_OFFSET;
 
-  private readonly cellMeasures = new Map<number, (event: ISymbioteEvent) => void>();
-  private readonly separatorOverrides = new Map<number, Partial<ISeparatorProps<unknown>>>();
+  private readonly cellMeasures = new Map<
+    number,
+    (event: ISymbioteEvent) => void
+  >();
+  private readonly separatorOverrides = new Map<
+    number,
+    Partial<ISeparatorProps<unknown>>
+  >();
   // The adapter-owned debounce (minimumViewTime) and incremental-fill timers; the reducer only
   // hands back a delay.
   private viewableTimer: ReturnType<typeof setTimeout> | null = null;
@@ -543,8 +587,10 @@ export class VirtualizedList<ItemT = unknown>
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,
@@ -584,7 +630,9 @@ export class VirtualizedList<ItemT = unknown>
     return this.maxToRenderPerBatch ?? DEFAULT_MAX_TO_RENDER_PER_BATCH;
   }
   private get updateCellsBatchingPeriodValue(): number {
-    return this.updateCellsBatchingPeriod ?? DEFAULT_UPDATE_CELLS_BATCHING_PERIOD;
+    return (
+      this.updateCellsBatchingPeriod ?? DEFAULT_UPDATE_CELLS_BATCHING_PERIOD
+    );
   }
   private get onEndReachedThresholdValue(): number {
     return this.onEndReachedThreshold ?? DEFAULT_END_REACHED_THRESHOLD;
@@ -663,7 +711,8 @@ export class VirtualizedList<ItemT = unknown>
       onStartReachedActive: this.startReached.observed,
       viewabilityPairs: buildViewabilityPairs(
         this.viewableItemsChanged.observed
-          ? (info: IViewableItemsChangedInfo<ItemT>): void => this.viewableItemsChanged.emit(info)
+          ? (info: IViewableItemsChangedInfo<ItemT>): void =>
+              this.viewableItemsChanged.emit(info)
           : undefined,
         this.viewabilityConfig,
         this.viewabilityConfigCallbackPairs,
@@ -697,7 +746,10 @@ export class VirtualizedList<ItemT = unknown>
     return `${m.first}|${m.last}|${m.count}|${m.total}`;
   }
 
-  private runEffects(effects: IListEffect<ItemT>[], inputs: IListReducerInputs<ItemT>): void {
+  private runEffects(
+    effects: IListEffect<ItemT>[],
+    inputs: IListReducerInputs<ItemT>,
+  ): void {
     for (const effect of effects) {
       switch (effect.kind) {
         case 'scroll-to':
@@ -707,7 +759,9 @@ export class VirtualizedList<ItemT = unknown>
           this.endReached.emit({ distanceFromEnd: effect.distanceFromEnd });
           break;
         case 'fire-start-reached':
-          this.startReached.emit({ distanceFromStart: effect.distanceFromStart });
+          this.startReached.emit({
+            distanceFromStart: effect.distanceFromStart,
+          });
           break;
         case 'fire-scroll-to-index-failed':
           this.scrollToIndexFailed.emit({
@@ -824,7 +878,9 @@ export class VirtualizedList<ItemT = unknown>
     const hasHeader = this.headerDir !== undefined;
     const hasSeparators = this.separatorDir !== undefined;
     const stickySet =
-      this.stickyHeaderIndices !== undefined ? new Set(this.stickyHeaderIndices) : undefined;
+      this.stickyHeaderIndices !== undefined
+        ? new Set(this.stickyHeaderIndices)
+        : undefined;
 
     this.resolvedContentContainerStyle = this.isHorizontal
       ? [this.contentContainerStyle, { width: m.total }]
@@ -846,7 +902,8 @@ export class VirtualizedList<ItemT = unknown>
         : {
             ...this.maintainVisibleContentPosition,
             minIndexForVisible:
-              this.maintainVisibleContentPosition.minIndexForVisible + (hasHeader ? 1 : 0),
+              this.maintainVisibleContentPosition.minIndexForVisible +
+              (hasHeader ? 1 : 0),
           };
 
     if (m.count === FIRST_INDEX) {
@@ -856,7 +913,9 @@ export class VirtualizedList<ItemT = unknown>
       this.gapSpacerStyle = null;
       this.trailingSpacerStyle = null;
       this.renderedStickyIndices = undefined;
-      dlog(`Angular VirtualizedList empty (viewport=${this.listState.viewportLength})`);
+      dlog(
+        `Angular VirtualizedList empty (viewport=${this.listState.viewportLength})`,
+      );
       return;
     }
 
@@ -870,13 +929,17 @@ export class VirtualizedList<ItemT = unknown>
       keyFor: this.keyFor,
       stickyIndices: stickySet,
       hasHeader,
-      hasSeparators,
     });
     this.leadingSpacerStyle =
-      plan.leadingExtent > EMPTY_OFFSET ? this.spacerStyle(plan.leadingExtent) : null;
-    this.gapSpacerStyle = plan.gapExtent > EMPTY_OFFSET ? this.spacerStyle(plan.gapExtent) : null;
+      plan.leadingExtent > EMPTY_OFFSET
+        ? this.spacerStyle(plan.leadingExtent)
+        : null;
+    this.gapSpacerStyle =
+      plan.gapExtent > EMPTY_OFFSET ? this.spacerStyle(plan.gapExtent) : null;
     this.trailingSpacerStyle =
-      plan.trailingExtent > EMPTY_OFFSET ? this.spacerStyle(plan.trailingExtent) : null;
+      plan.trailingExtent > EMPTY_OFFSET
+        ? this.spacerStyle(plan.trailingExtent)
+        : null;
     this.renderedStickyIndices =
       stickySet !== undefined && plan.stickyChildPositions.length > 0
         ? plan.stickyChildPositions
@@ -890,13 +953,24 @@ export class VirtualizedList<ItemT = unknown>
 
     this.forcedStickyCell =
       plan.forcedStickyCell !== undefined
-        ? this.buildWindowCell(plan.forcedStickyCell.index, plan.forcedStickyCell.key, false)
+        ? this.buildWindowCell(
+            plan.forcedStickyCell.index,
+            plan.forcedStickyCell.key,
+            false,
+          )
         : null;
 
     const cells: IWindowCell<ItemT>[] = [];
     for (const planned of plan.cells) {
-      const includeSeparator = hasSeparators && planned.index < m.last;
-      cells.push(this.buildWindowCell(planned.index, planned.key, includeSeparator));
+      // RN gates the separator on the last index of the DATA, not of the WINDOW
+      // (VirtualizedList.js:793 `const end = getItemCount(data) - 1`), and now that the separator
+      // lives INSIDE the measuring wrapper that distinction is load-bearing: gating on the window
+      // would make a cell's own measured height change as the window slides past it. Device-measured
+      // 2026-08-19 as a run of cells all shifting by exactly the divider's 1px.
+      const includeSeparator = hasSeparators && planned.index < m.count - 1;
+      cells.push(
+        this.buildWindowCell(planned.index, planned.key, includeSeparator),
+      );
     }
     this.windowCells = cells;
 
@@ -924,11 +998,16 @@ export class VirtualizedList<ItemT = unknown>
       index,
       context,
       measure: this.cellMeasure(index),
-      separatorContext: includeSeparator ? this.buildSeparatorContext(index, item) : undefined,
+      separatorContext: includeSeparator
+        ? this.buildSeparatorContext(index, item)
+        : undefined,
     };
   }
 
-  private buildSeparatorContext(index: number, item: ItemT): IVListSeparatorContext<ItemT> {
+  private buildSeparatorContext(
+    index: number,
+    item: ItemT,
+  ): IVListSeparatorContext<ItemT> {
     const overrides = this.separatorOverrides.get(index);
     const highlighted = overrides?.highlighted ?? false;
     const context: IVListSeparatorContext<ItemT> = {
@@ -941,7 +1020,12 @@ export class VirtualizedList<ItemT = unknown>
     // arbitrary separator props); the typed fields above stay authoritative.
     if (overrides !== undefined) {
       for (const key of Object.keys(overrides)) {
-        if (key === 'highlighted' || key === 'leadingItem' || key === 'trailingItem') continue;
+        if (
+          key === 'highlighted' ||
+          key === 'leadingItem' ||
+          key === 'trailingItem'
+        )
+          continue;
         context[key] = overrides[key];
       }
     }
@@ -958,10 +1042,13 @@ export class VirtualizedList<ItemT = unknown>
     const measure = (event: ISymbioteEvent): void => {
       const length = readLayoutLength(event, this.isHorizontal);
       if (length === undefined) return;
-      dlog(`Angular VirtualizedList cell ${index} measured length=${length}`);
+      const offset = readLayoutOffset(event, this.isHorizontal);
+      dlog(
+        `Angular VirtualizedList cell ${index} measured length=${length} offset=${offset ?? 'none'}`,
+      );
       // The reducer guards a fixed getItemLayout and a repeated length; a no-op leaves state and the
       // view untouched (dispatch marks for check only when something changed).
-      this.dispatch({ kind: 'measure', index, length });
+      this.dispatch({ kind: 'measure', index, length, offset });
     };
     this.cellMeasures.set(index, measure);
     return measure;
@@ -969,18 +1056,29 @@ export class VirtualizedList<ItemT = unknown>
 
   // Per-cell onLayout rides the engine's structural (layout) event channel — Angular forbids an
   // [onLayout] property binding (NG8002). $event arrives untyped, narrowed before reaching measure.
-  handleCellLayout(measure: (event: ISymbioteEvent) => void, event: unknown): void {
+  handleCellLayout(
+    measure: (event: ISymbioteEvent) => void,
+    event: unknown,
+  ): void {
     if (this.isSymbioteEvent(event)) measure(event);
   }
 
   private isSymbioteEvent(value: unknown): value is ISymbioteEvent {
-    return typeof value === 'object' && value !== null && 'nativeEvent' in value;
+    return (
+      typeof value === 'object' && value !== null && 'nativeEvent' in value
+    );
   }
 
-  private mergeSeparator(gapIndex: number, patch: Partial<ISeparatorProps<unknown>>): void {
+  private mergeSeparator(
+    gapIndex: number,
+    patch: Partial<ISeparatorProps<unknown>>,
+  ): void {
     const count = this.listState.metrics.count;
     if (!isSeparatorGapInRange(gapIndex, count)) return;
-    this.separatorOverrides.set(gapIndex, { ...this.separatorOverrides.get(gapIndex), ...patch });
+    this.separatorOverrides.set(gapIndex, {
+      ...this.separatorOverrides.get(gapIndex),
+      ...patch,
+    });
     this.cdr.markForCheck();
   }
 
@@ -996,7 +1094,10 @@ export class VirtualizedList<ItemT = unknown>
         this.mergeSeparator(index - 1, { highlighted: false });
         this.mergeSeparator(index, { highlighted: false });
       },
-      updateProps: (select: 'leading' | 'trailing', newProps: Record<string, unknown>): void => {
+      updateProps: (
+        select: 'leading' | 'trailing',
+        newProps: Record<string, unknown>,
+      ): void => {
         this.mergeSeparator(select === 'leading' ? index - 1 : index, newProps);
       },
     };
@@ -1029,7 +1130,11 @@ export class VirtualizedList<ItemT = unknown>
     });
   }
 
-  scrollToItem(params: { item: unknown; animated?: boolean; viewPosition?: number }): void {
+  scrollToItem(params: {
+    item: unknown;
+    animated?: boolean;
+    viewPosition?: number;
+  }): void {
     this.dispatch({
       kind: 'scroll-to-item',
       item: params.item,
@@ -1039,7 +1144,10 @@ export class VirtualizedList<ItemT = unknown>
   }
 
   scrollToEnd(params?: { animated?: boolean }): void {
-    this.dispatch({ kind: 'scroll-to-end', animated: params?.animated ?? true });
+    this.dispatch({
+      kind: 'scroll-to-end',
+      animated: params?.animated ?? true,
+    });
   }
 
   flashScrollIndicators(): void {

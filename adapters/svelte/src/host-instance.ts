@@ -25,7 +25,12 @@ export type { IHostInstance } from '@symbiote-native/engine';
 // and none of those is a host ref an interop library can hand back. `tagName` is ShimElement's
 // own field, so checking it makes the predicate mean what its name says.
 function isShimElement(value: unknown): value is ShimElement {
-  return typeof value === 'object' && value !== null && 'engineNode' in value && 'tagName' in value;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'engineNode' in value &&
+    'tagName' in value
+  );
 }
 
 // The typed imperative handle (measure/measureInWindow/measureLayout/setNativeProps/focus/blur)
@@ -35,16 +40,21 @@ function isShimElement(value: unknown): value is ShimElement {
 // isHostInstance guard short-circuits); this helper exists only to give app code a correctly
 // TYPED accessor off the SHIM value (`ShimElement`) instead of the bare `.engineNode` field,
 // with no `as` cast at the call site.
-export function hostInstance(shim: ShimElement | null | undefined): IHostInstance | undefined {
+export function hostInstance(
+  shim: ShimElement | null | undefined,
+): IHostInstance | undefined {
   if (shim === null || shim === undefined) return undefined;
   const node = shim.engineNode;
-  return node !== undefined && isSymbioteNode(node) ? toPublicInstance(node) : undefined;
+  return node !== undefined && isSymbioteNode(node)
+    ? toPublicInstance(node)
+    : undefined;
 }
 
 export function findNodeHandle(
   componentOrHandle: ShimElement | number | null | undefined,
 ): number | null {
-  if (componentOrHandle === null || componentOrHandle === undefined) return null;
+  if (componentOrHandle === null || componentOrHandle === undefined)
+    return null;
   if (typeof componentOrHandle === 'number') return componentOrHandle;
   if (!isShimElement(componentOrHandle)) return null;
   const node = componentOrHandle.engineNode;

@@ -30,11 +30,15 @@ const PUSHES = 5;
 
 const fabric = installFabric();
 
-const flush = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const flush = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 // Records every value the renderer was handed for a given prop key, so the test compares
 // identities across pushes rather than trusting a private method's return value.
-function probeSetProperty(key: string): { values: () => unknown[]; restore: () => void } {
+function probeSetProperty(key: string): {
+  values: () => unknown[];
+  restore: () => void;
+} {
   const original = SymbioteRenderer.prototype.setProperty;
   const seen: unknown[] = [];
   SymbioteRenderer.prototype.setProperty = function patched(
@@ -89,7 +93,8 @@ class WrapperStabilityHost {
 }
 
 function host(): WrapperStabilityHost {
-  if (mounted === undefined) throw new Error('host component was never constructed');
+  if (mounted === undefined)
+    throw new Error('host component was never constructed');
   return mounted;
 }
 
@@ -128,10 +133,19 @@ describe('SymbioteHostPropsDirective callback wrapper identity', () => {
       await flush();
     }
 
-    expect(host().taps, 'the events must actually have reached the component').toBe(PUSHES);
+    expect(
+      host().taps,
+      'the events must actually have reached the component',
+    ).toBe(PUSHES);
     const pushed = probe.values();
-    expect(pushed.length, 'the bag must have been re-pushed on those passes').toBeGreaterThan(1);
-    expect(new Set(pushed).size, 'every push of the same handler must reuse one wrapper').toBe(1);
+    expect(
+      pushed.length,
+      'the bag must have been re-pushed on those passes',
+    ).toBeGreaterThan(1);
+    expect(
+      new Set(pushed).size,
+      'every push of the same handler must reuse one wrapper',
+    ).toBe(1);
   });
 
   // why: memoization must not degrade into "wrap once and ignore later handlers" - an inline

@@ -164,7 +164,8 @@ export const SCROLL_VIEW_INPUTS = [
 // (ReactNode children, ReactElement refreshControl) — Angular takes children via <ng-content> and
 // composes RefreshControl through projection instead. Declared per-adapter over the shared
 // accessibility base since a framework element/ref field can't live in a shared agnostic type.
-export interface IAngularScrollViewProps extends IAccessibilityProps, IAriaProps {
+export interface IAngularScrollViewProps
+  extends IAccessibilityProps, IAriaProps {
   style?: IStyleProp<IViewStyle>;
   // A bare string resolves through the shared style registry, like `class` on the host node.
   contentContainerStyle?: IStyleProp<IViewStyle> | string;
@@ -176,7 +177,12 @@ export interface IAngularScrollViewProps extends IAccessibilityProps, IAriaProps
   bounces?: boolean;
   decelerationRate?: 'normal' | 'fast' | number;
   scrollEventThrottle?: number;
-  contentInset?: { top?: number; left?: number; bottom?: number; right?: number };
+  contentInset?: {
+    top?: number;
+    left?: number;
+    bottom?: number;
+    right?: number;
+  };
   contentOffset?: { x: number; y: number };
   removeClippedSubviews?: boolean;
   snapToInterval?: number;
@@ -204,11 +210,17 @@ export interface IAngularScrollViewProps extends IAccessibilityProps, IAriaProps
   alwaysBounceHorizontal?: boolean;
   alwaysBounceVertical?: boolean;
   centerContent?: boolean;
-  scrollIndicatorInsets?: { top?: number; left?: number; bottom?: number; right?: number };
+  scrollIndicatorInsets?: {
+    top?: number;
+    left?: number;
+    bottom?: number;
+    right?: number;
+  };
   indicatorStyle?: 'default' | 'black' | 'white';
   directionalLockEnabled?: boolean;
   automaticallyAdjustKeyboardInsets?: boolean;
-  contentInsetAdjustmentBehavior?: 'automatic' | 'scrollableAxes' | 'never' | 'always';
+  contentInsetAdjustmentBehavior?:
+    'automatic' | 'scrollableAxes' | 'never' | 'always';
   minimumZoomScale?: number;
   maximumZoomScale?: number;
   zoomScale?: number;
@@ -399,7 +411,8 @@ export abstract class ScrollViewBase
   @ViewChild('host', { read: SymbioteHostPropsDirective })
   private hostDirective?: SymbioteHostPropsDirective;
 
-  @ContentChild(RefreshControl) protected projectedRefreshControl?: RefreshControl;
+  @ContentChild(RefreshControl)
+  protected projectedRefreshControl?: RefreshControl;
 
   // This component's OWN anchor host — where a `class="..."` at the use site resolves (see
   // anchorHostStyle's doc comment) — NOT `#host` in the platform templates, which targets the real
@@ -459,7 +472,9 @@ export abstract class ScrollViewBase
   // (commit.ts) falls back to Object.is on a function leaf, so even a structurally-identical bag
   // reads as "props changed" and forces a real Fabric re-clone that cascades up every ancestor
   // (see AnimatedComponentBase.reconcile()'s identical warning).
-  private readonly handleInvertedStickyLayout = (event: ISymbioteEvent): void => {
+  private readonly handleInvertedStickyLayout = (
+    event: ISymbioteEvent,
+  ): void => {
     const height = readLayoutDimension(event, 'height');
     // The projection controller is pushed from here rather than picked up on the next prop-bag
     // read: viewportHeight is internal mutable state, so once `scrollProps` became a memoized
@@ -502,7 +517,8 @@ export abstract class ScrollViewBase
   // new listener wrapper (and a new AnimatedEvent walking `collectMappedValues`) on every unrelated
   // change-detection pass while sticky headers are active.
   private cachedStickyOnScrollSource: IScrollHandler | undefined;
-  private cachedStickyOnScrollHandler: ((...args: readonly unknown[]) => void) | undefined;
+  private cachedStickyOnScrollHandler:
+    ((...args: readonly unknown[]) => void) | undefined;
 
   get isHorizontal(): boolean {
     const value = this.horizontal === true;
@@ -516,20 +532,26 @@ export abstract class ScrollViewBase
   }
 
   private get hasStickyHeaders(): boolean {
-    return this.stickyHeaderIndices !== undefined && this.stickyHeaderIndices.length > 0;
+    return (
+      this.stickyHeaderIndices !== undefined &&
+      this.stickyHeaderIndices.length > 0
+    );
   }
 
   // A class-name string resolves through the shared registry before it reaches
   // selectScrollIntrinsics, which only understands style objects/arrays.
-  private get resolvedContentContainerStyle(): IStyleProp<IViewStyle> | undefined {
+  private get resolvedContentContainerStyle():
+    IStyleProp<IViewStyle> | undefined {
     return typeof this.contentContainerStyle === 'string'
       ? resolveClassName(this.contentContainerStyle)
       : this.contentContainerStyle;
   }
 
   private get scrollViewBaseStyle(): IViewStyle {
-    return selectScrollIntrinsics(this.isHorizontal, this.resolvedContentContainerStyle)
-      .scrollViewBaseStyle;
+    return selectScrollIntrinsics(
+      this.isHorizontal,
+      this.resolvedContentContainerStyle,
+    ).scrollViewBaseStyle;
   }
 
   // Bridges non-reactive @Input fields into the reactive graph, so a computed() can memoize a
@@ -623,7 +645,8 @@ export abstract class ScrollViewBase
     // value each frame (JS jitter). The DECISIONS (which path, throttle defaults, whether to
     // capture viewport height) are folded out to the shared resolveScrollForwarding; Angular only
     // EXECUTES them, keeping stable-reference handlers so a fresh closure never forces a re-clone.
-    const nativeStickyAvailable = this.hasStickyHeaders && isNativeAnimatedAvailable();
+    const nativeStickyAvailable =
+      this.hasStickyHeaders && isNativeAnimatedAvailable();
     const forwarding = resolveScrollForwarding({
       hasStickyHeaders: this.hasStickyHeaders,
       nativeStickyAvailable,
@@ -725,7 +748,9 @@ export abstract class ScrollViewBase
     this.projectedRefreshControl?.handleRefresh(nativeNode);
   }
 
-  private refreshControlProps(style?: IStyleProp<IViewStyle>): Record<string, unknown> {
+  private refreshControlProps(
+    style?: IStyleProp<IViewStyle>,
+  ): Record<string, unknown> {
     const refresh = this.projectedRefreshControl;
     if (refresh === undefined) return {};
     return compact({
@@ -765,8 +790,14 @@ export abstract class ScrollViewBase
       this.isHorizontal,
       this.resolvedContentContainerStyle,
     );
-    const bag: Record<string, unknown> = { style: contentStyle, collapsable: false };
-    if (this.maintainVisibleContentPosition !== undefined || this.snapToAlignment !== undefined) {
+    const bag: Record<string, unknown> = {
+      style: contentStyle,
+      collapsable: false,
+    };
+    if (
+      this.maintainVisibleContentPosition !== undefined ||
+      this.snapToAlignment !== undefined
+    ) {
       bag.collapsableChildren = false;
     }
     bag.onLayout = this.handleContentLayout;
@@ -783,7 +814,9 @@ export abstract class ScrollViewBase
   // subscribes a template's (event) listeners in its CREATION pass, before any input is written and
   // before this component's own view is first refreshed - so `observed` is already settled at the
   // first evaluation and cannot flip afterwards without destroying the whole component.
-  private emitterCallback(emitter: EventEmitter<ISymbioteEvent>): IScrollHandler | undefined {
+  private emitterCallback(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): IScrollHandler | undefined {
     if (!emitter.observed) return undefined;
     let cached = this.emitterCallbackCache.get(emitter);
     if (cached === undefined) {
@@ -807,7 +840,10 @@ export abstract class ScrollViewBase
         [{ nativeEvent: { contentOffset: { y: this.scrollAnimatedValue } } }],
         userOnScroll === undefined
           ? undefined
-          : { listener: (...args: readonly unknown[]) => forwardScrollEvent(userOnScroll, args) },
+          : {
+              listener: (...args: readonly unknown[]) =>
+                forwardScrollEvent(userOnScroll, args),
+            },
       );
     }
     return this.cachedStickyOnScrollHandler;
@@ -823,7 +859,9 @@ export abstract class ScrollViewBase
   // The imperative API a parent reaches via @ViewChild(ScrollView). buildScrollViewHandle is the
   // shared, proven handle (React/Vue use it verbatim); it reads the node through the LAZY getter on
   // every call, so a command before commit no-ops rather than freezing a null node.
-  private readonly handle: IScrollViewHandle = buildScrollViewHandle(() => this.hostNode);
+  private readonly handle: IScrollViewHandle = buildScrollViewHandle(
+    () => this.hostNode,
+  );
 
   scrollTo(options?: { x?: number; y?: number; animated?: boolean }): void {
     this.handle.scrollTo(options);
@@ -869,7 +907,8 @@ export abstract class ScrollViewBase
   // hook. Guarded on the flag itself so a check that changed nothing skips the reconcile walk,
   // which the old getter-driven update could not do.
   ngAfterContentChecked(): void {
-    if (this.hasProjectedRefreshControl === this.lastHasProjectedRefreshControl) return;
+    if (this.hasProjectedRefreshControl === this.lastHasProjectedRefreshControl)
+      return;
     this.lastHasProjectedRefreshControl = this.hasProjectedRefreshControl;
     this.updateProjectionController();
   }
@@ -910,8 +949,13 @@ export abstract class ScrollViewBase
     // Nothing that decides the attach has changed - return rather than detach and rebind the
     // native scroll event, which every unrelated @Input change would otherwise churn now that
     // ngOnChanges drives this too.
-    if (wantsAttach === this.stickyAttachedEnabled && node === this.stickyAttachedNode) {
-      dlog('STICKY[sv] attachSticky skipped (nothing about the attach changed)');
+    if (
+      wantsAttach === this.stickyAttachedEnabled &&
+      node === this.stickyAttachedNode
+    ) {
+      dlog(
+        'STICKY[sv] attachSticky skipped (nothing about the attach changed)',
+      );
       return;
     }
 
@@ -931,10 +975,15 @@ export abstract class ScrollViewBase
       );
       return;
     }
-    dlog('STICKY[sv] attachSticky waiting for commit to bind the native scroll event');
+    dlog(
+      'STICKY[sv] attachSticky waiting for commit to bind the native scroll event',
+    );
     this.cancelStickyBind = whenCommitted(node, () => {
       dlog('STICKY[sv] attachSticky node committed -> attachStickyScroll');
-      this.detachStickyScroll = attachStickyScroll(node, this.scrollAnimatedValue);
+      this.detachStickyScroll = attachStickyScroll(
+        node,
+        this.scrollAnimatedValue,
+      );
     });
   }
 
@@ -957,7 +1006,9 @@ export abstract class ScrollViewBase
 
   // Typed as the a11y intersection WITH the string index so resolveAccessibilityProps's result
   // stays assignable into the forwarded bag (a genuine narrowing, built at that type — no cast).
-  private accessibilityInputs(): IAccessibilityProps & IAriaProps & Record<string, unknown> {
+  private accessibilityInputs(): IAccessibilityProps &
+    IAriaProps &
+    Record<string, unknown> {
     return {
       testID: this.testID,
       nativeID: this.nativeID,
@@ -976,8 +1027,10 @@ export abstract class ScrollViewBase
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this['aria-label'],

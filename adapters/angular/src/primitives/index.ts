@@ -3,7 +3,16 @@
 // component imports them and renders them in its template. Declaring `style` as a real
 // Angular input prevents Angular's CSS style engine from decomposing RN `StyleProp` arrays.
 
-import { Component } from '@angular/core';
+import {
+  Component,
+  Input,
+  type OnInit,
+  type SimpleChanges,
+} from '@angular/core';
+import {
+  resolveTextProps,
+  type IEllipsizeMode,
+} from '@symbiote-native/components';
 import { SymbiotePrimitiveHost } from './shared';
 
 export {
@@ -21,12 +30,47 @@ export {
 })
 export class ViewHost extends SymbiotePrimitiveHost {}
 
+/**
+ * Text carries the two defaults RN's Text.js applies unconditionally (`ellipsizeMode ?? 'tail'`,
+ * `allowFontScaling !== false`, Text.js:288-291). Without them native falls back to `clip` and a
+ * clamped Text cuts mid-word with no ellipsis — device-observed on the other adapters 2026-08-19.
+ *
+ * They are declared as real `@Input()`s, unlike the pass-through props the base's comment
+ * describes, for one reason: the default can only be applied by code that can SEE whether the
+ * caller supplied a value. A host-binding pass-through is invisible here, so blindly writing
+ * 'tail' would silently overwrite an explicit `ellipsizeMode="clip"`.
+ */
 @Component({
   selector: 'symbiote-text, Text',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
-export class TextHost extends SymbiotePrimitiveHost {}
+export class TextHost extends SymbiotePrimitiveHost implements OnInit {
+  @Input() ellipsizeMode?: IEllipsizeMode;
+  @Input() allowFontScaling?: boolean;
+
+  // ngOnChanges fires before ngOnInit when a binding exists, and not at all when none does —
+  // so both hooks are needed to guarantee the defaults land exactly once per settled value.
+  ngOnInit(): void {
+    this.applyTextDefaults();
+  }
+
+  override ngOnChanges(changes: SimpleChanges): void {
+    super.ngOnChanges(changes);
+    if ('ellipsizeMode' in changes || 'allowFontScaling' in changes) {
+      this.applyTextDefaults();
+    }
+  }
+
+  private applyTextDefaults(): void {
+    const resolved = resolveTextProps({
+      ellipsizeMode: this.ellipsizeMode,
+      allowFontScaling: this.allowFontScaling,
+    });
+    this.setHostProp('ellipsizeMode', resolved.ellipsizeMode);
+    this.setHostProp('allowFontScaling', resolved.allowFontScaling);
+  }
+}
 
 @Component({
   selector: 'symbiote-image',

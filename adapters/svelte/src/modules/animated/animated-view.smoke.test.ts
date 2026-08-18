@@ -2,12 +2,13 @@
 // `Animated.Value`/`interpolate` reactively drives a style prop through the ordinary
 // flushValue -> AnimatedProps.update() -> setNativeProps commit path, with no native module and
 // no per-frame Svelte re-render — the everyday (non-native-driver) case every Animated consumer
-// hits before opting into useNativeDriver. Compiles the REAL AnimatedView.svelte, same harness
+// hits before opting into useNativeDriver. Compiles the REAL View.svelte and wraps it with the
+// REAL createAnimatedComponent, same harness
 // shape as animated-native-driver.test.ts / components/switch/switch.smoke.test.ts.
 //
 // Scope note: flushValue's graph walk and AnimatedProps.update()'s rasterization are core/engine
 // (core/engine/src/animated/*.test.ts) and are used, not re-verified, here. This file's job is the
-// Svelte-specific claim: that AnimatedView's reconcile $effect binds the leaf to the REAL committed
+// Svelte-specific claim: that the wrap's reconcile effect binds the leaf to the REAL committed
 // host node (not a stand-in), so a plain `setValue()` reaches the actual Fabric-facing props
 // without any native module installed. This is the counterpart of animated-native-driver.test.ts —
 // same component, no `nativeModuleProxy`, so `wantsNative` never engages.
@@ -24,7 +25,8 @@ import { AnimatedValue } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -34,7 +36,8 @@ globalThis.nativeModuleProxy = undefined;
 
 const fabric = installFabric();
 const ROOT_TAG = 91_103;
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 // fabric.find() walks the CREATION log, which never reflects a later clone's props
 // (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must
@@ -43,7 +46,10 @@ const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0))
 // root-element.ts's own mount target is ITSELF an unlabeled `symbiote-view` (RCTView, {}
 // props), sitting between the AppContainer and AnimatedView's real host node — so the search
 // must key on a prop only our own AnimatedView carries (testID), not the generic viewName.
-function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeNode | undefined {
+function findLive(
+  node: IFakeNode,
+  predicate: (n: IFakeNode) => boolean,
+): IFakeNode | undefined {
   if (predicate(node)) return node;
   for (const child of node.children) {
     const found = findLive(child, predicate);
@@ -53,27 +59,47 @@ function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeN
 }
 
 function appView(): IFakeNode {
-  const node = findLive(fabric.appRoot(), n => n.props.testID === 'animated-box');
-  if (node === undefined) throw new Error('no node with testID="animated-box" committed');
+  const node = findLive(
+    fabric.appRoot(),
+    n => n.props.testID === 'animated-box',
+  );
+  if (node === undefined)
+    throw new Error('no node with testID="animated-box" committed');
   return node;
 }
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
-const VIEW_OUT = join(__dirname, '.smoke-compiled-animated-view-js.mjs');
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
+const COMPONENTS_DIR = join(__dirname, '..', '..', 'components');
+// The compiled base has to sit NEXT TO its real source: its own relative imports
+// (`../runes/attachments`) resolve from wherever the compiled FILE lives.
+const VIEW_OUT = join(
+  COMPONENTS_DIR,
+  '.smoke-compiled-view-for-animated-view-js.mjs',
+);
 const PARENT_OUT = join(__dirname, '.smoke-compiled-js-parent.mjs');
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
 
 async function loadParent(): Promise<Component> {
-  const viewSource = readFileSync(join(__dirname, 'AnimatedView.svelte'), 'utf8');
-  compileToFile(viewSource, 'AnimatedView.svelte', VIEW_OUT);
+  const viewSource = readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8');
+  compileToFile(viewSource, 'View.svelte', VIEW_OUT);
 
   compileToFile(
     `<script>
-       import AnimatedView from './.smoke-compiled-animated-view-js.mjs';
+       import View from '../../components/.smoke-compiled-view-for-animated-view-js.mjs';
+       import { createAnimatedComponent } from './create-animated-component';
+       const AnimatedView = createAnimatedComponent(View);
        let { style, testID } = $props();
      </script>
      <AnimatedView {style} {testID} />`,

@@ -71,7 +71,11 @@ export interface IFlatListProps<ItemT> {
 
 // In multi-column mode #item is invoked per cell inside a packed row.
 export type IFlatListSlots<ItemT> = {
-  item: (info: { item: ItemT; index: number; separators: ISeparators }) => VNode[] | VNode;
+  item: (info: {
+    item: ItemT;
+    index: number;
+    separators: ISeparators;
+  }) => VNode[] | VNode;
   separator?: (props: ISeparatorProps<ItemT>) => VNode[] | VNode;
   header?: () => VNode[] | VNode;
   footer?: () => VNode[] | VNode;
@@ -111,23 +115,31 @@ const EMIT_KEYS = [
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-function isVirtualizedListHandle(value: unknown): value is IVirtualizedListHandle {
+function isVirtualizedListHandle(
+  value: unknown,
+): value is IVirtualizedListHandle {
   return isRecord(value) && typeof value.scrollToOffset === 'function';
 }
 
 // The handle FlatList exposes delegates to the inner VirtualizedList's handle (Vue resolves a
 // parent ref to the exposed object, so the wrapper must re-expose rather than forward the ref).
-function buildDelegateHandle(getInner: () => IVirtualizedListHandle | null): IFlatListHandle {
+function buildDelegateHandle(
+  getInner: () => IVirtualizedListHandle | null,
+): IFlatListHandle {
   return {
     scrollToOffset: params => getInner()?.scrollToOffset(params),
     scrollToIndex: params => getInner()?.scrollToIndex(params),
     scrollToItem: params => getInner()?.scrollToItem(params),
     scrollToEnd: params => getInner()?.scrollToEnd(params),
     flashScrollIndicators: () => getInner()?.flashScrollIndicators(),
-    getNativeScrollRef: (): IScrollViewHandle | null => getInner()?.getNativeScrollRef() ?? null,
-    getScrollableNode: (): IScrollViewHandle | null => getInner()?.getScrollableNode() ?? null,
-    getScrollResponder: (): IScrollViewHandle | null => getInner()?.getScrollResponder() ?? null,
-    getScrollNode: (): ISymbioteNode | null => getInner()?.getScrollNode() ?? null,
+    getNativeScrollRef: (): IScrollViewHandle | null =>
+      getInner()?.getNativeScrollRef() ?? null,
+    getScrollableNode: (): IScrollViewHandle | null =>
+      getInner()?.getScrollableNode() ?? null,
+    getScrollResponder: (): IScrollViewHandle | null =>
+      getInner()?.getScrollResponder() ?? null,
+    getScrollNode: (): ISymbioteNode | null =>
+      getInner()?.getScrollNode() ?? null,
     recordInteraction: () => getInner()?.recordInteraction(),
   };
 }
@@ -135,7 +147,12 @@ function buildDelegateHandle(getInner: () => IVirtualizedListHandle | null): IFl
 export const FlatList = defineComponent(
   <ItemT>(
     props: IFlatListProps<ItemT>,
-    { attrs, expose, emit, slots }: ICtx<IFlatListEmits<ItemT>, IFlatListSlots<ItemT>>,
+    {
+      attrs,
+      expose,
+      emit,
+      slots,
+    }: ICtx<IFlatListEmits<ItemT>, IFlatListSlots<ItemT>>,
   ) => {
     const inner = shallowRef<IVirtualizedListHandle | null>(null);
     const setInner = (instance: unknown): void => {
@@ -152,11 +169,18 @@ export const FlatList = defineComponent(
     };
 
     return () => {
-      const data: readonly ItemT[] = Array.isArray(props.data) ? props.data : [];
+      const data: readonly ItemT[] = Array.isArray(props.data)
+        ? props.data
+        : [];
       const keyExtractor = props.keyExtractor;
-      const numColumns = typeof props.numColumns === 'number' ? props.numColumns : SINGLE_COLUMN;
+      const numColumns =
+        typeof props.numColumns === 'number' ? props.numColumns : SINGLE_COLUMN;
       const viewabilityPairs = props.viewabilityConfigCallbackPairs;
-      const chromeSlots = { header: slots.header, footer: slots.footer, empty: slots.empty };
+      const chromeSlots = {
+        header: slots.header,
+        footer: slots.footer,
+        empty: slots.empty,
+      };
       const forwarded = normalizeVueAttrs(attrs);
 
       dlog(`Vue FlatList over ${data.length} items, ${numColumns} column(s)`);
@@ -165,9 +189,12 @@ export const FlatList = defineComponent(
         ? (info: { distanceFromEnd: number }): void => emit('endReached', info)
         : undefined;
       const startReached = listens('onStartReached')
-        ? (info: { distanceFromStart: number }): void => emit('startReached', info)
+        ? (info: { distanceFromStart: number }): void =>
+            emit('startReached', info)
         : undefined;
-      const refresh = listens('onRefresh') ? (): void => emit('refresh') : undefined;
+      const refresh = listens('onRefresh')
+        ? (): void => emit('refresh')
+        : undefined;
       const scrollToIndexFailed = listens('onScrollToIndexFailed')
         ? (info: {
             index: number;
@@ -179,7 +206,8 @@ export const FlatList = defineComponent(
 
       if (numColumns <= SINGLE_COLUMN) {
         const onViewableItemsChanged = wantsViewability
-          ? (info: IViewableItemsChangedInfo<ItemT>): void => emit('viewableItemsChanged', info)
+          ? (info: IViewableItemsChangedInfo<ItemT>): void =>
+              emit('viewableItemsChanged', info)
           : undefined;
         return h(
           VirtualizedListHost,
@@ -208,7 +236,8 @@ export const FlatList = defineComponent(
         { flexDirection: 'row' },
         typeof props.columnWrapperStyle === 'string'
           ? resolveClassName(props.columnWrapperStyle)
-          : isRecord(props.columnWrapperStyle) || Array.isArray(props.columnWrapperStyle)
+          : isRecord(props.columnWrapperStyle) ||
+              Array.isArray(props.columnWrapperStyle)
             ? props.columnWrapperStyle
             : undefined,
       ];
@@ -238,12 +267,19 @@ export const FlatList = defineComponent(
       // visibility, not row-level (shared expandRowViewability).
       const rowOnViewableItemsChanged = wantsViewability
         ? (rowInfo: IViewableItemsChangedInfo<IRow<ItemT>>): void =>
-            emit('viewableItemsChanged', expandRowViewability(rowInfo, keyExtractor))
+            emit(
+              'viewableItemsChanged',
+              expandRowViewability(rowInfo, keyExtractor),
+            )
         : undefined;
       const rowViewabilityPairs = viewabilityPairs?.map(pair => ({
         viewabilityConfig: pair.viewabilityConfig,
-        onViewableItemsChanged: (rowInfo: IViewableItemsChangedInfo<IRow<ItemT>>): void => {
-          pair.onViewableItemsChanged?.(expandRowViewability(rowInfo, keyExtractor));
+        onViewableItemsChanged: (
+          rowInfo: IViewableItemsChangedInfo<IRow<ItemT>>,
+        ): void => {
+          pair.onViewableItemsChanged?.(
+            expandRowViewability(rowInfo, keyExtractor),
+          );
         },
       }));
 
@@ -265,7 +301,8 @@ export const FlatList = defineComponent(
           ...forwarded,
           ref: setInner,
           data: rows,
-          getItem: (_source: unknown, index: number): IRow<ItemT> => rows[index],
+          getItem: (_source: unknown, index: number): IRow<ItemT> =>
+            rows[index],
           getItemCount: (): number => rows.length,
           keyExtractor: rowKeyExtractor,
           onEndReached: endReached,

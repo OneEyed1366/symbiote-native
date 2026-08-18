@@ -8,4 +8,6 @@ import type { IClassNameValue } from '@symbiote-native/engine';
 import type { IActivityIndicatorProps as IActivityIndicatorBaseProps } from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../../class-value';
 
-export type IActivityIndicatorProps = IActivityIndicatorBaseProps & { class?: ISvelteClassValue };
+export type IActivityIndicatorProps = IActivityIndicatorBaseProps & {
+  class?: ISvelteClassValue;
+};

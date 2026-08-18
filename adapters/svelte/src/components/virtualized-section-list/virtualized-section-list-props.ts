@@ -21,10 +21,18 @@ import type { ISvelteClassValue } from '../../class-value';
 
 export type { ISection, IVirtualizedSectionListHandle };
 
-export interface IVirtualizedSectionListProps<ItemT> extends IAccessibilityProps, IAriaProps {
+export interface IVirtualizedSectionListProps<ItemT>
+  extends IAccessibilityProps, IAriaProps {
   sections: ReadonlyArray<ISection<ItemT>>;
   item: Snippet<
-    [{ item: ItemT; index: number; section: ISection<ItemT>; separators: ISeparators }]
+    [
+      {
+        item: ItemT;
+        index: number;
+        section: ISection<ItemT>;
+        separators: ISeparators;
+      },
+    ]
   >;
   sectionHeader?: Snippet<[{ section: ISection<ItemT> }]>;
   sectionFooter?: Snippet<[{ section: ISection<ItemT> }]>;

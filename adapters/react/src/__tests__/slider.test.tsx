@@ -7,7 +7,11 @@
 
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/react';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/react';
 import { type ISymbioteEvent } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
@@ -20,7 +24,12 @@ const fakeColor = (value: unknown): string => `processed(${value})`;
 
 const RNC_SLIDER_VIEW_CONFIG = {
   bubblingEventTypes: {
-    topChange: { phasedRegistrationNames: { bubbled: 'onChange', captured: 'onChangeCapture' } },
+    topChange: {
+      phasedRegistrationNames: {
+        bubbled: 'onChange',
+        captured: 'onChangeCapture',
+      },
+    },
     topRNCSliderValueChange: {
       phasedRegistrationNames: {
         bubbled: 'onRNCSliderValueChange',
@@ -30,7 +39,9 @@ const RNC_SLIDER_VIEW_CONFIG = {
   },
   directEventTypes: {
     topRNCSliderSlidingStart: { registrationName: 'onRNCSliderSlidingStart' },
-    topRNCSliderSlidingComplete: { registrationName: 'onRNCSliderSlidingComplete' },
+    topRNCSliderSlidingComplete: {
+      registrationName: 'onRNCSliderSlidingComplete',
+    },
   },
   validAttributes: {
     value: true,
@@ -44,7 +55,9 @@ const RNC_SLIDER_VIEW_CONFIG = {
 };
 
 const fabric = installFabric();
-setNativeViewConfigSource(name => (name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined));
+setNativeViewConfigSource(name =>
+  name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined,
+);
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -71,7 +84,12 @@ describe('React-driven derived RNCSlider', () => {
     it('renders the raw RNCSlider and passes plain props through', () => {
       mount(
         ROOT_TAG,
-        createElement('RNCSlider', { value: 0.5, minimumValue: 0, maximumValue: 1, step: 0.1 }),
+        createElement('RNCSlider', {
+          value: 0.5,
+          minimumValue: 0,
+          maximumValue: 1,
+          step: 0.1,
+        }),
       );
       const props = sliderNode().props;
       expect(props.value).toBe(0.5);
@@ -109,13 +127,19 @@ describe('React-driven derived RNCSlider', () => {
       };
       mount(
         ROOT_TAG,
-        createElement('RNCSlider', { value: 0.2, onChange, onRNCSliderValueChange: onChange }),
+        createElement('RNCSlider', {
+          value: 0.2,
+          onChange,
+          onRNCSliderValueChange: onChange,
+        }),
       );
       const node = sliderNode();
       fabric.fireEvent(node.instanceHandle, 'topChange', { value: 0.7 });
       expect(changed).toBe(0.7);
       // The other value rail, derived from bubblingEventTypes, must reach the same handler.
-      fabric.fireEvent(node.instanceHandle, 'topRNCSliderValueChange', { value: 0.42 });
+      fabric.fireEvent(node.instanceHandle, 'topRNCSliderValueChange', {
+        value: 0.42,
+      });
       expect(changed).toBe(0.42);
     });
 
@@ -133,7 +157,11 @@ describe('React-driven derived RNCSlider', () => {
           },
         }),
       );
-      fabric.fireEvent(sliderNode().instanceHandle, 'topRNCSliderSlidingComplete', { value: 0.9 });
+      fabric.fireEvent(
+        sliderNode().instanceHandle,
+        'topRNCSliderSlidingComplete',
+        { value: 0.9 },
+      );
       expect(completedAt).toBe(0.9);
     });
   });

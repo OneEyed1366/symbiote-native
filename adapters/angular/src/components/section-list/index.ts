@@ -56,7 +56,10 @@ import {
   type IVListSeparatorContext,
 } from '../virtualized-list';
 import { VListOutletDirective } from '../virtualized-list/directives';
-import { stableAnchorStyle, SymbioteStyleInputDirective } from '../../primitives';
+import {
+  stableAnchorStyle,
+  SymbioteStyleInputDirective,
+} from '../../primitives';
 import {
   VSectionFooterDirective,
   VSectionHeaderDirective,
@@ -120,7 +123,9 @@ export type ISectionListInputs<ItemT> = Omit<
 @Component({
   selector: 'SectionList',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   imports: [
     VirtualizedSectionList,
     VSectionItemDirective,
@@ -182,8 +187,12 @@ export type ISectionListInputs<ItemT> = Omit<
       [accessibilityElementsHidden]="accessibilityElementsHidden"
       [accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"
       [accessibilityLanguage]="accessibilityLanguage"
-      [accessibilityRespondsToUserInteraction]="accessibilityRespondsToUserInteraction"
-      [accessibilityShowsLargeContentViewer]="accessibilityShowsLargeContentViewer"
+      [accessibilityRespondsToUserInteraction]="
+        accessibilityRespondsToUserInteraction
+      "
+      [accessibilityShowsLargeContentViewer]="
+        accessibilityShowsLargeContentViewer
+      "
       [accessibilityLargeContentTitle]="accessibilityLargeContentTitle"
       (accessibilityAction)="accessibilityAction.emit($event)"
       (accessibilityTap)="accessibilityTap.emit($event)"
@@ -214,7 +223,13 @@ export type ISectionListInputs<ItemT> = Omit<
       >
         <ng-container
           [vListOutlet]="sectionItemDir?.templateRef"
-          [vListOutletContext]="{ $implicit: item, item, index, section, separators }"
+          [vListOutletContext]="{
+            $implicit: item,
+            item,
+            index,
+            section,
+            separators,
+          }"
         ></ng-container>
       </ng-template>
       @if (sectionHeaderDir !== undefined) {
@@ -235,17 +250,23 @@ export type ISectionListInputs<ItemT> = Omit<
       }
       @if (sectionSeparatorDir !== undefined) {
         <ng-template vSectionSeparator>
-          <ng-container [vListOutlet]="sectionSeparatorDir.templateRef"></ng-container>
+          <ng-container
+            [vListOutlet]="sectionSeparatorDir.templateRef"
+          ></ng-container>
         </ng-template>
       }
       @if (listHeaderDir !== undefined) {
         <ng-template vListHeader>
-          <ng-container [vListOutlet]="listHeaderDir.templateRef"></ng-container>
+          <ng-container
+            [vListOutlet]="listHeaderDir.templateRef"
+          ></ng-container>
         </ng-template>
       }
       @if (listFooterDir !== undefined) {
         <ng-template vListFooter>
-          <ng-container [vListOutlet]="listFooterDir.templateRef"></ng-container>
+          <ng-container
+            [vListOutlet]="listFooterDir.templateRef"
+          ></ng-container>
         </ng-template>
       }
       @if (listEmptyDir !== undefined) {
@@ -262,7 +283,9 @@ export type ISectionListInputs<ItemT> = Omit<
         >
           <ng-container
             [vListOutlet]="itemSeparatorDir.templateRef"
-            [vListOutletContext]="itemSeparatorContext(highlighted, leadingItem, trailingItem)"
+            [vListOutletContext]="
+              itemSeparatorContext(highlighted, leadingItem, trailingItem)
+            "
           ></ng-container>
         </ng-template>
       }
@@ -276,9 +299,13 @@ export class SectionList<ItemT = unknown>
   @Input() keyExtractor?: (item: ItemT, index: number) => string;
   @Input() stickySectionHeadersEnabled?: boolean;
   @Input() extraData?: unknown;
-  @Output() readonly endReached = new EventEmitter<{ distanceFromEnd: number }>();
+  @Output() readonly endReached = new EventEmitter<{
+    distanceFromEnd: number;
+  }>();
   @Input() onEndReachedThreshold?: number;
-  @Output() readonly startReached = new EventEmitter<{ distanceFromStart: number }>();
+  @Output() readonly startReached = new EventEmitter<{
+    distanceFromStart: number;
+  }>();
   @Input() onStartReachedThreshold?: number;
   @Output() readonly refresh = new EventEmitter<void>();
   @Input() refreshing?: boolean | null;
@@ -331,8 +358,10 @@ export class SectionList<ItemT = unknown>
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -363,18 +392,24 @@ export class SectionList<ItemT = unknown>
 
   // The app's section/list authoring templates, captured from the app's DIRECT projected content
   // (single hop — always resolves) and re-stamped onto the inner VirtualizedSectionList above.
-  @ContentChild(VSectionItemDirective) sectionItemDir?: VSectionItemDirective<ItemT>;
-  @ContentChild(VSectionHeaderDirective) sectionHeaderDir?: VSectionHeaderDirective<ItemT>;
-  @ContentChild(VSectionFooterDirective) sectionFooterDir?: VSectionFooterDirective<ItemT>;
-  @ContentChild(VSectionSeparatorDirective) sectionSeparatorDir?: VSectionSeparatorDirective;
+  @ContentChild(VSectionItemDirective)
+  sectionItemDir?: VSectionItemDirective<ItemT>;
+  @ContentChild(VSectionHeaderDirective)
+  sectionHeaderDir?: VSectionHeaderDirective<ItemT>;
+  @ContentChild(VSectionFooterDirective)
+  sectionFooterDir?: VSectionFooterDirective<ItemT>;
+  @ContentChild(VSectionSeparatorDirective)
+  sectionSeparatorDir?: VSectionSeparatorDirective;
   @ContentChild(VListHeaderDirective) listHeaderDir?: VListHeaderDirective;
   @ContentChild(VListFooterDirective) listFooterDir?: VListFooterDirective;
   @ContentChild(VListEmptyDirective) listEmptyDir?: VListEmptyDirective;
-  @ContentChild(VListSeparatorDirective) itemSeparatorDir?: VListSeparatorDirective<ItemT>;
+  @ContentChild(VListSeparatorDirective)
+  itemSeparatorDir?: VListSeparatorDirective<ItemT>;
 
   // The composed inner VirtualizedSectionList. Its instance IS an IVirtualizedSectionListHandle, so
   // SectionList's handle delegates straight to it. Available from ngAfterViewInit; reads lazily.
-  @ViewChild(VirtualizedSectionList) private list?: VirtualizedSectionList<ItemT>;
+  @ViewChild(VirtualizedSectionList)
+  private list?: VirtualizedSectionList<ItemT>;
 
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
   // onto (see anchorHostStyle's doc comment) — NOT `list` above, which targets the real inner

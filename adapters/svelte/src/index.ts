@@ -286,7 +286,12 @@ export type { ShimElement } from './dom-shim';
 // no Svelte (or even Vue) twin — it is react-reconciler's own Fiber-level HostPortal primitive,
 // with no equivalent in a framework with no reconciler; createTunnel is the achievable analog,
 // same scope Vue itself settled on.
-export { createTunnel, TunnelIn, TunnelOut, type ITunnel } from './create-tunnel';
+export {
+  createTunnel,
+  TunnelIn,
+  TunnelOut,
+  type ITunnel,
+} from './create-tunnel';
 
 // useWindowDimensions / useColorScheme: the Svelte twins of React's hooks / Vue's composables —
 // see runes/use-window-dimensions.svelte.ts's header for why this adapter's lifecycle-helper
@@ -298,7 +303,13 @@ export { useColorScheme } from './runes/use-color-scheme.svelte';
 // `undefined` forever here. Same names, same `.current` shape, engine Dimensions/PixelRatio
 // underneath — see runes/window.ts's header for the two deliberate differences from upstream, and
 // for why `scrollX`/`scrollY`/`screenLeft`/`screenTop` are absent rather than faked.
-export { innerWidth, innerHeight, outerWidth, outerHeight, devicePixelRatio } from './runes/window';
+export {
+  innerWidth,
+  innerHeight,
+  outerWidth,
+  outerHeight,
+  devicePixelRatio,
+} from './runes/window';
 // What replaces `MediaQuery` from `svelte/reactivity`: named exports for the media features RN can
 // actually answer, instead of a class taking a CSS query string it would mostly have to answer
 // `false` to. `(prefers-color-scheme)`'s twin is `useColorScheme()` above. See
@@ -318,8 +329,8 @@ export {
   type IClassEntry,
 } from './class-value';
 
-// Animated: the Svelte twin of adapters/vue/src/modules/animated (see modules/animated/index.ts's
-// header for why Animated.View/Text/Image/ScrollView are each their own hand-authored .svelte
-// file rather than a generic createAnimatedComponent() wrap — Svelte has no runtime h()/
-// createElement equivalent a factory could target).
-export { Animated } from './modules/animated';
+// Animated: the Svelte twin of adapters/vue/src/modules/animated. All six RN animated components
+// ship (View/Text/Image/ScrollView/FlatList/SectionList), all of them from the same generic
+// createAnimatedComponent() wrap React, Vue and Solid also export.
+export { Animated, createAnimatedComponent } from './modules/animated';
+export type { IAnimatedComponentProps } from './modules/animated';

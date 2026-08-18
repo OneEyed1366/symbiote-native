@@ -14,4 +14,6 @@ import type { IClassNameValue } from '@symbiote-native/engine';
 import type { ITextInputProps as ITextInputBaseProps } from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../../class-value';
 
-export type ITextInputProps = ITextInputBaseProps & { class?: ISvelteClassValue };
+export type ITextInputProps = ITextInputBaseProps & {
+  class?: ISvelteClassValue;
+};
