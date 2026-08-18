@@ -17,7 +17,9 @@ import { createCssMetroTransformer } from './index';
 
 function fakeUpstream() {
   return {
-    transform: vi.fn((params: { filename: string; src: string }) => ({ received: params })),
+    transform: vi.fn((params: { filename: string; src: string }) => ({
+      received: params,
+    })),
     getCacheKey: vi.fn(() => 'cache-key'),
   };
 }
@@ -27,12 +29,18 @@ describe('createCssMetroTransformer', () => {
     const upstream = fakeUpstream();
     const transformer = createCssMetroTransformer(upstream);
 
-    await transformer.transform({ filename: 'theme.css', src: '.card { padding: 10px; }' });
+    await transformer.transform({
+      filename: 'theme.css',
+      src: '.card { padding: 10px; }',
+    });
 
     expect(upstream.transform).toHaveBeenCalledTimes(1);
-    const forwarded = upstream.transform.mock.calls[0]?.[0] as { filename: string; src: string };
+    const forwarded = upstream.transform.mock.calls[0]?.[0] as {
+      filename: string;
+      src: string;
+    };
     expect(forwarded.filename).toBe('theme.css.js');
-    expect(forwarded.src).toContain('registerStyles(');
+    expect(forwarded.src).toContain('registerRules(');
   });
 
   it('compiles a .scss file before handing it to the upstream transformer', async () => {
@@ -45,22 +53,33 @@ describe('createCssMetroTransformer', () => {
     });
 
     expect(upstream.transform).toHaveBeenCalledTimes(1);
-    const forwarded = upstream.transform.mock.calls[0]?.[0] as { filename: string; src: string };
+    const forwarded = upstream.transform.mock.calls[0]?.[0] as {
+      filename: string;
+      src: string;
+    };
     expect(forwarded.filename).toBe('theme.scss.js');
-    expect(forwarded.src).toContain('registerStyles(');
-    expect(forwarded.src).toContain('cardTitle');
+    expect(forwarded.src).toContain('registerRules(');
+    // The nested `.title` reaches the rule as the second token of `.card .title`, so this is what
+    // proves the SCSS was preprocessed and not forwarded raw.
+    expect(forwarded.src).toContain('"tokens":["card","title"]');
   });
 
   // why: a .module.css file's compiled output (an `export default` name map, not just
-  // registerStyles) must reach the upstream transformer just like a plain style file's does — the
+  // registerRules) must reach the upstream transformer just like a plain style file's does — the
   // wrapper must not special-case away the module branch.
   it('compiles a .module.css file, forwarding its default-export map to the upstream transformer', async () => {
     const upstream = fakeUpstream();
     const transformer = createCssMetroTransformer(upstream);
 
-    await transformer.transform({ filename: 'Card.module.css', src: '.card { padding: 10px; }' });
+    await transformer.transform({
+      filename: 'Card.module.css',
+      src: '.card { padding: 10px; }',
+    });
 
-    const forwarded = upstream.transform.mock.calls[0]?.[0] as { filename: string; src: string };
+    const forwarded = upstream.transform.mock.calls[0]?.[0] as {
+      filename: string;
+      src: string;
+    };
     expect(forwarded.filename).toBe('Card.module.css.js');
     expect(forwarded.src).toContain('export default');
   });
@@ -78,7 +97,9 @@ describe('createCssMetroTransformer', () => {
       options: { dev: true },
     });
 
-    const forwarded = upstream.transform.mock.calls[0]?.[0] as { options: unknown };
+    const forwarded = upstream.transform.mock.calls[0]?.[0] as {
+      options: unknown;
+    };
     expect(forwarded.options).toEqual({ dev: true });
   });
 
@@ -86,7 +107,10 @@ describe('createCssMetroTransformer', () => {
     const upstream = fakeUpstream();
     const transformer = createCssMetroTransformer(upstream);
 
-    await transformer.transform({ filename: 'App.tsx', src: 'export default 1;' });
+    await transformer.transform({
+      filename: 'App.tsx',
+      src: 'export default 1;',
+    });
 
     expect(upstream.transform).toHaveBeenCalledWith({
       filename: 'App.tsx',

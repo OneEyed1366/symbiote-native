@@ -1,6 +1,7 @@
 // Optional SCSS/Sass, Less, and Stylus preprocessor support. Each compiler here only ever reduces
-// its own syntax down to plain CSS text — parser.ts's `parseCSS()` is the single, UNCHANGED
-// downstream consumer of that text, exactly as it always was for a plain `.css` file. Tailwind
+// its own syntax down to plain CSS text — `lightning/rules.ts`'s `compileCssToRules()` is the
+// single, UNCHANGED downstream consumer of that text, exactly as it is for a plain `.css`
+// file. Tailwind
 // is a separate, out-of-scope concern and has no branch here.
 //
 // `sass`/`less`/`stylus` are lazy `import()`ed, never a top-level import, and are
@@ -17,14 +18,15 @@ export type IPreprocessorLanguage = 'css' | 'scss' | 'less' | 'stylus';
 // the one list `isStyleFile` (the Metro-transformer-facing "should I even look at this file?"
 // check) and `detectLanguage` (the "which compiler?" check) both key off, so a new preprocessor
 // extension is added in exactly one place.
-const RECOGNIZED_EXTENSIONS: ReadonlyMap<string, IPreprocessorLanguage> = new Map([
-  ['.css', 'css'],
-  ['.scss', 'scss'],
-  ['.sass', 'scss'],
-  ['.less', 'less'],
-  ['.styl', 'stylus'],
-  ['.stylus', 'stylus'],
-]);
+const RECOGNIZED_EXTENSIONS: ReadonlyMap<string, IPreprocessorLanguage> =
+  new Map([
+    ['.css', 'css'],
+    ['.scss', 'scss'],
+    ['.sass', 'scss'],
+    ['.less', 'less'],
+    ['.styl', 'stylus'],
+    ['.stylus', 'stylus'],
+  ]);
 
 export function isStyleFile(filename: string): boolean {
   return RECOGNIZED_EXTENSIONS.has(path.extname(filename).toLowerCase());
@@ -34,7 +36,9 @@ export function isStyleFile(filename: string): boolean {
  * (`compileScss` itself picks the concrete syntax off the extension); anything unrecognized is
  * treated as plain CSS, same as today. */
 export function detectLanguage(filename: string): IPreprocessorLanguage {
-  return RECOGNIZED_EXTENSIONS.get(path.extname(filename).toLowerCase()) ?? 'css';
+  return (
+    RECOGNIZED_EXTENSIONS.get(path.extname(filename).toLowerCase()) ?? 'css'
+  );
 }
 
 let sassModule: typeof import('sass') | undefined;
@@ -46,7 +50,9 @@ async function loadSass(): Promise<typeof import('sass')> {
     try {
       sassModule = await import('sass');
     } catch {
-      throw new Error('sass is required for .scss/.sass files. Install it: npm i -D sass');
+      throw new Error(
+        'sass is required for .scss/.sass files. Install it: npm i -D sass',
+      );
     }
   }
   return sassModule;
@@ -58,7 +64,9 @@ async function loadLess(): Promise<typeof import('less')> {
       const mod = await import('less');
       lessModule = mod.default ?? mod;
     } catch {
-      throw new Error('less is required for .less files. Install it: npm i -D less');
+      throw new Error(
+        'less is required for .less files. Install it: npm i -D less',
+      );
     }
   }
   return lessModule;
@@ -70,7 +78,9 @@ async function loadStylus(): Promise<typeof import('stylus')> {
       const mod = await import('stylus');
       stylusModule = mod.default ?? mod;
     } catch {
-      throw new Error('stylus is required for .styl files. Install it: npm i -D stylus');
+      throw new Error(
+        'stylus is required for .styl files. Install it: npm i -D stylus',
+      );
     }
   }
   return stylusModule;
@@ -79,7 +89,10 @@ async function loadStylus(): Promise<typeof import('stylus')> {
 /** Compiles SCSS, or the indented Sass syntax when `filePath` ends in `.sass`, down to plain CSS
  * text. `loadPaths` points at the source file's own directory so a relative `@use`/`@import`
  * resolves the way an author would expect. */
-export async function compileScss(source: string, filePath?: string): Promise<string> {
+export async function compileScss(
+  source: string,
+  filePath?: string,
+): Promise<string> {
   const sass = await loadSass();
   const result = sass.compileString(source, {
     loadPaths: filePath ? [path.dirname(filePath)] : [],
@@ -94,7 +107,10 @@ export async function compileScss(source: string, filePath?: string): Promise<st
 export const compileSass = compileScss;
 
 /** Compiles Less down to plain CSS text. Less has no synchronous render API. */
-export async function compileLess(source: string, filePath?: string): Promise<string> {
+export async function compileLess(
+  source: string,
+  filePath?: string,
+): Promise<string> {
   const less = await loadLess();
   const result = await less.render(source, {
     filename: filePath,
@@ -105,7 +121,10 @@ export async function compileLess(source: string, filePath?: string): Promise<st
 
 /** Compiles Stylus down to plain CSS text. Stylus's `render` is callback-based; wrapped in a
  * Promise so it composes with the rest of this module's async API. */
-export async function compileStylus(source: string, filePath?: string): Promise<string> {
+export async function compileStylus(
+  source: string,
+  filePath?: string,
+): Promise<string> {
   const stylus = await loadStylus();
   const compiler = stylus(source);
   if (filePath) compiler.set('filename', filePath);

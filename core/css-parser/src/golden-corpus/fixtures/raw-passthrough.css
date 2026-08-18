@@ -1,0 +1,26 @@
+/* The `raw` PROPERTY_TABLE entries: css-parser only renames the key and hands the CSS text
+   through untouched, because core/engine's own process-* ports parse it at commit time. A
+   library swap that "helpfully" normalizes these strings breaks the engine's parsers, so the
+   exact text is the assertion — down to the newline prettier leaves inside the multi-shadow
+   value below, which the snapshot records verbatim. */
+.effects {
+  transform: rotate(12deg) translate3d(1px, 2px, 0);
+  transform-origin: 10% 40%;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    0 0 8px #ff3e00;
+  filter: brightness(0.6) blur(2px);
+  background-image: linear-gradient(45deg, #ff3e00 0%, #0f1e30 100%);
+}
+
+/* text-shadow is the exception — RN has no composite prop, so css-parser decomposes it here.
+   Only the FIRST of a comma-separated list is applied, with a warning. */
+.text-shadow-single {
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.text-shadow-multi {
+  text-shadow:
+    1px 1px 2px black,
+    0 0 4px red;
+}

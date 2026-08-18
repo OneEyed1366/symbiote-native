@@ -70,20 +70,19 @@ import './theme.css'; // plain CSS — registers classes globally, no export
       │  (build time, Metro)                                       │  (runtime, all adapters)
       ▼                                                             ▼
 @symbiote-native/css-parser                              @symbiote-native/engine's style-registry
-  preprocessors.ts → parser.ts (parseCSS)            registerStyles() / resolveClassName()
+  preprocessors → lightning (compileCssToRules)       registerRules() / resolveClassName()
 ```
 
 A preprocessor source is reduced to plain CSS text first (`compileScss`/`compileSass`/
-`compileLess`/`compileStylus`); `parseCSS()` is the single downstream consumer either way, so every
-mechanism below runs identically regardless of source language.
+`compileLess`/`compileStylus`); `compileCssToRules()` is the single downstream consumer either way,
+so every mechanism below runs identically regardless of source language.
 
 ## API surface
 
 ```ts
 import {
-  parseCSS,
-  extractClassName,
-  kebabToCamel, // core compiler
+  compileCssToRules, // core compiler
+  compileScopedCss, // a scoped <style> block, rules + name map
   compileCssFile,
   isCssModuleFile, // standalone .css/.module.css files
   createCssMetroTransformer, // Metro babelTransformerPath factory
@@ -96,29 +95,28 @@ import {
   isStyleFile,
   classNamesToDtsSource,
   generateModuleDts, // .d.ts generation for CSS Modules typing
-  globalClassNamesIn,
-  globalClassTokensIn,
   hashFilePath,
 } from '@symbiote-native/css-parser';
 ```
 
-- **`parseCSS(css, { filename? })`** — the compiler core: postcss AST walk, `var()`/`calc()`
-  resolution, selector → camelCase key (`.card` → `card`, `.btn.primary` → `btnPrimary` compound,
-  `.card .title` → `cardTitle` descendant). A selector containing a pseudo-class (`:hover`, …) is
-  dropped whole — RN has no pseudo-class concept, so there is no partial-application semantics to
-  preserve.
+- **`compileCssToRules(css, { filename, pattern?, remToPx? })`** — the compiler core: one
+  lightningcss pass over the typed AST, resolving `var()`/`calc()` and emitting a `rules` array.
+  Each rule carries the class TOKENS its selector was written with — as authored, never camelCased
+  or collapsed into a single key — plus specificity and source order, so the registry matches by
+  token subset instead of reversing a guess. With a CSS-Modules `pattern` it also returns the
+  authored→renamed `exports` map and `globals`, the tokens lightningcss did NOT rename, which is
+  exactly the set the author put inside `:global(...)`. A selector containing a pseudo-class
+  (`:hover`, …) is dropped whole — RN has no pseudo-class concept, so there is no
+  partial-application semantics to preserve.
+- **`compileScopedCss(css, { filename, pattern })`** — the scoped-block form (a Svelte `<style>`, a
+  Vue `<style scoped>`): the same rules plus the authored→scoped name map its markup rewriter
+  resolves every class token through. Both halves come out of ONE compile, so the style side and
+  the markup side cannot disagree on a name.
 - **`compileCssFile` / `isCssModuleFile`** — the standalone-file form: `Card.module.css`'s classes
   are always scoped to a per-file hash and its default export is the name→scopedName map; a plain
   `.css` file registers globally via a side-effect import.
 - **`createCssMetroTransformer`** — wraps an upstream RN Babel transformer, detecting a stylesheet
   extension and compiling it before delegating everything else unchanged.
-- **`globalClassNamesIn` / `globalClassTokensIn`** — the two halves of `:global()`, and they answer
-  different questions. The first returns registered KEYS whose selector was global in full, so the
-  key itself skips scoping. The second returns MARKUP TOKENS that came out of a `:global(...)`
-  payload wherever it sat, including inside an otherwise-scoped selector — `.card :global(.reset)`
-  yields the key `cardReset` from neither, and the token `reset` from the second. A caller that
-  suffixes class names needs both: exempting only by key leaves a partial global's token
-  scope-mangled, exempting only by token leaves a fully global compound's rule dead.
 - **Preprocessors** — `sass`/`less`/`stylus` are lazy, **optional** `devDependencies`: a project
   that never authors `.scss`/`.less`/`.styl` never installs any of the three.
 - **CSS Modules type safety** — `css-dts` (bin) walks a directory and writes a real `<file>.d.ts`
@@ -143,7 +141,7 @@ import {
 
 ## Related packages
 
-- [`@symbiote-native/engine`](../engine) — owns the runtime `style-registry` (`registerStyles` /
+- [`@symbiote-native/engine`](../engine) — owns the runtime `style-registry` (`registerRules` /
   `resolveClassName`) this package's compiled output resolves against, and the class+style merge
   used by every adapter.
 - [`@symbiote-native/react`](../../adapters/react) / [`@symbiote-native/vue`](../../adapters/vue) /
