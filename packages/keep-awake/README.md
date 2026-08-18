@@ -31,12 +31,12 @@ into the native host app **once**, covering this package and every other `expo-m
 package (`@symbiote-native/battery`, `@symbiote-native/device`, `@symbiote-native/sensors`, …)
 with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 The recurring per-package half of the Android wiring (`app/build.gradle`'s
 `implementation project(':expo-keep-awake')` line and `MainApplication.kt`'s module-name map
@@ -100,7 +100,7 @@ useKeepAwake();
 import { Component, inject } from '@angular/core';
 import { KeepAwakeService } from '@symbiote-native/keep-awake/angular';
 
-@Component({ /* ... */ })
+@Component({/* ... */})
 export class KeepAwakeScreen {
   constructor() {
     inject(KeepAwakeService).connect();

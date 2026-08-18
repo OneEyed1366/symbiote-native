@@ -2,7 +2,7 @@
 
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`react-native-bootsplash`](https://github.com/zoontek/react-native-bootsplash) usable from
-**every** adapter — React, Vue, and Angular — not just React. Unlike a native-*view* wrapper
+**every** adapter — React, Vue, and Angular — not just React. Unlike a native-_view_ wrapper
 (see `@symbiote-native/slider`), bootsplash exposes an imperative TurboModule (`hide`/`isVisible`)
 plus a React hook (`useHideAnimation`) that composes a fade-out overlay from plain `View`/`Image`
 primitives — there is no `ViewConfig` to register, only lifecycle to port per adapter.

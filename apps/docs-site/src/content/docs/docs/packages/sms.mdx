@@ -21,11 +21,11 @@ in it; the user presses send, edits it, or throws it away.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -39,8 +39,8 @@ its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-sms`'s native code is discovered by `expo-modules-autolinking`, a different mechanism from
-  the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses — and
-  it isn't the standard Expo setup flow either, since this project never installs the `expo`
+  the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses — and it
+  isn't the standard Expo setup flow either, since this project never installs the `expo`
   meta-package. Follow [How to: wire up an Expo native
   module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
   every other `expo-modules-core` package with zero further native changes.
@@ -85,6 +85,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -112,6 +113,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -145,6 +147,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
 
     There's no per-instance service to `inject()` here — both functions are plain exports off the
     core package, called straight from a template event binding.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -166,6 +169,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
 
     <View><Text>{status}</Text><Button title="Invite a friend" onPress={onInvite} /></View>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -188,9 +192,9 @@ plain file path is not readable from there.
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `isAvailableAsync(): Promise<boolean>` | Whether this device can send an SMS at all. `false` on the iOS simulator, which has no Messages app, and on Android devices without telephony hardware |
+| Signature                                                           | Description                                                                                                                                                                       |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isAvailableAsync(): Promise<boolean>`                              | Whether this device can send an SMS at all. `false` on the iOS simulator, which has no Messages app, and on Android devices without telephony hardware                            |
 | `sendSMSAsync(addresses, message, options?): Promise<ISmsResponse>` | Opens the system composer prefilled with the recipients and text, and resolves once it closes. Rejects when there is no messaging application, or when a composer is already open |
 
 `addresses` takes one phone number as a string or a list of them; a bare string is normalised into
@@ -199,22 +203,22 @@ throws a `TypeError` before the native module is reached.
 
 ### `ISmsOptions`
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field         | Type                                              | Description                                                                                                                                                                                         |
+| ------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `attachments` | `ISmsAttachment \| ISmsAttachment[] \| undefined` | One file to attach, or a list of them. Android keeps only the first — its composer intent has a single `EXTRA_STREAM` slot — so extras are dropped before the native call. iOS attaches all of them |
 
 ### `ISmsAttachment`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `uri` | `string` | Content URI of the file. It must be a content URI so applications outside your own can read it; a plain file path is not reachable from the composer |
-| `mimeType` | `string` | MIME type of the attachment, such as `image/png` |
-| `filename` | `string` | File name shown for the attachment in the composer |
+| Field      | Type     | Description                                                                                                                                          |
+| ---------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `uri`      | `string` | Content URI of the file. It must be a content URI so applications outside your own can read it; a plain file path is not reachable from the composer |
+| `mimeType` | `string` | MIME type of the attachment, such as `image/png`                                                                                                     |
+| `filename` | `string` | File name shown for the attachment in the composer                                                                                                   |
 
 ### `ISmsResponse`
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field    | Type                                 | Description                                                                                                                                                                                          |
+| -------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `result` | `'sent' \| 'cancelled' \| 'unknown'` | How the composer was dismissed. `sent` when the user sent or scheduled the message, `cancelled` when they dismissed it, `unknown` when the outcome cannot be determined — always the case on Android |
 
 ## Notes

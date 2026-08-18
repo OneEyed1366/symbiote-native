@@ -99,6 +99,7 @@ tracks changing values:
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -117,6 +118,7 @@ tracks changing values:
       <ActionButton :title="`Push detail for ${route.value.name}`" @press="pushDetail" />
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -140,6 +142,7 @@ tracks changing values:
       }
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -156,6 +159,7 @@ tracks changing values:
       onPress={() => navigation.current.push('Detail', { id: route.current.params })}
     />
     ```
+
   </TabItem>
 </Tabs>
 
@@ -167,11 +171,11 @@ returned cleanup on blur — the same shape as a plain effect, just re-armed on 
 pair instead of once on mount.
 
 <Aside type="caution">
-  React's `useFocusEffect` must be given a **memoized** callback (wrap it in `useCallback`) — a
-  new function identity on every render re-subscribes the effect, same as any other
-  `useEffect` dependency. Vue's `useFocusEffect`, Angular's `injectFocusEffect`, and Svelte's
-  `useFocusEffect` need no memoization: `setup()`, a component constructor, and a Svelte
-  component's script each run exactly once, so the callback is captured a single time by value.
+  React's `useFocusEffect` must be given a **memoized** callback (wrap it in `useCallback`) — a new
+  function identity on every render re-subscribes the effect, same as any other `useEffect`
+  dependency. Vue's `useFocusEffect`, Angular's `injectFocusEffect`, and Svelte's `useFocusEffect`
+  need no memoization: `setup()`, a component constructor, and a Svelte component's script each run
+  exactly once, so the callback is captured a single time by value.
 </Aside>
 
 `useIsFocused`/`injectIsFocused` always **starts `false`**. It never guesses focus from stack
@@ -235,6 +239,7 @@ transition, not an instant JS-only mount.
       return <Text>{`focus count: ${focusCount}`}</Text>;
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -256,6 +261,7 @@ transition, not an instant JS-only mount.
       <Text>{{ `focus count: ${focusCount}` }}</Text>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -281,6 +287,7 @@ transition, not an instant JS-only mount.
       }
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -299,6 +306,7 @@ transition, not an instant JS-only mount.
 
     <Text>{`focus count: ${focusCount}`}</Text>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -357,6 +365,7 @@ navigator's state changes.
       return routeNames.map((name, index) => <Text key={name}>{`${index}. ${name}`}</Text>);
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -370,6 +379,7 @@ navigator's state changes.
       <Text v-for="(name, index) in routeNames" :key="name">{{ `${index}. ${name}` }}</Text>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -390,6 +400,7 @@ navigator's state changes.
       readonly routeNames = injectNavigationState(state => state.routes.map(route => route.name));
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -401,6 +412,7 @@ navigator's state changes.
 
     {#each routeNames.current as name, index (`${name}-${index}`)}<Text>{`${index}. ${name}`}</Text>{/each}
     ```
+
   </TabItem>
 </Tabs>
 

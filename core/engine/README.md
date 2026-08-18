@@ -9,7 +9,7 @@ current one, clones only what changed, and calls `completeRoot` — the persiste
 dance Fabric requires, done **once**, for every framework.
 
 > New to SymbioteNative? The [root README](../../README.md) has the architecture and the one fact it
-> rests on — React is just *one client* of `nativeFabricUIManager`. This package is what sits
+> rests on — React is just _one client_ of `nativeFabricUIManager`. This package is what sits
 > between every adapter and that native slot.
 
 ---
@@ -48,17 +48,24 @@ The entire surface a renderer seam drives:
 
 ```ts
 import {
-  createElement, createRawText, createAnchor,
-  appendChild, insertBefore, removeChild,
-  routeProp, setEventListener, setProp, setText,
+  createElement,
+  createRawText,
+  createAnchor,
+  appendChild,
+  insertBefore,
+  removeChild,
+  routeProp,
+  setEventListener,
+  setProp,
+  setText,
 } from '@symbiote-native/engine';
 
-const node = createElement('RCTView');          // component IS the Fabric view name
+const node = createElement('RCTView'); // component IS the Fabric view name
 const text = createRawText('Hello');
 appendChild(node, text);
-routeProp(node, 'onPress', () => {});            // ← the flat-bag entry point (React/Vue/Solid):
-                                                  //   decides event-vs-prop via the ViewConfig,
-                                                  //   NOT by the "onX" naming convention
+routeProp(node, 'onPress', () => {}); // ← the flat-bag entry point (React/Vue/Solid):
+//   decides event-vs-prop via the ViewConfig,
+//   NOT by the "onX" naming convention
 ```
 
 `routeProp` is the one call a flat-bag adapter should route every prop through — a **structural**
@@ -72,7 +79,7 @@ import { createSurface } from '@symbiote-native/engine';
 
 const surface = createSurface(rootTag);
 surface.appendChild(root, node);
-surface.commit();          // synchronous — for a framework that already batches (React)
+surface.commit(); // synchronous — for a framework that already batches (React)
 // surface.requestCommit(); // microtask-coalesced — for reactive frameworks (Vue/Svelte/Angular)
 ```
 

@@ -19,11 +19,11 @@ of scope for this pass.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -37,9 +37,9 @@ versions — never install either yourself, and never add the `expo` meta-packag
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-crypto`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
-  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper
-  uses — and it isn't the standard Expo setup flow either, since this project never installs the
-  `expo` meta-package. Follow [How to: wire up an Expo native
+  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses —
+  and it isn't the standard Expo setup flow either, since this project never installs the `expo`
+  meta-package. Follow [How to: wire up an Expo native
   module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
   every future `expo-modules-core` package with zero further native changes.
 </Aside>
@@ -87,6 +87,7 @@ subscription.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -123,6 +124,7 @@ subscription.
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -163,6 +165,7 @@ subscription.
 
     There's no per-instance service to `inject()` here — every function is a plain free function
     off the core package.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -201,6 +204,7 @@ subscription.
 
     There's no per-instance rune to reach for here either — every function is a plain free
     function off the core package.
+
   </TabItem>
 </Tabs>
 
@@ -208,51 +212,51 @@ subscription.
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `getRandomBytes(byteCount: number): Uint8Array` | Synchronously generates `byteCount` cryptographically secure random bytes. `byteCount` must be `0`-`1024` |
-| `getRandomBytesAsync(byteCount: number): Promise<Uint8Array>` | Same as `getRandomBytes`, asynchronously |
-| `getRandomValues<T extends ITypedArray>(typedArray: T): T` | Fills a provided integer-based `TypedArray` with cryptographically secure random values, in place |
-| `randomUUID(): string` | A V4 UUID (RFC4122), generated using cryptographically secure random values |
-| `digestStringAsync(algorithm: CryptoDigestAlgorithm, data: string, options?: ICryptoDigestOptions): Promise<IDigest>` | Generates a digest of a string, formatted per `options.encoding` (defaults to `CryptoEncoding.HEX`) |
-| `digest(algorithm: CryptoDigestAlgorithm, data: BufferSource): Promise<ArrayBuffer>` | Generates a digest of raw bytes, returned as an `ArrayBuffer` |
+| Signature                                                                                                             | Description                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `getRandomBytes(byteCount: number): Uint8Array`                                                                       | Synchronously generates `byteCount` cryptographically secure random bytes. `byteCount` must be `0`-`1024` |
+| `getRandomBytesAsync(byteCount: number): Promise<Uint8Array>`                                                         | Same as `getRandomBytes`, asynchronously                                                                  |
+| `getRandomValues<T extends ITypedArray>(typedArray: T): T`                                                            | Fills a provided integer-based `TypedArray` with cryptographically secure random values, in place         |
+| `randomUUID(): string`                                                                                                | A V4 UUID (RFC4122), generated using cryptographically secure random values                               |
+| `digestStringAsync(algorithm: CryptoDigestAlgorithm, data: string, options?: ICryptoDigestOptions): Promise<IDigest>` | Generates a digest of a string, formatted per `options.encoding` (defaults to `CryptoEncoding.HEX`)       |
+| `digest(algorithm: CryptoDigestAlgorithm, data: BufferSource): Promise<ArrayBuffer>`                                  | Generates a digest of raw bytes, returned as an `ArrayBuffer`                                             |
 
 ### `CryptoDigestAlgorithm`
 
-| Field | Value | Description |
-| --- | --- | --- |
-| `SHA1` | `'SHA-1'` | 160 bits |
+| Field    | Value       | Description                   |
+| -------- | ----------- | ----------------------------- |
+| `SHA1`   | `'SHA-1'`   | 160 bits                      |
 | `SHA256` | `'SHA-256'` | 256 bits, collision-resistant |
 | `SHA384` | `'SHA-384'` | 384 bits, collision-resistant |
 | `SHA512` | `'SHA-512'` | 512 bits, collision-resistant |
-| `MD2` | `'MD2'` | 128 bits. `@platform ios` |
-| `MD4` | `'MD4'` | 128 bits. `@platform ios` |
-| `MD5` | `'MD5'` | 128 bits |
+| `MD2`    | `'MD2'`     | 128 bits. `@platform ios`     |
+| `MD4`    | `'MD4'`     | 128 bits. `@platform ios`     |
+| `MD5`    | `'MD5'`     | 128 bits                      |
 
 ### `CryptoEncoding`
 
-| Field | Value | Description |
-| --- | --- | --- |
-| `HEX` | `'hex'` | Hexadecimal string output |
+| Field    | Value      | Description                                                |
+| -------- | ---------- | ---------------------------------------------------------- |
+| `HEX`    | `'hex'`    | Hexadecimal string output                                  |
 | `BASE64` | `'base64'` | Base64 string output, with trailing padding, no line wraps |
 
 ### `ICryptoDigestOptions`
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
+| Field      | Type             | Default              | Description                             |
+| ---------- | ---------------- | -------------------- | --------------------------------------- |
 | `encoding` | `CryptoEncoding` | `CryptoEncoding.HEX` | Format the digest string is returned in |
 
 ## Notes
 
 <Aside type="note" title="Input validation mirrors upstream exactly">
-  `getRandomBytes`/`getRandomBytesAsync` validate `byteCount` is a number in `0`-`1024`
-  (inclusive), throwing a plain `TypeError` otherwise, and floor a fractional count.
-  `digestStringAsync` validates `algorithm`/`data`/`options.encoding` and throws `CryptoError` (a
-  `TypeError` subclass, `code: 'ERR_CRYPTO'`) on an invalid value. `digest` prefers a native
-  `digestAsync` when present; otherwise it allocates a fixed-size output buffer (sized via a
-  per-algorithm length lookup table) and calls the native sync `digest`. This port skips
-  upstream's `__DEV__`/remote-debugger `Math.random` fallback — a React Native debugging-tool
-  concern, not applicable to this package's native-call path.
+  `getRandomBytes`/`getRandomBytesAsync` validate `byteCount` is a number in `0`-`1024` (inclusive),
+  throwing a plain `TypeError` otherwise, and floor a fractional count. `digestStringAsync`
+  validates `algorithm`/`data`/`options.encoding` and throws `CryptoError` (a `TypeError` subclass,
+  `code: 'ERR_CRYPTO'`) on an invalid value. `digest` prefers a native `digestAsync` when present;
+  otherwise it allocates a fixed-size output buffer (sized via a per-algorithm length lookup table)
+  and calls the native sync `digest`. This port skips upstream's `__DEV__`/remote-debugger
+  `Math.random` fallback — a React Native debugging-tool concern, not applicable to this package's
+  native-call path.
 </Aside>
 
 ## How the wrapper works

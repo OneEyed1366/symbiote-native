@@ -31,13 +31,13 @@ Unlike a plain RN native module, `expo-brightness`'s native code is discovered b
 this repo use — this needs wiring into the native host app **once**, covering this package and
 every other `expo-modules-core` package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
-| Android | `AndroidManifest.xml` — `android.permission.WRITE_SETTINGS`, required to set the system-wide brightness (`setSystemBrightnessAsync`/`setSystemBrightnessModeAsync`) |
+| Platform | Touches                                                                                                                                                             |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one)                 |
+| Android  | `AndroidManifest.xml` — `android.permission.WRITE_SETTINGS`, required to set the system-wide brightness (`setSystemBrightnessAsync`/`setSystemBrightnessModeAsync`) |
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
@@ -182,7 +182,9 @@ export class BrightnessScreen {
   }
 
   setBrightnessAsync(value: number): void {
-    setBrightnessAsync(value).then(() => getBrightnessAsync().then(result => this.brightness.set(result)));
+    setBrightnessAsync(value).then(() =>
+      getBrightnessAsync().then(result => this.brightness.set(result)),
+    );
   }
 }
 ```

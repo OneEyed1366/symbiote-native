@@ -9,11 +9,10 @@ You want to use a third-party RN library's native view (e.g.
 `@react-native-community/slider`) from a non-React adapter.
 
 <Aside type="danger" title="The library's component is React-only">
-  A third-party RN package ships a React **component** whose body calls hooks
-  off the React dispatcher. Rendering it from Vue or Angular hits a null
-  dispatcher and throws `Cannot read property 'useState' of null`. Only the
-  library's underlying **native view** can be made framework-agnostic —
-  never its React component wrapper.
+  A third-party RN package ships a React **component** whose body calls hooks off the React
+  dispatcher. Rendering it from Vue or Angular hits a null dispatcher and throws `Cannot read
+  property 'useState' of null`. Only the library's underlying **native view** can be made
+  framework-agnostic — never its React component wrapper.
 </Aside>
 
 ## The trick: register the native ViewConfig, skip the React component
@@ -59,6 +58,7 @@ framework-agnostic core plus a thin entry per adapter:
     @Component({ standalone: true, imports: [Slider], template: `<Slider [value]="0.5" />` })
     export class VolumeControl {}
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -68,6 +68,7 @@ framework-agnostic core plus a thin entry per adapter:
 
     <Slider value={0.5} onValueChange={next => (value = next)} />
     ```
+
   </TabItem>
 </Tabs>
 
@@ -80,7 +81,7 @@ the app declaring the third-party native package directly.
 
 If you're authoring your own wrapper (not just consuming Slider), the app
 must only ever list `@symbiote-native/<lib>` — never the third-party native package
-directly. (That's the rule for native *view* wrappers, which go through React
+directly. (That's the rule for native _view_ wrappers, which go through React
 Native's own CLI autolinking. A wrapper over an `expo-modules-core` module
 registers through a different path — see [Wire up an Expo native
 module](/docs/howtos/expo-native-module-setup/).) That means the wrapper itself has to look autolinkable to React
@@ -125,7 +126,7 @@ s.dependency 'React-Codegen'
 ```
 
 **`package.json`** copies the native library's `codegenConfig`, but points
-`jsSrcsDir` at the *nested* copy (`node_modules/<native-lib>/src`) so RN's own
+`jsSrcsDir` at the _nested_ copy (`node_modules/<native-lib>/src`) so RN's own
 codegen still runs against the real spec. The native library itself stays a
 regular `dependency` of the wrapper, never a `peerDependency` — that's what
 makes it install transitively without the app ever naming it.

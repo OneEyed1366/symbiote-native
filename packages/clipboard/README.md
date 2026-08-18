@@ -28,12 +28,12 @@ Unlike a plain RN native module, `expo-clipboard`'s native code is discovered by
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package (`@symbiote-native/sensors`, `@symbiote-native/local-auth`) with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` skill. Clipboard itself needs no
 `Info.plist`/`AndroidManifest.xml` permission entry on either platform — reading/writing the
@@ -64,7 +64,7 @@ shared by all three.
 import { getStringAsync, setStringAsync, addClipboardListener } from '@symbiote-native/clipboard';
 ```
 
-`useClipboard()`'s event only carries the clipboard's changed content *types*
+`useClipboard()`'s event only carries the clipboard's changed content _types_
 (`IClipboardEvent.contentTypes`), never the string itself — every adapter's demo screen treats a
 change as a cue to re-fetch via `getStringAsync()`, not a value to render directly.
 
@@ -82,7 +82,8 @@ function ClipboardScreen() {
     getStringAsync().then(setText);
   }, [clipboardEvent]);
 
-  const handleCopy = (input: string) => setStringAsync(input).then(() => getStringAsync().then(setText));
+  const handleCopy = (input: string) =>
+    setStringAsync(input).then(() => getStringAsync().then(setText));
 
   return <Text>{text ?? 'checking…'}</Text>;
 }
@@ -97,12 +98,16 @@ import { useClipboard } from '@symbiote-native/clipboard/vue';
 
 const text = ref('checking…');
 function refresh(): void {
-  void getStringAsync().then(value => { text.value = value; });
+  void getStringAsync().then(value => {
+    text.value = value;
+  });
 }
 onMounted(refresh);
 
 const clipboardEvent = useClipboard(); // Ref<IClipboardEvent | null>
-watch(clipboardEvent, event => { if (event) refresh(); });
+watch(clipboardEvent, event => {
+  if (event) refresh();
+});
 
 function handleCopy(input: string): void {
   void setStringAsync(input).then(refresh);
@@ -116,9 +121,13 @@ function handleCopy(input: string): void {
 ```ts
 // Angular
 import { Component, Injector, effect, inject, signal } from '@angular/core';
-import { ClipboardService, getStringAsync, setStringAsync } from '@symbiote-native/clipboard/angular';
+import {
+  ClipboardService,
+  getStringAsync,
+  setStringAsync,
+} from '@symbiote-native/clipboard/angular';
 
-@Component({ /* ... */ })
+@Component({/* ... */})
 export class ClipboardScreen {
   private readonly injector = inject(Injector);
   private readonly clipboardEvent = inject(ClipboardService).connect(); // Signal<IClipboardEvent | null>
@@ -126,7 +135,12 @@ export class ClipboardScreen {
 
   constructor() {
     this.refresh();
-    effect(() => { if (this.clipboardEvent() !== null) this.refresh(); }, { injector: this.injector });
+    effect(
+      () => {
+        if (this.clipboardEvent() !== null) this.refresh();
+      },
+      { injector: this.injector },
+    );
   }
 
   handleCopy(input: string): void {

@@ -19,29 +19,34 @@ brightness is an Android-only system-brightness-mode surface and an iOS-only cha
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
-<Aside type="caution" title="getBrightnessAsync/setBrightnessAsync never round-trip on the iOS Simulator">
+<Aside
+  type="caution"
+  title="getBrightnessAsync/setBrightnessAsync never round-trip on the iOS Simulator"
+>
   `UIScreen.main.brightness` is a long-standing Apple Simulator limitation, reproducible in any app
   including stock Expo Go: `set` is silently a no-op and `get` always returns a constant (observed
-  `1.0`), regardless of what was written. This is not a bug in this wrapper — `BrightnessModule.swift`'s
-  `setBrightnessAsync`/`getBrightnessAsync` are a bare, unstubbed `UIScreen.main.brightness` get/set.
-  Android's emulator has no such gap — `WindowManager.LayoutParams.screenBrightness` runs the same
-  framework code path as a real device, so the value genuinely persists there. Test brightness on a
-  real iPhone to see it actually round-trip on iOS.
+  `1.0`), regardless of what was written. This is not a bug in this wrapper —
+  `BrightnessModule.swift`'s `setBrightnessAsync`/`getBrightnessAsync` are a bare, unstubbed
+  `UIScreen.main.brightness` get/set. Android's emulator has no such gap —
+  `WindowManager.LayoutParams.screenBrightness` runs the same framework code path as a real device,
+  so the value genuinely persists there. Test brightness on a real iPhone to see it actually
+  round-trip on iOS.
 </Aside>
 
 <Aside type="note">
   The Android system-brightness surface (`getSystemBrightnessAsync`, `setSystemBrightnessAsync`,
   `restoreSystemBrightnessAsync`, `isUsingSystemBrightnessAsync`, `getSystemBrightnessModeAsync`,
-  `setSystemBrightnessModeAsync`) is Android-only. On every other platform each one either delegates to
-  the plain app-local `getBrightnessAsync`/`setBrightnessAsync`, or resolves a fixed no-op value
-  (`isUsingSystemBrightnessAsync` → `false`, `getSystemBrightnessModeAsync` → `BrightnessMode.UNKNOWN`,
-  `restoreSystemBrightnessAsync` → resolves immediately) — matching upstream's own per-platform branches.
+  `setSystemBrightnessModeAsync`) is Android-only. On every other platform each one either delegates
+  to the plain app-local `getBrightnessAsync`/`setBrightnessAsync`, or resolves a fixed no-op value
+  (`isUsingSystemBrightnessAsync` → `false`, `getSystemBrightnessModeAsync` →
+  `BrightnessMode.UNKNOWN`, `restoreSystemBrightnessAsync` → resolves immediately) — matching
+  upstream's own per-platform branches.
 </Aside>
 
 ## Installation
@@ -100,6 +105,7 @@ only changes in response to your own `setBrightnessAsync` calls.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -129,6 +135,7 @@ only changes in response to your own `setBrightnessAsync` calls.
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -163,6 +170,7 @@ only changes in response to your own `setBrightnessAsync` calls.
       }
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -187,6 +195,7 @@ only changes in response to your own `setBrightnessAsync` calls.
       </Pressable>
     </View>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -211,6 +220,7 @@ only changes in response to your own `setBrightnessAsync` calls.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -227,6 +237,7 @@ only changes in response to your own `setBrightnessAsync` calls.
       </Pressable>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -250,6 +261,7 @@ only changes in response to your own `setBrightnessAsync` calls.
       readonly error = this.permissions.error;
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -269,6 +281,7 @@ only changes in response to your own `setBrightnessAsync` calls.
       <Text>{permissions.error ? 'Retry check' : 'Request permission'}</Text>
     </Pressable>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -279,35 +292,35 @@ tells those two apart; `get()` re-runs the check without prompting the user.
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `isAvailableAsync(): Promise<boolean>` | Whether `getBrightnessAsync`/`setBrightnessAsync` exist on the native module |
-| `getBrightnessAsync(): Promise<number>` | Current screen brightness between `0` and `1`, inclusive |
-| `setBrightnessAsync(value: number): Promise<void>` | Sets the screen brightness (`0`..`1`, clamped); iOS only affects the app while foregrounded, Android persists until changed again |
-| `getSystemBrightnessAsync(): Promise<number>` | Gets the system-wide brightness. Delegates to `getBrightnessAsync` on every platform except Android, since iOS has no separate system-level value |
-| `setSystemBrightnessAsync(value: number): Promise<void>` | Sets the system-wide brightness. Delegates to `setBrightnessAsync` on every platform except Android |
-| `restoreSystemBrightnessAsync(): Promise<void>` | Resets the system brightness to the value it had before this app started controlling it. No-op on every platform except Android |
-| `isUsingSystemBrightnessAsync(): Promise<boolean>` | Whether the activity's window has no brightness override of its own, so the system-wide value is what the screen shows. It cannot distinguish "the app set the system value" from "the app never touched brightness" — it reports only that `setBrightnessAsync` is not overriding this window. Always `false` except on Android |
-| `getSystemBrightnessModeAsync(): Promise<BrightnessMode>` | Gets the system brightness mode. Always resolves `BrightnessMode.UNKNOWN` except on Android |
-| `setSystemBrightnessModeAsync(mode: BrightnessMode): Promise<void>` | Sets the system brightness mode. No-op except on Android, and also a no-op when passed `BrightnessMode.UNKNOWN` |
-| `getPermissionsAsync(): Promise<PermissionResponse>` | Checks the user's permission for accessing the system brightness |
-| `requestPermissionsAsync(): Promise<PermissionResponse>` | Asks the user for permission to access the system brightness |
-| `addBrightnessListener(listener): EventSubscription` | Subscribes to brightness-change events. Only fires on iOS — never on Android; call `.remove()` on the returned subscription to unsubscribe |
+| Signature                                                           | Description                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isAvailableAsync(): Promise<boolean>`                              | Whether `getBrightnessAsync`/`setBrightnessAsync` exist on the native module                                                                                                                                                                                                                                                     |
+| `getBrightnessAsync(): Promise<number>`                             | Current screen brightness between `0` and `1`, inclusive                                                                                                                                                                                                                                                                         |
+| `setBrightnessAsync(value: number): Promise<void>`                  | Sets the screen brightness (`0`..`1`, clamped); iOS only affects the app while foregrounded, Android persists until changed again                                                                                                                                                                                                |
+| `getSystemBrightnessAsync(): Promise<number>`                       | Gets the system-wide brightness. Delegates to `getBrightnessAsync` on every platform except Android, since iOS has no separate system-level value                                                                                                                                                                                |
+| `setSystemBrightnessAsync(value: number): Promise<void>`            | Sets the system-wide brightness. Delegates to `setBrightnessAsync` on every platform except Android                                                                                                                                                                                                                              |
+| `restoreSystemBrightnessAsync(): Promise<void>`                     | Resets the system brightness to the value it had before this app started controlling it. No-op on every platform except Android                                                                                                                                                                                                  |
+| `isUsingSystemBrightnessAsync(): Promise<boolean>`                  | Whether the activity's window has no brightness override of its own, so the system-wide value is what the screen shows. It cannot distinguish "the app set the system value" from "the app never touched brightness" — it reports only that `setBrightnessAsync` is not overriding this window. Always `false` except on Android |
+| `getSystemBrightnessModeAsync(): Promise<BrightnessMode>`           | Gets the system brightness mode. Always resolves `BrightnessMode.UNKNOWN` except on Android                                                                                                                                                                                                                                      |
+| `setSystemBrightnessModeAsync(mode: BrightnessMode): Promise<void>` | Sets the system brightness mode. No-op except on Android, and also a no-op when passed `BrightnessMode.UNKNOWN`                                                                                                                                                                                                                  |
+| `getPermissionsAsync(): Promise<PermissionResponse>`                | Checks the user's permission for accessing the system brightness                                                                                                                                                                                                                                                                 |
+| `requestPermissionsAsync(): Promise<PermissionResponse>`            | Asks the user for permission to access the system brightness                                                                                                                                                                                                                                                                     |
+| `addBrightnessListener(listener): EventSubscription`                | Subscribes to brightness-change events. Only fires on iOS — never on Android; call `.remove()` on the returned subscription to unsubscribe                                                                                                                                                                                       |
 
 ### `usePermissions()`
 
-| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Svelte (`/svelte`) | Signature | Returns |
-| --- | --- | --- | --- | --- | --- |
-| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions` | `()` | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null` |
+| React (`/react`) | Vue (`/vue`)     | Angular (`/angular`)           | Svelte (`/svelte`) | Signature | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------- | ---------------- | ------------------------------ | ------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions`   | `()`      | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null` |
 
 ### `usePermissions()` return value
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `status` | `PermissionResponse \| null` | The permission status last read, `null` until the first fetch resolves |
-| `error` | `Error \| null` | Why the automatic fetch left `status` at `null`. Cleared by the next successful `get()`/`request()` |
+| Field     | Type                                | Description                                                                                                                  |
+| --------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `status`  | `PermissionResponse \| null`        | The permission status last read, `null` until the first fetch resolves                                                       |
+| `error`   | `Error \| null`                     | Why the automatic fetch left `status` at `null`. Cleared by the next successful `get()`/`request()`                          |
 | `request` | `() => Promise<PermissionResponse>` | Asks the user for the permission, then updates `status` and clears `error`. Rejects to its caller when the native call fails |
-| `get` | `() => Promise<PermissionResponse>` | Re-reads the current status without prompting. Same update and rejection behavior as `request` |
+| `get`     | `() => Promise<PermissionResponse>` | Re-reads the current status without prompting. Same update and rejection behavior as `request`                               |
 
 React hands those back positionally, as `[status, request, get, error]`, so existing two- and
 three-element destructuring keeps working. Vue wraps `status` and `error` in refs; Angular exposes
@@ -316,11 +329,11 @@ returns both as getters, read as `permissions.status` / `permissions.error`.
 
 Read together, the two fields separate the three states:
 
-| `status` | `error` | Meaning |
-| --- | --- | --- |
-| `null` | `null` | Not fetched yet |
-| `null` | `Error` | The automatic fetch failed |
-| `PermissionResponse` | `null` | Fetched |
+| `status`             | `error` | Meaning                    |
+| -------------------- | ------- | -------------------------- |
+| `null`               | `null`  | Not fetched yet            |
+| `null`               | `Error` | The automatic fetch failed |
+| `PermissionResponse` | `null`  | Fetched                    |
 
 Every variant auto-fetches the current permission status once on mount/`connect()`, and updates
 again whenever `request`/`get` resolves. A failure in that automatic fetch lands in `error` instead
@@ -330,16 +343,16 @@ caller. Angular's auto-fetch is latched to at most one run per service instance,
 
 ### `BrightnessMode`
 
-| Member | Value | Description |
-| --- | --- | --- |
-| `UNKNOWN` | `0` | Returned when the brightness mode cannot be determined |
-| `AUTOMATIC` | `1` | Automatic brightness mode, tracking the ambient light sensor |
-| `MANUAL` | `2` | Manual brightness mode, set by the user or by `setSystemBrightnessAsync` |
+| Member      | Value | Description                                                              |
+| ----------- | ----- | ------------------------------------------------------------------------ |
+| `UNKNOWN`   | `0`   | Returned when the brightness mode cannot be determined                   |
+| `AUTOMATIC` | `1`   | Automatic brightness mode, tracking the ambient light sensor             |
+| `MANUAL`    | `2`   | Manual brightness mode, set by the user or by `setSystemBrightnessAsync` |
 
 ### `BrightnessEvent`
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field        | Type     | Description                                                 |
+| ------------ | -------- | ----------------------------------------------------------- |
 | `brightness` | `number` | The current brightness value between `0` and `1`, inclusive |
 
 ## Notes
@@ -356,11 +369,11 @@ caller. Angular's auto-fetch is latched to at most one run per service instance,
 - **Android quantizes the system value.** `0`..`1` is mapped onto Android's integer `1`..`255`
   range on write and back on read, so a written brightness round-trips approximately, never
   exactly. While the device is in `AUTOMATIC` mode, `getSystemBrightnessAsync` reads the
-  auto-brightness *adjustment* setting instead, rescaled — not the brightness actually on screen.
+  auto-brightness _adjustment_ setting instead, rescaled — not the brightness actually on screen.
 - **`restoreSystemBrightnessAsync` clears an override rather than replaying a saved value.** It
   puts the activity window's brightness back to `BRIGHTNESS_OVERRIDE_NONE`, handing the screen back
   to the system setting; nothing this app wrote earlier is restored. The same override is why
-  `getBrightnessAsync` reports the *system* brightness until your first `setBrightnessAsync` call
+  `getBrightnessAsync` reports the _system_ brightness until your first `setBrightnessAsync` call
   installs one.
 
 ## How the wrapper works

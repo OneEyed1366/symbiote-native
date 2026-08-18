@@ -77,7 +77,7 @@ Plus the `IWebCrypto` type describing the shape above.
 ## Notes
 
 - **`webCrypto` is resolved once, at module-load time**: if `globalThis.crypto` already exists
-  (a real Web Crypto implementation), `webCrypto` *is* that object; otherwise it's this package's
+  (a real Web Crypto implementation), `webCrypto` _is_ that object; otherwise it's this package's
   own `Crypto` class instance backed by `@symbiote-native/crypto`. React Native has no reliable
   `window` global, so this port checks/defines `globalThis.crypto` rather than upstream's `window`.
 - **`getRandomValues` only accepts the integer TypedArrays `@symbiote-native/crypto` can hand to

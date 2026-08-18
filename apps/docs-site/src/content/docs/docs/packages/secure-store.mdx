@@ -19,11 +19,11 @@ wrap — the React, Vue, and Angular entry points are plain re-exports of the sa
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -38,8 +38,8 @@ versions — never install either yourself, and never add the `expo` meta-packag
 <Aside type="danger" title="Native setup is required before first use">
   `expo-secure-store`'s native code is discovered by `expo-modules-autolinking`, a different
   mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
-  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
-  installs the `expo` meta-package. Follow [How to: wire up an Expo native
+  wrapper uses — and it isn't the standard Expo setup flow either, since this project never installs
+  the `expo` meta-package. Follow [How to: wire up an Expo native
   module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
   every other `expo-modules-core` package with zero further native changes.
 </Aside>
@@ -52,16 +52,17 @@ install; neither overwrites a value your app already set.
 <Aside type="caution" title="Android Auto Backup has to exclude the store">
   `symbiote-expo-link` sets two attributes on your app's `<application>` element:
 
-  ```xml
-  android:fullBackupContent="@xml/secure_store_backup_rules"
-  android:dataExtractionRules="@xml/secure_store_data_extraction_rules"
-  ```
+```xml
+android:fullBackupContent="@xml/secure_store_backup_rules"
+android:dataExtractionRules="@xml/secure_store_data_extraction_rules"
+```
 
-  The rule files themselves ship inside `expo-secure-store` and merge in automatically. They
-  matter: Auto Backup would otherwise upload the encrypted entries while leaving the Keystore keys
-  that decrypt them behind, so a restore onto a new device hands your app values it can no longer
-  read. If your app already sets either attribute, yours is kept and the install prints a notice —
-  merge the rules by hand in that case.
+The rule files themselves ship inside `expo-secure-store` and merge in automatically. They
+matter: Auto Backup would otherwise upload the encrypted entries while leaving the Keystore keys
+that decrypt them behind, so a restore onto a new device hands your app values it can no longer
+read. If your app already sets either attribute, yours is kept and the install prints a notice —
+merge the rules by hand in that case.
+
 </Aside>
 
 ## Usage
@@ -89,6 +90,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -125,6 +127,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -163,6 +166,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
 
     There's no per-instance service to `inject()` here — every function is a plain export off the
     core package, called straight from a template event binding.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -195,6 +199,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
 
     There's no per-instance rune to reach for here either — every function is a plain export off
     the core package, called straight from `onPress`.
+
   </TabItem>
 </Tabs>
 
@@ -224,43 +229,43 @@ enforce it at all, so this option can only be verified on a real device.
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `isAvailableAsync(): Promise<boolean>` | Whether the SecureStore API is usable on this device. Resolves `true` on Android and iOS. Says nothing about app permissions |
-| `getItemAsync(key, options?): Promise<string \| null>` | Reads the stored value. `null` when there is no entry for the key, or when the key has been invalidated |
-| `getItem(key, options?): string \| null` | Same read, synchronously. Blocks the JavaScript thread |
-| `setItemAsync(key, value, options?): Promise<void>` | Stores a key–value pair. Rejects if the value cannot be stored |
-| `setItem(key, value, options?): void` | Same write, synchronously. Blocks the JavaScript thread |
-| `deleteItemAsync(key, options?): Promise<void>` | Deletes the value stored under `key` |
-| `canUseBiometricAuthentication(): boolean` | Whether a value can be stored with `requireAuthentication` — `true` when the device supports biometrics and the enrolled method is strong enough |
+| Signature                                              | Description                                                                                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `isAvailableAsync(): Promise<boolean>`                 | Whether the SecureStore API is usable on this device. Resolves `true` on Android and iOS. Says nothing about app permissions                     |
+| `getItemAsync(key, options?): Promise<string \| null>` | Reads the stored value. `null` when there is no entry for the key, or when the key has been invalidated                                          |
+| `getItem(key, options?): string \| null`               | Same read, synchronously. Blocks the JavaScript thread                                                                                           |
+| `setItemAsync(key, value, options?): Promise<void>`    | Stores a key–value pair. Rejects if the value cannot be stored                                                                                   |
+| `setItem(key, value, options?): void`                  | Same write, synchronously. Blocks the JavaScript thread                                                                                          |
+| `deleteItemAsync(key, options?): Promise<void>`        | Deletes the value stored under `key`                                                                                                             |
+| `canUseBiometricAuthentication(): boolean`             | Whether a value can be stored with `requireAuthentication` — `true` when the device supports biometrics and the enrolled method is strong enough |
 
 Keys may contain alphanumeric characters, `.`, `-` and `_`, and must be non-empty. Anything else
 throws before the native call is made.
 
 ### `ISecureStoreOptions`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `keychainService` | `string \| undefined` | Android: the key pair's `Alias`. iOS: the item's `kSecAttrService`. An item stored with one needs the same one to be read back |
-| `requireAuthentication` | `boolean \| undefined` | Require the device's own authentication to reach the value |
-| `authenticationPrompt` | `string \| undefined` | Message shown in the prompt raised by `requireAuthentication` |
-| `keychainAccessible` | `IKeychainAccessibilityConstant \| undefined` | When the entry is accessible, via iOS's `kSecAttrAccessible`. iOS only. Defaults to `WHEN_UNLOCKED` |
-| `accessGroup` | `string \| undefined` | The keychain access group the entry belongs to. iOS only |
+| Field                   | Type                                          | Description                                                                                                                    |
+| ----------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `keychainService`       | `string \| undefined`                         | Android: the key pair's `Alias`. iOS: the item's `kSecAttrService`. An item stored with one needs the same one to be read back |
+| `requireAuthentication` | `boolean \| undefined`                        | Require the device's own authentication to reach the value                                                                     |
+| `authenticationPrompt`  | `string \| undefined`                         | Message shown in the prompt raised by `requireAuthentication`                                                                  |
+| `keychainAccessible`    | `IKeychainAccessibilityConstant \| undefined` | When the entry is accessible, via iOS's `kSecAttrAccessible`. iOS only. Defaults to `WHEN_UNLOCKED`                            |
+| `accessGroup`           | `string \| undefined`                         | The keychain access group the entry belongs to. iOS only                                                                       |
 
 ### Accessibility constants
 
 Values for `options.keychainAccessible`, exported from the package root. iOS only — Android's
 native module declares none of them, so they read `undefined` there.
 
-| Constant | Meaning |
-| --- | --- |
-| `WHEN_UNLOCKED` | Readable only while the device is unlocked. The default |
-| `WHEN_UNLOCKED_THIS_DEVICE_ONLY` | Same, and never migrated to a new device by a backup |
-| `AFTER_FIRST_UNLOCK` | Readable after the device has been unlocked once since boot — including while locked afterwards |
-| `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` | Same, and never migrated to a new device by a backup |
-| `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY` | Requires a passcode to store at all; removing the passcode deletes the entry |
-| `ALWAYS` | Readable regardless of lock state. Deprecated upstream — least secure |
-| `ALWAYS_THIS_DEVICE_ONLY` | Same, never migrated by a backup. Deprecated upstream |
+| Constant                              | Meaning                                                                                         |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `WHEN_UNLOCKED`                       | Readable only while the device is unlocked. The default                                         |
+| `WHEN_UNLOCKED_THIS_DEVICE_ONLY`      | Same, and never migrated to a new device by a backup                                            |
+| `AFTER_FIRST_UNLOCK`                  | Readable after the device has been unlocked once since boot — including while locked afterwards |
+| `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` | Same, and never migrated to a new device by a backup                                            |
+| `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`  | Requires a passcode to store at all; removing the passcode deletes the entry                    |
+| `ALWAYS`                              | Readable regardless of lock state. Deprecated upstream — least secure                           |
+| `ALWAYS_THIS_DEVICE_ONLY`             | Same, never migrated by a backup. Deprecated upstream                                           |
 
 ## Notes
 

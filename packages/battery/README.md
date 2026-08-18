@@ -29,12 +29,12 @@ Unlike a plain RN native module, `expo-battery`'s native code is discovered by
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package (`@symbiote-native/sensors`, `@symbiote-native/local-auth`) with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
@@ -72,9 +72,9 @@ import { useBatteryLevel, useBatteryState, useLowPowerMode } from '@symbiote-nat
 import { BatteryState } from '@symbiote-native/battery';
 
 function BatteryScreen() {
-  const batteryLevel = useBatteryLevel();   // number, -1 until the first reading arrives
-  const batteryState = useBatteryState();   // BatteryState, UNKNOWN until the first reading
-  const lowPowerMode = useLowPowerMode();   // boolean, false until the first reading
+  const batteryLevel = useBatteryLevel(); // number, -1 until the first reading arrives
+  const batteryState = useBatteryState(); // BatteryState, UNKNOWN until the first reading
+  const lowPowerMode = useLowPowerMode(); // boolean, false until the first reading
 
   const batteryLevelLabel = batteryLevel < 0 ? 'unknown' : `${Math.round(batteryLevel * 100)}%`;
 
@@ -111,13 +111,17 @@ const batteryLevelText = computed(() =>
 ```ts
 // Angular — examples/expo-angular/src/screens/BatteryScreen.ts
 import { Component, inject } from '@angular/core';
-import { BatteryLevelService, BatteryStateService, LowPowerModeService } from '@symbiote-native/battery/angular';
+import {
+  BatteryLevelService,
+  BatteryStateService,
+  LowPowerModeService,
+} from '@symbiote-native/battery/angular';
 
-@Component({ /* ... */ })
+@Component({/* ... */})
 export class BatteryScreen {
-  readonly batteryLevel = inject(BatteryLevelService).connect();  // Signal<number>
-  readonly batteryState = inject(BatteryStateService).connect();  // Signal<BatteryState>
-  readonly lowPowerMode = inject(LowPowerModeService).connect();  // Signal<boolean>
+  readonly batteryLevel = inject(BatteryLevelService).connect(); // Signal<number>
+  readonly batteryState = inject(BatteryStateService).connect(); // Signal<BatteryState>
+  readonly lowPowerMode = inject(LowPowerModeService).connect(); // Signal<boolean>
 
   batteryLevelLabel(): string {
     const level = this.batteryLevel();

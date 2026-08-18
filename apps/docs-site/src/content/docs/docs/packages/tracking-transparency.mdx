@@ -20,11 +20,11 @@ plain stateless free functions, same as [device](/docs/packages/device/).
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 <Aside type="note" title="Android and web always report granted">
   There is no tracking-consent concept on either platform —
@@ -46,16 +46,16 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
 <Aside type="danger" title="Native setup is required before first use">
   `expo-tracking-transparency`'s native code is discovered by `expo-modules-autolinking`, a
   different mechanism from the `react-native.config.cjs`/podspec autolinking every other
-  SymbioteNative wrapper uses — and it isn't the standard Expo setup flow either, since this
-  project never installs the `expo` meta-package. Follow [How to: wire up an Expo native
+  SymbioteNative wrapper uses — and it isn't the standard Expo setup flow either, since this project
+  never installs the `expo` meta-package. Follow [How to: wire up an Expo native
   module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every other `expo-modules-core` package with zero further native changes. Additionally, iOS
-  needs an `NSUserTrackingUsageDescription` string in `Info.plist` — required for the ATT prompt to
-  show at all. `symbiote-expo-link` inserts a generic default for you when that key is absent;
-  write your own wording into `Info.plist` and it stands, since the linker never rewrites a key
-  that already exists. The Android native module also pulls in
-  `com.google.android.gms:play-services-ads-identifier:18.0.1` transitively, automatically, with
-  no extra wiring needed.
+  every other `expo-modules-core` package with zero further native changes. Additionally, iOS needs
+  an `NSUserTrackingUsageDescription` string in `Info.plist` — required for the ATT prompt to show
+  at all. `symbiote-expo-link` inserts a generic default for you when that key is absent; write your
+  own wording into `Info.plist` and it stands, since the linker never rewrites a key that already
+  exists. The Android native module also pulls in
+  `com.google.android.gms:play-services-ads-identifier:18.0.1` transitively, automatically, with no
+  extra wiring needed.
 </Aside>
 
 ## Usage
@@ -81,6 +81,7 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -100,6 +101,7 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -125,6 +127,7 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
       readonly error = this.permissions.error;
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -146,6 +149,7 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
       </Pressable>
     </View>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -167,27 +171,27 @@ const advertisingId = getAdvertisingId(); // null on the iOS Simulator, or befor
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `getAdvertisingId(): string \| null` | Gets the advertising ID (Android AAID / iOS IDFA). Returns `null` on the iOS Simulator, when tracking hasn't been authorized via `requestTrackingPermissionsAsync`, or when the user declined |
-| `getTrackingPermissionsAsync(): Promise<PermissionResponse>` | Checks whether the user has authorized the app to access tracking-related data. Always resolves granted on Android and web |
-| `requestTrackingPermissionsAsync(): Promise<PermissionResponse>` | Requests the user to authorize or deny access to app-related data usable for tracking, showing the real ATT prompt on iOS. Always resolves granted on Android and web |
-| `isAvailable(): boolean` | Whether the tracking-transparency native module resolved at all |
+| Signature                                                        | Description                                                                                                                                                                                   |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getAdvertisingId(): string \| null`                             | Gets the advertising ID (Android AAID / iOS IDFA). Returns `null` on the iOS Simulator, when tracking hasn't been authorized via `requestTrackingPermissionsAsync`, or when the user declined |
+| `getTrackingPermissionsAsync(): Promise<PermissionResponse>`     | Checks whether the user has authorized the app to access tracking-related data. Always resolves granted on Android and web                                                                    |
+| `requestTrackingPermissionsAsync(): Promise<PermissionResponse>` | Requests the user to authorize or deny access to app-related data usable for tracking, showing the real ATT prompt on iOS. Always resolves granted on Android and web                         |
+| `isAvailable(): boolean`                                         | Whether the tracking-transparency native module resolved at all                                                                                                                               |
 
 ### `usePermissions()`
 
-| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Svelte (`/svelte`) | Signature | Returns |
-| --- | --- | --- | --- | --- | --- |
-| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions` | `()` | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null` |
+| React (`/react`) | Vue (`/vue`)     | Angular (`/angular`)           | Svelte (`/svelte`) | Signature | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------- | ---------------- | ------------------------------ | ------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions`   | `()`      | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null` |
 
 ### `usePermissions()` return value
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `status` | `PermissionResponse \| null` | The permission status last read, `null` until the first fetch resolves |
-| `error` | `Error \| null` | Why the automatic fetch left `status` at `null`. Cleared by the next successful `get()`/`request()` |
+| Field     | Type                                | Description                                                                                                                  |
+| --------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `status`  | `PermissionResponse \| null`        | The permission status last read, `null` until the first fetch resolves                                                       |
+| `error`   | `Error \| null`                     | Why the automatic fetch left `status` at `null`. Cleared by the next successful `get()`/`request()`                          |
 | `request` | `() => Promise<PermissionResponse>` | Asks the user for the permission, then updates `status` and clears `error`. Rejects to its caller when the native call fails |
-| `get` | `() => Promise<PermissionResponse>` | Re-reads the current status without prompting. Same update and rejection behavior as `request` |
+| `get`     | `() => Promise<PermissionResponse>` | Re-reads the current status without prompting. Same update and rejection behavior as `request`                               |
 
 React hands those back positionally, as `[status, request, get, error]`, so existing two- and
 three-element destructuring keeps working. Vue wraps `status` and `error` in refs; Angular exposes
@@ -196,11 +200,11 @@ returns both as getters, read as `permissions.status` / `permissions.error`.
 
 Read together, the two fields separate the three states:
 
-| `status` | `error` | Meaning |
-| --- | --- | --- |
-| `null` | `null` | Not fetched yet |
-| `null` | `Error` | The automatic fetch failed |
-| `PermissionResponse` | `null` | Fetched |
+| `status`             | `error` | Meaning                    |
+| -------------------- | ------- | -------------------------- |
+| `null`               | `null`  | Not fetched yet            |
+| `null`               | `Error` | The automatic fetch failed |
+| `PermissionResponse` | `null`  | Fetched                    |
 
 Every variant auto-fetches the current permission status once on mount/`connect()`, and updates
 again whenever `request`/`get` resolves. A failure in that automatic fetch lands in `error` instead
@@ -212,12 +216,12 @@ caller. Angular's auto-fetch is latched to at most one run per service instance,
 
 Re-exported verbatim from `expo-modules-core`, never the `expo` meta-package:
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `status` | `PermissionStatus` | The current permission status — `'undetermined'`, `'denied'`, or `'granted'` |
-| `granted` | `boolean` | Whether the permission is granted — a convenience shortcut over checking `status === 'granted'` |
-| `canAskAgain` | `boolean` | Whether the user can be asked again for this permission, or the OS has permanently blocked it |
-| `expires` | `PermissionExpiration` | When the permission expires (`'never'` on every platform this package targets) |
+| Field         | Type                   | Description                                                                                     |
+| ------------- | ---------------------- | ----------------------------------------------------------------------------------------------- |
+| `status`      | `PermissionStatus`     | The current permission status — `'undetermined'`, `'denied'`, or `'granted'`                    |
+| `granted`     | `boolean`              | Whether the permission is granted — a convenience shortcut over checking `status === 'granted'` |
+| `canAskAgain` | `boolean`              | Whether the user can be asked again for this permission, or the OS has permanently blocked it   |
+| `expires`     | `PermissionExpiration` | When the permission expires (`'never'` on every platform this package targets)                  |
 
 ## Notes
 

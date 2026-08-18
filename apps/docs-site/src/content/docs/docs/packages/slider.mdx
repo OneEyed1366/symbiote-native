@@ -21,12 +21,12 @@ instead.
 | iOS         | ✅ live |
 | Android     | ✅ live |
 
-| Framework adapter | Support    |
-| ------------------ | ---------- |
-| React               | ✅ live    |
-| Vue                 | ✅ live    |
-| Angular             | ✅ live    |
-| Svelte              | ✅ live    |
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -74,6 +74,7 @@ as a workspace dependency the same way the examples do.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -99,6 +100,7 @@ as a workspace dependency the same way the examples do.
     `v-model` is sugar over the same `value`/`@value-change` pair — write
     `:value="volume" @value-change="volume = $event"` instead if you need the
     explicit form. See the [Vue API reference](/docs/api/vue/#model-bindings-v-model).
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -133,6 +135,7 @@ as a workspace dependency the same way the examples do.
     `ReactiveFormsModule`) works the same way it does on `TextInput`/`Switch`,
     no extra import needed. See the [Angular API reference's Forms
     section](/docs/api/angular/#forms-angularforms) for the full pattern.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -159,6 +162,7 @@ as a workspace dependency the same way the examples do.
     reported value yourself; don't pass both on the same instance, since
     supplying `onValueChange` takes over and the bound variable stops updating
     from native reports.
+
   </TabItem>
 </Tabs>
 
@@ -193,29 +197,29 @@ Every prop below is framework-agnostic and shared verbatim by every adapter, **e
 Vue scoped slot, or a Svelte snippet) — see [shared vs
 framework-specific](/docs/api/components/#shared-vs-framework-specific).
 
-| Prop | Type | Default | Description |
-| --- | --- | --- | --- |
-| `value` | `number` | `0` | The slider's position. Uncontrolled during a drag — it doesn't snap back to `value` until `onSlidingComplete` fires |
-| `minimumValue` / `maximumValue` | `number` | `0` / `1` | Lower/upper bound of the draggable range |
-| `step` | `number` | `0` | Snaps the thumb to increments of this size; `0` draws implicit steps at native resolution (iOS 1000, Android 128) |
-| `lowerLimit` / `upperLimit` | `number` | unbounded | Clamps the draggable range without changing `minimumValue`/`maximumValue` |
-| `minimumTrackTintColor` / `maximumTrackTintColor` / `thumbTintColor` | `IColorValue` | native default | Color of the track before/after the thumb, and of the thumb itself |
-| `thumbImage` / `minimumTrackImage` / `maximumTrackImage` / `trackImage` | `IImageSourceProp` | — | Replaces the corresponding native default image |
-| `thumbSize` | `number` | native default | Diameter of the thumb, in points |
-| `disabled` | `boolean` | `false` | Disables dragging and dims the control to the native disabled look |
-| `inverted` | `boolean` | `false` | Reverses the direction the track fills in |
-| `tapToSeek` | `boolean` | `false` | Tapping anywhere on the track jumps the thumb there, instead of requiring a drag |
-| `vertical` | `boolean` | `false` | Renders the slider top-to-bottom instead of left-to-right |
-| `renderStepNumber` | `boolean` | `false` | Draws the built-in step-number indicator |
-| `StepMarker` (React) / `#stepMarker` (Vue) / `stepMarker` (Svelte) | render prop / scoped slot / snippet | — | Custom per-step marker, replacing `renderStepNumber`'s built-in dot |
-| `onValueChange` | `(value: number) => void` | — | Fires continuously while dragging |
-| `onSlidingStart` / `onSlidingComplete` | `(value: number) => void` | — | Fires once when a drag begins/ends |
-| accessibility / `aria-*` / `testID` / `style` | — | — | Pass through to the native node unchanged |
+| Prop                                                                    | Type                                | Default        | Description                                                                                                         |
+| ----------------------------------------------------------------------- | ----------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `value`                                                                 | `number`                            | `0`            | The slider's position. Uncontrolled during a drag — it doesn't snap back to `value` until `onSlidingComplete` fires |
+| `minimumValue` / `maximumValue`                                         | `number`                            | `0` / `1`      | Lower/upper bound of the draggable range                                                                            |
+| `step`                                                                  | `number`                            | `0`            | Snaps the thumb to increments of this size; `0` draws implicit steps at native resolution (iOS 1000, Android 128)   |
+| `lowerLimit` / `upperLimit`                                             | `number`                            | unbounded      | Clamps the draggable range without changing `minimumValue`/`maximumValue`                                           |
+| `minimumTrackTintColor` / `maximumTrackTintColor` / `thumbTintColor`    | `IColorValue`                       | native default | Color of the track before/after the thumb, and of the thumb itself                                                  |
+| `thumbImage` / `minimumTrackImage` / `maximumTrackImage` / `trackImage` | `IImageSourceProp`                  | —              | Replaces the corresponding native default image                                                                     |
+| `thumbSize`                                                             | `number`                            | native default | Diameter of the thumb, in points                                                                                    |
+| `disabled`                                                              | `boolean`                           | `false`        | Disables dragging and dims the control to the native disabled look                                                  |
+| `inverted`                                                              | `boolean`                           | `false`        | Reverses the direction the track fills in                                                                           |
+| `tapToSeek`                                                             | `boolean`                           | `false`        | Tapping anywhere on the track jumps the thumb there, instead of requiring a drag                                    |
+| `vertical`                                                              | `boolean`                           | `false`        | Renders the slider top-to-bottom instead of left-to-right                                                           |
+| `renderStepNumber`                                                      | `boolean`                           | `false`        | Draws the built-in step-number indicator                                                                            |
+| `StepMarker` (React) / `#stepMarker` (Vue) / `stepMarker` (Svelte)      | render prop / scoped slot / snippet | —              | Custom per-step marker, replacing `renderStepNumber`'s built-in dot                                                 |
+| `onValueChange`                                                         | `(value: number) => void`           | —              | Fires continuously while dragging                                                                                   |
+| `onSlidingStart` / `onSlidingComplete`                                  | `(value: number) => void`           | —              | Fires once when a drag begins/ends                                                                                  |
+| accessibility / `aria-*` / `testID` / `style`                           | —                                   | —              | Pass through to the native node unchanged                                                                           |
 
 ## Notes
 
-- **`value={0}` is discarded, not applied.** The shared fold treats `NaN` *and any falsy number,
-  including `0`*, as "no value given", so the native view falls back to its own initial position —
+- **`value={0}` is discarded, not applied.** The shared fold treats `NaN` _and any falsy number,
+  including `0`_, as "no value given", so the native view falls back to its own initial position —
   mirroring the community component. A slider that must start at zero wants `minimumValue={0}` and
   no explicit `value`.
 - **A bare slider measures differently per platform.** The iOS entry gives the wrapper a 40pt

@@ -29,12 +29,12 @@ Unlike a plain RN native module, `expo-sensors`' native code is discovered by
 into the native host app **once**, covering this package and every future `expo-modules-core`
 package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list, per-sensor permission strings — live in the
@@ -72,7 +72,11 @@ import { useAccelerometer } from '@symbiote-native/sensors/react';
 
 function SensorsScreen() {
   const accelerometer = useAccelerometer();
-  return <Text>{accelerometer && `x ${accelerometer.x} · y ${accelerometer.y} · z ${accelerometer.z}`}</Text>;
+  return (
+    <Text>
+      {accelerometer && `x ${accelerometer.x} · y ${accelerometer.y} · z ${accelerometer.z}`}
+    </Text>
+  );
 }
 ```
 
@@ -84,7 +88,9 @@ import { useAccelerometer } from '@symbiote-native/sensors/vue';
 const accelerometer = useAccelerometer();
 </script>
 <template>
-  <Text>{{ accelerometer && `x ${accelerometer.x} · y ${accelerometer.y} · z ${accelerometer.z}` }}</Text>
+  <Text>{{
+    accelerometer && `x ${accelerometer.x} · y ${accelerometer.y} · z ${accelerometer.z}`
+  }}</Text>
 </template>
 ```
 
@@ -93,7 +99,7 @@ const accelerometer = useAccelerometer();
 import { Component, inject } from '@angular/core';
 import { AccelerometerService } from '@symbiote-native/sensors/angular';
 
-@Component({ /* ... */ })
+@Component({/* ... */})
 export class SensorsScreen {
   readonly accelerometer = inject(AccelerometerService).connect();
 }

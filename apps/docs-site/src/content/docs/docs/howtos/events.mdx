@@ -17,6 +17,7 @@ shape of that event differs by framework.
     <Switch value={enabled} onValueChange={setEnabled} />
     <TextInput value={name} onValueChange={setName} />
     ```
+
   </TabItem>
   <TabItem label="Vue">
     Typed emits, or `v-model` sugar on controlled components.
@@ -26,6 +27,7 @@ shape of that event differs by framework.
     <Switch v-model="enabled" />
     <TextInput v-model="name" />
     ```
+
   </TabItem>
   <TabItem label="Angular">
     Real `@Output()` `EventEmitter`s carry the event across the boundary.
@@ -37,6 +39,7 @@ shape of that event differs by framework.
       <TextInput [value]="name" (valueChange)="setName($event)" />
     `
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     Callback props too — Svelte has no directive-based binding sugar for a
@@ -48,14 +51,14 @@ shape of that event differs by framework.
     <Switch value={enabled} onValueChange={(next) => (enabled = next)} />
     <TextInput value={name} onValueChange={(next) => (name = next)} />
     ```
+
   </TabItem>
 </Tabs>
 
 <Aside type="caution" title="Scroll events are the one exception">
-  `onScroll`/`onScrollBeginDrag`/`onScrollEndDrag`/`onMomentumScrollBegin`/
-  `onMomentumScrollEnd` stay plain callback `@Input()`s on Angular, even on
-  `ScrollView` and the lists — RN's scroll callbacks can carry an
-  `Animated.event(...)` marker, and `@Output()` can only bind a template
+  `onScroll`/`onScrollBeginDrag`/`onScrollEndDrag`/`onMomentumScrollBegin`/ `onMomentumScrollEnd`
+  stay plain callback `@Input()`s on Angular, even on `ScrollView` and the lists — RN's scroll
+  callbacks can carry an `Animated.event(...)` marker, and `@Output()` can only bind a template
   listener expression, not an arbitrary value.
 </Aside>
 

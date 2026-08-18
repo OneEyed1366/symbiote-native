@@ -17,17 +17,17 @@ two of RN's Android signals hang off exactly that class. Without this package in
 no error. iOS needs no equivalent: `RCTKeyboardObserver` and `RCTSettingsManager` are global
 native observers RN already ships, independent of which renderer drives the view tree.
 
-| OS platform | Support |
-| ----------- | ------- |
+| OS platform | Support                                  |
+| ----------- | ---------------------------------------- |
 | iOS         | — not needed (RN ships both equivalents) |
-| Android     | ✅ live |
+| Android     | ✅ live                                  |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 All four adapters are listed as live because none of them import this package. They reach it
 through their existing `Keyboard` and `Settings` exports, which resolve a native module by name —
@@ -45,11 +45,11 @@ autolinking registers both modules deterministically. There is no iOS half to li
 in that config) and no manifest permission to merge — the shipped `AndroidManifest.xml` is empty.
 
 <Aside type="caution" title="Two documented APIs are dead on Android without this package">
-  [`Keyboard`](/docs/api/react/) and [`Settings`](/docs/api/react/) are listed as available on
-  every adapter's API page, and they are — on iOS unconditionally, on Android only once this
-  package is installed. Missing it produces no crash and no error: `Keyboard.addListener` returns
-  a real subscription that never fires, and `Settings.get` reads from an empty snapshot. If either
-  API looks inert on an Android build, check this dependency first.
+  [`Keyboard`](/docs/api/react/) and [`Settings`](/docs/api/react/) are listed as available on every
+  adapter's API page, and they are — on iOS unconditionally, on Android only once this package is
+  installed. Missing it produces no crash and no error: `Keyboard.addListener` returns a real
+  subscription that never fires, and `Settings.get` reads from an empty snapshot. If either API
+  looks inert on an Android build, check this dependency first.
 </Aside>
 
 ## Usage
@@ -91,6 +91,7 @@ platforms.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -125,6 +126,7 @@ platforms.
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -164,6 +166,7 @@ platforms.
 
     There's no service to `inject()` — `Keyboard` and `Settings` are plain objects off the
     adapter barrel, same as on React and Vue.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -196,6 +199,7 @@ platforms.
     `Keyboard` and `Settings` are plain objects off the adapter barrel here too, same as on
     every other adapter — the `$effect`'s returned function is the teardown, taking the place of
     React's `useEffect` cleanup and Vue's separate `onUnmounted`.
+
   </TabItem>
 </Tabs>
 
@@ -207,10 +211,10 @@ or signature table would be fabricated. What it publishes is a native surface, c
 
 ### Native modules
 
-| Native module name | Kotlin class | Backs |
-| --- | --- | --- |
+| Native module name | Kotlin class             | Backs                                                                                                                                                                                                                                                                        |
+| ------------------ | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `KeyboardObserver` | `KeyboardObserverModule` | The JS `Keyboard` module — `addListener`, `removeAllListeners`, `isVisible`, `metrics`, `scheduleLayoutAnimation`. The engine resolves this exact name on both platforms (RN's own `INativeKeyboardObserver` spec uses it), so the JS side is platform-uniform and unchanged |
-| `SettingsManager` | `SettingsManagerModule` | The JS `Settings` module — `get`, `set`, `watchKeys`, `clearWatch`. Claims the same name RN's iOS `Settings` resolves, and backs it with `SharedPreferences` instead of `NSUserDefaults` |
+| `SettingsManager`  | `SettingsManagerModule`  | The JS `Settings` module — `get`, `set`, `watchKeys`, `clearWatch`. Claims the same name RN's iOS `Settings` resolves, and backs it with `SharedPreferences` instead of `NSUserDefaults`                                                                                     |
 
 Both are registered by one `ReactPackage`, `SymbioteAndroidPackage`, which is the class
 autolinking discovers. A plain legacy `ReactPackage` works under the New Architecture via
@@ -218,11 +222,11 @@ TurboModule interop, so neither module needs a codegen spec.
 
 ### Emitted events
 
-| Event | Emitted by | Payload |
-| --- | --- | --- |
+| Event             | Emitted by               | Payload                                                                                                                                               |
+| ----------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `keyboardDidShow` | `KeyboardObserverModule` | `{ endCoordinates: { screenX, screenY, width, height }, easing: 'keyboard', duration: 0 }` — the same shape RN's JS `Keyboard` already parses, in DIP |
-| `keyboardDidHide` | `KeyboardObserverModule` | Same shape with `height: 0` and `screenY` at the full view height |
-| `settingsUpdated` | `SettingsManagerModule` | The full current `SharedPreferences` snapshot, re-broadcast when a value changes from outside RN. Suppressed for the module's own writes |
+| `keyboardDidHide` | `KeyboardObserverModule` | Same shape with `height: 0` and `screenY` at the full view height                                                                                     |
+| `settingsUpdated` | `SettingsManagerModule`  | The full current `SharedPreferences` snapshot, re-broadcast when a value changes from outside RN. Suppressed for the module's own writes              |
 
 ## Notes
 
@@ -234,7 +238,7 @@ TurboModule interop, so neither module needs a codegen spec.
   `duration: 0`, and that method returns early on a zero duration since a zero-length animation
   does nothing. It stays meaningful on iOS, where native supplies a real duration and easing.
 - **The IME inset is read directly, not via `getRootWindowInsets()`.** Under `adjustResize` the
-  latter's *consumed* insets read `0` while the keyboard is up. The module observes the raw
+  latter's _consumed_ insets read `0` while the keyboard is up. The module observes the raw
   `ime()` inset on the apply-insets dispatch instead, subtracting the system-bar inset to get the
   on-screen height above the navigation bar.
 - **Insets are observed, never consumed.** The listener returns the insets unchanged, so RN's own

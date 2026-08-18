@@ -20,11 +20,11 @@ surface that don't need a native view underneath.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -76,6 +76,7 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -102,6 +103,7 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
       </Stack>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -145,6 +147,7 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
       readonly details = Details;
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -185,6 +188,7 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
     /></Stack
     >
     ```
+
   </TabItem>
 </Tabs>
 
@@ -232,15 +236,15 @@ nothing to forward through the layers in between. `useIsFocused()`/`useFocusEffe
 are read the same way. See [Hooks & focus](/docs/navigation/hooks/) for the full set.
 
 <Aside type="note">
-  `useNavigation()`/`injectNavigation()` return a **union** type (`IAnyNavigatorHandle` — could be
-  a Stack, Tab, or Drawer handle, since the hook itself doesn't know which navigator mounted the
+  `useNavigation()`/`injectNavigation()` return a **union** type (`IAnyNavigatorHandle` — could be a
+  Stack, Tab, or Drawer handle, since the hook itself doesn't know which navigator mounted the
   calling component) — that's TypeScript discriminating a union, not a null check; `navigation`
   itself is never missing. Rather than narrowing it by hand at every call site, reach for
   `useStackNavigation()`/`useTabNavigation()`/`useDrawerNavigation()` (Angular:
-  `injectStackNavigation()`/etc.) when the calling component knows which navigator kind it's
-  under — each does the narrowing once, inside the library, and hands back a concretely-typed
-  handle, throwing a clear error if the screen turns out to be under the wrong navigator kind.
-  See [Hooks & focus](/docs/navigation/hooks/) for the full picture.
+  `injectStackNavigation()`/etc.) when the calling component knows which navigator kind it's under —
+  each does the narrowing once, inside the library, and hands back a concretely-typed handle,
+  throwing a clear error if the screen turns out to be under the wrong navigator kind. See [Hooks &
+  focus](/docs/navigation/hooks/) for the full picture.
 </Aside>
 
 <Aside type="caution">

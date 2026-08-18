@@ -100,8 +100,18 @@ import { Stack, ScreenDirective } from '@symbiote-native/navigation/angular';
   imports: [Stack, ScreenDirective],
   template: `
     <Stack #nav initialRouteName="Menu">
-      <ng-template symbioteScreen name="Menu" [component]="menuScreen" [options]="menuOptions"></ng-template>
-      <ng-template symbioteScreen name="Details" [component]="detailsScreen" [options]="detailsOptions"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Menu"
+        [component]="menuScreen"
+        [options]="menuOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Details"
+        [component]="detailsScreen"
+        [options]="detailsOptions"
+      ></ng-template>
     </Stack>
   `,
 })

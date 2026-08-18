@@ -28,12 +28,12 @@ Unlike a plain RN native module, `expo-application`'s native code is discovered 
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
@@ -82,8 +82,12 @@ function ApplicationScreen() {
 
   return (
     <View>
-      <Text>{applicationName} ({applicationId})</Text>
-      <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+      <Text>
+        {applicationName} ({applicationId})
+      </Text>
+      <Text>
+        v{nativeApplicationVersion} (build {nativeBuildVersion})
+      </Text>
       {Platform.OS === 'android' && installedAt && (
         <Text>Installed {installedAt.toLocaleDateString()}</Text>
       )}

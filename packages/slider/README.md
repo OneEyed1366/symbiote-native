@@ -64,7 +64,7 @@ import { Slider } from '@symbiote-native/slider/react';
   minimumTrackTintColor="#7fb5ff"
   maximumTrackTintColor="#334155"
   thumbTintColor="#ffffff"
-/>
+/>;
 ```
 
 ```vue
@@ -73,11 +73,7 @@ import { Slider } from '@symbiote-native/slider/react';
 import { Slider } from '@symbiote-native/slider/vue';
 </script>
 <template>
-  <Slider
-    testID="volume-slider"
-    :value="volume"
-    @update:value="volume = $event"
-  />
+  <Slider testID="volume-slider" :value="volume" @update:value="volume = $event" />
 </template>
 ```
 

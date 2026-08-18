@@ -34,13 +34,13 @@ Unlike a plain RN native module, `expo-tracking-transparency`'s native code is d
 this repo use — this needs wiring into the native host app **once**, covering this package and
 every other `expo-modules-core` package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| iOS | `Info.plist` — `NSUserTrackingUsageDescription`, required to show the ATT prompt |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| iOS      | `Info.plist` — `NSUserTrackingUsageDescription`, required to show the ATT prompt                                                                    |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. The Android
@@ -117,7 +117,10 @@ const { status: permissionStatus, request: requestPermission } = usePermissions(
 ```ts
 // Angular
 import { Component, inject } from '@angular/core';
-import { PermissionsService, getAdvertisingId } from '@symbiote-native/tracking-transparency/angular';
+import {
+  PermissionsService,
+  getAdvertisingId,
+} from '@symbiote-native/tracking-transparency/angular';
 
 @Component({
   selector: 'TrackingScreen',
@@ -168,7 +171,10 @@ Plus `PermissionStatus`/`PermissionResponse`/`PermissionExpiration`/`PermissionH
 re-exported verbatim from `expo-modules-core`, never the `expo` meta-package.
 
 ```ts
-import { getAdvertisingId, getTrackingPermissionsAsync } from '@symbiote-native/tracking-transparency';
+import {
+  getAdvertisingId,
+  getTrackingPermissionsAsync,
+} from '@symbiote-native/tracking-transparency';
 
 // framework-scoped entry points re-export the same free functions, plus a usePermissions
 // hook/composable/service:

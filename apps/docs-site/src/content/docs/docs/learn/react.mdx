@@ -20,9 +20,7 @@ export default function App() {
   return (
     <View className="root">
       <Pressable onPress={() => setCount(value => value + 1)}>
-        {({ pressed }) => (
-          <Text className={pressed ? 'pressed' : 'label'}>Count is {count}</Text>
-        )}
+        {({ pressed }) => <Text className={pressed ? 'pressed' : 'label'}>Count is {count}</Text>}
       </Pressable>
     </View>
   );
@@ -31,9 +29,18 @@ export default function App() {
 
 ```css
 /* App.css */
-.root { flex: 1; align-items: center; justify-content: center; }
-.label { font-size: 24px; }
-.pressed { font-size: 24px; opacity: 0.6; }
+.root {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+.label {
+  font-size: 24px;
+}
+.pressed {
+  font-size: 24px;
+  opacity: 0.6;
+}
 ```
 
 `StyleSheet.create` works identically if you'd rather keep style objects

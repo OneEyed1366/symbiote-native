@@ -26,12 +26,12 @@ Unlike a plain RN native module, `expo-secure-store`'s native code is discovered
 `expo-modules-autolinking` — this needs wiring into the native host app **once**, covering this
 package and every other `expo-modules-core` package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a native-module name map |
+| Platform | Touches                                                                               |
+| -------- | ------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                               |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                   |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a native-module name map           |
 
 Full mechanics live in the `symbiote-expo-native-module` skill. The per-package half of that
 table — the Gradle dependency, the module map entry, the `NSFaceIDUsageDescription` string, and
@@ -108,15 +108,15 @@ const profile = JSON.parse((await SecureStore.getItemAsync('profile')) ?? 'null'
 
 ## API
 
-| Export | Signature | Notes |
-|---|---|---|
-| `isAvailableAsync` | `() => Promise<boolean>` | `true` on Android and iOS. Says nothing about permissions. |
-| `getItemAsync` | `(key, options?) => Promise<string \| null>` | `null` when there is no entry, or when the key has been invalidated. |
-| `getItem` | `(key, options?) => string \| null` | Blocks the JS thread. |
-| `setItemAsync` | `(key, value, options?) => Promise<void>` | Rejects if the value cannot be stored. |
-| `setItem` | `(key, value, options?) => void` | Blocks the JS thread. |
-| `deleteItemAsync` | `(key, options?) => Promise<void>` | |
-| `canUseBiometricAuthentication` | `() => boolean` | Whether `requireAuthentication` can be used at all. |
+| Export                                                                                                                                                                                    | Signature                                     | Notes                                                                                                                                                                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isAvailableAsync`                                                                                                                                                                        | `() => Promise<boolean>`                      | `true` on Android and iOS. Says nothing about permissions.                                                                                                                                         |
+| `getItemAsync`                                                                                                                                                                            | `(key, options?) => Promise<string \| null>`  | `null` when there is no entry, or when the key has been invalidated.                                                                                                                               |
+| `getItem`                                                                                                                                                                                 | `(key, options?) => string \| null`           | Blocks the JS thread.                                                                                                                                                                              |
+| `setItemAsync`                                                                                                                                                                            | `(key, value, options?) => Promise<void>`     | Rejects if the value cannot be stored.                                                                                                                                                             |
+| `setItem`                                                                                                                                                                                 | `(key, value, options?) => void`              | Blocks the JS thread.                                                                                                                                                                              |
+| `deleteItemAsync`                                                                                                                                                                         | `(key, options?) => Promise<void>`            |                                                                                                                                                                                                    |
+| `canUseBiometricAuthentication`                                                                                                                                                           | `() => boolean`                               | Whether `requireAuthentication` can be used at all.                                                                                                                                                |
 | `AFTER_FIRST_UNLOCK`, `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`, `ALWAYS`, `ALWAYS_THIS_DEVICE_ONLY`, `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`, `WHEN_UNLOCKED`, `WHEN_UNLOCKED_THIS_DEVICE_ONLY` | `IKeychainAccessibilityConstant \| undefined` | Values for `options.keychainAccessible`. iOS only — Android's native module declares none of them, so they read `undefined` there. `ALWAYS` and `ALWAYS_THIS_DEVICE_ONLY` are deprecated upstream. |
 
 `ISecureStoreOptions`: `keychainService`, `requireAuthentication`, `authenticationPrompt`,

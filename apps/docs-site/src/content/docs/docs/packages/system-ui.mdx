@@ -19,11 +19,11 @@ re-exports of the same `core`.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -36,10 +36,10 @@ versions — never install either yourself, and never add the `expo` meta-packag
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-system-ui`'s native code is discovered by `expo-modules-autolinking`, a different
-  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
-  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
-  installs the `expo` meta-package. Follow [How to: wire up an Expo native
+  `expo-system-ui`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
+  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses —
+  and it isn't the standard Expo setup flow either, since this project never installs the `expo`
+  meta-package. Follow [How to: wire up an Expo native
   module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
   every other `expo-modules-core` package with zero further native changes.
 </Aside>
@@ -72,6 +72,7 @@ subscription.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -91,6 +92,7 @@ subscription.
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -116,6 +118,7 @@ subscription.
 
     There's no per-instance service to `inject()` here — both functions are plain exports off the
     core package, called straight in the constructor or wherever the app's root is set up.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -130,6 +133,7 @@ subscription.
 
     <View><Text>Root background set to black</Text></View>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -137,10 +141,10 @@ subscription.
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
+| Signature                                                           | Description                                                                                                                                                                                              |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `setBackgroundColorAsync(color: ColorValue \| null): Promise<void>` | Changes the root view background color. Call this outside of your component tree (e.g. in the root file), since it affects the whole app. `null` clears the override rather than setting an actual color |
-| `getBackgroundColorAsync(): Promise<ColorValue \| null>` | Gets the current root view background color, in hex format. `null` if the background color is not set |
+| `getBackgroundColorAsync(): Promise<ColorValue \| null>`            | Gets the current root view background color, in hex format. `null` if the background color is not set                                                                                                    |
 
 ## Notes
 

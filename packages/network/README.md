@@ -31,12 +31,12 @@ into the native host app **once**, covering this package and every other `expo-m
 package (`@symbiote-native/battery`, `@symbiote-native/sensors`, `@symbiote-native/local-auth`)
 with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
@@ -73,7 +73,7 @@ import { getIpAddressAsync, isAirplaneModeEnabledAsync } from '@symbiote-native/
 import { useNetworkState } from '@symbiote-native/network/react';
 
 function NetworkScreen() {
-  const networkState = useNetworkState();          // { type, isConnected, isInternetReachable }
+  const networkState = useNetworkState(); // { type, isConnected, isInternetReachable }
   const [ipAddress, setIpAddress] = useState<string | null>(null);
   const [isAirplaneMode, setIsAirplaneMode] = useState<boolean | null>(null);
 
@@ -102,17 +102,19 @@ import { Text } from '@symbiote-native/vue';
 import { getIpAddressAsync, isAirplaneModeEnabledAsync } from '@symbiote-native/network';
 import { useNetworkState } from '@symbiote-native/network/vue';
 
-const networkState = useNetworkState();           // Ref<NetworkState>
+const networkState = useNetworkState(); // Ref<NetworkState>
 const ipAddress = ref<string | null>(null);
 const isAirplaneMode = ref<boolean | null>(null);
 
 watch(
   networkState,
   () => {
-    void Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(([ip, airplaneMode]) => {
-      ipAddress.value = ip;
-      isAirplaneMode.value = airplaneMode;
-    });
+    void Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
+      ([ip, airplaneMode]) => {
+        ipAddress.value = ip;
+        isAirplaneMode.value = airplaneMode;
+      },
+    );
   },
   { immediate: true },
 );

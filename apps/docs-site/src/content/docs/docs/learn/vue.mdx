@@ -15,20 +15,40 @@ compile down to the exact same `@vue/runtime-core` vnode tree, so both drive
 the identical adapter, the identical component surface, and the identical
 native output. Neither is a reduced mode of the other.
 
-<video poster={`${import.meta.env.BASE_URL}/vue-demo.webp`} aria-label="Vue SFC driving a native SymbioteNative demo" width="260" height="564" preload="none" autoplay muted loop playsinline>
+<video
+  poster={`${import.meta.env.BASE_URL}/vue-demo.webp`}
+  aria-label="Vue SFC driving a native SymbioteNative demo"
+  width="260"
+  height="564"
+  preload="none"
+  autoplay
+  muted
+  loop
+  playsinline
+>
   <source src={`${import.meta.env.BASE_URL}/vue-demo.mp4`} type="video/mp4" />
   <source src={`${import.meta.env.BASE_URL}/vue-demo.webm`} type="video/webm" />
 </video>
 
-*Vue SFC (`.vue`) — the reference canary at `examples/vue-sfc`.*
+_Vue SFC (`.vue`) — the reference canary at `examples/vue-sfc`._
 
-<video poster={`${import.meta.env.BASE_URL}/vue-tsx-demo.webp`} aria-label="Vue TSX driving a native SymbioteNative demo" width="260" height="564" preload="none" autoplay muted loop playsinline>
+<video
+  poster={`${import.meta.env.BASE_URL}/vue-tsx-demo.webp`}
+  aria-label="Vue TSX driving a native SymbioteNative demo"
+  width="260"
+  height="564"
+  preload="none"
+  autoplay
+  muted
+  loop
+  playsinline
+>
   <source src={`${import.meta.env.BASE_URL}/vue-tsx-demo.mp4`} type="video/mp4" />
   <source src={`${import.meta.env.BASE_URL}/vue-tsx-demo.webm`} type="video/webm" />
 </video>
 
-*Vue JSX/TSX (`.tsx`) — the same canary, authored render-function-first at
-`examples/vue-tsx`, proving the component surface is template-agnostic.*
+_Vue JSX/TSX (`.tsx`) — the same canary, authored render-function-first at
+`examples/vue-tsx`, proving the component surface is template-agnostic._
 
 ## Minimal component
 
@@ -49,9 +69,18 @@ const count = ref(0);
 </template>
 
 <style scoped>
-.root { flex: 1; align-items: center; justify-content: center; }
-.label { font-size: 24px; }
-.pressed { font-size: 24px; opacity: 0.6; }
+.root {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+.label {
+  font-size: 24px;
+}
+.pressed {
+  font-size: 24px;
+  opacity: 0.6;
+}
 </style>
 ```
 

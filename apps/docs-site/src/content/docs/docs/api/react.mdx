@@ -25,12 +25,12 @@ the Metro version anchor, so it has to be pinned at the app root.
 
 ## Component shape
 
-| Concern         | React API                                                  |
-| --------------- | ---------------------------------------------------------- |
-| Event callbacks | `onPress`, `onValueChange` (shared by `Switch`/`TextInput`), `onLayout` |
-| Children        | `children?: ReactNode`                                     |
-| Render children | `(state) => ReactNode`, for components such as `Pressable` |
-| Refs            | React refs to host instances or component handles          |
+| Concern         | React API                                                                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Event callbacks | `onPress`, `onValueChange` (shared by `Switch`/`TextInput`), `onLayout`                                                                          |
+| Children        | `children?: ReactNode`                                                                                                                           |
+| Render children | `(state) => ReactNode`, for components such as `Pressable`                                                                                       |
+| Refs            | React refs to host instances or component handles                                                                                                |
 | Styles          | `style={styles.root}` with React Native-style objects, or `className` for a registered CSS class (see the [Styling guide](/docs/learn/styling/)) |
 
 ## Common events
@@ -110,7 +110,7 @@ this works structurally where it never could in real RN.
 The target (`containerNodeOrRef`) must be an already-mounted SymbioteNative host
 node or `SymbioteSurface` — typically a ref to a persistent "overlay host"
 `View` near the app root — not a CSS-selector-style string. **v1 scope:** the
-target must live in the *same* surface as the portal's call site; portaling
+target must live in the _same_ surface as the portal's call site; portaling
 into a second, independently-mounted surface isn't wired yet.
 
 Vue has the equivalent through its own `Teleport` — see the
@@ -140,7 +140,7 @@ function Toast() {
 }
 ```
 
-`createPortal` only reaches a target in the *same* surface. `createTunnel` is
+`createPortal` only reaches a target in the _same_ surface. `createTunnel` is
 for two independently `mount()`-ed surfaces that share no Fabric tree at all —
 a split-screen embed, a system-level overlay surface. `In`/`Out` share
 nothing but a small store: `In` registers its children wherever it renders,

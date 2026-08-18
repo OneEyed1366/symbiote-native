@@ -19,20 +19,20 @@ are plain re-exports of the same `core`.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Scope: outgoing share only
 
 `expo-sharing` has two halves, and this package ships one of them.
 
-| Half | Upstream API | Here |
-| --- | --- | --- |
-| **Outgoing** — hand a local file to another app | `shareAsync`, `isAvailableAsync` | ✅ ported in full |
-| **Incoming** — receive files other apps share *into* your app | `useIncomingShare`, `getSharedPayloads`, `getResolvedSharedPayloadsAsync`, `clearSharedPayloads` | ❌ not ported |
+| Half                                                          | Upstream API                                                                                     | Here              |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------- |
+| **Outgoing** — hand a local file to another app               | `shareAsync`, `isAvailableAsync`                                                                 | ✅ ported in full |
+| **Incoming** — receive files other apps share _into_ your app | `useIncomingShare`, `getSharedPayloads`, `getResolvedSharedPayloadsAsync`, `clearSharedPayloads` | ❌ not ported     |
 
 <Aside type="caution" title="Incoming share needs an iOS Share Extension target">
   The incoming half is not a thinner JS surface. Upstream's config plugin generates a whole second
@@ -99,6 +99,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -129,6 +130,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -167,6 +169,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
 
     There's no per-instance service to `inject()` here — both functions are plain exports off the
     core package, called straight from a template event binding.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -196,6 +199,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
 
     There's no per-instance rune to reach for here either — both functions are plain exports off
     the core package, called straight from `onPress`.
+
   </TabItem>
 </Tabs>
 
@@ -213,31 +217,31 @@ await shareAsync(fileUri, { anchor: { x: 40, y: 120, width: 1, height: 1 } });
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `isAvailableAsync(): Promise<boolean>` | Whether the share sheet can be opened on this device. Resolves `true` on Android and iOS — it reports on the presence of the native module, not on any device capability |
-| `shareAsync(url, options?): Promise<void>` | Opens the platform share sheet for the local file at `url`. Resolves once the sheet is dismissed, whether or not the user picked anything |
+| Signature                                  | Description                                                                                                                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `isAvailableAsync(): Promise<boolean>`     | Whether the share sheet can be opened on this device. Resolves `true` on Android and iOS — it reports on the presence of the native module, not on any device capability |
+| `shareAsync(url, options?): Promise<void>` | Opens the platform share sheet for the local file at `url`. Resolves once the sheet is dismissed, whether or not the user picked anything                                |
 
 `url` must be a non-empty string pointing at a file the app can read — a `file://` URI, or a path
 from a file-system API. Anything else throws before the native call is made.
 
 ### `ISharingOptions`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `mimeType` | `string \| undefined` | MIME type of the file, deciding which apps the chooser offers. Guessed from the file name when omitted. Android only |
-| `UTI` | `string \| undefined` | Uniform Type Identifier of the file. Accepted by the native options record but unread in `expo-sharing@57.0.8`; carried through for forward compatibility. iOS only |
-| `dialogTitle` | `string \| undefined` | Title of the share dialog. Android renders it as the chooser header; iOS assigns it to the activity controller, where most share sheets ignore it |
-| `anchor` | `ISharingAnchor \| undefined` | Rectangle the iPad popover points at. Ignored on iPhone and on Android. iOS only |
+| Field         | Type                          | Description                                                                                                                                                         |
+| ------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mimeType`    | `string \| undefined`         | MIME type of the file, deciding which apps the chooser offers. Guessed from the file name when omitted. Android only                                                |
+| `UTI`         | `string \| undefined`         | Uniform Type Identifier of the file. Accepted by the native options record but unread in `expo-sharing@57.0.8`; carried through for forward compatibility. iOS only |
+| `dialogTitle` | `string \| undefined`         | Title of the share dialog. Android renders it as the chooser header; iOS assigns it to the activity controller, where most share sheets ignore it                   |
+| `anchor`      | `ISharingAnchor \| undefined` | Rectangle the iPad popover points at. Ignored on iPhone and on Android. iOS only                                                                                    |
 
 ### `ISharingAnchor`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `x` | `number \| undefined` | Horizontal offset in points, relative to the presenting view. Defaults to that view's horizontal center |
-| `y` | `number \| undefined` | Vertical offset in points, relative to the presenting view. Defaults to that view's bottom edge |
-| `width` | `number \| undefined` | Width of the anchor rectangle in points. Defaults to `0` |
-| `height` | `number \| undefined` | Height of the anchor rectangle in points. Defaults to `0` |
+| Field    | Type                  | Description                                                                                             |
+| -------- | --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `x`      | `number \| undefined` | Horizontal offset in points, relative to the presenting view. Defaults to that view's horizontal center |
+| `y`      | `number \| undefined` | Vertical offset in points, relative to the presenting view. Defaults to that view's bottom edge         |
+| `width`  | `number \| undefined` | Width of the anchor rectangle in points. Defaults to `0`                                                |
+| `height` | `number \| undefined` | Height of the anchor rectangle in points. Defaults to `0`                                               |
 
 ## Notes
 
@@ -271,6 +275,6 @@ Same shape as [secure store](/docs/packages/secure-store/)'s and
 [local auth](/docs/packages/local-auth/)'s four adapter entries: single-file re-exports with no
 lifecycle code, since every export is a stateless free function — there is nothing for a hook,
 composable, rune, or service to subscribe to or clean up. The incoming-share half in the scope section
-above is exactly the part that *would* have needed one. The native code itself is never
+above is exactly the part that _would_ have needed one. The native code itself is never
 vendored or copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see
 [the native setup guide](/docs/howtos/expo-native-module-setup/)).

@@ -25,12 +25,12 @@ Unlike a plain RN native module, `expo-haptics`' native code is discovered by
 wiring into the native host app **once**, covering this package and every other
 `expo-modules-core` package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
@@ -60,13 +60,22 @@ nothing per-framework to add, so all three adapter entry points are identical re
 
 ```tsx
 // React — examples/expo-react/screens/HapticsScreen.tsx
-import { impactAsync, ImpactFeedbackStyle, notificationAsync, NotificationFeedbackType, selectionAsync } from '@symbiote-native/haptics';
+import {
+  impactAsync,
+  ImpactFeedbackStyle,
+  notificationAsync,
+  NotificationFeedbackType,
+  selectionAsync,
+} from '@symbiote-native/haptics';
 
 function HapticsScreen() {
   return (
     <>
       <ActionButton title="Medium" onPress={() => impactAsync(ImpactFeedbackStyle.Medium)} />
-      <ActionButton title="Success" onPress={() => notificationAsync(NotificationFeedbackType.Success)} />
+      <ActionButton
+        title="Success"
+        onPress={() => notificationAsync(NotificationFeedbackType.Success)}
+      />
       <ActionButton title="Selection" onPress={() => selectionAsync()} />
     </>
   );
@@ -76,7 +85,13 @@ function HapticsScreen() {
 ```vue
 <!-- Vue — examples/expo-vue-sfc/screens/HapticsScreen.vue -->
 <script setup lang="ts">
-import { impactAsync, ImpactFeedbackStyle, notificationAsync, NotificationFeedbackType, selectionAsync } from '@symbiote-native/haptics';
+import {
+  impactAsync,
+  ImpactFeedbackStyle,
+  notificationAsync,
+  NotificationFeedbackType,
+  selectionAsync,
+} from '@symbiote-native/haptics';
 
 function fireImpact(style: ImpactFeedbackStyle): void {
   void impactAsync(style);
@@ -90,7 +105,12 @@ function fireImpact(style: ImpactFeedbackStyle): void {
 ```ts
 // Angular — examples/expo-angular/src/screens/HapticsScreen.ts
 import { Component } from '@angular/core';
-import { impactAsync, ImpactFeedbackStyle, notificationAsync, NotificationFeedbackType } from '@symbiote-native/haptics';
+import {
+  impactAsync,
+  ImpactFeedbackStyle,
+  notificationAsync,
+  NotificationFeedbackType,
+} from '@symbiote-native/haptics';
 
 @Component({
   selector: 'HapticsScreen',

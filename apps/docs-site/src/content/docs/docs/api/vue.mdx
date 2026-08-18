@@ -199,7 +199,7 @@ const overlayTunnel = createTunnel(); // module-level singleton, importable from
 </template>
 ```
 
-`Teleport` only reaches a target in the *same* surface. `createTunnel` is for
+`Teleport` only reaches a target in the _same_ surface. `createTunnel` is for
 two independently `mount()`-ed surfaces that share no Fabric tree at all.
 `In` and `Out` are separate components — not composables, since a composable
 can't accept template markup — linked only by a small reactive store: `In`

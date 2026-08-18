@@ -31,12 +31,12 @@ into the native host app **once**, covering this package and every other `expo-m
 package (`@symbiote-native/network`, `@symbiote-native/device`, `@symbiote-native/sensors`, ...)
 with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
@@ -143,7 +143,10 @@ Plus `Orientation` (enum: `UNKNOWN`/`PORTRAIT_UP`/`PORTRAIT_DOWN`/`LANDSCAPE_LEF
 `OrientationChangeEvent` — ported from upstream's `ScreenOrientation.types.ts`.
 
 ```ts
-import { getOrientationAsync, addOrientationChangeListener } from '@symbiote-native/screen-orientation';
+import {
+  getOrientationAsync,
+  addOrientationChangeListener,
+} from '@symbiote-native/screen-orientation';
 
 // framework-scoped entry points re-export the same free functions, plus a lifecycle
 // hook/composable/service:

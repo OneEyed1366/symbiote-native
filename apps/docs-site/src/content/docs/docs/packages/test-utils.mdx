@@ -21,19 +21,19 @@ Fabric family reparent.
 There is no native code here, so the usual platform table has nothing to vary on: the fake slot
 is plain JavaScript running in Node under Vitest, on whatever machine the suite runs on.
 
-| OS platform | Support                                                        |
-| ----------- | -------------------------------------------------------------- |
-| iOS         | n/a — the fake slot replaces Fabric; nothing reaches a device   |
-| Android     | n/a — same                                                      |
+| OS platform | Support                                                       |
+| ----------- | ------------------------------------------------------------- |
+| iOS         | n/a — the fake slot replaces Fabric; nothing reaches a device |
+| Android     | n/a — same                                                    |
 
 The adapter table, by contrast, is real: each adapter's own suite drives this harness.
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -98,6 +98,7 @@ under it.
     ```
 
     Trimmed from `adapters/react/src/components/switch/switch.test.tsx`.
+
   </TabItem>
   <TabItem label="Vue">
     ```ts
@@ -149,6 +150,7 @@ under it.
     ```
 
     Trimmed from `examples/vue-tsx/vue-fragment.test.ts`.
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -192,6 +194,7 @@ under it.
     Angular components are bound to the harness through the same `mount(rootTag, Component)` the
     other adapters use — there is no test-utils-specific `TestBed` setup, and no service to
     `inject()`.
+
   </TabItem>
   <TabItem label="Svelte">
     ```ts
@@ -250,6 +253,7 @@ under it.
     whose own suites can't lean on a loader to transform `.svelte` source — there is no
     `@sveltejs/vite-plugin-svelte` wired into this repo's Vitest config — so its tests compile
     real source through `svelte/compiler` by hand before mounting it, unlike the other three tabs.
+
   </TabItem>
 </Tabs>
 
@@ -260,51 +264,51 @@ the returned recorder.
 
 ### Functions
 
-| Signature                              | Description                                                                                                                                          |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `installFabric(): IFabricRecorder`      | Installs a fresh fake `nativeFabricUIManager` on `globalThis` and returns the recorder handle that observes it. Call it at module scope, before the first mount |
+| Signature                          | Description                                                                                                                                                     |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `installFabric(): IFabricRecorder` | Installs a fresh fake `nativeFabricUIManager` on `globalThis` and returns the recorder handle that observes it. Call it at module scope, before the first mount |
 
 ### `IFabricRecorder`
 
-| Member                                                                     | Type                                                                | Description                                                                                                                              |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `committed`                                                                | `IFakeNode[]`                                                       | The child set handed to the most recent `completeRoot` — the currently mounted tree                                                      |
-| `created`                                                                  | `IFakeNode[]`                                                       | Every node ever `createNode`'d this run, in creation order; clones are excluded                                                          |
-| `commands`                                                                 | `Array<{ node: IFakeNode; commandName: string; args: readonly unknown[] }>` | Every imperative view command dispatched at a committed node, e.g. `Switch`'s `setValue` snap-back                                        |
-| `counts`                                                                   | `{ createNode: number; completeRoot: number }`                      | Call counters, for asserting "exactly N native nodes were created" or "this update committed once"                                       |
-| `appRoot()`                                                                | `() => IFakeNode`                                                   | The synthetic `box-none` AppContainer root RN wraps every commit in; throws unless `committed` holds exactly that one root                |
-| `find(predicate)`                                                          | `(predicate: (node: IFakeNode) => boolean) => IFakeNode \| undefined` | The first `created` node matching the predicate — e.g. by `viewName` or `props.testID`                                                   |
-| `fireEvent(handle, topLevelType, nativeEvent?)`                            | `(handle: unknown, topLevelType: string, nativeEvent?: Record<string, unknown>) => void` | Delivers a native event to the handler the renderer registered, the same `instanceHandle` round-trip real Fabric does; throws if no handler is registered yet, and `nativeEvent` defaults to `{}` |
-| `serialize(nodes)`                                                         | `(nodes: IFakeNode[]) => string`                                    | Renders a node list as `RCTView(RCTText(RCTRawText "text"))` shorthand — a one-line snapshot instead of walking the tree by hand           |
-| `reset()`                                                                  | `() => void`                                                        | Clears `committed`, `created`, `commands` and zeroes `counts`; the registered event handler survives, so a mounted tree stays drivable    |
+| Member                                          | Type                                                                                     | Description                                                                                                                                                                                       |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `committed`                                     | `IFakeNode[]`                                                                            | The child set handed to the most recent `completeRoot` — the currently mounted tree                                                                                                               |
+| `created`                                       | `IFakeNode[]`                                                                            | Every node ever `createNode`'d this run, in creation order; clones are excluded                                                                                                                   |
+| `commands`                                      | `Array<{ node: IFakeNode; commandName: string; args: readonly unknown[] }>`              | Every imperative view command dispatched at a committed node, e.g. `Switch`'s `setValue` snap-back                                                                                                |
+| `counts`                                        | `{ createNode: number; completeRoot: number }`                                           | Call counters, for asserting "exactly N native nodes were created" or "this update committed once"                                                                                                |
+| `appRoot()`                                     | `() => IFakeNode`                                                                        | The synthetic `box-none` AppContainer root RN wraps every commit in; throws unless `committed` holds exactly that one root                                                                        |
+| `find(predicate)`                               | `(predicate: (node: IFakeNode) => boolean) => IFakeNode \| undefined`                    | The first `created` node matching the predicate — e.g. by `viewName` or `props.testID`                                                                                                            |
+| `fireEvent(handle, topLevelType, nativeEvent?)` | `(handle: unknown, topLevelType: string, nativeEvent?: Record<string, unknown>) => void` | Delivers a native event to the handler the renderer registered, the same `instanceHandle` round-trip real Fabric does; throws if no handler is registered yet, and `nativeEvent` defaults to `{}` |
+| `serialize(nodes)`                              | `(nodes: IFakeNode[]) => string`                                                         | Renders a node list as `RCTView(RCTText(RCTRawText "text"))` shorthand — a one-line snapshot instead of walking the tree by hand                                                                  |
+| `reset()`                                       | `() => void`                                                                             | Clears `committed`, `created`, `commands` and zeroes `counts`; the registered event handler survives, so a mounted tree stays drivable                                                            |
 
 ### `IFakeNode`
 
-| Field             | Type                       | Description                                                                                                     |
-| ----------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `tag`             | `number`                   | The Fabric react tag the engine minted for this node                                                            |
-| `viewName`        | `string`                   | The native component name, e.g. `RCTView`, `RCTText`, `RCTRawText`, `Switch`, `ActivityIndicatorView`            |
-| `props`           | `Record<string, unknown>`  | The props this node was created or cloned with — already flattened by the engine (styles land as top-level keys) |
-| `children`        | `IFakeNode[]`              | The children appended to this node in the commit that produced it                                               |
-| `instanceHandle`  | `unknown`                  | The renderer's own handle for the node, carried onto every clone — pass it to `fireEvent`                        |
-| `parentFamilyTag` | `number \| undefined`      | The tag of the Fabric family this node was appended under; appending it elsewhere throws a reparent error        |
+| Field             | Type                      | Description                                                                                                      |
+| ----------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `tag`             | `number`                  | The Fabric react tag the engine minted for this node                                                             |
+| `viewName`        | `string`                  | The native component name, e.g. `RCTView`, `RCTText`, `RCTRawText`, `Switch`, `ActivityIndicatorView`            |
+| `props`           | `Record<string, unknown>` | The props this node was created or cloned with — already flattened by the engine (styles land as top-level keys) |
+| `children`        | `IFakeNode[]`             | The children appended to this node in the commit that produced it                                                |
+| `instanceHandle`  | `unknown`                 | The renderer's own handle for the node, carried onto every clone — pass it to `fireEvent`                        |
+| `parentFamilyTag` | `number \| undefined`     | The tag of the Fabric family this node was appended under; appending it elsewhere throws a reparent error        |
 
 ### `IEventHandler`
 
-| Signature                                                                                | Description                                                                                             |
-| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Signature                                                                                       | Description                                                                                                                     |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `(instanceHandle: unknown, topLevelType: string, nativeEvent: Record<string, unknown>) => void` | The shape the renderer passes to `registerEventHandler`; `fireEvent` calls exactly this, so a test rarely names the type itself |
 
 ## Notes
 
 <Aside type="caution" title="Install once per file, before the first commit — not once per test">
   The fake slot is a `globalThis` singleton, and the engine reads it exactly once: `getSlot()`
-  destructures the slot's methods on its first commit and caches them for the rest of the
-  process. So every suite in this repo calls `installFabric()` a single time at module scope and
-  `reset()`s between tests — a second `installFabric()` after anything has committed replaces the
-  global, but the engine keeps writing to the handle it already bound, and the new recorder stays
-  silently empty. Vitest isolates test files from one another, so per-file is per-clean-slate;
-  within a file, `reset()` is what gives each test a clean recorder.
+  destructures the slot's methods on its first commit and caches them for the rest of the process.
+  So every suite in this repo calls `installFabric()` a single time at module scope and `reset()`s
+  between tests — a second `installFabric()` after anything has committed replaces the global, but
+  the engine keeps writing to the handle it already bound, and the new recorder stays silently
+  empty. Vitest isolates test files from one another, so per-file is per-clean-slate; within a file,
+  `reset()` is what gives each test a clean recorder.
 </Aside>
 
 - **A removed prop arrives as literal `null`, and stays `null`.** The engine sends a minimal
@@ -315,7 +319,7 @@ the returned recorder.
   `'large'` to `48`: `expect(spinner.props.size).toBeNull()`.
 - **`find()` searches `created`, not the committed tree.** Clones are fresh objects that never
   enter `created`, so a found node's `props` and `children` are as of the commit that created it
-  — right after a mount, wrong after an update. Its `instanceHandle` *is* carried onto every
+  — right after a mount, wrong after an update. Its `instanceHandle` _is_ carried onto every
   clone, so a handle grabbed once stays valid for `fireEvent` forever; to read updated props,
   walk `committed` (or assert on `serialize(fabric.committed)`).
 - **The fake implements the mutation, event and command surface — nothing else.** `measure`,
@@ -347,5 +351,5 @@ It lives under `core/`, not `packages/`, because it belongs to the same layer as
 [`@symbiote-native/engine`](/docs/api/core/) — it is the test double for the native side that
 engine's commit path drives — and it has no adapter entry points: one framework-agnostic export
 that React, Vue, and Angular suites all import unchanged. It also has no tests of its own; it
-*is* the test double every other package's suite runs against, so a regression in it surfaces as
+_is_ the test double every other package's suite runs against, so a regression in it surfaces as
 a failure there.

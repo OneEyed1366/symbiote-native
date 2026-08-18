@@ -44,7 +44,7 @@ is the reference for the full config.
 - Children: a `children` prop typed `Snippet`, rendered internally via
   `{@render children?.()}` — not Svelte 4's `<slot />`.
 - Render children: a component that passes state back renders `{@render
-  children?.(state)}` internally; the caller matches it with a named
+children?.(state)}` internally; the caller matches it with a named
   `{#snippet children(state)}` block, Svelte's twin of a scoped slot.
 - Refs: Symbiote components forward no `bind:this` of their own — `{@attach fn}`
   is the default way to reach a host node. A raw `symbiote-view`/`symbiote-text`

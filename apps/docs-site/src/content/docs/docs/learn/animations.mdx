@@ -32,6 +32,7 @@ which framework renders them.
 
     <Animated.View style={{ transform: [{ scale }] }} />;
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -57,6 +58,7 @@ which framework renders them.
       <AnimatedView :style="{ transform: [{ scale }] }" />
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -84,6 +86,7 @@ which framework renders them.
       }
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -109,21 +112,20 @@ which framework renders them.
 
     <AnimatedView style={{ transform: [{ scale }] }} />
     ```
+
   </TabItem>
 </Tabs>
 
 <Aside type="caution" title="Two different reasons for one workaround">
-  Vue, Svelte, and Angular all need a plain identifier instead of
-  `Animated.View`, but not for the same reason. Vue and Svelte templates
-  simply can't parse a dotted tag name, so both alias it to a local const
-  before use. Angular's reason is deeper: `ngc`'s AOT partial-mode compiler
-  statically evaluates template type-checking and can't trace a component
-  class through property access on an external, pre-compiled namespace
-  object — only through a direct named import binding. `@symbiote-native/angular`
-  exports `AnimatedView`, `AnimatedText`, `AnimatedImage`, `AnimatedScrollView`,
-  `AnimatedFlatList`, and `AnimatedSectionList` as top-level named symbols for
-  exactly this reason; plain `tsc`/Vitest won't catch a dotted alias slipping
-  through, only a real `ngc` build does.
+  Vue, Svelte, and Angular all need a plain identifier instead of `Animated.View`, but not for the
+  same reason. Vue and Svelte templates simply can't parse a dotted tag name, so both alias it to a
+  local const before use. Angular's reason is deeper: `ngc`'s AOT partial-mode compiler statically
+  evaluates template type-checking and can't trace a component class through property access on an
+  external, pre-compiled namespace object — only through a direct named import binding.
+  `@symbiote-native/angular` exports `AnimatedView`, `AnimatedText`, `AnimatedImage`,
+  `AnimatedScrollView`, `AnimatedFlatList`, and `AnimatedSectionList` as top-level named symbols for
+  exactly this reason; plain `tsc`/Vitest won't catch a dotted alias slipping through, only a real
+  `ngc` build does.
 </Aside>
 
 ## Why not Svelte's `transition:`/`animate:`/`in:`/`out:`?
@@ -135,7 +137,7 @@ any third-party Svelte component library, not just SymbioteNative's. Every
 SymbioteNative primitive (`View`, `Text`, …) is a component reference in app code,
 never a raw DOM element, so `<View transition:fade>` simply doesn't compile — this
 is Svelte's own component/element split, not an adapter limitation. `{@attach fn}`
-is the one directive in that family that *is* legal on a component, and it's your
+is the one directive in that family that _is_ legal on a component, and it's your
 route to the underlying host node when you need it; for animation itself, reach
 for the same `Animated` API and `$effect`-driven lifecycle shown above.
 

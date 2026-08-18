@@ -29,12 +29,12 @@ Unlike a plain RN native module, `expo-localization`'s native code is discovered
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package (`@symbiote-native/battery`, `@symbiote-native/device`, ...) with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
@@ -72,8 +72,8 @@ sync, not async) and recomputes it whenever the matching listener fires.
 import { useLocales, useCalendars } from '@symbiote-native/localization/react';
 
 function LocalizationScreen() {
-  const locales = useLocales();       // Locale[], guaranteed at least 1 element
-  const calendars = useCalendars();   // Calendar[], guaranteed at least 1 element
+  const locales = useLocales(); // Locale[], guaranteed at least 1 element
+  const calendars = useCalendars(); // Calendar[], guaranteed at least 1 element
 
   return (
     <>
@@ -89,7 +89,7 @@ function LocalizationScreen() {
 <script setup lang="ts">
 import { useLocales, useCalendars } from '@symbiote-native/localization/vue';
 
-const locales = useLocales();     // Ref<Locale[]>
+const locales = useLocales(); // Ref<Locale[]>
 const calendars = useCalendars(); // Ref<Calendar[]>
 </script>
 <template>
@@ -103,10 +103,10 @@ const calendars = useCalendars(); // Ref<Calendar[]>
 import { Component, inject } from '@angular/core';
 import { LocalesService, CalendarsService } from '@symbiote-native/localization/angular';
 
-@Component({ /* ... */ })
+@Component({/* ... */})
 export class LocalizationScreen {
-  readonly locales = inject(LocalesService).connect();     // Signal<Locale[]>
-  readonly calendars = inject(CalendarsService).connect();  // Signal<Calendar[]>
+  readonly locales = inject(LocalesService).connect(); // Signal<Locale[]>
+  readonly calendars = inject(CalendarsService).connect(); // Signal<Calendar[]>
 }
 ```
 

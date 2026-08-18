@@ -83,11 +83,11 @@ The component package owns framework-agnostic component logic:
 
 Adapters provide only lifecycle and element bridges:
 
-| Layer                  | React                | Vue                     | Angular                                       |
-| ---------------------- | -------------------- | ----------------------- | ---------------------------------------------- |
-| State lifecycle        | hooks / refs         | refs / watches / expose | zoneless change detection (signals / fields)   |
+| Layer                  | React                | Vue                     | Angular                                                               |
+| ---------------------- | -------------------- | ----------------------- | --------------------------------------------------------------------- |
+| State lifecycle        | hooks / refs         | refs / watches / expose | zoneless change detection (signals / fields)                          |
 | Render bridge          | `descriptorToReact`  | `descriptorToVue`       | `DescriptorOutlet` (proven on some components, migration in progress) |
-| Public framework shape | callbacks / children | emits / slots           | `@Output()` EventEmitters / `<ng-content>`     |
+| Public framework shape | callbacks / children | emits / slots           | `@Output()` EventEmitters / `<ng-content>`                            |
 
 ## Wrapper authors
 
