@@ -174,5 +174,25 @@ describe('Vue SectionList on the engine', () => {
       expect(scrolls[0].args[1]).toBe(5 * ITEM_HEIGHT);
       expect(scrolls[0].args[2]).toBe(true);
     });
+
+    it('forwards getItemLayout so it still receives the sections array', async () => {
+      // why: SectionList is a pure forwarder, so getItemLayout reaches VirtualizedSectionList
+      // through $attrs — this proves it lands on the DECLARED prop there (and thus the
+      // sections-argument wrapper) rather than falling through onto the inner VirtualizedList,
+      // where it would be handed the flattened entries instead.
+      const seen: unknown[] = [];
+      await mountSectionList({
+        stickySectionHeadersEnabled: false,
+        getItemLayout: (data: unknown, index: number) => {
+          seen.push(data);
+          return { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index };
+        },
+      });
+
+      expect(seen.length, 'getItemLayout was invoked').toBeGreaterThan(0);
+      for (const data of seen) {
+        expect(data, 'getItemLayout receives the sections array by identity').toBe(SECTIONS);
+      }
+    });
   });
 });

@@ -36,6 +36,16 @@ export interface IVirtualizedSectionListProps<ItemT> extends IAccessibilityProps
   footer?: Snippet;
   empty?: Snippet;
   keyExtractor?: (item: ItemT, index: number) => string;
+  // Fixed-layout fast path, FLAT like RN's: the SECTIONS array plus a flat entry index, where every
+  // section contributes two rows beyond its items (header, footer) and the caller accounts for them.
+  // A `({ section, index })` form would be our invention, not parity - `VirtualizedSectionList.js`
+  // has no getItemLayout code at all, the prop rides through `passThroughProps`; that shape is the
+  // community react-native-section-list-get-item-layout, layered on top. Without it a fast scroll
+  // outruns measurement and leaves blank windows.
+  getItemLayout?: (
+    data: ReadonlyArray<ISection<ItemT>> | null,
+    index: number,
+  ) => { length: number; offset: number; index: number };
   // Stick each section header to the top as the next section scrolls up. Defaults to
   // `Platform.OS === 'ios'`; Android does not stick by default. Pass true/false to override.
   stickySectionHeadersEnabled?: boolean;

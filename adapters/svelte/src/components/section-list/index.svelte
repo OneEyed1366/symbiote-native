@@ -77,6 +77,7 @@
   footer={props.footer}
   empty={props.empty}
   keyExtractor={props.keyExtractor}
+  getItemLayout={props.getItemLayout}
   stickySectionHeadersEnabled={props.stickySectionHeadersEnabled}
   inverted={props.inverted}
   extraData={props.extraData}

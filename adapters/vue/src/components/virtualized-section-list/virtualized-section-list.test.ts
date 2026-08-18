@@ -195,5 +195,24 @@ describe('Vue VirtualizedSectionList flattens sections into one windowed stream'
       expect(scrolls[0].args[1]).toBe(5 * ITEM_HEIGHT);
       expect(scrolls[0].args[2]).toBe(false);
     });
+
+    it('calls getItemLayout with the sections array, not the flattened entries', async () => {
+      // why: RN hands its inner VirtualizedList `data={this.props.sections}`, so a user's
+      // getItemLayout receives the SECTIONS. Ours streams the flattened entries as `data`, so
+      // without the wrapper the very same callback would be handed a different first argument
+      // here than on RN — silently, since the layout it returns still looks plausible.
+      const seen: unknown[] = [];
+      await mountWithViewport({
+        getItemLayout: (data: unknown, index: number) => {
+          seen.push(data);
+          return { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index };
+        },
+      });
+
+      expect(seen.length, 'getItemLayout was invoked').toBeGreaterThan(0);
+      for (const data of seen) {
+        expect(data, 'getItemLayout receives the sections array by identity').toBe(SECTIONS);
+      }
+    });
   });
 });

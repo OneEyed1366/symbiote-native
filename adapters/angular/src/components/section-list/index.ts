@@ -138,6 +138,7 @@ export type ISectionListInputs<ItemT> = Omit<
     <VirtualizedSectionList
       [sections]="sections"
       [keyExtractor]="keyExtractor"
+      [getItemLayout]="getItemLayout"
       [stickySectionHeadersEnabled]="stickySectionHeadersEnabled"
       [extraData]="extraData"
       (endReached)="endReached.emit($event)"
@@ -274,6 +275,12 @@ export class SectionList<ItemT = unknown>
 {
   @Input({ required: true }) sections!: ReadonlyArray<ISection<ItemT>>;
   @Input() keyExtractor?: (item: ItemT, index: number) => string;
+  // Passed through FLAT (sections array + flat entry index); VirtualizedSectionList owns the
+  // sections-vs-entries wrapper - see its entryItemLayout getter.
+  @Input() getItemLayout?: (
+    data: ReadonlyArray<ISection<ItemT>> | null,
+    index: number,
+  ) => { length: number; offset: number; index: number };
   @Input() stickySectionHeadersEnabled?: boolean;
   @Input() extraData?: unknown;
   @Output() readonly endReached = new EventEmitter<{ distanceFromEnd: number }>();

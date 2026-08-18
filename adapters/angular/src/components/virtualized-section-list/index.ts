@@ -95,6 +95,16 @@ export type { IVSectionContext, IVSectionItemContext } from './directives';
 export interface IVirtualizedSectionListProps<ItemT> extends IAccessibilityProps, IAriaProps {
   sections: ReadonlyArray<ISection<ItemT>>;
   keyExtractor?: (item: ItemT, index: number) => string;
+  // Fixed-layout fast path, FLAT like RN's: the SECTIONS array plus a flat entry index, where every
+  // section contributes two rows beyond its items (header, footer) and the caller accounts for them.
+  // A `({ section, index })` form would be our invention, not parity - `VirtualizedSectionList.js`
+  // has no getItemLayout code at all, the prop rides through `passThroughProps`; that shape is the
+  // community react-native-section-list-get-item-layout, layered on top. Without it a fast scroll
+  // outruns measurement and leaves blank windows.
+  getItemLayout?: (
+    data: ReadonlyArray<ISection<ItemT>> | null,
+    index: number,
+  ) => { length: number; offset: number; index: number };
   // Stick each section header to the top as the next section scrolls up. Routed to the inner
   // VirtualizedList's stickyHeaderIndices. Defaults to `Platform.OS === 'ios'`; Android does not
   // stick by default. Pass true/false to override.
@@ -163,6 +173,7 @@ export type IVirtualizedSectionListInputs<ItemT> = Omit<
       [getItem]="getEntry"
       [getItemCount]="getEntryCount"
       [keyExtractor]="entryKeyExtractor"
+      [getItemLayout]="entryItemLayout"
       [stickyHeaderIndices]="stickyHeaderIndices"
       [extraData]="extraData"
       [inverted]="inverted"
@@ -295,6 +306,10 @@ export class VirtualizedSectionList<ItemT = unknown>
 {
   @Input({ required: true }) sections!: ReadonlyArray<ISection<ItemT>>;
   @Input() keyExtractor?: (item: ItemT, index: number) => string;
+  @Input() getItemLayout?: (
+    data: ReadonlyArray<ISection<ItemT>> | null,
+    index: number,
+  ) => { length: number; offset: number; index: number };
   @Input() stickySectionHeadersEnabled?: boolean;
   @Input() extraData?: unknown;
   @Output() readonly endReached = new EventEmitter<{ distanceFromEnd: number }>();
@@ -462,6 +477,39 @@ export class VirtualizedSectionList<ItemT = unknown>
   getEntryCount = (): number => this.flatEntries.length;
   entryKeyExtractor = (entry: ISectionEntry<ItemT>, index: number): string =>
     sectionEntryKey(entry, index, this.keyExtractor);
+
+  // Hand the callback `sections`, not the entries: RN's inner VirtualizedList gets
+  // `data={this.props.sections}` (VirtualizedSectionList.js:216) while ours streams the FLATTENED
+  // entries, so the same user code would otherwise see a different argument here than on RN.
+  //
+  // UPSTREAM-DIVERGENCE(react-native): the flat INDEX matches RN's (two rows per section, header
+  // and footer) only while the vSectionSeparator template is unset. With it, flattenSections emits
+  // an extra 'section-separator' row per boundary that RN renders inside the neighbouring cell, so
+  // indices shift by one per boundary from the second section on. Deliberate - that row is how this
+  // adapter paints the separator; a caller combining the two must account for it.
+  //
+  // Cached on the input's own identity, like resolvedStyle above: the inner VirtualizedList folds
+  // getItemLayout into its ngDoCheck dedup array, so a wrapper allocated per getter read would
+  // re-run its whole recompute every CD.
+  private cachedEntryItemLayout?: (
+    data: unknown,
+    index: number,
+  ) => { length: number; offset: number; index: number };
+  private lastGetItemLayout?: IVirtualizedSectionListProps<ItemT>['getItemLayout'];
+  get entryItemLayout():
+    | ((data: unknown, index: number) => { length: number; offset: number; index: number })
+    | undefined {
+    if (this.getItemLayout !== this.lastGetItemLayout) {
+      const getItemLayout = this.getItemLayout;
+      this.lastGetItemLayout = getItemLayout;
+      this.cachedEntryItemLayout =
+        getItemLayout === undefined
+          ? undefined
+          : (_entries: unknown, index: number): { length: number; offset: number; index: number } =>
+              getItemLayout(this.sections, index);
+    }
+    return this.cachedEntryItemLayout;
+  }
 
   // Adapts each @Output() into the plain callback VirtualizedList's own @Input() still wants,
   // gated on `.observed` so an unlistened event forwards `undefined` — the same "nobody cares"
