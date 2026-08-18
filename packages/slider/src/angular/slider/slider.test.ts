@@ -16,7 +16,11 @@
 import '@angular/compiler';
 import { Component, Input } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/angular';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/angular';
 import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Slider } from '.';
@@ -30,7 +34,12 @@ const fakeColor = (value: unknown): string => `processed(${value})`;
 // rails + accessibility (direct), plain pass-through attributes, and the tint processors.
 const RNC_SLIDER_VIEW_CONFIG = {
   bubblingEventTypes: {
-    topChange: { phasedRegistrationNames: { bubbled: 'onChange', captured: 'onChangeCapture' } },
+    topChange: {
+      phasedRegistrationNames: {
+        bubbled: 'onChange',
+        captured: 'onChangeCapture',
+      },
+    },
     topRNCSliderValueChange: {
       phasedRegistrationNames: {
         bubbled: 'onRNCSliderValueChange',
@@ -40,8 +49,12 @@ const RNC_SLIDER_VIEW_CONFIG = {
   },
   directEventTypes: {
     topRNCSliderSlidingStart: { registrationName: 'onRNCSliderSlidingStart' },
-    topRNCSliderSlidingComplete: { registrationName: 'onRNCSliderSlidingComplete' },
-    topRNCSliderAccessibilityAction: { registrationName: 'onRNCSliderAccessibilityAction' },
+    topRNCSliderSlidingComplete: {
+      registrationName: 'onRNCSliderSlidingComplete',
+    },
+    topRNCSliderAccessibilityAction: {
+      registrationName: 'onRNCSliderAccessibilityAction',
+    },
   },
   validAttributes: {
     value: true,
@@ -59,9 +72,12 @@ const RNC_SLIDER_VIEW_CONFIG = {
 };
 
 const fabric = installFabric();
-setNativeViewConfigSource(name => (name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined));
+setNativeViewConfigSource(name =>
+  name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined,
+);
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedHost: SliderHost | undefined;
 
@@ -128,7 +144,9 @@ function sliderNode(): IFakeNode {
   return node;
 }
 
-async function mountSlider(initialProps: Record<string, unknown>): Promise<void> {
+async function mountSlider(
+  initialProps: Record<string, unknown>,
+): Promise<void> {
   mount(ROOT_TAG, SliderHost, { initialProps });
   await tick();
 }
@@ -141,7 +159,12 @@ describe('Angular Slider wrapper', () => {
       // why: renderSlider (core) always wraps the native leaf in a centering symbiote-view — a
       // caller must see BOTH the wrapper and the leaf, with the leaf's own props unaffected by
       // being nested rather than mounted at the root.
-      await mountSlider({ value: 0.5, minimumValue: 0, maximumValue: 1, step: 0.1 });
+      await mountSlider({
+        value: 0.5,
+        minimumValue: 0,
+        maximumValue: 1,
+        step: 0.1,
+      });
       const props = sliderNode().props;
       expect(props.value).toBe(0.5);
       expect(props.minimumValue).toBe(0);
@@ -201,15 +224,21 @@ describe('Angular Slider wrapper', () => {
       const node = sliderNode();
       fabric.fireEvent(node.instanceHandle, 'topChange', { value: 0.7 });
       expect(capturedHost?.onValueChange).toHaveBeenCalledWith(0.7);
-      fabric.fireEvent(node.instanceHandle, 'topRNCSliderValueChange', { value: 0.42 });
+      fabric.fireEvent(node.instanceHandle, 'topRNCSliderValueChange', {
+        value: 0.42,
+      });
       expect(capturedHost?.onValueChange).toHaveBeenCalledWith(0.42);
     });
 
     it('maps the direct sliding events onto their outputs', async () => {
       await mountSlider({ value: 0.2 });
       const node = sliderNode();
-      fabric.fireEvent(node.instanceHandle, 'topRNCSliderSlidingStart', { value: 0.1 });
-      fabric.fireEvent(node.instanceHandle, 'topRNCSliderSlidingComplete', { value: 0.9 });
+      fabric.fireEvent(node.instanceHandle, 'topRNCSliderSlidingStart', {
+        value: 0.1,
+      });
+      fabric.fireEvent(node.instanceHandle, 'topRNCSliderSlidingComplete', {
+        value: 0.9,
+      });
       expect(capturedHost?.onSlidingStart).toHaveBeenCalledWith(0.1);
       expect(capturedHost?.onSlidingComplete).toHaveBeenCalledWith(0.9);
     });
@@ -232,9 +261,15 @@ describe('Angular Slider wrapper', () => {
       // why: resolveSliderDisabled prefers an explicit boolean unconditionally — a caller who
       // sets `[disabled]="false"` while accessibilityState still says disabled must see the
       // slider enabled, matching the library's own precedence.
-      await mountSlider({ value: 0.2, disabled: false, accessibilityState: { disabled: true } });
+      await mountSlider({
+        value: 0.2,
+        disabled: false,
+        accessibilityState: { disabled: true },
+      });
       expect(sliderNode().props.disabled).toBe(false);
-      expect(sliderNode().props.accessibilityState).toEqual({ disabled: false });
+      expect(sliderNode().props.accessibilityState).toEqual({
+        disabled: false,
+      });
     });
 
     it('renders the step indicator when renderStepNumber is set', async () => {
@@ -245,7 +280,9 @@ describe('Angular Slider wrapper', () => {
         step: 0.5,
         renderStepNumber: true,
       });
-      const container = fabric.find(n => n.props.testID === 'StepsIndicator-Container');
+      const container = fabric.find(
+        n => n.props.testID === 'StepsIndicator-Container',
+      );
       expect(container, 'a StepsIndicator container is painted').toBeDefined();
     });
 
@@ -290,7 +327,10 @@ describe('Angular Slider anchor class= resolution', () => {
       await tick();
 
       const node = fabric.find(n => n.props.backgroundColor === 'red');
-      expect(node, 'a real Fabric node carries the class-derived style').toBeDefined();
+      expect(
+        node,
+        'a real Fabric node carries the class-derived style',
+      ).toBeDefined();
     });
   });
 });

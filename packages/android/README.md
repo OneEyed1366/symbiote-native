@@ -23,7 +23,7 @@ Autolinked automatically by RN's Gradle plugin — see
   `ReactSurfaceView` this project uses never triggers, so `keyboardDidShow`/`keyboardDidHide`
   never fire. This module re-derives the same signal from an
   `OnApplyWindowInsetsListener` on the activity's decor view, reading the IME inset directly
-  (rather than `getRootWindowInsets()`, whose *consumed* insets read `0` under `adjustResize`
+  (rather than `getRootWindowInsets()`, whose _consumed_ insets read `0` under `adjustResize`
   while the keyboard is up) and emitting the same `keyboardDidShow`/`Hide` payload shape RN's JS
   `Keyboard` module already listens for. `@symbiote-native/engine`'s `Keyboard` — re-exported by
   every adapter — resolves the `KeyboardObserver` module name on both iOS and Android, so the JS

@@ -14,12 +14,18 @@ import { mount, unmount, View } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 import { useNetworkState } from './index';
 
-type INetworkState = { type?: string; isConnected?: boolean; isInternetReachable?: boolean };
+type INetworkState = {
+  type?: string;
+  isConnected?: boolean;
+  isInternetReachable?: boolean;
+};
 
 const { addListener, getNetworkStateAsync, remove } = vi.hoisted(() => {
   const remove = vi.fn();
   return {
-    addListener: vi.fn((_listener: (event: INetworkState) => void) => ({ remove })),
+    addListener: vi.fn((_listener: (event: INetworkState) => void) => ({
+      remove,
+    })),
     getNetworkStateAsync: vi.fn(async () => ({
       type: 'WIFI',
       isConnected: true,
@@ -85,12 +91,20 @@ describe('useNetworkState — lifecycle (mount seeds + subscribes, event updates
   // render — a subscription that only fires once would show a stale connection type forever.
   it('updates when the native listener fires', async () => {
     mount(ROOT_TAG, createElement(Probe));
-    await vi.waitFor(() => expect(results[results.length - 1].type).toBe('WIFI'));
+    await vi.waitFor(() =>
+      expect(results[results.length - 1].type).toBe('WIFI'),
+    );
 
     const listener = addListener.mock.calls[0][0];
-    listener({ type: 'CELLULAR', isConnected: true, isInternetReachable: false });
+    listener({
+      type: 'CELLULAR',
+      isConnected: true,
+      isInternetReachable: false,
+    });
 
-    await vi.waitFor(() => expect(results[results.length - 1].type).toBe('CELLULAR'));
+    await vi.waitFor(() =>
+      expect(results[results.length - 1].type).toBe('CELLULAR'),
+    );
   });
 
   // why: an un-cleaned subscription is a memory/listener leak and can update state on an

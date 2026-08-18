@@ -19,18 +19,30 @@ import metroSvelteTransformer from '@symbiote-native/svelte/metro-svelte-transfo
 
 const {
   compileSvelteModuleFile,
-}: { compileSvelteModuleFile: (src: string, filename: string) => string } = metroSvelteTransformer;
+}: { compileSvelteModuleFile: (src: string, filename: string) => string } =
+  metroSvelteTransformer;
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
 const ROOT_TAG = 91_620;
-const PROBE_OUT = join(__dirname, '.smoke-compiled-use-network-state-probe.mjs');
-const RUNE_OUT = join(__dirname, '.smoke-compiled-use-network-state.svelte.mjs');
+const PROBE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-network-state-probe.mjs',
+);
+const RUNE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-network-state.svelte.mjs',
+);
 
-type INetworkState = { type?: string; isConnected?: boolean; isInternetReachable?: boolean };
+type INetworkState = {
+  type?: string;
+  isConnected?: boolean;
+  isInternetReachable?: boolean;
+};
 type IListener = (event: INetworkState) => void;
 
 let registeredListener: IListener | undefined;
@@ -51,7 +63,8 @@ vi.mock('../../core', () => ({
 }));
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -72,13 +85,23 @@ afterEach(() => {
   rmSync(RUNE_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 // $state/$effect require Svelte's MODULE compiler, not the component compiler — a bare,
 // uncompiled rune call throws `rune_outside_svelte` at runtime.
 function compileRuneModule(): void {
-  const source = readFileSync(join(__dirname, 'use-network-state.svelte.ts'), 'utf-8');
-  writeFileSync(RUNE_OUT, compileSvelteModuleFile(source, 'use-network-state.svelte.ts'));
+  const source = readFileSync(
+    join(__dirname, 'use-network-state.svelte.ts'),
+    'utf-8',
+  );
+  writeFileSync(
+    RUNE_OUT,
+    compileSvelteModuleFile(source, 'use-network-state.svelte.ts'),
+  );
 }
 
 async function loadProbe(): Promise<Component> {
@@ -103,7 +126,9 @@ async function loadProbe(): Promise<Component> {
 
 async function mountNetworkState(values: INetworkState[]): Promise<void> {
   const Probe = await loadProbe();
-  mount(ROOT_TAG, Probe, { onValue: (state: INetworkState) => values.push(state) });
+  mount(ROOT_TAG, Probe, {
+    onValue: (state: INetworkState) => values.push(state),
+  });
   await tick();
 }
 
@@ -117,7 +142,9 @@ describe('useNetworkState (Svelte)', () => {
       // why: a never-settling fetch pins the state at its seed value forever, proving `{}` is the
       // rune's OWN initial value rather than a value that happens to arrive before the mock
       // resolves in a race.
-      getNetworkStateAsyncMock.mockReturnValue(new Promise<INetworkState>(() => {}));
+      getNetworkStateAsyncMock.mockReturnValue(
+        new Promise<INetworkState>(() => {}),
+      );
       const values: INetworkState[] = [];
       await mountNetworkState(values);
 
@@ -147,9 +174,15 @@ describe('useNetworkState (Svelte)', () => {
       // re-subscription triggered by the rune's own state writes.
       const values: INetworkState[] = [];
       await mountNetworkState(values);
-      await vi.waitFor(() => expect(values[values.length - 1].type).toBe('WIFI'));
+      await vi.waitFor(() =>
+        expect(values[values.length - 1].type).toBe('WIFI'),
+      );
 
-      registeredListener?.({ type: 'CELLULAR', isConnected: true, isInternetReachable: false });
+      registeredListener?.({
+        type: 'CELLULAR',
+        isConnected: true,
+        isInternetReachable: false,
+      });
       await tick();
 
       expect(addListenerMock).toHaveBeenCalledTimes(1);
@@ -160,9 +193,15 @@ describe('useNetworkState (Svelte)', () => {
       // the one-shot initial read.
       const values: INetworkState[] = [];
       await mountNetworkState(values);
-      await vi.waitFor(() => expect(values[values.length - 1].type).toBe('WIFI'));
+      await vi.waitFor(() =>
+        expect(values[values.length - 1].type).toBe('WIFI'),
+      );
 
-      registeredListener?.({ type: 'CELLULAR', isConnected: true, isInternetReachable: false });
+      registeredListener?.({
+        type: 'CELLULAR',
+        isConnected: true,
+        isInternetReachable: false,
+      });
       await tick();
 
       expect(values[values.length - 1].type).toBe('CELLULAR');

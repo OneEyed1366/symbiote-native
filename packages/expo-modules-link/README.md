@@ -156,5 +156,5 @@ iOS Info.plist permission strings. iOS's own autolinking (`use_expo_modules!(exc
 already auto-discovers every installed expo-modules-core package with zero per-package Podfile
 edits once wired - see the `symbiote-expo-native-module` skill. The one-time per-app native
 bootstrap (Podfile monkey-patch, `SymbioteExpoModulesFactory`, bridging header) is still a
-manual, one-time step per app - this package only automates the *recurring* per-package
+manual, one-time step per app - this package only automates the _recurring_ per-package
 registration that repeats on every new native module.

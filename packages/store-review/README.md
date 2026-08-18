@@ -25,12 +25,12 @@ Unlike a plain RN native module, `expo-store-review`'s native code is discovered
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
@@ -65,7 +65,8 @@ function RateAppButton() {
       onPress={() =>
         requestReview({
           iosAppStoreUrl: 'https://apps.apple.com/app/id123456789',
-          androidPlayStoreUrl: 'https://play.google.com/store/apps/details?id=com.example.app',
+          androidPlayStoreUrl:
+            'https://play.google.com/store/apps/details?id=com.example.app',
         })
       }
     />
@@ -82,7 +83,8 @@ import { requestReview } from '@symbiote-native/store-review/vue';
 function onRatePress() {
   void requestReview({
     iosAppStoreUrl: 'https://apps.apple.com/app/id123456789',
-    androidPlayStoreUrl: 'https://play.google.com/store/apps/details?id=com.example.app',
+    androidPlayStoreUrl:
+      'https://play.google.com/store/apps/details?id=com.example.app',
   });
 }
 </script>
@@ -107,7 +109,8 @@ export class RateAppButton {
   onRatePress(): void {
     void requestReview({
       iosAppStoreUrl: 'https://apps.apple.com/app/id123456789',
-      androidPlayStoreUrl: 'https://play.google.com/store/apps/details?id=com.example.app',
+      androidPlayStoreUrl:
+        'https://play.google.com/store/apps/details?id=com.example.app',
     });
   }
 }
@@ -131,7 +134,11 @@ hasAction(options?: IStoreReviewUrlOptions): Promise<boolean>
 ```
 
 ```ts
-import { requestReview, isAvailableAsync, hasAction } from '@symbiote-native/store-review';
+import {
+  requestReview,
+  isAvailableAsync,
+  hasAction,
+} from '@symbiote-native/store-review';
 // or the framework-scoped entry points — identical surface, re-exported verbatim:
 import { requestReview } from '@symbiote-native/store-review/react';
 import { requestReview } from '@symbiote-native/store-review/vue';

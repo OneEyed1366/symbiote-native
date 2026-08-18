@@ -1,9 +1,10 @@
 # @symbiote-native/slider
 
 A wrapper package for [SymbioteNative](../../README.md) that makes the third-party native
-`@react-native-community/slider` view usable from **every** adapter — React, Vue, and Angular —
-not just React. The library's default export is a React component (it calls hooks off the React
-dispatcher), so a non-React adapter renders it with a null dispatcher and it throws. This package
+`@react-native-community/slider` view usable from **every** adapter — React, Vue, Svelte, Solid,
+and Angular — not just React. The library's default export is a React component (it calls hooks
+off the React dispatcher), so a non-React adapter renders it with a null dispatcher and it throws.
+This package
 reaches the native `RNCSlider` view directly through the engine's `createNode`-by-ViewConfig path
 instead of importing the library's React component — the same mechanism SymbioteNative uses for its
 own primitives.
@@ -29,14 +30,16 @@ src/register.ts side-effect import of RNCSlider's codegen spec — registers its
                 (never the library's React Slider.tsx)
 src/react/      @symbiote-native/slider/react — forwardRef FC + descriptorToReact
 src/vue/        @symbiote-native/slider/vue   — defineComponent + descriptorToVue
+src/svelte/     @symbiote-native/slider/svelte — .svelte component + the DOM-shim renderer
+src/solid/      @symbiote-native/slider/solid — signals + descriptorToSolid
 src/angular/    @symbiote-native/slider/angular — Angular component + descriptorToAngular
 ```
 
 Each adapter entry imports `../register` first (so the ViewConfig is registered before the
 component ever mounts), then exposes a platform-split `Slider`. The core is written once; every
 adapter inherits the same folding logic and the same `ISliderProps` surface (extended per-adapter
-only where a field carries a framework element — the custom `StepMarker` is a React render prop
-but a Vue scoped slot).
+only where a field carries a framework element — the custom `StepMarker` is a React render prop, a
+Vue scoped slot, a Svelte `Snippet`, and a Solid render prop taking an **accessor**).
 
 ## Packaging — one dependency, not two
 
@@ -64,7 +67,7 @@ import { Slider } from '@symbiote-native/slider/react';
   minimumTrackTintColor="#7fb5ff"
   maximumTrackTintColor="#334155"
   thumbTintColor="#ffffff"
-/>
+/>;
 ```
 
 ```vue
@@ -81,6 +84,20 @@ import { Slider } from '@symbiote-native/slider/vue';
 </template>
 ```
 
+```tsx
+// Solid — the marker props arrive as an ACCESSOR, so only the leaf reading them re-runs
+import { Slider } from '@symbiote-native/slider/solid';
+
+<Slider
+  value={volume()}
+  onValueChange={setVolume}
+  step={0.25}
+  StepMarker={marker => (
+    <symbiote-view style={{ opacity: marker().stepMarked ? 1 : 0.3 }} />
+  )}
+/>;
+```
+
 ```ts
 // Angular — examples/angular/App.ts
 import { Slider } from '@symbiote-native/slider/angular';
@@ -93,6 +110,6 @@ processors from its own ViewConfig at runtime, so there is nothing to pre-resolv
 ## Test it
 
 Headless component tests live next to each adapter entry
-(`src/{react,vue,angular}/slider/slider.test.{ts,tsx}`) and inject a fake ViewConfig via
+(`src/{react,vue,svelte,solid,angular}/slider/slider*.test.{ts,tsx}`) and inject a fake ViewConfig via
 `setNativeViewConfigSource`, so they run without a real Fabric host. Native rendering is verified
 on-device (see the parent [README](../../README.md) for the project's testing model).

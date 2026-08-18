@@ -9,7 +9,6 @@
 //  - the search bar's imperative ref attachment dispatches real native view commands.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { join } from 'node:path';
 
 import { installFabric } from '@symbiote-native/test-utils';
 import { setNativeViewConfigSource } from '@symbiote-native/engine';
@@ -23,10 +22,15 @@ import {
   findLive,
   findLiveByTestId,
   outline,
+  rawTextsOutsideTextContainer,
 } from '../fabric-tree.test-helper';
-import { createSvelteHarness, loadComponent } from '../svelte-compile.test-helper';
+import {
+  createSvelteHarness,
+  loadComponent,
+} from '../svelte-compile.test-helper';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -60,28 +64,48 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   },
   RNSModalScreen: {
     directEventTypes: { topDismissed: directEvent('onDismissed') },
-    validAttributes: { screenId: true, activityState: true, stackPresentation: true },
+    validAttributes: {
+      screenId: true,
+      activityState: true,
+      stackPresentation: true,
+    },
   },
   RNSScreenStack: {
-    directEventTypes: { topFinishTransitioning: directEvent('onFinishTransitioning') },
+    directEventTypes: {
+      topFinishTransitioning: directEvent('onFinishTransitioning'),
+    },
     validAttributes: {},
   },
   RNSScreenStackHeaderConfig: {
-    directEventTypes: { topPressHeaderBarButtonItem: directEvent('onPressHeaderBarButtonItem') },
-    validAttributes: { title: true, hidden: true, largeTitle: true, backTitleVisible: true },
+    directEventTypes: {
+      topPressHeaderBarButtonItem: directEvent('onPressHeaderBarButtonItem'),
+    },
+    validAttributes: {
+      title: true,
+      hidden: true,
+      largeTitle: true,
+      backTitleVisible: true,
+    },
   },
-  RNSScreenStackHeaderSubview: { directEventTypes: {}, validAttributes: { type: true } },
+  RNSScreenStackHeaderSubview: {
+    directEventTypes: {},
+    validAttributes: { type: true },
+  },
   RNSSearchBar: {
     directEventTypes: { topChangeText: directEvent('onChangeText') },
     validAttributes: { placeholder: true },
   },
-  RNSScreenContentWrapper: { directEventTypes: {}, validAttributes: { collapsable: true } },
+  RNSScreenContentWrapper: {
+    directEventTypes: {},
+    validAttributes: { collapsable: true },
+  },
 };
 
 const ROOT_TAG = 91_701;
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let harness = createSvelteHarness('stack');
 
@@ -126,7 +150,12 @@ function appSource(stackAttributes: string, screenAttributes: string): string {
 }
 
 function isNavigatorHandle(value: unknown): value is INavigatorHandle {
-  return typeof value === 'object' && value !== null && 'push' in value && 'pop' in value;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'push' in value &&
+    'pop' in value
+  );
 }
 
 // `variant` gives each differently-configured fixture its OWN compiled filename: Node caches
@@ -154,7 +183,8 @@ async function mountStack(
   });
   await tick();
   await tick();
-  if (!isNavigatorHandle(handle)) throw new Error('Stack did not expose a navigator handle');
+  if (!isNavigatorHandle(handle))
+    throw new Error('Stack did not expose a navigator handle');
   return handle;
 }
 
@@ -184,7 +214,9 @@ const DYNAMIC_APP_SOURCE = `<script lang="ts">
 
 const PROFILE_SOURCE = `<symbiote-view p={{ testID: 'profile' }} />`;
 
-function isDynamicControls(value: unknown): value is { hideDetails: () => void } {
+function isDynamicControls(
+  value: unknown,
+): value is { hideDetails: () => void } {
   return typeof value === 'object' && value !== null && 'hideDetails' in value;
 }
 
@@ -196,7 +228,11 @@ async function mountDynamicStack(): Promise<{
   harness.compileSource(dir, 'home-fixture', HOME_SOURCE);
   harness.compileSource(dir, 'details-fixture', DETAILS_SOURCE);
   harness.compileSource(dir, 'profile-fixture', PROFILE_SOURCE);
-  const app = harness.compileSource(dir, 'stack-app-dynamic', DYNAMIC_APP_SOURCE);
+  const app = harness.compileSource(
+    dir,
+    'stack-app-dynamic',
+    DYNAMIC_APP_SOURCE,
+  );
   const App = await loadComponent(app);
   let handle: unknown = null;
   let controls: unknown = null;
@@ -210,8 +246,10 @@ async function mountDynamicStack(): Promise<{
   });
   await tick();
   await tick();
-  if (!isNavigatorHandle(handle)) throw new Error('Stack did not expose a navigator handle');
-  if (!isDynamicControls(controls)) throw new Error('the dynamic fixture exposed no controls');
+  if (!isNavigatorHandle(handle))
+    throw new Error('Stack did not expose a navigator handle');
+  if (!isDynamicControls(controls))
+    throw new Error('the dynamic fixture exposed no controls');
   return { handle, hideDetails: controls.hideDetails };
 }
 
@@ -291,7 +329,11 @@ describe('Stack (real compiled index.svelte)', () => {
       // why: per-screen `options` must reach the native RNSScreenStackHeaderConfig view's props
       // (title/largeTitle), not stay trapped in JS state - this is the only way a screen actually
       // gets a native header.
-      await mountStack('options', '', 'options={{ title: "Home screen", headerLargeTitle: true }}');
+      await mountStack(
+        'options',
+        '',
+        'options={{ title: "Home screen", headerLargeTitle: true }}',
+      );
       const header = findLive(fabric.appRoot(), 'RNSScreenStackHeaderConfig');
       expect(header?.props?.title).toBe('Home screen');
       expect(header?.props?.largeTitle).toBe(true);
@@ -302,9 +344,9 @@ describe('Stack (real compiled index.svelte)', () => {
       // must track the REAL native RNSScreen onAppear/onDisappear events one-to-one, starting
       // false, since a route genuinely isn't focused at the instant it mounts.
       await mountStack();
-      expect(findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel).toBe(
-        'home:false',
-      );
+      expect(
+        findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel,
+      ).toBe('home:false');
 
       const screen = findLive(fabric.appRoot(), 'RNSScreen');
       expect(screen).toBeDefined();
@@ -313,16 +355,16 @@ describe('Stack (real compiled index.svelte)', () => {
       fabric.fireEvent(screen.instanceHandle, 'topAppear', {});
       await tick();
       await tick();
-      expect(findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel).toBe(
-        'home:true',
-      );
+      expect(
+        findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel,
+      ).toBe('home:true');
 
       fabric.fireEvent(screen.instanceHandle, 'topDisappear', {});
       await tick();
       await tick();
-      expect(findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel).toBe(
-        'home:false',
-      );
+      expect(
+        findLiveByTestId(fabric.appRoot(), 'home')?.props?.accessibilityLabel,
+      ).toBe('home:false');
     });
 
     it('pops one route when the native screen reports a dismissal', async () => {
@@ -348,7 +390,9 @@ describe('Stack (real compiled index.svelte)', () => {
       // why: `headerSearchBarOptions.ref` is an ESCAPE HATCH into imperative native view commands
       // (setText etc.) - this proves the ref actually resolves to a live RNSSearchBar tag and that
       // calling a method on it dispatches a REAL Fabric command, not a no-op stub.
-      const searchBarRef: { current: ISearchBarCommands | null } = { current: null };
+      const searchBarRef: { current: ISearchBarCommands | null } = {
+        current: null,
+      };
       const dir = __dirname;
       harness.compileSource(dir, 'home-fixture', HOME_SOURCE);
       harness.compileSource(dir, 'details-fixture', DETAILS_SOURCE);
@@ -370,9 +414,9 @@ describe('Stack (real compiled index.svelte)', () => {
 
       const searchBar = findLive(fabric.appRoot(), 'RNSSearchBar');
       expect(searchBar?.props?.placeholder).toBe('Find');
-      expect(findLive(fabric.appRoot(), 'RNSScreenStackHeaderSubview')?.props?.type).toBe(
-        'searchBar',
-      );
+      expect(
+        findLive(fabric.appRoot(), 'RNSScreenStackHeaderSubview')?.props?.type,
+      ).toBe('searchBar');
 
       expect(searchBarRef.current).not.toBeNull();
       searchBarRef.current?.setText('hello');
@@ -385,7 +429,11 @@ describe('Stack (real compiled index.svelte)', () => {
       // why: a `stackPresentation: "formSheet"` screen must mount inside its OWN nested
       // RNSScreenStack (wrapped in RNSModalScreen) so it can still carry a native header - this is
       // architecturally distinct from a plain pushed screen, not just a style variant.
-      await mountStack('modal', '', 'options={{ stackPresentation: "formSheet" }}');
+      await mountStack(
+        'modal',
+        '',
+        'options={{ stackPresentation: "formSheet" }}',
+      );
 
       expect(outline(fabric.appRoot())).toEqual([
         'RCTView',
@@ -449,17 +497,23 @@ describe('Stack (real compiled index.svelte)', () => {
     });
   });
 
-  // Not a Positive/Negative behavior scenario - a build-hygiene audit that the package's OWN
-  // templates compile edge-to-edge with no stray whitespace text nodes (skill §16), distinct from
-  // the deliberately-not-packed app fixture used by the tests above.
-  describe('compilation hygiene', () => {
-    it('compiles every navigator template with no stray whitespace text nodes', () => {
-      const audit = createSvelteHarness('stack-audit');
-      audit.compileFile(join(__dirname, 'index.svelte'));
-      audit.compileFile(join(__dirname, '../navigation-scope.svelte'));
-      audit.compileFile(join(__dirname, '../screen.svelte'));
-      expect(audit.strayWhitespaceCount()).toBe(0);
-      audit.cleanup();
+  // Not a Positive/Negative behavior scenario - the tree-shape invariant the navigator templates
+  // rely on: they are formatted normally, so Svelte emits a ' ' text node between sibling tags,
+  // and only the shim's parent check keeps it out of Fabric (svelte-adapter-dom-shim §16b). The
+  // modal variant is mounted too, because stack-screen's inModal branch is a separate template.
+  describe('committed-tree hygiene', () => {
+    it('commits no raw text outside a text container', async () => {
+      await mountStack();
+      expect(rawTextsOutsideTextContainer(fabric.appRoot())).toEqual([]);
+    });
+
+    it('commits no raw text outside a text container for a modal route', async () => {
+      await mountStack(
+        'hygiene-modal',
+        '',
+        'options={{ stackPresentation: "formSheet" }}',
+      );
+      expect(rawTextsOutsideTextContainer(fabric.appRoot())).toEqual([]);
     });
   });
 });

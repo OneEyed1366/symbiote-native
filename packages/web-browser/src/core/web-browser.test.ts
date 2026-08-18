@@ -3,11 +3,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const FAKE_NATIVE_WEB_BROWSER = {
   openBrowserAsync: vi.fn(async () => ({ type: 'opened' })),
   dismissBrowser: vi.fn(async () => ({ type: 'dismiss' })),
-  openAuthSessionAsync: vi.fn(async () => ({ type: 'success', url: 'myapp://callback' })),
+  openAuthSessionAsync: vi.fn(async () => ({
+    type: 'success',
+    url: 'myapp://callback',
+  })),
   dismissAuthSession: vi.fn(() => undefined),
   warmUpAsync: vi.fn(async () => ({ servicePackage: 'com.android.chrome' })),
   coolDownAsync: vi.fn(async () => ({ servicePackage: 'com.android.chrome' })),
-  mayInitWithUrlAsync: vi.fn(async () => ({ servicePackage: 'com.android.chrome' })),
+  mayInitWithUrlAsync: vi.fn(async () => ({
+    servicePackage: 'com.android.chrome',
+  })),
   getCustomTabsSupportingBrowsersAsync: vi.fn(async () => ({
     defaultBrowserPackage: 'com.android.chrome',
     preferredBrowserPackage: 'com.android.chrome',
@@ -52,12 +57,16 @@ vi.mock('react-native', () => ({
     },
   },
   Linking: {
-    addEventListener: (_type: string, handler: (event: { url: string }) => void) => {
+    addEventListener: (
+      _type: string,
+      handler: (event: { url: string }) => void,
+    ) => {
       urlListeners.add(handler);
       return { remove: () => urlListeners.delete(handler) };
     },
   },
-  processColor: (value?: string) => (value === undefined ? undefined : `processed:${value}`),
+  processColor: (value?: string) =>
+    value === undefined ? undefined : `processed:${value}`,
 }));
 
 const {
@@ -92,12 +101,17 @@ afterEach(() => {
 describe('openBrowserAsync', () => {
   describe('Positive', () => {
     it('passes the url and options through to the native module', async () => {
-      await expect(openBrowserAsync('https://example.com', { showTitle: true })).resolves.toEqual({
+      await expect(
+        openBrowserAsync('https://example.com', { showTitle: true }),
+      ).resolves.toEqual({
         type: 'opened',
       });
-      expect(FAKE_NATIVE_WEB_BROWSER.openBrowserAsync).toHaveBeenCalledWith('https://example.com', {
-        showTitle: true,
-      });
+      expect(FAKE_NATIVE_WEB_BROWSER.openBrowserAsync).toHaveBeenCalledWith(
+        'https://example.com',
+        {
+          showTitle: true,
+        },
+      );
     });
 
     it('runs the three color options through processColor', async () => {
@@ -108,11 +122,14 @@ describe('openBrowserAsync', () => {
         secondaryToolbarColor: 'blue',
         controlsColor: 'red',
       });
-      expect(FAKE_NATIVE_WEB_BROWSER.openBrowserAsync).toHaveBeenCalledWith('https://example.com', {
-        toolbarColor: 'processed:#ffffff',
-        secondaryToolbarColor: 'processed:blue',
-        controlsColor: 'processed:red',
-      });
+      expect(FAKE_NATIVE_WEB_BROWSER.openBrowserAsync).toHaveBeenCalledWith(
+        'https://example.com',
+        {
+          toolbarColor: 'processed:#ffffff',
+          secondaryToolbarColor: 'processed:blue',
+          controlsColor: 'processed:red',
+        },
+      );
     });
   });
 
@@ -148,7 +165,9 @@ describe('dismissBrowser', () => {
       // @ts-expect-error -- simulating Android, where the native module has no such method
       FAKE_NATIVE_WEB_BROWSER.dismissBrowser = undefined;
 
-      expect(() => dismissBrowser()).toThrow('dismissBrowser is not available on expo-web-browser');
+      expect(() => dismissBrowser()).toThrow(
+        'dismissBrowser is not available on expo-web-browser',
+      );
 
       FAKE_NATIVE_WEB_BROWSER.dismissBrowser = native;
     });
@@ -163,10 +182,14 @@ describe('the Custom Tabs service functions', () => {
       await expect(warmUpAsync('com.android.chrome')).resolves.toEqual({
         servicePackage: 'com.android.chrome',
       });
-      expect(FAKE_NATIVE_WEB_BROWSER.warmUpAsync).toHaveBeenCalledWith('com.android.chrome');
+      expect(FAKE_NATIVE_WEB_BROWSER.warmUpAsync).toHaveBeenCalledWith(
+        'com.android.chrome',
+      );
 
       await coolDownAsync('com.android.chrome');
-      expect(FAKE_NATIVE_WEB_BROWSER.coolDownAsync).toHaveBeenCalledWith('com.android.chrome');
+      expect(FAKE_NATIVE_WEB_BROWSER.coolDownAsync).toHaveBeenCalledWith(
+        'com.android.chrome',
+      );
 
       await mayInitWithUrlAsync('https://example.com', 'com.android.chrome');
       expect(FAKE_NATIVE_WEB_BROWSER.mayInitWithUrlAsync).toHaveBeenCalledWith(
@@ -174,7 +197,9 @@ describe('the Custom Tabs service functions', () => {
         'com.android.chrome',
       );
 
-      await expect(getCustomTabsSupportingBrowsersAsync()).resolves.toMatchObject({
+      await expect(
+        getCustomTabsSupportingBrowsersAsync(),
+      ).resolves.toMatchObject({
         browserPackages: ['com.android.chrome'],
       });
     });
@@ -184,7 +209,9 @@ describe('the Custom Tabs service functions', () => {
       // a harmless no-op rather than reach for a native method the platform never registers.
       await expect(warmUpAsync()).resolves.toEqual({});
       await expect(coolDownAsync()).resolves.toEqual({});
-      await expect(mayInitWithUrlAsync('https://example.com')).resolves.toEqual({});
+      await expect(mayInitWithUrlAsync('https://example.com')).resolves.toEqual(
+        {},
+      );
       await expect(getCustomTabsSupportingBrowsersAsync()).resolves.toEqual({
         defaultBrowserPackage: undefined,
         preferredBrowserPackage: undefined,
@@ -193,8 +220,12 @@ describe('the Custom Tabs service functions', () => {
       });
       expect(FAKE_NATIVE_WEB_BROWSER.warmUpAsync).not.toHaveBeenCalled();
       expect(FAKE_NATIVE_WEB_BROWSER.coolDownAsync).not.toHaveBeenCalled();
-      expect(FAKE_NATIVE_WEB_BROWSER.mayInitWithUrlAsync).not.toHaveBeenCalled();
-      expect(FAKE_NATIVE_WEB_BROWSER.getCustomTabsSupportingBrowsersAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_WEB_BROWSER.mayInitWithUrlAsync,
+      ).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_WEB_BROWSER.getCustomTabsSupportingBrowsersAsync,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -240,7 +271,8 @@ describe('the Custom Tabs service functions', () => {
       // `Async` suffix), so this guard has to fire on iOS BEFORE the "off Android" early return —
       // an iOS caller who mistakenly calls this must see a clear error, not a silently-empty result.
       fakePlatform.OS = 'android';
-      const { getCustomTabsSupportingBrowsersAsync: native } = FAKE_NATIVE_WEB_BROWSER;
+      const { getCustomTabsSupportingBrowsersAsync: native } =
+        FAKE_NATIVE_WEB_BROWSER;
       // @ts-expect-error -- simulating iOS, which registers the stub without the `Async` suffix
       FAKE_NATIVE_WEB_BROWSER.getCustomTabsSupportingBrowsersAsync = undefined;
 
@@ -277,7 +309,9 @@ describe('openAuthSessionAsync on a platform with a native auth session', () => 
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_WEB_BROWSER.openAuthSessionAsync = undefined;
 
-      await expect(openAuthSessionAsync('https://login.example')).rejects.toThrow(
+      await expect(
+        openAuthSessionAsync('https://login.example'),
+      ).rejects.toThrow(
         'openAuthSessionAsync is not available on expo-web-browser',
       );
 
@@ -294,14 +328,19 @@ describe('openAuthSessionAsync on Android', () => {
       fakePlatform.OS = 'android';
       // Android's native module has neither of these; without removing them the polyfill would never
       // be reached and the `finally` would dismiss a browser that cannot be dismissed.
-      const { openAuthSessionAsync: nativeAuth, dismissBrowser: nativeDismiss } =
-        FAKE_NATIVE_WEB_BROWSER;
+      const {
+        openAuthSessionAsync: nativeAuth,
+        dismissBrowser: nativeDismiss,
+      } = FAKE_NATIVE_WEB_BROWSER;
       // @ts-expect-error -- simulating Android's native surface
       FAKE_NATIVE_WEB_BROWSER.openAuthSessionAsync = undefined;
       // @ts-expect-error -- simulating Android's native surface
       FAKE_NATIVE_WEB_BROWSER.dismissBrowser = undefined;
 
-      const session = openAuthSessionAsync('https://login.example', 'myapp://callback');
+      const session = openAuthSessionAsync(
+        'https://login.example',
+        'myapp://callback',
+      );
       await flush();
       emitUrl('myapp://callback?code=abc');
 
@@ -324,14 +363,19 @@ describe('openAuthSessionAsync on Android', () => {
 
     it('resolves as dismissed when the app returns to the foreground without a redirect', async () => {
       fakePlatform.OS = 'android';
-      const { openAuthSessionAsync: nativeAuth, dismissBrowser: nativeDismiss } =
-        FAKE_NATIVE_WEB_BROWSER;
+      const {
+        openAuthSessionAsync: nativeAuth,
+        dismissBrowser: nativeDismiss,
+      } = FAKE_NATIVE_WEB_BROWSER;
       // @ts-expect-error -- simulating Android's native surface
       FAKE_NATIVE_WEB_BROWSER.openAuthSessionAsync = undefined;
       // @ts-expect-error -- simulating Android's native surface
       FAKE_NATIVE_WEB_BROWSER.dismissBrowser = undefined;
 
-      const session = openAuthSessionAsync('https://login.example', 'myapp://callback');
+      const session = openAuthSessionAsync(
+        'https://login.example',
+        'myapp://callback',
+      );
       await flush();
       emitAppState('active');
 
@@ -349,13 +393,17 @@ describe('openAuthSessionAsync on Android', () => {
       // side couldn't even present the tab) must resolve right away, not hang waiting for an
       // AppState transition that will never mean what it thinks it means.
       fakePlatform.OS = 'android';
-      const { openAuthSessionAsync: nativeAuth, dismissBrowser: nativeDismiss } =
-        FAKE_NATIVE_WEB_BROWSER;
+      const {
+        openAuthSessionAsync: nativeAuth,
+        dismissBrowser: nativeDismiss,
+      } = FAKE_NATIVE_WEB_BROWSER;
       // @ts-expect-error -- simulating Android's native surface
       FAKE_NATIVE_WEB_BROWSER.openAuthSessionAsync = undefined;
       // @ts-expect-error -- simulating Android's native surface
       FAKE_NATIVE_WEB_BROWSER.dismissBrowser = undefined;
-      FAKE_NATIVE_WEB_BROWSER.openBrowserAsync.mockResolvedValueOnce({ type: 'cancel' });
+      FAKE_NATIVE_WEB_BROWSER.openBrowserAsync.mockResolvedValueOnce({
+        type: 'cancel',
+      });
 
       await expect(
         openAuthSessionAsync('https://login.example', 'myapp://callback'),
@@ -372,8 +420,10 @@ describe('openAuthSessionAsync on Android', () => {
       // why: a launch failure must not leave a dangling AppState subscription behind — that would
       // leak a listener that fires forever on every future foreground/background transition.
       fakePlatform.OS = 'android';
-      const { openAuthSessionAsync: nativeAuth, dismissBrowser: nativeDismiss } =
-        FAKE_NATIVE_WEB_BROWSER;
+      const {
+        openAuthSessionAsync: nativeAuth,
+        dismissBrowser: nativeDismiss,
+      } = FAKE_NATIVE_WEB_BROWSER;
       // @ts-expect-error -- simulating Android's native surface
       FAKE_NATIVE_WEB_BROWSER.openAuthSessionAsync = undefined;
       // @ts-expect-error -- simulating Android's native surface
@@ -406,19 +456,24 @@ describe('openAuthSessionAsync on Android', () => {
       // violation, not a normal "you already have a session open" user-facing error — worth
       // confirming with whoever owns this port before relying on the message text anywhere.
       fakePlatform.OS = 'android';
-      const { openAuthSessionAsync: nativeAuth, dismissBrowser: nativeDismiss } =
-        FAKE_NATIVE_WEB_BROWSER;
+      const {
+        openAuthSessionAsync: nativeAuth,
+        dismissBrowser: nativeDismiss,
+      } = FAKE_NATIVE_WEB_BROWSER;
       // @ts-expect-error -- simulating Android's native surface
       FAKE_NATIVE_WEB_BROWSER.openAuthSessionAsync = undefined;
       // @ts-expect-error -- simulating Android's native surface
       FAKE_NATIVE_WEB_BROWSER.dismissBrowser = undefined;
 
-      const firstSession = openAuthSessionAsync('https://login.example', 'myapp://callback');
+      const firstSession = openAuthSessionAsync(
+        'https://login.example',
+        'myapp://callback',
+      );
       await flush();
 
-      await expect(openAuthSessionAsync('https://other.example')).rejects.toThrow(
-        'invalid state with a redirect handler set',
-      );
+      await expect(
+        openAuthSessionAsync('https://other.example'),
+      ).rejects.toThrow('invalid state with a redirect handler set');
 
       // Let the first session settle so its subscriptions are released before the next test.
       emitAppState('active');

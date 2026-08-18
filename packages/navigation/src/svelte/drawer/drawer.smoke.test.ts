@@ -4,7 +4,8 @@
 // from `@symbiote-native/svelte`'s main barrel, and that barrel re-exports real `.svelte` sources
 // which Vite's plain (svelte-plugin-free) test transform cannot parse. So the harness aliases
 // that ONE specifier to a module generated below - which itself pulls in the REAL, freshly
-// compiled `AnimatedView.svelte` from the adapter, not a stand-in. Everything the drawer uses
+// compiled `View.svelte` and the REAL `createAnimatedComponent` from the adapter, not a
+// stand-in. Everything the drawer uses
 // beyond it (PanResponder, Dimensions, AnimatedValue, timing) already comes straight from
 // @symbiote-native/engine, which needs no substitution.
 
@@ -17,20 +18,38 @@ import { Dimensions } from '@symbiote-native/engine';
 import * as engine from '@symbiote-native/engine';
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
 import type { IDrawerNavigatorHandle } from '../../core';
-import { findLiveByTestId, outline } from '../fabric-tree.test-helper';
-import { createSvelteHarness, loadComponent } from '../svelte-compile.test-helper';
+import {
+  findLiveByTestId,
+  outline,
+  rawTextsOutsideTextContainer,
+} from '../fabric-tree.test-helper';
+import {
+  createSvelteHarness,
+  loadComponent,
+} from '../svelte-compile.test-helper';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
 const ROOT_TAG = 91_703;
-const ANIMATED_VIEW_SOURCE = resolve(
+// Animated.View is no longer a `.svelte` file of its own: the adapter builds all six from one
+// generic createAnimatedComponent(Base), so this compiles the plain View and wraps it the same
+// way the adapter's own barrel does.
+const VIEW_SOURCE = resolve(
   __dirname,
-  '../../../../../adapters/svelte/src/modules/animated/AnimatedView.svelte',
+  '../../../../../adapters/svelte/src/components/View.svelte',
 );
-const ANIMATED_ALIAS = join(__dirname, '.smoke-compiled-drawer-animated-alias.mjs');
+const CREATE_ANIMATED_COMPONENT = resolve(
+  __dirname,
+  '../../../../../adapters/svelte/src/modules/animated/create-animated-component',
+);
+const ANIMATED_ALIAS = join(
+  __dirname,
+  '.smoke-compiled-drawer-animated-alias.mjs',
+);
 
 // rAF is not a Node global; the engine's `timing` (driven by every openDrawer/closeDrawer/
 // toggleDrawer call and by a gesture release) reads it at .start() time. Same shim, same reason,
@@ -67,9 +86,12 @@ function installRequestAnimationFrame(): void {
 Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve_ => setTimeout(resolve_, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve_ => setTimeout(resolve_, 0));
 
-let harness = createSvelteHarness('drawer', { '@symbiote-native/svelte': ANIMATED_ALIAS });
+let harness = createSvelteHarness('drawer', {
+  '@symbiote-native/svelte': ANIMATED_ALIAS,
+});
 
 beforeEach(() => {
   fabric.reset();
@@ -77,7 +99,9 @@ beforeEach(() => {
   pendingFrames.clear();
   nextFrameId = 1;
   installRequestAnimationFrame();
-  harness = createSvelteHarness('drawer', { '@symbiote-native/svelte': ANIMATED_ALIAS });
+  harness = createSvelteHarness('drawer', {
+    '@symbiote-native/svelte': ANIMATED_ALIAS,
+  });
 });
 
 afterEach(() => {
@@ -128,11 +152,14 @@ async function mountDrawer(
   includeScreens = true,
 ): Promise<IDrawerNavigatorHandle> {
   const dir = __dirname;
-  const animatedView = harness.compileFile(ANIMATED_VIEW_SOURCE);
+  const view = harness.compileFile(VIEW_SOURCE);
   writeFileSync(
     ANIMATED_ALIAS,
-    `import AnimatedView from ${JSON.stringify(relative(dir, animatedView))};\n` +
-      'export const Animated = { View: AnimatedView };\n',
+    `import View from ${JSON.stringify(relative(dir, view))};\n` +
+      `import { createAnimatedComponent } from ${JSON.stringify(
+        relative(dir, CREATE_ANIMATED_COMPONENT),
+      )};\n` +
+      'export const Animated = { View: createAnimatedComponent(View) };\n',
   );
   harness.compileSource(dir, 'inbox-fixture', screenSource('inbox'));
   harness.compileSource(dir, 'settings-fixture', screenSource('settings'));
@@ -150,7 +177,8 @@ async function mountDrawer(
   });
   await tick();
   await tick();
-  if (!isDrawerHandle(handle)) throw new Error('Drawer did not expose a navigator handle');
+  if (!isDrawerHandle(handle))
+    throw new Error('Drawer did not expose a navigator handle');
   return handle;
 }
 
@@ -199,7 +227,11 @@ function swipe(path: readonly ITouchFrame[]): void {
   const [start, ...rest] = path;
   fire('topTouchStart', start, false);
   rest.forEach((frame, i) =>
-    fire(i === rest.length - 1 ? 'topTouchEnd' : 'topTouchMove', frame, i === rest.length - 1),
+    fire(
+      i === rest.length - 1 ? 'topTouchEnd' : 'topTouchMove',
+      frame,
+      i === rest.length - 1,
+    ),
   );
 }
 
@@ -247,7 +279,9 @@ describe('Drawer (real compiled index.svelte)', () => {
         '        RCTView',
       ]);
       expect(findLiveByTestId(fabric.appRoot(), 'inbox')).toBeDefined();
-      expect(findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')).toBeDefined();
+      expect(
+        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content'),
+      ).toBeDefined();
     });
 
     // why: an app-authored `drawerContent` snippet needs the live route count, open state,
@@ -258,7 +292,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       await mountDrawer();
       // routes:isOpen:descriptorCount:typeof openDrawer
       expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props?.accessibilityLabel,
+        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props
+          ?.accessibilityLabel,
       ).toBe('2:false:2:function');
     });
 
@@ -271,14 +306,16 @@ describe('Drawer (real compiled index.svelte)', () => {
       await tick();
       await tick();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props?.accessibilityLabel,
+        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props
+          ?.accessibilityLabel,
       ).toBe('2:true:2:function');
 
       handle.closeDrawer();
       await tick();
       await tick();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props?.accessibilityLabel,
+        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props
+          ?.accessibilityLabel,
       ).toBe('2:false:2:function');
     });
 
@@ -303,17 +340,18 @@ describe('Drawer (real compiled index.svelte)', () => {
     it('synthesizes focus on mount and moves it with the focused route', async () => {
       const handle = await mountDrawer();
       await tick();
-      expect(findLiveByTestId(fabric.appRoot(), 'inbox')?.props?.accessibilityLabel).toBe(
-        'inbox:true',
-      );
+      expect(
+        findLiveByTestId(fabric.appRoot(), 'inbox')?.props?.accessibilityLabel,
+      ).toBe('inbox:true');
 
       handle.jumpTo('settings');
       await tick();
       await tick();
       await tick();
-      expect(findLiveByTestId(fabric.appRoot(), 'settings')?.props?.accessibilityLabel).toBe(
-        'settings:true',
-      );
+      expect(
+        findLiveByTestId(fabric.appRoot(), 'settings')?.props
+          ?.accessibilityLabel,
+      ).toBe('settings:true');
     });
 
     // why: drawerChildOrder's 'permanent' branch is the one type that is NOT absolutely
@@ -346,17 +384,19 @@ describe('Drawer (real compiled index.svelte)', () => {
       expect(findLiveByTestId(fabric.appRoot(), 'inbox')).toBeUndefined();
     });
 
-    // why: structural regression guard for svelte-adapter-dom-shim skill §16 - a stray
-    // single-space text entry between two sibling markers compiles into a real RCTRawText engine
-    // node that would visibly shift the outline assertions above.
-    it('compiles every navigator template with no stray whitespace text nodes', () => {
-      const audit = createSvelteHarness('drawer-audit', {
-        '@symbiote-native/svelte': ANIMATED_ALIAS,
-      });
-      audit.compileFile(join(__dirname, 'index.svelte'));
-      audit.compileFile(join(__dirname, '../drawer-screen.svelte'));
-      expect(audit.strayWhitespaceCount()).toBe(0);
-      audit.cleanup();
+    // why: structural regression guard for svelte-adapter-dom-shim skill §16b - the templates
+    // are formatted normally, so Svelte emits a ' ' text node between sibling tags and only the
+    // shim's parent check keeps it out of Fabric. One that got through would be a real
+    // RCTRawText engine node, visibly shifting the outline assertions above. Re-checked with the
+    // drawer open, because the panel slot only mounts then.
+    it('commits no raw text outside a text container', async () => {
+      const handle = await mountDrawer('hygiene');
+      expect(rawTextsOutsideTextContainer(fabric.appRoot())).toEqual([]);
+
+      handle.openDrawer();
+      await tick();
+      await tick();
+      expect(rawTextsOutsideTextContainer(fabric.appRoot())).toEqual([]);
     });
 
     // why: seedState's `routes.length === 0` branch (dlog-documented) must produce a mounted,
@@ -367,7 +407,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       const handle = await mountDrawer('empty', '', false);
       expect(handle.jumpTo).toBeTypeOf('function');
       expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props?.accessibilityLabel,
+        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props
+          ?.accessibilityLabel,
       ).toBe('0:false:0:function');
     });
 
@@ -397,14 +438,16 @@ describe('Drawer (real compiled index.svelte)', () => {
       await tick();
       await tick();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props?.accessibilityLabel,
+        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props
+          ?.accessibilityLabel,
       ).toBe('2:true:2:function');
 
       handle.toggleDrawer();
       await tick();
       await tick();
       expect(
-        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props?.accessibilityLabel,
+        findLiveByTestId(fabric.appRoot(), 'drawer-panel-content')?.props
+          ?.accessibilityLabel,
       ).toBe('2:false:2:function');
     });
 
@@ -443,7 +486,10 @@ describe('Drawer (real compiled index.svelte)', () => {
     // screen that was never registered - the drawer must still mount onto a real screen instead
     // of ending up with no focused route at all.
     it('falls back to the first route when initialRouteName is not registered', async () => {
-      await mountDrawer('initial-route-unknown', 'initialRouteName="does-not-exist"');
+      await mountDrawer(
+        'initial-route-unknown',
+        'initialRouteName="does-not-exist"',
+      );
       expect(findLiveByTestId(fabric.appRoot(), 'inbox')).toBeDefined();
       expect(findLiveByTestId(fabric.appRoot(), 'settings')).toBeUndefined();
     });

@@ -30,7 +30,9 @@ function isSupportedTypedArray(value: ArrayBufferView): value is ITypedArray {
 class Crypto implements IWebCrypto {
   getRandomValues<TArray extends ArrayBufferView>(values: TArray): TArray {
     if (!isSupportedTypedArray(values)) {
-      throw new TypeError('The provided ArrayBuffer view is not a supported integer-typed array');
+      throw new TypeError(
+        'The provided ArrayBuffer view is not a supported integer-typed array',
+      );
     }
     return getNativeRandomValues(values);
   }
@@ -40,7 +42,9 @@ function isWebCrypto(value: unknown): value is IWebCrypto {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
-  return 'getRandomValues' in value && typeof value.getRandomValues === 'function';
+  return (
+    'getRandomValues' in value && typeof value.getRandomValues === 'function'
+  );
 }
 
 // No ambient `declare global { var crypto }` here on purpose — it would collide with lib.dom.d.ts's

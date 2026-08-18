@@ -26,12 +26,12 @@ Unlike a plain RN native module, `expo-crypto`'s native code is discovered by
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
@@ -76,7 +76,9 @@ function CryptoScreen() {
   }, []);
 
   const handleHash = () => {
-    digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(setHash);
+    digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(
+      setHash,
+    );
   };
 
   return (
@@ -110,7 +112,10 @@ onMounted(() => {
 });
 
 function handleHash(): void {
-  void digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(value => {
+  void digestStringAsync(
+    CryptoDigestAlgorithm.SHA256,
+    'Confirm it is you',
+  ).then(value => {
     hash.value = value;
   });
 }
@@ -157,8 +162,8 @@ export class CryptoScreen {
   readonly hash = signal('');
 
   handleHash(): void {
-    digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(value =>
-      this.hash.set(value),
+    digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(
+      value => this.hash.set(value),
     );
   }
 }

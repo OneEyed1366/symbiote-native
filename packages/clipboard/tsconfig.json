@@ -11,6 +11,7 @@
     { "path": "../../adapters/vue" },
     { "path": "../../adapters/react" },
     { "path": "../../adapters/svelte" },
+    { "path": "../../adapters/solid" },
     { "path": "../../adapters/angular" }
   ]
 }

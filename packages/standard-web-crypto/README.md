@@ -43,7 +43,9 @@ through a separate `ngc`/AOT build (`build-ngc/`).
 ## Use it
 
 ```ts
-import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto';
 
 // Reach the polyfill (or a real globalThis.crypto, if one already exists) directly:
 const bytes = new Uint8Array(16);
@@ -58,9 +60,15 @@ crypto.getRandomValues(bytes);
 The React/Vue/Angular entry points re-export the identical surface:
 
 ```ts
-import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/react';
-import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/vue';
-import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/angular';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto/react';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto/vue';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto/angular';
 ```
 
 ## API
@@ -79,7 +87,7 @@ Plus the `IWebCrypto` type describing the shape above.
 ## Notes
 
 - **`webCrypto` is resolved once, at module-load time**: if `globalThis.crypto` already exists
-  (a real Web Crypto implementation), `webCrypto` *is* that object; otherwise it's this package's
+  (a real Web Crypto implementation), `webCrypto` _is_ that object; otherwise it's this package's
   own `Crypto` class instance backed by `@symbiote-native/crypto`. React Native has no reliable
   `window` global, so this port checks/defines `globalThis.crypto` rather than upstream's `window`.
 - **`getRandomValues` only accepts the integer TypedArrays `@symbiote-native/crypto` can hand to

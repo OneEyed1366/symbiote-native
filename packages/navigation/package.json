@@ -1,7 +1,7 @@
 {
   "name": "@symbiote-native/navigation",
   "version": "2.1.0",
-  "description": "Native stack navigator for SymbioteNative, built on react-native-screens' native view primitives (RNSScreen/RNSScreenStack) — one framework-agnostic core, reachable from the React, Vue, and Angular adapters.",
+  "description": "Native stack navigator for SymbioteNative, built on react-native-screens' native view primitives (RNSScreen/RNSScreenStack) — one framework-agnostic core, reachable from the React, Vue, Svelte, Solid, and Angular adapters.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -22,6 +22,7 @@
     "./react": "./src/react/index.ts",
     "./vue": "./src/vue/index.ts",
     "./svelte": "./src/svelte/index.ts",
+    "./solid": "./src/solid/index.ts",
     "./angular": {
       "types": "./build-ngc/angular/index.d.ts",
       "react-native": "./build-ngc/angular/index.js",
@@ -60,6 +61,10 @@
       "./svelte": {
         "types": "./build/svelte/index.d.ts",
         "default": "./build/svelte/index.js"
+      },
+      "./solid": {
+        "types": "./build/solid/index.d.ts",
+        "default": "./build/solid/index.js"
       },
       "./angular": {
         "types": "./build-ngc/angular/index.d.ts",
@@ -174,11 +179,13 @@
     "@symbiote-native/angular": ">=0.6.2",
     "@symbiote-native/engine": ">=0.1.7",
     "@symbiote-native/react": ">=0.2.8",
+    "@symbiote-native/solid": ">=0.1.0",
     "@symbiote-native/svelte": ">=0.1.0",
     "@symbiote-native/vue": ">=0.3.8",
     "@vue/runtime-core": "^3.5.13",
     "react": ">=19.0.0",
     "react-native": ">=0.86",
+    "solid-js": ">=1.9.0",
     "svelte": ">=5.56.0",
     "vue": ">=3.5.0"
   },
@@ -195,6 +202,9 @@
     "@symbiote-native/react": {
       "optional": true
     },
+    "@symbiote-native/solid": {
+      "optional": true
+    },
     "@symbiote-native/svelte": {
       "optional": true
     },
@@ -205,6 +215,9 @@
       "optional": true
     },
     "react": {
+      "optional": true
+    },
+    "solid-js": {
       "optional": true
     },
     "svelte": {
@@ -222,6 +235,7 @@
     "@symbiote-native/angular": "workspace:*",
     "@symbiote-native/engine": "workspace:*",
     "@symbiote-native/react": "workspace:*",
+    "@symbiote-native/solid": "workspace:*",
     "@symbiote-native/svelte": "workspace:*",
     "@symbiote-native/test-utils": "workspace:*",
     "@symbiote-native/vue": "workspace:*",
@@ -229,6 +243,7 @@
     "@types/react": "catalog:",
     "@vue/runtime-core": "catalog:",
     "react": "catalog:",
+    "solid-js": "catalog:",
     "svelte": "catalog:",
     "typescript": "catalog:"
   }
