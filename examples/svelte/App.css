@@ -530,6 +530,17 @@
   font-size: 18px;
   font-weight: bold;
 }
+/* Height is deliberately fat, not decorative: this divider is the chrome BETWEEN rows that the
+   offset table has to account for, and a 1px hairline would hide a mis-modelled gap. Insets match
+   .mvcp-row's padding on BOTH sides so it reads as part of the row rhythm instead of bleeding
+   under the container's rounded corner. */
+.mvcp-divider {
+  height: 8px;
+  margin-left: 14px;
+  margin-right: 14px;
+  border-radius: 2px;
+  background-color: #26304f;
+}
 .mvcp-row {
   padding-top: 10px;
   padding-bottom: 10px;

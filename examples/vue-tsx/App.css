@@ -34,6 +34,10 @@
   --line-structure: #4fd1a5;
   --line-introspection: #b18cf5;
   --line-routing: #f2789a;
+  /* Not a @symbiote-native/navigation line — API Playground's own (Vue's Composition/render-
+     function surface, not a navigation feature). Kept in the same --line-* token family so its
+     line-tag/menu-row/menu-badge chrome matches the other five mechanically. */
+  --line-framework: #f6ad55;
   --warn: #ff6b6b;
 }
 
@@ -509,6 +513,11 @@
   font-size: 18px;
   font-weight: bold;
 }
+.mvcp-divider {
+  height: 8px;
+  margin-left: 14px;
+  background-color: #26304f;
+}
 .mvcp-row {
   padding-top: 10px;
   padding-bottom: 10px;
@@ -680,6 +689,9 @@
 .line-tag-routing {
   background-color: var(--line-routing);
 }
+.line-tag-framework {
+  background-color: var(--line-framework);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -724,6 +736,10 @@
   border-left-width: 3px;
   border-left-color: var(--line-routing);
 }
+.menu-row-framework {
+  border-left-width: 3px;
+  border-left-color: var(--line-framework);
+}
 .menu-badge {
   width: 34px;
   height: 34px;
@@ -745,6 +761,9 @@
 }
 .menu-badge-routing {
   background-color: var(--line-routing);
+}
+.menu-badge-framework {
+  background-color: var(--line-framework);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -780,6 +799,9 @@
 .menu-row-hint-routing {
   color: var(--line-routing);
 }
+.menu-row-hint-framework {
+  color: var(--line-framework);
+}
 
 /* Compound-class demo (components/CompoundClassDemo) — the ONE place this app leans on a
    compound selector. `.badge.loud` restates only the two colours, so `.badge`'s padding and
@@ -801,4 +823,78 @@
 .badge-text {
   font-size: 13px;
   color: var(--chalk);
+}
+
+/* ApiPlaygroundScreen — Vue's own Composition/render-function API surface, running under the
+   engine. Generic widget chrome shared across its many small demo components, reusing the
+   .hero-card/.section-nested/.info-text/.list-row-text/.action-button vocabulary above wherever
+   it already fits; only genuinely new shapes get a class here. */
+.log-card {
+  padding: 12px;
+  border-radius: 12px;
+  gap: 4px;
+  background-color: var(--paper);
+}
+.stepper-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.stepper-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--line-framework);
+}
+.stepper-button-text {
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: bold;
+}
+.stepper-value {
+  color: var(--chalk-bright);
+  font-size: 18px;
+  font-weight: bold;
+  min-width: 32px;
+  text-align: center;
+}
+.frame-box {
+  padding: 14px;
+  border-radius: 12px;
+  border-width: 1px;
+  border-color: var(--line-framework);
+  gap: 6px;
+}
+.flash-box {
+  height: 48px;
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--paper);
+}
+.flash-box-text {
+  color: var(--chalk-bright);
+  font-size: 13px;
+}
+.tab-card {
+  padding: 16px;
+  border-radius: 14px;
+  gap: 10px;
+  background-color: var(--paper);
+}
+.inspector-row {
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 8px;
+}
+.inspector-key {
+  color: var(--chalk);
+  font-size: 13px;
+}
+.inspector-value {
+  color: var(--line-framework);
+  font-size: 13px;
+  font-weight: bold;
 }

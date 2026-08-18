@@ -286,6 +286,11 @@
   font-size: 18px;
   font-weight: bold;
 }
+.mvcp-divider {
+  height: 8px;
+  margin-left: 14px;
+  background-color: #26304f;
+}
 .mvcp-row {
   padding-top: 10px;
   padding-bottom: 10px;

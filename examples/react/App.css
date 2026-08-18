@@ -507,6 +507,17 @@
   font-size: 18px;
   font-weight: bold;
 }
+/* Height is deliberately fat, not decorative: this divider is the chrome BETWEEN rows that the
+   offset table has to account for, and a 1px hairline would hide a mis-modelled gap. Insets match
+   .mvcp-row's padding on BOTH sides so it reads as part of the row rhythm instead of bleeding
+   under the container's rounded corner. */
+.mvcp-divider {
+  height: 8px;
+  margin-left: 14px;
+  margin-right: 14px;
+  border-radius: 2px;
+  background-color: #26304f;
+}
 .mvcp-row {
   padding-top: 10px;
   padding-bottom: 10px;
@@ -799,4 +810,41 @@
 .badge-text {
   font-size: 13px;
   color: var(--chalk);
+}
+
+/* ApiPlaygroundScreen + its demo components (components/Hooks*Demo, components/*Demo below the
+   Fragment/Profiler/etc. cluster) — category-header/category-intro group each of the checklist's
+   4 `##` sections (Hooks, Built-in Components, Component Model, Other); caveat-text flags a
+   Partial row's degraded behavior inline (CaveatNote) instead of assuming the gap away;
+   log-box/error-fallback back the class-lifecycle and error-boundary demos' own readouts. */
+.category-header {
+  color: var(--chalk-bright);
+  font-size: 20px;
+  font-weight: bold;
+  padding-top: 8px;
+}
+.category-intro {
+  color: var(--chalk);
+  font-size: 13px;
+}
+.caveat-text {
+  color: #f6ad55;
+  font-size: 12px;
+}
+.log-box {
+  border-radius: 10px;
+  background-color: #0f1e30;
+  padding: 10px;
+  gap: 4px;
+}
+.error-fallback {
+  border-radius: 10px;
+  background-color: #3b1220;
+  padding: 12px;
+  gap: 6px;
+}
+.error-fallback-title {
+  color: #fca5a5;
+  font-size: 14px;
+  font-weight: bold;
 }
