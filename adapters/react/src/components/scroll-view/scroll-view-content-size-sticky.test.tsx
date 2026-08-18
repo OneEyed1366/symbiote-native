@@ -20,7 +20,11 @@ import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { View, Text, mount, unmount } from '@symbiote-native/react';
 import { ScrollView } from './index';
-import { ScrollViewStickyHeader, type IStickyHeaderComponentProps } from './sticky-header';
+import {
+  ScrollViewStickyHeader,
+  type IStickyHeaderComponentProps,
+  type IStickyHeaderHandle,
+} from './sticky-header';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 53;
@@ -63,11 +67,30 @@ function headerText(children: IStickyHeaderComponentProps['children']): string {
   return typeof inner === 'string' ? inner : '';
 }
 
-// Spy wrapper: records the nextHeaderLayoutY it is handed, then delegates to the real header so
-// the genuine onLayout recorder (which reports this header's own y up to the parent) still runs.
+// Spy wrapper: records the next-header y this header is handed, then delegates to the real header
+// so the genuine onLayout recorder (which reports this header's own y up to the parent) still runs.
+// The value arrives IMPERATIVELY through the ref, not as a prop (RN ScrollView.js:1141) — that is
+// what keeps one header's layout from re-rendering every child — so the spy wraps the handle. A
+// custom StickyHeaderComponent has to forward the ref for the same reason.
 function SpyStickyHeader(props: IStickyHeaderComponentProps): ReactElement {
-  nextYByHeader.set(headerText(props.children), props.nextHeaderLayoutY);
-  return createElement(ScrollViewStickyHeader, props);
+  const label = headerText(props.children);
+  const parentRef = props.ref;
+  return createElement(ScrollViewStickyHeader, {
+    ...props,
+    ref: (handle: IStickyHeaderHandle | null): void => {
+      if (typeof parentRef !== 'function') return;
+      if (handle === null) {
+        parentRef(null);
+        return;
+      }
+      parentRef({
+        setNextHeaderY: (y: number): void => {
+          nextYByHeader.set(label, y);
+          handle.setNextHeaderY(y);
+        },
+      });
+    },
+  });
 }
 
 function StickyApp(): ReactElement {
@@ -170,7 +193,7 @@ describe('ScrollView content-size + sticky headers', () => {
   // headers, the EARLIER header must receive the LATER header's y, while the LAST stays
   // undefined — and it must resolve by INDEX order, not by which layout event arrives first
   // (real devices don't guarantee layout-callback ordering).
-  it('feeds the earlier sticky header the next header y by index order', () => {
+  it('feeds the earlier sticky header the next header y by index order', async () => {
     mount(ROOT_TAG, <StickyApp />);
 
     // Before any layout: neither header knows the next one's y.
@@ -191,6 +214,10 @@ describe('ScrollView content-size + sticky headers', () => {
     fabric.fireEvent(stickyWrappers[0].instanceHandle, 'topLayout', {
       layout: { x: 0, y: 0, width: 320, height: 40 },
     });
+
+    // The handoff is coalesced onto a microtask so a mount's worth of layouts lands in one render
+    // pass (see usePreparedScrollView), so drain it before asserting.
+    await Promise.resolve();
 
     // H0 (earlier) must learn H1's y as its push-off collision point; H1 (last) stays undefined.
     expect(nextYByHeader.get('H0')).toBe(100);

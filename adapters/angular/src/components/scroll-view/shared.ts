@@ -861,6 +861,19 @@ export abstract class ScrollViewBase
   // actually moved, so `signal.set`'s own Object.is check makes an unchanged poll dirty nothing.
   ngDoCheck(): void {
     this.anchorStyle.set(anchorHostStyle(this.elementRef));
+    // The attach can want a node that does not exist yet, and nothing else would ask again.
+    // ngOnChanges covers "indices arrived late"; it does NOT cover "indices arrived late AND the host
+    // node had not committed yet", which is exactly what a VirtualizedList does - it derives
+    // stickyHeaderIndices from the measured window, so they land after this component's
+    // ngAfterViewInit and before its host node resolves. Device-diagnosed 2026-08-18 on
+    // examples/angular BenchmarkScreen STICKY PATH B, whose log ends on `attachSticky NOT attaching
+    // (wantsAttach=true hasNode=false)` - sticky never turned on, while PATH A (literal indices in
+    // the template) worked because ngAfterViewInit already saw a node. Retried ONLY from that stuck
+    // state, so a settled ScrollView pays nothing per check. Device-verified the same day.
+    // Not covered headless: sticky-native-attach.test.ts's late-indices case has its node resolved by
+    // the time the indices land, and the deferred-creation ordering under `@if` never rendered the
+    // ScrollView at all.
+    if (this.stickyAttachedEnabled && this.stickyAttachedNode === null) this.attachSticky();
   }
 
   // The projected RefreshControl is a @ContentChild, not an @Input, so ngOnChanges never fires when

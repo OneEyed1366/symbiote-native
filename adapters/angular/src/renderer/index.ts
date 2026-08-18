@@ -28,6 +28,7 @@ import { descriptorFor } from '@symbiote-native/components';
 import type { Renderer2, RendererFactory2, RendererType2 } from '@angular/core';
 import { isAnchorHostComponent } from '../anchor-host-registry';
 import {
+  flushScrollViewProjections,
   getScrollViewProjection,
   removeScrollViewProjectedChild,
 } from '../components/scroll-view/projection';
@@ -343,5 +344,14 @@ export class SymbioteRendererFactory implements RendererFactory2 {
 
   createRenderer(_hostElement: unknown, _type: RendererType2 | null): Renderer2 {
     return (this.renderer ??= new SymbioteRenderer(this.surface));
+  }
+
+  // Not commit coalescing (requestCommit owns that) — this is the one moment where a ScrollView's
+  // two input channels are known to be consistent: Angular has finished writing every `@Input` AND
+  // the renderer has finished every projected insert/remove for this pass, while the surface's
+  // commit is still only queued. Sticky projection reconciles are batched to here for both reasons;
+  // see flushScrollViewProjections.
+  end(): void {
+    flushScrollViewProjections();
   }
 }

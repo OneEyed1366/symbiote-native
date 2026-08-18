@@ -252,6 +252,22 @@ describe('reduceSticky debounce scheduling', () => {
     expect(result.state.translateY).toBe(7);
     expect(result.effects).toEqual([{ kind: 'apply-passthrough', translateY: 7 }]);
   });
+
+  // The same bail-out the 'layout' case spells out, in the settle path. Without it a settled value
+  // arriving twice re-emits apply-passthrough, the adapter force-renders, the passthrough object
+  // gets a fresh identity, the animated graph reconnects and re-emits - a self-feeding loop React
+  // eventually kills with "Maximum update depth exceeded".
+  it('debounce-fired at the value already committed emits nothing', () => {
+    const settled = reduceSticky(
+      createInitialStickyState(),
+      { kind: 'debounce-fired', value: 7 },
+      topInputs(),
+    ).state;
+    const again = reduceSticky(settled, { kind: 'debounce-fired', value: 7 }, topInputs());
+    expect(again.effects).toEqual([]);
+    expect(again.changed).toBe(false);
+    expect(again.state.translateY).toBe(7);
+  });
 });
 
 describe('reduceSticky zero-swallow gate', () => {
