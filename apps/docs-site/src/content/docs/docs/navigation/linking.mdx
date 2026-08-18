@@ -28,11 +28,12 @@ strings, neither of which fits a runtime config object on Hermes).
 ### `ILinkingConfig`
 
 ```ts
-type IScreenLinkingConfig = string | { path?: string; screens?: Record<string, IScreenLinkingConfig> };
+type IScreenLinkingConfig =
+  string | { path?: string; screens?: Record<string, IScreenLinkingConfig> };
 
 type ILinkingConfig = {
-  prefixes: string[];                                          // URL prefixes to match, e.g. 'myapp://', 'https://example.com'
-  config: { screens: Record<string, IScreenLinkingConfig> };    // screen name -> path pattern ('user/:id') or a nested group
+  prefixes: string[]; // URL prefixes to match, e.g. 'myapp://', 'https://example.com'
+  config: { screens: Record<string, IScreenLinkingConfig> }; // screen name -> path pattern ('user/:id') or a nested group
 };
 ```
 
@@ -78,6 +79,7 @@ export const APP_LINKING_CONFIG: ILinkingConfig = {
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     `useLinkingIntegration(config, navigatorHandle)` deliberately takes the **ref itself**, not a
@@ -99,6 +101,7 @@ export const APP_LINKING_CONFIG: ILinkingConfig = {
       <Stack ref="stackHandle" initial-route-name="Home"><!-- screens --></Stack>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     `injectLinkingIntegration(config, navigatorHandle)` is an injection function — it calls
@@ -144,6 +147,7 @@ export const APP_LINKING_CONFIG: ILinkingConfig = {
     `ngAfterViewInit` is the first lifecycle hook Angular guarantees `@ViewChild` queries are
     populated by, making it the earliest safe call site — the same gating React's `LinkingRunner`
     achieves with a null-checked child component, done here with one hook instead of a second one.
+
   </TabItem>
   <TabItem label="Svelte">
     `useLinkingIntegration(config, getNavigatorHandle)` takes a **getter function**, not a
@@ -176,6 +180,7 @@ export const APP_LINKING_CONFIG: ILinkingConfig = {
 
     <Stack bind:this={stackInstance} initialRouteName="Home"><!-- screens --></Stack>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -215,18 +220,24 @@ OS-level deep link — no OS event, no navigator, no adapter needed at all.
 ## State persistence
 
 `serializeNavigatorState` / `deserializeNavigatorState` are plain framework-agnostic functions
-from the `@symbiote-native/navigation` package root — persistence *storage* (e.g. AsyncStorage) is
+from the `@symbiote-native/navigation` package root — persistence _storage_ (e.g. AsyncStorage) is
 left to the app, this package only handles the serialize/validate step. To restore, pass the
 result into a Stack handle's `reset(state)` method:
 
 ```ts
-import { serializeNavigatorState, deserializeNavigatorState } from '@symbiote-native/navigation';
+import {
+  serializeNavigatorState,
+  deserializeNavigatorState,
+} from '@symbiote-native/navigation';
 import type { INavigatorState } from '@symbiote-native/navigation';
 import type { INavigatorHandle } from '@symbiote-native/navigation/react';
 
 // on navigator state change, persist it
 async function persist(state: INavigatorState): Promise<void> {
-  await AsyncStorage.setItem('nav-state', JSON.stringify(serializeNavigatorState(state)));
+  await AsyncStorage.setItem(
+    'nav-state',
+    JSON.stringify(serializeNavigatorState(state)),
+  );
 }
 
 // on app launch, restore it
@@ -238,20 +249,21 @@ async function restore(stackHandle: INavigatorHandle): Promise<void> {
 ```
 
 <Aside type="caution">
-  Every route's `params` must be plain JSON-serializable data — no functions, class instances, or
-  circular references. A route with a non-serializable param silently breaks the round trip: it
-  either throws at `JSON.stringify` time, or worse, silently drops the offending field.
+  Every route's `params` must be plain JSON-serializable data — no functions,
+  class instances, or circular references. A route with a non-serializable param
+  silently breaks the round trip: it either throws at `JSON.stringify` time, or
+  worse, silently drops the offending field.
 </Aside>
 
 ## API
 
-| Signature | Description |
-| --- | --- |
-| `useLinkingIntegration(config: ILinkingConfig, navigatorHandle: INavigatorHandle): void` (React) | Subscribes to deep links and drives the given handle. Takes the **resolved** handle — mount it only once the Stack's ref is non-null |
-| `useLinkingIntegration(config: ILinkingConfig, navigatorHandle: Ref<INavigatorHandle \| null>): void` (Vue) | Same behavior, but takes the **ref itself** — reads `.value` lazily inside its own `onMounted`, which fires after the Stack's ref has resolved |
-| `injectLinkingIntegration(config: ILinkingConfig, navigatorHandle: INavigatorHandle): void` (Angular) | Same behavior as an injection function — needs an injection context (`inject(DestroyRef)` internally), call it via `runInInjectionContext` from `ngAfterViewInit` |
-| `useLinkingIntegration(config: ILinkingConfig, getNavigatorHandle: () => INavigatorHandle \| null): void` (Svelte) | Same behavior, but takes a **getter function** over the Stack's `bind:this` target — reads it inside its own `$effect`, tracked so it re-runs once the binding resolves |
-| `resolveRouteFromUrl(config: ILinkingConfig, url: string): IRoute<unknown> \| null` | Resolves a URL to a route synchronously, with no navigator or OS event involved — the same resolution the integration hooks use internally |
-| `resolveUrlFromRoute(config: ILinkingConfig, route: IRoute<unknown>): string \| null` | The inverse of `resolveRouteFromUrl` — builds a URL for a route, filling `:param` segments from `route.params`; `null` when a required param is missing or the route name isn't configured |
-| `serializeNavigatorState(state: INavigatorState): unknown` | Currently an identity passthrough — `INavigatorState` is already plain JSON-safe data |
-| `deserializeNavigatorState(raw: unknown): INavigatorState` | Validates the shape at runtime and throws `"deserializeNavigatorState: persisted value is not a valid navigator state"` if invalid — no blind `as` cast |
+| Signature                                                                                                          | Description                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `useLinkingIntegration(config: ILinkingConfig, navigatorHandle: INavigatorHandle): void` (React)                   | Subscribes to deep links and drives the given handle. Takes the **resolved** handle — mount it only once the Stack's ref is non-null                                                       |
+| `useLinkingIntegration(config: ILinkingConfig, navigatorHandle: Ref<INavigatorHandle \| null>): void` (Vue)        | Same behavior, but takes the **ref itself** — reads `.value` lazily inside its own `onMounted`, which fires after the Stack's ref has resolved                                             |
+| `injectLinkingIntegration(config: ILinkingConfig, navigatorHandle: INavigatorHandle): void` (Angular)              | Same behavior as an injection function — needs an injection context (`inject(DestroyRef)` internally), call it via `runInInjectionContext` from `ngAfterViewInit`                          |
+| `useLinkingIntegration(config: ILinkingConfig, getNavigatorHandle: () => INavigatorHandle \| null): void` (Svelte) | Same behavior, but takes a **getter function** over the Stack's `bind:this` target — reads it inside its own `$effect`, tracked so it re-runs once the binding resolves                    |
+| `resolveRouteFromUrl(config: ILinkingConfig, url: string): IRoute<unknown> \| null`                                | Resolves a URL to a route synchronously, with no navigator or OS event involved — the same resolution the integration hooks use internally                                                 |
+| `resolveUrlFromRoute(config: ILinkingConfig, route: IRoute<unknown>): string \| null`                              | The inverse of `resolveRouteFromUrl` — builds a URL for a route, filling `:param` segments from `route.params`; `null` when a required param is missing or the route name isn't configured |
+| `serializeNavigatorState(state: INavigatorState): unknown`                                                         | Currently an identity passthrough — `INavigatorState` is already plain JSON-safe data                                                                                                      |
+| `deserializeNavigatorState(raw: unknown): INavigatorState`                                                         | Validates the shape at runtime and throws `"deserializeNavigatorState: persisted value is not a valid navigator state"` if invalid — no blind `as` cast                                    |

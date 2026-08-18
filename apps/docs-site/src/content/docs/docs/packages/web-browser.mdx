@@ -19,11 +19,11 @@ wrap — the React, Vue, Angular, and Svelte entry points are plain re-exports o
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -36,12 +36,14 @@ versions — never install either yourself, and never add the `expo` meta-packag
 bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-web-browser`'s native code is discovered by `expo-modules-autolinking`, a different
-  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
-  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
-  installs the `expo` meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every other `expo-modules-core` package with zero further native changes.
+  `expo-web-browser`'s native code is discovered by `expo-modules-autolinking`,
+  a different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every other `expo-modules-core` package with zero further
+  native changes.
 </Aside>
 
 Nothing else is needed per-app. This package's `native-link.json` asks `symbiote-expo-link` only
@@ -71,6 +73,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -89,6 +92,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -114,6 +118,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
 
     There's no per-instance service to `inject()` here — every function is a plain export off the
     core package, called straight from a template event binding.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -128,6 +133,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
 
     <View><Button title="Read the docs" onPress={onOpen} /></View>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -162,6 +168,7 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -187,6 +194,7 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -217,6 +225,7 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
       }
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -236,6 +245,7 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
 
     <View><Text>{code ?? 'not signed in'}</Text><Button title="Sign in" onPress={onSignIn} /></View>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -262,44 +272,44 @@ cross-platform call site needs no `Platform` branch.
 
 ### Browser
 
-| Signature | Description |
-| --- | --- |
+| Signature                                                     | Description                                                                                                                                                                                                           |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `openBrowserAsync(url, options?): Promise<IWebBrowserResult>` | Opens `url` in the in-app browser. iOS resolves `{ type: 'cancel' }` when the user closed it and `{ type: 'dismiss' }` when `dismissBrowser()` did; Android resolves `{ type: 'opened' }` as soon as the tab launches |
-| `dismissBrowser(): Promise<IWebBrowserDismissResult>` | Closes the presented browser. iOS only — throws on Android, where a Custom Tab cannot be closed programmatically and the user has to press its own close button |
+| `dismissBrowser(): Promise<IWebBrowserDismissResult>`         | Closes the presented browser. iOS only — throws on Android, where a Custom Tab cannot be closed programmatically and the user has to press its own close button                                                       |
 
 ### Auth session
 
-| Signature | Description |
-| --- | --- |
+| Signature                                                                                  | Description                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `openAuthSessionAsync(url, redirectUrl?, options?): Promise<IWebBrowserAuthSessionResult>` | Opens a login page and resolves `{ type: 'success', url }` once the provider redirects to `redirectUrl`, or `{ type: 'cancel' }` / `{ type: 'dismiss' }` if the session ended without one. Only one session can be open at a time |
-| `dismissAuthSession(): void` | Cancels the session in progress. iOS only — falls back to `dismissBrowser()` elsewhere, and so throws on Android for the same reason |
+| `dismissAuthSession(): void`                                                               | Cancels the session in progress. iOS only — falls back to `dismissBrowser()` elsewhere, and so throws on Android for the same reason                                                                                              |
 
 ### Custom Tabs service
 
-| Signature | Description |
-| --- | --- |
-| `warmUpAsync(browserPackage?): Promise<IWebBrowserWarmUpResult>` | Warms up the browser's Custom Tabs service ahead of time, so the first `openBrowserAsync` is faster. Defaults to the preferred browser. Resolves `{}` off Android |
-| `mayInitWithUrlAsync(url, browserPackage?): Promise<IWebBrowserMayInitWithUrlResult>` | Tells the warmed-up browser which page is most likely to be opened first, so it can prefetch. Resolves `{}` off Android |
-| `coolDownAsync(browserPackage?): Promise<IWebBrowserCoolDownResult>` | Drops every binding `warmUpAsync` and `mayInitWithUrlAsync` created. Resolves `{}` off Android, or when there was no connection to dismiss |
-| `getCustomTabsSupportingBrowsersAsync(): Promise<IWebBrowserCustomTabsResults>` | Lists the installed packages that can handle Custom Tabs and the Custom Tabs service, plus the user's default and the preferred one. Throws on iOS — see the notes below |
+| Signature                                                                             | Description                                                                                                                                                              |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `warmUpAsync(browserPackage?): Promise<IWebBrowserWarmUpResult>`                      | Warms up the browser's Custom Tabs service ahead of time, so the first `openBrowserAsync` is faster. Defaults to the preferred browser. Resolves `{}` off Android        |
+| `mayInitWithUrlAsync(url, browserPackage?): Promise<IWebBrowserMayInitWithUrlResult>` | Tells the warmed-up browser which page is most likely to be opened first, so it can prefetch. Resolves `{}` off Android                                                  |
+| `coolDownAsync(browserPackage?): Promise<IWebBrowserCoolDownResult>`                  | Drops every binding `warmUpAsync` and `mayInitWithUrlAsync` created. Resolves `{}` off Android, or when there was no connection to dismiss                               |
+| `getCustomTabsSupportingBrowsersAsync(): Promise<IWebBrowserCustomTabsResults>`       | Lists the installed packages that can handle Custom Tabs and the Custom Tabs service, plus the user's default and the preferred one. Throws on iOS — see the notes below |
 
 ### `IWebBrowserOpenOptions`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `toolbarColor` | `string \| undefined` | Color of the toolbar. Any React Native color format |
-| `enableBarCollapsing` | `boolean \| undefined` | Whether the toolbar hides as the user scrolls the page |
-| `browserPackage` | `string \| undefined` | Android: which browser should handle the Custom Tab. Pick one from `getCustomTabsSupportingBrowsersAsync` |
-| `secondaryToolbarColor` | `string \| undefined` | Android: color of the secondary toolbar |
-| `showTitle` | `boolean \| undefined` | Android: whether the toolbar shows the website's title |
-| `enableDefaultShareMenuItem` | `boolean \| undefined` | Android: whether a default share item is added to the browser's menu |
-| `showInRecents` | `boolean \| undefined` | Android: whether the browsed page gets its own entry in the recents view. Requires `createTask`. Defaults to `false` |
-| `createTask` | `boolean \| undefined` | Android: whether the browser opens in its own task rather than your app's. Defaults to `true` |
-| `useProxyActivity` | `boolean \| undefined` | Android: launch through a transparent proxy activity so the browser survives your app being backgrounded. Forces `showInRecents` on. Defaults to `true` |
-| `controlsColor` | `string \| undefined` | iOS: tint color for the `SFSafariViewController` controls |
-| `dismissButtonStyle` | `'done' \| 'close' \| 'cancel' \| undefined` | iOS: which label the dismiss button carries |
-| `readerMode` | `boolean \| undefined` | iOS: whether Safari enters Reader mode when the page supports it |
-| `presentationStyle` | `WebBrowserPresentationStyle \| undefined` | iOS: how the browser is presented modally. Defaults to `OVER_FULL_SCREEN` |
+| Field                        | Type                                         | Description                                                                                                                                             |
+| ---------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `toolbarColor`               | `string \| undefined`                        | Color of the toolbar. Any React Native color format                                                                                                     |
+| `enableBarCollapsing`        | `boolean \| undefined`                       | Whether the toolbar hides as the user scrolls the page                                                                                                  |
+| `browserPackage`             | `string \| undefined`                        | Android: which browser should handle the Custom Tab. Pick one from `getCustomTabsSupportingBrowsersAsync`                                               |
+| `secondaryToolbarColor`      | `string \| undefined`                        | Android: color of the secondary toolbar                                                                                                                 |
+| `showTitle`                  | `boolean \| undefined`                       | Android: whether the toolbar shows the website's title                                                                                                  |
+| `enableDefaultShareMenuItem` | `boolean \| undefined`                       | Android: whether a default share item is added to the browser's menu                                                                                    |
+| `showInRecents`              | `boolean \| undefined`                       | Android: whether the browsed page gets its own entry in the recents view. Requires `createTask`. Defaults to `false`                                    |
+| `createTask`                 | `boolean \| undefined`                       | Android: whether the browser opens in its own task rather than your app's. Defaults to `true`                                                           |
+| `useProxyActivity`           | `boolean \| undefined`                       | Android: launch through a transparent proxy activity so the browser survives your app being backgrounded. Forces `showInRecents` on. Defaults to `true` |
+| `controlsColor`              | `string \| undefined`                        | iOS: tint color for the `SFSafariViewController` controls                                                                                               |
+| `dismissButtonStyle`         | `'done' \| 'close' \| 'cancel' \| undefined` | iOS: which label the dismiss button carries                                                                                                             |
+| `readerMode`                 | `boolean \| undefined`                       | iOS: whether Safari enters Reader mode when the page supports it                                                                                        |
+| `presentationStyle`          | `WebBrowserPresentationStyle \| undefined`   | iOS: how the browser is presented modally. Defaults to `OVER_FULL_SCREEN`                                                                               |
 
 ### `IAuthSessionOpenOptions`
 
@@ -307,20 +317,20 @@ Everything in `IWebBrowserOpenOptions`, plus the two fields below. On Android th
 apply to the Custom Tab the polyfill opens; on iOS `ASWebAuthenticationSession` ignores them and
 reads only these two.
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field                    | Type                   | Description                                                                                                                                                                 |
+| ------------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `preferEphemeralSession` | `boolean \| undefined` | iOS: ask the browser for a private session that shares no cookies with the user's normal browsing. Whether it's honored is up to their default browser. Defaults to `false` |
-| `preferUniversalLinks` | `boolean \| undefined` | iOS: use HTTPS universal-link callbacks instead of a custom URL scheme. Needs the Associated Domains entitlement and iOS 17.4+. Defaults to `false` |
+| `preferUniversalLinks`   | `boolean \| undefined` | iOS: use HTTPS universal-link callbacks instead of a custom URL scheme. Needs the Associated Domains entitlement and iOS 17.4+. Defaults to `false`                         |
 
 ### Enums
 
-| Member | Description |
-| --- | --- |
-| `WebBrowserResultType.CANCEL` | The user dismissed the browser themselves |
-| `WebBrowserResultType.DISMISS` | The browser was closed by a `dismissBrowser()` call |
-| `WebBrowserResultType.OPENED` | The browser was launched. Android resolves here without waiting for it to close |
-| `WebBrowserResultType.LOCKED` | Another browser session is already in progress |
-| `WebBrowserPresentationStyle` | iOS modal presentation styles for `options.presentationStyle`, mapped onto `UIModalPresentationStyle`: `FULL_SCREEN`, `PAGE_SHEET`, `FORM_SHEET`, `CURRENT_CONTEXT`, `OVER_FULL_SCREEN`, `OVER_CURRENT_CONTEXT`, `POPOVER`, `AUTOMATIC` |
+| Member                         | Description                                                                                                                                                                                                                             |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WebBrowserResultType.CANCEL`  | The user dismissed the browser themselves                                                                                                                                                                                               |
+| `WebBrowserResultType.DISMISS` | The browser was closed by a `dismissBrowser()` call                                                                                                                                                                                     |
+| `WebBrowserResultType.OPENED`  | The browser was launched. Android resolves here without waiting for it to close                                                                                                                                                         |
+| `WebBrowserResultType.LOCKED`  | Another browser session is already in progress                                                                                                                                                                                          |
+| `WebBrowserPresentationStyle`  | iOS modal presentation styles for `options.presentationStyle`, mapped onto `UIModalPresentationStyle`: `FULL_SCREEN`, `PAGE_SHEET`, `FORM_SHEET`, `CURRENT_CONTEXT`, `OVER_FULL_SCREEN`, `OVER_CURRENT_CONTEXT`, `POPOVER`, `AUTOMATIC` |
 
 ## Notes
 

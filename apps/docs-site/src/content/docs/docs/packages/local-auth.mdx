@@ -24,11 +24,11 @@ only) — worth knowing before you reach for one.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -41,12 +41,14 @@ exact versions — never install either yourself, and never add the `expo` meta-
 project (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-local-authentication`'s native code is discovered by `expo-modules-autolinking`, a
-  different mechanism from the `react-native.config.cjs`/podspec autolinking every other
-  SymbioteNative wrapper uses — and it isn't the standard Expo setup flow either, since this
-  project never installs the `expo` meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every future `expo-modules-core` package with zero further native changes.
+  `expo-local-authentication`'s native code is discovered by
+  `expo-modules-autolinking`, a different mechanism from the
+  `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses — and it isn't the standard Expo setup flow either, since this
+  project never installs the `expo` meta-package. Follow [How to: wire up an
+  Expo native module](/docs/howtos/expo-native-module-setup/) once per app
+  first; it covers this package and every future `expo-modules-core` package
+  with zero further native changes.
 </Aside>
 
 ## Usage
@@ -97,6 +99,7 @@ and branch on `result.success`.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -140,6 +143,7 @@ and branch on `result.success`.
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -190,6 +194,7 @@ and branch on `result.success`.
     There's no per-instance service to `inject()` here — every function is a plain free function
     off the core package, called straight from the constructor, same as the real
     `examples/expo-angular` `LocalAuthScreen`.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -230,6 +235,7 @@ and branch on `result.success`.
       {/if}
     </View>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -237,73 +243,73 @@ and branch on `result.success`.
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `hasHardwareAsync(): Promise<boolean>` | Determine whether a face or fingerprint scanner is available on the device |
-| `supportedAuthenticationTypesAsync(): Promise<AuthenticationType[]>` | Determine what kinds of authentication are available on the device — a device can support several (`[FINGERPRINT, FACIAL_RECOGNITION]`), and an empty array means none |
-| `isEnrolledAsync(): Promise<boolean>` | Determine whether the device has saved fingerprints or facial data to use for authentication |
-| `getEnrolledLevelAsync(): Promise<SecurityLevel>` | Determine what kind of authentication is enrolled on the device — on pre-M Android devices this can read `SECRET` if only the SIM lock is enrolled, which `authenticateAsync` doesn't actually prompt |
+| Signature                                                                                       | Description                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `hasHardwareAsync(): Promise<boolean>`                                                          | Determine whether a face or fingerprint scanner is available on the device                                                                                                                                                                       |
+| `supportedAuthenticationTypesAsync(): Promise<AuthenticationType[]>`                            | Determine what kinds of authentication are available on the device — a device can support several (`[FINGERPRINT, FACIAL_RECOGNITION]`), and an empty array means none                                                                           |
+| `isEnrolledAsync(): Promise<boolean>`                                                           | Determine whether the device has saved fingerprints or facial data to use for authentication                                                                                                                                                     |
+| `getEnrolledLevelAsync(): Promise<SecurityLevel>`                                               | Determine what kind of authentication is enrolled on the device — on pre-M Android devices this can read `SECRET` if only the SIM lock is enrolled, which `authenticateAsync` doesn't actually prompt                                            |
 | `authenticateAsync(options?: ILocalAuthenticationOptions): Promise<ILocalAuthenticationResult>` | Attempts to authenticate via Fingerprint/TouchID, or FaceID where available. `symbiote-expo-link` puts a default `NSFaceIDUsageDescription` into `Info.plist`; if that key is missing, iOS falls back to the device passcode instead of throwing |
-| `cancelAuthenticate(): Promise<void>` | Cancels an in-flight authentication flow. `@platform android` |
+| `cancelAuthenticate(): Promise<void>`                                                           | Cancels an in-flight authentication flow. `@platform android`                                                                                                                                                                                    |
 
 ### `ILocalAuthenticationOptions`
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `promptMessage` | `string` | `'Authenticate'` | A message shown alongside the TouchID or FaceID prompt |
-| `promptSubtitle` | `string` | — | A subtitle displayed below the prompt message. `@platform android` |
-| `promptDescription` | `string` | — | A description displayed in the middle of the authentication prompt. `@platform android` |
-| `cancelLabel` | `string` | `'Cancel'` | Customizes the default `Cancel` label shown |
-| `disableDeviceFallback` | `boolean` | `false` | After several failed attempts the system normally falls back to the device passcode; set `true` to disable that and handle the fallback yourself |
-| `requireConfirmation` | `boolean` | `true` | Hints to the system whether it should require explicit user confirmation after a successful biometric read. `@platform android` |
-| `biometricsSecurityLevel` | `'weak' \| 'strong'` | `'weak'` | The biometric class to allow — `'strong'` accepts only Android Class 3 biometrics, `'weak'` accepts both Class 3 and Class 2. `@platform android` |
-| `fallbackLabel` | `string` | — | Customizes the default `Use Passcode` label shown after several failed attempts; an empty string hides the button entirely. `@platform ios` |
+| Field                     | Type                 | Default          | Description                                                                                                                                       |
+| ------------------------- | -------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `promptMessage`           | `string`             | `'Authenticate'` | A message shown alongside the TouchID or FaceID prompt                                                                                            |
+| `promptSubtitle`          | `string`             | —                | A subtitle displayed below the prompt message. `@platform android`                                                                                |
+| `promptDescription`       | `string`             | —                | A description displayed in the middle of the authentication prompt. `@platform android`                                                           |
+| `cancelLabel`             | `string`             | `'Cancel'`       | Customizes the default `Cancel` label shown                                                                                                       |
+| `disableDeviceFallback`   | `boolean`            | `false`          | After several failed attempts the system normally falls back to the device passcode; set `true` to disable that and handle the fallback yourself  |
+| `requireConfirmation`     | `boolean`            | `true`           | Hints to the system whether it should require explicit user confirmation after a successful biometric read. `@platform android`                   |
+| `biometricsSecurityLevel` | `'weak' \| 'strong'` | `'weak'`         | The biometric class to allow — `'strong'` accepts only Android Class 3 biometrics, `'weak'` accepts both Class 3 and Class 2. `@platform android` |
+| `fallbackLabel`           | `string`             | —                | Customizes the default `Use Passcode` label shown after several failed attempts; an empty string hides the button entirely. `@platform ios`       |
 
 ### `ILocalAuthenticationResult`
 
 A discriminated union — always check `success` before reading `error`:
 
-| Branch | Fields | Description |
-| --- | --- | --- |
-| `{ success: true }` | none | Authentication succeeded — no further fields |
+| Branch               | Fields                                                 | Description                                                                                                                                                                                                                |
+| -------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{ success: true }`  | none                                                   | Authentication succeeded — no further fields                                                                                                                                                                               |
 | `{ success: false }` | `error: ILocalAuthenticationError`, `warning?: string` | Authentication failed or couldn't run; `error` is the machine-readable reason (see below), `warning` is an optional free-text detail some Android failures attach (e.g. `KeyguardManager#isDeviceSecure() returned false`) |
 
 ### `AuthenticationType`
 
-| Field | Value | Description |
-| --- | --- | --- |
-| `FINGERPRINT` | `1` | Fingerprint support |
-| `FACIAL_RECOGNITION` | `2` | Facial recognition support |
-| `IRIS` | `3` | Iris recognition support. `@platform android` |
+| Field                | Value | Description                                   |
+| -------------------- | ----- | --------------------------------------------- |
+| `FINGERPRINT`        | `1`   | Fingerprint support                           |
+| `FACIAL_RECOGNITION` | `2`   | Facial recognition support                    |
+| `IRIS`               | `3`   | Iris recognition support. `@platform android` |
 
 ### `SecurityLevel`
 
-| Field | Value | Description |
-| --- | --- | --- |
-| `NONE` | `0` | No enrolled authentication of any kind |
-| `SECRET` | `1` | Non-biometric authentication enrolled (PIN, pattern, or password) |
-| `BIOMETRIC_WEAK` | `2` | Weak biometric authentication enrolled — e.g. 2D image-based face unlock; there are currently no weak options on iOS |
-| `BIOMETRIC_STRONG` | `3` | Strong biometric authentication enrolled — e.g. a fingerprint scan or 3D face unlock |
-| `BIOMETRIC` *(deprecated)* | aliases `BIOMETRIC_STRONG`/`BIOMETRIC_WEAK` | A getter kept for upstream compatibility that resolves to the platform-correct strong/weak member and logs a deprecation warning on every read — use `BIOMETRIC_WEAK`/`BIOMETRIC_STRONG` directly instead |
+| Field                      | Value                                       | Description                                                                                                                                                                                               |
+| -------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NONE`                     | `0`                                         | No enrolled authentication of any kind                                                                                                                                                                    |
+| `SECRET`                   | `1`                                         | Non-biometric authentication enrolled (PIN, pattern, or password)                                                                                                                                         |
+| `BIOMETRIC_WEAK`           | `2`                                         | Weak biometric authentication enrolled — e.g. 2D image-based face unlock; there are currently no weak options on iOS                                                                                      |
+| `BIOMETRIC_STRONG`         | `3`                                         | Strong biometric authentication enrolled — e.g. a fingerprint scan or 3D face unlock                                                                                                                      |
+| `BIOMETRIC` _(deprecated)_ | aliases `BIOMETRIC_STRONG`/`BIOMETRIC_WEAK` | A getter kept for upstream compatibility that resolves to the platform-correct strong/weak member and logs a deprecation warning on every read — use `BIOMETRIC_WEAK`/`BIOMETRIC_STRONG` directly instead |
 
 ### `ILocalAuthenticationError`
 
-| Value | Description |
-| --- | --- |
-| `not_enrolled` | No PIN/pattern/password or biometric is enrolled on the device at all |
-| `user_cancel` | The user dismissed the authentication prompt themselves |
-| `app_cancel` | The app canceled the authentication flow (e.g. via `cancelAuthenticate()`) |
-| `not_available` | Authentication isn't available on this device right now |
-| `lockout` | Too many failed attempts — biometric authentication is temporarily locked out |
-| `no_space` | Not enough storage on the device to complete the operation |
-| `timeout` | The authentication attempt timed out |
-| `unable_to_process` | The system couldn't process the captured biometric data |
-| `unknown` | An unclassified failure with no more specific reason available |
-| `system_cancel` | The system itself canceled the request, e.g. another app came to the foreground |
-| `user_fallback` | The user tapped the fallback/passcode button instead of using biometrics |
-| `invalid_context` | The authentication context became invalid before the operation completed |
-| `passcode_not_set` | The device has no passcode set, so biometric authentication can't be enrolled |
-| `authentication_failed` | The biometric or passcode check itself did not match |
+| Value                   | Description                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `not_enrolled`          | No PIN/pattern/password or biometric is enrolled on the device at all           |
+| `user_cancel`           | The user dismissed the authentication prompt themselves                         |
+| `app_cancel`            | The app canceled the authentication flow (e.g. via `cancelAuthenticate()`)      |
+| `not_available`         | Authentication isn't available on this device right now                         |
+| `lockout`               | Too many failed attempts — biometric authentication is temporarily locked out   |
+| `no_space`              | Not enough storage on the device to complete the operation                      |
+| `timeout`               | The authentication attempt timed out                                            |
+| `unable_to_process`     | The system couldn't process the captured biometric data                         |
+| `unknown`               | An unclassified failure with no more specific reason available                  |
+| `system_cancel`         | The system itself canceled the request, e.g. another app came to the foreground |
+| `user_fallback`         | The user tapped the fallback/passcode button instead of using biometrics        |
+| `invalid_context`       | The authentication context became invalid before the operation completed        |
+| `passcode_not_set`      | The device has no passcode set, so biometric authentication can't be enrolled   |
+| `authentication_failed` | The biometric or passcode check itself did not match                            |
 
 ## Notes
 

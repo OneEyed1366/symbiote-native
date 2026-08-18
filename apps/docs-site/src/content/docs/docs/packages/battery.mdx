@@ -9,10 +9,11 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 so every SymbioteNative adapter can read battery level, charging state, and low-power-mode. Unlike
 the [slider](/docs/packages/slider/) (a native **view**) or [splash screen](/docs/packages/splash-screen/)
 (one imperative **TurboModule**), `expo-battery` is built on `expo-modules-core` — a pure async-function
-+ `EventEmitter` surface, no Fabric view or `ViewConfig` involved. Like [sensors](/docs/packages/sensors/),
-battery exposes three independent subscriptions (level, state, low-power-mode) rather than one
-combined hook — matching upstream's own `useBatteryLevel`/`useBatteryState`/`useLowPowerMode` being
-three separate hooks, not one.
+
+- `EventEmitter` surface, no Fabric view or `ViewConfig` involved. Like [sensors](/docs/packages/sensors/),
+  battery exposes three independent subscriptions (level, state, low-power-mode) rather than one
+  combined hook — matching upstream's own `useBatteryLevel`/`useBatteryState`/`useLowPowerMode` being
+  three separate hooks, not one.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -20,15 +21,16 @@ three separate hooks, not one.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 <Aside type="note">
-  `isBatteryOptimizationEnabledAsync()` is Android-only — it always resolves `false` on iOS, since
-  iOS has no equivalent concept of per-app battery optimization / doze-mode exemption.
+  `isBatteryOptimizationEnabledAsync()` is Android-only — it always resolves
+  `false` on iOS, since iOS has no equivalent concept of per-app battery
+  optimization / doze-mode exemption.
 </Aside>
 
 ## Installation
@@ -42,19 +44,22 @@ versions — never install either yourself, and never add the `expo` meta-packag
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-battery`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
-  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses —
-  and it isn't the standard Expo setup flow either, since this project never installs the `expo`
-  meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every other `expo-modules-core` package with zero further native changes.
+  `expo-battery`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every other `expo-modules-core` package with zero further
+  native changes.
 </Aside>
 
 ## Usage
 
 <Aside type="note">
-  Every hook/composable/`connect()` below seeds its initial value from the matching one-shot
-  `get*Async`/`is*Async` call, then subscribes to the matching listener for live updates.
+  Every hook/composable/`connect()` below seeds its initial value from the
+  matching one-shot `get*Async`/`is*Async` call, then subscribes to the matching
+  listener for live updates.
 </Aside>
 
 ### Battery level
@@ -71,6 +76,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       return <Text>{batteryLevel}</Text>;
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -84,6 +90,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       <Text>{{ batteryLevel }}</Text>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -100,6 +107,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       readonly batteryLevel = inject(BatteryLevelService).connect();
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -112,6 +120,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
 
     <Text>{batteryLevel.current}</Text>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -130,6 +139,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       return <Text>{batteryState === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</Text>;
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -144,6 +154,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       <Text>{{ batteryState === BatteryState.CHARGING ? 'Charging' : 'Not charging' }}</Text>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -163,6 +174,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       readonly batteryState = inject(BatteryStateService).connect();
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -176,6 +188,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
 
     <Text>{batteryState.current === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</Text>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -193,6 +206,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       return <Text>{lowPowerMode ? 'Low Power Mode is on' : null}</Text>;
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -206,6 +220,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       <Text>{{ lowPowerMode ? 'Low Power Mode is on' : null }}</Text>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -222,6 +237,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       readonly lowPowerMode = inject(LowPowerModeService).connect();
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -234,6 +250,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
 
     <Text>{lowPowerMode.current ? 'Low Power Mode is on' : null}</Text>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -257,46 +274,46 @@ const { batteryLevel, batteryState, lowPowerMode } = await getPowerStateAsync();
 
 ### Stateless functions
 
-| Signature | Description |
-| --- | --- |
-| `isAvailableAsync(): Promise<boolean>` | Whether the battery API is available on this device — `false` on an iOS Simulator |
-| `getBatteryLevelAsync(): Promise<number>` | Battery level between `0` and `1`, inclusive, or `-1` if the device can't report it |
-| `getBatteryStateAsync(): Promise<BatteryState>` | Current charging state — see the [`BatteryState`](#batterystate) table below |
-| `isLowPowerModeEnabledAsync(): Promise<boolean>` | Whether Low Power Mode (iOS) / Power Saver (Android) is currently on |
+| Signature                                               | Description                                                                                                                                   |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isAvailableAsync(): Promise<boolean>`                  | Whether the battery API is available on this device — `false` on an iOS Simulator                                                             |
+| `getBatteryLevelAsync(): Promise<number>`               | Battery level between `0` and `1`, inclusive, or `-1` if the device can't report it                                                           |
+| `getBatteryStateAsync(): Promise<BatteryState>`         | Current charging state — see the [`BatteryState`](#batterystate) table below                                                                  |
+| `isLowPowerModeEnabledAsync(): Promise<boolean>`        | Whether Low Power Mode (iOS) / Power Saver (Android) is currently on                                                                          |
 | `isBatteryOptimizationEnabledAsync(): Promise<boolean>` | Whether Android battery optimization is enabled for this app (background tasks may be affected in doze mode) — always resolves `false` on iOS |
-| `getPowerStateAsync(): Promise<PowerState>` | Combined `{ batteryLevel, batteryState, lowPowerMode }` snapshot, gathered with a single `Promise.all` over the three calls above |
-| `addBatteryLevelListener(listener): EventSubscription` | Subscribes to battery level change events; call `.remove()` on the returned subscription to unsubscribe |
-| `addBatteryStateListener(listener): EventSubscription` | Subscribes to battery state (charging/full/unplugged/unknown) change events |
-| `addLowPowerModeListener(listener): EventSubscription` | Subscribes to Low Power Mode / Power Saver toggle events |
+| `getPowerStateAsync(): Promise<PowerState>`             | Combined `{ batteryLevel, batteryState, lowPowerMode }` snapshot, gathered with a single `Promise.all` over the three calls above             |
+| `addBatteryLevelListener(listener): EventSubscription`  | Subscribes to battery level change events; call `.remove()` on the returned subscription to unsubscribe                                       |
+| `addBatteryStateListener(listener): EventSubscription`  | Subscribes to battery state (charging/full/unplugged/unknown) change events                                                                   |
+| `addLowPowerModeListener(listener): EventSubscription`  | Subscribes to Low Power Mode / Power Saver toggle events                                                                                      |
 
 ### Hooks / composables / services
 
-| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Signature | Returns |
-| --- | --- | --- | --- | --- |
-| `useBatteryLevel` | `useBatteryLevel` | `BatteryLevelService.connect()` | `()` | Live battery level — `number` (React), `Ref<number>` (Vue), `Signal<number>` (Angular), seeded `-1` |
-| `useBatteryState` | `useBatteryState` | `BatteryStateService.connect()` | `()` | Live `BatteryState` — plain value (React/Vue `Ref`), `Signal<BatteryState>` (Angular), seeded `UNKNOWN` |
-| `useLowPowerMode` | `useLowPowerMode` | `LowPowerModeService.connect()` | `()` | Live `boolean` — plain value (React/Vue `Ref`), `Signal<boolean>` (Angular), seeded `false` |
+| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Signature | Returns                                                                                                 |
+| ----------------- | ----------------- | ------------------------------- | --------- | ------------------------------------------------------------------------------------------------------- |
+| `useBatteryLevel` | `useBatteryLevel` | `BatteryLevelService.connect()` | `()`      | Live battery level — `number` (React), `Ref<number>` (Vue), `Signal<number>` (Angular), seeded `-1`     |
+| `useBatteryState` | `useBatteryState` | `BatteryStateService.connect()` | `()`      | Live `BatteryState` — plain value (React/Vue `Ref`), `Signal<BatteryState>` (Angular), seeded `UNKNOWN` |
+| `useLowPowerMode` | `useLowPowerMode` | `LowPowerModeService.connect()` | `()`      | Live `boolean` — plain value (React/Vue `Ref`), `Signal<boolean>` (Angular), seeded `false`             |
 
 Angular's `connect()` returns a `Signal` — read it as `batteryLevel()` in code or in a template,
 same as every other `connect()`-based service in this project.
 
 ### `BatteryState`
 
-| Member | Value | Description |
-| --- | --- | --- |
-| `UNKNOWN` | `0` | Battery state is unknown or inaccessible |
-| `UNPLUGGED` | `1` | Discharging, not connected to power (Android: `BATTERY_STATUS_DISCHARGING`) |
-| `CHARGING` | `2` | Battery is charging |
-| `FULL` | `3` | Battery level is full |
-| `NOT_CHARGING` | `4` | Power connected (AC/USB/wireless) but not actually charging, e.g. a charge-limit or optimized-charging pause — Android only |
+| Member         | Value | Description                                                                                                                 |
+| -------------- | ----- | --------------------------------------------------------------------------------------------------------------------------- |
+| `UNKNOWN`      | `0`   | Battery state is unknown or inaccessible                                                                                    |
+| `UNPLUGGED`    | `1`   | Discharging, not connected to power (Android: `BATTERY_STATUS_DISCHARGING`)                                                 |
+| `CHARGING`     | `2`   | Battery is charging                                                                                                         |
+| `FULL`         | `3`   | Battery level is full                                                                                                       |
+| `NOT_CHARGING` | `4`   | Power connected (AC/USB/wireless) but not actually charging, e.g. a charge-limit or optimized-charging pause — Android only |
 
 ### `PowerState`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `batteryLevel` | `number` | `0`..`1`, inclusive, or `-1` if the battery level is unknown |
+| Field          | Type           | Description                                                           |
+| -------------- | -------------- | --------------------------------------------------------------------- |
+| `batteryLevel` | `number`       | `0`..`1`, inclusive, or `-1` if the battery level is unknown          |
 | `batteryState` | `BatteryState` | The current charging state, see [`BatteryState`](#batterystate) above |
-| `lowPowerMode` | `boolean` | `true` if Low Power Mode / Power Saver is on, `false` otherwise |
+| `lowPowerMode` | `boolean`      | `true` if Low Power Mode / Power Saver is on, `false` otherwise       |
 
 ## Notes
 

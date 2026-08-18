@@ -17,11 +17,11 @@ here is a JS-simulated animation.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Usage
 
@@ -55,6 +55,7 @@ here is a JS-simulated animation.
     `useStackNavigation()` hands back a concretely-typed Stack handle, no union to narrow. Any
     component under the stack reads them the same way, at any nesting depth. See
     [Hooks & focus](/docs/navigation/hooks/).
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -83,6 +84,7 @@ here is a JS-simulated animation.
     `HomeScreen.vue`/`DetailsScreen.vue` read their `route`/`navigation` with `useRoute()`/
     `useStackNavigation()` in `<script setup>` (reading `.value` on each) — the same hook pattern
     as React's tab above.
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -160,6 +162,7 @@ here is a JS-simulated animation.
     `injectRoute()`/`injectStackNavigation()` from a field initializer or the constructor;
     `injectStackNavigation()` returns a concretely-typed Stack handle. Any component under the
     stack reads them the same way, at any nesting depth. See [Hooks & focus](/docs/navigation/hooks/).
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -211,6 +214,7 @@ here is a JS-simulated animation.
     `useStackNavigation()` hands back a concretely-typed Stack handle, no union to narrow. Any
     component under the stack reads them the same way, at any nesting depth. See
     [Hooks & focus](/docs/navigation/hooks/).
+
   </TabItem>
 </Tabs>
 
@@ -242,6 +246,7 @@ here is a JS-simulated animation.
 
     `Stack` implements `INavigatorHandle` directly — the component instance reached through the
     template reference variable **is** the handle, no separate ref/ForwardRef indirection needed.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -267,6 +272,7 @@ here is a JS-simulated animation.
     `declare module '*.svelte'` fallback, which erases the `export function` surface `bind:this`
     actually hands back. Bind to `unknown` and narrow with a runtime guard on read, the same
     pattern `examples/svelte/App.svelte` uses for its own linking integration.
+
   </TabItem>
 </Tabs>
 
@@ -340,21 +346,22 @@ const searchBarRef = useRef<ISearchBarCommands>(null);
 ### Navigator handle
 
 <Aside type="caution">
-  Unlike react-navigation, `INavigatorHandle` has **no `.navigate()` method**. `push` always
-  stacks a new route instance; `replace` swaps the current top route for a new one. Pick whichever
-  of the two matches the transition you want.
+  Unlike react-navigation, `INavigatorHandle` has **no `.navigate()` method**.
+  `push` always stacks a new route instance; `replace` swaps the current top
+  route for a new one. Pick whichever of the two matches the transition you
+  want.
 </Aside>
 
-| Method | Signature | Description |
-| --- | --- | --- |
-| `push` | `(name: string, params?: unknown) => void` | Pushes a new route onto the stack |
-| `pop` | `(count?: number) => void` | Pops `count` routes (default `1`) off the top; never pops below the last remaining route |
-| `popToTop` | `() => void` | Pops back to the first (initial) route |
-| `popTo` | `(key: string) => void` | Pops to the route matching `key`; a no-op if no route has that key |
-| `replace` | `(name: string, params?: unknown) => void` | Replaces the current top route with a new one (or pushes if the stack is empty) |
-| `setParams` | `(params: unknown, key?: string) => void` | Shallow-merges `params` into the route matched by `key`, defaulting to the currently focused route |
-| `reset` | `(state: INavigatorState) => void` | Replaces the entire navigator state verbatim; used to restore persisted state |
-| `canGoBack` | `() => boolean` | Whether `pop()` or the hardware back button would currently have an effect |
+| Method      | Signature                                  | Description                                                                                        |
+| ----------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `push`      | `(name: string, params?: unknown) => void` | Pushes a new route onto the stack                                                                  |
+| `pop`       | `(count?: number) => void`                 | Pops `count` routes (default `1`) off the top; never pops below the last remaining route           |
+| `popToTop`  | `() => void`                               | Pops back to the first (initial) route                                                             |
+| `popTo`     | `(key: string) => void`                    | Pops to the route matching `key`; a no-op if no route has that key                                 |
+| `replace`   | `(name: string, params?: unknown) => void` | Replaces the current top route with a new one (or pushes if the stack is empty)                    |
+| `setParams` | `(params: unknown, key?: string) => void`  | Shallow-merges `params` into the route matched by `key`, defaulting to the currently focused route |
+| `reset`     | `(state: INavigatorState) => void`         | Replaces the entire navigator state verbatim; used to restore persisted state                      |
+| `canGoBack` | `() => boolean`                            | Whether `pop()` or the hardware back button would currently have an effect                         |
 
 ### Screen options
 
@@ -362,38 +369,38 @@ Every option below is passed through `<Stack.Screen options={...}>` (React), `:o
 the `[options]` input on `ng-template symbioteScreen` (Angular) — or through `screenOptions` on
 `Stack` itself to apply defaults to every screen.
 
-| Option | Type | Description |
-| --- | --- | --- |
-| `title` | `string` | Header title text |
-| `headerShown` | `boolean` | `false` hides the native header entirely |
-| `headerTitleColor` | color | Title text color |
-| `headerStyle` | `{ backgroundColor?: color }` | Compact/collapsed header background |
-| `headerTintColor` | color | Tint for the back button and other header content |
-| `headerBackTitle` | `string` | Back-button label text |
-| `headerBackButtonDisplayMode` | `'minimal' \| 'default' \| 'generic'` | iOS back-button label display mode |
-| `headerLargeTitle` | `boolean` | Enables the iOS large-title header |
-| `headerLargeStyle` | `{ backgroundColor?: color }` | Background for the expanded large-title state (tracked separately from `headerStyle` — left unset it defaults to white even in a dark theme) |
-| `headerUserInterfaceStyle` | `'unspecified' \| 'light' \| 'dark'` | Forces header (and any embedded search bar) chrome, overriding system appearance |
-| `headerTranslucent` | `boolean` | Makes the header see-through; on Android also removes the automatic content offset below the toolbar |
-| `headerLeftBarButtonItems` / `headerRightBarButtonItems` | array of bar-button items | Header bar buttons/menus on each side (**iOS-only** native surface) |
-| `headerSearchBarOptions` | search bar options object | Embeds a native search bar in the header |
-| `gestureEnabled` | `boolean` | Enables/disables the interactive back-swipe gesture |
-| `stackAnimation` | `'default' \| 'flip' \| 'simple_push' \| 'none' \| 'fade' \| 'slide_from_right' \| 'slide_from_left' \| 'slide_from_bottom' \| 'fade_from_bottom' \| 'ios_from_right' \| 'ios_from_left'` | Push/pop transition animation |
-| `stackPresentation` | `'push' \| 'modal' \| 'transparentModal' \| 'fullScreenModal' \| 'formSheet' \| 'pageSheet' \| 'containedModal' \| 'containedTransparentModal'` | Push vs. modal-family presentation |
-| `transitionDuration` | `number` | Transition duration override |
-| `sheetAllowedDetents` | `number[] \| 'fitToContents' \| 'large' \| 'medium' \| 'all'` | Allowed formSheet/pageSheet detents |
-| `sheetLargestUndimmedDetentIndex` | `number \| 'last' \| 'none' \| 'all' \| 'large' \| 'medium'` | Detent index beyond which the dimming overlay applies |
-| `sheetInitialDetentIndex` | `number \| 'last'` | Initial detent the sheet opens at |
-| `sheetGrabberVisible` | `boolean` | Shows the sheet's grabber handle |
-| `sheetCornerRadius` | `number` | Sheet corner radius |
-| `sheetExpandsWhenScrolledToEdge` | `boolean` | Sheet expands to the next detent when content scrolls to its edge |
-| `sheetElevation` | `number` | Sheet shadow elevation |
-| `sheetShouldOverflowTopInset` | `boolean` | Whether sheet content can overflow the top safe-area inset |
-| `sheetDefaultResizeAnimationEnabled` | `boolean` | Enables the default resize animation for sheet detent changes |
-| `statusBarStyle` | `'inverted' \| 'auto' \| 'light' \| 'dark'` | Status bar style while this screen is focused |
-| `statusBarHidden` | `boolean` | Hides the status bar |
-| `statusBarAnimation` | `'none' \| 'fade' \| 'slide'` | Status bar show/hide animation |
-| `screenOrientation` | `'default' \| 'all' \| 'portrait' \| 'portrait_up' \| 'portrait_down' \| 'landscape' \| 'landscape_left' \| 'landscape_right'` | Locks screen orientation |
+| Option                                                   | Type                                                                                                                                                                                      | Description                                                                                                                                  |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`                                                  | `string`                                                                                                                                                                                  | Header title text                                                                                                                            |
+| `headerShown`                                            | `boolean`                                                                                                                                                                                 | `false` hides the native header entirely                                                                                                     |
+| `headerTitleColor`                                       | color                                                                                                                                                                                     | Title text color                                                                                                                             |
+| `headerStyle`                                            | `{ backgroundColor?: color }`                                                                                                                                                             | Compact/collapsed header background                                                                                                          |
+| `headerTintColor`                                        | color                                                                                                                                                                                     | Tint for the back button and other header content                                                                                            |
+| `headerBackTitle`                                        | `string`                                                                                                                                                                                  | Back-button label text                                                                                                                       |
+| `headerBackButtonDisplayMode`                            | `'minimal' \| 'default' \| 'generic'`                                                                                                                                                     | iOS back-button label display mode                                                                                                           |
+| `headerLargeTitle`                                       | `boolean`                                                                                                                                                                                 | Enables the iOS large-title header                                                                                                           |
+| `headerLargeStyle`                                       | `{ backgroundColor?: color }`                                                                                                                                                             | Background for the expanded large-title state (tracked separately from `headerStyle` — left unset it defaults to white even in a dark theme) |
+| `headerUserInterfaceStyle`                               | `'unspecified' \| 'light' \| 'dark'`                                                                                                                                                      | Forces header (and any embedded search bar) chrome, overriding system appearance                                                             |
+| `headerTranslucent`                                      | `boolean`                                                                                                                                                                                 | Makes the header see-through; on Android also removes the automatic content offset below the toolbar                                         |
+| `headerLeftBarButtonItems` / `headerRightBarButtonItems` | array of bar-button items                                                                                                                                                                 | Header bar buttons/menus on each side (**iOS-only** native surface)                                                                          |
+| `headerSearchBarOptions`                                 | search bar options object                                                                                                                                                                 | Embeds a native search bar in the header                                                                                                     |
+| `gestureEnabled`                                         | `boolean`                                                                                                                                                                                 | Enables/disables the interactive back-swipe gesture                                                                                          |
+| `stackAnimation`                                         | `'default' \| 'flip' \| 'simple_push' \| 'none' \| 'fade' \| 'slide_from_right' \| 'slide_from_left' \| 'slide_from_bottom' \| 'fade_from_bottom' \| 'ios_from_right' \| 'ios_from_left'` | Push/pop transition animation                                                                                                                |
+| `stackPresentation`                                      | `'push' \| 'modal' \| 'transparentModal' \| 'fullScreenModal' \| 'formSheet' \| 'pageSheet' \| 'containedModal' \| 'containedTransparentModal'`                                           | Push vs. modal-family presentation                                                                                                           |
+| `transitionDuration`                                     | `number`                                                                                                                                                                                  | Transition duration override                                                                                                                 |
+| `sheetAllowedDetents`                                    | `number[] \| 'fitToContents' \| 'large' \| 'medium' \| 'all'`                                                                                                                             | Allowed formSheet/pageSheet detents                                                                                                          |
+| `sheetLargestUndimmedDetentIndex`                        | `number \| 'last' \| 'none' \| 'all' \| 'large' \| 'medium'`                                                                                                                              | Detent index beyond which the dimming overlay applies                                                                                        |
+| `sheetInitialDetentIndex`                                | `number \| 'last'`                                                                                                                                                                        | Initial detent the sheet opens at                                                                                                            |
+| `sheetGrabberVisible`                                    | `boolean`                                                                                                                                                                                 | Shows the sheet's grabber handle                                                                                                             |
+| `sheetCornerRadius`                                      | `number`                                                                                                                                                                                  | Sheet corner radius                                                                                                                          |
+| `sheetExpandsWhenScrolledToEdge`                         | `boolean`                                                                                                                                                                                 | Sheet expands to the next detent when content scrolls to its edge                                                                            |
+| `sheetElevation`                                         | `number`                                                                                                                                                                                  | Sheet shadow elevation                                                                                                                       |
+| `sheetShouldOverflowTopInset`                            | `boolean`                                                                                                                                                                                 | Whether sheet content can overflow the top safe-area inset                                                                                   |
+| `sheetDefaultResizeAnimationEnabled`                     | `boolean`                                                                                                                                                                                 | Enables the default resize animation for sheet detent changes                                                                                |
+| `statusBarStyle`                                         | `'inverted' \| 'auto' \| 'light' \| 'dark'`                                                                                                                                               | Status bar style while this screen is focused                                                                                                |
+| `statusBarHidden`                                        | `boolean`                                                                                                                                                                                 | Hides the status bar                                                                                                                         |
+| `statusBarAnimation`                                     | `'none' \| 'fade' \| 'slide'`                                                                                                                                                             | Status bar show/hide animation                                                                                                               |
+| `screenOrientation`                                      | `'default' \| 'all' \| 'portrait' \| 'portrait_up' \| 'portrait_down' \| 'landscape' \| 'landscape_left' \| 'landscape_right'`                                                            | Locks screen orientation                                                                                                                     |
 
 ## Next steps
 

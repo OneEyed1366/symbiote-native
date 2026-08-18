@@ -19,12 +19,12 @@ the same native module.
 | iOS         | ✅ live |
 | Android     | ✅ live |
 
-| Framework adapter | Support    |
-| ------------------ | ---------- |
-| React               | ✅ live    |
-| Vue                 | ✅ live    |
-| Angular             | ✅ live    |
-| Svelte              | ✅ live    |
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -38,10 +38,11 @@ sole autolinked native proxy for `react-native-bootsplash` (`react-native.config
 `symbiote-splash-screen.podspec`), so an app never lists `react-native-bootsplash` directly.
 
 <Aside type="danger" title="Two setup steps, not one">
-  Installing the JS package is not enough — the native launch screen itself (the thing shown
-  *before* JS runs) has to be generated and wired into your native project files first. Follow
-  [How to: add a native splash screen](/docs/howtos/splash-screen/) for the full
-  asset-generation + Android/iOS wiring steps before reaching for `hide()` below.
+  Installing the JS package is not enough — the native launch screen itself (the
+  thing shown *before* JS runs) has to be generated and wired into your native
+  project files first. Follow [How to: add a native splash
+  screen](/docs/howtos/splash-screen/) for the full asset-generation +
+  Android/iOS wiring steps before reaching for `hide()` below.
 </Aside>
 
 ## Usage
@@ -66,6 +67,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
       // ...
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -76,6 +78,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
     onMounted(() => hide());
     </script>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -89,6 +92,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
       }
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -104,16 +108,18 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
     Bare `hide()` on mount, matching `examples/svelte/App.svelte` — this repo's own canary calls
     it exactly this way at the app root, inside an `$effect` with no dependency, since a Svelte
     component's `<script>` body itself runs only once and there is no ongoing state to react to.
+
   </TabItem>
 </Tabs>
 
 ### The animated case: `useHideAnimation`
 
 <Aside type="note">
-  `useHideAnimation` does not render anything itself — it returns style/prop bags your own
-  `View`/`Image` bind to. It fires `hide()` exactly once, only after layout has committed, both
-  images (if you asked for them) have loaded, and your own `ready` flag is true — a faithful port
-  of `react-native-bootsplash`'s own `useHideAnimation`.
+  `useHideAnimation` does not render anything itself — it returns style/prop
+  bags your own `View`/`Image` bind to. It fires `hide()` exactly once, only
+  after layout has committed, both images (if you asked for them) have loaded,
+  and your own `ready` flag is true — a faithful port of
+  `react-native-bootsplash`'s own `useHideAnimation`.
 </Aside>
 
 <Tabs syncKey="framework">
@@ -145,6 +151,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -175,6 +182,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
 
     `useHideAnimation` takes a config **getter**, not a plain value — a Vue composable's setup body
     runs once, so the getter lets it keep reading whatever reactive refs it closes over.
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -220,6 +228,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
     must be wired explicitly through the real `(layout)`/`(loadEnd)` outputs `View`/`Image` expose,
     calling the readiness callbacks `container.onLayout`/`logo.onLoadEnd` by hand; skipping them
     means the readiness gate never completes and `hide()` never fires.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -229,9 +238,6 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
       import manifest from '../assets/bootsplash/manifest.json';
       import logo from '../assets/bootsplash/logo.png';
 
-      // Animated.View is dotted, so it can't be a template tag — aliased first, matching
-      // examples/svelte's own AnimatedDemo.svelte convention.
-      const AnimatedView = Animated.View;
       const opacity = new Animated.Value(1);
       let ready = $state(false);
 
@@ -245,10 +251,10 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
       }));
     </script>
 
-    <AnimatedView
+    <Animated.View
       {...hideAnimation.current.container}
       style={[hideAnimation.current.container.style, { opacity }]}
-    ><Image {...hideAnimation.current.logo} /></AnimatedView>
+    ><Image {...hideAnimation.current.logo} /></Animated.View>
     ```
 
     `useHideAnimation` takes a config **getter**, not a plain value — a Svelte component's
@@ -256,6 +262,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
     `ready` as it changes. The return value is a getter too (`hideAnimation.current`), the same
     boxed-getter convention as this adapter's other runes, since a raw `$state` doesn't survive
     being returned from a plain function.
+
   </TabItem>
 </Tabs>
 
@@ -263,30 +270,30 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
 
 ### `hide()` / `isVisible()`
 
-| Signature | Description |
-| --- | --- |
-| `hide(config?: { fade?: boolean }): Promise<void>` | Hides the native splash screen. `fade: true` fades the *native* view out before removing it; omitted/`false` removes it immediately — independent of the JS-side `useHideAnimation` fade below |
-| `isVisible(): boolean` | Reads whether the native splash screen is currently shown. Synchronous — iOS exports it as a blocking sync method, Android returns a plain boolean |
+| Signature                                          | Description                                                                                                                                                                                    |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hide(config?: { fade?: boolean }): Promise<void>` | Hides the native splash screen. `fade: true` fades the _native_ view out before removing it; omitted/`false` removes it immediately — independent of the JS-side `useHideAnimation` fade below |
+| `isVisible(): boolean`                             | Reads whether the native splash screen is currently shown. Synchronous — iOS exports it as a blocking sync method, Android returns a plain boolean                                             |
 
 ### `useHideAnimation()` config
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `manifest` | `IManifest` | *(required)* | The generated `assets/bootsplash/manifest.json` — background color plus logo size, optionally a dark background and/or brand |
-| `logo` / `darkLogo` | `IImageSourceProp` | — | The logo image to fade in; omit to skip the logo readiness gate entirely |
-| `brand` / `darkBrand` | `IImageSourceProp` | — | A secondary "powered by"-style image below the logo; only read when `manifest.brand` is present |
-| `ready` | `boolean` | `true` | Your own extra readiness gate (e.g. "auth check done") — `animate` waits for this to be `true` too |
-| `animate` | `() => void` | *(required)* | Called exactly once, the moment every readiness condition (layout committed + images loaded + `ready`) is met — put your own fade-out here |
-| `statusBarTranslucent` | `boolean` | `false` | Android-only: skip the extra top margin compensation when your app already draws a translucent status bar |
-| `navigationBarTranslucent` | `boolean` | `false` | Android-only: skip the extra bottom margin compensation when your app already draws a translucent navigation bar |
+| Field                      | Type               | Default      | Description                                                                                                                                |
+| -------------------------- | ------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `manifest`                 | `IManifest`        | _(required)_ | The generated `assets/bootsplash/manifest.json` — background color plus logo size, optionally a dark background and/or brand               |
+| `logo` / `darkLogo`        | `IImageSourceProp` | —            | The logo image to fade in; omit to skip the logo readiness gate entirely                                                                   |
+| `brand` / `darkBrand`      | `IImageSourceProp` | —            | A secondary "powered by"-style image below the logo; only read when `manifest.brand` is present                                            |
+| `ready`                    | `boolean`          | `true`       | Your own extra readiness gate (e.g. "auth check done") — `animate` waits for this to be `true` too                                         |
+| `animate`                  | `() => void`       | _(required)_ | Called exactly once, the moment every readiness condition (layout committed + images loaded + `ready`) is met — put your own fade-out here |
+| `statusBarTranslucent`     | `boolean`          | `false`      | Android-only: skip the extra top margin compensation when your app already draws a translucent status bar                                  |
+| `navigationBarTranslucent` | `boolean`          | `false`      | Android-only: skip the extra bottom margin compensation when your app already draws a translucent navigation bar                           |
 
 ### `useHideAnimation()` return value
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `container` | `{ style, onLayout }` | Bind onto your own `View` — `style` positions and colors the full-screen backdrop, `onLayout` reports layout readiness |
-| `logo` | `{ source, fadeDuration, resizeMode, style, onLoadEnd }` | Bind onto your own `Image` — `onLoadEnd` reports logo-load readiness |
-| `brand` | `{ source, fadeDuration, resizeMode, style, onLoadEnd }` | Same shape as `logo`, bound onto a second `Image` for the optional brand asset |
+| Field       | Type                                                     | Description                                                                                                            |
+| ----------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `container` | `{ style, onLayout }`                                    | Bind onto your own `View` — `style` positions and colors the full-screen backdrop, `onLayout` reports layout readiness |
+| `logo`      | `{ source, fadeDuration, resizeMode, style, onLoadEnd }` | Bind onto your own `Image` — `onLoadEnd` reports logo-load readiness                                                   |
+| `brand`     | `{ source, fadeDuration, resizeMode, style, onLoadEnd }` | Same shape as `logo`, bound onto a second `Image` for the optional brand asset                                         |
 
 ## Notes
 

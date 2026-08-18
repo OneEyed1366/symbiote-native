@@ -14,18 +14,19 @@ the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wra
 splash-screen) uses — it needs its own one-time native wiring per app.
 
 <Aside type="danger" title="This is not the standard Expo setup flow">
-  Expo's own docs say "install `expo` first, then `expo prebuild`." SymbioteNative apps never
-  install the `expo` meta-package — it bundles its own Metro config and Babel preset, which
-  collide with this project's own bundler pipeline (Vue SFC transform, Angular AOT linker, the
-  CSS-parser transform). Every step below reproduces the handful of things the `expo` package's
-  own scripts would otherwise do for you, using only `expo-modules-core` and
+  Expo's own docs say "install `expo` first, then `expo prebuild`."
+  SymbioteNative apps never install the `expo` meta-package — it bundles its own
+  Metro config and Babel preset, which collide with this project's own bundler
+  pipeline (Vue SFC transform, Angular AOT linker, the CSS-parser transform).
+  Every step below reproduces the handful of things the `expo` package's own
+  scripts would otherwise do for you, using only `expo-modules-core` and
   `expo-modules-autolinking` — both plain, `expo`-free dependencies.
 </Aside>
 
 ## Do this once per app, not once per package
 
 Every step below wires the app itself, not `@symbiote-native/sensors` specifically. Once done, any
-*future* `expo-modules-core`-based package (a camera module, a barcode scanner, …) is discovered
+_future_ `expo-modules-core`-based package (a camera module, a barcode scanner, …) is discovered
 with **zero further native changes** — the app-level linker set up in step 6 regenerates the
 Android registration for whatever is installed, so a new package costs one `npm install` and
 nothing else.
@@ -44,10 +45,11 @@ both need it as a direct edge in your app's own dependency graph, not a transiti
 ## 2. iOS — Podfile
 
 <Aside type="note">
-  `use_expo_modules!` is not a method `expo-modules-autolinking` exposes on its own — normally it
-  ships as a thin wrapper inside the `expo` package's own Ruby scripts. The wrapper has zero
-  `expo`-specific logic (it only requires `expo-modules-autolinking` and delegates), so it's safe
-  to reproduce directly in your own Podfile instead of installing `expo` for one method.
+  `use_expo_modules!` is not a method `expo-modules-autolinking` exposes on its
+  own — normally it ships as a thin wrapper inside the `expo` package's own Ruby
+  scripts. The wrapper has zero `expo`-specific logic (it only requires
+  `expo-modules-autolinking` and delegates), so it's safe to reproduce directly
+  in your own Podfile instead of installing `expo` for one method.
 </Aside>
 
 Add this near the top of `ios/Podfile`, before `platform :ios, ...`:
@@ -158,11 +160,11 @@ end
 ## 3. iOS — install the runtime hook
 
 <Aside type="note">
-  Everything above links the native code. One more piece is missing: the JSI host object
-  `requireNativeModule(...)` reads to resolve an autolinked Expo module
-  (`global.expo.modules`). Normally the `expo` package's own `RCTReactNativeFactory` subclass
-  installs it from an `RCTHostDelegate` callback — reproduced here directly, using only
-  `expo-modules-core` symbols.
+  Everything above links the native code. One more piece is missing: the JSI
+  host object `requireNativeModule(...)` reads to resolve an autolinked Expo
+  module (`global.expo.modules`). Normally the `expo` package's own
+  `RCTReactNativeFactory` subclass installs it from an `RCTHostDelegate`
+  callback — reproduced here directly, using only `expo-modules-core` symbols.
 </Aside>
 
 Add two files next to your `AppDelegate.swift` (Objective-C++, since the hook needs
@@ -250,41 +252,43 @@ sources the way pod targets do.
   Both surfaced only at `xcodebuild`, after a green `pod install` — a `pod install`-only
   verification pass will miss them.
 
-  1. **Register the two new files with the Xcode project, not just the filesystem.** Dropping
-     `SymbioteExpoModulesFactory.h`/`.mm` next to `AppDelegate.swift` on disk is not enough
-     unless the project uses Xcode 16's file-system-synchronized groups (check for
-     `PBXFileSystemSynchronizedRootGroup` in `project.pbxproj` — most React Native templates
-     still use the classic `PBXFileReference`/`PBXGroup` model). Without an explicit
-     `PBXFileReference` + a `Sources` build-phase membership for the `.mm`, linking fails with
-     `Undefined symbols for architecture arm64: "_OBJC_CLASS_$_SymbioteExpoModulesFactory"` — the
-     header compiles fine (nothing consumes it at link time), only the missing `.mm` shows up.
-     Add both via the `xcodeproj` gem (never hand-edit `project.pbxproj` text): find the group
-     that already contains `AppDelegate.swift`, add both files as siblings, and add only the
-     `.mm` to the target's Sources build phase. That group is typically **virtual** (`path: nil`)
-     — check the sibling file's own `path` (e.g. `Canary/AppDelegate.swift`) and set the new
-     files' `path` with the same prefix; relying on the group's `path` alone resolves one
-     directory too high and fails with `Build input file cannot be found`.
+1. **Register the two new files with the Xcode project, not just the filesystem.** Dropping
+   `SymbioteExpoModulesFactory.h`/`.mm` next to `AppDelegate.swift` on disk is not enough
+   unless the project uses Xcode 16's file-system-synchronized groups (check for
+   `PBXFileSystemSynchronizedRootGroup` in `project.pbxproj` — most React Native templates
+   still use the classic `PBXFileReference`/`PBXGroup` model). Without an explicit
+   `PBXFileReference` + a `Sources` build-phase membership for the `.mm`, linking fails with
+   `Undefined symbols for architecture arm64: "_OBJC_CLASS_$_SymbioteExpoModulesFactory"` — the
+   header compiles fine (nothing consumes it at link time), only the missing `.mm` shows up.
+   Add both via the `xcodeproj` gem (never hand-edit `project.pbxproj` text): find the group
+   that already contains `AppDelegate.swift`, add both files as siblings, and add only the
+   `.mm` to the target's Sources build phase. That group is typically **virtual** (`path: nil`)
+   — check the sibling file's own `path` (e.g. `Canary/AppDelegate.swift`) and set the new
+   files' `path` with the same prefix; relying on the group's `path` alone resolves one
+   directory too high and fails with `Build input file cannot be found`.
 
-  2. **Bump the app target's own `IPHONEOS_DEPLOYMENT_TARGET`, not just the Podfile's `platform
-     :ios` line.** That line (step 2) only raises the floor CocoaPods checks for Pod-to-Pod
-     compatibility — it does not touch the Xcode **project's** own deployment target. Once
-     `AppDelegate.swift` imports `ExpoModulesCore` directly (via the bridging header above),
-     Swift's compiler checks the imported module's minimum deployment target against the
-     *importing* target's own setting, not just the Pods project's — leaving the app target at
-     its old floor (commonly 15.1) fails with `compiling for iOS 15.1, but module
-     'ExpoModulesCore' has a minimum deployment target of iOS 16.4`. Fix: same `xcodeproj` gem
-     script, set `IPHONEOS_DEPLOYMENT_TARGET = '16.4'` on every build configuration (project-level
-     and every target) that is currently below it.
+2. **Bump the app target's own `IPHONEOS_DEPLOYMENT_TARGET`, not just the Podfile's `platform
+:ios` line.** That line (step 2) only raises the floor CocoaPods checks for Pod-to-Pod
+   compatibility — it does not touch the Xcode **project's** own deployment target. Once
+   `AppDelegate.swift` imports `ExpoModulesCore` directly (via the bridging header above),
+   Swift's compiler checks the imported module's minimum deployment target against the
+   _importing_ target's own setting, not just the Pods project's — leaving the app target at
+   its old floor (commonly 15.1) fails with `compiling for iOS 15.1, but module
+'ExpoModulesCore' has a minimum deployment target of iOS 16.4`. Fix: same `xcodeproj` gem
+   script, set `IPHONEOS_DEPLOYMENT_TARGET = '16.4'` on every build configuration (project-level
+   and every target) that is currently below it.
+
 </Aside>
 
 ## 4. Android — `settings.gradle`
 
 <Aside type="note">
-  Expo's own `expo-autolinking-settings` Gradle plugin hardcodes `require.resolve('expo/
-  package.json')` internally, so it can't run without the real `expo` package either.
-  `expo-module-gradle-plugin` (shipped inside `expo-modules-core` itself, not
-  `expo-modules-autolinking`) already ships a fallback for exactly this case — it expects the
-  app to `include()` the Expo module projects itself. This block does that by hand, driving
+  Expo's own `expo-autolinking-settings` Gradle plugin hardcodes
+  `require.resolve('expo/ package.json')` internally, so it can't run without
+  the real `expo` package either. `expo-module-gradle-plugin` (shipped inside
+  `expo-modules-core` itself, not `expo-modules-autolinking`) already ships a
+  fallback for exactly this case — it expects the app to `include()` the Expo
+  module projects itself. This block does that by hand, driving
   `expo-modules-autolinking`'s CLI directly.
 </Aside>
 
@@ -366,10 +370,11 @@ pnpm add @symbiote-native/expo-modules-link
 }
 ```
 
-  That's the whole integration, and it's per **app**, not per package — wrapper packages carry no
-  `postinstall` of their own. Every install from then on regenerates the region from whatever
-  wrapper packages are actually in `node_modules`; step 7 covers what it reads and what it writes.
-  You can also run it at any time with `npx symbiote-expo-link`.
+That's the whole integration, and it's per **app**, not per package — wrapper packages carry no
+`postinstall` of their own. Every install from then on regenerates the region from whatever
+wrapper packages are actually in `node_modules`; step 7 covers what it reads and what it writes.
+You can also run it at any time with `npx symbiote-expo-link`.
+
 </Aside>
 
 ```groovy
@@ -389,11 +394,12 @@ dependencies {
 ## 7. Android — `MainApplication.kt`
 
 <Aside type="tip" title="Generated by @symbiote-native/expo-modules-link">
-  There's still no `expo` aggregator project to auto-generate this module list, and
-  `ModuleRegistryAdapter` still only accepts a single `ModulesProvider` — so every
-  expo-modules-core package wired into the app lands its own entry in the same shared map. What
-  changed is who writes that entry: the app-level `symbiote-expo-link` run from step 6 owns two
-  regions in this file (the imports and the map) and rewrites both on every install, alongside the
+  There's still no `expo` aggregator project to auto-generate this module list,
+  and `ModuleRegistryAdapter` still only accepts a single `ModulesProvider` — so
+  every expo-modules-core package wired into the app lands its own entry in the
+  same shared map. What changed is who writes that entry: the app-level
+  `symbiote-expo-link` run from step 6 owns two regions in this file (the
+  imports and the map) and rewrites both on every install, alongside the
   `build.gradle` region from the previous step.
 </Aside>
 
@@ -420,7 +426,7 @@ its own `package.json`, and the app-level run collects them. Here's
 — that part hasn't changed, only who types it. Get it wrong and it's the same failure as before:
 a clean compile, then a **runtime** `Cannot find native module '<Name>'`.
 
-Authoring a *new* wrapper package needs nothing beyond that manifest — no `postinstall`, no
+Authoring a _new_ wrapper package needs nothing beyond that manifest — no `postinstall`, no
 dependency on `@symbiote-native/expo-modules-link`. Consuming an already-published one like
 `@symbiote-native/sensors` needs nothing beyond the app-level setup from step 6.
 
@@ -489,15 +495,16 @@ additive, with the presence of `<key>NAME</key>` as the whole idempotency check.
 wording into `Info.plist`, before or after install, and it stands permanently; the run only prints
 a one-line notice when your string and the package's default disagree.
 
-| Sensor | iOS `Info.plist` | Android |
-| --- | --- | --- |
-| DeviceMotion, Pedometer | `NSMotionUsageDescription` | `ACTIVITY_RECOGNITION` (merged automatically from `expo-sensors`' own manifest) |
-| Accelerometer, Gyroscope, Magnetometer, Barometer, LightSensor | none required | none required |
+| Sensor                                                         | iOS `Info.plist`           | Android                                                                         |
+| -------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------- |
+| DeviceMotion, Pedometer                                        | `NSMotionUsageDescription` | `ACTIVITY_RECOGNITION` (merged automatically from `expo-sensors`' own manifest) |
+| Accelerometer, Gyroscope, Magnetometer, Barometer, LightSensor | none required              | none required                                                                   |
 
 <Aside type="tip" title="A note on iOS 17.4+">
-  Community reports (see `expo/expo#28187`) show the Barometer needing Motion & Fitness
-  permission on iPhones running iOS 17.4+, where earlier iOS versions didn't require it — add
-  `NSMotionUsageDescription` even for Barometer-only usage if you target 17.4+.
+  Community reports (see `expo/expo#28187`) show the Barometer needing Motion &
+  Fitness permission on iPhones running iOS 17.4+, where earlier iOS versions
+  didn't require it — add `NSMotionUsageDescription` even for Barometer-only
+  usage if you target 17.4+.
 </Aside>
 
 ## 9. Android `<application>` attributes
@@ -541,13 +548,15 @@ cd android && ./gradlew projects   # lists Project ':expo-modules-core' and ':ex
 ```
 
 <Aside type="note" title="Gradle daemon dying mid-CMake build">
-  `expo-modules-core`'s native worklets library builds via CMake for every architecture in
-  `reactNativeArchitectures` (default 4: armeabi-v7a, arm64-v8a, x86, x86_64) — memory-hungry, and
-  the failure mode when the box runs out of headroom is `Gradle build daemon disappeared
-  unexpectedly`, not an out-of-memory message. Common when several such builds run concurrently on
-  the same machine (e.g. wiring multiple example apps in parallel). Not a wiring bug — retry with
-  `./gradlew :app:assembleDebug -PreactNativeArchitectures=arm64-v8a --max-workers=1
-  --no-daemon` to confirm the wiring itself is sound before chasing a phantom config issue.
+  `expo-modules-core`'s native worklets library builds via CMake for every
+  architecture in `reactNativeArchitectures` (default 4: armeabi-v7a, arm64-v8a,
+  x86, x86_64) — memory-hungry, and the failure mode when the box runs out of
+  headroom is `Gradle build daemon disappeared unexpectedly`, not an
+  out-of-memory message. Common when several such builds run concurrently on the
+  same machine (e.g. wiring multiple example apps in parallel). Not a wiring bug
+  — retry with `./gradlew :app:assembleDebug
+  -PreactNativeArchitectures=arm64-v8a --max-workers=1 --no-daemon` to confirm
+  the wiring itself is sound before chasing a phantom config issue.
 </Aside>
 
 <Aside type="caution" title="Test with a clean install">

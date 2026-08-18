@@ -20,11 +20,11 @@ per-instance state.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -37,12 +37,14 @@ versions — never install either yourself, and never add the `expo` meta-packag
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-application`'s native code is discovered by `expo-modules-autolinking`, a different
-  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
-  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
-  installs the `expo` meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every future `expo-modules-core` package with zero further native changes.
+  `expo-application`'s native code is discovered by `expo-modules-autolinking`,
+  a different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every future `expo-modules-core` package with zero further
+  native changes.
 </Aside>
 
 No app-level permission strings are needed — every function here reads app/device metadata that
@@ -85,6 +87,7 @@ live state or a subscription.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -116,6 +119,7 @@ live state or a subscription.
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -154,6 +158,7 @@ live state or a subscription.
 
     There's no per-instance service to `inject()` here — every function is a plain free function
     off the core package, called straight from the constructor.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -185,6 +190,7 @@ live state or a subscription.
 
     There's no per-instance rune to reach for here either — every function is a plain free
     function off the core package, called straight from `$effect`.
+
   </TabItem>
 </Tabs>
 
@@ -194,35 +200,35 @@ live state or a subscription.
 
 Resolved once, eagerly, at import time:
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `nativeApplicationVersion` | `string \| null` | Human-readable app version, e.g. `"2.11.0"` |
-| `nativeBuildVersion` | `string \| null` | Internal build version app stores use to distinguish binaries, e.g. `"114"` |
-| `applicationName` | `string \| null` | The app's home-screen display name |
-| `applicationId` | `string \| null` | The Android application ID or iOS bundle ID |
+| Field                      | Type             | Description                                                                 |
+| -------------------------- | ---------------- | --------------------------------------------------------------------------- |
+| `nativeApplicationVersion` | `string \| null` | Human-readable app version, e.g. `"2.11.0"`                                 |
+| `nativeBuildVersion`       | `string \| null` | Internal build version app stores use to distinguish binaries, e.g. `"114"` |
+| `applicationName`          | `string \| null` | The app's home-screen display name                                          |
+| `applicationId`            | `string \| null` | The Android application ID or iOS bundle ID                                 |
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `getAndroidId(): string` | The value of `Settings.Secure.ANDROID_ID` — a hex string unique per app-signing-key/user/device combination. Throws immediately if called off Android, without touching the native module. `@platform android` |
-| `getInstallReferrerAsync(): Promise<string>` | The Google Play Install Referrer URL, e.g. `"utm_source=google-play&utm_medium=organic"`. `@platform android` |
-| `getIosIdForVendorAsync(): Promise<string \| null>` | The iOS "identifier for vendor" (IDFV); may resolve `null` shortly after a device restart before the device is unlocked. `@platform ios` |
-| `getIosApplicationReleaseTypeAsync(): Promise<ApplicationReleaseType>` | The iOS release channel the app was built for. `@platform ios` |
-| `getIosPushNotificationServiceEnvironmentAsync(): Promise<PushNotificationServiceEnvironment>` | `'development'`, `'production'`, or `null` on the simulator (which doesn't support APN registration). `@platform ios` |
-| `getInstallationTimeAsync(): Promise<Date>` | When the app was first installed (a reinstall after uninstalling resets this) |
-| `getLastUpdateTimeAsync(): Promise<Date>` | When the app was last updated via the Google Play Store. `@platform android` |
+| Signature                                                                                      | Description                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getAndroidId(): string`                                                                       | The value of `Settings.Secure.ANDROID_ID` — a hex string unique per app-signing-key/user/device combination. Throws immediately if called off Android, without touching the native module. `@platform android` |
+| `getInstallReferrerAsync(): Promise<string>`                                                   | The Google Play Install Referrer URL, e.g. `"utm_source=google-play&utm_medium=organic"`. `@platform android`                                                                                                  |
+| `getIosIdForVendorAsync(): Promise<string \| null>`                                            | The iOS "identifier for vendor" (IDFV); may resolve `null` shortly after a device restart before the device is unlocked. `@platform ios`                                                                       |
+| `getIosApplicationReleaseTypeAsync(): Promise<ApplicationReleaseType>`                         | The iOS release channel the app was built for. `@platform ios`                                                                                                                                                 |
+| `getIosPushNotificationServiceEnvironmentAsync(): Promise<PushNotificationServiceEnvironment>` | `'development'`, `'production'`, or `null` on the simulator (which doesn't support APN registration). `@platform ios`                                                                                          |
+| `getInstallationTimeAsync(): Promise<Date>`                                                    | When the app was first installed (a reinstall after uninstalling resets this)                                                                                                                                  |
+| `getLastUpdateTimeAsync(): Promise<Date>`                                                      | When the app was last updated via the Google Play Store. `@platform android`                                                                                                                                   |
 
 ### `ApplicationReleaseType`
 
-| Field | Value | Description |
-| --- | --- | --- |
-| `UNKNOWN` | `0` | Release type could not be determined |
-| `SIMULATOR` | `1` | Running on the iOS Simulator |
-| `ENTERPRISE` | `2` | An enterprise-distributed build |
-| `DEVELOPMENT` | `3` | A development build |
-| `AD_HOC` | `4` | An ad-hoc distributed build |
-| `APP_STORE` | `5` | Distributed via the App Store |
+| Field         | Value | Description                          |
+| ------------- | ----- | ------------------------------------ |
+| `UNKNOWN`     | `0`   | Release type could not be determined |
+| `SIMULATOR`   | `1`   | Running on the iOS Simulator         |
+| `ENTERPRISE`  | `2`   | An enterprise-distributed build      |
+| `DEVELOPMENT` | `3`   | A development build                  |
+| `AD_HOC`      | `4`   | An ad-hoc distributed build          |
+| `APP_STORE`   | `5`   | Distributed via the App Store        |
 
 ### `PushNotificationServiceEnvironment`
 
@@ -231,11 +237,15 @@ A plain string-literal union, not a struct — carries no `I` prefix (`ts-js-bes
 
 ## Notes
 
-<Aside type="note" title="Every async function throws UnavailabilityError when its native method is absent">
-  E.g. calling an iOS-only function on Android, or vice versa. `getAndroidId()` is the one
-  synchronous exception: it checks `Platform.OS` up front and throws immediately off Android,
-  never touching the native module at all. `getInstallationTimeAsync`/`getLastUpdateTimeAsync`
-  wrap a native epoch-ms number into a `Date` — the native side returns a plain number, not a
+<Aside
+  type="note"
+  title="Every async function throws UnavailabilityError when its native method is absent"
+>
+  E.g. calling an iOS-only function on Android, or vice versa. `getAndroidId()`
+  is the one synchronous exception: it checks `Platform.OS` up front and throws
+  immediately off Android, never touching the native module at all.
+  `getInstallationTimeAsync`/`getLastUpdateTimeAsync` wrap a native epoch-ms
+  number into a `Date` — the native side returns a plain number, not a
   serialized date string.
 </Aside>
 

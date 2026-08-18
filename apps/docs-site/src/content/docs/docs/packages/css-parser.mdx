@@ -20,11 +20,11 @@ native JS bundle, so there is no per-OS support table to give — the same compi
 are produced for iOS and Android from one transform.
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -82,6 +82,7 @@ object, not the factory — so no local wrapper file is needed.
 
     <View className="card" style={styles.highlight} />
     ```
+
   </TabItem>
   <TabItem label="Vue">
     A Vue SFC app points `babelTransformerPath` at `@symbiote-native/vue/metro-vue-transformer`
@@ -121,6 +122,7 @@ object, not the factory — so no local wrapper file is needed.
       babelTransformerPath: require.resolve('@symbiote-native/vue/metro-css-parser'),
     },
     ```
+
   </TabItem>
   <TabItem label="Angular">
     Angular needs one extra Metro accommodation on top of the transformer: ngc compiles only
@@ -153,6 +155,7 @@ object, not the factory — so no local wrapper file is needed.
     `'build/angular'` — pass it explicitly if your `tsconfig` writes ngc output elsewhere. The
     ngc/linker pipeline never sees a `.css` file, so there is no conflict with the CSS
     transformer.
+
   </TabItem>
   <TabItem label="Svelte">
     A Svelte app points `babelTransformerPath` at `@symbiote-native/svelte/metro-svelte-transformer`
@@ -198,6 +201,7 @@ object, not the factory — so no local wrapper file is needed.
 
     <View class="card" style={styles.highlight} />
     ```
+
   </TabItem>
 </Tabs>
 
@@ -211,7 +215,11 @@ The `css-dts` bin and the language-service plugin are the devDependency half —
 ```
 
 ```json
-{ "compilerOptions": { "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }] } }
+{
+  "compilerOptions": {
+    "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
+  }
+}
 ```
 
 Both are needed, and why is spelled out in the [Styling
@@ -227,63 +235,63 @@ code that ships to the device.
 
 ### Metro transformer
 
-| Signature | Description |
-| --- | --- |
+| Signature                                                                               | Description                                                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `createCssMetroTransformer(upstreamTransformer?: IMetroTransformer): IMetroTransformer` | Builds the `{ transform, getCacheKey }` object Metro's `babelTransformerPath` expects: compiles a recognized style file, delegates every other file to the upstream transformer unchanged. Defaults the upstream to `resolveUpstreamTransformer()` |
-| `resolveUpstreamTransformer(): IMetroTransformer` | Resolves `@react-native/metro-babel-transformer` relative to this package (a real dependency of it), so a custom per-framework transformer can delegate its own passthrough branch without a fragile direct `require` |
+| `resolveUpstreamTransformer(): IMetroTransformer`                                       | Resolves `@react-native/metro-babel-transformer` relative to this package (a real dependency of it), so a custom per-framework transformer can delegate its own passthrough branch without a fragile direct `require`                              |
 
 `transform()` is async for every recognized extension, plain `.css` included — Metro's own
 transform worker awaits the call either way, and Less/Stylus have no synchronous render API.
 
 ### Compiler core
 
-| Signature | Description |
-| --- | --- |
-| `parseCSS(css: string, options?: ICssParserOptions): Record<string, Record<string, unknown>>` | Compiles plain CSS text into a `{ className: styleObject }` map — postcss AST walk, `var()`/`calc()` resolution, and CSS property → RN `ViewStyle`/`TextStyle` mapping |
-| `extractClassName(selector: string): string \| null` | Converts one CSS selector to the camelCase key `parseCSS` registers it under — `.card` → `card`, `.btn.primary` → `btnPrimary`, `.card .title` → `cardTitle`. Returns `null` for a selector with no RN equivalent (bare element, `*`, anything carrying a pseudo-class) |
-| `kebabToCamel(value: string): string` | Kebab-case → camelCase. Exported because a template's `class="section-label"` authoring must normalize to the same key `parseCSS` registered the selector under |
-| `globalClassNamesIn(css: string): Set<string>` | Scans CSS text for `:global(.name)`-wrapped class names, camelCased. A caller doing its own scope-suffixing uses this to exempt those names, since `parseCSS`'s output carries no per-key metadata |
-| `hashFilePath(filePath: string): string` | A short deterministic id derived from a file path, used as the scope suffix so two files can each define `.card` without colliding in the shared runtime registry |
+| Signature                                                                                     | Description                                                                                                                                                                                                                                                             |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parseCSS(css: string, options?: ICssParserOptions): Record<string, Record<string, unknown>>` | Compiles plain CSS text into a `{ className: styleObject }` map — postcss AST walk, `var()`/`calc()` resolution, and CSS property → RN `ViewStyle`/`TextStyle` mapping                                                                                                  |
+| `extractClassName(selector: string): string \| null`                                          | Converts one CSS selector to the camelCase key `parseCSS` registers it under — `.card` → `card`, `.btn.primary` → `btnPrimary`, `.card .title` → `cardTitle`. Returns `null` for a selector with no RN equivalent (bare element, `*`, anything carrying a pseudo-class) |
+| `kebabToCamel(value: string): string`                                                         | Kebab-case → camelCase. Exported because a template's `class="section-label"` authoring must normalize to the same key `parseCSS` registered the selector under                                                                                                         |
+| `globalClassNamesIn(css: string): Set<string>`                                                | Scans CSS text for `:global(.name)`-wrapped class names, camelCased. A caller doing its own scope-suffixing uses this to exempt those names, since `parseCSS`'s output carries no per-key metadata                                                                      |
+| `hashFilePath(filePath: string): string`                                                      | A short deterministic id derived from a file path, used as the scope suffix so two files can each define `.card` without colliding in the shared runtime registry                                                                                                       |
 
 `ICssParserOptions` has one optional field, `filename: string` — passed to postcss as the source
 name for error reporting.
 
 ### Standalone stylesheet files
 
-| Signature | Description |
-| --- | --- |
+| Signature                                                                                                  | Description                                                                                                                                                                                                                                                                                        |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `compileCssFile(source: string, filename: string, options?: ICssParserOptions): Promise<ICompiledCssFile>` | Compiles one stylesheet file into JS module source. A plain file emits a `registerStyles(...)` side-effect module with no export; a `.module.*` file additionally scopes every class to a per-file hash and default-exports the name→scopedName map. Preprocessor sources are reduced to CSS first |
-| `isCssModuleFile(filename: string): boolean` | Whether a filename's stem ends in `.module` (`Card.module.scss` → `true`) — the check that decides scoped-with-a-map vs. global-side-effect output |
+| `isCssModuleFile(filename: string): boolean`                                                               | Whether a filename's stem ends in `.module` (`Card.module.scss` → `true`) — the check that decides scoped-with-a-map vs. global-side-effect output                                                                                                                                                 |
 
 `ICompiledCssFile` has one field, `code: string` — the generated JS module source.
 
 ### Preprocessors
 
-| Signature | Description |
-| --- | --- |
-| `compile(source: string, lang: IPreprocessorLanguage, filePath?: string): Promise<string>` | Unified entry point: reduces any recognized language down to plain CSS text. `lang: 'css'` is a passthrough no-op |
-| `compileScss(source: string, filePath?: string): Promise<string>` | Compiles SCSS, or the indented Sass syntax when `filePath` ends in `.sass`, to CSS. Sets sass `loadPaths` to the source file's own directory so a relative `@use`/`@import` resolves as authored |
-| `compileSass` | An alias of `compileScss` — one compiler entry point serves both syntaxes, picked off the file extension |
-| `compileLess(source: string, filePath?: string): Promise<string>` | Compiles Less to CSS. Async because Less ships no synchronous render API |
-| `compileStylus(source: string, filePath?: string): Promise<string>` | Compiles Stylus to CSS, wrapping its callback-based `render` in a Promise |
-| `detectLanguage(filename: string): IPreprocessorLanguage` | Extension → language. `.scss`/`.sass` → `'scss'`, `.less` → `'less'`, `.styl`/`.stylus` → `'stylus'`; anything unrecognized falls back to `'css'` |
-| `isStyleFile(filename: string): boolean` | Whether an extension is a stylesheet the transformer should claim at all — the "should I even look at this file?" check |
+| Signature                                                                                  | Description                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `compile(source: string, lang: IPreprocessorLanguage, filePath?: string): Promise<string>` | Unified entry point: reduces any recognized language down to plain CSS text. `lang: 'css'` is a passthrough no-op                                                                                |
+| `compileScss(source: string, filePath?: string): Promise<string>`                          | Compiles SCSS, or the indented Sass syntax when `filePath` ends in `.sass`, to CSS. Sets sass `loadPaths` to the source file's own directory so a relative `@use`/`@import` resolves as authored |
+| `compileSass`                                                                              | An alias of `compileScss` — one compiler entry point serves both syntaxes, picked off the file extension                                                                                         |
+| `compileLess(source: string, filePath?: string): Promise<string>`                          | Compiles Less to CSS. Async because Less ships no synchronous render API                                                                                                                         |
+| `compileStylus(source: string, filePath?: string): Promise<string>`                        | Compiles Stylus to CSS, wrapping its callback-based `render` in a Promise                                                                                                                        |
+| `detectLanguage(filename: string): IPreprocessorLanguage`                                  | Extension → language. `.scss`/`.sass` → `'scss'`, `.less` → `'less'`, `.styl`/`.stylus` → `'stylus'`; anything unrecognized falls back to `'css'`                                                |
+| `isStyleFile(filename: string): boolean`                                                   | Whether an extension is a stylesheet the transformer should claim at all — the "should I even look at this file?" check                                                                          |
 
 `IPreprocessorLanguage` is `'css' | 'scss' | 'less' | 'stylus'`.
 
 ### CSS Modules typing
 
-| Signature | Description |
-| --- | --- |
-| `generateModuleDts(source: string, filename: string): Promise<string \| null>` | Produces the `.d.ts` source for one CSS Modules file. Returns `null` for a non-`.module.*` file, which has no default export to type |
-| `classNamesToDtsSource(classNames: readonly string[]): string` | Renders a sorted class-name list into `.d.ts` text — a `readonly` field per class, deliberately with no index signature, so a typo is a real `TS2339` |
+| Signature                                                                      | Description                                                                                                                                           |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generateModuleDts(source: string, filename: string): Promise<string \| null>` | Produces the `.d.ts` source for one CSS Modules file. Returns `null` for a non-`.module.*` file, which has no default export to type                  |
+| `classNamesToDtsSource(classNames: readonly string[]): string`                 | Renders a sorted class-name list into `.d.ts` text — a `readonly` field per class, deliberately with no index signature, so a typo is a real `TS2339` |
 
-| CLI | Description |
-| --- | --- |
+| CLI                                         | Description                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `css-dts [--watch] <dir-or-file> [...more]` | Walks the given paths and writes a sibling `<file>.d.ts` next to every `.module.css`/`.module.scss`/`.module.less`/`.module.styl` it finds, skipping `node_modules`, `build`, `.git`, and dot-directories. `--watch` regenerates on filesystem events, for live editor autocomplete without a running Metro |
 
-| Subpath | Description |
-| --- | --- |
+| Subpath                                         | Description                                                                                                                                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `@symbiote-native/css-parser/typescript-plugin` | A TypeScript language-service plugin synthesizing a virtual `.d.ts` for a `.module.css` import, so the IDE's own TS server gives per-class autocomplete and typo errors on every keystroke |
 
 ## Notes
@@ -334,7 +342,8 @@ regardless of source language. `compileCssFile` then emits JS module source that
 Each adapter's `metro-css-parser.cjs` is a one-line re-export:
 
 ```js
-module.exports = require('@symbiote-native/css-parser').createCssMetroTransformer();
+module.exports =
+  require('@symbiote-native/css-parser').createCssMetroTransformer();
 ```
 
 That indirection is load-bearing. Node resolves a `require()` relative to the requiring **file's**

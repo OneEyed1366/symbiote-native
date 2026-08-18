@@ -20,10 +20,10 @@ Animated.timing(opacity, {
 }).start();
 ```
 
-Wrap the view you want to animate in `Animated.View` (React), an aliased
-`AnimatedView` const (Vue — templates can't parse a dotted tag name), or the
-named `AnimatedView` import (Angular — required by its AOT compiler, not
-optional). See the [Animations guide](/docs/learn/animations/) for the full
+Wrap the view you want to animate in `Animated.View` — the dotted form works
+as written on React, Vue and Svelte. Angular is the exception: import
+`AnimatedView` by name there, because its AOT compiler cannot trace a component
+class through property access. See the [Animations guide](/docs/learn/animations/) for the full
 per-adapter reasoning and the rest of the surface (`ValueXY`, tracking,
 `diffClamp`, `Animated.event`).
 

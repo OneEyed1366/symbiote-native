@@ -18,11 +18,11 @@ pure `EventEmitter` + async-function surface, with no Fabric view or `ViewConfig
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -35,22 +35,25 @@ versions — never install either yourself, and never add the `expo` meta-packag
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-sensors`' native code is discovered by `expo-modules-autolinking`, a different mechanism
-  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses
-  — and it isn't the standard Expo setup flow either, since this project never installs the
-  `expo` meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every future `expo-modules-core` package with zero further native changes. DeviceMotion and
-  Pedometer need an `NSMotionUsageDescription` string on iOS; `symbiote-expo-link` inserts a
-  generic default when that key is absent, and leaves your own wording alone if you write one.
+  `expo-sensors`' native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every future `expo-modules-core` package with zero further
+  native changes. DeviceMotion and Pedometer need an `NSMotionUsageDescription`
+  string on iOS; `symbiote-expo-link` inserts a generic default when that key is
+  absent, and leaves your own wording alone if you write one.
 </Aside>
 
 ## Usage
 
 <Aside type="note">
-  Every hook/composable/`connect()` below returns `null` until the first native reading
-  arrives. Check `isAvailableAsync()` separately if you need to tell "not available on this
-  device" apart from "no reading yet" — see [Notes](#notes) below.
+  Every hook/composable/`connect()` below returns `null` until the first native
+  reading arrives. Check `isAvailableAsync()` separately if you need to tell
+  "not available on this device" apart from "no reading yet" — see
+  [Notes](#notes) below.
 </Aside>
 
 ### A `DeviceSensor` (Accelerometer, Barometer, DeviceMotion, Gyroscope, LightSensor, Magnetometer, MagnetometerUncalibrated)
@@ -71,6 +74,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -84,6 +88,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       <Text>{{ accelerometer && `x ${accelerometer.x} · y ${accelerometer.y} · z ${accelerometer.z}` }}</Text>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -100,6 +105,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       readonly accelerometer = inject(AccelerometerService).connect();
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -114,6 +120,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       {accelerometer.current && `x ${accelerometer.current.x} · y ${accelerometer.current.y} · z ${accelerometer.current.z}`}
     </Text>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -138,6 +145,7 @@ Unlike every other sensor, upstream `Pedometer` has no shared instance to hang `
       return <Text>{pedometer && `${pedometer.steps} steps`}</Text>;
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -151,6 +159,7 @@ Unlike every other sensor, upstream `Pedometer` has no shared instance to hang `
       <Text>{{ pedometer && `${pedometer.steps} steps` }}</Text>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -167,6 +176,7 @@ Unlike every other sensor, upstream `Pedometer` has no shared instance to hang `
       readonly pedometer = inject(PedometerService).connect();
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -179,6 +189,7 @@ Unlike every other sensor, upstream `Pedometer` has no shared instance to hang `
 
     <Text>{pedometer.current && `${pedometer.current.steps} steps`}</Text>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -199,26 +210,26 @@ const { steps } = await getStepCountAsync(startDate, endDate); // iOS only in pr
 Each is a shared singleton, importable from the package root, that every hook/composable/service
 subscribes to underneath.
 
-| Method | Signature | Description |
-| --- | --- | --- |
-| `addListener` | `(listener: (measurement) => void) => EventSubscription` | Subscribes to live readings; call `.remove()` on the returned subscription to unsubscribe |
-| `setUpdateInterval` | `(intervalMs: number) => void` | Requests a new native sampling interval; warns and no-ops where the platform/sensor doesn't support it |
-| `isAvailableAsync` | `() => Promise<boolean>` | Whether this sensor's hardware is present and enabled on the current device — always `false` on a simulator with no real IMU |
-| `getPermissionsAsync` / `requestPermissionsAsync` | `() => Promise<PermissionResponse>` | Reads/asks for the platform permission this sensor needs; a sensor needing none resolves already-granted |
-| `hasListeners` / `getListenerCount` / `removeAllListeners` | — | Inspect or clear this sensor's own subscriptions |
+| Method                                                     | Signature                                                | Description                                                                                                                  |
+| ---------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `addListener`                                              | `(listener: (measurement) => void) => EventSubscription` | Subscribes to live readings; call `.remove()` on the returned subscription to unsubscribe                                    |
+| `setUpdateInterval`                                        | `(intervalMs: number) => void`                           | Requests a new native sampling interval; warns and no-ops where the platform/sensor doesn't support it                       |
+| `isAvailableAsync`                                         | `() => Promise<boolean>`                                 | Whether this sensor's hardware is present and enabled on the current device — always `false` on a simulator with no real IMU |
+| `getPermissionsAsync` / `requestPermissionsAsync`          | `() => Promise<PermissionResponse>`                      | Reads/asks for the platform permission this sensor needs; a sensor needing none resolves already-granted                     |
+| `hasListeners` / `getListenerCount` / `removeAllListeners` | —                                                        | Inspect or clear this sensor's own subscriptions                                                                             |
 
 ### Hooks / composables / runes / services
 
-| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Svelte (`/svelte`) | Signature | Returns |
-| --- | --- | --- | --- | --- | --- |
-| `useAccelerometer` | `useAccelerometer` | `AccelerometerService.connect()` | `useAccelerometer` | `(updateIntervalMs?: number)` | Live `IAccelerometerMeasurement \| null` |
-| `useBarometer` | `useBarometer` | `BarometerService.connect()` | `useBarometer` | `(updateIntervalMs?: number)` | Live `IBarometerMeasurement \| null` |
-| `useDeviceMotion` | `useDeviceMotion` | `DeviceMotionService.connect()` | `useDeviceMotion` | `(updateIntervalMs?: number)` | Live `IDeviceMotionMeasurement \| null` |
-| `useGyroscope` | `useGyroscope` | `GyroscopeService.connect()` | `useGyroscope` | `(updateIntervalMs?: number)` | Live `IGyroscopeMeasurement \| null` |
-| `useLightSensor` | `useLightSensor` | `LightSensorService.connect()` | `useLightSensor` | `(updateIntervalMs?: number)` | Live `ILightSensorMeasurement \| null` |
-| `useMagnetometer` | `useMagnetometer` | `MagnetometerService.connect()` | `useMagnetometer` | `(updateIntervalMs?: number)` | Live `IMagnetometerMeasurement \| null` |
-| `useMagnetometerUncalibrated` | `useMagnetometerUncalibrated` | `MagnetometerUncalibratedService.connect()` | `useMagnetometerUncalibrated` | `(updateIntervalMs?: number)` | Live `IMagnetometerUncalibratedMeasurement \| null` |
-| `usePedometer` | `usePedometer` | `PedometerService.connect()` | `usePedometer` | `()` — no interval, Pedometer has none | Live `IPedometerResult \| null` |
+| React (`/react`)              | Vue (`/vue`)                  | Angular (`/angular`)                        | Svelte (`/svelte`)            | Signature                              | Returns                                             |
+| ----------------------------- | ----------------------------- | ------------------------------------------- | ----------------------------- | -------------------------------------- | --------------------------------------------------- |
+| `useAccelerometer`            | `useAccelerometer`            | `AccelerometerService.connect()`            | `useAccelerometer`            | `(updateIntervalMs?: number)`          | Live `IAccelerometerMeasurement \| null`            |
+| `useBarometer`                | `useBarometer`                | `BarometerService.connect()`                | `useBarometer`                | `(updateIntervalMs?: number)`          | Live `IBarometerMeasurement \| null`                |
+| `useDeviceMotion`             | `useDeviceMotion`             | `DeviceMotionService.connect()`             | `useDeviceMotion`             | `(updateIntervalMs?: number)`          | Live `IDeviceMotionMeasurement \| null`             |
+| `useGyroscope`                | `useGyroscope`                | `GyroscopeService.connect()`                | `useGyroscope`                | `(updateIntervalMs?: number)`          | Live `IGyroscopeMeasurement \| null`                |
+| `useLightSensor`              | `useLightSensor`              | `LightSensorService.connect()`              | `useLightSensor`              | `(updateIntervalMs?: number)`          | Live `ILightSensorMeasurement \| null`              |
+| `useMagnetometer`             | `useMagnetometer`             | `MagnetometerService.connect()`             | `useMagnetometer`             | `(updateIntervalMs?: number)`          | Live `IMagnetometerMeasurement \| null`             |
+| `useMagnetometerUncalibrated` | `useMagnetometerUncalibrated` | `MagnetometerUncalibratedService.connect()` | `useMagnetometerUncalibrated` | `(updateIntervalMs?: number)`          | Live `IMagnetometerUncalibratedMeasurement \| null` |
+| `usePedometer`                | `usePedometer`                | `PedometerService.connect()`                | `usePedometer`                | `()` — no interval, Pedometer has none | Live `IPedometerResult \| null`                     |
 
 React/Vue return the measurement directly; Angular's `connect()` returns a `Signal` — read it as
 `accelerometer()` in code or `accelerometer()` in a template. Svelte's rune returns a boxed getter,
@@ -231,15 +242,15 @@ takes it as a getter.
 
 ### Measurement shapes
 
-| Sensor | Fields | Units |
-| --- | --- | --- |
-| Accelerometer | `x`, `y`, `z`, `timestamp` | g-force (1g = 9.81 m/s²) |
-| Gyroscope | `x`, `y`, `z`, `timestamp` | rad/s |
-| Magnetometer / MagnetometerUncalibrated | `x`, `y`, `z`, `timestamp` | µT |
-| Barometer | `pressure`, `relativeAltitude?`, `timestamp` | hPa; `relativeAltitude` (meters) is iOS-only |
-| LightSensor | `illuminance`, `timestamp` | lux — Android-only, see [Notes](#notes) |
-| DeviceMotion | `acceleration`, `accelerationIncludingGravity`, `rotation`, `rotationRate`, `interval`, `orientation` | see below |
-| Pedometer | `steps` | count |
+| Sensor                                  | Fields                                                                                                | Units                                        |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Accelerometer                           | `x`, `y`, `z`, `timestamp`                                                                            | g-force (1g = 9.81 m/s²)                     |
+| Gyroscope                               | `x`, `y`, `z`, `timestamp`                                                                            | rad/s                                        |
+| Magnetometer / MagnetometerUncalibrated | `x`, `y`, `z`, `timestamp`                                                                            | µT                                           |
+| Barometer                               | `pressure`, `relativeAltitude?`, `timestamp`                                                          | hPa; `relativeAltitude` (meters) is iOS-only |
+| LightSensor                             | `illuminance`, `timestamp`                                                                            | lux — Android-only, see [Notes](#notes)      |
+| DeviceMotion                            | `acceleration`, `accelerationIncludingGravity`, `rotation`, `rotationRate`, `interval`, `orientation` | see below                                    |
+| Pedometer                               | `steps`                                                                                               | count                                        |
 
 `DeviceMotion`'s nested fields: `acceleration`/`accelerationIncludingGravity`/`rotationRate` are
 `{ x, y, z, timestamp }` (m/s² for acceleration, deg/s for `rotationRate`); `rotation` is
@@ -248,34 +259,40 @@ takes it as a getter.
 
 ### Pedometer free functions
 
-| Signature | Description |
-| --- | --- |
-| `watchStepCount(callback: (result) => void): EventSubscription` | Live step-count subscription — the same primitive `usePedometer` wraps |
+| Signature                                                               | Description                                                                                               |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `watchStepCount(callback: (result) => void): EventSubscription`         | Live step-count subscription — the same primitive `usePedometer` wraps                                    |
 | `getStepCountAsync(start: Date, end: Date): Promise<{ steps: number }>` | One-shot historical step count between two dates — iOS only in practice, Android has no native equivalent |
-| `isAvailableAsync(): Promise<boolean>` | Whether step counting is available on this device |
-| `getPermissionsAsync` / `requestPermissionsAsync` | `() => Promise<PermissionResponse>` |
+| `isAvailableAsync(): Promise<boolean>`                                  | Whether step counting is available on this device                                                         |
+| `getPermissionsAsync` / `requestPermissionsAsync`                       | `() => Promise<PermissionResponse>`                                                                       |
 
 ## Notes
 
 <Aside type="note" title="Simulators have no real IMU or step-counter hardware">
-  `isAvailableAsync()` genuinely returns `false` on an iOS Simulator for every CoreMotion-backed
-  sensor and `CMPedometer`. On an Android emulator, readings drift on their own even at rest,
-  since the emulator synthesizes motion data instead of returning frozen zeros. Neither is a
-  wiring bug — verify sensor behavior on a real device.
+  `isAvailableAsync()` genuinely returns `false` on an iOS Simulator for every
+  CoreMotion-backed sensor and `CMPedometer`. On an Android emulator, readings
+  drift on their own even at rest, since the emulator synthesizes motion data
+  instead of returning frozen zeros. Neither is a wiring bug — verify sensor
+  behavior on a real device.
 </Aside>
 
-<Aside type="caution" title="Guard DeviceMotion's nested fields, not just the top-level object">
-  `rotation`/`acceleration`/`accelerationIncludingGravity`/`rotationRate` can be absent from the
-  very first event — the underlying platform sensor hasn't reported yet. Guard the nested field
-  itself (`deviceMotion?.rotation && ...`), not just `deviceMotion && ...` — an unguarded nested
-  read throws, and in React Native that throw can silently blank the screen with no visible error
-  anywhere (no LogBox redbox, no logcat exception).
+<Aside
+  type="caution"
+  title="Guard DeviceMotion's nested fields, not just the top-level object"
+>
+  `rotation`/`acceleration`/`accelerationIncludingGravity`/`rotationRate` can be
+  absent from the very first event — the underlying platform sensor hasn't
+  reported yet. Guard the nested field itself (`deviceMotion?.rotation && ...`),
+  not just `deviceMotion && ...` — an unguarded nested read throws, and in React
+  Native that throw can silently blank the screen with no visible error anywhere
+  (no LogBox redbox, no logcat exception).
 </Aside>
 
 <Aside type="tip" title="rotation.beta can read NaN near pitch ±90°">
-  An inherent Euler-angle gimbal-lock singularity in the platform's device-attitude math (the
-  same one `DeviceOrientationEvent.beta` has on the web) — not a bug in this package. Check
-  `Number.isNaN(...)` if you display it directly.
+  An inherent Euler-angle gimbal-lock singularity in the platform's
+  device-attitude math (the same one `DeviceOrientationEvent.beta` has on the
+  web) — not a bug in this package. Check `Number.isNaN(...)` if you display it
+  directly.
 </Aside>
 
 `LightSensor` is Android-only — `expo-sensors` ships no iOS light-sensor implementation, so

@@ -14,14 +14,16 @@ swipe gesture itself, built on `PanResponder` + `Animated` — not
 ever mounted at a time, exactly like Tab.
 
 <Aside type="caution">
-  Drawer reaches the same swipe-to-open/close and `front`/`back`/`slide`/`permanent` behavior
-  as `@react-navigation/drawer`, but not byte-for-byte parity with it. `PanResponder` +
-  `Animated` cover the gesture and the transform math; a few pieces of the real drawer's
-  surface are not ported: no `configureGestureHandler` escape hatch, no declarative
-  gesture-relationship composition against a nested `ScrollView` or another `PanResponder`, no
-  UI-thread `useDrawerProgress` `SharedValue` (`progress` here is a plain JS-thread value), and
-  `hideStatusBarOnOpen`/`keyboardDismissMode`/`statusBarAnimation`/`overlayStyle` are not wired
-  up. This is a deliberate scope boundary, not a bug.
+  Drawer reaches the same swipe-to-open/close and
+  `front`/`back`/`slide`/`permanent` behavior as `@react-navigation/drawer`, but
+  not byte-for-byte parity with it. `PanResponder` + `Animated` cover the
+  gesture and the transform math; a few pieces of the real drawer's surface are
+  not ported: no `configureGestureHandler` escape hatch, no declarative
+  gesture-relationship composition against a nested `ScrollView` or another
+  `PanResponder`, no UI-thread `useDrawerProgress` `SharedValue` (`progress`
+  here is a plain JS-thread value), and
+  `hideStatusBarOnOpen`/`keyboardDismissMode`/`statusBarAnimation`/`overlayStyle`
+  are not wired up. This is a deliberate scope boundary, not a bug.
 </Aside>
 
 ## Usage
@@ -67,6 +69,7 @@ Angular, a snippet in Svelte.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -93,6 +96,7 @@ Angular, a snippet in Svelte.
 
     `drawer-position`/`drawer-type` and their camelCase spellings are interchangeable in an SFC
     template — Vue's `attrs` normalizes either form the same way.
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -144,6 +148,7 @@ Angular, a snippet in Svelte.
     own navigation. `HomeScreen`/`SettingsScreen` (the actual `Drawer.Screen` content) read their
     own `route`/`navigation` with `injectRoute()`/`injectDrawerNavigation()` the same way
     [Stack's screens](/docs/navigation/stack/) do.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -181,6 +186,7 @@ Angular, a snippet in Svelte.
     `svelte-adapter-dom-shim` skill). `Drawer` reads `<DrawerScreen>` markers off a
     context-based collector rather than scanning `children` directly, the same registration
     mechanism [Stack's `<Screen>`](/docs/navigation/stack/) uses.
+
   </TabItem>
 </Tabs>
 
@@ -202,28 +208,28 @@ hook API.
 React, `expose()` in Vue, the `Drawer` class itself in Angular, the exported functions off
 `bind:this` in Svelte), identical across all four:
 
-| Method | Signature | Description |
-| --- | --- | --- |
-| `openDrawer` | `() => void` | Opens the drawer, animating the panel/content/overlay to their open positions |
-| `closeDrawer` | `() => void` | Closes the drawer, animating back to closed |
-| `toggleDrawer` | `() => void` | Opens if closed, closes if open |
-| `jumpTo` | `(name: string) => void` | Focuses the route named `name` and closes the drawer — selecting a destination IS the dismissal gesture. Unlike Tab's `jumpTo`, takes no `params` argument |
+| Method         | Signature                | Description                                                                                                                                                |
+| -------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `openDrawer`   | `() => void`             | Opens the drawer, animating the panel/content/overlay to their open positions                                                                              |
+| `closeDrawer`  | `() => void`             | Closes the drawer, animating back to closed                                                                                                                |
+| `toggleDrawer` | `() => void`             | Opens if closed, closes if open                                                                                                                            |
+| `jumpTo`       | `(name: string) => void` | Focuses the route named `name` and closes the drawer — selecting a destination IS the dismissal gesture. Unlike Tab's `jumpTo`, takes no `params` argument |
 
 ### Drawer options
 
 `IDrawerOptions` — passed as props/inputs on the navigator itself, there is no per-screen
 equivalent:
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `drawerType` | `'front' \| 'back' \| 'slide' \| 'permanent'` | `'front'` | Panel/content movement style — `front`: panel slides over static content; `back`: content slides to reveal a stationary panel; `slide`: both move together; `permanent`: static sidebar, no gesture/animation |
-| `drawerPosition` | `'left' \| 'right'` | `'left'` | Which screen edge the drawer opens from |
-| `drawerWidth` | `number` | `280` | Panel width in px |
-| `overlayColor` | `string` | `'rgba(0, 0, 0, 0.5)'` | Dimming overlay color (`front`/`slide` only) |
-| `swipeEnabled` | `boolean` | `true` | Enables edge-swipe-to-open and anywhere-swipe-to-close |
-| `swipeEdgeWidth` | `number` | `32` | How close to the position edge a closed-drawer swipe must start |
-| `swipeMinDistance` | `number` | `60` | Minimum drag distance to snap open/closed on release |
-| `swipeMinVelocity` | `number` (px/ms) | `0.5` (= 500px/s) | Minimum release velocity that snaps regardless of distance |
+| Option             | Type                                          | Default                | Description                                                                                                                                                                                                   |
+| ------------------ | --------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `drawerType`       | `'front' \| 'back' \| 'slide' \| 'permanent'` | `'front'`              | Panel/content movement style — `front`: panel slides over static content; `back`: content slides to reveal a stationary panel; `slide`: both move together; `permanent`: static sidebar, no gesture/animation |
+| `drawerPosition`   | `'left' \| 'right'`                           | `'left'`               | Which screen edge the drawer opens from                                                                                                                                                                       |
+| `drawerWidth`      | `number`                                      | `280`                  | Panel width in px                                                                                                                                                                                             |
+| `overlayColor`     | `string`                                      | `'rgba(0, 0, 0, 0.5)'` | Dimming overlay color (`front`/`slide` only)                                                                                                                                                                  |
+| `swipeEnabled`     | `boolean`                                     | `true`                 | Enables edge-swipe-to-open and anywhere-swipe-to-close                                                                                                                                                        |
+| `swipeEdgeWidth`   | `number`                                      | `32`                   | How close to the position edge a closed-drawer swipe must start                                                                                                                                               |
+| `swipeMinDistance` | `number`                                      | `60`                   | Minimum drag distance to snap open/closed on release                                                                                                                                                          |
+| `swipeMinVelocity` | `number` (px/ms)                              | `0.5` (= 500px/s)      | Minimum release velocity that snaps regardless of distance                                                                                                                                                    |
 
 ### Screen options
 
@@ -231,10 +237,10 @@ equivalent:
 ships no built-in menu UI, so these fields exist purely for your own custom drawer-content UI
 to read off the descriptor map below.
 
-| Option | Type | Description |
-| --- | --- | --- |
-| `title` | `string` | Fallback label for your own custom drawer content to fall back to |
-| `drawerLabel` | `string` | Explicit label for your own custom drawer content to display |
+| Option        | Type     | Description                                                       |
+| ------------- | -------- | ----------------------------------------------------------------- |
+| `title`       | `string` | Fallback label for your own custom drawer content to fall back to |
+| `drawerLabel` | `string` | Explicit label for your own custom drawer content to display      |
 
 ### Custom drawer content
 
@@ -260,12 +266,12 @@ type IDrawerDescriptorMap = Record<
 How you supply the content differs by framework, matching each one's own idiom for
 "caller-supplied UI that needs live data":
 
-| Framework | Mechanism | Description |
-| --- | --- | --- |
-| React | `renderDrawerContent` render prop | A `(props) => ReactNode` function passed directly to `<Drawer>` |
-| Vue | `drawerContent` scoped slot | `<template #drawerContent="{ state, descriptors, navigation }">` in SFC, or a `{ drawerContent: (props) => ... }` slots object in TSX |
-| Angular | `TemplateRef` via `@ContentChild` | A projected `<ng-template #drawerContent let-ctx>` — the ref variable name **must** be exactly `drawerContent`, read via `@ContentChild('drawerContent', { read: TemplateRef })` |
-| Svelte | `drawerContent` Snippet prop | `{#snippet drawerContent(slot: IDrawerContentSlotProps)}...{/snippet}` passed as the `drawerContent` prop on `<Drawer>` |
+| Framework | Mechanism                         | Description                                                                                                                                                                      |
+| --------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| React     | `renderDrawerContent` render prop | A `(props) => ReactNode` function passed directly to `<Drawer>`                                                                                                                  |
+| Vue       | `drawerContent` scoped slot       | `<template #drawerContent="{ state, descriptors, navigation }">` in SFC, or a `{ drawerContent: (props) => ... }` slots object in TSX                                            |
+| Angular   | `TemplateRef` via `@ContentChild` | A projected `<ng-template #drawerContent let-ctx>` — the ref variable name **must** be exactly `drawerContent`, read via `@ContentChild('drawerContent', { read: TemplateRef })` |
+| Svelte    | `drawerContent` Snippet prop      | `{#snippet drawerContent(slot: IDrawerContentSlotProps)}...{/snippet}` passed as the `drawerContent` prop on `<Drawer>`                                                          |
 
 If you skip the render prop/slot/template entirely, the panel slot renders empty — Drawer never
 falls back to a default menu.

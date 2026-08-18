@@ -23,11 +23,11 @@ the React, Vue, Angular, and Svelte entry points are plain re-exports of the sam
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -75,6 +75,7 @@ holds live state or a subscription.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -100,6 +101,7 @@ holds live state or a subscription.
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -132,6 +134,7 @@ holds live state or a subscription.
     There's no per-instance service to `inject()` here — `webCrypto` and `polyfillWebCrypto` are
     plain exports off the core package, read straight in the constructor or class-field
     initializer.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -152,6 +155,7 @@ holds live state or a subscription.
 
     <View><Text>{hex || 'generating…'}</Text></View>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -159,25 +163,26 @@ holds live state or a subscription.
 
 ### `webCrypto` / `polyfillWebCrypto()`
 
-| Signature | Description |
-| --- | --- |
-| `webCrypto: IWebCrypto` (default export) | The resolved Web Crypto object — either the real `globalThis.crypto` if one already exists, or this package's own polyfill instance backed by `@symbiote-native/crypto` |
+| Signature                                                                           | Description                                                                                                                                                                                                                                                             |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `webCrypto: IWebCrypto` (default export)                                            | The resolved Web Crypto object — either the real `globalThis.crypto` if one already exists, or this package's own polyfill instance backed by `@symbiote-native/crypto`                                                                                                 |
 | `webCrypto.getRandomValues<TArray extends ArrayBufferView>(values: TArray): TArray` | Fills `values` with cryptographically random numbers in place and returns it. Throws a `TypeError` if `values` isn't one of the integer TypedArrays `@symbiote-native/crypto` supports (`Int8Array`/`Uint8Array`/`Int16Array`/`Uint16Array`/`Int32Array`/`Uint32Array`) |
-| `polyfillWebCrypto(): void` | Installs `webCrypto` as `globalThis.crypto` via a getter, for any library that expects the Web Crypto API to already be present. A no-op if `globalThis.crypto` is already defined — it never overwrites an existing implementation |
+| `polyfillWebCrypto(): void`                                                         | Installs `webCrypto` as `globalThis.crypto` via a getter, for any library that expects the Web Crypto API to already be present. A no-op if `globalThis.crypto` is already defined — it never overwrites an existing implementation                                     |
 
 ### `IWebCrypto`
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field             | Type                                                         | Description                                                                                            |
+| ----------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | `getRandomValues` | `<TArray extends ArrayBufferView>(values: TArray) => TArray` | The one method this partial polyfill implements, matching the shape of the real DOM `Crypto` interface |
 
 ## Notes
 
 <Aside type="note" title="webCrypto is resolved once, at module-load time">
-  If `globalThis.crypto` already exists when this module first loads (a real Web Crypto
-  implementation), `webCrypto` *is* that object; otherwise it's this package's own `Crypto` class
-  instance backed by `@symbiote-native/crypto`. React Native has no reliable `window` global, so
-  this port checks/defines `globalThis.crypto` rather than upstream's `window.crypto`.
+  If `globalThis.crypto` already exists when this module first loads (a real Web
+  Crypto implementation), `webCrypto` *is* that object; otherwise it's this
+  package's own `Crypto` class instance backed by `@symbiote-native/crypto`.
+  React Native has no reliable `window` global, so this port checks/defines
+  `globalThis.crypto` rather than upstream's `window.crypto`.
 </Aside>
 
 `getRandomValues` only accepts the integer TypedArrays `@symbiote-native/crypto` can hand to its

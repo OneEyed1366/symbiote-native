@@ -18,16 +18,17 @@ subscription, `addClipboardListener`.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 <Aside type="caution" title="The URL functions are iOS-only">
-  `getUrlAsync`, `setUrlAsync`, and `hasUrlAsync` exist only on iOS — `expo-clipboard` ships no
-  Android implementation for URL-typed clipboard content. Text, image, and the change listener
-  work identically on both platforms.
+  `getUrlAsync`, `setUrlAsync`, and `hasUrlAsync` exist only on iOS —
+  `expo-clipboard` ships no Android implementation for URL-typed clipboard
+  content. Text, image, and the change listener work identically on both
+  platforms.
 </Aside>
 
 ## Installation
@@ -41,12 +42,14 @@ versions — never install either yourself, and never add the `expo` meta-packag
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-clipboard`'s native code is discovered by `expo-modules-autolinking`, a different
-  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
-  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
-  installs the `expo` meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every future `expo-modules-core` package with zero further native changes.
+  `expo-clipboard`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every future `expo-modules-core` package with zero further
+  native changes.
 </Aside>
 
 ## Usage
@@ -84,6 +87,7 @@ hook/composable/service in the way:
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -111,6 +115,7 @@ hook/composable/service in the way:
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -145,6 +150,7 @@ hook/composable/service in the way:
 
     There's no per-instance service to `inject()` here — every one-shot function is a plain free
     function off the core package, same as `@symbiote-native/local-auth`.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -173,6 +179,7 @@ hook/composable/service in the way:
 
     There's no per-instance rune to reach for here either — every one-shot function is a plain
     free function off the core package, same as `@symbiote-native/local-auth`.
+
   </TabItem>
 </Tabs>
 
@@ -193,6 +200,7 @@ its own mount/unmount lifecycle so you don't manage the subscription by hand:
       return <Text>{clipboardEvent && `content types: ${clipboardEvent.contentTypes.join(', ')}`}</Text>;
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -206,6 +214,7 @@ its own mount/unmount lifecycle so you don't manage the subscription by hand:
       <Text>{{ clipboardEvent && `content types: ${clipboardEvent.contentTypes.join(', ')}` }}</Text>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -222,6 +231,7 @@ its own mount/unmount lifecycle so you don't manage the subscription by hand:
       readonly clipboardEvent = inject(ClipboardService).connect();
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -234,6 +244,7 @@ its own mount/unmount lifecycle so you don't manage the subscription by hand:
 
     <Text>{clipboardEvent.current && `content types: ${clipboardEvent.current.contentTypes.join(', ')}`}</Text>
     ```
+
   </TabItem>
 </Tabs>
 
@@ -241,59 +252,59 @@ its own mount/unmount lifecycle so you don't manage the subscription by hand:
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `getStringAsync(options?: IGetStringOptions): Promise<string>` | Reads the clipboard's text content; resolves an empty string if the clipboard is empty or (iOS 16+) paste permission was denied |
-| `setStringAsync(text: string, options?: ISetStringOptions): Promise<boolean>` | Writes a string to the clipboard; resolves `true` once saved |
-| `hasStringAsync(): Promise<boolean>` | Whether the clipboard has text content, plain or rich (e.g. HTML) |
-| `getUrlAsync(): Promise<string \| null>` | Reads the clipboard's URL content, or `null` if there is none. `@platform ios` |
-| `setUrlAsync(url: string): Promise<void>` | Writes a URL to the clipboard, marking its content type as a URL. `@platform ios` |
-| `hasUrlAsync(): Promise<boolean>` | Whether the clipboard has URL content. `@platform ios` |
-| `getImageAsync(options: IGetImageOptions): Promise<IClipboardImage \| null>` | Reads the clipboard's image content in the requested format, or `null` if there is none |
-| `setImageAsync(base64Image: string): Promise<void>` | Writes a base64-encoded image (no MIME prefix) to the clipboard |
-| `hasImageAsync(): Promise<boolean>` | Whether the clipboard has image content |
+| Signature                                                                             | Description                                                                                                                                                           |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getStringAsync(options?: IGetStringOptions): Promise<string>`                        | Reads the clipboard's text content; resolves an empty string if the clipboard is empty or (iOS 16+) paste permission was denied                                       |
+| `setStringAsync(text: string, options?: ISetStringOptions): Promise<boolean>`         | Writes a string to the clipboard; resolves `true` once saved                                                                                                          |
+| `hasStringAsync(): Promise<boolean>`                                                  | Whether the clipboard has text content, plain or rich (e.g. HTML)                                                                                                     |
+| `getUrlAsync(): Promise<string \| null>`                                              | Reads the clipboard's URL content, or `null` if there is none. `@platform ios`                                                                                        |
+| `setUrlAsync(url: string): Promise<void>`                                             | Writes a URL to the clipboard, marking its content type as a URL. `@platform ios`                                                                                     |
+| `hasUrlAsync(): Promise<boolean>`                                                     | Whether the clipboard has URL content. `@platform ios`                                                                                                                |
+| `getImageAsync(options: IGetImageOptions): Promise<IClipboardImage \| null>`          | Reads the clipboard's image content in the requested format, or `null` if there is none                                                                               |
+| `setImageAsync(base64Image: string): Promise<void>`                                   | Writes a base64-encoded image (no MIME prefix) to the clipboard                                                                                                       |
+| `hasImageAsync(): Promise<boolean>`                                                   | Whether the clipboard has image content                                                                                                                               |
 | `addClipboardListener(listener: (event: IClipboardEvent) => void): EventSubscription` | Subscribes to clipboard-content changes; call `.remove()` on the returned subscription to unsubscribe. The primitive `useClipboard`/`ClipboardService.connect()` wrap |
-| `removeClipboardListener(subscription: EventSubscription): void` | *Deprecated* — call `subscription.remove()` instead |
+| `removeClipboardListener(subscription: EventSubscription): void`                      | _Deprecated_ — call `subscription.remove()` instead                                                                                                                   |
 
 ### `IGetStringOptions` / `ISetStringOptions`
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `preferredFormat` *(get)* | `StringFormat` | `StringFormat.PLAIN_TEXT` | The target format to convert the clipboard string to, if possible |
-| `inputFormat` *(set)* | `StringFormat` | `StringFormat.PLAIN_TEXT` | The format of the string being written, so other applications can interpret the copied content correctly |
+| Field                     | Type           | Default                   | Description                                                                                              |
+| ------------------------- | -------------- | ------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `preferredFormat` _(get)_ | `StringFormat` | `StringFormat.PLAIN_TEXT` | The target format to convert the clipboard string to, if possible                                        |
+| `inputFormat` _(set)_     | `StringFormat` | `StringFormat.PLAIN_TEXT` | The format of the string being written, so other applications can interpret the copied content correctly |
 
 ### `IGetImageOptions`
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `format` | `'png' \| 'jpeg'` | — | The format to convert the clipboard image to |
-| `jpegQuality` | `number` | `1` | Quality between `0` and `1`; only applies when `format` is `'jpeg'` |
+| Field         | Type              | Default | Description                                                         |
+| ------------- | ----------------- | ------- | ------------------------------------------------------------------- |
+| `format`      | `'png' \| 'jpeg'` | —       | The format to convert the clipboard image to                        |
+| `jpegQuality` | `number`          | `1`     | Quality between `0` and `1`; only applies when `format` is `'jpeg'` |
 
 ### `IClipboardImage`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `data` | `string` | Base64-encoded image data, already prefixed with `data:image/png;base64,` or `data:image/jpeg;base64,` depending on the requested format |
-| `size` | `{ width: number; height: number }` | Dimensions of the pasted image |
+| Field  | Type                                | Description                                                                                                                              |
+| ------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `data` | `string`                            | Base64-encoded image data, already prefixed with `data:image/png;base64,` or `data:image/jpeg;base64,` depending on the requested format |
+| `size` | `{ width: number; height: number }` | Dimensions of the pasted image                                                                                                           |
 
 ### `IClipboardEvent`
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field          | Type            | Description                                            |
+| -------------- | --------------- | ------------------------------------------------------ |
 | `contentTypes` | `ContentType[]` | The content types currently available on the clipboard |
 
 ### `ContentType` / `StringFormat`
 
-| Enum | Members | Description |
-| --- | --- | --- |
-| `ContentType` | `PLAIN_TEXT`, `HTML`, `IMAGE`, `URL` *(`@platform ios`)* | What kind of data the clipboard currently holds |
-| `StringFormat` | `PLAIN_TEXT`, `HTML` | The string encoding to read/write clipboard text as |
+| Enum           | Members                                                  | Description                                         |
+| -------------- | -------------------------------------------------------- | --------------------------------------------------- |
+| `ContentType`  | `PLAIN_TEXT`, `HTML`, `IMAGE`, `URL` _(`@platform ios`)_ | What kind of data the clipboard currently holds     |
+| `StringFormat` | `PLAIN_TEXT`, `HTML`                                     | The string encoding to read/write clipboard text as |
 
 ### `useClipboard` / `ClipboardService.connect()`
 
-| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Signature | Returns |
-| --- | --- | --- | --- | --- |
-| `useClipboard` | `useClipboard` | `ClipboardService.connect()` | `()` — no config, always subscribes | React/Vue: live `IClipboardEvent \| null` directly; Angular: `Signal<IClipboardEvent \| null>` |
+| React (`/react`) | Vue (`/vue`)   | Angular (`/angular`)         | Signature                           | Returns                                                                                        |
+| ---------------- | -------------- | ---------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `useClipboard`   | `useClipboard` | `ClipboardService.connect()` | `()` — no config, always subscribes | React/Vue: live `IClipboardEvent \| null` directly; Angular: `Signal<IClipboardEvent \| null>` |
 
 Every variant returns `null` until the clipboard changes at least once after mount — there's no
 initial read of whatever's already on the clipboard, only new changes going forward.
@@ -306,14 +317,14 @@ initial read of whatever's already on the clipboard, only new changes going forw
   `useClipboard` is still `null` when the user comes back. Read the clipboard explicitly on resume
   if you need what happened while you were away.
 - **`hasStringAsync`/`hasImageAsync` do not trigger Android 12+'s "pasted from clipboard" toast;
-  the getters do.** The `has*` calls inspect only the clip *description*, while `getStringAsync`/
+  the getters do.** The `has*` calls inspect only the clip _description_, while `getStringAsync`/
   `getImageAsync` read the clip itself. Probe with `has*Async` when all you need is whether
   something is there to paste.
 - **Android never reports a `url` content type.** The Android module's own content-type enum has
   only `plain-text`, `html` and `image`, so `IClipboardEvent.contentTypes` can carry `'url'` on iOS
   alone — the same split as the iOS-only URL functions.
 - **`plain-text` is reported for HTML-only content on both platforms.** iOS marks `plain-text`
-  available when the pasteboard has strings *or* HTML; Android's text check matches both the
+  available when the pasteboard has strings _or_ HTML; Android's text check matches both the
   plain-text and HTML MIME types. Seeing `plain-text` in an event does not mean the content was
   copied as plain text — check for `html` first if the distinction matters.
 

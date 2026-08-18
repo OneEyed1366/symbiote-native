@@ -19,22 +19,28 @@ Svelte entry points are plain re-exports of the same `core`.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
-<Aside type="caution" title="Deliberate deviation from upstream — no expo-constants dependency">
-  Upstream's `storeUrl()` reads `Constants.expoConfig.ios.appStoreUrl`/`.android.playStoreUrl` off
-  `expo-constants`, which requires an Expo-CLI-generated manifest (`app.config`/EAS/updates) that
-  this bare, Metro-only project never produces — this repo doesn't run the Expo CLI at all, so
-  there is no manifest for `expo-constants` to read. This port trims that surface instead: every
-  function that would have read the manifest takes an optional `IStoreReviewUrlOptions` argument
-  (`iosAppStoreUrl` / `androidPlayStoreUrl`), and the caller supplies the store URL explicitly
-  rather than it being resolved from `app.json`/`app.config.js`. There is no standalone
-  `storeUrl()` export — its logic lives inline as a private helper, since every public function now
-  takes the same options argument.
+<Aside
+  type="caution"
+  title="Deliberate deviation from upstream — no expo-constants dependency"
+>
+  Upstream's `storeUrl()` reads
+  `Constants.expoConfig.ios.appStoreUrl`/`.android.playStoreUrl` off
+  `expo-constants`, which requires an Expo-CLI-generated manifest
+  (`app.config`/EAS/updates) that this bare, Metro-only project never produces —
+  this repo doesn't run the Expo CLI at all, so there is no manifest for
+  `expo-constants` to read. This port trims that surface instead: every function
+  that would have read the manifest takes an optional `IStoreReviewUrlOptions`
+  argument (`iosAppStoreUrl` / `androidPlayStoreUrl`), and the caller supplies
+  the store URL explicitly rather than it being resolved from
+  `app.json`/`app.config.js`. There is no standalone `storeUrl()` export — its
+  logic lives inline as a private helper, since every public function now takes
+  the same options argument.
 </Aside>
 
 ## Installation
@@ -48,12 +54,14 @@ versions — never install either yourself, and never add the `expo` meta-packag
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-store-review`'s native code is discovered by `expo-modules-autolinking`, a different
-  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
-  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
-  installs the `expo` meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every other `expo-modules-core` package with zero further native changes.
+  `expo-store-review`'s native code is discovered by `expo-modules-autolinking`,
+  a different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every other `expo-modules-core` package with zero further
+  native changes.
 </Aside>
 
 `expo-store-review` needs no runtime permission on either platform.
@@ -84,6 +92,7 @@ subscription.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -103,6 +112,7 @@ subscription.
       <Button title="Rate this app" @press="onRatePress" />
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -127,6 +137,7 @@ subscription.
 
     There's no per-instance service to `inject()` here — every function is a plain export off the
     core package, called straight from a template event binding.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -144,6 +155,7 @@ subscription.
 
     <Button title="Rate this app" onPress={onRatePress} />
     ```
+
   </TabItem>
 </Tabs>
 
@@ -151,18 +163,18 @@ subscription.
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `isAvailableAsync(): Promise<boolean>` | Whether the platform has the capabilities to use `requestReview()`'s native flow. iOS resolves `true` unless the app is distributed through TestFlight; Android resolves `true` when the Play Store app is installed |
-| `requestReview(options?: IStoreReviewUrlOptions): Promise<void>` | Opens a native modal letting the user pick a star rating without leaving the app, when the native flow is available. Otherwise falls back to opening the store URL supplied via `options` through `Linking` |
-| `hasAction(options?: IStoreReviewUrlOptions): Promise<boolean>` | Whether `requestReview()` is capable of directing the user to some kind of store review flow — either the native flow is available, or a store URL was supplied via `options` |
+| Signature                                                        | Description                                                                                                                                                                                                          |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isAvailableAsync(): Promise<boolean>`                           | Whether the platform has the capabilities to use `requestReview()`'s native flow. iOS resolves `true` unless the app is distributed through TestFlight; Android resolves `true` when the Play Store app is installed |
+| `requestReview(options?: IStoreReviewUrlOptions): Promise<void>` | Opens a native modal letting the user pick a star rating without leaving the app, when the native flow is available. Otherwise falls back to opening the store URL supplied via `options` through `Linking`          |
+| `hasAction(options?: IStoreReviewUrlOptions): Promise<boolean>`  | Whether `requestReview()` is capable of directing the user to some kind of store review flow — either the native flow is available, or a store URL was supplied via `options`                                        |
 
 ### `IStoreReviewUrlOptions`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `iosAppStoreUrl` | `string \| undefined` | The App Store URL to open as a fallback on iOS when the native review flow is unavailable (e.g. TestFlight builds) |
-| `androidPlayStoreUrl` | `string \| undefined` | The Play Store URL to open as a fallback on Android when the native flow is unavailable (e.g. below Android 5.0) |
+| Field                 | Type                  | Description                                                                                                        |
+| --------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `iosAppStoreUrl`      | `string \| undefined` | The App Store URL to open as a fallback on iOS when the native review flow is unavailable (e.g. TestFlight builds) |
+| `androidPlayStoreUrl` | `string \| undefined` | The Play Store URL to open as a fallback on Android when the native flow is unavailable (e.g. below Android 5.0)   |
 
 ## Notes
 

@@ -31,6 +31,7 @@ stay callback inputs (see the caveat below).
     <TextInput v-model="name" />
     <Pressable @press="count++" />
     ```
+
   </TabItem>
   <TabItem label="Angular">
     Angular uses real `@Output()` `EventEmitter`s everywhere, including `Switch` and
@@ -43,6 +44,7 @@ stay callback inputs (see the caveat below).
       <Pressable (press)="count = count + 1" />
     `
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     Svelte receives the same native event object shape as React — props pass through
@@ -53,22 +55,22 @@ stay callback inputs (see the caveat below).
     <TextInput value={name} onValueChange={next => (name = next)} />
     <Pressable onPress={() => (count += 1)} />
     ```
+
   </TabItem>
 </Tabs>
 
 The payload is the same concept. The public API is framework-shaped.
 
 <Aside type="caution" title="Scroll events stay callback inputs">
-  The scroll-family events (`onScroll`, `onScrollBeginDrag`,
-  `onScrollEndDrag`, `onMomentumScrollBegin`, `onMomentumScrollEnd`) are the
-  one **permanent** exception to Angular's `@Output()` migration, on
-  `ScrollView` and the list components. They stay plain callback
-  `@Input()`s — `[onScroll]="handler"` — because RN's scroll callbacks can
-  carry either a plain function or the return value of `Animated.event(...)`,
-  a native-driver marker for native-driven scroll animations, and
-  `@Output()` can only bind a template listener expression, not an arbitrary
-  value. See the [Angular API reference](/docs/api/angular/) for the exact
-  split.
+  The scroll-family events (`onScroll`, `onScrollBeginDrag`, `onScrollEndDrag`,
+  `onMomentumScrollBegin`, `onMomentumScrollEnd`) are the one **permanent**
+  exception to Angular's `@Output()` migration, on `ScrollView` and the list
+  components. They stay plain callback `@Input()`s — `[onScroll]="handler"` —
+  because RN's scroll callbacks can carry either a plain function or the return
+  value of `Animated.event(...)`, a native-driver marker for native-driven
+  scroll animations, and `@Output()` can only bind a template listener
+  expression, not an arbitrary value. See the [Angular API
+  reference](/docs/api/angular/) for the exact split.
 </Aside>
 
 ## Passthrough events vs adapter events
@@ -79,12 +81,12 @@ actually consumes and re-emits them.
 
 Other events are adapter-level conveniences. Examples:
 
-| Concept             | React                          | Vue                                | Angular                      | Svelte                        |
-| ------------------- | ------------------------------- | ------------------------------------ | ------------------------------ | ------------------------------ |
-| Press               | `onPress`                       | `@press`                           | `(press)`                     | `onPress`                      |
-| Switch value        | `onValueChange(value, event)`   | `@value-change`<br />or `v-model`  | `(valueChange)` (value only)  | `onValueChange(value, event)` |
-| Text input text     | `onValueChange(text, event)`    | `@value-change`<br />or `v-model`  | `(valueChange)` (text only)   | `onValueChange(text, event)`  |
-| Text input raw event | *(same callback, 2nd arg)*     | *(same emit, 2nd arg)*             | `(change)` (separate output)  | *(same callback, 2nd arg)*    |
+| Concept              | React                         | Vue                               | Angular                      | Svelte                        |
+| -------------------- | ----------------------------- | --------------------------------- | ---------------------------- | ----------------------------- |
+| Press                | `onPress`                     | `@press`                          | `(press)`                    | `onPress`                     |
+| Switch value         | `onValueChange(value, event)` | `@value-change`<br />or `v-model` | `(valueChange)` (value only) | `onValueChange(value, event)` |
+| Text input text      | `onValueChange(text, event)`  | `@value-change`<br />or `v-model` | `(valueChange)` (text only)  | `onValueChange(text, event)`  |
+| Text input raw event | _(same callback, 2nd arg)_    | _(same emit, 2nd arg)_            | `(change)` (separate output) | _(same callback, 2nd arg)_    |
 
 React, Vue, and Svelte merged `TextInput`'s old `onChangeText`/`onChange` pair
 into one `onValueChange(text, event)` callback — there's only ever one

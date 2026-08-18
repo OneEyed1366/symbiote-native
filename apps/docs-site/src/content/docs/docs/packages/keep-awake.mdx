@@ -20,11 +20,11 @@ four adapters.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
 
 ## Installation
 
@@ -37,12 +37,14 @@ versions — never install either yourself, and never add the `expo` meta-packag
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-keep-awake`'s native code is discovered by `expo-modules-autolinking`, a different
-  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
-  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
-  installs the `expo` meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every other `expo-modules-core` package with zero further native changes.
+  `expo-keep-awake`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every other `expo-modules-core` package with zero further
+  native changes.
 </Aside>
 
 No platform permission string is needed — keeping the screen awake has no runtime permission
@@ -67,6 +69,7 @@ way to use this package.
       return <Text>Screen will not sleep</Text>;
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -80,6 +83,7 @@ way to use this package.
       <Text>Screen will not sleep</Text>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -102,6 +106,7 @@ way to use this package.
     `KeepAwakeService.connect()` has no return value — it's a pure side effect for the component's
     lifetime, wired through Angular's `effect()` so activation/deactivation follows the same
     mount/cleanup timing as React's `useEffect`/Vue's `onMounted`/`onUnmounted`.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -117,6 +122,7 @@ way to use this package.
 
     `useKeepAwake` has no return value here either — it's a pure `$effect` side effect wired to
     the component's mount/unmount, same as Vue's `onMounted`/`onUnmounted` pair.
+
   </TabItem>
 </Tabs>
 
@@ -141,6 +147,7 @@ mount/unmount lifecycle above.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -153,6 +160,7 @@ mount/unmount lifecycle above.
       <Button title="Allow sleep" @press="deactivateKeepAwake('download-tag')" />
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -173,6 +181,7 @@ mount/unmount lifecycle above.
       protected readonly deactivateKeepAwake = deactivateKeepAwake;
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -184,6 +193,7 @@ mount/unmount lifecycle above.
     <Button title="Keep awake" onPress={() => activateKeepAwakeAsync('download-tag')} />
     <Button title="Allow sleep" onPress={() => deactivateKeepAwake('download-tag')} />
     ```
+
   </TabItem>
 </Tabs>
 
@@ -191,45 +201,49 @@ mount/unmount lifecycle above.
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `isAvailableAsync(): Promise<boolean>` | Resolves whether the keep-awake API is available on this device |
-| `activateKeepAwakeAsync(tag?: string): Promise<void>` | Activates a keep-awake lock under `tag` (the shared default tag when none is given) — the screen stays on for as long as any tag holds an active lock |
-| `deactivateKeepAwake(tag?: string): Promise<void>` | Releases the keep-awake lock held under `tag` (the shared default tag when none is given) |
+| Signature                                                                                                  | Description                                                                                                                                                        |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `isAvailableAsync(): Promise<boolean>`                                                                     | Resolves whether the keep-awake API is available on this device                                                                                                    |
+| `activateKeepAwakeAsync(tag?: string): Promise<void>`                                                      | Activates a keep-awake lock under `tag` (the shared default tag when none is given) — the screen stays on for as long as any tag holds an active lock              |
+| `deactivateKeepAwake(tag?: string): Promise<void>`                                                         | Releases the keep-awake lock held under `tag` (the shared default tag when none is given)                                                                          |
 | `addListener(tagOrListener: string \| KeepAwakeListener, listener?: KeepAwakeListener): EventSubscription` | Subscribes to keep-awake state changes for a tag — overloaded to accept a bare listener for the default tag. Throws if the native module lacks `addListenerForTag` |
 
 Plus the `ExpoKeepAwakeTag` constant (the shared default tag string, `'ExpoKeepAwakeDefaultTag'`).
 
 ### `useKeepAwake()` config
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `tag` (first argument) | `string \| undefined` | a per-instance auto-generated tag | The lock tag to activate/deactivate. React derives its default from `useId()`; Vue, Angular, and Svelte fall back to a monotonically-incrementing module-local counter (`keep-awake-tag-1`, `keep-awake-tag-2`, …), since none of them has a `useId` equivalent |
-| `options` (second argument) | `KeepAwakeOptions \| undefined` | `undefined` | `{ listener?, suppressDeactivateWarnings? }` — see below |
+| Field                       | Type                            | Default                           | Description                                                                                                                                                                                                                                                     |
+| --------------------------- | ------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tag` (first argument)      | `string \| undefined`           | a per-instance auto-generated tag | The lock tag to activate/deactivate. React derives its default from `useId()`; Vue, Angular, and Svelte fall back to a monotonically-incrementing module-local counter (`keep-awake-tag-1`, `keep-awake-tag-2`, …), since none of them has a `useId` equivalent |
+| `options` (second argument) | `KeepAwakeOptions \| undefined` | `undefined`                       | `{ listener?, suppressDeactivateWarnings? }` — see below                                                                                                                                                                                                        |
 
 ### `KeepAwakeOptions`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `listener` | `KeepAwakeListener \| undefined` | Registered via `addListener` once activation resolves, for keep-awake state-change notifications |
-| `suppressDeactivateWarnings` | `boolean \| undefined` | When `true`, a rejected `deactivateKeepAwake()` call on unmount is silently swallowed instead of surfacing as an unhandled rejection |
+| Field                        | Type                             | Description                                                                                                                          |
+| ---------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `listener`                   | `KeepAwakeListener \| undefined` | Registered via `addListener` once activation resolves, for keep-awake state-change notifications                                     |
+| `suppressDeactivateWarnings` | `boolean \| undefined`           | When `true`, a rejected `deactivateKeepAwake()` call on unmount is silently swallowed instead of surfacing as an unhandled rejection |
 
 ### `KeepAwakeEvent` / `KeepAwakeListener`
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field   | Type      | Description                                                                                                                                                                  |
+| ------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `state` | `unknown` | Kept as a minimal placeholder — upstream's own `state` shape is a web-only `WakeLockSentinel`-derived value with no native analogue, and native listeners for it rarely fire |
 
 `KeepAwakeListener` is `(event: KeepAwakeEvent) => void`.
 
 ## Notes
 
-<Aside type="note" title="React/Vue/Angular/Svelte have no shared default-tag mechanism">
-  React uses `useId()` for its default per-instance tag, matching upstream exactly, so two
-  components calling `useKeepAwake()` concurrently without an explicit tag don't clobber each
-  other's activation/deactivation. Vue, Angular, and Svelte have no `useId` equivalent, so all
-  three fall back to a small monotonically-incrementing module-local counter instead —
-  functionally equivalent, just not identical string values across adapters.
+<Aside
+  type="note"
+  title="React/Vue/Angular/Svelte have no shared default-tag mechanism"
+>
+  React uses `useId()` for its default per-instance tag, matching upstream
+  exactly, so two components calling `useKeepAwake()` concurrently without an
+  explicit tag don't clobber each other's activation/deactivation. Vue, Angular,
+  and Svelte have no `useId` equivalent, so all three fall back to a small
+  monotonically-incrementing module-local counter instead — functionally
+  equivalent, just not identical string values across adapters.
 </Aside>
 
 ## How the wrapper works
