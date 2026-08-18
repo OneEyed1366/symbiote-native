@@ -176,7 +176,11 @@
    hue stays untouched — that's a severity signal, not a brand color */
 .starlight-aside {
   border-radius: var(--radius);
-  background-color: color-mix(in srgb, var(--sl-color-asides-border) 12%, var(--surface));
+  background-color: color-mix(
+    in srgb,
+    var(--sl-color-asides-border) 12%,
+    var(--surface)
+  );
 }
 
 .starlight-aside__title {

@@ -14,7 +14,9 @@ body {
   margin: 0;
   font-family: var(--font-body);
   color: var(--core-text);
-  background: radial-gradient(120% 80% at 78% -12%, var(--glow), transparent 58%), var(--core-bg);
+  background:
+    radial-gradient(120% 80% at 78% -12%, var(--glow), transparent 58%),
+    var(--core-bg);
   transition:
     background-color var(--bond-ms) ease,
     color var(--bond-ms) ease;
