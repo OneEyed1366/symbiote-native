@@ -1,0 +1,85 @@
+{
+  "name": "@symbiote-native/solid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SymbioteNative's Solid adapter — a solid-js/universal createRenderer driving real native iOS/Android views through the same engine as every other adapter.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
+    "directory": "adapters/solid"
+  },
+  "homepage": "https://github.com/OneEyed1366/symbiote-native/tree/master/adapters/solid#readme",
+  "bugs": {
+    "url": "https://github.com/OneEyed1366/symbiote-native/issues"
+  },
+  "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "type": "module",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./bootstrap": "./src/bootstrap.ts",
+    "./renderer": "./src/renderer.ts",
+    "./jsx-runtime": "./src/jsx-runtime.ts",
+    "./jsx-dev-runtime": "./src/jsx-runtime.ts",
+    "./babel-preset": "./babel-preset.cjs",
+    "./metro-css-parser": "./metro-css-parser.cjs"
+  },
+  "files": [
+    "build",
+    "babel-preset.cjs",
+    "metro-css-parser.cjs"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./build/index.js",
+    "module": "./build/index.js",
+    "types": "./build/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      },
+      "./bootstrap": {
+        "types": "./build/bootstrap.d.ts",
+        "default": "./build/bootstrap.js"
+      },
+      "./renderer": {
+        "types": "./build/renderer.d.ts",
+        "default": "./build/renderer.js"
+      },
+      "./jsx-runtime": {
+        "types": "./build/jsx-runtime.d.ts",
+        "default": "./build/jsx-runtime.js"
+      },
+      "./jsx-dev-runtime": {
+        "types": "./build/jsx-runtime.d.ts",
+        "default": "./build/jsx-runtime.js"
+      },
+      "./babel-preset": "./babel-preset.cjs",
+      "./metro-css-parser": "./metro-css-parser.cjs"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --build",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "@symbiote-native/components": "workspace:*",
+    "@symbiote-native/css-parser": "workspace:*",
+    "babel-preset-solid": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "@symbiote-native/engine": ">=0.1.7",
+    "solid-js": ">=1.9.0",
+    "react-native": ">=0.86"
+  },
+  "devDependencies": {
+    "@symbiote-native/engine": "workspace:*",
+    "@symbiote-native/test-utils": "workspace:*",
+    "solid-js": "catalog:"
+  }
+}
