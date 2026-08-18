@@ -3,13 +3,21 @@
   pushing its own dedicated demo screen onto the same root Stack. Replaces Canary as the initial
   route; Canary itself is unchanged (just relocated) and reachable from the first row.
 
-  Rows are grouped into 5 thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
+  Rows are grouped into 6 thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
   2-letter badge per line, carried through onto each demo screen's own line tag — so the tour
-  reads as one system instead of a flat bag of unrelated test screens. Vue SFC twin of
-  .examples/react/screens/MenuScreen.tsx.
+  reads as one system instead of a flat bag of unrelated test screens. Five of the lines are
+  @symbiote-native/navigation itself; the sixth (Composition, the API Playground row) is Vue's own
+  template/API surface — no navigation package involved, still wearing the same wayfinding
+  language. Vue SFC twin of .examples/react/screens/MenuScreen.tsx.
 -->
 <script setup lang="ts">
-import { Pressable, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
 import { useStackNavigation } from '@symbiote-native/navigation/vue';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';
@@ -27,15 +35,56 @@ type IMenuItem = {
 };
 
 const MENU_ITEMS: readonly IMenuItem[] = [
-  { label: 'All primitives (Canary)', route: ROUTE_NAME.Canary, hint: 'every @symbiote-native/vue primitive' },
-  { label: 'Header options', route: ROUTE_NAME.HeaderOptions, hint: 'bar buttons, menu, search bar, large title' },
-  { label: 'Sheet presentation', route: ROUTE_NAME.SheetDemo, hint: 'formSheet + multiple detents' },
-  { label: 'Tabs', route: ROUTE_NAME.TabsDemo, hint: 'bottom-tabs — icon, badge, tint' },
-  { label: 'Drawer', route: ROUTE_NAME.DrawerDemo, hint: 'swipeable drawer — right side, slide type' },
-  { label: 'Nested navigators', route: ROUTE_NAME.NestedNavigators, hint: 'Tab nested in a Stack screen + getParent()' },
-  { label: 'Hooks', route: ROUTE_NAME.HooksDemo, hint: 'useFocusEffect / useIsFocused / useNavigationState' },
-  { label: 'Deep linking', route: ROUTE_NAME.DeepLinking, hint: 'resolveRouteFromUrl against a typed URL' },
-  { label: 'State persistence', route: ROUTE_NAME.StatePersistence, hint: 'serialize/deserialize the Stack state' },
+  {
+    label: 'All primitives (Canary)',
+    route: ROUTE_NAME.Canary,
+    hint: 'every @symbiote-native/vue primitive',
+  },
+  {
+    label: 'API Playground',
+    route: ROUTE_NAME.ApiPlayground,
+    hint: "v-show, KeepAlive, Suspense, provide/inject — Vue's own API surface",
+  },
+  {
+    label: 'Header options',
+    route: ROUTE_NAME.HeaderOptions,
+    hint: 'bar buttons, menu, search bar, large title',
+  },
+  {
+    label: 'Sheet presentation',
+    route: ROUTE_NAME.SheetDemo,
+    hint: 'formSheet + multiple detents',
+  },
+  {
+    label: 'Tabs',
+    route: ROUTE_NAME.TabsDemo,
+    hint: 'bottom-tabs — icon, badge, tint',
+  },
+  {
+    label: 'Drawer',
+    route: ROUTE_NAME.DrawerDemo,
+    hint: 'swipeable drawer — right side, slide type',
+  },
+  {
+    label: 'Nested navigators',
+    route: ROUTE_NAME.NestedNavigators,
+    hint: 'Tab nested in a Stack screen + getParent()',
+  },
+  {
+    label: 'Hooks',
+    route: ROUTE_NAME.HooksDemo,
+    hint: 'useFocusEffect / useIsFocused / useNavigationState',
+  },
+  {
+    label: 'Deep linking',
+    route: ROUTE_NAME.DeepLinking,
+    hint: 'resolveRouteFromUrl against a typed URL',
+  },
+  {
+    label: 'State persistence',
+    route: ROUTE_NAME.StatePersistence,
+    hint: 'serialize/deserialize the Stack state',
+  },
 ];
 
 function lineInfoFor(route: ITourRouteName) {
@@ -45,14 +94,19 @@ function lineInfoFor(route: ITourRouteName) {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="menu-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="menu-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View class="menu-hero">
         <Text class="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
-        <Text class="menu-hero-title">Nine stops along the stack</Text>
+        <Text class="menu-hero-title">Ten stops along the stack</Text>
         <Text class="menu-hero-subtitle"
-          >Each row below drives a different line of @symbiote-native/navigation —
-          Primitives, Presentation, Structure, Introspection, Routing — on a real native
-          stack.</Text
+          >Nine rows drive a different line of @symbiote-native/navigation —
+          Primitives, Presentation, Structure, Introspection, Routing — on a
+          real native stack. The last stop is Composition: Vue's own
+          template/API surface instead.</Text
         >
       </View>
       <Pressable
@@ -63,13 +117,16 @@ function lineInfoFor(route: ITourRouteName) {
         @press="() => navigation.push(item.route)"
       >
         <View :class="`menu-badge menu-badge-${lineInfoFor(item.route).line}`">
-          <Text class="menu-badge-text">{{ lineInfoFor(item.route).code }}</Text>
+          <Text class="menu-badge-text">{{
+            lineInfoFor(item.route).code
+          }}</Text>
         </View>
         <View class="menu-row-copy">
           <Text class="menu-row-label">{{ item.label }}</Text>
-          <Text :class="`menu-row-hint menu-row-hint-${lineInfoFor(item.route).line}`">{{
-            item.hint
-          }}</Text>
+          <Text
+            :class="`menu-row-hint menu-row-hint-${lineInfoFor(item.route).line}`"
+            >{{ item.hint }}</Text
+          >
         </View>
       </Pressable>
     </ScrollView>

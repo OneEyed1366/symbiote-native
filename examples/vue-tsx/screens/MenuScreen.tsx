@@ -1,5 +1,11 @@
 import { defineComponent } from 'vue';
-import { Pressable, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
 import { useStackNavigation } from '@symbiote-native/navigation/vue';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';
@@ -12,15 +18,56 @@ type IMenuItem = {
 };
 
 const MENU_ITEMS: readonly IMenuItem[] = [
-  { label: 'All primitives (Canary)', route: ROUTE_NAME.Canary, hint: 'every @symbiote-native/vue primitive' },
-  { label: 'Header options', route: ROUTE_NAME.HeaderOptions, hint: 'bar buttons, menu, search bar, large title' },
-  { label: 'Sheet presentation', route: ROUTE_NAME.SheetDemo, hint: 'formSheet + multiple detents' },
-  { label: 'Tabs', route: ROUTE_NAME.TabsDemo, hint: 'bottom-tabs — icon, badge, tint' },
-  { label: 'Drawer', route: ROUTE_NAME.DrawerDemo, hint: 'swipeable drawer — right side, slide type' },
-  { label: 'Nested navigators', route: ROUTE_NAME.NestedNavigators, hint: 'Tab nested in a Stack screen + getParent()' },
-  { label: 'Hooks', route: ROUTE_NAME.HooksDemo, hint: 'useFocusEffect / useIsFocused / useNavigationState' },
-  { label: 'Deep linking', route: ROUTE_NAME.DeepLinking, hint: 'resolveRouteFromUrl against a typed URL' },
-  { label: 'State persistence', route: ROUTE_NAME.StatePersistence, hint: 'serialize/deserialize the Stack state' },
+  {
+    label: 'All primitives (Canary)',
+    route: ROUTE_NAME.Canary,
+    hint: 'every @symbiote-native/vue primitive',
+  },
+  {
+    label: 'API Playground',
+    route: ROUTE_NAME.ApiPlayground,
+    hint: 'ref/computed/watch, provide/inject, KeepAlive, Suspense, h()',
+  },
+  {
+    label: 'Header options',
+    route: ROUTE_NAME.HeaderOptions,
+    hint: 'bar buttons, menu, search bar, large title',
+  },
+  {
+    label: 'Sheet presentation',
+    route: ROUTE_NAME.SheetDemo,
+    hint: 'formSheet + multiple detents',
+  },
+  {
+    label: 'Tabs',
+    route: ROUTE_NAME.TabsDemo,
+    hint: 'bottom-tabs — icon, badge, tint',
+  },
+  {
+    label: 'Drawer',
+    route: ROUTE_NAME.DrawerDemo,
+    hint: 'swipeable drawer — right side, slide type',
+  },
+  {
+    label: 'Nested navigators',
+    route: ROUTE_NAME.NestedNavigators,
+    hint: 'Tab nested in a Stack screen + getParent()',
+  },
+  {
+    label: 'Hooks',
+    route: ROUTE_NAME.HooksDemo,
+    hint: 'useFocusEffect / useIsFocused / useNavigationState',
+  },
+  {
+    label: 'Deep linking',
+    route: ROUTE_NAME.DeepLinking,
+    hint: 'resolveRouteFromUrl against a typed URL',
+  },
+  {
+    label: 'State persistence',
+    route: ROUTE_NAME.StatePersistence,
+    hint: 'serialize/deserialize the Stack state',
+  },
 ];
 
 /**
@@ -37,13 +84,18 @@ export const MenuScreen = defineComponent(
     const navigation = useStackNavigation();
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="menu-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="menu-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class="menu-hero">
             <Text class="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
             <Text class="menu-hero-title">Nine stops along the stack</Text>
             <Text class="menu-hero-subtitle">
-              Each row below drives a different line of @symbiote-native/navigation — Primitives,
-              Presentation, Structure, Introspection, Routing — on a real native stack.
+              Each row below drives a different line of
+              @symbiote-native/navigation — Primitives, Presentation, Structure,
+              Introspection, Routing — on a real native stack.
             </Text>
           </View>
           {MENU_ITEMS.map(item => {
@@ -60,7 +112,9 @@ export const MenuScreen = defineComponent(
                 </View>
                 <View class="menu-row-copy">
                   <Text class="menu-row-label">{item.label}</Text>
-                  <Text class={`menu-row-hint menu-row-hint-${lineInfo.line}`}>{item.hint}</Text>
+                  <Text class={`menu-row-hint menu-row-hint-${lineInfo.line}`}>
+                    {item.hint}
+                  </Text>
                 </View>
               </Pressable>
             );

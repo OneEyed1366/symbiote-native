@@ -1,18 +1,24 @@
 import { ROUTE_NAME } from './routes';
 import type { IRouteName } from './routes';
 
-// The @symbiote-native/navigation demo suite groups its 9 tour screens into 5 thematic "lines" —
-// which part of the package each screen exercises — carried through MenuScreen's row badges, each
-// demo screen's own line tag, and (where the native header/tab bar already takes a tint color) the
-// OS chrome itself. One color per line replaces the single flat accent every row/button used to
-// share. Kept in sync by hand with App.css's `:root` `--line-*` tokens — CSS custom properties and
-// this module are different runtimes with no shared import path.
+// The @symbiote-native/navigation demo suite groups 9 of its 10 tour screens into 5 thematic
+// "lines" — which part of the package each screen exercises — carried through MenuScreen's row
+// badges, each demo screen's own line tag, and (where the native header/tab bar already takes a
+// tint color) the OS chrome itself. One color per line replaces the single flat accent every
+// row/button used to share. Kept in sync by hand with App.css's `:root` `--line-*` tokens — CSS
+// custom properties and this module are different runtimes with no shared import path.
+//
+// Composition is the odd one out: ApiPlayground doesn't exercise @symbiote-native/navigation at
+// all — it's a live demo of Vue's OWN template/Composition API surface running under Symbiote's
+// renderer (see .docs/framework-api-surface/vue.md). It still gets a line entry so it can reuse
+// the exact same wayfinding pill/badge/row language as every other tour stop.
 export const NAV_LINE = {
   Primitives: 'primitives',
   Presentation: 'presentation',
   Structure: 'structure',
   Introspection: 'introspection',
   Routing: 'routing',
+  Composition: 'composition',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -29,6 +35,9 @@ export const LINE_COLOR: Record<INavLine, string> = {
   [NAV_LINE.Structure]: '#4fd1a5',
   [NAV_LINE.Introspection]: '#b18cf5',
   [NAV_LINE.Routing]: '#f2789a',
+  // Warm amber — visually distinct from every navigation-package line above, since this line
+  // isn't about @symbiote-native/navigation at all.
+  [NAV_LINE.Composition]: '#f5a623',
 };
 
 export type INavLineInfo = {
@@ -39,16 +48,60 @@ export type INavLineInfo = {
 
 // Every route reachable from MenuScreen, minus Menu itself. Deliberately excludes Details — it's a
 // plain push-target off Canary, not one of the 9 tour stops.
-export type ITourRouteName = Exclude<IRouteName, typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details>;
+export type ITourRouteName = Exclude<
+  IRouteName,
+  typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details
+>;
 
 export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
-  [ROUTE_NAME.Canary]: { line: NAV_LINE.Primitives, code: 'CN', label: 'PRIMITIVES LINE' },
-  [ROUTE_NAME.HeaderOptions]: { line: NAV_LINE.Presentation, code: 'HD', label: 'PRESENTATION LINE' },
-  [ROUTE_NAME.SheetDemo]: { line: NAV_LINE.Presentation, code: 'SH', label: 'PRESENTATION LINE' },
-  [ROUTE_NAME.TabsDemo]: { line: NAV_LINE.Structure, code: 'TB', label: 'STRUCTURE LINE' },
-  [ROUTE_NAME.DrawerDemo]: { line: NAV_LINE.Structure, code: 'DR', label: 'STRUCTURE LINE' },
-  [ROUTE_NAME.NestedNavigators]: { line: NAV_LINE.Structure, code: 'NN', label: 'STRUCTURE LINE' },
-  [ROUTE_NAME.HooksDemo]: { line: NAV_LINE.Introspection, code: 'HK', label: 'INTROSPECTION LINE' },
-  [ROUTE_NAME.DeepLinking]: { line: NAV_LINE.Routing, code: 'DL', label: 'ROUTING LINE' },
-  [ROUTE_NAME.StatePersistence]: { line: NAV_LINE.Routing, code: 'SP', label: 'ROUTING LINE' },
+  [ROUTE_NAME.Canary]: {
+    line: NAV_LINE.Primitives,
+    code: 'CN',
+    label: 'PRIMITIVES LINE',
+  },
+  [ROUTE_NAME.HeaderOptions]: {
+    line: NAV_LINE.Presentation,
+    code: 'HD',
+    label: 'PRESENTATION LINE',
+  },
+  [ROUTE_NAME.SheetDemo]: {
+    line: NAV_LINE.Presentation,
+    code: 'SH',
+    label: 'PRESENTATION LINE',
+  },
+  [ROUTE_NAME.TabsDemo]: {
+    line: NAV_LINE.Structure,
+    code: 'TB',
+    label: 'STRUCTURE LINE',
+  },
+  [ROUTE_NAME.DrawerDemo]: {
+    line: NAV_LINE.Structure,
+    code: 'DR',
+    label: 'STRUCTURE LINE',
+  },
+  [ROUTE_NAME.NestedNavigators]: {
+    line: NAV_LINE.Structure,
+    code: 'NN',
+    label: 'STRUCTURE LINE',
+  },
+  [ROUTE_NAME.HooksDemo]: {
+    line: NAV_LINE.Introspection,
+    code: 'HK',
+    label: 'INTROSPECTION LINE',
+  },
+  [ROUTE_NAME.DeepLinking]: {
+    line: NAV_LINE.Routing,
+    code: 'DL',
+    label: 'ROUTING LINE',
+  },
+  [ROUTE_NAME.StatePersistence]: {
+    line: NAV_LINE.Routing,
+    code: 'SP',
+    label: 'ROUTING LINE',
+  },
+  [ROUTE_NAME.ApiPlayground]: {
+    line: NAV_LINE.Composition,
+    code: 'AP',
+    label: 'COMPOSITION LINE',
+  },
 };

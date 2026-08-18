@@ -40,7 +40,9 @@ export function CryptoScreen() {
   }, []);
 
   const handleDigest = useCallback(() => {
-    digestStringAsync(CryptoDigestAlgorithm.SHA256, DIGEST_SAMPLE_STRING).then(setDigest);
+    digestStringAsync(CryptoDigestAlgorithm.SHA256, DIGEST_SAMPLE_STRING).then(
+      setDigest,
+    );
   }, []);
 
   const handleGetRandomBytes = useCallback(() => {
@@ -51,7 +53,11 @@ export function CryptoScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="crypto-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="crypto-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -62,8 +68,9 @@ export function CryptoScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Crypto</Text>
             <Text className="hero-body">
-              @symbiote-native/crypto — cryptographically secure random bytes, randomUUID, and
-              string digest hashing (SHA-1/256/384/512, MD2/4/5).
+              @symbiote-native/crypto — cryptographically secure random bytes,
+              randomUUID, and string digest hashing (SHA-1/256/384/512,
+              MD2/4/5).
             </Text>
           </View>
         </View>
@@ -104,7 +111,9 @@ export function CryptoScreen() {
             onPress={handleGetRandomBytes}
             color={lineColor}
           />
-          {randomBytes !== null && <ValueRow label="Bytes" value={randomBytes} />}
+          {randomBytes !== null && (
+            <ValueRow label="Bytes" value={randomBytes} />
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -1,4 +1,10 @@
-import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  OnDestroy,
+  OnInit,
+  inject,
+} from '@angular/core';
 import {
   ActivityIndicator,
   Alert,
@@ -33,6 +39,7 @@ import {
   TunnelInDirective,
   TunnelOut,
   VListItemDirective,
+  VListSeparatorDirective,
   Vibration,
   View,
   WindowDimensionsService,
@@ -121,6 +128,7 @@ const overlayTunnel = createTunnel();
     TunnelOut,
     View,
     VListItemDirective,
+    VListSeparatorDirective,
   ],
   template: `
     <SafeAreaView testID="angular-safe-area" class="screen">
@@ -146,8 +154,8 @@ const overlayTunnel = createTunnel();
           <View class="hero-copy">
             <Text class="hero-title">All primitives</Text>
             <Text class="hero-body">
-              Every @symbiote-native/angular primitive, driven straight onto Fabric — no
-              react-native renderer in the path.
+              Every @symbiote-native/angular primitive, driven straight onto
+              Fabric — no react-native renderer in the path.
             </Text>
           </View>
         </View>
@@ -260,7 +268,9 @@ const overlayTunnel = createTunnel();
           class="counter-card"
           (press)="increment()"
         >
-          <Text testID="angular-counter-value" class="counter-text">tapped {{ count }}×</Text>
+          <Text testID="angular-counter-value" class="counter-text"
+            >tapped {{ count }}×</Text
+          >
         </Pressable>
 
         <TextInput
@@ -270,7 +280,9 @@ const overlayTunnel = createTunnel();
           placeholderTextColor="#6b7280"
           class="text-input"
         />
-        <Text testID="angular-greeting-output" class="greeting">{{ name ? 'Hello, ' + name : 'Hello, stranger' }}</Text>
+        <Text testID="angular-greeting-output" class="greeting">{{
+          name ? 'Hello, ' + name : 'Hello, stranger'
+        }}</Text>
 
         <View testID="angular-switch-row" class="switch-row">
           <Text class="switch-label">spinner</Text>
@@ -380,6 +392,16 @@ const overlayTunnel = createTunnel();
             <View class="mvcp-row">
               <Text class="list-row-text">{{ mvcpLabel(item) }}</Text>
             </View>
+          </ng-template>
+          <!-- This list measures its own cells (no getItemLayout), and the divider is CHROME the
+               list renders BETWEEN them — so it belongs to the distance from one row to the next,
+               not to either row's height. That is the case the offset table has to get right; a
+               model built by summing heights alone is short by every divider it skipped, and the
+               content below a windowed-out region slides up and back as the window moves
+               (core/components buildOffsets). Deliberately on the MVCP list: prepend-without-jump
+               is exactly where a few points of offset error show. -->
+          <ng-template vListSeparator>
+            <View class="mvcp-divider" />
           </ng-template>
         </FlatList>
         <ActionButton

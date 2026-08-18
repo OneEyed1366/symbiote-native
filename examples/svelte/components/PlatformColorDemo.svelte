@@ -17,26 +17,27 @@
   const scheme = useColorScheme();
 </script>
 
-<!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16 (whitespace
-     between symbiote-*-producing tags compiles to a real, invalid RCTRawText child). Attribute
-     expressions ({...}) may still wrap freely — only inter-tag whitespace matters here. -->
-<View class="section-nested"
-  ><Text class="section-label"
-    >{`PlatformColor · semantic + DynamicColorIOS (${scheme.current ?? 'unknown'})`}</Text
-  ><View class="row"
-    ><View
+<View class="section-nested">
+  <Text class="section-label">
+    {`PlatformColor · semantic + DynamicColorIOS (${scheme.current ?? 'unknown'})`}
+  </Text>
+  <View class="row">
+    <View
       class="color-tile"
       style={{ backgroundColor: PlatformColor('systemBlue') }}
-      ><Text class="tile-label">systemBlue</Text></View
-    ><View
+    >
+      <Text class="tile-label">systemBlue</Text>
+    </View>
+    <View
       class="color-tile-bordered"
       style={{
         backgroundColor: DynamicColorIOS({ light: '#dbeafe', dark: '#13243a' }),
         borderColor: PlatformColor('separator'),
       }}
-      ><Text class="bold-label" style={{ color: PlatformColor('label') }}
-        >dynamic</Text
-      ></View
-    ></View
-  ></View
->
+    >
+      <Text class="bold-label" style={{ color: PlatformColor('label') }}>
+        dynamic
+      </Text>
+    </View>
+  </View>
+</View>

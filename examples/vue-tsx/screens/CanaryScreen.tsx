@@ -1306,11 +1306,7 @@ export const CanaryScreen = defineComponent({
               />
             </View>
           </View>
-          <Button
-            title="Open vuejs.org"
-            onPress={onOpenUrl}
-            color="#42b883"
-          />
+          <Button title="Open vuejs.org" onPress={onOpenUrl} color="#42b883" />
 
           {/* The native UIRefreshControl spinner only shows while iOS holds the scroll
             view pulled-down; our full re-commit snaps the offset back, so we drive
@@ -1541,6 +1537,14 @@ export const CanaryScreen = defineComponent({
                     <Text class="list-row-text">{item.label}</Text>
                   </View>
                 ),
+                // This list measures its own cells (no getItemLayout), and the divider is CHROME
+                // the list renders BETWEEN them — so it belongs to the distance from one row to
+                // the next, not to either row's height. That is the case the offset table has to
+                // get right; a model built by summing heights alone is short by every divider it
+                // skipped, and the content below a windowed-out region slides up and back as the
+                // window moves (core/components buildOffsets). Deliberately on the MVCP list:
+                // prepend-without-jump is exactly where a few points of offset error show.
+                separator: () => <View class="mvcp-divider" />,
               } satisfies IFlatListSlots<{ id: string; label: string }>
             }
           </FlatList>

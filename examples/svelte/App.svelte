@@ -16,10 +16,10 @@
   // the wiring re-runs the moment the binding resolves — no mount-ordering guarantee needed. See
   // packages/navigation/src/svelte/linking.svelte.ts's header.
   //
-  // MARKUP FORMATTING IS LOAD-BEARING: sibling markers are packed edge-to-edge with zero
-  // whitespace between them (svelte-adapter-dom-shim skill §16). The navigator parks the markers
-  // inside a collapsed symbiote-text so a stray space could not crash a device, but the audit
-  // (`node scripts/audit-svelte-stray-whitespace.mjs`) still expects zero.
+  // The markers below can be laid out normally. A whitespace-only text node under a parent that
+  // takes no raw text becomes an anchor in the shim, so the gap between two <Screen> markers
+  // never reaches Fabric as an RCTRawText (svelte-adapter-dom-shim §16b) — on top of the
+  // navigator already parking the markers inside a collapsed symbiote-text.
   import './App.css';
   import {
     Screen,
@@ -34,6 +34,7 @@
 
   import MenuScreen from './screens/MenuScreen.svelte';
   import CanaryScreen from './screens/CanaryScreen.svelte';
+  import ApiPlaygroundScreen from './screens/ApiPlaygroundScreen.svelte';
   import DetailsScreen from './screens/DetailsScreen.svelte';
   import HeaderOptionsScreen from './screens/HeaderOptionsScreen.svelte';
   import { headerOptionsScreenOptions } from './screens/header-options-screen-options';
@@ -78,6 +79,11 @@
 
   const canaryScreenOptions: IScreenOptions = darkHeader(
     'Symbiote Canary',
+    LINE_COLOR.primitives,
+  );
+
+  const apiPlaygroundScreenOptions: IScreenOptions = darkHeader(
+    'API Playground',
     LINE_COLOR.primitives,
   );
 
@@ -175,50 +181,65 @@
   });
 </script>
 
-<Stack bind:this={stackInstance} initialRouteName={ROUTE_NAME.Menu}
-  ><Screen
+<Stack bind:this={stackInstance} initialRouteName={ROUTE_NAME.Menu}>
+  <Screen
     name={ROUTE_NAME.Menu}
     component={MenuScreen}
     options={menuScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Canary}
     component={CanaryScreen}
     options={canaryScreenOptions}
-  /><Screen
+  />
+  <Screen
+    name={ROUTE_NAME.ApiPlayground}
+    component={ApiPlaygroundScreen}
+    options={apiPlaygroundScreenOptions}
+  />
+  <Screen
     name={ROUTE_NAME.Details}
     component={DetailsScreen}
     options={detailsScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.HeaderOptions}
     component={HeaderOptionsScreen}
     options={headerOptionsScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.SheetDemo}
     component={SheetDemoScreen}
     options={sheetDemoScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.TabsDemo}
     component={TabsDemoScreen}
     options={tabsDemoScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.DrawerDemo}
     component={DrawerDemoScreen}
     options={drawerDemoScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.NestedNavigators}
     component={NestedNavigatorsScreen}
     options={nestedNavigatorsScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.HooksDemo}
     component={HooksDemoScreen}
     options={hooksDemoScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.DeepLinking}
     component={DeepLinkingScreen}
     options={deepLinkingScreenOptions}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.StatePersistence}
     component={StatePersistenceScreen}
     options={statePersistenceScreenOptions}
-  /></Stack
->
+  />
+</Stack>

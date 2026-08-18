@@ -21,8 +21,15 @@
 -->
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Screen, Stack, useLinkingIntegration } from '@symbiote-native/navigation/vue';
-import type { INavigatorHandle, IScreenOptions } from '@symbiote-native/navigation/vue';
+import {
+  Screen,
+  Stack,
+  useLinkingIntegration,
+} from '@symbiote-native/navigation/vue';
+import type {
+  INavigatorHandle,
+  IScreenOptions,
+} from '@symbiote-native/navigation/vue';
 import { hide } from '@symbiote-native/splash-screen/vue';
 import './App.css';
 
@@ -38,6 +45,7 @@ import NestedNavigatorsScreen from './screens/NestedNavigatorsScreen.vue';
 import HooksDemoScreen from './screens/HooksDemoScreen.vue';
 import DeepLinkingScreen from './screens/DeepLinkingScreen.vue';
 import StatePersistenceScreen from './screens/StatePersistenceScreen.vue';
+import ApiPlaygroundScreen from './screens/ApiPlaygroundScreen.vue';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
@@ -126,8 +134,16 @@ onMounted(() => hide());
         transitionDuration: 300,
       }"
     />
-    <Screen :name="ROUTE_NAME.HeaderOptions" :component="HeaderOptionsScreen" :options="headerOptionsScreenOptions" />
-    <Screen :name="ROUTE_NAME.SheetDemo" :component="SheetDemoScreen" :options="sheetDemoScreenOptions" />
+    <Screen
+      :name="ROUTE_NAME.HeaderOptions"
+      :component="HeaderOptionsScreen"
+      :options="headerOptionsScreenOptions"
+    />
+    <Screen
+      :name="ROUTE_NAME.SheetDemo"
+      :component="SheetDemoScreen"
+      :options="sheetDemoScreenOptions"
+    />
     <Screen
       :name="ROUTE_NAME.TabsDemo"
       :component="TabsDemoScreen"
@@ -200,6 +216,19 @@ onMounted(() => hide());
         title: 'State Persistence',
         headerShown: true,
         headerTintColor: LINE_COLOR.routing,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.ApiPlayground"
+      :component="ApiPlaygroundScreen"
+      :options="{
+        title: 'API Playground',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.composition,
         headerTranslucent: true,
         headerTitleColor: '#ffffff',
         headerStyle: { backgroundColor: '#0b1622' },

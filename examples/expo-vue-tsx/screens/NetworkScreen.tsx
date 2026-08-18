@@ -1,22 +1,35 @@
 import { computed, defineComponent, onUnmounted, ref, watch } from 'vue';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
-import { NetworkStateType, getIpAddressAsync, isAirplaneModeEnabledAsync } from '@symbiote-native/network';
+import {
+  NetworkStateType,
+  getIpAddressAsync,
+  isAirplaneModeEnabledAsync,
+} from '@symbiote-native/network';
 import { useNetworkState } from '@symbiote-native/network/vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function networkTypeLabel(type: NetworkStateType | undefined): string {
   switch (type) {
-    case NetworkStateType.WIFI: return 'Wi-Fi';
-    case NetworkStateType.CELLULAR: return 'Cellular';
-    case NetworkStateType.BLUETOOTH: return 'Bluetooth';
-    case NetworkStateType.ETHERNET: return 'Ethernet';
-    case NetworkStateType.WIMAX: return 'WiMAX';
-    case NetworkStateType.VPN: return 'VPN';
-    case NetworkStateType.OTHER: return 'Other';
-    case NetworkStateType.NONE: return 'None';
+    case NetworkStateType.WIFI:
+      return 'Wi-Fi';
+    case NetworkStateType.CELLULAR:
+      return 'Cellular';
+    case NetworkStateType.BLUETOOTH:
+      return 'Bluetooth';
+    case NetworkStateType.ETHERNET:
+      return 'Ethernet';
+    case NetworkStateType.WIMAX:
+      return 'WiMAX';
+    case NetworkStateType.VPN:
+      return 'VPN';
+    case NetworkStateType.OTHER:
+      return 'Other';
+    case NetworkStateType.NONE:
+      return 'None';
     case NetworkStateType.UNKNOWN:
-    default: return 'Unknown';
+    default:
+      return 'Unknown';
   }
 }
 
@@ -51,18 +64,24 @@ export const NetworkScreen = defineComponent(
     });
 
     function refreshDeviceInfo() {
-      Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(([ip, airplaneMode]) => {
-        if (isMounted) {
-          ipAddress.value = ip;
-          isAirplaneMode.value = airplaneMode;
-        }
-      });
+      Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
+        ([ip, airplaneMode]) => {
+          if (isMounted) {
+            ipAddress.value = ip;
+            isAirplaneMode.value = airplaneMode;
+          }
+        },
+      );
     }
 
     watch(networkState, refreshDeviceInfo, { immediate: true });
 
     const connectedLabel = computed(() =>
-      networkState.value.isConnected === undefined ? 'checking…' : networkState.value.isConnected ? 'Yes' : 'No',
+      networkState.value.isConnected === undefined
+        ? 'checking…'
+        : networkState.value.isConnected
+          ? 'Yes'
+          : 'No',
     );
     const internetReachableLabel = computed(() =>
       networkState.value.isInternetReachable === undefined
@@ -71,14 +90,24 @@ export const NetworkScreen = defineComponent(
           ? 'Yes'
           : 'No',
     );
-    const ipAddressLabel = computed(() => (ipAddress.value === null ? 'checking…' : ipAddress.value));
+    const ipAddressLabel = computed(() =>
+      ipAddress.value === null ? 'checking…' : ipAddress.value,
+    );
     const airplaneModeLabel = computed(() =>
-      isAirplaneMode.value === null ? 'checking…' : isAirplaneMode.value ? 'On' : 'Off',
+      isAirplaneMode.value === null
+        ? 'checking…'
+        : isAirplaneMode.value
+          ? 'On'
+          : 'Off',
     );
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="network-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="network-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -89,9 +118,10 @@ export const NetworkScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Network</Text>
               <Text class="hero-body">
-                @symbiote-native/network — live network state via useNetworkState(), plus the
-                device's IP address and airplane-mode check. Toggle Wi-Fi or airplane mode on the
-                device to see the live card update on its own.
+                @symbiote-native/network — live network state via
+                useNetworkState(), plus the device's IP address and
+                airplane-mode check. Toggle Wi-Fi or airplane mode on the device
+                to see the live card update on its own.
               </Text>
             </View>
           </View>
@@ -100,9 +130,15 @@ export const NetworkScreen = defineComponent(
             <View class="auth-card-header">
               <Text class="auth-card-title">Live network state</Text>
             </View>
-            <ValueRow label="Type" value={networkTypeLabel(networkState.value.type)} />
+            <ValueRow
+              label="Type"
+              value={networkTypeLabel(networkState.value.type)}
+            />
             <ValueRow label="Connected" value={connectedLabel.value} />
-            <ValueRow label="Internet reachable" value={internetReachableLabel.value} />
+            <ValueRow
+              label="Internet reachable"
+              value={internetReachableLabel.value}
+            />
           </View>
 
           <View testID="network-info-card" class="auth-card">

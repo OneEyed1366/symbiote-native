@@ -9,10 +9,6 @@
   // RefApiDemo's measured box hand-authors `symbiote-view` directly), so only a hand-authored
   // host tag hands back a real ShimElement `hostInstance()` can resolve into the
   // AccessibilityInfo.sendAccessibilityEvent target.
-  //
-  // section-nested's sibling group below is packed with zero whitespace between tags — see
-  // svelte-adapter-dom-shim skill §16 (whitespace between sibling nodes becomes a real, invalid
-  // text-node child of a non-Text host; a real bug already found this way in shipped code).
   import {
     View,
     Text,
@@ -64,25 +60,32 @@
   }
 </script>
 
-<View class="section-nested"
-  ><symbiote-text p={{ class: 'section-label' }} bind:this={titleRef}
-    >Parity checks · longPress · dismiss · animated scroll · sticky · a11y focus</symbiote-text
-  ><Text
+<View class="section-nested">
+  <symbiote-text p={{ class: 'section-label' }} bind:this={titleRef}>
+    Parity checks · longPress · dismiss · animated scroll · sticky · a11y focus
+  </symbiote-text>
+  <Text
     onLongPress={() => (longPressMsg = 'long press! (tap was suppressed)')}
     onPress={() => (longPressMsg = 'tap')}
-    class="long-press-row">{longPressMsg}</Text
-  ><TextInput
+    class="long-press-row"
+  >
+    {longPressMsg}
+  </Text>
+  <TextInput
     placeholder="focus me…"
     placeholderTextColor="#41506a"
     onFocus={() => (dismissMsg = 'keyboard up — tap Hide keyboard')}
     onBlur={() => (dismissMsg = 'blurred (keyboard down)')}
     class="focus-input"
-  /><Text class="note-text">{dismissMsg}</Text><ActionButton
+  />
+  <Text class="note-text">{dismissMsg}</Text>
+  <ActionButton
     title="Hide keyboard"
     onPress={() => Keyboard.dismiss()}
     color="#7fb5ff"
-  /><Text class="section-label">FlatList · animated scrollToOffset</Text
-  ><FlatList
+  />
+  <Text class="section-label">FlatList · animated scrollToOffset</Text>
+  <FlatList
     bind:this={listRef}
     data={parityRows}
     keyExtractor={item => item.id}
@@ -92,14 +95,16 @@
       index,
     })}
     class="parity-list"
-    >{#snippet item({ item })}<View
-        class="parity-row"
-        style={{ height: PARITY_ROW_H }}
-        ><Text class="info-text">{`row ${item.n}`}</Text></View
-      >{/snippet}</FlatList
-  ><View class="row"
-    ><View class="flex1"
-      ><ActionButton
+  >
+    {#snippet item({ item })}
+      <View class="parity-row" style={{ height: PARITY_ROW_H }}>
+        <Text class="info-text">{`row ${item.n}`}</Text>
+      </View>
+    {/snippet}
+  </FlatList>
+  <View class="row">
+    <View class="flex1">
+      <ActionButton
         title="Scroll ▼ animated"
         onPress={() =>
           listRef?.scrollToOffset({
@@ -107,30 +112,38 @@
             animated: true,
           })}
         color="#7fb5ff"
-      /></View
-    ><View class="flex1"
-      ><ActionButton
+      />
+    </View>
+    <View class="flex1">
+      <ActionButton
         title="Top · instant"
         onPress={() => listRef?.scrollToOffset({ offset: 0, animated: false })}
         color="#7fb5ff"
-      /></View
-    ></View
-  ><Text class="section-label"
-    >SectionList · sticky (scroll: next header should push prev off)</Text
-  ><SectionList
+      />
+    </View>
+  </View>
+  <Text class="section-label">
+    SectionList · sticky (scroll: next header should push prev off)
+  </Text>
+  <SectionList
     testID="sticky-section-list"
     sections={paritySections}
     keyExtractor={item => item.id}
     stickySectionHeadersEnabled
     class="section-list"
-    >{#snippet sectionHeader({ section })}<Text class="section-header">{section.title}</Text>{/snippet}{#snippet item({ item })}<View
-        class="parity-row"
-        style={{ height: PARITY_ROW_H }}
-        ><Text class="info-text">{item.label}</Text></View
-      >{/snippet}</SectionList
-  ><ActionButton
+  >
+    {#snippet sectionHeader({ section })}
+      <Text class="section-header">{section.title}</Text>
+    {/snippet}
+    {#snippet item({ item })}
+      <View class="parity-row" style={{ height: PARITY_ROW_H }}>
+        <Text class="info-text">{item.label}</Text>
+      </View>
+    {/snippet}
+  </SectionList>
+  <ActionButton
     title="Focus the panel title (a11y)"
     onPress={onFocusTitle}
     color="#7fb5ff"
-  /></View
->
+  />
+</View>

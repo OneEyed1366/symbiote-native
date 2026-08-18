@@ -8,10 +8,10 @@
   // reads as one system instead of a flat bag of unrelated test screens. Svelte twin of
   // examples/vue-sfc/screens/MenuScreen.vue.
   //
-  // MARKUP FORMATTING IS LOAD-BEARING here as everywhere in this example: sibling tags are packed
-  // edge-to-edge with zero whitespace (svelte-adapter-dom-shim skill §16), and every text node
-  // stays on ONE source line however long. Verify with
-  // `node scripts/audit-svelte-stray-whitespace.mjs`.
+  // Whitespace in this markup is free, unlike when the screen was written. The shim maps a
+  // whitespace-only text node under a parent that takes no raw text to an anchor, so a gap
+  // between siblings never reaches Fabric as an RCTRawText (svelte-adapter-dom-shim §16b), and
+  // svelte.config.js's collapseTextWhitespace() folds a sentence wrapped across source lines.
   import {
     Pressable,
     SafeAreaView,
@@ -40,6 +40,11 @@
       label: 'All primitives (Canary)',
       route: ROUTE_NAME.Canary,
       hint: 'every @symbiote-native/svelte primitive',
+    },
+    {
+      label: 'API Playground',
+      route: ROUTE_NAME.ApiPlayground,
+      hint: 'runes, snippets, stores, context — Svelte 5’s own surface, live',
     },
     {
       label: 'Header options',
@@ -84,30 +89,38 @@
   ];
 </script>
 
-<SafeAreaView class="screen"
-  ><ScrollView
+<SafeAreaView class="screen">
+  <ScrollView
     testID="menu-scroll"
     class="screen"
     contentContainerStyle="scroll-content"
-    ><View class="menu-hero"
-      ><Text class="menu-eyebrow">NAVIGATION DEMO SUITE</Text><Text
-        class="menu-hero-title">Nine stops along the stack</Text
-      ><Text class="menu-hero-subtitle"
-        >Each row below drives a different line of @symbiote-native/navigation — Primitives, Presentation, Structure, Introspection, Routing — on a real native stack.</Text
-      ></View
-    >{#each MENU_ITEMS as item (item.route)}{@const lineInfo =
-        ROUTE_LINE_INFO[item.route]}<Pressable
+  >
+    <View class="menu-hero">
+      <Text class="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
+      <Text class="menu-hero-title">Nine stops along the stack</Text>
+      <Text class="menu-hero-subtitle">
+        Each row below drives a different line of @symbiote-native/navigation —
+        Primitives, Presentation, Structure, Introspection, Routing — on a real
+        native stack.
+      </Text>
+    </View>
+    {#each MENU_ITEMS as item (item.route)}
+      {@const lineInfo = ROUTE_LINE_INFO[item.route]}
+      <Pressable
         testID={`menu-row-${item.route}`}
         class={`menu-row menu-row-${lineInfo.line}`}
         onPress={() => navigation.current.push(item.route)}
-        ><View class={`menu-badge menu-badge-${lineInfo.line}`}
-          ><Text class="menu-badge-text">{lineInfo.code}</Text></View
-        ><View class="menu-row-copy"
-          ><Text class="menu-row-label">{item.label}</Text><Text
-            class={`menu-row-hint menu-row-hint-${lineInfo.line}`}
-            >{item.hint}</Text
-          ></View
-        ></Pressable
-      >{/each}</ScrollView
-  ></SafeAreaView
->
+      >
+        <View class={`menu-badge menu-badge-${lineInfo.line}`}>
+          <Text class="menu-badge-text">{lineInfo.code}</Text>
+        </View>
+        <View class="menu-row-copy">
+          <Text class="menu-row-label">{item.label}</Text>
+          <Text class={`menu-row-hint menu-row-hint-${lineInfo.line}`}>
+            {item.hint}
+          </Text>
+        </View>
+      </Pressable>
+    {/each}
+  </ScrollView>
+</SafeAreaView>

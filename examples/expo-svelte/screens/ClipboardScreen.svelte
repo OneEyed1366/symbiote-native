@@ -5,10 +5,14 @@
   // IClipboardEvent), a text input + setStringAsync "Copy text" card, a hasStringAsync() status
   // row, and an iOS-only URL get/set/has row. Svelte twin of
   // ../../expo-vue-sfc/screens/ClipboardScreen.vue.
-  //
-  // MARKUP FORMATTING IS LOAD-BEARING (svelte-adapter-dom-shim §16): sibling nodes are packed
-  // edge-to-edge with zero whitespace between them, and every text node stays on ONE source line.
-  import { Platform, SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/svelte';
+  import {
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
+  } from '@symbiote-native/svelte';
   import {
     getStringAsync,
     getUrlAsync,
@@ -99,63 +103,103 @@
   }
 </script>
 
-<SafeAreaView class="screen"
-  ><ScrollView testID="clipboard-scroll" class="screen" contentContainerStyle="scroll-content"
-    ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
-    ><View class="hero-card"
-      ><View class="hero-badge" style={{ backgroundColor: lineColor }}
-        ><Text class="hero-badge-text">{lineInfo.code}</Text></View
-      ><View class="hero-copy"
-        ><Text class="hero-title">Clipboard</Text><Text class="hero-body">@symbiote-native/clipboard — read and write the system clipboard's text and URL content, plus a live change-listener composable.</Text></View
-      ></View
-    ><View testID="clipboard-value-card" class="clipboard-card"
-      ><Text class="clipboard-card-title">Current value</Text><View class="clipboard-value-box"
-        ><Text testID="clipboard-current-text" class="clipboard-value-text">{clipboardText || '(empty)'}</Text></View
-      ><View class="clipboard-capability-row"
-        ><Text class="clipboard-capability-label">Has text</Text><View class={`clipboard-status-badge clipboard-status-badge-${hasString}`}
-          ><Text class="clipboard-status-text">{capabilityStatusText(hasString)}</Text></View
-        ></View
-      ></View
-    ><View testID="clipboard-copy-card" class="clipboard-card"
-      ><Text class="clipboard-card-title">Copy text</Text><TextInput
+<SafeAreaView class="screen">
+  <ScrollView
+    testID="clipboard-scroll"
+    class="screen"
+    contentContainerStyle="scroll-content"
+  >
+    <View class={`line-tag line-tag-${lineInfo.line}`}>
+      <Text class="line-tag-text">
+        {`${lineInfo.code} · ${lineInfo.label}`}
+      </Text>
+    </View>
+    <View class="hero-card">
+      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <Text class="hero-badge-text">{lineInfo.code}</Text>
+      </View>
+      <View class="hero-copy">
+        <Text class="hero-title">Clipboard</Text>
+        <Text class="hero-body">
+          @symbiote-native/clipboard — read and write the system clipboard's
+          text and URL content, plus a live change-listener composable.
+        </Text>
+      </View>
+    </View>
+    <View testID="clipboard-value-card" class="clipboard-card">
+      <Text class="clipboard-card-title">Current value</Text>
+      <View class="clipboard-value-box">
+        <Text testID="clipboard-current-text" class="clipboard-value-text">
+          {clipboardText || '(empty)'}
+        </Text>
+      </View>
+      <View class="clipboard-capability-row">
+        <Text class="clipboard-capability-label">Has text</Text>
+        <View
+          class={`clipboard-status-badge clipboard-status-badge-${hasString}`}
+        >
+          <Text class="clipboard-status-text">
+            {capabilityStatusText(hasString)}
+          </Text>
+        </View>
+      </View>
+    </View>
+    <View testID="clipboard-copy-card" class="clipboard-card">
+      <Text class="clipboard-card-title">Copy text</Text>
+      <TextInput
         testID="clipboard-input"
         value={inputText}
         onValueChange={next => (inputText = next)}
         placeholder="Type something to copy…"
         placeholderTextColor={PLACEHOLDER_TEXT_COLOR}
         class="text-input"
-      /><ActionButton
+      />
+      <ActionButton
         testID="clipboard-copy-button"
         title="Copy text"
         onPress={handleCopy}
         color={lineColor}
-      /></View
-    >{#if Platform.OS === 'ios'}<View testID="clipboard-url-card" class="clipboard-card"
-      ><Text class="clipboard-card-title">URL (iOS only)</Text><TextInput
-        testID="clipboard-url-input"
-        value={urlInput}
-        onValueChange={next => (urlInput = next)}
-        placeholder="https://…"
-        placeholderTextColor={PLACEHOLDER_TEXT_COLOR}
-        class="text-input"
-      /><View class="button-row"
-        ><ActionButton
-          testID="clipboard-set-url-button"
-          title="Set URL"
-          onPress={handleSetUrl}
-          color={lineColor}
-        /><ActionButton
-          testID="clipboard-get-url-button"
-          title="Get URL"
-          onPress={handleGetUrl}
-          color={lineColor}
-        /></View
-      ><View class="clipboard-capability-row"
-        ><Text class="clipboard-capability-label">Has URL</Text><View class={`clipboard-status-badge clipboard-status-badge-${hasUrl}`}
-          ><Text class="clipboard-status-text">{capabilityStatusText(hasUrl)}</Text></View
-        ></View
-      ><Text testID="clipboard-url-value" class="clipboard-value-text">{clipboardUrl ?? 'tap Get URL to read the clipboard'}</Text></View
-    >{/if}</ScrollView
-  ></SafeAreaView
->
+      />
+    </View>{#if Platform.OS === 'ios'}<View
+        testID="clipboard-url-card"
+        class="clipboard-card"
+      >
+        <Text class="clipboard-card-title">URL (iOS only)</Text>
+        <TextInput
+          testID="clipboard-url-input"
+          value={urlInput}
+          onValueChange={next => (urlInput = next)}
+          placeholder="https://…"
+          placeholderTextColor={PLACEHOLDER_TEXT_COLOR}
+          class="text-input"
+        />
+        <View class="button-row">
+          <ActionButton
+            testID="clipboard-set-url-button"
+            title="Set URL"
+            onPress={handleSetUrl}
+            color={lineColor}
+          />
+          <ActionButton
+            testID="clipboard-get-url-button"
+            title="Get URL"
+            onPress={handleGetUrl}
+            color={lineColor}
+          />
+        </View>
+        <View class="clipboard-capability-row">
+          <Text class="clipboard-capability-label">Has URL</Text>
+          <View
+            class={`clipboard-status-badge clipboard-status-badge-${hasUrl}`}
+          >
+            <Text class="clipboard-status-text">
+              {capabilityStatusText(hasUrl)}
+            </Text>
+          </View>
+        </View>
+        <Text testID="clipboard-url-value" class="clipboard-value-text">
+          {clipboardUrl ?? 'tap Get URL to read the clipboard'}
+        </Text>
+      </View>{/if}
+  </ScrollView>
+</SafeAreaView>

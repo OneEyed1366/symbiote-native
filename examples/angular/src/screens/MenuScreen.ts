@@ -1,5 +1,11 @@
 import { Component } from '@angular/core';
-import { Pressable, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import { injectStackNavigation } from '@symbiote-native/navigation/angular';
 import { ROUTE_NAME } from '../routes';
 import { ROUTE_LINE_INFO } from '../navigation-lines';
@@ -12,16 +18,61 @@ type IMenuItem = {
 };
 
 const MENU_ITEMS: readonly IMenuItem[] = [
-  { label: 'All primitives (Canary)', route: ROUTE_NAME.Canary, hint: 'every @symbiote-native/angular primitive' },
-  { label: 'Header options', route: ROUTE_NAME.HeaderOptions, hint: 'bar buttons, menu, search bar, large title' },
-  { label: 'Sheet presentation', route: ROUTE_NAME.SheetDemo, hint: 'formSheet + multiple detents' },
-  { label: 'Tabs', route: ROUTE_NAME.TabsDemo, hint: 'bottom-tabs — icon, badge, tint' },
-  { label: 'Drawer', route: ROUTE_NAME.DrawerDemo, hint: 'swipeable drawer — right side, slide type' },
-  { label: 'Nested navigators', route: ROUTE_NAME.NestedNavigators, hint: 'Tab nested in a Stack screen + getParent()' },
-  { label: 'Hooks', route: ROUTE_NAME.HooksDemo, hint: 'injectFocusEffect / injectIsFocused / injectNavigationState' },
-  { label: 'Deep linking', route: ROUTE_NAME.DeepLinking, hint: 'resolveRouteFromUrl against a typed URL' },
-  { label: 'State persistence', route: ROUTE_NAME.StatePersistence, hint: 'serialize/deserialize the Stack state' },
-  { label: 'Reactive style', route: ROUTE_NAME.ReactiveStyle, hint: 'one tap must repaint every tile' },
+  {
+    label: 'All primitives (Canary)',
+    route: ROUTE_NAME.Canary,
+    hint: 'every @symbiote-native/angular primitive',
+  },
+  {
+    label: 'API Playground',
+    route: ROUTE_NAME.ApiPlayground,
+    hint: 'signals, control flow, DI, lifecycle, pipes',
+  },
+  {
+    label: 'Header options',
+    route: ROUTE_NAME.HeaderOptions,
+    hint: 'bar buttons, menu, search bar, large title',
+  },
+  {
+    label: 'Sheet presentation',
+    route: ROUTE_NAME.SheetDemo,
+    hint: 'formSheet + multiple detents',
+  },
+  {
+    label: 'Tabs',
+    route: ROUTE_NAME.TabsDemo,
+    hint: 'bottom-tabs — icon, badge, tint',
+  },
+  {
+    label: 'Drawer',
+    route: ROUTE_NAME.DrawerDemo,
+    hint: 'swipeable drawer — right side, slide type',
+  },
+  {
+    label: 'Nested navigators',
+    route: ROUTE_NAME.NestedNavigators,
+    hint: 'Tab nested in a Stack screen + getParent()',
+  },
+  {
+    label: 'Hooks',
+    route: ROUTE_NAME.HooksDemo,
+    hint: 'injectFocusEffect / injectIsFocused / injectNavigationState',
+  },
+  {
+    label: 'Deep linking',
+    route: ROUTE_NAME.DeepLinking,
+    hint: 'resolveRouteFromUrl against a typed URL',
+  },
+  {
+    label: 'State persistence',
+    route: ROUTE_NAME.StatePersistence,
+    hint: 'serialize/deserialize the Stack state',
+  },
+  {
+    label: 'Reactive style',
+    route: ROUTE_NAME.ReactiveStyle,
+    hint: 'one tap must repaint every tile',
+  },
 ];
 
 /**
@@ -40,13 +91,18 @@ const MENU_ITEMS: readonly IMenuItem[] = [
   imports: [Pressable, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="menu-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="menu-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View class="menu-hero">
           <Text class="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
           <Text class="menu-hero-title">Ten stops along the stack</Text>
           <Text class="menu-hero-subtitle">
-            Each row below drives a different @symbiote-native/navigation line — Primitives,
-            Presentation, Structure, Introspection, Routing — on a real native stack.
+            Each row below drives a different @symbiote-native/navigation line —
+            Primitives, Presentation, Structure, Introspection, Routing — on a
+            real native stack.
           </Text>
         </View>
         @for (item of menuItems; track item.route) {

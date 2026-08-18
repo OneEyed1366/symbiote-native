@@ -4,11 +4,12 @@
   // so no $effect is needed) plus an actions card for the three one-shot async calls
   // (getDeviceTypeAsync/getUptimeAsync/isRootedExperimentalAsync). Svelte twin of
   // examples/expo-vue-sfc/screens/DeviceScreen.vue.
-  //
-  // Markup packing is load-bearing here, exactly as in MenuScreen.svelte: siblings sit edge-to-edge
-  // with zero whitespace between them and every text node stays on ONE source line
-  // (svelte-adapter-dom-shim §16).
-  import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/svelte';
+  import {
+    SafeAreaView,
+    ScrollView,
+    Text,
+    View,
+  } from '@symbiote-native/svelte';
   import {
     DeviceType,
     brand,
@@ -88,44 +89,109 @@
   }
 </script>
 
-<SafeAreaView class="screen"
-  ><ScrollView testID="device-scroll" class="screen" contentContainerStyle="scroll-content"
-    ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
-    ><View class="hero-card"
-      ><View class="hero-badge" style={{ backgroundColor: lineColor }}
-        ><Text class="hero-badge-text">{lineInfo.code}</Text></View
-      ><View class="hero-copy"
-        ><Text class="hero-title">Device</Text><Text class="hero-body">@symbiote-native/device — physical device info: brand/model/OS constants, memory, and best-effort root/jailbreak detection. A Simulator/emulator reports `isDevice` as false and several fields as unavailable.</Text></View
-      ></View
-    ><View testID="device-info-card" class="device-card"
-      ><Text class="device-card-title">Info</Text><View class="device-row"
-        ><Text class="device-row-label">Is device</Text><Text testID="device-is-device-value" class="device-value-text">{isDevice ? 'Yes' : 'No (simulator/emulator)'}</Text></View
-      ><View class="device-row"
-        ><Text class="device-row-label">Brand</Text><Text class="device-value-text">{brand ?? 'unknown'}</Text></View
-      ><View class="device-row"
-        ><Text class="device-row-label">Manufacturer</Text><Text class="device-value-text">{manufacturer ?? 'unknown'}</Text></View
-      ><View class="device-row"
-        ><Text class="device-row-label">Model name</Text><Text class="device-value-text">{modelName ?? 'unknown'}</Text></View
-      ><View class="device-row"
-        ><Text class="device-row-label">Device type</Text><Text class="device-value-text">{deviceTypeLabel(deviceType)}</Text></View
-      ><View class="device-row"
-        ><Text class="device-row-label">OS</Text><Text class="device-value-text">{`${osName ?? 'unknown'} ${osVersion ?? ''}`}</Text></View
-      ><View class="device-row"
-        ><Text class="device-row-label">Total memory</Text><Text class="device-value-text">{totalMemoryText}</Text></View
-      ><View class="device-row"
-        ><Text class="device-row-label">Device name</Text><Text testID="device-name-value" class="device-value-text">{deviceName ?? 'unnamed device'}</Text></View
-      ></View
-    ><View testID="device-actions-card" class="device-card"
-      ><Text class="device-card-title">Actions</Text><View class="button-row"
-        ><ActionButton testID="device-get-type-button" title="Get Device Type" onPress={handleGetDeviceType} color={lineColor} /><ActionButton testID="device-get-uptime-button" title="Get Uptime" onPress={handleGetUptime} color={lineColor} /><ActionButton testID="device-check-rooted-button" title="Check Rooted" onPress={handleCheckRooted} color={lineColor} /></View
-      >{#if deviceTypeResult !== null}<View class="device-row"
-        ><Text class="device-row-label">Device type result</Text><Text testID="device-type-result-value" class="device-value-text">{deviceTypeResult}</Text></View
-      >{/if}{#if uptimeResult !== null}<View class="device-row"
-        ><Text class="device-row-label">Uptime</Text><Text testID="device-uptime-result-value" class="device-value-text">{`${uptimeResult}ms`}</Text></View
-      >{/if}{#if isRootedResult !== null}<View class="device-row"
-        ><Text class="device-row-label">Rooted/jailbroken</Text><Text testID="device-rooted-result-value" class="device-value-text">{isRootedResult ? 'true' : 'false'}</Text></View
-      >{/if}</View
-    ></ScrollView
-  ></SafeAreaView
->
+<SafeAreaView class="screen">
+  <ScrollView
+    testID="device-scroll"
+    class="screen"
+    contentContainerStyle="scroll-content"
+  >
+    <View class={`line-tag line-tag-${lineInfo.line}`}>
+      <Text class="line-tag-text">
+        {`${lineInfo.code} · ${lineInfo.label}`}
+      </Text>
+    </View>
+    <View class="hero-card">
+      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <Text class="hero-badge-text">{lineInfo.code}</Text>
+      </View>
+      <View class="hero-copy">
+        <Text class="hero-title">Device</Text>
+        <Text class="hero-body">
+          @symbiote-native/device — physical device info: brand/model/OS
+          constants, memory, and best-effort root/jailbreak detection. A
+          Simulator/emulator reports `isDevice` as false and several fields as
+          unavailable.
+        </Text>
+      </View>
+    </View>
+    <View testID="device-info-card" class="device-card">
+      <Text class="device-card-title">Info</Text>
+      <View class="device-row">
+        <Text class="device-row-label">Is device</Text>
+        <Text testID="device-is-device-value" class="device-value-text">
+          {isDevice ? 'Yes' : 'No (simulator/emulator)'}
+        </Text>
+      </View>
+      <View class="device-row">
+        <Text class="device-row-label">Brand</Text>
+        <Text class="device-value-text">{brand ?? 'unknown'}</Text>
+      </View>
+      <View class="device-row">
+        <Text class="device-row-label">Manufacturer</Text>
+        <Text class="device-value-text">{manufacturer ?? 'unknown'}</Text>
+      </View>
+      <View class="device-row">
+        <Text class="device-row-label">Model name</Text>
+        <Text class="device-value-text">{modelName ?? 'unknown'}</Text>
+      </View>
+      <View class="device-row">
+        <Text class="device-row-label">Device type</Text>
+        <Text class="device-value-text">{deviceTypeLabel(deviceType)}</Text>
+      </View>
+      <View class="device-row">
+        <Text class="device-row-label">OS</Text>
+        <Text class="device-value-text">
+          {`${osName ?? 'unknown'} ${osVersion ?? ''}`}
+        </Text>
+      </View>
+      <View class="device-row">
+        <Text class="device-row-label">Total memory</Text>
+        <Text class="device-value-text">{totalMemoryText}</Text>
+      </View>
+      <View class="device-row">
+        <Text class="device-row-label">Device name</Text>
+        <Text testID="device-name-value" class="device-value-text">
+          {deviceName ?? 'unnamed device'}
+        </Text>
+      </View>
+    </View>
+    <View testID="device-actions-card" class="device-card">
+      <Text class="device-card-title">Actions</Text>
+      <View class="button-row">
+        <ActionButton
+          testID="device-get-type-button"
+          title="Get Device Type"
+          onPress={handleGetDeviceType}
+          color={lineColor}
+        />
+        <ActionButton
+          testID="device-get-uptime-button"
+          title="Get Uptime"
+          onPress={handleGetUptime}
+          color={lineColor}
+        />
+        <ActionButton
+          testID="device-check-rooted-button"
+          title="Check Rooted"
+          onPress={handleCheckRooted}
+          color={lineColor}
+        />
+      </View>{#if deviceTypeResult !== null}<View class="device-row">
+          <Text class="device-row-label">Device type result</Text>
+          <Text testID="device-type-result-value" class="device-value-text">
+            {deviceTypeResult}
+          </Text>
+        </View>{/if}{#if uptimeResult !== null}<View class="device-row">
+          <Text class="device-row-label">Uptime</Text>
+          <Text testID="device-uptime-result-value" class="device-value-text">
+            {`${uptimeResult}ms`}
+          </Text>
+        </View>{/if}{#if isRootedResult !== null}<View class="device-row">
+          <Text class="device-row-label">Rooted/jailbroken</Text>
+          <Text testID="device-rooted-result-value" class="device-value-text">
+            {isRootedResult ? 'true' : 'false'}
+          </Text>
+        </View>{/if}
+    </View>
+  </ScrollView>
+</SafeAreaView>

@@ -18,11 +18,23 @@
 // in a scoped block, since Svelte's own scoping deliberately refuses to reach into a child
 // component. Order matters: the guard throws on a construct that cannot work at all, so it runs
 // before anything rewrites the source it reports offsets against.
+//
+// `collapseTextWhitespace()` collapses whitespace INSIDE a Text node, so a sentence wrapped
+// across source lines does not ship its literal newline + indent into the RCTText. Metro's
+// transformer applies it unconditionally, so the device bundle was never at risk — but without
+// it here, svelte-check and the editor saw the un-collapsed source. That asymmetry with
+// examples/svelte only became visible once this app's markup was written normally, which is
+// what produces multi-line text bodies in the first place.
 import { forbidWebOnlyConstructs } from '@symbiote-native/svelte/preprocessor';
 import { scopedStyles } from '@symbiote-native/svelte/scoped-styles';
+import { collapseTextWhitespace } from '@symbiote-native/svelte/collapse-text-whitespace';
 
 export default {
-  preprocess: [forbidWebOnlyConstructs(), scopedStyles()],
+  preprocess: [
+    forbidWebOnlyConstructs(),
+    scopedStyles(),
+    collapseTextWhitespace(),
+  ],
   compilerOptions: {
     fragments: 'tree',
     css: 'external',

@@ -30,7 +30,8 @@
     "@symbiote-native/slider": "^5.1.0",
     "@symbiote-native/splash-screen": "^3.1.0",
     "react": "19.2.3",
-    "react-native": "0.86.0"
+    "react-native": "0.86.0",
+    "rxjs": "^7.8.1"
   },
   "devDependencies": {
     "@angular/compiler-cli": "~22.0.8",

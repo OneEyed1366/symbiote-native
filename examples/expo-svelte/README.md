@@ -43,17 +43,22 @@ npm run android
 # diagnostic logs:  DEBUG=1 npm start -- --reset-cache   (then run ios/android)
 ```
 
-## Markup formatting is load-bearing
+## Markup formatting
 
-Whitespace **between** two sibling nodes in one parent compiles to a real text node → a real
-`RCTRawText` child, which is invalid under a non-`Text` native parent; and Svelte, unlike Vue,
-does **not** condense whitespace **inside** a text node, so a sentence wrapped across two source
-lines ships its newline and indent into the `RCTText`. Neither is caught by `tsc`, `svelte-check`,
-or any compiler warning. Every screen here packs multi-sibling regions edge-to-edge and keeps each
-text node on one source line. The gate is:
+Write markup normally — indented, one tag per line. This used to be forbidden: whitespace
+**between** two sibling nodes compiles to a real text node, which became a real `RCTRawText`
+child, invalid under a non-`Text` native parent. The shim now maps a whitespace-only text node
+under a parent that takes no raw text to an anchor, so it never reaches Fabric
+(`svelte-adapter-dom-shim` §16b).
+
+The other half still needs a build step: Svelte, unlike Vue, does not condense whitespace
+**inside** a text node, so a sentence wrapped across two source lines would ship its newline and
+indent into the `RCTText`. `collapseTextWhitespace()` folds it back — registered both in
+`svelte.config.js` (for `svelte-check` and the editor) and unconditionally in Metro's transformer
+(for the bundle). The gate checks the pipeline's OUTPUT, not your source:
 
 ```sh
-node scripts/audit-svelte-stray-whitespace.mjs examples/expo-svelte   # 0 / 0
+node scripts/audit-svelte-stray-whitespace.mjs examples/expo-svelte   # 0 wrapped text nodes
 ```
 
 ## Local package resolution

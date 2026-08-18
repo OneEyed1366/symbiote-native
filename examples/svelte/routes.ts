@@ -10,6 +10,7 @@
 export const ROUTE_NAME = {
   Menu: 'Menu',
   Canary: 'Canary',
+  ApiPlayground: 'ApiPlayground',
   Details: 'Details',
   HeaderOptions: 'HeaderOptions',
   SheetDemo: 'SheetDemo',

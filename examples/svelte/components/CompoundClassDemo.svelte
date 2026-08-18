@@ -25,29 +25,31 @@
   let isLoud = $state(false);
 </script>
 
-<!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16 (whitespace between
-     symbiote-*-producing tags compiles to a real, invalid RCTRawText child). -->
-<View class="section-nested"
-  ><Text class="section-label">Compound class · scoped style block</Text><View
-    class="row"
-    ><View class="badge" testID="compound-badge-plain"
-      ><Text class="badge-text">plain</Text></View
-    ><View class="badge loud" testID="compound-badge-loud"
-      ><Text class="badge-text">loud</Text></View
-    ><View class={['badge', isLoud && 'loud']} testID="compound-badge-dynamic"
-      ><Text class="badge-text">dynamic</Text></View
-    ></View
-  ><Text class="note-text" testID="compound-badge-readout"
-    >{isLoud
+<View class="section-nested">
+  <Text class="section-label">Compound class · scoped style block</Text>
+  <View class="row">
+    <View class="badge" testID="compound-badge-plain">
+      <Text class="badge-text">plain</Text>
+    </View>
+    <View class="badge loud" testID="compound-badge-loud">
+      <Text class="badge-text">loud</Text>
+    </View>
+    <View class={['badge', isLoud && 'loud']} testID="compound-badge-dynamic">
+      <Text class="badge-text">dynamic</Text>
+    </View>
+  </View>
+  <Text class="note-text" testID="compound-badge-readout">
+    {isLoud
       ? 'dynamic badge carries both tokens — flame border, same pill shape'
-      : 'dynamic badge carries only .badge — grey border'}</Text
-  ><ActionButton
+      : 'dynamic badge carries only .badge — grey border'}
+  </Text>
+  <ActionButton
     testID="compound-badge-toggle"
     title={isLoud ? 'Drop .loud' : 'Add .loud'}
     color="#ff3e00"
     onPress={() => (isLoud = !isLoud)}
-  /></View
->
+  />
+</View>
 
 <style>
   .badge {

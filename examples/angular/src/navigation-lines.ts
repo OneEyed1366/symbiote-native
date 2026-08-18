@@ -36,17 +36,65 @@ export type INavLineInfo = {
 
 // Every route reachable from MenuScreen, minus Menu itself. Deliberately excludes Details — it's a
 // plain push-target off Canary, not one of the tour stops.
-export type ITourRouteName = Exclude<IRouteName, typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details>;
+export type ITourRouteName = Exclude<
+  IRouteName,
+  typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details
+>;
 
 export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
-  [ROUTE_NAME.Canary]: { line: NAV_LINE.Primitives, code: 'CN', label: 'PRIMITIVES LINE' },
-  [ROUTE_NAME.HeaderOptions]: { line: NAV_LINE.Presentation, code: 'HD', label: 'PRESENTATION LINE' },
-  [ROUTE_NAME.SheetDemo]: { line: NAV_LINE.Presentation, code: 'SH', label: 'PRESENTATION LINE' },
-  [ROUTE_NAME.TabsDemo]: { line: NAV_LINE.Structure, code: 'TB', label: 'STRUCTURE LINE' },
-  [ROUTE_NAME.DrawerDemo]: { line: NAV_LINE.Structure, code: 'DR', label: 'STRUCTURE LINE' },
-  [ROUTE_NAME.NestedNavigators]: { line: NAV_LINE.Structure, code: 'NN', label: 'STRUCTURE LINE' },
-  [ROUTE_NAME.HooksDemo]: { line: NAV_LINE.Introspection, code: 'HK', label: 'INTROSPECTION LINE' },
-  [ROUTE_NAME.DeepLinking]: { line: NAV_LINE.Routing, code: 'DL', label: 'ROUTING LINE' },
-  [ROUTE_NAME.StatePersistence]: { line: NAV_LINE.Routing, code: 'SP', label: 'ROUTING LINE' },
-  [ROUTE_NAME.ReactiveStyle]: { line: NAV_LINE.Primitives, code: 'RS', label: 'PRIMITIVES LINE' },
+  [ROUTE_NAME.Canary]: {
+    line: NAV_LINE.Primitives,
+    code: 'CN',
+    label: 'PRIMITIVES LINE',
+  },
+  [ROUTE_NAME.HeaderOptions]: {
+    line: NAV_LINE.Presentation,
+    code: 'HD',
+    label: 'PRESENTATION LINE',
+  },
+  [ROUTE_NAME.SheetDemo]: {
+    line: NAV_LINE.Presentation,
+    code: 'SH',
+    label: 'PRESENTATION LINE',
+  },
+  [ROUTE_NAME.TabsDemo]: {
+    line: NAV_LINE.Structure,
+    code: 'TB',
+    label: 'STRUCTURE LINE',
+  },
+  [ROUTE_NAME.DrawerDemo]: {
+    line: NAV_LINE.Structure,
+    code: 'DR',
+    label: 'STRUCTURE LINE',
+  },
+  [ROUTE_NAME.NestedNavigators]: {
+    line: NAV_LINE.Structure,
+    code: 'NN',
+    label: 'STRUCTURE LINE',
+  },
+  [ROUTE_NAME.HooksDemo]: {
+    line: NAV_LINE.Introspection,
+    code: 'HK',
+    label: 'INTROSPECTION LINE',
+  },
+  [ROUTE_NAME.DeepLinking]: {
+    line: NAV_LINE.Routing,
+    code: 'DL',
+    label: 'ROUTING LINE',
+  },
+  [ROUTE_NAME.StatePersistence]: {
+    line: NAV_LINE.Routing,
+    code: 'SP',
+    label: 'ROUTING LINE',
+  },
+  [ROUTE_NAME.ReactiveStyle]: {
+    line: NAV_LINE.Primitives,
+    code: 'RS',
+    label: 'PRIMITIVES LINE',
+  },
+  [ROUTE_NAME.ApiPlayground]: {
+    line: NAV_LINE.Primitives,
+    code: 'AP',
+    label: 'PRIMITIVES LINE',
+  },
 };

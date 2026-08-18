@@ -1,14 +1,25 @@
 import { Component, signal } from '@angular/core';
 import { SafeAreaView, Text, View } from '@symbiote-native/angular';
-import { deserializeNavigatorState, serializeNavigatorState } from '@symbiote-native/navigation';
-import { injectNavigation, injectNavigationState } from '@symbiote-native/navigation/angular';
-import type { INavigationHandle, INavigatorHandle } from '@symbiote-native/navigation/angular';
+import {
+  deserializeNavigatorState,
+  serializeNavigatorState,
+} from '@symbiote-native/navigation';
+import {
+  injectNavigation,
+  injectNavigationState,
+} from '@symbiote-native/navigation/angular';
+import type {
+  INavigationHandle,
+  INavigatorHandle,
+} from '@symbiote-native/navigation/angular';
 import type { INavigatorState } from '@symbiote-native/navigation';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-function isResettableHandle(handle: INavigationHandle): handle is INavigationHandle & INavigatorHandle {
+function isResettableHandle(
+  handle: INavigationHandle,
+): handle is INavigationHandle & INavigatorHandle {
   return 'reset' in handle;
 }
 
@@ -38,12 +49,14 @@ function isResettableHandle(handle: INavigationHandle): handle is INavigationHan
           <View class="hero-copy">
             <Text class="hero-title">State persistence</Text>
             <Text class="hero-body">
-              The Stack's own state serialized out and deserialized back in — restoring exactly
-              where you left off.
+              The Stack's own state serialized out and deserialized back in —
+              restoring exactly where you left off.
             </Text>
           </View>
         </View>
-        <Text class="info-text">{{ 'current stack depth: ' + state().routes.length }}</Text>
+        <Text class="info-text">{{
+          'current stack depth: ' + state().routes.length
+        }}</Text>
         <ActionButton
           testID="persist-serialize"
           title="Serialize current stack"
@@ -60,7 +73,9 @@ function isResettableHandle(handle: INavigationHandle): handle is INavigationHan
           <Text class="info-text">{{ 'error: ' + error }}</Text>
         }
         <View class="box-list160">
-          <Text testID="persist-snapshot" class="list-row-text">{{ snapshotText() }}</Text>
+          <Text testID="persist-snapshot" class="list-row-text">{{
+            snapshotText()
+          }}</Text>
         </View>
       </View>
     </SafeAreaView>
@@ -81,19 +96,25 @@ export class StatePersistenceScreen {
 
   constructor() {
     this.liveNavigation = injectNavigation();
-    this.state = injectNavigationState<INavigatorState>(currentState => currentState);
+    this.state = injectNavigationState<INavigatorState>(
+      currentState => currentState,
+    );
   }
 
   onSerialize(): void {
     this.restoreError.set(undefined);
-    this.snapshot.set(JSON.stringify(serializeNavigatorState(this.state()), null, 2));
+    this.snapshot.set(
+      JSON.stringify(serializeNavigatorState(this.state()), null, 2),
+    );
   }
 
   onRestore(): void {
     const snapshot = this.snapshot();
     if (snapshot === undefined) return;
     if (!isResettableHandle(this.liveNavigation)) {
-      this.restoreError.set('this screen is not mounted under a Stack — reset() is unavailable');
+      this.restoreError.set(
+        'this screen is not mounted under a Stack — reset() is unavailable',
+      );
       return;
     }
     try {
@@ -101,11 +122,16 @@ export class StatePersistenceScreen {
       this.liveNavigation.reset(deserializeNavigatorState(parsed));
       this.restoreError.set(undefined);
     } catch (error) {
-      this.restoreError.set(error instanceof Error ? error.message : 'restore failed');
+      this.restoreError.set(
+        error instanceof Error ? error.message : 'restore failed',
+      );
     }
   }
 
   snapshotText(): string {
-    return this.snapshot() ?? 'tap Serialize to capture the current route stack as JSON';
+    return (
+      this.snapshot() ??
+      'tap Serialize to capture the current route stack as JSON'
+    );
   }
 }

@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
-import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto';
+import webCrypto, {
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -39,7 +41,8 @@ export function WebCryptoScreen() {
   const lineColor = LINE_COLOR[lineInfo.line];
 
   const [randomBytesHex, setRandomBytesHex] = useState<string | null>(null);
-  const [isPolyfillInstalled, setIsPolyfillInstalled] = useState(hasGlobalCrypto());
+  const [isPolyfillInstalled, setIsPolyfillInstalled] =
+    useState(hasGlobalCrypto());
 
   const handleGenerateRandomBytes = useCallback(() => {
     const bytes = webCrypto.getRandomValues(new Uint8Array(RANDOM_BYTE_COUNT));
@@ -53,7 +56,11 @@ export function WebCryptoScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="web-crypto-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="web-crypto-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -64,9 +71,9 @@ export function WebCryptoScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Web Crypto</Text>
             <Text className="hero-body">
-              @symbiote-native/standard-web-crypto — a Web Crypto API getRandomValues polyfill
-              over @symbiote-native/crypto's native random source, installable onto
-              globalThis.crypto.
+              @symbiote-native/standard-web-crypto — a Web Crypto API
+              getRandomValues polyfill over @symbiote-native/crypto's native
+              random source, installable onto globalThis.crypto.
             </Text>
           </View>
         </View>
@@ -81,7 +88,9 @@ export function WebCryptoScreen() {
             onPress={handleGenerateRandomBytes}
             color={lineColor}
           />
-          {randomBytesHex !== null && <ValueRow label="Bytes (hex)" value={randomBytesHex} />}
+          {randomBytesHex !== null && (
+            <ValueRow label="Bytes (hex)" value={randomBytesHex} />
+          )}
         </View>
 
         <View testID="web-crypto-polyfill-card" className="feature-card">
@@ -94,7 +103,10 @@ export function WebCryptoScreen() {
             onPress={handleInstallPolyfill}
             color={lineColor}
           />
-          <ValueRow label="globalThis.crypto installed" value={isPolyfillInstalled ? 'Yes' : 'No'} />
+          <ValueRow
+            label="globalThis.crypto installed"
+            value={isPolyfillInstalled ? 'Yes' : 'No'}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -69,31 +69,33 @@
   }
 </script>
 
-<!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16. -->
-<View class="section-nested"
-  ><Text class="section-label"
-    >Runtime modules · I18nManager / Settings / Image statics</Text
-  ><Text class="info-text"
-    >{`RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`}</Text
-  ><ActionButton
+<View class="section-nested">
+  <Text class="section-label">
+    Runtime modules · I18nManager / Settings / Image statics
+  </Text>
+  <Text class="info-text">
+    {`RTL: ${rtl.isRTL ? 'on' : 'off'} · swap L/R: ${rtl.doLeftAndRightSwapInRTL ? 'yes' : 'no'}`}
+  </Text>
+  <ActionButton
     title={rtl.isRTL ? 'Force LTR (needs reload)' : 'Force RTL (needs reload)'}
     onPress={() => I18nManager.forceRTL(!rtl.isRTL)}
     color="#7fb5ff"
-  /><Text testID="persist-count" class="info-text"
-    >{`persisted taps: ${persisted} · survives relaunch`}</Text
-  ><ActionButton
+  />
+  <Text testID="persist-count" class="info-text">
+    {`persisted taps: ${persisted} · survives relaunch`}
+  </Text>
+  <ActionButton
     testID="persist-btn"
     title="Persist a tap"
     onPress={persistTap}
     color="#7fb5ff"
-  /><View class="row-align-center"
-    ><Image source={{ uri: LOGO_URI }} class="logo-thumb" /><Text
-      testID="logo-size"
-      class="info-text-flex">{`logo size: ${imageSize}`}</Text
-    ></View
-  ><Text class="info-text">{`prefetch cache: ${cacheState}`}</Text><ActionButton
-    title="Prefetch logo"
-    onPress={prefetchLogo}
-    color="#7fb5ff"
-  /></View
->
+  />
+  <View class="row-align-center">
+    <Image source={{ uri: LOGO_URI }} class="logo-thumb" />
+    <Text testID="logo-size" class="info-text-flex">
+      {`logo size: ${imageSize}`}
+    </Text>
+  </View>
+  <Text class="info-text">{`prefetch cache: ${cacheState}`}</Text>
+  <ActionButton title="Prefetch logo" onPress={prefetchLogo} color="#7fb5ff" />
+</View>

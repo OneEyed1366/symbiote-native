@@ -4,10 +4,13 @@
   // a permission card driving usePermissions(). Most fields need a physical device with a SIM card;
   // a simulator/emulator reports null/UNKNOWN for nearly everything. Svelte twin of
   // examples/expo-vue-sfc/screens/CellularScreen.vue.
-  //
-  // Markup whitespace is load-bearing here, exactly as in MenuScreen.svelte — siblings are packed
-  // edge-to-edge and every text node stays on ONE source line (svelte-adapter-dom-shim §16).
-  import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/svelte';
+  import {
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    Text,
+    View,
+  } from '@symbiote-native/svelte';
   import {
     CellularGeneration,
     allowsVoipAsync,
@@ -70,14 +73,16 @@
       getCarrierNameAsync(),
       getMobileCountryCodeAsync(),
       getMobileNetworkCodeAsync(),
-    ]).then(([currentGeneration, voip, iso, carrier, countryCode, networkCode]) => {
-      generation = currentGeneration;
-      allowsVoip = voip;
-      isoCountryCode = iso;
-      carrierName = carrier;
-      mobileCountryCode = countryCode;
-      mobileNetworkCode = networkCode;
-    });
+    ]).then(
+      ([currentGeneration, voip, iso, carrier, countryCode, networkCode]) => {
+        generation = currentGeneration;
+        allowsVoip = voip;
+        isoCountryCode = iso;
+        carrierName = carrier;
+        mobileCountryCode = countryCode;
+        mobileNetworkCode = networkCode;
+      },
+    );
   });
 
   const generationText = $derived(
@@ -93,39 +98,72 @@
   );
 </script>
 
-<SafeAreaView class="screen"
-  ><ScrollView testID="cellular-scroll" class="screen" contentContainerStyle="scroll-content"
-    ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
-    ><View class="hero-card"
-      ><View class="hero-badge" style={{ backgroundColor: lineColor }}
-        ><Text class="hero-badge-text">{lineInfo.code}</Text></View
-      ><View class="hero-copy"
-        ><Text class="hero-title">Cellular</Text><Text class="hero-body">@symbiote-native/cellular — cellular generation and carrier/SIM info. Every field except generation is Android-only upstream (iOS/web return null); a physical device with an active SIM is needed for real values.</Text></View
-      ></View
-    ><View testID="cellular-info-card" class="cellular-card"
-      ><Text class="cellular-card-title">Cellular info</Text><View class="cellular-row"
-        ><Text class="cellular-row-label">Generation</Text><Text testID="cellular-generation-value" class="cellular-value-text">{generationText}</Text></View
-      >{#if Platform.OS === 'android'}<View class="cellular-row"
-        ><Text class="cellular-row-label">Allows VoIP</Text><Text class="cellular-value-text">{allowsVoipText}</Text></View
-      ><View class="cellular-row"
-        ><Text class="cellular-row-label">ISO country code</Text><Text class="cellular-value-text">{isoCountryCodeText}</Text></View
-      ><View class="cellular-row"
-        ><Text class="cellular-row-label">Carrier name</Text><Text class="cellular-value-text">{carrierNameText}</Text></View
-      ><View class="cellular-row"
-        ><Text class="cellular-row-label">Mobile country code</Text><Text class="cellular-value-text">{mobileCountryCodeText}</Text></View
-      ><View class="cellular-row"
-        ><Text class="cellular-row-label">Mobile network code</Text><Text class="cellular-value-text">{mobileNetworkCodeText}</Text></View
-      >{/if}</View
-    ><View testID="cellular-permission-card" class="cellular-card"
-      ><Text class="cellular-card-title">Permission</Text><View class="cellular-row"
-        ><Text class="cellular-row-label">Phone-state permission status</Text><Text testID="cellular-permission-value" class="cellular-value-text">{permissionLabel}</Text></View
-      ><ActionButton
+<SafeAreaView class="screen">
+  <ScrollView
+    testID="cellular-scroll"
+    class="screen"
+    contentContainerStyle="scroll-content"
+  >
+    <View class={`line-tag line-tag-${lineInfo.line}`}>
+      <Text class="line-tag-text">
+        {`${lineInfo.code} · ${lineInfo.label}`}
+      </Text>
+    </View>
+    <View class="hero-card">
+      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <Text class="hero-badge-text">{lineInfo.code}</Text>
+      </View>
+      <View class="hero-copy">
+        <Text class="hero-title">Cellular</Text>
+        <Text class="hero-body">
+          @symbiote-native/cellular — cellular generation and carrier/SIM info.
+          Every field except generation is Android-only upstream (iOS/web return
+          null); a physical device with an active SIM is needed for real values.
+        </Text>
+      </View>
+    </View>
+    <View testID="cellular-info-card" class="cellular-card">
+      <Text class="cellular-card-title">Cellular info</Text>
+      <View class="cellular-row">
+        <Text class="cellular-row-label">Generation</Text>
+        <Text testID="cellular-generation-value" class="cellular-value-text">
+          {generationText}
+        </Text>
+      </View>{#if Platform.OS === 'android'}<View class="cellular-row">
+          <Text class="cellular-row-label">Allows VoIP</Text>
+          <Text class="cellular-value-text">{allowsVoipText}</Text>
+        </View>
+        <View class="cellular-row">
+          <Text class="cellular-row-label">ISO country code</Text>
+          <Text class="cellular-value-text">{isoCountryCodeText}</Text>
+        </View>
+        <View class="cellular-row">
+          <Text class="cellular-row-label">Carrier name</Text>
+          <Text class="cellular-value-text">{carrierNameText}</Text>
+        </View>
+        <View class="cellular-row">
+          <Text class="cellular-row-label">Mobile country code</Text>
+          <Text class="cellular-value-text">{mobileCountryCodeText}</Text>
+        </View>
+        <View class="cellular-row">
+          <Text class="cellular-row-label">Mobile network code</Text>
+          <Text class="cellular-value-text">{mobileNetworkCodeText}</Text>
+        </View>{/if}
+    </View>
+    <View testID="cellular-permission-card" class="cellular-card">
+      <Text class="cellular-card-title">Permission</Text>
+      <View class="cellular-row">
+        <Text class="cellular-row-label">Phone-state permission status</Text>
+        <Text testID="cellular-permission-value" class="cellular-value-text">
+          {permissionLabel}
+        </Text>
+      </View>
+      <ActionButton
         testID="cellular-request-permission"
         title="Request permission"
         onPress={() => permissions.request()}
         color={lineColor}
-      /></View
-    ></ScrollView
-  ></SafeAreaView
->
+      />
+    </View>
+  </ScrollView>
+</SafeAreaView>

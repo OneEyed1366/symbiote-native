@@ -1,4 +1,10 @@
-import { Pressable, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import {
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/react';
 import { useStackNavigation } from '@symbiote-native/navigation/react';
 import { ROUTE_NAME } from '../routes';
 import type { ITourRouteName } from '../navigation-lines';
@@ -11,15 +17,56 @@ type IMenuItem = {
 };
 
 const MENU_ITEMS: readonly IMenuItem[] = [
-  { label: 'All primitives (Canary)', route: ROUTE_NAME.Canary, hint: 'every @symbiote-native/react primitive' },
-  { label: 'Header options', route: ROUTE_NAME.HeaderOptions, hint: 'bar buttons, menu, search bar, large title' },
-  { label: 'Sheet presentation', route: ROUTE_NAME.SheetDemo, hint: 'formSheet + multiple detents' },
-  { label: 'Tabs', route: ROUTE_NAME.TabsDemo, hint: 'bottom-tabs — icon, badge, tint' },
-  { label: 'Drawer', route: ROUTE_NAME.DrawerDemo, hint: 'swipeable drawer — right side, slide type' },
-  { label: 'Nested navigators', route: ROUTE_NAME.NestedNavigators, hint: 'Tab nested in a Stack screen + getParent()' },
-  { label: 'Hooks', route: ROUTE_NAME.HooksDemo, hint: 'useFocusEffect / useIsFocused / useNavigationState' },
-  { label: 'Deep linking', route: ROUTE_NAME.DeepLinking, hint: 'resolveRouteFromUrl against a typed URL' },
-  { label: 'State persistence', route: ROUTE_NAME.StatePersistence, hint: 'serialize/deserialize the Stack state' },
+  {
+    label: 'All primitives (Canary)',
+    route: ROUTE_NAME.Canary,
+    hint: 'every @symbiote-native/react primitive',
+  },
+  {
+    label: 'API Playground',
+    route: ROUTE_NAME.ApiPlayground,
+    hint: 'React hooks, Suspense, Context, refs, error boundaries — live',
+  },
+  {
+    label: 'Header options',
+    route: ROUTE_NAME.HeaderOptions,
+    hint: 'bar buttons, menu, search bar, large title',
+  },
+  {
+    label: 'Sheet presentation',
+    route: ROUTE_NAME.SheetDemo,
+    hint: 'formSheet + multiple detents',
+  },
+  {
+    label: 'Tabs',
+    route: ROUTE_NAME.TabsDemo,
+    hint: 'bottom-tabs — icon, badge, tint',
+  },
+  {
+    label: 'Drawer',
+    route: ROUTE_NAME.DrawerDemo,
+    hint: 'swipeable drawer — right side, slide type',
+  },
+  {
+    label: 'Nested navigators',
+    route: ROUTE_NAME.NestedNavigators,
+    hint: 'Tab nested in a Stack screen + getParent()',
+  },
+  {
+    label: 'Hooks',
+    route: ROUTE_NAME.HooksDemo,
+    hint: 'useFocusEffect / useIsFocused / useNavigationState',
+  },
+  {
+    label: 'Deep linking',
+    route: ROUTE_NAME.DeepLinking,
+    hint: 'resolveRouteFromUrl against a typed URL',
+  },
+  {
+    label: 'State persistence',
+    route: ROUTE_NAME.StatePersistence,
+    hint: 'serialize/deserialize the Stack state',
+  },
 ];
 
 /**
@@ -29,19 +76,27 @@ const MENU_ITEMS: readonly IMenuItem[] = [
  *
  * Rows are grouped into 5 thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
  * 2-letter badge per line, carried through onto each demo screen's own line tag — so the tour
- * reads as one system instead of a flat bag of unrelated test screens.
+ * reads as one system instead of a flat bag of unrelated test screens. API Playground is the
+ * one row that isn't about @symbiote-native/navigation at all — it demos React's OWN API
+ * surface (hooks, Suspense, Context, refs…) running under the custom renderer, grouped onto the
+ * Introspection line alongside HooksDemo since both verify the renderer's internals.
  */
 export function MenuScreen() {
   const navigation = useStackNavigation();
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="menu-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="menu-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className="menu-hero">
           <Text className="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
-          <Text className="menu-hero-title">Nine stops along the stack</Text>
+          <Text className="menu-hero-title">Ten stops along the stack</Text>
           <Text className="menu-hero-subtitle">
-            Each row below drives a different line of @symbiote-native/navigation — Primitives,
-            Presentation, Structure, Introspection, Routing — on a real native stack.
+            Each row below drives a different line of
+            @symbiote-native/navigation — Primitives, Presentation, Structure,
+            Introspection, Routing — on a real native stack.
           </Text>
         </View>
         {MENU_ITEMS.map(item => {
@@ -58,7 +113,11 @@ export function MenuScreen() {
               </View>
               <View className="menu-row-copy">
                 <Text className="menu-row-label">{item.label}</Text>
-                <Text className={`menu-row-hint menu-row-hint-${lineInfo.line}`}>{item.hint}</Text>
+                <Text
+                  className={`menu-row-hint menu-row-hint-${lineInfo.line}`}
+                >
+                  {item.hint}
+                </Text>
               </View>
             </Pressable>
           );

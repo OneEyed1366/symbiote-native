@@ -4,11 +4,17 @@
   // capabilities-card/status-badge shape. No store-URL options passed — this demo relies on the
   // native review flow alone (see the core's IStoreReviewUrlOptions fallback for real apps).
   // Svelte twin of ../../expo-vue-sfc/screens/StoreReviewScreen.vue.
-  //
-  // Markup formatting is load-bearing: siblings are packed edge-to-edge and every text node stays
-  // on ONE source line — see MenuScreen.svelte's header and svelte-adapter-dom-shim §16.
-  import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/svelte';
-  import { hasAction, isAvailableAsync, requestReview } from '@symbiote-native/store-review/svelte';
+  import {
+    SafeAreaView,
+    ScrollView,
+    Text,
+    View,
+  } from '@symbiote-native/svelte';
+  import {
+    hasAction,
+    isAvailableAsync,
+    requestReview,
+  } from '@symbiote-native/store-review/svelte';
   import ActionButton from '../components/ActionButton.svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -20,7 +26,11 @@
   }
 
   function toBadgeText(status: ICapabilityStatus): string {
-    return status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+    return status === 'checking'
+      ? 'CHECKING…'
+      : status === 'yes'
+        ? 'YES'
+        : 'NO';
   }
 
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StoreReview];
@@ -55,35 +65,73 @@
   }
 </script>
 
-<SafeAreaView class="screen"
-  ><ScrollView testID="store-review-scroll" class="screen" contentContainerStyle="scroll-content"
-    ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
-    ><View class="hero-card"
-      ><View class="hero-badge" style={{ backgroundColor: lineColor }}
-        ><Text class="hero-badge-text">{lineInfo.code}</Text></View
-      ><View class="hero-copy"
-        ><Text class="hero-title">Store Review</Text><Text class="hero-body">@symbiote-native/store-review — prompts the platform's native in-app review flow.</Text></View
-      ></View
-    ><View testID="store-review-capabilities-card" class="store-review-card"
-      ><Text class="store-review-card-title">Capabilities</Text><View class="store-review-row"
-        ><Text class="store-review-row-label">Available</Text><View class={`store-review-status-badge store-review-status-badge-${isAvailable}`}
-          ><Text class="store-review-status-text">{toBadgeText(isAvailable)}</Text></View
-        ></View
-      ><View class="store-review-row"
-        ><Text class="store-review-row-label">Has action</Text><View class={`store-review-status-badge store-review-status-badge-${hasReviewAction}`}
-          ><Text class="store-review-status-text">{toBadgeText(hasReviewAction)}</Text></View
-        ></View
-      ></View
-    ><View testID="store-review-actions-card" class="store-review-card"
-      ><Text class="store-review-card-title">Actions</Text><ActionButton
+<SafeAreaView class="screen">
+  <ScrollView
+    testID="store-review-scroll"
+    class="screen"
+    contentContainerStyle="scroll-content"
+  >
+    <View class={`line-tag line-tag-${lineInfo.line}`}>
+      <Text class="line-tag-text">
+        {`${lineInfo.code} · ${lineInfo.label}`}
+      </Text>
+    </View>
+    <View class="hero-card">
+      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <Text class="hero-badge-text">{lineInfo.code}</Text>
+      </View>
+      <View class="hero-copy">
+        <Text class="hero-title">Store Review</Text>
+        <Text class="hero-body">
+          @symbiote-native/store-review — prompts the platform's native in-app
+          review flow.
+        </Text>
+      </View>
+    </View>
+    <View testID="store-review-capabilities-card" class="store-review-card">
+      <Text class="store-review-card-title">Capabilities</Text>
+      <View class="store-review-row">
+        <Text class="store-review-row-label">Available</Text>
+        <View
+          class={`store-review-status-badge store-review-status-badge-${isAvailable}`}
+        >
+          <Text class="store-review-status-text">
+            {toBadgeText(isAvailable)}
+          </Text>
+        </View>
+      </View>
+      <View class="store-review-row">
+        <Text class="store-review-row-label">Has action</Text>
+        <View
+          class={`store-review-status-badge store-review-status-badge-${hasReviewAction}`}
+        >
+          <Text class="store-review-status-text">
+            {toBadgeText(hasReviewAction)}
+          </Text>
+        </View>
+      </View>
+    </View>
+    <View testID="store-review-actions-card" class="store-review-card">
+      <Text class="store-review-card-title">Actions</Text>
+      <ActionButton
         testID="store-review-request-button"
         title="Request Review"
         onPress={handleRequestReview}
         color={lineColor}
-      /><View class="store-review-row"
-        ><Text class="store-review-row-label">Last result</Text><Text testID="store-review-result" class="store-review-value-text">{lastResult}</Text></View
-      ><Text class="info-text">resolved means the call completed, not that a prompt appeared. On Android the Play dialog only shows for a build installed from Google Play (internal test track, internal app sharing, or production); a sideloaded debug build resolves silently. iOS shows it in debug builds. Both stores also enforce a quota.</Text></View
-    ></ScrollView
-  ></SafeAreaView
->
+      />
+      <View class="store-review-row">
+        <Text class="store-review-row-label">Last result</Text>
+        <Text testID="store-review-result" class="store-review-value-text">
+          {lastResult}
+        </Text>
+      </View>
+      <Text class="info-text">
+        resolved means the call completed, not that a prompt appeared. On
+        Android the Play dialog only shows for a build installed from Google
+        Play (internal test track, internal app sharing, or production); a
+        sideloaded debug build resolves silently. iOS shows it in debug builds.
+        Both stores also enforce a quota.
+      </Text>
+    </View>
+  </ScrollView>
+</SafeAreaView>

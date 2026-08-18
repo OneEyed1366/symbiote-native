@@ -38,6 +38,7 @@ import { NestedNavigatorsScreen } from './screens/NestedNavigatorsScreen';
 import { HooksDemoScreen } from './screens/HooksDemoScreen';
 import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
 import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
+import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
@@ -193,6 +194,19 @@ function App() {
             title: 'State Persistence',
             headerShown: true,
             headerTintColor: LINE_COLOR.routing,
+            headerTranslucent: true,
+            headerTitleColor: '#ffffff',
+            headerStyle: { backgroundColor: '#0b1622' },
+            headerUserInterfaceStyle: 'dark',
+          }}
+        />
+        <Stack.Screen
+          name={ROUTE_NAME.ApiPlayground}
+          component={ApiPlaygroundScreen}
+          options={{
+            title: 'API Playground',
+            headerShown: true,
+            headerTintColor: LINE_COLOR.introspection,
             headerTranslucent: true,
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },

@@ -31,7 +31,9 @@ const searchBarRef: { current: ISearchBarCommands | null } = { current: null };
 // close over the LIVE navigation handle and round-trip the pressed action back onto the route via
 // setParams(), which HeaderOptionsScreen below then reads via injectRoute() to display. Twin of
 // ../../react/screens/HeaderOptionsScreen.tsx's headerOptionsScreenOptions.
-export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation }) => ({
+export const headerOptionsScreenOptions: IScreenOptionsResolver = ({
+  navigation,
+}) => ({
   title: 'Header Options',
   headerShown: true,
   headerTranslucent: true,
@@ -45,7 +47,8 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation 
     {
       type: 'button',
       title: 'Info',
-      onPress: () => navigation.setParams({ lastHeaderAction: 'left bar button: Info' }),
+      onPress: () =>
+        navigation.setParams({ lastHeaderAction: 'left bar button: Info' }),
     },
   ],
   headerRightBarButtonItems: [
@@ -58,13 +61,15 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation 
           {
             type: 'action',
             title: 'Share',
-            onPress: () => navigation.setParams({ lastHeaderAction: 'menu: Share' }),
+            onPress: () =>
+              navigation.setParams({ lastHeaderAction: 'menu: Share' }),
           },
           {
             type: 'action',
             title: 'Delete',
             destructive: true,
-            onPress: () => navigation.setParams({ lastHeaderAction: 'menu: Delete' }),
+            onPress: () =>
+              navigation.setParams({ lastHeaderAction: 'menu: Delete' }),
           },
         ],
       },
@@ -81,12 +86,16 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation 
     hintTextColor: '#41506a',
     headerIconColor: LINE_COLOR.presentation,
     onChangeText: text => navigation.setParams({ lastSearchText: text }),
-    onSearchButtonPress: text => navigation.setParams({ lastSearchSubmitted: text }),
+    onSearchButtonPress: text =>
+      navigation.setParams({ lastSearchSubmitted: text }),
     onFocus: () => navigation.setParams({ lastSearchBarEvent: 'focused' }),
     onBlur: () => navigation.setParams({ lastSearchBarEvent: 'blurred' }),
-    onCancelButtonPress: () => navigation.setParams({ lastSearchBarEvent: 'cancel pressed' }),
-    onClose: () => navigation.setParams({ lastSearchBarEvent: 'closed (Android)' }),
-    onOpen: () => navigation.setParams({ lastSearchBarEvent: 'opened (Android)' }),
+    onCancelButtonPress: () =>
+      navigation.setParams({ lastSearchBarEvent: 'cancel pressed' }),
+    onClose: () =>
+      navigation.setParams({ lastSearchBarEvent: 'closed (Android)' }),
+    onOpen: () =>
+      navigation.setParams({ lastSearchBarEvent: 'opened (Android)' }),
   },
 });
 
@@ -115,8 +124,9 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation 
           <View class="hero-copy">
             <Text class="hero-title">Header options</Text>
             <Text class="hero-body">
-              Bar buttons, a right-side menu, a native search bar, and headerLargeTitle — every
-              headerSearchBarOptions callback wired to a live control below.
+              Bar buttons, a right-side menu, a native search bar, and
+              headerLargeTitle — every headerSearchBarOptions callback wired to
+              a live control below.
             </Text>
           </View>
         </View>
@@ -136,8 +146,9 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation 
           {{ 'last search bar event: ' + lastSearchBarEvent() }}
         </Text>
         <Text class="note-text">
-          Pull down to reveal the search bar (headerSearchBarOptions), or use the buttons below to
-          drive it imperatively through its SearchBarCommands ref.
+          Pull down to reveal the search bar (headerSearchBarOptions), or use
+          the buttons below to drive it imperatively through its
+          SearchBarCommands ref.
         </Text>
         <ActionButton
           testID="search-bar-focus"
@@ -187,7 +198,9 @@ export class HeaderOptionsScreen {
   }
 
   lastHeaderAction(): string {
-    return this.params.lastHeaderAction ?? 'none yet — tap a bar button or menu item';
+    return (
+      this.params.lastHeaderAction ?? 'none yet — tap a bar button or menu item'
+    );
   }
 
   lastSearchText(): string {
@@ -195,11 +208,16 @@ export class HeaderOptionsScreen {
   }
 
   lastSearchSubmitted(): string {
-    return this.params.lastSearchSubmitted ?? 'none yet — type and press search';
+    return (
+      this.params.lastSearchSubmitted ?? 'none yet — type and press search'
+    );
   }
 
   lastSearchBarEvent(): string {
-    return this.params.lastSearchBarEvent ?? 'none yet — focus/blur/cancel the search bar';
+    return (
+      this.params.lastSearchBarEvent ??
+      'none yet — focus/blur/cancel the search bar'
+    );
   }
 
   onFocusSearchBar(): void {
