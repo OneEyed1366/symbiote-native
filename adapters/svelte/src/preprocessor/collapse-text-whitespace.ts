@@ -23,12 +23,18 @@
 // a whitespace-only node with a newline gets deleted; a same-line run of 2+ spaces collapses to
 // one and stays, matching HTML's own collapse of an intentional double space.
 //
-// Known gap: a whitespace-only run between two siblings on ONE line with no newline
-// (`<View><A/>  <B/></View>`) isn't caught - indistinguishable from the intentional-space case
-// without knowing whether the parent renders raw text. Rare in practice (§16's own audit found
-// only the wrapped-sentence and cross-line-gap shapes) and still caught by
-// `scripts/audit-svelte-stray-whitespace.mjs`, which walks the compiled output independently of
-// this heuristic.
+// Hazard 2 is no longer THIS file's guarantee. A whitespace-only run between two siblings on
+// ONE line (`<View><A/>  <B/></View>`) is indistinguishable here from an intentional space -
+// the missing fact is whether the parent renders raw text, which source alone cannot say.
+// `dom-shim/text.ts` knows it: by the time a text node goes live its parent's engine node is
+// bound, so it drops whitespace-only text under any non-text parent. That is exact, and it
+// holds even for a consumer who never registers this preprocessor.
+//
+// So deleting the cross-line gap here is now an OPTIMIZATION - the node is never built at all -
+// plus source hygiene for svelte-check. Hazard 1 (a wrapped sentence INSIDE one text node) does
+// still rely on this file: it needs collapsing rather than dropping, and only source can tell an
+// authored newline from one a runtime value carries. `scripts/audit-svelte-stray-whitespace.mjs`
+// still walks compiled output independently of both.
 //
 // Registered in svelte.config.js's `preprocess`, same as forbid-web-only-constructs.ts and
 // scoped-styles.ts, so it covers both svelte-check/the language server and Metro's build.
@@ -57,12 +63,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function numberAt(node: Record<string, unknown>, key: string): number | undefined {
+function numberAt(
+  node: Record<string, unknown>,
+  key: string,
+): number | undefined {
   const value = node[key];
   return typeof value === 'number' ? value : undefined;
 }
 
-function stringAt(node: Record<string, unknown>, key: string): string | undefined {
+function stringAt(
+  node: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const value = node[key];
   return typeof value === 'string' ? value : undefined;
 }
@@ -86,6 +98,11 @@ function nestedNodes(node: Record<string, unknown>): unknown[] {
   return nested;
 }
 
+// Narrower than the shim's WHITESPACE_ONLY, on purpose - do NOT "unify" them. This class drives
+// COLLAPSING runs inside real text content, where `&nbsp;` / `&emsp;` are a deliberate character
+// an author typed, not formatting; folding them into a plain space would change what renders.
+// The shim can be wider because it only ever DROPS, and only under a parent that cannot paint
+// text at all. Same reason Svelte's own regex_not_whitespace excludes nbsp.
 const WHITESPACE_RUN = /[ \t\r\n]+/g;
 
 function collectEdits(nodes: unknown[], edits: IEdit[]): void {
@@ -112,7 +129,9 @@ function textEdit(start: number, end: number, data: string): IEdit | undefined {
   if (collapsed.trim() === '') {
     // Whitespace-only node: delete it only if the original spanned a line break, else leave it
     // as the single collapsed space.
-    return data.includes('\n') ? { start, end, text: '' } : { start, end, text: collapsed };
+    return data.includes('\n')
+      ? { start, end, text: '' }
+      : { start, end, text: collapsed };
   }
   if (collapsed === data) return undefined;
   return { start, end, text: collapsed };
@@ -123,7 +142,8 @@ function applyEdits(content: string, edits: IEdit[]): string {
   return [...edits]
     .sort((left, right) => right.start - left.start)
     .reduce(
-      (source, edit) => source.slice(0, edit.start) + edit.text + source.slice(edit.end),
+      (source, edit) =>
+        source.slice(0, edit.start) + edit.text + source.slice(edit.end),
       content,
     );
 }

@@ -10,7 +10,7 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -43,7 +43,14 @@ afterEach(() => {
 // merge both resolve to a value, never a rejection.
 describe('InputAccessoryView (no throwing path — see file header)', () => {
   it('resolves a class= on the InputAccessoryView use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ toolbar: { backgroundColor: 'orange' } });
+    registerRules([
+      {
+        tokens: ['toolbar'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'orange' },
+      },
+    ]);
 
     mount(ROOT_TAG, InputAccessoryViewHostFixture);
     await new Promise<void>(resolve => setTimeout(resolve, 0));

@@ -11,7 +11,7 @@
 // resolves to SOME descriptor; there is no input it rejects.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import {
   mount,
   unmount,
@@ -95,9 +95,16 @@ describe('Image (React lifecycle + descriptor bridge)', () => {
       // why: className is IImageProps' React-specific extension (not part of the shared
       // agnostic IImageBaseProps) — since it is not one of renderImage's typed transform fields
       // (source/src/srcSet/alt/width/height/...), it falls into passthrough and must resolve
-      // through the SAME registerStyles/routeProp path View and ImageBackground use, landing as
+      // through the SAME registerRules/routeProp path View and ImageBackground use, landing as
       // flattened style props on the image node, not a literal `className` prop.
-      registerStyles({ hero: { opacity: 0.75 } });
+      registerRules([
+        {
+          tokens: ['hero'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { opacity: 0.75 },
+        },
+      ]);
       mount(
         ROOT_TAG,
         <Image source={{ uri: 'http://x/y.png' }} className="hero" />,

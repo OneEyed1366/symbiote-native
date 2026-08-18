@@ -21,7 +21,7 @@ import {
   unmount,
   setNativeViewConfigSource,
 } from '@symbiote-native/angular';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Slider } from '.';
 
@@ -312,7 +312,14 @@ describe('Angular Slider anchor class= resolution', () => {
   describe('Positive', () => {
     beforeEach(() => {
       fabric.reset();
-      registerStyles({ card: { backgroundColor: 'red' } });
+      registerRules([
+        {
+          tokens: ['card'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { backgroundColor: 'red' },
+        },
+      ]);
     });
     afterEach(() => {
       unmount(ROOT_TAG);

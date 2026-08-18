@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
 import type { IFakeNode } from '@symbiote-native/test-utils';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { normalizeSvelteClass, resolveSvelteClass } from './class-value';
 import { mount, unmount } from './render';
 
@@ -101,7 +101,20 @@ describe('normalizeSvelteClass', () => {
 describe('resolveSvelteClass', () => {
   beforeEach(() => {
     clearGlobalStyles();
-    registerStyles({ card: { padding: 8 }, cardOn: { opacity: 1 } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 8 },
+      },
+      {
+        tokens: ['cardOn'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { opacity: 1 },
+      },
+    ]);
   });
 
   // why: normalizing a clsx map to a string is only half the job — the host node needs the actual
@@ -199,7 +212,20 @@ describe('a clsx `class` on a real compiled View', () => {
   beforeEach(() => {
     fabric.reset();
     clearGlobalStyles();
-    registerStyles({ card: { padding: 8 }, cardOn: { opacity: 1 } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 8 },
+      },
+      {
+        tokens: ['cardOn'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { opacity: 1 },
+      },
+    ]);
   });
 
   afterEach(() => {
@@ -224,8 +250,8 @@ describe('a clsx `class` on a real compiled View', () => {
       node => node.props.testID === 'clsx-target',
     );
     expect(target).toBeDefined();
-    // `card cardOn` has no compound entry registered, so the per-class merge runs and both
-    // halves land; `style` is the explicit half and wins the flatten (the fake Fabric spreads
+    // `card` and `cardOn` are two independent single-token rules, so both land; `style` is the
+    // author's explicit half and wins the flatten (the fake Fabric spreads
     // the flattened style onto the node's props, so the fields read off `props` directly).
     expect(target?.props.padding).toBe(8);
     expect(target?.props.opacity).toBe(1);

@@ -13,7 +13,7 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import {
   imageStatics,
   setImageSourceResolver,
@@ -140,10 +140,17 @@ describe('Solid Image on the engine', () => {
     });
 
     // why: `class` is IImageProps' Solid-specific extension, not one of renderImage's typed view
-    // fields — so it must fall into passthrough and resolve through the SAME registerStyles /
+    // fields — so it must fall into passthrough and resolve through the SAME registerRules /
     // routeProp path View uses, landing as flattened style props rather than a literal `class`.
     it('resolves a Solid `class` through the shared style registry onto the image', async () => {
-      registerStyles({ hero: { opacity: CLASS_OPACITY } });
+      registerRules([
+        {
+          tokens: ['hero'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { opacity: CLASS_OPACITY },
+        },
+      ]);
       mount(ROOT_TAG, () => <Image source={REMOTE} class="hero" />);
       await tick();
 

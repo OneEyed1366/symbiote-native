@@ -29,7 +29,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { mount, unmount } from '../../render';
 
 if (globalThis.window === undefined)
@@ -168,7 +168,14 @@ describe('ImageBackground (real compiled index.svelte)', () => {
     // inner Image, after the dimension proxy, rather than forwarding the raw string to native
     // (which Fabric cannot consume as a style value).
     it('resolves a string imageStyle through the class registry and merges it onto the Image', async () => {
-      registerStyles({ ibTint: { opacity: 0.5 } });
+      registerRules([
+        {
+          tokens: ['ibTint'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { opacity: 0.5 },
+        },
+      ]);
       const Parent = await loadMountable('ibTint');
       mount(ROOT_TAG, Parent);
       await tick();

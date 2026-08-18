@@ -19,17 +19,19 @@
 // node-transform to a source rewrite because Svelte's compiler exposes no AST hook.
 //
 // Four steps, in order:
-//   1. parse the block out and compile it through @symbiote-native/css-parser, exactly like Vue's
-//      <style scoped> — every class registers under a per-file-suffixed key, `card` ->
-//      `card__svelte-<hash>`, in the same global registry App.css and Vue SFC blocks populate.
-//   2. rewrite `class` in THIS file's own markup to name the suffixed key. Static values are
-//      resolved here, at build time; a dynamic `class={expr}` is wrapped in a runtime call to
-//      `scopeSvelteClass` (../style-scope) — the only shape that can scope a value the compiler
-//      cannot see into.
+//   1. cut the block out TEXTUALLY (see STYLE_TAG_PATTERN) and compile it through
+//      @symbiote-native/css-parser's `compileScopedCss`, exactly like Vue's <style scoped> —
+//      lightningcss renames every class this file owns, `card` -> `card__svelte-<hash>`, and
+//      hands back the name map; the styles register under those names in the same global
+//      registry App.css and Vue SFC blocks populate.
+//   2. rewrite `class` in THIS file's own markup by READING that map — never by re-deriving the
+//      name, which is how the two halves used to be two implementations of "what is this class
+//      called now". Static values resolve here, at build time; a dynamic `class={expr}` is
+//      wrapped in a runtime call to `scopeSvelteClass` (../style-scope) that resolves through the
+//      SAME map, emitted beside it.
 //   3. delete the `<style>` block from the source handed on, so Svelte emits no
 //      `css_unused_selector` warnings and adds no scope hash of its own.
-//   4. append one `<script module>` line holding the `registerStyles()` call and the two
-//      per-file constants step 2's rewrite refers to.
+//   4. append one `<script module>` line holding the `registerRules()` call and the name map.
 //
 // SCOPING SEMANTICS, AND THE ONE DELIBERATE DIVERGENCE FROM SVELTE-ON-THE-WEB. Svelte scopes by
 // FILE: only markup written in this file carries the scope, never markup a child component owns
@@ -54,13 +56,11 @@
 
 import { parse } from 'svelte/compiler';
 import {
-  classTokensIn,
   compile as compilePreprocessor,
-  globalClassNamesIn,
-  globalClassTokensIn,
+  compileScopedCss,
   hashFilePath,
-  parseCSS,
   type IPreprocessorLanguage,
+  type IStyleRule,
 } from '@symbiote-native/css-parser';
 // Resolved by package SELF-REFERENCE, not the relative `../scope-token` the rest of this package
 // would write — same reason metro-svelte-transformer.cjs reaches for
@@ -71,30 +71,34 @@ import {
 // in this workspace, `build` in a published install — so one line works in both. `scope-token`
 // specifically, never `style-scope`: that one reaches the engine through `class-value`, a whole
 // extensionless graph this build-time file must not pull in.
-import { scopeToken } from '@symbiote-native/svelte/scope-token';
+import {
+  scopeToken,
+  type IScopedNames,
+} from '@symbiote-native/svelte/scope-token';
 
 const SCOPE_ID_PREFIX = 'svelte-';
 const ENGINE_MODULE = '@symbiote-native/engine';
 const RUNTIME_MODULE = '@symbiote-native/svelte/style-scope';
 
 // Every injected identifier is `__symbiote`-prefixed and import-aliased so a component that
-// happens to declare its own `registerStyles` / `scopeSvelteClass` cannot collide with it.
-const REGISTER_STYLES_LOCAL = '__symbioteRegisterStyles';
+// happens to declare its own `registerRules` / `scopeSvelteClass` cannot collide with it.
+const REGISTER_RULES_LOCAL = '__symbioteRegisterRules';
 const SCOPE_CLASS_LOCAL = '__symbioteScopeClass';
 const SCOPED_NAMES_LOCAL = '__symbioteScopedNames';
-const SCOPE_ID_LOCAL = '__symbioteScopeId';
 
 // A `<style lang="…">` names its language directly, unlike a standalone file identified by its
 // extension — so this is its own lookup rather than css-parser's extension-keyed
 // `detectLanguage()`. Same table Vue's transformer keeps for the identical reason.
-const STYLE_LANG_TO_PREPROCESSOR: ReadonlyMap<string, IPreprocessorLanguage> = new Map([
-  ['css', 'css'],
-  ['scss', 'scss'],
-  ['sass', 'scss'],
-  ['less', 'less'],
-  ['stylus', 'stylus'],
-  ['styl', 'stylus'],
-]);
+const DEFAULT_STYLE_LANG = 'css';
+const STYLE_LANG_TO_PREPROCESSOR: ReadonlyMap<string, IPreprocessorLanguage> =
+  new Map([
+    ['css', 'css'],
+    ['scss', 'scss'],
+    ['sass', 'scss'],
+    ['less', 'less'],
+    ['stylus', 'stylus'],
+    ['styl', 'stylus'],
+  ]);
 
 // Sass's indented syntax is selected off a `.sass`-suffixed PATH, and an inline block has no path
 // of its own — so one is synthesized from the component's, exactly as Vue's transformer does.
@@ -120,55 +124,102 @@ export function scopedStyles(): {
       // this saves them a full parse on every Metro transform.
       if (!content.includes('<style')) return { code: content };
 
-      const ast: unknown = parse(content, { filename, modern: true });
-      const styleBlock = readStyleBlock(ast);
+      const styleBlock = findStyleBlock(content);
       if (styleBlock === undefined) return { code: content };
 
       const path = filename ?? 'component.svelte';
       const css = await compileStyleBlock(styleBlock, path);
-      const parsed = parseCSS(css, { filename: path });
-      const exemptFromScope = globalClassNamesIn(css);
-      const scopeId = SCOPE_ID_PREFIX + hashFilePath(path);
-
       // A `:global(...)` selector opts out of scoping and registers under its plain name, the
-      // same escape hatch Vue's <style scoped> has. Everything else is suffixed and its ORIGINAL
-      // name recorded, so the markup rewrite below knows which tokens this file owns.
-      //
-      // A COMPOUND or DESCENDANT selector registers under one collapsed key (`.card.big` ->
-      // `cardBig`) that appears nowhere in the markup — the markup says `class="card big"`. So
-      // the key alone is not enough to know what this file owns: its TOKENS are recorded too, or
-      // a `.card.big` rule whose parts have no standalone rule of their own leaves both tokens
-      // unscoped and the rule unreachable.
-      //
-      // A token out of a `:global(...)` payload is the one exception: in `.card :global(.reset)`
-      // the collapsed KEY is this file's own, because `.card` is, but `reset` was written
-      // precisely to name markup this file does not own. Suffixing it along with the rest of its
-      // chain scope-mangles the escape hatch into matching nothing.
-      const tokensByName = classTokensIn(css, { filename: path });
-      const globalTokens = globalClassTokensIn(css, { filename: path });
-      const styles: Record<string, Record<string, unknown>> = {};
-      const localNames = new Set<string>();
-      for (const [className, props] of Object.entries(parsed)) {
-        const isExempt = exemptFromScope.has(className);
-        const registeredName = isExempt ? className : `${className}__${scopeId}`;
-        if (!isExempt) {
-          localNames.add(className);
-          for (const token of tokensByName.get(className) ?? []) {
-            if (!globalTokens.has(token)) localNames.add(token);
-          }
-        }
-        styles[registeredName] = props;
-      }
+      // same escape hatch Vue's <style scoped> has. lightningcss decides that — a name it did not
+      // rename is absent from `names` and every token of it passes through untouched below.
+      const { rules, names } = compileScopedCss(css, {
+        filename: path,
+        pattern: `[local]__${SCOPE_ID_PREFIX}${hashFilePath(path)}`,
+      });
 
-      const edits: IEdit[] = [blankOut(styleBlock.start, styleBlock.end, content)];
-      collectClassEdits(fragmentNodes(ast), content, localNames, scopeId, edits);
-      if (Object.keys(styles).length > 0) {
-        edits.push(injectModuleScript(ast, content, styles, localNames, scopeId));
+      // Parsed WITHOUT the style block, and with it replaced by same-length whitespace, so every
+      // offset the AST reports still indexes `content` itself.
+      const ast: unknown = parse(withoutStyleBlock(content, styleBlock), {
+        filename,
+        modern: true,
+      });
+
+      const edits: IEdit[] = [
+        blankOut(styleBlock.start, styleBlock.end, content),
+      ];
+      collectClassEdits(fragmentNodes(ast), content, names, edits);
+      if (rules.length > 0) {
+        edits.push(injectModuleScript(ast, content, rules, names));
       }
 
       return { code: applyEdits(content, edits) };
     },
   };
+}
+
+// ---------------------------------------------------------------------------------------------
+// The <style> block, located WITHOUT parsing it.
+//
+// This is svelte's own tag regex (src/compiler/preprocess/index.js), which is what its official
+// `preprocess()` style hook uses to hand a block's content to a preprocessor unparsed — and the
+// reason `svelte-preprocess` can compile SCSS at all. Reading `parse().css` instead, as this file
+// did until 2026-08-20, validates the block as CSS whatever `lang` says: `<style lang="scss">$pad:
+// 7px;</style>` threw `css_expected_identifier` before the language table above was ever
+// consulted, so only SCSS that is already valid CSS (nesting) survived. A `<!-- -->` comment is an
+// alternative of the pattern purely so a commented-out block is skipped rather than matched.
+
+const STYLE_TAG_PATTERN =
+  /<!--[^]*?-->|<style((?:\s+[^=>'"/\s]+=(?:"[^"]*"|'[^']*'|[^>\s]+)|\s+[^=>'"/\s]+)*\s*)(?:\/>|>([\S\s]*?)<\/style>)/g;
+
+const LANG_ATTRIBUTE_PATTERN = /\blang\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/;
+
+interface IStyleBlock {
+  readonly start: number;
+  readonly end: number;
+  readonly source: string;
+  readonly lang: string;
+}
+
+function findStyleBlock(content: string): IStyleBlock | undefined {
+  for (const match of content.matchAll(STYLE_TAG_PATTERN)) {
+    const [text, attributes, source] = match;
+    if (attributes === undefined || source === undefined) continue;
+    return {
+      start: match.index,
+      end: match.index + text.length,
+      source,
+      lang: readLang(attributes),
+    };
+  }
+  return undefined;
+}
+
+function readLang(attributes: string): string {
+  const match = LANG_ATTRIBUTE_PATTERN.exec(attributes);
+  if (match === null) return DEFAULT_STYLE_LANG;
+  return match[1] ?? match[2] ?? match[3] ?? DEFAULT_STYLE_LANG;
+}
+
+// Same byte length, newlines kept: the AST's offsets stay valid against the ORIGINAL source, and
+// svelte's own diagnostics keep their line numbers.
+function withoutStyleBlock(content: string, block: IStyleBlock): string {
+  const blanked = content.slice(block.start, block.end).replace(/[^\n]/g, ' ');
+  return content.slice(0, block.start) + blanked + content.slice(block.end);
+}
+
+async function compileStyleBlock(
+  block: IStyleBlock,
+  filename: string,
+): Promise<string> {
+  const language = STYLE_LANG_TO_PREPROCESSOR.get(block.lang);
+  if (language === undefined) {
+    throw new Error(
+      `${filename}: <style lang="${block.lang}"> is not supported — use css, scss, sass, less or stylus.`,
+    );
+  }
+  const path =
+    block.lang === INDENTED_SASS_LANG ? `${filename}.sass` : filename;
+  return compilePreprocessor(block.source, language, path);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -180,56 +231,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function numberAt(node: Record<string, unknown>, key: string): number | undefined {
+function numberAt(
+  node: Record<string, unknown>,
+  key: string,
+): number | undefined {
   const value = node[key];
   return typeof value === 'number' ? value : undefined;
 }
 
-function stringAt(node: Record<string, unknown>, key: string): string | undefined {
+function stringAt(
+  node: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const value = node[key];
   return typeof value === 'string' ? value : undefined;
-}
-
-interface IStyleBlock {
-  readonly start: number;
-  readonly end: number;
-  readonly source: string;
-  readonly lang: string;
-}
-
-function readStyleBlock(ast: unknown): IStyleBlock | undefined {
-  if (!isRecord(ast)) return undefined;
-  const css = ast.css;
-  if (!isRecord(css)) return undefined;
-  const start = numberAt(css, 'start');
-  const end = numberAt(css, 'end');
-  const content = css.content;
-  if (start === undefined || end === undefined || !isRecord(content)) return undefined;
-  const source = stringAt(content, 'styles');
-  if (source === undefined) return undefined;
-  return { start, end, source, lang: readLangAttribute(css) };
-}
-
-function readLangAttribute(block: Record<string, unknown>): string {
-  const attributes = block.attributes;
-  if (!Array.isArray(attributes)) return 'css';
-  for (const attribute of attributes) {
-    if (!isRecord(attribute) || attribute.name !== 'lang') continue;
-    const text = staticTextOf(attribute);
-    if (text !== undefined) return text;
-  }
-  return 'css';
-}
-
-async function compileStyleBlock(block: IStyleBlock, filename: string): Promise<string> {
-  const language = STYLE_LANG_TO_PREPROCESSOR.get(block.lang);
-  if (language === undefined) {
-    throw new Error(
-      `${filename}: <style lang="${block.lang}"> is not supported — use css, scss, sass, less or stylus.`,
-    );
-  }
-  const path = block.lang === INDENTED_SASS_LANG ? `${filename}.sass` : filename;
-  return compilePreprocessor(block.source, language, path);
 }
 
 function fragmentNodes(ast: unknown): unknown[] {
@@ -255,25 +270,31 @@ function nestedNodes(node: Record<string, unknown>): unknown[] {
 function collectClassEdits(
   nodes: unknown[],
   content: string,
-  localNames: ReadonlySet<string>,
-  scopeId: string,
+  names: IScopedNames,
   edits: IEdit[],
 ): void {
   for (const node of nodes) {
     if (!isRecord(node)) continue;
     if (node.type === 'Attribute' && node.name === 'class') {
-      const edit = classAttributeEdit(node, content, localNames, scopeId);
+      const edit = classAttributeEdit(node, content, names);
       if (edit !== undefined) edits.push(edit);
       continue;
     }
-    collectClassEdits(nestedNodes(node), content, localNames, scopeId, edits);
+    if (node.type === 'ClassDirective') {
+      const edit = classDirectiveEdit(node, content, names);
+      if (edit !== undefined) edits.push(edit);
+      continue;
+    }
+    collectClassEdits(nestedNodes(node), content, names, edits);
   }
 }
 
 // `value` is `true` for a bare `class` attribute, one node for a lone value, or an array mixing
 // Text and ExpressionTag for an interpolated one (`class="card {extra}"`). Normalizing to an
 // array up front removes the per-shape branching everywhere below.
-function attributeValueParts(attribute: Record<string, unknown>): unknown[] | undefined {
+function attributeValueParts(
+  attribute: Record<string, unknown>,
+): unknown[] | undefined {
   const value = attribute.value;
   if (value === true) return undefined;
   if (Array.isArray(value)) return value;
@@ -296,20 +317,20 @@ function staticTextOf(attribute: Record<string, unknown>): string | undefined {
 function classAttributeEdit(
   attribute: Record<string, unknown>,
   content: string,
-  localNames: ReadonlySet<string>,
-  scopeId: string,
+  names: IScopedNames,
 ): IEdit | undefined {
   const start = numberAt(attribute, 'start');
   const end = numberAt(attribute, 'end');
   const parts = attributeValueParts(attribute);
-  if (start === undefined || end === undefined || parts === undefined) return undefined;
+  if (start === undefined || end === undefined || parts === undefined)
+    return undefined;
 
   const staticValue = staticTextOf(attribute);
   if (staticValue !== undefined) {
     const scoped = staticValue
       .split(/\s+/)
       .filter(Boolean)
-      .map(token => scopeToken(token, localNames, scopeId))
+      .map(token => scopeToken(token, names))
       .join(' ');
     // Nothing this file owns appears in the value — leave the source byte-identical rather than
     // re-quoting it, so a component with only `:global(...)` rules is untouched.
@@ -319,23 +340,54 @@ function classAttributeEdit(
 
   // A dynamic value can only be scoped at runtime, and only if this file defines something to
   // scope against. With no local names there is nothing for the call to do, so it is not emitted
-  // at all — and the two constants it would reference stay out of the bundle.
-  if (localNames.size === 0) return undefined;
+  // at all — and the map it would reference stays out of the bundle.
+  if (names.size === 0) return undefined;
   const expression = expressionSourceOf(parts, content);
   if (expression === undefined) return undefined;
   return {
     start,
     end,
-    text: `class={${SCOPE_CLASS_LOCAL}(${expression}, ${SCOPED_NAMES_LOCAL}, ${SCOPE_ID_LOCAL})}`,
+    text: `class={${SCOPE_CLASS_LOCAL}(${expression}, ${SCOPED_NAMES_LOCAL})}`,
   };
+}
+
+// `class:card={cond}` carries its class name in the DIRECTIVE, where the value rewrite above
+// cannot see it. Svelte rejects the directive on a COMPONENT (`component_invalid_directive`), so
+// only a host element reaches here — rewritten anyway, because a token left unscoped names a rule
+// that registered under the scoped name and is silently dead. The shorthand `class:card` expands
+// to `class:card__<scope>={card}`: the class is scoped, the variable it reads keeps its own name.
+function classDirectiveEdit(
+  directive: Record<string, unknown>,
+  content: string,
+  names: IScopedNames,
+): IEdit | undefined {
+  const name = stringAt(directive, 'name');
+  const start = numberAt(directive, 'start');
+  const end = numberAt(directive, 'end');
+  if (name === undefined || start === undefined || end === undefined)
+    return undefined;
+
+  const scoped = scopeToken(name, names);
+  if (scoped === name) return undefined;
+
+  const expression = sliceExpression(directive, content);
+  if (expression === undefined) return undefined;
+  return { start, end, text: `class:${scoped}={${expression}}` };
 }
 
 // A lone `class={expr}` reproduces `expr` verbatim, so an arbitrary expression — a clsx array, a
 // ternary, a function call — passes through untouched and only its RESULT gets scoped. An
 // interpolated `class="a {b} c"` is rebuilt as the template literal Svelte itself would have
 // concatenated, so both shapes reduce to one expression the runtime helper can take.
-function expressionSourceOf(parts: unknown[], content: string): string | undefined {
-  if (parts.length === 1 && isRecord(parts[0]) && parts[0].type === 'ExpressionTag') {
+function expressionSourceOf(
+  parts: unknown[],
+  content: string,
+): string | undefined {
+  if (
+    parts.length === 1 &&
+    isRecord(parts[0]) &&
+    parts[0].type === 'ExpressionTag'
+  ) {
     return sliceExpression(parts[0], content);
   }
 
@@ -356,7 +408,10 @@ function expressionSourceOf(parts: unknown[], content: string): string | undefin
   return `\`${literal}\``;
 }
 
-function sliceExpression(part: Record<string, unknown>, content: string): string | undefined {
+function sliceExpression(
+  part: Record<string, unknown>,
+  content: string,
+): string | undefined {
   const expression = part.expression;
   if (!isRecord(expression)) return undefined;
   const start = numberAt(expression, 'start');
@@ -366,28 +421,49 @@ function sliceExpression(part: Record<string, unknown>, content: string): string
 }
 
 function escapeTemplateLiteral(text: string): string {
-  return text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$\{/g, '\\${');
 }
 
 // ---------------------------------------------------------------------------------------------
 // Emitting
 
+// `combinators` is compile-time-only — the registry matches by token subset and never reads it —
+// so it is stripped rather than shipped in every app bundle. Same cut `@symbiote-native/css-
+// parser`'s `serializeRules` makes for a standalone `.css` file; a Svelte `<style>` block has no
+// reason to ship more.
+function serializeRules(rules: readonly IStyleRule[]): string {
+  return JSON.stringify(
+    rules.map(({ tokens, specificity, order, style }) => ({
+      tokens,
+      specificity,
+      order,
+      style,
+    })),
+  );
+}
+
 function injectModuleScript(
   ast: unknown,
   content: string,
-  styles: Record<string, Record<string, unknown>>,
-  localNames: ReadonlySet<string>,
-  scopeId: string,
+  rules: readonly IStyleRule[],
+  names: IScopedNames,
 ): IEdit {
   const lines = [
-    `import { registerStyles as ${REGISTER_STYLES_LOCAL} } from '${ENGINE_MODULE}';`,
-    `${REGISTER_STYLES_LOCAL}(${JSON.stringify(styles)});`,
+    `import { registerRules as ${REGISTER_RULES_LOCAL} } from '${ENGINE_MODULE}';`,
+    `${REGISTER_RULES_LOCAL}(${serializeRules(rules)});`,
   ];
-  if (localNames.size > 0) {
-    lines.unshift(`import { scopeSvelteClass as ${SCOPE_CLASS_LOCAL} } from '${RUNTIME_MODULE}';`);
+  if (names.size > 0) {
+    lines.unshift(
+      `import { scopeSvelteClass as ${SCOPE_CLASS_LOCAL} } from '${RUNTIME_MODULE}';`,
+    );
+    // The SAME map the static rewrite above read, shipped verbatim: a dynamic value's tokens are
+    // only known at runtime, and re-deriving their names there is the divergence this map exists
+    // to make impossible.
     lines.push(
-      `const ${SCOPED_NAMES_LOCAL} = new Set(${JSON.stringify([...localNames])});`,
-      `const ${SCOPE_ID_LOCAL} = ${JSON.stringify(scopeId)};`,
+      `const ${SCOPED_NAMES_LOCAL} = new Map(${JSON.stringify([...names])});`,
     );
   }
   const source = lines.join(' ');
@@ -414,16 +490,19 @@ function injectModuleScript(
 function moduleScriptBodyStart(ast: unknown): number | undefined {
   if (!isRecord(ast)) return undefined;
   const moduleScript = ast.module;
-  if (!isRecord(moduleScript) || !isRecord(moduleScript.content)) return undefined;
+  if (!isRecord(moduleScript) || !isRecord(moduleScript.content))
+    return undefined;
   return numberAt(moduleScript.content, 'start');
 }
 
 function instanceScriptLang(ast: unknown): string | undefined {
   if (!isRecord(ast)) return undefined;
   const instance = ast.instance;
-  if (!isRecord(instance) || !Array.isArray(instance.attributes)) return undefined;
+  if (!isRecord(instance) || !Array.isArray(instance.attributes))
+    return undefined;
   for (const attribute of instance.attributes) {
-    if (isRecord(attribute) && attribute.name === 'lang') return staticTextOf(attribute);
+    if (isRecord(attribute) && attribute.name === 'lang')
+      return staticTextOf(attribute);
   }
   return undefined;
 }
@@ -448,7 +527,8 @@ function applyEdits(content: string, edits: IEdit[]): string {
   return [...edits]
     .sort((left, right) => right.start - left.start)
     .reduce(
-      (source, edit) => source.slice(0, edit.start) + edit.text + source.slice(edit.end),
+      (source, edit) =>
+        source.slice(0, edit.start) + edit.text + source.slice(edit.end),
       content,
     );
 }

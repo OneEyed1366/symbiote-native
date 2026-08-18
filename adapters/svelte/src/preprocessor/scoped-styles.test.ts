@@ -16,7 +16,11 @@ import { scopedStyles } from './scoped-styles';
 
 const preprocess = scopedStyles();
 const FILENAME = '/repo/src/Card.svelte';
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 async function run(source: string, filename = FILENAME): Promise<string> {
   const { code } = await preprocess.markup({ content: source, filename });
@@ -38,7 +42,8 @@ describe('scopedStyles preprocessor', () => {
     // be a true no-op for them, not just "doesn't crash" — a stray byte here corrupts every
     // component in the app.
     it('leaves a component with no <style> block byte-identical', async () => {
-      const source = '<script>let x = 1;</script>\n<View class="card">{x}</View>\n';
+      const source =
+        '<script>let x = 1;</script>\n<View class="card">{x}</View>\n';
       expect(await run(source)).toBe(source);
     });
 
@@ -51,7 +56,7 @@ describe('scopedStyles preprocessor', () => {
         '<View class="reset" />\n<style>:global(.reset) { margin: 0; }</style>\n',
       );
       expect(code).toContain('class="reset"');
-      expect(code).toContain('"reset":{"margin":0}');
+      expect(code).toContain('"tokens":["reset"]');
     });
   });
 
@@ -63,17 +68,23 @@ describe('scopedStyles preprocessor', () => {
       const scopeId = scopeIdOf(code);
 
       expect(code).toContain(`class="card__${scopeId}"`);
-      expect(code).toContain(`{"card__${scopeId}":{"padding":12}}`);
       expect(code).toContain(
-        "import { registerStyles as __symbioteRegisterStyles } from '@symbiote-native/engine'",
+        `{"tokens":["card__${scopeId}"],"specificity":[0,1,0],"order":0,"style":{"padding":12}}`,
+      );
+      expect(code).toContain(
+        "import { registerRules as __symbioteRegisterRules } from '@symbiote-native/engine'",
       );
       expect(code).not.toContain('<style');
+      // `combinators` is compile-time-only — stripped rather than shipped in every app bundle.
+      expect(code).not.toContain('combinators');
     });
 
-    // why: a compound/descendant rule registers under ONE collapsed key (`.card.big` ->
-    // `cardBig`) that appears nowhere in the markup, which says `class="card big"`. Recording
-    // only the collapsed key would leave `big` unscoped and the rule permanently unreachable —
-    // both tokens of the selector must be recorded, not just the merged name.
+    // why: a compound rule carries the TOKEN SET its selector was written with, renamed per token
+    // (lightningcss renames per token, never the compound), and the registry matches an element
+    // whose class list is a superset. Before the lightningcss migration the selector collapsed
+    // into ONE key with the suffix appended once (`cardBig__<scope>`) which the registry had to
+    // factor back out to match — the two operations did not commute, and that is the trap the
+    // token set closes.
     it('scopes both tokens of a compound selector whose parts have no standalone rule', async () => {
       const code = await run(
         '<View class="card big" />\n<style>\n  .card.big { padding: 16px; }\n</style>\n',
@@ -81,13 +92,16 @@ describe('scopedStyles preprocessor', () => {
       const scopeId = scopeIdOf(code);
 
       expect(code).toContain(`class="card__${scopeId} big__${scopeId}"`);
-      expect(code).toContain(`{"cardBig__${scopeId}":{"padding":16}}`);
+      expect(code).toContain(
+        `{"tokens":["card__${scopeId}","big__${scopeId}"],"specificity":[0,2,0],"order":0,"style":{"padding":16}}`,
+      );
     });
 
     // why: scoping is per FILE — two files defining the same class name must not collide, or one
     // component's style would silently overwrite another's in the shared global registry.
     it('gives two different files two different scope ids for the same class name', async () => {
-      const source = '<View class="card" />\n<style>.card { padding: 1px; }</style>\n';
+      const source =
+        '<View class="card" />\n<style>.card { padding: 1px; }</style>\n';
       const first = scopeIdOf(await run(source, '/repo/src/A.svelte'));
       const second = scopeIdOf(await run(source, '/repo/src/B.svelte'));
       expect(first).not.toBe(second);
@@ -104,7 +118,9 @@ describe('scopedStyles preprocessor', () => {
       const scopeId = scopeIdOf(code);
 
       expect(code).toContain(`class="reset card__${scopeId}"`);
-      expect(code).toContain('"reset":{"margin":0}');
+      expect(code).toContain(
+        '{"tokens":["reset"],"specificity":[0,1,0],"order":0,"style":{"margin":0}}',
+      );
       expect(code).not.toContain(`reset__${scopeId}`);
     });
 
@@ -122,10 +138,15 @@ describe('scopedStyles preprocessor', () => {
 
       expect(code).toContain(`class="card__${scopeId} legacy"`);
       expect(code).not.toContain(`legacy__${scopeId}`);
-      // Both keys survive registration: the compound rule LAYERS over `.card` rather than
+      // Both rules survive registration: the descendant rule LAYERS over `.card` rather than
       // replacing it, so `.card`'s own declarations must still be there to layer under.
-      expect(code).toContain(`"card__${scopeId}":{"padding":10}`);
-      expect(code).toContain(`"cardLegacy__${scopeId}":{"margin":0}`);
+      expect(code).toContain(
+        `{"tokens":["card__${scopeId}"],"specificity":[0,1,0],"order":0,"style":{"padding":10}}`,
+      );
+      // Per-token again: `.card` is renamed, the `:global()` half is not.
+      expect(code).toContain(
+        `{"tokens":["card__${scopeId}","legacy"],"specificity":[0,2,0],"order":1,"style":{"margin":0}}`,
+      );
     });
 
     // why: the exemption must be surgical — a fully global selector still registers under its
@@ -139,8 +160,12 @@ describe('scopedStyles preprocessor', () => {
       const scopeId = scopeIdOf(code);
 
       expect(code).toContain(`class="card__${scopeId} reset"`);
-      expect(code).toContain(`"card__${scopeId}":{"padding":10}`);
-      expect(code).toContain('"reset":{"margin":0}');
+      expect(code).toContain(
+        `{"tokens":["card__${scopeId}"],"specificity":[0,1,0],"order":0,"style":{"padding":10}}`,
+      );
+      expect(code).toContain(
+        '{"tokens":["reset"],"specificity":[0,1,0],"order":1,"style":{"margin":0}}',
+      );
     });
 
     // why: a class token this file's <style> block never mentions (e.g. one a design-system
@@ -153,22 +178,24 @@ describe('scopedStyles preprocessor', () => {
       expect(code).toContain(`class="card__${scopeIdOf(code)} global-thing"`);
     });
 
-    // why: CSS authoring is kebab-case by convention but the registry key is camelCase (matching
-    // every other adapter's class-registry convention) — a kebab-authored selector must still
-    // resolve, or every real-world stylesheet in this shape silently fails to scope.
-    it('matches a kebab-authored token against its camelCase registry key', async () => {
+    // why: a kebab-authored class registers under the name it was AUTHORED with — nothing
+    // camelCases any more, in either half. The old pipeline normalized the registry key, which is
+    // what mangled a scope tail whose hash began with a letter; this cell pins that the markup
+    // token and the rule's token are one string, kebab included.
+    it('keeps a kebab-authored token kebab on both sides', async () => {
       const code = await run(
         '<View class="card-title" />\n<style>.card-title { color: red; }</style>\n',
       );
       const scopeId = scopeIdOf(code);
-      expect(code).toContain(`class="cardTitle__${scopeId}"`);
-      expect(code).toContain(`"cardTitle__${scopeId}"`);
+      expect(code).toContain(`class="card-title__${scopeId}"`);
+      expect(code).toContain(`"tokens":["card-title__${scopeId}"]`);
     });
 
     // why: an empty static class attribute has zero tokens to scope — the fix has to leave it
     // alone rather than emit `class=""` as a needless rewrite.
     it('leaves an empty static class attribute untouched', async () => {
-      const source = '<View class="" />\n<style>.card { padding: 4px; }</style>\n';
+      const source =
+        '<View class="" />\n<style>.card { padding: 4px; }</style>\n';
       const code = await run(source);
       expect(code).toContain('class=""');
     });
@@ -180,10 +207,16 @@ describe('scopedStyles preprocessor', () => {
       const code = await run(
         "<View class={['card', on && 'lit']} />\n<style>.card { padding: 4px; } .lit { color: red; }</style>\n",
       );
+      const scopeId = scopeIdOf(code);
+
       expect(code).toContain(
-        "class={__symbioteScopeClass(['card', on && 'lit'], __symbioteScopedNames, __symbioteScopeId)}",
+        "class={__symbioteScopeClass(['card', on && 'lit'], __symbioteScopedNames)}",
       );
-      expect(code).toContain('const __symbioteScopedNames = new Set(["card","lit"])');
+      // The map, not a name set plus a scope id: the runtime reads the name lightningcss gave
+      // each class instead of re-deriving it from a suffix.
+      expect(code).toContain(
+        `const __symbioteScopedNames = new Map([["card","card__${scopeId}"],["lit","lit__${scopeId}"]])`,
+      );
     });
 
     // why: an interpolated class="a {b} c" is the shape Svelte itself would concatenate at
@@ -194,7 +227,7 @@ describe('scopedStyles preprocessor', () => {
         '<View class="card {extra} tail" />\n<style>.card { padding: 4px; }</style>\n',
       );
       expect(code).toContain(
-        'class={__symbioteScopeClass(`card ${extra} tail`, __symbioteScopedNames, __symbioteScopeId)}',
+        'class={__symbioteScopeClass(`card ${extra} tail`, __symbioteScopedNames)}',
       );
     });
 
@@ -206,7 +239,9 @@ describe('scopedStyles preprocessor', () => {
       );
       expect(code).toContain('class={cls}');
       expect(code).not.toContain('__symbioteScopeClass');
-      expect(code).toContain('"reset":{"margin":0}');
+      expect(code).toContain(
+        '{"tokens":["reset"],"specificity":[0,1,0],"order":0,"style":{"margin":0}}',
+      );
     });
 
     // why: the markup walk descends through every AST child value, not just the top-level
@@ -252,17 +287,25 @@ describe('scopedStyles preprocessor', () => {
 
       expect(lines[4]).toContain('<View class="card__');
       // The injected module script is appended AFTER everything, so nothing above it moves.
-      expect(lines.slice(0, 9).some(line => line.includes('__symbioteRegisterStyles'))).toBe(false);
+      expect(
+        lines
+          .slice(0, 9)
+          .some(line => line.includes('__symbioteRegisterRules')),
+      ).toBe(false);
     });
 
     // why: this preprocessor exists specifically to make the compiler's own CSS output a no-op
     // for us — proving the rewritten source compiles WITHOUT css_unused_selector or a leftover
     // Svelte scope hash is the real end-to-end claim, not just "the string contains X".
     it('compiles clean afterwards — no css_unused_selector, no leftover scope hash', async () => {
-      const code = await run('<View class="card" />\n<style>.card { padding: 4px; }</style>\n');
+      const code = await run(
+        '<View class="card" />\n<style>.card { padding: 4px; }</style>\n',
+      );
       const result = compile(code, { ...COMPILE_OPTIONS, filename: FILENAME });
 
-      expect(result.warnings.map(warning => warning.code)).not.toContain('css_unused_selector');
+      expect(result.warnings.map(warning => warning.code)).not.toContain(
+        'css_unused_selector',
+      );
       expect(result.css).toBeNull();
       expect(result.js.code).toContain(`card__${scopeIdOf(code)}`);
     });
@@ -297,13 +340,19 @@ describe('scopedStyles preprocessor', () => {
         'process.stdout.write(out.code);',
       ].join('\n');
 
-      const output = execFileSync(process.execPath, ['--input-type=module', '-e', script], {
-        cwd: packageRoot,
-        encoding: 'utf8',
-      });
+      const output = execFileSync(
+        process.execPath,
+        ['--input-type=module', '-e', script],
+        {
+          cwd: packageRoot,
+          encoding: 'utf8',
+        },
+      );
 
       expect(output).toContain('class="card__svelte-');
-      expect(output).toContain('__symbioteRegisterStyles({"card__svelte-');
+      expect(output).toContain(
+        '__symbioteRegisterRules([{"tokens":["card__svelte-',
+      );
     });
   });
 
@@ -312,9 +361,9 @@ describe('scopedStyles preprocessor', () => {
     // styling and no error — the loud rejection is the product contract, not the default of
     // "compile whatever comes through".
     it('rejects an unknown <style lang> instead of silently dropping the block', async () => {
-      await expect(run('<style lang="postcss">.card {}</style>')).rejects.toThrow(
-        /<style lang="postcss"> is not supported/,
-      );
+      await expect(
+        run('<style lang="postcss">.card {}</style>'),
+      ).rejects.toThrow(/<style lang="postcss"> is not supported/);
     });
   });
 });

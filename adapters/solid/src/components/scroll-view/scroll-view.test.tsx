@@ -12,7 +12,7 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 import { View } from '../view';
@@ -112,7 +112,14 @@ describe('Solid ScrollView on the engine', () => {
     // why: contentContainerStyle accepting only a style object silently dropped a class name, and
     // the resolved style must land on the CONTENT container, never the outer view that pans it.
     it('resolves a contentContainerStyle class name onto the content view alone', async () => {
-      registerStyles({ padded: { padding: 20 } });
+      registerRules([
+        {
+          tokens: ['padded'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { padding: 20 },
+        },
+      ]);
       mount(ROOT_TAG, () => (
         <ScrollView contentContainerStyle="padded">
           <View />

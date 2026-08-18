@@ -22,7 +22,7 @@ import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   clearGlobalStyles,
-  registerStyles,
+  registerRules,
   type ISymbioteEvent,
 } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -43,7 +43,14 @@ const tick = (): Promise<void> =>
 beforeEach(() => {
   fabric.reset();
   clearGlobalStyles();
-  registerStyles({ sheet: { flex: SHEET_FLEX, opacity: SHEET_OPACITY } });
+  registerRules([
+    {
+      tokens: ['sheet'],
+      specificity: [0, 1, 0],
+      order: 0,
+      style: { flex: SHEET_FLEX, opacity: SHEET_OPACITY },
+    },
+  ]);
 });
 
 afterEach(() => {

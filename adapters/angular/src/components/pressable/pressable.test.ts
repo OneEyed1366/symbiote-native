@@ -7,7 +7,7 @@
 import '@angular/compiler';
 import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -82,7 +82,14 @@ describe('Pressable (no throwing path — see file header)', () => {
   });
 
   it('resolves a class= on the Pressable use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ card: { backgroundColor: 'red' } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'red' },
+      },
+    ]);
 
     mount(ROOT_TAG, PressableHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -143,7 +150,14 @@ describe('Pressable memoized hostProps stays correct', () => {
   // serves the pre-toggle style forever. Verified: removing that poll turns this test red (and the
   // static-class test above with it).
   it('forwards a dynamic [class.on] toggle onto the committed view', async () => {
-    registerStyles({ on: { backgroundColor: 'lime' } });
+    registerRules([
+      {
+        tokens: ['on'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'lime' },
+      },
+    ]);
     mount(ROOT_TAG, MemoHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
     expect(

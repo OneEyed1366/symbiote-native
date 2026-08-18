@@ -11,7 +11,7 @@ import {
   disposeRoot,
   isAnchor,
   isSymbioteNode,
-  registerStyles,
+  registerRules,
 } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { SymbioteRenderer, SymbioteRendererFactory } from './index';
@@ -160,7 +160,14 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // still win over a class-derived value (the same precedence every adapter's class+style merge
   // guarantees), or CSS-module/SFC-style classes would silently behave differently on Angular.
   it('resolves addClass tokens through the shared style registry and lets explicit style win', async () => {
-    registerStyles({ card: { padding: 10, backgroundColor: 'red' } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10, backgroundColor: 'red' },
+      },
+    ]);
     const { surface, renderer } = setup();
     const view = renderer.createElement('symbiote-view');
     renderer.setProperty(view, 'nativeID', PROBE_ID);
@@ -185,7 +192,20 @@ describe('Angular SymbioteRenderer drives the engine', () => {
   // style subtracted (which would break if two classes shared a key), matching removeClass's
   // "rejoin the whole Set" implementation strategy.
   it('removeClass drops a token and recomputes the resolved style', async () => {
-    registerStyles({ card: { padding: 10 }, highlight: { opacity: 0.5 } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 10 },
+      },
+      {
+        tokens: ['highlight'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { opacity: 0.5 },
+      },
+    ]);
     const { surface, renderer } = setup();
     const view = renderer.createElement('symbiote-view');
     renderer.setProperty(view, 'nativeID', PROBE_ID);

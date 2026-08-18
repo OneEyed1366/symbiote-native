@@ -28,7 +28,7 @@ import { createSignal } from 'solid-js';
 import type { JSX } from '../../jsx-runtime';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { mount, unmount } from '../../render';
 import {
   TouchableOpacity,
@@ -156,7 +156,14 @@ beforeEach(() => {
   pendingFrames.clear();
   installRequestAnimationFrame();
   clearGlobalStyles();
-  registerStyles({ [FEEDBACK_CLASS]: { flex: FEEDBACK_FLEX } });
+  registerRules([
+    {
+      tokens: [FEEDBACK_CLASS],
+      specificity: [0, 1, 0],
+      order: 0,
+      style: { flex: FEEDBACK_FLEX },
+    },
+  ]);
 });
 afterEach(() => {
   unmount(ROOT_TAG);

@@ -8,9 +8,14 @@
 // is a SEPARATE override from scrollProps, since it recomputes `style` from scratch rather than
 // inheriting the base getter's result).
 import '@angular/compiler';
-import { ChangeDetectorRef, Component, CUSTOM_ELEMENTS_SCHEMA, inject } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  inject,
+} from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -20,7 +25,8 @@ import { ScrollView as IOSScrollView } from './index.ios';
 
 const ROOT_TAG = 950;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 @Component({
   selector: 'symbiote-scroll-ios-class-host',
@@ -133,7 +139,20 @@ function committedScrollBackground(): unknown {
 
 beforeEach(() => {
   fabric.reset();
-  registerStyles({ card: { backgroundColor: 'red' }, box: { flex: 1, height: 84 } });
+  registerRules([
+    {
+      tokens: ['card'],
+      specificity: [0, 1, 0],
+      order: 0,
+      style: { backgroundColor: 'red' },
+    },
+    {
+      tokens: ['box'],
+      specificity: [0, 1, 0],
+      order: 1,
+      style: { flex: 1, height: 84 },
+    },
+  ]);
 });
 afterEach(() => {
   unmount(ROOT_TAG);
@@ -149,7 +168,10 @@ describe('ScrollView anchor class= resolution', () => {
     await tick();
 
     const node = fabric.find(n => n.props.backgroundColor === 'red');
-    expect(node, 'a real Fabric node carries the class-derived style').toBeDefined();
+    expect(
+      node,
+      'a real Fabric node carries the class-derived style',
+    ).toBeDefined();
   });
 
   // why: androidWrappedScrollProps is a SEPARATE override from scrollProps (it recomputes `style`
@@ -160,7 +182,10 @@ describe('ScrollView anchor class= resolution', () => {
     await tick();
 
     const node = fabric.find(n => n.props.backgroundColor === 'red');
-    expect(node, 'a real Fabric node carries the class-derived style').toBeDefined();
+    expect(
+      node,
+      'a real Fabric node carries the class-derived style',
+    ).toBeDefined();
   });
 
   // why: a projected RefreshControl wraps the Android scroll view in an outer native node —
@@ -171,7 +196,10 @@ describe('ScrollView anchor class= resolution', () => {
     await tick();
 
     const node = fabric.find(n => n.props.backgroundColor === 'red');
-    expect(node, 'a real Fabric node carries the class-derived style').toBeDefined();
+    expect(
+      node,
+      'a real Fabric node carries the class-derived style',
+    ).toBeDefined();
   });
 
   // Regression for a real device bug distinct from the one above: a class-derived LAYOUT
@@ -187,7 +215,10 @@ describe('ScrollView anchor class= resolution', () => {
     await tick();
 
     const wrapper = fabric.find(n => n.props.refreshing === true);
-    expect(wrapper, 'the outer refresh-control wrapper committed').toBeDefined();
+    expect(
+      wrapper,
+      'the outer refresh-control wrapper committed',
+    ).toBeDefined();
     expect(wrapper?.props.flex).toBe(1);
     expect(wrapper?.props.height).toBe(84);
   });
@@ -200,7 +231,10 @@ describe('ScrollView anchor class= resolution', () => {
   it('picks up a class toggled after mount, with no @Input change', async () => {
     mount(ROOT_TAG, ScrollViewClassToggleHost);
     await tick();
-    expect(committedScrollBackground(), 'nothing painted before the toggle').toBeUndefined();
+    expect(
+      committedScrollBackground(),
+      'nothing painted before the toggle',
+    ).toBeUndefined();
 
     toggleHost?.light();
     await tick();

@@ -6,7 +6,7 @@
 import '@angular/compiler';
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import {
   installFabric,
   waitUntil,
@@ -105,7 +105,14 @@ class TouchableWithoutFeedbackHost {}
 
 describe('TouchableOpacity', () => {
   it('resolves a class= on the TouchableOpacity use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ card: { backgroundColor: 'red' } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'red' },
+      },
+    ]);
 
     mount(ROOT_TAG, TouchableOpacityHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -129,7 +136,14 @@ describe('TouchableHighlight', () => {
   // outer view that carries testID — a regression here would show up directly on the testID node,
   // not on an inner leaf, so this asserts the style lands where an author actually looks for it.
   it('resolves a class= on the TouchableHighlight use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ card: { backgroundColor: 'red' } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'red' },
+      },
+    ]);
 
     mount(ROOT_TAG, TouchableHighlightHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -144,7 +158,14 @@ describe('TouchableWithoutFeedback', () => {
   // "render children, add only a press responder") — its anchor fix has the least surrounding
   // machinery of the three Touchables, so a regression here isolates cleanly to the anchor merge.
   it('resolves a class= on the TouchableWithoutFeedback use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ card: { backgroundColor: 'red' } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'red' },
+      },
+    ]);
 
     mount(ROOT_TAG, TouchableWithoutFeedbackHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -230,7 +251,14 @@ describe('a Touchable class toggled after mount', () => {
   it.each([['toggle-highlight'], ['toggle-plain'], ['toggle-opacity']])(
     'reaches the committed view of %s',
     async testID => {
-      registerStyles({ dark: { backgroundColor: 'black' } });
+      registerRules([
+        {
+          tokens: ['dark'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { backgroundColor: 'black' },
+        },
+      ]);
 
       mount(ROOT_TAG, TouchableToggleFixture);
       await new Promise<void>(resolve => setTimeout(resolve, 0));

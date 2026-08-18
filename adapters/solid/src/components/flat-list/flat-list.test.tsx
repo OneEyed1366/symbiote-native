@@ -6,7 +6,7 @@
 
 import { createSignal } from 'solid-js';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
 import type {
   ISeparatorProps,
@@ -196,7 +196,14 @@ describe('Solid FlatList on the engine', () => {
     // shared style registry `class` uses, landing on the auto-generated row view. This is the
     // contract adapters/react and adapters/vue already ship.
     it('resolves a columnWrapperStyle class name onto every row wrapper', async () => {
-      registerStyles({ rowGap: { columnGap: 4 } });
+      registerRules([
+        {
+          tokens: ['rowGap'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { columnGap: 4 },
+        },
+      ]);
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
           data={DATA}
@@ -712,7 +719,14 @@ describe('Solid FlatList on the engine', () => {
     // lands its padding on the wrong one of the two views, reads as a native bug rather than as a
     // dropped prop.
     it('routes the native scroll-host props and both style targets to the right views', async () => {
-      registerStyles({ listSkin: { backgroundColor: 'papayawhip' } });
+      registerRules([
+        {
+          tokens: ['listSkin'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { backgroundColor: 'papayawhip' },
+        },
+      ]);
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
           data={DATA}

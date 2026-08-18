@@ -3,14 +3,14 @@
 // Proves the resolved style lands on the CONTENT node (RCTScrollContentView), not the outer
 // scroll view, and that a plain style object still works unchanged.
 //
-// SCOPE: class-name resolution itself (registerStyles/routeProp merge) is core/engine infra
+// SCOPE: class-name resolution itself (registerRules/routeProp merge) is core/engine infra
 // with its own coverage (style-registry) — N/A here, this file only proves ScrollView actually
 // routes contentContainerStyle THROUGH that resolution onto the right node. No Negative group:
 // an unregistered class name resolves to no styles, it does not throw (same as `className`
 // elsewhere in the repo) — untested here as it would just be re-testing routeProp's own contract.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { View, mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 import { ScrollView } from './index';
@@ -29,7 +29,14 @@ describe('React ScrollView contentContainerStyle class-name resolution', () => {
   // class-name string (CSS-modules / scoped `<style>` convention) means it must route through
   // the SAME registry className does, landing on the content node and never the outer frame.
   it('resolves a class-name string onto the content node', () => {
-    registerStyles({ scrollContent: { padding: 8 } });
+    registerRules([
+      {
+        tokens: ['scrollContent'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 8 },
+      },
+    ]);
     mount(
       ROOT_TAG,
       <ScrollView contentContainerStyle="scrollContent">

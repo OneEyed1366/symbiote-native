@@ -9,7 +9,7 @@
 import '@angular/compiler';
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -92,7 +92,14 @@ describe('SafeAreaView', () => {
   // why: without the anchorHostStyle merge, a class= on <SafeAreaView> silently paints nothing —
   // addClass toggles a token on the ANCHOR element only, and the anchor is never committed to Fabric.
   it('resolves a class= on the SafeAreaView use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ screen: { backgroundColor: 'navy' } });
+    registerRules([
+      {
+        tokens: ['screen'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'navy' },
+      },
+    ]);
 
     mount(ROOT_TAG, SafeAreaViewHostFixture);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -106,7 +113,14 @@ describe('SafeAreaView', () => {
   // index.ts's ngDoCheck bump the bag would keep the class it was built with, and an [ngClass]
   // that flips after mount would silently never repaint.
   it('picks up a class toggled after mount, with no @Input change', async () => {
-    registerStyles({ dark: { backgroundColor: 'black' } });
+    registerRules([
+      {
+        tokens: ['dark'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'black' },
+      },
+    ]);
 
     mount(ROOT_TAG, SafeAreaViewToggleFixture);
     await new Promise<void>(resolve => setTimeout(resolve, 0));

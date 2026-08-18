@@ -42,8 +42,14 @@ const SPECIAL_ELEMENT_ADVICE =
 
 const FORBIDDEN: ReadonlyMap<string, IForbidden> = new Map([
   ['SvelteHead', { label: '<svelte:head>', advice: SPECIAL_ELEMENT_ADVICE }],
-  ['SvelteWindow', { label: '<svelte:window>', advice: SPECIAL_ELEMENT_ADVICE }],
-  ['SvelteDocument', { label: '<svelte:document>', advice: SPECIAL_ELEMENT_ADVICE }],
+  [
+    'SvelteWindow',
+    { label: '<svelte:window>', advice: SPECIAL_ELEMENT_ADVICE },
+  ],
+  [
+    'SvelteDocument',
+    { label: '<svelte:document>', advice: SPECIAL_ELEMENT_ADVICE },
+  ],
   ['SvelteBody', { label: '<svelte:body>', advice: SPECIAL_ELEMENT_ADVICE }],
   [
     'HtmlTag',
@@ -152,7 +158,9 @@ function scriptBodies(ast: unknown): unknown[] {
   });
 }
 
-function importSpecifiers(node: Record<string, unknown>): Record<string, unknown>[] {
+function importSpecifiers(
+  node: Record<string, unknown>,
+): Record<string, unknown>[] {
   const specifiers = node.specifiers;
   if (!Array.isArray(specifiers)) return [];
   return specifiers.filter(isRecord);
@@ -171,7 +179,9 @@ function importedNames(node: Record<string, unknown>): string[] {
 // A default specifier is deliberately NOT treated as a dodge: none of these svelte subpackages
 // has a default export, and a default binding cannot reach a named member anyway.
 function hasNamespaceSpecifier(node: Record<string, unknown>): boolean {
-  return importSpecifiers(node).some(specifier => specifier.type === 'ImportNamespaceSpecifier');
+  return importSpecifiers(node).some(
+    specifier => specifier.type === 'ImportNamespaceSpecifier',
+  );
 }
 
 function checkImports(ast: unknown, filename: string): void {
@@ -183,7 +193,9 @@ function checkImports(ast: unknown, filename: string): void {
     if (rule === undefined) continue;
 
     if (rule.named === undefined) {
-      throw new Error(`${filename}: importing from '${source.value}' ${rule.advice}`);
+      throw new Error(
+        `${filename}: importing from '${source.value}' ${rule.advice}`,
+      );
     }
     // `import * as R from 'svelte/reactivity'` hands the whole module object over under one
     // local name, so whether app code reaches R.MediaQuery is decided at runtime and this check
@@ -199,7 +211,9 @@ function checkImports(ast: unknown, filename: string): void {
     }
     for (const name of importedNames(node)) {
       if (rule.named.has(name)) {
-        throw new Error(`${filename}: '${name}' from '${source.value}' ${rule.advice}`);
+        throw new Error(
+          `${filename}: '${name}' from '${source.value}' ${rule.advice}`,
+        );
       }
     }
   }

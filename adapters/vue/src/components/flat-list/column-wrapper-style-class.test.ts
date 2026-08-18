@@ -12,22 +12,29 @@
 // No Negative group: columnWrapperStyle has no throwing path — an invalid value (not a string,
 // not a record/array) silently degrades to `undefined` in the row style array, it never rejects.
 
-import { defineComponent, h, type FunctionalComponent } from '@vue/runtime-core';
+import {
+  defineComponent,
+  h,
+  type FunctionalComponent,
+} from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/vue';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 // Generic-component limitation (see flat-list.test.ts): drive FlatList through a loose functional
 // handle rather than the typed construct signature h() can't resolve imperatively.
-const FlatListHost = FlatList as unknown as FunctionalComponent<Record<string, unknown>>;
+const FlatListHost = FlatList as unknown as FunctionalComponent<
+  Record<string, unknown>
+>;
 
 const ROOT_TAG = 515;
 
 type IRow = { id: number; label: string };
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -45,7 +52,8 @@ function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
 function rowsWithFlexDirection(): IFakeNode[] {
   const rows: IFakeNode[] = [];
   walk(fabric.committed, node => {
-    if (node.viewName === 'RCTView' && node.props.flexDirection === 'row') rows.push(node);
+    if (node.viewName === 'RCTView' && node.props.flexDirection === 'row')
+      rows.push(node);
   });
   return rows;
 }
@@ -62,7 +70,11 @@ function mountFlatList(columnWrapperStyle: unknown): Promise<void> {
         h(
           FlatListHost,
           { data, numColumns: 2, columnWrapperStyle },
-          { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
+          {
+            item: ({ item }: { item: IRow }) => [
+              h('symbiote-text', {}, item.label),
+            ],
+          },
         ),
     }),
   );
@@ -75,7 +87,14 @@ describe('Vue FlatList columnWrapperStyle class-name support', () => {
       // why: the class-name path is the regression this file guards - a bare string used to be
       // silently dropped by isRecord/Array.isArray, so a class-only columnWrapperStyle painted no
       // gap/margin on the row at all.
-      registerStyles({ gap8: { gap: 8 } });
+      registerRules([
+        {
+          tokens: ['gap8'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { gap: 8 },
+        },
+      ]);
       await mountFlatList('gap8');
 
       const rows = rowsWithFlexDirection();
@@ -98,7 +117,10 @@ describe('Vue FlatList columnWrapperStyle class-name support', () => {
       await mountFlatList(42);
 
       const rows = rowsWithFlexDirection();
-      expect(rows.length, 'rows still render with the base flex-row style').toBe(2);
+      expect(
+        rows.length,
+        'rows still render with the base flex-row style',
+      ).toBe(2);
       expect(rows[0].props.gap).toBeUndefined();
     });
   });

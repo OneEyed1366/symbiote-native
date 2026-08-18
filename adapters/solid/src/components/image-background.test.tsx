@@ -18,7 +18,7 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import { Text } from './text';
@@ -135,10 +135,20 @@ describe('Solid ImageBackground on the engine', () => {
     // properties is what proves the resolution targets the right node rather than that a value
     // happened to be absent from the wrong one.
     it('routes a `class` to the wrapper and a bare-string imageStyle to the inner image', async () => {
-      registerStyles({
-        wrapperClass: { backgroundColor: '#123456' },
-        overlay: { opacity: 0.5 },
-      });
+      registerRules([
+        {
+          tokens: ['wrapperClass'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { backgroundColor: '#123456' },
+        },
+        {
+          tokens: ['overlay'],
+          specificity: [0, 1, 0],
+          order: 1,
+          style: { opacity: 0.5 },
+        },
+      ]);
       mount(ROOT_TAG, () => (
         <ImageBackground
           style={WRAPPER_STYLE}

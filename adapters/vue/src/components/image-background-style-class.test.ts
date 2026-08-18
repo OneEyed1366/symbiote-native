@@ -14,13 +14,14 @@
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, ImageBackground } from '@symbiote-native/vue';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 514;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -46,7 +47,8 @@ function mountImageBackground(imageStyle: unknown): Promise<void> {
   mount(
     ROOT_TAG,
     defineComponent({
-      setup: () => () => h(ImageBackground, { source: { uri: 'x' }, imageStyle }),
+      setup: () => () =>
+        h(ImageBackground, { source: { uri: 'x' }, imageStyle }),
     }),
   );
   return tick();
@@ -58,7 +60,14 @@ describe('Vue ImageBackground imageStyle class-name support', () => {
       // why: the class-name path is the regression this file guards, and it must land on the
       // SAME node the `class` prop fix (image-background.ts) targets — the inner image, never
       // the absolute-fill wrapper View.
-      registerStyles({ tinted: { opacity: 0.5 } });
+      registerRules([
+        {
+          tokens: ['tinted'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { opacity: 0.5 },
+        },
+      ]);
       await mountImageBackground('tinted');
 
       expect(committedImage().props.opacity).toBe(0.5);

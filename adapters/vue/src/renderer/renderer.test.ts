@@ -23,7 +23,7 @@ import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '../render';
 import { View, Text } from '@symbiote-native/vue';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 341;
@@ -71,7 +71,14 @@ function findCommitted(
 
 describe('patchProp class/style merge', () => {
   it('resolves a class binding to registered style props', async () => {
-    registerStyles({ foo: { color: 'red' } });
+    registerRules([
+      {
+        tokens: ['foo'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { color: 'red' },
+      },
+    ]);
     mount(
       ROOT_TAG,
       defineComponent({
@@ -83,7 +90,14 @@ describe('patchProp class/style merge', () => {
   });
 
   it('lets an explicit :style win over a class-derived style, regardless of declaration order', async () => {
-    registerStyles({ foo: { color: 'red' } });
+    registerRules([
+      {
+        tokens: ['foo'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { color: 'red' },
+      },
+    ]);
     mount(
       ROOT_TAG,
       defineComponent({
@@ -107,7 +121,20 @@ describe('patchProp class/style merge', () => {
   });
 
   it('re-resolves and recommits when the class changes reactively', async () => {
-    registerStyles({ foo: { color: 'red' }, bar: { color: 'green' } });
+    registerRules([
+      {
+        tokens: ['foo'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { color: 'red' },
+      },
+      {
+        tokens: ['bar'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { color: 'green' },
+      },
+    ]);
     const className = ref('foo');
     mount(
       ROOT_TAG,

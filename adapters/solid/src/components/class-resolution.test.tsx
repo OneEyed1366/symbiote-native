@@ -9,7 +9,7 @@
 // merge); what is asserted here is only that each component actually HANDS it the class.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import { Pressable } from './pressable';
@@ -33,10 +33,20 @@ const tick = (): Promise<void> =>
 beforeEach(() => {
   fabric.reset();
   clearGlobalStyles();
-  registerStyles({
-    screen: { flex: SCREEN_FLEX, opacity: SCREEN_OPACITY },
-    label: { fontSize: LABEL_FONT_SIZE },
-  });
+  registerRules([
+    {
+      tokens: ['screen'],
+      specificity: [0, 1, 0],
+      order: 0,
+      style: { flex: SCREEN_FLEX, opacity: SCREEN_OPACITY },
+    },
+    {
+      tokens: ['label'],
+      specificity: [0, 1, 0],
+      order: 1,
+      style: { fontSize: LABEL_FONT_SIZE },
+    },
+  ]);
 });
 
 afterEach(() => {

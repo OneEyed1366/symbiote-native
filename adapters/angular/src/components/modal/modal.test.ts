@@ -11,7 +11,7 @@ import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   clearGlobalStyles,
-  registerStyles,
+  registerRules,
   type ISymbioteEvent,
 } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
@@ -142,7 +142,14 @@ describe('Modal (no throwing path — see file header)', () => {
   });
 
   it('resolves a class= on the Modal use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ sheet: { backgroundColor: 'purple' } });
+    registerRules([
+      {
+        tokens: ['sheet'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'purple' },
+      },
+    ]);
 
     mount(ROOT_TAG, ModalHostFixture);
     await tick();

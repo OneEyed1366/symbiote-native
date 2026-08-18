@@ -1,4 +1,7 @@
-// The `<style>`-scoping rule for ONE class token, and nothing else.
+// The `<style>`-scoping rule for ONE class token, and nothing else: a lookup in the name map
+// @symbiote-native/css-parser built out of lightningcss's `exports`. A token the map does not
+// carry is one this file's `<style>` block never renamed — a `:global(...)` name, or a class
+// forwarded from somewhere else — and is returned VERBATIM.
 //
 // WHY THIS IS ITS OWN FILE — it looks like it belongs in `./style-scope`, and it cannot live
 // there. The build-time half (`preprocessor/scoped-styles.ts`) and the runtime half
@@ -15,26 +18,9 @@
 // Keep this file import-free. Adding one import to it breaks `svelte-check` for every consuming
 // app, and nothing in this package's own test run would notice.
 
-const SCOPE_SEPARATOR = '__';
+/** Authored class name -> the name it registers under. One spelling: nothing camelCases now. */
+export type IScopedNames = ReadonlyMap<string, string>;
 
-// A token is matched in its camelCase form because that is the only form the registry is keyed
-// in (@symbiote-native/css-parser's `extractClassName` always camelCases, so `.card-title`
-// registers as `cardTitle`) while markup idiomatically writes the kebab form. A token this file's
-// `<style>` block does NOT define is returned VERBATIM, not camelCased — unlike Vue's rewriter,
-// which camelCases everything it sees. The engine's `resolveOne` already falls back kebab->camel
-// on a miss, so camelCasing here would buy nothing and would silently rename a class the author
-// is forwarding to some other file's global rule.
-export function scopeToken(
-  token: string,
-  localNames: ReadonlySet<string>,
-  scopeId: string,
-): string {
-  const camelToken = kebabToCamel(token);
-  return localNames.has(camelToken) ? camelToken + SCOPE_SEPARATOR + scopeId : token;
-}
-
-// Duplicated from @symbiote-native/css-parser rather than imported, for the same reason
-// core/engine/src/style-registry/index.ts duplicates it — plus the import-free constraint above.
-export function kebabToCamel(value: string): string {
-  return value.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
+export function scopeToken(token: string, names: IScopedNames): string {
+  return names.get(token) ?? token;
 }

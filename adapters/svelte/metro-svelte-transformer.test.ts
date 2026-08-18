@@ -32,7 +32,12 @@ const COMPONENT_SOURCE = `
 </symbiote-view>
 `;
 
-const TRANSFORM_OPTIONS = { dev: true, minify: false, platform: 'ios', projectRoot: process.cwd() };
+const TRANSFORM_OPTIONS = {
+  dev: true,
+  minify: false,
+  platform: 'ios',
+  projectRoot: process.cwd(),
+};
 
 // No Negative group: compileSvelteFile has no guard of its own, it always compiles what it is
 // given. The build-time reject path lives one layer up, inside transform() — see below.
@@ -107,7 +112,10 @@ describe('compileSvelteModuleFile', () => {
       // why: this is the exact branch transform() must route rune-only files through instead
       // of the plain upstream transformer — proves the desugar itself happens, not just that
       // transform() picked the right function to call.
-      const code = compileSvelteModuleFile(RUNE_MODULE_SOURCE, 'use-counter.svelte.ts');
+      const code = compileSvelteModuleFile(
+        RUNE_MODULE_SOURCE,
+        'use-counter.svelte.ts',
+      );
       expect(code).toContain("from 'svelte/internal/client'");
       expect(code).not.toContain('$state(');
       expect(code).not.toContain('$effect(');

@@ -13,7 +13,7 @@ import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearGlobalStyles,
-  registerStyles,
+  registerRules,
   Keyboard,
   KEYBOARD_EVENT,
   type IEventSubscription,
@@ -375,7 +375,14 @@ describe('KeyboardAvoidingView (no throwing path — see file header)', () => {
   });
 
   it('resolves a class= on the KeyboardAvoidingView use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ panel: { backgroundColor: 'teal' } });
+    registerRules([
+      {
+        tokens: ['panel'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'teal' },
+      },
+    ]);
 
     mount(ROOT_TAG, KeyboardAvoidingViewHostFixture);
     await tick();

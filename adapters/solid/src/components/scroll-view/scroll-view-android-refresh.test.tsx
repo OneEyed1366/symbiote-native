@@ -9,7 +9,7 @@
 // Fabric view name is 'PullToRefreshView' regardless of which platform file is under test.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 import { View } from '../view';
@@ -91,7 +91,14 @@ describe('Solid ScrollView on Android with a RefreshControl', () => {
     // splitLayoutProps has already run. Splitting on `style` alone starves the wrapper of its layout
     // style and the whole scroll content becomes invisible on Android while iOS looks perfect.
     it('feeds the wrapper a layout prop that exists only on the class', async () => {
-      registerStyles({ screen: { flex: 1 } });
+      registerRules([
+        {
+          tokens: ['screen'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { flex: 1 },
+        },
+      ]);
       mount(ROOT_TAG, () => (
         <ScrollView
           class="screen"

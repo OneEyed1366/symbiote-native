@@ -12,7 +12,7 @@
 
 import { createSignal } from 'solid-js';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
@@ -1210,7 +1210,20 @@ describe('Solid VirtualizedList on the engine', () => {
     // additionally resolves a registered class name, matching its own View/Text/ScrollView, and
     // accepts one for contentContainerStyle too.
     it('routes style to the scroll view and contentContainerStyle to the content container', async () => {
-      registerStyles({ frame: { flex: 1 }, padded: { padding: 20 } });
+      registerRules([
+        {
+          tokens: ['frame'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { flex: 1 },
+        },
+        {
+          tokens: ['padded'],
+          specificity: [0, 1, 0],
+          order: 1,
+          style: { padding: 20 },
+        },
+      ]);
       mount(ROOT_TAG, () => (
         <VirtualizedList<IRow>
           data={DATA}
