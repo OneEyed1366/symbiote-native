@@ -1,0 +1,13 @@
+/* Co-located rather than in App.css: App.css is shared canary chrome, these three are this
+   demo's own. Names carry an `a11y-` prefix so nothing here can collide with a chrome class. */
+
+.a11y-card {
+  padding: 12px;
+  border-radius: 10px;
+  background-color: #20304f;
+}
+
+.a11y-text {
+  color: #cdd6ee;
+  font-size: 14px;
+}

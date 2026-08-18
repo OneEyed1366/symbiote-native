@@ -1,0 +1,18 @@
+.ref-box {
+  height: 56px;
+  border-radius: 12px;
+  background-color: #7aa2e3;
+  align-items: center;
+  justify-content: center;
+}
+
+.ref-box-text {
+  color: #0b1120;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.ref-frame-text {
+  color: #cdd6ee;
+  font-size: 14px;
+}

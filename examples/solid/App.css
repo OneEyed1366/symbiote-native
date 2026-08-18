@@ -1,0 +1,589 @@
+/*
+ * Styling by CSS class is the convention across every canary (see CLAUDE.md's styling note):
+ * @symbiote-native/css-parser compiles this file at build time via Metro's babelTransformerPath
+ * into a registerStyles() call, and the engine's routeProp resolves the `class` attribute against
+ * that registry. The path is cross-adapter, not per-framework — React's `className`, Vue's `class`
+ * and Angular's `[class]` all land in the same place, and Solid's `class` joins them unchanged.
+ *
+ * Only properties Yoga and Fabric actually implement — this is a native stylesheet, not the web's.
+ */
+
+/* On SafeAreaView. Its background paints the FULL screen (the inset is padding on the children,
+ * not a smaller frame), so the strip behind the status bar stays dark instead of showing the
+ * native root's colour through. */
+.screen {
+  flex: 1;
+  background-color: #0b1020;
+}
+
+/* On KeyboardAvoidingView, which sits between SafeAreaView and ScrollView. It carries no colour of
+ * its own — only the flex that lets the ScrollView fill what is left after the keyboard padding. */
+.avoider {
+  flex: 1;
+}
+
+/* The ScrollView node itself must flex; its padding belongs to the CONTENT container instead, or
+ * the last card would be unreachable behind the safe area. */
+.scroll {
+  flex: 1;
+}
+
+.content {
+  padding: 24px;
+  gap: 16px;
+}
+
+.card {
+  align-items: center;
+  align-self: stretch;
+  gap: 12px;
+  padding: 28px;
+  border-radius: 20px;
+  background-color: #151c33;
+  border-width: 1px;
+  border-color: #26304f;
+}
+
+.logo {
+  width: 72px;
+  height: 72px;
+}
+
+.title {
+  color: #f4f6fb;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.subtitle {
+  color: #9aa6c4;
+  font-size: 15px;
+  line-height: 22px;
+  text-align: center;
+}
+
+.row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  align-self: stretch;
+  padding-top: 6px;
+}
+
+.row-label {
+  color: #cdd6ee;
+  font-size: 15px;
+}
+
+.section {
+  color: #f4f6fb;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* Tall enough that the scroll offset is genuinely native-owned rather than a no-op. */
+.filler {
+  height: 320px;
+  align-self: stretch;
+  border-radius: 12px;
+  background-color: #1b2440;
+}
+
+.input {
+  align-self: stretch;
+  color: #f4f6fb;
+  font-size: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  border-width: 1px;
+  border-color: #26304f;
+  background-color: #0f1729;
+}
+
+/* transparent + a dimmed backdrop, so the modal reads as a sheet over the screen rather than an
+ * opaque replacement — which also makes it obvious it is a separate native window. */
+.sheet-backdrop {
+  flex: 1;
+  justify-content: flex-end;
+  background-color: rgba(4, 8, 20, 0.6);
+}
+
+.sheet {
+  gap: 12px;
+  padding: 28px;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  background-color: #151c33;
+  border-width: 1px;
+  border-color: #26304f;
+}
+
+/* ---- tab bar + list screens (wave 4) ---------------------------------------------------- */
+
+.tabbar {
+  flex-direction: row;
+  align-self: stretch;
+  padding-top: 8px;
+  padding-right: 12px;
+  padding-bottom: 8px;
+  padding-left: 12px;
+  gap: 8px;
+  border-bottom-width: 1px;
+  border-color: #26304f;
+}
+
+.tab {
+  flex: 1;
+  align-items: center;
+  padding: 10px;
+  border-radius: 10px;
+  background-color: #151c33;
+}
+
+.tab-label {
+  color: #7f8db3;
+  font-size: 14px;
+}
+
+.tab-label-on {
+  color: #f4f6fb;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Every tab's own container: it must FLEX, or a list inside it is handed an unbounded height and
+ * renders every row instead of a window. */
+.screen-body {
+  flex: 1;
+  align-self: stretch;
+}
+
+.toolbar {
+  flex-direction: row;
+  gap: 8px;
+  padding-top: 12px;
+  padding-right: 16px;
+  padding-bottom: 4px;
+  padding-left: 16px;
+}
+
+.chip {
+  padding-top: 8px;
+  padding-right: 14px;
+  padding-bottom: 8px;
+  padding-left: 14px;
+  border-radius: 999px;
+  background-color: #20304f;
+  border-width: 1px;
+  border-color: #2c4068;
+}
+
+.chip-label {
+  color: #cdd6ee;
+  font-size: 13px;
+}
+
+.readout {
+  padding-top: 4px;
+  padding-right: 16px;
+  padding-bottom: 8px;
+  padding-left: 16px;
+  gap: 2px;
+}
+
+/* FlatList's content: the padding belongs here, not on the list node, or the last row sits under
+ * the safe area. */
+.grid {
+  padding: 12px;
+  gap: 12px;
+}
+
+/* The auto-generated row View when numColumns > 1 (columnWrapperStyle). */
+.grid-row {
+  gap: 12px;
+}
+
+.tile {
+  flex: 1;
+  height: 96px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border-width: 1px;
+  border-color: #2c4068;
+}
+
+.tile-label {
+  color: #f4f6fb;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.footer {
+  align-items: center;
+  padding: 20px;
+}
+
+/* Opaque on purpose: a sticky header pinned over scrolling rows must not let them show through,
+ * which is also how you can tell at a glance that it really is pinned. */
+.section-header {
+  padding-top: 8px;
+  padding-right: 16px;
+  padding-bottom: 8px;
+  padding-left: 16px;
+  background-color: #20304f;
+  border-bottom-width: 1px;
+  border-color: #2c4068;
+}
+
+.section-header-label {
+  color: #f4f6fb;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.section-footer {
+  color: #5b678f;
+  font-size: 12px;
+  padding-top: 6px;
+  padding-right: 16px;
+  padding-bottom: 2px;
+  padding-left: 16px;
+}
+
+.contact {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  padding-right: 16px;
+  padding-bottom: 12px;
+  padding-left: 16px;
+}
+
+.subtle {
+  color: #5b678f;
+  font-size: 13px;
+}
+
+.divider {
+  height: 1px;
+  margin-left: 16px;
+  background-color: #26304f;
+}
+
+.section-gap {
+  height: 10px;
+}
+
+/* Diagnostic HUD (screens/ListDiagnostics.tsx). Deliberately loud and pinned above the list: it is
+ * read off a photograph of a device, so contrast beats fitting in. Menlo because the numbers are
+ * compared column-to-column down the rows — a proportional font makes a sub-pixel drift unreadable. */
+.hud {
+  padding-top: 8px;
+  padding-right: 10px;
+  padding-bottom: 8px;
+  padding-left: 10px;
+  gap: 1px;
+  background-color: #0b1020;
+  border-width: 1px;
+  border-color: #3a4a7a;
+  border-radius: 8px;
+  margin-top: 0;
+  margin-right: 12px;
+  margin-bottom: 0;
+  margin-left: 12px;
+}
+
+.hud-line {
+  color: #7fd4ff;
+  font-size: 11px;
+  font-family: Menlo;
+  font-weight: 600;
+}
+
+.hud-row {
+  color: #9aa8c8;
+  font-size: 10px;
+  font-family: Menlo;
+}
+
+.hud-move {
+  color: #ffb26b;
+  font-size: 10px;
+  font-family: Menlo;
+}
+
+/* ---- Animated tab (components/AnimatedDemo.tsx + AnimatedParityDemo.tsx) ------------------ */
+
+/* Each demo is one stretched column inside the ScrollView's .content, so the two read as
+ * separate blocks without needing .card's centring (which would break the slide tracks). */
+.section-nested {
+  align-self: stretch;
+  gap: 12px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.section-label {
+  color: #7f8db3;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.row-tight {
+  flex-direction: row;
+  align-self: stretch;
+  gap: 8px;
+}
+
+/* no hyphen: kebabToCamel only rewrites "-[a-z]", so ".flex-1" would parse to the literal
+ * "flex-1" rather than "flex1" — the same digit trap examples/react's App.css records. */
+.flex1 {
+  flex: 1;
+}
+
+.action-button {
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  border-radius: 12px;
+  border-width: 1.5px;
+  padding-top: 12px;
+  padding-right: 16px;
+  padding-bottom: 12px;
+  padding-left: 16px;
+  background-color: #151c33;
+}
+
+.action-button-text {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+/* The freeze verdict, on the phone rather than only in the source: whoever taps Freeze is holding
+ * a device and has 3 seconds to decide what they are looking at. */
+.verdict-pass {
+  color: #68d391;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.verdict-fail {
+  color: #fc8181;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.pulse-frame {
+  height: 64px;
+  align-items: center;
+  justify-content: center;
+}
+
+/* width/height/border-radius/background static; opacity + transform are the interpolations and
+ * stay on the same element's dynamic style prop. */
+.pulse-dot {
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background-color: #7fb5ff;
+}
+
+/* Height matches the pulse frame's own slack, so the gap around every animated dot reads the same
+ * even though the dots differ in size. */
+.slide-track {
+  height: 44px;
+  justify-content: center;
+}
+
+/* Orange = JS driver, and the Slide (JS driver) button is tinted to match: during the freeze this
+ * is the dot that must NOT move. */
+.js-slide-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background-color: #f6ad55;
+}
+
+/* Green = native driver: during the freeze this is the dot that must keep moving. */
+.native-slide-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background-color: #68d391;
+}
+
+.drag-hint {
+  color: #5b678f;
+  font-size: 11px;
+}
+
+/* width/height hardcoded: XY_SPAN(96) + 36 = 132 — a true compile-time constant. */
+.xy-frame {
+  width: 132px;
+  height: 132px;
+  border-radius: 12px;
+  background-color: #0f1729;
+  border-width: 1px;
+  border-color: #26304f;
+  padding: 6px;
+}
+
+/* transform (xy.getTranslateTransform()) stays dynamic */
+.xy-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background-color: #9f7aea;
+}
+
+.track-row {
+  height: 30px;
+  justify-content: center;
+}
+
+/* transform (translateX(lead)) stays dynamic */
+.lead-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background-color: #4299e1;
+}
+
+/* transform (translateX(follow)) stays dynamic — it lags the lead dot, which is the whole point */
+.follow-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background-color: #f6ad55;
+}
+
+/* height hardcoded: HEADER_COLLAPSE(60) + 24 = 84 — a true compile-time constant */
+.collapse-frame {
+  height: 84px;
+  overflow: hidden;
+  justify-content: flex-start;
+  align-self: stretch;
+}
+
+/* height hardcoded: HEADER_COLLAPSE = 60; transform (translateY) stays dynamic */
+.collapse-header {
+  height: 60px;
+  border-radius: 8px;
+  background-color: #38b2ac;
+  align-items: center;
+  justify-content: center;
+}
+
+.collapse-header-text {
+  color: #06231f;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ---- navigation tour chrome -------------------------------------------------
+ * The "you are here" line tag, the hero card, and the two body-text weights every
+ * demo screen leads with. Lives here, as on every other canary (see
+ * examples/svelte/App.css's .hero-card / .line-tag blocks these values come from) —
+ * the registry is global, so a tour screen needs no import of its own.
+ *
+ * The five line colors are hand-synced with navigation-lines.ts's LINE_COLOR: this
+ * example declares no :root custom properties, and a stylesheet and a TS module
+ * share no import path anyway.
+ */
+
+/* The tour screens' content column. NOT `.section`, which in this canary is a Text
+   heading style (color/font-size/font-weight), not a container. */
+.demo-section {
+  gap: 12px;
+  padding: 24px;
+}
+
+.line-tag {
+  align-self: flex-start;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 999px;
+}
+
+.line-tag-primitives {
+  background-color: #76b3e1;
+}
+
+.line-tag-presentation {
+  background-color: #5ec8f2;
+}
+
+.line-tag-structure {
+  background-color: #4fd1a5;
+}
+
+.line-tag-introspection {
+  background-color: #b18cf5;
+}
+
+.line-tag-routing {
+  background-color: #f2789a;
+}
+
+.line-tag-text {
+  color: #0b1020;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+/* Hero card — the "you've arrived" intro, reusing MenuScreen's row + badge language. The badge's
+   background is the line color, passed as an inline style since a class cannot parametrize it. */
+.hero-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: #151c33;
+}
+
+.hero-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-badge-text {
+  color: #0b1020;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.hero-copy {
+  flex: 1;
+  gap: 4px;
+}
+
+.hero-title {
+  color: #f4f6fb;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.hero-body {
+  color: #9aa6c4;
+  font-size: 13px;
+}
+
+.info-text {
+  color: #9aa6c4;
+  font-size: 14px;
+}
+
+.note-text {
+  color: #7f8db3;
+  font-size: 13px;
+}

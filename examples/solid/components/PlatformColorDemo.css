@@ -1,0 +1,21 @@
+.color-tile {
+  flex: 1;
+  height: 56px;
+  border-radius: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.color-tile-bordered {
+  flex: 1;
+  height: 56px;
+  border-radius: 12px;
+  border-width: 1px;
+  align-items: center;
+  justify-content: center;
+}
+
+.color-tile-label {
+  font-size: 13px;
+  font-weight: bold;
+}

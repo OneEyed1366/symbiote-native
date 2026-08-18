@@ -1,0 +1,127 @@
+/*
+ * MenuScreen's own stylesheet, co-located instead of appended to App.css so parallel work on other
+ * demo screens cannot collide in one file. A standalone .css import compiles through the same
+ * @symbiote-native/css-parser Metro transformer and lands in the same global class registry — the
+ * file it sits next to changes nothing about resolution.
+ *
+ * Palette is App.css's: #0b1020 ground, #151c33 card, #26304f edge, #f4f6fb / #9aa6c4 type.
+ * The five line colors are hand-synced with navigation-lines.ts's LINE_COLOR — this example
+ * declares no :root custom properties, and a stylesheet and a TS module share no import path
+ * anyway. All five variants are written out even though only the Primitives row exists today, so
+ * adding a demo screen stays one MENU_ROWS entry plus one <Stack.Screen> marker.
+ */
+
+.menu-content {
+  padding: 20px;
+  gap: 12px;
+}
+
+.menu-hero {
+  gap: 6px;
+  padding-bottom: 8px;
+}
+
+.menu-eyebrow {
+  color: #9aa6c4;
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+
+.menu-hero-title {
+  color: #f4f6fb;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.menu-hero-subtitle {
+  color: #9aa6c4;
+  font-size: 14px;
+}
+
+.menu-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  background-color: #151c33;
+  border-width: 1px;
+  border-color: #26304f;
+}
+.menu-row-primitives {
+  border-left-width: 3px;
+  border-left-color: #76b3e1;
+}
+.menu-row-presentation {
+  border-left-width: 3px;
+  border-left-color: #5ec8f2;
+}
+.menu-row-structure {
+  border-left-width: 3px;
+  border-left-color: #4fd1a5;
+}
+.menu-row-introspection {
+  border-left-width: 3px;
+  border-left-color: #b18cf5;
+}
+.menu-row-routing {
+  border-left-width: 3px;
+  border-left-color: #f2789a;
+}
+
+.menu-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+}
+.menu-badge-primitives {
+  background-color: #76b3e1;
+}
+.menu-badge-presentation {
+  background-color: #5ec8f2;
+}
+.menu-badge-structure {
+  background-color: #4fd1a5;
+}
+.menu-badge-introspection {
+  background-color: #b18cf5;
+}
+.menu-badge-routing {
+  background-color: #f2789a;
+}
+.menu-badge-text {
+  color: #0b1020;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.menu-row-copy {
+  flex: 1;
+  gap: 4px;
+}
+.menu-row-label {
+  color: #f4f6fb;
+  font-size: 16px;
+  font-weight: 700;
+}
+.menu-row-hint {
+  font-size: 12px;
+}
+.menu-row-hint-primitives {
+  color: #76b3e1;
+}
+.menu-row-hint-presentation {
+  color: #5ec8f2;
+}
+.menu-row-hint-structure {
+  color: #4fd1a5;
+}
+.menu-row-hint-introspection {
+  color: #b18cf5;
+}
+.menu-row-hint-routing {
+  color: #f2789a;
+}

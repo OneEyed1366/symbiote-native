@@ -1,0 +1,30 @@
+/* A plain (global) stylesheet, not a `.module.css` — deliberate, and the reason is the compound
+   rule below. A CSS-module suffixes every class as `badge__module__<id>`; the engine's compound
+   lookup factors a shared scope suffix back out only for the `data-v-…` / `svelte-…` shapes its
+   SCOPE_SUFFIX_PATTERN knows (core/engine/src/style-registry/index.ts), so a scoped compound rule
+   would register as `badgeLoud__module__<id>` and never match the two markup tokens. Global keeps
+   the compound half of the demo alive; the scoping half has no Solid equivalent today. */
+
+.badge {
+  padding: 8px;
+  border-radius: 999px;
+  border-width: 1px;
+  border-color: #2c4068;
+  background-color: #20304f;
+}
+
+/* Restates ONLY the two colours: the padding and radius above must survive on `badge loud`. */
+.badge.loud {
+  border-color: #7aa2e3;
+  background-color: #16305a;
+}
+
+.badge-text {
+  font-size: 13px;
+  color: #cdd6ee;
+}
+
+.badge-readout {
+  color: #cdd6ee;
+  font-size: 13px;
+}
