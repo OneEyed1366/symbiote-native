@@ -31,7 +31,11 @@ import { scopedStyles } from '@symbiote-native/svelte/scoped-styles';
 import { collapseTextWhitespace } from '@symbiote-native/svelte/collapse-text-whitespace';
 
 export default {
-  preprocess: [forbidWebOnlyConstructs(), scopedStyles(), collapseTextWhitespace()],
+  preprocess: [
+    forbidWebOnlyConstructs(),
+    scopedStyles(),
+    collapseTextWhitespace(),
+  ],
   compilerOptions: {
     fragments: 'tree',
     css: 'external',

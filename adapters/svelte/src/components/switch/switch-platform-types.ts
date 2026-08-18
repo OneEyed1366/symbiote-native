@@ -6,5 +6,8 @@ import type { ISwitchTrackColor } from '@symbiote-native/components';
 
 export type ISwitchHostPlatform = {
   snapBackCommand: string;
-  trackColorProps: (value: boolean, trackColor?: ISwitchTrackColor) => Record<string, unknown>;
+  trackColorProps: (
+    value: boolean,
+    trackColor?: ISwitchTrackColor,
+  ) => Record<string, unknown>;
 };

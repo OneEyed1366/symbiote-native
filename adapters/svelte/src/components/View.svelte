@@ -33,7 +33,9 @@
   // the raw `id` key so it never reaches Fabric (every non-function prop in the bag otherwise
   // passes through to the slot as-is) — mirrors React's `resolveId` in
   // `adapters/react/src/components.ts`, adapted to the object-bag idiom.
-  const bag = $derived(id === undefined ? { ...rest, nativeID } : { ...rest, nativeID: id });
+  const bag = $derived(
+    id === undefined ? { ...rest, nativeID } : { ...rest, nativeID: id },
+  );
 </script>
 
 <symbiote-view p={bag} bind:this={hostShim}>

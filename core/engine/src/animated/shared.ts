@@ -24,7 +24,9 @@ export function readPassthroughStyle(passthrough: unknown): unknown {
 // Replace animated entries in a props map with their current rasterized values so the
 // first paint (and every re-render) carries concrete props. `style` is run through
 // AnimatedStyle so an animated style key resolves to its current number.
-export function reduceProps(props: Record<string, unknown>): Record<string, unknown> {
+export function reduceProps(
+  props: Record<string, unknown>,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(props)) {
     const value = props[key];
@@ -48,7 +50,8 @@ export function reduceProps(props: Record<string, unknown>): Record<string, unkn
 export function resolveHostNode(instance: unknown): unknown {
   if (instance !== null && typeof instance === 'object') {
     const getScrollNode = Reflect.get(instance, 'getScrollNode');
-    if (typeof getScrollNode === 'function') return getScrollNode.call(instance);
+    if (typeof getScrollNode === 'function')
+      return getScrollNode.call(instance);
   }
   return instance;
 }

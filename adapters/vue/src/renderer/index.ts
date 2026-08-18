@@ -82,7 +82,9 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
       // without the check a raw text lands under a non-Text parent - an invalid Fabric tree
       // built silently, which is worse than the throw insert() would have given.
       if (!el.isText) {
-        throw new Error(`Text string "${text}" must be rendered inside a <Text>`);
+        throw new Error(
+          `Text string "${text}" must be rendered inside a <Text>`,
+        );
       }
       // An RCTText carries its string as a single raw-text child. Reuse a lone existing
       // one to avoid churn; otherwise replace all children with a fresh raw-text node.
@@ -127,7 +129,8 @@ export function createSymbioteRenderer(surface: SymbioteSurface) {
     },
 
     nextSibling(node) {
-      const siblings = node.parent !== undefined ? node.parent.children : surface.children;
+      const siblings =
+        node.parent !== undefined ? node.parent.children : surface.children;
       const index = siblings.indexOf(node);
       return index >= 0 ? (siblings[index + 1] ?? null) : null;
     },

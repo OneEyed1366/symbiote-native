@@ -19,7 +19,9 @@ import { getNativeTag, isSymbioteNode, dlog } from '@symbiote-native/engine';
 export type { IHostInstance } from '@symbiote-native/engine';
 
 export function findNodeHandle(componentOrHandle: unknown): number | null {
-  const candidate = isRef(componentOrHandle) ? componentOrHandle.value : componentOrHandle;
+  const candidate = isRef(componentOrHandle)
+    ? componentOrHandle.value
+    : componentOrHandle;
   if (candidate === null || candidate === undefined) return null;
   if (typeof candidate === 'number') return candidate;
   // A plain ref() would have wrapped the node in a reactive Proxy; the engine mirror is

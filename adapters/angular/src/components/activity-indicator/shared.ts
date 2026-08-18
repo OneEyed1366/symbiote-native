@@ -1,4 +1,11 @@
-import { Directive, ElementRef, EventEmitter, inject, Input, Output } from '@angular/core';
+import {
+  Directive,
+  ElementRef,
+  EventEmitter,
+  inject,
+  Input,
+  Output,
+} from '@angular/core';
 import {
   renderActivityIndicator,
   resolveAccessibilityProps,
@@ -13,7 +20,10 @@ import type { ISymbioteEvent } from '@symbiote-native/engine';
 import type { IDescriptor } from '@symbiote-native/components';
 import { anchorHostStyle } from '../../primitives';
 
-export type { IActivityIndicatorProps, IActivityIndicatorSize } from '@symbiote-native/components';
+export type {
+  IActivityIndicatorProps,
+  IActivityIndicatorSize,
+} from '@symbiote-native/components';
 
 // Narrows anchorHostStyle's `unknown` (it reads an opaque engine prop bag) to the shape
 // IActivityIndicatorProps['style'] actually declares, the same runtime guard image/shared.ts's
@@ -61,8 +71,10 @@ export abstract class ActivityIndicatorBase implements IActivityIndicatorInputs 
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -107,14 +119,18 @@ export abstract class ActivityIndicatorBase implements IActivityIndicatorInputs 
   // closure even when nothing changed — every CD pass would read as "props changed" and force a
   // real Fabric re-clone cascading up every ancestor to the root (the same hazard
   // AnimatedComponentBase.reconcile() and ScrollViewStickyHeader's onHostLayout guard against).
-  private readonly onLayoutHandler = (event: ISymbioteEvent): void => this.layout.emit(event);
-  private readonly onAccessibilityActionHandler = (event: ISymbioteEvent): void =>
-    this.accessibilityAction.emit(event);
+  private readonly onLayoutHandler = (event: ISymbioteEvent): void =>
+    this.layout.emit(event);
+  private readonly onAccessibilityActionHandler = (
+    event: ISymbioteEvent,
+  ): void => this.accessibilityAction.emit(event);
   private readonly onAccessibilityTapHandler = (event: ISymbioteEvent): void =>
     this.accessibilityTap.emit(event);
-  private readonly onMagicTapHandler = (event: ISymbioteEvent): void => this.magicTap.emit(event);
-  private readonly onAccessibilityEscapeHandler = (event: ISymbioteEvent): void =>
-    this.accessibilityEscape.emit(event);
+  private readonly onMagicTapHandler = (event: ISymbioteEvent): void =>
+    this.magicTap.emit(event);
+  private readonly onAccessibilityEscapeHandler = (
+    event: ISymbioteEvent,
+  ): void => this.accessibilityEscape.emit(event);
 
   get descriptor(): IDescriptor {
     const props = resolveAccessibilityProps<IActivityIndicatorProps>({
@@ -141,8 +157,10 @@ export abstract class ActivityIndicatorBase implements IActivityIndicatorInputs 
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       onAccessibilityAction: this.emitterHandler(
         this.accessibilityAction,
@@ -174,7 +192,8 @@ export abstract class ActivityIndicatorBase implements IActivityIndicatorInputs 
       'aria-valuetext': this.ariaValueText,
     });
 
-    const { animating, color, hidesWhenStopped, size, style, ...passthrough } = props;
+    const { animating, color, hidesWhenStopped, size, style, ...passthrough } =
+      props;
     return renderActivityIndicator(
       {
         animating: animating !== false,

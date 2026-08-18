@@ -43,7 +43,8 @@ export function usePermissions(): [
   useEffect(() => {
     isMounted.current = true;
     getPermission().catch((cause: unknown) => {
-      if (isMounted.current) setError(cause instanceof Error ? cause : new Error(String(cause)));
+      if (isMounted.current)
+        setError(cause instanceof Error ? cause : new Error(String(cause)));
     });
     return () => {
       isMounted.current = false;

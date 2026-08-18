@@ -51,7 +51,9 @@ export type IImageBackgroundViewProps = {
   image: IImageViewProps;
 };
 
-export function renderImageBackground(view: IImageBackgroundViewProps): IDescriptor {
+export function renderImageBackground(
+  view: IImageBackgroundViewProps,
+): IDescriptor {
   // Flatten only to read the wrapper's explicit dimensions; RN copies these onto the Image so
   // it fills the box rather than collapsing to the source's intrinsic size. `imageStyle` last.
   const flattenedWrapper = flattenStyle(view.style);
@@ -64,7 +66,9 @@ export function renderImageBackground(view: IImageBackgroundViewProps): IDescrip
     view.imageStyle,
   ];
 
-  dlog('ImageBackground -> View(RCTView) > Image(RCTImageView absolute-fill) + children');
+  dlog(
+    'ImageBackground -> View(RCTView) > Image(RCTImageView absolute-fill) + children',
+  );
 
   // The wrapper View holds the inner Image as its only structural child; the adapter appends
   // the user children after it (so they paint on top).

@@ -74,11 +74,13 @@ describe('Animated timing integration', () => {
     });
 
     const finished = await new Promise<boolean>(resolve => {
-      Animated.timing(opacity, { toValue: 1, duration: 80, easing: Easing.linear }).start(
-        result => {
-          resolve(result.finished);
-        },
-      );
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 80,
+        easing: Easing.linear,
+      }).start(result => {
+        resolve(result.finished);
+      });
     });
 
     opacity.removeListener(opacityListener);

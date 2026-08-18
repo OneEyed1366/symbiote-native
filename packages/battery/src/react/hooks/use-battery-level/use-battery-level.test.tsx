@@ -15,13 +15,18 @@ import { useBatteryLevel } from './index';
 const { addListener, getBatteryLevelAsync, remove } = vi.hoisted(() => {
   const remove = vi.fn();
   return {
-    addListener: vi.fn((_listener: (event: { batteryLevel: number }) => void) => ({ remove })),
+    addListener: vi.fn(
+      (_listener: (event: { batteryLevel: number }) => void) => ({ remove }),
+    ),
     getBatteryLevelAsync: vi.fn(async () => 0.42),
     remove,
   };
 });
 
-vi.mock('../../../core', () => ({ addBatteryLevelListener: addListener, getBatteryLevelAsync }));
+vi.mock('../../../core', () => ({
+  addBatteryLevelListener: addListener,
+  getBatteryLevelAsync,
+}));
 
 const ROOT_TAG = 951;
 

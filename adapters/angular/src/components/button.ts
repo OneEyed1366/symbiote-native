@@ -33,7 +33,12 @@ import {
   type IAriaProps,
   type IButtonProps as ICoreButtonProps,
 } from '@symbiote-native/components';
-import type { ISymbioteEvent, ITextStyle, IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type {
+  ISymbioteEvent,
+  ITextStyle,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
 import { anchorStyleProp, TextHost } from '../primitives';
 import { TouchableOpacity } from './touchable';
 
@@ -81,8 +86,12 @@ export type IButtonProps = Omit<
       [accessibilityElementsHidden]="accessibilityElementsHidden"
       [accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"
       [accessibilityLanguage]="accessibilityLanguage"
-      [accessibilityRespondsToUserInteraction]="accessibilityRespondsToUserInteraction"
-      [accessibilityShowsLargeContentViewer]="accessibilityShowsLargeContentViewer"
+      [accessibilityRespondsToUserInteraction]="
+        accessibilityRespondsToUserInteraction
+      "
+      [accessibilityShowsLargeContentViewer]="
+        accessibilityShowsLargeContentViewer
+      "
       [accessibilityLargeContentTitle]="accessibilityLargeContentTitle"
       (accessibilityAction)="accessibilityAction.emit($event)"
       (accessibilityTap)="accessibilityTap.emit($event)"
@@ -149,8 +158,10 @@ export class Button implements IButtonProps, DoCheck {
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -195,7 +206,9 @@ export class Button implements IButtonProps, DoCheck {
   // ngDoCheck runs during the PARENT's refresh even when this view is skipped; the signal write is
   // what marks this view. The anchor returns the same props.style reference until a commit changes
   // it, so Object.is makes an unchanged poll free.
-  private readonly anchorStyleValue = signal<IStyleProp<IViewStyle> | undefined>(undefined);
+  private readonly anchorStyleValue = signal<
+    IStyleProp<IViewStyle> | undefined
+  >(undefined);
 
   ngDoCheck(): void {
     this.anchorStyleValue.set(anchorStyleProp<IViewStyle>(this.elementRef));

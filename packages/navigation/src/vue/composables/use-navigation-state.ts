@@ -26,10 +26,13 @@ export function useNavigationState<TResult>(
   let unsubscribe: (() => void) | undefined;
 
   onMounted(() => {
-    unsubscribe = scope.value.emitter.addListener(NAVIGATION_EVENT_STATE, (state: unknown) => {
-      if (!isNavigatorState(state)) return;
-      result.value = selector(state);
-    });
+    unsubscribe = scope.value.emitter.addListener(
+      NAVIGATION_EVENT_STATE,
+      (state: unknown) => {
+        if (!isNavigatorState(state)) return;
+        result.value = selector(state);
+      },
+    );
   });
 
   onUnmounted(() => unsubscribe?.());

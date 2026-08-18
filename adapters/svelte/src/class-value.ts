@@ -25,7 +25,11 @@
 // compile error at the call site rather than a surprise at runtime. An empty object is
 // deliberately NOT treated as a clsx map: both readings contribute no style, so the cheaper,
 // non-allocating branch is the right one.
-import { isClassNameValue, resolveClassName, type IClassNameValue } from '@symbiote-native/engine';
+import {
+  isClassNameValue,
+  resolveClassName,
+  type IClassNameValue,
+} from '@symbiote-native/engine';
 
 // A clsx map: class name -> whether it applies.
 export type IClassMap = Readonly<Record<string, boolean | null | undefined>>;
@@ -52,9 +56,13 @@ const CLASS_SEPARATOR = ' ';
 // it to the host bag — ScrollView and VirtualizedList split the resolved class into layout vs.
 // visual halves before they know which host tag gets which — so a clsx map reaches the registry
 // there too instead of falling into resolveClassName's "already a style" branch.
-export function resolveSvelteClass(value: unknown): ReturnType<typeof resolveClassName> {
+export function resolveSvelteClass(
+  value: unknown,
+): ReturnType<typeof resolveClassName> {
   const normalized = normalizeSvelteClass(value);
-  return resolveClassName(isClassNameValue(normalized) ? normalized : undefined);
+  return resolveClassName(
+    isClassNameValue(normalized) ? normalized : undefined,
+  );
 }
 
 // Mirrors clsx's own `toVal` (node_modules/clsx/dist/clsx.js), which is what Svelte's `clsx()`
@@ -63,7 +71,8 @@ export function resolveSvelteClass(value: unknown): ReturnType<typeof resolveCla
 // is truthy. Returns false the moment it meets a plain object that is not a clsx map — that
 // makes the whole value non-clsx, so the caller hands it on unchanged.
 function collectClsxParts(value: unknown, parts: string[]): boolean {
-  if (value === null || value === undefined || typeof value === 'boolean') return true;
+  if (value === null || value === undefined || typeof value === 'boolean')
+    return true;
   if (typeof value === 'string' || typeof value === 'number') {
     if (value !== '' && value !== 0) parts.push(String(value));
     return true;
@@ -86,6 +95,7 @@ function collectClsxParts(value: unknown, parts: string[]): boolean {
 function isClassMapEntries(entries: Array<[string, unknown]>): boolean {
   if (entries.length === 0) return false;
   return entries.every(
-    ([, applies]) => typeof applies === 'boolean' || applies === null || applies === undefined,
+    ([, applies]) =>
+      typeof applies === 'boolean' || applies === null || applies === undefined,
   );
 }

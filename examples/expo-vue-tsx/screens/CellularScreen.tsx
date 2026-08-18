@@ -1,6 +1,12 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
 import {
   CellularGeneration,
   allowsVoipAsync,
@@ -17,12 +23,17 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function generationLabel(generation: CellularGeneration): string {
   switch (generation) {
-    case CellularGeneration.CELLULAR_2G: return '2G';
-    case CellularGeneration.CELLULAR_3G: return '3G';
-    case CellularGeneration.CELLULAR_4G: return '4G';
-    case CellularGeneration.CELLULAR_5G: return '5G';
+    case CellularGeneration.CELLULAR_2G:
+      return '2G';
+    case CellularGeneration.CELLULAR_3G:
+      return '3G';
+    case CellularGeneration.CELLULAR_4G:
+      return '4G';
+    case CellularGeneration.CELLULAR_5G:
+      return '5G';
     case CellularGeneration.UNKNOWN:
-    default: return 'Unknown';
+    default:
+      return 'Unknown';
   }
 }
 
@@ -59,7 +70,8 @@ export const CellularScreen = defineComponent(
     const carrierName: Ref<string | null> = ref(null);
     const mobileCountryCode: Ref<string | null> = ref(null);
     const mobileNetworkCode: Ref<string | null> = ref(null);
-    const { status: permissionStatus, request: requestPermission } = usePermissions();
+    const { status: permissionStatus, request: requestPermission } =
+      usePermissions();
 
     let isMounted = true;
     onUnmounted(() => {
@@ -87,15 +99,23 @@ export const CellularScreen = defineComponent(
     });
 
     const generationLabelText = computed(() =>
-      generation.value === null ? 'checking…' : generationLabel(generation.value),
+      generation.value === null
+        ? 'checking…'
+        : generationLabel(generation.value),
     );
     const permissionLabel = computed(() =>
-      permissionStatus.value === null ? 'checking…' : permissionStatus.value.status,
+      permissionStatus.value === null
+        ? 'checking…'
+        : permissionStatus.value.status,
     );
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="cellular-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="cellular-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -106,9 +126,10 @@ export const CellularScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Cellular</Text>
               <Text class="hero-body">
-                @symbiote-native/cellular — cellular generation and carrier/SIM info. Every field
-                except generation is Android-only upstream (iOS/web return null); a physical
-                device with an active SIM is needed for real values.
+                @symbiote-native/cellular — cellular generation and carrier/SIM
+                info. Every field except generation is Android-only upstream
+                (iOS/web return null); a physical device with an active SIM is
+                needed for real values.
               </Text>
             </View>
           </View>
@@ -120,11 +141,26 @@ export const CellularScreen = defineComponent(
             <ValueRow label="Generation" value={generationLabelText.value} />
             {Platform.OS === 'android' && (
               <>
-                <ValueRow label="Allows VoIP" value={valueLabel(allowsVoip.value)} />
-                <ValueRow label="ISO country code" value={valueLabel(isoCountryCode.value)} />
-                <ValueRow label="Carrier name" value={valueLabel(carrierName.value)} />
-                <ValueRow label="Mobile country code" value={valueLabel(mobileCountryCode.value)} />
-                <ValueRow label="Mobile network code" value={valueLabel(mobileNetworkCode.value)} />
+                <ValueRow
+                  label="Allows VoIP"
+                  value={valueLabel(allowsVoip.value)}
+                />
+                <ValueRow
+                  label="ISO country code"
+                  value={valueLabel(isoCountryCode.value)}
+                />
+                <ValueRow
+                  label="Carrier name"
+                  value={valueLabel(carrierName.value)}
+                />
+                <ValueRow
+                  label="Mobile country code"
+                  value={valueLabel(mobileCountryCode.value)}
+                />
+                <ValueRow
+                  label="Mobile network code"
+                  value={valueLabel(mobileNetworkCode.value)}
+                />
               </>
             )}
           </View>
@@ -133,7 +169,10 @@ export const CellularScreen = defineComponent(
             <View class="auth-card-header">
               <Text class="auth-card-title">Permission</Text>
             </View>
-            <ValueRow label="Phone-state permission status" value={permissionLabel.value} />
+            <ValueRow
+              label="Phone-state permission status"
+              value={permissionLabel.value}
+            />
             <ActionButton
               testID="cellular-request-permission"
               title="Request permission"

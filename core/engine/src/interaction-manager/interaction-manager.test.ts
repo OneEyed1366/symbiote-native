@@ -164,12 +164,18 @@ describe('InteractionManager', () => {
     it('fires interactionStart/Complete only at the busy<->idle boundary, not on every handle', () => {
       let started = 0;
       let completed = 0;
-      InteractionManager.addListener(InteractionManager.Events.interactionStart, () => {
-        started += 1;
-      });
-      InteractionManager.addListener(InteractionManager.Events.interactionComplete, () => {
-        completed += 1;
-      });
+      InteractionManager.addListener(
+        InteractionManager.Events.interactionStart,
+        () => {
+          started += 1;
+        },
+      );
+      InteractionManager.addListener(
+        InteractionManager.Events.interactionComplete,
+        () => {
+          completed += 1;
+        },
+      );
 
       const first = InteractionManager.createInteractionHandle();
       const second = InteractionManager.createInteractionHandle();
@@ -186,9 +192,12 @@ describe('InteractionManager', () => {
     // listener that already unsubscribed must not keep receiving events.
     it('addListener().remove() stops further notifications', () => {
       let started = 0;
-      const sub = InteractionManager.addListener(InteractionManager.Events.interactionStart, () => {
-        started += 1;
-      });
+      const sub = InteractionManager.addListener(
+        InteractionManager.Events.interactionStart,
+        () => {
+          started += 1;
+        },
+      );
       sub.remove();
 
       const handle = InteractionManager.createInteractionHandle();

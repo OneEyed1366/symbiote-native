@@ -24,7 +24,10 @@ export function useLinkingIntegration(
   handleRef.current = navigatorHandle;
 
   useEffect(() => {
-    function applyRoute(url: string, dispatch: (name: string, params?: unknown) => void): void {
+    function applyRoute(
+      url: string,
+      dispatch: (name: string, params?: unknown) => void,
+    ): void {
       const route = resolveRouteFromUrl(configRef.current, url);
       if (route === null) {
         dlog(`useLinkingIntegration: no route resolved for "${url}"`);

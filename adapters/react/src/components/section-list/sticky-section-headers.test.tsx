@@ -54,8 +54,10 @@ function renderSection(props: {
   return createElement(VirtualizedSectionList<IRow>, {
     sections: props.sections,
     stickySectionHeadersEnabled: props.stickySectionHeadersEnabled,
-    renderSectionHeader: ({ section }) => createElement('symbiote-text', {}, section.title),
-    renderItem: ({ item }) => createElement('symbiote-text', {}, `row-${item.id}`),
+    renderSectionHeader: ({ section }) =>
+      createElement('symbiote-text', {}, section.title),
+    renderItem: ({ item }) =>
+      createElement('symbiote-text', {}, `row-${item.id}`),
   });
 }
 
@@ -74,7 +76,10 @@ describe('VirtualizedSectionList sticky section headers', () => {
     const wrappers = stickyWrappers();
     expect(wrappers.length, 'one sticky wrapper per section header').toBe(2);
     for (const wrapper of wrappers) {
-      expect(wrapper.props.collapsable, 'sticky wrapper is collapsable:false').toBe(false);
+      expect(
+        wrapper.props.collapsable,
+        'sticky wrapper is collapsable:false',
+      ).toBe(false);
     }
   });
 
@@ -82,7 +87,10 @@ describe('VirtualizedSectionList sticky section headers', () => {
   // e.g. a horizontally-scrolling section list) must get plain, unwrapped children — the wrap
   // must be conditional on the resolved flag, not unconditionally applied whenever headers exist.
   it('wraps nothing when stickySectionHeadersEnabled is false', () => {
-    mount(ROOT_TAG, renderSection({ sections: SECTIONS, stickySectionHeadersEnabled: false }));
+    mount(
+      ROOT_TAG,
+      renderSection({ sections: SECTIONS, stickySectionHeadersEnabled: false }),
+    );
     const wrappers = stickyWrappers();
     expect(wrappers.length, 'disabled sticky headers wrap no header').toBe(0);
   });

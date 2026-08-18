@@ -13,11 +13,13 @@ export function injectIsFocused(): Signal<boolean> {
   const destroyRef = inject(DestroyRef);
   const isFocused = signal(false);
 
-  const unsubscribeFocus = context.emitter.addListener(NAVIGATION_EVENT_FOCUS, () =>
-    isFocused.set(true),
+  const unsubscribeFocus = context.emitter.addListener(
+    NAVIGATION_EVENT_FOCUS,
+    () => isFocused.set(true),
   );
-  const unsubscribeBlur = context.emitter.addListener(NAVIGATION_EVENT_BLUR, () =>
-    isFocused.set(false),
+  const unsubscribeBlur = context.emitter.addListener(
+    NAVIGATION_EVENT_BLUR,
+    () => isFocused.set(false),
   );
   destroyRef.onDestroy(() => {
     unsubscribeFocus();

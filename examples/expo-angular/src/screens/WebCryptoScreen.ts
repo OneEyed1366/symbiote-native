@@ -1,6 +1,9 @@
 import { Component, signal } from '@angular/core';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
-import { polyfillWebCrypto, webCrypto } from '@symbiote-native/standard-web-crypto/angular';
+import {
+  polyfillWebCrypto,
+  webCrypto,
+} from '@symbiote-native/standard-web-crypto/angular';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -26,7 +29,11 @@ function toHex(bytes: Uint8Array): string {
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="web-crypto-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="web-crypto-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -37,8 +44,9 @@ function toHex(bytes: Uint8Array): string {
           <View class="hero-copy">
             <Text class="hero-title">Web Crypto</Text>
             <Text class="hero-body">
-              @symbiote-native/standard-web-crypto — a partial W3C Web Crypto polyfill exposing
-              crypto.getRandomValues, backed by @symbiote-native/crypto's native random source.
+              @symbiote-native/standard-web-crypto — a partial W3C Web Crypto
+              polyfill exposing crypto.getRandomValues, backed by
+              @symbiote-native/crypto's native random source.
             </Text>
           </View>
         </View>
@@ -51,7 +59,9 @@ function toHex(bytes: Uint8Array): string {
             (press)="handleGenerateRandomBytes()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="web-crypto-random-bytes-result" class="value-text">{{ randomBytesLabel() }}</Text>
+          <Text testID="web-crypto-random-bytes-result" class="value-text">{{
+            randomBytesLabel()
+          }}</Text>
         </View>
 
         <View testID="web-crypto-polyfill-card" class="capability-card">
@@ -62,7 +72,9 @@ function toHex(bytes: Uint8Array): string {
             (press)="handleInstallPolyfill()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="web-crypto-polyfill-result" class="value-text">{{ polyfillLabel() }}</Text>
+          <Text testID="web-crypto-polyfill-result" class="value-text">{{
+            polyfillLabel()
+          }}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -80,7 +92,9 @@ export class WebCryptoScreen {
   readonly isPolyfillInstalled = signal<boolean | null>(null);
 
   handleGenerateRandomBytes(): void {
-    this.randomBytes.set(webCrypto.getRandomValues(new Uint8Array(RANDOM_BYTE_COUNT)));
+    this.randomBytes.set(
+      webCrypto.getRandomValues(new Uint8Array(RANDOM_BYTE_COUNT)),
+    );
   }
 
   handleInstallPolyfill(): void {
@@ -95,6 +109,8 @@ export class WebCryptoScreen {
 
   polyfillLabel(): string {
     const isInstalled = this.isPolyfillInstalled();
-    return isInstalled === null ? 'not installed yet' : `globalThis.crypto defined: ${isInstalled}`;
+    return isInstalled === null
+      ? 'not installed yet'
+      : `globalThis.crypto defined: ${isInstalled}`;
   }
 }

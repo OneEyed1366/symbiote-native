@@ -135,7 +135,12 @@ export { DescriptorOutlet } from './descriptor-to-angular';
 // idiom) parameterized by an `@Input()`, rather than a factory returning fresh components per
 // call.
 export { PortalDirective, PortalOutletDirective } from './create-portal';
-export { createTunnel, TunnelInDirective, TunnelOut, type ITunnelStore } from './create-tunnel';
+export {
+  createTunnel,
+  TunnelInDirective,
+  TunnelOut,
+  type ITunnelStore,
+} from './create-tunnel';
 export { SymbioteRenderer, SymbioteRendererFactory } from './renderer';
 // registerComposedComponent lives in the dependency-free leaf ./anchor-host-registry, NOT in the
 // require-cyclic ./renderer — see the leaf header. The babel-register-composed plugin injects the
@@ -258,7 +263,11 @@ export {
   setNativeViewConfigSource,
   StyleSheet,
 } from '@symbiote-native/engine';
-export type { IRootTag, ISymbioteEvent, ISymbioteNode } from '@symbiote-native/engine';
+export type {
+  IRootTag,
+  ISymbioteEvent,
+  ISymbioteNode,
+} from '@symbiote-native/engine';
 // The agnostic style / platform / view-config types behind the values above. Angular takes its
 // component props as @Input()s and exports no per-component prop type, but an app still needs
 // these to type a style object or a Platform.select spec.

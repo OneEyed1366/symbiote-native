@@ -7,7 +7,10 @@
 // PanResponder equivalent (see packages/navigation's README / the drawer feasibility note for the
 // full gap list).
 
-import type { IPanResponderGestureState, ISymbioteEvent } from '@symbiote-native/engine';
+import type {
+  IPanResponderGestureState,
+  ISymbioteEvent,
+} from '@symbiote-native/engine';
 import { isRecord } from '../guards';
 import type { IDrawerSlot } from '../render-drawer';
 
@@ -59,7 +62,9 @@ export function resolveDrawerType(options: IDrawerOptions): IDrawerType {
   return options.drawerType ?? DRAWER_DEFAULT_TYPE;
 }
 
-export function resolveDrawerPosition(options: IDrawerOptions): IDrawerPosition {
+export function resolveDrawerPosition(
+  options: IDrawerOptions,
+): IDrawerPosition {
   return options.drawerPosition ?? DRAWER_DEFAULT_POSITION;
 }
 
@@ -90,7 +95,9 @@ export function isDrawerOverlayVisible(options: IDrawerOptions): boolean {
 // slide: panel AND content move together by the same delta, overlay fades in (content still
 //   covers the panel partially as they slide in tandem, same as front visually at rest).
 // permanent: static, all zero (isDrawerAnimated() gates callers off this path already).
-export function resolveDrawerGeometry(options: IDrawerOptions): IDrawerGeometry {
+export function resolveDrawerGeometry(
+  options: IDrawerOptions,
+): IDrawerGeometry {
   const width = resolveDrawerWidth(options);
   const type = resolveDrawerType(options);
   const sign = resolveDrawerPosition(options) === 'left' ? 1 : -1;
@@ -188,25 +195,37 @@ export function resolveDrawerSlotInterpolation(
       return {
         translateX: {
           inputRange: DRAWER_PROGRESS_INPUT_RANGE,
-          outputRange: [geometry.contentTranslateXClosed, geometry.contentTranslateXOpen],
+          outputRange: [
+            geometry.contentTranslateXClosed,
+            geometry.contentTranslateXOpen,
+          ],
         },
       };
     case 'overlay':
       return {
         opacity: {
           inputRange: DRAWER_PROGRESS_INPUT_RANGE,
-          outputRange: [geometry.overlayOpacityClosed, geometry.overlayOpacityOpen],
+          outputRange: [
+            geometry.overlayOpacityClosed,
+            geometry.overlayOpacityOpen,
+          ],
         },
         translateX: {
           inputRange: DRAWER_PROGRESS_INPUT_RANGE,
-          outputRange: [geometry.contentTranslateXClosed, geometry.contentTranslateXOpen],
+          outputRange: [
+            geometry.contentTranslateXClosed,
+            geometry.contentTranslateXOpen,
+          ],
         },
       };
     case 'panel':
       return {
         translateX: {
           inputRange: DRAWER_PROGRESS_INPUT_RANGE,
-          outputRange: [geometry.panelTranslateXClosed, geometry.panelTranslateXOpen],
+          outputRange: [
+            geometry.panelTranslateXClosed,
+            geometry.panelTranslateXOpen,
+          ],
         },
       };
   }
@@ -235,7 +254,9 @@ export function isSwipeStartInEdge(
 // ScrollView's way).
 const MOVE_CLAIM_THRESHOLD = 5;
 
-export function isHorizontalDrag(gestureState: IPanResponderGestureState): boolean {
+export function isHorizontalDrag(
+  gestureState: IPanResponderGestureState,
+): boolean {
   return (
     Math.abs(gestureState.dx) > MOVE_CLAIM_THRESHOLD &&
     Math.abs(gestureState.dx) > Math.abs(gestureState.dy)
@@ -258,8 +279,10 @@ export function resolveSwipeIntent(
   // symmetrically for a right drawer's leftward drag).
   const signedDx = sign * gestureState.dx;
   const signedVx = sign * gestureState.vx;
-  const minDistance = options.swipeMinDistance ?? DRAWER_DEFAULT_SWIPE_MIN_DISTANCE;
-  const minVelocity = options.swipeMinVelocity ?? DRAWER_DEFAULT_SWIPE_MIN_VELOCITY;
+  const minDistance =
+    options.swipeMinDistance ?? DRAWER_DEFAULT_SWIPE_MIN_DISTANCE;
+  const minVelocity =
+    options.swipeMinVelocity ?? DRAWER_DEFAULT_SWIPE_MIN_VELOCITY;
 
   const pastDistance = Math.abs(signedDx) >= minDistance;
   const pastVelocity = Math.abs(signedVx) >= minVelocity;
@@ -276,7 +299,9 @@ export function clamp01(value: number): number {
 }
 
 function toFiniteNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 // The touch's real starting page-X, read off the raw event rather than gestureState.x0: the
@@ -293,7 +318,8 @@ export function startPageXOf(event: ISymbioteEvent): number | undefined {
   const direct = toFiniteNumber(nativeEvent.pageX);
   if (direct !== undefined) return direct;
   const touches = nativeEvent.touches;
-  if (Array.isArray(touches) && isRecord(touches[0])) return toFiniteNumber(touches[0].pageX);
+  if (Array.isArray(touches) && isRecord(touches[0]))
+    return toFiniteNumber(touches[0].pageX);
   return undefined;
 }
 
@@ -323,7 +349,8 @@ export function shouldClaimDrawerSwipe(
   options: IDrawerOptions,
   phase: 'start' | 'move',
 ): boolean {
-  if ((options.swipeEnabled ?? DRAWER_DEFAULT_SWIPE_ENABLED) === false) return false;
+  if ((options.swipeEnabled ?? DRAWER_DEFAULT_SWIPE_ENABLED) === false)
+    return false;
   if (!isDrawerAnimated(options)) return false;
   const startX = startPageXOf(event) ?? gestureState.x0;
   if (!isSwipeStartInEdge(startX, screenWidth, isOpen, options)) return false;

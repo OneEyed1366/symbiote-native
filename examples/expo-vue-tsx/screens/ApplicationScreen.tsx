@@ -1,6 +1,12 @@
 import { defineComponent, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
 import {
   ApplicationReleaseType,
   applicationId,
@@ -19,13 +25,19 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 function releaseTypeLabel(type: ApplicationReleaseType): string {
   switch (type) {
-    case ApplicationReleaseType.SIMULATOR: return 'Simulator';
-    case ApplicationReleaseType.ENTERPRISE: return 'Enterprise';
-    case ApplicationReleaseType.DEVELOPMENT: return 'Development';
-    case ApplicationReleaseType.AD_HOC: return 'Ad hoc';
-    case ApplicationReleaseType.APP_STORE: return 'App Store';
+    case ApplicationReleaseType.SIMULATOR:
+      return 'Simulator';
+    case ApplicationReleaseType.ENTERPRISE:
+      return 'Enterprise';
+    case ApplicationReleaseType.DEVELOPMENT:
+      return 'Development';
+    case ApplicationReleaseType.AD_HOC:
+      return 'Ad hoc';
+    case ApplicationReleaseType.APP_STORE:
+      return 'App Store';
     case ApplicationReleaseType.UNKNOWN:
-    default: return 'Unknown';
+    default:
+      return 'Unknown';
   }
 }
 
@@ -91,7 +103,11 @@ export const ApplicationScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="application-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="application-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -102,9 +118,10 @@ export const ApplicationScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Application</Text>
               <Text class="hero-body">
-                @symbiote-native/application — app version/build/name/ID, install-time lookups,
-                plus the Android ID/install-referrer and iOS vendor-ID/release-type functions,
-                each gated to the platform that supports it.
+                @symbiote-native/application — app version/build/name/ID,
+                install-time lookups, plus the Android ID/install-referrer and
+                iOS vendor-ID/release-type functions, each gated to the platform
+                that supports it.
               </Text>
             </View>
           </View>
@@ -113,10 +130,22 @@ export const ApplicationScreen = defineComponent(
             <View class="auth-card-header">
               <Text class="auth-card-title">App info</Text>
             </View>
-            <ValueRow label="Native app version" value={nativeApplicationVersion ?? 'unknown'} />
-            <ValueRow label="Native build version" value={nativeBuildVersion ?? 'unknown'} />
-            <ValueRow label="Application name" value={applicationName ?? 'unknown'} />
-            <ValueRow label="Application ID" value={applicationId ?? 'unknown'} />
+            <ValueRow
+              label="Native app version"
+              value={nativeApplicationVersion ?? 'unknown'}
+            />
+            <ValueRow
+              label="Native build version"
+              value={nativeBuildVersion ?? 'unknown'}
+            />
+            <ValueRow
+              label="Application name"
+              value={applicationName ?? 'unknown'}
+            />
+            <ValueRow
+              label="Application ID"
+              value={applicationId ?? 'unknown'}
+            />
           </View>
 
           <View testID="application-install-card" class="auth-card">
@@ -129,7 +158,10 @@ export const ApplicationScreen = defineComponent(
               onPress={handleGetInstallationTime}
               color={lineColor}
             />
-            <ValueRow label="Installed at" value={installationTime.value ?? 'checking…'} />
+            <ValueRow
+              label="Installed at"
+              value={installationTime.value ?? 'checking…'}
+            />
           </View>
 
           {Platform.OS === 'android' && (
@@ -143,14 +175,20 @@ export const ApplicationScreen = defineComponent(
                 onPress={handleGetAndroidId}
                 color={lineColor}
               />
-              <ValueRow label="Android ID" value={androidId.value ?? 'checking…'} />
+              <ValueRow
+                label="Android ID"
+                value={androidId.value ?? 'checking…'}
+              />
               <ActionButton
                 testID="application-install-referrer-button"
                 title="Get install referrer"
                 onPress={handleGetInstallReferrer}
                 color={lineColor}
               />
-              <ValueRow label="Install referrer" value={installReferrer.value ?? 'checking…'} />
+              <ValueRow
+                label="Install referrer"
+                value={installReferrer.value ?? 'checking…'}
+              />
             </View>
           )}
 
@@ -165,14 +203,20 @@ export const ApplicationScreen = defineComponent(
                 onPress={handleGetIosVendorId}
                 color={lineColor}
               />
-              <ValueRow label="Vendor ID" value={iosVendorId.value ?? 'checking…'} />
+              <ValueRow
+                label="Vendor ID"
+                value={iosVendorId.value ?? 'checking…'}
+              />
               <ActionButton
                 testID="application-ios-release-type-button"
                 title="Get release type"
                 onPress={handleGetIosReleaseType}
                 color={lineColor}
               />
-              <ValueRow label="Release type" value={iosReleaseType.value ?? 'checking…'} />
+              <ValueRow
+                label="Release type"
+                value={iosReleaseType.value ?? 'checking…'}
+              />
             </View>
           )}
         </ScrollView>

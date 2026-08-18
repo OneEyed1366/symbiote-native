@@ -25,7 +25,10 @@ function renderedRows(nodes: IFakeNode[]): string[] {
   const rows: string[] = [];
   for (const node of nodes) {
     for (const child of node.children) {
-      if (typeof child.props.text === 'string' && child.props.text.startsWith('row-')) {
+      if (
+        typeof child.props.text === 'string' &&
+        child.props.text.startsWith('row-')
+      ) {
         rows.push(child.props.text);
       }
     }
@@ -46,7 +49,8 @@ function App(): ReactElement {
       offset: ITEM_HEIGHT * index,
       index,
     }),
-    renderItem: ({ item }) => createElement('symbiote-text', {}, `row-${item.id}`),
+    renderItem: ({ item }) =>
+      createElement('symbiote-text', {}, `row-${item.id}`),
     onScroll: event => {
       seenEvents.push(event.nativeEvent);
     },

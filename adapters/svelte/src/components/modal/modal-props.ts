@@ -6,7 +6,11 @@
 // here per <prop_types_split_agnostic_vs_per_adapter> (children is a Svelte Snippet, so the full
 // prop type is per-adapter like React's/Vue's IModalProps, not shared).
 import type { Snippet } from 'svelte';
-import type { IStyleProp, ISymbioteEvent, IViewStyle } from '@symbiote-native/engine';
+import type {
+  IStyleProp,
+  ISymbioteEvent,
+  IViewStyle,
+} from '@symbiote-native/engine';
 import type {
   IAccessibilityProps,
   IAriaProps,

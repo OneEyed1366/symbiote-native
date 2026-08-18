@@ -53,7 +53,9 @@ describe('TouchableNativeFeedback', () => {
 
 // Fabric is clone-on-write: a prop update yields a NEW node in the committed tree, never in
 // `created`, so a post-mutation assertion must walk the live committed child set.
-function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findCommitted(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   const stack = [...fabric.committed];
   while (stack.length > 0) {
     const node = stack.pop();
@@ -96,11 +98,15 @@ describe('TouchableNativeFeedback memoized hostProps stays correct', () => {
 
     mount(ROOT_TAG, ClassToggleHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
-    expect(findCommitted(n => n.props.testID === 'toggle')?.props.backgroundColor).toBeUndefined();
+    expect(
+      findCommitted(n => n.props.testID === 'toggle')?.props.backgroundColor,
+    ).toBeUndefined();
 
     toggleHost?.on.set(true);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    expect(findCommitted(n => n.props.testID === 'toggle')?.props.backgroundColor).toBe('lime');
+    expect(
+      findCommitted(n => n.props.testID === 'toggle')?.props.backgroundColor,
+    ).toBe('lime');
   });
 });

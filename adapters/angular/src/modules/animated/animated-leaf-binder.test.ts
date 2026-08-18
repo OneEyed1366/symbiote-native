@@ -160,7 +160,9 @@ describe('AnimatedLeafBinder', () => {
       const binder = new AnimatedLeafBinder(() => null, 'test');
       const opacity = new AnimatedValue(1);
 
-      expect(() => binder.reconcile({ style: { opacity } }, false)).not.toThrow();
+      expect(() =>
+        binder.reconcile({ style: { opacity } }, false),
+      ).not.toThrow();
       opacity.setValue(0.4);
       // Nothing to bind to yet: no Fabric node was ever created, let alone flushed onto.
       expect(fabric.created).toHaveLength(0);

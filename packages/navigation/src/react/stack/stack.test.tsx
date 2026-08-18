@@ -18,7 +18,11 @@
 import { act, createElement, createRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/react';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/react';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from './index';
@@ -128,7 +132,9 @@ function screenNodes(): IFakeNode[] {
 }
 
 function headerConfigOf(screen: IFakeNode): IFakeNode {
-  const header = screen.children.find(child => child.viewName === HEADER_CONFIG_VIEW);
+  const header = screen.children.find(
+    child => child.viewName === HEADER_CONFIG_VIEW,
+  );
   if (!header) throw new Error('no header config child on screen');
   return header;
 }
@@ -161,7 +167,10 @@ function DynamicStackHost({
     { ref: navRef, initialRouteName: 'Home' },
     createElement(Stack.Screen, { name: 'Home', component: HomeScreen }),
     isDetailsRegistered
-      ? createElement(Stack.Screen, { name: 'Details', component: DetailsScreen })
+      ? createElement(Stack.Screen, {
+          name: 'Details',
+          component: DetailsScreen,
+        })
       : null,
     createElement(Stack.Screen, { name: 'Profile', component: ProfileScreen }),
   );
@@ -182,7 +191,10 @@ describe('React Stack navigator', () => {
             component: HomeScreen,
             options: { title: 'Home' },
           }),
-          createElement(Stack.Screen, { name: 'Details', component: DetailsScreen }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: DetailsScreen,
+          }),
         ),
       );
       const screens = screenNodes();
@@ -230,7 +242,10 @@ describe('React Stack navigator', () => {
           Stack,
           { ref, initialRouteName: 'Home' },
           createElement(Stack.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Stack.Screen, { name: 'Details', component: DetailsScreen }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: DetailsScreen,
+          }),
         ),
       );
       act(() => ref.current?.push('Details'));
@@ -267,13 +282,20 @@ describe('React Stack navigator', () => {
           Stack,
           { ref, initialRouteName: 'Home' },
           createElement(Stack.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Stack.Screen, { name: 'Details', component: DetailsScreen }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: DetailsScreen,
+          }),
         ),
       );
       act(() => ref.current?.push('Details'));
       expect(screenNodes()).toHaveLength(2);
       const top = screenNodes()[1];
-      act(() => fabric.fireEvent(top.instanceHandle, 'topDismissed', { dismissCount: 1 }));
+      act(() =>
+        fabric.fireEvent(top.instanceHandle, 'topDismissed', {
+          dismissCount: 1,
+        }),
+      );
       expect(screenNodes()).toHaveLength(1);
     });
 
@@ -288,12 +310,17 @@ describe('React Stack navigator', () => {
           Stack,
           { ref, initialRouteName: 'Home' },
           createElement(Stack.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Stack.Screen, { name: 'Details', component: DetailsScreen }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: DetailsScreen,
+          }),
         ),
       );
       act(() => ref.current?.push('Details'));
       const top = screenNodes()[1];
-      act(() => fabric.fireEvent(top.instanceHandle, 'topHeaderBackButtonClicked', {}));
+      act(() =>
+        fabric.fireEvent(top.instanceHandle, 'topHeaderBackButtonClicked', {}),
+      );
       expect(screenNodes()).toHaveLength(1);
     });
 
@@ -308,7 +335,9 @@ describe('React Stack navigator', () => {
           createElement(Stack.Screen, { name: 'Home', component: HomeScreen }),
         ),
       );
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
+      expect(
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+      ).toBeDefined();
     });
 
     // why: params passed to push() must reach the pushed screen's own useRoute() - the same route
@@ -326,7 +355,10 @@ describe('React Stack navigator', () => {
           Stack,
           { ref, initialRouteName: 'Home' },
           createElement(Stack.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Stack.Screen, { name: 'Details', component: ParamsScreen }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: ParamsScreen,
+          }),
         ),
       );
       act(() => ref.current?.push('Details', { id: 42 }));
@@ -348,7 +380,10 @@ describe('React Stack navigator', () => {
           Stack,
           { ref, initialRouteName: 'Home' },
           createElement(Stack.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Stack.Screen, { name: 'Details', component: ParamsScreen }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: ParamsScreen,
+          }),
         ),
       );
       act(() => ref.current?.push('Details', { id: 1 }));
@@ -379,11 +414,15 @@ describe('React Stack navigator', () => {
             component: HomeTrackingScreen,
             initialParams: { tab: 'feed' },
           }),
-          createElement(Stack.Screen, { name: 'Details', component: DetailsScreen }),
+          createElement(Stack.Screen, {
+            name: 'Details',
+            component: DetailsScreen,
+          }),
         ),
       );
       act(() => ref.current?.push('Details'));
-      if (homeKey === undefined) throw new Error('home route key was never captured');
+      if (homeKey === undefined)
+        throw new Error('home route key was never captured');
       act(() => ref.current?.setParams({ tab: 'search' }, homeKey));
       expect(homeParams).toEqual({ tab: 'search' });
     });
@@ -469,8 +508,13 @@ describe('React Stack navigator', () => {
           }),
         ),
       );
-      const searchBar = headerConfigOf(screenNodes()[0]).children[0].children[0];
-      act(() => fabric.fireEvent(searchBar.instanceHandle, 'topChangeText', { text: 'asdf' }));
+      const searchBar = headerConfigOf(screenNodes()[0]).children[0]
+        .children[0];
+      act(() =>
+        fabric.fireEvent(searchBar.instanceHandle, 'topChangeText', {
+          text: 'asdf',
+        }),
+      );
       expect(receivedText).toBe('asdf');
     });
 
@@ -510,12 +554,21 @@ describe('React Stack navigator', () => {
           }),
         ),
       );
-      const searchBar = headerConfigOf(screenNodes()[0]).children[0].children[0];
-      act(() => fabric.fireEvent(searchBar.instanceHandle, 'topSearchFocus', {}));
-      act(() => fabric.fireEvent(searchBar.instanceHandle, 'topSearchBlur', {}));
-      act(() => fabric.fireEvent(searchBar.instanceHandle, 'topCancelButtonPress', {}));
+      const searchBar = headerConfigOf(screenNodes()[0]).children[0]
+        .children[0];
       act(() =>
-        fabric.fireEvent(searchBar.instanceHandle, 'topSearchButtonPress', { text: 'qwer' }),
+        fabric.fireEvent(searchBar.instanceHandle, 'topSearchFocus', {}),
+      );
+      act(() =>
+        fabric.fireEvent(searchBar.instanceHandle, 'topSearchBlur', {}),
+      );
+      act(() =>
+        fabric.fireEvent(searchBar.instanceHandle, 'topCancelButtonPress', {}),
+      );
+      act(() =>
+        fabric.fireEvent(searchBar.instanceHandle, 'topSearchButtonPress', {
+          text: 'qwer',
+        }),
       );
       act(() => fabric.fireEvent(searchBar.instanceHandle, 'topClose', {}));
       act(() => fabric.fireEvent(searchBar.instanceHandle, 'topOpen', {}));
@@ -543,18 +596,30 @@ describe('React Stack navigator', () => {
           createElement(Stack.Screen, {
             name: 'Home',
             component: HomeScreen,
-            options: { headerSearchBarOptions: { placeholder: 'Search', ref: searchBarRef } },
+            options: {
+              headerSearchBarOptions: {
+                placeholder: 'Search',
+                ref: searchBarRef,
+              },
+            },
           }),
         ),
       );
-      const searchBar = headerConfigOf(screenNodes()[0]).children[0].children[0];
+      const searchBar = headerConfigOf(screenNodes()[0]).children[0]
+        .children[0];
 
       searchBarRef.current?.focus();
-      expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'focus', args: [] });
+      expect(fabric.commands.at(-1)).toMatchObject({
+        commandName: 'focus',
+        args: [],
+      });
       expect(fabric.commands.at(-1)?.node.tag).toBe(searchBar.tag);
 
       searchBarRef.current?.setText('preset');
-      expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'setText', args: ['preset'] });
+      expect(fabric.commands.at(-1)).toMatchObject({
+        commandName: 'setText',
+        args: ['preset'],
+      });
 
       searchBarRef.current?.toggleCancelButton(false);
       expect(fabric.commands.at(-1)).toMatchObject({
@@ -563,13 +628,22 @@ describe('React Stack navigator', () => {
       });
 
       searchBarRef.current?.clearText();
-      expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'clearText', args: [] });
+      expect(fabric.commands.at(-1)).toMatchObject({
+        commandName: 'clearText',
+        args: [],
+      });
 
       searchBarRef.current?.cancelSearch();
-      expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'cancelSearch', args: [] });
+      expect(fabric.commands.at(-1)).toMatchObject({
+        commandName: 'cancelSearch',
+        args: [],
+      });
 
       searchBarRef.current?.blur();
-      expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'blur', args: [] });
+      expect(fabric.commands.at(-1)).toMatchObject({
+        commandName: 'blur',
+        args: [],
+      });
     });
 
     // why: the boundary of the search-bar feature - when no headerSearchBarOptions is given, the
@@ -601,9 +675,13 @@ describe('React Stack navigator', () => {
       act(() => setDetailsRegistered?.(false));
 
       expect(screenNodes()).toHaveLength(1);
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
       expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'details'),
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+      ).toBeDefined();
+      expect(
+        findInTree(
+          n => n.viewName === 'RCTRawText' && n.props.text === 'details',
+        ),
       ).toBeUndefined();
       expect(ref.current?.canGoBack()).toBe(false);
     });
@@ -620,7 +698,9 @@ describe('React Stack navigator', () => {
       act(() => ref.current?.pop());
 
       expect(screenNodes()).toHaveLength(1);
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
+      expect(
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+      ).toBeDefined();
       expect(ref.current?.canGoBack()).toBe(false);
     });
   });

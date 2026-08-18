@@ -19,5 +19,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 // navigator-state.ts (Stack) and tab-router-state.ts (Tabs) so the two reducers can't drift on
 // this rule independently.
 export function mergeParams(current: unknown, incoming: unknown): unknown {
-  return isRecord(current) && isRecord(incoming) ? { ...current, ...incoming } : incoming;
+  return isRecord(current) && isRecord(incoming)
+    ? { ...current, ...incoming }
+    : incoming;
 }

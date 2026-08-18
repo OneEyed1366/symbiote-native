@@ -15,7 +15,8 @@ const config = {
   // Compile .vue SFCs on the way into the bundle — @symbiote-native/vue ships the transformer
   // itself, so no local wiring file is needed (see adapters/vue/metro-vue-transformer.cjs).
   transformer: {
-    babelTransformerPath: require.resolve('@symbiote-native/vue/metro-vue-transformer'),
+    babelTransformerPath:
+      require.resolve('@symbiote-native/vue/metro-vue-transformer'),
   },
   resolver: {
     // Teach Metro that .vue and every style extension are source files (the transformer turns
@@ -23,7 +24,15 @@ const config = {
     // stylesheet/CSS-Modules path, shared with the React and Angular examples (see
     // metro-css-transformer.js there); scss/sass/less/styl are optional preprocessor sources
     // (see core/css-parser/src/preprocessors.ts).
-    sourceExts: [...defaultConfig.resolver.sourceExts, 'vue', 'css', 'scss', 'sass', 'less', 'styl'],
+    sourceExts: [
+      ...defaultConfig.resolver.sourceExts,
+      'vue',
+      'css',
+      'scss',
+      'sass',
+      'less',
+      'styl',
+    ],
   },
 };
 

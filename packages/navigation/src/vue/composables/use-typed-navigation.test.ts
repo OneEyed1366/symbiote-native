@@ -4,13 +4,22 @@
 
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource, Dimensions } from '@symbiote-native/vue';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+  Dimensions,
+} from '@symbiote-native/vue';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
 import { Tab } from '../tabs';
 import { Drawer } from '../drawer';
-import { useDrawerNavigation, useStackNavigation, useTabNavigation } from './index';
+import {
+  useDrawerNavigation,
+  useStackNavigation,
+  useTabNavigation,
+} from './index';
 
 const ROOT_TAG = 4613;
 const SCREEN_VIEW = 'RNSScreen';
@@ -24,7 +33,9 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
       topWillAppear: { registrationName: 'onWillAppear' },
       topWillDisappear: { registrationName: 'onWillDisappear' },
       topDismissed: { registrationName: 'onDismissed' },
-      topHeaderBackButtonClicked: { registrationName: 'onHeaderBackButtonClicked' },
+      topHeaderBackButtonClicked: {
+        registrationName: 'onHeaderBackButtonClicked',
+      },
     },
     validAttributes: {
       screenId: true,
@@ -36,7 +47,9 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
     },
   },
   [STACK_VIEW]: {
-    directEventTypes: { topFinishTransitioning: { registrationName: 'onFinishTransitioning' } },
+    directEventTypes: {
+      topFinishTransitioning: { registrationName: 'onFinishTransitioning' },
+    },
     validAttributes: {},
   },
 };
@@ -48,7 +61,8 @@ Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -85,7 +99,10 @@ describe('useStackNavigation', () => {
           setup: () => () =>
             h(Stack, { initialRouteName: 'Home' }, () => [
               h(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-              h(Stack.Screen, { name: 'Details', component: textScreen('details') }),
+              h(Stack.Screen, {
+                name: 'Details',
+                component: textScreen('details'),
+              }),
             ]),
         }),
       );
@@ -114,7 +131,10 @@ describe('useStackNavigation', () => {
             setup: () => () =>
               h(Tab, { initialRouteName: 'Home' }, () => [
                 h(Tab.Screen, { name: 'Home', component: TrackedHomeTab }),
-                h(Tab.Screen, { name: 'Search', component: textScreen('search') }),
+                h(Tab.Screen, {
+                  name: 'Search',
+                  component: textScreen('search'),
+                }),
               ]),
           }),
         ),
@@ -142,7 +162,10 @@ describe('useTabNavigation', () => {
           setup: () => () =>
             h(Tab, { initialRouteName: 'Home' }, () => [
               h(Tab.Screen, { name: 'Home', component: TrackedHomeTab }),
-              h(Tab.Screen, { name: 'Search', component: textScreen('search') }),
+              h(Tab.Screen, {
+                name: 'Search',
+                component: textScreen('search'),
+              }),
             ]),
         }),
       );
@@ -169,7 +192,10 @@ describe('useTabNavigation', () => {
             setup: () => () =>
               h(Stack, { initialRouteName: 'Home' }, () => [
                 h(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-                h(Stack.Screen, { name: 'Details', component: textScreen('details') }),
+                h(Stack.Screen, {
+                  name: 'Details',
+                  component: textScreen('details'),
+                }),
               ]),
           }),
         ),
@@ -197,7 +223,10 @@ describe('useDrawerNavigation', () => {
           setup: () => () =>
             h(Drawer, { initialRouteName: 'Home' }, () => [
               h(Drawer.Screen, { name: 'Home', component: TrackedHomeScreen }),
-              h(Drawer.Screen, { name: 'Profile', component: textScreen('profile') }),
+              h(Drawer.Screen, {
+                name: 'Profile',
+                component: textScreen('profile'),
+              }),
             ]),
         }),
       );
@@ -224,7 +253,10 @@ describe('useDrawerNavigation', () => {
             setup: () => () =>
               h(Stack, { initialRouteName: 'Home' }, () => [
                 h(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-                h(Stack.Screen, { name: 'Details', component: textScreen('details') }),
+                h(Stack.Screen, {
+                  name: 'Details',
+                  component: textScreen('details'),
+                }),
               ]),
           }),
         ),

@@ -10,7 +10,8 @@ module.exports = {
   apps: {
     'ios.debug': {
       type: 'ios.app',
-      binaryPath: 'ios/build/Build/Products/Debug-iphonesimulator/CanaryExpo.app',
+      binaryPath:
+        'ios/build/Build/Products/Debug-iphonesimulator/CanaryExpo.app',
       build:
         'xcodebuild -workspace ios/CanaryExpo.xcworkspace -UseNewBuildSystem=NO -scheme CanaryExpo -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build',
       start: 'react-native start',

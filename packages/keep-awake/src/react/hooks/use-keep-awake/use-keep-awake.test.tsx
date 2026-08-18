@@ -14,17 +14,20 @@ import { mount, unmount, View } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 import { useKeepAwake } from './index';
 
-const { activateKeepAwakeAsync, addListener, removeSubscription, deactivateKeepAwake } = vi.hoisted(
-  () => {
-    const remove = vi.fn();
-    return {
-      activateKeepAwakeAsync: vi.fn(async (_tag: string) => undefined),
-      addListener: vi.fn((..._args: unknown[]) => ({ remove })),
-      removeSubscription: remove,
-      deactivateKeepAwake: vi.fn(async (_tag: string) => undefined),
-    };
-  },
-);
+const {
+  activateKeepAwakeAsync,
+  addListener,
+  removeSubscription,
+  deactivateKeepAwake,
+} = vi.hoisted(() => {
+  const remove = vi.fn();
+  return {
+    activateKeepAwakeAsync: vi.fn(async (_tag: string) => undefined),
+    addListener: vi.fn((..._args: unknown[]) => ({ remove })),
+    removeSubscription: remove,
+    deactivateKeepAwake: vi.fn(async (_tag: string) => undefined),
+  };
+});
 
 // The native-call leaf is mocked rather than the `../../../core` barrel, so that the barrel
 // stays REAL and the hook runs the real createKeepAwakeListenerAttachment (the unmount guard
@@ -38,7 +41,8 @@ vi.mock('../../../core/keep-awake', () => ({
 }));
 
 const ROOT_TAG = 954;
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function Probe({
   tag,
@@ -71,7 +75,9 @@ describe('useKeepAwake', () => {
     it('activates a default tag on mount', async () => {
       mount(ROOT_TAG, createElement(Probe));
 
-      await vi.waitFor(() => expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1),
+      );
       expect(typeof activateKeepAwakeAsync.mock.calls[0][0]).toBe('string');
     });
 
@@ -80,14 +86,18 @@ describe('useKeepAwake', () => {
     it('activates the explicit tag when one is given', async () => {
       mount(ROOT_TAG, createElement(Probe, { tag: 'custom-tag' }));
 
-      await vi.waitFor(() => expect(activateKeepAwakeAsync).toHaveBeenCalledWith('custom-tag'));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsync).toHaveBeenCalledWith('custom-tag'),
+      );
     });
 
     // why: the effect's cleanup is the ONLY place a mounted lock gets released — if it doesn't
     // fire on unmount, the lock leaks for the app's lifetime.
     it('deactivates the same tag on unmount', async () => {
       mount(ROOT_TAG, createElement(Probe, { tag: 'custom-tag' }));
-      await vi.waitFor(() => expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1),
+      );
 
       unmount(ROOT_TAG);
 
@@ -99,7 +109,9 @@ describe('useKeepAwake', () => {
     it('never touches addListener when no options are given', async () => {
       mount(ROOT_TAG, createElement(Probe, { tag: 'custom-tag' }));
 
-      await vi.waitFor(() => expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1),
+      );
       expect(addListener).not.toHaveBeenCalled();
     });
 
@@ -110,7 +122,9 @@ describe('useKeepAwake', () => {
 
       mount(ROOT_TAG, createElement(Probe, { tag: 'custom-tag', listener }));
 
-      await vi.waitFor(() => expect(addListener).toHaveBeenCalledWith('custom-tag', listener));
+      await vi.waitFor(() =>
+        expect(addListener).toHaveBeenCalledWith('custom-tag', listener),
+      );
     });
   });
 
@@ -129,7 +143,9 @@ describe('useKeepAwake', () => {
       const listener = vi.fn();
 
       mount(ROOT_TAG, createElement(Probe, { tag: 'custom-tag', listener }));
-      await vi.waitFor(() => expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1),
+      );
 
       unmount(ROOT_TAG);
       resolveActivate();
@@ -157,12 +173,16 @@ describe('useKeepAwake', () => {
     // rejection — a failed activation must never attach a listener for a lock that was never
     // actually acquired.
     it('does not register a listener when activateKeepAwakeAsync rejects', async () => {
-      activateKeepAwakeAsync.mockRejectedValueOnce(new Error('activation failed'));
+      activateKeepAwakeAsync.mockRejectedValueOnce(
+        new Error('activation failed'),
+      );
       const listener = vi.fn();
 
       mount(ROOT_TAG, createElement(Probe, { tag: 'custom-tag', listener }));
 
-      await vi.waitFor(() => expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1),
+      );
       await tick();
       expect(addListener).not.toHaveBeenCalled();
     });
@@ -177,9 +197,14 @@ describe('useKeepAwake', () => {
 
       mount(
         ROOT_TAG,
-        createElement(Probe, { tag: 'custom-tag', suppressDeactivateWarnings: true }),
+        createElement(Probe, {
+          tag: 'custom-tag',
+          suppressDeactivateWarnings: true,
+        }),
       );
-      await vi.waitFor(() => expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1),
+      );
       unmount(ROOT_TAG);
       await tick();
 

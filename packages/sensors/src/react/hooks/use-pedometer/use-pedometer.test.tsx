@@ -21,7 +21,9 @@ import type { IPedometerResult } from '../../../core';
 const { watchStepCount, remove } = vi.hoisted(() => {
   const remove = vi.fn();
   return {
-    watchStepCount: vi.fn((_callback: (result: IPedometerResult) => void) => ({ remove })),
+    watchStepCount: vi.fn((_callback: (result: IPedometerResult) => void) => ({
+      remove,
+    })),
     remove,
   };
 });
@@ -69,7 +71,9 @@ describe('usePedometer', () => {
       // The mock invokes the listener directly, outside the engine's event dispatcher
       // (setEventDispatcher in render.ts), which is what normally flushes a native-driven
       // setState synchronously — so the resulting re-render lands on a later microtask here.
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(result));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(result),
+      );
     });
 
     it('replaces the previous result rather than accumulating step counts client-side', async () => {
@@ -79,10 +83,14 @@ describe('usePedometer', () => {
       const listener = watchStepCount.mock.calls[0][0];
 
       listener({ steps: 10 });
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual({ steps: 10 }));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual({ steps: 10 }),
+      );
       listener({ steps: 25 });
 
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual({ steps: 25 }));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual({ steps: 25 }),
+      );
     });
 
     it('unsubscribes from the native listener on unmount', () => {

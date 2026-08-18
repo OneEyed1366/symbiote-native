@@ -27,5 +27,7 @@ export function isDebug(): boolean {
 
 export function dlog(message: string | (() => string)): void {
   if (!isDebug()) return;
-  console.log(`[symbiote] ${typeof message === 'function' ? message() : message}`);
+  console.log(
+    `[symbiote] ${typeof message === 'function' ? message() : message}`,
+  );
 }

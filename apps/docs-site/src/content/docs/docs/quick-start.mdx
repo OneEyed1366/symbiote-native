@@ -46,6 +46,7 @@ pnpm install
 
     The React example is the reference canary: it drives the SymbioteNative engine through
     a React reconciler in mutation mode, then the engine commits to Fabric.
+
   </TabItem>
   <TabItem label="Vue">
     Run the Vue example:
@@ -64,6 +65,7 @@ pnpm install
 
     The Vue examples prove the same native engine can be driven by Vue's renderer
     operations rather than React's host config.
+
   </TabItem>
   <TabItem label="Angular">
     Run the Angular example:
@@ -84,6 +86,7 @@ pnpm install
     `Renderer2`/`RendererFactory2` — Angular's own framework-agnostic rendering
     seam — maps Angular's operations onto the engine mutation API, with a
     DOM-less bootstrap (no `platform-browser`, no zone.js).
+
   </TabItem>
   <TabItem label="Svelte">
     Run the Svelte canary:
@@ -105,6 +108,7 @@ pnpm install
     stock compiled Svelte output believes it is talking to the real DOM, and
     every DOM call it makes routes into the same mutation API every other
     adapter drives.
+
   </TabItem>
 </Tabs>
 

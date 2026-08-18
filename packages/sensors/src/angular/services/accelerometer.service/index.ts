@@ -1,4 +1,11 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
 import { Accelerometer, type IAccelerometerMeasurement } from '../../../core';
 
 // Angular twin of React's `useAccelerometer` hook / Vue's `useAccelerometer` composable.
@@ -23,7 +30,9 @@ export class AccelerometerService {
         if (updateIntervalMs !== undefined) {
           Accelerometer.setUpdateInterval(updateIntervalMs);
         }
-        const subscription = Accelerometer.addListener(next => measurement.set(next));
+        const subscription = Accelerometer.addListener(next =>
+          measurement.set(next),
+        );
         onCleanup(() => subscription.remove());
       },
       { injector: this.injector },

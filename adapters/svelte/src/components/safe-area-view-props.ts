@@ -10,7 +10,10 @@ import type {
   IStyleProp,
   IViewStyle,
 } from '@symbiote-native/engine';
-import type { IAccessibilityProps, IAriaProps } from '@symbiote-native/components';
+import type {
+  IAccessibilityProps,
+  IAriaProps,
+} from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../class-value';
 
 export interface ISafeAreaViewProps extends IAccessibilityProps, IAriaProps {

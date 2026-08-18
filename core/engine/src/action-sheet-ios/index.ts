@@ -85,7 +85,8 @@ export const ActionSheetIOS = {
     callback: (buttonIndex: number) => void,
   ): void {
     dlog('ActionSheetIOS.showActionSheetWithOptions');
-    const manager = getNativeModule<INativeActionSheetManager>(ACTION_SHEET_MANAGER);
+    const manager =
+      getNativeModule<INativeActionSheetManager>(ACTION_SHEET_MANAGER);
     if (manager === null) {
       dlog(`ActionSheetIOS: "${ACTION_SHEET_MANAGER}" unresolved — no-op`);
       return;
@@ -102,7 +103,10 @@ export const ActionSheetIOS = {
     } else if (typeof destructiveButtonIndex === 'number') {
       destructiveButtonIndices = [destructiveButtonIndex];
     }
-    const nativeOptions: IActionSheetIOSOptions = { ...remainingOptions, destructiveButtonIndices };
+    const nativeOptions: IActionSheetIOSOptions = {
+      ...remainingOptions,
+      destructiveButtonIndices,
+    };
     manager.showActionSheetWithOptions(nativeOptions, buttonIndex => {
       dlog(`ActionSheetIOS callback buttonIndex=${buttonIndex}`);
       callback(buttonIndex);
@@ -115,7 +119,8 @@ export const ActionSheetIOS = {
     successCallback: (completed: boolean, activityType?: string) => void,
   ): void {
     dlog('ActionSheetIOS.showShareActionSheetWithOptions');
-    const manager = getNativeModule<INativeActionSheetManager>(ACTION_SHEET_MANAGER);
+    const manager =
+      getNativeModule<INativeActionSheetManager>(ACTION_SHEET_MANAGER);
     if (manager === null) {
       dlog(`ActionSheetIOS: "${ACTION_SHEET_MANAGER}" unresolved — no-op`);
       return;
@@ -135,7 +140,8 @@ export const ActionSheetIOS = {
 
   dismissActionSheet(): void {
     dlog('ActionSheetIOS.dismissActionSheet');
-    const manager = getNativeModule<INativeActionSheetManager>(ACTION_SHEET_MANAGER);
+    const manager =
+      getNativeModule<INativeActionSheetManager>(ACTION_SHEET_MANAGER);
     if (manager === null) {
       dlog(`ActionSheetIOS: "${ACTION_SHEET_MANAGER}" unresolved — no-op`);
       return;

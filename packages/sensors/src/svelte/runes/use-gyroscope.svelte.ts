@@ -2,7 +2,11 @@
 // use-accelerometer.svelte.ts's shape exactly. See its header for why this lives in `runes/` with
 // a `.svelte.ts` extension, returns a boxed getter object, and takes a plain `updateIntervalMs`
 // rather than a getter.
-import { Gyroscope, type EventSubscription, type IGyroscopeMeasurement } from '../../core';
+import {
+  Gyroscope,
+  type EventSubscription,
+  type IGyroscopeMeasurement,
+} from '../../core';
 
 export function useGyroscope(updateIntervalMs?: number): {
   readonly current: IGyroscopeMeasurement | null;

@@ -44,7 +44,9 @@ export function processTransformOrigin(
 
   let index = INDEX_X;
   let matches: RegExpExecArray | null;
-  outer: while ((matches = TRANSFORM_ORIGIN_REGEX.exec(transformOriginString))) {
+  outer: while (
+    (matches = TRANSFORM_ORIGIN_REGEX.exec(transformOriginString))
+  ) {
     let nextIndex = index + 1;
 
     const value = matches[0];
@@ -55,7 +57,9 @@ export function processTransformOrigin(
       case 'right': {
         // RN processTransformOrigin.js:42-46, left/right are x-only.
         if (index !== INDEX_X) {
-          dlog(`processTransformOrigin reject: "${value}" can only be used for x-position`);
+          dlog(
+            `processTransformOrigin reject: "${value}" can only be used for x-position`,
+          );
           return transformOriginArray;
         }
         transformOriginArray[INDEX_X] = valueLower === 'left' ? 0 : '100%';
@@ -65,7 +69,9 @@ export function processTransformOrigin(
       case 'bottom': {
         // RN processTransformOrigin.js:52-56, top/bottom are not valid for z.
         if (index === INDEX_Z) {
-          dlog(`processTransformOrigin reject: "${value}" can only be used for y-position`);
+          dlog(
+            `processTransformOrigin reject: "${value}" can only be used for y-position`,
+          );
           return transformOriginArray;
         }
         transformOriginArray[INDEX_Y] = valueLower === 'top' ? 0 : '100%';
@@ -89,7 +95,9 @@ export function processTransformOrigin(
               transformOriginArray[INDEX_X] = '50%';
               break;
             default:
-              dlog(`processTransformOrigin reject: could not parse "${transformOriginString}"`);
+              dlog(
+                `processTransformOrigin reject: could not parse "${transformOriginString}"`,
+              );
               return transformOriginArray;
           }
           nextIndex = INDEX_Z;
@@ -100,7 +108,9 @@ export function processTransformOrigin(
       case 'center': {
         // RN processTransformOrigin.js:91-95, center is invalid for z.
         if (index === INDEX_Z) {
-          dlog(`processTransformOrigin reject: "${value}" cannot be used for z-position`);
+          dlog(
+            `processTransformOrigin reject: "${value}" cannot be used for z-position`,
+          );
           return transformOriginArray;
         }
         transformOriginArray[index] = '50%';

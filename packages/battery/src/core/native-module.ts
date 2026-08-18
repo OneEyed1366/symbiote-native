@@ -1,6 +1,11 @@
 import { requireNativeModule } from 'expo-modules-core';
 import type { EventSubscription } from 'expo-modules-core';
-import type { BatteryLevelEvent, BatteryState, BatteryStateEvent, PowerModeEvent } from './types';
+import type {
+  BatteryLevelEvent,
+  BatteryState,
+  BatteryStateEvent,
+  PowerModeEvent,
+} from './types';
 
 const EXPO_BATTERY_MODULE_NAME = 'ExpoBattery';
 
@@ -28,4 +33,6 @@ export type INativeBatteryModule = {
   ): EventSubscription;
 };
 
-export const expoBattery = requireNativeModule<INativeBatteryModule>(EXPO_BATTERY_MODULE_NAME);
+export const expoBattery = requireNativeModule<INativeBatteryModule>(
+  EXPO_BATTERY_MODULE_NAME,
+);

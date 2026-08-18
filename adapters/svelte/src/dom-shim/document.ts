@@ -24,7 +24,11 @@ export class ShimDocument {
     return element;
   }
 
-  createElementNS(namespace: string, tag: string, options?: { is?: string }): ShimElement {
+  createElementNS(
+    namespace: string,
+    tag: string,
+    options?: { is?: string },
+  ): ShimElement {
     const element = new ShimElement(tag, namespace);
     if (options?.is !== undefined) element.setAttribute('is', options.is);
     return element;

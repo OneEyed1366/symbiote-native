@@ -40,7 +40,11 @@ async function elementText(id: string): Promise<string> {
   return '';
 }
 
-async function waitForText(id: string, matches: (text: string) => boolean, timeoutMs: number): Promise<void> {
+async function waitForText(
+  id: string,
+  matches: (text: string) => boolean,
+  timeoutMs: number,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let last = '';
   while (Date.now() < deadline) {
@@ -48,7 +52,9 @@ async function waitForText(id: string, matches: (text: string) => boolean, timeo
     if (matches(last)) return;
     await sleep(250);
   }
-  throw new Error(`${id} never matched within ${timeoutMs}ms; last text was "${last}"`);
+  throw new Error(
+    `${id} never matched within ${timeoutMs}ms; last text was "${last}"`,
+  );
 }
 
 describe('Angular Hooks demo', () => {
@@ -76,11 +82,19 @@ describe('Angular Hooks demo', () => {
   });
 
   it('reports focused on first mount via injectIsFocused', async () => {
-    await waitForText('hooks-is-focused', text => text === 'injectIsFocused(): true', 5_000);
+    await waitForText(
+      'hooks-is-focused',
+      text => text === 'injectIsFocused(): true',
+      5_000,
+    );
   });
 
   it('counts the first mount as focus #1 via injectFocusEffect', async () => {
-    await waitForText('hooks-focus-count', text => text === 'injectFocusEffect focus count: 1', 5_000);
+    await waitForText(
+      'hooks-focus-count',
+      text => text === 'injectFocusEffect focus count: 1',
+      5_000,
+    );
   });
 
   it('renders the live root-Stack route stack via injectNavigationState', async () => {
@@ -105,6 +119,10 @@ describe('Angular Hooks demo', () => {
   // has been confirmed against a real device/simulator run.
   it.skip('increments the focus count across a focus->blur->focus cycle', async () => {
     await element(by.id('menu-row-HooksDemo')).tap();
-    await waitForText('hooks-focus-count', text => text === 'injectFocusEffect focus count: 2', 5_000);
+    await waitForText(
+      'hooks-focus-count',
+      text => text === 'injectFocusEffect focus count: 2',
+      5_000,
+    );
   });
 });

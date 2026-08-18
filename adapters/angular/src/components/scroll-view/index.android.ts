@@ -43,7 +43,11 @@ import {
   SymbioteHostPropsDirective,
   SymbioteStyleInputDirective,
 } from '../../primitives';
-import { ScrollViewBase, ScrollViewProjectionDirective, SCROLL_VIEW_INPUTS } from './shared';
+import {
+  ScrollViewBase,
+  ScrollViewProjectionDirective,
+  SCROLL_VIEW_INPUTS,
+} from './shared';
 export type { IAngularScrollViewProps, IScrollViewHandle } from './shared';
 
 // Minimal local twin of `@angular/common`'s NgTemplateOutlet (this adapter deliberately has no
@@ -66,7 +70,9 @@ export class SymbioteTemplateOutletDirective implements OnChanges, OnDestroy {
       this.viewRef = undefined;
     }
     if (this.symbioteTemplateOutlet !== null) {
-      this.viewRef = this.viewContainerRef.createEmbeddedView(this.symbioteTemplateOutlet);
+      this.viewRef = this.viewContainerRef.createEmbeddedView(
+        this.symbioteTemplateOutlet,
+      );
     }
   }
 
@@ -87,7 +93,9 @@ function asStyle(value: unknown): IStyleProp<IViewStyle> | undefined {
 @Component({
   selector: 'ScrollView',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
     ScrollViewHost,
@@ -120,17 +128,24 @@ function asStyle(value: unknown): IStyleProp<IViewStyle> | undefined {
               [symbioteHostProps]="contentProps()"
               [symbioteScrollViewProjection]="projectionController"
             >
-              <ng-container [symbioteTemplateOutlet]="sharedContent"></ng-container>
+              <ng-container
+                [symbioteTemplateOutlet]="sharedContent"
+              ></ng-container>
             </symbiote-horizontal-scroll-content>
           </symbiote-horizontal-scroll-view>
         </symbiote-refresh-control>
       } @else {
-        <symbiote-horizontal-scroll-view #host="symbioteHost" [symbioteHostProps]="scrollProps()">
+        <symbiote-horizontal-scroll-view
+          #host="symbioteHost"
+          [symbioteHostProps]="scrollProps()"
+        >
           <symbiote-horizontal-scroll-content
             [symbioteHostProps]="contentProps()"
             [symbioteScrollViewProjection]="projectionController"
           >
-            <ng-container [symbioteTemplateOutlet]="sharedContent"></ng-container>
+            <ng-container
+              [symbioteTemplateOutlet]="sharedContent"
+            ></ng-container>
           </symbiote-horizontal-scroll-content>
         </symbiote-horizontal-scroll-view>
       }
@@ -149,17 +164,24 @@ function asStyle(value: unknown): IStyleProp<IViewStyle> | undefined {
               [symbioteHostProps]="contentProps()"
               [symbioteScrollViewProjection]="projectionController"
             >
-              <ng-container [symbioteTemplateOutlet]="sharedContent"></ng-container>
+              <ng-container
+                [symbioteTemplateOutlet]="sharedContent"
+              ></ng-container>
             </symbiote-scroll-content>
           </symbiote-scroll-view>
         </symbiote-refresh-control>
       } @else {
-        <symbiote-scroll-view #host="symbioteHost" [symbioteHostProps]="scrollProps()">
+        <symbiote-scroll-view
+          #host="symbioteHost"
+          [symbioteHostProps]="scrollProps()"
+        >
           <symbiote-scroll-content
             [symbioteHostProps]="contentProps()"
             [symbioteScrollViewProjection]="projectionController"
           >
-            <ng-container [symbioteTemplateOutlet]="sharedContent"></ng-container>
+            <ng-container
+              [symbioteTemplateOutlet]="sharedContent"
+            ></ng-container>
           </symbiote-scroll-content>
         </symbiote-scroll-view>
       }

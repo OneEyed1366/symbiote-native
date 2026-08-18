@@ -1,5 +1,11 @@
 import { Component, inject, signal } from '@angular/core';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   BrightnessMode,
   PermissionsService,
@@ -55,7 +61,11 @@ const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="brightness-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="brightness-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -66,9 +76,10 @@ const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
           <View class="hero-copy">
             <Text class="hero-title">Brightness</Text>
             <Text class="hero-body">
-              @symbiote-native/brightness — screen brightness get/set, Android system-brightness
-              mode, and an iOS-only live listener. Requires SYSTEM_BRIGHTNESS permission on
-              Android before setting the system-wide value.
+              @symbiote-native/brightness — screen brightness get/set, Android
+              system-brightness mode, and an iOS-only live listener. Requires
+              SYSTEM_BRIGHTNESS permission on Android before setting the
+              system-wide value.
             </Text>
           </View>
         </View>
@@ -93,7 +104,9 @@ const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
 
         @if (Platform.OS === 'android') {
           <View testID="brightness-system-card" class="capability-card">
-            <Text class="capability-card-title">System brightness (Android only)</Text>
+            <Text class="capability-card-title"
+              >System brightness (Android only)</Text
+            >
             <View class="capability-row">
               <Text class="capability-label">Mode</Text>
               <Text class="value-text">{{ systemModeLabel() }}</Text>
@@ -101,7 +114,9 @@ const BRIGHTNESS_STEPS: readonly { label: string; value: number }[] = [
             <View testID="brightness-using-system" class="capability-row">
               <Text class="capability-label">Using system value</Text>
               <View [class]="statusBadgeClass(isUsingSystem())">
-                <Text class="status-badge-text">{{ statusLabel(isUsingSystem()) }}</Text>
+                <Text class="status-badge-text">{{
+                  statusLabel(isUsingSystem())
+                }}</Text>
               </View>
             </View>
             <View class="button-row">
@@ -169,7 +184,9 @@ export class BrightnessScreen {
 
     if (Platform.OS === 'android') {
       getSystemBrightnessModeAsync().then(mode => this.systemMode.set(mode));
-      isUsingSystemBrightnessAsync().then(value => this.isUsingSystem.set(toCapabilityStatus(value)));
+      isUsingSystemBrightnessAsync().then(value =>
+        this.isUsingSystem.set(toCapabilityStatus(value)),
+      );
     }
   }
 
@@ -188,18 +205,24 @@ export class BrightnessScreen {
   }
 
   handleSetBrightness(value: number): void {
-    setBrightnessAsync(value).then(() => getBrightnessAsync().then(result => this.brightness.set(result)));
+    setBrightnessAsync(value).then(() =>
+      getBrightnessAsync().then(result => this.brightness.set(result)),
+    );
   }
 
   handleSetSystemMode(mode: BrightnessMode): void {
     setSystemBrightnessModeAsync(mode).then(() =>
-      getSystemBrightnessModeAsync().then(result => this.systemMode.set(result)),
+      getSystemBrightnessModeAsync().then(result =>
+        this.systemMode.set(result),
+      ),
     );
   }
 
   handleRestoreSystem(): void {
     restoreSystemBrightnessAsync().then(() =>
-      isUsingSystemBrightnessAsync().then(value => this.isUsingSystem.set(toCapabilityStatus(value))),
+      isUsingSystemBrightnessAsync().then(value =>
+        this.isUsingSystem.set(toCapabilityStatus(value)),
+      ),
     );
   }
 
@@ -212,6 +235,10 @@ export class BrightnessScreen {
   }
 
   statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+    return status === 'checking'
+      ? 'CHECKING…'
+      : status === 'yes'
+        ? 'YES'
+        : 'NO';
   }
 }

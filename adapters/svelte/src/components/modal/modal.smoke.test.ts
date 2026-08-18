@@ -63,7 +63,8 @@ import type { ISymbioteEvent } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -73,11 +74,15 @@ const ROOT_TAG = 91_003;
 // switch.smoke.test.ts: a compiled component's own relative imports resolve relative to where
 // the compiled FILE lives, and index.svelte sits next to its real sibling `modal-props.ts`.
 const MODAL_OUT = join(__dirname, '.smoke-compiled-modal.mjs');
-const DISMISSIBLE_PARENT_OUT = join(__dirname, '.smoke-compiled-parent-dismissible.mjs');
+const DISMISSIBLE_PARENT_OUT = join(
+  __dirname,
+  '.smoke-compiled-parent-dismissible.mjs',
+);
 const HIDDEN_PARENT_OUT = join(__dirname, '.smoke-compiled-parent-hidden.mjs');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 const settle = async (rounds = 4): Promise<void> => {
   for (let i = 0; i < rounds; i += 1) await tick();
 };
@@ -93,14 +98,25 @@ afterEach(() => {
   rmSync(HIDDEN_PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
 
-async function importDefault(path: string, sourceLabel: string): Promise<Component> {
+async function importDefault(
+  path: string,
+  sourceLabel: string,
+): Promise<Component> {
   const mod: unknown = await import(`file://${path}`);
   if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
     throw new Error(`${sourceLabel} produced no default export`);
@@ -110,7 +126,9 @@ async function importDefault(path: string, sourceLabel: string): Promise<Compone
 
 // Walks the CURRENTLY COMMITTED tree (unlike `fabric.find`, which walks the creation log and
 // stays "defined" even after a node is later removed from the committed childSet).
-function findInCommittedTree(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findInCommittedTree(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   function walk(nodes: IFakeNode[]): IFakeNode | undefined {
     for (const node of nodes) {
       if (predicate(node)) return node;
@@ -129,7 +147,11 @@ function committedModalNode(): IFakeNode {
 }
 
 function compileModal(): void {
-  compileToFile(readFileSync(join(__dirname, 'index.svelte'), 'utf8'), 'Modal.svelte', MODAL_OUT);
+  compileToFile(
+    readFileSync(join(__dirname, 'index.svelte'), 'utf8'),
+    'Modal.svelte',
+    MODAL_OUT,
+  );
 }
 
 async function loadDismissible(): Promise<Component> {
@@ -205,17 +227,25 @@ describe('Modal (real compiled index.svelte)', () => {
       const Dismissible = await loadDismissible();
       mount(ROOT_TAG, Dismissible);
       await settle();
-      expect(findInCommittedTree(n => n.viewName === 'ModalHostView')).toBeDefined();
+      expect(
+        findInCommittedTree(n => n.viewName === 'ModalHostView'),
+      ).toBeDefined();
 
       // Drive the native close exactly like React's DismissCase: topRequestClose -> the parent's
       // own $state flips visible=false, which flows back down through the SAME onRequestClose bag
       // entry the passthrough props wired onto the host node.
-      fabric.fireEvent(committedModalNode().instanceHandle, 'topRequestClose', {});
+      fabric.fireEvent(
+        committedModalNode().instanceHandle,
+        'topRequestClose',
+        {},
+      );
       await settle();
 
       // The keep-alive reducer must have actually transitioned (not gotten stuck): the node is
       // fully gone from the CURRENTLY COMMITTED tree.
-      expect(findInCommittedTree(n => n.viewName === 'ModalHostView')).toBeUndefined();
+      expect(
+        findInCommittedTree(n => n.viewName === 'ModalHostView'),
+      ).toBeUndefined();
     });
 
     // why: onOrientationChange rides the object bag like every other DirectEvent, but it is the
@@ -233,9 +263,13 @@ describe('Modal (real compiled index.svelte)', () => {
       });
       await settle();
 
-      fabric.fireEvent(committedModalNode().instanceHandle, 'topOrientationChange', {
-        orientation: 'landscape',
-      });
+      fabric.fireEvent(
+        committedModalNode().instanceHandle,
+        'topOrientationChange',
+        {
+          orientation: 'landscape',
+        },
+      );
 
       expect(received?.type).toBe('orientationChange');
       expect(received?.nativeEvent.orientation).toBe('landscape');
@@ -249,7 +283,9 @@ describe('Modal (real compiled index.svelte)', () => {
       mount(ROOT_TAG, Hidden);
       await settle();
 
-      expect(findInCommittedTree(n => n.viewName === 'ModalHostView')).toBeUndefined();
+      expect(
+        findInCommittedTree(n => n.viewName === 'ModalHostView'),
+      ).toBeUndefined();
     });
   });
 });

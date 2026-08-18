@@ -22,7 +22,10 @@ import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
-import { setDeviceEventSource, type IEventSubscription } from '@symbiote-native/engine';
+import {
+  setDeviceEventSource,
+  type IEventSubscription,
+} from '@symbiote-native/engine';
 import { STICKY_HEADER_Z_INDEX } from '@symbiote-native/components';
 import { mount, unmount } from '../../render';
 import { ScrollView } from './index.ios';
@@ -31,8 +34,10 @@ const ROOT_TAG = 934;
 const PAST_DEBOUNCE_MS = 120;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
-const wait = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
+const wait = (ms: number): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, ms));
 
 // Stand-in for RN's DeviceEventEmitter: native-animated streams value updates over this bus, and
 // without it `startListeningToValue` cannot register at all.
@@ -98,7 +103,10 @@ beforeEach(() => {
   lateIndices = undefined;
   busListeners.clear();
   setDeviceEventSource({
-    addListener(eventType: string, listener: (payload: unknown) => void): IEventSubscription {
+    addListener(
+      eventType: string,
+      listener: (payload: unknown) => void,
+    ): IEventSubscription {
       let set = busListeners.get(eventType);
       if (set === undefined) {
         set = new Set();
@@ -121,7 +129,8 @@ beforeEach(() => {
         disconnectAnimatedNodes: () => record('disconnectAnimatedNodes'),
         connectAnimatedNodeToView: (node: number, view: number) =>
           record('connectAnimatedNodeToView', node, view),
-        disconnectAnimatedNodeFromView: () => record('disconnectAnimatedNodeFromView'),
+        disconnectAnimatedNodeFromView: () =>
+          record('disconnectAnimatedNodeFromView'),
         restoreDefaultValues: () => record('restoreDefaultValues'),
         dropAnimatedNode: () => record('dropAnimatedNode'),
         startAnimatingNode: () => record('startAnimatingNode'),
@@ -132,11 +141,16 @@ beforeEach(() => {
         extractAnimatedNodeOffset: () => record('extractAnimatedNodeOffset'),
         startListeningToAnimatedNodeValue: (tag: number) =>
           record('startListeningToAnimatedNodeValue', tag),
-        stopListeningToAnimatedNodeValue: () => record('stopListeningToAnimatedNodeValue'),
+        stopListeningToAnimatedNodeValue: () =>
+          record('stopListeningToAnimatedNodeValue'),
         getValue: () => record('getValue'),
-        addAnimatedEventToView: (view: number, eventName: string, mapping: unknown) =>
-          record('addAnimatedEventToView', view, eventName, mapping),
-        removeAnimatedEventFromView: () => record('removeAnimatedEventFromView'),
+        addAnimatedEventToView: (
+          view: number,
+          eventName: string,
+          mapping: unknown,
+        ) => record('addAnimatedEventToView', view, eventName, mapping),
+        removeAnimatedEventFromView: () =>
+          record('removeAnimatedEventFromView'),
       },
     },
   });
@@ -147,7 +161,9 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, 'nativeModuleProxy');
 });
 
-function findLive(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findLive(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   const walk = (nodes: readonly IFakeNode[]): IFakeNode | undefined => {
     for (const node of nodes) {
       if (predicate(node)) return node;
@@ -179,7 +195,10 @@ describe('Angular sticky headers — native scroll driver attach', () => {
     await tick();
     await tick();
 
-    expect(stickyWrapper(), 'the sticky wrapper must be projected').toBeDefined();
+    expect(
+      stickyWrapper(),
+      'the sticky wrapper must be projected',
+    ).toBeDefined();
     expect(opCount('addAnimatedEventToView')).toBe(1);
   });
 
@@ -200,7 +219,10 @@ describe('Angular sticky headers — native scroll driver attach', () => {
     await tick();
 
     // The projection half self-heals.
-    expect(stickyWrapper(), 'the wrapper is projected once the indices land').toBeDefined();
+    expect(
+      stickyWrapper(),
+      'the wrapper is projected once the indices land',
+    ).toBeDefined();
     // The native half does not: attachSticky() only ever ran from ngAfterViewInit.
     expect(opCount('addAnimatedEventToView')).toBe(1);
   });

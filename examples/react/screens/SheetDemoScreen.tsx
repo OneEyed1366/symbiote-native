@@ -49,19 +49,23 @@ export function SheetDemoScreen() {
         <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
       </View>
       <View className="hero-card">
-        <View className="hero-badge" style={{ backgroundColor: LINE_COLOR.presentation }}>
+        <View
+          className="hero-badge"
+          style={{ backgroundColor: LINE_COLOR.presentation }}
+        >
           <Text className="hero-badge-text">SH</Text>
         </View>
         <View className="hero-copy">
           <Text className="hero-title">Sheet presentation</Text>
           <Text className="hero-body">
-            Pushed with stackPresentation: formSheet and three detents — drag the grabber between
-            30%, 60%, and full height.
+            Pushed with stackPresentation: formSheet and three detents — drag
+            the grabber between 30%, 60%, and full height.
           </Text>
         </View>
       </View>
       <Text className="info-text">
-        stackPresentation: formSheet · detents 30% / 60% / 100% · drag the grabber
+        stackPresentation: formSheet · detents 30% / 60% / 100% · drag the
+        grabber
       </Text>
       <ActionButton
         testID="sheet-dismiss"

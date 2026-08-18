@@ -44,7 +44,8 @@ function resolveLength(value: unknown): number | null {
 // resolved), anything else (incl. undefined) is null, i.e. unprocessable, like RN.
 function processShadowColor(color: unknown): unknown {
   if (typeof color === 'number') return color;
-  if (typeof color === 'string' || isOpaqueColorValue(color)) return processColor(color);
+  if (typeof color === 'string' || isOpaqueColorValue(color))
+    return processColor(color);
   return null;
 }
 
@@ -71,7 +72,9 @@ export function processBoxShadow(
         case 'offsetX': {
           const value = resolveLength(rawBoxShadow.offsetX);
           if (value == null) {
-            dlog(`processBoxShadow reject: invalid offsetX "${String(rawBoxShadow.offsetX)}"`);
+            dlog(
+              `processBoxShadow reject: invalid offsetX "${String(rawBoxShadow.offsetX)}"`,
+            );
             return [];
           }
           parsedBoxShadow.offsetX = value;
@@ -80,7 +83,9 @@ export function processBoxShadow(
         case 'offsetY': {
           const value = resolveLength(rawBoxShadow.offsetY);
           if (value == null) {
-            dlog(`processBoxShadow reject: invalid offsetY "${String(rawBoxShadow.offsetY)}"`);
+            dlog(
+              `processBoxShadow reject: invalid offsetY "${String(rawBoxShadow.offsetY)}"`,
+            );
             return [];
           }
           parsedBoxShadow.offsetY = value;
@@ -114,7 +119,8 @@ export function processBoxShadow(
           break;
         }
         case 'inset':
-          if (typeof rawBoxShadow.inset === 'boolean') parsedBoxShadow.inset = rawBoxShadow.inset;
+          if (typeof rawBoxShadow.inset === 'boolean')
+            parsedBoxShadow.inset = rawBoxShadow.inset;
       }
     }
     result.push(parsedBoxShadow);

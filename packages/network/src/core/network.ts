@@ -29,7 +29,10 @@ export async function getIpAddressAsync(): Promise<string> {
  */
 export async function isAirplaneModeEnabledAsync(): Promise<boolean> {
   if (!expoNetwork.isAirplaneModeEnabledAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'isAirplaneModeEnabledAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'isAirplaneModeEnabledAsync',
+    );
   }
   return expoNetwork.isAirplaneModeEnabledAsync();
 }

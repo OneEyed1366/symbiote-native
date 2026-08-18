@@ -9,7 +9,11 @@
 // ignore parameters it doesn't need, so a plain `{#snippet children()}` block (never reading
 // `pressed`) satisfies this type exactly as well as one that does.
 import type { Snippet } from 'svelte';
-import type { IClassNameValue, IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type {
+  IClassNameValue,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
 import type {
   IAccessibilityProps,
   IAriaProps,
@@ -20,7 +24,10 @@ import type {
 } from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../../class-value';
 
-export type { IPressState, IPressableAndroidRippleConfig } from '@symbiote-native/components';
+export type {
+  IPressState,
+  IPressableAndroidRippleConfig,
+} from '@symbiote-native/components';
 
 export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   onPress?: IPressHandler;
@@ -51,7 +58,8 @@ export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   onHoverOut?: IPressHandler;
   delayHoverIn?: number;
   delayHoverOut?: number;
-  style?: IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
+  style?:
+    IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
   // Unlike `style`, never a function of press state — a CSS class is compiled statically, so
   // only the truly static half of a Pressable's look can move here; a press-state-dependent
   // look still needs `style`'s function form.

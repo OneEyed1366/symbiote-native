@@ -34,7 +34,8 @@ vi.mock('react-native', () => ({
   Linking: fakeLinking,
 }));
 
-const { isAvailableAsync, requestReview, hasAction } = await import('./store-review');
+const { isAvailableAsync, requestReview, hasAction } =
+  await import('./store-review');
 
 afterEach(() => {
   fakePlatform.OS = 'ios';
@@ -70,7 +71,9 @@ describe('requestReview', () => {
     it('calls the native requestReview and never touches Linking', async () => {
       // why: when the platform can show the native in-app rating modal, that flow always wins
       // over the URL fallback — opening the store page instead would be a worse user experience.
-      await requestReview({ iosAppStoreUrl: 'https://apps.apple.com/app/id123' });
+      await requestReview({
+        iosAppStoreUrl: 'https://apps.apple.com/app/id123',
+      });
 
       expect(FAKE_NATIVE_STORE_REVIEW.requestReview).toHaveBeenCalled();
       expect(fakeLinking.canOpenURL).not.toHaveBeenCalled();
@@ -83,10 +86,16 @@ describe('requestReview', () => {
       // @ts-expect-error -- simulating a platform with no native review flow
       FAKE_NATIVE_STORE_REVIEW.requestReview = undefined;
 
-      await requestReview({ iosAppStoreUrl: 'https://apps.apple.com/app/id123' });
+      await requestReview({
+        iosAppStoreUrl: 'https://apps.apple.com/app/id123',
+      });
 
-      expect(fakeLinking.canOpenURL).toHaveBeenCalledWith('https://apps.apple.com/app/id123');
-      expect(fakeLinking.openURL).toHaveBeenCalledWith('https://apps.apple.com/app/id123');
+      expect(fakeLinking.canOpenURL).toHaveBeenCalledWith(
+        'https://apps.apple.com/app/id123',
+      );
+      expect(fakeLinking.openURL).toHaveBeenCalledWith(
+        'https://apps.apple.com/app/id123',
+      );
     });
 
     it('opens the supplied Android Play Store URL on android', async () => {
@@ -97,7 +106,8 @@ describe('requestReview', () => {
       fakePlatform.OS = 'android';
 
       await requestReview({
-        androidPlayStoreUrl: 'https://play.google.com/store/apps/details?id=com.app',
+        androidPlayStoreUrl:
+          'https://play.google.com/store/apps/details?id=com.app',
       });
 
       expect(fakeLinking.canOpenURL).toHaveBeenCalledWith(
@@ -115,14 +125,20 @@ describe('requestReview', () => {
       // @ts-expect-error -- simulating a platform with no native review flow
       FAKE_NATIVE_STORE_REVIEW.requestReview = undefined;
       fakePlatform.OS = 'web';
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const warnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
 
-      await requestReview({ iosAppStoreUrl: 'https://apps.apple.com/app/id123' });
+      await requestReview({
+        iosAppStoreUrl: 'https://apps.apple.com/app/id123',
+      });
 
       expect(fakeLinking.canOpenURL).not.toHaveBeenCalled();
       expect(fakeLinking.openURL).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('no native review flow and no store URL was provided'),
+        expect.stringContaining(
+          'no native review flow and no store URL was provided',
+        ),
       );
 
       warnSpy.mockRestore();
@@ -134,9 +150,13 @@ describe('requestReview', () => {
       // @ts-expect-error -- simulating a platform with no native review flow
       FAKE_NATIVE_STORE_REVIEW.requestReview = undefined;
       fakeLinking.canOpenURL.mockResolvedValueOnce(false);
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const warnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
 
-      await requestReview({ iosAppStoreUrl: 'https://apps.apple.com/app/id123' });
+      await requestReview({
+        iosAppStoreUrl: 'https://apps.apple.com/app/id123',
+      });
 
       expect(fakeLinking.openURL).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(
@@ -151,14 +171,18 @@ describe('requestReview', () => {
       // with silently no-op behavior unless this warns loudly enough to be noticed in dev.
       // @ts-expect-error -- simulating a platform with no native review flow
       FAKE_NATIVE_STORE_REVIEW.requestReview = undefined;
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const warnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
 
       await requestReview();
 
       expect(fakeLinking.canOpenURL).not.toHaveBeenCalled();
       expect(fakeLinking.openURL).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('no native review flow and no store URL was provided'),
+        expect.stringContaining(
+          'no native review flow and no store URL was provided',
+        ),
       );
 
       warnSpy.mockRestore();
@@ -172,9 +196,9 @@ describe('hasAction', () => {
       // why: hasAction's contract is "requestReview will do SOMETHING" — a supplied URL already
       // guarantees that via the fallback path, so the (potentially slower/async) native
       // availability check must be skipped rather than run redundantly.
-      await expect(hasAction({ iosAppStoreUrl: 'https://apps.apple.com/app/id123' })).resolves.toBe(
-        true,
-      );
+      await expect(
+        hasAction({ iosAppStoreUrl: 'https://apps.apple.com/app/id123' }),
+      ).resolves.toBe(true);
 
       expect(FAKE_NATIVE_STORE_REVIEW.isAvailableAsync).not.toHaveBeenCalled();
     });

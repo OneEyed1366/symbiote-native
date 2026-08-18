@@ -14,8 +14,12 @@ export function useIsFocused(): boolean {
   const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
-    const unsubscribeFocus = emitter.addListener(NAVIGATION_EVENT_FOCUS, () => setIsFocused(true));
-    const unsubscribeBlur = emitter.addListener(NAVIGATION_EVENT_BLUR, () => setIsFocused(false));
+    const unsubscribeFocus = emitter.addListener(NAVIGATION_EVENT_FOCUS, () =>
+      setIsFocused(true),
+    );
+    const unsubscribeBlur = emitter.addListener(NAVIGATION_EVENT_BLUR, () =>
+      setIsFocused(false),
+    );
     return () => {
       unsubscribeFocus();
       unsubscribeBlur();

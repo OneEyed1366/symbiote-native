@@ -16,7 +16,10 @@ import { AnimatedNode, AnimatedWithChildren } from './graph';
 import { setNativeProps, getNativeTag } from '../commit';
 import { isSymbioteNode, type ISymbioteNode } from '../node';
 import { registerPostCommit } from '../post-commit';
-import { nativeAnimated, type INativeNodeConfig } from './native/native-animated';
+import {
+  nativeAnimated,
+  type INativeNodeConfig,
+} from './native/native-animated';
 import { AnimatedStyle } from './style';
 
 function isAnimatedNode(value: unknown): value is AnimatedNode {
@@ -176,7 +179,10 @@ export class AnimatedProps extends AnimatedWithChildren {
 
   private disconnectFromView(): void {
     if (this.connectedViewTag === null) return;
-    nativeAnimated.disconnectAnimatedNodeFromView(this.__getNativeTag(), this.connectedViewTag);
+    nativeAnimated.disconnectAnimatedNodeFromView(
+      this.__getNativeTag(),
+      this.connectedViewTag,
+    );
     this.connectedViewTag = null;
   }
 

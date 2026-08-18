@@ -85,19 +85,23 @@ export class ShimElement extends ShimNode {
 
   addEventListener(name: string, handler: (event: unknown) => void): void {
     this.domListeners.set(name, handler);
-    if (this.engineNode !== undefined) setEventListener(this.engineNode, name, handler);
+    if (this.engineNode !== undefined)
+      setEventListener(this.engineNode, name, handler);
   }
 
   removeEventListener(name: string): void {
     this.domListeners.delete(name);
-    if (this.engineNode !== undefined) setEventListener(this.engineNode, name, undefined);
+    if (this.engineNode !== undefined)
+      setEventListener(this.engineNode, name, undefined);
   }
 
   override cloneNode(deep?: boolean): ShimElement {
     const clone = new ShimElement(this.tagName, this.namespaceURI);
-    for (const [key, value] of this.attributes) clone.attributes.set(key, value);
+    for (const [key, value] of this.attributes)
+      clone.attributes.set(key, value);
     if (deep === true) {
-      for (const child of this.children) clone.appendChild(child.cloneNode(true));
+      for (const child of this.children)
+        clone.appendChild(child.cloneNode(true));
     }
     return clone;
   }
@@ -109,14 +113,17 @@ export class ShimElement extends ShimNode {
   // the previously-bare createElement() call.
   createEngineNode(): ISymbioteNode {
     const descriptor = descriptorFor(this.tagName);
-    return toPublicInstance(createElement(descriptor.component, descriptor.isText));
+    return toPublicInstance(
+      createElement(descriptor.component, descriptor.isText),
+    );
   }
 
   override onMadeLive(): void {
     const engineNode = this.engineNode;
     if (engineNode === undefined) return;
     applyBagDiff(engineNode, {}, this.lastBag);
-    for (const [name, handler] of this.domListeners) setEventListener(engineNode, name, handler);
+    for (const [name, handler] of this.domListeners)
+      setEventListener(engineNode, name, handler);
   }
 }
 
@@ -145,6 +152,10 @@ function diffKeys(prev: IShimPropBag, next: IShimPropBag): string[] {
   return [...keys].filter(key => prev[key] !== next[key]);
 }
 
-function applyBagDiff(engineNode: ISymbioteNode, prev: IShimPropBag, next: IShimPropBag): void {
+function applyBagDiff(
+  engineNode: ISymbioteNode,
+  prev: IShimPropBag,
+  next: IShimPropBag,
+): void {
   for (const key of diffKeys(prev, next)) routeProp(engineNode, key, next[key]);
 }

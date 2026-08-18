@@ -6,14 +6,20 @@
 
 import { h } from '@vue/runtime-core';
 import { createScrollView } from './shared';
-export type { IScrollViewProps, IScrollViewEmits, IScrollViewHandle } from './shared';
+export type {
+  IScrollViewProps,
+  IScrollViewEmits,
+  IScrollViewHandle,
+} from './shared';
 
 export const ScrollView = createScrollView({
   assemble: input => {
     // Sibling placement: RefreshControl before content (RN iOS). The node ref stays on the scroll
     // view via input.scrollProps, so the imperative handle targets it whether or not refresh is on.
     const children =
-      input.refreshControl === undefined ? [input.content] : [input.refreshControl, input.content];
+      input.refreshControl === undefined
+        ? [input.content]
+        : [input.refreshControl, input.content];
     return h(input.scrollViewIntrinsic, input.scrollProps, children);
   },
 });

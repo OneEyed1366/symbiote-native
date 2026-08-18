@@ -32,7 +32,8 @@ function rowsWithFlexDirection(): IFakeNode[] {
   const rows: IFakeNode[] = [];
   const walk = (nodes: IFakeNode[]): void => {
     for (const node of nodes) {
-      if (node.viewName === 'RCTView' && node.props.flexDirection === 'row') rows.push(node);
+      if (node.viewName === 'RCTView' && node.props.flexDirection === 'row')
+        rows.push(node);
       walk(node.children);
     }
   };

@@ -12,7 +12,10 @@
   import { setNavigationScope } from './navigation-context';
   import type { INavigationScopeValue } from './navigation-context';
 
-  let { value, children }: { value: INavigationScopeValue; children?: Snippet } = $props();
+  let {
+    value,
+    children,
+  }: { value: INavigationScopeValue; children?: Snippet } = $props();
 
   setNavigationScope({
     get current(): INavigationScopeValue {

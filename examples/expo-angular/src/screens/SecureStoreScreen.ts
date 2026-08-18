@@ -1,5 +1,11 @@
 import { Component, signal } from '@angular/core';
-import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/angular';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/angular';
 import {
   canUseBiometricAuthentication,
   deleteItemAsync,
@@ -32,7 +38,11 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   imports: [ActionButton, SafeAreaView, ScrollView, Text, TextInput, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="secure-store-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="secure-store-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -43,8 +53,9 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           <View class="hero-copy">
             <Text class="hero-title">Secure Store</Text>
             <Text class="hero-body">
-              @symbiote-native/secure-store — encrypted key/value storage in the iOS Keychain and
-              the Android Keystore. Save a value, kill the app, relaunch, and read it back.
+              @symbiote-native/secure-store — encrypted key/value storage in the
+              iOS Keychain and the Android Keystore. Save a value, kill the app,
+              relaunch, and read it back.
             </Text>
           </View>
         </View>
@@ -54,13 +65,17 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           <View testID="secure-store-available" class="secure-store-row">
             <Text class="secure-store-row-label">Available</Text>
             <View [class]="statusBadgeClass(isAvailable())">
-              <Text class="secure-store-status-text">{{ statusLabel(isAvailable()) }}</Text>
+              <Text class="secure-store-status-text">{{
+                statusLabel(isAvailable())
+              }}</Text>
             </View>
           </View>
           <View testID="secure-store-biometrics" class="secure-store-row">
             <Text class="secure-store-row-label">Biometrics usable</Text>
             <View [class]="statusBadgeClass(canUseBiometrics())">
-              <Text class="secure-store-status-text">{{ statusLabel(canUseBiometrics()) }}</Text>
+              <Text class="secure-store-status-text">{{
+                statusLabel(canUseBiometrics())
+              }}</Text>
             </View>
           </View>
         </View>
@@ -69,11 +84,17 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           <Text class="secure-store-card-title">Stored value</Text>
           <View class="secure-store-row">
             <Text class="secure-store-row-label">{{ demoKey }}</Text>
-            <Text testID="secure-store-value" class="secure-store-value-text">{{ valueLabel() }}</Text>
+            <Text testID="secure-store-value" class="secure-store-value-text">{{
+              valueLabel()
+            }}</Text>
           </View>
           <View class="secure-store-row">
             <Text class="secure-store-row-label">Last result</Text>
-            <Text testID="secure-store-result" class="secure-store-value-text">{{ lastResult() }}</Text>
+            <Text
+              testID="secure-store-result"
+              class="secure-store-value-text"
+              >{{ lastResult() }}</Text
+            >
           </View>
         </View>
 
@@ -151,7 +172,9 @@ export class SecureStoreScreen {
   handleSave(): void {
     setItemAsync(DEMO_KEY, this.inputText())
       .then(() => this.readBack('saved'))
-      .catch((error: Error) => this.lastResult.set(`save failed: ${error.message}`));
+      .catch((error: Error) =>
+        this.lastResult.set(`save failed: ${error.message}`),
+      );
   }
 
   // Android prompts on every operation, iOS only when reading or updating an entry that already
@@ -173,7 +196,9 @@ export class SecureStoreScreen {
         this.storedValue.set(null);
         this.lastResult.set('deleted');
       })
-      .catch((error: Error) => this.lastResult.set(`delete failed: ${error.message}`));
+      .catch((error: Error) =>
+        this.lastResult.set(`delete failed: ${error.message}`),
+      );
   }
 
   valueLabel(): string {
@@ -185,7 +210,11 @@ export class SecureStoreScreen {
   }
 
   statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+    return status === 'checking'
+      ? 'CHECKING…'
+      : status === 'yes'
+        ? 'YES'
+        : 'NO';
   }
 
   private async readBack(label: string): Promise<void> {

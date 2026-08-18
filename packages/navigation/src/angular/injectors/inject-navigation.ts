@@ -6,11 +6,20 @@
 // surface. All pub/sub logic lives in ../../core/navigation-events; this function only reads
 // NavigationContextService and binds identity.
 
-import type { INavigationEventListener, INavigationEventName } from '../../core';
-import { requireNavigationContext, type IAnyNavigatorHandle } from '../navigation-context.service';
+import type {
+  INavigationEventListener,
+  INavigationEventName,
+} from '../../core';
+import {
+  requireNavigationContext,
+  type IAnyNavigatorHandle,
+} from '../navigation-context.service';
 
 export type INavigationHandle = IAnyNavigatorHandle & {
-  addListener: (event: INavigationEventName, listener: INavigationEventListener) => () => void;
+  addListener: (
+    event: INavigationEventName,
+    listener: INavigationEventListener,
+  ) => () => void;
   // Walks exactly ONE hop up NavigationContextService's `parent` chain to the enclosing
   // navigator's handle (plain immediate-parent walking, no named/targeted ancestor lookup).
   getParent: () => IAnyNavigatorHandle | undefined;

@@ -62,14 +62,21 @@ export interface IFabricSlot {
   ): IFabricNode;
   cloneNodeWithNewProps(node: IFabricNode, newProps: IFabricProps): IFabricNode;
   cloneNodeWithNewChildren(node: IFabricNode): IFabricNode;
-  cloneNodeWithNewChildrenAndProps(node: IFabricNode, newProps: IFabricProps): IFabricNode;
+  cloneNodeWithNewChildrenAndProps(
+    node: IFabricNode,
+    newProps: IFabricProps,
+  ): IFabricNode;
   createChildSet(rootTag: IRootTag): IFabricChildSet;
   appendChild(parent: IFabricNode, child: IFabricNode): IFabricNode;
   appendChildToSet(childSet: IFabricChildSet, child: IFabricNode): void;
   completeRoot(rootTag: IRootTag, childSet: IFabricChildSet): void;
   registerEventHandler(handler: IFabricEventHandler): void;
   // Imperative view commands (e.g. TextInput setTextAndSelection, focus, blur).
-  dispatchCommand(node: IFabricNode, commandName: string, args: readonly unknown[]): void;
+  dispatchCommand(
+    node: IFabricNode,
+    commandName: string,
+    args: readonly unknown[],
+  ): void;
   // Emit an accessibility event (focus/click/…) at a node's CURRENT Fabric handle.
   // RN's Fabric binding passes the public-instance handle straight here; the C++ side
   // maps the string eventType to the platform's accessibility-event kind.
@@ -129,7 +136,8 @@ export function getSlot(): IFabricSlot {
   cached = {
     createNode: (reactTag, viewName, rootTag, props, instanceHandle) =>
       createNode(reactTag, viewName, rootTag, props, instanceHandle),
-    cloneNodeWithNewProps: (node, newProps) => cloneNodeWithNewProps(node, newProps),
+    cloneNodeWithNewProps: (node, newProps) =>
+      cloneNodeWithNewProps(node, newProps),
     cloneNodeWithNewChildren: node => cloneNodeWithNewChildren(node),
     cloneNodeWithNewChildrenAndProps: (node, newProps) =>
       cloneNodeWithNewChildrenAndProps(node, newProps),
@@ -138,10 +146,13 @@ export function getSlot(): IFabricSlot {
     appendChildToSet: (childSet, child) => appendChildToSet(childSet, child),
     completeRoot: (rootTag, childSet) => completeRoot(rootTag, childSet),
     registerEventHandler: handler => registerEventHandler(handler),
-    dispatchCommand: (node, commandName, args) => dispatchCommand(node, commandName, args),
+    dispatchCommand: (node, commandName, args) =>
+      dispatchCommand(node, commandName, args),
     sendAccessibilityEvent: (node, eventType) => {
       if (typeof sendAccessibilityEvent !== 'function') {
-        dlog(`sendAccessibilityEvent("${eventType}") -> host lacks the method (no-op)`);
+        dlog(
+          `sendAccessibilityEvent("${eventType}") -> host lacks the method (no-op)`,
+        );
         return;
       }
       sendAccessibilityEvent(node, eventType);

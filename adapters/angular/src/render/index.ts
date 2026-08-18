@@ -62,7 +62,9 @@ function asAngularHost(hostNode: SymbioteSurface | ISymbioteNode): Element {
 // to the wrapper as projectable content.
 function createDetachedViewHost(): ISymbioteNode {
   const descriptor = descriptorFor('View');
-  return toPublicInstance(createEngineElement(descriptor.component, descriptor.isText));
+  return toPublicInstance(
+    createEngineElement(descriptor.component, descriptor.isText),
+  );
 }
 
 interface IMountedApp {
@@ -81,7 +83,10 @@ export interface IMountOptions {
   wrapperComponent?: Type<unknown>;
 }
 
-function applyInputs(cmpRef: ComponentRef<unknown>, initialProps: object | undefined): void {
+function applyInputs(
+  cmpRef: ComponentRef<unknown>,
+  initialProps: object | undefined,
+): void {
   if (initialProps === undefined) return;
   for (const [key, value] of Object.entries(initialProps)) {
     cmpRef.setInput(key, value);

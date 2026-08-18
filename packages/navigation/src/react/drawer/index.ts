@@ -29,10 +29,21 @@ import {
   useRef,
 } from 'react';
 import type { ReactElement, ReactNode } from 'react';
-import { Animated, PanResponder, useWindowDimensions } from '@symbiote-native/react';
-import type { IPanResponderGestureState, ISymbioteEvent } from '@symbiote-native/react';
+import {
+  Animated,
+  PanResponder,
+  useWindowDimensions,
+} from '@symbiote-native/react';
+import type {
+  IPanResponderGestureState,
+  ISymbioteEvent,
+} from '@symbiote-native/react';
 import type { IDescriptor } from '@symbiote-native/components';
-import { dlog, type IStyleProp, type IViewStyle } from '@symbiote-native/engine';
+import {
+  dlog,
+  type IStyleProp,
+  type IViewStyle,
+} from '@symbiote-native/engine';
 import {
   DRAWER_DEFAULT_OVERLAY_COLOR,
   NAVIGATION_EVENT_BLUR,
@@ -62,7 +73,10 @@ import type {
 import { collectRegistry } from '../collect-registry';
 import { NavigationContext } from '../navigation-context';
 import { DrawerScreen } from '../drawer-screen';
-import type { IDrawerScreenOptionsArgs, IDrawerScreenProps } from '../drawer-screen';
+import type {
+  IDrawerScreenOptionsArgs,
+  IDrawerScreenProps,
+} from '../drawer-screen';
 
 export type { IDrawerNavigatorHandle, IDrawerDescriptorMap } from '../../core';
 
@@ -80,7 +94,9 @@ export type IDrawerProps = IDrawerOptions & {
 
 type IDrawerRegistryEntry = Omit<IDrawerScreenProps, 'name'>;
 
-function isDrawerScreenElement(child: ReactNode): child is ReactElement<IDrawerScreenProps> {
+function isDrawerScreenElement(
+  child: ReactNode,
+): child is ReactElement<IDrawerScreenProps> {
   return isValidElement(child) && child.type === DrawerScreen;
 }
 
@@ -89,363 +105,411 @@ function resolveDrawerScreenOptions(
   optionsArgs: IDrawerScreenOptionsArgs,
   screenOptions: IDrawerScreenOptions | undefined,
 ): IDrawerScreenOptions {
-  const own = typeof entry.options === 'function' ? entry.options(optionsArgs) : entry.options;
+  const own =
+    typeof entry.options === 'function'
+      ? entry.options(optionsArgs)
+      : entry.options;
   return { ...screenOptions, ...own };
 }
 
 const DRAWER_SNAP_DURATION = 250;
 
-const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>((props, forwardedRef) => {
-  // Read BEFORE establishing this Drawer's own Context value below - becomes the `parent` link a
-  // nested screen's useNavigation().getParent() walks (e.g. this Drawer rendered as a Stack
-  // screen's content reaches that Stack via this value). undefined when this Drawer is the
-  // nesting root.
-  const ambientContext = useContext(NavigationContext);
-  const {
-    initialRouteName,
-    screenOptions,
-    renderDrawerContent,
-    children,
-    drawerStyle,
-    drawerType,
-    drawerPosition,
-    drawerWidth,
-    overlayColor,
-    swipeEnabled,
-    swipeEdgeWidth,
-    swipeMinDistance,
-    swipeMinVelocity,
-  } = props;
-
-  const options: IDrawerOptions = {
-    drawerType,
-    drawerPosition,
-    drawerWidth,
-    overlayColor,
-    swipeEnabled,
-    swipeEdgeWidth,
-    swipeMinDistance,
-    swipeMinVelocity,
-  };
-
-  const registry = useMemo(() => collectRegistry(children, isDrawerScreenElement), [children]);
-  const routeIdPrefix = useId();
-
-  const routes = useMemo<IRoute<unknown>[]>(
-    () =>
-      Array.from(registry.entries()).map(([name, entry]) => ({
-        key: `${routeIdPrefix}-${name}`,
-        name,
-        params: entry.initialParams,
-      })),
-    [registry, routeIdPrefix],
-  );
-
-  const [state, dispatch] = useReducer(drawerRouterReducer, undefined, () =>
-    createInitialDrawerRouterState(routes, initialRouteName),
-  );
-
-  if (routes.length === 0) dlog('Drawer: no <Drawer.Screen> children registered');
-
-  const { width: screenWidth } = useWindowDimensions();
-
-  // progress: 0 closed -> 1 open, the single Animated.Value every slide/opacity transform below
-  // interpolates from.
-  const progress = useRef(new Animated.Value(state.isOpen ? 1 : 0)).current;
-  // Where a drag STARTS from, in progress units. Always exactly 0 or 1: a gesture only ever
-  // begins at rest, since terminate/release always snap the value back to a resting state before
-  // another grant can fire.
-  const dragStartProgress = useRef(0);
-
-  // Refs so the PanResponder's callbacks - built ONCE below, RN's own idiom - always read the
-  // CURRENT render's values without forcing a new PanResponder identity on every state/prop
-  // change (recreating panHandlers mid-gesture would drop the in-flight touch).
-  const optionsRef = useRef(options);
-  optionsRef.current = options;
-  const screenWidthRef = useRef(screenWidth);
-  screenWidthRef.current = screenWidth;
-  // The whole router state, not just its isOpen bit: jumpTo below has to re-run the reducer to
-  // learn what the dispatch actually produced, and that needs the routes too.
-  const stateRef = useRef(state);
-  stateRef.current = state;
-
-  const animateProgressTo = useCallback(
-    (open: boolean): void => {
-      // Investigation instrumentation (Drawer openDrawer-no-op / toggleDrawer-no-animation bug):
-      // every imperative caller (openDrawer/closeDrawer/toggleDrawer/jumpTo) funnels through here,
-      // so this single seam proves whether Animated.timing is actually being started at all, and
-      // with what toValue - a live-only failure (e.g. a stale progress ref, or Animated.timing
-      // silently short-circuiting) would show up as this log firing with no visible motion. Kept
-      // behind DEBUG per <keep_logs_gate_behind_DEBUG>, never removed.
-      dlog(`Drawer: animateProgressTo(open=${open}) starting at t=${Date.now()}`);
-      Animated.timing(progress, {
-        toValue: open ? 1 : 0,
-        duration: DRAWER_SNAP_DURATION,
-        // Native-driver wiring (the AnimatedComponent passthrough opt-in ADR 0017 defines) is
-        // deferred for v1 - see this file's header feasibility note. The JS timing loop still
-        // drives every frame, same as any other non-native-driven Animated.timing in this codebase.
-        useNativeDriver: false,
-      }).start();
-    },
-    [progress],
-  );
-
-  const handle = useMemo<IDrawerNavigatorHandle>(
-    () => ({
-      openDrawer: () => {
-        dlog(`Drawer: openDrawer() called, isOpen=${stateRef.current.isOpen} at t=${Date.now()}`);
-        animateProgressTo(true);
-        dispatch({ type: 'openDrawer' });
-      },
-      closeDrawer: () => {
-        dlog(`Drawer: closeDrawer() called, isOpen=${stateRef.current.isOpen} at t=${Date.now()}`);
-        animateProgressTo(false);
-        dispatch({ type: 'closeDrawer' });
-      },
-      toggleDrawer: () => {
-        dlog(`Drawer: toggleDrawer() called, isOpen=${stateRef.current.isOpen} at t=${Date.now()}`);
-        animateProgressTo(!stateRef.current.isOpen);
-        dispatch({ type: 'toggleDrawer' });
-      },
-      jumpTo: (name: string) => {
-        // An unregistered name is a documented reducer no-op that hands the SAME state back, so
-        // animating off `isOpen` alone would slide the panel shut while the router still says
-        // open. useReducer's dispatch is async - stateRef only catches up on the next render - so
-        // the reducer (a pure function) is re-run here to learn what the dispatch produces, and
-        // the animation runs only on a genuine open -> closed transition.
-        const action: IDrawerRouterAction = { type: 'jumpTo', name };
-        const current = stateRef.current;
-        const next = drawerRouterReducer(current, action);
-        dispatch(action);
-        if (current.isOpen && !next.isOpen) animateProgressTo(false);
-      },
-    }),
-    [animateProgressTo],
-  );
-
-  useImperativeHandle(forwardedRef, () => handle, [handle]);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: (
-        event: ISymbioteEvent,
-        gestureState: IPanResponderGestureState,
-      ): boolean =>
-        shouldClaimDrawerSwipe(
-          event,
-          gestureState,
-          screenWidthRef.current,
-          stateRef.current.isOpen,
-          optionsRef.current,
-          'start',
-        ),
-      onMoveShouldSetPanResponder: (
-        event: ISymbioteEvent,
-        gestureState: IPanResponderGestureState,
-      ): boolean =>
-        shouldClaimDrawerSwipe(
-          event,
-          gestureState,
-          screenWidthRef.current,
-          stateRef.current.isOpen,
-          optionsRef.current,
-          'move',
-        ),
-      onPanResponderGrant: (): void => {
-        dlog('Drawer: gesture grant');
-        dragStartProgress.current = stateRef.current.isOpen ? 1 : 0;
-      },
-      onPanResponderMove: (
-        _event: ISymbioteEvent,
-        gestureState: IPanResponderGestureState,
-      ): void => {
-        const nextProgress = resolveDragProgress(
-          gestureState,
-          dragStartProgress.current,
-          optionsRef.current,
-        );
-        progress.setValue(nextProgress);
-      },
-      onPanResponderRelease: (
-        _event: ISymbioteEvent,
-        gestureState: IPanResponderGestureState,
-      ): void => {
-        const intent = resolveSwipeIntent(
-          gestureState,
-          stateRef.current.isOpen,
-          optionsRef.current,
-        );
-        const open = intent === 'open';
-        dlog(`Drawer: gesture release -> ${open ? 'open' : 'close'}`);
-        animateProgressTo(open);
-        dispatch(open ? { type: 'openDrawer' } : { type: 'closeDrawer' });
-      },
-      onPanResponderTerminate: (): void => {
-        dlog('Drawer: gesture terminated, snapping back');
-        animateProgressTo(stateRef.current.isOpen);
-      },
-    }),
-  ).current;
-
-  const animated = isDrawerAnimated(options);
-  const geometry = useMemo(
-    () => resolveDrawerGeometry(options),
-    [options.drawerType, options.drawerPosition, options.drawerWidth],
-  );
-
-  const panelSlot = animated ? resolveDrawerSlotInterpolation(geometry, 'panel') : undefined;
-  const contentSlot = animated ? resolveDrawerSlotInterpolation(geometry, 'content') : undefined;
-  const overlaySlot = animated ? resolveDrawerSlotInterpolation(geometry, 'overlay') : undefined;
-
-  const panelTranslateX = panelSlot ? progress.interpolate(panelSlot.translateX) : undefined;
-  const contentTranslateX = contentSlot ? progress.interpolate(contentSlot.translateX) : undefined;
-  const overlayOpacity = overlaySlot ? progress.interpolate(overlaySlot.opacity) : undefined;
-  // The overlay is a full-screen absolutely-positioned sibling BELOW content in paint order
-  // (see render-drawer.ts's drawerChildOrder) - for 'front' that's fine since content never moves,
-  // but for 'slide' content itself translates away by contentTranslateX, and without following it
-  // the overlay stays pinned full-screen, dimming (and touch-capturing) the now-revealed panel
-  // underneath instead of just the content sliver it's meant to dim. Tying overlay to the SAME
-  // translateX as content keeps it registered exactly under content, wherever content actually is
-  // (resolveDrawerSlotInterpolation's 'overlay' overload returns that same content delta).
-  const overlayTranslateX = overlaySlot ? progress.interpolate(overlaySlot.translateX) : undefined;
-
-  const focusedRoute = state.routes[state.index];
-  const focusedEntry = focusedRoute ? registry.get(focusedRoute.name) : undefined;
-  if (focusedRoute && !focusedEntry) {
-    dlog(`Drawer: no screen registered for route name "${focusedRoute.name}"`);
-  }
-
-  // Only the focused route's screen is ever mounted (like Tab, unlike Stack which keeps every
-  // pushed route alive), so a fresh emitter per focus change is sufficient - see tabs.ts's
-  // matching comment for why no per-route emitter map is needed. Keyed on the route KEY, not the
-  // route object, so a jumpTo-with-no-params re-focus of the ALREADY-focused route (a no-op in
-  // drawerRouterReducer) and any future params merge don't spuriously re-fire focus/blur.
-  const focusedRouteKey = focusedRoute?.key;
-  const routeEmitter = useMemo(() => createNavigationEmitter(), [focusedRouteKey]);
-
-  // Drawer paints its own panel in pure JS - there is no native onAppear/onDisappear to hook
-  // (unlike Stack's RNSScreen), so focus/blur is synthesized here: mount = focus, cleanup = blur,
-  // exactly what an effect keyed on focusedRouteKey already encodes - no diffFocusedRoute
-  // indirection needed (unlike Vue/Angular, which diff real prev/next keys inside an imperative
-  // watch/CD callback that has no mount/cleanup pairing of its own).
-  useEffect(() => {
-    if (focusedRouteKey === undefined) return undefined;
-    dlog(`Drawer: route "${focusedRoute?.name}" focused`);
-    routeEmitter.emit(NAVIGATION_EVENT_FOCUS);
-    return () => {
-      dlog(`Drawer: route "${focusedRoute?.name}" blurred`);
-      routeEmitter.emit(NAVIGATION_EVENT_BLUR);
-    };
-    // focusedRoute omitted deliberately: only its .key (tracked via focusedRouteKey) should
-    // re-run this effect - see the comment above on focusedRouteKey.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeEmitter, focusedRouteKey]);
-
-  const content =
-    focusedEntry && focusedRoute
-      ? createElement(
-          NavigationContext.Provider,
-          {
-            value: {
-              route: focusedRoute,
-              navigation: handle,
-              emitter: routeEmitter,
-              parent: ambientContext,
-            },
-          },
-          createElement(focusedEntry.component),
-        )
-      : null;
-
-  const descriptors: IDrawerDescriptorMap = {};
-  for (const route of state.routes) {
-    const entry = registry.get(route.name);
-    if (entry === undefined) continue;
-    descriptors[route.key] = {
-      options: resolveDrawerScreenOptions(entry, { route, navigation: handle }, screenOptions),
-      navigation: handle,
-    };
-  }
-
-  const drawerContent = renderDrawerContent?.({ state, descriptors, navigation: handle }) ?? null;
-
-  const root = renderDrawer(
-    {
-      overlayColor: overlayColor ?? DRAWER_DEFAULT_OVERLAY_COLOR,
+const DrawerImpl = forwardRef<IDrawerNavigatorHandle, IDrawerProps>(
+  (props, forwardedRef) => {
+    // Read BEFORE establishing this Drawer's own Context value below - becomes the `parent` link a
+    // nested screen's useNavigation().getParent() walks (e.g. this Drawer rendered as a Stack
+    // screen's content reaches that Stack via this value). undefined when this Drawer is the
+    // nesting root.
+    const ambientContext = useContext(NavigationContext);
+    const {
+      initialRouteName,
+      screenOptions,
+      renderDrawerContent,
+      children,
       drawerStyle,
-      contentPassthrough: {},
-      overlayPassthrough: animated
-        ? {
-            pointerEvents: state.isOpen ? 'auto' : 'none',
-            onStartShouldSetResponder: () => true,
-            onResponderRelease: () => {
-              animateProgressTo(false);
-              dispatch({ type: 'closeDrawer' });
+      drawerType,
+      drawerPosition,
+      drawerWidth,
+      overlayColor,
+      swipeEnabled,
+      swipeEdgeWidth,
+      swipeMinDistance,
+      swipeMinVelocity,
+    } = props;
+
+    const options: IDrawerOptions = {
+      drawerType,
+      drawerPosition,
+      drawerWidth,
+      overlayColor,
+      swipeEnabled,
+      swipeEdgeWidth,
+      swipeMinDistance,
+      swipeMinVelocity,
+    };
+
+    const registry = useMemo(
+      () => collectRegistry(children, isDrawerScreenElement),
+      [children],
+    );
+    const routeIdPrefix = useId();
+
+    const routes = useMemo<IRoute<unknown>[]>(
+      () =>
+        Array.from(registry.entries()).map(([name, entry]) => ({
+          key: `${routeIdPrefix}-${name}`,
+          name,
+          params: entry.initialParams,
+        })),
+      [registry, routeIdPrefix],
+    );
+
+    const [state, dispatch] = useReducer(drawerRouterReducer, undefined, () =>
+      createInitialDrawerRouterState(routes, initialRouteName),
+    );
+
+    if (routes.length === 0)
+      dlog('Drawer: no <Drawer.Screen> children registered');
+
+    const { width: screenWidth } = useWindowDimensions();
+
+    // progress: 0 closed -> 1 open, the single Animated.Value every slide/opacity transform below
+    // interpolates from.
+    const progress = useRef(new Animated.Value(state.isOpen ? 1 : 0)).current;
+    // Where a drag STARTS from, in progress units. Always exactly 0 or 1: a gesture only ever
+    // begins at rest, since terminate/release always snap the value back to a resting state before
+    // another grant can fire.
+    const dragStartProgress = useRef(0);
+
+    // Refs so the PanResponder's callbacks - built ONCE below, RN's own idiom - always read the
+    // CURRENT render's values without forcing a new PanResponder identity on every state/prop
+    // change (recreating panHandlers mid-gesture would drop the in-flight touch).
+    const optionsRef = useRef(options);
+    optionsRef.current = options;
+    const screenWidthRef = useRef(screenWidth);
+    screenWidthRef.current = screenWidth;
+    // The whole router state, not just its isOpen bit: jumpTo below has to re-run the reducer to
+    // learn what the dispatch actually produced, and that needs the routes too.
+    const stateRef = useRef(state);
+    stateRef.current = state;
+
+    const animateProgressTo = useCallback(
+      (open: boolean): void => {
+        // Investigation instrumentation (Drawer openDrawer-no-op / toggleDrawer-no-animation bug):
+        // every imperative caller (openDrawer/closeDrawer/toggleDrawer/jumpTo) funnels through here,
+        // so this single seam proves whether Animated.timing is actually being started at all, and
+        // with what toValue - a live-only failure (e.g. a stale progress ref, or Animated.timing
+        // silently short-circuiting) would show up as this log firing with no visible motion. Kept
+        // behind DEBUG per <keep_logs_gate_behind_DEBUG>, never removed.
+        dlog(
+          `Drawer: animateProgressTo(open=${open}) starting at t=${Date.now()}`,
+        );
+        Animated.timing(progress, {
+          toValue: open ? 1 : 0,
+          duration: DRAWER_SNAP_DURATION,
+          // Native-driver wiring (the AnimatedComponent passthrough opt-in ADR 0017 defines) is
+          // deferred for v1 - see this file's header feasibility note. The JS timing loop still
+          // drives every frame, same as any other non-native-driven Animated.timing in this codebase.
+          useNativeDriver: false,
+        }).start();
+      },
+      [progress],
+    );
+
+    const handle = useMemo<IDrawerNavigatorHandle>(
+      () => ({
+        openDrawer: () => {
+          dlog(
+            `Drawer: openDrawer() called, isOpen=${stateRef.current.isOpen} at t=${Date.now()}`,
+          );
+          animateProgressTo(true);
+          dispatch({ type: 'openDrawer' });
+        },
+        closeDrawer: () => {
+          dlog(
+            `Drawer: closeDrawer() called, isOpen=${stateRef.current.isOpen} at t=${Date.now()}`,
+          );
+          animateProgressTo(false);
+          dispatch({ type: 'closeDrawer' });
+        },
+        toggleDrawer: () => {
+          dlog(
+            `Drawer: toggleDrawer() called, isOpen=${stateRef.current.isOpen} at t=${Date.now()}`,
+          );
+          animateProgressTo(!stateRef.current.isOpen);
+          dispatch({ type: 'toggleDrawer' });
+        },
+        jumpTo: (name: string) => {
+          // An unregistered name is a documented reducer no-op that hands the SAME state back, so
+          // animating off `isOpen` alone would slide the panel shut while the router still says
+          // open. useReducer's dispatch is async - stateRef only catches up on the next render - so
+          // the reducer (a pure function) is re-run here to learn what the dispatch produces, and
+          // the animation runs only on a genuine open -> closed transition.
+          const action: IDrawerRouterAction = { type: 'jumpTo', name };
+          const current = stateRef.current;
+          const next = drawerRouterReducer(current, action);
+          dispatch(action);
+          if (current.isOpen && !next.isOpen) animateProgressTo(false);
+        },
+      }),
+      [animateProgressTo],
+    );
+
+    useImperativeHandle(forwardedRef, () => handle, [handle]);
+
+    const panResponder = useRef(
+      PanResponder.create({
+        onStartShouldSetPanResponder: (
+          event: ISymbioteEvent,
+          gestureState: IPanResponderGestureState,
+        ): boolean =>
+          shouldClaimDrawerSwipe(
+            event,
+            gestureState,
+            screenWidthRef.current,
+            stateRef.current.isOpen,
+            optionsRef.current,
+            'start',
+          ),
+        onMoveShouldSetPanResponder: (
+          event: ISymbioteEvent,
+          gestureState: IPanResponderGestureState,
+        ): boolean =>
+          shouldClaimDrawerSwipe(
+            event,
+            gestureState,
+            screenWidthRef.current,
+            stateRef.current.isOpen,
+            optionsRef.current,
+            'move',
+          ),
+        onPanResponderGrant: (): void => {
+          dlog('Drawer: gesture grant');
+          dragStartProgress.current = stateRef.current.isOpen ? 1 : 0;
+        },
+        onPanResponderMove: (
+          _event: ISymbioteEvent,
+          gestureState: IPanResponderGestureState,
+        ): void => {
+          const nextProgress = resolveDragProgress(
+            gestureState,
+            dragStartProgress.current,
+            optionsRef.current,
+          );
+          progress.setValue(nextProgress);
+        },
+        onPanResponderRelease: (
+          _event: ISymbioteEvent,
+          gestureState: IPanResponderGestureState,
+        ): void => {
+          const intent = resolveSwipeIntent(
+            gestureState,
+            stateRef.current.isOpen,
+            optionsRef.current,
+          );
+          const open = intent === 'open';
+          dlog(`Drawer: gesture release -> ${open ? 'open' : 'close'}`);
+          animateProgressTo(open);
+          dispatch(open ? { type: 'openDrawer' } : { type: 'closeDrawer' });
+        },
+        onPanResponderTerminate: (): void => {
+          dlog('Drawer: gesture terminated, snapping back');
+          animateProgressTo(stateRef.current.isOpen);
+        },
+      }),
+    ).current;
+
+    const animated = isDrawerAnimated(options);
+    const geometry = useMemo(
+      () => resolveDrawerGeometry(options),
+      [options.drawerType, options.drawerPosition, options.drawerWidth],
+    );
+
+    const panelSlot = animated
+      ? resolveDrawerSlotInterpolation(geometry, 'panel')
+      : undefined;
+    const contentSlot = animated
+      ? resolveDrawerSlotInterpolation(geometry, 'content')
+      : undefined;
+    const overlaySlot = animated
+      ? resolveDrawerSlotInterpolation(geometry, 'overlay')
+      : undefined;
+
+    const panelTranslateX = panelSlot
+      ? progress.interpolate(panelSlot.translateX)
+      : undefined;
+    const contentTranslateX = contentSlot
+      ? progress.interpolate(contentSlot.translateX)
+      : undefined;
+    const overlayOpacity = overlaySlot
+      ? progress.interpolate(overlaySlot.opacity)
+      : undefined;
+    // The overlay is a full-screen absolutely-positioned sibling BELOW content in paint order
+    // (see render-drawer.ts's drawerChildOrder) - for 'front' that's fine since content never moves,
+    // but for 'slide' content itself translates away by contentTranslateX, and without following it
+    // the overlay stays pinned full-screen, dimming (and touch-capturing) the now-revealed panel
+    // underneath instead of just the content sliver it's meant to dim. Tying overlay to the SAME
+    // translateX as content keeps it registered exactly under content, wherever content actually is
+    // (resolveDrawerSlotInterpolation's 'overlay' overload returns that same content delta).
+    const overlayTranslateX = overlaySlot
+      ? progress.interpolate(overlaySlot.translateX)
+      : undefined;
+
+    const focusedRoute = state.routes[state.index];
+    const focusedEntry = focusedRoute
+      ? registry.get(focusedRoute.name)
+      : undefined;
+    if (focusedRoute && !focusedEntry) {
+      dlog(
+        `Drawer: no screen registered for route name "${focusedRoute.name}"`,
+      );
+    }
+
+    // Only the focused route's screen is ever mounted (like Tab, unlike Stack which keeps every
+    // pushed route alive), so a fresh emitter per focus change is sufficient - see tabs.ts's
+    // matching comment for why no per-route emitter map is needed. Keyed on the route KEY, not the
+    // route object, so a jumpTo-with-no-params re-focus of the ALREADY-focused route (a no-op in
+    // drawerRouterReducer) and any future params merge don't spuriously re-fire focus/blur.
+    const focusedRouteKey = focusedRoute?.key;
+    const routeEmitter = useMemo(
+      () => createNavigationEmitter(),
+      [focusedRouteKey],
+    );
+
+    // Drawer paints its own panel in pure JS - there is no native onAppear/onDisappear to hook
+    // (unlike Stack's RNSScreen), so focus/blur is synthesized here: mount = focus, cleanup = blur,
+    // exactly what an effect keyed on focusedRouteKey already encodes - no diffFocusedRoute
+    // indirection needed (unlike Vue/Angular, which diff real prev/next keys inside an imperative
+    // watch/CD callback that has no mount/cleanup pairing of its own).
+    useEffect(() => {
+      if (focusedRouteKey === undefined) return undefined;
+      dlog(`Drawer: route "${focusedRoute?.name}" focused`);
+      routeEmitter.emit(NAVIGATION_EVENT_FOCUS);
+      return () => {
+        dlog(`Drawer: route "${focusedRoute?.name}" blurred`);
+        routeEmitter.emit(NAVIGATION_EVENT_BLUR);
+      };
+      // focusedRoute omitted deliberately: only its .key (tracked via focusedRouteKey) should
+      // re-run this effect - see the comment above on focusedRouteKey.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [routeEmitter, focusedRouteKey]);
+
+    const content =
+      focusedEntry && focusedRoute
+        ? createElement(
+            NavigationContext.Provider,
+            {
+              value: {
+                route: focusedRoute,
+                navigation: handle,
+                emitter: routeEmitter,
+                parent: ambientContext,
+              },
             },
-          }
-        : {},
-      panelPassthrough: {},
-    },
-    options,
-  );
+            createElement(focusedEntry.component),
+          )
+        : null;
 
-  const order = drawerChildOrder(options);
-  const slots = new Map<IDrawerSlot, IDescriptor>();
-  order.forEach((slot, index) => {
-    const descriptor = root.children[index];
-    if (typeof descriptor !== 'string') slots.set(slot, descriptor);
-  });
+    const descriptors: IDrawerDescriptorMap = {};
+    for (const route of state.routes) {
+      const entry = registry.get(route.name);
+      if (entry === undefined) continue;
+      descriptors[route.key] = {
+        options: resolveDrawerScreenOptions(
+          entry,
+          { route, navigation: handle },
+          screenOptions,
+        ),
+        navigation: handle,
+      };
+    }
 
-  const slotChildren: Record<IDrawerSlot, ReactNode> = {
-    content,
-    overlay: null,
-    panel: drawerContent,
-  };
-  // Each animated style holds an AnimatedInterpolation node, not a plain number/color - it feeds
-  // only Animated.View's deliberately permissive `style?: unknown` (see create-animated-component.tsx),
-  // never the plain-IViewStyle branch below, so this stays untyped rather than widening IViewStyle.
-  const slotAnimatedStyle: Record<IDrawerSlot, unknown> = {
-    content:
-      contentTranslateX === undefined
-        ? undefined
-        : { transform: [{ translateX: contentTranslateX }] },
-    overlay:
-      overlayOpacity === undefined
-        ? undefined
-        : { opacity: overlayOpacity, transform: [{ translateX: overlayTranslateX }] },
-    panel:
-      panelTranslateX === undefined ? undefined : { transform: [{ translateX: panelTranslateX }] },
-  };
+    const drawerContent =
+      renderDrawerContent?.({ state, descriptors, navigation: handle }) ?? null;
 
-  function renderSlot(slot: IDrawerSlot): ReactElement | null {
-    const descriptor = slots.get(slot);
-    if (descriptor === undefined) return null;
-    const animatedStyle = slotAnimatedStyle[slot];
-    if (animatedStyle === undefined) {
+    const root = renderDrawer(
+      {
+        overlayColor: overlayColor ?? DRAWER_DEFAULT_OVERLAY_COLOR,
+        drawerStyle,
+        contentPassthrough: {},
+        overlayPassthrough: animated
+          ? {
+              pointerEvents: state.isOpen ? 'auto' : 'none',
+              onStartShouldSetResponder: () => true,
+              onResponderRelease: () => {
+                animateProgressTo(false);
+                dispatch({ type: 'closeDrawer' });
+              },
+            }
+          : {},
+        panelPassthrough: {},
+      },
+      options,
+    );
+
+    const order = drawerChildOrder(options);
+    const slots = new Map<IDrawerSlot, IDescriptor>();
+    order.forEach((slot, index) => {
+      const descriptor = root.children[index];
+      if (typeof descriptor !== 'string') slots.set(slot, descriptor);
+    });
+
+    const slotChildren: Record<IDrawerSlot, ReactNode> = {
+      content,
+      overlay: null,
+      panel: drawerContent,
+    };
+    // Each animated style holds an AnimatedInterpolation node, not a plain number/color - it feeds
+    // only Animated.View's deliberately permissive `style?: unknown` (see create-animated-component.tsx),
+    // never the plain-IViewStyle branch below, so this stays untyped rather than widening IViewStyle.
+    const slotAnimatedStyle: Record<IDrawerSlot, unknown> = {
+      content:
+        contentTranslateX === undefined
+          ? undefined
+          : { transform: [{ translateX: contentTranslateX }] },
+      overlay:
+        overlayOpacity === undefined
+          ? undefined
+          : {
+              opacity: overlayOpacity,
+              transform: [{ translateX: overlayTranslateX }],
+            },
+      panel:
+        panelTranslateX === undefined
+          ? undefined
+          : { transform: [{ translateX: panelTranslateX }] },
+    };
+
+    function renderSlot(slot: IDrawerSlot): ReactElement | null {
+      const descriptor = slots.get(slot);
+      if (descriptor === undefined) return null;
+      const animatedStyle = slotAnimatedStyle[slot];
+      if (animatedStyle === undefined) {
+        return createElement(
+          descriptor.type,
+          { key: descriptor.key, ...descriptor.props },
+          slotChildren[slot],
+        );
+      }
+      const style = [descriptor.props.style, animatedStyle];
       return createElement(
-        descriptor.type,
-        { key: descriptor.key, ...descriptor.props },
+        Animated.View,
+        { key: descriptor.key, ...descriptor.props, style },
         slotChildren[slot],
       );
     }
-    const style = [descriptor.props.style, animatedStyle];
+
+    const drawerChildren = order
+      .map(renderSlot)
+      .filter((element): element is ReactElement => element !== null);
+
     return createElement(
-      Animated.View,
-      { key: descriptor.key, ...descriptor.props, style },
-      slotChildren[slot],
+      'symbiote-view',
+      { style: root.props.style, ...panResponder.panHandlers },
+      ...drawerChildren,
     );
-  }
-
-  const drawerChildren = order
-    .map(renderSlot)
-    .filter((element): element is ReactElement => element !== null);
-
-  return createElement(
-    'symbiote-view',
-    { style: root.props.style, ...panResponder.panHandlers },
-    ...drawerChildren,
-  );
-});
+  },
+);
 
 export const Drawer = Object.assign(DrawerImpl, { Screen: DrawerScreen });
 

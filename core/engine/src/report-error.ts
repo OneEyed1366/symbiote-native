@@ -46,7 +46,10 @@ function toError(value: unknown, origin: string): Error {
   return new Error(`${origin}: ${String(value)}`);
 }
 
-export function reportUncaughtError(value: unknown, info: IUncaughtErrorInfo): void {
+export function reportUncaughtError(
+  value: unknown,
+  info: IUncaughtErrorInfo,
+): void {
   const error = toError(value, info.origin);
 
   if (info.componentStack) {
@@ -54,7 +57,10 @@ export function reportUncaughtError(value: unknown, info: IUncaughtErrorInfo): v
     // ReactFiberErrorDialog sets exactly the same pair, in a try/catch because a frozen or
     // sealed error still deserves to be reported, just without the frames.
     try {
-      Object.assign(error, { componentStack: info.componentStack, isComponentError: true });
+      Object.assign(error, {
+        componentStack: info.componentStack,
+        isComponentError: true,
+      });
     } catch {
       // Reported below regardless.
     }

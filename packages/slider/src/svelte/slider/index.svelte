@@ -130,7 +130,8 @@
   }
   function handleLayout(event: ISymbioteEvent): void {
     const layout = event.nativeEvent.layout;
-    if (isRecord(layout) && typeof layout.width === 'number') width = layout.width;
+    if (isRecord(layout) && typeof layout.width === 'number')
+      width = layout.width;
   }
 
   const minimum = $derived(minimumValue ?? SLIDER_DEFAULT_MINIMUM_VALUE);
@@ -147,13 +148,17 @@
 
   const hasStepMarker = $derived(stepMarker !== undefined);
   const hasThumbImage = $derived(thumbImage !== undefined);
-  const showSteps = $derived(shouldRenderStepsIndicator(hasStepMarker, renderStepNumber));
+  const showSteps = $derived(
+    shouldRenderStepsIndicator(hasStepMarker, renderStepNumber),
+  );
 
   // The native view gets a thumbImage only when there is one AND no custom marker (which draws
   // its own thumb), matching the library. Passed raw — the engine runs the image processor
   // derived from RNCSlider's ViewConfig (same path as the color tints).
   const nativeThumbImage = $derived(
-    shouldPassNativeThumbImage(hasStepMarker, hasThumbImage) ? thumbImage : undefined,
+    shouldPassNativeThumbImage(hasStepMarker, hasThumbImage)
+      ? thumbImage
+      : undefined,
   );
 
   const view = $derived<ISliderViewProps>({
@@ -165,9 +170,16 @@
     upperLimit: upper,
     disabled: resolveSliderDisabled(disabled, accessibilityState),
     inverted,
-    thumbTintColor: resolveThumbTintColor(thumbTintColor, hasStepMarker, hasThumbImage),
+    thumbTintColor: resolveThumbTintColor(
+      thumbTintColor,
+      hasStepMarker,
+      hasThumbImage,
+    ),
     thumbImage: nativeThumbImage,
-    accessibilityState: resolveSliderAccessibilityState(disabled, accessibilityState),
+    accessibilityState: resolveSliderAccessibilityState(
+      disabled,
+      accessibilityState,
+    ),
     width,
     style,
     passthrough: {
@@ -180,7 +192,9 @@
     },
   });
 
-  const options = $derived(computeStepOptions(minimum, maximum, resolvedStep, PLATFORM.stepResolution));
+  const options = $derived(
+    computeStepOptions(minimum, maximum, resolvedStep, PLATFORM.stepResolution),
+  );
   const currentValue = $derived(reportedValue ?? view.value ?? minimum);
 
   // --- No custom marker: renderSlider() is the single source of truth (wrapper + optional
@@ -217,8 +231,12 @@
 
   function syncDefaultChildren(children: IDescriptorChild[]): void {
     if (hostShimDefault === null) return;
-    if (mountedDefault === undefined || mountedDefaultCount !== children.length) {
-      for (const child of hostShimDefault.children.slice()) hostShimDefault.removeChild(child);
+    if (
+      mountedDefault === undefined ||
+      mountedDefaultCount !== children.length
+    ) {
+      for (const child of hostShimDefault.children.slice())
+        hostShimDefault.removeChild(child);
       mountedDefault = mountDescriptorChildren(hostShimDefault, children);
       mountedDefaultCount = children.length;
     } else {
@@ -265,10 +283,44 @@
       }}
     >
       {#each orderedOptions as optionValue, index (optionValue)}
-        <symbiote-view p={{ style: STEP_INDICATOR_ELEMENT_STYLE }}><symbiote-view p={{ style: TRACK_MARK_CONTAINER_STYLE }}>{@render stepMarker?.({ stepMarked: optionValue === currentValue, currentValue, index, min: minOption, max: maxOption })}{#if thumbImage !== undefined && optionValue === currentValue}<symbiote-view p={{ style: THUMB_IMAGE_CONTAINER_STYLE, testID: 'sliderTrackMark-thumbImage' }}><symbiote-image p={{ source: thumbImage, style: THUMB_IMAGE_STYLE }} /></symbiote-view>{/if}</symbiote-view>{#if renderStepNumber}<symbiote-view p={{ style: STEP_NUMBER_CONTAINER_STYLE }}><symbiote-text p={{ testID: `${index}th-step`, style: { fontSize } }}>{String(optionValue)}</symbiote-text></symbiote-view>{/if}</symbiote-view>
+        <symbiote-view p={{ style: STEP_INDICATOR_ELEMENT_STYLE }}>
+          <symbiote-view p={{ style: TRACK_MARK_CONTAINER_STYLE }}>
+            {@render stepMarker?.({
+              stepMarked: optionValue === currentValue,
+              currentValue,
+              index,
+              min: minOption,
+              max: maxOption,
+            })}
+            {#if thumbImage !== undefined && optionValue === currentValue}
+              <symbiote-view
+                p={{
+                  style: THUMB_IMAGE_CONTAINER_STYLE,
+                  testID: 'sliderTrackMark-thumbImage',
+                }}
+              >
+                <symbiote-image
+                  p={{ source: thumbImage, style: THUMB_IMAGE_STYLE }}
+                />
+              </symbiote-view>
+            {/if}
+          </symbiote-view>
+          {#if renderStepNumber}
+            <symbiote-view p={{ style: STEP_NUMBER_CONTAINER_STYLE }}>
+              <symbiote-text
+                p={{ testID: `${index}th-step`, style: { fontSize } }}
+              >
+                {String(optionValue)}
+              </symbiote-text>
+            </symbiote-view>
+          {/if}
+        </symbiote-view>
       {/each}
     </symbiote-view>
   </symbiote-view>
 {:else}
-  <symbiote-view p={{ ...defaultDescriptor?.props, class: className }} bind:this={hostShimDefault} />
+  <symbiote-view
+    p={{ ...defaultDescriptor?.props, class: className }}
+    bind:this={hostShimDefault}
+  />
 {/if}

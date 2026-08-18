@@ -10,11 +10,17 @@
 // below covers that defensive behavior instead of inventing a throw that doesn't exist.
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { AnimatedColor, AnimatedValue, AnimatedWithChildren } from '@symbiote-native/engine';
+import {
+  AnimatedColor,
+  AnimatedValue,
+  AnimatedWithChildren,
+} from '@symbiote-native/engine';
 
 describe('AnimatedColor — Positive (input forms parse to channels)', () => {
   it('parses a 6-digit hex', () => {
-    expect(new AnimatedColor('#ff8800').__getValue()).toBe('rgba(255, 136, 0, 1)');
+    expect(new AnimatedColor('#ff8800').__getValue()).toBe(
+      'rgba(255, 136, 0, 1)',
+    );
   });
 
   it('parses a 3-digit shorthand hex', () => {
@@ -22,11 +28,15 @@ describe('AnimatedColor — Positive (input forms parse to channels)', () => {
   });
 
   it('parses an rgba() string', () => {
-    expect(new AnimatedColor('rgba(10, 20, 30, 0.5)').__getValue()).toBe('rgba(10, 20, 30, 0.5)');
+    expect(new AnimatedColor('rgba(10, 20, 30, 0.5)').__getValue()).toBe(
+      'rgba(10, 20, 30, 0.5)',
+    );
   });
 
   it('parses the rgba object form', () => {
-    expect(new AnimatedColor({ r: 1, g: 2, b: 3, a: 1 }).__getValue()).toBe('rgba(1, 2, 3, 1)');
+    expect(new AnimatedColor({ r: 1, g: 2, b: 3, a: 1 }).__getValue()).toBe(
+      'rgba(1, 2, 3, 1)',
+    );
   });
 
   // why: an omitted constructor argument must default to opaque black, matching RN's
@@ -105,7 +115,9 @@ describe('AnimatedColor — Positive (input forms parse to channels)', () => {
 
 describe('AnimatedColor — Fallback (silent default instead of throwing — see file header)', () => {
   it('falls back to default black on an unparseable named color', () => {
-    expect(new AnimatedColor('rebeccapurple').__getValue()).toBe('rgba(0, 0, 0, 1)');
+    expect(new AnimatedColor('rebeccapurple').__getValue()).toBe(
+      'rgba(0, 0, 0, 1)',
+    );
   });
 
   it('never throws for an unparseable color: constructing and reading it is safe inside a render', () => {
@@ -183,8 +195,12 @@ describe('AnimatedColor — native color node references the four channel tags',
       setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
       flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
       extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-      startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
-      stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
+      startListeningToAnimatedNodeValue: record(
+        'startListeningToAnimatedNodeValue',
+      ),
+      stopListeningToAnimatedNodeValue: record(
+        'stopListeningToAnimatedNodeValue',
+      ),
       getValue: record('getValue'),
       addAnimatedEventToView: record('addAnimatedEventToView'),
       removeAnimatedEventFromView: record('removeAnimatedEventFromView'),
@@ -201,7 +217,10 @@ describe('AnimatedColor — native color node references the four channel tags',
     const colorCreate = nativeCalls.find(call => {
       const config = call.args[1];
       return (
-        typeof config === 'object' && config !== null && 'type' in config && config.type === 'color'
+        typeof config === 'object' &&
+        config !== null &&
+        'type' in config &&
+        config.type === 'color'
       );
     });
     expect(colorCreate, 'a "color" animated node was created').toBeDefined();

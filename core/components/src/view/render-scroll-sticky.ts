@@ -44,7 +44,10 @@ export type IStickyHeaderProps = {
 // Thin re-export kept for the existing public surface (adapters import this name from
 // `@symbiote-native/components`); the actual field read is shared with render-scroll-view's
 // width/height read in layout-event.ts.
-export function readLayoutNumber(event: ISymbioteEvent, key: 'y' | 'height'): number | undefined {
+export function readLayoutNumber(
+  event: ISymbioteEvent,
+  key: 'y' | 'height',
+): number | undefined {
   return readLayoutField(event, key);
 }
 
@@ -64,11 +67,20 @@ export type IStickyInterpolationParams = {
 // [-1, 0] -> [0, 0] stub is the un-measured identity; once measured, the top branch pins at
 // layoutY and tracks 1:1 until the next header pushes it off, while the inverted branch pins
 // at the viewport bottom (stickStartPoint) and tracks up to the collision point.
-export function computeStickyInterpolation(params: IStickyInterpolationParams): {
+export function computeStickyInterpolation(
+  params: IStickyInterpolationParams,
+): {
   inputRange: number[];
   outputRange: number[];
 } {
-  const { measured, inverted, scrollViewHeight, layoutY, layoutHeight, nextHeaderLayoutY } = params;
+  const {
+    measured,
+    inverted,
+    scrollViewHeight,
+    layoutY,
+    layoutHeight,
+    nextHeaderLayoutY,
+  } = params;
   const inputRange: number[] = [-1, 0];
   const outputRange: number[] = [0, 0];
   if (measured) {
@@ -81,10 +93,14 @@ export function computeStickyInterpolation(params: IStickyInterpolationParams): 
         if (stickStartPoint > 0) {
           inputRange.push(stickStartPoint, stickStartPoint + 1);
           outputRange.push(0, 1);
-          const collisionPoint = (nextHeaderLayoutY ?? 0) - layoutHeight - scrollViewHeight;
+          const collisionPoint =
+            (nextHeaderLayoutY ?? 0) - layoutHeight - scrollViewHeight;
           if (collisionPoint > stickStartPoint) {
             inputRange.push(collisionPoint, collisionPoint + 1);
-            outputRange.push(collisionPoint - stickStartPoint, collisionPoint - stickStartPoint);
+            outputRange.push(
+              collisionPoint - stickStartPoint,
+              collisionPoint - stickStartPoint,
+            );
           }
         }
       }

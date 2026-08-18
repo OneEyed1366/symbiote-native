@@ -26,7 +26,8 @@ import {
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -34,7 +35,10 @@ if (globalThis.navigator === undefined) {
 const ROOT_TAG = 91_931;
 const SECOND_ROOT_TAG = 91_933;
 const PROBE_OUT = join(__dirname, '.smoke-compiled-window-probe.mjs');
-const SECOND_PROBE_OUT = join(__dirname, '.smoke-compiled-window-second-probe.mjs');
+const SECOND_PROBE_OUT = join(
+  __dirname,
+  '.smoke-compiled-window-second-probe.mjs',
+);
 
 const INITIAL: IDimensionsPayload = {
   window: { width: 400, height: 800, scale: 3, fontScale: 1 },
@@ -46,7 +50,8 @@ const ROTATED: IDimensionsPayload = {
 };
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 const addEventListener = Dimensions.addEventListener.bind(Dimensions);
 let removals: Array<ReturnType<typeof vi.fn>> = [];
@@ -54,12 +59,14 @@ let removals: Array<ReturnType<typeof vi.fn>> = [];
 beforeEach(() => {
   fabric.reset();
   removals = [];
-  vi.spyOn(Dimensions, 'addEventListener').mockImplementation((type, listener) => {
-    const subscription: IEventSubscription = addEventListener(type, listener);
-    const remove = vi.fn(() => subscription.remove());
-    removals.push(remove);
-    return { remove };
-  });
+  vi.spyOn(Dimensions, 'addEventListener').mockImplementation(
+    (type, listener) => {
+      const subscription: IEventSubscription = addEventListener(type, listener);
+      const remove = vi.fn(() => subscription.remove());
+      removals.push(remove);
+      return { remove };
+    },
+  );
   Dimensions.set(INITIAL);
 });
 
@@ -120,7 +127,9 @@ async function mountProbe(values: IMetrics[]): Promise<void> {
   if (typeof probe !== 'function')
     throw new Error('WindowProbe.svelte default export is not a component');
   const component: Component = probe;
-  mount(ROOT_TAG, component, { onValue: (metrics: IMetrics) => values.push(metrics) });
+  mount(ROOT_TAG, component, {
+    onValue: (metrics: IMetrics) => values.push(metrics),
+  });
   await tick();
 }
 
@@ -150,9 +159,13 @@ async function mountSecondProbe(values: number[]): Promise<void> {
   }
   const probe: unknown = mod.default;
   if (typeof probe !== 'function')
-    throw new Error('WindowSecondProbe.svelte default export is not a component');
+    throw new Error(
+      'WindowSecondProbe.svelte default export is not a component',
+    );
   const component: Component = probe;
-  mount(SECOND_ROOT_TAG, component, { onValue: (width: number) => values.push(width) });
+  mount(SECOND_ROOT_TAG, component, {
+    onValue: (width: number) => values.push(width),
+  });
   await tick();
 }
 

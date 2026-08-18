@@ -19,13 +19,16 @@ import { StatusBar } from './index';
 
 const ROOT_TAG = 901;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 @Component({
   selector: 'symbiote-status-bar-host',
   standalone: true,
   imports: [StatusBar],
-  template: ` <StatusBar [barStyle]="'dark-content'" [hidden]="true" [animated]="false" /> `,
+  template: `
+    <StatusBar [barStyle]="'dark-content'" [hidden]="true" [animated]="false" />
+  `,
 })
 class StatusBarHost {}
 
@@ -49,7 +52,9 @@ describe('StatusBar', () => {
   // why: StatusBar's template is '' — it drives a native module imperatively and must never paint
   // a real view, or it would silently occupy space / intercept layout in the host tree.
   it('applies status bar props on mount and renders no Fabric node', async () => {
-    const spy = vi.spyOn(engine, 'applyStatusBarProps').mockReturnValue(undefined);
+    const spy = vi
+      .spyOn(engine, 'applyStatusBarProps')
+      .mockReturnValue(undefined);
 
     mount(ROOT_TAG, StatusBarHost);
     await tick();
@@ -71,12 +76,16 @@ describe('StatusBar', () => {
   // render (e.g. a screen toggling dark mode) must re-drive the native module again, not just once
   // at mount, or the status bar would freeze at its first-render appearance forever.
   it('re-applies props on every subsequent input change, not only at mount', async () => {
-    const spy = vi.spyOn(engine, 'applyStatusBarProps').mockReturnValue(undefined);
+    const spy = vi
+      .spyOn(engine, 'applyStatusBarProps')
+      .mockReturnValue(undefined);
     DynamicStatusBarHost.hidden.set(false);
 
     mount(ROOT_TAG, DynamicStatusBarHost);
     await tick();
-    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ hidden: false }));
+    expect(spy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ hidden: false }),
+    );
     const callsAfterMount = spy.mock.calls.length;
 
     DynamicStatusBarHost.hidden.set(true);
@@ -86,7 +95,9 @@ describe('StatusBar', () => {
     // pass per commit, which is its own internal detail, not a product contract. The contract is
     // that a LATER input change drives at least one more real re-application with the new value.
     expect(spy.mock.calls.length).toBeGreaterThan(callsAfterMount);
-    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ hidden: true }));
+    expect(spy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ hidden: true }),
+    );
   });
 
   // why: Object.assign(StatusBarComponent, statusBarImperative) must forward the EXACT engine
@@ -99,15 +110,22 @@ describe('StatusBar', () => {
     expect(StatusBar.setNetworkActivityIndicatorVisible).toBe(
       engine.statusBarImperative.setNetworkActivityIndicatorVisible,
     );
-    expect(StatusBar.setBackgroundColor).toBe(engine.statusBarImperative.setBackgroundColor);
-    expect(StatusBar.setTranslucent).toBe(engine.statusBarImperative.setTranslucent);
+    expect(StatusBar.setBackgroundColor).toBe(
+      engine.statusBarImperative.setBackgroundColor,
+    );
+    expect(StatusBar.setTranslucent).toBe(
+      engine.statusBarImperative.setTranslucent,
+    );
   });
 
   // why: currentHeight is wired as a live GETTER (Object.defineProperty), not a value snapshotted
   // once at module load — it must read through the engine's own platform accessor every access, so
   // this proves the descriptor is the accessor itself, not merely that a `currentHeight` key exists.
   it('exposes currentHeight as a getter backed by the engine platform accessor', () => {
-    const descriptor = Object.getOwnPropertyDescriptor(StatusBar, 'currentHeight');
+    const descriptor = Object.getOwnPropertyDescriptor(
+      StatusBar,
+      'currentHeight',
+    );
     expect(descriptor?.get).toBe(engine.statusBarCurrentHeight);
   });
 });

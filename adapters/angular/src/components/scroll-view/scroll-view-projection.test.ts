@@ -19,7 +19,8 @@ import { ScrollView } from './index.ios';
 
 const ROOT_TAG = 918;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 class StickyProjectionApp {}
 Component({
@@ -142,7 +143,10 @@ describe('Angular ScrollView projection parity', () => {
         node.props.collapsable === false &&
         node.children.some(child => child.props.testID === 'sticky'),
     );
-    expect(stickyWrapper?.props).toMatchObject({ collapsable: false, onLayout: true });
+    expect(stickyWrapper?.props).toMatchObject({
+      collapsable: false,
+      onLayout: true,
+    });
   });
 
   // why: React/Vue can instantiate an arbitrary StickyHeaderComponent type at the auto-projected
@@ -154,14 +158,19 @@ describe('Angular ScrollView projection parity', () => {
     await tick();
 
     expect(CustomStickyHeader.instantiated).toBe(false);
-    expect(fabric.find(node => node.props.testID === 'custom-sticky-wrapper')).toBeUndefined();
+    expect(
+      fabric.find(node => node.props.testID === 'custom-sticky-wrapper'),
+    ).toBeUndefined();
 
     const stickyWrapper = fabric.find(
       node =>
         node.props.collapsable === false &&
         node.children.some(child => child.props.testID === 'sticky'),
     );
-    expect(stickyWrapper?.props).toMatchObject({ collapsable: false, onLayout: true });
+    expect(stickyWrapper?.props).toMatchObject({
+      collapsable: false,
+      onLayout: true,
+    });
   });
 
   // why: RN's iOS pull-to-refresh spinner is a sibling ABOVE the scroll content (PullToRefreshView

@@ -19,10 +19,15 @@ vi.mock('./native/exponent-magnetometer-uncalibrated', () => ({
 // 'react-native' source that Vitest's Oxc transform can't parse — same fake as device-sensor.test.ts.
 vi.mock('expo-modules-core', () => ({
   Platform: { OS: 'ios' },
-  PermissionStatus: { GRANTED: 'granted', UNDETERMINED: 'undetermined', DENIED: 'denied' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    UNDETERMINED: 'undetermined',
+    DENIED: 'denied',
+  },
 }));
 
-const { MagnetometerUncalibrated } = await import('./magnetometer-uncalibrated');
+const { MagnetometerUncalibrated } =
+  await import('./magnetometer-uncalibrated');
 
 afterEach(() => {
   MagnetometerUncalibrated.removeAllListeners();
@@ -43,7 +48,9 @@ describe('MagnetometerUncalibrated', () => {
       // ExponentMagnetometerUncalibrated, distinct from the calibrated Magnetometer's module.
       MagnetometerUncalibrated.setUpdateInterval(1234);
 
-      expect(FAKE_NATIVE_MAGNETOMETER_UNCALIBRATED.setUpdateInterval).toHaveBeenCalledWith(1234);
+      expect(
+        FAKE_NATIVE_MAGNETOMETER_UNCALIBRATED.setUpdateInterval,
+      ).toHaveBeenCalledWith(1234);
     });
 
     it('subscribes through the "magnetometerUncalibratedDidUpdate" event name the native module emits', () => {
@@ -54,10 +61,9 @@ describe('MagnetometerUncalibrated', () => {
       const listener = vi.fn();
       MagnetometerUncalibrated.addListener(listener);
 
-      expect(FAKE_NATIVE_MAGNETOMETER_UNCALIBRATED.addListener).toHaveBeenCalledWith(
-        'magnetometerUncalibratedDidUpdate',
-        listener,
-      );
+      expect(
+        FAKE_NATIVE_MAGNETOMETER_UNCALIBRATED.addListener,
+      ).toHaveBeenCalledWith('magnetometerUncalibratedDidUpdate', listener);
     });
   });
 });

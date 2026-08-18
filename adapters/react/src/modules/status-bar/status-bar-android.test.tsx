@@ -17,9 +17,11 @@ import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@symbiote-native/engine', async () => {
-  const actual =
-    await vi.importActual<typeof import('@symbiote-native/engine')>('@symbiote-native/engine');
-  const android = await import('../../../../../core/engine/src/status-bar/index.android');
+  const actual = await vi.importActual<
+    typeof import('@symbiote-native/engine')
+  >('@symbiote-native/engine');
+  const android =
+    await import('../../../../../core/engine/src/status-bar/index.android');
   return {
     ...actual,
     applyStatusBarProps: android.applyStatusBarProps,
@@ -29,7 +31,10 @@ vi.mock('@symbiote-native/engine', async () => {
 });
 
 import { View, mount, unmount } from '@symbiote-native/react';
-import { setColorProcessor, statusBarImperative } from '@symbiote-native/engine';
+import {
+  setColorProcessor,
+  statusBarImperative,
+} from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 import { StatusBar } from './index.android';
 
@@ -64,7 +69,9 @@ const fakeStatusBarManager = {
   },
 };
 
-const registeredModules: Record<string, unknown> = { StatusBarManager: fakeStatusBarManager };
+const registeredModules: Record<string, unknown> = {
+  StatusBarManager: fakeStatusBarManager,
+};
 
 function isType<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
@@ -155,7 +162,9 @@ describe('StatusBar (Android)', () => {
     expect(StatusBar.setNetworkActivityIndicatorVisible).toBe(
       statusBarImperative.setNetworkActivityIndicatorVisible,
     );
-    expect(StatusBar.setBackgroundColor).toBe(statusBarImperative.setBackgroundColor);
+    expect(StatusBar.setBackgroundColor).toBe(
+      statusBarImperative.setBackgroundColor,
+    );
     expect(StatusBar.setTranslucent).toBe(statusBarImperative.setTranslucent);
   });
 });

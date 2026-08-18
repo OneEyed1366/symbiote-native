@@ -72,7 +72,9 @@ describe('activateKeepAwakeAsync', () => {
     it('activates the default tag when none is given', async () => {
       await activateKeepAwakeAsync();
 
-      expect(FAKE_NATIVE_KEEP_AWAKE.activate).toHaveBeenCalledWith(ExpoKeepAwakeTag);
+      expect(FAKE_NATIVE_KEEP_AWAKE.activate).toHaveBeenCalledWith(
+        ExpoKeepAwakeTag,
+      );
     });
 
     // why: a caller managing its own named lock must be able to target it specifically, matching
@@ -80,7 +82,9 @@ describe('activateKeepAwakeAsync', () => {
     it('activates an explicit tag', async () => {
       await activateKeepAwakeAsync('custom-tag');
 
-      expect(FAKE_NATIVE_KEEP_AWAKE.activate).toHaveBeenCalledWith('custom-tag');
+      expect(FAKE_NATIVE_KEEP_AWAKE.activate).toHaveBeenCalledWith(
+        'custom-tag',
+      );
     });
 
     // why: `activate` is an optional native method (native-module.ts) — a platform lacking it
@@ -90,7 +94,9 @@ describe('activateKeepAwakeAsync', () => {
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_KEEP_AWAKE.activate = undefined;
 
-      await expect(activateKeepAwakeAsync('custom-tag')).resolves.toBeUndefined();
+      await expect(
+        activateKeepAwakeAsync('custom-tag'),
+      ).resolves.toBeUndefined();
 
       FAKE_NATIVE_KEEP_AWAKE.activate = native;
     });
@@ -104,14 +110,18 @@ describe('deactivateKeepAwake', () => {
     it('deactivates the default tag when none is given', async () => {
       await deactivateKeepAwake();
 
-      expect(FAKE_NATIVE_KEEP_AWAKE.deactivate).toHaveBeenCalledWith(ExpoKeepAwakeTag);
+      expect(FAKE_NATIVE_KEEP_AWAKE.deactivate).toHaveBeenCalledWith(
+        ExpoKeepAwakeTag,
+      );
     });
 
     // why: a caller releasing one of several named locks must target only that lock.
     it('deactivates an explicit tag', async () => {
       await deactivateKeepAwake('custom-tag');
 
-      expect(FAKE_NATIVE_KEEP_AWAKE.deactivate).toHaveBeenCalledWith('custom-tag');
+      expect(FAKE_NATIVE_KEEP_AWAKE.deactivate).toHaveBeenCalledWith(
+        'custom-tag',
+      );
     });
 
     // why: `deactivate` is an optional native method too — its absence must not crash a caller
@@ -147,7 +157,10 @@ describe('addListener', () => {
       const listener = vi.fn();
       addListener('custom-tag', listener);
 
-      expect(FAKE_NATIVE_KEEP_AWAKE.addListenerForTag).toHaveBeenCalledWith('custom-tag', listener);
+      expect(FAKE_NATIVE_KEEP_AWAKE.addListenerForTag).toHaveBeenCalledWith(
+        'custom-tag',
+        listener,
+      );
     });
 
     // why: the overload resolution is positional, not "whichever argument looks like a
@@ -187,7 +200,9 @@ describe('addListener', () => {
     // why: calling the tag-only overload without a listener leaves nothing to subscribe —
     // failing loudly here beats silently registering `undefined` as a listener.
     it('throws when no listener can be resolved', () => {
-      expect(() => addListener('custom-tag')).toThrow('addListener requires a listener function');
+      expect(() => addListener('custom-tag')).toThrow(
+        'addListener requires a listener function',
+      );
     });
   });
 });

@@ -42,7 +42,9 @@ registerComposedComponent('input-propagation-child');
 
 const fabric = installFabric();
 
-function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findCommitted(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   const stack = [...fabric.committed];
   while (stack.length > 0) {
     const node = stack.pop();
@@ -66,7 +68,8 @@ function handleFor(testID: string): unknown {
   return node.instanceHandle;
 }
 
-const flush = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const flush = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 // OnPush + a getter read from the template: the narrowest thing that can show the gap. The getter
 // is the observable — it runs only when this component's own template re-executes. `other` is the
@@ -76,7 +79,9 @@ const flush = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0)
   standalone: true,
   imports: [View, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   template: `<View [symbioteHostProps]="bag"></View>`,
 })
 class InputPropagationChild {
@@ -92,9 +97,17 @@ class InputPropagationChild {
 @Component({
   selector: 'input-propagation-root',
   standalone: true,
-  imports: [View, AnimatedView, InputPropagationChild, SymbioteHostPropsDirective],
+  imports: [
+    View,
+    AnimatedView,
+    InputPropagationChild,
+    SymbioteHostPropsDirective,
+  ],
   template: `<View [symbioteHostProps]="handlers"></View
-    ><input-propagation-child [style]="margins()" [testID]="'styled-leaf'"></input-propagation-child
+    ><input-propagation-child
+      [style]="margins()"
+      [testID]="'styled-leaf'"
+    ></input-propagation-child
     ><input-propagation-child
       [other]="margins()"
       [testID]="'control-leaf'"

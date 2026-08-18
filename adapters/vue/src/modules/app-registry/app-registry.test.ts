@@ -19,19 +19,27 @@
 
 import { defineComponent, h, type SetupContext } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AppRegistry, setHostRegistrar, unmount, type IAppParameters, type IRunnable } from '../..';
+import {
+  AppRegistry,
+  setHostRegistrar,
+  unmount,
+  type IAppParameters,
+  type IRunnable,
+} from '../..';
 import { installFabric } from '@symbiote-native/test-utils';
 import { Text, View } from '../../components';
 
 const APP_KEY = 'canary';
 const ROOT_TAG = 211;
 
-const App = () => h(View, { style: { flex: 1 } }, () => h(Text, null, () => 'hi'));
+const App = () =>
+  h(View, { style: { flex: 1 } }, () => h(Text, null, () => 'hi'));
 
 const fabric = installFabric();
 // Vue's mount() requestCommit()s on a microtask (vue-adapter-reactivity Gotcha 2), unlike
 // React's synchronous commit, so assertions on the committed tree need one tick.
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 // The host registrar the native side drives (RN's AppRegistry stand-in).
 const hostRunnables = new Map<string, IRunnable>();
@@ -166,7 +174,9 @@ describe('AppRegistry', () => {
       await tick();
 
       expect(receivedParams).toEqual({ rootTag: ROOT_TAG });
-      const texts = fabric.created.filter(n => n.viewName === 'RCTRawText').map(n => n.props.text);
+      const texts = fabric.created
+        .filter(n => n.viewName === 'RCTRawText')
+        .map(n => n.props.text);
       expect(texts).toEqual(expect.arrayContaining(['wrapped', 'hi']));
     });
   });

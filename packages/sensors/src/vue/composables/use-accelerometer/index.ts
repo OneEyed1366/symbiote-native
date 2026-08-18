@@ -12,7 +12,9 @@ import {
   type IAccelerometerMeasurement,
 } from '../../../core';
 
-export function useAccelerometer(updateIntervalMs?: number): Ref<IAccelerometerMeasurement | null> {
+export function useAccelerometer(
+  updateIntervalMs?: number,
+): Ref<IAccelerometerMeasurement | null> {
   // A plain ref: the value is a POJO measurement, not an engine node, so no shallowRef needed.
   const measurement = ref<IAccelerometerMeasurement | null>(null);
   let subscription: EventSubscription | undefined;

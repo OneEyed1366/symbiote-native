@@ -27,7 +27,10 @@ export async function isAvailableAsync(): Promise<boolean> {
  * instead. Resolves once the sheet is dismissed, whether or not the user picked anything: no
  * platform reports which app received the file, so a resolved promise is not a delivery receipt.
  */
-export async function shareAsync(url: string, options: ISharingOptions = {}): Promise<void> {
+export async function shareAsync(
+  url: string,
+  options: ISharingOptions = {},
+): Promise<void> {
   ensureShareableUrl(url);
   if (!expoSharing.shareAsync) {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'shareAsync');
@@ -41,6 +44,8 @@ export async function shareAsync(url: string, options: ISharingOptions = {}): Pr
 // caller's own argument named.
 function ensureShareableUrl(url: string): void {
   if (typeof url !== 'string' || url.length === 0) {
-    throw new Error('Invalid url provided to Sharing. Pass a non-empty local file URI or path.');
+    throw new Error(
+      'Invalid url provided to Sharing. Pass a non-empty local file URI or path.',
+    );
   }
 }

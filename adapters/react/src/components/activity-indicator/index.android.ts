@@ -6,7 +6,10 @@
 
 import { descriptorToReact } from '../../descriptor-to-react';
 import { useActivityIndicatorLogic } from './shared';
-import type { IActivityIndicatorPlatform, IActivityIndicatorProps } from './shared';
+import type {
+  IActivityIndicatorPlatform,
+  IActivityIndicatorProps,
+} from './shared';
 export type { IActivityIndicatorProps } from './shared';
 
 const PLATFORM: IActivityIndicatorPlatform = {

@@ -1,5 +1,16 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
-import { addNetworkStateListener, getNetworkStateAsync, type NetworkState } from '../../../core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
+import {
+  addNetworkStateListener,
+  getNetworkStateAsync,
+  type NetworkState,
+} from '../../../core';
 
 // Angular twin of React's `useNetworkState` hook and Vue's `useNetworkState` composable.
 //
@@ -15,7 +26,9 @@ export class NetworkStateService {
     effect(
       onCleanup => {
         getNetworkStateAsync().then(state => networkState.set(state));
-        const subscription = addNetworkStateListener(event => networkState.set(event));
+        const subscription = addNetworkStateListener(event =>
+          networkState.set(event),
+        );
         onCleanup(() => subscription.remove());
       },
       { injector: this.injector },

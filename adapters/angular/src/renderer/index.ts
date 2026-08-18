@@ -68,7 +68,9 @@ function describeHost(node: IHostElement | null | undefined): string {
   if (node === null || node === undefined) return 'null';
   if (isSurface(node)) return 'surface';
   const anchorId = anchorDebugIds.get(node);
-  return anchorId !== undefined ? `${node.component}#${anchorId}` : node.component;
+  return anchorId !== undefined
+    ? `${node.component}#${anchorId}`
+    : node.component;
 }
 
 const PRIMITIVE_SELECTOR_ALIAS: Record<string, string> = {
@@ -86,7 +88,9 @@ const PRIMITIVE_SELECTOR_ALIAS: Record<string, string> = {
 // but guard anyway for parity with the Vue adapter and to fail loudly on a bad template.
 function assertTextPlacement(child: ISymbioteNode, parent: IHostElement): void {
   if (isRawText(child) && (isSurface(parent) || !parent.isText)) {
-    throw new Error(`Text string "${String(child.props.text)}" must be rendered inside a <Text>`);
+    throw new Error(
+      `Text string "${String(child.props.text)}" must be rendered inside a <Text>`,
+    );
   }
 }
 
@@ -114,7 +118,9 @@ export class SymbioteRenderer implements Renderer2 {
     const engineName = PRIMITIVE_SELECTOR_ALIAS[name] ?? name;
     if (isAnchorHostComponent(engineName)) {
       const anchor = tagAnchorForDebug(createAnchor());
-      dlog(`angular createElement ${name} -> anchor host ${describeHost(anchor)}`);
+      dlog(
+        `angular createElement ${name} -> anchor host ${describeHost(anchor)}`,
+      );
       return anchor;
     }
 
@@ -144,7 +150,9 @@ export class SymbioteRenderer implements Renderer2 {
     if (parent === null) return;
     assertTextPlacement(newChild, parent);
     if (isSurface(parent)) {
-      dlog(`Angular renderer appendChild parent=surface child=${describeHost(newChild)}`);
+      dlog(
+        `Angular renderer appendChild parent=surface child=${describeHost(newChild)}`,
+      );
       parent.appendChild(newChild);
     } else {
       const projection = getScrollViewProjection(parent);
@@ -162,7 +170,11 @@ export class SymbioteRenderer implements Renderer2 {
     this.surface.requestCommit();
   }
 
-  insertBefore(parent: IHostElement | null, newChild: IHostNode, refChild: IHostNode | null): void {
+  insertBefore(
+    parent: IHostElement | null,
+    newChild: IHostNode,
+    refChild: IHostNode | null,
+  ): void {
     if (parent === null) return; // see the appendChild guard above
     assertTextPlacement(newChild, parent);
     if (isSurface(parent)) {
@@ -177,10 +189,15 @@ export class SymbioteRenderer implements Renderer2 {
         `Angular renderer insertBefore parent=${describeHost(parent)} child=${describeHost(newChild)} ref=${refChild ? describeHost(refChild) : 'null'} projection=${projection !== undefined}`,
       );
       if (projection !== undefined) {
-        projection.insertProjectedChild(parent, newChild, refChild, (target, child, before) => {
-          if (before === undefined) appendChild(target, child);
-          else insertBefore(target, child, before);
-        });
+        projection.insertProjectedChild(
+          parent,
+          newChild,
+          refChild,
+          (target, child, before) => {
+            if (before === undefined) appendChild(target, child);
+            else insertBefore(target, child, before);
+          },
+        );
       } else if (refChild) {
         insertBefore(parent, newChild, refChild);
       } else {
@@ -195,9 +212,11 @@ export class SymbioteRenderer implements Renderer2 {
     // surface.children with no parent). Angular's `parent` arg is ignored in favor of the
     // authoritative link, mirroring the Vue adapter's remove.
     const angularParent = _parent !== null ? describeHost(_parent) : 'null';
-    const retainedParent = oldChild.parent !== undefined ? describeHost(oldChild.parent) : 'none';
-    const wasProjected = removeScrollViewProjectedChild(oldChild, (parent, child) =>
-      removeChild(parent, child),
+    const retainedParent =
+      oldChild.parent !== undefined ? describeHost(oldChild.parent) : 'none';
+    const wasProjected = removeScrollViewProjectedChild(
+      oldChild,
+      (parent, child) => removeChild(parent, child),
     );
     dlog(
       `Angular renderer removeChild angularParent=${angularParent} retainedParent=${retainedParent} child=${describeHost(oldChild)} viaProjection=${wasProjected}`,
@@ -228,7 +247,8 @@ export class SymbioteRenderer implements Renderer2 {
   }
 
   nextSibling(node: IHostNode): IHostNode | null {
-    const siblings = node.parent !== undefined ? node.parent.children : this.surface.children;
+    const siblings =
+      node.parent !== undefined ? node.parent.children : this.surface.children;
     const index = siblings.indexOf(node);
     return index >= 0 ? (siblings[index + 1] ?? null) : null;
   }
@@ -341,7 +361,10 @@ export class SymbioteRendererFactory implements RendererFactory2 {
 
   constructor(private readonly surface: SymbioteSurface) {}
 
-  createRenderer(_hostElement: unknown, _type: RendererType2 | null): Renderer2 {
+  createRenderer(
+    _hostElement: unknown,
+    _type: RendererType2 | null,
+  ): Renderer2 {
     return (this.renderer ??= new SymbioteRenderer(this.surface));
   }
 }

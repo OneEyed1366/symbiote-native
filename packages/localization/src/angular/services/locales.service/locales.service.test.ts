@@ -64,7 +64,8 @@ vi.mock('../../../core', () => ({
 
 const ROOT_TAG = 974;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedResult: Signal<Locale[]> | undefined;
 let capturedListener: (() => void) | undefined;
@@ -114,7 +115,8 @@ describe('LocalesService.connect', () => {
     mount(ROOT_TAG, LocalesHost);
     await tick();
 
-    if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+    if (capturedListener === undefined)
+      throw new Error('addListener callback was not captured');
     getLocalesMock.mockReturnValue(FAKE_LOCALES_UPDATED);
     capturedListener();
 

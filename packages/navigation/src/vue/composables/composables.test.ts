@@ -11,12 +11,22 @@
 
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/vue';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/vue';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
 import type { INavigatorHandle } from '../stack';
-import { useFocusEffect, useIsFocused, useNavigation, useNavigationState, useRoute } from './index';
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+  useNavigationState,
+  useRoute,
+} from './index';
 
 const ROOT_TAG = 4513;
 const SCREEN_VIEW = 'RNSScreen';
@@ -47,18 +57,28 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
     },
   },
   [STACK_VIEW]: {
-    directEventTypes: { topFinishTransitioning: directEvent('onFinishTransitioning') },
+    directEventTypes: {
+      topFinishTransitioning: directEvent('onFinishTransitioning'),
+    },
     validAttributes: {},
   },
   [HEADER_CONFIG_VIEW]: {
-    directEventTypes: { topPressHeaderBarButtonItem: directEvent('onPressHeaderBarButtonItem') },
-    validAttributes: { title: true, hidden: true, backTitle: true, backTitleVisible: true },
+    directEventTypes: {
+      topPressHeaderBarButtonItem: directEvent('onPressHeaderBarButtonItem'),
+    },
+    validAttributes: {
+      title: true,
+      hidden: true,
+      backTitle: true,
+      backTitleVisible: true,
+    },
   },
 };
 
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -187,7 +207,10 @@ describe('navigation composables', () => {
           setup: () => () =>
             h(Stack, { ref: handleRef, initialRouteName: 'Home' }, () => [
               h(Stack.Screen, { name: 'Home', component: HomeScreen }),
-              h(Stack.Screen, { name: 'Details', component: TrackedDetailsScreen }),
+              h(Stack.Screen, {
+                name: 'Details',
+                component: TrackedDetailsScreen,
+              }),
             ]),
         }),
       );

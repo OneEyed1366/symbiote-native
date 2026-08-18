@@ -19,7 +19,11 @@ vi.mock('./native/exponent-light-sensor', () => ({
 // Vitest's Oxc transform can't parse — same fake as device-sensor.test.ts.
 vi.mock('expo-modules-core', () => ({
   Platform: { OS: 'ios' },
-  PermissionStatus: { GRANTED: 'granted', UNDETERMINED: 'undetermined', DENIED: 'denied' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    UNDETERMINED: 'undetermined',
+    DENIED: 'denied',
+  },
 }));
 
 const { LightSensor } = await import('./light-sensor');
@@ -41,7 +45,9 @@ describe('LightSensor', () => {
       // accidental stand-in shared with another sensor.
       LightSensor.setUpdateInterval(1234);
 
-      expect(FAKE_NATIVE_LIGHT_SENSOR.setUpdateInterval).toHaveBeenCalledWith(1234);
+      expect(FAKE_NATIVE_LIGHT_SENSOR.setUpdateInterval).toHaveBeenCalledWith(
+        1234,
+      );
     });
 
     it('subscribes through the "lightSensorDidUpdate" event name the native module emits', () => {

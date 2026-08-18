@@ -22,15 +22,25 @@ const calendar = computed(() => calendars.value[0] ?? null);
 
 const uses24hourClockText = computed(() => {
   const value = calendar.value?.uses24hourClock;
-  return value === null || value === undefined ? 'unknown' : value ? 'true' : 'false';
+  return value === null || value === undefined
+    ? 'unknown'
+    : value
+      ? 'true'
+      : 'false';
 });
 </script>
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="localization-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="localization-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -39,8 +49,8 @@ const uses24hourClockText = computed(() => {
         <View class="hero-copy">
           <Text class="hero-title">Localization</Text>
           <Text class="hero-body"
-            >@symbiote-native/localization — the user's preferred locales and calendars,
-            live-updated on device settings changes.</Text
+            >@symbiote-native/localization — the user's preferred locales and
+            calendars, live-updated on device settings changes.</Text
           >
         </View>
       </View>
@@ -49,27 +59,35 @@ const uses24hourClockText = computed(() => {
         <Text class="localization-card-title">First locale</Text>
         <View class="localization-row">
           <Text class="localization-row-label">Language tag</Text>
-          <Text testID="localization-language-tag-value" class="localization-value-text">{{
-            locale?.languageTag ?? 'unknown'
-          }}</Text>
+          <Text
+            testID="localization-language-tag-value"
+            class="localization-value-text"
+            >{{ locale?.languageTag ?? 'unknown' }}</Text
+          >
         </View>
         <View class="localization-row">
           <Text class="localization-row-label">Currency code</Text>
-          <Text testID="localization-currency-code-value" class="localization-value-text">{{
-            locale?.currencyCode ?? 'unknown'
-          }}</Text>
+          <Text
+            testID="localization-currency-code-value"
+            class="localization-value-text"
+            >{{ locale?.currencyCode ?? 'unknown' }}</Text
+          >
         </View>
         <View class="localization-row">
           <Text class="localization-row-label">Currency symbol</Text>
-          <Text testID="localization-currency-symbol-value" class="localization-value-text">{{
-            locale?.currencySymbol ?? 'unknown'
-          }}</Text>
+          <Text
+            testID="localization-currency-symbol-value"
+            class="localization-value-text"
+            >{{ locale?.currencySymbol ?? 'unknown' }}</Text
+          >
         </View>
         <View class="localization-row">
           <Text class="localization-row-label">Text direction</Text>
-          <Text testID="localization-text-direction-value" class="localization-value-text">{{
-            locale?.textDirection ?? 'unknown'
-          }}</Text>
+          <Text
+            testID="localization-text-direction-value"
+            class="localization-value-text"
+            >{{ locale?.textDirection ?? 'unknown' }}</Text
+          >
         </View>
       </View>
 
@@ -77,21 +95,27 @@ const uses24hourClockText = computed(() => {
         <Text class="localization-card-title">First calendar</Text>
         <View class="localization-row">
           <Text class="localization-row-label">Calendar</Text>
-          <Text testID="localization-calendar-value" class="localization-value-text">{{
-            calendar?.calendar ?? 'unknown'
-          }}</Text>
+          <Text
+            testID="localization-calendar-value"
+            class="localization-value-text"
+            >{{ calendar?.calendar ?? 'unknown' }}</Text
+          >
         </View>
         <View class="localization-row">
           <Text class="localization-row-label">Uses 24h clock</Text>
-          <Text testID="localization-24h-clock-value" class="localization-value-text">{{
-            uses24hourClockText
-          }}</Text>
+          <Text
+            testID="localization-24h-clock-value"
+            class="localization-value-text"
+            >{{ uses24hourClockText }}</Text
+          >
         </View>
         <View class="localization-row">
           <Text class="localization-row-label">Time zone</Text>
-          <Text testID="localization-time-zone-value" class="localization-value-text">{{
-            calendar?.timeZone ?? 'unknown'
-          }}</Text>
+          <Text
+            testID="localization-time-zone-value"
+            class="localization-value-text"
+            >{{ calendar?.timeZone ?? 'unknown' }}</Text
+          >
         </View>
       </View>
     </ScrollView>

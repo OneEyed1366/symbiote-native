@@ -7,12 +7,22 @@
 
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/react';
-import { setColorProcessor, type ISymbioteEvent } from '@symbiote-native/engine';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/react';
+import {
+  setColorProcessor,
+  type ISymbioteEvent,
+} from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import './index';
 
-vi.mock('@react-native-community/slider/dist/RNCSliderNativeComponent', () => ({}));
+vi.mock(
+  '@react-native-community/slider/dist/RNCSliderNativeComponent',
+  () => ({}),
+);
 
 const ROOT_TAG = 313;
 const SLIDER_VIEW = 'RNCSlider';
@@ -77,12 +87,20 @@ describe('RNCSlider package registration', () => {
         changed = numberFromEvent(event);
       };
 
-      mount(ROOT_TAG, createElement('RNCSlider', { onChange, onRNCSliderValueChange: onChange }));
+      mount(
+        ROOT_TAG,
+        createElement('RNCSlider', {
+          onChange,
+          onRNCSliderValueChange: onChange,
+        }),
+      );
 
       const node = sliderNode();
       fabric.fireEvent(node.instanceHandle, 'topChange', { value: 0.25 });
       expect(changed).toBe(0.25);
-      fabric.fireEvent(node.instanceHandle, 'topRNCSliderValueChange', { value: 0.75 });
+      fabric.fireEvent(node.instanceHandle, 'topRNCSliderValueChange', {
+        value: 0.75,
+      });
       expect(changed).toBe(0.75);
     });
 
@@ -101,7 +119,11 @@ describe('RNCSlider package registration', () => {
         }),
       );
 
-      fabric.fireEvent(sliderNode().instanceHandle, 'topRNCSliderSlidingComplete', { value: 0.5 });
+      fabric.fireEvent(
+        sliderNode().instanceHandle,
+        'topRNCSliderSlidingComplete',
+        { value: 0.5 },
+      );
       expect(completedAt).toBe(0.5);
     });
   });

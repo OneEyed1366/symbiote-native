@@ -37,17 +37,23 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HeaderOptions];
   <SafeAreaView class="screen">
     <View class="section">
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: LINE_COLOR.presentation }">
+        <View
+          class="hero-badge"
+          :style="{ backgroundColor: LINE_COLOR.presentation }"
+        >
           <Text class="hero-badge-text">HD</Text>
         </View>
         <View class="hero-copy">
           <Text class="hero-title">Header options</Text>
           <Text class="hero-body"
-            >Bar buttons, a right-side menu, a native search bar, and headerLargeTitle —
-            every headerSearchBarOptions callback wired to a live control below.</Text
+            >Bar buttons, a right-side menu, a native search bar, and
+            headerLargeTitle — every headerSearchBarOptions callback wired to a
+            live control below.</Text
           >
         </View>
       </View>
@@ -67,8 +73,9 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HeaderOptions];
         `last search bar event: ${params.lastSearchBarEvent ?? 'none yet — focus/blur/cancel the search bar'}`
       }}</Text>
       <Text class="note-text"
-        >Pull down to reveal the search bar (headerSearchBarOptions), or use the buttons
-        below to drive it imperatively through its SearchBarCommands ref.</Text
+        >Pull down to reveal the search bar (headerSearchBarOptions), or use the
+        buttons below to drive it imperatively through its SearchBarCommands
+        ref.</Text
       >
       <ActionButton
         testID="search-bar-focus"

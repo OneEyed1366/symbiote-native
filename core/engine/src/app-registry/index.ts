@@ -71,12 +71,18 @@ interface INativeHeadlessJsTaskSupport {
 const HEADLESS_TASK_MODULE = 'HeadlessJsTaskSupport';
 
 export interface IAppRegistry<TComponentProvider, TWrapperComponentProvider> {
-  registerComponent(appKey: string, componentProvider: TComponentProvider): string;
+  registerComponent(
+    appKey: string,
+    componentProvider: TComponentProvider,
+  ): string;
   registerRunnable(appKey: string, run: IRunnable): string;
   // Registers an app as a section, mirroring RN's `registerSection`
   // (AppRegistryImpl.js:115). Same path as a component, additionally tracked under
   // the section keys.
-  registerSection(appKey: string, componentProvider: TComponentProvider): string;
+  registerSection(
+    appKey: string,
+    componentProvider: TComponentProvider,
+  ): string;
   runApplication(appKey: string, appParameters: IAppParameters): void;
   // Tears down a mounted surface by rootTag, delegating to the host registrar
   // (RN routes through RendererProxy, AppRegistryImpl.js:212). No-op headless.
@@ -110,7 +116,10 @@ export interface IAppRegistry<TComponentProvider, TWrapperComponentProvider> {
   cancelHeadlessTask(taskId: number, taskKey: string): void;
 }
 
-export interface ICreateAppRegistryResult<TComponentProvider, TWrapperComponentProvider> {
+export interface ICreateAppRegistryResult<
+  TComponentProvider,
+  TWrapperComponentProvider,
+> {
   AppRegistry: IAppRegistry<TComponentProvider, TWrapperComponentProvider>;
   setHostRegistrar(registrar: IHostRegistrar): void;
 }
@@ -121,7 +130,10 @@ export interface ICreateAppRegistryResult<TComponentProvider, TWrapperComponentP
 // run, mirroring AppRegistryImpl.js reading it live inside the runnable it returns), it returns
 // the IRunnable that actually mounts the app for a rootTag — e.g. React's createElement + mount,
 // Vue's createApp(component, props).mount(surface), Angular's createComponent + setInput.
-export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>(
+export function createAppRegistry<
+  TComponentProvider,
+  TWrapperComponentProvider,
+>(
   runnableFor: (
     componentProvider: TComponentProvider,
     getWrapperComponentProvider: () => TWrapperComponentProvider | undefined,
@@ -149,13 +161,20 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
   // protocol, mirroring RN's `startHeadlessTask` (AppRegistryImpl.js:255). Native
   // is the only caller; it must be told when the task settles so the OS can release
   // the wakelock. Headless (no native module) → we just run the task.
-  function runHeadlessTask(taskId: number, taskKey: string, data: unknown): void {
-    const native = getNativeModule<INativeHeadlessJsTaskSupport>(HEADLESS_TASK_MODULE);
+  function runHeadlessTask(
+    taskId: number,
+    taskKey: string,
+    data: unknown,
+  ): void {
+    const native =
+      getNativeModule<INativeHeadlessJsTaskSupport>(HEADLESS_TASK_MODULE);
     dlog(`AppRegistry.startHeadlessTask: ${taskKey} (taskId=${taskId})`);
 
     const provider = taskProviders.get(taskKey);
     if (provider === undefined) {
-      dlog(`AppRegistry.startHeadlessTask: no task registered for key "${taskKey}"`);
+      dlog(
+        `AppRegistry.startHeadlessTask: no task registered for key "${taskKey}"`,
+      );
       native?.notifyTaskFinished?.(taskId);
       return;
     }
@@ -165,7 +184,9 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
         native?.notifyTaskFinished?.(taskId);
       })
       .catch((reason: unknown) => {
-        dlog(`AppRegistry.startHeadlessTask: "${taskKey}" failed: ${String(reason)}`);
+        dlog(
+          `AppRegistry.startHeadlessTask: "${taskKey}" failed: ${String(reason)}`,
+        );
         // RN asks native whether a retry was scheduled; if not, finish the task.
         // Without the native module there is nothing to notify.
         const retry = native?.notifyTaskRetry?.(taskId);
@@ -179,7 +200,10 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
       });
   }
 
-  const AppRegistry: IAppRegistry<TComponentProvider, TWrapperComponentProvider> = {
+  const AppRegistry: IAppRegistry<
+    TComponentProvider,
+    TWrapperComponentProvider
+  > = {
     registerComponent(appKey, componentProvider) {
       return register(
         appKey,
@@ -209,7 +233,9 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
     },
 
     unmountApplicationComponentAtRootTag(rootTag) {
-      dlog(`AppRegistry.unmountApplicationComponentAtRootTag: rootTag ${String(rootTag)}`);
+      dlog(
+        `AppRegistry.unmountApplicationComponentAtRootTag: rootTag ${String(rootTag)}`,
+      );
       hostRegistrar?.unmountAtRootTag?.(rootTag);
     },
 
@@ -241,12 +267,18 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
     },
 
     registerHeadlessTask(taskKey, taskProvider) {
-      AppRegistry.registerCancellableHeadlessTask(taskKey, taskProvider, () => () => {});
+      AppRegistry.registerCancellableHeadlessTask(
+        taskKey,
+        taskProvider,
+        () => () => {},
+      );
     },
 
     registerCancellableHeadlessTask(taskKey, taskProvider, taskCancelProvider) {
       if (taskProviders.has(taskKey)) {
-        dlog(`AppRegistry: headless task registered multiple times for key "${taskKey}"`);
+        dlog(
+          `AppRegistry: headless task registered multiple times for key "${taskKey}"`,
+        );
       }
       taskProviders.set(taskKey, taskProvider);
       taskCancelProviders.set(taskKey, taskCancelProvider);
@@ -260,7 +292,9 @@ export function createAppRegistry<TComponentProvider, TWrapperComponentProvider>
       dlog(`AppRegistry.cancelHeadlessTask: ${taskKey} (taskId=${taskId})`);
       const cancelProvider = taskCancelProviders.get(taskKey);
       if (cancelProvider === undefined) {
-        dlog(`AppRegistry.cancelHeadlessTask: no canceller registered for key "${taskKey}"`);
+        dlog(
+          `AppRegistry.cancelHeadlessTask: no canceller registered for key "${taskKey}"`,
+        );
         return;
       }
       cancelProvider()();

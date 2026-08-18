@@ -38,7 +38,9 @@ const fakeNativeAnimated = {
   setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
   flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
   extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-  startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
+  startListeningToAnimatedNodeValue: record(
+    'startListeningToAnimatedNodeValue',
+  ),
   stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
   getValue: record('getValue'),
   addAnimatedEventToView: record('addAnimatedEventToView'),
@@ -51,7 +53,8 @@ Object.assign(globalThis, {
 const fabric = installFabric();
 const ROOT_TAG = 55;
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function callsOf(method: string): INativeCall[] {
   return nativeCalls.filter(call => call.method === method);
@@ -91,9 +94,12 @@ describe('Vue Animated component native event', () => {
           setup: () => () =>
             h(Animated.View, {
               style: { height: 10 },
-              onScroll: Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-                useNativeDriver: true,
-              }),
+              onScroll: Animated.event(
+                [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                {
+                  useNativeDriver: true,
+                },
+              ),
             }),
         }),
       );
@@ -101,7 +107,9 @@ describe('Vue Animated component native event', () => {
 
       const attach = callsOf('addAnimatedEventToView');
       expect(attach, 'the native event attaches to the view').toHaveLength(1);
-      expect(attach[0].args[0], 'bound to the committed view tag').toBe(animatedViewNode().tag);
+      expect(attach[0].args[0], 'bound to the committed view tag').toBe(
+        animatedViewNode().tag,
+      );
       expect(attach[0].args[1]).toBe('onScroll');
     });
   });

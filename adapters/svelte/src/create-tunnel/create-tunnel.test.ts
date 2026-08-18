@@ -17,7 +17,8 @@ import type { Component } from 'svelte';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -26,11 +27,18 @@ const ROOT_TAG = 91_401;
 const IN_OUT = join(__dirname, '.smoke-compiled-tunnel-in.mjs');
 const OUT_OUT = join(__dirname, '.smoke-compiled-tunnel-out.mjs');
 const PARENT_OUT = join(__dirname, '.smoke-compiled-tunnel-parent.mjs');
-const TOGGLE_PARENT_OUT = join(__dirname, '.smoke-compiled-tunnel-toggle-parent.mjs');
-const MULTI_PARENT_OUT = join(__dirname, '.smoke-compiled-tunnel-multi-parent.mjs');
+const TOGGLE_PARENT_OUT = join(
+  __dirname,
+  '.smoke-compiled-tunnel-toggle-parent.mjs',
+);
+const MULTI_PARENT_OUT = join(
+  __dirname,
+  '.smoke-compiled-tunnel-multi-parent.mjs',
+);
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -45,9 +53,17 @@ afterEach(() => {
   rmSync(MULTI_PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }

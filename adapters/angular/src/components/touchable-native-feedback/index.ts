@@ -44,8 +44,16 @@ import {
   type IPressableAndroidRippleConfig,
   type IRectOffset,
 } from '@symbiote-native/components';
-import { dlog, isSymbioteEvent, type ISymbioteEvent } from '@symbiote-native/engine';
-import { anchorHostStyle, SymbioteHostPropsDirective, ViewHost } from '../../primitives';
+import {
+  dlog,
+  isSymbioteEvent,
+  type ISymbioteEvent,
+} from '@symbiote-native/engine';
+import {
+  anchorHostStyle,
+  SymbioteHostPropsDirective,
+  ViewHost,
+} from '../../primitives';
 import { Pressable, type IAngularPressableInputs } from '../pressable';
 
 export type {
@@ -58,7 +66,10 @@ export type {
 // feedback config) minus children (Angular takes children via <ng-content>) and minus the press/
 // hover events (declared as this component's OWN @Output()s below). Declared per-adapter over the
 // shared Pressable INPUT surface.
-export type IAngularTouchableNativeFeedbackProps = Omit<IAngularPressableInputs, 'style'> & {
+export type IAngularTouchableNativeFeedbackProps = Omit<
+  IAngularPressableInputs,
+  'style'
+> & {
   background?: INativeFeedbackBackground;
   useForeground?: boolean;
 };
@@ -107,7 +118,8 @@ export class TouchableNativeFeedback
   // The static helpers are pure config-dict producers; they live as members on the component class
   // so callers reach them as `TouchableNativeFeedback.Ripple(...)`, exactly like RN.
   static readonly SelectableBackground = selectableBackground;
-  static readonly SelectableBackgroundBorderless = selectableBackgroundBorderless;
+  static readonly SelectableBackgroundBorderless =
+    selectableBackgroundBorderless;
   static readonly Ripple = rippleBackground;
   static readonly canUseNativeForeground = canUseNativeForeground;
 
@@ -144,8 +156,10 @@ export class TouchableNativeFeedback
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -222,7 +236,10 @@ export class TouchableNativeFeedback
   // backgroundProps picks the foreground slot only where the platform supports it, else the
   // background slot (canUseNativeForeground) — shared with React/Vue. One side is always undefined.
   get feedback(): Record<string, INativeFeedbackBackground> {
-    return backgroundProps(this.resolvedBackground, this.useForeground === true);
+    return backgroundProps(
+      this.resolvedBackground,
+      this.useForeground === true,
+    );
   }
 
   // Assembles the SAME resolved values the template used to bind one-by-one into a single
@@ -261,7 +278,10 @@ export class TouchableNativeFeedback
       accessibilityLabel: this.accessibilityLabel,
       accessibilityHint: this.accessibilityHint,
       accessibilityRole: this.accessibilityRole,
-      accessibilityState: resolveDisabledAccessibilityState(this.accessibilityState, this.disabled),
+      accessibilityState: resolveDisabledAccessibilityState(
+        this.accessibilityState,
+        this.disabled,
+      ),
       accessibilityValue: this.accessibilityValue,
       accessibilityActions: this.accessibilityActions,
       accessibilityLabelledBy: this.accessibilityLabelledBy,
@@ -272,8 +292,10 @@ export class TouchableNativeFeedback
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,

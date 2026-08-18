@@ -38,6 +38,6 @@ export const outerHeight: IReactiveValue<number> = createDimensionsValue(
 );
 
 // PixelRatio.get() IS Dimensions.get('window').scale, so the same 'change' event carries it.
-export const devicePixelRatio: IReactiveValue<number> = createDimensionsValue(() =>
-  PixelRatio.get(),
+export const devicePixelRatio: IReactiveValue<number> = createDimensionsValue(
+  () => PixelRatio.get(),
 );

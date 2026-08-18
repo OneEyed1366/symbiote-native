@@ -42,7 +42,11 @@ import {
 /** Marks the destination for `*portal` — place it on whichever already-mounted host should
  *  paint the portaled content (e.g. a persistent overlay-host View near the app root), then
  *  export it to a template variable and pass that variable as `*portal`'s target. */
-@Directive({ selector: '[portalOutlet]', standalone: true, exportAs: 'portalOutlet' })
+@Directive({
+  selector: '[portalOutlet]',
+  standalone: true,
+  exportAs: 'portalOutlet',
+})
 export class PortalOutletDirective {
   readonly viewContainerRef = inject(ViewContainerRef);
 }
@@ -59,7 +63,9 @@ export class PortalDirective implements OnChanges, OnDestroy {
 
   ngOnChanges(): void {
     this.viewRef?.destroy();
-    this.viewRef = this.portal.viewContainerRef.createEmbeddedView(this.templateRef);
+    this.viewRef = this.portal.viewContainerRef.createEmbeddedView(
+      this.templateRef,
+    );
   }
 
   ngOnDestroy(): void {

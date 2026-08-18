@@ -33,7 +33,9 @@ describe('SecurityLevel.BIOMETRIC (deprecated alias, no throwing path)', () => {
 
     expect(readBiometric()).toBe(SecurityLevel.BIOMETRIC_STRONG);
     expect(warn).toHaveBeenCalledOnce();
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('has been deprecated'));
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('has been deprecated'),
+    );
     expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('Android'));
   });
 
@@ -46,7 +48,9 @@ describe('SecurityLevel.BIOMETRIC (deprecated alias, no throwing path)', () => {
 
     expect(readBiometric()).toBe(SecurityLevel.BIOMETRIC_WEAK);
     expect(warn).toHaveBeenCalledOnce();
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('has been deprecated'));
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('has been deprecated'),
+    );
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('Android'));
   });
 

@@ -1,4 +1,11 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
 import { addBatteryLevelListener, getBatteryLevelAsync } from '../../../core';
 
 // Angular twin of React's `useBatteryLevel` hook and Vue's `useBatteryLevel` composable.
@@ -21,7 +28,9 @@ export class BatteryLevelService {
     effect(
       onCleanup => {
         getBatteryLevelAsync().then(level => batteryLevel.set(level));
-        const subscription = addBatteryLevelListener(event => batteryLevel.set(event.batteryLevel));
+        const subscription = addBatteryLevelListener(event =>
+          batteryLevel.set(event.batteryLevel),
+        );
         onCleanup(() => subscription.remove());
       },
       { injector: this.injector },

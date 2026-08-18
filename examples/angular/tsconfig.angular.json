@@ -37,6 +37,11 @@
   // watch host, so watchOptions has zero effect on it — the angularCompilerOptions.basePath
   // above is what actually fixes the watch scope.
   "watchOptions": {
-    "excludeDirectories": ["**/node_modules", "../../node_modules", "**/.git", "**/build"]
+    "excludeDirectories": [
+      "**/node_modules",
+      "../../node_modules",
+      "**/.git",
+      "**/build"
+    ]
   }
 }

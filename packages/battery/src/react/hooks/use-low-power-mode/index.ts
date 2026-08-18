@@ -3,14 +3,19 @@
 // isLowPowerModeEnabledAsync() call before the first native event fires, matching upstream's
 // own useLowPowerMode.
 import { useEffect, useState } from 'react';
-import { addLowPowerModeListener, isLowPowerModeEnabledAsync } from '../../../core';
+import {
+  addLowPowerModeListener,
+  isLowPowerModeEnabledAsync,
+} from '../../../core';
 
 export function useLowPowerMode(): boolean {
   const [lowPowerMode, setLowPowerMode] = useState(false);
 
   useEffect(() => {
     isLowPowerModeEnabledAsync().then(setLowPowerMode);
-    const subscription = addLowPowerModeListener(event => setLowPowerMode(event.lowPowerMode));
+    const subscription = addLowPowerModeListener(event =>
+      setLowPowerMode(event.lowPowerMode),
+    );
     return () => subscription.remove();
   }, []);
 

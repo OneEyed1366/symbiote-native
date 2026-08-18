@@ -58,7 +58,9 @@ export interface INativeViewConfig {
   directEventTypes?: Record<string, IDirectEventType | null | undefined>;
   validAttributes?: Record<string, unknown>;
 }
-export type INativeViewConfigSource = (name: string) => INativeViewConfig | undefined;
+export type INativeViewConfigSource = (
+  name: string,
+) => INativeViewConfig | undefined;
 
 interface IResolved {
   listeners: Set<string>;
@@ -66,7 +68,11 @@ interface IResolved {
   processors: Map<string, IPropProcessor>;
 }
 
-const EMPTY: IResolved = { listeners: new Set(), byRaw: new Map(), processors: new Map() };
+const EMPTY: IResolved = {
+  listeners: new Set(),
+  byRaw: new Map(),
+  processors: new Map(),
+};
 
 // OUR own primitives: the finite set shared hand-tunes (view-config events,
 // commit COLOR_PROPS). The source is never consulted for these, so they can't
@@ -97,14 +103,19 @@ const resolvedCache = new Map<string, IResolved>();
 let viewConfigSource: INativeViewConfigSource | undefined;
 
 // Wired once by the adapter on a real host: `name => ReactNativeViewConfigRegistry.get(name)`.
-export function setNativeViewConfigSource(source: INativeViewConfigSource): void {
+export function setNativeViewConfigSource(
+  source: INativeViewConfigSource,
+): void {
   viewConfigSource = source;
   resolvedCache.clear();
 }
 
 // Escape hatch: override a derived config, or supply one for a view with no codegen
 // ViewConfig. NOT needed on the common path; views derive from the source.
-export function registerComponent(name: string, registration: IComponentRegistration = {}): void {
+export function registerComponent(
+  name: string,
+  registration: IComponentRegistration = {},
+): void {
   const list = overrides.get(name);
   if (list === undefined) overrides.set(name, [registration]);
   else list.push(registration);
@@ -126,14 +137,19 @@ function deriveFromConfig(config: INativeViewConfig, into: IResolved): void {
   if (bubblingEventTypes) {
     for (const raw in bubblingEventTypes) {
       const bubbled = bubblingEventTypes[raw]?.phasedRegistrationNames?.bubbled;
-      if (typeof bubbled === 'string') addEvent(into, { raw, listener: splitListener(bubbled) });
+      if (typeof bubbled === 'string')
+        addEvent(into, { raw, listener: splitListener(bubbled) });
     }
   }
   if (directEventTypes) {
     for (const raw in directEventTypes) {
       const registrationName = directEventTypes[raw]?.registrationName;
       if (typeof registrationName === 'string') {
-        addEvent(into, { raw, listener: splitListener(registrationName), direct: true });
+        addEvent(into, {
+          raw,
+          listener: splitListener(registrationName),
+          direct: true,
+        });
       }
     }
   }
@@ -144,14 +160,19 @@ function deriveFromConfig(config: INativeViewConfig, into: IResolved): void {
         const process = attribute.process;
         // The codegen config already carries the right processor (processColor, ...);
         // wrap it so the typed Function becomes a PropProcessor without a cast.
-        if (typeof process === 'function') into.processors.set(key, value => process(value));
+        if (typeof process === 'function')
+          into.processors.set(key, value => process(value));
       }
     }
   }
 }
 
-function applyRegistration(registration: IComponentRegistration, into: IResolved): void {
-  if (registration.events) for (const binding of registration.events) addEvent(into, binding);
+function applyRegistration(
+  registration: IComponentRegistration,
+  into: IResolved,
+): void {
+  if (registration.events)
+    for (const binding of registration.events) addEvent(into, binding);
   if (registration.processors) {
     for (const key of Object.keys(registration.processors)) {
       into.processors.set(key, registration.processors[key]);
@@ -171,13 +192,17 @@ function resolve(name: string): IResolved {
   if (config) deriveFromConfig(config, resolved);
   const registrations = overrides.get(name);
   if (registrations)
-    for (const registration of registrations) applyRegistration(registration, resolved);
+    for (const registration of registrations)
+      applyRegistration(registration, resolved);
   resolvedCache.set(name, resolved);
   return resolved;
 }
 
 // True when `listener` is an event the (third-party) component emits.
-export function isRegisteredEvent(component: string, listener: string): boolean {
+export function isRegisteredEvent(
+  component: string,
+  listener: string,
+): boolean {
   return resolve(component).listeners.has(listener);
 }
 
@@ -191,6 +216,9 @@ export function registeredNativeEvent(
 
 // The processor for a prop of this component (e.g. processColor for a tint), or
 // undefined to leave the value untouched.
-export function registeredProcessor(component: string, key: string): IPropProcessor | undefined {
+export function registeredProcessor(
+  component: string,
+  key: string,
+): IPropProcessor | undefined {
   return resolve(component).processors.get(key);
 }

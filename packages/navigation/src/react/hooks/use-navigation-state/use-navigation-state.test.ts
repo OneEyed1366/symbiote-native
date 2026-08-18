@@ -14,7 +14,11 @@ import { act, createElement, useReducer } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
-import type { INavigationEmitter, INavigationEventListener, INavigatorState } from '../../../core';
+import type {
+  INavigationEmitter,
+  INavigationEventListener,
+  INavigatorState,
+} from '../../../core';
 import { NavigationContext } from '../../navigation-context';
 import type { INavigationContextValue } from '../../navigation-context';
 import { useNavigationState } from './index';

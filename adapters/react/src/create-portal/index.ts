@@ -12,7 +12,11 @@
 // fires for the primary root's own container, so a different surface's tree would never repaint.
 
 import type { ReactNode, ReactPortal } from 'react';
-import { isSymbioteNode, SymbioteSurface, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  isSymbioteNode,
+  SymbioteSurface,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
 import reconciler from '../host-config';
 
 export type IPortalContainer = ISymbioteNode | SymbioteSurface;

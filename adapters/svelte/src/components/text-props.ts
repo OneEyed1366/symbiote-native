@@ -7,7 +7,10 @@ import type {
   IStyleProp,
   ITextStyle,
 } from '@symbiote-native/engine';
-import type { IAccessibilityProps, IAriaProps } from '@symbiote-native/components';
+import type {
+  IAccessibilityProps,
+  IAriaProps,
+} from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../class-value';
 
 export interface ITextProps extends IAccessibilityProps, IAriaProps {

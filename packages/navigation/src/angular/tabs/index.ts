@@ -66,7 +66,12 @@ let tabInstanceCounter = 0;
 @Component({
   selector: 'Tab',
   standalone: true,
-  imports: [NgComponentOutlet, NavigationScopeDirective, DescriptorOutlet, View],
+  imports: [
+    NgComponentOutlet,
+    NavigationScopeDirective,
+    DescriptorOutlet,
+    View,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <View [style]="rootStyle">
@@ -101,7 +106,8 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
   // Keyed by name -> the LIVE TabScreenDirective instance - see stack.ts's matching comment for
   // why a snapshot copy would go stale on an in-place `[options]`/`[component]` change.
   private readonly registry = new Map<string, TabScreenDirective>();
-  private tabScreenChildrenSubscription: { unsubscribe: () => void } | undefined;
+  private tabScreenChildrenSubscription:
+    { unsubscribe: () => void } | undefined;
 
   private readonly stateSignal = signal<ITabRouterState | undefined>(undefined);
   readonly state = this.stateSignal.asReadonly();
@@ -116,9 +122,10 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
 
   ngAfterContentInit(): void {
     this.syncRegistry();
-    this.tabScreenChildrenSubscription = this.tabScreenChildren.changes.subscribe(() => {
-      this.syncRegistry();
-    });
+    this.tabScreenChildrenSubscription =
+      this.tabScreenChildren.changes.subscribe(() => {
+        this.syncRegistry();
+      });
   }
 
   ngOnDestroy(): void {
@@ -150,7 +157,8 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
   private syncRegistry(): void {
     this.rebuildRegistry();
     const routes = this.routesFromRegistry();
-    if (routes.length === 0) dlog('Tab: no <ng-template symbioteTabScreen> children registered');
+    if (routes.length === 0)
+      dlog('Tab: no <ng-template symbioteTabScreen> children registered');
     const current = this.stateSignal();
     if (current !== undefined) {
       this.stateSignal.set(reconcileTabRoutes(current, routes));
@@ -168,9 +176,15 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
     this.stateSignal.set(tabRouterReducer(current, action));
   }
 
-  private resolveTabOptions(entry: TabScreenDirective, route: IRoute<unknown>): ITabOptions {
+  private resolveTabOptions(
+    entry: TabScreenDirective,
+    route: IRoute<unknown>,
+  ): ITabOptions {
     const props: ITabScreenOptionsArgs = { route, navigation: this };
-    const own = typeof entry.options === 'function' ? entry.options(props) : entry.options;
+    const own =
+      typeof entry.options === 'function'
+        ? entry.options(props)
+        : entry.options;
     return { ...this.screenOptions, ...own };
   }
 
@@ -207,8 +221,12 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
   focusedRouteEmitter(): INavigationEmitter {
     const key = this.focusedRoute()?.key;
     return untracked(() => {
-      if (key === this.currentEmitterKey && this.currentEmitter) return this.currentEmitter;
-      const { blurKey, focusKey } = diffFocusedRoute(this.currentEmitterKey, key);
+      if (key === this.currentEmitterKey && this.currentEmitter)
+        return this.currentEmitter;
+      const { blurKey, focusKey } = diffFocusedRoute(
+        this.currentEmitterKey,
+        key,
+      );
       if (blurKey !== undefined && this.currentEmitter) {
         dlog('Tab: previous route blurred');
         this.currentEmitter.emit(NAVIGATION_EVENT_BLUR);
@@ -257,12 +275,18 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
     });
 
     const focusedRoute = this.focusedRoute();
-    const focusedEntry = focusedRoute ? this.registry.get(focusedRoute.name) : undefined;
+    const focusedEntry = focusedRoute
+      ? this.registry.get(focusedRoute.name)
+      : undefined;
     const focusedOptions =
       focusedEntry && focusedRoute
         ? this.resolveTabOptions(focusedEntry, focusedRoute)
         : this.screenOptions;
 
-    return renderTabBar({ items, style: focusedOptions?.tabBarStyle, passthrough: {} });
+    return renderTabBar({
+      items,
+      style: focusedOptions?.tabBarStyle,
+      passthrough: {},
+    });
   }
 }

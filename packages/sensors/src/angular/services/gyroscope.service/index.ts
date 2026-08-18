@@ -1,4 +1,11 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
 import { Gyroscope, type IGyroscopeMeasurement } from '../../../core';
 
 // Angular twin of React's `useGyroscope` hook / Vue's `useGyroscope` composable. Angular has no
@@ -23,7 +30,9 @@ export class GyroscopeService {
         if (updateIntervalMs !== undefined) {
           Gyroscope.setUpdateInterval(updateIntervalMs);
         }
-        const subscription = Gyroscope.addListener(next => measurement.set(next));
+        const subscription = Gyroscope.addListener(next =>
+          measurement.set(next),
+        );
         onCleanup(() => subscription.remove());
       },
       { injector: this.injector },

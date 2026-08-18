@@ -38,7 +38,9 @@ beforeEach(async () => {
   };
 
   globalThis.__turboModuleProxy = <T>(name: string): T | null =>
-    name === NATIVE_MODULE_NAME && isPresent<T>(fakeUIManager) ? fakeUIManager : null;
+    name === NATIVE_MODULE_NAME && isPresent<T>(fakeUIManager)
+      ? fakeUIManager
+      : null;
 
   vi.resetModules();
   ({ LayoutAnimation } = await import('./index'));
@@ -264,7 +266,9 @@ describe('LayoutAnimation native resolution mechanism', () => {
         ? moduleWithoutTheMethod
         : null;
 
-    expect(() => LayoutAnimation.configureNext(LayoutAnimation.Presets.linear)).not.toThrow();
+    expect(() =>
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.linear),
+    ).not.toThrow();
     expect(captured).toBeNull();
   });
 });
@@ -277,7 +281,9 @@ describe('LayoutAnimation (no native module)', () => {
 
     captured = null;
     expect(() => {
-      fresh.LayoutAnimation.configureNext(fresh.LayoutAnimation.Presets.easeInEaseOut);
+      fresh.LayoutAnimation.configureNext(
+        fresh.LayoutAnimation.Presets.easeInEaseOut,
+      );
     }).not.toThrow();
     expect(captured).toBeNull();
   });

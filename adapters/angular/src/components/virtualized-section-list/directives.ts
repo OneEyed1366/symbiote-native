@@ -46,7 +46,8 @@ export interface IVSectionContext<ItemT> {
 // `<ng-template vSectionItem>` — one section item row. The static guard types the `let-` bindings.
 @Directive({ selector: '[vSectionItem]', standalone: true })
 export class VSectionItemDirective<ItemT = unknown> {
-  readonly templateRef = inject<TemplateRef<IVSectionItemContext<ItemT>>>(TemplateRef);
+  readonly templateRef =
+    inject<TemplateRef<IVSectionItemContext<ItemT>>>(TemplateRef);
 
   static ngTemplateContextGuard<T>(
     _dir: VSectionItemDirective<T>,
@@ -59,7 +60,8 @@ export class VSectionItemDirective<ItemT = unknown> {
 // `<ng-template vSectionHeader>` — rendered above each section's items (RN renderSectionHeader).
 @Directive({ selector: '[vSectionHeader]', standalone: true })
 export class VSectionHeaderDirective<ItemT = unknown> {
-  readonly templateRef = inject<TemplateRef<IVSectionContext<ItemT>>>(TemplateRef);
+  readonly templateRef =
+    inject<TemplateRef<IVSectionContext<ItemT>>>(TemplateRef);
 
   static ngTemplateContextGuard<T>(
     _dir: VSectionHeaderDirective<T>,
@@ -72,7 +74,8 @@ export class VSectionHeaderDirective<ItemT = unknown> {
 // `<ng-template vSectionFooter>` — rendered below each section's items (RN renderSectionFooter).
 @Directive({ selector: '[vSectionFooter]', standalone: true })
 export class VSectionFooterDirective<ItemT = unknown> {
-  readonly templateRef = inject<TemplateRef<IVSectionContext<ItemT>>>(TemplateRef);
+  readonly templateRef =
+    inject<TemplateRef<IVSectionContext<ItemT>>>(TemplateRef);
 
   static ngTemplateContextGuard<T>(
     _dir: VSectionFooterDirective<T>,

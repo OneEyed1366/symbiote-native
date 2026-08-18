@@ -20,10 +20,18 @@ export type { ISwitchProps, ISwitchTrackColor } from './shared';
 @Component({
   selector: 'Switch',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SwitchHost, SymbioteHostPropsDirective],
-  providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => Switch), multi: true }],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => Switch),
+      multi: true,
+    },
+  ],
   inputs: [
     'value',
     'disabled',
@@ -60,7 +68,10 @@ export class Switch extends SwitchBase implements DoCheck {
 
   protected readonly platform = {
     snapBackCommand: 'setNativeValue',
-    trackColorProps: (value: boolean, trackColor?: { false?: string; true?: string }) => ({
+    trackColorProps: (
+      value: boolean,
+      trackColor?: { false?: string; true?: string },
+    ) => ({
       trackColorForFalse: trackColor?.false,
       trackColorForTrue: trackColor?.true,
       trackTintColor: value ? trackColor?.true : trackColor?.false,

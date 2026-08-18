@@ -48,7 +48,10 @@
   // Every demo screen wears the same dark translucent header and differs only in title and tint
   // (its own line color, navigation-lines.ts). Vue's App.vue repeats the five shared fields per
   // <Screen>; one factory says the same thing once and keeps a tint typo from hiding in the noise.
-  function demoScreenOptions(title: string, headerTintColor: string): ISvelteScreenOptions {
+  function demoScreenOptions(
+    title: string,
+    headerTintColor: string,
+  ): ISvelteScreenOptions {
     return {
       title,
       headerShown: true,
@@ -76,91 +79,119 @@
       headerStyle: { backgroundColor: HEADER_BACKGROUND_COLOR },
       headerUserInterfaceStyle: 'dark',
     }}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Sensors}
     component={SensorsScreen}
     options={demoScreenOptions('Sensors', LINE_COLOR.sensors)}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.LocalAuth}
     component={LocalAuthScreen}
     options={demoScreenOptions('Local Auth', LINE_COLOR['local-auth'])}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Haptics}
     component={HapticsScreen}
     options={demoScreenOptions('Haptics', LINE_COLOR.haptics)}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Clipboard}
     component={ClipboardScreen}
     options={demoScreenOptions('Clipboard', LINE_COLOR.clipboard)}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Battery}
     component={BatteryScreen}
     options={demoScreenOptions('Battery', LINE_COLOR.battery)}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Brightness}
     component={BrightnessScreen}
     options={demoScreenOptions('Brightness', LINE_COLOR.brightness)}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Cellular}
     component={CellularScreen}
     options={demoScreenOptions('Cellular', LINE_COLOR.cellular)}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Network}
     component={NetworkScreen}
     options={demoScreenOptions('Network', LINE_COLOR.network)}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Device}
     component={DeviceScreen}
     options={demoScreenOptions('Device', LINE_COLOR.device)}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Application}
     component={ApplicationScreen}
     options={demoScreenOptions('Application', LINE_COLOR.application)}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Crypto}
     component={CryptoScreen}
     options={demoScreenOptions('Crypto', LINE_COLOR.crypto)}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.StandardWebCrypto}
     component={WebCryptoScreen}
     options={demoScreenOptions('Web Crypto', LINE_COLOR['standard-web-crypto'])}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.SystemUi}
     component={SystemUiScreen}
     options={demoScreenOptions('System UI', LINE_COLOR['system-ui'])}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.StoreReview}
     component={StoreReviewScreen}
     options={demoScreenOptions('Store Review', LINE_COLOR['store-review'])}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.KeepAwake}
     component={KeepAwakeScreen}
     options={demoScreenOptions('Keep Awake', LINE_COLOR['keep-awake'])}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.ScreenOrientation}
     component={ScreenOrientationScreen}
-    options={demoScreenOptions('Screen Orientation', LINE_COLOR['screen-orientation'])}
-  /><Screen
+    options={demoScreenOptions(
+      'Screen Orientation',
+      LINE_COLOR['screen-orientation'],
+    )}
+  />
+  <Screen
     name={ROUTE_NAME.Localization}
     component={LocalizationScreen}
     options={demoScreenOptions('Localization', LINE_COLOR.localization)}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.TrackingTransparency}
     component={TrackingTransparencyScreen}
-    options={demoScreenOptions('Tracking Transparency', LINE_COLOR['tracking-transparency'])}
-  /><Screen
+    options={demoScreenOptions(
+      'Tracking Transparency',
+      LINE_COLOR['tracking-transparency'],
+    )}
+  />
+  <Screen
     name={ROUTE_NAME.SecureStore}
     component={SecureStoreScreen}
     options={demoScreenOptions('Secure Store', LINE_COLOR['secure-store'])}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Sharing}
     component={SharingScreen}
     options={demoScreenOptions('Sharing', LINE_COLOR.sharing)}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.WebBrowser}
     component={WebBrowserScreen}
     options={demoScreenOptions('Web Browser', LINE_COLOR['web-browser'])}
-  /><Screen
+  />
+  <Screen
     name={ROUTE_NAME.Sms}
     component={SmsScreen}
     options={demoScreenOptions('SMS', LINE_COLOR.sms)}

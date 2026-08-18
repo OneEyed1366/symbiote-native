@@ -19,4 +19,5 @@ export enum ApplicationReleaseType {
  * Maps to the `aps-environment` key in the native target's registered entitlements.
  * @platform ios
  */
-export type PushNotificationServiceEnvironment = 'development' | 'production' | null;
+export type PushNotificationServiceEnvironment =
+  'development' | 'production' | null;

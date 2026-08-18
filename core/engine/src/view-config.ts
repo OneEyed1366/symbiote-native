@@ -59,7 +59,12 @@ const TEXT_INPUT_EVENTS: readonly string[] = [
   'selectionChange',
   'contentSizeChange',
 ];
-const MODAL_EVENTS: readonly string[] = ['show', 'dismiss', 'requestClose', 'orientationChange'];
+const MODAL_EVENTS: readonly string[] = [
+  'show',
+  'dismiss',
+  'requestClose',
+  'orientationChange',
+];
 
 // A scroll view's events are the same on both axes and both platforms; only the native
 // NAME differs (iOS RCTScrollView for both; Android RCTScrollView vertical vs
@@ -85,7 +90,14 @@ const TEXT_EVENTS: readonly string[] = ['textLayout'];
 // SymbioteNode.component (what createNode is called with). A component absent here
 // still gets BASE_EVENTS, so a new primitive has working press/layout for free.
 const COMPONENT_EVENTS: Readonly<Record<string, readonly string[]>> = {
-  RCTImageView: ['loadStart', 'load', 'loadEnd', 'error', 'progress', 'partialLoad'],
+  RCTImageView: [
+    'loadStart',
+    'load',
+    'loadEnd',
+    'error',
+    'progress',
+    'partialLoad',
+  ],
   RCTScrollView: SCROLL_EVENTS,
   AndroidHorizontalScrollView: SCROLL_EVENTS,
   RCTSinglelineTextInputView: TEXT_INPUT_EVENTS,

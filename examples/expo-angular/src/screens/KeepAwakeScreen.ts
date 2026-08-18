@@ -36,7 +36,11 @@ const KEEP_AWAKE_DEMO_TAG = 'keep-awake-screen-demo';
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="keep-awake-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="keep-awake-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -47,8 +51,8 @@ const KEEP_AWAKE_DEMO_TAG = 'keep-awake-screen-demo';
           <View class="hero-copy">
             <Text class="hero-title">Keep Awake</Text>
             <Text class="hero-body">
-              @symbiote-native/keep-awake — keeps the screen on for as long as a tagged
-              activation stays engaged.
+              @symbiote-native/keep-awake — keeps the screen on for as long as a
+              tagged activation stays engaged.
             </Text>
           </View>
         </View>
@@ -58,7 +62,9 @@ const KEEP_AWAKE_DEMO_TAG = 'keep-awake-screen-demo';
           <View testID="keep-awake-is-available" class="capability-row">
             <Text class="capability-label">isAvailableAsync()</Text>
             <View [class]="statusBadgeClass(isAvailable())">
-              <Text class="status-badge-text">{{ statusLabel(isAvailable()) }}</Text>
+              <Text class="status-badge-text">{{
+                statusLabel(isAvailable())
+              }}</Text>
             </View>
           </View>
         </View>
@@ -68,7 +74,9 @@ const KEEP_AWAKE_DEMO_TAG = 'keep-awake-screen-demo';
           <View testID="keep-awake-engaged" class="capability-row">
             <Text class="capability-label">Engaged</Text>
             <View [class]="statusBadgeClass(engagedStatus())">
-              <Text class="status-badge-text">{{ statusLabel(engagedStatus()) }}</Text>
+              <Text class="status-badge-text">{{
+                statusLabel(engagedStatus())
+              }}</Text>
             </View>
           </View>
           <ActionButton
@@ -97,7 +105,9 @@ export class KeepAwakeScreen {
   readonly isEngaged = signal(false);
 
   constructor() {
-    isAvailableAsync().then(value => this.isAvailable.set(toCapabilityStatus(value)));
+    isAvailableAsync().then(value =>
+      this.isAvailable.set(toCapabilityStatus(value)),
+    );
 
     effect(
       onCleanup => {
@@ -128,6 +138,10 @@ export class KeepAwakeScreen {
   }
 
   statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+    return status === 'checking'
+      ? 'CHECKING…'
+      : status === 'yes'
+        ? 'YES'
+        : 'NO';
   }
 }

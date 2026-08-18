@@ -26,7 +26,8 @@ import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -36,7 +37,8 @@ const LARGE = 40;
 const TMP_DIR = join(__dirname, '../build/__release__');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 const mountedRoots: number[] = [];
 
 beforeEach(() => {
@@ -49,7 +51,10 @@ afterEach(() => {
   rmSync(TMP_DIR, { recursive: true, force: true });
 });
 
-async function compileComponent(source: string, name: string): Promise<Component> {
+async function compileComponent(
+  source: string,
+  name: string,
+): Promise<Component> {
   const result = compile(source, {
     generate: 'client',
     filename: `${name}.svelte`,
@@ -79,7 +84,9 @@ function resolveCollector(): () => void {
   setFlagsFromString('--expose_gc');
   const collect: unknown = runInNewContext('gc');
   if (typeof collect !== 'function') {
-    throw new Error('no collector available: this test cannot measure retention without gc()');
+    throw new Error(
+      'no collector available: this test cannot measure retention without gc()',
+    );
   }
   return collect;
 }
@@ -108,8 +115,14 @@ function shrinkingList(size: number): string {
 
 // Renders `size` rows, empties the list, drops every strong reference, and reports how many of
 // the removed nodes are still reachable.
-async function survivorsAfterShrink(size: number, rootTag: number): Promise<number> {
-  const List = await compileComponent(shrinkingList(size), `ShrinkingList${String(size)}`);
+async function survivorsAfterShrink(
+  size: number,
+  rootTag: number,
+): Promise<number> {
+  const List = await compileComponent(
+    shrinkingList(size),
+    `ShrinkingList${String(size)}`,
+  );
   mount(rootTag, List);
   mountedRoots.push(rootTag);
   await tick();
@@ -120,12 +133,16 @@ async function survivorsAfterShrink(size: number, rootTag: number): Promise<numb
   const handles = fabric.created
     .filter(node => node.viewName === 'RCTRawText')
     .map(node => node.instanceHandle)
-    .filter((handle): handle is object => typeof handle === 'object' && handle !== null)
+    .filter(
+      (handle): handle is object =>
+        typeof handle === 'object' && handle !== null,
+    )
     .map(handle => new WeakRef(handle));
 
-  expect(handles.length, `the ${String(size)}-row list actually rendered`).toBeGreaterThanOrEqual(
-    size,
-  );
+  expect(
+    handles.length,
+    `the ${String(size)}-row list actually rendered`,
+  ).toBeGreaterThanOrEqual(size);
 
   fabric.reset();
   await tick();
@@ -154,6 +171,8 @@ describe('shim node release', () => {
     ).toBeLessThanOrEqual(smallSurvivors);
     // And the bulk must genuinely go: a constant that happens to equal most of a small list
     // would pass the check above while still being a leak at scale.
-    expect(largeSurvivors, 'most removed nodes were collected').toBeLessThan(LARGE / 4);
+    expect(largeSurvivors, 'most removed nodes were collected').toBeLessThan(
+      LARGE / 4,
+    );
   });
 });

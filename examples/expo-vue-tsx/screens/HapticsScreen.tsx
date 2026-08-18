@@ -1,5 +1,11 @@
 import { defineComponent, ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
 import {
   AndroidHaptics,
   ImpactFeedbackStyle,
@@ -27,25 +33,36 @@ const NOTIFICATION_TYPES: readonly NotificationFeedbackType[] = [
   NotificationFeedbackType.Error,
 ];
 
-const ANDROID_HAPTICS: readonly AndroidHaptics[] = Object.values(AndroidHaptics);
+const ANDROID_HAPTICS: readonly AndroidHaptics[] =
+  Object.values(AndroidHaptics);
 
 function impactLabel(style: ImpactFeedbackStyle): string {
   switch (style) {
-    case ImpactFeedbackStyle.Light: return 'Light';
-    case ImpactFeedbackStyle.Medium: return 'Medium';
-    case ImpactFeedbackStyle.Heavy: return 'Heavy';
-    case ImpactFeedbackStyle.Rigid: return 'Rigid';
-    case ImpactFeedbackStyle.Soft: return 'Soft';
-    default: return style;
+    case ImpactFeedbackStyle.Light:
+      return 'Light';
+    case ImpactFeedbackStyle.Medium:
+      return 'Medium';
+    case ImpactFeedbackStyle.Heavy:
+      return 'Heavy';
+    case ImpactFeedbackStyle.Rigid:
+      return 'Rigid';
+    case ImpactFeedbackStyle.Soft:
+      return 'Soft';
+    default:
+      return style;
   }
 }
 
 function notificationLabel(type: NotificationFeedbackType): string {
   switch (type) {
-    case NotificationFeedbackType.Success: return 'Success';
-    case NotificationFeedbackType.Warning: return 'Warning';
-    case NotificationFeedbackType.Error: return 'Error';
-    default: return type;
+    case NotificationFeedbackType.Success:
+      return 'Success';
+    case NotificationFeedbackType.Warning:
+      return 'Warning';
+    case NotificationFeedbackType.Error:
+      return 'Error';
+    default:
+      return type;
   }
 }
 
@@ -94,7 +111,11 @@ export const HapticsScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="haptics-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="haptics-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -105,9 +126,10 @@ export const HapticsScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Haptics</Text>
               <Text class="hero-body">
-                @symbiote-native/haptics — impact, notification, and selection feedback via iOS's
-                Taptic Engine and Android's Vibrator API. Every button fires immediately; a
-                physical device is needed to feel it, the Simulator has no haptics hardware.
+                @symbiote-native/haptics — impact, notification, and selection
+                feedback via iOS's Taptic Engine and Android's Vibrator API.
+                Every button fires immediately; a physical device is needed to
+                feel it, the Simulator has no haptics hardware.
               </Text>
             </View>
           </View>

@@ -3,14 +3,20 @@
 // same tsc-cannot-see-a-`.svelte`-named-export reason screen-props.ts documents.
 
 import type { Component } from 'svelte';
-import type { IDrawerNavigatorHandle, IDrawerScreenOptions, IRoute } from '../core';
+import type {
+  IDrawerNavigatorHandle,
+  IDrawerScreenOptions,
+  IRoute,
+} from '../core';
 
 export type IDrawerScreenOptionsArgs = {
   route: IRoute<unknown>;
   navigation: IDrawerNavigatorHandle;
 };
 
-export type IDrawerScreenOptionsResolver = (args: IDrawerScreenOptionsArgs) => IDrawerScreenOptions;
+export type IDrawerScreenOptionsResolver = (
+  args: IDrawerScreenOptionsArgs,
+) => IDrawerScreenOptions;
 
 export type IDrawerScreenProps = {
   name: string;

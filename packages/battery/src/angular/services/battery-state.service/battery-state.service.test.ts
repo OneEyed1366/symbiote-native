@@ -17,15 +17,23 @@ const removeMock = vi.fn();
 const getBatteryStateAsyncMock = vi.fn(async () => 2);
 
 vi.mock('../../../core', () => ({
-  addBatteryStateListener: (listener: (event: { batteryState: number }) => void) =>
-    addListenerMock(listener),
+  addBatteryStateListener: (
+    listener: (event: { batteryState: number }) => void,
+  ) => addListenerMock(listener),
   getBatteryStateAsync: () => getBatteryStateAsyncMock(),
-  BatteryState: { UNKNOWN: 0, UNPLUGGED: 1, CHARGING: 2, FULL: 3, NOT_CHARGING: 4 },
+  BatteryState: {
+    UNKNOWN: 0,
+    UNPLUGGED: 1,
+    CHARGING: 2,
+    FULL: 3,
+    NOT_CHARGING: 4,
+  },
 }));
 
 const ROOT_TAG = 972;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedResult: Signal<number> | undefined;
 let capturedListener: ((event: { batteryState: number }) => void) | undefined;
@@ -82,7 +90,8 @@ describe('BatteryStateService.connect', () => {
     mount(ROOT_TAG, BatteryStateHost);
     await tick();
 
-    if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+    if (capturedListener === undefined)
+      throw new Error('addListener callback was not captured');
     capturedListener({ batteryState: 1 });
 
     expect(capturedResult?.()).toBe(1);

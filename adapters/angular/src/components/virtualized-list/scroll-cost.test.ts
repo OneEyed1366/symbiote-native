@@ -25,7 +25,8 @@ const SCROLL_BURST = 10;
 const ROW_COUNT = 5;
 const fabric = installFabric();
 
-const flush = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const flush = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function handleFor(testID: string): unknown {
   const node = fabric.find((n: IFakeNode) => n.props.testID === testID);
@@ -74,9 +75,13 @@ class VListCostScreen {
   templateReads = 0;
   rowReads = 0;
   readonly rows = ROWS;
-  readonly screenRows = Array.from({ length: ROW_COUNT }, (_unused, index) => index);
+  readonly screenRows = Array.from(
+    { length: ROW_COUNT },
+    (_unused, index) => index,
+  );
   readonly rowKey = (item: IRow): string => item.id;
-  readonly getRow = (_data: unknown, index: number): IRow => ROWS[index] ?? ROWS[0]!;
+  readonly getRow = (_data: unknown, index: number): IRow =>
+    ROWS[index] ?? ROWS[0]!;
   readonly getRowCount = (): number => ROWS.length;
 
   constructor() {
@@ -97,7 +102,8 @@ class VListCostScreen {
 }
 
 function screen(): VListCostScreen {
-  if (mountedScreen === undefined) throw new Error('screen component was never constructed');
+  if (mountedScreen === undefined)
+    throw new Error('screen component was never constructed');
   return mountedScreen;
 }
 
@@ -120,7 +126,9 @@ describe('the cost of a scroll frame inside a VirtualizedList', () => {
     const rowsBefore = screen().rowReads;
 
     for (let index = 0; index < SCROLL_BURST; index += 1) {
-      fabric.fireEvent(host, SCROLL_EVENT, { contentOffset: { x: 0, y: index } });
+      fabric.fireEvent(host, SCROLL_EVENT, {
+        contentOffset: { x: 0, y: index },
+      });
       await flush();
     }
 

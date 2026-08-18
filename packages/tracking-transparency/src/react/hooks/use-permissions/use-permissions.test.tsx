@@ -9,10 +9,11 @@ import { installFabric } from '@symbiote-native/test-utils';
 import { usePermissions } from './index';
 import { PermissionStatus, type PermissionResponse } from '../../../core';
 
-const { getTrackingPermissionsAsync, requestTrackingPermissionsAsync } = vi.hoisted(() => ({
-  getTrackingPermissionsAsync: vi.fn(),
-  requestTrackingPermissionsAsync: vi.fn(),
-}));
+const { getTrackingPermissionsAsync, requestTrackingPermissionsAsync } =
+  vi.hoisted(() => ({
+    getTrackingPermissionsAsync: vi.fn(),
+    requestTrackingPermissionsAsync: vi.fn(),
+  }));
 
 // Same enum-shaped-object mock trick packages/battery/src/react/hooks/use-battery-state's test
 // uses for BatteryState — the mock factory's runtime object stands in for the real enum
@@ -20,7 +21,11 @@ const { getTrackingPermissionsAsync, requestTrackingPermissionsAsync } = vi.hois
 vi.mock('../../../core', () => ({
   getTrackingPermissionsAsync,
   requestTrackingPermissionsAsync,
-  PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    DENIED: 'denied',
+    UNDETERMINED: 'undetermined',
+  },
 }));
 
 const ROOT_TAG = 954;
@@ -54,7 +59,9 @@ function Probe(): ReactElement {
 
 // Node only reports an unhandled rejection a macrotask after the promise settles, so a plain
 // `await` on the hook's own state is too early to prove one did not happen.
-async function collectUnhandledRejections(run: () => Promise<void>): Promise<unknown[]> {
+async function collectUnhandledRejections(
+  run: () => Promise<void>,
+): Promise<unknown[]> {
   const unhandled: unknown[] = [];
   const onUnhandledRejection = (reason: unknown): void => {
     unhandled.push(reason);
@@ -101,7 +108,9 @@ describe('usePermissions', () => {
       // would be a wasted native round-trip on every screen that reads this hook.
       mount(ROOT_TAG, createElement(Probe));
 
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(GRANTED));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(GRANTED),
+      );
       expect(getTrackingPermissionsAsync).toHaveBeenCalledTimes(1);
     });
 
@@ -110,24 +119,32 @@ describe('usePermissions', () => {
       // its result must land back in the same reactive `status` the initial fetch populated, so
       // one UI branch works whether the status came from mount or from a user tapping "Allow".
       mount(ROOT_TAG, createElement(Probe));
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(GRANTED));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(GRANTED),
+      );
 
       requestTrackingPermissionsAsync.mockResolvedValueOnce(DENIED);
       await latestRequest?.();
 
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(DENIED));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(DENIED),
+      );
     });
 
     it('get() re-fetches and updates the status', async () => {
       // why: a caller returning from Settings (where the user may have changed the OS
       // permission outside the app) needs a way to refresh status without re-requesting it.
       mount(ROOT_TAG, createElement(Probe));
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(GRANTED));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(GRANTED),
+      );
 
       getTrackingPermissionsAsync.mockResolvedValueOnce(DENIED);
       await latestGet?.();
 
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(DENIED));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(DENIED),
+      );
     });
 
     it('tolerates the initial fetch resolving after the component already unmounted', async () => {
@@ -157,9 +174,13 @@ describe('usePermissions', () => {
       // show an error), and the last-known status must not be silently overwritten by a failed
       // attempt.
       mount(ROOT_TAG, createElement(Probe));
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(GRANTED));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(GRANTED),
+      );
 
-      getTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
+      getTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
       await expect(latestGet?.()).rejects.toThrow('native call failed');
 
       expect(results[results.length - 1]).toEqual(GRANTED);
@@ -167,9 +188,13 @@ describe('usePermissions', () => {
 
     it('request() propagates a native failure to its caller without updating the status', async () => {
       mount(ROOT_TAG, createElement(Probe));
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(GRANTED));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(GRANTED),
+      );
 
-      requestTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
+      requestTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
       await expect(latestRequest?.()).rejects.toThrow('native call failed');
 
       expect(results[results.length - 1]).toEqual(GRANTED);
@@ -179,7 +204,9 @@ describe('usePermissions', () => {
       // why: the mount-time auto-fetch has no caller to reject to. It used to be
       // `void getPermission()`, so a native rejection escaped the hook entirely as an unhandled
       // promise rejection and left `status` at null — indistinguishable from "still fetching".
-      getTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
+      getTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
 
       const unhandled = await collectUnhandledRejections(async () => {
         mount(ROOT_TAG, createElement(Probe));
@@ -196,7 +223,9 @@ describe('usePermissions', () => {
     it('clears the recorded error once a later get() succeeds', async () => {
       // why: a consumer that retries by hand after a failed mount fetch must end up with a clean
       // slate — a stale error next to a freshly fetched status would keep reading as "broken".
-      getTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
+      getTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
       mount(ROOT_TAG, createElement(Probe));
       await vi.waitFor(() => expect(errors[errors.length - 1]).not.toBe(null));
 

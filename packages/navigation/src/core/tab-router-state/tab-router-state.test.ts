@@ -25,7 +25,10 @@ function twoRouteState(): ITabRouterState {
 
 describe('createInitialTabState', () => {
   it('focuses the first route when no initialRouteName is given', () => {
-    expect(createInitialTabState([FEED, PROFILE])).toEqual({ routes: [FEED, PROFILE], index: 0 });
+    expect(createInitialTabState([FEED, PROFILE])).toEqual({
+      routes: [FEED, PROFILE],
+      index: 0,
+    });
   });
 
   it('focuses the route matching initialRouteName', () => {
@@ -39,7 +42,10 @@ describe('createInitialTabState', () => {
 
 describe('tabRouterReducer — jumpTo', () => {
   it('moves the focused index to the named route', () => {
-    const next = tabRouterReducer(twoRouteState(), { type: 'jumpTo', name: 'Profile' });
+    const next = tabRouterReducer(twoRouteState(), {
+      type: 'jumpTo',
+      name: 'Profile',
+    });
     expect(next.index).toBe(1);
   });
 
@@ -54,12 +60,16 @@ describe('tabRouterReducer — jumpTo', () => {
 
   it('is a no-op for an unknown route name, same reference returned', () => {
     const state = twoRouteState();
-    expect(tabRouterReducer(state, { type: 'jumpTo', name: 'Nowhere' })).toBe(state);
+    expect(tabRouterReducer(state, { type: 'jumpTo', name: 'Nowhere' })).toBe(
+      state,
+    );
   });
 
   it('is a no-op when already focused on that route and no params given, same reference returned', () => {
     const state = twoRouteState();
-    expect(tabRouterReducer(state, { type: 'jumpTo', name: 'Feed' })).toBe(state);
+    expect(tabRouterReducer(state, { type: 'jumpTo', name: 'Feed' })).toBe(
+      state,
+    );
   });
 
   it('merges params onto the target route when jumping with params', () => {
@@ -111,9 +121,13 @@ describe('tabRouterReducer — setParams', () => {
 
   it('is a no-op for an unmatched key, same reference returned', () => {
     const state = twoRouteState();
-    expect(tabRouterReducer(state, { type: 'setParams', key: 'missing', params: { a: 1 } })).toBe(
-      state,
-    );
+    expect(
+      tabRouterReducer(state, {
+        type: 'setParams',
+        key: 'missing',
+        params: { a: 1 },
+      }),
+    ).toBe(state);
   });
 
   it('setParams replaces (not merges) params when incoming params is an array', () => {
@@ -153,7 +167,10 @@ describe('reconcileTabRoutes', () => {
   });
 
   it('keeps focus on the same route when an unrelated route is dropped', () => {
-    const state: ITabRouterState = { routes: [FEED, PROFILE, SETTINGS], index: 2 };
+    const state: ITabRouterState = {
+      routes: [FEED, PROFILE, SETTINGS],
+      index: 2,
+    };
     const next = reconcileTabRoutes(state, [FEED, SETTINGS]);
     expect(next.index).toBe(1);
     expect(next.routes[next.index]).toBe(SETTINGS);
@@ -161,7 +178,10 @@ describe('reconcileTabRoutes', () => {
 
   it('falls back to the first route when the focused route is dropped', () => {
     const state: ITabRouterState = { routes: [FEED, PROFILE], index: 1 };
-    expect(reconcileTabRoutes(state, [FEED])).toEqual({ routes: [FEED], index: 0 });
+    expect(reconcileTabRoutes(state, [FEED])).toEqual({
+      routes: [FEED],
+      index: 0,
+    });
   });
 
   it('reorders routes to follow the incoming order', () => {
@@ -171,7 +191,10 @@ describe('reconcileTabRoutes', () => {
   });
 
   it('yields an empty route list when every screen unregisters', () => {
-    expect(reconcileTabRoutes(twoRouteState(), [])).toEqual({ routes: [], index: 0 });
+    expect(reconcileTabRoutes(twoRouteState(), [])).toEqual({
+      routes: [],
+      index: 0,
+    });
   });
 });
 

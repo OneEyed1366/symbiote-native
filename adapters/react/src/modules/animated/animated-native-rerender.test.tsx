@@ -8,7 +8,11 @@
 
 import { type ReactElement } from 'react';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createSurface, setEventDispatcher, type IRootTag } from '@symbiote-native/engine';
+import {
+  createSurface,
+  setEventDispatcher,
+  type IRootTag,
+} from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 import reconciler, { withDiscretePriority } from '../../host-config';
 import { LegacyRoot } from '../../reconciler-constants';
@@ -74,8 +78,12 @@ beforeAll(() => {
     setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
     flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
     extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-    startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
-    stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
+    startListeningToAnimatedNodeValue: record(
+      'startListeningToAnimatedNodeValue',
+    ),
+    stopListeningToAnimatedNodeValue: record(
+      'stopListeningToAnimatedNodeValue',
+    ),
     getValue: record('getValue'),
     addAnimatedEventToView: record('addAnimatedEventToView'),
     removeAnimatedEventFromView: record('removeAnimatedEventFromView'),
@@ -107,12 +115,19 @@ beforeAll(() => {
 
   render(<App tick={0} />);
 
-  Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+  Animated.timing(opacity, {
+    toValue: 1,
+    duration: 200,
+    useNativeDriver: true,
+  }).start();
 
   const valueCreate = callsOf('createAnimatedNode').find(call => {
     const config = call.args[1];
     return (
-      typeof config === 'object' && config !== null && 'type' in config && config.type === 'value'
+      typeof config === 'object' &&
+      config !== null &&
+      'type' in config &&
+      config.type === 'value'
     );
   });
   const tag = valueCreate?.args[0];
@@ -131,7 +146,9 @@ describe('native animation survives an unrelated re-render', () => {
   });
 
   it('never drops the running Value node on an unrelated re-render', () => {
-    const droppedValue = callsOf('dropAnimatedNode').some(call => call.args[0] === valueTag);
+    const droppedValue = callsOf('dropAnimatedNode').some(
+      call => call.args[0] === valueTag,
+    );
     expect(droppedValue).toBe(false);
   });
 

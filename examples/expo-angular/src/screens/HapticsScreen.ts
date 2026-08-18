@@ -1,5 +1,11 @@
 import { Component, signal } from '@angular/core';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   AndroidHaptics,
   ImpactFeedbackStyle,
@@ -51,7 +57,10 @@ const ANDROID_HAPTIC_OPTIONS: readonly IAndroidHapticOption[] = [
   { effect: AndroidHaptics.Virtual_Key_Release, label: 'Virtual key release' },
   { effect: AndroidHaptics.No_Haptics, label: 'No haptics' },
   { effect: AndroidHaptics.Segment_Tick, label: 'Segment tick' },
-  { effect: AndroidHaptics.Segment_Frequent_Tick, label: 'Segment frequent tick' },
+  {
+    effect: AndroidHaptics.Segment_Frequent_Tick,
+    label: 'Segment frequent tick',
+  },
   { effect: AndroidHaptics.Text_Handle_Move, label: 'Text handle move' },
 ];
 
@@ -70,7 +79,11 @@ const ANDROID_HAPTIC_OPTIONS: readonly IAndroidHapticOption[] = [
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="haptics-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="haptics-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -81,9 +94,10 @@ const ANDROID_HAPTIC_OPTIONS: readonly IAndroidHapticOption[] = [
           <View class="hero-copy">
             <Text class="hero-title">Haptics</Text>
             <Text class="hero-body">
-              @symbiote-native/haptics — impact, notification, and selection feedback via iOS's
-              Taptic Engine and Android's Vibrator/haptics APIs. A simulator plays no physical
-              feedback; a real device is needed to feel it.
+              @symbiote-native/haptics — impact, notification, and selection
+              feedback via iOS's Taptic Engine and Android's Vibrator/haptics
+              APIs. A simulator plays no physical feedback; a real device is
+              needed to feel it.
             </Text>
           </View>
         </View>
@@ -145,7 +159,9 @@ const ANDROID_HAPTIC_OPTIONS: readonly IAndroidHapticOption[] = [
         }
 
         @if (lastFired(); as fired) {
-          <Text testID="haptics-last-fired" class="value-text">{{ 'Last fired: ' + fired }}</Text>
+          <Text testID="haptics-last-fired" class="value-text">{{
+            'Last fired: ' + fired
+          }}</Text>
         }
       </ScrollView>
     </SafeAreaView>

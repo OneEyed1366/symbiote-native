@@ -262,10 +262,12 @@ describe('bubbling', () => {
   it('tracks currentTarget per listener while target stays the dispatch node', () => {
     let seen = 0;
     routeProp(tree.child, 'onPress', (event: ISymbioteEvent) => {
-      if (event.target === tree.child && event.currentTarget === tree.child) seen += 1;
+      if (event.target === tree.child && event.currentTarget === tree.child)
+        seen += 1;
     });
     routeProp(tree.button, 'onPress', (event: ISymbioteEvent) => {
-      if (event.target === tree.child && event.currentTarget === tree.button) seen += 1;
+      if (event.target === tree.child && event.currentTarget === tree.button)
+        seen += 1;
     });
     fabric.fireEvent(tree.child, 'topTouchStart');
     fabric.fireEvent(tree.child, 'topTouchEnd');
@@ -287,13 +289,22 @@ describe('bubbling', () => {
   // (out of scope: that gate lives in node.ts/view-config.ts, not this module).
   it('runs capture listeners root -> target ahead of bubble listeners', () => {
     const order: string[] = [];
-    setEventListener(tree.button, 'pressCapture', () => order.push('parent-capture'));
-    setEventListener(tree.child, 'pressCapture', () => order.push('child-capture'));
+    setEventListener(tree.button, 'pressCapture', () =>
+      order.push('parent-capture'),
+    );
+    setEventListener(tree.child, 'pressCapture', () =>
+      order.push('child-capture'),
+    );
     routeProp(tree.button, 'onPress', () => order.push('parent-bubble'));
     routeProp(tree.child, 'onPress', () => order.push('child-bubble'));
     fabric.fireEvent(tree.child, 'topTouchStart');
     fabric.fireEvent(tree.child, 'topTouchEnd');
-    expect(order).toEqual(['parent-capture', 'child-capture', 'child-bubble', 'parent-bubble']);
+    expect(order).toEqual([
+      'parent-capture',
+      'child-capture',
+      'child-bubble',
+      'parent-bubble',
+    ]);
   });
 
   // why: stopPropagation during capture must prevent the bubble phase from running
@@ -330,7 +341,9 @@ describe('bubbling', () => {
     const anchor = createAnchor();
     appendChild(tree.button, anchor);
     routeProp(anchor, 'onPress', () => {
-      throw new Error('anchor listener must never be invoked by bubble dispatch');
+      throw new Error(
+        'anchor listener must never be invoked by bubble dispatch',
+      );
     });
     let parentCalls = 0;
     routeProp(tree.button, 'onPress', () => {
@@ -403,7 +416,9 @@ describe('third-party Fabric view fallback (registry)', () => {
   // deliberately rather than exercise a second module's behavior here.
   it('dispatches a registered bubbling event for a non-built-in component', () => {
     registerComponent('RNCFakeWidget', {
-      events: [{ raw: 'topRNCFakeWidgetChange', listener: 'rNCFakeWidgetChange' }],
+      events: [
+        { raw: 'topRNCFakeWidgetChange', listener: 'rNCFakeWidgetChange' },
+      ],
     });
     const widget = createElement('RNCFakeWidget');
     const parent = createElement('RCTView');
@@ -422,7 +437,11 @@ describe('third-party Fabric view fallback (registry)', () => {
   it('dispatches a registered direct event only to its own target', () => {
     registerComponent('RNCFakeSlider', {
       events: [
-        { raw: 'topRNCFakeSliderComplete', listener: 'rNCFakeSliderComplete', direct: true },
+        {
+          raw: 'topRNCFakeSliderComplete',
+          listener: 'rNCFakeSliderComplete',
+          direct: true,
+        },
       ],
     });
     const slider = createElement('RNCFakeSlider');
@@ -447,7 +466,9 @@ describe('unmatched native events', () => {
   // drift, a name mismatch) must be dropped harmlessly, not crash the app -- this
   // is the documented permanent diagnostic seam.
   it('does not throw and dispatches nothing for an unrecognized topLevelType', () => {
-    expect(() => fabric.fireEvent(tree.button, 'topSomeUnknownNativeEvent')).not.toThrow();
+    expect(() =>
+      fabric.fireEvent(tree.button, 'topSomeUnknownNativeEvent'),
+    ).not.toThrow();
   });
 });
 
@@ -495,7 +516,9 @@ describe('responder negotiation (PanResponder protocol)', () => {
   it('transfers the responder to an ancestor that claims via onMoveShouldSetResponder', () => {
     const order: string[] = [];
     routeProp(tree.button, 'onStartShouldSetResponder', () => true);
-    routeProp(tree.button, 'onResponderTerminate', () => order.push('button-terminated'));
+    routeProp(tree.button, 'onResponderTerminate', () =>
+      order.push('button-terminated'),
+    );
     routeProp(tree.root, 'onMoveShouldSetResponder', () => true);
     routeProp(tree.root, 'onResponderGrant', () => order.push('root-granted'));
 
@@ -511,10 +534,14 @@ describe('responder negotiation (PanResponder protocol)', () => {
     const order: string[] = [];
     routeProp(tree.button, 'onStartShouldSetResponder', () => true);
     routeProp(tree.button, 'onResponderTerminationRequest', () => false);
-    routeProp(tree.button, 'onResponderTerminate', () => order.push('button-terminated'));
+    routeProp(tree.button, 'onResponderTerminate', () =>
+      order.push('button-terminated'),
+    );
     routeProp(tree.root, 'onMoveShouldSetResponder', () => true);
     routeProp(tree.root, 'onResponderGrant', () => order.push('root-granted'));
-    routeProp(tree.root, 'onResponderReject', () => order.push('root-rejected'));
+    routeProp(tree.root, 'onResponderReject', () =>
+      order.push('root-rejected'),
+    );
 
     fabric.fireEvent(tree.button, 'topTouchStart');
     fabric.fireEvent(tree.button, 'topTouchMove');
@@ -551,7 +578,9 @@ describe('responder negotiation (PanResponder protocol)', () => {
     routeProp(tree.button, 'onResponderRelease', () => order.push('release'));
     fabric.fireEvent(tree.button, 'topTouchStart');
     // A second finger is still down, and its touch target is the responder itself.
-    fabric.fireEvent(tree.button, 'topTouchEnd', { touches: [{ target: tree.button }] });
+    fabric.fireEvent(tree.button, 'topTouchEnd', {
+      touches: [{ target: tree.button }],
+    });
     expect(order).toEqual(['end']);
   });
 
@@ -576,7 +605,9 @@ describe('responder negotiation (PanResponder protocol)', () => {
     routeProp(tree.button, 'onStartShouldSetResponder', () => true);
     routeProp(tree.button, 'onResponderEnd', () => order.push('end'));
     routeProp(tree.button, 'onResponderRelease', () => order.push('release'));
-    routeProp(tree.button, 'onResponderTerminate', () => order.push('terminate'));
+    routeProp(tree.button, 'onResponderTerminate', () =>
+      order.push('terminate'),
+    );
     fabric.fireEvent(tree.button, 'topTouchStart');
     fabric.fireEvent(tree.button, 'topTouchCancel');
     expect(order).toEqual(['end', 'terminate']);

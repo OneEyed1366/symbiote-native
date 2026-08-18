@@ -10,7 +10,13 @@
 // `fabric.find` only ever sees a node's FIRST-created props (createNode never re-runs on update),
 // so a style that lands after mount only shows up on the live clone in `fabric.committed`.
 
-import { defineComponent, h, ref, type VNode, type Ref } from '@vue/runtime-core';
+import {
+  defineComponent,
+  h,
+  ref,
+  type VNode,
+  type Ref,
+} from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, TouchableOpacity, Text } from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -41,7 +47,8 @@ const StyleUpdateApp = defineComponent({
   setup() {
     const style = ref<Record<string, number>>({ margin: 1 });
     boxStyle = style;
-    return (): VNode => h(TouchableOpacity, { style: style.value }, () => [h(Text, () => ['x'])]);
+    return (): VNode =>
+      h(TouchableOpacity, { style: style.value }, () => [h(Text, () => ['x'])]);
   },
 });
 
@@ -58,7 +65,13 @@ describe('Vue TouchableOpacity style after mount', () => {
     if (boxStyle !== undefined) boxStyle.value = { margin: 2, borderWidth: 7 };
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    expect(committedStyleProp('borderWidth'), 'the new style must reach the view').toBe(7);
-    expect(committedStyleProp('margin'), 'and the changed value must be the new one').toBe(2);
+    expect(
+      committedStyleProp('borderWidth'),
+      'the new style must reach the view',
+    ).toBe(7);
+    expect(
+      committedStyleProp('margin'),
+      'and the changed value must be the new one',
+    ).toBe(2);
   });
 });

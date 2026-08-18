@@ -31,7 +31,8 @@ const TOUCH_IDENTIFIER = 1;
 const TERMINATION_REQUEST = 'responderTerminationRequest';
 
 // The frame slot.measure reports; undefined disables measure (the radius fallback path).
-let measuredFrame: { width: number; height: number; pageX: number; pageY: number } | undefined;
+let measuredFrame:
+  { width: number; height: number; pageX: number; pageY: number } | undefined;
 
 const fabric = installFabric();
 const slot = globalThis.nativeFabricUIManager;
@@ -58,7 +59,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 // The responder is the Pressable's own RCTView, the first non-box-none RCTView created.
 function responderHandle(): unknown {
-  const view = fabric.find(n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none');
+  const view = fabric.find(
+    n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+  );
   if (!view) throw new Error('no RCTView (Pressable responder) was created');
   return view.instanceHandle;
 }
@@ -66,7 +69,8 @@ function responderHandle(): unknown {
 // The latest committed props of the responder View (re-read after each commit).
 function responderProps(): Record<string, unknown> {
   function find(node: IFakeNode): IFakeNode | undefined {
-    if (node.viewName === 'RCTView' && node.props.pointerEvents !== 'box-none') return node;
+    if (node.viewName === 'RCTView' && node.props.pointerEvents !== 'box-none')
+      return node;
     for (const child of node.children) {
       const hit = find(child);
       if (hit) return hit;
@@ -87,9 +91,19 @@ function fire(handle: unknown, type: string): void {
 // A single-touch native event at a page coordinate; topTouchEnd reports the lifted finger
 // only in changedTouches (touches is now empty), start/move keep it in both.
 function fireAt(handle: unknown, type: string, x: number, y: number): void {
-  const touch = { pageX: x, pageY: y, identifier: TOUCH_IDENTIFIER, timestamp: 0 };
+  const touch = {
+    pageX: x,
+    pageY: y,
+    identifier: TOUCH_IDENTIFIER,
+    timestamp: 0,
+  };
   const touches = type === TOUCH_END ? [] : [touch];
-  fabric.fireEvent(handle, type, { pageX: x, pageY: y, touches, changedTouches: [touch] });
+  fabric.fireEvent(handle, type, {
+    pageX: x,
+    pageY: y,
+    touches,
+    changedTouches: [touch],
+  });
 }
 
 function accessibilityDisabled(props: Record<string, unknown>): unknown {
@@ -97,7 +111,9 @@ function accessibilityDisabled(props: Record<string, unknown>): unknown {
   return isRecord(state) ? state.disabled : undefined;
 }
 
-function terminationGate(handle: unknown): ((event: unknown) => unknown) | undefined {
+function terminationGate(
+  handle: unknown,
+): ((event: unknown) => unknown) | undefined {
   if (!isRecord(handle)) return undefined;
   const listeners = handle.listeners;
   if (!(listeners instanceof Map)) return undefined;
@@ -205,7 +221,10 @@ describe('React Pressable on the engine', () => {
   // accessibilityState it's handed; this proves the fold actually reaches the committed native
   // node through the View wiring, and that unrelated a11y props pass through untouched.
   it('reports accessibilityState.disabled and passes a11y props through', () => {
-    mount(ROOT_TAG, <Pressable disabled accessibilityLabel="save" testID="save-btn" />);
+    mount(
+      ROOT_TAG,
+      <Pressable disabled accessibilityLabel="save" testID="save-btn" />,
+    );
     const props = responderProps();
     expect(accessibilityDisabled(props)).toBe(true);
     expect(props.accessibilityLabel).toBe('save');
@@ -216,7 +235,10 @@ describe('React Pressable on the engine', () => {
   // as disabled when `disabled` is set — this proves that mapping survives Button → Pressable →
   // View, not just Pressable's own accessibilityState fold tested above.
   it('gives Button role=button, accessible, and a disabled a11y state', () => {
-    mount(ROOT_TAG, <Button title="OK" disabled accessibilityLabel="confirm" />);
+    mount(
+      ROOT_TAG,
+      <Button title="OK" disabled accessibilityLabel="confirm" />,
+    );
     const props = responderProps();
     expect(props.accessibilityRole).toBe('button');
     expect(props.accessible).toBe(true);

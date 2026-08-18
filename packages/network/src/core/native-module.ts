@@ -16,4 +16,6 @@ export type INativeNetworkModule = {
   ): EventSubscription;
 };
 
-export const expoNetwork = requireNativeModule<INativeNetworkModule>(EXPO_NETWORK_MODULE_NAME);
+export const expoNetwork = requireNativeModule<INativeNetworkModule>(
+  EXPO_NETWORK_MODULE_NAME,
+);

@@ -79,7 +79,11 @@ describe('sendSMSAsync', () => {
       // why: the public API accepts a lone recipient for caller convenience, but the native side
       // only decodes a list — the wrapper is the single place that reconciles the two shapes.
       await sendSMSAsync('0123456789', 'test');
-      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {});
+      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(
+        ['0123456789'],
+        'test',
+        {},
+      );
     });
 
     it('passes an array of addresses through unchanged', async () => {
@@ -94,7 +98,9 @@ describe('sendSMSAsync', () => {
     it('resolves with the native result', async () => {
       // why: the composer result (sent/cancelled/unknown) is the caller's only signal that a
       // message left the composer — it must flow back unmodified.
-      await expect(sendSMSAsync('0123456789', 'test')).resolves.toEqual({ result: 'sent' });
+      await expect(sendSMSAsync('0123456789', 'test')).resolves.toEqual({
+        result: 'sent',
+      });
     });
 
     it('omits the attachments key entirely when none are given', async () => {
@@ -102,14 +108,24 @@ describe('sendSMSAsync', () => {
       // instead of omitting the key would misrepresent "no attachment" as "an empty attachment
       // list" to the native decoder.
       await sendSMSAsync('0123456789', 'test', {});
-      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {});
+      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(
+        ['0123456789'],
+        'test',
+        {},
+      );
     });
 
     it('normalizes a single attachment into an array', async () => {
-      await sendSMSAsync('0123456789', 'test', { attachments: IMAGE_ATTACHMENT });
-      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {
-        attachments: [IMAGE_ATTACHMENT],
+      await sendSMSAsync('0123456789', 'test', {
+        attachments: IMAGE_ATTACHMENT,
       });
+      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(
+        ['0123456789'],
+        'test',
+        {
+          attachments: [IMAGE_ATTACHMENT],
+        },
+      );
     });
 
     it('keeps every attachment on iOS', async () => {
@@ -119,9 +135,13 @@ describe('sendSMSAsync', () => {
       await sendSMSAsync('0123456789', 'test', {
         attachments: [IMAGE_ATTACHMENT, AUDIO_ATTACHMENT],
       });
-      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {
-        attachments: [IMAGE_ATTACHMENT, AUDIO_ATTACHMENT],
-      });
+      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(
+        ['0123456789'],
+        'test',
+        {
+          attachments: [IMAGE_ATTACHMENT, AUDIO_ATTACHMENT],
+        },
+      );
     });
 
     it('keeps only the first attachment on Android', async () => {
@@ -133,9 +153,13 @@ describe('sendSMSAsync', () => {
       await sendSMSAsync('0123456789', 'test', {
         attachments: [IMAGE_ATTACHMENT, AUDIO_ATTACHMENT],
       });
-      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(['0123456789'], 'test', {
-        attachments: [IMAGE_ATTACHMENT],
-      });
+      expect(FAKE_NATIVE_SMS.sendSMSAsync).toHaveBeenLastCalledWith(
+        ['0123456789'],
+        'test',
+        {
+          attachments: [IMAGE_ATTACHMENT],
+        },
+      );
     });
   });
 
@@ -145,7 +169,9 @@ describe('sendSMSAsync', () => {
       // an opaque conversion error far from its cause, so a caller without type checking (plain
       // JS) must get a clear TypeError instead, and the native module must never see the bad call.
       // @ts-expect-error -- the guard exists precisely for callers without type checking
-      await expect(sendSMSAsync(['0123456789', null], 'test')).rejects.toThrow(TypeError);
+      await expect(sendSMSAsync(['0123456789', null], 'test')).rejects.toThrow(
+        TypeError,
+      );
       expect(FAKE_NATIVE_SMS.sendSMSAsync).not.toHaveBeenCalled();
     });
 

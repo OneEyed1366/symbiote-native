@@ -26,7 +26,10 @@ const GRANTED_PERMISSION_RESPONSE: PermissionResponse = {
 /** Gets the generation of the device's current connection. */
 export async function getCellularGenerationAsync(): Promise<CellularGeneration> {
   if (!expoCellular.getCellularGenerationAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getCellularGenerationAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'getCellularGenerationAsync',
+    );
   }
   return expoCellular.getCellularGenerationAsync();
 }
@@ -83,7 +86,10 @@ export async function getMobileCountryCodeAsync(): Promise<string | null> {
     return null;
   }
   if (!expoCellular.getMobileCountryCodeAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getMobileCountryCodeAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'getMobileCountryCodeAsync',
+    );
   }
   return expoCellular.getMobileCountryCodeAsync();
 }
@@ -97,7 +103,10 @@ export async function getMobileNetworkCodeAsync(): Promise<string | null> {
     return null;
   }
   if (!expoCellular.getMobileNetworkCodeAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getMobileNetworkCodeAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'getMobileNetworkCodeAsync',
+    );
   }
   return expoCellular.getMobileNetworkCodeAsync();
 }
@@ -123,7 +132,10 @@ export async function getPermissionsAsync(): Promise<PermissionResponse> {
 export async function requestPermissionsAsync(): Promise<PermissionResponse> {
   if (Platform.OS === 'android') {
     if (!expoCellular.requestPermissionsAsync) {
-      throw new UnavailabilityError(NATIVE_MODULE_NAME, 'requestPermissionsAsync');
+      throw new UnavailabilityError(
+        NATIVE_MODULE_NAME,
+        'requestPermissionsAsync',
+      );
     }
     return expoCellular.requestPermissionsAsync();
   }

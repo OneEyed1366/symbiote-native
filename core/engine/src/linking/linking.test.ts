@@ -79,8 +79,14 @@ beforeEach(async () => {
   sentIntent = undefined;
   deviceHub = undefined;
 
-  installModules({ LinkingManager: fakeLinkingManager(), IntentAndroid: fakeIntentAndroid() });
-  globalThis.RN$registerCallableModule = (name: string, factory: () => IDeviceHub): void => {
+  installModules({
+    LinkingManager: fakeLinkingManager(),
+    IntentAndroid: fakeIntentAndroid(),
+  });
+  globalThis.RN$registerCallableModule = (
+    name: string,
+    factory: () => IDeviceHub,
+  ): void => {
     if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
   };
 
@@ -116,7 +122,9 @@ describe('Linking (iOS build -> LinkingManager)', () => {
     // why: iOS has no native counterpart to Android's sendIntent -- it must reject
     // 'Unsupported' unconditionally, never forward to IntentAndroid.
     it('sendIntent rejects (no iOS counterpart) and never reaches IntentAndroid', async () => {
-      await expect(iosLinking.sendIntent('android.intent.action.VIEW')).rejects.toBeDefined();
+      await expect(
+        iosLinking.sendIntent('android.intent.action.VIEW'),
+      ).rejects.toBeDefined();
       expect(sentIntent).toBeUndefined();
     });
 
@@ -169,11 +177,15 @@ describe('Linking (iOS build -> LinkingManager)', () => {
     // why: an app calling openURL before/without LinkingManager linked must get an
     // informative rejection, not a hang or a generic native crash.
     it('openURL rejects with an "unavailable" error', async () => {
-      await expect(iosLinking.openURL('https://x')).rejects.toThrow(/unavailable/);
+      await expect(iosLinking.openURL('https://x')).rejects.toThrow(
+        /unavailable/,
+      );
     });
 
     it('canOpenURL rejects with an "unavailable" error', async () => {
-      await expect(iosLinking.canOpenURL('https://x')).rejects.toThrow(/unavailable/);
+      await expect(iosLinking.canOpenURL('https://x')).rejects.toThrow(
+        /unavailable/,
+      );
     });
 
     it('openSettings rejects with an "unavailable" error', async () => {
@@ -219,9 +231,9 @@ describe('Linking (Android build -> IntentAndroid)', () => {
     // genuinely depends on IntentAndroid -- without it, the rejection must name
     // the real cause (module unavailable), not silently no-op a launched intent.
     it('sendIntent rejects with an "unavailable" error', async () => {
-      await expect(androidLinking.sendIntent('android.intent.action.VIEW')).rejects.toThrow(
-        /unavailable/,
-      );
+      await expect(
+        androidLinking.sendIntent('android.intent.action.VIEW'),
+      ).rejects.toThrow(/unavailable/);
     });
   });
 });

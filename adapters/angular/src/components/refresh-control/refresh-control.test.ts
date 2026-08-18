@@ -19,7 +19,8 @@ import { RefreshControl } from './index';
 
 const ROOT_TAG = 914;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedHost: RefreshControlHostFixture | undefined;
 

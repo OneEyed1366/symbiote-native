@@ -8,7 +8,9 @@
 
 let sourceResolver: (source: unknown) => unknown = source => source;
 
-export function setImageSourceResolver(resolve: (source: unknown) => unknown): void {
+export function setImageSourceResolver(
+  resolve: (source: unknown) => unknown,
+): void {
   sourceResolver = resolve;
 }
 

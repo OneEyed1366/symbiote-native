@@ -7,7 +7,13 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
 import {
   BrightnessMode,
   addBrightnessListener,
@@ -51,7 +57,8 @@ const lineColor = LINE_COLOR[lineInfo.line];
 const brightness = ref<number | null>(null);
 const systemMode = ref<BrightnessMode>(BrightnessMode.UNKNOWN);
 const isUsingSystem = ref<ICapabilityStatus>('checking');
-const { status: permissionStatus, request: requestPermission } = usePermissions();
+const { status: permissionStatus, request: requestPermission } =
+  usePermissions();
 
 let subscription: EventSubscription | undefined;
 
@@ -64,12 +71,13 @@ onMounted(() => {
   });
 
   if (Platform.OS === 'android') {
-    void Promise.all([getSystemBrightnessModeAsync(), isUsingSystemBrightnessAsync()]).then(
-      ([mode, usingSystem]) => {
-        systemMode.value = mode;
-        isUsingSystem.value = usingSystem ? 'yes' : 'no';
-      },
-    );
+    void Promise.all([
+      getSystemBrightnessModeAsync(),
+      isUsingSystemBrightnessAsync(),
+    ]).then(([mode, usingSystem]) => {
+      systemMode.value = mode;
+      isUsingSystem.value = usingSystem ? 'yes' : 'no';
+    });
   }
 });
 
@@ -78,25 +86,33 @@ onUnmounted(() => {
 });
 
 function handleSetBrightness(value: number): void {
-  void setBrightnessAsync(value).then(() => getBrightnessAsync().then(value_ => {
-    brightness.value = value_;
-  }));
+  void setBrightnessAsync(value).then(() =>
+    getBrightnessAsync().then(value_ => {
+      brightness.value = value_;
+    }),
+  );
 }
 
 function handleSetSystemMode(mode: BrightnessMode): void {
-  void setSystemBrightnessModeAsync(mode).then(() => getSystemBrightnessModeAsync().then(mode_ => {
-    systemMode.value = mode_;
-  }));
+  void setSystemBrightnessModeAsync(mode).then(() =>
+    getSystemBrightnessModeAsync().then(mode_ => {
+      systemMode.value = mode_;
+    }),
+  );
 }
 
 function handleRestoreSystem(): void {
-  void restoreSystemBrightnessAsync().then(() => isUsingSystemBrightnessAsync().then(usingSystem => {
-    isUsingSystem.value = usingSystem ? 'yes' : 'no';
-  }));
+  void restoreSystemBrightnessAsync().then(() =>
+    isUsingSystemBrightnessAsync().then(usingSystem => {
+      isUsingSystem.value = usingSystem ? 'yes' : 'no';
+    }),
+  );
 }
 
 const brightnessLabel = computed(() =>
-  brightness.value === null ? 'checking…' : `${Math.round(brightness.value * 100)}%`,
+  brightness.value === null
+    ? 'checking…'
+    : `${Math.round(brightness.value * 100)}%`,
 );
 const systemModeLabel = computed(() => brightnessModeLabel(systemMode.value));
 const permissionLabel = computed(() =>
@@ -106,9 +122,15 @@ const permissionLabel = computed(() =>
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="brightness-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="brightness-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -117,9 +139,10 @@ const permissionLabel = computed(() =>
         <View class="hero-copy">
           <Text class="hero-title">Brightness</Text>
           <Text class="hero-body"
-            >@symbiote-native/brightness — screen brightness get/set, Android system-brightness
-            mode, and an iOS-only live listener. Requires SYSTEM_BRIGHTNESS permission on Android
-            before setting the system-wide value.</Text
+            >@symbiote-native/brightness — screen brightness get/set, Android
+            system-brightness mode, and an iOS-only live listener. Requires
+            SYSTEM_BRIGHTNESS permission on Android before setting the
+            system-wide value.</Text
           >
         </View>
       </View>
@@ -128,7 +151,9 @@ const permissionLabel = computed(() =>
         <Text class="brightness-card-title">Live brightness</Text>
         <View class="brightness-row">
           <Text class="brightness-row-label">Screen brightness</Text>
-          <Text testID="brightness-level-value" class="brightness-value-text">{{ brightnessLabel }}</Text>
+          <Text testID="brightness-level-value" class="brightness-value-text">{{
+            brightnessLabel
+          }}</Text>
         </View>
         <View class="button-row">
           <ActionButton
@@ -142,17 +167,31 @@ const permissionLabel = computed(() =>
         </View>
       </View>
 
-      <View v-if="Platform.OS === 'android'" testID="brightness-system-card" class="brightness-card">
-        <Text class="brightness-card-title">System brightness (Android only)</Text>
+      <View
+        v-if="Platform.OS === 'android'"
+        testID="brightness-system-card"
+        class="brightness-card"
+      >
+        <Text class="brightness-card-title"
+          >System brightness (Android only)</Text
+        >
         <View class="brightness-row">
           <Text class="brightness-row-label">Mode</Text>
-          <Text testID="brightness-mode-value" class="brightness-value-text">{{ systemModeLabel }}</Text>
+          <Text testID="brightness-mode-value" class="brightness-value-text">{{
+            systemModeLabel
+          }}</Text>
         </View>
         <View testID="brightness-using-system" class="brightness-row">
           <Text class="brightness-row-label">Using system value</Text>
-          <View :class="`brightness-status-badge brightness-status-badge-${isUsingSystem}`">
+          <View
+            :class="`brightness-status-badge brightness-status-badge-${isUsingSystem}`"
+          >
             <Text class="brightness-status-text">{{
-              isUsingSystem === 'checking' ? 'CHECKING…' : isUsingSystem === 'yes' ? 'YES' : 'NO'
+              isUsingSystem === 'checking'
+                ? 'CHECKING…'
+                : isUsingSystem === 'yes'
+                  ? 'YES'
+                  : 'NO'
             }}</Text>
           </View>
         </View>
@@ -182,7 +221,11 @@ const permissionLabel = computed(() =>
         <Text class="brightness-card-title">Permission</Text>
         <View class="brightness-row">
           <Text class="brightness-row-label">SYSTEM_BRIGHTNESS status</Text>
-          <Text testID="brightness-permission-value" class="brightness-value-text">{{ permissionLabel }}</Text>
+          <Text
+            testID="brightness-permission-value"
+            class="brightness-value-text"
+            >{{ permissionLabel }}</Text
+          >
         </View>
         <ActionButton
           testID="brightness-request-permission"

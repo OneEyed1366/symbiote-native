@@ -113,7 +113,10 @@ class InteractionManagerImpl {
   private deadline = DEFAULT_DEADLINE;
   private flushScheduled = false;
 
-  addListener(eventType: IInteractionEvent, listener: IEventListener): { remove: () => void } {
+  addListener(
+    eventType: IInteractionEvent,
+    listener: IEventListener,
+  ): { remove: () => void } {
     const off = this.emitter.on(eventType, listener);
     return { remove: off };
   }
@@ -166,7 +169,8 @@ class InteractionManagerImpl {
 
   // Notify the manager an interaction has completed; the last clear resumes the queue.
   clearInteractionHandle(handle: IHandle): void {
-    if (!handle) throw new Error('InteractionManager: Must provide a handle to clear.');
+    if (!handle)
+      throw new Error('InteractionManager: Must provide a handle to clear.');
     dlog(`InteractionManager.clearInteractionHandle(${handle})`);
     this.interactionHandleCount -= 1;
     if (this.interactionHandleCount === 0) {
@@ -215,7 +219,11 @@ class InteractionManagerImpl {
       }
       return;
     }
-    reject(new TypeError('InteractionManager task object must have a gen or run method.'));
+    reject(
+      new TypeError(
+        'InteractionManager task object must have a gen or run method.',
+      ),
+    );
   }
 
   // Schedule a single flush of the queue on the next tick, coalescing multiple
@@ -240,7 +248,10 @@ class InteractionManagerImpl {
       const next = this.taskQueue.shift();
       if (next === undefined) break;
       if (typeof next === 'function') next();
-      if (this.deadline > DEFAULT_DEADLINE && Date.now() - startTime >= this.deadline) {
+      if (
+        this.deadline > DEFAULT_DEADLINE &&
+        Date.now() - startTime >= this.deadline
+      ) {
         if (this.taskQueue.length > 0) {
           scheduleTimeout(() => {
             this.flushQueue();
@@ -255,7 +266,9 @@ class InteractionManagerImpl {
 // Coerce a thrown unknown into an Error without `as`, mirroring RN's toError.
 function toError(value: unknown): Error {
   if (value instanceof Error) return value;
-  return new Error(typeof value === 'string' ? value : 'Unknown InteractionManager task error');
+  return new Error(
+    typeof value === 'string' ? value : 'Unknown InteractionManager task error',
+  );
 }
 
 export const InteractionManager = new InteractionManagerImpl();

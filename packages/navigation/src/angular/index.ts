@@ -15,7 +15,11 @@ export type {
   IScreenOptionsArgs,
   IScreenOptionsResolver,
 } from './screen.directive';
-export type { IScreenOptions, IStackAnimation, IStackPresentation } from '../core';
+export type {
+  IScreenOptions,
+  IStackAnimation,
+  IStackPresentation,
+} from '../core';
 
 export {
   injectNavigation,
@@ -46,7 +50,10 @@ export type { ILinkingConfig, IScreenLinkingConfig } from '../core';
 export { Tab } from './tabs';
 export type { ITabNavigatorHandle } from './tabs';
 export { TabScreenDirective } from './tab-screen.directive';
-export type { ITabScreenOptionsArgs, ITabScreenOptionsResolver } from './tab-screen.directive';
+export type {
+  ITabScreenOptionsArgs,
+  ITabScreenOptionsResolver,
+} from './tab-screen.directive';
 export type { ITabOptions, ITabBarIcon } from '../core';
 
 // Drawer: the swipeable drawer navigator, a PURE-JS UI (PanResponder + Animated, no
@@ -54,10 +61,19 @@ export type { ITabOptions, ITabBarIcon } from '../core';
 // ../register import above). See drawer.ts's header for the feasibility note re:
 // react-native-gesture-handler / react-native-reanimated parity gaps.
 export { Drawer } from './drawer';
-export type { IDrawerNavigatorHandle, IDrawerDescriptorMap, IDrawerContentContext } from './drawer';
+export type {
+  IDrawerNavigatorHandle,
+  IDrawerDescriptorMap,
+  IDrawerContentContext,
+} from './drawer';
 export { DrawerScreenDirective } from './drawer-screen.directive';
 export type {
   IDrawerScreenOptionsArgs,
   IDrawerScreenOptionsResolver,
 } from './drawer-screen.directive';
-export type { IDrawerOptions, IDrawerScreenOptions, IDrawerType, IDrawerPosition } from '../core';
+export type {
+  IDrawerOptions,
+  IDrawerScreenOptions,
+  IDrawerType,
+  IDrawerPosition,
+} from '../core';

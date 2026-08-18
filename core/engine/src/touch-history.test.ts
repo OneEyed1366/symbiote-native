@@ -28,7 +28,9 @@ describe('touch-history store', () => {
   describe('single-touch lifecycle', () => {
     it('records a touch start into the bank and tracks it as the single active touch', () => {
       recordTouchTrack('start', {
-        changedTouches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 100 }],
+        changedTouches: [
+          { identifier: 0, pageX: 10, pageY: 20, timestamp: 100 },
+        ],
         touches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 100 }],
       });
       expect(touchHistory.numberActiveTouches).toBe(1);
@@ -43,11 +45,15 @@ describe('touch-history store', () => {
 
     it('shifts previous<-current on a move without deactivating the touch', () => {
       recordTouchTrack('start', {
-        changedTouches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 100 }],
+        changedTouches: [
+          { identifier: 0, pageX: 10, pageY: 20, timestamp: 100 },
+        ],
         touches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 100 }],
       });
       recordTouchTrack('move', {
-        changedTouches: [{ identifier: 0, pageX: 15, pageY: 25, timestamp: 110 }],
+        changedTouches: [
+          { identifier: 0, pageX: 15, pageY: 25, timestamp: 110 },
+        ],
         touches: [{ identifier: 0, pageX: 15, pageY: 25, timestamp: 110 }],
       });
 
@@ -59,11 +65,15 @@ describe('touch-history store', () => {
 
     it('deactivates the touch on end and clears numberActiveTouches', () => {
       recordTouchTrack('start', {
-        changedTouches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 100 }],
+        changedTouches: [
+          { identifier: 0, pageX: 10, pageY: 20, timestamp: 100 },
+        ],
         touches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 100 }],
       });
       recordTouchTrack('end', {
-        changedTouches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 120 }],
+        changedTouches: [
+          { identifier: 0, pageX: 10, pageY: 20, timestamp: 120 },
+        ],
         touches: [],
       });
 
@@ -77,15 +87,21 @@ describe('touch-history store', () => {
     // from the fresh-slot branch and must reset start/current/previous identically.
     it('a touch that starts again on the same identifier resets the existing bank slot', () => {
       recordTouchTrack('start', {
-        changedTouches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 100 }],
+        changedTouches: [
+          { identifier: 0, pageX: 10, pageY: 20, timestamp: 100 },
+        ],
         touches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 100 }],
       });
       recordTouchTrack('end', {
-        changedTouches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 120 }],
+        changedTouches: [
+          { identifier: 0, pageX: 10, pageY: 20, timestamp: 120 },
+        ],
         touches: [],
       });
       recordTouchTrack('start', {
-        changedTouches: [{ identifier: 0, pageX: 50, pageY: 60, timestamp: 200 }],
+        changedTouches: [
+          { identifier: 0, pageX: 50, pageY: 60, timestamp: 200 },
+        ],
         touches: [{ identifier: 0, pageX: 50, pageY: 60, timestamp: 200 }],
       });
 
@@ -134,7 +150,9 @@ describe('touch-history store', () => {
         ],
       });
       recordTouchTrack('end', {
-        changedTouches: [{ identifier: 1, pageX: 30, pageY: 40, timestamp: 150 }],
+        changedTouches: [
+          { identifier: 1, pageX: 30, pageY: 40, timestamp: 150 },
+        ],
         touches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 150 }],
       });
 
@@ -147,7 +165,9 @@ describe('touch-history store', () => {
   describe('resetTouchHistory', () => {
     it('clears the bank and history back to the initial state', () => {
       recordTouchTrack('start', {
-        changedTouches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 100 }],
+        changedTouches: [
+          { identifier: 0, pageX: 10, pageY: 20, timestamp: 100 },
+        ],
         touches: [{ identifier: 0, pageX: 10, pageY: 20, timestamp: 100 }],
       });
       resetTouchHistory();

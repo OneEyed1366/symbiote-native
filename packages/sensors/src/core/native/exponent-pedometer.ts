@@ -5,7 +5,10 @@ import type { IPedometerResult } from '../pedometer';
 const EXPONENT_PEDOMETER_MODULE_NAME = 'ExponentPedometer';
 
 export type IExponentPedometerModule = {
-  addListener(eventName: string, listener: (result: IPedometerResult) => void): EventSubscription;
+  addListener(
+    eventName: string,
+    listener: (result: IPedometerResult) => void,
+  ): EventSubscription;
   getStepCountAsync?(startMs: number, endMs: number): Promise<IPedometerResult>;
   isAvailableAsync(): Promise<boolean>;
   getPermissionsAsync?(): Promise<PermissionResponse>;

@@ -129,7 +129,10 @@ export interface IDeviceEventModuleConfig<TModule> {
   // existing dlog text doesn't drift.
   moduleLogPrefix: string;
   bindModuleToEmitter?: boolean;
-  onEmitterCreated?: (emitter: NativeEventEmitter, module: TModule | null) => void;
+  onEmitterCreated?: (
+    emitter: NativeEventEmitter,
+    module: TModule | null,
+  ) => void;
 }
 
 export interface IDeviceEventModule<TModule> {
@@ -149,7 +152,9 @@ export function createDeviceEventModule<TModule>(
   function getModule(): TModule | null {
     if (module === undefined) {
       module = getNativeModule<TModule>(config.moduleName);
-      dlog(`${config.moduleLogPrefix} ${module ? 'resolved' : 'NOT resolved (null)'}`);
+      dlog(
+        `${config.moduleLogPrefix} ${module ? 'resolved' : 'NOT resolved (null)'}`,
+      );
     }
     return module;
   }
@@ -162,7 +167,9 @@ export function createDeviceEventModule<TModule>(
       const resolved = getModule();
       const bindModule = config.bindModuleToEmitter ?? true;
       const boundModule =
-        bindModule && resolved !== null && hasEventEmitterShape(resolved) ? resolved : undefined;
+        bindModule && resolved !== null && hasEventEmitterShape(resolved)
+          ? resolved
+          : undefined;
       emitter = new NativeEventEmitter(boundModule);
       config.onEmitterCreated?.(emitter, resolved);
     }

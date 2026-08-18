@@ -66,7 +66,9 @@ describe('Positive — the native module is present and answers', () => {
     // why: the wrapper adds no logic of its own here — it must be a transparent proxy so a
     // caller's "does this device even have a scanner" check reflects the real hardware.
     await expect(hasHardwareAsync()).resolves.toBe(true);
-    expect(FAKE_NATIVE_LOCAL_AUTHENTICATION.hasHardwareAsync).toHaveBeenCalledTimes(1);
+    expect(
+      FAKE_NATIVE_LOCAL_AUTHENTICATION.hasHardwareAsync,
+    ).toHaveBeenCalledTimes(1);
   });
 
   it('supportedAuthenticationTypesAsync delegates to the native module', async () => {
@@ -91,7 +93,9 @@ describe('Positive — the native module is present and answers', () => {
     // several platforms crash or render blank UI text when the system prompt has no label.
     await authenticateAsync();
 
-    expect(FAKE_NATIVE_LOCAL_AUTHENTICATION.authenticateAsync).toHaveBeenCalledWith({
+    expect(
+      FAKE_NATIVE_LOCAL_AUTHENTICATION.authenticateAsync,
+    ).toHaveBeenCalledWith({
       promptMessage: 'Authenticate',
       cancelLabel: 'Cancel',
     });
@@ -99,9 +103,14 @@ describe('Positive — the native module is present and answers', () => {
 
   it('authenticateAsync passes through a custom promptMessage and cancelLabel', async () => {
     // why: apps must be able to brand the system authentication prompt with their own copy.
-    await authenticateAsync({ promptMessage: 'Unlock the vault', cancelLabel: 'Nope' });
+    await authenticateAsync({
+      promptMessage: 'Unlock the vault',
+      cancelLabel: 'Nope',
+    });
 
-    expect(FAKE_NATIVE_LOCAL_AUTHENTICATION.authenticateAsync).toHaveBeenCalledWith({
+    expect(
+      FAKE_NATIVE_LOCAL_AUTHENTICATION.authenticateAsync,
+    ).toHaveBeenCalledWith({
       promptMessage: 'Unlock the vault',
       cancelLabel: 'Nope',
     });
@@ -112,7 +121,9 @@ describe('Positive — the native module is present and answers', () => {
     // still resolve to a usable button label rather than shipping blank UI text to native.
     await authenticateAsync({ cancelLabel: '' });
 
-    expect(FAKE_NATIVE_LOCAL_AUTHENTICATION.authenticateAsync).toHaveBeenCalledWith({
+    expect(
+      FAKE_NATIVE_LOCAL_AUTHENTICATION.authenticateAsync,
+    ).toHaveBeenCalledWith({
       promptMessage: 'Authenticate',
       cancelLabel: 'Cancel',
     });
@@ -131,14 +142,19 @@ describe('Positive — the native module is present and answers', () => {
       error: 'user_cancel',
     });
 
-    await expect(authenticateAsync()).resolves.toEqual({ success: false, error: 'user_cancel' });
+    await expect(authenticateAsync()).resolves.toEqual({
+      success: false,
+      error: 'user_cancel',
+    });
   });
 
   it('cancelAuthenticate delegates to the native module', async () => {
     // why: Android callers must be able to interrupt an in-flight prompt (e.g. leaving the
     // screen) — the call has to actually reach the native side, not be a local no-op.
     await cancelAuthenticate();
-    expect(FAKE_NATIVE_LOCAL_AUTHENTICATION.cancelAuthenticate).toHaveBeenCalledTimes(1);
+    expect(
+      FAKE_NATIVE_LOCAL_AUTHENTICATION.cancelAuthenticate,
+    ).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -156,13 +172,21 @@ describe('Negative — the native method is missing on this platform', () => {
     expectThrowsWhenNativeMethodAbsent('isEnrolledAsync', isEnrolledAsync));
 
   it('getEnrolledLevelAsync throws an UnavailabilityError-shaped error', () =>
-    expectThrowsWhenNativeMethodAbsent('getEnrolledLevelAsync', getEnrolledLevelAsync));
+    expectThrowsWhenNativeMethodAbsent(
+      'getEnrolledLevelAsync',
+      getEnrolledLevelAsync,
+    ));
 
   it('authenticateAsync throws an UnavailabilityError-shaped error', () =>
-    expectThrowsWhenNativeMethodAbsent('authenticateAsync', () => authenticateAsync()));
+    expectThrowsWhenNativeMethodAbsent('authenticateAsync', () =>
+      authenticateAsync(),
+    ));
 
   it('cancelAuthenticate throws an UnavailabilityError-shaped error', () =>
-    expectThrowsWhenNativeMethodAbsent('cancelAuthenticate', cancelAuthenticate));
+    expectThrowsWhenNativeMethodAbsent(
+      'cancelAuthenticate',
+      cancelAuthenticate,
+    ));
 
   it('authenticateAsync rejects an empty-string promptMessage without calling through', async () => {
     // why: an explicitly-empty promptMessage is a caller bug (the system prompt would render
@@ -171,6 +195,8 @@ describe('Negative — the native method is missing on this platform', () => {
     await expect(authenticateAsync({ promptMessage: '' })).rejects.toThrow(
       '`options.promptMessage` must be a non-empty string',
     );
-    expect(FAKE_NATIVE_LOCAL_AUTHENTICATION.authenticateAsync).not.toHaveBeenCalled();
+    expect(
+      FAKE_NATIVE_LOCAL_AUTHENTICATION.authenticateAsync,
+    ).not.toHaveBeenCalled();
   });
 });

@@ -84,8 +84,14 @@ describe('Animated binary operators — shared attach/detach/makeNative boilerpl
     create: (a: AnimatedNode, b: AnimatedNode) => AnimatedNode;
   }> = [
     { name: 'AnimatedAddition', create: (a, b) => new AnimatedAddition(a, b) },
-    { name: 'AnimatedSubtraction', create: (a, b) => new AnimatedSubtraction(a, b) },
-    { name: 'AnimatedMultiplication', create: (a, b) => new AnimatedMultiplication(a, b) },
+    {
+      name: 'AnimatedSubtraction',
+      create: (a, b) => new AnimatedSubtraction(a, b),
+    },
+    {
+      name: 'AnimatedMultiplication',
+      create: (a, b) => new AnimatedMultiplication(a, b),
+    },
     { name: 'AnimatedDivision', create: (a, b) => new AnimatedDivision(a, b) },
   ];
 
@@ -112,19 +118,22 @@ describe('Animated binary operators — shared attach/detach/makeNative boilerpl
     },
   );
 
-  it.each(operators)('makeNative on $name marks BOTH operands native too', ({ create }) => {
-    const a = new AnimatedValue(1);
-    const b = new AnimatedValue(2);
-    const operator = create(a, b);
+  it.each(operators)(
+    'makeNative on $name marks BOTH operands native too',
+    ({ create }) => {
+      const a = new AnimatedValue(1);
+      const b = new AnimatedValue(2);
+      const operator = create(a, b);
 
-    expect(a.__isNative()).toBe(false);
-    expect(b.__isNative()).toBe(false);
+      expect(a.__isNative()).toBe(false);
+      expect(b.__isNative()).toBe(false);
 
-    operator.__makeNative();
+      operator.__makeNative();
 
-    expect(a.__isNative()).toBe(true);
-    expect(b.__isNative()).toBe(true);
-  });
+      expect(a.__isNative()).toBe(true);
+      expect(b.__isNative()).toBe(true);
+    },
+  );
 
   it.each(operators)(
     '$name.__getValue recomputes from the CURRENT operand values',
@@ -172,13 +181,16 @@ describe('Animated single-operand operators — attach/detach/makeNative (Positi
     },
   );
 
-  it.each(singleOperandOperators)('makeNative on $name marks `a` native too', ({ create }) => {
-    const a = new AnimatedValue(3);
-    const operator = create(a);
-    expect(a.__isNative()).toBe(false);
-    operator.__makeNative();
-    expect(a.__isNative()).toBe(true);
-  });
+  it.each(singleOperandOperators)(
+    'makeNative on $name marks `a` native too',
+    ({ create }) => {
+      const a = new AnimatedValue(3);
+      const operator = create(a);
+      expect(a.__isNative()).toBe(false);
+      operator.__makeNative();
+      expect(a.__isNative()).toBe(true);
+    },
+  );
 });
 
 describe('Animated operators — Negative (the throw IS the contract)', () => {
@@ -219,7 +231,9 @@ describe('Animated operators — native __getNativeConfig types (Positive)', () 
   function configTypeFor(node: AnimatedNode): unknown {
     node.__makeNative();
     const created = nativeCalls.find(
-      call => call.method === 'createAnimatedNode' && call.args[0] === node.__getNativeTag(),
+      call =>
+        call.method === 'createAnimatedNode' &&
+        call.args[0] === node.__getNativeTag(),
     );
     const config = created?.args[1];
     return typeof config === 'object' && config !== null && 'type' in config
@@ -244,8 +258,12 @@ describe('Animated operators — native __getNativeConfig types (Positive)', () 
       setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
       flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
       extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-      startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
-      stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
+      startListeningToAnimatedNodeValue: record(
+        'startListeningToAnimatedNodeValue',
+      ),
+      stopListeningToAnimatedNodeValue: record(
+        'stopListeningToAnimatedNodeValue',
+      ),
       getValue: record('getValue'),
       addAnimatedEventToView: record('addAnimatedEventToView'),
       removeAnimatedEventFromView: record('removeAnimatedEventFromView'),
@@ -258,16 +276,29 @@ describe('Animated operators — native __getNativeConfig types (Positive)', () 
   // why: native decides how to evaluate each node from its `type` alone — every operator MUST
   // carry its own distinct type string, or native would apply the wrong arithmetic op.
   it.each([
-    ['addition', () => new AnimatedAddition(new AnimatedValue(1), new AnimatedValue(2))],
-    ['subtraction', () => new AnimatedSubtraction(new AnimatedValue(1), new AnimatedValue(2))],
+    [
+      'addition',
+      () => new AnimatedAddition(new AnimatedValue(1), new AnimatedValue(2)),
+    ],
+    [
+      'subtraction',
+      () => new AnimatedSubtraction(new AnimatedValue(1), new AnimatedValue(2)),
+    ],
     [
       'multiplication',
-      () => new AnimatedMultiplication(new AnimatedValue(1), new AnimatedValue(2)),
+      () =>
+        new AnimatedMultiplication(new AnimatedValue(1), new AnimatedValue(2)),
     ],
-    ['division', () => new AnimatedDivision(new AnimatedValue(1), new AnimatedValue(2))],
+    [
+      'division',
+      () => new AnimatedDivision(new AnimatedValue(1), new AnimatedValue(2)),
+    ],
     ['modulus', () => new AnimatedModulo(new AnimatedValue(1), 5)],
     ['diffclamp', () => new AnimatedDiffClamp(new AnimatedValue(0), 0, 10)],
-  ] as const)('a %s-typed operator node makes a matching native config', (expectedType, create) => {
-    expect(configTypeFor(create())).toBe(expectedType);
-  });
+  ] as const)(
+    'a %s-typed operator node makes a matching native config',
+    (expectedType, create) => {
+      expect(configTypeFor(create())).toBe(expectedType);
+    },
+  );
 });

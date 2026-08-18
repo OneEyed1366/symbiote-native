@@ -79,7 +79,9 @@ interface INativeDeviceInfo {
 // our types here, behind a structural guard (no per-call cast). A shape that fails
 // the guard is treated as "module absent".
 
-function isDimensionsConstants(value: unknown): value is { Dimensions: IDimensionsPayload } {
+function isDimensionsConstants(
+  value: unknown,
+): value is { Dimensions: IDimensionsPayload } {
   return isRecord(value) && isRecord(value.Dimensions);
 }
 
@@ -132,7 +134,9 @@ function setDimensions(payload: IDimensionsPayload): void {
   const isFirst = cached === undefined;
   cached = resolveMetrics(payload);
   if (isFirst) return;
-  dlog(`Dimensions: 'change' -> window ${cached.window.width}x${cached.window.height}`);
+  dlog(
+    `Dimensions: 'change' -> window ${cached.window.width}x${cached.window.height}`,
+  );
   for (const listener of [...changeListeners]) listener(cached);
 }
 
@@ -153,11 +157,15 @@ const deviceEventModule = createDeviceEventModule<INativeDeviceInfo>({
     });
 
     if (module === null) {
-      dlog('Dimensions: DeviceInfo not resolvable via native bridge — using zero metrics');
+      dlog(
+        'Dimensions: DeviceInfo not resolvable via native bridge — using zero metrics',
+      );
     } else {
       const constants: unknown = module.getConstants();
       if (isDimensionsConstants(constants)) {
-        dlog('Dimensions: resolved initial metrics from DeviceInfo.getConstants()');
+        dlog(
+          'Dimensions: resolved initial metrics from DeviceInfo.getConstants()',
+        );
         setDimensions(constants.Dimensions);
       } else {
         dlog(
@@ -180,7 +188,10 @@ function ensureResolved(): IDimensionsSet {
 export interface IDimensionsStatic {
   get(dim: IDimensionsKey): IDisplayMetrics;
   set(dims: IDimensionsPayload): void;
-  addEventListener(type: 'change', listener: IDimensionsChangeListener): IEventSubscription;
+  addEventListener(
+    type: 'change',
+    listener: IDimensionsChangeListener,
+  ): IEventSubscription;
 }
 
 export const Dimensions: IDimensionsStatic = {
@@ -195,7 +206,10 @@ export const Dimensions: IDimensionsStatic = {
   },
 
   // `_type` is fixed to 'change' for RN signature parity; Dimensions emits no other.
-  addEventListener(_type: 'change', listener: IDimensionsChangeListener): IEventSubscription {
+  addEventListener(
+    _type: 'change',
+    listener: IDimensionsChangeListener,
+  ): IEventSubscription {
     // Resolve on first subscribe too, so the native update bridge is wired even if
     // get() was never called first.
     ensureResolved();

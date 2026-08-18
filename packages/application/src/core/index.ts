@@ -11,4 +11,7 @@ export {
   getInstallationTimeAsync,
   getLastUpdateTimeAsync,
 } from './application';
-export { ApplicationReleaseType, type PushNotificationServiceEnvironment } from './types';
+export {
+  ApplicationReleaseType,
+  type PushNotificationServiceEnvironment,
+} from './types';

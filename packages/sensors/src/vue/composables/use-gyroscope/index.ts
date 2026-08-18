@@ -6,9 +6,15 @@
 // a later change of updateIntervalMs, so a plain numeric param is enough.
 
 import { onMounted, onUnmounted, ref, type Ref } from '@vue/runtime-core';
-import { Gyroscope, type EventSubscription, type IGyroscopeMeasurement } from '../../../core';
+import {
+  Gyroscope,
+  type EventSubscription,
+  type IGyroscopeMeasurement,
+} from '../../../core';
 
-export function useGyroscope(updateIntervalMs?: number): Ref<IGyroscopeMeasurement | null> {
+export function useGyroscope(
+  updateIntervalMs?: number,
+): Ref<IGyroscopeMeasurement | null> {
   // A plain ref: the value is a POJO measurement, not an engine node, so no shallowRef needed.
   const measurement = ref<IGyroscopeMeasurement | null>(null);
   let subscription: EventSubscription | undefined;

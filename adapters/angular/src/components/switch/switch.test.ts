@@ -31,7 +31,11 @@ let capturedHost: SwitchHost | undefined;
   standalone: true,
   imports: [Switch],
   template: `
-    <Switch [value]="value" (valueChange)="onValueChange($event)" (change)="onChange($event)">
+    <Switch
+      [value]="value"
+      (valueChange)="onValueChange($event)"
+      (change)="onChange($event)"
+    >
     </Switch>
   `,
 })
@@ -83,7 +87,8 @@ class SwitchColorHost {}
 })
 class SwitchClassHost {}
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function switchNode(): ReturnType<typeof fabric.find> {
   return fabric.find(n => n.viewName === 'Switch');
@@ -132,7 +137,10 @@ describe('Switch', () => {
     const node = switchNode();
     expect(node).toBeDefined();
 
-    fabric.fireEvent(node?.instanceHandle, 'topChange', { value: true, eventCount: 1 });
+    fabric.fireEvent(node?.instanceHandle, 'topChange', {
+      value: true,
+      eventCount: 1,
+    });
     await tick();
 
     const host = capturedHost;
@@ -149,7 +157,9 @@ describe('Switch', () => {
     await tick();
 
     const node = switchNode();
-    fabric.fireEvent(node?.instanceHandle, 'topChange', { value: 'not-a-boolean' });
+    fabric.fireEvent(node?.instanceHandle, 'topChange', {
+      value: 'not-a-boolean',
+    });
     await tick();
 
     expect(capturedHost?.onValueChange).not.toHaveBeenCalled();
@@ -169,7 +179,10 @@ describe('Switch', () => {
     await tick();
 
     const setValue = fabric.commands.find(c => c.commandName === 'setValue');
-    expect(setValue, 'a setValue command after a rejected toggle').toBeDefined();
+    expect(
+      setValue,
+      'a setValue command after a rejected toggle',
+    ).toBeDefined();
     expect(setValue?.args[0]).toBe(false);
   });
 

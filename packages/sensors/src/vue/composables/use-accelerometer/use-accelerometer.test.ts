@@ -31,7 +31,8 @@ vi.mock('../../../core', () => ({
   Accelerometer: {
     addListener: (listener: IListener) => addListenerMock(listener),
     removeAllListeners: vi.fn(),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
@@ -47,7 +48,9 @@ beforeEach(() => {
 
 afterEach(() => unmount(ROOT_TAG));
 
-function mountAccelerometer(updateIntervalMs?: number): Ref<IAccelerometerMeasurement | null> {
+function mountAccelerometer(
+  updateIntervalMs?: number,
+): Ref<IAccelerometerMeasurement | null> {
   let measurement: Ref<IAccelerometerMeasurement | null> | undefined;
   mount(
     ROOT_TAG,
@@ -78,7 +81,12 @@ describe('useAccelerometer (Vue)', () => {
       // why: the composable's whole job is bridging the native event stream into Vue
       // reactivity — a fired event that never reaches the ref would make it useless.
       const measurement = mountAccelerometer();
-      const reading: IAccelerometerMeasurement = { x: 0.1, y: 0.2, z: 0.9, timestamp: 123 };
+      const reading: IAccelerometerMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.9,
+        timestamp: 123,
+      };
 
       registeredListener?.(reading);
 
@@ -89,8 +97,18 @@ describe('useAccelerometer (Vue)', () => {
       // why: each native event is a full snapshot, not a delta — merging would leave stale
       // axis values behind after a real reading changes.
       const measurement = mountAccelerometer();
-      const first: IAccelerometerMeasurement = { x: 0.1, y: 0.2, z: 0.3, timestamp: 1 };
-      const second: IAccelerometerMeasurement = { x: 9, y: 9, z: 9, timestamp: 2 };
+      const first: IAccelerometerMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.3,
+        timestamp: 1,
+      };
+      const second: IAccelerometerMeasurement = {
+        x: 9,
+        y: 9,
+        z: 9,
+        timestamp: 2,
+      };
 
       registeredListener?.(first);
       expect(measurement.value).toEqual(first);

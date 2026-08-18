@@ -34,7 +34,9 @@ const fakePlatformConstants = {
   getConstants: (): IPlatformConstantsIOS => fakeConstants,
 };
 
-const registeredModules: Record<string, unknown> = { PlatformConstants: fakePlatformConstants };
+const registeredModules: Record<string, unknown> = {
+  PlatformConstants: fakePlatformConstants,
+};
 
 function installFakeProxy(modules: Record<string, unknown>): void {
   Object.assign(globalThis, {
@@ -105,17 +107,24 @@ describe('Platform (iOS) — derived getters, each proven against its own fresh 
     installFakeProxy(registeredModules);
   });
 
-  async function loadPlatformWith(constants: IPlatformConstantsIOS): Promise<typeof Platform> {
+  async function loadPlatformWith(
+    constants: IPlatformConstantsIOS,
+  ): Promise<typeof Platform> {
     vi.resetModules();
     installFakeProxy({
-      PlatformConstants: { getConstants: (): IPlatformConstantsIOS => constants },
+      PlatformConstants: {
+        getConstants: (): IPlatformConstantsIOS => constants,
+      },
     });
     const imported = await import('./index');
     return imported.Platform;
   }
 
   it("isVision is true for interfaceIdiom 'vision'", async () => {
-    const fresh = await loadPlatformWith({ ...fakeConstants, interfaceIdiom: 'vision' });
+    const fresh = await loadPlatformWith({
+      ...fakeConstants,
+      interfaceIdiom: 'vision',
+    });
     expect(fresh.isVision).toBe(true);
     expect(fresh.isPad).toBe(false);
   });
@@ -142,7 +151,10 @@ describe('Platform (iOS) — derived getters, each proven against its own fresh 
   });
 
   it('isMacCatalyst tracks the native isMacCatalyst flag', async () => {
-    const fresh = await loadPlatformWith({ ...fakeConstants, isMacCatalyst: true });
+    const fresh = await loadPlatformWith({
+      ...fakeConstants,
+      isMacCatalyst: true,
+    });
     expect(fresh.isMacCatalyst).toBe(true);
   });
 
@@ -169,7 +181,9 @@ describe('Platform (iOS) — derived getters, each proven against its own fresh 
   // not partially trusted.
   it('falls back to neutral defaults when getConstants() returns an unexpected shape', async () => {
     vi.resetModules();
-    installFakeProxy({ PlatformConstants: { getConstants: (): unknown => ({ nonsense: true }) } });
+    installFakeProxy({
+      PlatformConstants: { getConstants: (): unknown => ({ nonsense: true }) },
+    });
     const { Platform: fresh } = await import('./index');
 
     expect(fresh.Version).toBe('');
@@ -183,7 +197,9 @@ describe('Platform (Android)', () => {
   ): Promise<typeof import('./index.android').Platform> {
     vi.resetModules();
     installFakeProxy({
-      PlatformConstants: { getConstants: (): Record<string, unknown> => constants },
+      PlatformConstants: {
+        getConstants: (): Record<string, unknown> => constants,
+      },
     });
     const imported = await import('./index.android');
     return imported.Platform;
@@ -235,7 +251,10 @@ describe('Platform (Android)', () => {
   });
 
   it("isTV reflects uiMode === 'tv'", async () => {
-    const fresh = await loadAndroidPlatformWith({ ...fakeAndroidConstants, uiMode: 'tv' });
+    const fresh = await loadAndroidPlatformWith({
+      ...fakeAndroidConstants,
+      uiMode: 'tv',
+    });
     expect(fresh.isTV).toBe(true);
 
     const notTv = await loadAndroidPlatformWith(fakeAndroidConstants);
@@ -243,7 +262,10 @@ describe('Platform (Android)', () => {
   });
 
   it('isDisableAnimations falls back to isTesting when the native flag is absent, same rule as iOS', async () => {
-    const fresh = await loadAndroidPlatformWith({ ...fakeAndroidConstants, isTesting: true });
+    const fresh = await loadAndroidPlatformWith({
+      ...fakeAndroidConstants,
+      isTesting: true,
+    });
     expect(fresh.isDisableAnimations).toBe(true);
   });
 
@@ -257,7 +279,9 @@ describe('Platform (Android)', () => {
   // assumed identical to iOS's guard.
   it('falls back to neutral defaults (Version 0) when getConstants() returns an unexpected shape', async () => {
     vi.resetModules();
-    installFakeProxy({ PlatformConstants: { getConstants: (): unknown => ({ nonsense: true }) } });
+    installFakeProxy({
+      PlatformConstants: { getConstants: (): unknown => ({ nonsense: true }) },
+    });
     const { Platform: fresh } = await import('./index.android');
 
     expect(fresh.Version).toBe(0);

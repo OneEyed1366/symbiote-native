@@ -32,7 +32,9 @@ export type IDrawerSlot = 'content' | 'overlay' | 'panel';
 // slide: panel, overlay, content (both panel and content animate; content stays visually on top).
 // permanent: NOT absolutely positioned (an ordinary flexDirection:'row' sidebar), so sibling
 // order IS the left-to-right screen position - it must follow drawerPosition.
-export function drawerChildOrder(options: IDrawerOptions): readonly IDrawerSlot[] {
+export function drawerChildOrder(
+  options: IDrawerOptions,
+): readonly IDrawerSlot[] {
   const type = resolveDrawerType(options);
   switch (type) {
     case 'back':
@@ -89,12 +91,22 @@ function panelBaseStyle(options: IDrawerOptions): IViewStyle {
   };
 }
 
-export function renderDrawer(view: IDrawerViewProps, options: IDrawerOptions): IDescriptor {
+export function renderDrawer(
+  view: IDrawerViewProps,
+  options: IDrawerOptions,
+): IDescriptor {
   const type = resolveDrawerType(options);
-  const content = el('symbiote-view', { ...view.contentPassthrough, style: CONTENT_STYLE }, []);
+  const content = el(
+    'symbiote-view',
+    { ...view.contentPassthrough, style: CONTENT_STYLE },
+    [],
+  );
   const panel = el(
     'symbiote-view',
-    { ...view.panelPassthrough, style: [panelBaseStyle(options), view.drawerStyle] },
+    {
+      ...view.panelPassthrough,
+      style: [panelBaseStyle(options), view.drawerStyle],
+    },
     [],
   );
 
@@ -110,11 +122,14 @@ export function renderDrawer(view: IDrawerViewProps, options: IDrawerOptions): I
     );
   }
 
-  const children = drawerChildOrder(options).reduce<IDescriptor[]>((acc, slot) => {
-    const descriptor = slots[slot];
-    if (descriptor !== undefined) acc.push(descriptor);
-    return acc;
-  }, []);
+  const children = drawerChildOrder(options).reduce<IDescriptor[]>(
+    (acc, slot) => {
+      const descriptor = slots[slot];
+      if (descriptor !== undefined) acc.push(descriptor);
+      return acc;
+    },
+    [],
+  );
 
   const rootStyle: IViewStyle =
     type === 'permanent' ? { ...ROOT_STYLE, flexDirection: 'row' } : ROOT_STYLE;

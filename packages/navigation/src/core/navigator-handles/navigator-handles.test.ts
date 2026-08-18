@@ -4,8 +4,16 @@
 // group: each guard is a total boolean predicate over the union, never throws - only the
 // contract-accurate label used, "identifies X and rules out the others".
 import { describe, expect, it } from 'vitest';
-import { isDrawerNavigatorHandle, isStackNavigatorHandle, isTabNavigatorHandle } from './index';
-import type { IDrawerNavigatorHandle, INavigatorHandle, ITabNavigatorHandle } from './index';
+import {
+  isDrawerNavigatorHandle,
+  isStackNavigatorHandle,
+  isTabNavigatorHandle,
+} from './index';
+import type {
+  IDrawerNavigatorHandle,
+  INavigatorHandle,
+  ITabNavigatorHandle,
+} from './index';
 
 const stackHandle: INavigatorHandle = {
   push: () => {},

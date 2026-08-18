@@ -30,7 +30,8 @@ const ROOT_TAG = 512;
 const REFRESH_WRAPPER_VIEW = 'PullToRefreshView';
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -51,7 +52,8 @@ function committedRefreshWrapper(): IFakeNode {
     if (node.viewName === REFRESH_WRAPPER_VIEW) found = node;
   });
   expect(found, `a ${REFRESH_WRAPPER_VIEW} was committed`).toBeDefined();
-  if (found === undefined) throw new Error('unreachable: refresh wrapper missing');
+  if (found === undefined)
+    throw new Error('unreachable: refresh wrapper missing');
   return found;
 }
 
@@ -62,7 +64,10 @@ function mountAndroidScrollView(props: Record<string, unknown>): Promise<void> {
       setup: () => () =>
         h(
           ScrollView,
-          { ...props, refreshControl: h(RefreshControl, { refreshing: false }) },
+          {
+            ...props,
+            refreshControl: h(RefreshControl, { refreshing: false }),
+          },
           { default: () => [h('symbiote-text')] },
         ),
     }),

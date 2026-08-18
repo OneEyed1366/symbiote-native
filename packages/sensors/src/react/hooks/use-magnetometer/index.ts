@@ -3,8 +3,11 @@
 import { useEffect, useState } from 'react';
 import { Magnetometer, type IMagnetometerMeasurement } from '../../../core';
 
-export function useMagnetometer(updateIntervalMs?: number): IMagnetometerMeasurement | null {
-  const [measurement, setMeasurement] = useState<IMagnetometerMeasurement | null>(null);
+export function useMagnetometer(
+  updateIntervalMs?: number,
+): IMagnetometerMeasurement | null {
+  const [measurement, setMeasurement] =
+    useState<IMagnetometerMeasurement | null>(null);
 
   useEffect(() => {
     // Re-subscribing on interval change keeps the native update rate in sync with the

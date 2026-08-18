@@ -44,6 +44,7 @@ surface as the call site:
       <View *portal="overlayHost"><Text>Ported via *portal</Text></View>
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     Svelte has no same-surface portal primitive at all — not even a partial one.
@@ -60,10 +61,10 @@ resolves once it actually commits — a plain ref is `null` on the entire first
 render.
 
 <Aside type="caution" title="Same-surface only, permanently">
-  Stock React Native has no portal at all (Fabric's persistent host config
-  never implements the mutation-mode container ops it needs). SymbioteNative's React
-  adapter runs in mutation mode, so `createPortal` structurally works — but
-  only within the surface that owns the commit. A target in a second,
+  Stock React Native has no portal at all (Fabric's persistent host config never
+  implements the mutation-mode container ops it needs). SymbioteNative's React
+  adapter runs in mutation mode, so `createPortal` structurally works — but only
+  within the surface that owns the commit. A target in a second,
   independently-mounted surface silently never repaints; this is not a gap to
   eventually close, see `createTunnel` below instead.
 </Aside>
@@ -84,6 +85,7 @@ surface, use `createTunnel()` instead — a shared store, not a node reference:
     // wherever the content originates, any surface:
     <overlayTunnel.In><ToastCard /></overlayTunnel.In>
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -108,6 +110,7 @@ surface, use `createTunnel()` instead — a shared store, not a node reference:
     }
     <tunnel-out [tunnel]="overlayTunnel" />
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -135,6 +138,7 @@ surface, use `createTunnel()` instead — a shared store, not a node reference:
     `tunnel.In`/`tunnel.Out` — a `.svelte` file compiles to one fixed, top-level component, so
     there's no per-call factory `createTunnel()` could bake a registry into via closure the way
     Vue's `defineComponent` can.
+
   </TabItem>
 </Tabs>
 

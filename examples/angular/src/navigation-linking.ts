@@ -9,7 +9,10 @@ import type { ILinkingConfig } from '@symbiote-native/navigation/angular';
 import { ROUTE_NAME } from './routes';
 
 export const APP_LINKING_CONFIG: ILinkingConfig = {
-  prefixes: ['symbiotecanaryangular://', 'https://canary-angular.symbiote-native.dev'],
+  prefixes: [
+    'symbiotecanaryangular://',
+    'https://canary-angular.symbiote-native.dev',
+  ],
   config: {
     screens: {
       [ROUTE_NAME.Details]: 'details/:id',

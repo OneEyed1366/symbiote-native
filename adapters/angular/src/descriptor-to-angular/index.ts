@@ -15,7 +15,10 @@ import {
   type OnDestroy,
   type SimpleChanges,
 } from '@angular/core';
-import type { IDescriptor, IDescriptorChild } from '@symbiote-native/components';
+import type {
+  IDescriptor,
+  IDescriptorChild,
+} from '@symbiote-native/components';
 
 type IRenderedChild = IRenderedElement | IRenderedText;
 
@@ -43,7 +46,8 @@ export class DescriptorOutlet implements OnChanges, OnDestroy {
   @Input({ required: true }) node!: IDescriptor;
 
   private readonly renderer = inject(Renderer2);
-  private readonly hostNode = inject<ElementRef<unknown>>(ElementRef).nativeElement;
+  private readonly hostNode =
+    inject<ElementRef<unknown>>(ElementRef).nativeElement;
   private rendered: IRenderedElement | undefined;
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -57,7 +61,10 @@ export class DescriptorOutlet implements OnChanges, OnDestroy {
     this.rendered = undefined;
   }
 
-  private patchRoot(rendered: IRenderedElement | undefined, next: IDescriptor): IRenderedElement {
+  private patchRoot(
+    rendered: IRenderedElement | undefined,
+    next: IDescriptor,
+  ): IRenderedElement {
     if (rendered === undefined) {
       const created = this.createElement(next);
       this.renderer.appendChild(this.hostNode, created.node);
@@ -67,7 +74,9 @@ export class DescriptorOutlet implements OnChanges, OnDestroy {
   }
 
   private createChild(child: IDescriptorChild): IRenderedChild {
-    return typeof child === 'string' ? this.createText(child) : this.createElement(child);
+    return typeof child === 'string'
+      ? this.createText(child)
+      : this.createElement(child);
   }
 
   private createText(value: string): IRenderedText {
@@ -127,12 +136,19 @@ export class DescriptorOutlet implements OnChanges, OnDestroy {
     }
 
     this.patchProps(rendered, next.props);
-    rendered.children = this.patchChildren(rendered.node, rendered.children, next.children);
+    rendered.children = this.patchChildren(
+      rendered.node,
+      rendered.children,
+      next.children,
+    );
     rendered.descriptor = next;
     return rendered;
   }
 
-  private patchProps(rendered: IRenderedElement, nextProps: Record<string, unknown>): void {
+  private patchProps(
+    rendered: IRenderedElement,
+    nextProps: Record<string, unknown>,
+  ): void {
     const prevProps = rendered.props;
     for (const key of Object.keys(prevProps)) {
       if (!(key in nextProps)) {
@@ -173,13 +189,18 @@ export class DescriptorOutlet implements OnChanges, OnDestroy {
 
     for (let i = common; i < renderedChildren.length; i++) {
       const rendered = renderedChildren[i];
-      if (rendered !== undefined) this.renderer.removeChild(parent, rendered.node);
+      if (rendered !== undefined)
+        this.renderer.removeChild(parent, rendered.node);
     }
 
     return nextRendered;
   }
 
-  private replaceChild(parent: unknown, oldChild: unknown, newChild: unknown): void {
+  private replaceChild(
+    parent: unknown,
+    oldChild: unknown,
+    newChild: unknown,
+  ): void {
     this.renderer.insertBefore(parent, newChild, oldChild);
     this.renderer.removeChild(parent, oldChild);
   }

@@ -15,7 +15,10 @@
 // native bridge).
 
 import { dlog } from './debug';
-import { resolveImageSource, type IImageSourceProp } from './image-source-resolver';
+import {
+  resolveImageSource,
+  type IImageSourceProp,
+} from './image-source-resolver';
 import { getNativeModule } from './native-modules';
 import { Platform } from './platform';
 import { isNumber } from './type-guards';
@@ -39,7 +42,10 @@ type ISizeFailure = (error: unknown) => void;
 // unsupported (iOS, headless) is a no-op rather than a throw.
 type INativeImageLoader = {
   getSize(uri: string): Promise<unknown>;
-  getSizeWithHeaders(uri: string, headers: Record<string, string>): Promise<unknown>;
+  getSizeWithHeaders(
+    uri: string,
+    headers: Record<string, string>,
+  ): Promise<unknown>;
   // iOS takes ONLY the uri (NativeImageLoaderIOS); Android adds the requestId so abortRequest can
   // key off it. The arg is optional here so the iOS call passes exactly one - a second arg makes the
   // bridgeless TurboModule throw "Exception in HostFunction".
@@ -58,8 +64,11 @@ let imageLoaderModule: INativeImageLoader | null | undefined;
 
 function getImageLoader(): INativeImageLoader | null {
   if (imageLoaderModule === undefined) {
-    imageLoaderModule = getNativeModule<INativeImageLoader>(IMAGE_LOADER_MODULE);
-    dlog(`Image: ImageLoader module ${imageLoaderModule ? 'resolved' : 'NOT resolved (null)'}`);
+    imageLoaderModule =
+      getNativeModule<INativeImageLoader>(IMAGE_LOADER_MODULE);
+    dlog(
+      `Image: ImageLoader module ${imageLoaderModule ? 'resolved' : 'NOT resolved (null)'}`,
+    );
   }
   return imageLoaderModule;
 }
@@ -75,7 +84,9 @@ function toImageSize(result: unknown): IImageSize {
     const height = Reflect.get(result, 'height');
     if (isNumber(width) && isNumber(height)) return { width, height };
   }
-  throw new Error(`Image: unexpected size result from native: ${JSON.stringify(result)}`);
+  throw new Error(
+    `Image: unexpected size result from native: ${JSON.stringify(result)}`,
+  );
 }
 
 function requireLoader(method: string): INativeImageLoader {
@@ -92,7 +103,11 @@ function requireLoader(method: string): INativeImageLoader {
 // Resolve image dimensions, optionally via success/failure callbacks. Always returns the Promise
 // too (RN returns void when a callback is passed, but a promise-and-callback shape is friendlier
 // and a strict superset).
-function getSize(uri: string, success?: ISizeSuccess, failure?: ISizeFailure): Promise<IImageSize> {
+function getSize(
+  uri: string,
+  success?: ISizeSuccess,
+  failure?: ISizeFailure,
+): Promise<IImageSize> {
   const promise = Promise.resolve()
     .then(() => requireLoader('getSize').getSize(uri))
     .then(toImageSize);
@@ -114,14 +129,17 @@ function getSizeWithHeaders(
   failure?: ISizeFailure,
 ): Promise<IImageSize> {
   const promise = Promise.resolve()
-    .then(() => requireLoader('getSizeWithHeaders').getSizeWithHeaders(uri, headers))
+    .then(() =>
+      requireLoader('getSizeWithHeaders').getSizeWithHeaders(uri, headers),
+    )
     .then(toImageSize);
   if (typeof success === 'function') {
     promise
       .then(size => success(size.width, size.height))
       .catch((error: unknown) => {
         if (typeof failure === 'function') failure(error);
-        else dlog(`Image.getSizeWithHeaders failed for ${uri}: ${String(error)}`);
+        else
+          dlog(`Image.getSizeWithHeaders failed for ${uri}: ${String(error)}`);
       });
   }
   return promise;
@@ -134,7 +152,10 @@ let prefetchRequestId = 0;
 // Download a remote image into the disk cache. Resolves to whether it succeeded. `callback`
 // receives the requestId (RN's Image.android.js shape) so the caller can later pass it to
 // abortPrefetch.
-async function prefetch(uri: string, callback?: (requestId: number) => void): Promise<boolean> {
+async function prefetch(
+  uri: string,
+  callback?: (requestId: number) => void,
+): Promise<boolean> {
   prefetchRequestId += 1;
   const requestId = prefetchRequestId;
   if (typeof callback === 'function') callback(requestId);
@@ -162,7 +183,9 @@ async function prefetch(uri: string, callback?: (requestId: number) => void): Pr
 function abortPrefetch(requestId: number): void {
   const loader = getImageLoader();
   if (loader === null || typeof loader.abortRequest !== 'function') {
-    dlog(`Image.abortPrefetch(${requestId}): no abortRequest on this host, ignoring`);
+    dlog(
+      `Image.abortPrefetch(${requestId}): no abortRequest on this host, ignoring`,
+    );
     return;
   }
   loader.abortRequest(requestId);
@@ -188,7 +211,9 @@ function toCacheRecord(result: unknown): Record<string, IImageCacheStatus> {
   return record;
 }
 
-async function queryCache(uris: string[]): Promise<Record<string, IImageCacheStatus>> {
+async function queryCache(
+  uris: string[],
+): Promise<Record<string, IImageCacheStatus>> {
   return Promise.resolve()
     .then(() => {
       const loader = requireLoader('queryCache');

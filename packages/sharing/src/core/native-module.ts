@@ -19,4 +19,6 @@ export type INativeSharingModule = {
   shareAsync?(url: string, options: ISharingOptions): Promise<void>;
 };
 
-export const expoSharing = requireNativeModule<INativeSharingModule>(EXPO_SHARING_MODULE_NAME);
+export const expoSharing = requireNativeModule<INativeSharingModule>(
+  EXPO_SHARING_MODULE_NAME,
+);

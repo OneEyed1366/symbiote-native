@@ -18,7 +18,13 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, ScrollView, RefreshControl, mount, unmount } from '@symbiote-native/react';
+import {
+  View,
+  ScrollView,
+  RefreshControl,
+  mount,
+  unmount,
+} from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 61;
@@ -70,7 +76,9 @@ describe('React RefreshControl on the engine (Positive — completes without err
     // view directly: refresh control FIRST, content container SECOND.
     const scrollView = appRoot.children[0];
     expect(scrollView?.viewName).toBe('RCTScrollView');
-    const childNames = scrollView.children.map((node: IFakeNode) => node.viewName);
+    const childNames = scrollView.children.map(
+      (node: IFakeNode) => node.viewName,
+    );
     expect(childNames).toEqual(['PullToRefreshView', 'RCTScrollContentView']);
   });
 

@@ -49,7 +49,9 @@ describe('webCrypto.getRandomValues', () => {
       // reaching the native boundary, with a clear error rather than an opaque native-side one.
       const { default: webCrypto } = await import('./web-crypto');
 
-      expect(() => webCrypto.getRandomValues(new DataView(new ArrayBuffer(4)))).toThrow(TypeError);
+      expect(() =>
+        webCrypto.getRandomValues(new DataView(new ArrayBuffer(4))),
+      ).toThrow(TypeError);
       expect(getRandomValues).not.toHaveBeenCalled();
     });
   });
@@ -92,7 +94,9 @@ describe('webCrypto singleton', () => {
       const { default: webCrypto } = await import('./web-crypto');
 
       expect(typeof webCrypto.getRandomValues).toBe('function');
-      expect(webCrypto.getRandomValues(new Uint8Array(1))).toBeInstanceOf(Uint8Array);
+      expect(webCrypto.getRandomValues(new Uint8Array(1))).toBeInstanceOf(
+        Uint8Array,
+      );
     });
   });
 });
@@ -103,7 +107,8 @@ describe('polyfillWebCrypto', () => {
       // why: consumer code (and any third-party lib assuming a Web Crypto global) must be able to
       // call `globalThis.crypto.getRandomValues` directly after opting in, without importing this
       // package's default export first.
-      const { default: webCrypto, polyfillWebCrypto } = await import('./web-crypto');
+      const { default: webCrypto, polyfillWebCrypto } =
+        await import('./web-crypto');
 
       expect(Reflect.get(globalThis, 'crypto')).toBeUndefined();
 

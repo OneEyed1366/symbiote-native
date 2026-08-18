@@ -5,7 +5,11 @@
 // CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter>, mirroring React's own
 // `Omit<IImageProps, 'style'> & {...}` declaration.
 import type { Snippet } from 'svelte';
-import type { IClassNameValue, IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type {
+  IClassNameValue,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
 import type { IImageProps } from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../../class-value';
 

@@ -12,7 +12,8 @@ import { mount, unmount } from './index';
 const ROOT_TAG = 808;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 const drainAngularAndCommit = async (): Promise<void> => {
   await tick();
   await tick();
@@ -144,7 +145,9 @@ describe('Angular mount', () => {
     fabric.fireEvent(counter?.instanceHandle, 'topTouchEnd');
     await drainAngularAndCommit();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 1×"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "tapped 1×"',
+    );
   });
 
   // why: see the file-level comment above CounterChild/UnrelatedSiblingChild — a real
@@ -164,7 +167,9 @@ describe('Angular mount', () => {
     fabric.fireEvent(counter?.instanceHandle, 'topTouchEnd');
     await drainAngularAndCommit();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 1×"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "tapped 1×"',
+    );
     // UnrelatedSiblingChild has no dirty descendant of its own, so it must not be re-checked
     // just because CounterChild (a completely separate branch) got pressed. This does NOT prove
     // the root's own template stays untouched — the root's template still re-runs on every
@@ -177,10 +182,14 @@ describe('Angular mount', () => {
   // initialProps` through it too (modules/app-registry/index.ts), so a regression here breaks
   // every app that passes launch params. Untested before this rewrite.
   it('applies IMountOptions.initialProps to the root component via setInput', async () => {
-    mount(ROOT_TAG, InitialPropsComponent, { initialProps: { greeting: 'from native' } });
+    mount(ROOT_TAG, InitialPropsComponent, {
+      initialProps: { greeting: 'from native' },
+    });
     await tick();
 
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "from native"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "from native"',
+    );
   });
 
   // why: mount()'s own header comment states "A re-mount on a live rootTag starts clean;
@@ -196,12 +205,16 @@ describe('Angular mount', () => {
     fabric.fireEvent(counter?.instanceHandle, 'topTouchStart');
     fabric.fireEvent(counter?.instanceHandle, 'topTouchEnd');
     await drainAngularAndCommit();
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 1×"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "tapped 1×"',
+    );
 
     // Re-mount the SAME rootTag WITHOUT an intervening unmount() call.
     mount(ROOT_TAG, SmokeComponent);
     await tick();
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 0×"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "tapped 0×"',
+    );
   });
 
   // why: `global.RN$stopSurface` is the JSI hook C++ calls to stop a Fabric surface (render.ts's
@@ -216,13 +229,17 @@ describe('Angular mount', () => {
     fabric.fireEvent(counter?.instanceHandle, 'topTouchStart');
     fabric.fireEvent(counter?.instanceHandle, 'topTouchEnd');
     await drainAngularAndCommit();
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 1×"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "tapped 1×"',
+    );
 
     expect(globalThis.RN$stopSurface).toBeTypeOf('function');
     globalThis.RN$stopSurface?.(ROOT_TAG);
 
     mount(ROOT_TAG, SmokeComponent);
     await tick();
-    expect(fabric.serialize(fabric.appRoot().children)).toContain('RCTRawText "tapped 0×"');
+    expect(fabric.serialize(fabric.appRoot().children)).toContain(
+      'RCTRawText "tapped 0×"',
+    );
   });
 });

@@ -1,5 +1,11 @@
 import { Component, signal } from '@angular/core';
-import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/angular';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/angular';
 import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/angular';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -23,7 +29,11 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   imports: [ActionButton, SafeAreaView, ScrollView, Text, TextInput, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="sharing-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="sharing-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -34,8 +44,9 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           <View class="hero-copy">
             <Text class="hero-title">Sharing</Text>
             <Text class="hero-body">
-              @symbiote-native/sharing — opens the platform share sheet for a local file. Outgoing
-              only: it hands a file to another app, it does not receive one.
+              @symbiote-native/sharing — opens the platform share sheet for a
+              local file. Outgoing only: it hands a file to another app, it does
+              not receive one.
             </Text>
           </View>
         </View>
@@ -45,21 +56,23 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           <View testID="sharing-available" class="sharing-row">
             <Text class="sharing-row-label">Available</Text>
             <View [class]="statusBadgeClass(isAvailable())">
-              <Text class="sharing-status-text">{{ statusLabel(isAvailable()) }}</Text>
+              <Text class="sharing-status-text">{{
+                statusLabel(isAvailable())
+              }}</Text>
             </View>
           </View>
           <Text class="sharing-note">
-            Reports on the native module, not on any device capability — it is true on both
-            platforms whenever the module is linked.
+            Reports on the native module, not on any device capability — it is
+            true on both platforms whenever the module is linked.
           </Text>
         </View>
 
         <View testID="sharing-share-card" class="sharing-card">
           <Text class="sharing-card-title">Share a file</Text>
           <Text class="sharing-note">
-            A real local file URI is required — file:///… pointing at a file this app can read.
-            There is no file-system package here to create one, so paste a path that already
-            exists on the device.
+            A real local file URI is required — file:///… pointing at a file
+            this app can read. There is no file-system package here to create
+            one, so paste a path that already exists on the device.
           </Text>
           <TextInput
             testID="sharing-uri-input"
@@ -81,7 +94,9 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           <Text class="sharing-card-title">Last result</Text>
           <View class="sharing-row">
             <Text class="sharing-row-label">Status</Text>
-            <Text testID="sharing-result" class="sharing-value-text">{{ lastResult() }}</Text>
+            <Text testID="sharing-result" class="sharing-value-text">{{
+              lastResult()
+            }}</Text>
           </View>
         </View>
       </ScrollView>
@@ -101,7 +116,9 @@ export class SharingScreen {
   readonly lastResult = signal('idle');
 
   constructor() {
-    isAvailableAsync().then(available => this.isAvailable.set(toCapabilityStatus(available)));
+    isAvailableAsync().then(available =>
+      this.isAvailable.set(toCapabilityStatus(available)),
+    );
   }
 
   handleShare(): void {
@@ -123,6 +140,10 @@ export class SharingScreen {
   }
 
   statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+    return status === 'checking'
+      ? 'CHECKING…'
+      : status === 'yes'
+        ? 'YES'
+        : 'NO';
   }
 }

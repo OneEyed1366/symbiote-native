@@ -10,7 +10,11 @@
 
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/vue';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/vue';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from './stack';
@@ -48,18 +52,28 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
     },
   },
   [STACK_VIEW]: {
-    directEventTypes: { topFinishTransitioning: directEvent('onFinishTransitioning') },
+    directEventTypes: {
+      topFinishTransitioning: directEvent('onFinishTransitioning'),
+    },
     validAttributes: {},
   },
   [HEADER_CONFIG_VIEW]: {
-    directEventTypes: { topPressHeaderBarButtonItem: directEvent('onPressHeaderBarButtonItem') },
-    validAttributes: { title: true, hidden: true, backTitle: true, backTitleVisible: true },
+    directEventTypes: {
+      topPressHeaderBarButtonItem: directEvent('onPressHeaderBarButtonItem'),
+    },
+    validAttributes: {
+      title: true,
+      hidden: true,
+      backTitle: true,
+      backTitleVisible: true,
+    },
   },
 };
 
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -68,7 +82,10 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   const found: string[] = [];
   const collect = (list: readonly IFakeNode[]): void => {
     for (const node of list) {
-      if (node.viewName === 'RCTRawText' && typeof node.props.text === 'string') {
+      if (
+        node.viewName === 'RCTRawText' &&
+        typeof node.props.text === 'string'
+      ) {
         found.push(node.props.text);
       }
       collect(node.children);
@@ -143,8 +160,14 @@ describe('nested navigators (scope parent chain)', () => {
         defineComponent({
           setup: () => () =>
             h(Stack, { ref: handleRef, initialRouteName: 'Root' }, () => [
-              h(Stack.Screen, { name: 'Root', component: RootScreenRendersTab }),
-              h(Stack.Screen, { name: 'Details', component: StackDetailsScreen }),
+              h(Stack.Screen, {
+                name: 'Root',
+                component: RootScreenRendersTab,
+              }),
+              h(Stack.Screen, {
+                name: 'Details',
+                component: StackDetailsScreen,
+              }),
             ]),
         }),
       );

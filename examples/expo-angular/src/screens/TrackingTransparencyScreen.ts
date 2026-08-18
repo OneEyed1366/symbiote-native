@@ -21,7 +21,11 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="tracking-transparency-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="tracking-transparency-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -32,21 +36,29 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           <View class="hero-copy">
             <Text class="hero-title">Tracking Transparency</Text>
             <Text class="hero-body">
-              @symbiote-native/tracking-transparency — App Tracking Transparency permission
-              (iOS-only; Android/web always resolve granted) plus the advertising ID.
+              @symbiote-native/tracking-transparency — App Tracking Transparency
+              permission (iOS-only; Android/web always resolve granted) plus the
+              advertising ID.
             </Text>
           </View>
         </View>
 
-        <View testID="tracking-transparency-permission-card" class="capability-card">
+        <View
+          testID="tracking-transparency-permission-card"
+          class="capability-card"
+        >
           <Text class="capability-card-title">Permission</Text>
           <View class="capability-row">
             <Text class="capability-label">Status</Text>
-            <Text testID="tracking-transparency-status" class="value-text">{{ statusLabel() }}</Text>
+            <Text testID="tracking-transparency-status" class="value-text">{{
+              statusLabel()
+            }}</Text>
           </View>
           <View class="capability-row">
             <Text class="capability-label">Granted</Text>
-            <Text testID="tracking-transparency-granted" class="value-text">{{ grantedLabel() }}</Text>
+            <Text testID="tracking-transparency-granted" class="value-text">{{
+              grantedLabel()
+            }}</Text>
           </View>
           <View class="button-row">
             <ActionButton
@@ -64,11 +76,18 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           </View>
         </View>
 
-        <View testID="tracking-transparency-advertising-id-card" class="capability-card">
+        <View
+          testID="tracking-transparency-advertising-id-card"
+          class="capability-card"
+        >
           <Text class="capability-card-title">Advertising ID</Text>
           <View class="capability-row">
             <Text class="capability-label">getAdvertisingId()</Text>
-            <Text testID="tracking-transparency-advertising-id" class="value-text">{{ advertisingIdLabel() }}</Text>
+            <Text
+              testID="tracking-transparency-advertising-id"
+              class="value-text"
+              >{{ advertisingIdLabel() }}</Text
+            >
           </View>
         </View>
       </ScrollView>
@@ -93,7 +112,9 @@ export class TrackingTransparencyScreen {
   }
 
   handleRequest(): void {
-    this.permissionsService.request().then(() => this.advertisingId.set(getAdvertisingId()));
+    this.permissionsService
+      .request()
+      .then(() => this.advertisingId.set(getAdvertisingId()));
   }
 
   statusLabel(): string {

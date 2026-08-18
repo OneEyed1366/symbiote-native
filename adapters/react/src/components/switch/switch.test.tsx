@@ -122,7 +122,9 @@ describe('React Switch on the engine', () => {
         }}
       />,
     );
-    fabric.fireEvent(switchNode().instanceHandle, 'topChange', { value: 'not-a-boolean' });
+    fabric.fireEvent(switchNode().instanceHandle, 'topChange', {
+      value: 'not-a-boolean',
+    });
     expect(calls).toBe(0);
     // and no snap-back command either — the reducer never saw a report to disagree with.
     expect(commands.some(c => c.name === 'setValue')).toBe(false);
@@ -149,7 +151,10 @@ describe('React Switch on the engine', () => {
     fabric.fireEvent(switchNode().instanceHandle, 'topChange', { value: true });
 
     const setValue = commands.find(c => c.name === 'setValue');
-    expect(setValue, 'a setValue command after a rejected toggle').toBeDefined();
+    expect(
+      setValue,
+      'a setValue command after a rejected toggle',
+    ).toBeDefined();
     expect(setValue!.args[0]).toBe(false);
   });
 

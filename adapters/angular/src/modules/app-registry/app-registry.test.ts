@@ -11,7 +11,12 @@ import '@angular/compiler';
 import { Component, Input, type Type } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
-import { AppRegistry, setHostRegistrar, type IAppParameters, type IRunnable } from '../..';
+import {
+  AppRegistry,
+  setHostRegistrar,
+  type IAppParameters,
+  type IRunnable,
+} from '../..';
 import { unmount } from '../../render';
 
 const APP_KEY = 'canary';
@@ -21,7 +26,8 @@ const WRAPPED_ROOT_TAG = 213;
 
 // Angular's mount() batches change detection on a microtask, so a committed native tag isn't
 // available synchronously — assertions on the committed tree need one tick, same as Vue.
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 class TestText {}
 Component({
@@ -45,7 +51,8 @@ Component({
   selector: 'symbiote-app-registry-wrapper',
   standalone: true,
   imports: [TestText],
-  template: '<symbiote-text>{{ label }}</symbiote-text><ng-content></ng-content>',
+  template:
+    '<symbiote-text>{{ label }}</symbiote-text><ng-content></ng-content>',
 })(WrapperComponent);
 
 const fabric = installFabric();
@@ -108,7 +115,9 @@ describe('AppRegistry', () => {
   // the AOT-safe twin of React's createElement(Wrapper, null, rootElement). This proves that
   // projection actually happens, not merely that setWrapperComponentProvider was called.
   it('projects the root component into a registered wrapper via <ng-content>', async () => {
-    AppRegistry.setWrapperComponentProvider(() => WrapperComponent as Type<unknown>);
+    AppRegistry.setWrapperComponentProvider(
+      () => WrapperComponent as Type<unknown>,
+    );
     AppRegistry.registerComponent(WRAPPED_APP_KEY, () => SmokeComponent);
 
     AppRegistry.runApplication(WRAPPED_APP_KEY, { rootTag: WRAPPED_ROOT_TAG });

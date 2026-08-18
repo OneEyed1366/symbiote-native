@@ -8,7 +8,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
-import { hasAction, isAvailableAsync, requestReview } from '@symbiote-native/store-review/vue';
+import {
+  hasAction,
+  isAvailableAsync,
+  requestReview,
+} from '@symbiote-native/store-review/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -51,9 +55,15 @@ function handleRequestReview(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="store-review-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="store-review-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -62,7 +72,8 @@ function handleRequestReview(): void {
         <View class="hero-copy">
           <Text class="hero-title">Store Review</Text>
           <Text class="hero-body"
-            >@symbiote-native/store-review — prompts the platform's native in-app review flow.</Text
+            >@symbiote-native/store-review — prompts the platform's native
+            in-app review flow.</Text
           >
         </View>
       </View>
@@ -71,17 +82,29 @@ function handleRequestReview(): void {
         <Text class="store-review-card-title">Capabilities</Text>
         <View class="store-review-row">
           <Text class="store-review-row-label">Available</Text>
-          <View :class="`store-review-status-badge store-review-status-badge-${isAvailable}`">
+          <View
+            :class="`store-review-status-badge store-review-status-badge-${isAvailable}`"
+          >
             <Text class="store-review-status-text">{{
-              isAvailable === 'checking' ? 'CHECKING…' : isAvailable === 'yes' ? 'YES' : 'NO'
+              isAvailable === 'checking'
+                ? 'CHECKING…'
+                : isAvailable === 'yes'
+                  ? 'YES'
+                  : 'NO'
             }}</Text>
           </View>
         </View>
         <View class="store-review-row">
           <Text class="store-review-row-label">Has action</Text>
-          <View :class="`store-review-status-badge store-review-status-badge-${hasReviewAction}`">
+          <View
+            :class="`store-review-status-badge store-review-status-badge-${hasReviewAction}`"
+          >
             <Text class="store-review-status-text">{{
-              hasReviewAction === 'checking' ? 'CHECKING…' : hasReviewAction === 'yes' ? 'YES' : 'NO'
+              hasReviewAction === 'checking'
+                ? 'CHECKING…'
+                : hasReviewAction === 'yes'
+                  ? 'YES'
+                  : 'NO'
             }}</Text>
           </View>
         </View>
@@ -97,13 +120,16 @@ function handleRequestReview(): void {
         />
         <View class="store-review-row">
           <Text class="store-review-row-label">Last result</Text>
-          <Text testID="store-review-result" class="store-review-value-text">{{ lastResult }}</Text>
+          <Text testID="store-review-result" class="store-review-value-text">{{
+            lastResult
+          }}</Text>
         </View>
         <Text class="info-text"
-          >resolved means the call completed, not that a prompt appeared. On Android the Play
-          dialog only shows for a build installed from Google Play (internal test track, internal
-          app sharing, or production); a sideloaded debug build resolves silently. iOS shows it in
-          debug builds. Both stores also enforce a quota.</Text
+          >resolved means the call completed, not that a prompt appeared. On
+          Android the Play dialog only shows for a build installed from Google
+          Play (internal test track, internal app sharing, or production); a
+          sideloaded debug build resolves silently. iOS shows it in debug
+          builds. Both stores also enforce a quota.</Text
         >
       </View>
     </ScrollView>

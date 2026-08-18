@@ -16,7 +16,11 @@
 
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/vue';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/vue';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from './index';
@@ -55,13 +59,22 @@ const RNS_SCREEN_VIEW_CONFIG = {
 };
 
 const RNS_SCREEN_STACK_VIEW_CONFIG = {
-  directEventTypes: { topFinishTransitioning: directEvent('onFinishTransitioning') },
+  directEventTypes: {
+    topFinishTransitioning: directEvent('onFinishTransitioning'),
+  },
   validAttributes: {},
 };
 
 const RNS_HEADER_CONFIG_VIEW_CONFIG = {
-  directEventTypes: { topPressHeaderBarButtonItem: directEvent('onPressHeaderBarButtonItem') },
-  validAttributes: { title: true, hidden: true, backTitle: true, backTitleVisible: true },
+  directEventTypes: {
+    topPressHeaderBarButtonItem: directEvent('onPressHeaderBarButtonItem'),
+  },
+  validAttributes: {
+    title: true,
+    hidden: true,
+    backTitle: true,
+    backTitleVisible: true,
+  },
 };
 
 const RNS_SEARCH_BAR_VIEW_CONFIG = {
@@ -87,7 +100,8 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -117,7 +131,9 @@ function screenNodes(): IFakeNode[] {
 }
 
 function headerConfigOf(screen: IFakeNode): IFakeNode {
-  const header = screen.children.find(child => child.viewName === HEADER_CONFIG_VIEW);
+  const header = screen.children.find(
+    child => child.viewName === HEADER_CONFIG_VIEW,
+  );
   if (!header) throw new Error('no header config child on screen');
   return header;
 }
@@ -137,7 +153,8 @@ function mountStack(
   mount(
     ROOT_TAG,
     defineComponent({
-      setup: () => () => h(Stack, { ref: handleRef, initialRouteName: 'Home' }, () => children),
+      setup: () => () =>
+        h(Stack, { ref: handleRef, initialRouteName: 'Home' }, () => children),
     }),
   );
 }
@@ -177,7 +194,11 @@ describe('Vue Stack navigator', () => {
         defineComponent({
           setup: () => () =>
             h(Stack, { initialRouteName: 'Home' }, () => [
-              h(Stack.Screen, { name: 'Home', component: HomeScreen, options: { title: 'Home' } }),
+              h(Stack.Screen, {
+                name: 'Home',
+                component: HomeScreen,
+                options: { title: 'Home' },
+              }),
               h(Stack.Screen, { name: 'Details', component: DetailsScreen }),
             ]),
         }),
@@ -237,7 +258,9 @@ describe('Vue Stack navigator', () => {
     // matches core's own reducer contract, observed here as an unchanged screen count.
     it('refuses to pop the last route', async () => {
       const handleRef = ref<INavigatorHandle | null>(null);
-      mountStack(handleRef, [h(Stack.Screen, { name: 'Home', component: HomeScreen })]);
+      mountStack(handleRef, [
+        h(Stack.Screen, { name: 'Home', component: HomeScreen }),
+      ]);
       await tick();
       handleRef.value?.pop();
       await tick();
@@ -295,7 +318,9 @@ describe('Vue Stack navigator', () => {
         }),
       );
       await tick();
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
+      expect(
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+      ).toBeDefined();
     });
 
     // why: params passed to push() must reach the pushed screen's own useRoute() - the same route
@@ -370,7 +395,8 @@ describe('Vue Stack navigator', () => {
       await tick();
       handleRef.value?.push('Details');
       await tick();
-      if (homeKey === undefined) throw new Error('home route key was never captured');
+      if (homeKey === undefined)
+        throw new Error('home route key was never captured');
       handleRef.value?.setParams({ tab: 'search' }, homeKey);
       await tick();
       expect(homeParams).toEqual({ tab: 'search' });
@@ -459,8 +485,11 @@ describe('Vue Stack navigator', () => {
         }),
       );
       await tick();
-      const searchBar = headerConfigOf(screenNodes()[0]).children[0].children[0];
-      fabric.fireEvent(searchBar.instanceHandle, 'topChangeText', { text: 'asdf' });
+      const searchBar = headerConfigOf(screenNodes()[0]).children[0]
+        .children[0];
+      fabric.fireEvent(searchBar.instanceHandle, 'topChangeText', {
+        text: 'asdf',
+      });
       await tick();
       expect(receivedText).toBe('asdf');
     });
@@ -503,11 +532,14 @@ describe('Vue Stack navigator', () => {
         }),
       );
       await tick();
-      const searchBar = headerConfigOf(screenNodes()[0]).children[0].children[0];
+      const searchBar = headerConfigOf(screenNodes()[0]).children[0]
+        .children[0];
       fabric.fireEvent(searchBar.instanceHandle, 'topSearchFocus', {});
       fabric.fireEvent(searchBar.instanceHandle, 'topSearchBlur', {});
       fabric.fireEvent(searchBar.instanceHandle, 'topCancelButtonPress', {});
-      fabric.fireEvent(searchBar.instanceHandle, 'topSearchButtonPress', { text: 'qwer' });
+      fabric.fireEvent(searchBar.instanceHandle, 'topSearchButtonPress', {
+        text: 'qwer',
+      });
       fabric.fireEvent(searchBar.instanceHandle, 'topClose', {});
       fabric.fireEvent(searchBar.instanceHandle, 'topOpen', {});
       await tick();
@@ -535,20 +567,32 @@ describe('Vue Stack navigator', () => {
               h(Stack.Screen, {
                 name: 'Home',
                 component: HomeScreen,
-                options: { headerSearchBarOptions: { placeholder: 'Search', ref: searchBarRef } },
+                options: {
+                  headerSearchBarOptions: {
+                    placeholder: 'Search',
+                    ref: searchBarRef,
+                  },
+                },
               }),
             ]),
         }),
       );
       await tick();
-      const searchBar = headerConfigOf(screenNodes()[0]).children[0].children[0];
+      const searchBar = headerConfigOf(screenNodes()[0]).children[0]
+        .children[0];
 
       searchBarRef.value?.focus();
-      expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'focus', args: [] });
+      expect(fabric.commands.at(-1)).toMatchObject({
+        commandName: 'focus',
+        args: [],
+      });
       expect(fabric.commands.at(-1)?.node.tag).toBe(searchBar.tag);
 
       searchBarRef.value?.setText('preset');
-      expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'setText', args: ['preset'] });
+      expect(fabric.commands.at(-1)).toMatchObject({
+        commandName: 'setText',
+        args: ['preset'],
+      });
 
       searchBarRef.value?.toggleCancelButton(false);
       expect(fabric.commands.at(-1)).toMatchObject({
@@ -557,13 +601,22 @@ describe('Vue Stack navigator', () => {
       });
 
       searchBarRef.value?.clearText();
-      expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'clearText', args: [] });
+      expect(fabric.commands.at(-1)).toMatchObject({
+        commandName: 'clearText',
+        args: [],
+      });
 
       searchBarRef.value?.cancelSearch();
-      expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'cancelSearch', args: [] });
+      expect(fabric.commands.at(-1)).toMatchObject({
+        commandName: 'cancelSearch',
+        args: [],
+      });
 
       searchBarRef.value?.blur();
-      expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'blur', args: [] });
+      expect(fabric.commands.at(-1)).toMatchObject({
+        commandName: 'blur',
+        args: [],
+      });
     });
 
     // why: the boundary of the search-bar feature - when no headerSearchBarOptions is given, the
@@ -601,9 +654,13 @@ describe('Vue Stack navigator', () => {
       await tick();
 
       expect(screenNodes()).toHaveLength(1);
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
       expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'details'),
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+      ).toBeDefined();
+      expect(
+        findInTree(
+          n => n.viewName === 'RCTRawText' && n.props.text === 'details',
+        ),
       ).toBeUndefined();
       expect(handleRef.value?.canGoBack()).toBe(false);
     });
@@ -626,7 +683,9 @@ describe('Vue Stack navigator', () => {
       await tick();
 
       expect(screenNodes()).toHaveLength(1);
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
+      expect(
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+      ).toBeDefined();
       expect(handleRef.value?.canGoBack()).toBe(false);
     });
   });

@@ -31,10 +31,19 @@ describe('ImageBackground (React lifecycle + children composition)', () => {
       // why: RN's ImageBackground.js contract — the wrapper View owns the user's layout style,
       // while the inner Image is absolutely positioned behind it so it never affects the
       // wrapper's own layout.
-      mount(ROOT_TAG, <ImageBackground style={WRAPPER_STYLE} source={SOURCE} resizeMode="cover" />);
+      mount(
+        ROOT_TAG,
+        <ImageBackground
+          style={WRAPPER_STYLE}
+          source={SOURCE}
+          resizeMode="cover"
+        />,
+      );
 
       const wrapper = fabric.find(
-        node => node.viewName === 'RCTView' && node.props.pointerEvents !== 'box-none',
+        node =>
+          node.viewName === 'RCTView' &&
+          node.props.pointerEvents !== 'box-none',
       );
       expect(wrapper).toBeDefined();
       expect(wrapper!.props.width).toBe(WRAPPER_STYLE.width);
@@ -48,7 +57,10 @@ describe('ImageBackground (React lifecycle + children composition)', () => {
     it("proxies the wrapper's explicit width/height onto the inner image so it fills the box", () => {
       // why: RN's Image would otherwise collapse to the source's own intrinsic size, fighting
       // the wrapper's explicit dimensions — the proxy is what actually makes "background" work.
-      mount(ROOT_TAG, <ImageBackground style={WRAPPER_STYLE} source={SOURCE} />);
+      mount(
+        ROOT_TAG,
+        <ImageBackground style={WRAPPER_STYLE} source={SOURCE} />,
+      );
 
       const image = fabric.find(node => node.viewName === 'RCTImageView');
       expect(image!.props.width).toBe(WRAPPER_STYLE.width);
@@ -72,7 +84,9 @@ describe('ImageBackground (React lifecycle + children composition)', () => {
 
       const childNames = committedWrapper.children.map(child => child.viewName);
       const imageIndex = childNames.indexOf('RCTImageView');
-      const textIndex = childNames.findIndex(name => name === 'RCTText' || name === 'RCTParagraph');
+      const textIndex = childNames.findIndex(
+        name => name === 'RCTText' || name === 'RCTParagraph',
+      );
       expect(imageIndex).toBeGreaterThanOrEqual(0);
       expect(textIndex).toBeGreaterThan(imageIndex);
     });
@@ -80,10 +94,15 @@ describe('ImageBackground (React lifecycle + children composition)', () => {
     it('renders just the wrapper + image with no children given, without throwing', () => {
       // why: `children` is optional — a caller using ImageBackground purely as a decorative
       // background (no overlay content) must not be forced to pass an empty fragment.
-      mount(ROOT_TAG, <ImageBackground style={WRAPPER_STYLE} source={SOURCE} />);
+      mount(
+        ROOT_TAG,
+        <ImageBackground style={WRAPPER_STYLE} source={SOURCE} />,
+      );
 
       const committedWrapper = fabric.appRoot().children[0];
-      expect(committedWrapper.children.map(child => child.viewName)).toEqual(['RCTImageView']);
+      expect(committedWrapper.children.map(child => child.viewName)).toEqual([
+        'RCTImageView',
+      ]);
     });
   });
 });

@@ -31,7 +31,8 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount as svelteMount, unmount as svelteUnmount } from './render';
 import { mount as vueMount, unmount as vueUnmount } from '@symbiote-native/vue';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -42,7 +43,8 @@ const ROWS = [1, 2, 3, 4, 5];
 const TMP_DIR = join(__dirname, '../build/__parity__');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -55,7 +57,10 @@ afterEach(() => {
   rmSync(TMP_DIR, { recursive: true, force: true });
 });
 
-async function compileComponent(source: string, name: string): Promise<Component> {
+async function compileComponent(
+  source: string,
+  name: string,
+): Promise<Component> {
   const result = compile(source, {
     generate: 'client',
     filename: `${name}.svelte`,
@@ -73,7 +78,8 @@ async function compileComponent(source: string, name: string): Promise<Component
 
 function byViewName(nodes: readonly IFakeNode[]): Record<string, number> {
   const tally: Record<string, number> = {};
-  for (const node of nodes) tally[node.viewName] = (tally[node.viewName] ?? 0) + 1;
+  for (const node of nodes)
+    tally[node.viewName] = (tally[node.viewName] ?? 0) + 1;
   return tally;
 }
 
@@ -81,7 +87,8 @@ function byViewName(nodes: readonly IFakeNode[]): Record<string, number> {
 // differ only by a wrapper can be compared at the same depth.
 function stripOuter(tree: string): string {
   const open = tree.indexOf('(');
-  if (open < 0 || !tree.endsWith(')')) throw new Error(`not a wrapped tree: ${tree}`);
+  if (open < 0 || !tree.endsWith(')'))
+    throw new Error(`not a wrapped tree: ${tree}`);
   return tree.slice(open + 1, -1);
 }
 
@@ -138,9 +145,10 @@ describe('native node production per adapter, same UI', () => {
       // anchor rather than handing us a root node the way Vue/React do. It carries flex:1 so a
       // flex:1 app root still fills the screen (mount-pipeline.smoke.test.ts covers that).
       // Peeling BOTH layers off the Svelte tree and ONE off Vue's must leave identical trees.
-      expect(stripOuter(stripOuter(svelteTree)), 'tree below the adapter wrappers').toBe(
-        stripOuter(vueTree),
-      );
+      expect(
+        stripOuter(stripOuter(svelteTree)),
+        'tree below the adapter wrappers',
+      ).toBe(stripOuter(vueTree));
 
       const svelteTally = byViewName(svelteCreated);
       const vueTally = byViewName(vueCreated);
@@ -151,7 +159,9 @@ describe('native node production per adapter, same UI', () => {
 
       // Stated as a constant, not a ratio, on purpose: if this ever starts scaling with ROWS the
       // assertion breaks loudly, which is exactly the regression worth catching.
-      expect(svelteCreated.length, 'total native nodes created').toBe(vueCreated.length + 1);
+      expect(svelteCreated.length, 'total native nodes created').toBe(
+        vueCreated.length + 1,
+      );
     });
   });
 });

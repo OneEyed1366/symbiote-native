@@ -34,7 +34,11 @@ export function createInitialDrawerRouterState(
     return { routes, index: INITIAL_FOCUSED_INDEX, isOpen: false };
   }
   const index = routes.findIndex(route => route.name === initialRouteName);
-  return { routes, index: index === -1 ? INITIAL_FOCUSED_INDEX : index, isOpen: false };
+  return {
+    routes,
+    index: index === -1 ? INITIAL_FOCUSED_INDEX : index,
+    isOpen: false,
+  };
 }
 
 // Mirrors @react-navigation/drawer's DrawerActions: jumpTo focuses a route by NAME (TabRouter's
@@ -49,7 +53,9 @@ export function drawerRouterReducer(
     case 'jumpTo': {
       const index = state.routes.findIndex(route => route.name === action.name);
       if (index === -1) return state;
-      return index === state.index && !state.isOpen ? state : { ...state, index, isOpen: false };
+      return index === state.index && !state.isOpen
+        ? state
+        : { ...state, index, isOpen: false };
     }
 
     case 'openDrawer':
@@ -66,6 +72,8 @@ export function drawerRouterReducer(
   }
 }
 
-export function focusedDrawerRoute(state: IDrawerRouterState): IRouteEntry | undefined {
+export function focusedDrawerRoute(
+  state: IDrawerRouterState,
+): IRouteEntry | undefined {
   return state.routes[state.index];
 }

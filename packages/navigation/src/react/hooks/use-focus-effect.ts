@@ -24,8 +24,14 @@ export function useFocusEffect(effect: EffectCallback): void {
       cleanup = undefined;
     };
 
-    const unsubscribeFocus = emitter.addListener(NAVIGATION_EVENT_FOCUS, runEffect);
-    const unsubscribeBlur = emitter.addListener(NAVIGATION_EVENT_BLUR, runCleanup);
+    const unsubscribeFocus = emitter.addListener(
+      NAVIGATION_EVENT_FOCUS,
+      runEffect,
+    );
+    const unsubscribeBlur = emitter.addListener(
+      NAVIGATION_EVENT_BLUR,
+      runCleanup,
+    );
 
     return () => {
       unsubscribeFocus();

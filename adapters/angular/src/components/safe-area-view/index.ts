@@ -42,7 +42,8 @@ import {
 // Mirrors React's ISafeAreaViewProps minus children (Angular takes children via <ng-content>),
 // declared per-adapter over the shared accessibility base since the framework-specific children
 // slot keeps it from being fully shared across adapters.
-export interface IAngularSafeAreaViewProps extends IAccessibilityProps, IAriaProps {
+export interface IAngularSafeAreaViewProps
+  extends IAccessibilityProps, IAriaProps {
   style?: IStyleProp<IViewStyle>;
   onLayout?: (event: ISymbioteEvent) => void;
 }
@@ -62,7 +63,9 @@ export type IAngularSafeAreaViewInputs = Omit<
 @Component({
   selector: 'SafeAreaView',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SafeAreaViewHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -79,7 +82,9 @@ export type IAngularSafeAreaViewInputs = Omit<
     </symbiote-safe-area-view>
   `,
 })
-export class SafeAreaView implements IAngularSafeAreaViewInputs, OnChanges, DoCheck {
+export class SafeAreaView
+  implements IAngularSafeAreaViewInputs, OnChanges, DoCheck
+{
   @Input() style?: IStyleProp<IViewStyle>;
   // Real @Output()s, not `[onX]="…"` callbacks. Safe to name `layout` the same as the native
   // `layout` event fired inside this component's own template — the engine's bubble() treats
@@ -99,8 +104,10 @@ export class SafeAreaView implements IAngularSafeAreaViewInputs, OnChanges, DoCh
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -199,8 +206,10 @@ export class SafeAreaView implements IAngularSafeAreaViewInputs, OnChanges, DoCh
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,

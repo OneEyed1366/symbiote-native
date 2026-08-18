@@ -7,7 +7,12 @@
 // Returns a boxed getter, not a bare `$state`: Svelte 5 reactivity is lexically scoped to the
 // declaring module and doesn't survive being returned raw from a plain function, so the caller
 // reads `.current` like unwrapping Vue's `Ref` via `.value`.
-import { addLocaleListener, getLocales, type EventSubscription, type Locale } from '../../core';
+import {
+  addLocaleListener,
+  getLocales,
+  type EventSubscription,
+  type Locale,
+} from '../../core';
 
 export function useLocales(): { readonly current: Locale[] } {
   let locales = $state<Locale[]>(getLocales());

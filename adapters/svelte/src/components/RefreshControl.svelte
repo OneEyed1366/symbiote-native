@@ -20,8 +20,10 @@
 
   dlog('RefreshControl -> PullToRefreshView');
   dlog(`RefreshControl refreshing=${String(rest.refreshing)}`);
-  if (rest.enabled !== undefined) dlog(`RefreshControl enabled=${String(rest.enabled)} (Android-only)`);
-  if (rest.onRefresh !== undefined) dlog('RefreshControl onRefresh listener wired');
+  if (rest.enabled !== undefined)
+    dlog(`RefreshControl enabled=${String(rest.enabled)} (Android-only)`);
+  if (rest.onRefresh !== undefined)
+    dlog('RefreshControl onRefresh listener wired');
 
   const bag = $derived(resolveAccessibilityProps(rest));
 

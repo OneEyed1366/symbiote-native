@@ -8,7 +8,10 @@ import '@angular/compiler';
 import { ElementRef, Injector, runInInjectionContext } from '@angular/core';
 import { describe, expect, it } from 'vitest';
 import { Image, ScrollView, Text, View } from './components';
-import { VirtualizedList, VListItemDirective } from './components/virtualized-list';
+import {
+  VirtualizedList,
+  VListItemDirective,
+} from './components/virtualized-list';
 import { SymbioteHostPropsDirective } from './primitives';
 import {
   Animated,
@@ -30,11 +33,15 @@ interface IAngularCompiledDirective {
 // Narrows the JIT-attached `ɵcmp`/`ɵdir` field without an `as` cast — these are runtime
 // properties Angular's `@angular/compiler` bolts onto the class after decoration, which no
 // static type declares, so a plain property read needs a guard rather than a cast.
-function isAngularCompiledComponent(value: unknown): value is IAngularCompiledComponent {
+function isAngularCompiledComponent(
+  value: unknown,
+): value is IAngularCompiledComponent {
   return typeof value === 'function';
 }
 
-function isAngularCompiledDirective(value: unknown): value is IAngularCompiledDirective {
+function isAngularCompiledDirective(
+  value: unknown,
+): value is IAngularCompiledDirective {
   return typeof value === 'function';
 }
 
@@ -78,9 +85,16 @@ describe('Angular source imports under Vitest', () => {
       }
 
       expect(VirtualizedList.ɵcmp?.selectors).toEqual([['VirtualizedList']]);
-      expect(AnimatedView.ɵcmp?.selectors).toEqual([['AnimatedView'], ['symbiote-animated-view']]);
-      expect(VListItemDirective.ɵdir?.selectors).toEqual([['', 'vListItem', '']]);
-      expect(SymbioteHostPropsDirective.ɵdir?.selectors).toEqual([['', 'symbioteHostProps', '']]);
+      expect(AnimatedView.ɵcmp?.selectors).toEqual([
+        ['AnimatedView'],
+        ['symbiote-animated-view'],
+      ]);
+      expect(VListItemDirective.ɵdir?.selectors).toEqual([
+        ['', 'vListItem', ''],
+      ]);
+      expect(SymbioteHostPropsDirective.ɵdir?.selectors).toEqual([
+        ['', 'symbioteHostProps', ''],
+      ]);
     });
 
     // why: the Animated namespace re-exports component classes built by
@@ -116,7 +130,10 @@ describe('Angular source imports under Vitest', () => {
       image.width = 32;
       image.height = 24;
       image.alt = 'Preview';
-      image.animatedProps = { style: { opacity: 0.5 }, testID: 'animated-image' };
+      image.animatedProps = {
+        style: { opacity: 0.5 },
+        testID: 'animated-image',
+      };
 
       expect(image.animatedImageProps).toMatchObject({
         testID: 'animated-image',

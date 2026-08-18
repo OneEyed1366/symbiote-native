@@ -82,12 +82,18 @@ describe('I18nManager', () => {
     // why: localeIdentifier is documented optional (RN omits it on some hosts) --
     // it must be genuinely absent, not coerced to an empty string or null.
     it('omits localeIdentifier when native does not report one', async () => {
-      await loadWithModule(() => ({ isRTL: false, doLeftAndRightSwapInRTL: true }));
+      await loadWithModule(() => ({
+        isRTL: false,
+        doLeftAndRightSwapInRTL: true,
+      }));
       expect(I18nManager.getConstants().localeIdentifier).toBeUndefined();
     });
 
     it('allowRTL routes to the native module', async () => {
-      await loadWithModule(() => ({ isRTL: false, doLeftAndRightSwapInRTL: true }));
+      await loadWithModule(() => ({
+        isRTL: false,
+        doLeftAndRightSwapInRTL: true,
+      }));
       I18nManager.allowRTL(true);
       const calls = callsOf('allowRTL');
       expect(calls).toHaveLength(1);
@@ -95,7 +101,10 @@ describe('I18nManager', () => {
     });
 
     it('forceRTL routes to the native module', async () => {
-      await loadWithModule(() => ({ isRTL: false, doLeftAndRightSwapInRTL: true }));
+      await loadWithModule(() => ({
+        isRTL: false,
+        doLeftAndRightSwapInRTL: true,
+      }));
       I18nManager.forceRTL(false);
       const calls = callsOf('forceRTL');
       expect(calls).toHaveLength(1);
@@ -103,7 +112,10 @@ describe('I18nManager', () => {
     });
 
     it('swapLeftAndRightInRTL routes to the native module', async () => {
-      await loadWithModule(() => ({ isRTL: false, doLeftAndRightSwapInRTL: true }));
+      await loadWithModule(() => ({
+        isRTL: false,
+        doLeftAndRightSwapInRTL: true,
+      }));
       I18nManager.swapLeftAndRightInRTL(true);
       const calls = callsOf('swapLeftAndRightInRTL');
       expect(calls).toHaveLength(1);
@@ -124,7 +136,10 @@ describe('I18nManager', () => {
     // untrustworthy as a missing shape -- must fall back rather than surface `isRTL`
     // as a non-boolean that would silently break every RTL conditional downstream.
     it('falls back to defaults when isRTL is not a boolean', async () => {
-      await loadWithModule(() => ({ isRTL: 'yes', doLeftAndRightSwapInRTL: true }));
+      await loadWithModule(() => ({
+        isRTL: 'yes',
+        doLeftAndRightSwapInRTL: true,
+      }));
       expect(I18nManager.isRTL).toBe(false);
       expect(I18nManager.doLeftAndRightSwapInRTL).toBe(true);
     });

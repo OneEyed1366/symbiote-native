@@ -19,9 +19,12 @@ export type {
   IRippleBackground,
 } from '@symbiote-native/components';
 
-export const TouchableNativeFeedback = Object.assign(TouchableNativeFeedbackImpl, {
-  SelectableBackground: selectableBackground,
-  SelectableBackgroundBorderless: selectableBackgroundBorderless,
-  Ripple: rippleBackground,
-  canUseNativeForeground,
-});
+export const TouchableNativeFeedback = Object.assign(
+  TouchableNativeFeedbackImpl,
+  {
+    SelectableBackground: selectableBackground,
+    SelectableBackgroundBorderless: selectableBackgroundBorderless,
+    Ripple: rippleBackground,
+    canUseNativeForeground,
+  },
+);

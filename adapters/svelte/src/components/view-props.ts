@@ -13,10 +13,15 @@ import type {
   IStyleProp,
   IViewStyle,
 } from '@symbiote-native/engine';
-import type { IAccessibilityProps, IAriaProps, IResponderProps } from '@symbiote-native/components';
+import type {
+  IAccessibilityProps,
+  IAriaProps,
+  IResponderProps,
+} from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../class-value';
 
-export interface IViewProps extends IAccessibilityProps, IAriaProps, IResponderProps {
+export interface IViewProps
+  extends IAccessibilityProps, IAriaProps, IResponderProps {
   style?: IStyleProp<IViewStyle>;
   class?: ISvelteClassValue;
   onPress?: (event: ISymbioteEvent) => void;
@@ -26,7 +31,8 @@ export interface IViewProps extends IAccessibilityProps, IAriaProps, IResponderP
   onFocus?: (event: ISymbioteEvent) => void;
   onBlur?: (event: ISymbioteEvent) => void;
   pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
-  hitSlop?: number | { top?: number; left?: number; bottom?: number; right?: number };
+  hitSlop?:
+    number | { top?: number; left?: number; bottom?: number; right?: number };
   id?: string;
   focusable?: boolean;
   collapsable?: boolean;

@@ -23,7 +23,10 @@ export type ISvelteSearchBarOptions = ISearchBarOptions & {
   ref?: { current: ISearchBarCommands | null };
 };
 
-export type ISvelteScreenOptions = Omit<IScreenOptions, 'headerSearchBarOptions'> & {
+export type ISvelteScreenOptions = Omit<
+  IScreenOptions,
+  'headerSearchBarOptions'
+> & {
   headerSearchBarOptions?: ISvelteSearchBarOptions;
 };
 
@@ -35,7 +38,9 @@ export type IScreenOptionsArgs = {
   navigation: INavigatorHandle;
 };
 
-export type IScreenOptionsResolver = (args: IScreenOptionsArgs) => ISvelteScreenOptions;
+export type IScreenOptionsResolver = (
+  args: IScreenOptionsArgs,
+) => ISvelteScreenOptions;
 
 export type IScreenProps = {
   name: string;

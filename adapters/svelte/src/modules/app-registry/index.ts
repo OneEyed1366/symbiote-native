@@ -27,7 +27,9 @@ import {
 export type IComponentProvider = () => Component;
 
 // RN's IWrapperComponentProvider — see the KNOWN GAP note above.
-export type IWrapperComponentProvider = (appParameters: IAppParameters) => Component;
+export type IWrapperComponentProvider = (
+  appParameters: IAppParameters,
+) => Component;
 
 function runnableFor(
   componentProvider: IComponentProvider,

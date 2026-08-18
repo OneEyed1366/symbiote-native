@@ -13,8 +13,18 @@ import {
   type IShareActionSheetIOSOptions,
   type IShareActionSheetError,
 } from '../action-sheet-ios';
-import { validateContent, shareActions, SHARED_ACTION, DISMISSED_ACTION } from './shared';
-import type { IShareContent, IShareOptions, IShareAction, IShareStatic } from './shared';
+import {
+  validateContent,
+  shareActions,
+  SHARED_ACTION,
+  DISMISSED_ACTION,
+} from './shared';
+import type {
+  IShareContent,
+  IShareOptions,
+  IShareAction,
+  IShareStatic,
+} from './shared';
 
 export type { IShareContent, IShareOptions, IShareAction } from './shared';
 
@@ -23,22 +33,29 @@ export const Share: IShareStatic = {
   // Open the iOS share sheet for `content`. Resolves with the user's action
   // (sharedAction / dismissedAction); rejects on invalid content, a native failure,
   // or a missing module (explicit reject rather than a Promise that never settles).
-  share(content: IShareContent, options: IShareOptions = {}): Promise<IShareAction> {
+  share(
+    content: IShareContent,
+    options: IShareOptions = {},
+  ): Promise<IShareAction> {
     const invalid = validateContent(content);
     if (invalid !== null) {
       dlog(`Share.share -> invalid content: ${invalid.message}`);
       return Promise.reject(invalid);
     }
     dlog('Share.share (ios)');
-    const manager = getNativeModule<INativeActionSheetManager>(ACTION_SHEET_MANAGER);
+    const manager =
+      getNativeModule<INativeActionSheetManager>(ACTION_SHEET_MANAGER);
     if (manager === null) {
       dlog(`Share: "${ACTION_SHEET_MANAGER}" unresolved`);
-      return Promise.reject(new Error('Share: ActionSheetManager native module unavailable'));
+      return Promise.reject(
+        new Error('Share: ActionSheetManager native module unavailable'),
+      );
     }
     return new Promise((resolve, reject) => {
       manager.showShareActionSheetWithOptions(
         {
-          message: typeof content.message === 'string' ? content.message : undefined,
+          message:
+            typeof content.message === 'string' ? content.message : undefined,
           url: typeof content.url === 'string' ? content.url : undefined,
           subject: options.subject,
           tintColor: options.tintColor,

@@ -16,7 +16,11 @@ export type {
   ISvelteScreenOptions,
   ISvelteSearchBarOptions,
 } from './screen-props';
-export type { IScreenOptions, IStackAnimation, IStackPresentation } from '../core';
+export type {
+  IScreenOptions,
+  IStackAnimation,
+  IStackPresentation,
+} from '../core';
 
 export {
   useNavigation,
@@ -34,7 +38,10 @@ export type {
   ITabNavigationHandle,
   IDrawerNavigationHandle,
 } from './runes';
-export type { INavigationScopeValue, IAnyNavigatorHandle } from './navigation-context';
+export type {
+  INavigationScopeValue,
+  IAnyNavigatorHandle,
+} from './navigation-context';
 
 export { useLinkingIntegration } from './linking.svelte';
 export type { ILinkingConfig, IScreenLinkingConfig } from '../core';
@@ -68,4 +75,9 @@ export type {
   IDrawerScreenOptionsResolver,
   IDrawerScreenProps,
 } from './drawer-screen-props';
-export type { IDrawerOptions, IDrawerScreenOptions, IDrawerType, IDrawerPosition } from '../core';
+export type {
+  IDrawerOptions,
+  IDrawerScreenOptions,
+  IDrawerType,
+  IDrawerPosition,
+} from '../core';

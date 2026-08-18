@@ -132,7 +132,9 @@ const EMIT_KEYS = ['endReached', 'startReached', 'refresh'];
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-function isVirtualizedListHandle(value: unknown): value is IVirtualizedListHandle {
+function isVirtualizedListHandle(
+  value: unknown,
+): value is IVirtualizedListHandle {
   return isRecord(value) && typeof value.scrollToOffset === 'function';
 }
 
@@ -165,10 +167,14 @@ function buildSectionDelegate(
       });
     },
     flashScrollIndicators: () => getInner()?.flashScrollIndicators(),
-    getNativeScrollRef: (): IScrollViewHandle | null => getInner()?.getNativeScrollRef() ?? null,
-    getScrollableNode: (): IScrollViewHandle | null => getInner()?.getScrollableNode() ?? null,
-    getScrollResponder: (): IScrollViewHandle | null => getInner()?.getScrollResponder() ?? null,
-    getScrollNode: (): ISymbioteNode | null => getInner()?.getScrollNode() ?? null,
+    getNativeScrollRef: (): IScrollViewHandle | null =>
+      getInner()?.getNativeScrollRef() ?? null,
+    getScrollableNode: (): IScrollViewHandle | null =>
+      getInner()?.getScrollableNode() ?? null,
+    getScrollResponder: (): IScrollViewHandle | null =>
+      getInner()?.getScrollResponder() ?? null,
+    getScrollNode: (): ISymbioteNode | null =>
+      getInner()?.getScrollNode() ?? null,
     recordInteraction: () => getInner()?.recordInteraction(),
   };
 }
@@ -205,7 +211,9 @@ export const VirtualizedSectionList = defineComponent(
     };
 
     return () => {
-      const sections: ReadonlyArray<ISection<ItemT>> = Array.isArray(props.sections)
+      const sections: ReadonlyArray<ISection<ItemT>> = Array.isArray(
+        props.sections,
+      )
         ? props.sections
         : [];
       const keyExtractor = props.keyExtractor;
@@ -239,10 +247,14 @@ export const VirtualizedSectionList = defineComponent(
       }): VNode[] | VNode => {
         const entry = info.item;
         if (entry.kind === 'header') {
-          return slots.sectionHeader ? slots.sectionHeader({ section: entry.section }) : [];
+          return slots.sectionHeader
+            ? slots.sectionHeader({ section: entry.section })
+            : [];
         }
         if (entry.kind === 'footer') {
-          return slots.sectionFooter ? slots.sectionFooter({ section: entry.section }) : [];
+          return slots.sectionFooter
+            ? slots.sectionFooter({ section: entry.section })
+            : [];
         }
         if (entry.kind === 'section-separator') {
           return slots.sectionSeparator ? slots.sectionSeparator() : [];
@@ -262,25 +274,33 @@ export const VirtualizedSectionList = defineComponent(
       const entrySeparatorSlot =
         slots.separator === undefined
           ? undefined
-          : (entryProps: ISeparatorProps<ISectionEntry<ItemT>>): VNode[] | VNode =>
+          : (
+              entryProps: ISeparatorProps<ISectionEntry<ItemT>>,
+            ): VNode[] | VNode =>
               slots.separator!({
                 ...entryProps,
                 leadingItem: unwrapEntryItem(entryProps.leadingItem),
                 trailingItem: unwrapEntryItem(entryProps.trailingItem),
               });
 
-      const entryKeyExtractor = (entry: ISectionEntry<ItemT>, index: number): string =>
-        sectionEntryKey(entry, index, keyExtractor);
+      const entryKeyExtractor = (
+        entry: ISectionEntry<ItemT>,
+        index: number,
+      ): string => sectionEntryKey(entry, index, keyExtractor);
 
       // The three synthesized events become inner-VL handlers ONLY when listened, so the inner list
       // keeps gating (no parasitic RefreshControl / edge-reached work for an unlistened event).
       const endReached = listens('onEndReached')
-        ? (eventInfo: { distanceFromEnd: number }): void => emit('endReached', eventInfo)
+        ? (eventInfo: { distanceFromEnd: number }): void =>
+            emit('endReached', eventInfo)
         : undefined;
       const startReached = listens('onStartReached')
-        ? (eventInfo: { distanceFromStart: number }): void => emit('startReached', eventInfo)
+        ? (eventInfo: { distanceFromStart: number }): void =>
+            emit('startReached', eventInfo)
         : undefined;
-      const refresh = listens('onRefresh') ? (): void => emit('refresh') : undefined;
+      const refresh = listens('onRefresh')
+        ? (): void => emit('refresh')
+        : undefined;
 
       return h(
         VirtualizedListHost,
@@ -288,7 +308,8 @@ export const VirtualizedSectionList = defineComponent(
           ...forwarded,
           ref: setInner,
           data: entries,
-          getItem: (_source: unknown, index: number): ISectionEntry<ItemT> => entries[index],
+          getItem: (_source: unknown, index: number): ISectionEntry<ItemT> =>
+            entries[index],
           getItemCount: (): number => entries.length,
           keyExtractor: entryKeyExtractor,
           stickyHeaderIndices,

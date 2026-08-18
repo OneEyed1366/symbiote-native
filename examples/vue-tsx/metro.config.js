@@ -21,13 +21,21 @@ const config = {
   // (same framework-agnostic path the React and Angular examples use via their own adapter's
   // ./metro-css-parser export), so no local wiring file is needed here either.
   transformer: {
-    babelTransformerPath: require.resolve('@symbiote-native/vue/metro-css-parser'),
+    babelTransformerPath:
+      require.resolve('@symbiote-native/vue/metro-css-parser'),
   },
   resolver: {
     // Teach Metro that a style file is a source file (the transformer turns it into a module).
     // scss/sass/less/styl are optional SCSS/Sass/Less/Stylus preprocessor sources — see
     // core/css-parser/src/preprocessors.ts.
-    sourceExts: [...defaultConfig.resolver.sourceExts, 'css', 'scss', 'sass', 'less', 'styl'],
+    sourceExts: [
+      ...defaultConfig.resolver.sourceExts,
+      'css',
+      'scss',
+      'sass',
+      'less',
+      'styl',
+    ],
     extraNodeModules: {
       // @vue/babel-plugin-jsx injects helper imports `from 'vue'`; there is no vue/runtime-dom
       // in a native bundle, and this app never installs the `vue` package itself (only

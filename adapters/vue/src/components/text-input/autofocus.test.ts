@@ -35,7 +35,8 @@ slot.dispatchCommand = (_node, name, args) => {
 };
 
 const ROOT_TAG = 53;
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function focusCommands(): ICommandCall[] {
   return commands.filter(command => command.name === 'focus');
@@ -62,7 +63,10 @@ describe('Vue TextInput autoFocus', () => {
         }),
       );
 
-      expect(focusCommands(), 'no focus command before the commit microtask runs').toHaveLength(0);
+      expect(
+        focusCommands(),
+        'no focus command before the commit microtask runs',
+      ).toHaveLength(0);
     });
 
     it('dispatches the focus command to the committed node once whenCommitted retries after commit', async () => {
@@ -76,7 +80,10 @@ describe('Vue TextInput autoFocus', () => {
       );
       await tick();
 
-      expect(focusCommands(), 'autoFocus dispatches exactly one focus command').toHaveLength(1);
+      expect(
+        focusCommands(),
+        'autoFocus dispatches exactly one focus command',
+      ).toHaveLength(1);
     });
 
     it('does not focus when autoFocus is absent', async () => {

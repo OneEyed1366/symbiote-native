@@ -56,7 +56,10 @@ const OX = 32;
 const OY = 6;
 const SCALE = 1.18;
 
-const place = (x: number, y: number): [number, number] => [OX + SCALE * x, OY + SCALE * y];
+const place = (x: number, y: number): [number, number] => [
+  OX + SCALE * x,
+  OY + SCALE * y,
+];
 
 const CX = OX + SCALE * 100;
 const CY = OY + SCALE * 120;
@@ -99,7 +102,10 @@ function distanceToSegment(px: number, py: number, { a, b }: ISocket): number {
   const t =
     lengthSquared === 0
       ? 0
-      : Math.max(0, Math.min(1, ((px - a[0]) * abx + (py - a[1]) * aby) / lengthSquared));
+      : Math.max(
+          0,
+          Math.min(1, ((px - a[0]) * abx + (py - a[1]) * aby) / lengthSquared),
+        );
   return Math.hypot(px - (a[0] + t * abx), py - (a[1] + t * aby));
 }
 
@@ -173,7 +179,14 @@ const CASES: number[][][] = [
 const key = (p: Point) => `${p[0].toFixed(3)},${p[1].toFixed(3)}`;
 
 /* Where along an edge the field crosses ISO. */
-function crossing(ax: number, ay: number, av: number, bx: number, by: number, bv: number): Point {
+function crossing(
+  ax: number,
+  ay: number,
+  av: number,
+  bx: number,
+  by: number,
+  bv: number,
+): Point {
   const t = (ISO - av) / (bv - av);
   return [ax + t * (bx - ax), ay + t * (by - ay)];
 }
@@ -198,7 +211,8 @@ function contours(
   const grid: number[][] = [];
   for (let j = 0; j < rows; j++) {
     const row: number[] = [];
-    for (let i = 0; i < cols; i++) row.push(field(x0 + i * step, y0 + j * step));
+    for (let i = 0; i < cols; i++)
+      row.push(field(x0 + i * step, y0 + j * step));
     grid.push(row);
   }
 
@@ -236,15 +250,22 @@ function contours(
       const vd = grid[j + 1][i];
 
       const mask =
-        (va >= ISO ? 1 : 0) | (vb >= ISO ? 2 : 0) | (vc >= ISO ? 4 : 0) | (vd >= ISO ? 8 : 0);
+        (va >= ISO ? 1 : 0) |
+        (vb >= ISO ? 2 : 0) |
+        (vc >= ISO ? 4 : 0) |
+        (vd >= ISO ? 8 : 0);
       const segments = CASES[mask];
       if (segments.length === 0) continue;
 
       const edge: Array<Point | null> = [null, null, null, null];
-      if (segments.some(s => s.includes(0))) edge[0] = crossing(ax, ay, va, bx, ay, vb);
-      if (segments.some(s => s.includes(1))) edge[1] = crossing(bx, ay, vb, bx, by, vc);
-      if (segments.some(s => s.includes(2))) edge[2] = crossing(bx, by, vc, ax, by, vd);
-      if (segments.some(s => s.includes(3))) edge[3] = crossing(ax, by, vd, ax, ay, va);
+      if (segments.some(s => s.includes(0)))
+        edge[0] = crossing(ax, ay, va, bx, ay, vb);
+      if (segments.some(s => s.includes(1)))
+        edge[1] = crossing(bx, ay, vb, bx, by, vc);
+      if (segments.some(s => s.includes(2)))
+        edge[2] = crossing(bx, by, vc, ax, by, vd);
+      if (segments.some(s => s.includes(3)))
+        edge[3] = crossing(ax, by, vd, ax, ay, va);
 
       for (const [from, to] of segments) {
         const p = edge[from];
@@ -311,7 +332,8 @@ function decimate(pts: Point[], minDistance: number): Point[] {
   if (out.length > 2) {
     const first = out[0];
     const last = out[out.length - 1];
-    if (Math.hypot(last[0] - first[0], last[1] - first[1]) < minDistance * 0.5) out.pop();
+    if (Math.hypot(last[0] - first[0], last[1] - first[1]) < minDistance * 0.5)
+      out.pop();
   }
   return out;
 }
@@ -329,8 +351,14 @@ function toPath(pts: Point[]): string {
     const p1 = at(i);
     const p2 = at(i + 1);
     const p3 = at(i + 2);
-    const c1: Point = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
-    const c2: Point = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    const c1: Point = [
+      p1[0] + (p2[0] - p0[0]) / 6,
+      p1[1] + (p2[1] - p0[1]) / 6,
+    ];
+    const c2: Point = [
+      p2[0] - (p3[0] - p1[0]) / 6,
+      p2[1] - (p3[1] - p1[1]) / 6,
+    ];
     d +=
       `C${round(c1[0])},${round(c1[1])} ` +
       `${round(c2[0])},${round(c2[1])} ` +
@@ -409,7 +437,13 @@ function limbPath(spine: ISpine, halfWidth: number): string {
     const tanX = ahead[0] - behind[0];
     const tanY = ahead[1] - behind[1];
     const len = Math.hypot(tanX, tanY) || 1;
-    return { here, nx: -tanY / len, ny: tanX / len, tx: tanX / len, ty: tanY / len };
+    return {
+      here,
+      nx: -tanY / len,
+      ny: tanX / len,
+      tx: tanX / len,
+      ty: tanY / len,
+    };
   };
 
   for (let i = 0; i < SPINE_SAMPLES; i++) {
@@ -452,8 +486,14 @@ function limbSpine(
   curl: number,
   drift: number,
 ): ISpine {
-  const base: Point = [CX + Math.cos(angle) * root, CY + Math.sin(angle) * root];
-  const tip: Point = [CX + Math.cos(angle + drift) * length, CY + Math.sin(angle + drift) * length];
+  const base: Point = [
+    CX + Math.cos(angle) * root,
+    CY + Math.sin(angle) * root,
+  ];
+  const tip: Point = [
+    CX + Math.cos(angle + drift) * length,
+    CY + Math.sin(angle + drift) * length,
+  ];
 
   const axis = angle + drift / 2;
   const perpX = Math.cos(axis + Math.PI / 2);
@@ -563,8 +603,26 @@ function buildGrips(): IRootedLimb[] {
        buried the device's own UI — the one thing on this page that has to stay
        legible — and read as a handle bolted on rather than as something alive
        holding it. Deliberately not mirror images, for the same reason. */
-    { bx: 100, by: 150, tx: 127, ty: 84, width: 15, dur: '5.20s', delay: '-1.10s', sweep: 2.6 },
-    { bx: 200, by: 144, tx: 175, ty: 90, width: 16, dur: '6.10s', delay: '-3.40s', sweep: 2.3 },
+    {
+      bx: 100,
+      by: 150,
+      tx: 127,
+      ty: 84,
+      width: 15,
+      dur: '5.20s',
+      delay: '-1.10s',
+      sweep: 2.6,
+    },
+    {
+      bx: 200,
+      by: 144,
+      tx: 175,
+      ty: 90,
+      width: 16,
+      dur: '6.10s',
+      delay: '-3.40s',
+      sweep: 2.3,
+    },
   ];
 
   return specs.map(g => {
@@ -609,7 +667,9 @@ export function buildSymbioteShape(): ISymbioteShape {
      runs into the sampling edge comes back as an open, broken loop. */
   const loops = contours(field, 40, -30, 265, 272, 1);
 
-  const mass = loops.map(loop => toPath(decimate(chaikin(loop, 2), 4.6))).filter(d => d.length > 0);
+  const mass = loops
+    .map(loop => toPath(decimate(chaikin(loop, 2), 4.6)))
+    .filter(d => d.length > 0);
 
   const [gx1, gy1] = place(44, 44);
   const [gx2, gy2] = place(156, 200);

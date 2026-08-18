@@ -1,4 +1,7 @@
-import type { IImageSourceProp, IResizeMode } from '@symbiote-native/components';
+import type {
+  IImageSourceProp,
+  IResizeMode,
+} from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
 
 export type IHideConfig = {

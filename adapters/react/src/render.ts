@@ -27,7 +27,9 @@ type IReactErrorInfo = {
   readonly componentStack?: string | null;
 };
 
-function errorReporter(origin: string): (error: unknown, info: IReactErrorInfo) => void {
+function errorReporter(
+  origin: string,
+): (error: unknown, info: IReactErrorInfo) => void {
   return (error, info) => {
     reportUncaughtError(error, { origin, componentStack: info.componentStack });
   };

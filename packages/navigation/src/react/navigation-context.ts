@@ -24,12 +24,16 @@ export type INavigationContextValue = {
   parent?: INavigationContextValue;
 };
 
-export const NavigationContext = createContext<INavigationContextValue | undefined>(undefined);
+export const NavigationContext = createContext<
+  INavigationContextValue | undefined
+>(undefined);
 
 // Every hook in ./hooks needs the same `useContext(NavigationContext)` + missing-provider throw,
 // so it's co-located here instead of repeated per hook. `hookName` keeps each hook's own name in
 // the thrown message.
-export function useRequiredNavigationContext(hookName: string): INavigationContextValue {
+export function useRequiredNavigationContext(
+  hookName: string,
+): INavigationContextValue {
   const context = useContext(NavigationContext);
   if (!context) {
     throw new Error(

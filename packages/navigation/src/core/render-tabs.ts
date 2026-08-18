@@ -9,7 +9,12 @@
 
 import { el, txt } from '@symbiote-native/components';
 import type { IDescriptor } from '@symbiote-native/components';
-import type { IColorValue, IViewStyle, ITextStyle, IStyleProp } from '@symbiote-native/engine';
+import type {
+  IColorValue,
+  IViewStyle,
+  ITextStyle,
+  IStyleProp,
+} from '@symbiote-native/engine';
 import type { ITabBarIcon } from './tab-options';
 
 // react-navigation's own bottom-tabs default to the surrounding theme's primary/text colors;
@@ -96,14 +101,19 @@ function resolveTintColor(item: ITabBarItemView): IColorValue {
 // for a vector-icon-font label); an IDescriptor icon (an <Image>/vector-icon element the adapter
 // already resolved) is spliced in verbatim, exactly like renderHeaderConfig treats a pre-built
 // Descriptor child.
-function renderIcon(icon: ITabBarIcon | undefined, color: IColorValue): IDescriptor | undefined {
+function renderIcon(
+  icon: ITabBarIcon | undefined,
+  color: IColorValue,
+): IDescriptor | undefined {
   if (icon === undefined) return undefined;
   if (typeof icon === 'string')
     return txt({ style: { color, fontSize: TAB_ICON_FONT_SIZE } }, [icon]);
   return icon;
 }
 
-function renderBadge(badge: string | number | undefined): IDescriptor | undefined {
+function renderBadge(
+  badge: string | number | undefined,
+): IDescriptor | undefined {
   if (badge === undefined) return undefined;
   return el('symbiote-view', { style: BADGE_STYLE }, [
     txt({ style: BADGE_TEXT_STYLE }, [String(badge)]),
@@ -121,8 +131,12 @@ export function renderTabBarItem(item: ITabBarItemView): IDescriptor {
 
   const children: IDescriptor[] = [];
   if (iconChildren.length > 0)
-    children.push(el('symbiote-view', { style: ICON_WRAPPER_STYLE }, iconChildren));
-  children.push(txt({ style: { color, fontSize: TAB_LABEL_FONT_SIZE } }, [item.label]));
+    children.push(
+      el('symbiote-view', { style: ICON_WRAPPER_STYLE }, iconChildren),
+    );
+  children.push(
+    txt({ style: { color, fontSize: TAB_LABEL_FONT_SIZE } }, [item.label]),
+  );
 
   return el(
     'symbiote-view',
@@ -134,5 +148,9 @@ export function renderTabBarItem(item: ITabBarItemView): IDescriptor {
 
 export function renderTabBar(view: ITabBarViewProps): IDescriptor {
   const items = view.items.map(renderTabBarItem);
-  return el('symbiote-view', { ...view.passthrough, style: [TAB_BAR_STYLE, view.style] }, items);
+  return el(
+    'symbiote-view',
+    { ...view.passthrough, style: [TAB_BAR_STYLE, view.style] },
+    items,
+  );
 }

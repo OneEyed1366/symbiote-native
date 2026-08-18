@@ -18,7 +18,12 @@ interface IWindowMetrics {
   fontScale: number;
 }
 
-const WINDOW: IWindowMetrics = { width: 400, height: 800, scale: 3, fontScale: 2 };
+const WINDOW: IWindowMetrics = {
+  width: 400,
+  height: 800,
+  scale: 3,
+  fontScale: 2,
+};
 
 let PixelRatio: typeof import('./index').PixelRatio;
 let Dimensions: typeof import('../dimensions').Dimensions;
@@ -36,13 +41,18 @@ beforeEach(async () => {
       Dimensions: { window: WINDOW },
     }),
   };
-  const registeredModules: Record<string, unknown> = { DeviceInfo: fakeDeviceInfo };
+  const registeredModules: Record<string, unknown> = {
+    DeviceInfo: fakeDeviceInfo,
+  };
 
   globalThis.__turboModuleProxy = <T>(name: string): T | null => {
     const module = registeredModules[name];
     return isPresent<T>(module) ? module : null;
   };
-  globalThis.RN$registerCallableModule = (name: string, factory: () => IDeviceHub): void => {
+  globalThis.RN$registerCallableModule = (
+    name: string,
+    factory: () => IDeviceHub,
+  ): void => {
     if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
   };
 
@@ -80,7 +90,8 @@ describe('PixelRatio', () => {
         }),
       };
       globalThis.__turboModuleProxy = <T>(name: string): T | null => {
-        const module: unknown = name === 'DeviceInfo' ? fakeDeviceInfo : undefined;
+        const module: unknown =
+          name === 'DeviceInfo' ? fakeDeviceInfo : undefined;
         return isPresent<T>(module) ? module : null;
       };
       vi.resetModules();
@@ -114,7 +125,9 @@ describe('PixelRatio', () => {
   // without PixelRatio needing its own native subscription.
   it('reflects a later Dimensions change with no subscription of its own', () => {
     expect(PixelRatio.get()).toBe(3);
-    Dimensions.set({ window: { width: 800, height: 400, scale: 2, fontScale: 1 } });
+    Dimensions.set({
+      window: { width: 800, height: 400, scale: 2, fontScale: 1 },
+    });
     expect(PixelRatio.get()).toBe(2);
   });
 });

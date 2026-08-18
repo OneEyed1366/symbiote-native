@@ -21,4 +21,6 @@ export type INativeCellularModule = {
   requestPermissionsAsync?(): Promise<PermissionResponse>;
 };
 
-export const expoCellular = requireNativeModule<INativeCellularModule>(EXPO_CELLULAR_MODULE_NAME);
+export const expoCellular = requireNativeModule<INativeCellularModule>(
+  EXPO_CELLULAR_MODULE_NAME,
+);

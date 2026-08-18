@@ -25,7 +25,13 @@ const getBatteryStateAsyncMock = vi.fn(async () => 2);
 vi.mock('../../../core', () => ({
   addBatteryStateListener: (listener: IListener) => addListenerMock(listener),
   getBatteryStateAsync: () => getBatteryStateAsyncMock(),
-  BatteryState: { UNKNOWN: 0, UNPLUGGED: 1, CHARGING: 2, FULL: 3, NOT_CHARGING: 4 },
+  BatteryState: {
+    UNKNOWN: 0,
+    UNPLUGGED: 1,
+    CHARGING: 2,
+    FULL: 3,
+    NOT_CHARGING: 4,
+  },
 }));
 
 const fabric = installFabric();

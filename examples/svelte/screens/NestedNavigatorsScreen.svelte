@@ -9,14 +9,15 @@
   import NestedTabInfoScreen from './NestedTabInfoScreen.svelte';
 </script>
 
-<Tab initialRouteName="NestedHome"
-  ><TabScreen
+<Tab initialRouteName="NestedHome">
+  <TabScreen
     name="NestedHome"
     component={NestedTabHomeScreen}
     options={{ tabBarLabel: 'Home' }}
-  /><TabScreen
+  />
+  <TabScreen
     name="NestedInfo"
     component={NestedTabInfoScreen}
     options={{ tabBarLabel: 'Info' }}
-  /></Tab
->
+  />
+</Tab>

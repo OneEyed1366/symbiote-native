@@ -7,7 +7,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
-import { getAdvertisingId, usePermissions } from '@symbiote-native/tracking-transparency/vue';
+import {
+  getAdvertisingId,
+  usePermissions,
+} from '@symbiote-native/tracking-transparency/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -39,9 +42,15 @@ function handleRequest(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="tracking-transparency-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="tracking-transparency-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -50,25 +59,37 @@ function handleRequest(): void {
         <View class="hero-copy">
           <Text class="hero-title">Tracking Transparency</Text>
           <Text class="hero-body"
-            >@symbiote-native/tracking-transparency — App Tracking Transparency permission status
-            plus the advertising ID it gates. Android/web always report granted.</Text
+            >@symbiote-native/tracking-transparency — App Tracking Transparency
+            permission status plus the advertising ID it gates. Android/web
+            always report granted.</Text
           >
         </View>
       </View>
 
-      <View testID="tracking-transparency-permission-card" class="tracking-transparency-card">
+      <View
+        testID="tracking-transparency-permission-card"
+        class="tracking-transparency-card"
+      >
         <Text class="tracking-transparency-card-title">Permission</Text>
         <View class="tracking-transparency-row">
           <Text class="tracking-transparency-row-label">Status</Text>
-          <Text testID="tracking-transparency-status-value" class="tracking-transparency-value-text">{{
-            statusText
-          }}</Text>
+          <Text
+            testID="tracking-transparency-status-value"
+            class="tracking-transparency-value-text"
+            >{{ statusText }}</Text
+          >
         </View>
         <View class="tracking-transparency-row">
           <Text class="tracking-transparency-row-label">Granted</Text>
-          <View :class="`tracking-transparency-status-badge tracking-transparency-status-badge-${grantedStatus}`">
+          <View
+            :class="`tracking-transparency-status-badge tracking-transparency-status-badge-${grantedStatus}`"
+          >
             <Text class="tracking-transparency-status-text">{{
-              grantedStatus === 'checking' ? 'CHECKING…' : grantedStatus === 'yes' ? 'YES' : 'NO'
+              grantedStatus === 'checking'
+                ? 'CHECKING…'
+                : grantedStatus === 'yes'
+                  ? 'YES'
+                  : 'NO'
             }}</Text>
           </View>
         </View>
@@ -88,12 +109,17 @@ function handleRequest(): void {
         </View>
       </View>
 
-      <View testID="tracking-transparency-advertising-id-card" class="tracking-transparency-card">
+      <View
+        testID="tracking-transparency-advertising-id-card"
+        class="tracking-transparency-card"
+      >
         <Text class="tracking-transparency-card-title">Advertising ID</Text>
         <View class="tracking-transparency-result-box">
-          <Text testID="tracking-transparency-advertising-id-value" class="tracking-transparency-result-text">{{
-            advertisingId ?? 'null'
-          }}</Text>
+          <Text
+            testID="tracking-transparency-advertising-id-value"
+            class="tracking-transparency-result-text"
+            >{{ advertisingId ?? 'null' }}</Text
+          >
         </View>
       </View>
     </ScrollView>

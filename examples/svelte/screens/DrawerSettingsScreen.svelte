@@ -13,17 +13,19 @@
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DrawerDemo];
 </script>
 
-<SafeAreaView class="screen"
-  ><View class="section"
-    ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text"
-        >{`${lineInfo.code} · ${lineInfo.label}`}</Text
-      ></View
-    ><Text class="section-label">Drawer demo · Settings</Text><ActionButton
+<SafeAreaView class="screen">
+  <View class="section">
+    <View class={`line-tag line-tag-${lineInfo.line}`}>
+      <Text class="line-tag-text">
+        {`${lineInfo.code} · ${lineInfo.label}`}
+      </Text>
+    </View>
+    <Text class="section-label">Drawer demo · Settings</Text>
+    <ActionButton
       testID="drawer-close-from-settings"
       title="Close drawer"
       onPress={() => navigation.current.closeDrawer()}
       color={LINE_COLOR.structure}
-    /></View
-  ></SafeAreaView
->
+    />
+  </View>
+</SafeAreaView>

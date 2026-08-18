@@ -20,9 +20,11 @@ import metroSvelteTransformer from '@symbiote-native/svelte/metro-svelte-transfo
 
 const {
   compileSvelteModuleFile,
-}: { compileSvelteModuleFile: (src: string, filename: string) => string } = metroSvelteTransformer;
+}: { compileSvelteModuleFile: (src: string, filename: string) => string } =
+  metroSvelteTransformer;
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -33,7 +35,9 @@ const RUNE_OUT = join(__dirname, '.smoke-compiled-use-keep-awake.svelte.mjs');
 
 const activateKeepAwakeAsyncMock = vi.fn(async (_tag: string) => undefined);
 const removeSubscriptionMock = vi.fn();
-const addListenerMock = vi.fn((..._args: unknown[]) => ({ remove: removeSubscriptionMock }));
+const addListenerMock = vi.fn((..._args: unknown[]) => ({
+  remove: removeSubscriptionMock,
+}));
 const deactivateKeepAwakeMock = vi.fn(async (_tag: string) => undefined);
 
 // The native-call leaf is mocked rather than the `../../core` barrel, so that the barrel stays
@@ -48,7 +52,8 @@ vi.mock('../../core/keep-awake', () => ({
 }));
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -66,13 +71,23 @@ afterEach(() => {
   rmSync(RUNE_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 // $effect needs Svelte's MODULE compiler, not the component compiler — a bare, uncompiled rune
 // call throws `rune_outside_svelte` at runtime.
 function compileRuneModule(): void {
-  const source = readFileSync(join(__dirname, 'use-keep-awake.svelte.ts'), 'utf-8');
-  writeFileSync(RUNE_OUT, compileSvelteModuleFile(source, 'use-keep-awake.svelte.ts'));
+  const source = readFileSync(
+    join(__dirname, 'use-keep-awake.svelte.ts'),
+    'utf-8',
+  );
+  writeFileSync(
+    RUNE_OUT,
+    compileSvelteModuleFile(source, 'use-keep-awake.svelte.ts'),
+  );
 }
 
 async function loadProbe(): Promise<Component> {
@@ -104,7 +119,9 @@ type IKeepAwakeProbeOptions = {
   suppressDeactivateWarnings?: boolean;
 };
 
-async function mountKeepAwake(options: IKeepAwakeProbeOptions = {}): Promise<void> {
+async function mountKeepAwake(
+  options: IKeepAwakeProbeOptions = {},
+): Promise<void> {
   const Probe = await loadProbe();
   mount(ROOT_TAG, Probe, { ...options });
   await tick();
@@ -122,7 +139,9 @@ describe('useKeepAwake (Svelte)', () => {
     it('activates a default tag on mount', async () => {
       await mountKeepAwake();
 
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1),
+      );
       expect(typeof activateKeepAwakeAsyncMock.mock.calls[0][0]).toBe('string');
     });
 
@@ -131,7 +150,9 @@ describe('useKeepAwake (Svelte)', () => {
     it('activates the explicit tag when one is given', async () => {
       await mountKeepAwake({ tag: 'custom-tag' });
 
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledWith('custom-tag'));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledWith('custom-tag'),
+      );
     });
 
     // why: the tag is what native deactivateKeepAwake targets to release a live handle — passing
@@ -139,7 +160,9 @@ describe('useKeepAwake (Svelte)', () => {
     // else's.
     it('deactivates the same tag on unmount', async () => {
       await mountKeepAwake({ tag: 'custom-tag' });
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1),
+      );
 
       unmount(ROOT_TAG);
 
@@ -151,7 +174,9 @@ describe('useKeepAwake (Svelte)', () => {
     it('never touches addListener when no options are given', async () => {
       await mountKeepAwake({ tag: 'custom-tag' });
 
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1),
+      );
       expect(addListenerMock).not.toHaveBeenCalled();
     });
 
@@ -163,7 +188,9 @@ describe('useKeepAwake (Svelte)', () => {
 
       await mountKeepAwake({ tag: 'custom-tag', listener });
 
-      await vi.waitFor(() => expect(addListenerMock).toHaveBeenCalledWith('custom-tag', listener));
+      await vi.waitFor(() =>
+        expect(addListenerMock).toHaveBeenCalledWith('custom-tag', listener),
+      );
     });
   });
 
@@ -172,12 +199,16 @@ describe('useKeepAwake (Svelte)', () => {
     // entirely on rejection — a failed activation must never spuriously attach a listener for a
     // keep-awake handle that was never actually acquired.
     it('does not register a listener when activateKeepAwakeAsync rejects', async () => {
-      activateKeepAwakeAsyncMock.mockRejectedValueOnce(new Error('activation failed'));
+      activateKeepAwakeAsyncMock.mockRejectedValueOnce(
+        new Error('activation failed'),
+      );
       const listener = vi.fn();
 
       await mountKeepAwake({ tag: 'custom-tag', listener });
 
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1),
+      );
       expect(addListenerMock).not.toHaveBeenCalled();
     });
 
@@ -185,12 +216,19 @@ describe('useKeepAwake (Svelte)', () => {
     // "deactivate failed" warning upstream expo-keep-awake would otherwise surface — the rejection
     // must be swallowed, not become an unhandled promise rejection.
     it('swallows a deactivation rejection when suppressDeactivateWarnings is set', async () => {
-      deactivateKeepAwakeMock.mockRejectedValueOnce(new Error('deactivate failed'));
+      deactivateKeepAwakeMock.mockRejectedValueOnce(
+        new Error('deactivate failed'),
+      );
       const unhandled = vi.fn();
       process.once('unhandledRejection', unhandled);
 
-      await mountKeepAwake({ tag: 'custom-tag', suppressDeactivateWarnings: true });
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1));
+      await mountKeepAwake({
+        tag: 'custom-tag',
+        suppressDeactivateWarnings: true,
+      });
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1),
+      );
       unmount(ROOT_TAG);
       await tick();
 
@@ -213,7 +251,9 @@ describe('useKeepAwake (Svelte)', () => {
       const listener = vi.fn();
 
       await mountKeepAwake({ tag: 'custom-tag', listener });
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1),
+      );
 
       unmount(ROOT_TAG);
       resolveActivate();

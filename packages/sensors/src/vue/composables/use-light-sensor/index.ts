@@ -6,9 +6,15 @@
 // a later change of updateIntervalMs, so a plain numeric param is enough.
 
 import { onMounted, onUnmounted, ref, type Ref } from '@vue/runtime-core';
-import { LightSensor, type EventSubscription, type ILightSensorMeasurement } from '../../../core';
+import {
+  LightSensor,
+  type EventSubscription,
+  type ILightSensorMeasurement,
+} from '../../../core';
 
-export function useLightSensor(updateIntervalMs?: number): Ref<ILightSensorMeasurement | null> {
+export function useLightSensor(
+  updateIntervalMs?: number,
+): Ref<ILightSensorMeasurement | null> {
   // A plain ref: the value is a POJO measurement, not an engine node, so no shallowRef needed.
   const measurement = ref<ILightSensorMeasurement | null>(null);
   let subscription: EventSubscription | undefined;

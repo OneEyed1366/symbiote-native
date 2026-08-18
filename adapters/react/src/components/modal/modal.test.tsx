@@ -22,7 +22,13 @@
 
 import { useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, Modal, mount, unmount, type ISymbioteEvent } from '@symbiote-native/react';
+import {
+  View,
+  Modal,
+  mount,
+  unmount,
+  type ISymbioteEvent,
+} from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 220;
@@ -59,7 +65,9 @@ describe('React Modal on the engine', () => {
           <View />
         </Modal>,
       );
-      expect(fabric.serialize(fabric.appRoot().children)).toBe('ModalHostView(RCTView(RCTView))');
+      expect(fabric.serialize(fabric.appRoot().children)).toBe(
+        'ModalHostView(RCTView(RCTView))',
+      );
       expect(modalNode().props.visible).toBe(true);
     });
 
@@ -222,7 +230,12 @@ describe('React Modal on the engine', () => {
     it('passes ViewProps / a11y through to the host node', () => {
       mount(
         ROOT_TAG,
-        <Modal visible testID="my-modal" accessible accessibilityLabel="a dialog">
+        <Modal
+          visible
+          testID="my-modal"
+          accessible
+          accessibilityLabel="a dialog"
+        >
           <View />
         </Modal>,
       );

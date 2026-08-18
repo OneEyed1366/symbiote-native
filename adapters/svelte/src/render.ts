@@ -4,7 +4,11 @@
 // (2026-08-11, svelte-adapter-dom-shim skill §10): single root per process, so
 // patchGlobals()/restoreGlobals() need no ref-counting.
 
-import { mount as svelteMount, unmount as svelteUnmount, type Component } from 'svelte';
+import {
+  mount as svelteMount,
+  unmount as svelteUnmount,
+  type Component,
+} from 'svelte';
 import {
   createSurface,
   disposeRoot,

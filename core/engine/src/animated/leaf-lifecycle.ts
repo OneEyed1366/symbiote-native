@@ -31,7 +31,10 @@ let globalReconcileSeq = 0;
 //
 // The caller MUST pass a stored SNAPSHOT as `a` - see `lastProps` below. Handing this the same
 // live object on both sides compares it with itself and is unconditionally true.
-function shallowEqualProps(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+function shallowEqualProps(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): boolean {
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
   if (aKeys.length !== bKeys.length) return false;
@@ -93,7 +96,9 @@ export type IAnimatedLeafLifecycle = {
   teardown(): void;
 };
 
-export function createAnimatedLeafLifecycle(label: string): IAnimatedLeafLifecycle {
+export function createAnimatedLeafLifecycle(
+  label: string,
+): IAnimatedLeafLifecycle {
   let attached: AnimatedProps | null = null;
   let eventDetachers: Array<() => void> = [];
   // Diagnostic-only: the last node identity, plus a reentrancy flag to catch reconcile() being
@@ -118,7 +123,8 @@ export function createAnimatedLeafLifecycle(label: string): IAnimatedLeafLifecyc
       const reentrant = inReconcile;
       const nodeChanged = node !== lastNode;
       const wantsNativeChanged = wantsNative !== lastWantsNative;
-      const propsChanged = lastProps === null || !shallowEqualProps(lastProps, props);
+      const propsChanged =
+        lastProps === null || !shallowEqualProps(lastProps, props);
       lastNode = node;
       lastWantsNative = wantsNative;
       // A SNAPSHOT, never the reference. A caller can legitimately hand back the SAME object on
@@ -192,7 +198,8 @@ export function createAnimatedLeafLifecycle(label: string): IAnimatedLeafLifecyc
           if (node === null) return;
           for (const key of Object.keys(props)) {
             const attachment = attachNativeEventHandler(node, key, props[key]);
-            if (attachment !== undefined) eventDetachers.push(attachment.detach);
+            if (attachment !== undefined)
+              eventDetachers.push(attachment.detach);
           }
         };
 

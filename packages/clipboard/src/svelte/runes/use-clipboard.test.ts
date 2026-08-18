@@ -27,9 +27,11 @@ import { ContentType } from '../../core/types';
 
 const {
   compileSvelteModuleFile,
-}: { compileSvelteModuleFile: (src: string, filename: string) => string } = metroSvelteTransformer;
+}: { compileSvelteModuleFile: (src: string, filename: string) => string } =
+  metroSvelteTransformer;
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -48,11 +50,13 @@ const addClipboardListenerMock = vi.fn((listener: IListener) => {
 });
 
 vi.mock('../../core', () => ({
-  addClipboardListener: (listener: IListener) => addClipboardListenerMock(listener),
+  addClipboardListener: (listener: IListener) =>
+    addClipboardListenerMock(listener),
 }));
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -67,13 +71,23 @@ afterEach(() => {
   rmSync(RUNE_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 // $state/$effect need Svelte's MODULE compiler, not the component compiler — a bare, uncompiled
 // rune call throws `rune_outside_svelte` at runtime.
 function compileRuneModule(): void {
-  const source = readFileSync(join(__dirname, 'use-clipboard.svelte.ts'), 'utf-8');
-  writeFileSync(RUNE_OUT, compileSvelteModuleFile(source, 'use-clipboard.svelte.ts'));
+  const source = readFileSync(
+    join(__dirname, 'use-clipboard.svelte.ts'),
+    'utf-8',
+  );
+  writeFileSync(
+    RUNE_OUT,
+    compileSvelteModuleFile(source, 'use-clipboard.svelte.ts'),
+  );
 }
 
 async function loadProbe(): Promise<Component> {
@@ -104,7 +118,8 @@ async function mountClipboard(): Promise<(IClipboardEvent | null)[]> {
   const values: (IClipboardEvent | null)[] = [];
   const Probe = await loadProbe();
   mount(ROOT_TAG, Probe, {
-    onValue: (value: unknown) => values.push(isClipboardEvent(value) ? value : null),
+    onValue: (value: unknown) =>
+      values.push(isClipboardEvent(value) ? value : null),
   });
   await tick();
   return values;

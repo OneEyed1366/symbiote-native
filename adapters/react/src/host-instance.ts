@@ -20,8 +20,10 @@ export { toPublicInstance, type IHostInstance };
 export function findNodeHandle(
   componentOrHandle: IHostInstance | ISymbioteNode | number | null | undefined,
 ): number | null {
-  if (componentOrHandle === null || componentOrHandle === undefined) return null;
+  if (componentOrHandle === null || componentOrHandle === undefined)
+    return null;
   if (typeof componentOrHandle === 'number') return componentOrHandle;
-  if (isSymbioteNode(componentOrHandle)) return getNativeTag(componentOrHandle) ?? null;
+  if (isSymbioteNode(componentOrHandle))
+    return getNativeTag(componentOrHandle) ?? null;
   return null;
 }

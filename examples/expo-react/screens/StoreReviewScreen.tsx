@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
-import { hasAction, isAvailableAsync, requestReview } from '@symbiote-native/store-review';
+import {
+  hasAction,
+  isAvailableAsync,
+  requestReview,
+} from '@symbiote-native/store-review';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -26,17 +30,21 @@ export function StoreReviewScreen() {
   const lineColor = LINE_COLOR[lineInfo.line];
 
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
-  const [canRequestReview, setCanRequestReview] = useState<boolean | null>(null);
+  const [canRequestReview, setCanRequestReview] = useState<boolean | null>(
+    null,
+  );
   const [lastResult, setLastResult] = useState('idle');
 
   useEffect(() => {
     let isMounted = true;
-    Promise.all([isAvailableAsync(), hasAction()]).then(([available, action]) => {
-      if (isMounted) {
-        setIsAvailable(available);
-        setCanRequestReview(action);
-      }
-    });
+    Promise.all([isAvailableAsync(), hasAction()]).then(
+      ([available, action]) => {
+        if (isMounted) {
+          setIsAvailable(available);
+          setCanRequestReview(action);
+        }
+      },
+    );
     return () => {
       isMounted = false;
     };
@@ -51,7 +59,11 @@ export function StoreReviewScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="store-review-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="store-review-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -62,7 +74,8 @@ export function StoreReviewScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Store Review</Text>
             <Text className="hero-body">
-              @symbiote-native/store-review — prompts the platform's native in-app review flow.
+              @symbiote-native/store-review — prompts the platform's native
+              in-app review flow.
             </Text>
           </View>
         </View>
@@ -73,11 +86,19 @@ export function StoreReviewScreen() {
           </View>
           <ValueRow
             label="Native flow available"
-            value={isAvailable === null ? 'checking…' : isAvailable ? 'Yes' : 'No'}
+            value={
+              isAvailable === null ? 'checking…' : isAvailable ? 'Yes' : 'No'
+            }
           />
           <ValueRow
             label="Can request review"
-            value={canRequestReview === null ? 'checking…' : canRequestReview ? 'Yes' : 'No'}
+            value={
+              canRequestReview === null
+                ? 'checking…'
+                : canRequestReview
+                  ? 'Yes'
+                  : 'No'
+            }
           />
         </View>
 
@@ -98,10 +119,11 @@ export function StoreReviewScreen() {
             </Text>
           </View>
           <Text className="info-text">
-            resolved means the call completed, not that a prompt appeared. On Android the Play
-            dialog only shows for a build installed from Google Play (internal test track,
-            internal app sharing, or production); a sideloaded debug build resolves silently. iOS
-            shows it in debug builds. Both stores also enforce a quota.
+            resolved means the call completed, not that a prompt appeared. On
+            Android the Play dialog only shows for a build installed from Google
+            Play (internal test track, internal app sharing, or production); a
+            sideloaded debug build resolves silently. iOS shows it in debug
+            builds. Both stores also enforce a quota.
           </Text>
         </View>
       </ScrollView>

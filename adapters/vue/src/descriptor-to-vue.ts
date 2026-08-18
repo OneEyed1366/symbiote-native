@@ -5,12 +5,19 @@
 // twin is `adapters/react/src/descriptor-to-react.ts`.
 
 import { h, type VNode } from '@vue/runtime-core';
-import type { IDescriptor, IDescriptorChild } from '@symbiote-native/components';
+import type {
+  IDescriptor,
+  IDescriptorChild,
+} from '@symbiote-native/components';
 
 export function descriptorToVue(node: IDescriptor): VNode {
   // String type → host element (the Vue renderer's createElement → descriptorFor maps it to
   // a Fabric name); array children, since these are host elements, not slotted components.
-  return h(node.type, { ...node.props, key: node.key }, node.children.map(toChild));
+  return h(
+    node.type,
+    { ...node.props, key: node.key },
+    node.children.map(toChild),
+  );
 }
 
 function toChild(child: IDescriptorChild): VNode | string {

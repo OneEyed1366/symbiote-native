@@ -24,4 +24,5 @@ export type INativeSmsModule = {
   ): Promise<ISmsResponse>;
 };
 
-export const expoSms = requireNativeModule<INativeSmsModule>(EXPO_SMS_MODULE_NAME);
+export const expoSms =
+  requireNativeModule<INativeSmsModule>(EXPO_SMS_MODULE_NAME);

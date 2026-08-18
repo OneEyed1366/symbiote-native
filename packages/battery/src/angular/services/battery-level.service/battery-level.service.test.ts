@@ -24,14 +24,16 @@ const removeMock = vi.fn();
 const getBatteryLevelAsyncMock = vi.fn(async () => 0.42);
 
 vi.mock('../../../core', () => ({
-  addBatteryLevelListener: (listener: (event: { batteryLevel: number }) => void) =>
-    addListenerMock(listener),
+  addBatteryLevelListener: (
+    listener: (event: { batteryLevel: number }) => void,
+  ) => addListenerMock(listener),
   getBatteryLevelAsync: () => getBatteryLevelAsyncMock(),
 }));
 
 const ROOT_TAG = 971;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedResult: Signal<number> | undefined;
 let capturedListener: ((event: { batteryLevel: number }) => void) | undefined;
@@ -90,7 +92,8 @@ describe('BatteryLevelService.connect', () => {
     mount(ROOT_TAG, BatteryLevelHost);
     await tick();
 
-    if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+    if (capturedListener === undefined)
+      throw new Error('addListener callback was not captured');
     capturedListener({ batteryLevel: 0.1 });
 
     expect(capturedResult?.()).toBe(0.1);

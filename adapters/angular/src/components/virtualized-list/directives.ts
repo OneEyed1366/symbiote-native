@@ -68,7 +68,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // typed at the call site (let-item: ItemT, let-index: number, let-separators: ISeparators).
 @Directive({ selector: '[vListItem]', standalone: true })
 export class VListItemDirective<ItemT = unknown> {
-  readonly templateRef = inject<TemplateRef<IVListItemContext<ItemT>>>(TemplateRef);
+  readonly templateRef =
+    inject<TemplateRef<IVListItemContext<ItemT>>>(TemplateRef);
 
   static ngTemplateContextGuard<T>(
     _dir: VListItemDirective<T>,
@@ -101,7 +102,8 @@ export class VListEmptyDirective {
 // types the `let-` bindings against the separator props.
 @Directive({ selector: '[vListSeparator]', standalone: true })
 export class VListSeparatorDirective<ItemT = unknown> {
-  readonly templateRef = inject<TemplateRef<IVListSeparatorContext<ItemT>>>(TemplateRef);
+  readonly templateRef =
+    inject<TemplateRef<IVListSeparatorContext<ItemT>>>(TemplateRef);
 
   static ngTemplateContextGuard<T>(
     _dir: VListSeparatorDirective<T>,
@@ -133,11 +135,16 @@ export class VListOutletDirective<C = unknown> implements OnChanges, OnDestroy {
       this.viewRef =
         this.templateRef === undefined
           ? null
-          : this.viewContainer.createEmbeddedView(this.templateRef, this.context);
+          : this.viewContainer.createEmbeddedView(
+              this.templateRef,
+              this.context,
+            );
       return;
     }
     if (this.viewRef !== null && this.context !== undefined) {
-      dlog(`Angular VListOutlet#${this.instanceId} context updated, markForCheck`);
+      dlog(
+        `Angular VListOutlet#${this.instanceId} context updated, markForCheck`,
+      );
       this.updateContext(this.viewRef.context, this.context);
       this.viewRef.markForCheck();
     }
@@ -158,7 +165,10 @@ export class VListOutletDirective<C = unknown> implements OnChanges, OnDestroy {
   }
 }
 
-function copyContextFields(target: Record<string, unknown>, source: Record<string, unknown>): void {
+function copyContextFields(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+): void {
   for (const key of Object.keys(target)) {
     if (!(key in source)) delete target[key];
   }

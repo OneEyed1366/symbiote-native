@@ -23,7 +23,8 @@ import { mount, unmount } from './render';
 
 // RN sets both before any app code runs (setUpGlobals.js / setUpNavigator.js); a bare vitest
 // sandbox has neither, and svelte's init_operations() reads both at first mount.
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -33,7 +34,8 @@ const TMP_DIR = join(__dirname, '../build/__boundary_smoke__');
 const CHILD_MODULE = 'throwing-child.mjs';
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -47,7 +49,11 @@ afterEach(() => {
 
 let compileCounter = 0;
 
-function compileToFile(source: string, name: string, fileName?: string): string {
+function compileToFile(
+  source: string,
+  name: string,
+  fileName?: string,
+): string {
   const result = compile(source, {
     generate: 'client',
     filename: `${name}.svelte`,
@@ -55,7 +61,10 @@ function compileToFile(source: string, name: string, fileName?: string): string 
     css: 'external',
   });
   compileCounter += 1;
-  const file = join(TMP_DIR, fileName ?? `${name}-${String(compileCounter)}.mjs`);
+  const file = join(
+    TMP_DIR,
+    fileName ?? `${name}-${String(compileCounter)}.mjs`,
+  );
   writeFileSync(file, result.js.code);
   return file;
 }
@@ -67,12 +76,17 @@ async function loadComponent(file: string, name: string): Promise<Component> {
   }
   const component: unknown = mod.default;
   if (typeof component !== 'function') {
-    throw new Error(`compiled ${name}.svelte default export is not a component`);
+    throw new Error(
+      `compiled ${name}.svelte default export is not a component`,
+    );
   }
   return component;
 }
 
-async function compileComponent(source: string, name: string): Promise<Component> {
+async function compileComponent(
+  source: string,
+  name: string,
+): Promise<Component> {
   return loadComponent(compileToFile(source, name), name);
 }
 
@@ -151,7 +165,9 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
       // Exactly one child: the boundary itself must contribute NO native node of its own, and its
       // anchor must stay an engine anchor the commit walk skips.
       expect(testIds()).toEqual(['child']);
-      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "ok"))');
+      expect(fabric.serialize(appChildren())).toBe(
+        'RCTView(RCTText(RCTRawText "ok"))',
+      );
     });
 
     // why: a boundary wrapping a live `{#each}` must let the each-block's own keyed diff run
@@ -182,7 +198,11 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
       await tick();
 
       const listChildren = (): IFakeNode[] => appChildren()[0]?.children ?? [];
-      expect(listChildren().map(child => child.props.testID)).toEqual(['a', 'b', 'c']);
+      expect(listChildren().map(child => child.props.testID)).toEqual([
+        'a',
+        'b',
+        'c',
+      ]);
 
       // Reorder + grow + shrink in one update: the each-block's keyed diff moves nodes around the
       // boundary's own anchor, which is where a mis-managed anchor would surface as a wrong order.
@@ -190,7 +210,11 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
       await tick();
       await tick();
 
-      expect(listChildren().map(child => child.props.testID)).toEqual(['c', 'd', 'a']);
+      expect(listChildren().map(child => child.props.testID)).toEqual([
+        'c',
+        'd',
+        'a',
+      ]);
       expect(fabric.serialize(listChildren())).toBe(
         'RCTView(RCTText(RCTRawText "c"))RCTView(RCTText(RCTRawText "d"))RCTView(RCTText(RCTRawText "a"))',
       );
@@ -230,7 +254,9 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
 
       // The child's own subtree must be fully gone, not merely hidden behind the failed snippet.
       expect(testIds()).toEqual(['failed']);
-      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "child exploded"))');
+      expect(fabric.serialize(appChildren())).toBe(
+        'RCTView(RCTText(RCTRawText "child exploded"))',
+      );
     });
 
     // why: `reset()` is the boundary's own retry mechanism — a real app wires it to a "try again"
@@ -268,7 +294,9 @@ describe('<svelte:boundary> (real compiled output, real fake-Fabric)', () => {
       // Back to exactly the child — the failed subtree must be torn down, and re-rendering the
       // children must not leave a second copy behind.
       expect(testIds()).toEqual(['child']);
-      expect(fabric.serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "ok"))');
+      expect(fabric.serialize(appChildren())).toBe(
+        'RCTView(RCTText(RCTRawText "ok"))',
+      );
     });
   });
 });

@@ -38,6 +38,7 @@ wiring your own change handler by hand.
     component resolves whichever arrived and emits both, so `:value`/`@value-
     change` and `v-model` are interchangeable, never a choice you have to commit
     to upfront.
+
   </TabItem>
   <TabItem label="Angular">
     This is Angular's banana-in-a-box `[(value)]` two-way binding. The same three
@@ -59,6 +60,7 @@ wiring your own change handler by hand.
     This is not a special case wired per-component — it falls out of the RN prop
     name (`value`) already matching Angular's `@Output()` naming convention
     (`value` + `valueChange`), which is exactly what `[(x)]` expects.
+
   </TabItem>
   <TabItem label="Svelte">
     This is Svelte 5's own `$bindable()` mechanism — a component opts a prop
@@ -95,6 +97,7 @@ wiring your own change handler by hand.
     instance is bound from the inside, so it only echoes the native-reported
     value back into your bound variable when `onValueChange` is absent. Pass
     one or the other, not both, on the same control.
+
   </TabItem>
 </Tabs>
 

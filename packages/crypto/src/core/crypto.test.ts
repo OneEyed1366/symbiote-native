@@ -89,7 +89,9 @@ describe('getRandomBytes', () => {
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_CRYPTO.getRandomValues = undefined;
 
-      expect(() => getRandomBytes(4)).toThrow('getRandomBytes is not available on expo-crypto');
+      expect(() => getRandomBytes(4)).toThrow(
+        'getRandomBytes is not available on expo-crypto',
+      );
 
       FAKE_NATIVE_CRYPTO.getRandomValues = native;
     });
@@ -139,7 +141,9 @@ describe('getRandomValues', () => {
       const result = getRandomValues(typedArray);
 
       expect(result).toBe(typedArray);
-      expect(FAKE_NATIVE_CRYPTO.getRandomValues).toHaveBeenCalledWith(typedArray);
+      expect(FAKE_NATIVE_CRYPTO.getRandomValues).toHaveBeenCalledWith(
+        typedArray,
+      );
       expect(Array.from(typedArray)).toEqual([7, 7, 7, 7]);
     });
   });
@@ -172,7 +176,9 @@ describe('randomUUID', () => {
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_CRYPTO.randomUUID = undefined;
 
-      expect(() => randomUUID()).toThrow('randomUUID is not available on expo-crypto');
+      expect(() => randomUUID()).toThrow(
+        'randomUUID is not available on expo-crypto',
+      );
 
       FAKE_NATIVE_CRYPTO.randomUUID = native;
     });
@@ -206,9 +212,9 @@ describe('digestStringAsync', () => {
     });
 
     it('resolves with the native digest', async () => {
-      await expect(digestStringAsync(CryptoDigestAlgorithm.MD5, 'hello')).resolves.toBe(
-        'fake-digest-hex',
-      );
+      await expect(
+        digestStringAsync(CryptoDigestAlgorithm.MD5, 'hello'),
+      ).resolves.toBe('fake-digest-hex');
     });
   });
 
@@ -217,23 +223,25 @@ describe('digestStringAsync', () => {
       // why: CryptoDigestAlgorithm is a closed enum — a value outside it must never reach the
       // native module, which may not validate it itself.
       // @ts-expect-error -- exercising the runtime guard against an invalid algorithm value
-      await expect(digestStringAsync('NOT-A-REAL-ALGORITHM', 'hello')).rejects.toThrow(
-        'Invalid algorithm provided',
-      );
+      await expect(
+        digestStringAsync('NOT-A-REAL-ALGORITHM', 'hello'),
+      ).rejects.toThrow('Invalid algorithm provided');
       expect(FAKE_NATIVE_CRYPTO.digestStringAsync).not.toHaveBeenCalled();
     });
 
     it('rejects non-string data', async () => {
       // @ts-expect-error -- exercising the runtime guard against non-string data
-      await expect(digestStringAsync(CryptoDigestAlgorithm.SHA256, 12345)).rejects.toThrow(
-        'Invalid data provided',
-      );
+      await expect(
+        digestStringAsync(CryptoDigestAlgorithm.SHA256, 12345),
+      ).rejects.toThrow('Invalid data provided');
     });
 
     it('rejects an invalid encoding', async () => {
       await expect(
         // @ts-expect-error -- exercising the runtime guard against an invalid encoding value
-        digestStringAsync(CryptoDigestAlgorithm.SHA256, 'hello', { encoding: 'not-an-encoding' }),
+        digestStringAsync(CryptoDigestAlgorithm.SHA256, 'hello', {
+          encoding: 'not-an-encoding',
+        }),
       ).rejects.toThrow('Invalid encoding provided');
     });
 
@@ -242,9 +250,9 @@ describe('digestStringAsync', () => {
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_CRYPTO.digestStringAsync = undefined;
 
-      await expect(digestStringAsync(CryptoDigestAlgorithm.SHA256, 'hello')).rejects.toThrow(
-        'digestStringAsync is not available on expo-crypto',
-      );
+      await expect(
+        digestStringAsync(CryptoDigestAlgorithm.SHA256, 'hello'),
+      ).rejects.toThrow('digestStringAsync is not available on expo-crypto');
 
       FAKE_NATIVE_CRYPTO.digestStringAsync = native;
     });
@@ -279,7 +287,8 @@ describe('digest', () => {
       const result = await digest(CryptoDigestAlgorithm.SHA1, data);
 
       expect(FAKE_NATIVE_CRYPTO.digest).toHaveBeenCalledTimes(1);
-      const [algorithm, output, passedData] = FAKE_NATIVE_CRYPTO.digest.mock.calls[0];
+      const [algorithm, output, passedData] =
+        FAKE_NATIVE_CRYPTO.digest.mock.calls[0];
       expect(algorithm).toBe(CryptoDigestAlgorithm.SHA1);
       expect(output).toHaveLength(20); // SHA1's entry in digestLengths
       expect(passedData).toBe(data);
@@ -292,15 +301,16 @@ describe('digest', () => {
 
   describe('Negative', () => {
     it('rejects when neither digestAsync nor digest is available', async () => {
-      const { digestAsync: nativeAsync, digest: nativeSync } = FAKE_NATIVE_CRYPTO;
+      const { digestAsync: nativeAsync, digest: nativeSync } =
+        FAKE_NATIVE_CRYPTO;
       // @ts-expect-error -- simulating a platform where the native module has neither method
       FAKE_NATIVE_CRYPTO.digestAsync = undefined;
       // @ts-expect-error -- simulating a platform where the native module has neither method
       FAKE_NATIVE_CRYPTO.digest = undefined;
 
-      await expect(digest(CryptoDigestAlgorithm.SHA256, new Uint8Array([1]))).rejects.toThrow(
-        'digest is not available on expo-crypto',
-      );
+      await expect(
+        digest(CryptoDigestAlgorithm.SHA256, new Uint8Array([1])),
+      ).rejects.toThrow('digest is not available on expo-crypto');
 
       FAKE_NATIVE_CRYPTO.digestAsync = nativeAsync;
       FAKE_NATIVE_CRYPTO.digest = nativeSync;
@@ -316,9 +326,9 @@ describe('digest', () => {
         throw new Error('native digestAsync exploded');
       });
 
-      await expect(digest(CryptoDigestAlgorithm.SHA256, new Uint8Array([1]))).rejects.toThrow(
-        'native digestAsync exploded',
-      );
+      await expect(
+        digest(CryptoDigestAlgorithm.SHA256, new Uint8Array([1])),
+      ).rejects.toThrow('native digestAsync exploded');
 
       FAKE_NATIVE_CRYPTO.digestAsync = native;
     });

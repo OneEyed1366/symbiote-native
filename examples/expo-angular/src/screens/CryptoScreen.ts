@@ -26,7 +26,11 @@ const RANDOM_BYTE_COUNT = 16;
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="crypto-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="crypto-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -37,8 +41,9 @@ const RANDOM_BYTE_COUNT = 16;
           <View class="hero-copy">
             <Text class="hero-title">Crypto</Text>
             <Text class="hero-body">
-              @symbiote-native/crypto — cryptographically secure random bytes, randomUUID, and
-              string digest hashing (SHA-1/256/384/512, MD2/4/5).
+              @symbiote-native/crypto — cryptographically secure random bytes,
+              randomUUID, and string digest hashing (SHA-1/256/384/512,
+              MD2/4/5).
             </Text>
           </View>
         </View>
@@ -51,7 +56,9 @@ const RANDOM_BYTE_COUNT = 16;
             (press)="handleGenerateUuid()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="crypto-uuid-result" class="value-text">{{ uuidLabel() }}</Text>
+          <Text testID="crypto-uuid-result" class="value-text">{{
+            uuidLabel()
+          }}</Text>
         </View>
 
         <View testID="crypto-digest-card" class="capability-card">
@@ -62,7 +69,9 @@ const RANDOM_BYTE_COUNT = 16;
             (press)="handleDigestSha256()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="crypto-digest-result" class="value-text">{{ digestLabel() }}</Text>
+          <Text testID="crypto-digest-result" class="value-text">{{
+            digestLabel()
+          }}</Text>
         </View>
 
         <View testID="crypto-random-bytes-card" class="capability-card">
@@ -73,7 +82,9 @@ const RANDOM_BYTE_COUNT = 16;
             (press)="handleGetRandomBytes()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="crypto-random-bytes-result" class="value-text">{{ randomBytesLabel() }}</Text>
+          <Text testID="crypto-random-bytes-result" class="value-text">{{
+            randomBytesLabel()
+          }}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -96,13 +107,15 @@ export class CryptoScreen {
   }
 
   handleDigestSha256(): void {
-    digestStringAsync(CryptoDigestAlgorithm.SHA256, DIGEST_SAMPLE_STRING).then(value =>
-      this.digest.set(value),
+    digestStringAsync(CryptoDigestAlgorithm.SHA256, DIGEST_SAMPLE_STRING).then(
+      value => this.digest.set(value),
     );
   }
 
   handleGetRandomBytes(): void {
-    getRandomBytesAsync(RANDOM_BYTE_COUNT).then(value => this.randomBytes.set(value));
+    getRandomBytesAsync(RANDOM_BYTE_COUNT).then(value =>
+      this.randomBytes.set(value),
+    );
   }
 
   uuidLabel(): string {

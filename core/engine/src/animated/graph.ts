@@ -16,7 +16,11 @@ import {
   type INativeNodeConfig,
   type IPlatformConfig,
 } from './native/native-animated';
-import { checkValidRanges, createInterpolation, type IInterpolationConfig } from './interpolation';
+import {
+  checkValidRanges,
+  createInterpolation,
+  type IInterpolationConfig,
+} from './interpolation';
 import { dlog } from '../debug';
 
 // Most nodes emit a scalar; a composite node (AnimatedColor) emits its rasterized
@@ -102,7 +106,10 @@ export class AnimatedNode {
       const config =
         this.platformConfig === undefined
           ? this.__getNativeConfig()
-          : { ...this.__getNativeConfig(), platformConfig: this.platformConfig };
+          : {
+              ...this.__getNativeConfig(),
+              platformConfig: this.platformConfig,
+            };
       nativeAnimated.createAnimatedNode(this.nativeTag, config);
     }
     return this.nativeTag;
@@ -111,7 +118,9 @@ export class AnimatedNode {
   // Each concrete node type (value / interpolation / style / transform / props)
   // overrides this with its native shape; a plain node cannot be offloaded.
   __getNativeConfig(): INativeNodeConfig {
-    throw new Error('This animated node type cannot be used as a native animated node');
+    throw new Error(
+      'This animated node type cannot be used as a native animated node',
+    );
   }
 
   // The current rasterized value. Heterogeneous across the graph: scalar nodes
@@ -192,7 +201,10 @@ export class AnimatedWithChildren extends AnimatedNode {
       child.__makeNative();
     }
     for (const child of this.children) {
-      nativeAnimated.connectAnimatedNodes(this.__getNativeTag(), child.__getNativeTag());
+      nativeAnimated.connectAnimatedNodes(
+        this.__getNativeTag(),
+        child.__getNativeTag(),
+      );
     }
   }
 
@@ -204,7 +216,10 @@ export class AnimatedWithChildren extends AnimatedNode {
     // A child joining an already-native parent must itself be made native and wired.
     if (this.isNative) {
       child.__makeNative();
-      nativeAnimated.connectAnimatedNodes(this.__getNativeTag(), child.__getNativeTag());
+      nativeAnimated.connectAnimatedNodes(
+        this.__getNativeTag(),
+        child.__getNativeTag(),
+      );
     }
   }
 
@@ -214,7 +229,10 @@ export class AnimatedWithChildren extends AnimatedNode {
       return;
     }
     if (this.isNative && child.__isNative()) {
-      nativeAnimated.disconnectAnimatedNodes(this.__getNativeTag(), child.__getNativeTag());
+      nativeAnimated.disconnectAnimatedNodes(
+        this.__getNativeTag(),
+        child.__getNativeTag(),
+      );
     }
     this.children.splice(index, 1);
     if (this.children.length === 0) {
@@ -261,7 +279,9 @@ function numericValueOf(node: AnimatedNode): number {
 // under useDefineForClassFields. So leaves are detected structurally instead.
 function leafUpdate(node: AnimatedNode): (() => void) | undefined {
   const candidate = Reflect.get(node, 'update');
-  return typeof candidate === 'function' ? () => candidate.call(node) : undefined;
+  return typeof candidate === 'function'
+    ? () => candidate.call(node)
+    : undefined;
 }
 
 // Top-down walk to the leaves, then re-pull each leaf (deduped by node identity,
@@ -354,8 +374,10 @@ export class AnimatedInterpolation extends AnimatedWithChildren {
       type: 'interpolation',
       inputRange: this.config.inputRange,
       outputRange: this.config.outputRange,
-      extrapolateLeft: this.config.extrapolateLeft ?? this.config.extrapolate ?? 'extend',
-      extrapolateRight: this.config.extrapolateRight ?? this.config.extrapolate ?? 'extend',
+      extrapolateLeft:
+        this.config.extrapolateLeft ?? this.config.extrapolate ?? 'extend',
+      extrapolateRight:
+        this.config.extrapolateRight ?? this.config.extrapolate ?? 'extend',
     };
   }
 }

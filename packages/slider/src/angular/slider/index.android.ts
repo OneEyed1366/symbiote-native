@@ -15,7 +15,13 @@ const ANDROID_STEPS_CONTAINER_TOP = 0;
   standalone: true,
   imports: [DescriptorOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => Slider), multi: true }],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => Slider),
+      multi: true,
+    },
+  ],
   template: `<symbiote-descriptor-outlet [node]="descriptor" />`,
 })
 export class Slider extends SliderBase {

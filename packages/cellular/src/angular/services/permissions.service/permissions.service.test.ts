@@ -43,14 +43,17 @@ vi.mock('../../../core', () => ({
 
 const ROOT_TAG = 973;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedResult: Signal<IPermissionResponse | null> | undefined;
 let capturedService: PermissionsService | undefined;
 
 // Node only reports an unhandled rejection a macrotask after the promise settles, so a plain
 // `await tick()` on the service's own signals is too early to prove one did not happen.
-async function collectUnhandledRejections(run: () => Promise<void>): Promise<unknown[]> {
+async function collectUnhandledRejections(
+  run: () => Promise<void>,
+): Promise<unknown[]> {
   const unhandled: unknown[] = [];
   const onUnhandledRejection = (reason: unknown): void => {
     unhandled.push(reason);
@@ -155,9 +158,13 @@ describe('PermissionsService.connect', () => {
       mount(ROOT_TAG, PermissionsHost);
       await tick();
 
-      requestPermissionsAsyncMock.mockRejectedValueOnce(new Error('permission request failed'));
+      requestPermissionsAsyncMock.mockRejectedValueOnce(
+        new Error('permission request failed'),
+      );
 
-      await expect(capturedService?.request()).rejects.toThrow('permission request failed');
+      await expect(capturedService?.request()).rejects.toThrow(
+        'permission request failed',
+      );
       expect(capturedResult?.()).toEqual(GRANTED);
     });
 
@@ -165,9 +172,13 @@ describe('PermissionsService.connect', () => {
       mount(ROOT_TAG, PermissionsHost);
       await tick();
 
-      getPermissionsAsyncMock.mockRejectedValueOnce(new Error('permission check failed'));
+      getPermissionsAsyncMock.mockRejectedValueOnce(
+        new Error('permission check failed'),
+      );
 
-      await expect(capturedService?.get()).rejects.toThrow('permission check failed');
+      await expect(capturedService?.get()).rejects.toThrow(
+        'permission check failed',
+      );
       expect(capturedResult?.()).toEqual(GRANTED);
     });
 
@@ -175,7 +186,9 @@ describe('PermissionsService.connect', () => {
       // why: connect()'s auto-fetch has no caller to reject to. It used to be `void this.get()`,
       // so a native rejection escaped the service entirely as an unhandled promise rejection and
       // left the signal at null — indistinguishable from "still fetching".
-      getPermissionsAsyncMock.mockRejectedValueOnce(new Error('permission check failed'));
+      getPermissionsAsyncMock.mockRejectedValueOnce(
+        new Error('permission check failed'),
+      );
 
       // mounted before the listener goes up, but the rejection can only be reported once the
       // microtask queue drains — no turn passes between these two lines
@@ -194,7 +207,9 @@ describe('PermissionsService.connect', () => {
       // why: the auto-fetch used to be guarded on `status() === null`, which a failed fetch never
       // clears — so every later connect() fired another native call, unbounded once connect() is
       // reached from a change-detected expression instead of a field initializer.
-      getPermissionsAsyncMock.mockRejectedValueOnce(new Error('permission check failed'));
+      getPermissionsAsyncMock.mockRejectedValueOnce(
+        new Error('permission check failed'),
+      );
       mount(ROOT_TAG, PermissionsHost);
       await tick();
 
@@ -209,7 +224,9 @@ describe('PermissionsService.connect', () => {
     it('clears the recorded error once a later get() succeeds', async () => {
       // why: a consumer that retries by hand after a failed auto-fetch must end up with a clean
       // slate — a stale error next to a freshly fetched status would keep reading as "broken".
-      getPermissionsAsyncMock.mockRejectedValueOnce(new Error('permission check failed'));
+      getPermissionsAsyncMock.mockRejectedValueOnce(
+        new Error('permission check failed'),
+      );
       mount(ROOT_TAG, PermissionsHost);
       await tick();
       expect(capturedService?.error()).not.toBeNull();

@@ -9,9 +9,13 @@ import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
 import { setNativeViewConfigSource } from '@symbiote-native/engine';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { findLiveByTestId } from './fabric-tree.test-helper';
-import { createSvelteHarness, loadComponent } from './svelte-compile.test-helper';
+import {
+  createSvelteHarness,
+  loadComponent,
+} from './svelte-compile.test-helper';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -19,15 +23,25 @@ if (globalThis.navigator === undefined) {
 const ROOT_TAG = 91_705;
 
 const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
-  RNSScreen: { directEventTypes: {}, validAttributes: { screenId: true, activityState: true } },
+  RNSScreen: {
+    directEventTypes: {},
+    validAttributes: { screenId: true, activityState: true },
+  },
   RNSScreenStack: { directEventTypes: {}, validAttributes: {} },
-  RNSScreenStackHeaderConfig: { directEventTypes: {}, validAttributes: { title: true } },
-  RNSScreenContentWrapper: { directEventTypes: {}, validAttributes: { collapsable: true } },
+  RNSScreenStackHeaderConfig: {
+    directEventTypes: {},
+    validAttributes: { title: true },
+  },
+  RNSScreenContentWrapper: {
+    directEventTypes: {},
+    validAttributes: { collapsable: true },
+  },
 };
 
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let harness = createSvelteHarness('nested');
 
@@ -99,10 +113,12 @@ describe('nested navigation (Stack inside a Tab screen)', () => {
       // (navigation-context.ts's header comment) - the inner Stack mounts its own NavigationScope
       // for its "inner" route, so a screen inside it must NOT inherit the Tab's "main" route.
       await mountNested();
-      expect(findLiveByTestId(fabric.appRoot(), 'stack-host')?.props?.accessibilityLabel).toBe(
-        'main',
-      );
-      const innerLabel = findLiveByTestId(fabric.appRoot(), 'inner')?.props?.accessibilityLabel;
+      expect(
+        findLiveByTestId(fabric.appRoot(), 'stack-host')?.props
+          ?.accessibilityLabel,
+      ).toBe('main');
+      const innerLabel = findLiveByTestId(fabric.appRoot(), 'inner')?.props
+        ?.accessibilityLabel;
       // The full label format (route|typeof-push|parent-kind) is asserted precisely by the next
       // test; this one only needs to prove the route name segment is "inner", not "main".
       expect(innerLabel?.split('|')[0]).toBe('inner');
@@ -114,9 +130,9 @@ describe('nested navigation (Stack inside a Tab screen)', () => {
       // screen must resolve to the Tab's handle specifically (a jumpTo-capable handle), not merely
       // "some" ancestor object.
       await mountNested();
-      expect(findLiveByTestId(fabric.appRoot(), 'inner')?.props?.accessibilityLabel).toBe(
-        'inner|function|tab-parent',
-      );
+      expect(
+        findLiveByTestId(fabric.appRoot(), 'inner')?.props?.accessibilityLabel,
+      ).toBe('inner|function|tab-parent');
     });
 
     it('keeps the two navigators screen registries separate', async () => {

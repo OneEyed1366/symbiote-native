@@ -51,14 +51,22 @@ types and wires the reducer/render pair from here. Calling the render function d
 adapter itself does, to build its lifecycle wrapper:
 
 ```ts
-import { renderSwitch, createInitialSwitchState, switchReducer } from '@symbiote-native/components';
+import {
+  renderSwitch,
+  createInitialSwitchState,
+  switchReducer,
+} from '@symbiote-native/components';
 
 // inside an adapter's own hook/composable:
 const state = createInitialSwitchState();
 const next = switchReducer(state, { type: 'native-reported', value: true });
 const descriptor = renderSwitch(
   { value: true, disabled: false, passthrough: { onChange, ref } },
-  { trackColorProps: (value, trackColor) => ({ /* platform-specific prop names */ }) },
+  {
+    trackColorProps: (value, trackColor) => ({
+      /* platform-specific prop names */
+    }),
+  },
 );
 // descriptor is then handed to the adapter's own descriptorToReact / descriptorToVue bridge
 ```

@@ -74,16 +74,24 @@ const COLOR_PROPS: ReadonlySet<string> = new Set([
 const STYLE_PROCESSORS = new Map<string, (value: unknown) => unknown>([
   ['boxShadow', value => processBoxShadow(asBoxShadowInput(value))],
   ['filter', value => processFilter(asFilterInput(value))],
-  ['transformOrigin', value => processTransformOrigin(asTransformOriginInput(value))],
+  [
+    'transformOrigin',
+    value => processTransformOrigin(asTransformOriginInput(value)),
+  ],
   ['transform', processTransformValue],
   ['aspectRatio', value => processAspectRatio(asAspectRatioInput(value))],
   ['fontVariant', value => processFontVariant(asFontVariantInput(value))],
-  ['experimental_backgroundImage', value => processBackgroundImage(asBackgroundImageInput(value))],
+  [
+    'experimental_backgroundImage',
+    value => processBackgroundImage(asBackgroundImageInput(value)),
+  ],
 ]);
 
 // boxShadow accepts a CSS string or an array of shadow objects; anything else is
 // undefined to processBoxShadow (which returns []). Narrowing avoids an `as` cast.
-function asBoxShadowInput(value: unknown): Parameters<typeof processBoxShadow>[0] {
+function asBoxShadowInput(
+  value: unknown,
+): Parameters<typeof processBoxShadow>[0] {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.filter(isRecord);
   return undefined;
@@ -98,7 +106,9 @@ function asFilterInput(value: unknown): Parameters<typeof processFilter>[0] {
 
 // experimental_backgroundImage accepts a CSS string (gradient functions) or an array of
 // structured gradient objects; same narrowing as boxShadow/filter.
-function asBackgroundImageInput(value: unknown): Parameters<typeof processBackgroundImage>[0] {
+function asBackgroundImageInput(
+  value: unknown,
+): Parameters<typeof processBackgroundImage>[0] {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.filter(isRecord);
   return undefined;
@@ -106,7 +116,9 @@ function asBackgroundImageInput(value: unknown): Parameters<typeof processBackgr
 
 // transformOrigin accepts a CSS string or a [x, y, z] array of strings/numbers; anything
 // else is undefined to processTransformOrigin (which defaults to center/center/0).
-function asTransformOriginInput(value: unknown): Parameters<typeof processTransformOrigin>[0] {
+function asTransformOriginInput(
+  value: unknown,
+): Parameters<typeof processTransformOrigin>[0] {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.filter(isStringOrNumber);
   return undefined;
@@ -114,14 +126,18 @@ function asTransformOriginInput(value: unknown): Parameters<typeof processTransf
 
 // aspectRatio accepts a number (the common, working form) or a ratio string; otherwise
 // undefined, which processAspectRatio drops.
-function asAspectRatioInput(value: unknown): Parameters<typeof processAspectRatio>[0] {
+function asAspectRatioInput(
+  value: unknown,
+): Parameters<typeof processAspectRatio>[0] {
   if (typeof value === 'number' || typeof value === 'string') return value;
   return undefined;
 }
 
 // fontVariant accepts an array of variant strings (the common, working form) or a
 // space-separated string; anything else becomes an empty string, which yields [].
-function asFontVariantInput(value: unknown): Parameters<typeof processFontVariant>[0] {
+function asFontVariantInput(
+  value: unknown,
+): Parameters<typeof processFontVariant>[0] {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.filter(isString);
   return '';
@@ -152,7 +168,8 @@ function processValue(component: string, key: string, value: unknown): unknown {
   if (processor !== undefined) return processor(value);
   const styleProcessor = STYLE_PROCESSORS.get(key);
   if (styleProcessor !== undefined) return styleProcessor(value);
-  if (COLOR_PROPS.has(key) && isProcessableColor(value)) return processColor(value);
+  if (COLOR_PROPS.has(key) && isProcessableColor(value))
+    return processColor(value);
   return value;
 }
 
@@ -174,7 +191,8 @@ export function fabricProps(node: ISymbioteNode): IFabricProps {
   // hoisting: `style={[base, override]}` is RN's idiom and Fabric wants it flat.
   const style = flattenStyle(node.props.style);
   for (const [key, value] of Object.entries(style)) {
-    if (value !== undefined) out[key] = processValue(node.component, key, value);
+    if (value !== undefined)
+      out[key] = processValue(node.component, key, value);
   }
   return out;
 }

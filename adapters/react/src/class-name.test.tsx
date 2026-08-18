@@ -37,10 +37,20 @@ describe('React className prop', () => {
     // every other adapter's className/class precedence rule.
     it('lets an explicit style prop win over the className-derived one', () => {
       registerStyles({ card: { padding: 10, backgroundColor: 'red' } });
-      mount(ROOT_TAG, <View testID="probe" className="card" style={{ backgroundColor: 'blue' }} />);
+      mount(
+        ROOT_TAG,
+        <View
+          testID="probe"
+          className="card"
+          style={{ backgroundColor: 'blue' }}
+        />,
+      );
 
       const committed = fabric.find(node => node.props.testID === 'probe');
-      expect(committed?.props).toMatchObject({ padding: 10, backgroundColor: 'blue' });
+      expect(committed?.props).toMatchObject({
+        padding: 10,
+        backgroundColor: 'blue',
+      });
     });
   });
 });

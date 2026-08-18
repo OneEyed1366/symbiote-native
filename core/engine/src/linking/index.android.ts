@@ -15,7 +15,9 @@ export const Linking = createLinking({
   moduleName: 'IntentAndroid',
   sendIntent: (module, action, extras) => {
     if (module === null || module.sendIntent === undefined) {
-      return Promise.reject(new Error('Linking: IntentAndroid native module unavailable'));
+      return Promise.reject(
+        new Error('Linking: IntentAndroid native module unavailable'),
+      );
     }
     return module.sendIntent(action, extras);
   },

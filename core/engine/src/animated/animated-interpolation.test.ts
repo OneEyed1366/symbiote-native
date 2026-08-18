@@ -6,7 +6,11 @@
 // functions plus one graph node, so no Fabric slot.
 
 import { describe, expect, it } from 'vitest';
-import { AnimatedNode, AnimatedValue, checkValidRanges } from '@symbiote-native/engine';
+import {
+  AnimatedNode,
+  AnimatedValue,
+  checkValidRanges,
+} from '@symbiote-native/engine';
 
 describe('AnimatedNode.interpolate — the base-class implementation (Positive)', () => {
   it('works on a plain AnimatedNode subclass with no interpolate override of its own', () => {
@@ -24,7 +28,10 @@ describe('AnimatedNode.interpolate — the base-class implementation (Positive)'
     }
 
     const bare = new BareValueNode(0.5);
-    const doubled = bare.interpolate({ inputRange: [0, 1], outputRange: [0, 2] });
+    const doubled = bare.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 2],
+    });
 
     expect(doubled.__getValue()).toBe(1);
   });
@@ -138,8 +145,14 @@ describe('AnimatedInterpolation — Positive (non-numeric output ranges)', () =>
   // interpolation leaf during flushValue.
   it('__attach registers the interpolation as a child of its parent; __detach removes it', () => {
     const source = new AnimatedValue(0);
-    const interpolation = source.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-    const consumer = source.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+    const interpolation = source.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
+    const consumer = source.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
     interpolation.__addChild(consumer);
     expect(source.__getChildren()).toContain(interpolation);
 
@@ -173,13 +186,17 @@ describe('AnimatedInterpolation — Negative (the throw IS the contract)', () =>
   // interpolate along, so this is rejected at construction instead of producing an undefined
   // segment lookup at read time.
   it('checkValidRanges throws when inputRange has fewer than 2 elements', () => {
-    expect(() => checkValidRanges([0], [0, 1])).toThrow(/inputRange must have at least 2 elements/);
+    expect(() => checkValidRanges([0], [0, 1])).toThrow(
+      /inputRange must have at least 2 elements/,
+    );
   });
 
   // why: findRange's binary-search-like scan assumes inputRange is sorted; a non-monotonic
   // range would silently pick the wrong segment instead of failing loudly.
   it('checkValidRanges throws when inputRange is not monotonically non-decreasing', () => {
-    expect(() => checkValidRanges([1, 0], [0, 1])).toThrow(/monotonically non-decreasing/);
+    expect(() => checkValidRanges([1, 0], [0, 1])).toThrow(
+      /monotonically non-decreasing/,
+    );
   });
 
   it('checkValidRanges throws when inputRange and outputRange lengths differ', () => {
@@ -207,7 +224,9 @@ describe('AnimatedInterpolation — Negative (the throw IS the contract)', () =>
   // calls checkValidRanges rather than deferring it.
   it('the constructor throws immediately for a bad range, before any __getValue() read', () => {
     const source = new AnimatedValue(0);
-    expect(() => source.interpolate({ inputRange: [0], outputRange: [0, 1] })).toThrow();
+    expect(() =>
+      source.interpolate({ inputRange: [0], outputRange: [0, 1] }),
+    ).toThrow();
   });
 
   // why: a string output range mixing a color entry with a non-color entry can't be
@@ -264,7 +283,12 @@ describe('AnimatedInterpolation — Negative (the throw IS the contract)', () =>
       }
     }
     const stringParent = new StringValuedNode();
-    const broken = stringParent.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-    expect(() => broken.__getValue()).toThrow('Cannot interpolate an input which is not a number');
+    const broken = stringParent.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
+    expect(() => broken.__getValue()).toThrow(
+      'Cannot interpolate an input which is not a number',
+    );
   });
 });

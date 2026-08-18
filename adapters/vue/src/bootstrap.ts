@@ -5,7 +5,10 @@
 
 import { AppRegistry as RNAppRegistry } from 'react-native';
 import type { Component } from '@vue/runtime-core';
-import { bootstrapHost, type IBootstrapHostOptions } from '@symbiote-native/components/bootstrap';
+import {
+  bootstrapHost,
+  type IBootstrapHostOptions,
+} from '@symbiote-native/components/bootstrap';
 import { AppRegistry, setHostRegistrar } from './modules/app-registry';
 
 export type { IBootstrapHostOptions } from '@symbiote-native/components/bootstrap';
@@ -15,7 +18,10 @@ export type ISymbioteVueApp = {
 };
 
 // Mirrors real Vue's createApp(App).mount(selector) two-step idiom.
-export function createApp(App: Component, options: IBootstrapHostOptions = {}): ISymbioteVueApp {
+export function createApp(
+  App: Component,
+  options: IBootstrapHostOptions = {},
+): ISymbioteVueApp {
   return {
     mount(appName: string): void {
       bootstrapHost(options);

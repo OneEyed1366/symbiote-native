@@ -10,7 +10,9 @@ export type ITabScreenOptionsArgs = {
   navigation: ITabNavigatorHandle;
 };
 
-export type ITabScreenOptionsResolver = (args: ITabScreenOptionsArgs) => ITabOptions;
+export type ITabScreenOptionsResolver = (
+  args: ITabScreenOptionsArgs,
+) => ITabOptions;
 
 export type ITabScreenProps = {
   name: string;

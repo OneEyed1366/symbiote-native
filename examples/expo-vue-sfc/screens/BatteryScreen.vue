@@ -7,13 +7,23 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
 import {
   BatteryState,
   isAvailableAsync,
   isBatteryOptimizationEnabledAsync,
 } from '@symbiote-native/battery';
-import { useBatteryLevel, useBatteryState, useLowPowerMode } from '@symbiote-native/battery/vue';
+import {
+  useBatteryLevel,
+  useBatteryState,
+  useLowPowerMode,
+} from '@symbiote-native/battery/vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -46,7 +56,9 @@ const batteryState = useBatteryState();
 const lowPowerMode = useLowPowerMode();
 
 const batteryLevelText = computed(() =>
-  batteryLevel.value < 0 ? 'unknown' : `${Math.round(batteryLevel.value * 100)}%`,
+  batteryLevel.value < 0
+    ? 'unknown'
+    : `${Math.round(batteryLevel.value * 100)}%`,
 );
 const batteryStateText = computed(() => batteryStateLabel(batteryState.value));
 const lowPowerModeText = computed(() => (lowPowerMode.value ? 'ON' : 'OFF'));
@@ -68,9 +80,15 @@ onMounted(() => {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="battery-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="battery-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -79,9 +97,10 @@ onMounted(() => {
         <View class="hero-copy">
           <Text class="hero-title">Battery</Text>
           <Text class="hero-body"
-            >@symbiote-native/battery — live battery level, charging state, and low-power mode,
-            over three Vue composables. The iOS Simulator reports the battery API as unavailable;
-            a real device is needed to see live readings.</Text
+            >@symbiote-native/battery — live battery level, charging state, and
+            low-power mode, over three Vue composables. The iOS Simulator
+            reports the battery API as unavailable; a real device is needed to
+            see live readings.</Text
           >
         </View>
       </View>
@@ -90,15 +109,21 @@ onMounted(() => {
         <Text class="battery-card-title">Live</Text>
         <View class="battery-row">
           <Text class="battery-row-label">Level</Text>
-          <Text testID="battery-level-value" class="battery-value-text">{{ batteryLevelText }}</Text>
+          <Text testID="battery-level-value" class="battery-value-text">{{
+            batteryLevelText
+          }}</Text>
         </View>
         <View class="battery-row">
           <Text class="battery-row-label">State</Text>
-          <Text testID="battery-state-value" class="battery-value-text">{{ batteryStateText }}</Text>
+          <Text testID="battery-state-value" class="battery-value-text">{{
+            batteryStateText
+          }}</Text>
         </View>
         <View class="battery-row">
           <Text class="battery-row-label">Low power mode</Text>
-          <Text testID="battery-low-power-value" class="battery-value-text">{{ lowPowerModeText }}</Text>
+          <Text testID="battery-low-power-value" class="battery-value-text">{{
+            lowPowerModeText
+          }}</Text>
         </View>
       </View>
 
@@ -106,15 +131,23 @@ onMounted(() => {
         <Text class="battery-card-title">Capabilities</Text>
         <View class="battery-row">
           <Text class="battery-row-label">Available</Text>
-          <View :class="`battery-status-badge battery-status-badge-${isAvailable}`">
+          <View
+            :class="`battery-status-badge battery-status-badge-${isAvailable}`"
+          >
             <Text class="battery-status-text">{{
-              isAvailable === 'checking' ? 'CHECKING…' : isAvailable === 'yes' ? 'YES' : 'NO'
+              isAvailable === 'checking'
+                ? 'CHECKING…'
+                : isAvailable === 'yes'
+                  ? 'YES'
+                  : 'NO'
             }}</Text>
           </View>
         </View>
         <View v-if="Platform.OS === 'android'" class="battery-row">
           <Text class="battery-row-label">Battery optimization enabled</Text>
-          <View :class="`battery-status-badge battery-status-badge-${isOptimizationEnabled}`">
+          <View
+            :class="`battery-status-badge battery-status-badge-${isOptimizationEnabled}`"
+          >
             <Text class="battery-status-text">{{
               isOptimizationEnabled === 'checking'
                 ? 'CHECKING…'

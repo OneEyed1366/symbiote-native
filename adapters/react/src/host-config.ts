@@ -52,7 +52,11 @@ function applyProps(node: ISymbioteNode, props: IProps): void {
   }
 }
 
-function applyUpdate(node: ISymbioteNode, oldProps: IProps, newProps: IProps): void {
+function applyUpdate(
+  node: ISymbioteNode,
+  oldProps: IProps,
+  newProps: IProps,
+): void {
   for (const key of Object.keys(oldProps)) {
     if (isReservedProp(key)) continue;
     if (!Object.hasOwn(newProps, key)) routeProp(node, key, undefined);
@@ -68,7 +72,9 @@ function applyUpdate(node: ISymbioteNode, oldProps: IProps, newProps: IProps): v
 // createPortal(children, node)). Mirrors the Vue renderer's identical IHostElement union.
 type IContainer = SymbioteSurface | ISymbioteNode;
 
-function isSurfaceContainer(container: IContainer): container is SymbioteSurface {
+function isSurfaceContainer(
+  container: IContainer,
+): container is SymbioteSurface {
   return container instanceof SymbioteSurface;
 }
 
@@ -113,7 +119,9 @@ const reconciler = createReconciler<
   getRootHostContext: () => ({ isInsideText: false }),
   getChildHostContext(parentHostContext, type) {
     const isInsideText = descriptorFor(type).isText;
-    return parentHostContext.isInsideText === isInsideText ? parentHostContext : { isInsideText };
+    return parentHostContext.isInsideText === isInsideText
+      ? parentHostContext
+      : { isInsideText };
   },
   getPublicInstance: instance => toPublicInstance(instance),
 
@@ -190,7 +198,9 @@ const reconciler = createReconciler<
   },
   getCurrentUpdatePriority: () => currentUpdatePriority,
   resolveUpdatePriority: () =>
-    currentUpdatePriority !== NoEventPriority ? currentUpdatePriority : DefaultEventPriority,
+    currentUpdatePriority !== NoEventPriority
+      ? currentUpdatePriority
+      : DefaultEventPriority,
 
   maySuspendCommit: () => false,
   NotPendingTransition: null,

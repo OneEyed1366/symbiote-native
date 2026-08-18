@@ -1,4 +1,10 @@
-import { View, Text, useColorScheme, PlatformColor, DynamicColorIOS } from '@symbiote-native/react';
+import {
+  View,
+  Text,
+  useColorScheme,
+  PlatformColor,
+  DynamicColorIOS,
+} from '@symbiote-native/react';
 
 // PlatformColor / DynamicColorIOS resolve on the native side: 'systemBlue' / 'label'
 // become iOS UIColor selectors, and the dynamic tuple flips with the system

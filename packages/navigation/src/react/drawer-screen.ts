@@ -5,7 +5,11 @@
 // <third_party_rn_packages_are_react_only> - this and Drawer import nothing from react-native.
 
 import type { FC, ReactElement } from 'react';
-import type { IDrawerNavigatorHandle, IDrawerScreenOptions, IRoute } from '../core';
+import type {
+  IDrawerNavigatorHandle,
+  IDrawerScreenOptions,
+  IRoute,
+} from '../core';
 
 // The options resolver runs INSIDE Drawer while it computes a screen's options, closing over the
 // live navigator handle - not the mounted screen component (that reads navigation/route via the
@@ -15,7 +19,9 @@ export type IDrawerScreenOptionsArgs = {
   navigation: IDrawerNavigatorHandle;
 };
 
-export type IDrawerScreenOptionsResolver = (args: IDrawerScreenOptionsArgs) => IDrawerScreenOptions;
+export type IDrawerScreenOptionsResolver = (
+  args: IDrawerScreenOptionsArgs,
+) => IDrawerScreenOptions;
 
 export type IDrawerScreenProps = {
   name: string;

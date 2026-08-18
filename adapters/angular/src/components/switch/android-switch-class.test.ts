@@ -99,7 +99,9 @@ describe('Switch (android)', () => {
 
     mount(ROOT_TAG, AndroidSwitchToggleHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
-    expect(committedNode('switch-toggle')?.props.backgroundColor).toBeUndefined();
+    expect(
+      committedNode('switch-toggle')?.props.backgroundColor,
+    ).toBeUndefined();
 
     toggleFixture?.enableDark();
     await new Promise<void>(resolve => setTimeout(resolve, 0));

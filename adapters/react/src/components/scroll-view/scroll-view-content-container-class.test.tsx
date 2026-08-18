@@ -37,7 +37,9 @@ describe('React ScrollView contentContainerStyle class-name resolution', () => {
       </ScrollView>,
     );
 
-    const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+    const content = fabric.find(
+      node => node.viewName === 'RCTScrollContentView',
+    );
     expect(content, 'RCTScrollContentView was created').toBeDefined();
     expect(content!.props.padding).toBe(8);
 
@@ -57,7 +59,9 @@ describe('React ScrollView contentContainerStyle class-name resolution', () => {
       </ScrollView>,
     );
 
-    const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+    const content = fabric.find(
+      node => node.viewName === 'RCTScrollContentView',
+    );
     expect(content!.props.padding).toBe(12);
   });
 });

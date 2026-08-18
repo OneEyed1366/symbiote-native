@@ -24,7 +24,11 @@ const drawerStyle = { backgroundColor: '#13243a' };
     drawer-type="slide"
     :drawer-style="drawerStyle"
   >
-    <DrawerScreen name="Home" :component="DrawerHomeScreen" :options="{ title: 'Home', drawerLabel: 'Home' }" />
+    <DrawerScreen
+      name="Home"
+      :component="DrawerHomeScreen"
+      :options="{ title: 'Home', drawerLabel: 'Home' }"
+    />
     <DrawerScreen
       name="Settings"
       :component="DrawerSettingsScreen"

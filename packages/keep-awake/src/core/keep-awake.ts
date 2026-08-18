@@ -21,12 +21,16 @@ export async function isAvailableAsync(): Promise<boolean> {
  * Activates a keep-awake lock under `tag` (the shared default tag when none is given) — the
  * screen stays on for as long as any tag holds an active lock.
  */
-export async function activateKeepAwakeAsync(tag: string = ExpoKeepAwakeTag): Promise<void> {
+export async function activateKeepAwakeAsync(
+  tag: string = ExpoKeepAwakeTag,
+): Promise<void> {
   await expoKeepAwake.activate?.(tag);
 }
 
 /** Releases the keep-awake lock held under `tag` (the shared default tag when none is given). */
-export async function deactivateKeepAwake(tag: string = ExpoKeepAwakeTag): Promise<void> {
+export async function deactivateKeepAwake(
+  tag: string = ExpoKeepAwakeTag,
+): Promise<void> {
   await expoKeepAwake.deactivate?.(tag);
 }
 
@@ -41,8 +45,10 @@ export function addListener(
   if (!expoKeepAwake.addListenerForTag) {
     throw new UnavailabilityError('ExpoKeepAwake', 'addListenerForTag');
   }
-  const tag = typeof tagOrListener === 'string' ? tagOrListener : ExpoKeepAwakeTag;
-  const resolvedListener = typeof tagOrListener === 'function' ? tagOrListener : listener;
+  const tag =
+    typeof tagOrListener === 'string' ? tagOrListener : ExpoKeepAwakeTag;
+  const resolvedListener =
+    typeof tagOrListener === 'function' ? tagOrListener : listener;
   if (!resolvedListener) {
     throw new TypeError('addListener requires a listener function');
   }

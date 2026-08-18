@@ -29,7 +29,8 @@ export function createInitialTabState(
   routes: readonly IRouteEntry[],
   initialRouteName?: string,
 ): ITabRouterState {
-  if (initialRouteName === undefined) return { routes, index: INITIAL_FOCUSED_INDEX };
+  if (initialRouteName === undefined)
+    return { routes, index: INITIAL_FOCUSED_INDEX };
   const index = routes.findIndex(route => route.name === initialRouteName);
   return { routes, index: index === -1 ? INITIAL_FOCUSED_INDEX : index };
 }
@@ -77,7 +78,10 @@ export function tabRouterReducer(
       }
       const target = state.routes[index];
       const routes = state.routes.slice();
-      routes[index] = { ...target, params: mergeParams(target.params, action.params) };
+      routes[index] = {
+        ...target,
+        params: mergeParams(target.params, action.params),
+      };
       return { ...state, index, routes };
     }
 
@@ -86,7 +90,10 @@ export function tabRouterReducer(
       if (index === -1) return state;
       const target = state.routes[index];
       const routes = state.routes.slice();
-      routes[index] = { ...target, params: mergeParams(target.params, action.params) };
+      routes[index] = {
+        ...target,
+        params: mergeParams(target.params, action.params),
+      };
       return { ...state, routes };
     }
 

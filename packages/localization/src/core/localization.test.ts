@@ -10,7 +10,12 @@
 // getCalendars' own comment in localization.ts: "no extra wrapping needed beyond typing".
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CalendarIdentifier, Weekday, type Calendar, type Locale } from './types';
+import {
+  CalendarIdentifier,
+  Weekday,
+  type Calendar,
+  type Locale,
+} from './types';
 
 const FAKE_LOCALES: Locale[] = [
   {
@@ -56,7 +61,8 @@ vi.mock('expo-modules-core', () => ({
 }));
 
 const { getLocales, getCalendars } = await import('./localization');
-const { addLocaleListener, addCalendarListener } = await import('./native-module');
+const { addLocaleListener, addCalendarListener } =
+  await import('./native-module');
 
 afterEach(() => {
   vi.clearAllMocks();

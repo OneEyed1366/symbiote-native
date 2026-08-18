@@ -3,8 +3,12 @@
 import { useEffect, useState } from 'react';
 import { Gyroscope, type IGyroscopeMeasurement } from '../../../core';
 
-export function useGyroscope(updateIntervalMs?: number): IGyroscopeMeasurement | null {
-  const [measurement, setMeasurement] = useState<IGyroscopeMeasurement | null>(null);
+export function useGyroscope(
+  updateIntervalMs?: number,
+): IGyroscopeMeasurement | null {
+  const [measurement, setMeasurement] = useState<IGyroscopeMeasurement | null>(
+    null,
+  );
 
   useEffect(() => {
     // Re-subscribing on interval change keeps the native update rate in sync with the

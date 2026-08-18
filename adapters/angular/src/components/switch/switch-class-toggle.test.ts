@@ -60,7 +60,8 @@ function committedNode(testID: string): IFakeNode | undefined {
   return undefined;
 }
 
-const tick = (): Promise<void> => new Promise<void>(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise<void>(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();

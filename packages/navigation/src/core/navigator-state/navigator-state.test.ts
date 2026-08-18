@@ -39,12 +39,18 @@ describe('navigatorReducer — push', () => {
   // why: push must APPEND, never replace - the whole point of a stack navigator is that the
   // prior screen stays reachable underneath the new one.
   it('appends the new route after the existing stack', () => {
-    const next = navigatorReducer(twoRouteState(), { type: 'push', route: SETTINGS });
+    const next = navigatorReducer(twoRouteState(), {
+      type: 'push',
+      route: SETTINGS,
+    });
     expect(next.routes).toEqual([HOME, DETAILS, SETTINGS]);
   });
 
   it('can push onto a single-route stack', () => {
-    const next = navigatorReducer({ routes: [HOME] }, { type: 'push', route: DETAILS });
+    const next = navigatorReducer(
+      { routes: [HOME] },
+      { type: 'push', route: DETAILS },
+    );
     expect(next.routes).toEqual([HOME, DETAILS]);
   });
 });
@@ -63,7 +69,10 @@ describe('navigatorReducer — pop', () => {
   // why: mirrors the library refusing to pop the initial screen (source comment) - a count that
   // would overshoot the root clamps to the root instead of throwing or emptying the stack.
   it('clamps an overshooting count to the root route, never below it', () => {
-    const next = navigatorReducer(threeRouteState(), { type: 'pop', count: 10 });
+    const next = navigatorReducer(threeRouteState(), {
+      type: 'pop',
+      count: 10,
+    });
     expect(next.routes).toEqual([HOME]);
   });
 
@@ -87,19 +96,27 @@ describe('navigatorReducer — popToTop', () => {
 
 describe('navigatorReducer — popTo', () => {
   it('truncates the stack down to and including the matched key', () => {
-    const next = navigatorReducer(threeRouteState(), { type: 'popTo', key: 'details-1' });
+    const next = navigatorReducer(threeRouteState(), {
+      type: 'popTo',
+      key: 'details-1',
+    });
     expect(next.routes).toEqual([HOME, DETAILS]);
   });
 
   it('is a no-op for an unmatched key, same reference returned', () => {
     const state = threeRouteState();
-    expect(navigatorReducer(state, { type: 'popTo', key: 'missing' })).toBe(state);
+    expect(navigatorReducer(state, { type: 'popTo', key: 'missing' })).toBe(
+      state,
+    );
   });
 });
 
 describe('navigatorReducer — replace', () => {
   it('swaps the top route for the new one, keeping the rest of the stack', () => {
-    const next = navigatorReducer(twoRouteState(), { type: 'replace', route: SETTINGS });
+    const next = navigatorReducer(twoRouteState(), {
+      type: 'replace',
+      route: SETTINGS,
+    });
     expect(next.routes).toEqual([HOME, SETTINGS]);
   });
 
@@ -107,14 +124,20 @@ describe('navigatorReducer — replace', () => {
   // IRouteEntry[] allows []) even though createInitialNavigatorState never produces one - the
   // reducer guards it explicitly rather than crashing on `.slice(0, -1)` of nothing to replace.
   it('seeds the stack with the new route when there is nothing to replace', () => {
-    const next = navigatorReducer({ routes: [] }, { type: 'replace', route: HOME });
+    const next = navigatorReducer(
+      { routes: [] },
+      { type: 'replace', route: HOME },
+    );
     expect(next.routes).toEqual([HOME]);
   });
 });
 
 describe('navigatorReducer — setParams', () => {
   it('merges params onto the focused (top) route when no key is given', () => {
-    const next = navigatorReducer(twoRouteState(), { type: 'setParams', params: { id: 2 } });
+    const next = navigatorReducer(twoRouteState(), {
+      type: 'setParams',
+      params: { id: 2 },
+    });
     expect(next.routes).toEqual([HOME, { ...DETAILS, params: { id: 2 } }]);
   });
 
@@ -124,26 +147,41 @@ describe('navigatorReducer — setParams', () => {
       key: 'home-1',
       params: { tab: 'search' },
     });
-    expect(next.routes).toEqual([{ ...HOME, params: { tab: 'search' } }, DETAILS]);
+    expect(next.routes).toEqual([
+      { ...HOME, params: { tab: 'search' } },
+      DETAILS,
+    ]);
   });
 
   it('shallow-merges, keeping sibling fields the new params omit', () => {
     const state: INavigatorState = {
       routes: [{ key: 'r1', name: 'Home', params: { a: 1, b: 2 } }],
     };
-    const next = navigatorReducer(state, { type: 'setParams', params: { b: 3 } });
+    const next = navigatorReducer(state, {
+      type: 'setParams',
+      params: { b: 3 },
+    });
     expect(next.routes[0].params).toEqual({ a: 1, b: 3 });
   });
 
   it('replaces params outright when the existing params are not an object', () => {
-    const state: INavigatorState = { routes: [{ key: 'r1', name: 'Home', params: undefined }] };
-    const next = navigatorReducer(state, { type: 'setParams', params: { a: 1 } });
+    const state: INavigatorState = {
+      routes: [{ key: 'r1', name: 'Home', params: undefined }],
+    };
+    const next = navigatorReducer(state, {
+      type: 'setParams',
+      params: { a: 1 },
+    });
     expect(next.routes[0].params).toEqual({ a: 1 });
   });
 
   it('leaves state untouched when no route matches the given key', () => {
     const state = twoRouteState();
-    const next = navigatorReducer(state, { type: 'setParams', key: 'missing', params: { id: 9 } });
+    const next = navigatorReducer(state, {
+      type: 'setParams',
+      key: 'missing',
+      params: { id: 9 },
+    });
     expect(next).toBe(state);
   });
 
@@ -164,7 +202,10 @@ describe('navigatorReducer — reset', () => {
     const nextState: INavigatorState = {
       routes: [{ key: 'settings-1', name: 'Settings', params: undefined }],
     };
-    const next = navigatorReducer(twoRouteState(), { type: 'reset', state: nextState });
+    const next = navigatorReducer(twoRouteState(), {
+      type: 'reset',
+      state: nextState,
+    });
     expect(next).toBe(nextState);
   });
 
@@ -172,7 +213,10 @@ describe('navigatorReducer — reset', () => {
     const persisted: INavigatorState = {
       routes: [HOME, DETAILS, { key: 'r3', name: 'Extra', params: undefined }],
     };
-    const next = navigatorReducer({ routes: [HOME] }, { type: 'reset', state: persisted });
+    const next = navigatorReducer(
+      { routes: [HOME] },
+      { type: 'reset', state: persisted },
+    );
     expect(next.routes).toHaveLength(3);
   });
 });

@@ -25,7 +25,12 @@ interface IWindowMetrics {
   fontScale: number;
 }
 
-const INITIAL_WINDOW: IWindowMetrics = { width: 400, height: 800, scale: 3, fontScale: 2 };
+const INITIAL_WINDOW: IWindowMetrics = {
+  width: 400,
+  height: 800,
+  scale: 3,
+  fontScale: 2,
+};
 const ZERO_METRICS = { width: 0, height: 0, scale: 1, fontScale: 1 };
 
 let Dimensions: typeof import('./index').Dimensions;
@@ -52,7 +57,10 @@ beforeEach(() => {
       }),
     },
   });
-  globalThis.RN$registerCallableModule = (name: string, factory: () => IDeviceHub): void => {
+  globalThis.RN$registerCallableModule = (
+    name: string,
+    factory: () => IDeviceHub,
+  ): void => {
     if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
   };
 
@@ -123,7 +131,12 @@ describe('Dimensions', () => {
         },
       });
       await loadDimensions();
-      expect(Dimensions.get('window')).toEqual({ width: 400, height: 800, scale: 3, fontScale: 1 });
+      expect(Dimensions.get('window')).toEqual({
+        width: 400,
+        height: 800,
+        scale: 3,
+        fontScale: 1,
+      });
     });
 
     // why: screen and window are converted independently on Android -- a
@@ -152,8 +165,18 @@ describe('Dimensions', () => {
         },
       });
       await loadDimensions();
-      expect(Dimensions.get('window')).toEqual({ width: 300, height: 600, scale: 3, fontScale: 1 });
-      expect(Dimensions.get('screen')).toEqual({ width: 400, height: 800, scale: 3, fontScale: 1 });
+      expect(Dimensions.get('window')).toEqual({
+        width: 300,
+        height: 600,
+        scale: 3,
+        fontScale: 1,
+      });
+      expect(Dimensions.get('screen')).toEqual({
+        width: 400,
+        height: 800,
+        scale: 3,
+        fontScale: 1,
+      });
     });
   });
 
@@ -168,7 +191,12 @@ describe('Dimensions', () => {
       });
       expect(deviceHub).toBeDefined();
 
-      const nextWindow: IWindowMetrics = { width: 500, height: 900, scale: 3, fontScale: 2 };
+      const nextWindow: IWindowMetrics = {
+        width: 500,
+        height: 900,
+        scale: 3,
+        fontScale: 2,
+      };
       deviceHub?.emit('didUpdateDimensions', { window: nextWindow });
 
       expect(changed?.window.width).toBe(500);
@@ -215,7 +243,9 @@ describe('Dimensions', () => {
     // exactly like the initial getConstants() push during lazy resolution.
     it('the first set() call seeds the cache without notifying; the next one does', async () => {
       await loadDimensions();
-      Dimensions.set({ window: { width: 111, height: 222, scale: 1, fontScale: 1 } });
+      Dimensions.set({
+        window: { width: 111, height: 222, scale: 1, fontScale: 1 },
+      });
 
       let received: { window: { width: number } } | undefined;
       const sub = Dimensions.addEventListener('change', set => {
@@ -223,7 +253,9 @@ describe('Dimensions', () => {
       });
       expect(received).toBeUndefined();
 
-      Dimensions.set({ window: { width: 333, height: 444, scale: 1, fontScale: 1 } });
+      Dimensions.set({
+        window: { width: 333, height: 444, scale: 1, fontScale: 1 },
+      });
       expect(received?.window.width).toBe(333);
       expect(Dimensions.get('window').width).toBe(333);
       sub.remove();

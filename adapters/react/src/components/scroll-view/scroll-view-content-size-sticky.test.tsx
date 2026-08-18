@@ -20,7 +20,10 @@ import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { View, Text, mount, unmount } from '@symbiote-native/react';
 import { ScrollView } from './index';
-import { ScrollViewStickyHeader, type IStickyHeaderComponentProps } from './sticky-header';
+import {
+  ScrollViewStickyHeader,
+  type IStickyHeaderComponentProps,
+} from './sticky-header';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 53;
@@ -72,7 +75,10 @@ function SpyStickyHeader(props: IStickyHeaderComponentProps): ReactElement {
 
 function StickyApp(): ReactElement {
   return (
-    <ScrollView stickyHeaderIndices={[0, 2]} StickyHeaderComponent={SpyStickyHeader}>
+    <ScrollView
+      stickyHeaderIndices={[0, 2]}
+      StickyHeaderComponent={SpyStickyHeader}
+    >
       <Text>H0</Text>
       <View />
       <Text>H1</Text>
@@ -98,7 +104,9 @@ describe('ScrollView content-size + sticky headers', () => {
     mount(ROOT_TAG, <App />);
 
     // The synthesizer puts an onLayout on the content node, so Fabric raises the onLayout flag.
-    const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+    const content = fabric.find(
+      node => node.viewName === 'RCTScrollContentView',
+    );
     expect(content, 'RCTScrollContentView was created').toBeDefined();
     expect(content!.props.onLayout).toBe(true);
 
@@ -132,7 +140,9 @@ describe('ScrollView content-size + sticky headers', () => {
   it('wraps the flagged sticky child and sets a scrollEventThrottle', () => {
     mount(ROOT_TAG, <App />);
 
-    const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+    const content = fabric.find(
+      node => node.viewName === 'RCTScrollContentView',
+    );
     expect(content, 'RCTScrollContentView was created').toBeDefined();
 
     const text = fabric.find(
@@ -143,21 +153,27 @@ describe('ScrollView content-size + sticky headers', () => {
     // The Text must NOT be a direct child of the content node. It sits inside the sticky wrapper.
     expect(content!.children.includes(text!)).toBe(false);
     // The wrapper is the content child whose subtree contains the Text.
-    const wrapper = content!.children.find(child => subtreeContains(child, text!));
+    const wrapper = content!.children.find(child =>
+      subtreeContains(child, text!),
+    );
     expect(wrapper, 'a sticky wrapper wraps the flagged child').toBeDefined();
     // The wrapper is a real (non-flattened) view carrying a transform: the sticky translateY.
     expect(wrapper!.props.collapsable).toBe(false);
     const transform = wrapper!.props.transform;
     expect(Array.isArray(transform)).toBe(true);
     expect(
-      Array.isArray(transform) && transform.some(entry => isRecord(entry) && 'translateY' in entry),
+      Array.isArray(transform) &&
+        transform.some(entry => isRecord(entry) && 'translateY' in entry),
     ).toBe(true);
 
     // The second child (the plain View at index 1) is NOT flagged, so it stays unwrapped.
     const plainView = content!.children.find(
       child => child !== wrapper && child.viewName === 'RCTView',
     );
-    expect(plainView, 'the non-sticky child stays an unwrapped direct content child').toBeDefined();
+    expect(
+      plainView,
+      'the non-sticky child stays an unwrapped direct content child',
+    ).toBeDefined();
 
     // onScroll is wired on the scroll view so the sticky AnimatedValue tracks the offset.
     const outer = fabric.find(node => node.viewName === 'RCTScrollView');
@@ -179,7 +195,8 @@ describe('ScrollView content-size + sticky headers', () => {
     // The two sticky wrappers are the transform-bearing Animated.View nodes, in document order:
     // [0] = H0, [1] = H1. Fire a real topLayout at each via the registered event handler.
     const stickyWrappers = fabric.created.filter(
-      node => Array.isArray(node.props.transform) && node.props.collapsable === false,
+      node =>
+        Array.isArray(node.props.transform) && node.props.collapsable === false,
     );
     expect(stickyWrappers.length).toBe(2);
 

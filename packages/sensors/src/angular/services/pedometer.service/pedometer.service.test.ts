@@ -16,12 +16,14 @@ const watchStepCountMock = vi.fn();
 const removeMock = vi.fn();
 
 vi.mock('../../../core', () => ({
-  watchStepCount: (listener: (result: IPedometerResult) => void) => watchStepCountMock(listener),
+  watchStepCount: (listener: (result: IPedometerResult) => void) =>
+    watchStepCountMock(listener),
 }));
 
 const ROOT_TAG = 942;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 const RESULT: IPedometerResult = { steps: 789 };
 

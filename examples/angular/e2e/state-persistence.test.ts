@@ -59,7 +59,8 @@ async function bringMenuRowIntoView(id: string): Promise<void> {
 // sidesteps it entirely (see the symbiote-detox-e2e skill, wix/Detox #3130/#4747/#2229).
 async function deviceTap(id: string): Promise<void> {
   const attrs = await element(by.id(id)).getAttributes();
-  if (!('frame' in attrs)) throw new Error(`${id}: getAttributes() returned no frame`);
+  if (!('frame' in attrs))
+    throw new Error(`${id}: getAttributes() returned no frame`);
   const { x, y, width, height } = attrs.frame;
   await device.tap({ x: x + width / 2, y: y + height / 2 });
 }
@@ -70,7 +71,11 @@ async function elementText(id: string): Promise<string> {
   return '';
 }
 
-async function waitForText(id: string, matches: (text: string) => boolean, timeoutMs: number): Promise<void> {
+async function waitForText(
+  id: string,
+  matches: (text: string) => boolean,
+  timeoutMs: number,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let last = '';
   while (Date.now() < deadline) {
@@ -78,10 +83,13 @@ async function waitForText(id: string, matches: (text: string) => boolean, timeo
     if (matches(last)) return;
     await sleep(250);
   }
-  throw new Error(`${id} never matched within ${timeoutMs}ms; last text was "${last}"`);
+  throw new Error(
+    `${id} never matched within ${timeoutMs}ms; last text was "${last}"`,
+  );
 }
 
-const snapshotPlaceholder = 'tap Serialize to capture the current route stack as JSON';
+const snapshotPlaceholder =
+  'tap Serialize to capture the current route stack as JSON';
 
 describe('Angular State persistence demo', () => {
   beforeAll(async () => {
@@ -108,7 +116,11 @@ describe('Angular State persistence demo', () => {
   });
 
   it('shows the placeholder before anything has been serialized', async () => {
-    await waitForText('persist-snapshot', text => text === snapshotPlaceholder, 5_000);
+    await waitForText(
+      'persist-snapshot',
+      text => text === snapshotPlaceholder,
+      5_000,
+    );
   });
 
   it('serializes the live root-Stack state into real JSON on Serialize', async () => {
@@ -141,6 +153,10 @@ describe('Angular State persistence demo', () => {
     // state with the deserialized object verbatim (route keys included), so the freshly
     // re-captured snapshot must match the pre-restore one exactly.
     await deviceTap('persist-serialize');
-    await waitForText('persist-snapshot', text => text === snapshotBeforeRestore, 5_000);
+    await waitForText(
+      'persist-snapshot',
+      text => text === snapshotBeforeRestore,
+      5_000,
+    );
   });
 });

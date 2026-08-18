@@ -11,7 +11,10 @@
 </script>
 
 <script lang="ts">
-  import { BUTTON_ACCESSIBILITY_ROLE, resolveButtonTextStyle } from '@symbiote-native/components';
+  import {
+    BUTTON_ACCESSIBILITY_ROLE,
+    resolveButtonTextStyle,
+  } from '@symbiote-native/components';
   import TouchableOpacity from './touchable-opacity/index.svelte';
 
   let {
@@ -38,9 +41,11 @@
   // excess-property typing does not reject the native-only keys. TV-focus is inert on a phone.
   const nativeForward = $derived.by(() => {
     const forward: Record<string, unknown> = { testID };
-    if (hasTVPreferredFocus !== undefined) forward.hasTVPreferredFocus = hasTVPreferredFocus;
+    if (hasTVPreferredFocus !== undefined)
+      forward.hasTVPreferredFocus = hasTVPreferredFocus;
     if (nextFocusDown !== undefined) forward.nextFocusDown = nextFocusDown;
-    if (nextFocusForward !== undefined) forward.nextFocusForward = nextFocusForward;
+    if (nextFocusForward !== undefined)
+      forward.nextFocusForward = nextFocusForward;
     if (nextFocusLeft !== undefined) forward.nextFocusLeft = nextFocusLeft;
     if (nextFocusRight !== undefined) forward.nextFocusRight = nextFocusRight;
     if (nextFocusUp !== undefined) forward.nextFocusUp = nextFocusUp;

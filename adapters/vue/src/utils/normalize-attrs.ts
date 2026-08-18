@@ -12,14 +12,22 @@
 const KEBAB_SEGMENT = /-([a-z])/g;
 
 function toCamel(key: string): string {
-  return key.replace(KEBAB_SEGMENT, (_match, char: string) => char.toUpperCase());
+  return key.replace(KEBAB_SEGMENT, (_match, char: string) =>
+    char.toUpperCase(),
+  );
 }
 
-export function normalizeVueAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
+export function normalizeVueAttrs(
+  attrs: Record<string, unknown>,
+): Record<string, unknown> {
   let changed = false;
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(attrs)) {
-    if (key.includes('-') && !key.startsWith('aria-') && !key.startsWith('data-')) {
+    if (
+      key.includes('-') &&
+      !key.startsWith('aria-') &&
+      !key.startsWith('data-')
+    ) {
       out[toCamel(key)] = attrs[key];
       changed = true;
     } else {

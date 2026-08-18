@@ -10,7 +10,13 @@
 // exactly this reason.
 
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { Animated, AnimatedView, Button, Text, View } from '@symbiote-native/angular';
+import {
+  Animated,
+  AnimatedView,
+  Button,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 // Static look lives in AnimatedDemo.css — compiled at build time by @symbiote-native/css-parser.
 import './AnimatedDemo.css';
 
@@ -31,7 +37,10 @@ const FREEZE_MS = 1500;
         <AnimatedView
           testID="pulse-dot"
           class="pulse-dot"
-          [style]="{ opacity: pulseOpacity, transform: [{ scale: pulseScale }] }"
+          [style]="{
+            opacity: pulseOpacity,
+            transform: [{ scale: pulseScale }],
+          }"
         ></AnimatedView>
       </View>
 
@@ -88,7 +97,10 @@ export class AnimatedDemo implements OnInit, OnDestroy {
     inputRange: [0, 0.5, 1],
     outputRange: [0.4, 1, 0.4],
   });
-  readonly jsX = this.jsSlide.interpolate({ inputRange: [0, 1], outputRange: [0, SLIDE_DISTANCE] });
+  readonly jsX = this.jsSlide.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, SLIDE_DISTANCE],
+  });
   readonly nativeX = this.nativeSlide.interpolate({
     inputRange: [0, 1],
     outputRange: [0, SLIDE_DISTANCE],
@@ -96,7 +108,11 @@ export class AnimatedDemo implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.animation = Animated.loop(
-      Animated.timing(this.pulse, { toValue: 1, duration: PULSE_DURATION_MS, useNativeDriver: true }),
+      Animated.timing(this.pulse, {
+        toValue: 1,
+        duration: PULSE_DURATION_MS,
+        useNativeDriver: true,
+      }),
     );
     this.animation.start();
   }

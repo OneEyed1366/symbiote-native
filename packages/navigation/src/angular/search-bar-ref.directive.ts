@@ -7,7 +7,14 @@
 // needed here: buildSearchBarHandle's own methods are already a LAZY getter over the node,
 // tolerant of the node existing-but-not-yet-committed, same contract every adapter shares).
 
-import { Directive, Input, inject, type OnDestroy, type OnInit, ElementRef } from '@angular/core';
+import {
+  Directive,
+  Input,
+  inject,
+  type OnDestroy,
+  type OnInit,
+  ElementRef,
+} from '@angular/core';
 import { isSymbioteNode, dlog, debugNodeId } from '@symbiote-native/engine';
 import { buildSearchBarHandle } from '../core';
 import type { ISearchBarCommands } from '../core';
@@ -17,7 +24,8 @@ import type { ISearchBarCommands } from '../core';
   standalone: true,
 })
 export class SearchBarRefDirective implements OnInit, OnDestroy {
-  @Input('symbioteSearchBarRef') ref: { current: ISearchBarCommands | null } | undefined;
+  @Input('symbioteSearchBarRef') ref:
+    { current: ISearchBarCommands | null } | undefined;
 
   private readonly elementRef = inject<ElementRef<unknown>>(ElementRef);
 

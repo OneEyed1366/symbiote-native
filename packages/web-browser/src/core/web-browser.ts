@@ -45,7 +45,10 @@ export async function getCustomTabsSupportingBrowsersAsync(): Promise<IWebBrowse
   // suffix, so this guard — kept in upstream's order deliberately — fires there before the
   // non-Android early return below can be reached.
   if (!expoWebBrowser.getCustomTabsSupportingBrowsersAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'getCustomTabsSupportingBrowsersAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'getCustomTabsSupportingBrowsersAsync',
+    );
   }
   if (Platform.OS !== 'android') {
     return EMPTY_CUSTOM_TABS_PACKAGES;
@@ -60,7 +63,9 @@ export async function getCustomTabsSupportingBrowsersAsync(): Promise<IWebBrowse
  * @param browserPackage Browser to warm up. Defaults to the preferred one.
  * @platform android
  */
-export async function warmUpAsync(browserPackage?: string): Promise<IWebBrowserWarmUpResult> {
+export async function warmUpAsync(
+  browserPackage?: string,
+): Promise<IWebBrowserWarmUpResult> {
   if (!expoWebBrowser.warmUpAsync) {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'warmUpAsync');
   }
@@ -100,7 +105,9 @@ export async function mayInitWithUrlAsync(
  * @returns The cooled service, or an empty object when there was no connection to dismiss.
  * @platform android
  */
-export async function coolDownAsync(browserPackage?: string): Promise<IWebBrowserCoolDownResult> {
+export async function coolDownAsync(
+  browserPackage?: string,
+): Promise<IWebBrowserCoolDownResult> {
   if (!expoWebBrowser.coolDownAsync) {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'coolDownAsync');
   }
@@ -174,7 +181,11 @@ export async function openAuthSessionAsync(
   if (!expoWebBrowser.openAuthSessionAsync) {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'openAuthSessionAsync');
   }
-  return expoWebBrowser.openAuthSessionAsync(url, redirectUrl, processOptions(options));
+  return expoWebBrowser.openAuthSessionAsync(
+    url,
+    redirectUrl,
+    processOptions(options),
+  );
 }
 
 /**
@@ -198,7 +209,9 @@ export function dismissAuthSession(): void {
   void expoWebBrowser.dismissBrowser();
 }
 
-function processOptions(options: IAuthSessionOpenOptions): IProcessedOpenOptions {
+function processOptions(
+  options: IAuthSessionOpenOptions,
+): IProcessedOpenOptions {
   return {
     ...options,
     controlsColor: processColor(options.controlsColor),
@@ -242,7 +255,10 @@ async function openBrowserAndWaitAndroidAsync(
   const appStateChangedToActive = new Promise<void>(resolve => {
     onWebBrowserCloseAndroid = resolve;
   });
-  const stateChangeSubscription = AppState.addEventListener('change', onAppStateChangeAndroid);
+  const stateChangeSubscription = AppState.addEventListener(
+    'change',
+    onAppStateChangeAndroid,
+  );
 
   let launched: IWebBrowserResult;
   try {
@@ -275,7 +291,9 @@ async function openAuthSessionPolyfillAsync(
     );
   }
   if (onWebBrowserCloseAndroid) {
-    throw new Error('WebBrowser is already open, only one can be open at a time');
+    throw new Error(
+      'WebBrowser is already open, only one can be open at a time',
+    );
   }
 
   try {
@@ -303,14 +321,19 @@ function stopWaitingForRedirect(): void {
   redirectSubscription = null;
 }
 
-function waitForRedirectAsync(returnUrl?: string | null): Promise<IWebBrowserRedirectResult> {
+function waitForRedirectAsync(
+  returnUrl?: string | null,
+): Promise<IWebBrowserRedirectResult> {
   // Deliberately never resolves when `returnUrl` is nullish: the browser promise it is raced
   // against is then the only thing that can settle the session.
   return new Promise(resolve => {
-    redirectSubscription = Linking.addEventListener('url', (event: IRedirectEvent) => {
-      if (returnUrl && event.url.startsWith(returnUrl)) {
-        resolve({ url: event.url, type: 'success' });
-      }
-    });
+    redirectSubscription = Linking.addEventListener(
+      'url',
+      (event: IRedirectEvent) => {
+        if (returnUrl && event.url.startsWith(returnUrl)) {
+          resolve({ url: event.url, type: 'success' });
+        }
+      },
+    );
   });
 }

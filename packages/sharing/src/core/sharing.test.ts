@@ -65,18 +65,27 @@ describe('positive — isAvailableAsync always resolves a boolean, never throws'
 
 describe('positive — shareAsync delegates a valid call to the native module', () => {
   it('passes the url and options straight through', async () => {
-    await shareAsync(LOCAL_FILE_URL, { mimeType: 'application/pdf', dialogTitle: 'Send report' });
-    expect(FAKE_NATIVE_SHARING.shareAsync).toHaveBeenCalledWith(LOCAL_FILE_URL, {
+    await shareAsync(LOCAL_FILE_URL, {
       mimeType: 'application/pdf',
       dialogTitle: 'Send report',
     });
+    expect(FAKE_NATIVE_SHARING.shareAsync).toHaveBeenCalledWith(
+      LOCAL_FILE_URL,
+      {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Send report',
+      },
+    );
   });
 
   // why: options is an optional param — omitting it must not reach the native module as
   // `undefined`, which several native SDKs reject outright.
   it('defaults the options to an empty object when omitted', async () => {
     await shareAsync(LOCAL_FILE_URL);
-    expect(FAKE_NATIVE_SHARING.shareAsync).toHaveBeenCalledWith(LOCAL_FILE_URL, {});
+    expect(FAKE_NATIVE_SHARING.shareAsync).toHaveBeenCalledWith(
+      LOCAL_FILE_URL,
+      {},
+    );
   });
 
   // why: anchor is a nested rectangle for the iPad popover — a flattening refactor (spreading
@@ -84,7 +93,10 @@ describe('positive — shareAsync delegates a valid call to the native module', 
   it('forwards the iPad anchor rectangle unflattened', async () => {
     const anchor = { x: 10, y: 20, width: 1, height: 1 };
     await shareAsync(LOCAL_FILE_URL, { anchor });
-    expect(FAKE_NATIVE_SHARING.shareAsync).toHaveBeenCalledWith(LOCAL_FILE_URL, { anchor });
+    expect(FAKE_NATIVE_SHARING.shareAsync).toHaveBeenCalledWith(
+      LOCAL_FILE_URL,
+      { anchor },
+    );
   });
 });
 
@@ -94,13 +106,17 @@ describe('negative — shareAsync rejects before or instead of a native call', (
   // guard fails early with the caller's own argument named instead.
   describe('invalid url rejected before any native call', () => {
     it('rejects an empty url', async () => {
-      await expect(shareAsync('')).rejects.toThrow(/Invalid url provided to Sharing/);
+      await expect(shareAsync('')).rejects.toThrow(
+        /Invalid url provided to Sharing/,
+      );
       expect(FAKE_NATIVE_SHARING.shareAsync).not.toHaveBeenCalled();
     });
 
     it('rejects a non-string url', async () => {
       // @ts-expect-error -- the guard exists precisely for callers without type checking
-      await expect(shareAsync(undefined)).rejects.toThrow(/Invalid url provided to Sharing/);
+      await expect(shareAsync(undefined)).rejects.toThrow(
+        /Invalid url provided to Sharing/,
+      );
       expect(FAKE_NATIVE_SHARING.shareAsync).not.toHaveBeenCalled();
     });
   });

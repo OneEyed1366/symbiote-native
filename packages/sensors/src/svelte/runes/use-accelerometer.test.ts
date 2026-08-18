@@ -22,16 +22,24 @@ import metroSvelteTransformer from '@symbiote-native/svelte/metro-svelte-transfo
 
 const {
   compileSvelteModuleFile,
-}: { compileSvelteModuleFile: (src: string, filename: string) => string } = metroSvelteTransformer;
+}: { compileSvelteModuleFile: (src: string, filename: string) => string } =
+  metroSvelteTransformer;
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
 const ROOT_TAG = 91_650;
-const PROBE_OUT = join(__dirname, '.smoke-compiled-use-accelerometer-probe.mjs');
-const RUNE_OUT = join(__dirname, '.smoke-compiled-use-accelerometer.svelte.mjs');
+const PROBE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-accelerometer-probe.mjs',
+);
+const RUNE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-accelerometer.svelte.mjs',
+);
 
 type IListener = (measurement: IAccelerometerMeasurement) => void;
 
@@ -47,12 +55,14 @@ vi.mock('../../core', () => ({
   Accelerometer: {
     addListener: (listener: IListener) => addListenerMock(listener),
     removeAllListeners: vi.fn(),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -68,13 +78,23 @@ afterEach(() => {
   rmSync(RUNE_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 // $state/$effect require Svelte's MODULE compiler, not the component compiler — a bare,
 // uncompiled rune call throws `rune_outside_svelte` at runtime.
 function compileRuneModule(): void {
-  const source = readFileSync(join(__dirname, 'use-accelerometer.svelte.ts'), 'utf-8');
-  writeFileSync(RUNE_OUT, compileSvelteModuleFile(source, 'use-accelerometer.svelte.ts'));
+  const source = readFileSync(
+    join(__dirname, 'use-accelerometer.svelte.ts'),
+    'utf-8',
+  );
+  writeFileSync(
+    RUNE_OUT,
+    compileSvelteModuleFile(source, 'use-accelerometer.svelte.ts'),
+  );
 }
 
 async function loadProbe(): Promise<Component> {
@@ -107,7 +127,8 @@ async function mountAccelerometer(
   const Probe = await loadProbe();
   mount(ROOT_TAG, Probe, {
     updateIntervalMs,
-    onValue: (measurement: IAccelerometerMeasurement | null) => values.push(measurement),
+    onValue: (measurement: IAccelerometerMeasurement | null) =>
+      values.push(measurement),
   });
   await tick();
 }
@@ -143,7 +164,12 @@ describe('useAccelerometer (Svelte)', () => {
     it('updates the state when the native listener fires', async () => {
       const values: (IAccelerometerMeasurement | null)[] = [];
       await mountAccelerometer(values);
-      const reading: IAccelerometerMeasurement = { x: 0.1, y: 0.2, z: 0.9, timestamp: 123 };
+      const reading: IAccelerometerMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.9,
+        timestamp: 123,
+      };
 
       registeredListener?.(reading);
       await tick();
@@ -157,8 +183,18 @@ describe('useAccelerometer (Svelte)', () => {
     it('replaces the previous reading, not merges it, on a second native event', async () => {
       const values: (IAccelerometerMeasurement | null)[] = [];
       await mountAccelerometer(values);
-      const first: IAccelerometerMeasurement = { x: 0.1, y: 0.2, z: 0.9, timestamp: 123 };
-      const second: IAccelerometerMeasurement = { x: -0.4, y: 0.05, z: 0.7, timestamp: 456 };
+      const first: IAccelerometerMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.9,
+        timestamp: 123,
+      };
+      const second: IAccelerometerMeasurement = {
+        x: -0.4,
+        y: 0.05,
+        z: 0.7,
+        timestamp: 456,
+      };
 
       registeredListener?.(first);
       await tick();

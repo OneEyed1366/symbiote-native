@@ -6,7 +6,12 @@
 // functional root (h() has no createElement-style prop/children spread of its own targets, so
 // the wrap step is a render function rather than an object merge).
 
-import { h, type Component, type FunctionalComponent, type VNode } from '@vue/runtime-core';
+import {
+  h,
+  type Component,
+  type FunctionalComponent,
+  type VNode,
+} from '@vue/runtime-core';
 import {
   createAppRegistry,
   dlog,
@@ -21,7 +26,9 @@ export type IComponentProvider = () => Component;
 
 // RN's IWrapperComponentProvider: given the surface's parameters, returns a
 // component to wrap the app root in (e.g. a context provider). Optional.
-export type IWrapperComponentProvider = (appParameters: IAppParameters) => Component;
+export type IWrapperComponentProvider = (
+  appParameters: IAppParameters,
+) => Component;
 
 function runnableFor(
   componentProvider: IComponentProvider,
@@ -30,7 +37,8 @@ function runnableFor(
   return appParameters => {
     dlog(`AppRegistry: mounting on rootTag ${String(appParameters.rootTag)}`);
     const rootComponent = componentProvider();
-    const renderRoot = (): VNode => h(rootComponent, appParameters.initialProps);
+    const renderRoot = (): VNode =>
+      h(rootComponent, appParameters.initialProps);
     // Wrap the root when a provider is set, mirroring RN's `registerComponent`. Vue's equivalent
     // of React's createElement(Wrapper, null, element) is a default-slot render, since Vue has
     // no standalone element value to nest. Read live so setWrapperComponentProvider affects
@@ -39,7 +47,10 @@ function runnableFor(
     const mounted: FunctionalComponent =
       wrapperComponentProvider === undefined
         ? renderRoot
-        : () => h(wrapperComponentProvider(appParameters), null, { default: renderRoot });
+        : () =>
+            h(wrapperComponentProvider(appParameters), null, {
+              default: renderRoot,
+            });
     mount(appParameters.rootTag, mounted);
   };
 }

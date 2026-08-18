@@ -10,7 +10,10 @@
   // Unlike Vue's twin (status-bar.ts), no untyped-attrs guard layer is needed: Svelte's
   // `$props()` already destructures real typed fields straight from the compiler, so there is
   // no kebab-case-attrs normalization step to run first.
-  import { applyStatusBarProps, type IStatusBarProps } from '@symbiote-native/engine';
+  import {
+    applyStatusBarProps,
+    type IStatusBarProps,
+  } from '@symbiote-native/engine';
 
   let props: IStatusBarProps = $props();
 

@@ -163,17 +163,29 @@ describe('resolveRouteFromUrl', () => {
 
 describe('resolveUrlFromRoute', () => {
   it('builds a url for a flat route with no params', () => {
-    const route: IRoute<unknown> = { key: 'k', name: 'Home', params: undefined };
+    const route: IRoute<unknown> = {
+      key: 'k',
+      name: 'Home',
+      params: undefined,
+    };
     expect(resolveUrlFromRoute(CONFIG, route)).toBe('myapp://');
   });
 
   it('builds a url for a :param route', () => {
-    const route: IRoute<unknown> = { key: 'k', name: 'User', params: { id: '42' } };
+    const route: IRoute<unknown> = {
+      key: 'k',
+      name: 'User',
+      params: { id: '42' },
+    };
     expect(resolveUrlFromRoute(CONFIG, route)).toBe('myapp://user/42');
   });
 
   it('builds a url for a nested screen using its accumulated path', () => {
-    const route: IRoute<unknown> = { key: 'k', name: 'Profile', params: undefined };
+    const route: IRoute<unknown> = {
+      key: 'k',
+      name: 'Profile',
+      params: undefined,
+    };
     expect(resolveUrlFromRoute(CONFIG, route)).toBe('myapp://settings/profile');
   });
 
@@ -183,7 +195,11 @@ describe('resolveUrlFromRoute', () => {
   });
 
   it('returns null for an unconfigured route name', () => {
-    const route: IRoute<unknown> = { key: 'k', name: 'Nowhere', params: undefined };
+    const route: IRoute<unknown> = {
+      key: 'k',
+      name: 'Nowhere',
+      params: undefined,
+    };
     expect(resolveUrlFromRoute(CONFIG, route)).toBeNull();
   });
 
@@ -191,9 +207,18 @@ describe('resolveUrlFromRoute', () => {
   // insert one itself rather than concatenate straight into 'https://example.compath', which the
   // source comment calls out explicitly ("only add a '/' when the prefix doesn't have one").
   it('inserts a separator when the configured prefix has no trailing slash', () => {
-    const config: ILinkingConfig = { ...CONFIG, prefixes: ['https://example.com'] };
-    const route: IRoute<unknown> = { key: 'k', name: 'User', params: { id: '42' } };
-    expect(resolveUrlFromRoute(config, route)).toBe('https://example.com/user/42');
+    const config: ILinkingConfig = {
+      ...CONFIG,
+      prefixes: ['https://example.com'],
+    };
+    const route: IRoute<unknown> = {
+      key: 'k',
+      name: 'User',
+      params: { id: '42' },
+    };
+    expect(resolveUrlFromRoute(config, route)).toBe(
+      'https://example.com/user/42',
+    );
   });
 
   // why: an app with no configured prefixes still needs a usable in-app path (e.g. for a
@@ -201,13 +226,21 @@ describe('resolveUrlFromRoute', () => {
   // returning null just because there's nothing to prepend.
   it('falls back to a bare leading-slash path when no prefix is configured', () => {
     const config: ILinkingConfig = { ...CONFIG, prefixes: [] };
-    const route: IRoute<unknown> = { key: 'k', name: 'User', params: { id: '42' } };
+    const route: IRoute<unknown> = {
+      key: 'k',
+      name: 'User',
+      params: { id: '42' },
+    };
     expect(resolveUrlFromRoute(config, route)).toBe('/user/42');
   });
 
   it('falls back to "/" for the root route when no prefix is configured', () => {
     const config: ILinkingConfig = { ...CONFIG, prefixes: [] };
-    const route: IRoute<unknown> = { key: 'k', name: 'Home', params: undefined };
+    const route: IRoute<unknown> = {
+      key: 'k',
+      name: 'Home',
+      params: undefined,
+    };
     expect(resolveUrlFromRoute(config, route)).toBe('/');
   });
 });

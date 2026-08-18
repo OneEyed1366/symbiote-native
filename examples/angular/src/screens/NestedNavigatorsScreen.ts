@@ -1,6 +1,10 @@
 import { Component } from '@angular/core';
 import { SafeAreaView, Text, View } from '@symbiote-native/angular';
-import { Tab, TabScreenDirective, injectNavigation } from '@symbiote-native/navigation/angular';
+import {
+  Tab,
+  TabScreenDirective,
+  injectNavigation,
+} from '@symbiote-native/navigation/angular';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -30,13 +34,16 @@ function canPop(handle: unknown): handle is { pop: () => void } {
           <View class="hero-copy">
             <Text class="hero-title">Nested navigators</Text>
             <Text class="hero-body">
-              A Tab navigator nested inside a Stack screen, reaching its parent's own navigation
-              handle through getParent().
+              A Tab navigator nested inside a Stack screen, reaching its
+              parent's own navigation handle through getParent().
             </Text>
           </View>
         </View>
         <Text class="info-text">
-          {{ 'parent navigator reachable via getParent(): ' + (canPopParent ? 'yes (Stack)' : 'no') }}
+          {{
+            'parent navigator reachable via getParent(): ' +
+              (canPopParent ? 'yes (Stack)' : 'no')
+          }}
         </Text>
         <ActionButton
           testID="nested-pop-parent"
@@ -82,7 +89,10 @@ export class NestedTabHomeScreen {
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
         <Text class="section-label">Nested Tab · Info</Text>
-        <Text class="info-text">A second tab, proving the nested Tab bar switches focus normally.</Text>
+        <Text class="info-text"
+          >A second tab, proving the nested Tab bar switches focus
+          normally.</Text
+        >
       </View>
     </SafeAreaView>
   `,
@@ -105,8 +115,18 @@ export class NestedTabInfoScreen {
   imports: [Tab, TabScreenDirective],
   template: `
     <Tab initialRouteName="NestedHome">
-      <ng-template symbioteTabScreen name="NestedHome" [component]="nestedTabHomeScreen" [options]="homeOptions"></ng-template>
-      <ng-template symbioteTabScreen name="NestedInfo" [component]="nestedTabInfoScreen" [options]="infoOptions"></ng-template>
+      <ng-template
+        symbioteTabScreen
+        name="NestedHome"
+        [component]="nestedTabHomeScreen"
+        [options]="homeOptions"
+      ></ng-template>
+      <ng-template
+        symbioteTabScreen
+        name="NestedInfo"
+        [component]="nestedTabInfoScreen"
+        [options]="infoOptions"
+      ></ng-template>
     </Tab>
   `,
 })

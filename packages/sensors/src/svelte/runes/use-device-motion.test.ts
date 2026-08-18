@@ -14,16 +14,24 @@ import metroSvelteTransformer from '@symbiote-native/svelte/metro-svelte-transfo
 
 const {
   compileSvelteModuleFile,
-}: { compileSvelteModuleFile: (src: string, filename: string) => string } = metroSvelteTransformer;
+}: { compileSvelteModuleFile: (src: string, filename: string) => string } =
+  metroSvelteTransformer;
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
 const ROOT_TAG = 91_652;
-const PROBE_OUT = join(__dirname, '.smoke-compiled-use-device-motion-probe.mjs');
-const RUNE_OUT = join(__dirname, '.smoke-compiled-use-device-motion.svelte.mjs');
+const PROBE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-device-motion-probe.mjs',
+);
+const RUNE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-device-motion.svelte.mjs',
+);
 
 type IListener = (measurement: IDeviceMotionMeasurement) => void;
 
@@ -39,7 +47,8 @@ vi.mock('../../core', () => ({
   DeviceMotion: {
     addListener: (listener: IListener) => addListenerMock(listener),
     removeAllListeners: vi.fn(),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
@@ -65,7 +74,8 @@ const UNGYRO_READING: IDeviceMotionMeasurement = {
 };
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -81,11 +91,21 @@ afterEach(() => {
   rmSync(RUNE_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 function compileRuneModule(): void {
-  const source = readFileSync(join(__dirname, 'use-device-motion.svelte.ts'), 'utf-8');
-  writeFileSync(RUNE_OUT, compileSvelteModuleFile(source, 'use-device-motion.svelte.ts'));
+  const source = readFileSync(
+    join(__dirname, 'use-device-motion.svelte.ts'),
+    'utf-8',
+  );
+  writeFileSync(
+    RUNE_OUT,
+    compileSvelteModuleFile(source, 'use-device-motion.svelte.ts'),
+  );
 }
 
 async function loadProbe(): Promise<Component> {
@@ -118,7 +138,8 @@ async function mountDeviceMotion(
   const Probe = await loadProbe();
   mount(ROOT_TAG, Probe, {
     updateIntervalMs,
-    onValue: (measurement: IDeviceMotionMeasurement | null) => values.push(measurement),
+    onValue: (measurement: IDeviceMotionMeasurement | null) =>
+      values.push(measurement),
   });
   await tick();
 }

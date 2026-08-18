@@ -14,9 +14,11 @@ import metroSvelteTransformer from '@symbiote-native/svelte/metro-svelte-transfo
 
 const {
   compileSvelteModuleFile,
-}: { compileSvelteModuleFile: (src: string, filename: string) => string } = metroSvelteTransformer;
+}: { compileSvelteModuleFile: (src: string, filename: string) => string } =
+  metroSvelteTransformer;
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -39,12 +41,14 @@ vi.mock('../../core', () => ({
   Magnetometer: {
     addListener: (listener: IListener) => addListenerMock(listener),
     removeAllListeners: vi.fn(),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -60,11 +64,21 @@ afterEach(() => {
   rmSync(RUNE_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 function compileRuneModule(): void {
-  const source = readFileSync(join(__dirname, 'use-magnetometer.svelte.ts'), 'utf-8');
-  writeFileSync(RUNE_OUT, compileSvelteModuleFile(source, 'use-magnetometer.svelte.ts'));
+  const source = readFileSync(
+    join(__dirname, 'use-magnetometer.svelte.ts'),
+    'utf-8',
+  );
+  writeFileSync(
+    RUNE_OUT,
+    compileSvelteModuleFile(source, 'use-magnetometer.svelte.ts'),
+  );
 }
 
 async function loadProbe(): Promise<Component> {
@@ -97,7 +111,8 @@ async function mountMagnetometer(
   const Probe = await loadProbe();
   mount(ROOT_TAG, Probe, {
     updateIntervalMs,
-    onValue: (measurement: IMagnetometerMeasurement | null) => values.push(measurement),
+    onValue: (measurement: IMagnetometerMeasurement | null) =>
+      values.push(measurement),
   });
   await tick();
 }
@@ -133,7 +148,12 @@ describe('useMagnetometer (Svelte)', () => {
     it('updates the state when the native listener fires', async () => {
       const values: (IMagnetometerMeasurement | null)[] = [];
       await mountMagnetometer(values);
-      const reading: IMagnetometerMeasurement = { x: 0.1, y: 0.2, z: 0.9, timestamp: 123 };
+      const reading: IMagnetometerMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.9,
+        timestamp: 123,
+      };
 
       registeredListener?.(reading);
       await tick();
@@ -146,8 +166,18 @@ describe('useMagnetometer (Svelte)', () => {
     it('replaces the previous reading, not merges it, on a second native event', async () => {
       const values: (IMagnetometerMeasurement | null)[] = [];
       await mountMagnetometer(values);
-      const first: IMagnetometerMeasurement = { x: 0.1, y: 0.2, z: 0.9, timestamp: 123 };
-      const second: IMagnetometerMeasurement = { x: -18.2, y: 41.7, z: -3.9, timestamp: 456 };
+      const first: IMagnetometerMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.9,
+        timestamp: 123,
+      };
+      const second: IMagnetometerMeasurement = {
+        x: -18.2,
+        y: 41.7,
+        z: -3.9,
+        timestamp: 456,
+      };
 
       registeredListener?.(first);
       await tick();

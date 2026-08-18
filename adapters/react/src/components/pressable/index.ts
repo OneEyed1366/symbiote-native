@@ -12,7 +12,14 @@
 // on iOS), unstable_pressDelay, and pressRetentionOffset (the drift region), all handled by the
 // shared machine; here we only wire its host + render the View.
 
-import { createElement, useMemo, useRef, useState, type FC, type ReactNode } from 'react';
+import {
+  createElement,
+  useMemo,
+  useRef,
+  useState,
+  type FC,
+  type ReactNode,
+} from 'react';
 import {
   createPressHandlers,
   createPressRuntime,
@@ -36,9 +43,13 @@ import type {
 } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 
-export type { IPressState, IPressableAndroidRippleConfig } from '@symbiote-native/components';
+export type {
+  IPressState,
+  IPressableAndroidRippleConfig,
+} from '@symbiote-native/components';
 
-type IPressableStyle = IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
+type IPressableStyle =
+  IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
 type IChildrenProp = ReactNode | ((state: IPressState) => ReactNode);
 
 export interface IPressableProps extends IAccessibilityProps, IAriaProps {
@@ -86,7 +97,10 @@ function resolveStyle(
   return style;
 }
 
-function resolveChildren(children: IChildrenProp | undefined, state: IPressState): ReactNode {
+function resolveChildren(
+  children: IChildrenProp | undefined,
+  state: IPressState,
+): ReactNode {
   if (typeof children === 'function') return children(state);
   return children;
 }
@@ -194,15 +208,21 @@ export const Pressable: FC<IPressableProps> = props => {
     testID,
   };
   // Forward the Android tap-sound suppressor under RN's own key; inert on iOS.
-  if (android_disableSound !== undefined) viewProps.android_disableSound = android_disableSound;
-  Object.assign(viewProps, buildPressableListeners(handlers, { disabled, cancelable }));
+  if (android_disableSound !== undefined)
+    viewProps.android_disableSound = android_disableSound;
+  Object.assign(
+    viewProps,
+    buildPressableListeners(handlers, { disabled, cancelable }),
+  );
 
   // android_ripple rides a dedicated inner View (the Pressable's own View only forwards a fixed
   // prop set), mirroring touchable-native-feedback. On iOS the ripple prop is undefined, so the
   // child renders unwrapped, no extra node.
-  const ripple = android_ripple !== undefined ? rippleProps(android_ripple) : undefined;
+  const ripple =
+    android_ripple !== undefined ? rippleProps(android_ripple) : undefined;
   const content = resolveChildren(children, state);
-  const inner = ripple !== undefined ? createElement(View, ripple, content) : content;
+  const inner =
+    ripple !== undefined ? createElement(View, ripple, content) : content;
 
   return createElement(View, viewProps, inner);
 };

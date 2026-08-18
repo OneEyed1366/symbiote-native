@@ -12,8 +12,16 @@ import { reconcileStackRoutes } from './index';
 import type { INavigatorState } from '../navigator-state';
 
 const HOME = { key: 'stack-1-Home-1', name: 'Home', params: undefined };
-const DETAILS = { key: 'stack-1-Details-2', name: 'Details', params: { id: 42 } };
-const SETTINGS = { key: 'stack-1-Settings-3', name: 'Settings', params: undefined };
+const DETAILS = {
+  key: 'stack-1-Details-2',
+  name: 'Details',
+  params: { id: 42 },
+};
+const SETTINGS = {
+  key: 'stack-1-Settings-3',
+  name: 'Settings',
+  params: undefined,
+};
 
 function pushedStack(): INavigatorState {
   return { routes: [HOME, DETAILS, SETTINGS] };
@@ -22,14 +30,18 @@ function pushedStack(): INavigatorState {
 describe('reconcileStackRoutes', () => {
   it('returns the same state reference when every route name is still registered', () => {
     const state = pushedStack();
-    expect(reconcileStackRoutes(state, ['Home', 'Details', 'Settings'])).toBe(state);
+    expect(reconcileStackRoutes(state, ['Home', 'Details', 'Settings'])).toBe(
+      state,
+    );
   });
 
   // why: a registry always holds names the history has never visited (every screen the app declares,
   // not just the pushed ones) - an extra registered name must not count as a change.
   it('ignores registered names the history never visited', () => {
     const state = pushedStack();
-    expect(reconcileStackRoutes(state, ['Home', 'Details', 'Settings', 'Profile'])).toBe(state);
+    expect(
+      reconcileStackRoutes(state, ['Home', 'Details', 'Settings', 'Profile']),
+    ).toBe(state);
   });
 
   it('drops the history entry whose screen is no longer registered', () => {
@@ -64,7 +76,11 @@ describe('reconcileStackRoutes', () => {
   // why: the same screen pushed twice is two distinct history entries with distinct keys; both are
   // phantoms once the marker goes, and both must survive while it stays.
   it('treats repeated visits to one screen as separate entries', () => {
-    const revisit = { key: 'stack-1-Details-4', name: 'Details', params: { id: 7 } };
+    const revisit = {
+      key: 'stack-1-Details-4',
+      name: 'Details',
+      params: { id: 7 },
+    };
     const state: INavigatorState = { routes: [HOME, DETAILS, revisit] };
     expect(reconcileStackRoutes(state, ['Home', 'Details'])).toBe(state);
     expect(reconcileStackRoutes(state, ['Home']).routes).toEqual([HOME]);

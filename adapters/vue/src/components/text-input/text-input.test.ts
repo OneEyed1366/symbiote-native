@@ -12,7 +12,12 @@
 
 import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { TextInput, mount, unmount, type ITextInputHandle } from '@symbiote-native/vue';
+import {
+  TextInput,
+  mount,
+  unmount,
+  type ITextInputHandle,
+} from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 type ICommandCall = {
@@ -41,7 +46,8 @@ slot.dispatchCommand = (_node, name, args) => {
 
 // A macrotask boundary drains ALL pending microtasks: the engine's coalesced commit AND the
 // post-flush watch (controlled write), before the assert reads them.
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -89,7 +95,9 @@ describe('Vue TextInput on the engine', () => {
   it('selects the multiline intrinsic for multiline', async () => {
     mount(
       ROOT_TAG,
-      defineComponent({ setup: () => () => h(TextInput, { multiline: true, value: 'x' }) }),
+      defineComponent({
+        setup: () => () => h(TextInput, { multiline: true, value: 'x' }),
+      }),
     );
     await tick();
     inputNode(MULTILINE);
@@ -99,7 +107,11 @@ describe('Vue TextInput on the engine', () => {
     mount(
       ROOT_TAG,
       defineComponent({
-        setup: () => () => h(TextInput, { value: 'x', style: { paddingBottom: PADDING_BOTTOM } }),
+        setup: () => () =>
+          h(TextInput, {
+            value: 'x',
+            style: { paddingBottom: PADDING_BOTTOM },
+          }),
       }),
     );
     await tick();
@@ -113,22 +125,33 @@ describe('Vue TextInput on the engine', () => {
     mount(
       ROOT_TAG,
       defineComponent({
-        setup: () => () => h(TextInput, { value: 'x', onValueChange: () => {} }),
+        setup: () => () =>
+          h(TextInput, { value: 'x', onValueChange: () => {} }),
       }),
     );
     await tick();
 
     const node = inputNode(SINGLELINE);
-    expect('onValueChange' in node.props, 'onValueChange must not reach Fabric').toBe(false);
+    expect(
+      'onValueChange' in node.props,
+      'onValueChange must not reach Fabric',
+    ).toBe(false);
   });
 
   it('accepts modelValue as an alias for value, never forwarding it to Fabric', async () => {
-    mount(ROOT_TAG, defineComponent({ setup: () => () => h(TextInput, { modelValue: 'hi' }) }));
+    mount(
+      ROOT_TAG,
+      defineComponent({
+        setup: () => () => h(TextInput, { modelValue: 'hi' }),
+      }),
+    );
     await tick();
 
     const node = inputNode(SINGLELINE);
     expect(node.props.text).toBe('hi');
-    expect('modelValue' in node.props, 'modelValue must not reach Fabric').toBe(false);
+    expect('modelValue' in node.props, 'modelValue must not reach Fabric').toBe(
+      false,
+    );
   });
 
   it('emits update:modelValue and update:value alongside valueChange', async () => {
@@ -189,7 +212,10 @@ describe('Vue TextInput on the engine', () => {
     await tick();
 
     const setText = commands.find(c => c.name === 'setTextAndSelection');
-    expect(setText, 'a setTextAndSelection command was dispatched').toBeDefined();
+    expect(
+      setText,
+      'a setTextAndSelection command was dispatched',
+    ).toBeDefined();
     expect(setText!.args[0]).toBe(ACK_COUNT);
     expect(setText!.args[1]).toBe('AB');
   });
@@ -221,13 +247,19 @@ describe('Vue TextInput on the engine', () => {
     await tick();
 
     const setText = commands.find(c => c.name === 'setTextAndSelection');
-    expect(setText, 'a setTextAndSelection command was dispatched').toBeDefined();
+    expect(
+      setText,
+      'a setTextAndSelection command was dispatched',
+    ).toBeDefined();
     expect(setText!.args[0]).toBe(ACK_COUNT);
     expect(setText!.args[1]).toBe('AB');
   });
 
   it('issues no controlled-write command on mount (value equals the seed)', async () => {
-    mount(ROOT_TAG, defineComponent({ setup: () => () => h(TextInput, { value: 'seed' }) }));
+    mount(
+      ROOT_TAG,
+      defineComponent({ setup: () => () => h(TextInput, { value: 'seed' }) }),
+    );
     await tick();
     expect(commands.some(c => c.name === 'setTextAndSelection')).toBe(false);
   });
@@ -236,11 +268,16 @@ describe('Vue TextInput on the engine', () => {
     const handleRef = ref<ITextInputHandle | null>(null);
     mount(
       ROOT_TAG,
-      defineComponent({ setup: () => () => h(TextInput, { value: 'x', ref: handleRef }) }),
+      defineComponent({
+        setup: () => () => h(TextInput, { value: 'x', ref: handleRef }),
+      }),
     );
     await tick();
 
-    expect(handleRef.value, 'imperative handle captured after commit').not.toBeNull();
+    expect(
+      handleRef.value,
+      'imperative handle captured after commit',
+    ).not.toBeNull();
     handleRef.value!.focus();
     handleRef.value!.blur();
     await tick();
@@ -260,7 +297,9 @@ describe('Vue TextInput on the engine', () => {
     const handleRef = ref<ITextInputHandle | null>(null);
     mount(
       ROOT_TAG,
-      defineComponent({ setup: () => () => h(TextInput, { value: 'x', ref: handleRef }) }),
+      defineComponent({
+        setup: () => () => h(TextInput, { value: 'x', ref: handleRef }),
+      }),
     );
     await tick();
 
@@ -278,7 +317,9 @@ describe('Vue TextInput on the engine', () => {
     const handleRef = ref<ITextInputHandle | null>(null);
     mount(
       ROOT_TAG,
-      defineComponent({ setup: () => () => h(TextInput, { value: 'hello', ref: handleRef }) }),
+      defineComponent({
+        setup: () => () => h(TextInput, { value: 'hello', ref: handleRef }),
+      }),
     );
     await tick();
 
@@ -292,7 +333,10 @@ describe('Vue TextInput on the engine', () => {
     handleRef.value!.setSelection(2, 5);
     await tick();
     const selected = commands.find(c => c.name === 'setTextAndSelection');
-    expect(selected, 'setSelection() dispatches setTextAndSelection').toBeDefined();
+    expect(
+      selected,
+      'setSelection() dispatches setTextAndSelection',
+    ).toBeDefined();
     expect(selected!.args[2]).toBe(2);
     expect(selected!.args[3]).toBe(5);
   });
@@ -304,16 +348,24 @@ describe('Vue TextInput on the engine', () => {
   it('commands focus once via whenCommitted when autoFocus is set, despite the async-commit race', async () => {
     mount(
       ROOT_TAG,
-      defineComponent({ setup: () => () => h(TextInput, { value: 'x', autoFocus: true }) }),
+      defineComponent({
+        setup: () => () => h(TextInput, { value: 'x', autoFocus: true }),
+      }),
     );
     await tick();
 
     const focusCommands = commands.filter(c => c.name === 'focus');
-    expect(focusCommands, 'exactly one focus command from the autoFocus guard').toHaveLength(1);
+    expect(
+      focusCommands,
+      'exactly one focus command from the autoFocus guard',
+    ).toHaveLength(1);
   });
 
   it('does not command focus when autoFocus is unset', async () => {
-    mount(ROOT_TAG, defineComponent({ setup: () => () => h(TextInput, { value: 'x' }) }));
+    mount(
+      ROOT_TAG,
+      defineComponent({ setup: () => () => h(TextInput, { value: 'x' }) }),
+    );
     await tick();
     expect(commands.some(c => c.name === 'focus')).toBe(false);
   });
@@ -323,7 +375,9 @@ describe('Vue TextInput on the engine', () => {
   it('falls back to defaultValue when neither value nor modelValue is set', async () => {
     mount(
       ROOT_TAG,
-      defineComponent({ setup: () => () => h(TextInput, { defaultValue: 'seeded' }) }),
+      defineComponent({
+        setup: () => () => h(TextInput, { defaultValue: 'seeded' }),
+      }),
     );
     await tick();
     expect(inputNode(SINGLELINE).props.text).toBe('seeded');
@@ -339,11 +393,16 @@ describe('Vue TextInput on the engine', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h(TextInput, { value: 'x', onValueChange: (text: string) => (changed = text) }),
+          h(TextInput, {
+            value: 'x',
+            onValueChange: (text: string) => (changed = text),
+          }),
       }),
     );
     await tick();
-    fabric.fireEvent(inputNode(SINGLELINE).instanceHandle, 'topChange', { eventCount: 1 });
+    fabric.fireEvent(inputNode(SINGLELINE).instanceHandle, 'topChange', {
+      eventCount: 1,
+    });
     await tick();
     expect(changed).toBeUndefined();
   });

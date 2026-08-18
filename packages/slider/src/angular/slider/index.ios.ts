@@ -6,7 +6,10 @@ import { ChangeDetectionStrategy, Component, forwardRef } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { DescriptorOutlet } from '@symbiote-native/angular';
 import { SliderBase } from './shared';
-import { SLIDER_IOS_DEFAULT_HEIGHT, SLIDER_STEP_RESOLUTION_IOS } from '../../core';
+import {
+  SLIDER_IOS_DEFAULT_HEIGHT,
+  SLIDER_STEP_RESOLUTION_IOS,
+} from '../../core';
 export type { ISliderProps } from './shared';
 
 const IOS_STEPS_CONTAINER_TOP = 10;
@@ -16,7 +19,13 @@ const IOS_STEPS_CONTAINER_TOP = 10;
   standalone: true,
   imports: [DescriptorOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => Slider), multi: true }],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => Slider),
+      multi: true,
+    },
+  ],
   template: `<symbiote-descriptor-outlet [node]="descriptor" />`,
 })
 export class Slider extends SliderBase {

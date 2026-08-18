@@ -17,7 +17,10 @@ import {
   type FunctionalComponent,
 } from '@vue/runtime-core';
 import type { ISymbioteNode } from '@symbiote-native/engine';
-import type { IScrollViewHandle, IVirtualizedSectionListHandle } from '@symbiote-native/components';
+import type {
+  IScrollViewHandle,
+  IVirtualizedSectionListHandle,
+} from '@symbiote-native/components';
 import {
   VirtualizedSectionList,
   type IVirtualizedSectionListEmits,
@@ -29,9 +32,10 @@ import type { ICtx } from '../../utils/component-helpers';
 
 // VirtualizedSectionList's generic construct signature can't be resolved by h()'s overloads, so
 // drive it through a loose functional-component handle.
-const VirtualizedSectionListHost = VirtualizedSectionList as unknown as FunctionalComponent<
-  Record<string, unknown>
->;
+const VirtualizedSectionListHost =
+  VirtualizedSectionList as unknown as FunctionalComponent<
+    Record<string, unknown>
+  >;
 
 export type { ISection } from '../virtualized-section-list';
 export type ISectionListHandle = IVirtualizedSectionListHandle;
@@ -44,7 +48,9 @@ export type ISectionListSlots<ItemT> = IVirtualizedSectionListSlots<ItemT>;
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-function isSectionHandle(value: unknown): value is IVirtualizedSectionListHandle {
+function isSectionHandle(
+  value: unknown,
+): value is IVirtualizedSectionListHandle {
   return isRecord(value) && typeof value.scrollToLocation === 'function';
 }
 
@@ -56,10 +62,14 @@ function buildDelegate(
   return {
     scrollToLocation: params => getInner()?.scrollToLocation(params),
     flashScrollIndicators: () => getInner()?.flashScrollIndicators(),
-    getNativeScrollRef: (): IScrollViewHandle | null => getInner()?.getNativeScrollRef() ?? null,
-    getScrollableNode: (): IScrollViewHandle | null => getInner()?.getScrollableNode() ?? null,
-    getScrollResponder: (): IScrollViewHandle | null => getInner()?.getScrollResponder() ?? null,
-    getScrollNode: (): ISymbioteNode | null => getInner()?.getScrollNode() ?? null,
+    getNativeScrollRef: (): IScrollViewHandle | null =>
+      getInner()?.getNativeScrollRef() ?? null,
+    getScrollableNode: (): IScrollViewHandle | null =>
+      getInner()?.getScrollableNode() ?? null,
+    getScrollResponder: (): IScrollViewHandle | null =>
+      getInner()?.getScrollResponder() ?? null,
+    getScrollNode: (): ISymbioteNode | null =>
+      getInner()?.getScrollNode() ?? null,
     recordInteraction: () => getInner()?.recordInteraction(),
   };
 }
@@ -68,7 +78,12 @@ export const SectionList = defineComponent(
   // _props is read only by the type system, to let ItemT infer at the call site.
   <ItemT>(
     _props: ISectionListProps<ItemT>,
-    { attrs, expose, emit, slots }: ICtx<ISectionListEmits, ISectionListSlots<ItemT>>,
+    {
+      attrs,
+      expose,
+      emit,
+      slots,
+    }: ICtx<ISectionListEmits, ISectionListSlots<ItemT>>,
   ) => {
     const inner = shallowRef<IVirtualizedSectionListHandle | null>(null);
     const setInner = (instance: unknown): void => {
@@ -89,9 +104,12 @@ export const SectionList = defineComponent(
         ? (info: { distanceFromEnd: number }): void => emit('endReached', info)
         : undefined;
       const startReached = listens('onStartReached')
-        ? (info: { distanceFromStart: number }): void => emit('startReached', info)
+        ? (info: { distanceFromStart: number }): void =>
+            emit('startReached', info)
         : undefined;
-      const refresh = listens('onRefresh') ? (): void => emit('refresh') : undefined;
+      const refresh = listens('onRefresh')
+        ? (): void => emit('refresh')
+        : undefined;
 
       return h(
         VirtualizedSectionListHost,

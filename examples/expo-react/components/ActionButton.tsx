@@ -13,13 +13,21 @@ type IActionButtonProps = {
 // cohesion pass). One consistent bordered pill, tinted in the caller's own `color` exactly like
 // Button already took, so each screen's own line color is preserved — only the chrome becomes
 // consistent.
-export function ActionButton({ title, onPress, color, testID }: IActionButtonProps) {
+export function ActionButton({
+  title,
+  onPress,
+  color,
+  testID,
+}: IActionButtonProps) {
   return (
     <Pressable
       testID={testID}
       onPress={onPress}
       className="action-button"
-      style={({ pressed }) => ({ borderColor: color, opacity: pressed ? 0.6 : 1 })}
+      style={({ pressed }) => ({
+        borderColor: color,
+        opacity: pressed ? 0.6 : 1,
+      })}
     >
       <Text className="action-button-text" style={{ color }}>
         {title}

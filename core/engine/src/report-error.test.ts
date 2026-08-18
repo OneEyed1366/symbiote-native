@@ -68,9 +68,15 @@ describe('Positive', () => {
   it('attaches the component stack the way LogBox reads it', () => {
     const error = new Error('boom');
 
-    reportUncaughtError(error, { origin: ORIGIN, componentStack: '\n    in App' });
+    reportUncaughtError(error, {
+      origin: ORIGIN,
+      componentStack: '\n    in App',
+    });
 
-    expect(error).toMatchObject({ componentStack: '\n    in App', isComponentError: true });
+    expect(error).toMatchObject({
+      componentStack: '\n    in App',
+      isComponentError: true,
+    });
   });
 });
 
@@ -92,7 +98,10 @@ describe('Negative', () => {
     const error = Object.freeze(new Error('boom'));
 
     expect(() => {
-      reportUncaughtError(error, { origin: ORIGIN, componentStack: '\n    in App' });
+      reportUncaughtError(error, {
+        origin: ORIGIN,
+        componentStack: '\n    in App',
+      });
     }).not.toThrow();
     expect(consoleError).toHaveBeenCalledTimes(1);
   });

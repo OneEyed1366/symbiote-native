@@ -8,7 +8,10 @@
 import { dlog } from '@symbiote-native/engine';
 import { el } from '../descriptor';
 import type { IDescriptor } from '../descriptor';
-import type { IFoldedTextInputProps, ITextInputSelection } from '../state/text-input';
+import type {
+  IFoldedTextInputProps,
+  ITextInputSelection,
+} from '../state/text-input';
 
 // One host element per native input class. Text carries the only non-trivial nesting elsewhere;
 // here the choice is binary and runtime (the `multiline` prop), so the module stays flat.

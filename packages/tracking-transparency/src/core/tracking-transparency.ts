@@ -5,7 +5,11 @@
 // NOT ported here — that helper is React-only (built on useState/useEffect), and this repo's
 // convention is for each adapter to hand-roll its own permission hook instead (react/hooks,
 // vue/composables, angular/services), same as brightness/cellular already do.
-import { Platform, PermissionStatus, UnavailabilityError } from 'expo-modules-core';
+import {
+  Platform,
+  PermissionStatus,
+  UnavailabilityError,
+} from 'expo-modules-core';
 import type { PermissionResponse } from 'expo-modules-core';
 
 import { expoTrackingTransparency } from './native-module';
@@ -41,7 +45,10 @@ export async function requestTrackingPermissionsAsync(): Promise<PermissionRespo
     return Promise.resolve(androidAndWebPermissionsResponse);
   }
   if (!expoTrackingTransparency.requestPermissionsAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'requestPermissionsAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'requestPermissionsAsync',
+    );
   }
   return await expoTrackingTransparency.requestPermissionsAsync();
 }

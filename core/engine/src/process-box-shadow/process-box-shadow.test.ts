@@ -18,7 +18,8 @@ const PROCESSED_COLOR = 0x7f_b5_ff_d9;
 // processColor(arg) != null, so the stub must reject "0px"/"22px" and accept rgba(...).
 function installRealisticColorProcessor(): void {
   setColorProcessor(value => {
-    if (typeof value === 'string' && /^(rgba?|hsla?|#)/i.test(value.trim())) return PROCESSED_COLOR;
+    if (typeof value === 'string' && /^(rgba?|hsla?|#)/i.test(value.trim()))
+      return PROCESSED_COLOR;
     return null;
   });
 }
@@ -59,7 +60,9 @@ describe('processBoxShadow', () => {
     });
 
     it('keeps a boolean inset field as-is', () => {
-      const [insetShadow] = processBoxShadow([{ offsetX: 1, offsetY: 2, inset: true }]);
+      const [insetShadow] = processBoxShadow([
+        { offsetX: 1, offsetY: 2, inset: true },
+      ]);
       expect(insetShadow.inset).toBe(true);
     });
   });
@@ -73,26 +76,34 @@ describe('processBoxShadow', () => {
     });
 
     it('rejects an unparseable spreadDistance', () => {
-      expect(processBoxShadow([{ offsetX: 0, offsetY: 0, spreadDistance: 'nope' }])).toEqual([]);
+      expect(
+        processBoxShadow([{ offsetX: 0, offsetY: 0, spreadDistance: 'nope' }]),
+      ).toEqual([]);
     });
 
     // why: blurRadius has an EXTRA constraint beyond parseability — negative blur is
     // physically meaningless, so the guard is `value == null || value < 0`, not just
     // `value == null` like the other length fields.
     it('rejects a negative blurRadius', () => {
-      expect(processBoxShadow([{ offsetX: 0, offsetY: 0, blurRadius: -5 }])).toEqual([]);
+      expect(
+        processBoxShadow([{ offsetX: 0, offsetY: 0, blurRadius: -5 }]),
+      ).toEqual([]);
     });
 
     it('rejects a color that the processor cannot resolve', () => {
       setColorProcessor(() => null);
-      expect(processBoxShadow([{ offsetX: 0, offsetY: 0, color: 'anything' }])).toEqual([]);
+      expect(
+        processBoxShadow([{ offsetX: 0, offsetY: 0, color: 'anything' }]),
+      ).toEqual([]);
     });
   });
 
   describe('string form — realistic processColor (null for lengths, int for colors)', () => {
     it('parses every component of a full shadow string', () => {
       installRealisticColorProcessor();
-      const shadows = processBoxShadow('0px 0px 22px 3px rgba(127,181,255,0.85)');
+      const shadows = processBoxShadow(
+        '0px 0px 22px 3px rgba(127,181,255,0.85)',
+      );
       expect(shadows).toHaveLength(1);
       const [shadow] = shadows;
       expect(shadow.offsetX).toBe(0);
@@ -121,7 +132,9 @@ describe('processBoxShadow', () => {
     // occurrence of either is invalid syntax, must reject the whole shadow.
     it('rejects a shadow string with two colors', () => {
       installRealisticColorProcessor();
-      expect(processBoxShadow('rgba(0,0,0,1) 0px 0px rgba(1,1,1,1)')).toEqual([]);
+      expect(processBoxShadow('rgba(0,0,0,1) 0px 0px rgba(1,1,1,1)')).toEqual(
+        [],
+      );
     });
 
     // why: CSS requires the length values (offsetX/offsetY/blur/spread) to stay grouped

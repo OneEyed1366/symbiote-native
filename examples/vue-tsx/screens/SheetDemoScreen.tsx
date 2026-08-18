@@ -58,19 +58,23 @@ export const SheetDemoScreen = defineComponent(
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
           <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: LINE_COLOR.presentation }}>
+            <View
+              class="hero-badge"
+              style={{ backgroundColor: LINE_COLOR.presentation }}
+            >
               <Text class="hero-badge-text">SH</Text>
             </View>
             <View class="hero-copy">
               <Text class="hero-title">Sheet presentation</Text>
               <Text class="hero-body">
-                Pushed with stackPresentation: formSheet and three detents — drag the grabber between
-                30%, 60%, and full height.
+                Pushed with stackPresentation: formSheet and three detents —
+                drag the grabber between 30%, 60%, and full height.
               </Text>
             </View>
           </View>
           <Text class="info-text">
-            stackPresentation: formSheet · detents 30% / 60% / 100% · drag the grabber
+            stackPresentation: formSheet · detents 30% / 60% / 100% · drag the
+            grabber
           </Text>
           <ActionButton
             testID="sheet-dismiss"

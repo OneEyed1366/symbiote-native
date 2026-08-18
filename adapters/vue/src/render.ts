@@ -25,7 +25,10 @@ function teardown(rootTag: IRootTag): void {
   disposeRoot(rootTag);
 }
 
-export function mount(rootTag: IRootTag, rootComponent: Component): SymbioteSurface {
+export function mount(
+  rootTag: IRootTag,
+  rootComponent: Component,
+): SymbioteSurface {
   // A re-mount on a live rootTag starts clean; otherwise the stale app double-drives
   // the surface.
   teardown(rootTag);

@@ -21,7 +21,10 @@ const ROOT_TAG = 977;
 const fabric = installFabric();
 
 function subtreeStyled(testID: string, prop: string): unknown {
-  const find = (node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeNode | undefined => {
+  const find = (
+    node: IFakeNode,
+    predicate: (n: IFakeNode) => boolean,
+  ): IFakeNode | undefined => {
     if (predicate(node)) return node;
     for (const child of node.children) {
       const found = find(child, predicate);
@@ -43,7 +46,11 @@ let fixture: ButtonToggleFixture | undefined;
   selector: 'symbiote-button-toggle-host',
   standalone: true,
   imports: [Button],
-  template: `<Button [testID]="'toggle-button'" title="x" [class.dark]="dark"></Button>`,
+  template: `<Button
+    [testID]="'toggle-button'"
+    title="x"
+    [class.dark]="dark"
+  ></Button>`,
 })
 class ButtonToggleFixture {
   dark = false;

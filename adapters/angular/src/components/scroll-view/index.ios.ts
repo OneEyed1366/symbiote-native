@@ -16,7 +16,11 @@
 // a horizontal FlatList's cells landed outside the ScrollView entirely. Fix: single unconditional
 // `<ng-content>` call site.
 
-import { CUSTOM_ELEMENTS_SCHEMA, ChangeDetectionStrategy, Component } from '@angular/core';
+import {
+  CUSTOM_ELEMENTS_SCHEMA,
+  ChangeDetectionStrategy,
+  Component,
+} from '@angular/core';
 import {
   RefreshControlHost,
   ScrollContentView,
@@ -24,7 +28,11 @@ import {
   SymbioteHostPropsDirective,
   SymbioteStyleInputDirective,
 } from '../../primitives';
-import { ScrollViewBase, ScrollViewProjectionDirective, SCROLL_VIEW_INPUTS } from './shared';
+import {
+  ScrollViewBase,
+  ScrollViewProjectionDirective,
+  SCROLL_VIEW_INPUTS,
+} from './shared';
 export type { IAngularScrollViewProps, IScrollViewHandle } from './shared';
 
 // The symbiote-* host elements are imported as standalone components; the props directive is
@@ -32,7 +40,9 @@ export type { IAngularScrollViewProps, IScrollViewHandle } from './shared';
 @Component({
   selector: 'ScrollView',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
     ScrollViewHost,
@@ -44,7 +54,10 @@ export type { IAngularScrollViewProps, IScrollViewHandle } from './shared';
   changeDetection: ChangeDetectionStrategy.OnPush,
   inputs: SCROLL_VIEW_INPUTS,
   template: `
-    <symbiote-scroll-view #host="symbioteHost" [symbioteHostProps]="scrollProps()">
+    <symbiote-scroll-view
+      #host="symbioteHost"
+      [symbioteHostProps]="scrollProps()"
+    >
       @if (hasProjectedRefreshControl) {
         <symbiote-refresh-control
           #refreshHost="symbioteHost"

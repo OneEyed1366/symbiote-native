@@ -8,7 +8,12 @@
 // instead.
 
 import { describe, expect, it } from 'vitest';
-import { AnimatedValue, event, forkEvent, unforkEvent } from '@symbiote-native/engine';
+import {
+  AnimatedValue,
+  event,
+  forkEvent,
+  unforkEvent,
+} from '@symbiote-native/engine';
 
 describe('forkEvent / unforkEvent — Positive', () => {
   // why: with no existing handler, the new listener simply BECOMES the handler — the degenerate
@@ -29,9 +34,12 @@ describe('forkEvent / unforkEvent — Positive', () => {
   it('appends to an AnimatedEvent, returns the SAME handler, and still drives the value', () => {
     const scrollY = new AnimatedValue(0);
     const calls: string[] = [];
-    const handler = event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-      listener: () => calls.push('config'),
-    });
+    const handler = event(
+      [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+      {
+        listener: () => calls.push('config'),
+      },
+    );
     const extra = (): void => {
       calls.push('forked');
     };
@@ -48,9 +56,12 @@ describe('forkEvent / unforkEvent — Positive', () => {
   it('unforkEvent removes a forked listener from an AnimatedEvent while the value still drives', () => {
     const scrollY = new AnimatedValue(0);
     const calls: string[] = [];
-    const handler = event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-      listener: () => calls.push('config'),
-    });
+    const handler = event(
+      [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+      {
+        listener: () => calls.push('config'),
+      },
+    );
     const extra = (): void => {
       calls.push('forked');
     };

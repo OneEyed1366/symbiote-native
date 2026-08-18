@@ -15,7 +15,12 @@
 import { dlog } from '../debug';
 import { getNativeModule } from '../native-modules';
 
-import type { IAlertButtons, IAlertOptions, IAlertStatic, IAlertType } from './shared';
+import type {
+  IAlertButtons,
+  IAlertOptions,
+  IAlertStatic,
+  IAlertType,
+} from './shared';
 
 export type {
   IAlertButton,
@@ -48,7 +53,10 @@ interface IAlertArgs {
 // getNativeModule carries it. The callback `id`/`value` arrive typed because we declare
 // them here, so they cross the trust boundary already narrowed.
 interface INativeAlertManager {
-  alertWithArgs(args: IAlertArgs, callback: (id: number, value: string) => void): void;
+  alertWithArgs(
+    args: IAlertArgs,
+    callback: (id: number, value: string) => void,
+  ): void;
 }
 
 type IPromptCallbackOrButtons = ((text: string) => void) | IAlertButtons;
@@ -138,7 +146,12 @@ function prompt(
 // iOS-only, so it lives beyond IAlertStatic on this build.
 export const Alert: IAlertStatic & { prompt: typeof prompt } = {
   // alert delegates to prompt (same AlertManager path), exactly as RN does on iOS.
-  alert(title?: string, message?: string, buttons?: IAlertButtons, options?: IAlertOptions): void {
+  alert(
+    title?: string,
+    message?: string,
+    buttons?: IAlertButtons,
+    options?: IAlertOptions,
+  ): void {
     prompt(title, message, buttons, 'default', undefined, undefined, options);
   },
 

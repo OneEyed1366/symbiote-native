@@ -92,7 +92,9 @@ export function createLinking(platform: ILinkingPlatform): ILinkingStatic {
 
   function getModule(): INativeLinkingModule | null {
     if (linkingModule === undefined) {
-      linkingModule = getNativeModule<INativeLinkingModule>(platform.moduleName);
+      linkingModule = getNativeModule<INativeLinkingModule>(
+        platform.moduleName,
+      );
       dlog(
         `Linking: ${platform.moduleName} module ${linkingModule ? 'resolved' : 'NOT resolved (null)'}`,
       );
@@ -111,7 +113,9 @@ export function createLinking(platform: ILinkingPlatform): ILinkingStatic {
   }
 
   function moduleUnavailable(): Error {
-    return new Error(`Linking: ${platform.moduleName} native module unavailable`);
+    return new Error(
+      `Linking: ${platform.moduleName} native module unavailable`,
+    );
   }
 
   return {

@@ -28,7 +28,12 @@ const actionButtonStyle = ({ pressed }: { pressed: boolean }) => ({
 </script>
 
 <template>
-  <Pressable :testID="testID" @press="onPress" class="action-button" :style="actionButtonStyle">
+  <Pressable
+    :testID="testID"
+    @press="onPress"
+    class="action-button"
+    :style="actionButtonStyle"
+  >
     <Text class="action-button-text" :style="{ color }">{{ title }}</Text>
   </Pressable>
 </template>

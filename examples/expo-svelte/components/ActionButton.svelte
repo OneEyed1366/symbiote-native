@@ -11,7 +11,8 @@
     onPress,
     color,
     testID,
-  }: { title: string; onPress: () => void; color: string; testID?: string } = $props();
+  }: { title: string; onPress: () => void; color: string; testID?: string } =
+    $props();
 </script>
 
 <Pressable

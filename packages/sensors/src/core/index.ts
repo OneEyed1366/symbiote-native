@@ -3,7 +3,11 @@ export {
   AccelerometerSensor,
   type IAccelerometerMeasurement,
 } from './accelerometer';
-export { Barometer, BarometerSensor, type IBarometerMeasurement } from './barometer';
+export {
+  Barometer,
+  BarometerSensor,
+  type IBarometerMeasurement,
+} from './barometer';
 export {
   DeviceMotion,
   DeviceMotionSensor,
@@ -11,9 +15,21 @@ export {
   gravity,
   type IDeviceMotionMeasurement,
 } from './device-motion';
-export { Gyroscope, GyroscopeSensor, type IGyroscopeMeasurement } from './gyroscope';
-export { LightSensor, LightSensorSensor, type ILightSensorMeasurement } from './light-sensor';
-export { Magnetometer, MagnetometerSensor, type IMagnetometerMeasurement } from './magnetometer';
+export {
+  Gyroscope,
+  GyroscopeSensor,
+  type IGyroscopeMeasurement,
+} from './gyroscope';
+export {
+  LightSensor,
+  LightSensorSensor,
+  type ILightSensorMeasurement,
+} from './light-sensor';
+export {
+  Magnetometer,
+  MagnetometerSensor,
+  type IMagnetometerMeasurement,
+} from './magnetometer';
 export {
   MagnetometerUncalibrated,
   MagnetometerUncalibratedSensor,
@@ -28,7 +44,11 @@ export {
   type IPedometerResult,
   type IPedometerUpdateCallback,
 } from './pedometer';
-export { DeviceSensor, type IListener, type INativeSensorModule } from './device-sensor';
+export {
+  DeviceSensor,
+  type IListener,
+  type INativeSensorModule,
+} from './device-sensor';
 export type {
   EventSubscription,
   PermissionExpiration,

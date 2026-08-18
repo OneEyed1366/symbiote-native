@@ -34,7 +34,8 @@ import { AnimatedScrollView } from './create-animated-component';
 const ROOT_TAG = 927;
 const OVERRIDE_ROOT_TAG = 928;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 class AnimatedScrollViewApp {}
 Component({
@@ -85,7 +86,10 @@ describe('AnimatedScrollView', () => {
     const content = scrollView?.children[0];
     expect(content?.viewName).toBe('RCTScrollContentView');
     expect(content?.props.collapsable).toBe(false);
-    expect(content?.children.map(child => child.props.testID)).toEqual(['a', 'b']);
+    expect(content?.children.map(child => child.props.testID)).toEqual([
+      'a',
+      'b',
+    ]);
   });
 
   // Regression test for a THIRD bug in this same bespoke-template class, this one iOS-only (the

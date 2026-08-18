@@ -18,9 +18,12 @@ vi.mock('react-native', () => ({
   DeviceEventEmitter: { addListener: vi.fn() },
   Image: { resolveAssetSource: vi.fn() },
 }));
-vi.mock('react-native/Libraries/Renderer/shims/ReactNativeViewConfigRegistry', () => ({
-  get: vi.fn(),
-}));
+vi.mock(
+  'react-native/Libraries/Renderer/shims/ReactNativeViewConfigRegistry',
+  () => ({
+    get: vi.fn(),
+  }),
+);
 vi.mock('@symbiote-native/engine', () => ({
   setColorProcessor,
   setDeviceEventSource,
@@ -29,7 +32,8 @@ vi.mock('@symbiote-native/engine', () => ({
 }));
 
 const { bootstrapHost } = await import('./index');
-const { processColor, DeviceEventEmitter, Image } = await import('react-native');
+const { processColor, DeviceEventEmitter, Image } =
+  await import('react-native');
 const ReactNativeViewConfigRegistry =
   await import('react-native/Libraries/Renderer/shims/ReactNativeViewConfigRegistry');
 
@@ -59,7 +63,9 @@ describe('bootstrapHost — explicit overrides (Positive)', () => {
     expect(setColorProcessor).toHaveBeenCalledWith(colorProcessor);
     expect(setImageSourceResolver).toHaveBeenCalledWith(imageSourceResolver);
     expect(setDeviceEventSource).toHaveBeenCalledWith(deviceEventSource);
-    expect(setNativeViewConfigSource).toHaveBeenCalledWith(nativeViewConfigSource);
+    expect(setNativeViewConfigSource).toHaveBeenCalledWith(
+      nativeViewConfigSource,
+    );
     expect(processColor).not.toHaveBeenCalled();
     expect(Image.resolveAssetSource).not.toHaveBeenCalled();
   });
@@ -115,14 +121,18 @@ describe("bootstrapHost — zero-config seams (Positive, the module's actual pur
   // function got registered.
   it('wires the default color processor straight to RN processColor', () => {
     bootstrapHost();
-    const registered = setColorProcessor.mock.calls[0][0] as (value: unknown) => unknown;
+    const registered = setColorProcessor.mock.calls[0][0] as (
+      value: unknown,
+    ) => unknown;
     registered('red');
     expect(processColor).toHaveBeenCalledWith('red');
   });
 
   it('wires the default image source resolver straight to RN Image.resolveAssetSource', () => {
     bootstrapHost();
-    const registered = setImageSourceResolver.mock.calls[0][0] as (value: unknown) => unknown;
+    const registered = setImageSourceResolver.mock.calls[0][0] as (
+      value: unknown,
+    ) => unknown;
     registered({ uri: 'x.png' });
     expect(Image.resolveAssetSource).toHaveBeenCalledWith({ uri: 'x.png' });
   });
@@ -138,10 +148,16 @@ describe('bootstrapHost — default native-view-config source (Positive / guarde
   // the seam <third_party_rn_packages_are_react_only>-adjacent code relies on to derive events for
   // any RN view manager by name.
   it('returns whatever the RN registry has for a registered name', () => {
-    const config = { validAttributes: {}, bubblingEventTypes: {}, directEventTypes: {} };
+    const config = {
+      validAttributes: {},
+      bubblingEventTypes: {},
+      directEventTypes: {},
+    };
     vi.mocked(ReactNativeViewConfigRegistry.get).mockReturnValueOnce(config);
     bootstrapHost();
-    const registered = setNativeViewConfigSource.mock.calls[0][0] as (name: string) => unknown;
+    const registered = setNativeViewConfigSource.mock.calls[0][0] as (
+      name: string,
+    ) => unknown;
     expect(registered('RCTSomeThirdPartyView')).toBe(config);
   });
 
@@ -154,7 +170,9 @@ describe('bootstrapHost — default native-view-config source (Positive / guarde
       throw new Error('view config not found');
     });
     bootstrapHost();
-    const registered = setNativeViewConfigSource.mock.calls[0][0] as (name: string) => unknown;
+    const registered = setNativeViewConfigSource.mock.calls[0][0] as (
+      name: string,
+    ) => unknown;
     expect(registered('symbiote-view')).toBeUndefined();
   });
 });

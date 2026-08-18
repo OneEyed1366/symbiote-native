@@ -47,13 +47,14 @@ export const sheetDemoScreenOptions: IAngularScreenOptions = {
         <View class="hero-copy">
           <Text class="hero-title">Sheet presentation</Text>
           <Text class="hero-body">
-            Pushed with stackPresentation: formSheet and three detents — drag the grabber between
-            30%, 60%, and full height.
+            Pushed with stackPresentation: formSheet and three detents — drag
+            the grabber between 30%, 60%, and full height.
           </Text>
         </View>
       </View>
       <Text class="info-text">
-        stackPresentation: formSheet · detents 30% / 60% / 100% · drag the grabber
+        stackPresentation: formSheet · detents 30% / 60% / 100% · drag the
+        grabber
       </Text>
       <ActionButton
         testID="sheet-dismiss"

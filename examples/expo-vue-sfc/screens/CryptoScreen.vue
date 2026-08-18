@@ -32,9 +32,11 @@ function handleGenerateUuid(): void {
 }
 
 function handleDigestSha256(): void {
-  void digestStringAsync(CryptoDigestAlgorithm.SHA256, DIGEST_SAMPLE_TEXT).then(value => {
-    digestResult.value = value;
-  });
+  void digestStringAsync(CryptoDigestAlgorithm.SHA256, DIGEST_SAMPLE_TEXT).then(
+    value => {
+      digestResult.value = value;
+    },
+  );
 }
 
 function handleGetRandomBytes(): void {
@@ -46,9 +48,15 @@ function handleGetRandomBytes(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="crypto-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="crypto-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -57,8 +65,9 @@ function handleGetRandomBytes(): void {
         <View class="hero-copy">
           <Text class="hero-title">Crypto</Text>
           <Text class="hero-body"
-            >@symbiote-native/crypto — cryptographically secure random bytes, randomUUID, and
-            string digest hashing (SHA-1/256/384/512, MD2/4/5).</Text
+            >@symbiote-native/crypto — cryptographically secure random bytes,
+            randomUUID, and string digest hashing (SHA-1/256/384/512,
+            MD2/4/5).</Text
           >
         </View>
       </View>
@@ -72,13 +81,17 @@ function handleGetRandomBytes(): void {
           :color="lineColor"
         />
         <View v-if="uuidResult !== null" class="crypto-result-box">
-          <Text testID="crypto-uuid-result-value" class="crypto-result-text">{{ uuidResult }}</Text>
+          <Text testID="crypto-uuid-result-value" class="crypto-result-text">{{
+            uuidResult
+          }}</Text>
         </View>
       </View>
 
       <View testID="crypto-digest-card" class="crypto-card">
         <Text class="crypto-card-title">Digest</Text>
-        <Text class="info-text">{{ `SHA-256 of "${DIGEST_SAMPLE_TEXT}"` }}</Text>
+        <Text class="info-text">{{
+          `SHA-256 of "${DIGEST_SAMPLE_TEXT}"`
+        }}</Text>
         <ActionButton
           testID="crypto-digest-sha256-button"
           title="Digest SHA-256"
@@ -86,7 +99,11 @@ function handleGetRandomBytes(): void {
           :color="lineColor"
         />
         <View v-if="digestResult !== null" class="crypto-result-box">
-          <Text testID="crypto-digest-result-value" class="crypto-result-text">{{ digestResult }}</Text>
+          <Text
+            testID="crypto-digest-result-value"
+            class="crypto-result-text"
+            >{{ digestResult }}</Text
+          >
         </View>
       </View>
 
@@ -99,7 +116,11 @@ function handleGetRandomBytes(): void {
           :color="lineColor"
         />
         <View v-if="randomBytesResult !== null" class="crypto-result-box">
-          <Text testID="crypto-random-bytes-result-value" class="crypto-result-text">{{ randomBytesResult }}</Text>
+          <Text
+            testID="crypto-random-bytes-result-value"
+            class="crypto-result-text"
+            >{{ randomBytesResult }}</Text
+          >
         </View>
       </View>
     </ScrollView>

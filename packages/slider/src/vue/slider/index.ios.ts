@@ -3,7 +3,10 @@
 // Also the base (./index re-exports it) for headless. Mirrors the library's iOS branches.
 
 import { createSlider } from './shared';
-import { SLIDER_IOS_DEFAULT_HEIGHT, SLIDER_STEP_RESOLUTION_IOS } from '../../core';
+import {
+  SLIDER_IOS_DEFAULT_HEIGHT,
+  SLIDER_STEP_RESOLUTION_IOS,
+} from '../../core';
 
 const IOS_STEPS_CONTAINER_TOP = 10;
 

@@ -31,7 +31,8 @@ vi.mock('../../../core', () => ({
   Barometer: {
     addListener: (listener: IListener) => addListenerMock(listener),
     removeAllListeners: vi.fn(),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
@@ -47,7 +48,9 @@ beforeEach(() => {
 
 afterEach(() => unmount(ROOT_TAG));
 
-function mountBarometer(updateIntervalMs?: number): Ref<IBarometerMeasurement | null> {
+function mountBarometer(
+  updateIntervalMs?: number,
+): Ref<IBarometerMeasurement | null> {
   let measurement: Ref<IBarometerMeasurement | null> | undefined;
   mount(
     ROOT_TAG,
@@ -98,7 +101,11 @@ describe('useBarometer (Vue)', () => {
         relativeAltitude: 12.3,
         timestamp: 1,
       };
-      const second: IBarometerMeasurement = { pressure: 950, relativeAltitude: 500, timestamp: 2 };
+      const second: IBarometerMeasurement = {
+        pressure: 950,
+        relativeAltitude: 500,
+        timestamp: 2,
+      };
 
       registeredListener?.(first);
       expect(measurement.value).toEqual(first);

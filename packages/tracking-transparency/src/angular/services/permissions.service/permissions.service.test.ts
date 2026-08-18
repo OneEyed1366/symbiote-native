@@ -17,17 +17,22 @@ import { installFabric } from '@symbiote-native/test-utils';
 import { PermissionsService } from './index';
 import { PermissionStatus, type PermissionResponse } from '../../../core';
 
-const { getTrackingPermissionsAsync, requestTrackingPermissionsAsync } = vi.hoisted(() => ({
-  getTrackingPermissionsAsync: vi.fn(),
-  requestTrackingPermissionsAsync: vi.fn(),
-}));
+const { getTrackingPermissionsAsync, requestTrackingPermissionsAsync } =
+  vi.hoisted(() => ({
+    getTrackingPermissionsAsync: vi.fn(),
+    requestTrackingPermissionsAsync: vi.fn(),
+  }));
 
 // Same enum-shaped-object mock trick packages/battery/src/angular/services/battery-state.service's
 // test uses for BatteryState.
 vi.mock('../../../core', () => ({
   getTrackingPermissionsAsync,
   requestTrackingPermissionsAsync,
-  PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    DENIED: 'denied',
+    UNDETERMINED: 'undetermined',
+  },
 }));
 
 const GRANTED: PermissionResponse = {
@@ -45,14 +50,17 @@ const DENIED: PermissionResponse = {
 
 const ROOT_TAG = 974;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedStatus: Signal<PermissionResponse | null> | undefined;
 let capturedService: PermissionsService | undefined;
 
 // Node only reports an unhandled rejection a macrotask after the promise settles, so a plain
 // `await tick()` on the service's own signals is too early to prove one did not happen.
-async function collectUnhandledRejections(run: () => Promise<void>): Promise<unknown[]> {
+async function collectUnhandledRejections(
+  run: () => Promise<void>,
+): Promise<unknown[]> {
   const unhandled: unknown[] = [];
   const onUnhandledRejection = (reason: unknown): void => {
     unhandled.push(reason);
@@ -133,7 +141,9 @@ describe('PermissionsService.connect', () => {
       // why: connect()'s auto-fetch has no caller to reject to. It used to be `void this.get()`,
       // so a native rejection escaped the service entirely as an unhandled promise rejection and
       // left the signal at null — indistinguishable from "still fetching".
-      getTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
+      getTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
 
       // mounted before the listener goes up, but the rejection can only be reported once the
       // microtask queue drains — no turn passes between these two lines
@@ -152,7 +162,9 @@ describe('PermissionsService.connect', () => {
       // why: the auto-fetch used to be guarded on `status() === null`, which a failed fetch never
       // clears — so every later connect() fired another native call, unbounded once connect() is
       // reached from a change-detected expression instead of a field initializer.
-      getTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
+      getTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
       mount(ROOT_TAG, PermissionsHost);
       await tick();
 
@@ -167,7 +179,9 @@ describe('PermissionsService.connect', () => {
     it('clears the recorded error once a later get() succeeds', async () => {
       // why: a consumer that retries by hand after a failed auto-fetch must end up with a clean
       // slate — a stale error next to a freshly fetched status would keep reading as "broken".
-      getTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
+      getTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
       mount(ROOT_TAG, PermissionsHost);
       await tick();
       expect(capturedService?.error()).not.toBe(null);
@@ -201,8 +215,12 @@ describe('PermissionsService.get', () => {
       mount(ROOT_TAG, PermissionsHost);
       await tick();
 
-      getTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
-      await expect(capturedService?.get()).rejects.toThrow('native call failed');
+      getTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
+      await expect(capturedService?.get()).rejects.toThrow(
+        'native call failed',
+      );
 
       expect(capturedStatus?.()).toEqual(GRANTED);
     });
@@ -227,8 +245,12 @@ describe('PermissionsService.request', () => {
       mount(ROOT_TAG, PermissionsHost);
       await tick();
 
-      requestTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
-      await expect(capturedService?.request()).rejects.toThrow('native call failed');
+      requestTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
+      await expect(capturedService?.request()).rejects.toThrow(
+        'native call failed',
+      );
 
       expect(capturedStatus?.()).toEqual(GRANTED);
     });

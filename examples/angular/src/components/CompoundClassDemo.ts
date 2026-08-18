@@ -35,7 +35,9 @@ import './CompoundClassDemo.css';
           <Text class="badge-text">dynamic</Text>
         </View>
       </View>
-      <Text class="note-text" testID="angular-compound-badge-readout">{{ readout }}</Text>
+      <Text class="note-text" testID="angular-compound-badge-readout">{{
+        readout
+      }}</Text>
       <ActionButton
         testID="angular-compound-badge-toggle"
         [title]="isLoud ? 'Drop .loud' : 'Add .loud'"

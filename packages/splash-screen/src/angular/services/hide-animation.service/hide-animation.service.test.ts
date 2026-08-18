@@ -18,7 +18,10 @@ import { flattenStyle } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 import type { IImageSourceProp } from '@symbiote-native/components';
 import { hide as mockedHide } from 'react-native-bootsplash';
-import type { IHideAnimationFailure, IHideAnimationResult } from '../../../core';
+import type {
+  IHideAnimationFailure,
+  IHideAnimationResult,
+} from '../../../core';
 import { HideAnimationService } from './index';
 
 vi.mock('react-native-bootsplash', () => ({
@@ -36,11 +39,14 @@ const FAKE_NATIVE_MODULE = {
   isVisible: () => true,
 };
 
-const registeredNativeModules: Record<string, unknown> = { RNBootSplash: FAKE_NATIVE_MODULE };
+const registeredNativeModules: Record<string, unknown> = {
+  RNBootSplash: FAKE_NATIVE_MODULE,
+};
 
 const ROOT_TAG = 940;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 const settle = async (): Promise<void> => {
   await tick();
   await tick();
@@ -209,9 +215,12 @@ describe('HideAnimationService.connect', () => {
       await settle();
 
       const result = capturedResult?.();
-      if (result === undefined) throw new Error('hideAnimation signal was not captured');
+      if (result === undefined)
+        throw new Error('hideAnimation signal was not captured');
 
-      expect(flattenStyle(result.container.style).backgroundColor).toBe(MANIFEST.background);
+      expect(flattenStyle(result.container.style).backgroundColor).toBe(
+        MANIFEST.background,
+      );
       expect(result.container.onLayout).toBeTypeOf('function');
 
       expect(result.logo.source).toBe(LOGO_SOURCE);
@@ -291,7 +300,8 @@ describe('HideAnimationService.connect', () => {
       await settle();
 
       const result = capturedResult?.();
-      if (result === undefined) throw new Error('hideAnimation signal was not captured');
+      if (result === undefined)
+        throw new Error('hideAnimation signal was not captured');
 
       expect(result.logo.source).toBe(-1);
       expect(result.logo.onLoadEnd).toBeUndefined();
@@ -338,9 +348,12 @@ describe('HideAnimationService.connect', () => {
       await settle();
 
       const result = capturedResult?.();
-      if (result === undefined) throw new Error('hideAnimation signal was not captured');
+      if (result === undefined)
+        throw new Error('hideAnimation signal was not captured');
 
-      expect(flattenStyle(result.container.style).backgroundColor).toBe(MANIFEST.darkBackground);
+      expect(flattenStyle(result.container.style).backgroundColor).toBe(
+        MANIFEST.darkBackground,
+      );
       expect(result.logo.source).toBe(DARK_LOGO_SOURCE);
       expect(result.brand.source).toBe(DARK_BRAND_SOURCE);
     });
@@ -375,7 +388,9 @@ describe('HideAnimationService.connect', () => {
       // rejection shut the readiness gate for good — animate() never ran, no later layout event
       // could retry, and the app stayed buried under an overlay that never faded out.
       const hideError = new Error('native hide failed');
-      vi.mocked(mockedHide).mockImplementationOnce(() => Promise.reject(hideError));
+      vi.mocked(mockedHide).mockImplementationOnce(() =>
+        Promise.reject(hideError),
+      );
 
       mount(ROOT_TAG, HideAnimationFailureHost);
       await settle();
@@ -405,7 +420,9 @@ describe('HideAnimationService.connect', () => {
       // running on a splash quietly stuck in light mode.
       registeredNativeModules.RNBootSplash = undefined;
 
-      expect(() => mount(ROOT_TAG, HideAnimationNoLogoHost)).toThrow(/RNBootSplash/);
+      expect(() => mount(ROOT_TAG, HideAnimationNoLogoHost)).toThrow(
+        /RNBootSplash/,
+      );
     });
   });
 });

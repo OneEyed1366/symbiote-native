@@ -16,13 +16,18 @@ import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
-import { createSurface, disposeRoot, getNativeTag } from '@symbiote-native/engine';
+import {
+  createSurface,
+  disposeRoot,
+  getNativeTag,
+} from '@symbiote-native/engine';
 import { mount, unmount } from './render';
 import { createRootShimElement } from './root-element';
 import { getShimDocument } from './dom-shim';
 import { findNodeHandle, hostInstance } from './host-instance';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -32,7 +37,8 @@ const LIGHT_ROOT_TAG = 91_502;
 const PARENT_OUT = join(__dirname, '.smoke-compiled-host-instance-parent.mjs');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => {
@@ -41,9 +47,17 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
@@ -95,8 +109,11 @@ describe('hostInstance', () => {
       // fabric.find() walks the CREATION log, which never reflects a later clone's props
       // (svelte-adapter-dom-shim skill's documented gotcha) — a live-value assertion must
       // instead walk the currently COMMITTED tree.
-      function findLive(node: import('@symbiote-native/test-utils').IFakeNode): boolean {
-        if (node.props.testID === 'ref-box') return node.props.backgroundColor === '#f6ad55';
+      function findLive(
+        node: import('@symbiote-native/test-utils').IFakeNode,
+      ): boolean {
+        if (node.props.testID === 'ref-box')
+          return node.props.backgroundColor === '#f6ad55';
         return node.children.some(findLive);
       }
       expect(findLive(fabric.appRoot())).toBe(true);
@@ -147,7 +164,8 @@ describe('findNodeHandle', () => {
       const root = createRootShimElement(surface);
       await tick();
       const engineNode = root.engineNode;
-      if (engineNode === undefined) throw new Error('test setup: root shim never went live');
+      if (engineNode === undefined)
+        throw new Error('test setup: root shim never went live');
 
       const tag = getNativeTag(engineNode);
       expect(tag).not.toBeNull();

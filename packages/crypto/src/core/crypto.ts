@@ -74,7 +74,9 @@ export function getRandomBytes(byteCount: number): Uint8Array {
  * Generates completely random bytes using native implementations. `byteCount` must be within
  * `0`-`1024` (inclusive), anything else throws a `TypeError`.
  */
-export async function getRandomBytesAsync(byteCount: number): Promise<Uint8Array> {
+export async function getRandomBytesAsync(
+  byteCount: number,
+): Promise<Uint8Array> {
   assertByteCount(byteCount, 'getRandomBytesAsync');
   const validByteCount = Math.floor(byteCount);
   if (!expoCrypto.getRandomValues) {
@@ -151,7 +153,10 @@ const digestLengths: Record<CryptoDigestAlgorithm, number> = {
  * `algorithm`. Prefers the native async `digestAsync` when present; otherwise falls back to
  * allocating a fixed-size output buffer (sized via `digestLengths`) and the sync `digest`.
  */
-export function digest(algorithm: CryptoDigestAlgorithm, data: BufferSource): Promise<ArrayBuffer> {
+export function digest(
+  algorithm: CryptoDigestAlgorithm,
+  data: BufferSource,
+): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     try {
       if (typeof expoCrypto.digestAsync === 'function') {

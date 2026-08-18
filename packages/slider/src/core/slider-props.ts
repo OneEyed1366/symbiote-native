@@ -3,7 +3,11 @@
 // `StepMarker` field is per-adapter (a framework element return type can't live here) - see
 // CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter>.
 
-import type { IColorValue, IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type {
+  IColorValue,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
 import type {
   IAccessibilityProps,
   IAriaProps,

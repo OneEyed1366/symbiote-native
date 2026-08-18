@@ -109,7 +109,9 @@ export class TunnelOut implements OnInit, OnDestroy {
   private stopEffect: (() => void) | undefined;
 
   ngOnInit(): void {
-    const ref = effect(() => this.sync(this.tunnel.entries()), { injector: this.injector });
+    const ref = effect(() => this.sync(this.tunnel.entries()), {
+      injector: this.injector,
+    });
     this.stopEffect = () => ref.destroy();
   }
 

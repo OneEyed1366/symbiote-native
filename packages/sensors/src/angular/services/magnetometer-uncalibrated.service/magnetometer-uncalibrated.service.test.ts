@@ -18,15 +18,18 @@ const setUpdateIntervalMock = vi.fn();
 
 vi.mock('../../../core', () => ({
   MagnetometerUncalibrated: {
-    addListener: (listener: (measurement: IMagnetometerUncalibratedMeasurement) => void) =>
-      addListenerMock(listener),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    addListener: (
+      listener: (measurement: IMagnetometerUncalibratedMeasurement) => void,
+    ) => addListenerMock(listener),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
 const ROOT_TAG = 942;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 const MEASUREMENT: IMagnetometerUncalibratedMeasurement = {
   x: 0.1,
@@ -35,8 +38,10 @@ const MEASUREMENT: IMagnetometerUncalibratedMeasurement = {
   timestamp: 123,
 };
 
-let capturedResult: Signal<IMagnetometerUncalibratedMeasurement | null> | undefined;
-let capturedListener: ((measurement: IMagnetometerUncalibratedMeasurement) => void) | undefined;
+let capturedResult:
+  Signal<IMagnetometerUncalibratedMeasurement | null> | undefined;
+let capturedListener:
+  ((measurement: IMagnetometerUncalibratedMeasurement) => void) | undefined;
 
 @Component({
   selector: 'symbiote-magnetometer-uncalibrated-host',
@@ -112,7 +117,8 @@ describe('MagnetometerUncalibratedService.connect', () => {
       mount(ROOT_TAG, MagnetometerUncalibratedHost);
       await tick();
 
-      if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+      if (capturedListener === undefined)
+        throw new Error('addListener callback was not captured');
       capturedListener(MEASUREMENT);
 
       expect(capturedResult?.()).toEqual(MEASUREMENT);
