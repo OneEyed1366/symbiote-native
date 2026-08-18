@@ -105,7 +105,7 @@ before a tag is guaranteed to exist.
 - **The style pipeline** — `flattenStyle`, the CSS-style processors RN itself runs in JS
   (`processBoxShadow`, `processFilter`, `processTransform`, `processTransformOrigin`,
   `processAspectRatio`, `processFontVariant`, `processBackgroundImage`), and the runtime
-  **class-name registry** (`registerStyles` / `resolveClassName` / `scopeClassName`) that
+  **class-name registry** (`registerRules` / `resolveClassName` / `renameClassTokens`) that
   `@symbiote-native/css-parser`'s build-time output resolves against — shared by every adapter's
   `class` / `className` / `addClass` prop path.
 - **`AppRegistry` core** (`createAppRegistry`) — registry bookkeeping + headless-task plumbing;

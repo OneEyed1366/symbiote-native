@@ -10,9 +10,15 @@ import type { IColorValue } from './platform-color';
 // RN allows `%` strings for layout dimensions and insets, plus the 'auto' keyword.
 export type IDimensionValue = number | string;
 
-export type IFlexAlign = 'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
+export type IFlexAlign =
+  'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
 export type IFlexJustify =
-  'flex-start' | 'flex-end' | 'center' | 'space-between' | 'space-around' | 'space-evenly';
+  | 'flex-start'
+  | 'flex-end'
+  | 'center'
+  | 'space-between'
+  | 'space-around'
+  | 'space-evenly';
 
 // transform is an array of single-key objects, applied in order. Each entry names
 // exactly one transform; numeric ones take a number, angular/skew ones a string.
@@ -245,7 +251,8 @@ export interface IViewStyle {
   transform?: ITransformProp[];
   // The point a transform scales/rotates about (StyleSheetTypes:94 in _TransformStyle).
   // CSS string (`'30% 80% 15px'`) or a [x, y, z] tuple; the z element must be a number.
-  transformOrigin?: [string | number, string | number, string | number] | string;
+  transformOrigin?:
+    [string | number, string | number, string | number] | string;
 
   // New-Architecture visual props (StyleSheetTypes ____ViewStyle_InternalBase:887).
   // All three are pass-through style keys: flattenStyle copies the array/object/string
@@ -263,17 +270,35 @@ export interface ITextStyle extends IViewStyle {
   fontSize?: number;
   fontStyle?: 'normal' | 'italic';
   fontWeight?:
-    'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
+    | 'normal'
+    | 'bold'
+    | '100'
+    | '200'
+    | '300'
+    | '400'
+    | '500'
+    | '600'
+    | '700'
+    | '800'
+    | '900';
   letterSpacing?: number;
   lineHeight?: number;
   textAlign?: 'auto' | 'left' | 'right' | 'center' | 'justify';
   textAlignVertical?: 'auto' | 'top' | 'bottom' | 'center';
   textTransform?: 'none' | 'capitalize' | 'uppercase' | 'lowercase';
-  textDecorationLine?: 'none' | 'underline' | 'line-through' | 'underline line-through';
+  textDecorationLine?:
+    'none' | 'underline' | 'line-through' | 'underline line-through';
   // A color prop: needs processColor before Fabric. See SHARED CHANGES NEEDED:
   // the type is declared here, the COLOR_PROPS wiring is a shared change.
   textDecorationColor?: IColorValue;
   textDecorationStyle?: 'solid' | 'double' | 'dotted' | 'dashed';
+  // The three halves of CSS `text-shadow`, which the CSS compiler has always emitted and
+  // fabric-props.ts has always listed under COLOR_PROPS — the type was the only place they were
+  // missing, so a hand-written `style={{ textShadowRadius: 2 }}` was a type error while the same
+  // thing from a stylesheet went through.
+  textShadowColor?: IColorValue;
+  textShadowOffset?: { width: number; height: number };
+  textShadowRadius?: number;
   // OpenType feature selectors, e.g. ['tabular-nums', 'oldstyle-nums'].
   fontVariant?: string[];
   // Per-text override of the layout writing direction.

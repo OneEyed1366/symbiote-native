@@ -28,7 +28,10 @@ export { registerComponent, setNativeViewConfigSource } from './registry';
 export { isRecord } from './type-guards';
 // InteractionManager: pure JS (timers + emitter), framework-agnostic, so it lives
 // here; every adapter re-exports it.
-export { InteractionManager, Events as InteractionManagerEvents } from './interaction-manager';
+export {
+  InteractionManager,
+  Events as InteractionManagerEvents,
+} from './interaction-manager';
 export type {
   IInteractionEvent,
   ISimpleTask,
@@ -76,8 +79,16 @@ export {
 // here because it depends only on engine internals, so all adapters inherit it identically.
 export { toPublicInstance } from './host-instance';
 export type { IHostInstance } from './host-instance';
-export { PlatformColor, DynamicColorIOS, isOpaqueColorValue } from './platform-color';
-export type { IColorValue, IOpaqueColorValue, IDynamicColorIOSTuple } from './platform-color';
+export {
+  PlatformColor,
+  DynamicColorIOS,
+  isOpaqueColorValue,
+} from './platform-color';
+export type {
+  IColorValue,
+  IOpaqueColorValue,
+  IDynamicColorIOSTuple,
+} from './platform-color';
 // CSS-style processors (boxShadow/filter): RN parses these in JS before native because
 // enableNativeCSSParsing() defaults to false. Exported so an adapter / test can reuse them.
 export { processBoxShadow } from './process-box-shadow';
@@ -115,16 +126,24 @@ export type {
 } from './styles';
 export { StyleSheet, computeHairlineWidth } from './style-sheet';
 export {
-  registerStyles,
+  registerRules,
   resolveClassName,
   clearGlobalStyles,
   isClassNameValue,
 } from './style-registry';
-export type { IClassNameValue } from './style-registry';
-export { scopeClassName } from './style-registry/scope';
-export type { IClassToggleMap, IScopableClassValue } from './style-registry/scope';
+export type { IClassNameValue, IStyleRule } from './style-registry';
+export { renameClassTokens } from './style-registry/scope';
+export type {
+  IClassNameRenames,
+  IClassToggleMap,
+  IScopableClassValue,
+} from './style-registry/scope';
 export { Platform } from './platform';
-export type { IPlatformStatic, IPlatformOSType, IPlatformSelectSpec } from './platform';
+export type {
+  IPlatformStatic,
+  IPlatformOSType,
+  IPlatformSelectSpec,
+} from './platform';
 // The per-platform constants types come from their own files, not the host-selected
 // `./platform`: on an Android Metro build `./platform` IS platform.android.ts, which
 // has no PlatformConstantsIOS. These are type-only (erased at runtime), so naming the
@@ -136,7 +155,11 @@ export { reportUncaughtError } from './report-error';
 export type { IUncaughtErrorInfo } from './report-error';
 
 export { getNativeModule, getEnforcingNativeModule } from './native-modules';
-export { installDeviceEventHub, NativeEventEmitter, setDeviceEventSource } from './native-events';
+export {
+  installDeviceEventHub,
+  NativeEventEmitter,
+  setDeviceEventSource,
+} from './native-events';
 export type {
   IEventSubscription,
   IEventEmitterModule,
@@ -256,8 +279,15 @@ export type { IShareContent, IShareOptions, IShareAction } from './share';
 // no view of its own, same shape as Alert/Share. The source-resolution seam it shares with
 // @symbiote-native/components' renderImage lives alongside it in image-source-resolver.
 export { imageStatics } from './image-loader';
-export type { IImageStatics, IImageSize, IImageCacheStatus } from './image-loader';
-export { setImageSourceResolver, resolveImageSource } from './image-source-resolver';
+export type {
+  IImageStatics,
+  IImageSize,
+  IImageCacheStatus,
+} from './image-loader';
+export {
+  setImageSourceResolver,
+  resolveImageSource,
+} from './image-source-resolver';
 export type { IImageSource, IImageSourceProp } from './image-source-resolver';
 export { ActionSheetIOS } from './action-sheet-ios';
 export type {
@@ -309,7 +339,11 @@ export type {
   ITaskCancelProvider,
 } from './app-registry';
 export { Keyboard, KEYBOARD_EVENT } from './keyboard';
-export type { IKeyboardEventName, IKeyboardEvent, IKeyboardMetrics } from './keyboard';
+export type {
+  IKeyboardEventName,
+  IKeyboardEvent,
+  IKeyboardMetrics,
+} from './keyboard';
 export {
   currentlyFocusedInput,
   setInputFocused,
@@ -327,8 +361,16 @@ export type {
 } from './layout-animation';
 export { BackHandler } from './back-handler';
 export type { IBackPressEventName, IBackPressHandler } from './back-handler';
-export { PermissionsAndroid, PERMISSIONS, RESULTS } from './permissions-android';
-export type { IPermission, IPermissionStatus, IRationale } from './permissions-android';
+export {
+  PermissionsAndroid,
+  PERMISSIONS,
+  RESULTS,
+} from './permissions-android';
+export type {
+  IPermission,
+  IPermissionStatus,
+  IRationale,
+} from './permissions-android';
 export { AccessibilityInfo } from './accessibility-info';
 export type {
   IAccessibilityChangeEvent,
@@ -342,7 +384,11 @@ export type {
 } from './accessibility-info/shared';
 // StatusBar: values from the platform-selected './status-bar', types from '-shared' (the
 // .ios re-export would otherwise duplicate-export the type symbols).
-export { applyStatusBarProps, statusBarImperative, statusBarCurrentHeight } from './status-bar';
+export {
+  applyStatusBarProps,
+  statusBarImperative,
+  statusBarCurrentHeight,
+} from './status-bar';
 export {
   hideTransition,
   STATUS_BAR_MANAGER,

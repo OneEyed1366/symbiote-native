@@ -55,7 +55,10 @@ export interface ISymbioteNode {
   parent: ISymbioteNode | undefined;
 }
 
-export function createElement(component: string, isText = false): ISymbioteNode {
+export function createElement(
+  component: string,
+  isText = false,
+): ISymbioteNode {
   return {
     [BRAND]: true,
     component,
@@ -117,10 +120,24 @@ export function isAnchor(node: ISymbioteNode): boolean {
   return node.component === ANCHOR_COMPONENT;
 }
 
+// A raw text with no characters must not reach Fabric. Its fragment is dropped by
+// AttributedString::appendFragment, but the text walk has already flagged "the last child was raw
+// text", so the NEXT raw sibling merges into `fragments.back()` of an empty vector and the process
+// aborts. The commit walk skips such a node exactly as it skips an anchor (commit.ts,
+// renderableChildren); an empty string paints nothing either way, so nothing is lost. `''` only —
+// a whitespace-only string is real content inside a <Text>.
+export function isEmptyRawText(node: ISymbioteNode): boolean {
+  return node.component === RAW_TEXT_COMPONENT && node.props.text === '';
+}
+
 // A pure prop set: no event inference. `onTintColor` is a Switch prop and reaches
 // Fabric like any other; the event-vs-prop decision is made by routeProp, never by
 // the key's name.
-export function setProp(node: ISymbioteNode, key: string, value: unknown): void {
+export function setProp(
+  node: ISymbioteNode,
+  key: string,
+  value: unknown,
+): void {
   if (value === undefined) {
     delete node.props[key];
   } else {
@@ -140,7 +157,11 @@ const LAYOUT_FLAG_PROP = 'onLayout';
 // The explicit event channel. Structural adapters (Svelte addEventListener, Angular
 // Renderer2.listen) call this directly with an already-known event name; flat-bag
 // adapters reach it through routeProp. A non-function value clears the listener.
-export function setEventListener(node: ISymbioteNode, name: string, value: unknown): void {
+export function setEventListener(
+  node: ISymbioteNode,
+  name: string,
+  value: unknown,
+): void {
   const isHandler = typeof value === 'function';
   if (isHandler) {
     const handler = value;
@@ -149,7 +170,8 @@ export function setEventListener(node: ISymbioteNode, name: string, value: unkno
   } else {
     node.listeners?.delete(name);
   }
-  if (name === LAYOUT_EVENT) setProp(node, LAYOUT_FLAG_PROP, isHandler ? true : undefined);
+  if (name === LAYOUT_EVENT)
+    setProp(node, LAYOUT_FLAG_PROP, isHandler ? true : undefined);
 }
 
 const ON_PREFIX = /^on[A-Z]/;
@@ -188,7 +210,10 @@ const RESPONDER_EVENTS: ReadonlySet<string> = new Set([
 // dynamic" (the instance holds functions) and the surface paints black, while iOS silently
 // drops it. SFC/template authoring never produces them. Strip them here, once, so no
 // adapter leaks React JSX dev metadata to the host, mirroring React's host config.
-const REACT_JSX_DEV_PROPS: ReadonlySet<string> = new Set(['__self', '__source']);
+const REACT_JSX_DEV_PROPS: ReadonlySet<string> = new Set([
+  '__self',
+  '__source',
+]);
 
 // `class`/`className` and `style` can each be set independently and out of order — Vue's
 // patchProp fires one call per changed key, Angular's addClass/removeClass and setStyle are
@@ -208,7 +233,10 @@ interface IClassStyleParts {
 }
 const classStyleParts = new WeakMap<ISymbioteNode, IClassStyleParts>();
 
-function commitClassStyle(node: ISymbioteNode, patch: Partial<IClassStyleParts>): void {
+function commitClassStyle(
+  node: ISymbioteNode,
+  patch: Partial<IClassStyleParts>,
+): void {
   const entry = { ...classStyleParts.get(node), ...patch };
   classStyleParts.set(node, entry);
   setProp(node, 'style', [entry.classStyle, entry.explicitStyle]);
@@ -228,7 +256,11 @@ const CLASS_PROP_KEYS: ReadonlySet<string> = new Set(['class', 'className']);
 // ONLY when the node's component actually declares `x` as an event (per the shared
 // ViewConfig). Otherwise it is a plain prop, so `onTintColor` on a Switch, whose
 // only event is `change`, routes to setProp and reaches Fabric.
-export function routeProp(node: ISymbioteNode, key: string, value: unknown): void {
+export function routeProp(
+  node: ISymbioteNode,
+  key: string,
+  value: unknown,
+): void {
   if (REACT_JSX_DEV_PROPS.has(key)) return;
   if (CLASS_PROP_KEYS.has(key)) {
     commitClassStyle(node, {
@@ -242,7 +274,8 @@ export function routeProp(node: ISymbioteNode, key: string, value: unknown): voi
   }
   if (ON_PREFIX.test(key)) {
     const name = listenerName(key);
-    const isRegisteredEvent = RESPONDER_EVENTS.has(name) || isEventFor(node.component, name);
+    const isRegisteredEvent =
+      RESPONDER_EVENTS.has(name) || isEventFor(node.component, name);
     // Investigation instrumentation (HeaderOptionsScreen unresponsive-buttons bug): RNS* views
     // derive their events from react-native-screens' own codegen ViewConfig (registry.ts), so an
     // unregistered event silently falls through to setProp below — a dead prop Fabric ignores,

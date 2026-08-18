@@ -1,60 +1,62 @@
-// Vue `<style scoped>` class-name rewriter. Distinct responsibility from the sibling
-// ./index.ts (the CSS class -> style registry): this module does pure NAME rewriting,
-// no registry lookup, no CSS parsing. It runs at the compiled call site of a Vue SFC's
-// scoped-style template - `adapters/vue/metro-vue-transformer.cjs` emits calls to
-// scopeClassName (imported there as `__scopeClass`) - BEFORE Vue's own normalizeClass()
-// collapses string/object/array `class` values to a final string, so it must pre-process
-// all three shapes normalizeClass understands. resolveClassName in ./index.ts still does
-// the actual style lookup, unchanged, against the rewritten (possibly suffixed) name.
-
-import { kebabToCamel } from './index';
+// Class-name rewriter for scoped styles. Distinct responsibility from the sibling ./index.ts
+// (the CSS class -> style registry): this module does pure NAME rewriting, no registry lookup,
+// no CSS parsing. It runs at the compiled call site of a scoped-style template -
+// `adapters/vue/metro-vue-transformer.cjs` emits calls to renameClassTokens (imported there as
+// `__scopeClass`) - BEFORE Vue's own normalizeClass() collapses string/object/array `class`
+// values to a final string, so it must pre-process all three shapes normalizeClass understands.
+// resolveClassName in ./index.ts still does the actual style lookup, unchanged, against the
+// rewritten name.
 
 export type IClassToggleMap = Record<string, boolean | undefined>;
 
 export type IScopableClassValue =
   string | IClassToggleMap | Array<string | IClassToggleMap> | undefined | null;
 
-// Suffixes every class token that this file's scoped block locally defines with
-// `__${scopeId}`, leaving unrecognized tokens (globals, external classes) untouched.
-export function scopeClassName(
+// A compile-time table of authored class name -> the name it was RENAMED to, carrying both the
+// authored spelling and its camelCase alias so either survives a lookup.
+export type IClassNameRenames = Readonly<Record<string, string>>;
+
+/**
+ * Rewrites every class token the style compiler renamed, leaving the rest alone.
+ *
+ * The names come from the compiler's own rename table, emitted verbatim, rather than being
+ * RECOMPUTED here as `token + '__' + scopeId`. Recomputing made the runtime a second,
+ * independent implementation of "what is this class called now" beside the style compiler —
+ * they agreed by construction until a rename mechanism changed under one of them. lightningcss
+ * renames the class; this reads the result.
+ *
+ * A token absent from the table is left alone: it belongs to another file (a `:global()` escape
+ * hatch, App.css, a class handed down by a parent), and the registry resolves it under its own
+ * authored name.
+ */
+export function renameClassTokens(
   value: IScopableClassValue,
-  localNames: ReadonlySet<string>,
-  scopeId: string,
+  renames: IClassNameRenames,
 ): IScopableClassValue {
   if (value === undefined || value === null) return value;
 
   if (Array.isArray(value)) {
-    return value.map(item => scopeClassEntry(item, localNames, scopeId));
+    return value.map(item => renameClassEntry(item, renames));
   }
 
-  return scopeClassEntry(value, localNames, scopeId);
+  return renameClassEntry(value, renames);
 }
 
-// A token arrives as either the camelCase registry key (`sectionLabel`) or its kebab-case
-// authoring form (`section-label`) - normalize to camelCase FIRST, then decide scoping, so
-// `localNames` (always camelCase, built from the css-parser's registered keys) recognizes a
-// kebab-written token. The emitted (possibly suffixed) name is always the camelCase form.
-function scopeToken(token: string, localNames: ReadonlySet<string>, scopeId: string): string {
-  const camelToken = kebabToCamel(token);
-  return localNames.has(camelToken) ? `${camelToken}__${scopeId}` : camelToken;
-}
-
-function scopeClassEntry(
+function renameClassEntry(
   value: string | IClassToggleMap,
-  localNames: ReadonlySet<string>,
-  scopeId: string,
+  renames: IClassNameRenames,
 ): string | IClassToggleMap {
   if (typeof value === 'object') {
-    const scoped: IClassToggleMap = {};
+    const renamed: IClassToggleMap = {};
     for (const [name, enabled] of Object.entries(value)) {
-      scoped[scopeToken(name, localNames, scopeId)] = enabled;
+      renamed[renames[name] ?? name] = enabled;
     }
-    return scoped;
+    return renamed;
   }
 
   return value
     .split(/\s+/)
     .filter(Boolean)
-    .map(token => scopeToken(token, localNames, scopeId))
+    .map(token => renames[token] ?? token)
     .join(' ');
 }
