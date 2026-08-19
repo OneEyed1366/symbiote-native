@@ -6,7 +6,7 @@ description: Style SymbioteNative native views with CSS classes, CSS Modules, or
 SymbioteNative's preferred way to style a native view is ordinary CSS — a class
 string resolved through a shared runtime registry, compiled to native style
 objects at build time. Every current example app (React, Vue SFC, Vue TSX,
-Angular, Svelte) styles this way. `StyleSheet.create` — React Native's own JS-object
+Angular, Svelte, Solid) styles this way. `StyleSheet.create` — React Native's own JS-object
 style model — is still fully supported and works identically everywhere; use
 it for genuinely dynamic values a CSS class can't express, or if you'd rather
 not reach for CSS.
@@ -355,7 +355,7 @@ misapplied. Tailwind CSS is not supported. Everything else — plain CSS
 `background-image`), CSS Modules, and the SCSS/Less/Stylus preprocessors
 above — is a stable, build-time-only compile step: no CSS engine, no selector
 matching, and no extra runtime cost ships in the app bundle. It works the
-same way across React, Vue, Angular, and Svelte, including Svelte's own
+same way across React, Vue, Angular, Svelte, and Solid, including Svelte's own
 default-scoped `<style>` block.
 
 ## StyleSheet.create — the alternative

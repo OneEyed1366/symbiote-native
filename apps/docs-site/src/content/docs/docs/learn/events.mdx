@@ -1,6 +1,6 @@
 ---
 title: Events
-description: Understand how native events surface as React callbacks, Vue emits/v-model, Angular bindings, and Svelte callback props.
+description: Understand how native events surface as React callbacks, Vue emits/v-model, Angular bindings, Svelte callback props, and Solid callback props.
 ---
 
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -8,10 +8,11 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 Native Fabric events come back to the engine. Each adapter then exposes them in
 that framework's idiom: React callback props, Vue typed emits (plus `v-model`
 on controlled components), Angular real `@Output()` `EventEmitter`s, and
-Svelte plain callback props — the DOM-shim adapter passes the same event
-object straight through, with no framework-specific wrapper or emit
-translation — with one permanent exception, the scroll-family events, which
-stay callback inputs (see the caveat below).
+Svelte and Solid plain callback props — the DOM-shim adapter and the Solid
+renderer both pass the same event object straight through, with no
+framework-specific wrapper or emit translation — with one permanent
+exception, the scroll-family events, which stay callback inputs (see the
+caveat below).
 
 ## Same event, different framework shape
 
@@ -57,6 +58,17 @@ stay callback inputs (see the caveat below).
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    Solid receives the same native event object shape as React and Svelte,
+    props pass through as-is with no framework-specific event wrapper:
+
+    ```tsx
+    <Switch value={enabled()} onValueChange={next => setEnabled(next)} />
+    <TextInput value={name()} onValueChange={next => setName(next)} />
+    <Pressable onPress={() => setCount(count() + 1)} />
+    ```
+
+  </TabItem>
 </Tabs>
 
 The payload is the same concept. The public API is framework-shaped.
@@ -81,21 +93,21 @@ actually consumes and re-emits them.
 
 Other events are adapter-level conveniences. Examples:
 
-| Concept              | React                         | Vue                               | Angular                      | Svelte                        |
-| -------------------- | ----------------------------- | --------------------------------- | ---------------------------- | ----------------------------- |
-| Press                | `onPress`                     | `@press`                          | `(press)`                    | `onPress`                     |
-| Switch value         | `onValueChange(value, event)` | `@value-change`<br />or `v-model` | `(valueChange)` (value only) | `onValueChange(value, event)` |
-| Text input text      | `onValueChange(text, event)`  | `@value-change`<br />or `v-model` | `(valueChange)` (text only)  | `onValueChange(text, event)`  |
-| Text input raw event | _(same callback, 2nd arg)_    | _(same emit, 2nd arg)_            | `(change)` (separate output) | _(same callback, 2nd arg)_    |
+| Concept               | React                          | Vue                                | Angular                       | Svelte                          | Solid                           |
+| --------------------- | ------------------------------- | ------------------------------------ | ------------------------------- | ---------------------------------- | ---------------------------------- |
+| Press                 | `onPress`                      | `@press`                            | `(press)`                      | `onPress`                         | `onPress`                         |
+| Switch value          | `onValueChange(value, event)`  | `@value-change`<br />or `v-model`   | `(valueChange)` (value only)   | `onValueChange(value, event)`     | `onValueChange(value, event)`     |
+| Text input text       | `onValueChange(text, event)`   | `@value-change`<br />or `v-model`   | `(valueChange)` (text only)    | `onValueChange(text, event)`      | `onValueChange(text, event)`      |
+| Text input raw event  | _(same callback, 2nd arg)_      | _(same emit, 2nd arg)_               | `(change)` (separate output)   | _(same callback, 2nd arg)_         | _(same callback, 2nd arg)_         |
 
-React, Vue, and Svelte merged `TextInput`'s old `onChangeText`/`onChange` pair
-into one `onValueChange(text, event)` callback — there's only ever one
+React, Vue, Svelte, and Solid merged `TextInput`'s old `onChangeText`/`onChange`
+pair into one `onValueChange(text, event)` callback — there's only ever one
 underlying native event. Angular keeps two separate `@Output()`s instead,
 because an `EventEmitter` carries exactly one value: `valueChange` stays
 text-only (so `[(value)]` two-way binding keeps working) and `change` is a
 second output for the raw event. `Switch` follows the same shape one level
-simpler: React's `onValueChange`, Vue's `@value-change`, and Svelte's
-`onValueChange` all receive the native event as a second argument, but
+simpler: React's, Svelte's, and Solid's `onValueChange`, and Vue's
+`@value-change`, all receive the native event as a second argument, but
 Angular's `valueChange` stays single-value (just the boolean) since there's
 no second output to split it into.
 
@@ -110,4 +122,4 @@ native view reports a new value but the parent does not update the `value` prop,
 SymbioteNative commands native back to the JavaScript value.
 
 That correction logic is shared in `@symbiote-native/components`; React, Vue,
-Angular, and Svelte each only wire it to their own lifecycle systems.
+Angular, Svelte, and Solid each only wire it to their own lifecycle systems.

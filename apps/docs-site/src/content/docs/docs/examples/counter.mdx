@@ -1,6 +1,6 @@
 ---
 title: Counter example
-description: The smallest useful SymbioteNative app in React, Vue, Angular, and Svelte.
+description: The smallest useful SymbioteNative app in React, Vue, Angular, Svelte, and Solid.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
@@ -101,20 +101,44 @@ This example shows state, native layout, text, and a press event.
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import './App.css';
+    import { createSignal } from 'solid-js';
+    import { Text, View } from '@symbiote-native/solid';
+
+    export function App() {
+      const [count, setCount] = createSignal(0);
+
+      return (
+        <View class="root" onPress={() => setCount(value => value + 1)}>
+          <Text class="text">Count is {count()}</Text>
+        </View>
+      );
+    }
+    ```
+
+    ```css
+    /* App.css */
+    .root { flex: 1; align-items: center; justify-content: center; }
+    .text { font-size: 24px; }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ## What changed
 
-| Concern     | React                          | Vue                            | Angular                            | Svelte                               |
-| ----------- | ------------------------------ | ------------------------------ | ---------------------------------- | ------------------------------------ |
-| State       | `useState()`                   | `ref()`                        | plain class field                  | `$state()` rune                      |
-| Press event | `onPress` directly on `View`   | `@press` directly on `View`    | `(press)` on a `Pressable` wrapper | `onPress` directly on `View`         |
-| Styling     | `className="root"` + `App.css` | `class="root"` + SFC `<style>` | `class="root"` + `app.css`         | `class="root"` + component `<style>` |
-| Native path | shared engine                  | shared engine                  | shared engine                      | shared engine                        |
+| Concern     | React                          | Vue                            | Angular                            | Svelte                               | Solid                        |
+| ----------- | ------------------------------ | ------------------------------ | ---------------------------------- | ------------------------------------ | ---------------------------- |
+| State       | `useState()`                   | `ref()`                        | plain class field                  | `$state()` rune                      | `createSignal()`             |
+| Press event | `onPress` directly on `View`   | `@press` directly on `View`    | `(press)` on a `Pressable` wrapper | `onPress` directly on `View`         | `onPress` directly on `View` |
+| Styling     | `className="root"` + `App.css` | `class="root"` + SFC `<style>` | `class="root"` + `app.css`         | `class="root"` + component `<style>` | `class="root"` + `App.css`   |
+| Native path | shared engine                  | shared engine                  | shared engine                      | shared engine                        | shared engine                |
 
-`View` itself carries `onPress`/`onPressIn`/`onPressOut` — React, Vue, and
-Svelte's simplest counter reaches for it directly rather than wrapping in
-`Pressable`. Angular's counter uses `Pressable` here since its
+`View` itself carries `onPress`/`onPressIn`/`onPressOut` — React, Vue,
+Svelte, and Solid's simplest counter reaches for it directly rather than
+wrapping in `Pressable`. Angular's counter uses `Pressable` here since its
 non-function-children form is the idiomatic starting point on that adapter;
 either works on every adapter (see the [Pressable example](/docs/examples/pressable/)).
 `StyleSheet.create` works identically to a CSS class if you'd rather keep
