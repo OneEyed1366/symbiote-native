@@ -1,0 +1,18 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    // "node", not "jest" (expo-react's choice), matching examples/expo-svelte, whose "typecheck"
+    // script (like this app's) runs a whole-tree checker over this tsconfig; e2e/ carries
+    // its own tsconfig with jest/detox types and is excluded below instead.
+    "types": ["node"],
+    // Solid's JSX is compiled by babel-preset-solid, never by tsc - `preserve` leaves it alone and
+    // `jsxImportSource` only tells tsc whose JSX namespace to type-check against. Both override
+    // @react-native/typescript-config's React defaults (`react-jsx`), which would otherwise check
+    // this app's elements as React's and emit React factory calls.
+    "jsx": "preserve",
+    "jsxImportSource": "@symbiote-native/solid",
+    "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["**/node_modules", "**/Pods", "e2e"]
+}
