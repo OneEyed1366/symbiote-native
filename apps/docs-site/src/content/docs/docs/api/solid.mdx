@@ -1,0 +1,297 @@
+---
+title: Solid API
+description: The Solid adapter public contract.
+---
+
+Import app-facing APIs from `@symbiote-native/solid`:
+
+```ts
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/solid';
+```
+
+Solid drives the same engine as React/Vue/Svelte/Angular, through
+`solid-js/universal`'s own `createRenderer` - the official, framework-shipped
+seam for a non-DOM target. Compiled Solid JSX imports eleven functions
+(`createElement`, `insert`, `setProp`, ...) straight from
+`@symbiote-native/solid/renderer`, and each one is a thin wrapper over the
+engine's mutation API. A Solid component body runs **once**; everything that
+changes afterward has to cross as a signal or accessor, not a re-invocation.
+See the [reactivity guide](/docs/howtos/solid-reactivity/) before writing a
+component that holds state.
+
+## Installation
+
+```sh
+pnpm add @symbiote-native/solid react-native solid-js
+```
+
+`react-native` and `solid-js` stay your app's own top-level dependencies -
+`react-native` is the Metro version anchor, so it has to be pinned at the app
+root. `@symbiote-native/engine` is a peer dependency and installs alongside.
+
+Two things Metro/Babel/tsc all need, none optional:
+
+- `babel.config.js` - add `@symbiote-native/solid/babel-preset` to
+  `presets`, **listed last** (Babel applies presets in reverse array order,
+  so last means "runs first"). It has to win the JSX before
+  `@react-native/babel-preset`'s own React-JSX transform claims the same
+  elements. Swap the order and you get `createElement` calls no renderer in
+  the app implements. The preset arrives pre-configured
+  (`generate: 'universal'` + the renderer's `moduleName`); don't override
+  either option yourself.
+- `tsconfig.json` - `"jsx": "preserve"`, `"jsxImportSource":
+"@symbiote-native/solid"`. TypeScript resolves the JSX namespace from
+  `<jsxImportSource>/jsx-runtime` and nowhere else, even under `preserve`.
+  Without this the package's own host-tag namespace (`symbiote-view`,
+  `symbiote-text`, ...) isn't in scope and every JSX element fails to type
+  check.
+
+`examples/solid` is the reference for the full config, including
+`metro.config.js`.
+
+## Component shape
+
+- Events: real camelCase **props** (`onPress`, `onLongPress`,
+  `onValueChange`, `onLayout`) passed straight through the compiled JSX,
+  same as Svelte's shape, no directive and no kebab-case step.
+- Children: ordinary JSX, built once per component body. A component that
+  hands state back to its children (`Pressable`'s `pressed`) takes a
+  **function child called with an `Accessor`**, not a snapshot object. See
+  [Children](#children) below.
+- Refs: `ref={callback}`, a compile-time rewrite into a callback prop, not a
+  runtime ref object. See [Refs and handles](#refs-and-handles) below.
+- Styles: `style`/`class` props, resolved through the same style registry
+  every other adapter's `class`/`className`/`:class` path shares.
+- Two-way binding has no dedicated syntax: `TextInput`/`Switch`/
+  [`Slider`](/docs/packages/slider/) take the explicit `value`/
+  `onValueChange` pair; wire it to a signal yourself
+  (`value={text()} onValueChange={setText}`).
+
+## Common events
+
+```tsx
+<Pressable onPress={onTap} onLongPress={onHold} />
+<Switch value={enabled()} onValueChange={setEnabled} />
+<TextInput
+  value={text()}
+  onValueChange={(next, event) => onChange(event)}
+/>
+<View onLayout={onLayout} />
+```
+
+`TextInput`'s `onValueChange` fires `(text, event)`, the same merged shape
+React and Svelte use, unlike Angular, which needs a second output because an
+`EventEmitter` only carries one value.
+
+## Children
+
+```tsx
+import { Pressable, Text } from '@symbiote-native/solid';
+
+<Pressable onPress={onTap}>
+  {state => <Text>{state().pressed ? 'Release' : 'Press me'}</Text>}
+</Pressable>;
+```
+
+The child function is called **once, untracked**, and handed an
+`Accessor<IPressState>`. Reading `state()` inside the JSX (or inside a
+`<Show>`) stays reactive; reading it at the top of the function freezes it at
+its first value. This is the Solid-specific fix for a real device bug, not a
+stylistic choice: Solid has no reconciler to diff a rebuilt subtree against,
+so a snapshot value read inside a render effect tears the child tree down and
+rebuilds it on every press, which can lose the native responder grant
+mid-gesture. Full mechanism: [Solid
+reactivity](/docs/howtos/solid-reactivity/#render-children-take-an-accessor).
+
+List renderers follow the same principle: the data and native list math are
+shared with every other adapter, while the rendered cell is ordinary Solid
+JSX (`<For>`/`<Index>`) rather than a React node, Vue slot, or Svelte
+snippet.
+
+## Refs and handles
+
+```tsx
+import { createSignal } from 'solid-js';
+import { TextInput, type IHostInstance } from '@symbiote-native/solid';
+
+const [input, setInput] = createSignal<IHostInstance | null>(null);
+
+<TextInput ref={setInput} value="" onValueChange={() => {}} />;
+```
+
+Solid's `ref={el}` is a compile-time construct: the compiler rewrites it
+into a callback prop (`createComponent(TextInput, { ref(node) { ... } })`), so
+by the time a component body reads `props.ref` it is already a function.
+There is no `RefObject`/template-ref wrapper to allocate: the callback is
+called once with the committed host node, which carries the grafted
+imperative API (`measure`, `measureInWindow`, `setNativeProps`, `focus`,
+`blur`) exactly like React's `getPublicInstance`. Holding it in a signal (as
+above) is the idiomatic way to keep it across the component's lifetime; a
+plain `let` variable also works if nothing needs to react to the ref
+resolving.
+
+A component with its own exported imperative surface
+(`ScrollView.scrollTo`/`scrollToEnd`/`flashScrollIndicators`, `TextInput`'s
+`focus`/`blur`/`clear`) exposes that surface directly on the ref, same as
+every other adapter.
+
+## Runtime modules
+
+`@symbiote-native/solid` re-exports the same runtime utilities as the other
+adapters, so app code keeps one import root: `Platform`, `StyleSheet`,
+`Dimensions`, `PixelRatio`, `PlatformColor`, `DynamicColorIOS`, `Alert`,
+`Share`, `ActionSheetIOS`, `Linking`, `Vibration`, `ToastAndroid`, `Settings`,
+`I18nManager`, `Appearance`, `AppState`, `Keyboard`, `BackHandler`,
+`PermissionsAndroid`, `LayoutAnimation`, `InteractionManager`,
+`AccessibilityInfo`, `findNodeHandle`, and `dlog`/`isDebug` for diagnostic
+logging.
+
+Two reactive reads are **primitives**, not hooks: Solid's ecosystem term for
+a composable reactive function, and why this adapter's lifecycle bucket is
+named `primitives/`.
+
+```tsx
+import {
+  createColorScheme,
+  createWindowDimensions,
+} from '@symbiote-native/solid';
+
+const scheme = createColorScheme();
+const dimensions = createWindowDimensions();
+
+<Text>
+  {dimensions().width}×{dimensions().height} · {scheme()}
+</Text>;
+```
+
+Each returns an **accessor**, never a bare value: a Solid component body
+runs once, so a returned snapshot would freeze at whatever the app booted
+with. Named `create*`, not `use*`: Solid reserves `use*` for consuming
+something that already exists (`useContext`, `useTransition`); a function
+that owns its own subscription is `create*`. `useNavigation`/`useRoute` from
+`@symbiote-native/navigation` are the `use*` counterpart: they consume an
+existing router rather than creating one.
+
+On Android, `Keyboard` and `Settings` do nothing until you also install
+[`@symbiote-native/android`](/docs/packages/android/):
+`keyboardDidShow`/`keyboardDidHide` never fire, because Android's only stock
+keyboard-event source is `ReactRootView`'s layout listener and the bridgeless
+surface SymbioteNative mounts never triggers it, and `Settings` reads back
+`null`, because RN's `Settings` has no stock Android implementation at all.
+
+## Animations and gestures
+
+`Animated` (both the JS and native driver, plus the `Animated.View`/
+`Animated.Text`/`Animated.Image`/`Animated.ScrollView`/`Animated.FlatList`/
+`Animated.SectionList` components) and `PanResponder` are re-exported from
+`@symbiote-native/solid`. See the [Animations guide](/docs/learn/animations/)
+for the full surface. Solid's JSX takes the dotted form directly
+(`<Animated.View>` compiles to `createComponent(Animated.View, ...)`), unlike
+Angular, whose AOT compiler needs a named import instead.
+
+## Portals (`Portal`)
+
+```tsx
+import { createSignal } from 'solid-js';
+import {
+  Portal,
+  Show,
+  Text,
+  View,
+  type ISymbioteNode,
+} from '@symbiote-native/solid';
+
+const [overlayHost, setOverlayHost] = createSignal<ISymbioteNode | null>(null);
+
+<View ref={node => setOverlayHost(node)} />;
+<Show when={overlayHost()}>
+  {host => (
+    <Portal mount={host()}>
+      <Text>Rendered under overlayHost, not here</Text>
+    </Portal>
+  )}
+</Show>;
+```
+
+`Portal` relocates its children under a different node than its own call
+site: the same primitive as React's `createPortal` and Angular's
+`PortalDirective`/`PortalOutletDirective` pair. Vue's `Teleport` and Svelte
+have no equivalent - a design gap on those two, not something Solid lacks.
+`mount` takes an already-mounted host node (or a surface, from
+`AppRegistry`), never a selector string: Solid's own `solid-js/web` `Portal`
+resolves a DOM container the same way ours resolves a ref, so the spelling
+matches what a Solid author already knows. Same **v1 scope** as React's and
+Angular's: the target must live in the same surface as the `<Portal>` call
+site. Gate the `Portal` behind `<Show>` until the target ref resolves -
+reading an unset `mount` throws immediately rather than silently corrupting
+the tree.
+
+## Cross-surface content (`createTunnel`)
+
+```tsx
+import { createTunnel, Show, Text } from '@symbiote-native/solid';
+
+const overlayTunnel = createTunnel(); // module-level singleton, importable from both surfaces
+
+// inside the surface that should paint the content
+<overlayTunnel.Out />;
+
+// inside any other component, in any surface
+<Show when={toastVisible()}>
+  <overlayTunnel.In>
+    <Text>Toast</Text>
+  </overlayTunnel.In>
+</Show>;
+```
+
+`Portal` only reaches a target in the same surface. `createTunnel` is for two
+independently `mount()`-ed surfaces that share no Fabric tree at all. `In`
+and `Out` are per-call components closed over the tunnel's own registry.
+Solid components are ordinary functions, so `createTunnel()` mints a fresh
+pair on every call, the same shape React's and Vue's versions use. `In`
+registers its content wherever it renders and paints nothing itself; `Out`
+renders everything currently tunneled in, in registration order, wherever it
+is actually mounted.
+
+## App entry point (`AppRegistry`)
+
+```tsx
+import { AppRegistry } from '@symbiote-native/solid';
+
+AppRegistry.registerComponent('MyApp', () => App);
+```
+
+`@symbiote-native/solid` exports the same `AppRegistry`/`setHostRegistrar`
+entry point described in the [Core API](/docs/api/core/#app-entry-point-appregistry).
+`setWrapperComponentProvider` is fully supported here, unlike Svelte: a Solid
+component is an ordinary function, so wrapping composes exactly the way
+compiled JSX already builds children:
+`createComponent(Wrapper, { get children() { return renderRoot(); } })`,
+with no extra design needed:
+
+```tsx
+import type { Component, JSX } from 'solid-js';
+import { AppRegistry } from '@symbiote-native/solid';
+
+const ThemeWrapper: Component<{ children?: JSX.Element }> = props => (
+  <ThemeProvider>{props.children}</ThemeProvider>
+);
+
+AppRegistry.setWrapperComponentProvider(() => ThemeWrapper);
+AppRegistry.registerComponent('MyApp', () => App);
+```
+
+## Boundary
+
+Do not pass React component packages to the Solid adapter. A third-party
+React Native package that ships a JavaScript React component still uses the
+React dispatcher internally. Non-React adapters need native-view wrappers
+instead. See the [Slider package](/docs/packages/slider/) for the reference
+implementation, shipping on React, Vue, Angular, Svelte, and Solid alike.

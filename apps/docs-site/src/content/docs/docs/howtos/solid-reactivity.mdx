@@ -1,0 +1,212 @@
+---
+title: 'How to: Solid reactivity in SymbioteNative'
+description: What "a component body runs once" changes about props, refs, and render children.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+React, Vue, Svelte, and Angular all re-invoke (or re-patch) a component's
+render output when its state changes. Solid does not - a component function
+body runs **exactly once**, and everything reactive afterward flows through
+signals read inside fine-grained effects that Solid tracks automatically.
+This page is the app-author's half of that model: what changes about the
+code you write day to day. If you're porting a package's per-framework entry
+to Solid instead, see the `symbiote-solid-package-port` skill - it covers the
+same ideas from the library-author side, with more edge cases.
+
+## Read a prop, don't destructure it
+
+A Solid props object is a set of **getters**, not plain values. Destructuring
+freezes whatever the prop held at the moment the component ran:
+
+```tsx
+// WRONG - count is frozen at whatever value the caller passed on mount
+function Counter({ count }: { count: number }) {
+  return <Text>{count}</Text>;
+}
+
+// RIGHT - props.count is read fresh wherever it's used
+function Counter(props: { count: number }) {
+  return <Text>{props.count}</Text>;
+}
+```
+
+The same applies to `splitProps`, which SymbioteNative components use
+throughout (`Pressable`, `Switch`, `TextInput`, ...): it returns two prop
+proxies, not two plain objects, so reading from either side still stays
+live.
+
+## A scalar you'll re-read over time needs to become an accessor
+
+If a value only matters once - an initial count, a static label - a plain
+number/string prop is fine. The moment a caller might want to change it
+later and have your component notice, that prop has to be something Solid
+can track: a signal accessor, not a number.
+
+```tsx
+// A caller cannot make this component react to a later change: the prop
+// value was read once (props.intervalMs) and nothing subscribes to it again.
+function Ticker(props: { intervalMs: number }) { ... }
+
+// The accessor form lets EITHER a literal or a signal be passed -
+// solid-primitives' own convention, also used across this codebase for any
+// "a component body would re-read this on every render" param.
+type IMaybeAccessor<T> = T | Accessor<T>;
+function Ticker(props: { intervalMs: IMaybeAccessor<number> }) {
+  const interval = () =>
+    typeof props.intervalMs === 'function' ? props.intervalMs() : props.intervalMs;
+  createEffect(() => {
+    const id = setInterval(tick, interval());
+    onCleanup(() => clearInterval(id));
+  });
+}
+```
+
+This is exactly the shape `createColorScheme()`/`createWindowDimensions()`
+(`@symbiote-native/solid`) return - an `Accessor`, never a bare value - for
+the identical reason: a returned snapshot would freeze at whatever the app
+booted with.
+
+## Render children take an accessor, not a snapshot
+
+`Pressable`'s child-as-a-function-of-state prop is the sharpest example of
+"own-once" biting a naive port. React, Vue, and Svelte hand the child
+function a **value**:
+
+```tsx
+// React / Vue's scoped slot / Svelte's snippet - a snapshot object
+<Pressable>
+  {state => <Text>{state.pressed ? 'Release' : 'Press me'}</Text>}
+</Pressable>
+```
+
+Solid's `Pressable` hands the same child function an **`Accessor`** instead,
+and calls it once, untracked:
+
+```tsx
+<Pressable>
+  {state => <Text>{state().pressed ? 'Release' : 'Press me'}</Text>}
+</Pressable>
+```
+
+The difference is one pair of parens, and skipping it is not a style
+mismatch - it is a real, on-device bug. Here's the mechanism.
+
+Solid has **no reconciler** between what a component returns and the actual
+host nodes: `insert` (the internal call every child position compiles to)
+_replaces_ a subtree wholesale, it never diffs one, the way React reconciles
+or Vue patches vnodes. So if `Pressable` called `children({ pressed: true })`
+with a plain value, that call would happen **inside `View`'s own render
+effect** - which means the press signal it read joins that effect's
+dependency list. Every touch would tear the whole child subtree down and
+rebuild it from scratch.
+
+<Aside type="caution" title="Measured on device, 2026-08-17">
+  That rebuild landed in the middle of a touch gesture - between `pressIn`
+  firing and the native responder actually granting the touch - and the rebuild
+  destroyed the view mid-grant. The result: `onPress` fired on only every
+  *other* tap, and the label stuck reading "Release" because `pressed` never got
+  the chance to flip back. The bug is invisible in a headless test, because the
+  test fabric dispatches events straight into a listener map with no responder
+  negotiation to interrupt - there's nothing to lose.
+</Aside>
+
+The fix generalizes: **a value that changes over time must cross a
+component boundary as an accessor.** Call it inside the leaf that actually
+needs the fresh read, not at the boundary. Two follow-on rules once you do:
+
+- A signal read at the **top level** of the child function is frozen -
+  the call itself is untracked, matching how Solid's own `<For>` runs its
+  map function under `createRoot`. Nest the read inside JSX (or a `<Show>`)
+  instead, where the compiler's own tracking picks it back up.
+- `typeof children === 'function'` can't tell a render-prop from a bare
+  zero-argument accessor (`JSX.Element` permits both). Arity does the
+  telling: a render prop takes the state argument, a plain accessor takes
+  none.
+
+None of this is a SymbioteNative invention - it is exactly what Solid's own
+`<Show>` does internally: `untrack(() => child(keyed ? value : accessor))`.
+`Pressable`'s render-prop shape is the same pattern, applied to a real
+gesture instead of a conditional.
+
+## A ref is a callback, not a box to read later
+
+React's `ref.current` and Vue's template `ref` are both objects you read
+from after the fact. Solid's `ref` is a **compile-time construct** - the
+compiler rewrites `ref={el}` into a callback prop before your code ever
+runs:
+
+```tsx
+<View ref={el} />;
+// compiles to:
+createComponent(View, {
+  ref(r$) {
+    el = r$;
+  },
+});
+```
+
+So there's nothing to allocate and nothing to unwrap - a component's whole
+job with a `ref` prop is to call it once with the committed host node:
+
+```tsx
+const [input, setInput] = createSignal<IHostInstance | null>(null);
+
+<TextInput ref={setInput} value={text()} onValueChange={setText} />;
+
+createEffect(() => {
+  const node = input();
+  if (node !== null) node.focus();
+});
+```
+
+The node a ref receives already carries the imperative API - `measure`,
+`measureInWindow`, `setNativeProps`, `focus`, `blur` - grafted on by the
+renderer, the same way React's `getPublicInstance` does it. Holding it in a
+signal (as above) is idiomatic when something needs to react to the ref
+resolving; a plain mutable variable is fine when nothing does.
+
+## `<For>` / `<Index>` / `<Show>` come straight from `@symbiote-native/solid`
+
+Solid's built-in control-flow components are pure reactivity with no DOM
+dependency, so they work unchanged over the engine and are re-exported
+directly - one import root, same as every other runtime module:
+
+```tsx
+import { For, Index, Show } from '@symbiote-native/solid';
+```
+
+`For` keys by referential identity of each array element (reorders reuse
+DOM/host nodes); `Index` keys by position (reuse by slot, contents update in
+place) - pick `For` when your list items are themselves stable references
+(objects from a store), `Index` for a list of primitives you're happy to
+have update in place rather than move. `Show` replaces a manual ternary
+guard and is what makes a conditional's condition get memoized by the
+compiler (see `wrapConditionals` below) - reach for it over a raw `&&`/`?:`
+buried in a helper function.
+
+<Aside type="tip" title="Where 'inside the JSX' stops counting">
+  The Babel preset memoizes a ternary/`&&` condition **written inline inside
+  JSX** - moving the exact same expression into a named helper function loses
+  that memoization, even though it looks like a pure refactor. If a conditional
+  block starts rebuilding its subtree on every unrelated signal change after an
+  "extract this into a function" cleanup, this is why. When in doubt, wrap the
+  branch in an explicit `createMemo` instead of relying on where the expression
+  happens to be written.
+</Aside>
+
+One name is deliberately absent: Solid's own `Switch`/`Match` control-flow
+pair collides with the `Switch` **component** every adapter exports under
+that exact name, and RN's component wins it. Import Solid's control-flow
+pair straight from `solid-js` (aliasing it if you need both in one file) -
+`@symbiote-native/solid` does not re-export it.
+
+## Further reading
+
+The full API surface - events, refs, portals, animations - is in the [Solid
+API reference](/docs/api/solid/). The [Solid guide](/docs/learn/solid/) has
+a minimal working component. Porting a package's own per-framework entry to
+Solid, rather than just consuming one, is a different and stricter set of
+traps (ownership/timing, an empty collector at body time, `mergeProps` vs a
+JS spread) - that side lives in the `symbiote-solid-package-port` skill, not
+here.

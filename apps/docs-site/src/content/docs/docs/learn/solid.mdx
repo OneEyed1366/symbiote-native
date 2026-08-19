@@ -1,0 +1,111 @@
+---
+title: Solid guide
+description: How to write SymbioteNative apps with the Solid adapter.
+---
+
+The Solid adapter drives the same native Fabric engine as React, Vue, Svelte,
+and Angular, through `solid-js/universal`'s own official custom-renderer API,
+the framework-agnostic seam Solid ships for non-DOM targets. Compiled Solid
+JSX becomes calls into the engine's mutation API directly; Fabric commits the
+real native views.
+
+The one thing to internalize before writing a component: a Solid component
+body runs **once**, not on every update, unlike React, Vue, Svelte, and
+Angular. Reactivity crosses through signals and accessors instead of
+re-invoking the function. See the
+[Solid reactivity guide](/docs/howtos/solid-reactivity/) for what that
+changes about props, refs, and render children.
+
+{/* solid-demo.{mp4,webm,webp} pending recording */}
+
+<video
+  poster={`${import.meta.env.BASE_URL}/solid-demo.webp`}
+  aria-label="Solid driving a native SymbioteNative demo"
+  width="260"
+  height="564"
+  preload="none"
+  autoplay
+  muted
+  loop
+  playsinline
+>
+  <source src={`${import.meta.env.BASE_URL}/solid-demo.mp4`} type="video/mp4" />
+  <source
+    src={`${import.meta.env.BASE_URL}/solid-demo.webm`}
+    type="video/webm"
+  />
+</video>
+
+_The `examples/solid` canary - the same component surface and engine as the
+React, Vue, Svelte, and Angular canaries, driven through
+`solid-js/universal` instead._
+
+## Minimal component
+
+```tsx
+import { createSignal } from 'solid-js';
+import { Pressable, Text, View } from '@symbiote-native/solid';
+import './App.css';
+
+export default function App() {
+  const [count, setCount] = createSignal(0);
+
+  return (
+    <View class="root">
+      <Pressable onPress={() => setCount(count() + 1)}>
+        <Text class="label">Count is {count()}</Text>
+      </Pressable>
+    </View>
+  );
+}
+```
+
+```css
+/* App.css */
+.root {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+.label {
+  font-size: 24px;
+}
+```
+
+`StyleSheet.create` works identically if you'd rather keep style objects
+inline instead of a CSS file - see the [Styling guide](/docs/learn/styling/)
+for both paths.
+
+## Solid contract
+
+- events are real camelCase **props** (`onPress={onTap}`, `onLongPress`,
+  `onValueChange`, `onLayout`): compiled JSX passes them straight through, no
+  directive and no kebab-case normalization step;
+- children are ordinary Solid JSX. A component that hands state back to its
+  children (`Pressable`'s `pressed`) takes a **function child called with an
+  accessor**, not a snapshot: `<Pressable>{state => <Text>{state().pressed ?
+'Release' : 'Press me'}</Text>}</Pressable>`. Passing a snapshot value here
+  is how the other adapters spell the same thing, and it is the one place
+  copying their shape verbatim breaks Solid - see the reactivity guide;
+- refs are plain `ref={callback}`: Solid rewrites `ref={el}` into a callback
+  prop at compile time, and every SymbioteNative component grafts the
+  imperative host API (`measure`, `setNativeProps`, `focus`, ...) onto the
+  node a ref receives, exactly like React's `getPublicInstance`;
+- styles: `style`/`class` props, plus `StyleSheet.create` if you'd rather
+  avoid CSS entirely;
+- the two reactive lifecycle primitives are spelled `createColorScheme()` /
+  `createWindowDimensions()`, not `useColorScheme`/`useWindowDimensions`:
+  Solid's own convention reserves `use*` for consuming something that already
+  exists (`useContext`, `useTransition`), while a function that owns a
+  subscription is `create*`. `useNavigation`/`useRoute` from
+  `@symbiote-native/navigation` keep the `use*` form for the same reason:
+  they consume an existing router, they don't create one;
+- both cross-tree content primitives are here: `Portal` (`<Portal
+mount={target}>`, same-surface, the twin of React's `createPortal`) and
+  `createTunnel` (cross-surface, matching every other adapter).
+
+Solid's headless/vitest suite covers the full component surface; it hasn't
+been run on a physical iOS/Android device yet, unlike the React and Vue
+canaries.
+
+Read the exact API surface in the [Solid API reference](/docs/api/solid/).
