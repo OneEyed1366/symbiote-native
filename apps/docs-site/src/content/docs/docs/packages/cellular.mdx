@@ -24,6 +24,7 @@ cellular is that almost the entire carrier/SIM surface is Android-only — iOS e
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 <Aside type="caution" title="Every field except generation is Android-only">
   `allowsVoipAsync`, `getIsoCountryCodeAsync`, `getCarrierNameAsync`,
@@ -162,6 +163,27 @@ adapter, with no hook/composable/service in the way:
     function off the core package, called straight from `$effect`.
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { Text } from '@symbiote-native/solid';
+    import { CellularGeneration, getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
+
+    export function CellularInfo() {
+      const [generation, setGeneration] = createSignal<CellularGeneration | null>(null);
+      const [carrierName, setCarrierName] = createSignal<string | null>(null);
+
+      getCellularGenerationAsync().then(setGeneration);
+      getCarrierNameAsync().then(setCarrierName); // Android only — always null on iOS
+
+      return <Text>{carrierName() ?? `generation ${generation()}`}</Text>;
+    }
+    ```
+
+    No Solid primitive is needed here either: each function is a plain free function off the
+    core package, called directly in the component body, which runs once.
+
+  </TabItem>
 </Tabs>
 
 ### Permission
@@ -248,6 +270,26 @@ adapter, with no hook/composable/service in the way:
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Pressable, Text } from '@symbiote-native/solid';
+    import { createPermissions } from '@symbiote-native/cellular/solid';
+
+    export function CellularPermission() {
+      const { status, error, request, get } = createPermissions();
+
+      return (
+        <>
+          <Text>{error() ? `check failed: ${error()!.message}` : (status()?.status ?? 'checking…')}</Text>
+          <Pressable onPress={() => (error() ? get() : request())}>
+            <Text>{error() ? 'Retry check' : 'Request permission'}</Text>
+          </Pressable>
+        </>
+      );
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 `status` stays `null` both while the first fetch is in flight and after it fails, so `error` is what
@@ -331,7 +373,7 @@ caller. Angular's auto-fetch is latched to at most one run per service instance,
 
 ## How the wrapper works
 
-`@symbiote-native/cellular` ships **zero React/Vue/Angular logic in `expo-cellular` itself** — that
+`@symbiote-native/cellular` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-cellular` itself** — that
 package's own types file hard-imports `PermissionResponse`/`PermissionStatus` from the `expo`
 meta-package (which this project never installs), so its functions, enum, and types are hand-ported,
 verbatim, into this package's own `core/`, changing only that one import line to pull from
@@ -346,12 +388,13 @@ packages/cellular/src/
 ├── react/hooks/use-permissions   @symbiote-native/cellular/react
 ├── vue/composables/use-permissions @symbiote-native/cellular/vue
 ├── svelte/runes/use-permissions  @symbiote-native/cellular/svelte
+├── solid/primitives/use-permissions @symbiote-native/cellular/solid
 └── angular/services/permissions.service @symbiote-native/cellular/angular
 ```
 
 `usePermissions` is written once as a shared pattern and reapplied identically in
 [brightness](/docs/packages/brightness/#how-the-wrapper-works); every other export is a stateless
-free function, re-exported verbatim by all four adapters, same as
+free function, re-exported verbatim by all five adapters, same as
 [local-auth](/docs/packages/local-auth/). The native code itself is never vendored or copied —
 `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
 guide](/docs/howtos/expo-native-module-setup/)).

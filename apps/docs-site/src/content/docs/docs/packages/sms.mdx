@@ -10,7 +10,8 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 in — so every SymbioteNative adapter can reach it, not just React. Like
 [secure store](/docs/packages/secure-store/) and [local auth](/docs/packages/local-auth/), every
 export is a free function with no per-instance state, so there is no hook/composable/service to
-wrap — the React, Vue, Angular, and Svelte entry points are plain re-exports of the same `core`.
+wrap — the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same
+`core`.
 
 Nothing is ever sent on the user's behalf. Both platforms open their own composer with the draft
 in it; the user presses send, edits it, or throws it away.
@@ -26,6 +27,7 @@ in it; the user presses send, edits it, or throws it away.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -57,8 +59,9 @@ Android registration from the package's `native-link.json` on install.
 
 ## Usage
 
-All four adapters re-export the exact same functions; there is no per-adapter
-hook/composable/service to reach for, since nothing here holds live state or a subscription.
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same functions; there
+is no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+subscription.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
@@ -173,6 +176,34 @@ hook/composable/service to reach for, since nothing here holds live state or a s
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { Button, Text, View } from '@symbiote-native/solid';
+    import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms/solid';
+
+    export default function InviteByText() {
+      const [status, setStatus] = createSignal('idle');
+
+      async function onInvite() {
+        if (!(await isAvailableAsync())) {
+          setStatus('this device cannot send SMS');
+          return;
+        }
+        const { result } = await sendSMSAsync('0123456789', 'Join me on this app!');
+        setStatus(result);
+      }
+
+      return (
+        <View>
+          <Text>{status()}</Text>
+          <Button title="Invite a friend" onPress={onInvite} />
+        </View>
+      );
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ### Attachments
@@ -236,7 +267,7 @@ throws a `TypeError` before the native module is reached.
 
 ## How the wrapper works
 
-`@symbiote-native/sms` ships zero React/Vue/Angular/Svelte logic — `expo-sms`'s own JS is
+`@symbiote-native/sms` ships zero React/Vue/Angular/Svelte/Solid logic — `expo-sms`'s own JS is
 hand-ported into this package's `core/`, resolving the native module through
 `expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package this project
 never installs:
@@ -248,7 +279,8 @@ packages/sms/src/
 ├── react/    # @symbiote-native/sms/react   — export * from '../core'
 ├── vue/      # @symbiote-native/sms/vue     — export * from '../core'
 ├── angular/  # @symbiote-native/sms/angular — export * from '../core'
-└── svelte/   # @symbiote-native/sms/svelte  — export * from '../core'
+├── svelte/   # @symbiote-native/sms/svelte  — export * from '../core'
+└── solid/    # @symbiote-native/sms/solid   — export * from '../core'
 ```
 
 Same shape as [secure store](/docs/packages/secure-store/)'s and

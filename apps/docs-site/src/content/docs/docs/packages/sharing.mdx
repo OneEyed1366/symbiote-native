@@ -10,8 +10,8 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 share sheet that hands a local file to any other app that can accept it — so every SymbioteNative
 adapter can reach it, not just React. Like [secure store](/docs/packages/secure-store/) and
 [local auth](/docs/packages/local-auth/), every export is a free function with no per-instance
-state, so there is no hook/composable/service to wrap — the React, Vue, and Angular entry points
-are plain re-exports of the same `core`.
+state, so there is no hook/composable/service to wrap — the React, Vue, Angular, Svelte, and
+Solid entry points are plain re-exports of the same `core`.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -24,6 +24,7 @@ are plain re-exports of the same `core`.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Scope: outgoing share only
 
@@ -77,8 +78,9 @@ into your app automatically.
 
 ## Usage
 
-All four adapters re-export the exact same functions; there is no per-adapter
-hook/composable/service to reach for, since nothing here holds live state or a subscription.
+All five adapters (React, Vue, Angular, Svelte, Solid) re-export the exact same functions; there's
+no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+subscription.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
@@ -208,6 +210,37 @@ hook/composable/service to reach for, since nothing here holds live state or a s
     the core package, called straight from `onPress`.
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { Button, Text, View } from '@symbiote-native/solid';
+    import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/solid';
+
+    export function ShareReport(props: { fileUri: string }) {
+      const [error, setError] = createSignal<string | null>(null);
+
+      async function onShare() {
+        if (!(await isAvailableAsync())) {
+          setError('Sharing is not available on this device');
+          return;
+        }
+        await shareAsync(props.fileUri, { mimeType: 'application/pdf', dialogTitle: 'Send the report' });
+      }
+
+      return (
+        <View>
+          <Button title="Share the report" onPress={onShare} />
+          {error() === null ? null : <Text>{error()}</Text>}
+        </View>
+      );
+    }
+    ```
+
+    There's no per-instance primitive here either: both functions are plain exports off the core
+    package, called straight from `onPress`. `props.fileUri` stays inline rather than destructured,
+    since a component body runs only once and a destructured value would freeze at mount.
+
+  </TabItem>
 </Tabs>
 
 ### On iPad
@@ -264,9 +297,10 @@ from a file-system API. Anything else throws before the native call is made.
 
 ## How the wrapper works
 
-`@symbiote-native/sharing` ships zero React/Vue/Angular logic — `expo-sharing`'s own JS is
-hand-ported into this package's `core/`, resolving the native module through `expo-modules-core`'s
-`requireNativeModule` rather than the `expo` meta-package this project never installs:
+`@symbiote-native/sharing` ships zero React/Vue/Angular/Svelte/Solid logic — `expo-sharing`'s own
+JS is hand-ported into this package's `core/`, resolving the native module through
+`expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package this project never
+installs:
 
 ```
 packages/sharing/src/
@@ -275,11 +309,12 @@ packages/sharing/src/
 ├── react/    # @symbiote-native/sharing/react   — export * from '../core'
 ├── vue/      # @symbiote-native/sharing/vue     — export * from '../core'
 ├── svelte/   # @symbiote-native/sharing/svelte  — export * from '../core'
-└── angular/  # @symbiote-native/sharing/angular — export * from '../core'
+├── angular/  # @symbiote-native/sharing/angular — export * from '../core'
+└── solid/    # @symbiote-native/sharing/solid   — export * from '../core'
 ```
 
 Same shape as [secure store](/docs/packages/secure-store/)'s and
-[local auth](/docs/packages/local-auth/)'s four adapter entries: single-file re-exports with no
+[local auth](/docs/packages/local-auth/)'s five adapter entries: single-file re-exports with no
 lifecycle code, since every export is a stateless free function — there is nothing for a hook,
 composable, rune, or service to subscribe to or clean up. The incoming-share half in the scope section
 above is exactly the part that _would_ have needed one. The native code itself is never

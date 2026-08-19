@@ -10,8 +10,8 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 prompting the platform's native in-app review flow — so every SymbioteNative adapter can reach it,
 not just React. Like [device](/docs/packages/device/) and
 [local auth](/docs/packages/local-auth/), every export here is a one-shot async call with no
-per-instance state, so there is no hook/composable/service to wrap — the React, Vue, Angular, and
-Svelte entry points are plain re-exports of the same `core`.
+per-instance state, so there is no hook/composable/service to wrap — the React, Vue, Angular, Svelte, and
+Solid entry points are plain re-exports of the same `core`.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -24,6 +24,7 @@ Svelte entry points are plain re-exports of the same `core`.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 <Aside
   type="caution"
@@ -68,8 +69,8 @@ versions — never install either yourself, and never add the `expo` meta-packag
 
 ## Usage
 
-All four adapters — React, Vue, Angular, Svelte — re-export the exact same functions; there is no
-per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same functions; there
+is no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
 subscription.
 
 <Tabs syncKey="framework">
@@ -157,6 +158,24 @@ subscription.
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Button } from '@symbiote-native/solid';
+    import { requestReview } from '@symbiote-native/store-review/solid';
+
+    function onRatePress() {
+      void requestReview({
+        iosAppStoreUrl: 'https://apps.apple.com/app/id123456789',
+        androidPlayStoreUrl: 'https://play.google.com/store/apps/details?id=com.example.app',
+      });
+    }
+
+    export function RateAppButton() {
+      return <Button title="Rate this app" onPress={onRatePress} />;
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ## API
@@ -195,10 +214,11 @@ subscription.
 
 ## How the wrapper works
 
-`@symbiote-native/store-review` ships zero React/Vue/Angular logic in `expo-store-review` itself
-— its functions are hand-ported, verbatim apart from the `expo-constants` deviation above, into
-this package's own `core/`, resolving the native module through `expo-modules-core`'s
-`requireNativeModule` rather than the `expo` meta-package this project never installs:
+`@symbiote-native/store-review` ships zero React/Vue/Angular/Svelte/Solid logic in
+`expo-store-review` itself — its functions are hand-ported, verbatim apart from the
+`expo-constants` deviation above, into this package's own `core/`, resolving the native module
+through `expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package this
+project never installs:
 
 ```
 packages/store-review/src/
@@ -208,7 +228,8 @@ packages/store-review/src/
 ├── react/    # @symbiote-native/store-review/react   — export * from '../core'
 ├── vue/      # @symbiote-native/store-review/vue     — export * from '../core'
 ├── angular/  # @symbiote-native/store-review/angular — export * from '../core'
-└── svelte/   # @symbiote-native/store-review/svelte  — export * from '../core'
+├── svelte/   # @symbiote-native/store-review/svelte  — export * from '../core'
+└── solid/    # @symbiote-native/store-review/solid   — export * from '../core'
 ```
 
 Same shape as [device](/docs/packages/device/)'s and [local auth](/docs/packages/local-auth/)'s

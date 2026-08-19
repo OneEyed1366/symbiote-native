@@ -24,6 +24,7 @@ of scope for this pass.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -51,9 +52,9 @@ hashing touch no protected device capability.
 
 ## Usage
 
-All four adapters — React, Vue, Angular, Svelte — re-export the exact same free functions; there
-is no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
-subscription.
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same free functions;
+there is no per-adapter hook/composable/service to reach for, since nothing here holds live state
+or a subscription.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
@@ -208,6 +209,44 @@ subscription.
     function off the core package.
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal, onMount } from 'solid-js';
+    import { Pressable, Text, View } from '@symbiote-native/solid';
+    import {
+      CryptoDigestAlgorithm,
+      digestStringAsync,
+      randomUUID,
+    } from '@symbiote-native/crypto/solid';
+
+    export default function CryptoDemo() {
+      const [uuid, setUuid] = createSignal('');
+      const [hash, setHash] = createSignal('');
+
+      onMount(() => {
+        setUuid(randomUUID());
+      });
+
+      function handleHash(): void {
+        digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(setHash);
+      }
+
+      return (
+        <View>
+          <Text>UUID: {uuid()}</Text>
+          <Pressable onPress={handleHash}>
+            <Text>Hash a string</Text>
+          </Pressable>
+          {hash() && <Text>SHA-256: {hash()}</Text>}
+        </View>
+      );
+    }
+    ```
+
+    There's no per-instance primitive to reach for here either - every function is a plain free
+    function off the core package, read straight into a signal.
+
+  </TabItem>
 </Tabs>
 
 ## API
@@ -265,7 +304,7 @@ subscription.
 
 ## How the wrapper works
 
-`@symbiote-native/crypto` ships zero React/Vue/Angular logic in `expo-crypto` itself — its
+`@symbiote-native/crypto` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-crypto` itself — its
 functions, enums, and the `CryptoError` validation class are hand-ported, verbatim, into this
 package's own `core/`, resolving the native module through `expo-modules-core`'s
 `requireNativeModule` rather than the `expo` meta-package this project never installs:
@@ -278,10 +317,11 @@ packages/crypto/src/
 ├── react/    # @symbiote-native/crypto/react   — export * from '../core'
 ├── vue/      # @symbiote-native/crypto/vue     — export * from '../core'
 ├── svelte/   # @symbiote-native/crypto/svelte  — export * from '../core'
+├── solid/    # @symbiote-native/crypto/solid   — export * from '../core'
 └── angular/  # @symbiote-native/crypto/angular — export * from '../core'
 ```
 
-Same shape as [local auth](/docs/packages/local-auth/)'s three adapter entries: single-file
+Same shape as [local auth](/docs/packages/local-auth/)'s five adapter entries: single-file
 re-exports with no lifecycle code at all, since every function here is stateless and one-shot —
 there is nothing for a hook, composable, or service to subscribe to or clean up. The native code
 itself is never vendored or copied — `expo-modules-autolinking` resolves it straight out of

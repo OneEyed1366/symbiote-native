@@ -26,6 +26,7 @@ one combined hook.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -128,6 +129,28 @@ with no runtime permission prompt on either platform.
     Both runes return a boxed getter object rather than a bare value — Svelte 5 reactivity does
     not survive being returned as a raw value from a plain function, so read `.current` exactly
     like unwrapping Vue's `Ref` via `.value`.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createLocales, createCalendars } from '@symbiote-native/localization/solid';
+
+    export default function LocalizationScreen() {
+      const locales = createLocales();     // Accessor<Locale[]>
+      const calendars = createCalendars(); // Accessor<Calendar[]>
+
+      return (
+        <>
+          <Text>{locales()[0].languageTag}</Text>
+          <Text>{calendars()[0].timeZone}</Text>
+        </>
+      );
+    }
+    ```
+
+    Both primitives return an `Accessor`, not a plain value: call them, `locales()`, like any
+    other Solid signal, since a component body runs once.
 
   </TabItem>
 </Tabs>
@@ -236,7 +259,7 @@ Maps days of the week in the Gregorian calendar to their index as returned by `C
 
 ## How the wrapper works
 
-`@symbiote-native/localization` ships zero React/Vue/Angular logic in `expo-localization` itself
+`@symbiote-native/localization` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-localization` itself
 — its types and functions are hand-ported, verbatim, into this package's own `core/`, resolving
 the native module through `expo-modules-core`'s `requireNativeModule` rather than the `expo`
 meta-package this project never installs. One native module fans out two independent event

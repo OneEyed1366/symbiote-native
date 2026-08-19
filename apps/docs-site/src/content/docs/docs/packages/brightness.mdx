@@ -24,6 +24,7 @@ brightness is an Android-only system-brightness-mode surface and an iOS-only cha
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 <Aside
   type="caution"
@@ -202,6 +203,36 @@ only changes in response to your own `setBrightnessAsync` calls.
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal, onCleanup } from 'solid-js';
+    import { Pressable, Text, View } from '@symbiote-native/solid';
+    import { addBrightnessListener, getBrightnessAsync, setBrightnessAsync } from '@symbiote-native/brightness';
+    import type { EventSubscription } from '@symbiote-native/brightness';
+
+    export function BrightnessControl() {
+      const [brightness, setBrightness] = createSignal<number | null>(null);
+
+      getBrightnessAsync().then(setBrightness);
+      const subscription: EventSubscription = addBrightnessListener(event => setBrightness(event.brightness));
+      onCleanup(() => subscription.remove());
+
+      return (
+        <View>
+          <Text>{brightness() === null ? 'checking…' : `${Math.round(brightness()! * 100)}%`}</Text>
+          <Pressable onPress={() => setBrightnessAsync(0.5)}>
+            <Text>Set to 50%</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    ```
+
+    The seed fetch and the subscription both fire directly in the component body, not from
+    `onMount`: a Solid body runs once, so this already happens at construction time. `onCleanup`
+    tears the subscription down when the owner disposes.
+
+  </TabItem>
 </Tabs>
 
 ### Permission
@@ -285,6 +316,26 @@ only changes in response to your own `setBrightnessAsync` calls.
     <Pressable onPress={() => (permissions.error ? permissions.get() : permissions.request())}>
       <Text>{permissions.error ? 'Retry check' : 'Request permission'}</Text>
     </Pressable>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Pressable, Text } from '@symbiote-native/solid';
+    import { createPermissions } from '@symbiote-native/brightness/solid';
+
+    export function BrightnessPermission() {
+      const { status, error, request, get } = createPermissions();
+
+      return (
+        <>
+          <Text>{error() ? `check failed: ${error()!.message}` : (status()?.status ?? 'checking…')}</Text>
+          <Pressable onPress={() => (error() ? get() : request())}>
+            <Text>{error() ? 'Retry check' : 'Request permission'}</Text>
+          </Pressable>
+        </>
+      );
+    }
     ```
 
   </TabItem>
@@ -383,7 +434,7 @@ caller. Angular's auto-fetch is latched to at most one run per service instance,
 
 ## How the wrapper works
 
-`@symbiote-native/brightness` ships **zero React/Vue/Angular logic in `expo-brightness` itself** —
+`@symbiote-native/brightness` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-brightness` itself** —
 that package's own JS hard-imports `PermissionResponse`/`PermissionStatus` from the `expo`
 meta-package (which this project never installs), so its functions and types are hand-ported,
 verbatim, into this package's own `core/`, changing only that one import line to pull from
@@ -399,12 +450,13 @@ packages/brightness/src/
 ├── react/hooks/use-permissions   @symbiote-native/brightness/react
 ├── vue/composables/use-permissions @symbiote-native/brightness/vue
 ├── svelte/runes/use-permissions  @symbiote-native/brightness/svelte
+├── solid/primitives/use-permissions @symbiote-native/brightness/solid
 └── angular/services/permissions.service @symbiote-native/brightness/angular
 ```
 
 `usePermissions` is the only stateful surface — auto-fetch on mount, expose `get`/`request` as
 imperative callbacks — written once as a shared pattern and reapplied identically in
 [cellular](/docs/packages/cellular/#usepermissions); every other export is a stateless free
-function, re-exported verbatim by all four adapters. The native code itself is never vendored or
+function, re-exported verbatim by all five adapters. The native code itself is never vendored or
 copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native
 setup guide](/docs/howtos/expo-native-module-setup/)).

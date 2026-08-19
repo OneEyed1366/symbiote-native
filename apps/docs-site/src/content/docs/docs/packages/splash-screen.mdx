@@ -25,6 +25,7 @@ the same native module.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -108,6 +109,24 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
     Bare `hide()` on mount, matching `examples/svelte/App.svelte` — this repo's own canary calls
     it exactly this way at the app root, inside an `$effect` with no dependency, since a Svelte
     component's `<script>` body itself runs only once and there is no ongoing state to react to.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { onMount } from 'solid-js';
+    import { hide } from '@symbiote-native/splash-screen';
+
+    export default function App() {
+      onMount(() => {
+        hide();
+      });
+
+      // ...
+    }
+    ```
+
+    Bare `hide()` inside `onMount`, matching `examples/solid/App.tsx` - this repo's own canary
+    calls it exactly this way at the app root.
 
   </TabItem>
 </Tabs>
@@ -262,6 +281,44 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
     `ready` as it changes. The return value is a getter too (`hideAnimation.current`), the same
     boxed-getter convention as this adapter's other runes, since a raw `$state` doesn't survive
     being returned from a plain function.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { View, Image, Animated } from '@symbiote-native/solid';
+    import { createHideAnimation } from '@symbiote-native/splash-screen/solid';
+    import manifest from '../assets/bootsplash/manifest.json';
+    import logo from '../assets/bootsplash/logo.png';
+
+    export default function AnimatedSplash() {
+      const opacity = new Animated.Value(1);
+      const [ready, setReady] = createSignal(false);
+
+      const hideAnimation = createHideAnimation(() => ({
+        manifest,
+        logo,
+        ready: ready(),
+        animate: () => {
+          Animated.timing(opacity, { toValue: 0, duration: 250, useNativeDriver: true }).start();
+        },
+      }));
+
+      return (
+        <Animated.View
+          {...hideAnimation().container}
+          style={[hideAnimation().container.style, { opacity }]}
+        >
+          <Image {...hideAnimation().logo} />
+        </Animated.View>
+      );
+    }
+    ```
+
+    `createHideAnimation` takes a config **accessor**, not a plain value - a Solid component body
+    runs once, so the accessor is what lets it keep reading `ready` as it changes. The return value
+    is an accessor too (`hideAnimation()`), Solid's own primitive convention, the same shape as this
+    adapter's other `create*` primitives.
 
   </TabItem>
 </Tabs>

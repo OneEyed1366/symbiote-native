@@ -11,7 +11,8 @@ encrypted key/value storage in the iOS Keychain and the Android Keystore, option
 the device's own biometrics — so every SymbioteNative adapter can reach it, not just React. Like
 [store review](/docs/packages/store-review/) and [local auth](/docs/packages/local-auth/), every
 export is a free function with no per-instance state, so there is no hook/composable/service to
-wrap — the React, Vue, and Angular entry points are plain re-exports of the same `core`.
+wrap — the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same
+`core`.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -24,6 +25,7 @@ wrap — the React, Vue, and Angular entry points are plain re-exports of the sa
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -69,8 +71,9 @@ merge the rules by hand in that case.
 
 ## Usage
 
-All four adapters re-export the exact same functions; there is no per-adapter
-hook/composable/service to reach for, since nothing here holds live state or a subscription.
+All five adapters (React, Vue, Angular, Svelte, Solid) re-export the exact same functions; there's
+no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+subscription.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
@@ -203,6 +206,30 @@ hook/composable/service to reach for, since nothing here holds live state or a s
     the core package, called straight from `onPress`.
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { Button, Text, View } from '@symbiote-native/solid';
+    import { deleteItemAsync, getItemAsync, setItemAsync } from '@symbiote-native/secure-store/solid';
+
+    export function SessionToken() {
+      const [token, setToken] = createSignal<string | null>(null);
+
+      return (
+        <View>
+          <Text>{token() ?? 'no token stored'}</Text>
+          <Button title="Save" onPress={() => setItemAsync('session-token', 'abc123')} />
+          <Button title="Read" onPress={() => getItemAsync('session-token').then(setToken)} />
+          <Button title="Forget" onPress={() => deleteItemAsync('session-token').then(() => setToken(null))} />
+        </View>
+      );
+    }
+    ```
+
+    There's no per-instance primitive to reach for here either: every function is a plain export
+    off the core package, called straight from `onPress`.
+
+  </TabItem>
 </Tabs>
 
 Values are strings. JSON-encode anything else:
@@ -284,10 +311,10 @@ native module declares none of them, so they read `undefined` there.
 
 ## How the wrapper works
 
-`@symbiote-native/secure-store` ships zero React/Vue/Angular logic — `expo-secure-store`'s own JS
-is hand-ported into this package's `core/`, resolving the native module through
-`expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package this project never
-installs:
+`@symbiote-native/secure-store` ships zero React/Vue/Angular/Svelte/Solid logic —
+`expo-secure-store`'s own JS is hand-ported into this package's `core/`, resolving the native
+module through `expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package
+this project never installs:
 
 ```
 packages/secure-store/src/
@@ -296,11 +323,12 @@ packages/secure-store/src/
 ├── react/    # @symbiote-native/secure-store/react   — export * from '../core'
 ├── vue/      # @symbiote-native/secure-store/vue     — export * from '../core'
 ├── svelte/   # @symbiote-native/secure-store/svelte  — export * from '../core'
-└── angular/  # @symbiote-native/secure-store/angular — export * from '../core'
+├── angular/  # @symbiote-native/secure-store/angular — export * from '../core'
+└── solid/    # @symbiote-native/secure-store/solid   — export * from '../core'
 ```
 
 Same shape as [store review](/docs/packages/store-review/)'s and
-[local auth](/docs/packages/local-auth/)'s four adapter entries: single-file re-exports with no
+[local auth](/docs/packages/local-auth/)'s five adapter entries: single-file re-exports with no
 lifecycle code, since every export is a stateless free function — there is nothing for a hook,
 composable, rune, or service to subscribe to or clean up. The native code itself is never vendored or
 copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native

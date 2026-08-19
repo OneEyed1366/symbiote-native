@@ -25,6 +25,7 @@ per-instance state.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -52,9 +53,9 @@ carries no runtime or manifest permission.
 
 ## Usage
 
-All four adapters — React, Vue, Angular, Svelte — re-export the exact same constants and free
-functions; there is no per-adapter hook/composable/service to reach for, since nothing here holds
-live state or a subscription.
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same constants and
+free functions; there is no per-adapter hook/composable/service to reach for, since nothing here
+holds live state or a subscription.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
@@ -192,6 +193,42 @@ live state or a subscription.
     function off the core package, called straight from `$effect`.
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal, onMount, Show } from 'solid-js';
+    import { Platform, Text, View } from '@symbiote-native/solid';
+    import {
+      applicationId,
+      applicationName,
+      getInstallationTimeAsync,
+      nativeApplicationVersion,
+      nativeBuildVersion,
+    } from '@symbiote-native/application/solid';
+
+    export function ApplicationInfo() {
+      const [installedAt, setInstalledAt] = createSignal<Date | null>(null);
+
+      onMount(() => {
+        getInstallationTimeAsync().then(setInstalledAt);
+      });
+
+      return (
+        <View>
+          <Text>{applicationName} ({applicationId})</Text>
+          <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+          <Show when={Platform.OS === 'android' && installedAt()}>
+            {date => <Text>Installed {date().toLocaleDateString()}</Text>}
+          </Show>
+        </View>
+      );
+    }
+    ```
+
+    Nothing here needs a Solid primitive either: every function is a plain free function off
+    the core package, called straight from `onMount`. `@symbiote-native/application/solid` re-exports
+    the same `core/` module every other adapter does, so only the import path differs from React.
+
+  </TabItem>
 </Tabs>
 
 ## API
@@ -251,7 +288,7 @@ A plain string-literal union, not a struct — carries no `I` prefix (`ts-js-bes
 
 ## How the wrapper works
 
-`@symbiote-native/application` ships zero React/Vue/Angular logic in `expo-application` itself —
+`@symbiote-native/application` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-application` itself —
 its constants and functions are hand-ported, verbatim, into this package's own `core/`, resolving
 the native module through `expo-modules-core`'s `requireNativeModule` rather than the `expo`
 meta-package this project never installs:
@@ -267,7 +304,11 @@ packages/application/src/
 └── angular/  # @symbiote-native/application/angular — export * from '../core'
 ```
 
-Same shape as [local auth](/docs/packages/local-auth/)'s three adapter entries: single-file
+Solid has no `solid/` directory at all: `package.json`'s `"./solid"` export points straight at
+`./src/core/index.ts`. A physical re-export file would add nothing over aliasing the subpath
+directly (`.claude/rules/barrel-passthrough.md`).
+
+Same shape as [local auth](/docs/packages/local-auth/)'s five adapter entries: single-file
 re-exports with no lifecycle code at all, since every export here is either an eagerly-resolved
 constant or a stateless one-shot call — there is nothing for a hook, composable, or service to
 subscribe to or clean up. The native code itself is never vendored or copied —

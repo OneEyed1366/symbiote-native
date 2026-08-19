@@ -27,6 +27,7 @@ instead.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -166,13 +167,40 @@ as a workspace dependency the same way the examples do.
     from native reports.
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { Slider } from '@symbiote-native/slider/solid';
+
+    export default function VolumeControl() {
+      const [volume, setVolume] = createSignal(0.5);
+
+      return (
+        <Slider
+          value={volume()}
+          minimumValue={0}
+          maximumValue={1}
+          step={0.05}
+          onValueChange={setVolume}
+          minimumTrackTintColor="#2c4f7c"
+          thumbTintColor="#2c4f7c"
+        />
+      );
+    }
+    ```
+
+    Solid has no two-way-binding sugar of its own - `value={volume()}` plus `onValueChange={setVolume}`
+    is the whole controlled pattern, a signal read in place of React's `useState` value.
+
+  </TabItem>
 </Tabs>
 
 ### Custom step markers
 
 `renderStepNumber` draws the library's built-in step dots. To draw your own marker per step,
-pass a `StepMarker` (React), fill the `#stepMarker` scoped slot (Vue), or pass a `stepMarker`
-snippet (Svelte) — all three receive `{ stepMarked, currentValue, index, min, max }`:
+pass a `StepMarker` (React), fill the `#stepMarker` scoped slot (Vue), pass a `stepMarker`
+snippet (Svelte), or pass a `StepMarker` render-prop function (Solid, given an accessor) - all
+four receive `{ stepMarked, currentValue, index, min, max }`:
 
 ```tsx
 <Slider

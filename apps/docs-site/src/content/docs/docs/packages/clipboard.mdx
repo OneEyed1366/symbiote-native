@@ -23,6 +23,7 @@ subscription, `addClipboardListener`.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 <Aside type="caution" title="The URL functions are iOS-only">
   `getUrlAsync`, `setUrlAsync`, and `hasUrlAsync` exist only on iOS —
@@ -181,6 +182,37 @@ hook/composable/service in the way:
     free function off the core package, same as `@symbiote-native/local-auth`.
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Pressable, Text, View } from '@symbiote-native/solid';
+    import { getStringAsync, setStringAsync } from '@symbiote-native/clipboard/solid';
+
+    export function CopyPaste() {
+      const handleCopy = () => {
+        void setStringAsync('Hello from SymbioteNative');
+      };
+
+      const handlePaste = () => {
+        void getStringAsync().then(text => console.log('clipboard text', text));
+      };
+
+      return (
+        <View>
+          <Pressable onPress={handleCopy}>
+            <Text>Copy</Text>
+          </Pressable>
+          <Pressable onPress={handlePaste}>
+            <Text>Paste</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    ```
+
+    Same story here: every one-shot function is a plain free function off the core package,
+    exactly as in `@symbiote-native/local-auth`, with no Solid primitive needed.
+
+  </TabItem>
 </Tabs>
 
 ### The clipboard-change listener
@@ -243,6 +275,19 @@ its own mount/unmount lifecycle so you don't manage the subscription by hand:
     </script>
 
     <Text>{clipboardEvent.current && `content types: ${clipboardEvent.current.contentTypes.join(', ')}`}</Text>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createClipboard } from '@symbiote-native/clipboard/solid';
+
+    export function ClipboardWatcher() {
+      const clipboardEvent = createClipboard(); // Accessor<IClipboardEvent | null>
+
+      return <Text>{clipboardEvent() && `content types: ${clipboardEvent()!.contentTypes.join(', ')}`}</Text>;
+    }
     ```
 
   </TabItem>
@@ -330,7 +375,7 @@ initial read of whatever's already on the clipboard, only new changes going forw
 
 ## How the wrapper works
 
-`@symbiote-native/clipboard` ships **zero React/Vue/Angular logic in `expo-clipboard` itself** —
+`@symbiote-native/clipboard` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-clipboard` itself** —
 that package's own types file hard-imports from the `expo` meta-package (which this project never
 installs), so its functions, enums, and option/result types are hand-ported, verbatim, into this
 package's own `core/`, changing only the native-module resolution to go through

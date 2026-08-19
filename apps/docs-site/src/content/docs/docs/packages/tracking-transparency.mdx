@@ -25,6 +25,7 @@ plain stateless free functions, same as [device](/docs/packages/device/).
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 <Aside type="note" title="Android and web always report granted">
   There is no tracking-consent concept on either platform —
@@ -154,6 +155,26 @@ project (it bundles its own Metro/Babel pipeline, which conflicts with this proj
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Pressable, Text, View } from '@symbiote-native/solid';
+    import { createPermissions } from '@symbiote-native/tracking-transparency/solid';
+
+    export default function TrackingScreen() {
+      const { status, error, request, get } = createPermissions();
+
+      return (
+        <View>
+          <Text>{error() ? `check failed: ${error()?.message}` : (status()?.status ?? 'checking…')}</Text>
+          <Pressable onPress={() => (error() ? get() : request())}>
+            <Text>{error() ? 'Retry check' : 'Request tracking permission'}</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 `status` stays `null` both while the first fetch is in flight and after it fails, so `error` is what
@@ -181,13 +202,13 @@ const advertisingId = getAdvertisingId(); // null on the iOS Simulator, or befor
 | `requestTrackingPermissionsAsync(): Promise<PermissionResponse>` | Requests the user to authorize or deny access to app-related data usable for tracking, showing the real ATT prompt on iOS. Always resolves granted on Android and web                         |
 | `isAvailable(): boolean`                                         | Whether the tracking-transparency native module resolved at all                                                                                                                               |
 
-### `usePermissions()`
+### `usePermissions()` / `createPermissions()`
 
-| React (`/react`) | Vue (`/vue`)     | Angular (`/angular`)           | Svelte (`/svelte`) | Signature | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ---------------- | ---------------- | ------------------------------ | ------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions`   | `()`      | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null` |
+| React (`/react`) | Vue (`/vue`)     | Angular (`/angular`)           | Svelte (`/svelte`) | Solid (`/solid`)    | Signature | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------- | ---------------- | ------------------------------ | ------------------- | -------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions`   | `createPermissions` | `()`      | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null`. Solid: `{ status, error, request, get }`, `status`/`error` are `Accessor<PermissionResponse \| null>` / `Accessor<Error \| null>` |
 
-### `usePermissions()` return value
+### Return value
 
 | Field     | Type                                | Description                                                                                                                  |
 | --------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -199,7 +220,9 @@ const advertisingId = getAdvertisingId(); // null on the iOS Simulator, or befor
 React hands those back positionally, as `[status, request, get, error]`, so existing two- and
 three-element destructuring keeps working. Vue wraps `status` and `error` in refs; Angular exposes
 `status` through `connect()` and `error` as a separate readonly signal on the service; Svelte
-returns both as getters, read as `permissions.status` / `permissions.error`.
+returns both as getters, read as `permissions.status` / `permissions.error`; Solid returns both as
+accessors, `status()` / `error()` - the auto-fetch runs once, synchronously, inside the
+primitive's own body rather than a mount effect, since a Solid component body only runs once.
 
 Read together, the two fields separate the three states:
 
@@ -236,7 +259,7 @@ Re-exported verbatim from `expo-modules-core`, never the `expo` meta-package:
 
 ## How the wrapper works
 
-`@symbiote-native/tracking-transparency` ships zero React/Vue/Angular/Svelte logic in
+`@symbiote-native/tracking-transparency` ships zero React/Vue/Angular/Svelte/Solid logic in
 `expo-tracking-transparency` itself — its functions are hand-ported, verbatim, into this package's
 own `core/`, resolving the native module through `expo-modules-core`'s `requireNativeModule`
 rather than the `expo` meta-package this project never installs:
@@ -249,7 +272,8 @@ packages/tracking-transparency/src/
 ├── react/hooks/           @symbiote-native/tracking-transparency/react   — usePermissions
 ├── vue/composables/       @symbiote-native/tracking-transparency/vue     — usePermissions (same name)
 ├── angular/services/      @symbiote-native/tracking-transparency/angular — PermissionsService
-└── svelte/runes/          @symbiote-native/tracking-transparency/svelte  — usePermissions (same name)
+├── svelte/runes/          @symbiote-native/tracking-transparency/svelte  — usePermissions (same name)
+└── solid/primitives/      @symbiote-native/tracking-transparency/solid  — createPermissions
 ```
 
 Only the permission surface gets a lifecycle hook — there's per-instance state to seed and

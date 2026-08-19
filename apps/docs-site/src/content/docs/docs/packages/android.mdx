@@ -28,8 +28,9 @@ native observers RN already ships, independent of which renderer drives the view
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
-All four adapters are listed as live because none of them import this package. They reach it
+All five adapters are listed as live because none of them import this package. They reach it
 through their existing `Keyboard` and `Settings` exports, which resolve a native module by name —
 this package is what makes that name resolve on Android.
 
@@ -62,8 +63,8 @@ in that config) and no manifest permission to merge — the shipped `AndroidMani
 There is nothing to import from this package — see [API](#api) below. Using it means
 using `Keyboard` and `Settings` from your adapter's own barrel, exactly as you would on iOS.
 Both are re-exported by [React](/docs/api/react/), [Vue](/docs/api/vue/), [Angular](/docs/api/angular/),
-and Svelte from `@symbiote-native/engine`, so the JS is identical across all four and across both
-platforms.
+Svelte, and Solid from `@symbiote-native/engine`, so the JS is identical across all five and
+across both platforms.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
@@ -204,6 +205,41 @@ platforms.
     `Keyboard` and `Settings` are plain objects off the adapter barrel here too, same as on
     every other adapter — the `$effect`'s returned function is the teardown, taking the place of
     React's `useEffect` cleanup and Vue's separate `onUnmounted`.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal, onCleanup } from 'solid-js';
+    import { KEYBOARD_EVENT, Keyboard, Settings, Text, View } from '@symbiote-native/solid';
+
+    export function KeyboardStatus() {
+      const [height, setHeight] = createSignal(0);
+
+      const shown = Keyboard.addListener(KEYBOARD_EVENT.didShow, () => {
+        setHeight(Keyboard.metrics()?.height ?? 0);
+      });
+      const hidden = Keyboard.addListener(KEYBOARD_EVENT.didHide, () => setHeight(0));
+
+      // Persisted through SharedPreferences on Android, NSUserDefaults on iOS.
+      Settings.set({ lastSeenKeyboard: Date.now() });
+
+      onCleanup(() => {
+        shown.remove();
+        hidden.remove();
+      });
+
+      return (
+        <View>
+          <Text>Keyboard height: {height()}</Text>
+        </View>
+      );
+    }
+    ```
+
+    `Keyboard` and `Settings` are plain objects off the adapter barrel here too. A Solid
+    component body runs once, so the listeners subscribe synchronously in that pass instead
+    of inside an effect. `onCleanup` handles teardown here, in place of React's `useEffect`
+    cleanup or Vue's `onUnmounted`.
 
   </TabItem>
 </Tabs>
