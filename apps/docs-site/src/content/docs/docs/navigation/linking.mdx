@@ -8,7 +8,7 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 Deep linking gets your app to a specific screen from an external URL — a push notification tap,
 a universal link, a QR code. State persistence restores where the user left off across app
 restarts — the stack they had open, not just the initial route. Both are **opt-in**: neither
-runs unless you wire it up yourself, and both work identically across all four adapters at the
+runs unless you wire it up yourself, and both work identically across all five adapters at the
 config/data level — only the lifecycle glue that wires them into a component differs.
 
 ## Deep linking
@@ -182,11 +182,35 @@ export const APP_LINKING_CONFIG: ILinkingConfig = {
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    `createLinkingIntegration(config, navigatorHandle)` takes an **accessor**, not a resolved
+    handle. `Stack`'s `ref` callback fires during the navigator's own creation, strictly before
+    any effect runs, so by the time `createLinkingIntegration`'s internal `onMount` reads the
+    accessor it has already resolved. No child-component workaround like React's, and unlike
+    Svelte's `bind:this`, no runtime narrowing either: `ref` is already typed to hand back an
+    `INavigatorHandle` directly:
+
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { Stack, createLinkingIntegration } from '@symbiote-native/navigation/solid';
+    import type { INavigatorHandle } from '@symbiote-native/navigation/solid';
+    import { APP_LINKING_CONFIG } from './navigation-linking';
+
+    function App() {
+      const [stackHandle, setStackHandle] = createSignal<INavigatorHandle | null>(null);
+      createLinkingIntegration(APP_LINKING_CONFIG, stackHandle);
+      return (
+        <Stack ref={setStackHandle} initialRouteName="Home">{/* screens */}</Stack>
+      );
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ### Behavior
 
-All four adapters share the same semantics: on mount, the OS's initial URL is resolved once and
+All five adapters share the same semantics: on mount, the OS's initial URL is resolved once and
 `navigatorHandle.replace(name, params)` is called for the resolved route. From then on, incoming
 deep-link URL events are subscribed to, and each one calls `navigatorHandle.push(name, params)`.
 Both paths resolve the URL through the same function as the standalone one below.
@@ -263,6 +287,7 @@ async function restore(stackHandle: INavigatorHandle): Promise<void> {
 | `useLinkingIntegration(config: ILinkingConfig, navigatorHandle: Ref<INavigatorHandle \| null>): void` (Vue)        | Same behavior, but takes the **ref itself** — reads `.value` lazily inside its own `onMounted`, which fires after the Stack's ref has resolved                                             |
 | `injectLinkingIntegration(config: ILinkingConfig, navigatorHandle: INavigatorHandle): void` (Angular)              | Same behavior as an injection function — needs an injection context (`inject(DestroyRef)` internally), call it via `runInInjectionContext` from `ngAfterViewInit`                          |
 | `useLinkingIntegration(config: ILinkingConfig, getNavigatorHandle: () => INavigatorHandle \| null): void` (Svelte) | Same behavior, but takes a **getter function** over the Stack's `bind:this` target — reads it inside its own `$effect`, tracked so it re-runs once the binding resolves                    |
+| `createLinkingIntegration(config: ILinkingConfig, navigatorHandle: Accessor<INavigatorHandle \| null>): void` (Solid) | Same behavior, but takes a Solid **accessor** over the Stack's `ref` target, read inside its own `onMount`, which runs after the navigator's `ref` callback has resolved           |
 | `resolveRouteFromUrl(config: ILinkingConfig, url: string): IRoute<unknown> \| null`                                | Resolves a URL to a route synchronously, with no navigator or OS event involved — the same resolution the integration hooks use internally                                                 |
 | `resolveUrlFromRoute(config: ILinkingConfig, route: IRoute<unknown>): string \| null`                              | The inverse of `resolveRouteFromUrl` — builds a URL for a route, filling `:param` segments from `route.params`; `null` when a required param is missing or the route name isn't configured |
 | `serializeNavigatorState(state: INavigatorState): unknown`                                                         | Currently an identity passthrough — `INavigatorState` is already plain JSON-safe data                                                                                                      |

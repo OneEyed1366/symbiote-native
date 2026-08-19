@@ -1,14 +1,14 @@
 ---
 title: Navigation
-description: A framework-agnostic Stack/Tab/Drawer navigation library with native react-native-screens transitions, shared across React, Vue, Angular, and Svelte.
+description: A framework-agnostic Stack/Tab/Drawer navigation library with native react-native-screens transitions, shared across React, Vue, Angular, Svelte, and Solid.
 ---
 
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 `@symbiote-native/navigation` is SymbioteNative's navigation library — broadly comparable in
 scope to `react-navigation`, but built the SymbioteNative way: **one shared,
-framework-agnostic core** (`packages/navigation/src/core/`) drives thin React, Vue, Angular, and
-Svelte adapters, exactly like every other package in this monorepo. It ships **native Stack
+framework-agnostic core** (`packages/navigation/src/core/`) drives thin React, Vue, Angular,
+Svelte, and Solid adapters, exactly like every other package in this monorepo. It ships **native Stack
 navigation** built on `react-native-screens`' `RNSScreen`/`RNSScreenStack` views — real native
 push/pop transitions, headers, and modals, not a JS-only fake — plus pure-JS **Tab** and
 **Drawer** navigators (bottom tabs and a swipeable side panel) for the parts of a navigation
@@ -25,6 +25,7 @@ surface that don't need a native view underneath.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -37,13 +38,13 @@ npm install @symbiote-native/navigation
   **not** need to `pnpm add react-native-screens` yourself or import anything
   from it directly. `@symbiote-native/navigation` depends on it directly and
   registers its native views' `ViewConfig`s itself — every adapter barrel
-  (`react/index.ts`, `vue/index.ts`, `angular/index.ts`, `svelte/index.ts`)
-  starts with `import '../register'`, a side-effect import that registers
-  `RNSScreen`, `RNSScreenStack`, `RNSModalScreen`, `RNSScreenStackHeaderConfig`,
-  `RNSScreenStackHeaderSubview`, `RNSSearchBar`, and `RNSScreenContentWrapper`
-  in Fabric's view-config registry before any navigator is used. You only ever
-  import from `@symbiote-native/navigation/react`, `/vue`, `/angular`, or
-  `/svelte`.
+  (`react/index.ts`, `vue/index.ts`, `angular/index.ts`, `svelte/index.ts`,
+  `solid/index.ts`) starts with `import '../register'`, a side-effect import
+  that registers `RNSScreen`, `RNSScreenStack`, `RNSModalScreen`,
+  `RNSScreenStackHeaderConfig`, `RNSScreenStackHeaderSubview`, `RNSSearchBar`,
+  and `RNSScreenContentWrapper` in Fabric's view-config registry before any
+  navigator is used. You only ever import from `@symbiote-native/navigation/react`,
+  `/vue`, `/angular`, `/svelte`, or `/solid`.
 </Aside>
 
 ## Quick start
@@ -192,6 +193,32 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Stack, useStackNavigation } from '@symbiote-native/navigation/solid';
+    import { Button } from '@symbiote-native/solid';
+
+    function Home() {
+      const navigation = useStackNavigation();
+      return <Button title="Open details" onPress={() => navigation().push('Details')} />;
+    }
+
+    function Details() {
+      const navigation = useStackNavigation();
+      return <Button title="Go back" onPress={() => navigation().pop()} />;
+    }
+
+    export default function App() {
+      return (
+        <Stack initialRouteName="Home">
+          <Stack.Screen name="Home" component={Home} />
+          <Stack.Screen name="Details" component={Details} />
+        </Stack>
+      );
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ## What's in this section
@@ -200,7 +227,9 @@ handle for a `Stack` screen, so there's no union and nothing to narrow by hand. 
 - [Tabs](/docs/navigation/tabs/) — the bottom tab bar navigator.
 - [Drawer](/docs/navigation/drawer/) — the swipeable side-panel navigator.
 - [Hooks](/docs/navigation/hooks/) — `useNavigation`/`useRoute`/`useIsFocused`/`useFocusEffect`/`useNavigationState`
-  (Svelte: the same names, as runes; Angular: their `injectX` equivalents) across all four adapters.
+  (Svelte: the same names, as runes; Angular: their `injectX` equivalents; Solid: `useNavigation`/`useRoute`
+  stay `use*`, but `createIsFocused`/`createFocusEffect`/`createNavigationState` switch to `create*` since
+  each owns a subscription) across all five adapters.
 - [Linking](/docs/navigation/linking/) — deep linking and navigation-state persistence.
 - [FAQ](/docs/navigation/faq/) — frequently asked questions.
 
@@ -221,15 +250,18 @@ custom content); Angular uses structural marker directives on an inert `ng-templ
 `<Screen name="..." component={...} />` marker as Vue, but discovers it differently underneath —
 Svelte hands a component its children as an opaque `Snippet`, so `<Screen>`/`<Stack.Screen>`
 registers itself on a context-based collector while the snippet renders, rather than being read
-from a children scan. This is deliberate: each adapter follows its own framework's idiom for
-declaring children rather than forcing one JSX-shaped convention onto Vue's, Angular's, or
-Svelte's template model.
+from a children scan. Solid uses the same `<Stack.Screen name="..." component={...} />` JSX shape
+React does, but for the same reason as Svelte, not React's: a Solid component body runs exactly
+once, so it can't scan `props.children` any more than Svelte can: the marker registers itself on
+a context collector during that one render pass instead. This is deliberate: each adapter follows
+its own framework's idiom for declaring children rather than forcing one JSX-shaped convention
+onto Vue's, Angular's, Svelte's, or Solid's own model.
 
 **Read `route`/`navigation` with a hook — there is no props path.** Every component under a
-navigator reads its current route and navigator handle by calling a hook (React/Vue), a rune
+navigator reads its current route and navigator handle by calling a hook (React/Vue/Solid), a rune
 (Svelte), or an inject function (Angular): `useRoute()`/`useNavigation()` — or, better, the
-navigator-specific `useStackNavigation()`/`useTabNavigation()`/`useDrawerNavigation()` (Svelte
-uses these same names; Angular:
+navigator-specific `useStackNavigation()`/`useTabNavigation()`/`useDrawerNavigation()` (Svelte and
+Solid use these same names; Angular:
 `injectRoute()`/`injectNavigation()`/`injectStackNavigation()`/…). The navigator does **not**
 thread `route`/`navigation` into the mounted screen as a prop or `@Input()`; the screen's own
 top-level component reads them exactly the way any component nested deeper does, so there's
@@ -268,9 +300,10 @@ screen that reads it.
 
 All of the router logic — the route-stack reducer, screen-options resolution/merging, and the
 derivation of the native view props `RNSScreen`/`RNSScreenStack`/the header config leaves need —
-lives once in `core/`, shared verbatim by React, Vue, Angular, and Svelte. Each adapter supplies
-only its own lifecycle glue (hooks, composables, runes, or a directive/signal pair) and the
-descriptor bridge that turns the core's render output into that framework's elements:
+lives once in `core/`, shared verbatim by React, Vue, Angular, Svelte, and Solid. Each adapter
+supplies only its own lifecycle glue (hooks, composables, runes, primitives, or a
+directive/signal pair) and the descriptor bridge that turns the core's render output into that
+framework's elements:
 
 ```
 packages/navigation/src/
@@ -279,10 +312,11 @@ packages/navigation/src/
 ├── react/         # React lifecycle (hooks) + descriptorToReact bridge
 ├── vue/           # Vue lifecycle (composables) + descriptorToVue bridge
 ├── angular/       # Angular lifecycle (injectors/signals) + directive-based descriptor bridge
-└── svelte/        # Svelte lifecycle (runes) + descriptor-subtree bridge for Tab's pure-JS bar
+├── svelte/        # Svelte lifecycle (runes) + descriptor-subtree bridge for Tab's pure-JS bar
+└── solid/         # Solid lifecycle (primitives) + descriptor-subtree bridge for Tab's pure-JS bar
 ```
 
 A persistence bug in the route-stack reducer, or a header-layout bug in the native prop
-derivation, is fixed once in `core/` for all four adapters — the same shared-core pattern every
+derivation, is fixed once in `core/` for all five adapters — the same shared-core pattern every
 SymbioteNative package follows. See [how it works](/docs/how-it-works/) for the general
 render-pipeline this sits on top of.

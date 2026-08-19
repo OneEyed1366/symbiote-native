@@ -154,6 +154,44 @@ there is no `push`/`pop`, only `jumpTo` between the existing tabs.
     `TabSearchScreen.svelte` read theirs the same way.
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Tab } from '@symbiote-native/navigation/solid';
+    import type { ITabOptions } from '@symbiote-native/navigation/solid';
+    import { TabHomeScreen } from './TabHomeScreen';
+    import { TabSearchScreen } from './TabSearchScreen';
+
+    const homeTabOptions: ITabOptions = {
+      tabBarLabel: 'Home',
+      tabBarIcon: '🏠',
+      tabBarActiveTintColor: '#4fd1a5',
+    };
+
+    const searchTabOptions: ITabOptions = {
+      tabBarLabel: 'Search',
+      tabBarIcon: '🔍',
+      tabBarBadge: 3,
+    };
+
+    export function TabsDemoScreen() {
+      return (
+        <Tab initialRouteName="Home">
+          <Tab.Screen name="Home" component={TabHomeScreen} options={homeTabOptions} />
+          <Tab.Screen name="Search" component={TabSearchScreen} options={searchTabOptions} />
+        </Tab>
+      );
+    }
+    ```
+
+    Solid's JSX takes the dotted `Tab.Screen` form directly, no standalone `TabScreen` needed the
+    way Vue/Svelte's templates require. Screens are discovered the same way Stack's are: Solid
+    cannot inspect `children` either, so each `<Tab.Screen>` registers itself on a context-based
+    collector, not a children scan. A screen that needs its own `route`/`navigation` reads them
+    with `useRoute()`/`useTabNavigation()` (Solid: [Stack's screens](/docs/navigation/stack/)):
+    both hand back an **accessor**, called at the read site (`navigation().jumpTo(...)`), since a
+    Solid component body runs once. `TabHomeScreen`/`TabSearchScreen` read theirs the same way.
+
+  </TabItem>
 </Tabs>
 
 <Aside type="note">

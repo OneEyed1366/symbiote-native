@@ -22,6 +22,7 @@ here is a JS-simulated animation.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Usage
 
@@ -216,6 +217,61 @@ here is a JS-simulated animation.
     [Hooks & focus](/docs/navigation/hooks/).
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    // HomeScreen.tsx
+    import { useStackNavigation } from '@symbiote-native/navigation/solid';
+    import { ActionButton } from './ActionButton';
+
+    export function HomeScreen() {
+      const navigation = useStackNavigation();
+      return (
+        <ActionButton
+          title="Go to Details"
+          onPress={() => navigation().push('Details', { id: 42 })}
+        />
+      );
+    }
+    ```
+
+    ```tsx
+    // DetailsScreen.tsx
+    import { useStackNavigation } from '@symbiote-native/navigation/solid';
+    import { ActionButton } from './ActionButton';
+
+    export function DetailsScreen() {
+      const navigation = useStackNavigation();
+      return <ActionButton title="Back" onPress={() => navigation().pop()} />;
+    }
+    ```
+
+    ```tsx
+    // App.tsx
+    import { Stack } from '@symbiote-native/navigation/solid';
+    import { HomeScreen } from './HomeScreen';
+    import { DetailsScreen } from './DetailsScreen';
+
+    export function App() {
+      return (
+        <Stack initialRouteName="Home">
+          <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
+          <Stack.Screen name="Details" component={DetailsScreen} options={{ title: 'Details' }} />
+        </Stack>
+      );
+    }
+    ```
+
+    `<Stack.Screen>`'s `component` prop takes a Solid `Component` reference, not a render prop:
+    the navigator mounts it itself. Solid's JSX takes the dotted `Stack.Screen` form directly (no
+    Vue/Svelte-style standalone `Screen` needed); markers register through a context-based
+    collector rather than a children scan, since Solid has no way to inspect `children` either.
+    `useRoute()`/`useStackNavigation()` hand back an **accessor**, called at the read site
+    (`navigation().push(...)`, never destructured): a Solid component body runs once, so a
+    snapshot taken at the top would freeze and never see a later `setParams`. Any component under
+    the stack reads them the same way, at any nesting depth. See
+    [Hooks & focus](/docs/navigation/hooks/).
+
+  </TabItem>
 </Tabs>
 
 ### Getting the navigator handle imperatively
@@ -272,6 +328,18 @@ here is a JS-simulated animation.
     `declare module '*.svelte'` fallback, which erases the `export function` surface `bind:this`
     actually hands back. Bind to `unknown` and narrow with a runtime guard on read, the same
     pattern `examples/svelte/App.svelte` uses for its own linking integration.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    let stackHandle: INavigatorHandle | undefined;
+    // <Stack ref={(handle) => (stackHandle = handle)}>...</Stack>
+    stackHandle?.push('Details');
+    ```
+
+    `Stack`'s `ref` is a plain callback prop (`(handle: INavigatorHandle) => void`), Solid's own
+    spelling of "give me the thing when it exists", not a signal or a `bind:this` target like
+    Vue's/Svelte's. The callback fires once, synchronously, from the navigator's body.
 
   </TabItem>
 </Tabs>
