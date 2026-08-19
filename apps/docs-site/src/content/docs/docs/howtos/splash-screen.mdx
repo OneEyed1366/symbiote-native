@@ -7,7 +7,7 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 You want a native launch screen shown _before_ JS ever runs, hidden once your app is ready. This
 is [`@symbiote-native/splash-screen`](/docs/packages/splash-screen/) — a wrapper
-over `react-native-bootsplash` reachable from React, Vue, Angular, and Svelte alike.
+over `react-native-bootsplash` reachable from React, Vue, Angular, Svelte, and Solid alike.
 
 <Aside type="danger" title="This is two setups, not one">
   Installing the JS package only gets you `hide()`/`useHideAnimation`. The
@@ -192,11 +192,22 @@ mounted:
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { onMount } from 'solid-js';
+    import { hide } from '@symbiote-native/splash-screen/solid';
+
+    onMount(() => {
+      hide();
+    });
+    ```
+
+  </TabItem>
 </Tabs>
 
 If you want a fade transition gated on real readiness (layout committed + logo/brand images
 loaded + your own `ready` flag) instead of an immediate cut, reach for `useHideAnimation` —
-covered with full React/Vue/Angular examples on the
+covered with full React/Vue/Angular/Svelte/Solid examples on the
 [package page](/docs/packages/splash-screen/#the-animated-case-usehideanimation).
 
 ## Known upstream gotchas
@@ -227,4 +238,4 @@ you file a bug against `@symbiote-native/splash-screen` itself:
 | 4    | Hide it from JS                                              | `hide()` / `useHideAnimation` in app code            |
 
 Steps 1–3 are native, one-time setup per app; step 4 is the only part that lives in your
-framework code, and it's identical in shape across React, Vue, Angular, and Svelte.
+framework code, and it's identical in shape across React, Vue, Angular, Svelte, and Solid.

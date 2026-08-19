@@ -9,7 +9,7 @@ without reaching for a third-party animation library.
 ## Every adapter — the same `Animated` namespace
 
 ```tsx
-import { Animated } from '@symbiote-native/react'; // or '@symbiote-native/vue' / '@symbiote-native/angular'
+import { Animated } from '@symbiote-native/react'; // or '@symbiote-native/vue' / '@symbiote-native/angular' / '@symbiote-native/solid'
 
 const opacity = new Animated.Value(0);
 
@@ -21,7 +21,7 @@ Animated.timing(opacity, {
 ```
 
 Wrap the view you want to animate in `Animated.View` — the dotted form works
-as written on React, Vue and Svelte. Angular is the exception: import
+as written on React, Vue, Svelte and Solid. Angular is the exception: import
 `AnimatedView` by name there, because its AOT compiler cannot trace a component
 class through property access. See the [Animations guide](/docs/learn/animations/) for the full
 per-adapter reasoning and the rest of the surface (`ValueXY`, tracking,

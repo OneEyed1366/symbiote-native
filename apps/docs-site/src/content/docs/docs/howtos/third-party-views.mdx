@@ -71,6 +71,14 @@ framework-agnostic core plus a thin entry per adapter:
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Slider } from '@symbiote-native/slider/solid';
+
+    <Slider value={value()} onValueChange={setValue} />
+    ```
+
+  </TabItem>
 </Tabs>
 
 The consuming app installs only `@symbiote-native/slider` — the wrapper package
