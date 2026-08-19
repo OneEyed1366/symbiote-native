@@ -60,7 +60,7 @@ Vue, with its own [guide](/docs/learn/angular/), demo GIF, and
 [API reference](/docs/api/angular/), and wrapper packages like Slider ship an
 Angular build too. One thing is still catching up: Angular has its own
 real-device Detox e2e suite, but doesn't yet share the identical
-`canary-journeys` spec file that React and Vue run byte-for-byte. See the
+`canary-journeys` spec file that React, Vue, and Svelte run byte-for-byte. See the
 [status page](/docs/project/status/) for the exact line.
 
 ## Is Svelte a first-class adapter?
@@ -76,14 +76,34 @@ guide page.
 ## Can I use Svelte stores, Context, or `svelte/motion`/`svelte/easing` in a SymbioteNative app?
 
 Yes, almost all of Svelte's own runtime works completely unmodified. `svelte/store`
-(`writable`/`readable`/`derived`), `svelte/easing`, `svelte/motion`, `svelte/events`,
+(`writable`/`readable`/`derived`), `svelte/easing`, `svelte/events`,
 `svelte/attachments`, and nearly all of `svelte/reactivity` (`SvelteMap`, `SvelteSet`,
 `SvelteDate`, `SvelteURL`, `createSubscriber`) are pure JavaScript with zero DOM
-dependency, so the DOM-shim adapter never gets in their way. Context (`setContext`/
+dependency, so the DOM-shim adapter never gets in their way.
+
+`svelte/motion` is the exception, and this page used to list it among the pure ones
+by mistake. `Tween` and `Spring` themselves are pure, but the module's entry point
+constructs a `MediaQuery` at module scope to expose `prefersReducedMotion`:
+
+```js
+// svelte/src/motion/index.js
+import { MediaQuery } from 'svelte/reactivity';
+export const prefersReducedMotion = /*@__PURE__*/ new MediaQuery(
+  '(prefers-reduced-motion: reduce)',
+);
+```
+
+`MediaQuery`'s constructor calls `window.matchMedia`, which React Native does not
+define. The `/*@__PURE__*/` annotation lets a tree-shaking bundler drop that line when
+`prefersReducedMotion` is unused, but Metro does not tree-shake by default, so
+`import { Tween } from 'svelte/motion'` can fail at import time rather than at first
+use. Reach for `Animated` from `@symbiote-native/svelte` for animation, and
+`orientation` / `createWidthQuery` / `useColorScheme` where you would have used a media
+query. Context (`setContext`/
 `getContext`) also works as-is — `@symbiote-native/navigation`'s Svelte port uses it
 internally to hand each mounted route its own navigation scope.
 
-Only two members are browser-only and rejected at build time: `svelte/reactivity/window`
+Two members are browser-only and rejected at build time: `svelte/reactivity/window`
 (reads `window.innerWidth`/`scrollY`/etc, which React Native never defines — use
 `innerWidth`/`innerHeight`/`outerWidth`/`outerHeight`/`devicePixelRatio` from
 `@symbiote-native/svelte` instead) and `MediaQuery` from `svelte/reactivity` (built on
@@ -104,9 +124,15 @@ native. Use the matching runtime module instead:
 - `<svelte:body>` — no equivalent; there is no native page body to bind listeners to.
 - `<svelte:head>` — no equivalent; native apps have no page head.
 
-## What about Solid?
+## Is Solid a first-class adapter?
 
-No code exists yet. The architecture is built for thin adapters over the same
-shared engine, so it fits the same long-term model React, Vue, Angular, and
-Svelte all proved out, but it stays in architecture diagrams and roadmap text
-only until that work starts.
+Code-wise, yes: it's a Solid custom renderer over `solid-js/universal`'s own
+`createRenderer`, driving the same engine, with the same component-parity
+surface as React, Vue, Angular, and Svelte, including `createPortal`,
+`createTunnel`, `Animated`, and `AppRegistry` (`examples/solid`). Every
+companion package under `packages/*` ships a `./solid` build too, and it has
+its own [guide](/docs/learn/solid/) and [API reference](/docs/api/solid/).
+Two things are still catching up: it hasn't been verified on a real
+iOS/Android device yet (headless `vitest` only), and it isn't on the landing
+page's live framework switcher, which needs a recorded demo clip rather than
+more adapter work.

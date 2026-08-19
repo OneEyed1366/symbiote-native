@@ -223,7 +223,7 @@ here returns a plain signal-backed store, and `TunnelInDirective`
 one static, pre-authored, AOT-compilable pair parameterized by that store —
 the same relationship the list directives have to their per-cell templates.
 
-React and Vue have the same primitive — see their own API references.
+React, Vue, and Solid have the same primitive — see their own API references.
 
 ## App entry point (`AppRegistry`)
 
@@ -256,8 +256,8 @@ AppRegistry.registerComponent('MyApp', () => App);
 
 ## Runtime modules and services
 
-The adapter re-exports the same stable runtime utilities the React and Vue
-adapters expose, so app code keeps one import root:
+The adapter re-exports the same stable runtime utilities the React, Vue, Svelte,
+and Solid adapters expose, so app code keeps one import root:
 
 ```ts
 import {
@@ -327,4 +327,4 @@ Do not pass React component packages to the Angular adapter. A third-party
 React Native package that ships a JavaScript React component still uses the
 React dispatcher internally. Non-React adapters need native-view wrappers
 instead — see the [Slider package](/docs/packages/slider/) for the reference
-implementation, shipping on React, Vue, and Angular alike.
+implementation, shipping on React, Vue, Angular, Svelte, and Solid alike.

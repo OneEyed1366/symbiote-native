@@ -3,8 +3,8 @@ title: Status
 description: What is stable enough to document today.
 ---
 
-The documented public surface focuses on React, Vue, Angular, Svelte, and the
-shared core packages.
+The documented public surface focuses on React, Vue, Angular, Svelte, Solid,
+and the shared core packages.
 
 ## Adapter status
 
@@ -34,7 +34,16 @@ shared core packages.
   with React/Vue/Angular, verified on-device on iOS and Android
   (`examples/svelte`). On the landing page's live framework switcher now; the
   Slider wrapper package also ships a Svelte build.
-- Solid — not started. Architecture diagrams and roadmap text only.
+- Solid — the fourth non-React adapter. A Solid custom renderer built on
+  `solid-js/universal`'s official `createRenderer` (Solid's own
+  framework-agnostic seam for non-DOM targets) maps every compiled-JSX call
+  onto the same engine mutation API every other adapter drives. Full
+  component parity with React/Vue/Angular/Svelte, including `createPortal`,
+  `createTunnel`, `Animated`, and `AppRegistry` (`examples/solid`). Every
+  companion package under `packages/*` also ships a `./solid` export subpath
+  now, matching npm-catalog parity with the other four adapters. Verified
+  only in headless `vitest` so far; real-device and live-switcher testing
+  wait on the same recorded demo clip, not on more adapter work.
 
 ## Core status
 
@@ -43,7 +52,7 @@ shared core packages.
   wraps.
 - `@symbiote-native/css-parser` — build-time compiler for plain CSS, CSS Modules, and
   SCSS/Sass, Less, and Stylus preprocessor sources, resolved at runtime
-  through a class registry shared by React, Vue, Angular, and Svelte. Also ships a
+  through a class registry shared by React, Vue, Angular, Svelte, and Solid. Also ships a
   `css-dts` CLI (typo-safe `.module.css` `.d.ts` generation) and a
   `typescript-plugin` for live in-editor autocomplete — see the
   [roadmap](/docs/project/roadmap/).
@@ -54,15 +63,16 @@ shared core packages.
   `package.json` with a `postinstall` script; each install rescans
   `node_modules` and regenerates the Android registration blocks for every
   wrapper package it finds.
-- React/Vue/Angular/Svelte adapters — framework lifecycle and public API
+- React/Vue/Angular/Svelte/Solid adapters — framework lifecycle and public API
   bridges over the shared core.
 
 ## What the docs promise
 
 React, Vue, Angular, and Svelte are presented as live choices on the landing
 page's framework switcher, each with its own demo clip on the landing page
-and its own learn guide. Solid stays in architecture diagrams and roadmap
-text only, with no dedicated guide yet because no code exists for it.
+and its own learn guide. Solid has full adapter code, its own learn guide,
+and its own API reference, but stays off the live switcher until it has a
+recorded demo clip.
 
 ## What remains moving
 

@@ -6,9 +6,9 @@
 
 ### Want to ship a real native iOS/Android app, but you don't write React? Today you can't.
 
-**Beta** · iOS + Android · React + Vue + Angular + Svelte · one native core, N framework adapters
+**Beta** · iOS + Android · React + Vue + Angular + Svelte + Solid · one native core, N framework adapters
 
-[**Docs**](https://docs.symbiote-native.dev) · [Why SymbioteNative](#why-not-nativescript-lynx-or-just-react-native) · [Architecture](#how-it-works) · [Testing](#testing) · [Milestones](#milestones) · [React adapter](./adapters/react) · [Vue adapter](./adapters/vue) · [Angular adapter](./adapters/angular) · [Svelte adapter](./adapters/svelte)
+[**Docs**](https://docs.symbiote-native.dev) · [Why SymbioteNative](#why-not-nativescript-lynx-or-just-react-native) · [Architecture](#how-it-works) · [Testing](#testing) · [Milestones](#milestones) · [React adapter](./adapters/react) · [Vue adapter](./adapters/vue) · [Angular adapter](./adapters/angular) · [Svelte adapter](./adapters/svelte) · [Solid adapter](./adapters/solid)
 
 </div>
 
@@ -46,13 +46,13 @@ Every existing answer to "native UI without React lock-in" forces a trade this p
 doesn't. The demand is real - Tencent's Hippy and ByteDance's Lynx both ship multi-framework
 native UI at real production scale - but each option gives up something structural:
 
-|                       | Native layer                                                                            | Frameworks                                                                                             | Native-module ecosystem                                                    | The trade you make                                                    |
-| --------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| **React Native**      | Fabric / Yoga / Hermes, the most battle-tested stack, maintained by Meta                 | React only                                                                                                 | Thousands of packages: payments, maps, analytics are an `npm install`         | React lock-in                                                         |
-| **NativeScript**      | Its own runtime + bindings, maintained by nstudio (core last commit Aug 14, 2026, releases every 2-4 weeks) | Angular active (`@nativescript/angular` 21.0.0, Jan 2026); Vue quiet since `3.0.2` in Oct 2025; Svelte's community fork stalled since Dec 2025, and the original `svelte-native` package hasn't shipped since Nov 2024 | Its own, real but a fraction of RN's                                          | Leave RN's ecosystem, and framework support quality varies sharply by which one you pick |
-| **Hippy** (Tencent)   | Its own C++ DOM + its own Flex layout engine, maintained by Tencent                      | React and Vue, both officially supported, shipping in QQ, QQ Music, and Tencent News (releases through Aug 2025) | Its own, real production scale but a separate ecosystem from RN's             | Leave RN's ecosystem for Tencent's, solid Vue support but on their roadmap |
-| **Lynx** (ByteDance)  | Its own new engine (PrimJS, dual-thread), launched March 2025                            | ReactLynx is the only framework that actually ships; Vue support is an unfinished community prototype     | Minimal, most integrations mean hand-written native bridging                  | A year-old ecosystem, and "framework-agnostic" is still a roadmap item, not what ships today |
-| **SymbioteNative**    | **Stock, unforked React Native**, Meta keeps maintaining it, you keep upstream merges   | React, Vue 3, Angular, Svelte shipping today; Solid is the same thin-adapter recipe                        | RN's own, inherited at the native-view level                                  | Solid adapter still pending; no `create-symbiote` scaffolder yet      |
+|                      | Native layer                                                                                                | Frameworks                                                                                                                                                                                                             | Native-module ecosystem                                               | The trade you make                                                                             |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **React Native**     | Fabric / Yoga / Hermes, the most battle-tested stack, maintained by Meta                                    | React only                                                                                                                                                                                                             | Thousands of packages: payments, maps, analytics are an `npm install` | React lock-in                                                                                  |
+| **NativeScript**     | Its own runtime + bindings, maintained by nstudio (core last commit Aug 14, 2026, releases every 2-4 weeks) | Angular active (`@nativescript/angular` 21.0.0, Jan 2026); Vue quiet since `3.0.2` in Oct 2025; Svelte's community fork stalled since Dec 2025, and the original `svelte-native` package hasn't shipped since Nov 2024 | Its own, real but a fraction of RN's                                  | Leave RN's ecosystem, and framework support quality varies sharply by which one you pick       |
+| **Hippy** (Tencent)  | Its own C++ DOM + its own Flex layout engine, maintained by Tencent                                         | React and Vue, both officially supported, shipping in QQ, QQ Music, and Tencent News (releases through Aug 2025)                                                                                                       | Its own, real production scale but a separate ecosystem from RN's     | Leave RN's ecosystem for Tencent's, solid Vue support but on their roadmap                     |
+| **Lynx** (ByteDance) | Its own new engine (PrimJS, dual-thread), launched March 2025                                               | ReactLynx is the only framework that actually ships; Vue support is an unfinished community prototype                                                                                                                  | Minimal, most integrations mean hand-written native bridging          | A year-old ecosystem, and "framework-agnostic" is still a roadmap item, not what ships today   |
+| **SymbioteNative**   | **Stock, unforked React Native**, Meta keeps maintaining it, you keep upstream merges                       | React, Vue 3, Angular, Svelte, Solid all shipping today                                                                                                                                                                | RN's own, inherited at the native-view level                          | Solid still headless-only (no on-device verification yet); no `create-symbiote` scaffolder yet |
 
 NativeScript and Hippy each prove multi-framework native UI works at real scale, carrying
 their own native runtime alone. Lynx, a year into its own new engine, still ships React
@@ -171,6 +171,7 @@ live in the per-adapter READMEs:
 - **[`adapters/vue`](./adapters/vue)** — `@symbiote-native/vue`, Vue 3 on the same core (`examples/vue-tsx`, `examples/vue-sfc`).
 - **[`adapters/angular`](./adapters/angular)** — `@symbiote-native/angular`, `Renderer2`/`RendererFactory2` on the same core (`examples/angular`).
 - **[`adapters/svelte`](./adapters/svelte)** — `@symbiote-native/svelte`, a DOM shim over stock compiled Svelte output on the same core (`examples/svelte`).
+- **[`adapters/solid`](./adapters/solid)** — `@symbiote-native/solid`, `solid-js/universal`'s `createRenderer` on the same core (`examples/solid`).
 
 ---
 
@@ -193,9 +194,12 @@ npm install @symbiote-native/angular react-native @angular/core
 
 # Svelte
 npm install @symbiote-native/svelte react-native svelte
+
+# Solid
+npm install @symbiote-native/solid react-native solid-js
 ```
 
-`react-native` (and `react`/`vue`/`@angular/core`/`svelte`) stay **your app's own top-level dependencies** —
+`react-native` (and `react`/`vue`/`@angular/core`/`svelte`/`solid-js`) stay **your app's own top-level dependencies** —
 SymbioteNative never hides them, it only replaces the JS renderer that drives them. There's no
 `create-symbiote` scaffolder yet, so the Metro config and the `index.js` entry seam
 (`registerRunnable`, not `registerComponent`) aren't generated for you — copy them from the matching
@@ -205,6 +209,7 @@ example app, per the adapter's own README:
 - **[`adapters/vue`](./adapters/vue)** — TSX needs nothing extra; SFC adds a Metro transformer for `.vue` files.
 - **[`adapters/angular`](./adapters/angular)** — needs `ngc --watch` running alongside Metro (AOT compiles separately from Metro).
 - **[`adapters/svelte`](./adapters/svelte)** — adds a Metro transformer for `.svelte` files, same recipe as Vue SFC.
+- **[`adapters/solid`](./adapters/solid)** — needs `@symbiote-native/solid/babel-preset` listed last in Metro's Babel presets, so it claims the JSX before the RN preset's own React-JSX transform does.
 
 The navigation package ([`@symbiote-native/navigation`](./packages/navigation) — a native
 stack/tab/drawer navigator over `react-native-screens`), the third-party-view wrapper
@@ -216,14 +221,14 @@ stack/tab/drawer navigator over `react-native-screens`), the third-party-view wr
 ## Status
 
 > [!NOTE]
-> **Beta, but the API is settled.** The thesis is proven _four times over_: React Native's
-> renderer is extracted, and **four** frameworks — React, Vue 3, Angular, and Svelte — drive the
-> same untouched framework-agnostic core on iOS + Android, with RN's own renderer never in the path.
+> **Beta, but the API is settled.** The thesis is proven _five times over_: React Native's
+> renderer is extracted, and **five** frameworks — React, Vue 3, Angular, Svelte, and Solid — drive
+> the same untouched framework-agnostic core on iOS + Android, with RN's own renderer never in the path.
 > Every adapter (and the shared core packages under it) ships to npm at `0.1.x`, so you can add one
-> to an existing RN app today — see [Try It In Your Own App](#try-it-in-your-own-app). Solid is the
-> only framework adapter left to build; everything else is in day-to-day use. What's still
-> catching up: the long-tail prop surface keeps widening, automated device coverage is just coming
-> online, and the `create-symbiote` scaffolder doesn't exist yet, so wiring Metro/CocoaPods follows
+> to an existing RN app today — see [Try It In Your Own App](#try-it-in-your-own-app). Solid runs
+> headless only so far, not yet on a device or the landing page switcher; everything else is
+> already in day-to-day use. What's still catching up: the long-tail prop surface keeps widening, automated
+> device coverage is just coming online, and the `create-symbiote` scaffolder doesn't exist yet, so wiring Metro/CocoaPods follows
 > the example apps rather than one command. iOS stays the reference surface; Android is at canary
 > parity.
 
@@ -234,7 +239,7 @@ stack/tab/drawer navigator over `react-native-screens`), the third-party-view wr
 lifecycle, accessibility, and RN's JS style processors — all committing through `@symbiote-native/engine`
 into Fabric. Each adapter's full surface and what's verified where lives in its README:
 [**React →**](./adapters/react) · [**Vue →**](./adapters/vue) · [**Angular →**](./adapters/angular) ·
-[**Svelte →**](./adapters/svelte).
+[**Svelte →**](./adapters/svelte) · [**Solid →**](./adapters/solid).
 
 **The bar for "done" is the canary, not a percentage.** The example apps are the working spec —
 they exercise the real surface and run green on an iOS simulator and an Android emulator. RN's own
@@ -259,8 +264,10 @@ without per-framework reinvention.
   every adapter rides on. `pnpm test` at the workspace root.
 - **On-device — `Detox`.** End-to-end user-journey tests run against the real app on a
   simulator/emulator. One `canary-journeys` spec is mirrored across `examples/react`,
-  `examples/vue-tsx`, and `examples/vue-sfc` — the _same_ journeys, proving each adapter paints and
-  responds identically on device. Detox attaches with zero SymbioteNative-specific glue, because to Detox
+  `examples/vue-tsx`, `examples/vue-sfc`, and `examples/svelte` — the _same_ journeys, proving each
+  adapter paints and responds identically on device. `examples/angular` has its own Detox harness
+  but not this shared spec yet; `examples/solid` has no Detox harness yet.
+  Detox attaches with zero SymbioteNative-specific glue, because to Detox
   it is just an RN app (`e2e:build:ios` / `e2e:test:ios`, and the `android` equivalents).
 
 The lever is the same as the renderer's: stay on RN's internals, and the whole RN ecosystem —
@@ -277,10 +284,10 @@ isolates to _that adapter_, not the native pipe or the commit engine. The **fram
 (React → Vue → Angular → Svelte → Solid) and the **platform** axis (iOS, Android) are independent:
 React already drives both platforms, and each new adapter inherits the platform axis as it lands.
 
-Four frameworks now drive the core (React, Vue, Angular, Svelte) — the _breadth_ bet is proven.
-What they still lack is _depth_: a real app needs more than primitives and a canary, starting with
-navigation. That's why **M5 keeps running alongside Svelte/Solid** — porting the minimal
-third-party-library surface a real app can't ship without is as urgent a proof as the fifth
+Five frameworks now drive the core (React, Vue, Angular, Svelte, Solid) — the _breadth_ bet is
+proven. What they still lack is _depth_: a real app needs more than primitives and a canary,
+starting with navigation. That's why **M5 keeps running alongside adapter work** — porting the
+minimal third-party-library surface a real app can't ship without is as urgent a proof as a new
 framework adapter.
 
 | #      | Milestone                                        | What it proves                                                                                                                                                                                                                                                                                                                                        | Status     |
@@ -304,7 +311,7 @@ framework adapter.
 | ↳ M5.2 | Small native-module wrappers                     | one-dependency proxy packages closing the gap against Expo's package set one module at a time — Clipboard-class APIs first (same recipe as `@symbiote-native/slider`/`@symbiote-native/splash-screen`), plus lingering primitive-level gaps (persistent storage, safe-area edges beyond `SafeAreaView`)                                               | ⏳ planned |
 | ↳ M5.3 | Reanimated                                       | the largest remaining gap, saved for last — a full worklet-driven animation layer                                                                                                                                                                                                                                                                     | ⏳ planned |
 | **M6** | **Svelte adapter**                               | a DOM-shim adapter over stock compiled Svelte output driving the engine's mutation API — third non-React framework, full component parity                                                                                                                                                                                                             | ✅ done    |
-| **M7** | Solid adapter                                    | fine-grained reactivity driving the engine's mutation API                                                                                                                                                                                                                                                                                             | ⏳ planned |
+| **M7** | Solid adapter                                    | `solid-js/universal`'s `createRenderer` on the validated core, fourth non-React framework with full component parity (`createPortal`/`createTunnel`/`Animated`/`AppRegistry`); headless only so far, no device build or switcher entry yet                                                                                                            | ✅ done    |
 | **M8** | Web _(stretch)_                                  | the same trees rendered to the web as a default platform target                                                                                                                                                                                                                                                                                       | 💭 maybe   |
 | **DX** | `create-symbiote` scaffolder                     | pins `react-native` + `react` at the app root so your app code imports only `@symbiote-native/*`, never `react-native`                                                                                                                                                                                                                                | ⏳ planned |
 
@@ -329,16 +336,18 @@ adapters/
   vue/         @symbiote-native/vue         — @vue/runtime-core createRenderer + nodeOps over the engine
   angular/     @symbiote-native/angular    — Renderer2/RendererFactory2 + DOM-less bootstrap over the engine
   svelte/      @symbiote-native/svelte     — DOM shim over stock compiled Svelte output over the engine
+  solid/       @symbiote-native/solid      — solid-js/universal createRenderer over the engine
 packages/
   android/     @symbiote-native/android    — autolinked native host shims (keyboard, settings) for Android
   navigation/  @symbiote-native/navigation — native stack/tab/drawer navigator over react-native-screens
-  slider/      @symbiote-native/slider     — third-party native-view wrapper (React + Vue + Angular + Svelte builds)
+  slider/      @symbiote-native/slider     — third-party native-view wrapper (React + Vue + Angular + Svelte + Solid builds)
 examples/
   react/       stock RN 0.86 app driven by @symbiote-native/react (the reference canary)
   vue-tsx/     the same canary in Vue 3, authored in TSX
   vue-sfc/     the same canary in Vue 3, authored in single-file components
   angular/     the same canary in Angular, standalone components
   svelte/      the same canary in Svelte
+  solid/       the same canary in Solid
 ```
 
 Tests are **colocated** next to the code they cover (`*.test.ts(x)` for `vitest`, `e2e/` per
@@ -368,6 +377,7 @@ steps are identical bar the directory:
 - **[adapters/vue →](./adapters/vue)** — `examples/vue-tsx`, `examples/vue-sfc`
 - **[adapters/angular →](./adapters/angular)** — `examples/angular`
 - **[adapters/svelte →](./adapters/svelte)** — `examples/svelte`
+- **[adapters/solid →](./adapters/solid)** — `examples/solid`
 
 > **A note on logs.** All diagnostics go through `dlog` / `isDebug` from `@symbiote-native/engine`,
 > off by default, gated by `DEBUG` (each example's `index.js` mirrors it onto
@@ -409,11 +419,11 @@ it to validate the native pipe and the commit engine first means that when Vue/S
 Angular break, the failure isolates to _that adapter_ — not the native stack underneath it.
 
 **Can I use it today?** The packages are on npm — you can `npm install @symbiote-native/react` (or
-`vue` / `angular` / `svelte`) into an existing RN app today, see [Try It In Your Own
-App](#try-it-in-your-own-app). It's still beta, but the API is settled — Solid is the only
-adapter left to build, and there's no `create-symbiote` scaffolder yet, so Metro/CocoaPods wiring
-follows the example apps rather than one command. The thesis is proven — **four** frameworks
-(React, Vue 3, Angular, and Svelte) drive the agnostic core on iOS + Android with RN's renderer
+`vue` / `angular` / `svelte` / `solid`) into an existing RN app today, see [Try It In Your Own
+App](#try-it-in-your-own-app). It's still beta, but the API is settled — Solid is headless-tested
+only, no device pass yet, and there's no `create-symbiote` scaffolder yet,
+so Metro/CocoaPods wiring follows the example apps rather than one command. The thesis is proven —
+**five** frameworks (React, Vue 3, Angular, Svelte, and Solid) drive the agnostic core on iOS + Android with RN's renderer
 never in the path. You can read the architecture, run the `vitest` suite and the `Detox` journeys,
 drive any of the five canaries, and follow the milestones.
 
