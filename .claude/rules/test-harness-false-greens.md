@@ -96,6 +96,19 @@ before believing a formatting gate.
 Generalised: when a tool's summary line and its detail lines disagree, believe the details. A
 summary is a claim; the details are the measurement.
 
+**And it swallows `console.log` from a vitest run outright.** Found 2026-08-20 while probing Vue's
+Teleport: a probe that printed its findings produced NO output through the wrapper, silently — the
+run looked like it had done nothing. The workaround that works is to have the probe WRITE ITS
+RESULT TO A FILE and read the file afterwards. Worth knowing before concluding a probe found
+nothing: the absence of output is not evidence of an absence of behaviour.
+
+**The same wrapper swallows `tsc` too, and there it is worse — there are no detail lines to read.**
+Measured 2026-08-20 on `examples/solid`: the wrapped `npx tsc --noEmit` printed
+`TypeScript compilation completed` and exited 0, while `rtk proxy npx tsc --noEmit` on the SAME
+tree reported `TS7006` and exit 2. Prettier at least contradicted itself out loud; tsc just looks
+clean. So a typecheck gate is only believable through **`rtk proxy`** — and by extension any gate
+whose whole signal is its exit code.
+
 ## The rule this leaves
 
 **Every new test gets broken once.** Change the thing it guards, run it, read the failure message,
@@ -103,3 +116,38 @@ restore. Record the message. A test you could not make fail is either redundant 
 which in the report rather than counting it as coverage. Where a break produces the SAME failure as
 an existing test, pick a scenario that fails differently (a distinct number, a distinct shape), or
 the two tests are one test.
+
+## `fabric.find()` returns a PRE-CLONE node — assert on the live tree, never on a search hit
+
+`core/test-utils/src/fake-fabric.ts:177` — `find(predicate)` runs over `created`, the list of every
+node the fake slot has ever built. Fabric is clone-on-write, so **any prop update produces a new
+node and leaves the old one in that list**. `find` matches the original first and hands it back,
+frozen at its pre-update props.
+
+Measured 2026-08-20 while wiring React's `Activity`: `hideInstance` was firing (proved by
+instrumenting it), the engine was committing `display: 'none'` correctly, and the assertion read
+the stale node and reported the fix as dead. Ten minutes went into the wrong half of the system.
+
+Read the LIVE tree instead — walk `fabric.appRoot().children`, the way `Counter.test.tsx` does via
+`fabric.serialize(fabric.appRoot().children)`:
+
+```ts
+function byTestId(id: string) {
+  const walk = nodes => {
+    for (const node of nodes) {
+      if (node.props.testID === id) return node.props;
+      const hit = walk(node.children);
+      if (hit !== undefined) return hit;
+    }
+  };
+  return walk(fabric.appRoot().children);
+}
+```
+
+`find` is still right for a node you only ever read once, before any update touches it.
+
+### And a prop REMOVED on a clone reads as `null`, not `undefined`
+
+Fabric spells "back to the default" as an explicit `null`, so a correctly-cleared prop fails
+`toBeUndefined()`. Assert `expect(props.x ?? null).toBeNull()` — or the absence of the value you
+care about — not the absence of the key.
