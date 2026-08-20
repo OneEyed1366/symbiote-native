@@ -19,12 +19,12 @@
   },
   "dependencies": {
     "@symbiote-native/android": "^0.1.2",
-    "@symbiote-native/components": "file:./symbiote-native-components-0.4.0.tgz",
-    "@symbiote-native/engine": "file:./symbiote-native-engine-0.2.0.tgz",
+    "@symbiote-native/components": "^0.4.0",
+    "@symbiote-native/engine": "^0.2.0",
     "@symbiote-native/navigation": "^2.1.0",
     "@symbiote-native/slider": "^5.1.0",
     "@symbiote-native/splash-screen": "^3.1.0",
-    "@symbiote-native/svelte": "file:./symbiote-native-svelte-0.2.1.tgz",
+    "@symbiote-native/svelte": "^0.2.1",
     "react": "19.2.3",
     "react-native": "0.86.0",
     "svelte": "^5.56.0"
