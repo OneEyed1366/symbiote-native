@@ -280,18 +280,43 @@ export class SymbioteHostPropsDirective {
     (...args: unknown[]) => unknown
   >();
 
+  // Values pushed by the previous bag, so a push writes only what actually moved. Copied rather
+  // than aliased: a component is free to hand back the same object with mutated fields.
+  private pushed: Record<string, unknown> = {};
+
   get node(): unknown {
     return this.elementRef.nativeElement;
   }
 
+  // MEASURED 2026-08-20, headless 1000-row create: writing every key of every bag cost 104 000
+  // engine setProp calls where Solid's identical screen cost 12 000 — and 90 000 of them carried
+  // `undefined`. A composed component's bag is a FIXED-SHAPE literal (Pressable's is ~48 keys,
+  // most of them unset on any given instance), so the first push of a fresh node spends most of
+  // its work deleting keys the node never had. Diffing per key removes exactly that: an unset key
+  // is skipped on mount and still written the moment it changes to or from a real value.
   set symbioteHostProps(props: Record<string, unknown>) {
+    const pushed = this.pushed;
+    // Only keys the node actually carries, so the vanished-key sweep below walks a handful rather
+    // than the bag's whole declared shape.
+    const next: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(props)) {
+      if (value !== undefined) next[key] = value;
+      if (Object.is(pushed[key], value)) continue;
       this.renderer.setProperty(
         this.elementRef.nativeElement,
         key,
         this.wrapCallback(key, value),
       );
     }
+    // A bag's key SET is not fixed across pushes — resolveAccessibilityProps folds aria-* aliases
+    // into a different shape once any of them holds a value — and a key that vanishes must clear
+    // the prop rather than leave the last value on the native view. A key still IN the bag was
+    // already handled above, `undefined` included.
+    for (const key of Object.keys(pushed)) {
+      if (key in props) continue;
+      this.renderer.setProperty(this.elementRef.nativeElement, key, undefined);
+    }
+    this.pushed = next;
   }
 
   // A flat-bag `onX` callback (responder negotiation, onLongPress, …) is invoked by the engine's

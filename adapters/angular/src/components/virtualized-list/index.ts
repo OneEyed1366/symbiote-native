@@ -56,6 +56,7 @@ import {
   INVERTED_Y_STYLE,
   buildListPlan,
   buildViewabilityPairs,
+  computeWindow,
   createInitialListState,
   isSeparatorGapInRange,
   listEffectSignature,
@@ -517,6 +518,23 @@ export class VirtualizedList<ItemT = unknown>
     number,
     (event: ISymbioteEvent) => void
   >();
+  // A cell's context object is the ONLY thing its stamped view reads, and VListOutletDirective
+  // refreshes that view whenever the object's IDENTITY changes. recomputeView runs on every frame
+  // the window moves, so minting a fresh context per cell made a four-row slide cost a refresh of
+  // EVERY cell in the window. MEASURED on PATH B geometry (544 entries, 320px viewport, RN
+  // defaults), per fling frame: 233-cell window, 4 cells genuinely entering, 228 outlet updates —
+  // each one a copyContextFields plus a markForCheck that walks to the root. Solid, same geometry,
+  // same shared reducer, same engine output: 4. Handing back the SAME object for a cell whose item
+  // and index did not move keeps `[vListOutletContext]` reference-equal, so ngOnChanges never fires
+  // for it. The fast adapters get this by construction — Solid's <For> is keyed on the cell KEY
+  // strings precisely so "the plan's freshly-built cell objects" cannot rebuild every row
+  // (adapters/solid/src/components/virtualized-list/shared.tsx, the cellKeys memo).
+  private cellContexts = new Map<string, IVListItemContext<ItemT>>();
+  private nextCellContexts = new Map<string, IVListItemContext<ItemT>>();
+  // Everything a cell's CONTENT can depend on that is not its own item identity. RN's contract for
+  // "re-render the cells, the data object itself did not change" is extraData; without it here an
+  // extraData flip would reuse every context and repaint nothing.
+  private cellContextEpoch: unknown[] | undefined = undefined;
   private readonly separatorOverrides = new Map<
     number,
     Partial<ISeparatorProps<unknown>>
@@ -527,9 +545,6 @@ export class VirtualizedList<ItemT = unknown>
   private batchTimer: ReturnType<typeof setTimeout> | null = null;
   // Dedupes the after-commit effects: they run only when the windowing signature changed.
   private lastEffectSignature = '';
-  // Dedupes dispatch's markForCheck against the RENDERED window (see dispatch below). Distinct from
-  // lastEffectSignature, which gates the batch-fill timer and deliberately includes scrollOffset.
-  private lastRenderSignature = '';
   // Dedupes ngDoCheck's own recompute. WITHOUT this, recomputeView() unconditionally rebuilds
   // windowCells (and each cell's `separators` handle — fresh closures every call) on EVERY CD pass,
   // including ones triggered by something else entirely in the app. A fresh context object flows
@@ -732,21 +747,52 @@ export class VirtualizedList<ItemT = unknown>
     this.runEffects(result.effects, inputs);
     if (!result.changed) return;
     this.renderVersion += 1;
-    // The reducer reports `changed` for EVERY scroll offset - it has to, since the offset feeds
-    // end-reached distance, viewability and the batch-fill timer, all handled above in runEffects.
-    // The TEMPLATE reads none of those; it reads the window. Marking on the offset repainted the
-    // whole ancestor chain 60 times a second on a sticky screen for a window that had not moved.
-    const signature = this.renderSignature();
-    if (signature === this.lastRenderSignature) return;
-    this.lastRenderSignature = signature;
+    if (this.isWindowSettled(action)) return;
     countAngular('listMarks');
     this.cdr.markForCheck();
   }
 
-  // The window, not the offset: exactly the metrics recomputeView turns into cells and spacers.
-  private renderSignature(): string {
+  // The reducer reports `changed` for EVERY scroll offset - it has to, since the offset feeds
+  // end-reached distance, viewability and the batch-fill timer, all handled by runEffects. The
+  // TEMPLATE reads none of those; it reads the window. Marking on the offset repainted the whole
+  // ancestor chain 60 times a second on a sticky screen for a window that had not moved.
+  //
+  // So the question here is "would a render leave the window exactly where it is", and it is asked
+  // of the state as it is NOW. It must NOT be answered by comparing the last-rendered window with
+  // the one before it: that window was derived from the PREVIOUS scroll offset, so once two
+  // consecutive derives agree the comparison reads "settled" for every offset that ever follows -
+  // no mark, no CD, no ngDoCheck, no refresh-metrics, so the window can never move again and the
+  // list goes permanently deaf mid-scroll (device: examples/angular Benchmark sticky path B froze
+  // at exactly the window the first viewport asked for, blank below it).
+  //
+  // computeWindow re-run over the CACHED offset table answers it directly. Two scans, no
+  // allocation - buildOffsets, the O(count) allocating half, still runs once per render only. It is
+  // the same function the render will use, so this cannot drift away from the window it predicts.
+  private isWindowSettled(action: IListAction<ItemT>): boolean {
+    // A measurement rewrites the very offset table the prediction reads, so it has no cached
+    // geometry to answer from.
+    if (action.kind === 'measure') return false;
     const m = this.listState.metrics;
-    return `${m.first}|${m.last}|${m.count}|${m.total}`;
+    // Mid-fill: the committed window is still climbing toward target one batch step per render, and
+    // only a render advances it. Skipping the mark here is what stalls the incremental fill.
+    if (m.first !== m.target.first || m.last !== m.target.last) return false;
+    const next = computeWindow(
+      m.count,
+      m.offsets,
+      m.lengths,
+      this.listState.scrollOffset,
+      this.listState.viewportLength,
+      this.windowSizeValue,
+      this.initialNumToRenderValue,
+    );
+    const isSettled =
+      next.first === m.target.first && next.last === m.target.last;
+    if (!isSettled)
+      dlog(
+        `Angular VirtualizedList window moves [${m.first}, ${m.last}] -> ` +
+          `[${next.first}, ${next.last}] at offset ${this.listState.scrollOffset}`,
+      );
+    return isSettled;
   }
 
   private runEffects(
@@ -911,7 +957,27 @@ export class VirtualizedList<ItemT = unknown>
               (hasHeader ? 1 : 0),
           };
 
+    // A change in anything a cell's content reads other than its own item invalidates every cached
+    // context: identity reuse is only sound while the reused object still describes the cell.
+    const epoch: unknown[] = [
+      this.data,
+      this.extraData,
+      this.getItem,
+      this.keyExtractor,
+    ];
+    const previousEpoch = this.cellContextEpoch;
+    this.cellContextEpoch = epoch;
+    if (
+      previousEpoch === undefined ||
+      previousEpoch.length !== epoch.length ||
+      !previousEpoch.every((value, index) => value === epoch[index])
+    ) {
+      this.cellContexts.clear();
+    }
+
     if (m.count === FIRST_INDEX) {
+      this.cellContexts.clear();
+      this.nextCellContexts.clear();
       this.windowCells = [];
       this.forcedStickyCell = null;
       this.leadingSpacerStyle = null;
@@ -978,6 +1044,10 @@ export class VirtualizedList<ItemT = unknown>
       );
     }
     this.windowCells = cells;
+    // Swap, don't prune: a cell that left the window is simply absent from the pass that just ran,
+    // so the old map is the garbage and the new one is exactly the live set.
+    this.cellContexts = this.nextCellContexts;
+    this.nextCellContexts = new Map<string, IVListItemContext<ItemT>>();
 
     dlog(
       `Angular VirtualizedList window [${m.first}, ${m.last}] of ${m.count} ` +
@@ -993,20 +1063,39 @@ export class VirtualizedList<ItemT = unknown>
     includeSeparator: boolean,
   ): IWindowCell<ItemT> {
     const item = this.getItem(this.data, index);
-    const context: IVListItemContext<ItemT> = {
-      $implicit: item,
-      index,
-      separators: this.makeSeparators(index),
-    };
     return {
       key,
       index,
-      context,
+      context: this.contextFor(key, index, item),
       measure: this.cellMeasure(index),
       separatorContext: includeSeparator
         ? this.buildSeparatorContext(index, item)
         : undefined,
     };
+  }
+
+  // The context for one cell, reused by identity when the cell did not move. See cellContexts.
+  private contextFor(
+    key: string,
+    index: number,
+    item: ItemT,
+  ): IVListItemContext<ItemT> {
+    const cached = this.cellContexts.get(key);
+    if (
+      cached !== undefined &&
+      cached.$implicit === item &&
+      cached.index === index
+    ) {
+      this.nextCellContexts.set(key, cached);
+      return cached;
+    }
+    const context: IVListItemContext<ItemT> = {
+      $implicit: item,
+      index,
+      separators: this.makeSeparators(index),
+    };
+    this.nextCellContexts.set(key, context);
+    return context;
   }
 
   private buildSeparatorContext(

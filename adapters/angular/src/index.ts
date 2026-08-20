@@ -61,6 +61,16 @@ export {
   AnimatedText,
   AnimatedView,
 } from './modules/animated';
+// Exported even though Angular's version maps only the four primitives (View/Text/Image/
+// ScrollView) onto the pre-authored wrappers above and THROWS on anything else — there is no JIT
+// under AOT/Metro, so it cannot synthesize a wrapper at runtime the way the other four adapters
+// do. It ships anyway because portable code (`createAnimatedComponent(View)`) then compiles and
+// runs identically on all five adapters, and the one case Angular cannot serve fails with a
+// message naming the fix (author a standalone @Component over AnimatedComponentBase) instead of
+// failing as a missing export, which names nothing. Found by the barrel audit in
+// `.claude/rules/adapter-parity-audit.md`: it was implemented and tested here all along and simply
+// never reached this file, so `@symbiote-native/angular` consumers could not reach it at all.
+export { createAnimatedComponent } from './modules/animated';
 export type {
   IActivityIndicatorProps,
   IAngularImageBackgroundProps,

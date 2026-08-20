@@ -167,5 +167,17 @@ describe('Angular source imports under Vitest', () => {
         /Author an explicit standalone @Component extending AnimatedComponentBase instead/,
       );
     });
+
+    // why: the function above lived in ./modules/animated with these tests for its whole life and
+    // was simply never re-exported from the PACKAGE barrel, so `@symbiote-native/angular`
+    // consumers could not reach what the adapter demonstrably had — implemented, tested, and
+    // unreachable. tests/adapter-barrel-parity.test.ts cannot see it: that guards names passed
+    // through from the SHARED barrels, and this one is adapter-owned. So the barrel reachability
+    // needs its own assertion, importing the way an app does.
+    it('reaches the package barrel, the way an app imports it', async () => {
+      const barrel: Record<string, unknown> = await import('./index');
+      expect(typeof barrel.createAnimatedComponent).toBe('function');
+      expect(barrel.createAnimatedComponent).toBe(createAnimatedComponent);
+    });
   });
 });

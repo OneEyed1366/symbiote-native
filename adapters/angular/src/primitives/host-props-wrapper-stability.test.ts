@@ -138,10 +138,14 @@ describe('SymbioteHostPropsDirective callback wrapper identity', () => {
       'the events must actually have reached the component',
     ).toBe(PUSHES);
     const pushed = probe.values();
+    // Was `toBeGreaterThan(1)` while the directive wrote every key of every bag. The bag getter
+    // still rebuilds on each of those passes, but `onLongPress` holds the SAME handler across all
+    // of them, and the directive now diffs per key — so the stronger statement is that a stable
+    // handler reaches the renderer exactly once, no matter how often the bag is rebuilt.
     expect(
       pushed.length,
-      'the bag must have been re-pushed on those passes',
-    ).toBeGreaterThan(1);
+      'an unchanged handler must reach the renderer once and never again',
+    ).toBe(1);
     expect(
       new Set(pushed).size,
       'every push of the same handler must reuse one wrapper',
