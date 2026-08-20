@@ -10,7 +10,7 @@
 // mounted Stack.
 
 import { defineComponent, h, ref } from '@vue/runtime-core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   mount,
   unmount,
@@ -101,6 +101,21 @@ function HomeScreen() {
 
 function DetailsScreen() {
   return h('symbiote-text', {}, 'details');
+}
+
+// `mount()` no longer lets a render error escape: adapters/vue/src/render.ts installs a default
+// `app.config.errorHandler` that routes it to the engine's shared reporter, so on a device the
+// error reaches the redbox instead of aborting the AppRegistry runnable mid-bring-up. The
+// contract these tests guard is unchanged — a mismatched navigator still fails loudly and names
+// the mismatch — only the channel moved, so the assertion follows it.
+function expectReportedError(mountApp: () => void, pattern: RegExp): void {
+  const reportError = vi.fn();
+  Object.assign(globalThis, { ErrorUtils: { reportError } });
+
+  mountApp();
+
+  expect(reportError).toHaveBeenCalled();
+  expect(String(reportError.mock.calls[0]?.[0])).toMatch(pattern);
 }
 
 describe('navigation composables', () => {
@@ -279,7 +294,18 @@ describe('navigation composables', () => {
         return () => h('symbiote-text', {}, 'orphan');
       });
 
-      expect(() => mount(ROOT_TAG, OrphanScreen)).toThrow(
+      // `mount()` no longer lets a render error escape: adapters/vue/src/render.ts installs a
+      // default `app.config.errorHandler` routing it to the engine's shared reporter, so on a
+      // device this reaches the redbox instead of aborting the AppRegistry runnable mid-bring-up.
+      // The contract is unchanged — an orphaned useRoute() still fails loudly and says so — only
+      // the channel moved, so the assertion follows it.
+      const reportError = vi.fn();
+      Object.assign(globalThis, { ErrorUtils: { reportError } });
+
+      mount(ROOT_TAG, OrphanScreen);
+
+      expect(reportError).toHaveBeenCalled();
+      expect(String(reportError.mock.calls[0]?.[0])).toMatch(
         /useRoute must be used within a screen rendered by <Stack>, <Tab>, or <Drawer>/,
       );
     });
