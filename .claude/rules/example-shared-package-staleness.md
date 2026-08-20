@@ -3,6 +3,8 @@ paths:
   - 'examples/**'
   - 'core/components/**'
   - 'core/engine/**'
+  - 'scripts/overlay-local-packages.mjs'
+  - 'scripts/check-bundle-framework-isolation.mjs'
 ---
 
 # A `core/*` change is invisible to `examples/*` — and the failure is a blank white screen
@@ -63,3 +65,36 @@ the INSTALLED copies actually export — run from the example directory:
 
 A miss names the exact symbol and package. Run it after every re-pack; it costs nothing and it is
 the only signal that appears before the simulator.
+
+## The same gap, in CI: `overlay-local-packages.mjs` was `packages/*`-only
+
+`scripts/overlay-local-packages.mjs` exists to give `check-bundle-framework-isolation.mjs`
+this-commit's build instead of the registry version (same problem, CI-side). It only overlaid
+`packages/*` (slider, navigation, …) — `core/engine`, `core/components`, and every
+`adapters/*` stayed on whatever's published, so example source that outruns the last publish of
+those packages fails CI with an error that looks unrelated to staleness.
+
+Measured 2026-08-21: `examples/angular`'s `BenchmarkScreen`/`JsFrameRateMeter` called
+`readCommitProfile`/`registerPostCommit` — real exports of `core/engine`, absent from the
+published `0.2.0` — and got `TS2305: has no exported member`. Its `SectionList` binding to
+`getItemLayout` failed `NG8002` the same way, because `@symbiote-native/angular@0.7.0` (published)
+predates that Input. Both read as ordinary source bugs, not a stale-package symptom.
+
+Fix: `overlay-local-packages.mjs` now also overlays `core/engine`, `core/components`, and
+`adapters/angular` (an `OVERLAY_ONLY` allowlist alongside the `packages/*` prefix match) — picked
+narrowly, not blanket-widened to every `core/`+`adapters/`. Also overlaying `core/css-parser` and
+`adapters/{react,vue,svelte}` was tried and reverted: `core/css-parser` gained a real new
+dependency (`lightningcss`) that the overlay's swap-the-folder-contents trick can't install (it
+never touches `package-lock.json`, only `pnpm pack` + extract over an already-`npm install`ed
+folder — new transitive deps need the full `file:` + reinstall dance from the section above,
+not this overlay), and the Vue/Svelte adapters called a `compileScopedCss` export the registry
+`css-parser` doesn't have either. Widen this allowlist only when a specific example genuinely
+needs it, and check whether the overlaid package pulled in a NEW dependency first.
+
+## `check-bundle-framework-isolation.mjs` also needs Angular's `build/` before bundling
+
+Every other example bundles straight from source; Angular's `index.js` imports
+`./build/angular/src/App` — gitignored `ngc` AOT output, produced only by `npm run ng:build`.
+Bundling before that step fails on the FIRST import with a plain "module not found", which reads
+like a broken example, not a missing build step. Fixed by running `npm run ng:build` in
+`buildBundleSources()` before the `react-native bundle` call, framework-gated on `angular`.
