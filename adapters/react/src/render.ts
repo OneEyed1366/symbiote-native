@@ -36,10 +36,25 @@ function errorReporter(
 }
 
 const onUncaughtError = errorReporter('react render (no error boundary)');
-// A boundary handled it, and it is still reported - the boundary decides what the USER sees, not
-// whether the developer hears about it. Upstream's nativeOnCaughtError calls the same
-// showErrorDialog as the uncaught path.
-const onCaughtError = errorReporter('react render (caught by error boundary)');
+// A boundary handled it, so it does NOT reach the native redbox — it goes to , off unless
+// DEBUG is set.
+//
+// This deliberately DIVERGES from upstream, whose nativeOnCaughtError calls the same
+// showErrorDialog as the uncaught path. The argument for upstream's choice is that the boundary
+// decides what the USER sees, not whether the developer hears. The argument against, and the one
+// this project takes: writing an ErrorBoundary IS the developer saying "I know this can throw and
+// I am handling it here". Answering that with a full-screen redbox over the fallback the app just
+// rendered contradicts the thing the app asked for, and it is the only adapter here that did it —
+// Solid's ErrorBoundary is silent, and its canary reads as correct next to React's alarming one.
+// An UNCAUGHT error still hits the redbox; the difference is exactly whether someone claimed it.
+const onCaughtError = (error: unknown, info: IReactErrorInfo): void => {
+  dlog(
+    () =>
+      `react render (caught by error boundary): ${String(error)}${
+        info.componentStack ?? ''
+      }`,
+  );
+};
 // React recovered on its own (a concurrent render retried and succeeded), so this is not fatal -
 // but it is still a real error the app swallowed a first render over. RN keeps React's
 // defaultOnRecoverableError here, which reports it globally.

@@ -12,6 +12,7 @@ import {
   insertBefore,
   removeChild,
   routeProp,
+  setNodeHidden,
   setText,
   SymbioteSurface,
   type ISymbioteNode,
@@ -183,8 +184,12 @@ const reconciler = createReconciler<
   resetTextContent: () => {},
   hideTextInstance: node => setText(node, ''),
   unhideTextInstance: (node, text) => setText(node, text),
-  hideInstance: () => {},
-  unhideInstance: () => {},
+  // `Activity mode="hidden"` and a re-suspending `Suspense` both reach the tree through these.
+  // They were no-ops, so hidden content went on painting — stacked on top of whatever replaced
+  // it — and only the mount/unmount half of Activity appeared to work. The engine owns the
+  // reversible half (see setNodeHidden): the author's own style stays untouched underneath.
+  hideInstance: node => setNodeHidden(node, true),
+  unhideInstance: node => setNodeHidden(node, false),
 
   beforeActiveInstanceBlur: () => {},
   afterActiveInstanceBlur: () => {},
