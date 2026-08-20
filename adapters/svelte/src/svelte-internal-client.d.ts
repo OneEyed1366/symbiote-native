@@ -33,6 +33,15 @@ declare module 'svelte/internal/client' {
   export function push(props: object, runes: boolean): void;
   export function pop<T>(component: T): T;
 
+  // internal/client/dom/blocks/snippet.js. `{@render children()}` compiles to EXACTLY this call —
+  // probed against 5.56.8: `$.snippet(node, () => $$props.children)`. create-portal/index.ts makes
+  // the same call and substitutes one argument, the anchor, which is the whole portal mechanism.
+  // Args are omitted from the declaration because a portal never passes snippet parameters.
+  export function snippet(
+    node: unknown,
+    getSnippet: () => import('svelte').Snippet | undefined,
+  ): void;
+
   // internal/client/reactivity/props.js. The `{...spread}` target: a Proxy merging its sources,
   // each function source re-read per property access so the child stays reactive. The generic
   // return type is what lets a caller hand it to a base whose prop type is only known there,

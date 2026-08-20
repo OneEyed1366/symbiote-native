@@ -282,16 +282,23 @@ export type { ShimElement } from './dom-shim';
 
 // createTunnel: the Svelte twin of adapters/vue/src/create-tunnel (see create-tunnel/tunnel.ts's
 // header for why the API shape — an explicit `tunnel` prop on TunnelIn/TunnelOut, rather than
-// `tunnel.In`/`tunnel.Out` — deliberately differs from React/Vue). NOTE: React's createPortal has
-// no Svelte (or even Vue) twin — it is react-reconciler's own Fiber-level HostPortal primitive,
-// with no equivalent in a framework with no reconciler; createTunnel is the achievable analog,
-// same scope Vue itself settled on.
+// `tunnel.In`/`tunnel.Out` — deliberately differs from React/Vue).
 export {
   createTunnel,
   TunnelIn,
   TunnelOut,
   type ITunnel,
 } from './create-tunnel';
+
+// Portal: the Svelte twin of React's createPortal / Solid's <Portal mount={…}> / Angular's
+// PortalDirective. It is NOT interchangeable with createTunnel above — the two capabilities do
+// not overlap (create-portal/index.ts's header carries the row-by-row table, each row pinned by a
+// test). Portal uniquely buys a target that renders no outlet — the only route to a container you
+// merely hold a ref to — and call-site `getContext`; the tunnel uniquely buys cross-surface reach.
+// (This barrel used to state that createPortal "has no Svelte twin ... with no equivalent in a
+// framework with no reconciler". That was wrong: a portal needs a retained tree you can move a
+// subtree within, not a reconciler, and this adapter has one.)
+export { Portal, type IPortalProps, type IPortalTarget } from './create-portal';
 
 // useWindowDimensions / useColorScheme: the Svelte twins of React's hooks / Vue's composables —
 // see runes/use-window-dimensions.svelte.ts's header for why this adapter's lifecycle-helper
