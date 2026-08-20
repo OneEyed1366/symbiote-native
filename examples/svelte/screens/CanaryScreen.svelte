@@ -3,7 +3,7 @@
   // Svelte's own brand colors. Every section, every PASS/FAIL device check and every prop of the
   // Vue screen is here; the palette is this example's own (App.css: --flame #ff3e00 from
   // github.com/sveltejs/branding, over the neutral dark --ink/--paper/--mist) instead of Vue's
-  // green-on-navy, and the ONE external link points at svelte.com.
+  // green-on-navy, and the ONE external link points at svelte.dev.
   //
   // The accent is read from navigation-lines.ts's LINE_COLOR — the same single source of truth the
   // Vue canary reads — never re-typed as a local hex, so the line tag, the buttons and the CSS
@@ -256,7 +256,7 @@
   function onShare(): void {
     void Share.share({
       message: 'Sent from symbiote',
-      url: 'https://svelte.com',
+      url: 'https://svelte.dev',
     }).catch(() => {});
   }
   function onAlert(): void {
@@ -275,7 +275,7 @@
     );
   }
   function onOpenUrl(): void {
-    void Linking.openURL('https://svelte.com').catch(() => {});
+    void Linking.openURL('https://svelte.dev').catch(() => {});
   }
 
   function onRetentionMove(event: ISymbioteEvent): void {
@@ -436,7 +436,7 @@
         />
       </View>
     </View>
-    <ActionButton title="Open svelte.com" onPress={onOpenUrl} color={accent} />
+    <ActionButton title="Open svelte.dev" onPress={onOpenUrl} color={accent} />
     <!--
       The native UIRefreshControl spinner only shows while iOS holds the pull-down; our full
       re-commit snaps the offset back, so we drive our OWN indicator from `refreshing`.

@@ -60,10 +60,15 @@
     background-color: #262626;
   }
 
-  /* Restates ONLY the two colours: the padding and radius above must survive on `badge loud`. */
+  /* Restates ONLY the two colours: the padding and radius above must survive on `badge loud`.
+     The lit fill was #3a1400 — a brown so dark it read as the same near-black as `.badge`'s own
+     #262626, so the toggle below looked dead and the 1px ring was the only thing carrying the
+     state. This badge's LABEL never changes, so its pixels are the whole signal. Still exactly
+     two colour declarations, so the rule proves what it always did. Same fix react/App.css
+     already carries for its own `.badge.loud`. */
   .badge.loud {
     border-color: #ff3e00;
-    background-color: #3a1400;
+    background-color: #a32d00;
   }
 
   .badge-text {

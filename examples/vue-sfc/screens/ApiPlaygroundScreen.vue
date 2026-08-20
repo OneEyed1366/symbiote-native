@@ -62,6 +62,11 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.ApiPlayground];
 const ACCENT = LINE_COLOR.composition;
+// .pressable-card carries border-width but no border-color, and RN defaults border-color to BLACK
+// — invisible on this near-black screen. The OUTER cards of the .self/.stop demos already tint
+// their ring with ACCENT; the nested inner targets were left on the default and drew a 1px ring of
+// nothing, so "tap this border vs the button below" pointed at an edge nobody could see.
+const NESTED_TARGET_BORDER = '#41506a';
 
 // ── Template Directives ──────────────────────────────────────────────────────────────
 const MODES: readonly ('a' | 'b' | 'c')[] = ['a', 'b', 'c'];
@@ -324,6 +329,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           <Pressable
             testID="press-inner-plain"
             class="pressable-card"
+            :style="{ borderColor: NESTED_TARGET_BORDER }"
             @press="
               () =>
                 logSelfPress('inner fired (its own listener — always fires)')
@@ -347,6 +353,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           <Pressable
             testID="press-inner-stop"
             class="pressable-card"
+            :style="{ borderColor: NESTED_TARGET_BORDER }"
             @press.stop="
               () => logStopPress('inner-stop fired (.stop — never bubbles)')
             "
@@ -356,6 +363,7 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           <Pressable
             testID="press-inner-plain2"
             class="pressable-card"
+            :style="{ borderColor: NESTED_TARGET_BORDER }"
             @press="() => logStopPress('inner-plain2 fired')"
           >
             <Text class="pressable-label">inner (@press, no modifier)</Text>

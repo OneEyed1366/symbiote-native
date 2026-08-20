@@ -759,8 +759,13 @@ const ResponderDemo = defineComponent({
                 }}
                 class="chip"
                 style={{
+                  // White, not #42b883: `.chip`'s own fill IS #42b883, so the grabbed ring used
+                  // to be painted in the chip's background colour and the active state was
+                  // literally invisible. The sibling canaries all ring the chip in a colour that
+                  // reads against their fill (React #7fb5ff on #2b6cb0) — do not "restore" the
+                  // accent here.
                   borderColor:
-                    activeChip.value === index ? '#42b883' : 'transparent',
+                    activeChip.value === index ? '#ffffff' : 'transparent',
                   transform: [
                     {
                       translateX: activeChip.value === index ? chipDx.value : 0,

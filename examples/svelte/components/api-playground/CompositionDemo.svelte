@@ -45,12 +45,19 @@
   // it re-spreads `...rest` onto Pressable, and a symbol-keyed attachment prop survives that
   // spread with zero forwarding code in TouchableOpacity itself (svelte-adapter-dom-shim skill
   // §22c, category 2).
+  // The run counter is a plain closure variable, exactly as in RunesDemo's $effect: an
+  // attachment body runs inside an effect, so `touchableAttachCount += 1` would READ the $state
+  // it writes, and Svelte re-runs the effect on its own write forever
+  // (`effect_update_depth_exceeded`). Write-only into the $state keeps the readout reactive with
+  // no self-dependency.
+  let attachRunsRaw = 0;
   let touchableAttachCount = $state(0);
   function onTouchableAttach(): void {
     dlog(
       'api-playground: {@attach} forwarded through TouchableOpacity -> Pressable',
     );
-    touchableAttachCount += 1;
+    attachRunsRaw += 1;
+    touchableAttachCount = attachRunsRaw;
   }
 
   // setContext — registered once here; ContextConsumer.svelte reads it via getContext regardless

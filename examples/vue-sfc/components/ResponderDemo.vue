@@ -18,6 +18,10 @@ const RESPONDER_CHIPS = [0, 1, 2, 3, 4];
 // Horizontal travel (in the touch's page units: px on Android, pt on iOS, so the feel
 // differs a little per platform) after which the strip steals the gesture from the chip.
 const RESPONDER_STEAL_DX = 64;
+// A pale mint, NOT the brand green: .chip's own background IS #42b883, so the grabbed chip used to
+// draw a green ring on a green fill and the grant state read on device as "nothing happened". The
+// React and Svelte twins do the same thing — a light tint of the chip's own hue over its fill.
+const CHIP_ACTIVE_BORDER = '#c6f6d5';
 
 const activeChip = ref<number | null>(null);
 const chipDx = ref(0);
@@ -112,7 +116,8 @@ const onChipRelease = (index: number): void => {
           @responder-release="() => onChipRelease(index)"
           class="chip"
           :style="{
-            borderColor: activeChip === index ? '#42b883' : 'transparent',
+            borderColor:
+              activeChip === index ? CHIP_ACTIVE_BORDER : 'transparent',
             transform: [{ translateX: activeChip === index ? chipDx : 0 }],
           }"
         >

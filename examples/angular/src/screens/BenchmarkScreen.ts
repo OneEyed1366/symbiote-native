@@ -119,6 +119,55 @@ const MOUNT_MODE = {
   Virtualized: 'virtualized',
 } as const;
 type IMountMode = (typeof MOUNT_MODE)[keyof typeof MOUNT_MODE];
+
+// DIAGNOSTIC PROBE — delete once the question below is answered either way.
+//
+// THE OPEN QUESTION. Angular builds a 1,000-row list ~3x slower than every other adapter, while
+// its point operations are ordinary. Measured on device, all-mounted Create 1,000 rows:
+//
+//   Angular 2383 ms · Solid 765 · React 814 · Svelte 937 · Vue 1132
+//   Angular's own select 77 ms · swap 81 · remove 84 — in line with everyone else.
+//
+// Two explanations were tested and DIED. ChangeDetectionStrategy.OnPush: every counter
+// byte-identical with and without it. Wasted engine prop writes (Angular pushed 104,000 setProp
+// calls where Solid needed 12,000): real, fixed, and worth exactly nothing — every row within
+// ±10% of baseline afterwards.
+//
+// The remaining structural suspect is the one this toggle exists to test: Angular binds a
+// component to a host ELEMENT, so every composed component instance costs an engine node
+// (anchor-host-registry.ts keeps it from painting), while a Vue/React/Solid/Svelte component is a
+// function that allocates nothing. The row below is 12 engine nodes under Angular against 9 under
+// the others — the row component itself plus its two <Pressable>s. Note the arithmetic that makes
+// this doubtful rather than obvious, and treat it as the thing under test: +33% nodes would have
+// to produce 3x time, which needs a sharply superlinear cost nobody has located. A REFUTATION is
+// a good result here; two convincing hypotheses have already died.
+//
+// So the same row exists in two shapes, switchable at runtime so both numbers come out of ONE
+// build in ONE session with nothing rebuilt in between:
+const ROW_SHAPE = {
+  // The row as every other adapter's canary has it, and what produced the 2383 ms above. The
+  // DEFAULT, and byte-identical to what it was before this toggle existed — the screen stays a
+  // valid cross-adapter instrument for anyone who never touches the toggle.
+  Composed: 'composed',
+  // The same row with ZERO composed components: the two <Pressable>s become plain host elements
+  // carrying a (press) listener, and the row component is inlined into the list template. Same 9
+  // native views, same props, 9 engine nodes instead of 12.
+  //
+  // What it gives up, which is why this measures "composed components as a whole" rather than
+  // anchors alone: Pressable's press machine (hitSlop, pressRetentionOffset, delayLongPress,
+  // unstable_pressDelay, disabled, android_ripple), its responder claim and termination
+  // negotiation, its accessibility fold, and the markForCheck wiring that comes with a component
+  // boundary. A plain (press) on a View still fires — press is a base ViewConfig event the engine
+  // synthesizes from the touch stream — so tapping a row still selects, and the × still removes.
+  Flat: 'flat',
+} as const;
+type IRowShape = (typeof ROW_SHAPE)[keyof typeof ROW_SHAPE];
+
+// The row's class in each state, as literals rather than a template concatenation so a
+// change-detection pass hands `[class]` the same string it saw last time. BenchmarkRow's own
+// getter spells the identical two values; the flat row must not differ from it here either.
+const ROW_CLASS = 'bench-row';
+const ROW_CLASS_SELECTED = 'bench-row bench-row-selected';
 // krausest's "partial update" touches every 10th row of 10,000 and appends " !!!" to its label.
 const UPDATE_STRIDE = 10;
 const UPDATE_SUFFIX = ' !!!';
@@ -335,6 +384,13 @@ const SUITE_ROW_HOST_PROPS: Record<string, IHostProps> = Object.fromEntries(
   Object.values(BENCH_OP).map(op => [op, { testID: `bench-suite-${op}` }]),
 );
 
+// Same arrangement for the composed-vs-flat probe table. Its own testIDs, never the suite's -
+// the two tables show different quantities and a shared testID would let a check read one for
+// the other.
+const PROBE_ROW_HOST_PROPS: Record<string, IHostProps> = Object.fromEntries(
+  Object.values(BENCH_OP).map(op => [op, { testID: `bench-probe-${op}` }]),
+);
+
 // The suite's fixed order, shared by the runner and the comparison table below, so a step can
 // never run without a row to land in (or a row exist for a step that never runs).
 const SUITE_STEPS: readonly { op: IBenchOpId; label: string }[] = [
@@ -366,9 +422,18 @@ type ISuiteProgress = {
 // other is how "the engine is slow" gets claimed off a number that measured 9,000 native views.
 type ISuiteResults = Record<IMountMode, readonly ISuiteEntry[]>;
 
+// Kept per row shape as well, so the probe's two runs sit side by side instead of the second
+// overwriting the first - the whole point is reading them back to back without a rebuild.
+type IShapedSuiteResults = Record<IRowShape, ISuiteResults>;
+
 const EMPTY_SUITE_RESULTS: ISuiteResults = {
   [MOUNT_MODE.All]: [],
   [MOUNT_MODE.Virtualized]: [],
+};
+
+const EMPTY_SHAPED_RESULTS: IShapedSuiteResults = {
+  [ROW_SHAPE.Composed]: EMPTY_SUITE_RESULTS,
+  [ROW_SHAPE.Flat]: EMPTY_SUITE_RESULTS,
 };
 
 // A step's stopwatch: started by runStep, stopped by the engine's post-commit hook.
@@ -629,6 +694,30 @@ export class StickySectionListBlock {
           </View>
         </View>
 
+        <!-- The row-shape probe's switch. Sits with the run buttons, not down beside the rows,
+             because it decides what a run MEASURES - press a shape, then press a mode. -->
+        <View class="bench-run-row">
+          <View class="flex1">
+            <ActionButton
+              testID="bench-row-shape-composed"
+              [title]="composedShapeTitle()"
+              [color]="accent"
+              (press)="onPickRowShape(rowShapeComposed)"
+            ></ActionButton>
+          </View>
+          <View class="flex1">
+            <ActionButton
+              testID="bench-row-shape-flat"
+              [title]="flatShapeTitle()"
+              [color]="accent"
+              (press)="onPickRowShape(rowShapeFlat)"
+            ></ActionButton>
+          </View>
+        </View>
+        <Text testID="bench-row-shape-note" class="note-text">{{
+          rowShapeNote()
+        }}</Text>
+
         @if (progress() !== undefined) {
           <View testID="bench-suite-progress" class="bench-progress">
             <ActivityIndicator [color]="accent" />
@@ -657,6 +746,28 @@ export class StickySectionListBlock {
               }}</Text>
             </View>
           }
+
+          <Text class="section-label">PROBE · ROW SHAPE · ALL MOUNTED</Text>
+          <View class="bench-compare-row">
+            <Text class="bench-compare-label"></Text>
+            <Text class="bench-compare-head-cell">COMPOSED</Text>
+            <Text class="bench-compare-head-cell">FLAT</Text>
+          </View>
+          @for (step of suiteSteps; track step.op) {
+            <View
+              [symbioteHostProps]="probeHostProps(step.op)"
+              class="bench-compare-row"
+            >
+              <Text class="bench-compare-label">{{ step.label }}</Text>
+              <Text class="bench-compare-cell">{{
+                composedShapeResult(step.op)
+              }}</Text>
+              <Text class="bench-compare-cell">{{
+                flatShapeResult(step.op)
+              }}</Text>
+            </View>
+          }
+          <Text class="note-text">{{ probeNote }}</Text>
         } @else {
           <Text testID="bench-suite-empty" class="note-text"
             >No suite run yet.</Text
@@ -676,14 +787,57 @@ export class StickySectionListBlock {
         </Text>
 
         <Text class="section-label">{{ rowsSectionLabel() }}</Text>
-        @if (isAllMounted()) {
+        <!-- The shape branch is OUTSIDE the mount-mode branch on purpose. Nested the other way,
+             every row would carry an extra @if container - one more engine node per row, in BOTH
+             shapes - and the composed column would stop being the thing the 2383 ms was measured
+             on. This way the composed branch below is byte-identical to what it was before the
+             probe, and the whole toggle costs one anchor for the list. -->
+        @if (isComposedRow()) {
+          @if (isAllMounted()) {
+            @for (row of rows(); track row.id) {
+              <BenchmarkRow
+                [row]="row"
+                [isSelected]="row.id === selectedId()"
+                (select)="onSelect($event)"
+                (remove)="onRemove($event)"
+              />
+            }
+          } @else {
+            <FlatList
+              testID="bench-rows-virtualized"
+              class="bench-rows-viewport"
+              [data]="rows()"
+              [keyExtractor]="rowKeyExtractor"
+              [getItemLayout]="rowItemLayout"
+            >
+              <ng-template vListItem let-item>
+                <BenchmarkRow
+                  [row]="rowOf(item)"
+                  [isSelected]="rowOf(item).id === selectedId()"
+                  (select)="onSelect($event)"
+                  (remove)="onRemove($event)"
+                />
+              </ng-template>
+            </FlatList>
+          }
+        } @else if (isAllMounted()) {
+          <!-- The same nine native views, no component boundary anywhere: the row markup is
+               inlined here rather than living in a @Component, and each <Pressable> is a plain
+               View with a (press) listener. A literal copy of BenchmarkRow's template rather than
+               something shared with it - sharing would need a component, which is the thing being
+               removed. adapters/angular/src/__tests__/benchmark-row-shape.test.ts pins the two
+               against each other so a drifting copy fails there instead of silently voiding a
+               measurement. -->
           @for (row of rows(); track row.id) {
-            <BenchmarkRow
-              [row]="row"
-              [isSelected]="row.id === selectedId()"
-              (select)="onSelect($event)"
-              (remove)="onRemove($event)"
-            />
+            <View [class]="rowClassFor(row)">
+              <Text class="bench-row-id">{{ row.id }}</Text>
+              <View class="flex1" (press)="onSelect(row.id)">
+                <Text class="bench-row-label">{{ row.label }}</Text>
+              </View>
+              <View class="bench-row-remove" (press)="onRemove(row.id)">
+                <Text class="bench-row-remove-text">×</Text>
+              </View>
+            </View>
           }
         } @else {
           <FlatList
@@ -694,12 +848,18 @@ export class StickySectionListBlock {
             [getItemLayout]="rowItemLayout"
           >
             <ng-template vListItem let-item>
-              <BenchmarkRow
-                [row]="rowOf(item)"
-                [isSelected]="rowOf(item).id === selectedId()"
-                (select)="onSelect($event)"
-                (remove)="onRemove($event)"
-              />
+              <View [class]="rowClassFor(rowOf(item))">
+                <Text class="bench-row-id">{{ rowOf(item).id }}</Text>
+                <View class="flex1" (press)="onSelect(rowOf(item).id)">
+                  <Text class="bench-row-label">{{ rowOf(item).label }}</Text>
+                </View>
+                <View
+                  class="bench-row-remove"
+                  (press)="onRemove(rowOf(item).id)"
+                >
+                  <Text class="bench-row-remove-text">×</Text>
+                </View>
+              </View>
             </ng-template>
           </FlatList>
         }
@@ -757,17 +917,25 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     selectedId: undefined,
   });
   private readonly mountMode = signal<IMountMode>(MOUNT_MODE.All);
+  // Composed by default, so a screen nobody touches reports the same numbers it always did.
+  private readonly rowShape = signal<IRowShape>(ROW_SHAPE.Composed);
   readonly history = signal<readonly IBenchResult[]>([]);
-  readonly suiteResults = signal<ISuiteResults>(EMPTY_SUITE_RESULTS);
+  readonly suiteResults = signal<IShapedSuiteResults>(EMPTY_SHAPED_RESULTS);
   readonly progress = signal<ISuiteProgress | undefined>(undefined);
   readonly suiteSteps = SUITE_STEPS;
   readonly suiteStepCount = SUITE_STEPS.length;
   readonly mountModeAll = MOUNT_MODE.All;
   readonly mountModeVirtualized = MOUNT_MODE.Virtualized;
+  readonly rowShapeComposed = ROW_SHAPE.Composed;
+  readonly rowShapeFlat = ROW_SHAPE.Flat;
+  readonly probeNote = `Composed is ${NATIVE_VIEWS_PER_ROW + 3} engine nodes per row (the row component and its two Pressables each own a non-painting host element); flat is ${NATIVE_VIEWS_PER_ROW}. Both commit the same ${NATIVE_VIEWS_PER_ROW} native views with the same props, so a difference here is the cost of the component boundaries themselves — press one shape, run a mode, press the other, run the same mode.`;
 
   readonly rows = computed(() => this.list().rows);
   readonly selectedId = computed(() => this.list().selectedId);
   readonly isAllMounted = computed(() => this.mountMode() === MOUNT_MODE.All);
+  readonly isComposedRow = computed(
+    () => this.rowShape() === ROW_SHAPE.Composed,
+  );
 
   // History is newest-first, so the first entry found for an operation is its latest run.
   private readonly lastDurations = computed(() => {
@@ -802,6 +970,20 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
       : 'Run · virtualized',
   );
 
+  readonly composedShapeTitle = computed(() =>
+    this.isComposedRow() ? 'Rows · composed ✓' : 'Rows · composed',
+  );
+
+  readonly flatShapeTitle = computed(() =>
+    this.isComposedRow() ? 'Rows · flat' : 'Rows · flat ✓',
+  );
+
+  readonly rowShapeNote = computed(() =>
+    this.isComposedRow()
+      ? `Composed row · BenchmarkRow + 2 Pressables · ${NATIVE_VIEWS_PER_ROW + 3} engine nodes per row. The default, and the shape every other adapter's canary runs.`
+      : `Flat row · no composed components · ${NATIVE_VIEWS_PER_ROW} engine nodes per row. Diagnostic only — the row loses Pressable's press machine, responder negotiation and accessibility fold.`,
+  );
+
   readonly progressLine = computed(() => {
     const progress = this.progress();
     if (progress === undefined) return '';
@@ -817,29 +999,22 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
       : `${progress.done}/${this.suiteStepCount}`;
   });
 
-  private readonly allDurations = computed(
-    () =>
-      new Map(
-        this.suiteResults()[MOUNT_MODE.All].map(entry => [
-          entry.op,
-          entry.durationMs,
-        ]),
-      ),
-  );
+  // Every recorded duration in one map, keyed shape:mode:operation. One computed rather than four
+  // because the probe added a second axis and a computed per cell would be four more to keep in
+  // step with each other.
+  private readonly durations = computed(() => {
+    const durations = new Map<string, number>();
+    for (const [shape, byMode] of Object.entries(this.suiteResults())) {
+      for (const [mode, entries] of Object.entries(byMode)) {
+        for (const entry of entries) {
+          durations.set(`${shape}:${mode}:${entry.op}`, entry.durationMs);
+        }
+      }
+    }
+    return durations;
+  });
 
-  private readonly virtualizedDurations = computed(
-    () =>
-      new Map(
-        this.suiteResults()[MOUNT_MODE.Virtualized].map(entry => [
-          entry.op,
-          entry.durationMs,
-        ]),
-      ),
-  );
-
-  readonly hasSuiteResults = computed(
-    () => this.allDurations().size > 0 || this.virtualizedDurations().size > 0,
-  );
+  readonly hasSuiteResults = computed(() => this.durations().size > 0);
 
   readonly suiteNote = `Every operation in a fixed order, each timed step starting from exactly ${SUITE_ROWS} rows, with untimed resets in between. All-mounted is krausest's own shape (${NATIVE_VIEWS_PER_ROW} native views per row) and the column that compares to the published web numbers; virtualized mounts a window instead, so it prices what an app ships rather than the commit path itself. Pressing the operation buttons by hand leaves Remove and Append measuring whatever happened to be on screen.`;
 
@@ -909,12 +1084,38 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     return SUITE_ROW_HOST_PROPS[op];
   }
 
+  probeHostProps(op: IBenchOpId): IHostProps {
+    return PROBE_ROW_HOST_PROPS[op];
+  }
+
+  // The two mode columns follow the row shape currently selected, so the table always prices what
+  // the buttons above it would run right now; the probe table below them holds both shapes.
   allMountedResult(op: IBenchOpId): string {
-    return formatDuration(this.allDurations().get(op));
+    return this.durationOf(this.rowShape(), MOUNT_MODE.All, op);
   }
 
   virtualizedResult(op: IBenchOpId): string {
-    return formatDuration(this.virtualizedDurations().get(op));
+    return this.durationOf(this.rowShape(), MOUNT_MODE.Virtualized, op);
+  }
+
+  composedShapeResult(op: IBenchOpId): string {
+    return this.durationOf(ROW_SHAPE.Composed, MOUNT_MODE.All, op);
+  }
+
+  flatShapeResult(op: IBenchOpId): string {
+    return this.durationOf(ROW_SHAPE.Flat, MOUNT_MODE.All, op);
+  }
+
+  rowClassFor(row: IBenchmarkRow): string {
+    return row.id === this.selectedId() ? ROW_CLASS_SELECTED : ROW_CLASS;
+  }
+
+  // Ignored mid-suite for the same reason a hand-pressed operation is: the shape swap commits a
+  // whole new row list, and that commit would stop the running step's stopwatch and file its own
+  // teardown cost under whichever operation was in flight.
+  onPickRowShape(shape: IRowShape): void {
+    if (this.progress() !== undefined) return;
+    this.rowShape.set(shape);
   }
 
   onRunSuite(mode: IMountMode): void {
@@ -1029,6 +1230,9 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
   private async runSuite(mode: IMountMode): Promise<void> {
     resetRowData();
 
+    // Read once, up front: the shape cannot change mid-run (onPickRowShape refuses while a suite
+    // is up), and this is the cell the results land in.
+    const shape = this.rowShape();
     const entries: ISuiteEntry[] = [];
     const clearRows = (): void => {
       this.list.set({ rows: [], selectedId: undefined });
@@ -1071,7 +1275,10 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     // suite until the timeout. Every step after this one changes the tree by construction.
     await this.runStep(() => {
       this.mountMode.set(mode);
-      this.suiteResults.update(current => ({ ...current, [mode]: [] }));
+      this.suiteResults.update(current => ({
+        ...current,
+        [shape]: { ...current[shape], [mode]: [] },
+      }));
       this.history.set([]);
       this.progress.set({ mode, label: 'Preparing', done: 0 });
       clearRows();
@@ -1124,8 +1331,19 @@ export class BenchmarkScreen implements OnInit, OnDestroy {
     await this.runStep(fillRows);
     await timed(BENCH_OP.Clear, SUITE_ROWS, clearRows);
 
-    this.suiteResults.update(current => ({ ...current, [mode]: entries }));
+    this.suiteResults.update(current => ({
+      ...current,
+      [shape]: { ...current[shape], [mode]: entries },
+    }));
     this.progress.set(undefined);
+  }
+
+  private durationOf(
+    shape: IRowShape,
+    mode: IMountMode,
+    op: IBenchOpId,
+  ): string {
+    return formatDuration(this.durations().get(`${shape}:${mode}:${op}`));
   }
 
   private operation(

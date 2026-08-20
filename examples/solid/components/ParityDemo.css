@@ -31,12 +31,6 @@
   background-color: #131c33;
 }
 
-.parity-row {
-  justify-content: center;
-  padding-left: 12px;
-  padding-right: 12px;
-}
-
 .parity-section-list {
   height: 200px;
   border-radius: 10px;
