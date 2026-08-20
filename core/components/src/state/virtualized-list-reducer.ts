@@ -78,6 +78,27 @@ export interface IListState<ItemT> {
   // The raw host offset of each measured cell, kept beside its length. buildOffsets stores these
   // VERBATIM — see that function on why re-deriving one from another cannot be done here.
   measuredOffsets: Map<number, number>;
+  // Bumped by the ONLY two writers of the two maps above (the 'measure' case). The maps are
+  // mutated in place, so their identity can never say "nothing changed" — this counter can.
+  measureVersion: number;
+  // buildOffsets walks the WHOLE list and allocates two count-length arrays plus one object per
+  // index, and deriveMetrics runs it on every scroll frame. With getItemLayout the answer is a
+  // pure function of the index and is byte-identical frame to frame, so a fling on a 544-entry
+  // list paid 544 allocations sixty times a second for a value that never moved. Cached on
+  // everything buildOffsets actually reads; a miss recomputes exactly as before. Kept as state
+  // rather than a module-level map so two lists cannot evict each other, and so it dies with the
+  // list.
+  offsetsCache: {
+    count: number;
+    data: unknown;
+    getItemLayout: unknown;
+    averageLength: number;
+    averageStride: number;
+    measureVersion: number;
+    offsets: number[];
+    lengths: number[];
+    total: number;
+  } | null;
   committedWindow: { first: number; last: number };
   sentEndForContentLength: number;
   sentStartForContentLength: number;
@@ -185,6 +206,8 @@ export function createInitialListState<ItemT>(): IListState<ItemT> {
     viewportLength: EMPTY_OFFSET,
     measured: new Map<number, number>(),
     measuredOffsets: new Map<number, number>(),
+    measureVersion: 0,
+    offsetsCache: null,
     committedWindow: { first: FIRST_INDEX, last: NO_INDEX },
     sentEndForContentLength: NO_CONTENT_LENGTH_SENT,
     sentStartForContentLength: NO_CONTENT_LENGTH_SENT,
@@ -228,14 +251,45 @@ function deriveMetrics<ItemT>(
     count,
     state.measured,
   );
-  const { offsets, lengths, total } = buildOffsets(
-    count,
-    state.measured,
+  const averageStride = averageMeasuredStride(
     state.measuredOffsets,
-    fixedLayout,
     averageLength,
-    averageMeasuredStride(state.measuredOffsets, averageLength),
   );
+  // Every input buildOffsets reads, compared before paying for it again. `data` and
+  // `getItemLayout` stand in for `fixedLayout`, which wrapFixedLayout mints fresh on every call
+  // and whose identity therefore means nothing.
+  const cached = state.offsetsCache;
+  const reusable =
+    cached !== null &&
+    cached.count === count &&
+    cached.data === inputs.data &&
+    cached.getItemLayout === inputs.getItemLayout &&
+    cached.averageLength === averageLength &&
+    cached.averageStride === averageStride &&
+    cached.measureVersion === state.measureVersion;
+  const { offsets, lengths, total } = reusable
+    ? cached
+    : buildOffsets(
+        count,
+        state.measured,
+        state.measuredOffsets,
+        fixedLayout,
+        averageLength,
+        averageStride,
+      );
+  if (!reusable) {
+    state.offsetsCache = {
+      count,
+      data: inputs.data,
+      getItemLayout: inputs.getItemLayout,
+      averageLength,
+      averageStride,
+      measureVersion: state.measureVersion,
+      offsets,
+      lengths,
+      total,
+    };
+  }
   const target = computeWindow(
     count,
     offsets,
@@ -595,11 +649,13 @@ export function reduceList<ItemT>(
         if (knownLength !== undefined)
           recordCellMove('sized', action.index, knownLength, action.length);
         state.measured.set(action.index, action.length);
+        state.measureVersion += 1;
       }
       if (action.offset !== undefined && !offsetSettled) {
         if (knownOffset !== undefined)
           recordCellMove('moved', action.index, knownOffset, action.offset);
         state.measuredOffsets.set(action.index, action.offset);
+        state.measureVersion += 1;
       }
       return { state, effects: [], changed: true };
     }

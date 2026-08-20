@@ -585,6 +585,97 @@ describe('reduceList imperative scrolls', () => {
   });
 });
 
+// buildOffsets walks the WHOLE list and allocates two count-length arrays plus an object per
+// index, and deriveMetrics calls it on every scroll frame — 544 allocations per frame on the
+// canary's PATH B list, for a table that with getItemLayout is identical frame to frame. The
+// observable is ARRAY IDENTITY: a reused table is literally the same object, a recomputed one is
+// not. Asserting identity rather than a call count keeps the test off the implementation's shape.
+// buildOffsets walks the WHOLE list and allocates two count-length arrays plus an object per
+// index, and deriveMetrics calls it on every scroll frame — 544 allocations per frame on the
+// canary's PATH B list, for a table that with getItemLayout is identical frame to frame. The
+// observable is ARRAY IDENTITY: a reused table is literally the same object, a recomputed one is
+// not. Asserting identity rather than a call count keeps the test off the implementation's shape.
+describe('the offset table is reused while nothing it depends on moves', () => {
+  // A window only SLIDES when the data outruns the overscan. DATA is five items and the default
+  // windowSize is 21 viewports, so the default inputs can never move `first` off 0 — the fixture
+  // has to be big enough and the overscan small enough, or the test proves nothing.
+  const LONG = Array.from({ length: 200 }, (_value, index) => `row-${index}`);
+
+  function longInputs(
+    over: Partial<IListReducerInputs<string>> = {},
+  ): IListReducerInputs<string> {
+    return baseInputs({
+      data: LONG,
+      getItem: (_data, index): string => LONG[index],
+      getItemCount: (): number => LONG.length,
+      windowSize: 1,
+      maxToRenderPerBatch: 200,
+      ...over,
+    });
+  }
+
+  it('hands back the same arrays across scroll frames', () => {
+    const inputs = longInputs();
+    const first = settled(inputs);
+    const offsets = first.metrics.offsets;
+    const lengths = first.metrics.lengths;
+    // Read NOW, not after the scrolls: reduceList mutates and returns the same state object, so
+    // `first` and `scrolledAgain` are the same reference and a later read would compare a value
+    // with itself.
+    const firstIndexBefore = first.metrics.first;
+
+    const scrolled = stepTo(first, { kind: 'scroll', offset: 4000 }, inputs);
+    const scrolledAgain = stepTo(
+      scrolled,
+      { kind: 'scroll', offset: 8000 },
+      inputs,
+    );
+
+    expect(scrolledAgain.metrics.offsets).toBe(offsets);
+    expect(scrolledAgain.metrics.lengths).toBe(lengths);
+    // The window still has to MOVE. A cache that also froze the window would satisfy the identity
+    // checks above and break the list outright, which is what this assertion is here to catch.
+    expect(scrolledAgain.metrics.first).toBeGreaterThan(firstIndexBefore);
+  });
+
+  it('rebuilds the table once a cell reports a new measurement', () => {
+    // Without getItemLayout the table is derived from what the cells report, so a measurement is
+    // exactly the input that must invalidate it.
+    const inputs = longInputs({ getItemLayout: undefined });
+    const first = settled(inputs);
+    const offsets = first.metrics.offsets;
+
+    const measured = stepTo(
+      first,
+      { kind: 'measure', index: 3, length: 140, offset: 420 },
+      inputs,
+    );
+
+    expect(measured.metrics.offsets).not.toBe(offsets);
+    expect(measured.metrics.lengths[3]).toBe(140);
+  });
+
+  it('rebuilds the table when the data identity changes', () => {
+    const inputs = longInputs();
+    const first = settled(inputs);
+    const offsets = first.metrics.offsets;
+
+    const grown = [...LONG, 'extra'];
+    const next = stepTo(
+      first,
+      { kind: 'refresh-metrics' },
+      longInputs({
+        data: grown,
+        getItem: (_data, index): string => grown[index],
+        getItemCount: (): number => grown.length,
+      }),
+    );
+
+    expect(next.metrics.offsets).not.toBe(offsets);
+    expect(next.metrics.count).toBe(grown.length);
+  });
+});
+
 describe('listEffectSignature', () => {
   it('changes when the window moves and stays put otherwise', () => {
     const inputs = baseInputs();
