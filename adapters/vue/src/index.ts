@@ -2,8 +2,15 @@
 // each RendererOptions call onto the engine's mutation API; all Fabric clone-on-write
 // lives in the engine, shared with every other adapter. App code names only @symbiote-native/vue.
 
-export { mount, unmount } from './render';
-// Teleport stays same-surface-only by design - see create-tunnel.ts for why.
+export { mount, unmount, setAppConfigurator } from './render';
+export type { IAppConfigurator } from './render';
+// The portal: Vue's own <Teleport>, guarded so `to` must be a node/surface this renderer actually
+// mounted (there is no querySelector). It MOVES host nodes, so it reaches any already-mounted
+// target in the SAME surface — including one you only hold a ref to — and keeps the content's
+// reactive owner at the call site (provide/inject resolve from where it was written). Reaching a
+// second, independently mount()ed surface is a different mechanism: createTunnel, which copies
+// into an <Out/> the destination has to render. See create-portal/index.ts.
+export { Teleport, type ITeleportTarget } from './create-portal';
 export { createTunnel, type ITunnel } from './create-tunnel';
 export { View, Text } from './components';
 export type {

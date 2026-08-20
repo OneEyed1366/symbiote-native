@@ -5,7 +5,7 @@
 // is no shared node/ref here at all — the two apps below never touch each other's Fabric
 // tree directly, only a plain shared reactive Map.
 
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, inject, provide, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTunnel, mount, unmount } from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
@@ -195,5 +195,59 @@ describe('createTunnel — genuine cross-surface delivery', () => {
     // A real render loop would keep re-committing every microtask; a handful of commits for one
     // mount + one reactive settle is the honest upper bound, not an exact implementation count.
     expect(fabric.counts.completeRoot).toBeLessThan(5);
+  });
+  // why: the exact inverse of the portal's provide/inject test
+  // (../create-portal/create-portal.test.ts), and the reason the two mechanisms are not
+  // interchangeable. A tunnel moves no nodes — `In` hands over a SLOT and `Out` invokes it, so the
+  // content's vnodes are created in Out's component tree and inject resolves from the OUT site.
+  // That is precisely what buys the tunnel its cross-surface reach (there is nothing to move
+  // between two surfaces) and what a caller has to know before choosing between the two.
+  it('resolves inject from the Out site, not the In site', async () => {
+    const tunnel = createTunnel();
+    const ORIGIN_KEY = 'tunnel-origin';
+
+    const Consumer = defineComponent({
+      setup: () => {
+        const origin = inject(ORIGIN_KEY, 'default');
+        return () => h('symbiote-text', {}, origin);
+      },
+    });
+    const Provider = defineComponent({
+      props: { origin: { type: String, required: true } },
+      setup: (props, { slots }) => {
+        provide(ORIGIN_KEY, props.origin);
+        return () => slots.default?.();
+      },
+    });
+
+    mount(
+      SOURCE_TAG,
+      defineComponent({
+        setup: () => () =>
+          h('symbiote-view', {}, [
+            h(
+              Provider,
+              { origin: 'in site' },
+              {
+                default: () => h(tunnel.In, {}, () => h(Consumer)),
+              },
+            ),
+            h(
+              Provider,
+              { origin: 'out site' },
+              {
+                default: () => h('symbiote-view', {}, [h(tunnel.Out)]),
+              },
+            ),
+          ]),
+      }),
+    );
+    await tick();
+
+    expect(
+      findText('out site'),
+      'the content resolved inject where it is rendered',
+    ).toBeDefined();
+    expect(findText('in site'), 'not where it was written').toBeUndefined();
   });
 });
