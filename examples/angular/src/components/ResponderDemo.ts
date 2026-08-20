@@ -72,9 +72,7 @@ const CHIP_ACTIVE_BORDER = '#ffb3c1';
               class="chip"
               [style]="{
                 borderColor:
-                  activeChip === chip.index
-                    ? CHIP_ACTIVE_BORDER
-                    : 'transparent',
+                  activeChip === chip.index ? chipActiveBorder : 'transparent',
                 transform: [
                   { translateX: activeChip === chip.index ? chipDx : 0 },
                 ],
@@ -89,6 +87,7 @@ const CHIP_ACTIVE_BORDER = '#ffb3c1';
   `,
 })
 export class ResponderDemo {
+  readonly chipActiveBorder = CHIP_ACTIVE_BORDER;
   activeChip: number | null = null;
   chipDx = 0;
   rowDx = 0;
