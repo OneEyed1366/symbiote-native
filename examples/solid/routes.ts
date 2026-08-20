@@ -12,6 +12,7 @@ export const ROUTE_NAME = {
   Menu: 'Menu',
   Canary: 'Canary',
   ApiPlayground: 'ApiPlayground',
+  StyleShowcase: 'StyleShowcase',
   Details: 'Details',
   HeaderOptions: 'HeaderOptions',
   SheetDemo: 'SheetDemo',
@@ -21,6 +22,7 @@ export const ROUTE_NAME = {
   HooksDemo: 'HooksDemo',
   DeepLinking: 'DeepLinking',
   StatePersistence: 'StatePersistence',
+  Benchmark: 'Benchmark',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];
@@ -42,8 +44,9 @@ export type IMenuRow = {
 // <Stack.Screen> marker in App.tsx, never an edit inside MenuScreen's JSX. Only routes that have a
 // registered screen belong in this array — an entry whose marker does not exist yet renders a row
 // that pushes a route the navigator cannot resolve.
-// Order matches examples/react and examples/svelte row-for-row, so the three canaries can be read
-// side by side. Only the two Solid-specific blurbs differ.
+// Order matches examples/react row-for-row, so the two canaries can be read side by side; the
+// Svelte port has no Styling stop yet, so it is the same list minus that row. Only the two
+// Solid-specific blurbs differ.
 export const MENU_ROWS: readonly IMenuRow[] = [
   {
     route: ROUTE_NAME.Canary,
@@ -54,6 +57,11 @@ export const MENU_ROWS: readonly IMenuRow[] = [
     route: ROUTE_NAME.ApiPlayground,
     label: 'API Playground',
     blurb: 'signals, stores, control flow, Suspense — solid-js itself, live',
+  },
+  {
+    route: ROUTE_NAME.StyleShowcase,
+    label: 'Styling showcase',
+    blurb: 'CSS · Modules · SCSS/Less/Stylus — and what is refused',
   },
   {
     route: ROUTE_NAME.HeaderOptions,
@@ -94,5 +102,10 @@ export const MENU_ROWS: readonly IMenuRow[] = [
     route: ROUTE_NAME.StatePersistence,
     label: 'State persistence',
     blurb: 'serialize/deserialize the Stack state',
+  },
+  {
+    route: ROUTE_NAME.Benchmark,
+    label: 'Benchmark',
+    blurb: 'js-framework-benchmark ops + JS-thread FPS',
   },
 ];

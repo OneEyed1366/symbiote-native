@@ -5,10 +5,10 @@
  * file it sits next to changes nothing about resolution.
  *
  * Palette is App.css's: #0b1020 ground, #151c33 card, #26304f edge, #f4f6fb / #9aa6c4 type.
- * The five line colors are hand-synced with navigation-lines.ts's LINE_COLOR — this example
+ * The seven line colors are hand-synced with navigation-lines.ts's LINE_COLOR — this example
  * declares no :root custom properties, and a stylesheet and a TS module share no import path
- * anyway. All five variants are written out even though only the Primitives row exists today, so
- * adding a demo screen stays one MENU_ROWS entry plus one <Stack.Screen> marker.
+ * anyway. All seven variants are written out, so adding a demo screen stays one MENU_ROWS entry plus
+ * one <Stack.Screen> marker.
  */
 
 .menu-content {
@@ -68,6 +68,14 @@
   border-left-width: 3px;
   border-left-color: #f2789a;
 }
+.menu-row-performance {
+  border-left-width: 3px;
+  border-left-color: #f5a524;
+}
+.menu-row-styling {
+  border-left-width: 3px;
+  border-left-color: #a3d94f;
+}
 
 .menu-badge {
   width: 34px;
@@ -90,6 +98,12 @@
 }
 .menu-badge-routing {
   background-color: #f2789a;
+}
+.menu-badge-performance {
+  background-color: #f5a524;
+}
+.menu-badge-styling {
+  background-color: #a3d94f;
 }
 .menu-badge-text {
   color: #0b1020;
@@ -124,4 +138,10 @@
 }
 .menu-row-hint-routing {
   color: #f2789a;
+}
+.menu-row-hint-performance {
+  color: #f5a524;
+}
+.menu-row-hint-styling {
+  color: #a3d94f;
 }

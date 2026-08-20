@@ -63,11 +63,22 @@
   text-align: center;
 }
 
+/* `flex-wrap` because RN, like CSS, defaults to nowrap: a row whose children measure wider than
+   the content box runs off the right edge and the last one is simply unreachable — no scrollbar,
+   no clipping indicator, nothing to suggest a control is missing. Wrapping is the only behaviour
+   that degrades honestly on a phone width. Children that carry `.flex1` keep sharing one line
+   regardless: flex:1 gives them a 0 basis, so they never trip the wrap.
+
+   `gap` because there was none: every `.row` in CanaryScreen, RefApiDemo and ParityDemo holds two
+   half-width buttons, and edge to edge they read as one wide control rather than two. 12px is the
+   value the other four canaries' `.row` already uses. */
 .row {
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   align-self: stretch;
+  gap: 12px;
   padding-top: 6px;
 }
 
@@ -332,8 +343,10 @@
   font-weight: 600;
 }
 
+/* Wraps for the same reason `.row` does — see the note there. */
 .row-tight {
   flex-direction: row;
+  flex-wrap: wrap;
   align-self: stretch;
   gap: 8px;
 }
@@ -530,6 +543,19 @@
   background-color: #f2789a;
 }
 
+/* The benchmark stop is not a navigation line, so it takes the only warm hue in the set and never
+   reads as one at a glance. Shared verbatim with every other canary — a line color, not this
+   canary's accent. */
+.line-tag-performance {
+  background-color: #f5a524;
+}
+
+/* The CSS-compiler showcase is not a navigation line either — yellow-green, the one wide hue gap
+   the six above leave open. Hand-synced with navigation-lines.ts's LINE_COLOR.styling. */
+.line-tag-styling {
+  background-color: #a3d94f;
+}
+
 .line-tag-text {
   color: #0b1020;
   font-size: 11px;
@@ -586,4 +612,19 @@
 .note-text {
   color: #7f8db3;
   font-size: 13px;
+}
+
+/* A row inside a demo list — the sticky blocks on BenchmarkScreen and ParityDemo's own lists. Both
+   live in App.css rather than beside one of their callers because two screens share them; a second
+   copy in a component stylesheet would collide silently in the flat class registry (whichever
+   imports LAST wins, with no build error). */
+.parity-row {
+  justify-content: center;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.list-row-text {
+  color: #cdd6ee;
+  font-size: 15px;
 }

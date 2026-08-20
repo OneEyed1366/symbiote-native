@@ -1,5 +1,5 @@
 // Root menu for the @symbiote-native/navigation demo suite: one row per navigator/feature, each
-// pushing its own screen onto the same root Stack. Rows are grouped into 5 thematic "lines"
+// pushing its own screen onto the same root Stack. Rows are grouped into 7 thematic "lines"
 // (navigation-lines.ts's ROUTE_LINE_INFO) — a color + 2-letter badge per line, carried onto each
 // demo screen's own line tag — so the tour reads as one system rather than a bag of test screens.
 //
@@ -37,11 +37,13 @@ export function MenuScreen() {
       >
         <View class="menu-hero">
           <Text class="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
-          <Text class="menu-hero-title">Ten stops along the stack</Text>
+          <Text class="menu-hero-title">Twelve stops along the stack</Text>
           <Text class="menu-hero-subtitle">
             Each row below drives a different line of
             @symbiote-native/navigation — Primitives, Presentation, Structure,
-            Introspection, Routing — on a real native stack.
+            Introspection, Routing — on a real native stack, plus a Performance
+            stop timing the engine's own commit path and a Styling stop showing
+            the whole CSS compiler surface.
           </Text>
         </View>
 

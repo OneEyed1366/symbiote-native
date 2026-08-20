@@ -1,0 +1,299 @@
+/* Plain, unscoped sheet for StyleShowcaseScreen — the "what the compiler emits verbatim" half
+   of the showcase. Every class here is prefixed `sc-` because the runtime registry is ONE flat
+   map shared with App.css and every other sheet in the app (style-registry-collisions.md, first
+   trap): a name that collides is silently overwritten by whichever file imports last.
+
+   Values are literal or come from this file's own `:root` — `var()` is resolved at BUILD time,
+   per compiled file, so a token declared in App.css is invisible here. The limits sheet next
+   door shows what that failure looks like on screen.
+
+   Everything below is chosen so a regression PAINTS: asymmetric sides, mismatched corners, one
+   filtered tile beside its unfiltered twin. A rule the compiler drops does not fall back to
+   something plausible, it falls back to nothing, and that has to be visible. */
+
+:root {
+  --sc-lime: #a3d94f;
+  --sc-slate: #41506a;
+  --sc-panel: #16243a;
+  --sc-panel-lit: #1c2c46;
+  --sc-chalk: #cbd5e1;
+  --sc-win: #2f7d4f;
+  --sc-sky: #7bd0ff;
+  --sc-rose: #f2789a;
+}
+
+/* ---- screen chrome -------------------------------------------------------------------- */
+
+.sc-panel {
+  gap: 12px;
+  padding: 16px;
+  border-radius: 14px;
+  background-color: var(--sc-panel);
+}
+.sc-panel-title {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: bold;
+}
+.sc-panel-note {
+  color: var(--sc-chalk);
+  font-size: 12px;
+}
+.sc-readout {
+  color: var(--sc-lime);
+  font-size: 12px;
+}
+.sc-tile-label {
+  color: var(--sc-slate);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+.sc-tile-caption {
+  color: var(--sc-chalk);
+  font-size: 12px;
+}
+.sc-pair {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+}
+.sc-pair-half {
+  flex: 1;
+  gap: 6px;
+}
+
+/* ---- 1. shorthand expansion ------------------------------------------------------------
+   Four different padding values and four different border widths on one box. The pre-migration
+   compiler kept only the FIRST value of a multi-value shorthand, so a regression collapses this
+   into a uniform 6px inset with a 1px ring — the lime core would sit dead centre. */
+.sc-shorthand-box {
+  border-radius: 12px;
+  border-color: var(--sc-lime);
+  border-width: 1px 4px 10px 20px;
+  padding: 6px 12px 26px 38px;
+  background-color: var(--sc-panel-lit);
+}
+.sc-shorthand-core {
+  height: 22px;
+  border-radius: 6px;
+  background-color: var(--sc-lime);
+}
+
+/* ---- 2. corner-radius longhands --------------------------------------------------------
+   The bug that prompted this screen: a corner LONGHAND parses to a Size2D pair, not to one
+   length, and reading it through the generic dimension path dropped every one of them. The
+   shorthand tile beside it was always fine, which is exactly why nobody noticed. Two big
+   corners and two small ones give a leaf; a drop gives a 4px-rounded square. */
+.sc-corner-shorthand {
+  height: 76px;
+  border-radius: 20px;
+  background-color: var(--sc-sky);
+}
+.sc-corner-longhand {
+  height: 76px;
+  border-top-left-radius: 28px;
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 28px;
+  border-bottom-left-radius: 4px;
+  background-color: var(--sc-lime);
+}
+
+/* ---- 3. background-image gradients -----------------------------------------------------
+   A real native Fabric prop (`experimental_backgroundImage`), not an approximation — the CSS
+   text is handed through unparsed and the engine's own processBackgroundImage port parses it at
+   commit time. A drop leaves a transparent tile against the panel. */
+.sc-gradient-tile {
+  height: 76px;
+  border-radius: 12px;
+  background-image: linear-gradient(
+    135deg,
+    #a3d94f 0%,
+    #149eca 55%,
+    #b18cf5 100%
+  );
+}
+
+/* ---- 4. filter -------------------------------------------------------------------------
+   Same gradient, one tile filtered. The two tiles are identical the moment `filter` stops
+   arriving — the comparison IS the test. Both functions reach the native prop; how many of
+   them PAINT is RN's business and differs per platform. On iOS only brightness and opacity
+   apply: every other function (grayscale, blur, saturate, contrast, hue-rotate, drop-shadow)
+   needs a SwiftUI wrapper that RCTViewComponentView builds only when the
+   `enableSwiftUIBasedFilters` feature flag is on, and it defaults to false — so this tile reads
+   brighter but still fully coloured there, while Android applies the whole list. */
+.sc-filter-tile {
+  height: 76px;
+  border-radius: 12px;
+  background-image: linear-gradient(
+    135deg,
+    #a3d94f 0%,
+    #149eca 55%,
+    #b18cf5 100%
+  );
+  filter: grayscale(0.85) brightness(1.25);
+}
+
+/* ---- 5. transform-origin ---------------------------------------------------------------
+   Two squares under the same rotation. The origin is the only difference, so if it stops
+   arriving the pair snaps into alignment. The fixed-height frames keep the rotated corners from
+   pushing the surrounding layout around. */
+.sc-origin-frame {
+  flex: 1;
+  height: 96px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background-color: var(--sc-panel-lit);
+}
+.sc-origin-square {
+  width: 54px;
+  height: 54px;
+  border-radius: 8px;
+  background-color: var(--sc-sky);
+  transform: rotate(22deg);
+}
+.sc-origin-square-corner {
+  width: 54px;
+  height: 54px;
+  border-radius: 8px;
+  background-color: var(--sc-lime);
+  transform: rotate(22deg);
+  transform-origin: top left;
+}
+
+/* ---- 6. box-shadow ---------------------------------------------------------------------
+   Handed through as raw CSS text and parsed by the engine's processBoxShadow port, so spread
+   radius and multiple layers survive — the things a decompose-into-shadowOffset heuristic used
+   to throw away. */
+.sc-shadow-tile {
+  height: 76px;
+  border-radius: 14px;
+  background-color: var(--sc-panel-lit);
+  box-shadow:
+    0 10px 26px rgba(163, 217, 79, 0.45),
+    0 2px 6px rgba(20, 158, 202, 0.6);
+}
+
+/* ---- 7. specificity and source order ---------------------------------------------------
+   Two tie-breakers on one tile, and the file order is deliberately adversarial to both.
+
+   The compound rule is declared FIRST and still beats the single-class rule below it, because
+   (0,2,0) outranks (0,1,0) whatever the line numbers say. Then `.sc-spec-early` and
+   `.sc-spec-late` are equally specific, so the later line takes the border colour. Swap either
+   pair around in this file and the tile changes colour — that is the whole demo. */
+.sc-spec-tile.sc-spec-strong {
+  background-color: var(--sc-win);
+}
+.sc-spec-tile {
+  height: 76px;
+  border-radius: 12px;
+  border-width: 3px;
+  border-color: var(--sc-slate);
+  align-items: center;
+  justify-content: center;
+  background-color: var(--sc-slate);
+}
+.sc-spec-early {
+  border-color: var(--sc-rose);
+}
+.sc-spec-late {
+  border-color: var(--sc-sky);
+}
+.sc-spec-text {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* ---- 8. compound selectors ------------------------------------------------------------
+   Three independent tokens over a base, with rules keyed on one, two, and all three of them —
+   so the fully-lit tile carries FOUR class tokens. That count is the point: the retired
+   collapse-and-permute registry capped its compound branch at four parts and silently stopped
+   matching past it, which read as a perf cap and was a correctness cliff.
+
+   Each rule restates only what it changes, so `.sc-tri`'s size and centring have to survive
+   underneath all of them. A resolver that returned the winning rule alone instead of layering
+   would blank the tile's shape, not just its colour. */
+.sc-tri {
+  height: 72px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border-width: 2px;
+  border-color: var(--sc-slate);
+  background-color: var(--sc-panel-lit);
+}
+.sc-tri.sc-t-a {
+  border-color: var(--sc-lime);
+}
+.sc-tri.sc-t-b {
+  background-color: #1f4d7a;
+}
+.sc-tri.sc-t-c {
+  border-radius: 34px;
+}
+.sc-tri.sc-t-a.sc-t-b {
+  border-width: 6px;
+}
+.sc-tri.sc-t-a.sc-t-b.sc-t-c {
+  background-color: #4a2a6b;
+  border-color: #f5a524;
+}
+.sc-tri-text {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* ---- 9. class + inline style ----------------------------------------------------------
+   routeProp keeps the two halves apart in a WeakMap and always writes
+   `[classStyle, explicitStyle]` in that fixed order, so the explicit half wins no matter which
+   prop the framework happens to set last. The tile's toggles flip each half independently. */
+.sc-merge-tile {
+  height: 72px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border-width: 3px;
+  border-color: var(--sc-lime);
+  background-color: #1f4d7a;
+}
+.sc-merge-text {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* ---- 10. animation over a class -------------------------------------------------------
+   The class owns the whole static look; the Animated.Value writes only `transform` and
+   `opacity`. If a frame clobbered the resolved class the tile would lose its ring and its
+   corners mid-pulse rather than just stopping. */
+.sc-anim-frame {
+  height: 120px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background-color: var(--sc-panel-lit);
+}
+.sc-anim-tile {
+  width: 88px;
+  height: 88px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 26px;
+  border-width: 3px;
+  border-color: var(--sc-lime);
+  background-color: #1f4d7a;
+}
+.sc-anim-text {
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* ---- chips row shared by the CSS-Modules and preprocessor sections --------------------- */
+.sc-chip-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}

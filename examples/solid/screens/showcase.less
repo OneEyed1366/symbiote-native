@@ -1,0 +1,29 @@
+// Less tile — same three proofs as the SCSS one (variable, parametric mixin, arithmetic), in
+// Less's own syntax. The mixin is declared with parentheses so Less does not also emit it as a
+// rule of its own; `@less-unit * 2` gives 22px, a number this file never spells.
+
+@less-sky: #7bd0ff;
+@less-unit: 11px;
+
+.less-pill(@radius) {
+  border-radius: @radius;
+  border-width: 2px;
+}
+
+.less-tile {
+  .less-pill(18px);
+  padding: @less-unit (@less-unit * 2);
+  border-color: @less-sky;
+  background-color: #16243a;
+
+  &.less-tile-on {
+    border-color: #a3d94f;
+    background-color: #1f4d7a;
+  }
+}
+
+.less-tile-text {
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: bold;
+}
