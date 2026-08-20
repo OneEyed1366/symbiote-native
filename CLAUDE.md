@@ -448,14 +448,22 @@ bring-up step) should add a `dlog` at its seam as a matter of course.
   source reduces to plain CSS text before the same parser/registry pipeline runs, so every
   scoped/module/`:global()` mechanism above applies identically regardless of source language;
   `sass`/`less`/`stylus` are lazy-optional devDependencies of `@symbiote-native/css-parser` only, never
-  forced on a project that doesn't author them. Cross-adapter class/style resolution (React,
-  Vue, Angular) is exercised for plain CSS and CSS Modules; the preprocessor layer is newer and
-  not yet exercised as heavily end-to-end. `$style.card` property-access type safety (`.d.ts`
-  generation), Svelte's default-scoped styles, and `background-image` (CSS gradients — a real
-  native Fabric prop via `experimental_backgroundImage`, unlike Tailwind; `filter` and
-  `transform-origin` are already done) are recorded in that skill as the remaining open,
-  unimplemented seams. JS style objects via `StyleSheet.create` remain the baseline every
-  adapter supports; the CSS path is additive.
+  forced on a project that doesn't author them. **The whole surface — plain CSS, CSS Modules
+  (`composes`, `:global()`), all three preprocessors, and what the compiler deliberately refuses
+  — is exercised by one screen present in all five examples, `StyleShowcaseScreen` (2026-08-20);
+  React's is device-verified, the other four are ported but not yet built.** Every tile is built
+  so a dropped rule is VISIBLE rather than silent, which is what makes it a regression canary and
+  not a gallery — read it before claiming any part of this pipeline is broken or missing. Three
+  claims this paragraph used to carry are now WRONG and must not be repeated: `$style.card` type
+  safety is closed for standalone `.module.css` (`css-dts` + the TS plugin; only the INLINE
+  `<style module>` typo case is still open), Svelte's default-scoped styles are BUILT (the
+  scoper's third pattern `[local]__svelte-<hash>`, same single lightningcss rename as Vue's
+  `__module__` / `__data-v-`), and `background-image` shipped in 2026-07 alongside `filter` and
+  `transform-origin`. What IS still open is recorded in that skill, and `filter` carries a
+  platform caveat worth knowing before demoing it: on iOS RN paints only `brightness` and
+  `opacity` unless the `enableSwiftUIBasedFilters` flag is on, so `grayscale`/`blur`/`saturate`/
+  `contrast`/`hue-rotate` silently do nothing there. JS style objects via `StyleSheet.create`
+  remain the baseline every adapter supports; the CSS path is additive.
 
 ## Milestones
 

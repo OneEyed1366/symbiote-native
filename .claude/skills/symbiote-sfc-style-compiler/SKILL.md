@@ -1045,13 +1045,17 @@ autocomplete as documented above; nobody is patching Volar to fix it.
 
 ### Svelte
 
-Svelte's `<style>` is scoped **by default** (opposite of Vue's opt-in
-`scoped`), via an implicitly-injected `.svelte-hash` class rather than a
-`data-v-hash` attribute, plus its own `:global(...)`. Symbiote has no Svelte
-adapter yet (React, Vue, Angular only — see the other adapter skills) — this
-is a forward-reference for whenever one is built, not actionable now. The
-registry-scoping mechanism transfers directly once `scoped` exists for Vue;
-only the SFC-syntax-extraction side (Svelte's own compiler) would differ.
+**Stale as written — corrected 2026-08-20.** The Svelte adapter SHIPS
+(`@symbiote-native/svelte`, `examples/svelte`, on the landing-page switcher
+beside React/Vue/Angular/Solid), and its `<style>` handling is built: the
+scoper's third pattern, `[local]__svelte-<hash>`, runs through the same single
+lightningcss rename as Vue's `__module__` and `__data-v-` forms. What the
+original entry got right is the mechanism — Svelte scopes by DEFAULT (opposite
+of Vue's opt-in `scoped`), via an injected class rather than a `data-v-`
+attribute, and has its own `:global(...)`, which `lightning/selectors.ts`
+unwraps along with Vue's. Only the syntax-extraction half differs, and it lives
+in the Svelte preprocessor, not here. Left in place rather than deleted because
+the count of scoping patterns — three, one renamer — is the load-bearing fact.
 
 ### Tailwind CSS
 
@@ -1115,6 +1119,34 @@ current findings and the reasoning for why it doesn't fit here.
         within hours",
 }
 ```
+
+#### The caveat this section did NOT carry: `filter` reaches the native prop but only PARTLY paints on iOS
+
+Measured 2026-08-20 off the React showcase screen. Our side is clean —
+`compileCssToRules('.a{filter:grayscale(.85) brightness(1.25)}')` emits both
+functions verbatim. RN then drops most of them on iOS:
+
+```
+RCTViewComponentView.mm:1184  Brightness  -> _filterLayer (CALayer), unconditional
+RCTViewComponentView.mm:1160  Grayscale   -> only `if (_swiftUIWrapper != nullptr)`
+              (same guard on Blur, Saturate, Contrast, HueRotate, DropShadow)
+RCTViewComponentView.mm:893   effectiveContentView: `if (!enableSwiftUIBasedFilters()) return self;`
+                              -> the wrapper is never built, so it stays nil
+ReactNativeFeatureFlagsDefaults.h:214   enableSwiftUIBasedFilters() -> **false**
+```
+
+So on iOS, with stock flags, `filter` paints **brightness and opacity only**;
+every other function is silently ignored by RN itself. Android applies the whole
+list. Nothing warns — not css-parser, not the engine, not RN.
+
+The trap for a demo or a doc: a tile with `grayscale(x) brightness(y)` DOES look
+different from its unfiltered twin, because brightness landed — so "the filter
+works" reads as confirmed while most of it was thrown away. The showcase's
+caption claimed "desaturated"; the device showed brighter-and-fully-coloured.
+Only naming ONE function per tile makes the gap visible.
+
+Applies to every adapter — this is RN's paint layer, below our seam. If a
+platform-uniform filter demo is ever needed, use brightness/opacity.
 
 ### 9. Cross-file class-name collisions in one app: the registry is flat and global, last-registered wins
 
@@ -1249,6 +1281,46 @@ exactly, so the runtime's scope-tail parsing is unaffected; `:global(.reset)` st
 | Unistyles                                 | does not parse CSS at all — a `StyleSheet.create` superset in C++/JSI. Its win is bypassing re-render, which our architecture already has.                                                                                                                                                                                                              |
 | Stylo / `selectors` crate for the RUNTIME | **Hermes has no WebAssembly.** Verified: 0 hits in RN 0.84–0.87 release notes and in Hermes' own `doc/Features.md`; the only WASM-adjacent code is a 2021 asm.js path behind a custom-build flag, "unsupported, trusted code only" (facebook/hermes#429, still open). A Callstack webinar page claims otherwise — contradicted by every primary source. |
 | Stylo standalone at build time            | 48 deps, `links=`, Gecko-shaped `ComputedValues`; Blitz needed ~140 KB of glue AND relicensed that glue crate to MPL. It would deliver a browser cascade we don't want.                                                                                                                                                                                 |
+
+### `@media` — decided architecture, backlogged (grilled 2026-08-21)
+
+```
+§media_query_decision := {
+  issue: "GitHub issue proposed react-native-css's model: compiler preserves
+         dynamic rules instead of flattening to one fixed style, a shared
+         runtime resolves them against device/component context, engine.setProp
+         pushes the resolved style, normal Fabric commit follows",
+  precedent_check: "react-native-css itself stays rejected (see table above,
+         same reasons — React-only runtime, no CSS Modules, drops combinators).
+         The issue only borrows the RUNTIME-RESOLUTION IDEA, not the library —
+         that distinction is what makes this worth recording separately",
+  today: "zero handling — lightningcss's visitor descends into @media
+         structurally while walking Rule.style, but nothing consumes it;
+         parseCSS's return shape is a flat Record<className, RNStyleObject>
+         with no per-condition branching, so an @media block would silently
+         vanish the same way an unmapped property does",
+  architecture_if_built: "ENGINE-LEVEL PUSH, not per-adapter reactivity.
+         Rejected the Dimensions/createWindowDimensions precedent (each
+         adapter subscribes + re-renders through its own reactivity) because
+         that is opt-in — a component that never calls the hook stays static,
+         which is not real @media semantics. Real @media applies to any node
+         wearing the class with zero component code, which means the ENGINE
+         must own the condition registry and call setProp on committed nodes
+         directly, matching the issue's diagram. Zero precedent for this in
+         the codebase today — nothing currently pushes a prop from outside
+         any adapter's own render cycle. This is new architecture, not an
+         extension of an existing pattern",
+  priority: "BACKLOGGED past the SolidJS milestone. The functional gap
+         (react to width) is already closed by Dimensions +
+         createWindowDimensions/useWindowDimensions per adapter — @media
+         would be pure authoring DX (declarative CSS vs an imperative hook),
+         not a capability unlock. RN itself has no native media-query concept;
+         apps handle tablet/foldable/split-view reflow via those same hooks",
+  var_is_separate: "cross-file var() (§var_scope_is_per_file above) is an
+         unrelated, already-tracked, smaller gap — do not bundle it into an
+         @media implementation; it can be picked up independently",
+}
+```
 
 ### The one thing no library can give us
 
@@ -1525,6 +1597,7 @@ only about leaving the rule UNDECLARED. Declared, it works:
 customAtRules: { platform: { prelude: '<custom-ident>', body: 'rule-list' } }
 visitor: { Rule: { custom: { platform(rule) { /* rule.prelude, rule.body.value */ return []; } } } }
 ```
+
 ```
 rule.prelude       {type:'custom-ident', value:'ios'}    typed, validated by the parser
 rule.body.value    real style rules, declarations already expanded (padding -> 4 sides)
@@ -1560,9 +1633,9 @@ file — which is where most of this repo's styling actually lives. That, not er
 argument for `@platform`: it reaches the surface the file split cannot. Neither is needed today
 (no example carries a platform style delta); this exists so the trade-off is not re-derived.
 
-### Four things the lightningcss visitor does that the docs do not say (measured 2026-08-20)
+### Five things the lightningcss visitor does that the docs do not say (measured 2026-08-20)
 
-All four cost real debugging during the stage-2 wiring; none is guessable from the API surface.
+All five cost real debugging during the stage-2 wiring; none is guessable from the API surface.
 
 **1. Under `cssModules`, the visitor sees the ORIGINAL class names.** The rename happens AFTER the
 visitor walk. So one `transform()` yields both the authored tokens (from the AST) and their renamed
@@ -1596,6 +1669,18 @@ as a class `.css`) swallowed the real `.pg-subsection-label` rule after it. post
 registering the garbage under a phantom key AND the real class; lightningcss dropped the whole
 rule, taking the real class with it. Both were wrong; only the warning surface tells anyone. We now
 funnel `result.warnings` through the same `warnOnce` as every other drop.
+
+**5. A typed value is NOT always the shape its property name suggests — a corner-radius LONGHAND
+arrives as a Size2D pair.** `border-top-left-radius: 20px` parses to
+`[{dimension 20px}, {dimension 20px}]`, not to one length; `4px 8px` (elliptical) to
+`[4px, 8px]`. Reading it through the table's generic `dimension` path got `null` and dropped
+every corner longhand with `"…" has a value React Native cannot express` — on a plain `20px`,
+which RN supports perfectly. Found on `examples/solid/App.css`'s `.sheet`, the only place in the
+corpus that uses them, so the whole corpus passing proved nothing. The `border-radius` SHORTHAND
+was already correct because it has its own handler that unwraps each corner's pair. General
+lesson for any new property: **probe the actual value shape with a throwaway `transform()` before
+adding it to `PROPERTY_TABLE`** — a table entry is a claim about the value type, and the table
+cannot check it. `declarations.ts`'s `CORNER_RADIUS_PROPERTIES` is the fix.
 
 ### Stage 2 landed — what the pipeline is now, and the numbers (2026-08-20)
 
@@ -1658,3 +1743,59 @@ Merge overlap this predicted, for the record: both commits touch `core/engine/sr
 node.ts,index.ts}` and the stage-2 work touched `index.ts` (the `registerRules`/`IStyleRule`
 exports, `registerStyles`/`scopeClassName` REMOVED from it) plus `styles.ts` — the conflicts landed
 in the barrel, not in the walk.
+
+## 11. The showcase screen — `examples/react` StyleShowcaseScreen (2026-08-20)
+
+One screen demonstrating this whole surface, built so a dropped rule PAINTS rather than
+disappears. It exists because `border-top-left-radius` shipped silently dropped (§10, fifth
+measured item) and survived until somebody happened to look at a corner on a device: `examples/
+react` had exactly ONE stylesheet, no CSS Modules, no preprocessor, and nothing that would have
+shown the loss.
+
+```
+§11_showcase_screen := {
+  route: "StyleShowcase / 'Styling showcase' / badge ST / NAV_LINE.Styling #a3d94f — the 12th
+         stop, ON TOP of the shared 11-stop tour, like Angular's ReactiveStyle and Probe",
+  sheets: {
+    "screens/StyleShowcase.css":        "36 rules — shorthand expansion, the four corner
+                                        longhands, background-image, filter, transform-origin,
+                                        box-shadow, plus the specificity and compound rule sets",
+    "screens/StyleShowcase.module.css": "5 rules — a two-hop composes chain, :global(), authored
+                                        kebab keys, css-dts .d.ts",
+    "screens/showcase.{scss,less,styl}":"3 rules each — variable + parametric mixin + arithmetic
+                                        per language. FIRST end-to-end use of the preprocessor
+                                        layer in this repo; it had been documented since
+                                        2026-07 with zero corpus coverage",
+    "screens/StyleShowcase.limits.css": "11 rules + 6 warnings — @media/@supports/@container,
+                                        calc() across unit families, the combinator, var()
+                                        across files",
+  },
+  design_rule: "every dynamic tile changes the CLASS SET on the node — var() is build-time and
+               a combinator does not descend, so that is where the behaviour is. Four of them:
+               specificity vs source order, three-token compounds (four tokens on the node, the
+               retired registry's cliff), class + inline style, Animated over a class",
+  combinator_tile: "shows the WRONG result, not a note about it — a nested child that the web
+                   would paint stays plain, and one node carrying both names goes red",
+  guard: "tests/style-showcase-contract.test.ts — 22 tests, compiles the six real sheets and
+         resolves them through the real registry. All 22 broken once (three mutation runs), each
+         with a distinct message. It complements the golden corpus rather than repeating it: the
+         snapshot catches ANY byte change, this names the fact each tile rests on",
+  scripts: "examples/react gained pretypecheck (css-dts .) + typecheck, closing the parity gap §8
+           recorded; sass/less/stylus are devDependencies of that example only",
+  open_debt: "the other five canaries do NOT have this screen. Deliberate for this pass and
+             recorded as DEBT, not as a completed port — the sheets are framework-agnostic and
+             only the lifecycle/markup half would be rewritten per adapter",
+  wart_found: "CLOSED 2026-08-20. `composes` warned `unsupported CSS property` on every working
+              .module.* build. The one-line fix landed in the WRONG BRANCH first and the test
+              caught it: composes does NOT arrive under `custom` where an unknown name goes — it
+              is a first-class `property: 'composes'` carrying {names, from, loc}, so it fell
+              through to the PROPERTY_TABLE miss. Probe before placing a guard; the value shape is
+              not guessable from the name. Now a `case 'composes'` in declarationToStyleAt",
+  wart_found_2: "CLOSED 2026-08-20. Both prefixes are `[@symbiote-native/css-parser]` now;
+                selectors.ts was the only `[symbiote-css]` site",
+  warning_surface_is_load_bearing: "the reason both warts were worth a fix at all: drop warnings
+                are the ONLY signal that a real rule died silently, which is the entire gain of the
+                lightningcss migration. A channel that cries wolf on working code is the one
+                nobody reads when it finally matters",
+}
+```
