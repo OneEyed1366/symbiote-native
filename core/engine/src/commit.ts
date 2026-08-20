@@ -28,6 +28,7 @@ import {
   isAnchor,
   isEmptyRawText,
   markDirty,
+  takePropStats,
   VIRTUAL_TEXT_COMPONENT,
   type ISymbioteNode,
 } from './node';
@@ -53,6 +54,33 @@ const stats = { created: 0, cloneProps: 0, cloneChildren: 0, reused: 0 };
 // the walk they measure, and the number is only meaningful from a RELEASE build - dev-mode JS
 // drowns the signal. The dlog below stays gated as usual.
 const profile = { commits: 0, walkMs: 0, nodesVisited: 0 };
+
+// What `renderableChildren` costs, accumulated over the same window as `profile`. Anchors are the
+// only reason that function is not free, and how many a tree carries is a property of the ADAPTER,
+// not of the app: a Vue/React/Svelte/Solid component is a function returning children and allocates
+// no node, while an Angular component is bound to a host ELEMENT and therefore always has one
+// (anchor-host-registry.ts keeps it from painting). So the same screen is a no-anchor tree under
+// four adapters and an anchor-per-composed-component tree under the fifth, and only a counter tells
+// them apart at runtime - a source-level grep for "anchor" measures instrumentation density, not
+// trees.
+//
+// `scans` counts invocations; `probed` counts children actually examined by the fast-path probe,
+// which is why that probe is a counted loop rather than `.some()` (a `.some` short-circuits at the
+// first anchor, so children.length would overstate a defeated scan by however much it skipped).
+// `flattens` is the probe defeated: a fresh array, a second pass, and a recursion into every
+// anchor. `widest` is the widest single flatten in the window, because a defeated scan over 3
+// children is noise and one over 1000 is not - a count alone cannot separate them.
+//
+// Not gated behind isDebug(), for the same reason the rest of the profile is not: integer
+// increments are noise next to the array work they price, and the number is only meaningful from a
+// release build.
+const childScan = {
+  scans: 0,
+  probed: 0,
+  flattens: 0,
+  flattenProbed: 0,
+  widest: 0,
+};
 
 // Diagnostic (gated): Fabric serializes props to folly::dynamic, which rejects a JS
 // Symbol or function with "JS Symbols are not convertible to dynamic". A hard native
@@ -199,7 +227,21 @@ function renderableChildren(node: ISymbioteNode): readonly ISymbioteNode[] {
   // wrapper node. Fast path: no anchors reuses the array, so the common case allocates nothing.
   // An empty raw text is skipped for a different reason and with no flattening: it has no
   // children, and committing it aborts the app inside Fabric's text walk (isEmptyRawText).
-  if (!node.children.some(isSkippedAtCommit)) return node.children;
+  //
+  // The probe is a counted loop rather than `.some()` only so childScan can price it honestly;
+  // see the childScan declaration for what the five counters mean and what they were built to
+  // settle.
+  childScan.scans += 1;
+  const total = node.children.length;
+  let index = 0;
+  while (index < total && !isSkippedAtCommit(node.children[index])) index += 1;
+  // The defeating child was examined too, so it counts.
+  childScan.probed += index === total ? total : index + 1;
+  if (index === total) return node.children;
+
+  childScan.flattens += 1;
+  childScan.flattenProbed += total;
+  if (total > childScan.widest) childScan.widest = total;
 
   const children: ISymbioteNode[] = [];
   for (const child of node.children) {
@@ -548,21 +590,51 @@ function commitContainer(rootTag: IRootTag): void {
 // slower than V8 on a laptop and sizing that multiplier is the whole reason this exists; `commits`
 // separates one expensive commit from a burst of cheap ones inside a frame. Reading zeroes the
 // accumulator, so a sampler on an interval gets disjoint windows rather than a growing total.
+//
+// `propWrites` / `propNoops` come from setProp (node.ts) and price the layer ABOVE the walk: how
+// many prop writes an adapter pushed at the engine in this window, and how many of those asked for
+// a value the node already held. A high `propNoops` says the adapter is re-pushing an unchanged
+// bag; the guard absorbs the cost, but the number is the only place the churn is visible at all.
+//
+// `childScans` / `childFlattens` price renderableChildren, the one part of the walk whose cost is
+// set by WHICH ADAPTER is driving rather than by the app: see the childScan comment above. Read
+// them as a pair — `childFlattens / childScans` is the share of scans an anchor defeated, and
+// `childFlattenWidest` says whether any of them was wide enough to matter.
 export interface ICommitProfile {
   commits: number;
   walkMs: number;
   nodesVisited: number;
+  propWrites: number;
+  propNoops: number;
+  childScans: number;
+  childScanProbed: number;
+  childFlattens: number;
+  childFlattenProbed: number;
+  childFlattenWidest: number;
 }
 
 export function readCommitProfile(): ICommitProfile {
+  const props = takePropStats();
   const snapshot = {
     commits: profile.commits,
     walkMs: profile.walkMs,
     nodesVisited: profile.nodesVisited,
+    propWrites: props.writes,
+    propNoops: props.noops,
+    childScans: childScan.scans,
+    childScanProbed: childScan.probed,
+    childFlattens: childScan.flattens,
+    childFlattenProbed: childScan.flattenProbed,
+    childFlattenWidest: childScan.widest,
   };
   profile.commits = 0;
   profile.walkMs = 0;
   profile.nodesVisited = 0;
+  childScan.scans = 0;
+  childScan.probed = 0;
+  childScan.flattens = 0;
+  childScan.flattenProbed = 0;
+  childScan.widest = 0;
   return snapshot;
 }
 

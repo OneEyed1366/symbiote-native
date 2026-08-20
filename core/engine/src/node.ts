@@ -158,19 +158,70 @@ export function markDirty(node: ISymbioteNode): void {
   }
 }
 
+// How many prop writes actually landed, and how many the no-op guard below turned away.
+// Read-and-zeroed through readCommitProfile() (commit.ts), which folds them into the same window
+// as the walk numbers so one read prices both halves: `propNoops` is the waste an adapter is
+// generating above the engine, `nodesVisited` is what that waste costs below it.
+//
+// Not gated behind isDebug(), for the same reason the commit profile is not: an integer increment
+// is noise next to the prop write it counts, and the figure is only meaningful from a release
+// build. A per-call dlog was the obvious alternative and is deliberately NOT here - the Angular
+// screen that motivated the guard emitted 90 000 no-op writes on one press, and a log line each
+// would measure the logging rather than the code (see the `perf-claims-need-numbers` rule).
+const propStats = { writes: 0, noops: 0 };
+
+export function takePropStats(): { writes: number; noops: number } {
+  const snapshot = { writes: propStats.writes, noops: propStats.noops };
+  propStats.writes = 0;
+  propStats.noops = 0;
+  return snapshot;
+}
+
 // A pure prop set: no event inference. `onTintColor` is a Switch prop and reaches
 // Fabric like any other; the event-vs-prop decision is made by routeProp, never by
 // the key's name.
+//
+// Writing a value the node already holds is a NO-OP and returns before markDirty. Fabric never saw
+// a difference either way - reconcile rebuilds the node's Fabric props and `propsEqual` finds them
+// identical, so no clone is emitted - but the mark itself is not free: it walks to the first
+// already-dirty ancestor and strips every one of them of the commit walk's early exit, so an
+// otherwise untouched subtree gets re-walked purely to prove it is untouched. The guard makes that
+// whole bug class free for every adapter instead of each one having to remember to diff first
+// (measured: Angular's Pressable host bag pushed 104 000 setProp calls for a screen Solid built in
+// 12 000, 90 000 of them writing `undefined` over a key that was not there).
+//
+// Three deliberate choices:
+//
+// - `Object.hasOwn`, not `node.props[key] === undefined`. A key explicitly present holding
+//   `undefined` is not an absent key: `delete` genuinely changes the record's shape, and
+//   `setNativeProps` writes node.props directly and can leave exactly such a key behind. Fabric
+//   itself cannot tell the two apart (fabricProps skips undefined values), but node.props is also
+//   read outside the commit path, so the retained tree keeps the shape callers asked for.
+// - `Object.is`, not a deep compare. A style object, an array, or a handler closure is a fresh
+//   reference on nearly every render, so the guard simply never fires for them - correct, since an
+//   adapter is free to hand back the SAME reference with mutated contents and identity cannot see
+//   that. A deep compare on every prop write would cost more than the walk it saves.
+// - The in-place-mutation hazard that leaves is already instrumented: a node skipped as clean whose
+//   props have drifted is exactly what `warnIfStale` reports as DIRTY-MISS under DEBUG (commit.ts).
 export function setProp(
   node: ISymbioteNode,
   key: string,
   value: unknown,
 ): void {
   if (value === undefined) {
+    if (!Object.hasOwn(node.props, key)) {
+      propStats.noops += 1;
+      return;
+    }
     delete node.props[key];
   } else {
+    if (Object.is(node.props[key], value)) {
+      propStats.noops += 1;
+      return;
+    }
     node.props[key] = value;
   }
+  propStats.writes += 1;
   markDirty(node);
 }
 
@@ -259,16 +310,55 @@ const REACT_JSX_DEV_PROPS: ReadonlySet<string> = new Set([
 interface IClassStyleParts {
   classStyle?: unknown;
   explicitStyle?: unknown;
+  // The hide-without-unmount slot, LAST so it wins over both halves, and cleared rather than
+  // overwritten so unhiding restores exactly what the author wrote. React's `Activity` (and any
+  // future adapter equivalent) needs a node to stop painting while its state and its children
+  // stay mounted; RN's own renderer does this by writing `style: {display:'none'}` straight onto
+  // the instance, which here would clobber the declarative style and leave nothing to restore
+  // from. A third part costs one array slot and makes the operation exactly reversible.
+  hiddenStyle?: unknown;
 }
 const classStyleParts = new WeakMap<ISymbioteNode, IClassStyleParts>();
 
+// The fresh array below means setProp's no-op guard never fires for `style`, and that is
+// DELIBERATE - do not "finish the optimization" by skipping when both halves are unchanged.
+// `classStyleParts` is a shadow copy of the declarative style, and setNativeProps bypasses it
+// (it writes node.props.style directly, merging an Animated frame onto whatever is there). An
+// app that hands over a hoisted style constant - StyleSheet.create, a module-level object - would
+// then re-push an identity-equal half, get skipped, and never restore the declarative style the
+// animation overwrote. The re-push IS the restore path.
 function commitClassStyle(
   node: ISymbioteNode,
   patch: Partial<IClassStyleParts>,
 ): void {
   const entry = { ...classStyleParts.get(node), ...patch };
   classStyleParts.set(node, entry);
-  setProp(node, 'style', [entry.classStyle, entry.explicitStyle]);
+  // The third slot is APPENDED ONLY WHILE HIDDEN. Writing a permanent three-element array would
+  // change the style payload of every node in every app for a state almost none of them are ever
+  // in — and this project spent a day removing per-frame allocations, so a slot that is undefined
+  // 99.9% of the time does not get to ride along on every style write.
+  setProp(
+    node,
+    'style',
+    entry.hiddenStyle === undefined
+      ? [entry.classStyle, entry.explicitStyle]
+      : [entry.classStyle, entry.explicitStyle, entry.hiddenStyle],
+  );
+}
+
+// `display: 'none'` is a real RN style value (Yoga's DisplayNone), so a hidden node keeps its
+// place in the tree, its state and its children — it just stops laying out and painting.
+const HIDDEN_STYLE = { display: 'none' } as const;
+
+/**
+ * Stop a node painting without unmounting it, or let it paint again.
+ *
+ * The seam React's `Activity`/`Suspense` reach for through `hideInstance`/`unhideInstance`. It
+ * lives in the engine rather than an adapter because the reversibility problem — restoring the
+ * author's style byte for byte — belongs to whoever owns the style merge, and that is here.
+ */
+export function setNodeHidden(node: ISymbioteNode, hidden: boolean): void {
+  commitClassStyle(node, { hiddenStyle: hidden ? HIDDEN_STYLE : undefined });
 }
 
 // The explicit (non-class-derived) style half, for an adapter that builds its style prop up
@@ -324,8 +414,24 @@ export function routeProp(
   setProp(node, key, value);
 }
 
+// The same no-op guard as setProp, and here it is strictly stronger: `text` is a string, so
+// `Object.is` is a real value comparison rather than the reference check it degrades to for a style
+// object or a handler. A framework that re-renders a subtree and hands back an unchanged label -
+// every list row whose text did not move, on every update - stops stripping its ancestors of the
+// commit walk's early exit. Counted in the same propStats, because a text write IS a prop write:
+// it lands in node.props.text and reaches Fabric as RCTRawText's only prop.
+//
+// Safe against the one ordering hazard worth naming: a raw-text node REPARENTED under a <Text>
+// commits as RCTVirtualText instead of RCTText (viewNameFor, commit.ts). That flip is not driven
+// from here - a structural op marks the parent chain, and reconcile re-checks `committed.parent` on
+// its early-exit path - so a same-text write not marking cannot hide it.
 export function setText(node: ISymbioteNode, text: string): void {
+  if (Object.is(node.props.text, text)) {
+    propStats.noops += 1;
+    return;
+  }
   node.props.text = text;
+  propStats.writes += 1;
   markDirty(node);
 }
 
@@ -365,4 +471,56 @@ export function removeChild(parent: ISymbioteNode, child: ISymbioteNode): void {
   if (index >= 0) parent.children.splice(index, 1);
   child.parent = undefined;
   markDirty(parent);
+}
+
+// A structural census of a retained tree: how many nodes it holds, how many of those the commit
+// walk skips, and — the number this exists for — the WIDTH of every parent whose child list
+// contains a skipped node, because that width is exactly what `renderableChildren` (commit.ts)
+// re-scans and re-allocates every time such a parent reconciles.
+//
+// Anchor count is an ADAPTER property, not an app one. A React/Vue/Svelte/Solid component is a
+// function that returns children and allocates no node; an Angular component is bound to a host
+// ELEMENT and therefore always has one, kept from painting by anchor-host-registry.ts. So the same
+// screen is anchor-free under four adapters and carries one anchor per composed component instance
+// under the fifth, and nothing short of counting the live tree shows it — grepping adapter sources
+// for "anchor" measures how much they talk about anchors, not how many they build.
+//
+// Pairs with readCommitProfile()'s childScans/childFlattens (commit.ts): the profile says how often
+// a scan was defeated over a window, this says over how many children each defeat could range.
+export interface ITreeCensus {
+  nodes: number;
+  anchors: number;
+  emptyRawTexts: number;
+  /** Nodes the commit walk actually reconciles: `nodes` minus everything it skips. */
+  renderable: number;
+  /** children.length of every parent holding at least one skipped child, widest first. */
+  flattenWidths: number[];
+}
+
+export function censusRetainedTree(
+  roots: readonly ISymbioteNode[],
+): ITreeCensus {
+  const census: ITreeCensus = {
+    nodes: 0,
+    anchors: 0,
+    emptyRawTexts: 0,
+    renderable: 0,
+    flattenWidths: [],
+  };
+  // Explicit stack, not recursion: a deep list under a benchmark screen would blow the JS stack
+  // on the very tree this is meant to measure.
+  const stack: ISymbioteNode[] = [...roots];
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (node === undefined) break;
+    census.nodes += 1;
+    if (isAnchor(node)) census.anchors += 1;
+    else if (isEmptyRawText(node)) census.emptyRawTexts += 1;
+    else census.renderable += 1;
+    if (node.children.some(child => isAnchor(child) || isEmptyRawText(child)))
+      census.flattenWidths.push(node.children.length);
+    for (const child of node.children) stack.push(child);
+  }
+  census.flattenWidths.sort((left, right) => right - left);
+  return census;
 }
