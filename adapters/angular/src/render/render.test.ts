@@ -4,7 +4,7 @@
 // through the engine.
 
 import '@angular/compiler';
-import { Component } from '@angular/core';
+import { Component, resource } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from './index';
@@ -99,6 +99,22 @@ Component({
   template: `<symbiote-view><counter-child /><unrelated-sibling-child /></symbiote-view>`,
 })(TargetedComponent);
 
+// A component whose only unusual move is calling `resource()`. Angular resolves TransferState
+// while constructing it, and TransferState's root factory probes `document.getElementById` — so
+// this component is a canary for the DOCUMENT stub in render.ts, not for resource() itself.
+class ResourceComponent {
+  readonly probe = resource({
+    params: () => ({ id: 1 }),
+    loader: (): Promise<string> => Promise.resolve('loaded'),
+  });
+}
+Component({
+  selector: 'symbiote-angular-resource',
+  standalone: true,
+  imports: [TestText],
+  template: '<symbiote-text>resource mounted</symbiote-text>',
+})(ResourceComponent);
+
 class InitialPropsComponent {
   greeting = 'unset';
 }
@@ -118,6 +134,20 @@ Component({
 // modules/app-registry/app-registry.test.ts's "projects the root component into a registered
 // wrapper via <ng-content>" — not duplicated here.
 describe('Angular mount', () => {
+  // A screen that calls resource() rendered NOTHING on device — white body under a native
+  // header — because TransferState's factory hit `document.getElementById` on a stub that had
+  // only { head, body }. The throw lands during component construction, so the failure is a
+  // blank tree rather than an error anyone sees. Assert the tree, not the absence of a throw:
+  // the symptom was silence.
+  it('renders a component that calls resource(), whose TransferState probes the document', async () => {
+    mount(ROOT_TAG, ResourceComponent);
+    await tick();
+
+    expect(fabric.serialize(fabric.appRoot().children)).toBe(
+      'RCTText(RCTRawText "resource mounted")',
+    );
+  });
+
   it('bootstraps a standalone component into a committed Fabric tree', async () => {
     mount(ROOT_TAG, SmokeComponent);
     await tick();
