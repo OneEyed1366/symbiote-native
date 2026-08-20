@@ -48,6 +48,13 @@ local resolution never sees `publishConfig` at all.
 }
 ```
 
+The two `exports` maps are independent lists, not a merge — so ADDING a subpath means editing
+BOTH. Editing only the top one passes tsc, Metro, the test suite and every in-repo check, and
+breaks solely for `npm install`ers with `ERR_PACKAGE_PATH_NOT_EXPORTED`, because the overlay
+replaces the map wholesale. Measured 2026-08-21 while adding `./solid` to twelve companion
+packages. `tests/package-subpath-parity.test.ts` guards the top map only — the packed one is
+covered by the pack-and-read step below, which is the reason that step exists.
+
 Verify the override actually applies by packing for real, not by reading the
 source `package.json`:
 
@@ -562,3 +569,29 @@ npx tsc --build                       # confirms build/ output for every plain +
 cd core/engine && pnpm pack --pack-destination /tmp && tar -tzf /tmp/symbiote-engine-*.tgz
 # → only build/** + package.json + LICENSE, no src/ leakage
 ```
+
+### `pnpm pack` captures whatever `build/` happens to be on disk — run `clean:build` first
+
+Measured 2026-08-20. `pnpm pack` runs `prepare`, and `prepare` runs `tsc --build`, which is
+INCREMENTAL: a file whose output tsc decides is up to date is not re-emitted, so the tarball can
+ship an older `build/` than the source it was packed from. Caught by hashing every `build/` file
+inside the tarball against the same path on disk — 314 files, one differed, and it differed only by
+a comment, which is exactly why nobody would notice it in a diff of the code.
+
+A comment is harmless; the same mechanism ships stale CODE just as quietly. The repo already has
+the fix — `prepublish-build` starts with `clean:build` (`scripts/clean-build-outputs.mjs`) — so the
+rule is simply: **`pnpm run prepublish-build` before packing anything you intend to install or
+publish, never a bare `pnpm pack` on a working tree you have been iterating in.** After that the
+same hash comparison came back 0/312.
+
+The check itself is worth keeping, since it is three lines and it is the only thing that
+distinguishes "packed" from "packed what I think it packed":
+
+```
+open each build/* member of the tarball, md5 it, md5 the same path under the package dir, compare
+```
+
+Related trap on the consuming side, already documented under `<examples_vs_dot_examples>`: npm
+serves a cached copy for an unchanged `file:` path unless BOTH `node_modules/@symbiote-native/<pkg>`
+and `package-lock.json` are deleted. A fresh tarball plus a stale install looks identical to a
+successful update, right down to `added N packages`.
