@@ -21,3 +21,11 @@ pnpm-lock.yaml
 package-lock.json
 *.xcassets/
 *.tgz
+
+# `css-dts` writes these next to each .module.css and rewrites them on every `pretypecheck`.
+# Formatting them would make the on-disk copy diverge from the generator's output on the very
+# next run, so the CI format gate would fail against a file nobody edited.
+*.module.css.d.ts
+*.module.scss.d.ts
+*.module.less.d.ts
+*.module.styl.d.ts
