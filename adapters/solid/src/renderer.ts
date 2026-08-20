@@ -107,6 +107,18 @@ function asText(value: unknown): string {
   return typeof value === 'string' ? value : String(value);
 }
 
+// Hoisted and exported for the same reason as replaceText above: createRenderer() hands back only
+// the 11 names the JSX compiler imports, and removeNode is not among them — but create-portal.tsx
+// has to DETACH its anchor host from the portal target on cleanup. Going through here rather than
+// calling the engine's removeChild directly is what keeps the mutation paired with requestCommit(),
+// and keeps the surface-vs-node branch in one place.
+export function removeNode(parent: IHostNode, node: IHostNode): void {
+  if (isSurface(node)) return;
+  if (isSurface(parent)) parent.removeChild(node);
+  else removeEngineChild(parent, node);
+  requestCommit();
+}
+
 const nodeOps: RendererOptions<IHostNode> = {
   createElement(tag) {
     const descriptor = descriptorFor(tag);
@@ -186,12 +198,7 @@ const nodeOps: RendererOptions<IHostNode> = {
     requestCommit();
   },
 
-  removeNode(parent, node) {
-    if (isSurface(node)) return;
-    if (isSurface(parent)) parent.removeChild(node);
-    else removeEngineChild(parent, node);
-    requestCommit();
-  },
+  removeNode,
 
   getParentNode(node) {
     if (isSurface(node)) return undefined;

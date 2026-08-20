@@ -7,9 +7,10 @@
 // Layer status (symbiote-new-adapter §7): L4 in progress. The primitives, the stateful touch
 // components, the Touchable family, Button / ImageBackground / InputAccessoryView, StatusBar and
 // the list family are done at full parity with the React reference, and the engine-owned runtime
-// modules are re-exported below. Still absent: `createPortal` / `createTunnel` (both need a
-// same-surface replacement for solid-js/web's DOM-bound Portal / Dynamic). This barrel grows a
-// layer at a time on purpose, so a break localizes to the layer that introduced it.
+// modules are re-exported below. Content relocation is in too: `Portal` (same-surface, React's
+// createPortal twin) and `createTunnel` (cross-surface), both written over the universal renderer
+// — solid-js/web's DOM-bound Portal was never the route to either. This barrel grows a layer at a
+// time on purpose, so a break localizes to the layer that introduced it.
 //
 // The two lifecycle primitives are spelled `createColorScheme` / `createWindowDimensions`, not
 // `use*`: in Solid `use*` means consuming something that already exists (useContext,
@@ -80,6 +81,18 @@ export type {
 // compiler cannot trace a class through property access (.claude/rules/dotted-component-tags.md).
 export { StatusBar } from './modules/status-bar';
 export type { IStatusBarProps, IStatusBarStyle } from './modules/status-bar';
+
+// Portal: same-surface content relocation, the twin of React's createPortal and Angular's
+// PortalDirective/PortalOutletDirective. `mount` takes an already-mounted host node in THIS
+// surface (a ref off a rendered component) or the surface itself; reaching a second, separately
+// mounted surface is a different mechanism by design — see ./create-portal's header.
+export { Portal } from './create-portal';
+export type { IPortalProps, IPortalTarget } from './create-portal';
+// createTunnel: cross-surface content sharing, the case Portal deliberately does not cover. A
+// shared store, never a reach into a foreign surface's tree — `Out` paints from whichever surface
+// renders it. Same name and same In/Out shape as the React, Vue, Svelte and Angular versions.
+export { createTunnel } from './create-tunnel';
+export type { ITunnel, ITunnelInProps } from './create-tunnel';
 
 // Reactive wrappers over the engine's own Appearance / Dimensions event sources. The engine keeps
 // the subscription logic; these add only the Solid lifecycle (signal + onCleanup).
@@ -226,11 +239,14 @@ export type {
 } from '@symbiote-native/engine';
 
 // Solid's control flow is pure reactivity with no DOM dependency, so it works verbatim over the
-// universal renderer and is re-exported here to keep an app on one import. `Portal` and `Dynamic`
-// are deliberately ABSENT: both live in solid-js/web and are built on real DOM. Their replacements
-// are a same-surface Dynamic reimplementation over the universal renderer and, for cross-surface
-// content, `createTunnel` — the same conclusion the React, Vue and Angular adapters reached about
-// createPortal/Teleport (react-adapter-portal, vue-adapter-directives).
+// universal renderer and is re-exported here to keep an app on one import. solid-js/web's own
+// `Portal` is NOT among them and cannot be — it allocates its container with
+// `document.createElement` — but the CAPABILITY is not missing: this package ships its own
+// `Portal` over the universal renderer (./create-portal, exported above), at the same
+// same-surface scope React and Angular chose for theirs. `Dynamic` is the one member of that DOM-bound pair still absent.
+// It is absent on its own terms, not as fallout from Portal: nothing here needed it (a tunnel
+// renders stored content by calling a thunk inside <For>, no dynamic component involved), and no
+// other adapter ships a twin of it for parity to require one.
 //
 // Solid's own control-flow `Switch`/`Match` pair is ABSENT for a different reason: `Switch` collides
 // head-on with RN's Switch component, which every other adapter exports under exactly that name and
