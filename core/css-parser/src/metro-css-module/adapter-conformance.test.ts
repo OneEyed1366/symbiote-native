@@ -515,3 +515,25 @@ describe('value normalization is the same in both file kinds', () => {
     ).toEqual({ backgroundColor: NORMALIZED });
   });
 });
+
+// `composes` is a CSS-Modules DIRECTIVE that lightningcss consumes into `exports`, not a property
+// this compiler has to map. It reached the property mapper only because lightningcss files
+// anything outside the CSS property grammar under `custom`, and the mapper warned about it — so a
+// perfectly working `.module.*` file printed "unsupported CSS property" on every build. That is
+// worse than useless: the drop warnings are the only signal that a real rule died, and a channel
+// that cries wolf on working code is the one nobody reads when it finally matters.
+describe('composes does not warn', () => {
+  it('emits no unsupported-property warning for a working composes', async () => {
+    const messages: string[] = [];
+    const original = console.warn;
+    console.warn = (message: unknown) => void messages.push(String(message));
+    try {
+      // A filename no other case in this file compiles: `warnOnce` dedupes per file, so reusing
+      // MODULE_KIND's would let an earlier test absorb the warning and this one pass vacuously.
+      await compileCssFile(AUTHORED_CSS, 'composes-warning-probe.module.css');
+    } finally {
+      console.warn = original;
+    }
+    expect(messages.filter(line => line.includes('composes'))).toEqual([]);
+  });
+});

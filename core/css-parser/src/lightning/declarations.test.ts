@@ -154,6 +154,10 @@ describe('declarationToStyle — shorthand expansion (trap 4)', () => {
       },
     ],
     ['border-radius: 50%', { borderRadius: '50%' }],
+    // The longhands arrive as a Size2D pair, not a length — reading `value` directly dropped them.
+    ['border-top-left-radius: 20px', { borderTopLeftRadius: 20 }],
+    ['border-bottom-right-radius: 4px 8px', { borderBottomRightRadius: 4 }],
+    ['border-top-right-radius: 50%', { borderTopRightRadius: '50%' }],
     // RN has no `inset`-era guarantee, so this one always expands even when uniform.
     ['inset: 0', { top: 0, right: 0, bottom: 0, left: 0 }],
     ['inset: 0 10px', { top: 0, right: 10, bottom: 0, left: 10 }],

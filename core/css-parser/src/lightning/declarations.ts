@@ -613,6 +613,17 @@ const CORNER_PROPS = [
   'borderBottomLeftRadius',
 ] as const;
 
+// A corner LONGHAND never arrives as a bare length: lightningcss gives a Size2D pair, so
+// `border-top-left-radius: 20px` is `[20px, 20px]` and `4px 8px` is `[4px, 8px]`. Reading it as
+// one length made every corner longhand drop with "cannot express" on a plain `20px` — found in
+// `examples/solid/App.css`'s `.sheet`, the only place in the corpus that uses them.
+const CORNER_RADIUS_PROPERTIES: ReadonlySet<string> = new Set([
+  'border-top-left-radius',
+  'border-top-right-radius',
+  'border-bottom-right-radius',
+  'border-bottom-left-radius',
+]);
+
 function readRectSide(
   side: unknown,
   mapping: IRectMapping,
@@ -989,6 +1000,15 @@ function declarationToStyleAt(
     }
     case 'text-shadow':
       return textShadowToStyle(value, context);
+    // A CSS-Modules DIRECTIVE, not a style property — and lightningcss has ALREADY acted on it:
+    // the composed names come back through `exports[...].composes`, which
+    // `metro-css-module/index.ts` walks to flatten a chain. Measured 2026-08-20: it arrives as a
+    // first-class `property: 'composes'`, NOT under `custom` where an unknown name goes, so it fell
+    // through to the PROPERTY_TABLE miss and every author of a WORKING `.module.*` file was told
+    // "unsupported CSS property" on every build. The drop warnings are the only signal that a real
+    // rule died; a channel that cries wolf on working code is the one nobody reads when it matters.
+    case 'composes':
+      return {};
     default:
       break;
   }
@@ -1012,6 +1032,21 @@ function declarationToStyleAt(
       return {};
     }
     return { [mapping.rnProperty]: color };
+  }
+
+  // Only the horizontal half survives — RN has no elliptical radius, the same rule
+  // `borderRadiusToStyle` already applies to each corner of the shorthand.
+  if (CORNER_RADIUS_PROPERTIES.has(cssProperty)) {
+    const radius = readLength(Array.isArray(value) ? value[0] : value, context);
+    if (radius === null) {
+      warnDrop(
+        context,
+        cssProperty,
+        `"${cssProperty}" has a value React Native cannot express`,
+      );
+      return {};
+    }
+    return { [mapping.rnProperty]: lengthToStyleValue(radius) };
   }
 
   if (mapping.kind === 'raw') {
