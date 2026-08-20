@@ -150,10 +150,13 @@ export function compileCssToRules(
           CONDITIONAL_AT_RULES.map(name => [name, dropAtRule(name)]),
         ),
         style(rule) {
-          // `dropped` is deliberately ignored here: `selectorsToMatches` already warns per drop,
-          // with the reason spelled out for the author. Warning again from this level printed the
-          // same drop twice.
-          const { matches } = selectorsToMatches(
+          // Every reason but `root` is announced by `selectorsToMatches` itself, with the
+          // explanation spelled out for the author — warning again from this level printed the
+          // same drop twice. `root` is the exception it hands back silently, because only here
+          // are the declarations in scope, and a `:root` block is worth a word ONLY when it
+          // carries something that would have painted. Custom properties are its whole purpose
+          // and are already collected by `collectCustomProperties`.
+          const { matches, dropped } = selectorsToMatches(
             rule.value.selectors,
             filename,
           );
@@ -163,6 +166,18 @@ export function compileCssToRules(
             ...rule.value.declarations.declarations,
             ...rule.value.declarations.importantDeclarations,
           ];
+          if (
+            dropped.some(entry => entry.reason === 'root') &&
+            declarations.some(declaration => declaration.property !== 'custom')
+          ) {
+            warnOnce(
+              warned,
+              `root-paints:${filename}`,
+              `[@symbiote-native/css-parser] ${filename}: a \`:root\` rule declares more than ` +
+                'custom properties — everything else in it is dropped, because `:root` matches no ' +
+                'node in React Native. Move those declarations onto a class.',
+            );
+          }
           for (const match of matches) {
             collected.push({ ...match, declarations });
           }

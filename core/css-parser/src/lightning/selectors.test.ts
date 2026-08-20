@@ -355,7 +355,7 @@ describe('selectorsToMatches — dropped selectors', () => {
 
     expect(warn).toHaveBeenCalledTimes(1);
     const message = String(warn.mock.calls[0]?.[0]);
-    expect(message).toContain(`[symbiote-css] ${FILENAME}:`);
+    expect(message).toContain(`[@symbiote-native/css-parser] ${FILENAME}:`);
     expect(message).toContain('hover');
     expect(message).toContain('never match');
   });
@@ -364,6 +364,17 @@ describe('selectorsToMatches — dropped selectors', () => {
     expect(matchesFor('div.card:hover').dropped).toEqual([
       { reason: 'element', detail: 'div' },
     ]);
+  });
+
+  // `:root` is the one drop this module reports without announcing: it is where an author is told
+  // to put custom properties, and those are read by their own pass. Only `rules.ts` can see
+  // whether the block ALSO carries something that would have painted, so only it may speak.
+  it('drops `:root` silently, with a reason of its own', () => {
+    const result = matchesFor(':root');
+
+    expect(result.matches).toEqual([]);
+    expect(result.dropped).toEqual([{ reason: 'root', detail: 'root' }]);
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

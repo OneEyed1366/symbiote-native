@@ -65,6 +65,7 @@ export interface ISelectorMatch {
 
 export interface IDroppedSelector {
   readonly reason:
+    | 'root'
     | 'pseudo-class'
     | 'pseudo-element'
     | 'attribute'
@@ -86,6 +87,7 @@ export interface ISelectorResult {
 // Why the rule can never fire on a device, per reason — the half of the warning that tells an
 // author what to do instead of just what was thrown away.
 const DROP_EXPLANATION: Record<IDroppedSelector['reason'], string> = {
+  root: 'a `:root` rule paints nothing — it exists to declare custom properties, which are collected by their own pass',
   'pseudo-class':
     'React Native has no pseudo-class state (no hover/focus/nth-child)',
   'pseudo-element': 'React Native has no pseudo-elements',
@@ -378,6 +380,16 @@ function consumeComponent(
         consumeSelector(builder, component.selector);
         return;
       }
+      // `:root` is not state — it is where an author is SUPPOSED to declare custom properties, and
+      // `collectCustomProperties` has already read them by the time this runs. Reported with its
+      // own reason so the caller can stay silent about the ordinary token sheet and speak up only
+      // when the rule also carries a declaration that would have painted. Warning unconditionally
+      // meant every stylesheet with a `:root { --token: … }` block printed "it can never match",
+      // about the one construct the docs tell people to write.
+      if (component.kind === 'root') {
+        drop(builder, 'root', 'root');
+        return;
+      }
       if (component.kind === 'custom-function') {
         if (component.name === 'global') {
           consumePayload(builder, component.arguments, ':global()');
@@ -470,8 +482,10 @@ export function selectorsToMatches(
     const problem = builder.drop;
     if (problem !== null) {
       dropped.push(problem);
+      // `root` is returned, never announced from here — see DROP_EXPLANATION.root.
+      if (problem.reason === 'root') continue;
       console.warn(
-        `[symbiote-css] ${filename}: dropped a rule on \`${problem.detail}\` — ${DROP_EXPLANATION[problem.reason]}, so it can never match in React Native.`,
+        `[@symbiote-native/css-parser] ${filename}: dropped a rule on \`${problem.detail}\` — ${DROP_EXPLANATION[problem.reason]}, so it can never match in React Native.`,
       );
       continue;
     }
