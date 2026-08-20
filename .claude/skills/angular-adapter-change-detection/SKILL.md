@@ -1,6 +1,6 @@
 ---
 name: angular-adapter-change-detection
-description: "Symbiote Angular adapter change detection — read BEFORE debugging why a component renders but does not REPAINT after a flat-bag onX/responder/PanResponder mutation, before touching SymbioteHostPropsDirective or render.ts's CD wiring, or before assuming ApplicationRef.tick() fixes a whole-tree rebuild on press. Covers: whenCommitted async-commit gotcha (from Vue); SignalView vs CheckAlways (Angular 20 @Component views are SignalView, so a flat-bag onX mutation dirties nothing — fix is markForCheck(), NOT detectChanges()); zoneless scheduling + ApplicationRef.tick() (unreachable pre-fix, missing INJECTOR_SCOPE:'root', Targeted vs Global mode); a hypothesis DISPROVED: Targeted mode does NOT stop a press re-running the root template (markViewDirty walks RefreshView|Dirty to root); protected (@Component) vs not (@if/@for); AND (§13/§14) why a `[style]`/`[class]` binding is the ONE binding name that writes the input without dirtying the child — Angular's styling instruction hands off to setDirectiveInputsWhichShadowsStyling and skips markDirtyIfOnPush — with the two fix shapes (SymbioteStyleInputDirective for a real `style` input; an anchorStyle signal polled in ngDoCheck for class= / for Button, which has no style input) and the ReactiveStyle canary screen. Trigger: 'renders but doesn't repaint', 'class toggled after mount does nothing', 'style frozen at creation', 'rebuild whole tree on press', markForCheck vs detectChanges, NG0201/ApplicationRef failures, template literals losing referential stability."
+description: "Symbiote Angular adapter change detection — read BEFORE debugging why a component renders but does not REPAINT after a flat-bag onX/responder/PanResponder mutation, before touching SymbioteHostPropsDirective or render.ts's CD wiring, or before assuming ApplicationRef.tick() fixes a whole-tree rebuild on press. Covers: whenCommitted async-commit gotcha (from Vue); SignalView vs CheckAlways (Angular 20 @Component views are SignalView, so a flat-bag onX mutation dirties nothing — fix is markForCheck(), NOT detectChanges()); zoneless scheduling + ApplicationRef.tick() (unreachable pre-fix, missing INJECTOR_SCOPE:'root', Targeted vs Global mode); a hypothesis DISPROVED: Targeted mode does NOT stop a press re-running the root template (markViewDirty walks RefreshView|Dirty to root); protected (@Component) vs not (@if/@for); AND (§13/§14) why a `[style]`/`[class]` binding is the ONE binding name that writes the input without dirtying the child — Angular's styling instruction hands off to setDirectiveInputsWhichShadowsStyling and skips markDirtyIfOnPush — with the two fix shapes (SymbioteStyleInputDirective for a real `style` input; an anchorStyle signal polled in ngDoCheck for class= / for Button, which has no style input) and the ReactiveStyle canary screen. AND (§17) why a windowed list can go permanently DEAF to scroll — §15's per-frame scroll gate compared the last-rendered window against the one before it, a comparison that latches 'settled' forever once two recomputes agree, freezing VirtualizedList at the first viewport's window with blank space below (fix: predict the window from the LIVE offset via the shared computeWindow). Trigger: 'renders but doesn't repaint', 'list stops scrolling / blank below the last row', 'window frozen mid-scroll', 'class toggled after mount does nothing', 'style frozen at creation', 'rebuild whole tree on press', markForCheck vs detectChanges, NG0201/ApplicationRef failures, template literals losing referential stability."
 ---
 
 # Symbiote Angular adapter — change detection mechanics
@@ -662,9 +662,9 @@ nothing at one read per refresh and only adds a staleness surface.
 }
 ```
 
-| what changed | reaches the component as | fix |
-| --- | --- | --- |
-| `[style]` where a `style` @Input exists | an input write with no dirty mark | `SymbioteStyleInputDirective` |
+| what changed                                                             | reaches the component as                                      | fix                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------ |
+| `[style]` where a `style` @Input exists                                  | an input write with no dirty mark                             | `SymbioteStyleInputDirective`              |
 | `class=` / `[class.x]` / `[ngClass]`, or `[style]` with no `style` input | renderer addClass/removeClass onto the anchor, never an input | `anchorStyle` signal polled in `ngDoCheck` |
 
 A NEW composed component needs whichever row applies to it; a plain getter over
@@ -791,5 +791,280 @@ absent: they propagate correctly, so a tile driven by one would only dilute the 
       real). Each poll = one property read + Object.is",
   conclusion: "no push refactor, no signal migration for this. If a future screen ever refreshes
              on every frame again, re-measure then rather than assuming"
+}
+```
+
+## §16. The flat bag was pushed key-by-key with no diff — and OnPush is NOT the benchmark story (2026-08-20)
+
+```
+§16_host_props_bag_written_whole := {
+  question_asked: "Angular is ~3x every other adapter on the js-framework-benchmark rows that
+                 BUILD the list (create 2383ms / replace 2515 / append 2544 / clear 126 vs Solid
+                 765/804/910/16) while its POINT ops are normal (select 77.3, swap 80.6, remove
+                 83.9 — the field is 62-116). Hypothesis under test: BenchmarkScreen's four
+                 @Components lack OnPush",
+  ONPUSH_REFUTED: "measured headless, examples/angular's BenchmarkRow verbatim, 1000 rows, Default
+                 vs ChangeDetectionStrategy.OnPush — every counter BYTE-IDENTICAL (createNode
+                 9000, completeRoot 1, nodesVisited 9003, engineNodes 12005, rendererWrites
+                 106000, rowTemplateReads 1000). Two reasons: a create is a first BUILD, not a
+                 re-check, and zoneless Angular 20+ already runs a signal write in TARGETED mode
+                 (§5) — a meter signal ticking 10x beside 1000 mounted rows cost 10 viewsChecked
+                 and 0 row-template runs under Default. Do NOT sprinkle OnPush on app screens for
+                 this; examples/angular has 44 @Components, 2 with OnPush, and that is fine",
+  ENGINE_EXONERATED: "same 1000-row create, Angular vs Solid: createNode 9000 = 9000,
+                    completeRoot 1 = 1, nodesVisited 9003 = 9002, engine walkMs 10.5 = 11.2.
+                    Identical Fabric output. Whatever the device 3x is, it is not the engine",
+  THE_ONE_REAL_GAP: "engine setProp() calls for that create — Angular 104 000 vs Solid 12 000
+                   (8.7x), of which 90 000 carried `undefined`",
+  root_cause: "SymbioteHostPropsDirective's setter wrote EVERY key of the bag on every push, and a
+             composed component's bag is a FIXED-SHAPE literal — Pressable's hostProps() computed
+             lists ~48 keys (nextFocus*, the whole accessibility + aria set, android_ripple pair),
+             nearly all `undefined` on any instance. Two Pressables per benchmark row x 1000 rows
+             = 96 000 writes that each did `delete node.props[key]` on a fresh object plus a
+             markDirty walk, and produced nothing. Per row: 106 writes to deposit ~17 keys",
+  fix: "per-key diff in the directive (adapters/angular/src/primitives/shared.ts): skip when
+      Object.is(previouslyPushed[key], value), plus a second pass clearing keys that VANISHED
+      from the bag (resolveAccessibilityProps genuinely returns two different key sets — see
+      .claude/rules/solid-descriptor-bridge.md trap 1 for the same hazard elsewhere). Previous
+      values are COPIED, not aliased: a component may hand back the same object mutated",
+  measured_after: "create 1000: setProp 104 000 -> 14 000 (Solid 12 000), rendererWrites 106 000
+                 -> 16 000, undefinedWrites 90 000 -> 0, committed tree byte-identical.
+                 UPDATE path is the bigger win: 5 press cycles on ONE Pressable, 460 renderer
+                 writes -> 10 (92/press -> 2/press)",
+  HONEST_LIMIT: "on desktop V8 this buys NOTHING measurable — framework half of the create was
+               108.0ms before and 113.3ms after, inside a 108-135ms run-to-run band. V8's JIT
+               makes 90 000 monomorphic delete+regex+Set-lookup calls near-free. Hermes is a
+               bytecode interpreter with no JIT and no widenable semi-space, which is where a
+               7.4x call-count cut should pay — but that is a PREDICTION. Do not quote a
+               millisecond figure for this until the device says one",
+  the_3x_IS_NOT_REPRODUCED_HEADLESS: "same host, same operation: Angular framework time 113ms vs
+                                     Solid 92ms — 1.23x, not 3.1x. So either Hermes amplifies
+                                     exactly this call-count gap, or something in the real screen
+                                     is absent from a minimal probe. Next suspects, in order:
+                                     (1) 3 002 extra engine nodes per 1000 rows — an anchor host
+                                         per composed component (<Pressable> x2 + the row
+                                         component itself), 12 engine nodes/row vs Solid's 9,
+                                         each an allocation and each forcing renderableChildren
+                                         to rebuild its parent's child array on EVERY reconcile;
+                                     (2) Angular's own LView+LContainer instantiation for 1000
+                                         component instances, which OnPush provably cannot touch;
+                                     (3) §21d's per-frame idle commit running THROUGHOUT each
+                                         timed operation, Angular-only",
+  guarded_by: "adapters/angular/src/primitives/host-props-diff.test.ts, 3 cases, each broken once:
+             removing the skip -> `expected [ 'nativeID', 'accessibilityHint' ] to deeply equal
+             []`; skipping undefined unconditionally -> the change-to-undefined case reads `[]`
+             instead of one write; dropping the vanished-key pass -> same shape on `role`",
+  side_effect: "host-props-wrapper-stability.test.ts asserted `pushed.length > 1` as a
+              PRECONDITION for its wrapper-identity check. A stable handler is now pushed exactly
+              once, so that line became toBe(1) — the guarded property (one wrapper per unchanged
+              handler) is unchanged and now holds more strongly",
+  repack_required: "the fix is in adapters/angular, so examples/angular needs the documented pack
+                  loop before any device re-measurement"
+}
+```
+
+## §17. §15's scroll gate had a latch: a "settled" verdict it could never leave (2026-08-20)
+
+```
+§17_render_signature_latch := {
+  bug: "examples/angular Benchmark sticky PATH B (SectionList 16x32, getItemLayout, 320px box)
+      painted up to flat index 120 - section 4 row 18 - and blank to the bottom of the box,
+      forever. 120 is EXACTLY the window a 320px viewport asks for at offset 0, so the list was
+      not mid-fill: it had stopped reacting to scroll altogether",
+  root_cause: "§15 source_2 gated dispatch's markForCheck on `renderSignature() !==
+             lastRenderSignature`, where renderSignature() reads the LIVE metrics - which are only
+             recomputed inside a CD pass, i.e. only after a mark. The comparison therefore lags the
+             state by one pass and works only while every recompute MOVES the window. The moment
+             two consecutive recomputes agree (a sub-row scroll delta; at 60Hz, most frames),
+             lastRenderSignature equals the live metrics and the gate LATCHES: no mark -> no CD ->
+             no ngDoCheck -> no refresh-metrics -> metrics frozen -> signature frozen. Permanent,
+             and it swallows arbitrarily large offsets after it",
+  why_no_revival: "nothing else can restart it. The batch-fill pump needs a commit, which lives in
+                 ngAfterViewChecked, which needs a CD pass. An unrelated ancestor refresh does not
+                 reach the list either - a plain @Component child is SignalView and is skipped when
+                 not dirty (§3d). ngDoCheck's lastRecompute gate is NOT the culprit: renderVersion
+                 does bump",
+  hypothesis_refuted: "the ngAfterViewChecked / listEffectSignature guard was the suspect and is
+                     INNOCENT - it never even runs, because its view is never checked. Counters at
+                     the moment of the frozen scroll: scrollTicks=1 listMarks=0 listChecks=0
+                     listRecomputes=0 cdPasses=0. The event arrived; dispatch returned before the
+                     mark",
+  fix: "isWindowSettled(action) (components/virtualized-list/index.ts) replaces the signature
+      field. It asks the question the gate always meant to ask - `would a render leave the window
+      where it is` - of the state as it is NOW: re-run the SHARED computeWindow over the CACHED
+      offsets/lengths at the live scrollOffset/viewportLength and compare with metrics.target.
+      Two scans, no allocation; buildOffsets (the O(count) allocating half) still runs once per
+      render. Returns false unconditionally for a `measure` action (it rewrites the very table the
+      prediction reads) and while committedWindow is short of target (only a render advances the
+      throttle - skipping there is what stalled the fill)",
+  no_drift: "it calls the same function the render will call, so the prediction cannot disagree
+           with the window it predicts. Do NOT hand-inline computeWindow's boundary test here",
+  cannot_free_run_CD: "markForCheck is reachable ONLY from dispatch, and dispatch only from a
+                     native callback or an adapter timer - never from a CD hook. ngDoCheck's
+                     lastRecompute gate (the guard that actually prevents the windowCells ->
+                     VListOutletDirective -> markForCheck loop) is untouched and still keyed on
+                     renderVersion, which only moves in dispatch. The predicate terminates: it
+                     returns false only while the window is short of target or the target moved,
+                     both resolved by one render",
+  guarded_by: "components/virtualized-list/refill-pump-deadlock.test.ts, 3 cases on the real PATH B
+             config, each broken once:
+               schedule-refill effect disabled -> `the fill pump stopped short of its target:
+                 window [0, 19] of target [0, 120] over 544 entries at offset 0` (case 1) and
+                 `... window [0, 69] of target [0, 223] ... at offset 3000` (case 2)
+               prediction fed a stale offset -> `the list never recomputed its window for the
+                 offset it was scrolled to: expected +0 to be 6000` (case 3, and ONLY case 3)
+             Observable is subscribeListDiagnostics, not the committed tree: a frozen list reports
+             a target that agrees with itself, so the fill predicate alone reads healthy - the
+             frame's scrollOffset is what catches it",
+  side_effect: "scroll-cost.test.ts (§15's own regression) went 1 screen re-run / 5 row re-runs ->
+              0 / 0. That list never gets a viewport, so no offset can move its window and it owed
+              nothing; the 1 was the stale lagging pass being paid for. Property held more
+              strongly, not weakened",
+  scope: "ANGULAR ONLY - checked, not assumed. React (forceRender via useReducer tick+1), Vue
+        (version.value += 1), Svelte ($state version += 1), Solid (setVersion(tick+1)) all notify
+        UNCONDITIONALLY on `changed`; none has a window-comparison gate on the notification. Their
+        shared listEffectSignature dedup is on the COMMIT, recomputed from current state each
+        pass, and throttleWindow provably moves an edge whenever a refill is pending - so it
+        cannot latch. PATH A (plain ScrollView + stickyHeaderIndices, every child mounted) has no
+        window and no pump at all; its sticky rides an Animated interpolation off the native
+        scroll value. Unaffected",
+  latent_all_five: "maxToRenderPerBatch is defaulted with ?? and never clamped in all five
+                  adapters, so an explicit 0 makes throttleWindow return the previous window while
+                  commitList still reports below-target - the pump dies after one tick,
+                  framework-independently. Not hit in practice, and the clamp belongs in the
+                  reducer, not in five adapters",
+  repack_required: "the fix is in adapters/angular, so examples/angular needs the documented pnpm
+                  pack + rm node_modules/@symbiote-native/angular + rm package-lock + npm install
+                  loop before the device shows it"
+}
+```
+
+### §pack_ships_stale_aot — `pnpm pack` on adapters/angular shipped an OLD build, silently (2026-08-20)
+
+Cost: two fixes reported "installed and verified", neither in the bundle; a wrong device
+conclusion built on top of that (see honest_limit above); one wasted measurement.
+
+```
+"prepare":   node -e "existsSync('build/angular/index.js') || process.exit(1)"  ||  pnpm run ng:build
+"ng:build":  pnpm run clean && ngc -p tsconfig.angular.json
+"typecheck": tsc --build
+```
+
+`prepare` rebuilds ONLY IF `build/angular/index.js` is missing — right for install-time (a
+workspace consumer should not pay for an AOT build on every `pnpm install`), and exactly wrong for
+packing: the folder exists after the first build, so every later `pnpm pack` packed stale output.
+
+Compounding it, `tsc --build` does NOT write that tree. It emits `build/render/`,
+`build/components/`, … while `exports` sends Metro's `react-native` condition to
+`./build/angular/index.js`. "I built it, I packed it, I grepped the file" was true three times and
+still shipped nothing:
+
+```
+build/render/index.js                     getElementById: 3   <- tsc --build wrote this; unloaded
+build/angular/render/index.js             getElementById: 0   <- Metro loads THIS
+build/angular/components/virtualized-list contextFor:     0
+```
+
+**Fixed 2026-08-20** by adding `"prepack": "pnpm run ng:build"` — pack/publish only, so the
+published artifact is always freshly compiled, while `prepare` keeps its cheap install-time guard.
+`adapters/svelte` already had this shape; Angular was the outlier. package.json cannot carry a
+comment, which is why the rationale lives here. Verified by packing without touching `build/` and
+watching `build/angular/index.js`'s mtime change.
+
+Two rules that outlive this bug:
+
+1. **`tsc --build` is a typecheck for this adapter, not a build.** Only `ng:build` produces what
+   ships.
+2. **Verify the artifact at the path `exports` resolves, never a sibling.** Every grep in the
+   pack -> reinstall loop must name `build/angular/**` (and, installed,
+   `examples/angular/node_modules/@symbiote-native/angular/build/angular/**`). A hit in another
+   tree proves nothing, and reads exactly like proof.
+
+## §18. The fling frame, measured: 228 of 233 cells re-stamped for nothing (2026-08-20)
+
+```
+§18_fling_frame_cost := {
+  symptom: "with §17's latch fixed, examples/angular PATH B scrolls but the JS thread drops to
+          ~7fps on a fast fling and cells fill in behind the finger. The other four adapters hold
+          frame rate on the same screen, same shared reducer, same RN defaults",
+  instrument: "components/virtualized-list/scroll-cost.test.ts gains a PATH B fling block (544
+             entries, getItemLayout, 320px viewport, RN defaults) parked past the overscan so the
+             window SLIDES rather than grows; control =
+             adapters/solid/src/components/virtualized-list/fling-cost.control.test.tsx, same
+             geometry, same reducer. Both report OPERATION COUNTS, and both write their report to
+             $SYMBIOTE_FLING_REPORT / $SYMBIOTE_FLING_REPORT_SOLID (vitest stdout is swallowed)",
+  steady_state_gotcha: "windowSize 21 x a 320px viewport = (21-1)/2*320 = 3200px overscan per side,
+                      so below offset 3200 the window's first index never leaves 0 and a scroll only
+                      GROWS it. A fling measured from offset 0 prices a first paint. Park at 6000",
+  measured_per_frame: "                     Angular before   Angular after   Solid (control)
+                     cell views built             4.2            4.2            4.2
+                     cell views destroyed         4.2            4.2            -
+                     CELLS RE-STAMPED           228.3            0.0            0
+                     window width               232.6          232.6          232.6
+                     deriveMetrics                1.0            1.0            1.0
+                     engine commits               1.0            1.0            1.0
+                     engine nodesVisited        251.2          251.2          250.2
+                     propWrites                  19.8           19.8            6.2
+                     childScans                  43.2           43.2           26.0
+                     primitive views checked    236.6          236.6            -",
+  ISWINDOWSETTLED_CLEARED: "§17's gate is 372 array-index steps/frame (computeWindow's loops walk
+                          exactly `last + 2` entries, readable off its own result) and 0.02-0.03%
+                          of the frame timed in isolation on desktop V8. It is not the regression.
+                          Note it is CHEAPER than the deriveMetrics pass beside it, which walks all
+                          544 through buildOffsets and allocates 544 getItemLayout objects + 2
+                          arrays per frame",
+  root_cause: "recomputeView minted a FRESH context object per cell every pass. VListOutletDirective
+             refreshes a stamped view whenever `[vListOutletContext]` changes IDENTITY, so a
+             four-cell slide re-stamped all 233: copyContextFields + markForCheck (walks to root)
+             + a full embedded-view refresh, each producing byte-identical output (rendererWrites
+             flat at 11.4, engine profile identical before/after)",
+  fix: "cellContexts: Map<key, context> in components/virtualized-list/index.ts. contextFor() hands
+      back the SAME object while item identity and index hold; a cellContextEpoch over
+      [data, extraData, getItem, keyExtractor] clears the map so RN's extraData contract survives.
+      Swap-not-prune: nextCellContexts becomes cellContexts at the end of each recompute",
+  precedent: "Solid already does this by construction - its <For> is keyed on the cell KEY strings
+            'so the plan's freshly-built cell objects' cannot rebuild every row
+            (adapters/solid/.../virtualized-list/shared.tsx, cellKeys memo). Re-keying that <For>
+            per pass in the control probe reproduces the identical defect: 232.55 cell bodies/frame",
+  honest_limit: "on desktop V8 the fling loop went 2.921 -> 1.956 ms/frame, inside a noisy band; the
+               claim is a WORK-COUNT claim (228.3 -> 0). **Device-measured 2026-08-20, this time
+               with the fix verified present in build/angular (the tree Metro loads): fast-fling
+               PATH B went 17-22fps -> 22-30fps.** Real, and modest - which is the honest shape of
+               it, because the fix removes ONE of three per-frame terms. An earlier version of this
+               line claimed confirmation BEFORE that was true.** What happened:
+               the device did improve that afternoon (blanking gone, 7fps -> 20/49/60), the win was
+               credited to this fix, and it belonged to §17's deadlock fix, which had shipped in an
+               earlier pack. THIS fix was still sitting in a build tree nothing loads - see
+               §pack_ships_stale_aot. So the 17-22fps fast-fling figure was measured WITHOUT the
+               cell-context cache. Re-measure before claiming anything. The trap, stated once: when
+               two fixes are in flight and neither was verified IN THE ARTIFACT THAT ACTUALLY RUNS,
+               a real improvement from one is trivially handed to the other. For the record the
+               whole arc reads: 1-7fps (deadlock, list did no work and looked smooth) -> 7fps
+               (deadlock fixed, real cost exposed) -> 17-22 (unrelated, fix not actually shipped)
+               -> 22-30 (fix shipped). Same rule as §16",
+  what_remains_and_is_INTRINSIC: "236.6 primitive host views checked per frame - every symbiote-* in
+             the list's own @for is CheckAlways, so the window width IS the per-frame tree walk, and
+             Solid pays zero there. Plus 232.6 shared plan-cell objects and 544 buildOffsets steps,
+             which BOTH adapters pay. Every one of these is O(window), and the window is 233 cells
+             because RN's default windowSize 21 overscans a 320px BOX by 6720px",
+  app_level_lever: "windowSize on the PATH B box. 21 -> 5 makes the window 320*5 = 1600px ~ 55 cells,
+                  a 4.2x cut in EVERY per-frame O(window) term for all five adapters. This is an app
+                  knob, not an adapter fix - and BenchmarkScreen is a shared cross-adapter
+                  instrument, so retuning it changes what it measures in all five flavors at once.
+                  Propose, do not unilaterally retune",
+  guarded_by: "scroll-cost.test.ts, both cases broken once:
+             reuse removed -> `a sliding window must re-stamp only the cells that entered it:
+               expected 4567 to be +0`
+             epoch invalidation removed -> `an extraData change must reach every cell already in the
+               window: expected +0 to be 121`
+             control's own claim broken by re-keying its <For> -> `a keyed window must run a cell
+               body only for the cells that entered it: expected 232.55 to be less than 23.25`",
+  harness_note: "the fill-to-target settle must be CONDITION-driven, not a fixed count of 55ms ticks
+               - a fixed 80-step settle added ~9s of wall clock to the angular project and tipped
+               flat-list-array-style.test.ts's waitForQuiet into reading a slow neighbour as a
+               free-running change detector (it says so in its own comment)",
+  repack_required: "the fix is in adapters/angular, so examples/angular needs the documented
+                  pnpm pack + rm node_modules/@symbiote-native/angular + rm package-lock +
+                  npm install + pod install loop before the device shows it"
 }
 ```
