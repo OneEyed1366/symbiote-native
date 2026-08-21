@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/slider",
-  "version": "5.1.0",
+  "version": "5.2.0",
   "description": "Third-party native Slider view wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Angular, Svelte, and Solid adapters.",
   "license": "MIT",
   "repository": {

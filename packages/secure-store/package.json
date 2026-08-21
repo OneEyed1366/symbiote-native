@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/secure-store",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "expo-secure-store wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Encrypted key-value storage in the iOS Keychain and the Android Keystore, optionally gated behind biometrics.",
   "license": "MIT",
   "repository": {
