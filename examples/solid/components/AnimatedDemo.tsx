@@ -142,21 +142,12 @@ export function AnimatedDemo() {
         color="#68d391"
       />
 
-      {/* The criterion belongs on the phone too — whoever taps this is holding a device, not
-          reading the source. */}
       <ActionButton
         testID="freeze-btn"
         title="Freeze JS 3s"
         onPress={freezeJs}
         color="#fc8181"
       />
-      <Text class="verdict-pass">
-        PASS · during the freeze the blue pulse keeps breathing and the GREEN
-        dot slides; the ORANGE dot is frozen and only jumps when JS thaws.
-      </Text>
-      <Text class="verdict-fail">
-        FAIL · everything stops together — the native driver fell back to JS.
-      </Text>
     </View>
   );
 }
