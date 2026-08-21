@@ -256,11 +256,6 @@ export function createScrollView(
     // A LAZY getter, not the node captured once: it is null until buildTree runs, and null again
     // under it if the tree is ever rebuilt.
     const handle = buildScrollViewHandle(() => scrollNode);
-    // Solid's `ref` is a COMPILE-TIME construct: by the time a component body reads `props.ref`, a
-    // `ref={scroller}` call site has already been rewritten into a callback. The full rationale (and
-    // why the declared type still has to be the `Ref<T>` union) is in utils/host-ref.ts, whose
-    // helper is typed for a host node — this hands back the imperative handle instead.
-    if (typeof local.ref === 'function') local.ref(handle);
 
     // Read ONCE and untracked — see the module header, point 2. Nothing reactive is lost: a
     // RefreshControl's live state is `refreshing`, which is a prop of the element itself.
@@ -510,6 +505,21 @@ export function createScrollView(
       () => `${String(isHorizontal())}:${String(hasStickyHeaders())}`,
     );
     const tree = createMemo(on(treeShape, () => buildTree()));
+
+    // Solid's `ref` is a COMPILE-TIME construct: by the time a component body reads `props.ref`, a
+    // `ref={scroller}` call site has already been rewritten into a callback. The full rationale (and
+    // why the declared type still has to be the `Ref<T>` union) is in utils/host-ref.ts, whose
+    // helper is typed for a host node — this hands back the imperative handle instead.
+    //
+    // Called AFTER `tree` has built at least once, not right after `handle` is constructed.
+    // `createAnimatedComponent`'s captureRef (resolveHostNode) reads handle.getScrollNode()
+    // EAGERLY, once, at ref-call time - it never re-reads the lazy getter later. React's
+    // useImperativeHandle and Vue's expose() fire only after the child's own mount work, so they
+    // never saw a null handle; Solid's `ref` is called by the component itself and has to be
+    // sequenced by hand. Calling it before `buildTree()` gave captureRef a permanently-null node,
+    // so Animated.ScrollView's onScroll never native-attached - a scroll-linked header fade froze
+    // at its initial value on this adapter only.
+    if (typeof local.ref === 'function') local.ref(handle);
 
     // Drive the sticky scroll value on the native UI thread (RN's attachNativeEvent /
     // _updateAnimatedNodeAttachment), so the header interpolations ride scroll natively with no JS
