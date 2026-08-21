@@ -709,9 +709,35 @@ section {
 }
 
 .demo-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
   gap: 18px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  padding-bottom: 10px;
+  scrollbar-color: var(--accent) transparent;
+}
+
+.demo-grid figure {
+  flex: 0 0 min(230px, 44vw);
+  scroll-snap-align: start;
+}
+
+.demo-grid::-webkit-scrollbar {
+  height: 6px;
+}
+
+.demo-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.demo-grid::-webkit-scrollbar-thumb {
+  background: var(--core-line);
+  border-radius: 999px;
+}
+
+.demo-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }
 
 figure {
@@ -752,6 +778,13 @@ figcaption {
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--core-muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+figcaption span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 figcaption .dot {
@@ -969,7 +1002,6 @@ figcaption .dot[data-fw='solid'] {
 
   .demo,
   .proof,
-  .demo-grid,
   .trait-grid {
     grid-template-columns: 1fr;
   }
