@@ -715,30 +715,36 @@ const symbiotes = [
         figures.forEach(f => {
           f.style.order = f.dataset.fw === id ? '-1' : '0';
         });
-        if (reduce.matches) {
-          demoGrid.scrollLeft = 0;
-          return;
+        if (!reduce.matches) {
+          figures.forEach((f, i) => {
+            const delta = before[i] - f.getBoundingClientRect().left;
+            if (!delta) return;
+            f.style.transition = 'none';
+            f.style.transform = `translateX(${delta}px)`;
+          });
+          demoGrid.offsetHeight; // force reflow before releasing the transition
+          figures.forEach(f => {
+            if (!f.style.transform) return;
+            f.style.transition = 'transform 320ms ease';
+            f.style.transform = '';
+            f.addEventListener(
+              'transitionend',
+              () => {
+                f.style.transition = '';
+              },
+              { once: true },
+            );
+          });
         }
-        figures.forEach((f, i) => {
-          const delta = before[i] - f.getBoundingClientRect().left;
-          if (!delta) return;
-          f.style.transition = 'none';
-          f.style.transform = `translateX(${delta}px)`;
-        });
-        demoGrid.offsetHeight; // force reflow before releasing the transition
-        figures.forEach(f => {
-          if (!f.style.transform) return;
-          f.style.transition = 'transform 320ms ease';
-          f.style.transform = '';
-          f.addEventListener(
-            'transitionend',
-            () => {
-              f.style.transition = '';
-            },
-            { once: true },
-          );
-        });
-        demoGrid.scrollTo({ left: 0, behavior: 'smooth' });
+        // Give the reorder a beat to read before the row auto-scrolls back to
+        // the start — scrolling in lockstep with the slide reads as one
+        // muddy jump instead of two legible moves.
+        setTimeout(() => {
+          demoGrid.scrollTo({
+            left: 0,
+            behavior: reduce.matches ? 'auto' : 'smooth',
+          });
+        }, 350);
       }
 
       function apply(id) {
