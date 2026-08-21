@@ -110,6 +110,27 @@ pnpm install
     adapter drives.
 
   </TabItem>
+  <TabItem label="Solid">
+    Run the Solid canary:
+
+    ```sh
+    cd examples/solid
+    pnpm ios
+    ```
+
+    For Android:
+
+    ```sh
+    cd examples/solid
+    pnpm android
+    ```
+
+    The Solid example proves the engine can be driven through Solid's own
+    official non-DOM seam: `@symbiote-native/solid` is a custom renderer built on
+    `solid-js/universal`'s `createRenderer`, mapping each renderer operation
+    onto the same tiny mutation API every other adapter drives.
+
+  </TabItem>
 </Tabs>
 
 ## What to look for

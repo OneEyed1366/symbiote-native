@@ -161,9 +161,9 @@ const airplaneMode = await isAirplaneModeEnabledAsync();
 
 ### `useNetworkState()` / `NetworkStateService.connect()`
 
-| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Svelte (`/svelte`) | Signature | Returns                                                                                                                                                                                |
-| ----------------- | ----------------- | ------------------------------- | ------------------ | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `useNetworkState` | `useNetworkState` | `NetworkStateService.connect()` | `useNetworkState`  | `()`      | Live `NetworkState` — plain value (React), `Ref<NetworkState>` (Vue), `Signal<NetworkState>` (Angular), `{ readonly current: NetworkState }` (Svelte, read as `.current`), seeded `{}` |
+| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Svelte (`/svelte`) | Solid (`/solid`)          | Signature | Returns                                                                                                                                                                                |
+| ----------------- | ----------------- | -------------------------------- | ------------------- | --------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useNetworkState` | `useNetworkState` | `NetworkStateService.connect()` | `useNetworkState`  | `createNetworkState` | `()`      | Live `NetworkState` — plain value (React), `Ref<NetworkState>` (Vue), `Signal<NetworkState>` (Angular), `{ readonly current: NetworkState }` (Svelte, read as `.current`), `Accessor<NetworkState>` (Solid), seeded `{}` |
 
 ### `NetworkState` / `NetworkStateEvent`
 

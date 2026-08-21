@@ -106,6 +106,41 @@ A property with genuinely no RN equivalent (`animation`, pseudo-classes,
 media queries) is dropped with a build warning instead — see "What is not
 CSS" below.
 
+## Svelte's own `<style>` block
+
+A Svelte component's inline `<style>` block compiles into native style objects
+the same way, through the same build-time compiler — with one difference from
+Vue: scoping is **on by default**, no `scoped` attribute to opt into:
+
+```svelte
+<View class="card">
+  <Text class="title">Native surface</Text>
+</View>
+
+<style>
+.card {
+  padding: 16px;
+  border-radius: 12px;
+  background-color: #111827;
+}
+.title {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 600;
+}
+</style>
+```
+
+Every class in the block is suffixed to a per-component scope, exactly like
+real Svelte's own scoped-CSS semantics minus the DOM underneath — the same
+class name in two components never collides. `:global(...)` is the escape
+hatch back out, for a utility class meant to apply anywhere. See
+[`examples/svelte/screens/StyleShowcaseScreen.svelte`](https://github.com/OneEyed1366/symbiote-native/blob/master/examples/svelte/screens/StyleShowcaseScreen.svelte)
+for a real component using both a scoped block and a `:global()` mark running
+on device. Svelte has no inline `<style module>` equivalent — a CSS Modules
+name→scopedName map is always a standalone `.module.css` import (below), the
+same as every other adapter.
+
 ## CSS Modules
 
 CSS Modules — scoped classes resolved through a name→scopedName map instead

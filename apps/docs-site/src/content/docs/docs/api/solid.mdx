@@ -221,11 +221,11 @@ const [overlayHost, setOverlayHost] = createSignal<ISymbioteNode | null>(null);
 ```
 
 `Portal` relocates its children under a different node than its own call
-site: the same primitive as React's `createPortal` and Angular's
-`PortalDirective`/`PortalOutletDirective` pair. Vue's `Teleport` and Svelte
-have no equivalent - a design gap on those two, not something Solid lacks.
-`mount` takes an already-mounted host node (or a surface, from
-`AppRegistry`), never a selector string: Solid's own `solid-js/web` `Portal`
+site: the same primitive as React's `createPortal`, Angular's
+`PortalDirective`/`PortalOutletDirective` pair, Vue's `Teleport`, and
+Svelte's own `Portal`. `mount` takes an already-mounted host node (or a
+surface, from `AppRegistry`), never a selector string: Solid's own
+`solid-js/web` `Portal`
 resolves a DOM container the same way ours resolves a ref, so the spelling
 matches what a Solid author already knows. Same **v1 scope** as React's and
 Angular's: the target must live in the same surface as the `<Portal>` call

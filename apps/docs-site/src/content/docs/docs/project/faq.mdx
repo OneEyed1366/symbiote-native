@@ -69,9 +69,7 @@ Yes. It's a DOM shim over stock compiled Svelte output driving the same
 engine, with full component parity against React, Vue, and Angular, verified
 on-device on iOS and Android (`examples/svelte`). The Slider wrapper package
 ships a Svelte build too, and it's on the landing page's live framework
-switcher alongside React, Vue, and Angular. Two things are still catching
-up: a recorded demo clip for the landing page's demo grid, and its own learn
-guide page.
+switcher, with its own demo clip and [learn guide](/docs/learn/svelte/).
 
 ## Can I use Svelte stores, Context, or `svelte/motion`/`svelte/easing` in a SymbioteNative app?
 
@@ -132,7 +130,6 @@ surface as React, Vue, Angular, and Svelte, including `createPortal`,
 `createTunnel`, `Animated`, and `AppRegistry` (`examples/solid`). Every
 companion package under `packages/*` ships a `./solid` build too, and it has
 its own [guide](/docs/learn/solid/) and [API reference](/docs/api/solid/).
-Two things are still catching up: it hasn't been verified on a real
-iOS/Android device yet (headless `vitest` only), and it isn't on the landing
-page's live framework switcher, which needs a recorded demo clip rather than
-more adapter work.
+It's also on the landing page's live framework switcher, with its own demo
+clip. What's still catching up: it hasn't been verified on a real
+iOS/Android device (headless `vitest` only).

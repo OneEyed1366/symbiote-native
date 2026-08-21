@@ -329,16 +329,19 @@ const { batteryLevel, batteryState, lowPowerMode } = await getPowerStateAsync();
 
 ### Hooks / composables / services / primitives
 
-| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Solid (`/solid`)     | Signature | Returns                                                                                                                                   |
-| ----------------- | ----------------- | ------------------------------- | -------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `useBatteryLevel` | `useBatteryLevel` | `BatteryLevelService.connect()` | `createBatteryLevel` | `()`      | Live battery level — `number` (React), `Ref<number>` (Vue), `Signal<number>` (Angular), `Accessor<number>` (Solid), seeded `-1`           |
-| `useBatteryState` | `useBatteryState` | `BatteryStateService.connect()` | `createBatteryState` | `()`      | Live `BatteryState` — plain value (React/Vue `Ref`), `Signal<BatteryState>` (Angular), `Accessor<BatteryState>` (Solid), seeded `UNKNOWN` |
-| `useLowPowerMode` | `useLowPowerMode` | `LowPowerModeService.connect()` | `createLowPowerMode` | `()`      | Live `boolean` — plain value (React/Vue `Ref`), `Signal<boolean>` (Angular), `Accessor<boolean>` (Solid), seeded `false`                  |
+| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Svelte (`/svelte`) | Solid (`/solid`)     | Signature | Returns                                                                                                                                          |
+| ----------------- | ----------------- | ------------------------------- | ------------------- | --------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useBatteryLevel` | `useBatteryLevel` | `BatteryLevelService.connect()` | `useBatteryLevel`   | `createBatteryLevel` | `()`      | Live battery level — `number` (React), `Ref<number>` (Vue), `Signal<number>` (Angular), `{ readonly current: number }` (Svelte), `Accessor<number>` (Solid), seeded `-1`           |
+| `useBatteryState` | `useBatteryState` | `BatteryStateService.connect()` | `useBatteryState`   | `createBatteryState` | `()`      | Live `BatteryState` — plain value (React/Vue `Ref`), `Signal<BatteryState>` (Angular), `{ readonly current: BatteryState }` (Svelte), `Accessor<BatteryState>` (Solid), seeded `UNKNOWN` |
+| `useLowPowerMode` | `useLowPowerMode` | `LowPowerModeService.connect()` | `useLowPowerMode`   | `createLowPowerMode` | `()`      | Live `boolean` — plain value (React/Vue `Ref`), `Signal<boolean>` (Angular), `{ readonly current: boolean }` (Svelte), `Accessor<boolean>` (Solid), seeded `false`                  |
 
 Angular's `connect()` returns a `Signal` — read it as `batteryLevel()` in code or in a template,
 same as every other `connect()`-based service in this project. Solid's `create*` primitives return
 an `Accessor` for the same reason: call it as `batteryLevel()`, never destructure it, since a Solid
-component body runs once and a destructured value would freeze at its first reading.
+component body runs once and a destructured value would freeze at its first reading. Svelte's
+`use*` runes return a boxed getter, `{ readonly current }`, read as `batteryLevel.current` — a
+bare `$state` handed out of a plain function loses its reactivity once destructured, since Svelte 5
+runes are lexically scoped to the file that declares them.
 
 ### `BatteryState`
 

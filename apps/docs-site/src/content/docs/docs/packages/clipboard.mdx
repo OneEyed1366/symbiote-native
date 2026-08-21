@@ -347,9 +347,9 @@ its own mount/unmount lifecycle so you don't manage the subscription by hand:
 
 ### `useClipboard` / `ClipboardService.connect()`
 
-| React (`/react`) | Vue (`/vue`)   | Angular (`/angular`)         | Signature                           | Returns                                                                                        |
-| ---------------- | -------------- | ---------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `useClipboard`   | `useClipboard` | `ClipboardService.connect()` | `()` — no config, always subscribes | React/Vue: live `IClipboardEvent \| null` directly; Angular: `Signal<IClipboardEvent \| null>` |
+| React (`/react`) | Vue (`/vue`)   | Angular (`/angular`)         | Svelte (`/svelte`) | Solid (`/solid`)   | Signature                           | Returns                                                                                                                                              |
+| ---------------- | -------------- | ---------------------------- | ------------------- | --------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useClipboard`   | `useClipboard` | `ClipboardService.connect()` | `useClipboard`      | `createClipboard`   | `()` — no config, always subscribes | React/Vue: live `IClipboardEvent \| null` directly; Angular: `Signal<IClipboardEvent \| null>`; Svelte: `{ readonly current: IClipboardEvent \| null }`; Solid: `Accessor<IClipboardEvent \| null>` |
 
 Every variant returns `null` until the clipboard changes at least once after mount — there's no
 initial read of whatever's already on the clipboard, only new changes going forward.

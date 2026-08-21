@@ -125,8 +125,11 @@ node or `SymbioteSurface` — typically a ref to a persistent "overlay host"
 target must live in the _same_ surface as the portal's call site; portaling
 into a second, independently-mounted surface isn't wired yet.
 
-Vue has the equivalent through its own `Teleport` — see the
-[Vue API reference](/docs/api/vue/#portals-teleport).
+Vue has the equivalent through its own `Teleport`, Angular through
+`PortalDirective`/`PortalOutletDirective`, and Svelte and Solid through their
+own `Portal` — see the [Vue](/docs/api/vue/#portals-teleport),
+[Angular](/docs/api/angular/#portals), [Svelte](/docs/api/svelte/#portals),
+and [Solid](/docs/api/solid/#portals-portal) API references.
 
 ## Cross-surface content (`createTunnel`)
 
@@ -160,7 +163,8 @@ any surface; `Out` reads that store and paints in whichever surface actually
 mounts it. Neither touches a Fabric node directly, so there's no ref-timing
 gotcha and no `isSymbioteNode` guard to satisfy.
 
-Vue and Angular have the same primitive — see their own API references.
+Vue, Angular, Svelte, and Solid all have the same primitive — see their own
+API references.
 
 ## App entry point (`AppRegistry`)
 

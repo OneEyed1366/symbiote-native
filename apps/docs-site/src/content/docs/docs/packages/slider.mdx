@@ -221,6 +221,23 @@ four receive `{ stepMarked, currentValue, index, min, max }`:
 />
 ```
 
+```vue
+<template>
+  <Slider :value="2" :minimum-value="0" :maximum-value="4" :step="1">
+    <template #stepMarker="{ stepMarked }">
+      <View
+        :style="{
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          opacity: stepMarked ? 1 : 0.4,
+        }"
+      />
+    </template>
+  </Slider>
+</template>
+```
+
 ```svelte
 <Slider value={2} minimumValue={0} maximumValue={4} step={1}
   >{#snippet stepMarker({ stepMarked })}<View
@@ -234,13 +251,48 @@ four receive `{ stepMarked, currentValue, index, min, max }`:
 >
 ```
 
+```tsx
+<Slider
+  value={2}
+  minimumValue={0}
+  maximumValue={4}
+  step={1}
+  StepMarker={marker => (
+    <View
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        opacity: marker().stepMarked ? 1 : 0.4,
+      }}
+    />
+  )}
+/>
+```
+
+Solid's `StepMarker` receives an `Accessor<IStepMarkerProps>`, called once per cell — read
+`marker().stepMarked`, never destructure the accessor itself, or the marker freezes at its first
+report mid-drag.
+
+<Aside type="caution" title="No Angular equivalent yet">
+  Angular has no `StepMarker` slot — it's a deliberate, scoped gap
+  (`packages/slider/src/angular/slider/shared.ts`'s module header), not an
+  oversight. The natural analogue is a `@ContentChild(TemplateRef)
+  stepMarker?: TemplateRef<IStepMarkerProps>` projected per cell via
+  `NgTemplateOutlet`, but wiring an embedded view per cell against the
+  imperative `DescriptorOutlet` patch model is disproportionate complexity for
+  a path no real caller exercises today. Every other prop, including the
+  default `renderStepNumber` indicator, is fully supported on Angular.
+</Aside>
+
 ## API
 
 ### Props
 
 Every prop below is framework-agnostic and shared verbatim by every adapter, **except**
 `StepMarker`, which is per-adapter because it returns a framework element (a React component, a
-Vue scoped slot, or a Svelte snippet) — see [shared vs
+Vue scoped slot, a Svelte snippet, or a Solid render-prop over an accessor — no Angular
+equivalent yet, see the caution above) — see [shared vs
 framework-specific](/docs/api/components/#shared-vs-framework-specific).
 
 | Prop                                                                    | Type                                | Default        | Description                                                                                                         |
@@ -257,7 +309,7 @@ framework-specific](/docs/api/components/#shared-vs-framework-specific).
 | `tapToSeek`                                                             | `boolean`                           | `false`        | Tapping anywhere on the track jumps the thumb there, instead of requiring a drag                                    |
 | `vertical`                                                              | `boolean`                           | `false`        | Renders the slider top-to-bottom instead of left-to-right                                                           |
 | `renderStepNumber`                                                      | `boolean`                           | `false`        | Draws the built-in step-number indicator                                                                            |
-| `StepMarker` (React) / `#stepMarker` (Vue) / `stepMarker` (Svelte)      | render prop / scoped slot / snippet | —              | Custom per-step marker, replacing `renderStepNumber`'s built-in dot                                                 |
+| `StepMarker` (React, Solid) / `#stepMarker` (Vue) / `stepMarker` (Svelte) — no Angular equivalent | render prop / scoped slot / snippet | —              | Custom per-step marker, replacing `renderStepNumber`'s built-in dot                                                 |
 | `onValueChange`                                                         | `(value: number) => void`           | —              | Fires continuously while dragging                                                                                   |
 | `onSlidingStart` / `onSlidingComplete`                                  | `(value: number) => void`           | —              | Fires once when a drag begins/ends                                                                                  |
 | accessibility / `aria-*` / `testID` / `style`                           | —                                   | —              | Pass through to the native node unchanged                                                                           |

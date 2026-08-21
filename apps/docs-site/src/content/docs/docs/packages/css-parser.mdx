@@ -5,8 +5,9 @@ description: The build-time CSS/SCSS/Sass/Less/Stylus compiler behind SymbioteNa
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`@symbiote-native/css-parser` compiles a stylesheet — a `.css`/`.module.css` file, a Vue SFC
-`<style>` block, or an SCSS/Sass/Less/Stylus source — into React Native style objects at build
+`@symbiote-native/css-parser` compiles a stylesheet — a `.css`/`.module.css` file, an inline
+`<style>` block in a Vue SFC or a Svelte component, or an SCSS/Sass/Less/Stylus source — into
+React Native style objects at build
 time, inside a Metro transformer. The runtime half lives elsewhere: `@symbiote-native/engine`'s
 `style-registry` (`registerStyles` / `resolveClassName`) is what turns `className="card"` back
 into a style object at render time. What to write in your stylesheets and how classes resolve per

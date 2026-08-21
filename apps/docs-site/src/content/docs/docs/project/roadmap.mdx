@@ -14,8 +14,8 @@ parity through shared layers.
 | React adapter      | On the live switcher | Reference canary for the engine and Fabric pipe.                                            |
 | Vue adapter        | On the live switcher | First non-React proof of the framework-agnostic seam.                                       |
 | Angular adapter    | On the live switcher | Second non-React proof: `Renderer2` seam, DOM-less bootstrap, full component parity.        |
-| Svelte adapter     | Shipped              | Third non-React proof: a DOM shim over stock compiled Svelte output, full component parity. |
-| Solid adapter      | Shipped              | Fourth non-React proof: `solid-js/universal`'s `createRenderer`, full component parity.      |
+| Svelte adapter     | On the live switcher | Third non-React proof: a DOM shim over stock compiled Svelte output, full component parity. |
+| Solid adapter      | On the live switcher | Fourth non-React proof: `solid-js/universal`'s `createRenderer`, full component parity. |
 | Engine             | In progress          | Retained tree, clone-on-write commits, event normalization.                                 |
 | Components         | In progress          | Shared state/view layers so adapters inherit parity.                                        |
 | Android host shim  | Active               | Keeps Android at canary parity with iOS.                                                    |
@@ -40,9 +40,8 @@ layer over the shared engine — here a DOM shim over stock compiled Svelte
 output, so components stay ordinary Svelte markup with no bespoke compiler
 output. It reaches the same full component parity as React, Vue, and
 Angular, verified on-device on iOS and Android, and the Slider wrapper
-package ships a Svelte build too. It isn't on the landing page's live
-framework switcher yet — that needs its own demo assets, not more adapter
-work.
+package ships a Svelte build too. It's on the landing page's live framework
+switcher.
 
 Solid is the fourth non-React adapter, built the same long-term way: a thin
 layer over the shared engine, here a Solid custom renderer over
@@ -50,18 +49,16 @@ layer over the shared engine, here a Solid custom renderer over
 agnostic seam for non-DOM targets. It reaches the same component parity as
 React, Vue, Angular, and Svelte, including `createPortal`, `createTunnel`,
 `Animated`, and `AppRegistry`, and every companion package now ships a
-`./solid` build too. It's verified only in headless `vitest` so far;
-real-device and landing-page verification wait on the same missing demo
-assets that block Svelte, not on more adapter work.
+`./solid` build too. It's also on the live switcher now, with its own demo
+clip; real-device verification is still pending, verified only in headless
+`vitest` so far.
 
 React, Vue, Angular, Svelte, and Solid keep expanding parity in the meantime:
-React, Vue, Angular, and Solid each have a portal primitive for same-surface
-content relocation (React's `createPortal`, Vue's `Teleport`, Angular's
-`*portal` directive, Solid's `Portal`) plus a `createTunnel` primitive for
+all five now have a portal primitive for same-surface content relocation
+(React's `createPortal`, Vue's `Teleport`, Angular's `*portal` directive,
+Svelte's and Solid's own `Portal`) plus a `createTunnel` primitive for
 cross-surface delivery. Mutation-mode Fabric supports this where stock RN's
-persistent-mode renderer can't. Svelte has `createTunnel` too, with no portal
-equivalent since its DOM-shim adapter has no framework-level teleport
-primitive to hook. Vue also gained `v-model` on controlled components and a
+persistent-mode renderer can't. Vue also gained `v-model` on controlled components and a
 working `v-show` directive; Angular's `[(value)]` two-way binding covers the
 same controlled-component case idiomatically. All five adapters now share one
 `AppRegistry` entry point over the same `@symbiote-native/engine` core.

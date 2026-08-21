@@ -10,14 +10,14 @@ tutorial. For the concept behind an answer, follow the link into
 
 ## Available how-tos
 
-- [Style a component](/docs/howtos/styling/) — `StyleSheet.create` vs a Vue SFC
-  `<style>` block.
+- [Style a component](/docs/howtos/styling/) — `StyleSheet.create` vs an
+  inline `<style>` block in a Vue SFC or a Svelte component.
 - [Animate a value](/docs/howtos/animations/) — `Animated.Value`, and when the
   native driver can take over from the JS one.
 - [Handle press/change events](/docs/howtos/events/) — React callback props,
   Vue emits, Angular `@Output()`.
 - [Two-way bind a value](/docs/howtos/two-way-binding/) — Vue `v-model`,
-  Angular `[(value)]`.
+  Angular `[(value)]`, Svelte `$bindable()`.
 - [Share content across surfaces](/docs/howtos/portals-and-tunnels/) —
   `createPortal`/`Teleport` vs `createTunnel`.
 - [Write platform-specific code](/docs/howtos/platform-code/) — the
@@ -35,3 +35,5 @@ tutorial. For the concept behind an answer, follow the link into
   `bind:this` vs `{@attach}` for imperative access to a host node.
 - [Catch render errors (Svelte, Solid)](/docs/howtos/error-boundaries/) —
   `<svelte:boundary>` and `<ErrorBoundary>`, a fallback, and `reset()`.
+- [Reactivity in Solid](/docs/howtos/solid-reactivity/) — props as accessors,
+  `MaybeAccessor`, and the traps a body that runs once opens up.
