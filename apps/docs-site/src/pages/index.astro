@@ -45,7 +45,7 @@ const symbiotes = [
   { id: 'vue', label: 'Vue', live: true },
   { id: 'angular', label: 'Angular', live: true },
   { id: 'svelte', label: 'Svelte', live: true },
-  { id: 'solid', label: 'Solid', live: false },
+  { id: 'solid', label: 'Solid', live: true },
 ];
 ---
 
@@ -486,13 +486,15 @@ const symbiotes = [
       <section class="demo" aria-labelledby="demo-title">
         <div class="demo-copy">
           <span class="eyebrow">Same surface, different host</span>
-          <h2 id="demo-title">Four symbiotes, one native core.</h2>
+          <h2 id="demo-title">Five symbiotes, one native core.</h2>
           <p>
             React is the reference canary. Vue proves the native core is no
             longer tied to React's reconciler. Angular proves it again, through
             a completely different rendering model. Svelte proves it a third
-            time, with no host-renderer seam to hook at all. All four flow
-            through the same engine and the same stock Fabric host.
+            time, with no host-renderer seam to hook at all. Solid proves it a
+            fourth, driving the same engine through fine-grained signals
+            instead of a virtual DOM. All five flow through the same engine
+            and the same stock Fabric host.
           </p>
         </div>
         <!--
@@ -510,6 +512,7 @@ const symbiotes = [
               { id: 'vue', label: 'Vue', file: 'vue-demo' },
               { id: 'angular', label: 'Angular', file: 'angular-demo' },
               { id: 'svelte', label: 'Svelte', file: 'svelte-demo' },
+              { id: 'solid', label: 'Solid', file: 'solid-demo' },
             ].map(demo => (
               <figure
                 data-fw={demo.id}
@@ -589,9 +592,7 @@ const symbiotes = [
           <li data-fw="solid">
             <span class="dot" aria-hidden="true"></span>
             <strong>Solid</strong>
-            <span class="state"
-              >same full adapter surface, demo video pending</span
-            >
+            <span class="state">fourth non-React proof — full component parity</span>
           </li>
         </ul>
         <a class="text-link" href={`${base}/docs/project/roadmap/`}
@@ -606,7 +607,7 @@ const symbiotes = [
     </footer>
 
     <script is:inline>
-      const LIVE_SYMBIOTES = ['react', 'vue', 'angular', 'svelte'];
+      const LIVE_SYMBIOTES = ['react', 'vue', 'angular', 'svelte', 'solid'];
       const LABEL = {
         react: 'React',
         vue: 'Vue',

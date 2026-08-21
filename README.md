@@ -121,7 +121,7 @@ The only thing SymbioteNative replaces is the JS renderer.
 
 ## See It Work
 
-The _same_ native app — same `@symbiote-native/engine`, same stock Fabric core — driven by four different
+The _same_ native app — same `@symbiote-native/engine`, same stock Fabric core — driven by five different
 frameworks on the iOS simulator. React Native's own renderer is never in the path of any of them:
 
 <div align="center">
@@ -132,12 +132,14 @@ frameworks on the iOS simulator. React Native's own renderer is never in the pat
 <td align="center"><b>Vue 3</b></td>
 <td align="center"><b>Angular</b></td>
 <td align="center"><b>Svelte</b></td>
+<td align="center"><b>Solid</b></td>
 </tr>
 <tr>
 <td><img src="./assets/react-demo.gif" width="240" alt="React driving real native iOS views through SymbioteNative"></td>
 <td><img src="./assets/vue-demo.gif" width="240" alt="Vue 3 driving real native iOS views through SymbioteNative"></td>
 <td><img src="./assets/angular-demo.gif" width="240" alt="Angular driving real native iOS views through SymbioteNative"></td>
 <td><img src="./assets/svelte-demo.gif" width="240" alt="Svelte driving real native iOS views through SymbioteNative"></td>
+<td><img src="./assets/solid-demo.gif" width="240" alt="Solid driving real native iOS views through SymbioteNative"></td>
 </tr>
 </table>
 

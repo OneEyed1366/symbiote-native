@@ -710,7 +710,7 @@ section {
 
 .demo-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 18px;
 }
 
@@ -771,6 +771,9 @@ figcaption .dot[data-fw='angular'] {
 }
 figcaption .dot[data-fw='svelte'] {
   background: #ff3e00;
+}
+figcaption .dot[data-fw='solid'] {
+  background: #4a8bc2;
 }
 
 /* seam / pipeline — the one real sequence, so it keeps arrows */
