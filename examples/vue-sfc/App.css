@@ -91,7 +91,9 @@
   flex: 1;
 }
 .section-label {
-  color: #41506a;
+  /* #41506a measured at 1.92:1 against --paper — below WCAG AA (4.5:1), reads as
+     blended-into-background. #9db4d9 keeps the muted blue-gray hue at 7.43:1. */
+  color: #9db4d9;
   font-size: 13px;
 }
 .info-text {
