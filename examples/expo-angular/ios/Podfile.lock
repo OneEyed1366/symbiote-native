@@ -1,6 +1,32 @@
 PODS:
   - EXApplication (57.0.2):
     - ExpoModulesCore
+  - Expo (57.0.14):
+    - ExpoModulesCore
+    - ExpoModulesJSI
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTAppDelegate
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactAppDependencyProvider
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - ExpoBattery (57.0.1):
     - ExpoModulesCore
   - ExpoBrightness (57.0.1):
@@ -45,7 +71,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - ExpoModulesJSI (57.0.4):
+  - ExpoModulesJSI (57.0.5):
     - React-Core
     - ReactCommon
   - ExpoModulesWorklets (57.0.5):
@@ -1916,7 +1942,7 @@ PODS:
     - React-utils (= 0.86.0)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.0)
-  - symbiote-navigation (2.0.3):
+  - symbiote-navigation (2.2.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1938,9 +1964,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - symbiote-navigation/common (= 2.0.3)
+    - symbiote-navigation/common (= 2.2.0)
     - Yoga
-  - symbiote-navigation/common (2.0.3):
+  - symbiote-navigation/common (2.2.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1963,7 +1989,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-splash-screen (3.0.3):
+  - symbiote-splash-screen (3.2.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1989,6 +2015,7 @@ PODS:
 
 DEPENDENCIES:
   - "EXApplication (from `../node_modules/@symbiote-native/application/node_modules/expo-application/ios`)"
+  - Expo (from `../node_modules/expo`)
   - "ExpoBattery (from `../node_modules/@symbiote-native/battery/node_modules/expo-battery/ios`)"
   - "ExpoBrightness (from `../node_modules/@symbiote-native/brightness/node_modules/expo-brightness/ios`)"
   - "ExpoCellular (from `../node_modules/@symbiote-native/cellular/node_modules/expo-cellular/ios`)"
@@ -2094,6 +2121,8 @@ DEPENDENCIES:
 EXTERNAL SOURCES:
   EXApplication:
     :path: "../node_modules/@symbiote-native/application/node_modules/expo-application/ios"
+  Expo:
+    :path: "../node_modules/expo"
   ExpoBattery:
     :path: "../node_modules/@symbiote-native/battery/node_modules/expo-battery/ios"
   ExpoBrightness:
@@ -2298,6 +2327,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   EXApplication: bbd517d50878ca1d121fb3843392beb210181e28
+  Expo: 74ca681cd7a77385ac0ba805ba9b188cc8dd81c3
   ExpoBattery: cb4f978965f2d14d06f2d36293c2deedee6616b0
   ExpoBrightness: bd5b283f0ccd168d6c5b7ff1e95bc3999972a54a
   ExpoCellular: e78a2fe5ac3239ec7252f3451e170560c8e25dcd
@@ -2309,7 +2339,7 @@ SPEC CHECKSUMS:
   ExpoLocalAuthentication: 96989637e567a10cdeabe61e5c6026d30c0dc53f
   ExpoLocalization: 659243b03b3a3e9589793cee2f728a899e181329
   ExpoModulesCore: 9df645bbfcfe4fec54e6597aee756f7820ac8e0e
-  ExpoModulesJSI: b20fefa4cdd9097e7e6b715466d1900b8c5d4711
+  ExpoModulesJSI: ea64813990c7650f3a2d469f176a54c3c7b2c66a
   ExpoModulesWorklets: 18419b65da3b14a8df484baccec7dd6dad15387a
   ExpoNetwork: 973d523fe9b1f99223dd945fed9ad1226ae64920
   ExpoScreenOrientation: 17fd81b2bdb7615b4b540335673aaf98a358281f
@@ -2322,7 +2352,7 @@ SPEC CHECKSUMS:
   ExpoTrackingTransparency: 43401b22cf6aed3a4a35e0c24d0b320905acc477
   ExpoWebBrowser: 9b98d939d5f1c5dd8f523f0a0683056fb1204434
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
-  hermes-engine: f16db9913d4a9598239272b50fae0ff323b5b45c
+  hermes-engine: f9df247afd45296b2357dde5a3d3d0d3c3c1160e
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
   RCTSwiftUI: 5aaf0b07e747ba749dc6acc94d8bd41eea4b570f
@@ -2395,10 +2425,10 @@ SPEC CHECKSUMS:
   ReactCodegen: afe0d436ee089d7bea6418429d8312b1d23a6801
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
-  symbiote-navigation: 48688b7d7811c091d722510489b211c8785e8800
-  symbiote-splash-screen: 94836f2a38e77e14889d079b7a209842fa87bf17
+  symbiote-navigation: 1dcb17db615052fdc90b12d5dc29f3fc681f3543
+  symbiote-splash-screen: 029fcc03b4f4ac8332a5ab47664286feb9aab35f
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
-PODFILE CHECKSUM: 20ce26e6fef3666c64361a8e0d1a89c7427ebe19
+PODFILE CHECKSUM: 8ca2aaf6aed00e243bb8ba82747472aca424ac86
 
 COCOAPODS: 1.16.2
