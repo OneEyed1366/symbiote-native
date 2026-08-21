@@ -282,11 +282,23 @@ export type { ShimElement } from './dom-shim';
 
 // createTunnel: the Svelte twin of adapters/vue/src/create-tunnel (see create-tunnel/tunnel.ts's
 // header for why the API shape — an explicit `tunnel` prop on TunnelIn/TunnelOut, rather than
-// `tunnel.In`/`tunnel.Out` — deliberately differs from React/Vue). NOTE: React's createPortal has
-// no Svelte (or even Vue) twin — it is react-reconciler's own Fiber-level HostPortal primitive,
-// with no equivalent in a framework with no reconciler; createTunnel is the achievable analog,
-// same scope Vue itself settled on.
-export { createTunnel, TunnelIn, TunnelOut, type ITunnel } from './create-tunnel';
+// `tunnel.In`/`tunnel.Out` — deliberately differs from React/Vue).
+export {
+  createTunnel,
+  TunnelIn,
+  TunnelOut,
+  type ITunnel,
+} from './create-tunnel';
+
+// Portal: the Svelte twin of React's createPortal / Solid's <Portal mount={…}> / Angular's
+// PortalDirective. It is NOT interchangeable with createTunnel above — the two capabilities do
+// not overlap (create-portal/index.ts's header carries the row-by-row table, each row pinned by a
+// test). Portal uniquely buys a target that renders no outlet — the only route to a container you
+// merely hold a ref to — and call-site `getContext`; the tunnel uniquely buys cross-surface reach.
+// (This barrel used to state that createPortal "has no Svelte twin ... with no equivalent in a
+// framework with no reconciler". That was wrong: a portal needs a retained tree you can move a
+// subtree within, not a reconciler, and this adapter has one.)
+export { Portal, type IPortalProps, type IPortalTarget } from './create-portal';
 
 // useWindowDimensions / useColorScheme: the Svelte twins of React's hooks / Vue's composables —
 // see runes/use-window-dimensions.svelte.ts's header for why this adapter's lifecycle-helper
@@ -298,7 +310,13 @@ export { useColorScheme } from './runes/use-color-scheme.svelte';
 // `undefined` forever here. Same names, same `.current` shape, engine Dimensions/PixelRatio
 // underneath — see runes/window.ts's header for the two deliberate differences from upstream, and
 // for why `scrollX`/`scrollY`/`screenLeft`/`screenTop` are absent rather than faked.
-export { innerWidth, innerHeight, outerWidth, outerHeight, devicePixelRatio } from './runes/window';
+export {
+  innerWidth,
+  innerHeight,
+  outerWidth,
+  outerHeight,
+  devicePixelRatio,
+} from './runes/window';
 // What replaces `MediaQuery` from `svelte/reactivity`: named exports for the media features RN can
 // actually answer, instead of a class taking a CSS query string it would mostly have to answer
 // `false` to. `(prefers-color-scheme)`'s twin is `useColorScheme()` above. See
@@ -318,8 +336,8 @@ export {
   type IClassEntry,
 } from './class-value';
 
-// Animated: the Svelte twin of adapters/vue/src/modules/animated (see modules/animated/index.ts's
-// header for why Animated.View/Text/Image/ScrollView are each their own hand-authored .svelte
-// file rather than a generic createAnimatedComponent() wrap — Svelte has no runtime h()/
-// createElement equivalent a factory could target).
-export { Animated } from './modules/animated';
+// Animated: the Svelte twin of adapters/vue/src/modules/animated. All six RN animated components
+// ship (View/Text/Image/ScrollView/FlatList/SectionList), all of them from the same generic
+// createAnimatedComponent() wrap React, Vue and Solid also export.
+export { Animated, createAnimatedComponent } from './modules/animated';
+export type { IAnimatedComponentProps } from './modules/animated';

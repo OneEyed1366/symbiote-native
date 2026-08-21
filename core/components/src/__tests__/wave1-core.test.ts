@@ -12,7 +12,11 @@ import type { IDescriptor, IDescriptorChild } from '../descriptor';
 import { renderImageBackground } from '../view/render-image-background';
 import { renderInputAccessoryView } from '../view/render-input-accessory-view';
 import { renderModal } from '../view/render-modal';
-import { createInitialModalState, modalReducer, shouldRenderModal } from '../state/modal';
+import {
+  createInitialModalState,
+  modalReducer,
+  shouldRenderModal,
+} from '../state/modal';
 
 function asDescriptor(child: IDescriptorChild | undefined): IDescriptor {
   if (child === undefined || typeof child === 'string')
@@ -105,7 +109,10 @@ describe('renderInputAccessoryView', () => {
 
 describe('renderModal', () => {
   it('builds a symbiote-modal host with the default attributes', () => {
-    const root = renderModal({ visible: true, passthrough: { testID: 'm', onShow: () => {} } });
+    const root = renderModal({
+      visible: true,
+      passthrough: { testID: 'm', onShow: () => {} },
+    });
     expect(root.type).toBe('symbiote-modal');
     expect(flattenStyle(root.props.style).position).toBe('absolute');
     expect(root.props.animationType).toBe('none');
@@ -128,14 +135,24 @@ describe('renderModal', () => {
   });
 
   it('flips presentationStyle to overFullScreen and the backdrop to transparent when transparent', () => {
-    const transparent = renderModal({ visible: true, transparent: true, passthrough: {} });
+    const transparent = renderModal({
+      visible: true,
+      transparent: true,
+      passthrough: {},
+    });
     expect(transparent.props.presentationStyle).toBe('overFullScreen');
     const container = asDescriptor(transparent.children[0]);
-    expect(flattenStyle(container.props.style).backgroundColor).toBe('transparent');
+    expect(flattenStyle(container.props.style).backgroundColor).toBe(
+      'transparent',
+    );
   });
 
   it('lets backdropColor override the container background', () => {
-    const tinted = renderModal({ visible: true, backdropColor: '#123456', passthrough: {} });
+    const tinted = renderModal({
+      visible: true,
+      backdropColor: '#123456',
+      passthrough: {},
+    });
     const container = asDescriptor(tinted.children[0]);
     expect(flattenStyle(container.props.style).backgroundColor).toBe('#123456');
   });
@@ -153,7 +170,11 @@ describe('renderModal', () => {
   // why: 'none' is only the RN default — an explicit animationType must reach the host node
   // unchanged, or a caller could never opt into 'slide'/'fade'.
   it('forwards an explicit animationType over the none default', () => {
-    const sliding = renderModal({ visible: true, animationType: 'slide', passthrough: {} });
+    const sliding = renderModal({
+      visible: true,
+      animationType: 'slide',
+      passthrough: {},
+    });
     expect(sliding.props.animationType).toBe('slide');
   });
 
@@ -193,7 +214,9 @@ describe('modal keep-alive state machine', () => {
   });
 
   it('re-arms the keep-alive on show and is identity-stable when already shown', () => {
-    const hidden = modalReducer(createInitialModalState(true), { type: 'hide' });
+    const hidden = modalReducer(createInitialModalState(true), {
+      type: 'hide',
+    });
     const shown = modalReducer(hidden, { type: 'show' });
     expect(shown.isRendered).toBe(true);
     expect(modalReducer(shown, { type: 'show' })).toBe(shown);

@@ -14,7 +14,10 @@
 </script>
 
 <script lang="ts">
-  import { renderInputAccessoryView, resolveAccessibilityProps } from '@symbiote-native/components';
+  import {
+    renderInputAccessoryView,
+    resolveAccessibilityProps,
+  } from '@symbiote-native/components';
   import { createAttachmentsSync } from '../../runes/attachments';
   import type { ShimElement } from '../../dom-shim';
 

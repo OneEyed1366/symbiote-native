@@ -7,7 +7,10 @@ const projectRoot = __dirname;
 // Resolving the package root via its manifest and joining the filename ourselves bypasses the
 // exports map (this is our own file lookup, not a package-consumer import), landing on the exact
 // same physical file the "production" condition of "./development" already points to.
-const esmEnvFalseFile = path.join(path.dirname(require.resolve('esm-env')), 'false.js');
+const esmEnvFalseFile = path.join(
+  path.dirname(require.resolve('esm-env')),
+  'false.js',
+);
 
 const defaultConfig = getDefaultConfig(projectRoot);
 
@@ -23,7 +26,8 @@ const config = {
   // transformer itself, so no local wiring file is needed (see
   // adapters/svelte/metro-svelte-transformer.cjs).
   transformer: {
-    babelTransformerPath: require.resolve('@symbiote-native/svelte/metro-svelte-transformer'),
+    babelTransformerPath:
+      require.resolve('@symbiote-native/svelte/metro-svelte-transformer'),
     // @react-native/metro-config defaults inlineRequires to true — every top-level
     // import/require gets rewritten to a lazy, per-call-site require() instead of running once
     // at module-load time. Svelte's internal client runtime (svelte/internal/client/**) is a

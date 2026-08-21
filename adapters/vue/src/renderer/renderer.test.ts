@@ -23,14 +23,15 @@ import { defineComponent, h, ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '../render';
 import { View, Text } from '@symbiote-native/vue';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 341;
 const VIEW = 'RCTView';
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -58,7 +59,9 @@ function committedView(): IFakeNode {
 // fabric.find() searches `created` — every node ever createNode'd, INCLUDING ones later removed
 // or superseded by a clone-on-write update — so it can't prove "currently in/out of the tree" or
 // "currently holds this text/prop". These tests need the LIVE committed tree instead.
-function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findCommitted(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   let found: IFakeNode | undefined;
   walk(fabric.committed, node => {
     if (found === undefined && predicate(node)) found = node;
@@ -68,7 +71,14 @@ function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | und
 
 describe('patchProp class/style merge', () => {
   it('resolves a class binding to registered style props', async () => {
-    registerStyles({ foo: { color: 'red' } });
+    registerRules([
+      {
+        tokens: ['foo'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { color: 'red' },
+      },
+    ]);
     mount(
       ROOT_TAG,
       defineComponent({
@@ -80,11 +90,19 @@ describe('patchProp class/style merge', () => {
   });
 
   it('lets an explicit :style win over a class-derived style, regardless of declaration order', async () => {
-    registerStyles({ foo: { color: 'red' } });
+    registerRules([
+      {
+        tokens: ['foo'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { color: 'red' },
+      },
+    ]);
     mount(
       ROOT_TAG,
       defineComponent({
-        setup: () => () => h('symbiote-view', { class: 'foo', style: { color: 'blue' } }),
+        setup: () => () =>
+          h('symbiote-view', { class: 'foo', style: { color: 'blue' } }),
       }),
     );
     await tick();
@@ -103,7 +121,20 @@ describe('patchProp class/style merge', () => {
   });
 
   it('re-resolves and recommits when the class changes reactively', async () => {
-    registerStyles({ foo: { color: 'red' }, bar: { color: 'green' } });
+    registerRules([
+      {
+        tokens: ['foo'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { color: 'red' },
+      },
+      {
+        tokens: ['bar'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { color: 'green' },
+      },
+    ]);
     const className = ref('foo');
     mount(
       ROOT_TAG,
@@ -127,7 +158,10 @@ describe('insert', () => {
   // natively with a less legible error.
   it('rejects a raw text child inserted outside a <Text>', () => {
     expect(() =>
-      mount(ROOT_TAG, defineComponent({ setup: () => () => h(View, null, 'plain text') })),
+      mount(
+        ROOT_TAG,
+        defineComponent({ setup: () => () => h(View, null, 'plain text') }),
+      ),
     ).toThrow('must be rendered inside a <Text>');
   });
 });
@@ -142,7 +176,8 @@ describe("createComment / createText('') — Fragment and v-if placeholder ancho
     mount(
       ROOT_TAG,
       defineComponent({
-        setup: () => () => (visible.value ? h(View, { nativeID: 'toggle' }) : null),
+        setup: () => () =>
+          visible.value ? h(View, { nativeID: 'toggle' }) : null,
       }),
     );
     await tick();
@@ -161,7 +196,10 @@ describe("createComment / createText('') — Fragment and v-if placeholder ancho
     mount(
       ROOT_TAG,
       defineComponent({
-        setup: () => () => [h(View, { nativeID: 'a' }), h(View, { nativeID: 'b' })],
+        setup: () => () => [
+          h(View, { nativeID: 'a' }),
+          h(View, { nativeID: 'b' }),
+        ],
       }),
     );
     await tick();
@@ -177,23 +215,32 @@ describe('setElementText — <Text> content updates', () => {
   // first — this is a behavioral (black-box) proof, not an assertion on which internal path fired.
   it('reflects every subsequent reactive text change, not just the first', async () => {
     const label = ref('first');
-    mount(ROOT_TAG, defineComponent({ setup: () => () => h(Text, null, label.value) }));
+    mount(
+      ROOT_TAG,
+      defineComponent({ setup: () => () => h(Text, null, label.value) }),
+    );
     await tick();
     expect(
-      findCommitted(n => n.viewName === 'RCTRawText' && n.props.text === 'first'),
+      findCommitted(
+        n => n.viewName === 'RCTRawText' && n.props.text === 'first',
+      ),
     ).toBeDefined();
 
     label.value = 'second';
     await tick();
     expect(
-      findCommitted(n => n.viewName === 'RCTRawText' && n.props.text === 'second'),
+      findCommitted(
+        n => n.viewName === 'RCTRawText' && n.props.text === 'second',
+      ),
     ).toBeDefined();
     expect(findCommitted(n => n.props.text === 'first')).toBeUndefined();
 
     label.value = 'third';
     await tick();
     expect(
-      findCommitted(n => n.viewName === 'RCTRawText' && n.props.text === 'third'),
+      findCommitted(
+        n => n.viewName === 'RCTRawText' && n.props.text === 'third',
+      ),
     ).toBeDefined();
   });
 
@@ -205,7 +252,10 @@ describe('setElementText — <Text> content updates', () => {
   // guard instead - only a hand-written `h()` on the raw intrinsic reaches this route.
   it('rejects a plain string child on the raw intrinsic under a non-<Text> View', () => {
     expect(() =>
-      mount(ROOT_TAG, defineComponent({ setup: () => () => h('symbiote-view', {}, 'stray') })),
+      mount(
+        ROOT_TAG,
+        defineComponent({ setup: () => () => h('symbiote-view', {}, 'stray') }),
+      ),
     ).toThrow('must be rendered inside a <Text>');
   });
 });
@@ -220,7 +270,11 @@ describe('remove and reorder', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h(View, { nativeID: 'parent' }, show.value ? [h(View, { nativeID: 'child' })] : []),
+          h(
+            View,
+            { nativeID: 'parent' },
+            show.value ? [h(View, { nativeID: 'child' })] : [],
+          ),
       }),
     );
     await tick();
@@ -253,12 +307,21 @@ describe('remove and reorder', () => {
     const list = findCommitted(n => n.props.nativeID === 'list');
     expect(list, 'list root committed').toBeDefined();
     if (list === undefined) throw new Error('unreachable: list missing');
-    expect(list.children.map(c => c.props.nativeID)).toEqual(['item-a', 'item-b', 'item-c']);
+    expect(list.children.map(c => c.props.nativeID)).toEqual([
+      'item-a',
+      'item-b',
+      'item-c',
+    ]);
 
     order.value = ['c', 'a', 'b'];
     await tick();
     const reordered = findCommitted(n => n.props.nativeID === 'list');
-    if (reordered === undefined) throw new Error('unreachable: list missing after reorder');
-    expect(reordered.children.map(c => c.props.nativeID)).toEqual(['item-c', 'item-a', 'item-b']);
+    if (reordered === undefined)
+      throw new Error('unreachable: list missing after reorder');
+    expect(reordered.children.map(c => c.props.nativeID)).toEqual([
+      'item-c',
+      'item-a',
+      'item-b',
+    ]);
   });
 });

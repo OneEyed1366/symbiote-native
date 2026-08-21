@@ -19,7 +19,11 @@ vi.mock('./native/exponent-gyroscope', () => ({
 // Vitest's Oxc transform can't parse — same fake as device-sensor.test.ts.
 vi.mock('expo-modules-core', () => ({
   Platform: { OS: 'ios' },
-  PermissionStatus: { GRANTED: 'granted', UNDETERMINED: 'undetermined', DENIED: 'denied' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    UNDETERMINED: 'undetermined',
+    DENIED: 'denied',
+  },
 }));
 
 const { Gyroscope } = await import('./gyroscope');
@@ -41,7 +45,9 @@ describe('Gyroscope', () => {
       // an accidental stand-in shared with another sensor.
       Gyroscope.setUpdateInterval(1234);
 
-      expect(FAKE_NATIVE_GYROSCOPE.setUpdateInterval).toHaveBeenCalledWith(1234);
+      expect(FAKE_NATIVE_GYROSCOPE.setUpdateInterval).toHaveBeenCalledWith(
+        1234,
+      );
     });
 
     it('subscribes through the "gyroscopeDidUpdate" event name the native module emits', () => {

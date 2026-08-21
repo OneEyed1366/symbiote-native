@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { SafeAreaView, Text, TextInput, View } from '@symbiote-native/react';
 import { ActionButton } from '../components/ActionButton';
 import { resolveRouteFromUrl } from '@symbiote-native/navigation';
-import { APP_LINKING_CONFIG, SAMPLE_DEEP_LINK_URL } from '../navigation-linking';
+import {
+  APP_LINKING_CONFIG,
+  SAMPLE_DEEP_LINK_URL,
+} from '../navigation-linking';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -30,21 +33,27 @@ export function DeepLinkingScreen() {
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
         <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: LINE_COLOR.routing }}>
+          <View
+            className="hero-badge"
+            style={{ backgroundColor: LINE_COLOR.routing }}
+          >
             <Text className="hero-badge-text">DL</Text>
           </View>
           <View className="hero-copy">
             <Text className="hero-title">Deep linking</Text>
             <Text className="hero-body">
-              A typed URL resolved to a route through resolveRouteFromUrl, the same path a real
-              deep link or push notification would take.
+              A typed URL resolved to a route through resolveRouteFromUrl, the
+              same path a real deep link or push notification would take.
             </Text>
           </View>
         </View>
         <Text className="info-text">
           prefixes: symbiotecanary:// · https://canary.symbiote-native.dev
         </Text>
-        <Text className="note-text">Details → details/:id · HeaderOptions → header-options · TabsDemo → tabs</Text>
+        <Text className="note-text">
+          Details → details/:id · HeaderOptions → header-options · TabsDemo →
+          tabs
+        </Text>
         <TextInput
           testID="deep-link-input"
           value={url}
@@ -53,7 +62,12 @@ export function DeepLinkingScreen() {
           placeholderTextColor="#41506a"
           className="text-input"
         />
-        <ActionButton testID="deep-link-resolve" title="Resolve" onPress={onResolve} color={LINE_COLOR.routing} />
+        <ActionButton
+          testID="deep-link-resolve"
+          title="Resolve"
+          onPress={onResolve}
+          color={LINE_COLOR.routing}
+        />
         <View className="parity-list">
           <Text testID="deep-link-result" className="list-row-text">
             {resolved ?? 'tap Resolve to see the parsed route'}

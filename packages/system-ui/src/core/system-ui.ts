@@ -17,7 +17,9 @@ import { expoSystemUI } from './native-module';
  * @param color Any valid [CSS 3 (SVG) color](http://www.w3.org/TR/css3-color/#svg-color), or
  * `null` to clear the override.
  */
-export async function setBackgroundColorAsync(color: ColorValue | null): Promise<void> {
+export async function setBackgroundColorAsync(
+  color: ColorValue | null,
+): Promise<void> {
   if (color == null) {
     return await expoSystemUI.setBackgroundColorAsync(null);
   } else {

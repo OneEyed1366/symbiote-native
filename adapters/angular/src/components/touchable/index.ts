@@ -6,9 +6,10 @@
 //     to 1 on press-out, driven from Pressable's onPressIn/onPressOut. The opacity Value is held by
 //     IDENTITY as a plain field (an engine object, never an @Input / reactive wrap) and the
 //     <symbiote-animated-view> leaf commits it every frame.
-//   TouchableHighlight: paint underlayColor + lower child opacity while pressed, via Pressable's
-//     style-as-function (Pressable drives the pressed flag through its own responder lifecycle).
-//   TouchableWithoutFeedback: no visual change, just the press wiring forwarded through Pressable.
+//   TouchableHighlight: paint underlayColor + lower child opacity while the underlay is SHOWN.
+//     RN drives that from onPressIn/onPress/onPressOut and holds it past the tap for delayPressOut,
+//     NOT from Pressable's pressed flag — a tap too fast to see is already un-pressed by then.
+//   TouchableWithoutFeedback: no visual change, but RN still runs the full press-timing machine.
 //
 // Every Touchable's own press/hover/accessibility events are now real @Output() EventEmitters too,
 // matching Pressable (which they wrap) — `(press)="handler($event)"`, never `[onPress]="handler"`.
@@ -33,31 +34,42 @@ import {
   inject,
   Input,
   type OnChanges,
+  type OnDestroy,
   Output,
   signal,
 } from '@angular/core';
 import {
+  createHighlightUnderlayHandlers,
+  createHighlightUnderlayRuntime,
   createTouchableFeedbackHandlers,
   createTouchableFeedbackRuntime,
-  highlightPressedStyle,
+  hasTouchablePressHandler,
+  resolveHighlightExtraStyles,
+  restingOpacityFromStyle,
   DEFAULT_ACTIVE_OPACITY,
-  DEFAULT_HIGHLIGHT_CHILD_OPACITY,
-  DEFAULT_MIN_PRESS_DURATION_MS,
-  DEFAULT_UNDERLAY_COLOR,
-  OPACITY_ACTIVE_DURATION_MS,
+  OPACITY_ACTIVE_GRANT_DURATION_MS,
   OPACITY_INACTIVE_DURATION_MS,
   RESTING_OPACITY,
+  TOUCHABLE_MIN_PRESS_DURATION_MS,
   type IAccessibilityProps,
   type IAccessibilityStateValue,
   type IAriaProps,
+  type IHighlightUnderlayHandlers,
   type IPressableAndroidRippleConfig,
-  type IPressState,
   type IPressTimingProps,
   type IRectOffset,
   type ITouchableFeedbackHandlers,
 } from '@symbiote-native/components';
-import { type ISymbioteEvent, type IStyleProp, type IViewStyle } from '@symbiote-native/engine';
-import { anchorHostStyle, anchorStyleProp, SymbioteStyleInputDirective } from '../../primitives';
+import {
+  type ISymbioteEvent,
+  type IStyleProp,
+  type IViewStyle,
+} from '@symbiote-native/engine';
+import {
+  anchorHostStyle,
+  anchorStyleProp,
+  SymbioteStyleInputDirective,
+} from '../../primitives';
 import { Pressable, type IAngularPressableInputs } from '../pressable';
 import { Animated, AnimatedView } from '../../modules/animated';
 
@@ -82,17 +94,43 @@ export type IAngularTouchableHighlightProps = IAngularTouchableBaseProps & {
 
 export type IAngularTouchableWithoutFeedbackProps = IAngularTouchableBaseProps;
 
-// The real setTimeout the shared feedback machine schedules its deferred activation/deactivation on
-// (core/components has no timer globals). Returns a canceller so an early release flushes the timer.
-function scheduleTimeout(callback: () => void, ms: number): () => void {
-  const id = setTimeout(callback, ms);
-  return () => clearTimeout(id);
+// The real timers both shared machines schedule on — core/components carries no timer globals, so
+// scheduling is the adapter's half. Every canceller is retained so ngOnDestroy cancels what is
+// still in flight: a deferred press-out or a held underlay firing after teardown would emit from a
+// destroyed component and write a signal on a destroyed view.
+interface ITimerScheduler {
+  schedule: (callback: () => void, ms: number) => () => void;
+  cancelAll: () => void;
+}
+
+function createTimerScheduler(): ITimerScheduler {
+  const pending = new Set<() => void>();
+  return {
+    schedule(callback: () => void, ms: number): () => void {
+      const id = setTimeout(() => {
+        pending.delete(cancel);
+        callback();
+      }, ms);
+      const cancel = (): void => {
+        clearTimeout(id);
+        pending.delete(cancel);
+      };
+      pending.add(cancel);
+      return cancel;
+    },
+    cancelAll(): void {
+      for (const cancel of [...pending]) cancel();
+      pending.clear();
+    },
+  };
 }
 
 @Component({
   selector: 'TouchableOpacity',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [Pressable, AnimatedView],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -138,8 +176,12 @@ function scheduleTimeout(callback: () => void, ms: number): () => void {
       [accessibilityElementsHidden]="accessibilityElementsHidden"
       [accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"
       [accessibilityLanguage]="accessibilityLanguage"
-      [accessibilityRespondsToUserInteraction]="accessibilityRespondsToUserInteraction"
-      [accessibilityShowsLargeContentViewer]="accessibilityShowsLargeContentViewer"
+      [accessibilityRespondsToUserInteraction]="
+        accessibilityRespondsToUserInteraction
+      "
+      [accessibilityShowsLargeContentViewer]="
+        accessibilityShowsLargeContentViewer
+      "
       [accessibilityLargeContentTitle]="accessibilityLargeContentTitle"
       (accessibilityAction)="accessibilityAction.emit($event)"
       (accessibilityTap)="accessibilityTap.emit($event)"
@@ -168,7 +210,9 @@ function scheduleTimeout(callback: () => void, ms: number): () => void {
     </Pressable>
   `,
 })
-export class TouchableOpacity implements IAngularTouchableOpacityProps, DoCheck {
+export class TouchableOpacity
+  implements IAngularTouchableOpacityProps, OnChanges, OnDestroy, DoCheck
+{
   @Output() readonly press = new EventEmitter<ISymbioteEvent>();
   @Output() readonly pressIn = new EventEmitter<ISymbioteEvent>();
   @Output() readonly pressOut = new EventEmitter<ISymbioteEvent>();
@@ -211,8 +255,10 @@ export class TouchableOpacity implements IAngularTouchableOpacityProps, DoCheck 
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -238,13 +284,21 @@ export class TouchableOpacity implements IAngularTouchableOpacityProps, DoCheck 
   @Input() id?: string;
   @Input() role?: IAriaProps['role'];
 
-  // One Animated.Value per mount, resting at full opacity. Held by IDENTITY as a plain field (an
-  // engine object, never an @Input / reactive wrap); the <symbiote-animated-view> leaf rasterizes
-  // it for the first paint and drives it through setNativeProps every frame.
+  // One Animated.Value per mount. Held by IDENTITY as a plain field (an engine object, never an
+  // @Input / reactive wrap); the <symbiote-animated-view> leaf rasterizes it for the first paint
+  // and drives it through setNativeProps every frame.
+  //
+  // RN seeds it from _getChildStyleOpacityWithDefault(props.style). Angular writes @Input()s AFTER
+  // the field initializers run, so `style` is still undefined here — the real resting value is
+  // seeded by the first ngOnChanges below, which still precedes the first template pass.
   private readonly opacity = new Animated.Value(RESTING_OPACITY);
   // The shared press-scheduling cell (delayPressIn timer + activation clock), persisted on the
   // instance; the machine's handlers are rebuilt per event over live @Input()s.
   private readonly runtime = createTouchableFeedbackRuntime();
+  private readonly timers = createTimerScheduler();
+  // What the last settle ran for. Undefined until the first ngOnChanges, which is the MOUNT.
+  private settled:
+    { disabled: boolean | undefined; resting: number } | undefined;
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
   // onto (see anchorHostStyle's doc comment) — NOT the <symbiote-animated-view> leaf one level down.
   private readonly elementRef = inject(ElementRef);
@@ -271,12 +325,46 @@ export class TouchableOpacity implements IAngularTouchableOpacityProps, DoCheck 
     this.anchorStyle.set(anchorHostStyle(this.elementRef));
   }
 
+  // RN's componentDidUpdate: a changed `disabled` or a changed style opacity re-settles the view,
+  // so a Touchable disabled mid-press does not stay stuck at its active opacity. The FIRST call is
+  // the mount (ngOnChanges runs before ngOnInit and before the first template pass), so it seeds
+  // the Value instead of animating — RN does this on update only, and a fade at mount would animate
+  // away from the value the leaf is about to paint. A use site with no bindings gets no ngOnChanges
+  // at all, and there the RESTING_OPACITY seed is already the right answer.
+  ngOnChanges(): void {
+    const settled = { disabled: this.disabled, resting: this.restingOpacity() };
+    if (this.settled === undefined) {
+      this.opacity.setValue(settled.resting);
+    } else if (
+      this.settled.disabled !== settled.disabled ||
+      this.settled.resting !== settled.resting
+    ) {
+      this.setOpacityTo(settled.resting, OPACITY_INACTIVE_DURATION_MS);
+    }
+    this.settled = settled;
+  }
+
+  // RN's componentWillUnmount: stop the animation so a teardown mid-fade leaves no driver running
+  // against a node that is gone, and drop any press-out still deferred behind a timer.
+  ngOnDestroy(): void {
+    this.timers.cancelAll();
+    this.opacity.resetAnimation();
+  }
+
+  // RN's _getChildStyleOpacityWithDefault: the fade settles at the opacity the CALLER's style asks
+  // for, not at a hard 1 — a Touchable styled `opacity: 0.6` must come back to 0.6.
+  private restingOpacity(): number {
+    return restingOpacityFromStyle(this.style);
+  }
+
   private setOpacityTo(toValue: number, duration: number): void {
     Animated.timing(this.opacity, {
       toValue,
       duration,
       easing: Animated.Easing.inOut(Animated.Easing.quad),
-      useNativeDriver: false,
+      // RN's own (TouchableOpacity.js:242). opacity is natively drivable, so the fade survives a
+      // busy JS thread — which is the entire point of press feedback.
+      useNativeDriver: true,
     }).start();
   }
 
@@ -288,8 +376,11 @@ export class TouchableOpacity implements IAngularTouchableOpacityProps, DoCheck 
       {
         delayPressIn: this.delayPressIn ?? 0,
         delayPressOut: this.delayPressOut ?? 0,
-        minPressDuration: this.minPressDuration ?? DEFAULT_MIN_PRESS_DURATION_MS,
-        schedule: scheduleTimeout,
+        // RN's Touchables override Pressability's own 130ms floor with 0; what holds the active
+        // visual there is the fade's own duration, not a press-duration floor.
+        minPressDuration:
+          this.minPressDuration ?? TOUCHABLE_MIN_PRESS_DURATION_MS,
+        schedule: this.timers.schedule,
         now: Date.now,
       },
       this.runtime,
@@ -297,12 +388,15 @@ export class TouchableOpacity implements IAngularTouchableOpacityProps, DoCheck 
         activate: (event: ISymbioteEvent): void => {
           this.setOpacityTo(
             this.activeOpacity ?? DEFAULT_ACTIVE_OPACITY,
-            OPACITY_ACTIVE_DURATION_MS,
+            OPACITY_ACTIVE_GRANT_DURATION_MS,
           );
           this.pressIn.emit(event);
         },
         deactivate: (event: ISymbioteEvent): void => {
-          this.setOpacityTo(RESTING_OPACITY, OPACITY_INACTIVE_DURATION_MS);
+          this.setOpacityTo(
+            this.restingOpacity(),
+            OPACITY_INACTIVE_DURATION_MS,
+          );
           this.pressOut.emit(event);
         },
       },
@@ -323,15 +417,17 @@ export class TouchableOpacity implements IAngularTouchableOpacityProps, DoCheck 
 @Component({
   selector: 'TouchableHighlight',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   imports: [Pressable],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <Pressable
-      [style]="pressedStyle()"
-      (press)="press.emit($event)"
-      (pressIn)="pressIn.emit($event)"
-      (pressOut)="pressOut.emit($event)"
+      [style]="containerStyle()"
+      (press)="handlePress($event)"
+      (pressIn)="handlePressIn($event)"
+      (pressOut)="handlePressOut($event)"
       (pressMove)="pressMove.emit($event)"
       (longPress)="longPress.emit($event)"
       (hoverIn)="hoverIn.emit($event)"
@@ -369,8 +465,12 @@ export class TouchableOpacity implements IAngularTouchableOpacityProps, DoCheck 
       [accessibilityElementsHidden]="accessibilityElementsHidden"
       [accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"
       [accessibilityLanguage]="accessibilityLanguage"
-      [accessibilityRespondsToUserInteraction]="accessibilityRespondsToUserInteraction"
-      [accessibilityShowsLargeContentViewer]="accessibilityShowsLargeContentViewer"
+      [accessibilityRespondsToUserInteraction]="
+        accessibilityRespondsToUserInteraction
+      "
+      [accessibilityShowsLargeContentViewer]="
+        accessibilityShowsLargeContentViewer
+      "
       [accessibilityLargeContentTitle]="accessibilityLargeContentTitle"
       (accessibilityAction)="accessibilityAction.emit($event)"
       (accessibilityTap)="accessibilityTap.emit($event)"
@@ -397,7 +497,9 @@ export class TouchableOpacity implements IAngularTouchableOpacityProps, DoCheck 
     </Pressable>
   `,
 })
-export class TouchableHighlight implements IAngularTouchableHighlightProps, OnChanges, DoCheck {
+export class TouchableHighlight
+  implements IAngularTouchableHighlightProps, OnChanges, OnDestroy, DoCheck
+{
   @Output() readonly press = new EventEmitter<ISymbioteEvent>();
   @Output() readonly pressIn = new EventEmitter<ISymbioteEvent>();
   @Output() readonly pressOut = new EventEmitter<ISymbioteEvent>();
@@ -409,6 +511,9 @@ export class TouchableHighlight implements IAngularTouchableHighlightProps, OnCh
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
+  // RN's onShowUnderlay / onHideUnderlay — fired on a real transition only, never on a repeat.
+  @Output() readonly showUnderlay = new EventEmitter<void>();
+  @Output() readonly hideUnderlay = new EventEmitter<void>();
   @Input() activeOpacity?: number;
   @Input() underlayColor?: string;
   @Input() delayPressIn?: number;
@@ -441,8 +546,10 @@ export class TouchableHighlight implements IAngularTouchableHighlightProps, OnCh
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -472,33 +579,102 @@ export class TouchableHighlight implements IAngularTouchableHighlightProps, OnCh
   // onto (see anchorHostStyle's doc comment) — NOT the Pressable one level down.
   private readonly elementRef = inject(ElementRef);
 
-  // Pressable accepts a style-as-function and calls it with the live pressed state. Arrow field so
-  // `this` stays bound when Pressable invokes it; it reads the inputs LIVE at call time. The
-  // anchor's class-derived style goes first, then the user's explicit style, so an explicit
-  // [style] still beats the ambient class. When pressed, paint the underlay color + lower the
-  // child opacity (RN drives this with setState, not Animated, so we mirror that faithfully
-  // through Pressable's pressed flag, no tween) — the overlay always goes last so it wins.
-  // A computed that RETURNS A NEW ARROW when its dependencies move, not one stable arrow forever.
-  // The stable-arrow form was silently frozen: Pressable's `style` @Input never reported a change,
-  // so Pressable's view never refreshed and never re-invoked the arrow - a class or [style]
-  // toggled after mount never reached the committed view. Reading the anchor signal from inside
-  // the arrow body instead would have worked by accident, by registering THIS component's signal
-  // on Pressable's consumer; returning a new reference keeps the dependency where it belongs, in
-  // an ordinary input change.
-  readonly pressedStyle = computed<(state: IPressState) => IStyleProp<IViewStyle>>(() => {
+  // `shown` is NOT Pressable's `pressed`. RN holds the underlay for delayPressOut past the tap so a
+  // press too fast to see still flashes, and the pressed flag is already false by then. A SIGNAL,
+  // because the hide fires from a timer — outside any Angular listener, so under zoneless CD
+  // nothing else would mark this view. A signal write both notifies the change-detection scheduler
+  // (markAncestorsForTraversal) and dirties this template's own reactive consumer, which is the one
+  // thing honored in Targeted mode; markForCheck from a plain field would not be reachable here.
+  private readonly shown = signal(false);
+  private readonly underlayRuntime = createHighlightUnderlayRuntime();
+  private readonly timers = createTimerScheduler();
+
+  // The container style Pressable paints.
+  //
+  // POINT-7 DECISION — both halves stay on the CONTAINER, deliberately. RN's _createExtraStyles
+  // keeps them apart: `underlay` (the backgroundColor) on the container, `child` (the lowered
+  // opacity) cloned onto the single child. Angular has no cloneElement and no way to reach a
+  // projected <ng-content> node, so the only path to the child is a permanent wrapper View — which
+  // inserts a node into the flex chain and silently re-parents any `flex` a child declares. The
+  // fake Fabric runs no Yoga, so no headless test can measure that damage, only assert the extra
+  // node exists; shipping an unmeasurable layout change is worse than the visual approximation.
+  // Same call, same reason, as the Solid adapter. resolveHighlightExtraStyles keeps the two styles
+  // SEPARATE regardless, so a layout-safe fix (which needs a device check, not a test) stays open.
+  //
+  // Returns a NEW ARRAY whenever a dependency moves: Pressable's `style` @Input then reports an
+  // ordinary change. A stable reference was the earlier bug — Pressable's view never refreshed, so
+  // a class or [style] toggled after mount never reached the committed view.
+  readonly containerStyle = computed<IStyleProp<IViewStyle>>(() => {
     this.inputsRevision();
     const base: IStyleProp<IViewStyle> = [this.anchorStyle(), this.style];
-    const underlayColor = this.underlayColor ?? DEFAULT_UNDERLAY_COLOR;
-    const childOpacity = this.activeOpacity ?? DEFAULT_HIGHLIGHT_CHILD_OPACITY;
-    return (state: IPressState): IStyleProp<IViewStyle> =>
-      highlightPressedStyle(state.pressed, base, underlayColor, childOpacity);
+    const extra = resolveHighlightExtraStyles({
+      shown: this.shown(),
+      hasPressHandler: this.hasPressHandler(),
+      underlayColor: this.underlayColor,
+      activeOpacity: this.activeOpacity,
+    });
+    return extra === undefined ? base : [base, extra.underlay, extra.child];
   });
 
-  // `style`, `underlayColor` and `activeOpacity` are read untracked inside that computed, so the
+  // RN's _hasPressHandler: a Touchable that handles no press paints no underlay. Angular exposes
+  // the press lifecycle as @Output()s, so "a handler is present" is "something is subscribed" — the
+  // same `.observed` test Pressable uses to decide whether to arm its long-press timer at all.
+  private hasPressHandler(): boolean {
+    return hasTouchablePressHandler({
+      onPress: this.press.observed ? this.press : undefined,
+      onPressIn: this.pressIn.observed ? this.pressIn : undefined,
+      onPressOut: this.pressOut.observed ? this.pressOut : undefined,
+      onLongPress: this.longPress.observed ? this.longPress : undefined,
+    });
+  }
+
+  // Built per event so the machine reads live @Input()s (delayPressOut, the has-handler gate); the
+  // runtime persists across calls, which is what lets handlePressOut see the timer handlePress set.
+  private underlayHandlers(): IHighlightUnderlayHandlers {
+    return createHighlightUnderlayHandlers(
+      {
+        delayPressOut: this.delayPressOut ?? 0,
+        hasPressHandler: this.hasPressHandler(),
+        schedule: this.timers.schedule,
+      },
+      this.underlayRuntime,
+      {
+        setShown: (shown: boolean): void => this.shown.set(shown),
+        onShowUnderlay: (): void => this.showUnderlay.emit(),
+        onHideUnderlay: (): void => this.hideUnderlay.emit(),
+      },
+    );
+  }
+
+  // Visual first, then the caller's own event — RN's order in _createPressabilityConfig.
+  // onLongPress is deliberately NOT intercepted (Pressable emits it straight through); it is only
+  // READ, by the has-press-handler gate above.
+  handlePressIn(event: ISymbioteEvent): void {
+    this.underlayHandlers().handlePressIn(event);
+    this.pressIn.emit(event);
+  }
+
+  handlePress(event: ISymbioteEvent): void {
+    this.underlayHandlers().handlePress(event);
+    this.press.emit(event);
+  }
+
+  handlePressOut(event: ISymbioteEvent): void {
+    this.underlayHandlers().handlePressOut(event);
+    this.pressOut.emit(event);
+  }
+
+  ngOnDestroy(): void {
+    this.timers.cancelAll();
+  }
+
+  // `style`, `underlayColor` and `activeOpacity` are read untracked inside containerStyle, so the
   // bump is what tells it they moved. See the ngDoCheck note below for the anchor half, which
   // ngOnChanges cannot cover.
   private readonly inputsRevision = signal(0);
-  private readonly anchorStyle = signal<IStyleProp<IViewStyle> | undefined>(undefined);
+  private readonly anchorStyle = signal<IStyleProp<IViewStyle> | undefined>(
+    undefined,
+  );
 
   ngOnChanges(): void {
     this.inputsRevision.update(revision => revision + 1);
@@ -517,15 +693,17 @@ export class TouchableHighlight implements IAngularTouchableHighlightProps, OnCh
 @Component({
   selector: 'TouchableWithoutFeedback',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   imports: [Pressable],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <Pressable
       [style]="mergedStyle"
       (press)="press.emit($event)"
-      (pressIn)="pressIn.emit($event)"
-      (pressOut)="pressOut.emit($event)"
+      (pressIn)="handlePressIn($event)"
+      (pressOut)="handlePressOut($event)"
       (pressMove)="pressMove.emit($event)"
       (longPress)="longPress.emit($event)"
       (hoverIn)="hoverIn.emit($event)"
@@ -563,8 +741,12 @@ export class TouchableHighlight implements IAngularTouchableHighlightProps, OnCh
       [accessibilityElementsHidden]="accessibilityElementsHidden"
       [accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"
       [accessibilityLanguage]="accessibilityLanguage"
-      [accessibilityRespondsToUserInteraction]="accessibilityRespondsToUserInteraction"
-      [accessibilityShowsLargeContentViewer]="accessibilityShowsLargeContentViewer"
+      [accessibilityRespondsToUserInteraction]="
+        accessibilityRespondsToUserInteraction
+      "
+      [accessibilityShowsLargeContentViewer]="
+        accessibilityShowsLargeContentViewer
+      "
       [accessibilityLargeContentTitle]="accessibilityLargeContentTitle"
       (accessibilityAction)="accessibilityAction.emit($event)"
       (accessibilityTap)="accessibilityTap.emit($event)"
@@ -591,10 +773,13 @@ export class TouchableHighlight implements IAngularTouchableHighlightProps, OnCh
     </Pressable>
   `,
 })
-export class TouchableWithoutFeedback implements DoCheck, IAngularTouchableWithoutFeedbackProps {
-  // delayPressIn/delayPressOut/minPressDuration ride the prop type for surface parity with the
-  // other two, but TouchableWithoutFeedback has no visual feedback, so nothing schedules off them
-  // (RN's TouchableWithoutFeedback is the same pure passthrough).
+export class TouchableWithoutFeedback
+  implements DoCheck, OnDestroy, IAngularTouchableWithoutFeedbackProps
+{
+  // RN's TouchableWithoutFeedback builds a FULL Pressability config with delayPressIn /
+  // delayPressOut / minPressDuration: 0 — "without feedback" means no VISUAL, not no timing. So the
+  // same shared machine TouchableOpacity uses runs here, with the visual half left empty: the
+  // pressIn/pressOut EMIT is what gets deferred and floored.
   @Output() readonly press = new EventEmitter<ISymbioteEvent>();
   @Output() readonly pressIn = new EventEmitter<ISymbioteEvent>();
   @Output() readonly pressOut = new EventEmitter<ISymbioteEvent>();
@@ -636,8 +821,10 @@ export class TouchableWithoutFeedback implements DoCheck, IAngularTouchableWitho
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -667,10 +854,45 @@ export class TouchableWithoutFeedback implements DoCheck, IAngularTouchableWitho
   // onto (see anchorHostStyle's doc comment) — NOT the Pressable one level down.
   private readonly elementRef = inject(ElementRef);
 
+  // The shared press-scheduling cell (delayPressIn timer + activation clock), persisted on the
+  // instance; the machine's handlers are rebuilt per event over live @Input()s.
+  private readonly runtime = createTouchableFeedbackRuntime();
+  private readonly timers = createTimerScheduler();
+
   // The anchor's class-derived style goes first, then the explicit style, so an explicit [style]
   // still beats the ambient class.
   get mergedStyle(): IStyleProp<IViewStyle> {
     return [this.anchorStyle(), this.style];
+  }
+
+  private feedbackHandlers(): ITouchableFeedbackHandlers {
+    return createTouchableFeedbackHandlers(
+      {
+        delayPressIn: this.delayPressIn ?? 0,
+        delayPressOut: this.delayPressOut ?? 0,
+        minPressDuration:
+          this.minPressDuration ?? TOUCHABLE_MIN_PRESS_DURATION_MS,
+        schedule: this.timers.schedule,
+        now: Date.now,
+      },
+      this.runtime,
+      {
+        activate: (event: ISymbioteEvent): void => this.pressIn.emit(event),
+        deactivate: (event: ISymbioteEvent): void => this.pressOut.emit(event),
+      },
+    );
+  }
+
+  handlePressIn(event: ISymbioteEvent): void {
+    this.feedbackHandlers().handlePressIn(event);
+  }
+
+  handlePressOut(event: ISymbioteEvent): void {
+    this.feedbackHandlers().handlePressOut(event);
+  }
+
+  ngOnDestroy(): void {
+    this.timers.cancelAll();
   }
 
   // The anchor's class-derived style is written by the renderer's addClass/removeClass at the USE
@@ -681,7 +903,9 @@ export class TouchableWithoutFeedback implements DoCheck, IAngularTouchableWitho
   // ngDoCheck fixes both halves: ngDoCheck runs during the PARENT's refresh even when this view is
   // skipped, and the signal write is what then marks this view for refresh. `signal.set`'s own
   // Object.is makes an unchanged poll a no-op, so there is no loop.
-  private readonly anchorStyle = signal<IStyleProp<IViewStyle> | undefined>(undefined);
+  private readonly anchorStyle = signal<IStyleProp<IViewStyle> | undefined>(
+    undefined,
+  );
 
   ngDoCheck(): void {
     this.anchorStyle.set(anchorStyleProp<IViewStyle>(this.elementRef));

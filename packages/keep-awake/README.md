@@ -2,8 +2,8 @@
 
 Port of [`expo-keep-awake`](https://docs.expo.dev/versions/latest/sdk/keep-awake/) for
 [SymbioteNative](../../README.md) — keeps the screen on for the lifetime of a mounted
-component/composable/service, reachable from every adapter (React, Vue, Angular), not just
-React.
+component/composable/service, reachable from every adapter (React, Vue, Svelte, Solid, Angular),
+not just React.
 
 Built the same way as [`@symbiote-native/battery`](../battery) and
 [`@symbiote-native/device`](../device), an `expo-modules-core`-based wrapper (see the
@@ -31,12 +31,12 @@ into the native host app **once**, covering this package and every other `expo-m
 package (`@symbiote-native/battery`, `@symbiote-native/device`, `@symbiote-native/sensors`, …)
 with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 The recurring per-package half of the Android wiring (`app/build.gradle`'s
 `implementation project(':expo-keep-awake')` line and `MainApplication.kt`'s module-name map
@@ -59,15 +59,18 @@ src/core/               keep-awake.ts — isAvailableAsync/activateKeepAwakeAsyn
                         KeepAwakeOptions, hand-ported from KeepAwake.types.ts.
 src/react/hooks/        @symbiote-native/keep-awake/react   — useKeepAwake
 src/vue/composables/    @symbiote-native/keep-awake/vue     — useKeepAwake
+src/svelte/runes/       @symbiote-native/keep-awake/svelte  — useKeepAwake
+src/solid/primitives/   @symbiote-native/keep-awake/solid   — createKeepAwake (Solid says
+                                                              create*, not use*)
 src/angular/services/   @symbiote-native/keep-awake/angular — KeepAwakeService (`.connect()`,
                         no return value — a pure side effect for the component's lifetime)
 ```
 
-Each adapter's hook/composable/service activates a keep-awake lock on mount and deactivates it on
-unmount, over the same `core` functions — the tag-generation and activate/deactivate lifecycle is
-written once and shared by all three. React uses `useId()` for its default per-instance tag,
-matching upstream; Vue and Angular have no `useId` equivalent, so both fall back to a small
-monotonically-incrementing module-local counter (`keep-awake-tag-1`, `keep-awake-tag-2`, …) when
+Each adapter's hook/composable/rune/primitive/service activates a keep-awake lock on mount and
+deactivates it on unmount, over the same `core` functions — the tag-generation and
+activate/deactivate lifecycle is written once and shared by every adapter. React uses `useId()`
+for its default per-instance tag, matching upstream; Vue, Svelte, Solid and Angular have no
+`useId` equivalent, so they fall back to a small monotonically-incrementing module-local counter (`keep-awake-tag-1`, `keep-awake-tag-2`, …) when
 no explicit tag is given.
 
 ## Use it
@@ -100,7 +103,7 @@ useKeepAwake();
 import { Component, inject } from '@angular/core';
 import { KeepAwakeService } from '@symbiote-native/keep-awake/angular';
 
-@Component({ /* ... */ })
+@Component({/* ... */})
 export class KeepAwakeScreen {
   constructor() {
     inject(KeepAwakeService).connect();
@@ -123,25 +126,31 @@ as a minimal `unknown` placeholder: upstream's own shape there is web-specific a
 analogue, and native listeners for it rarely fire.
 
 ```ts
-import { activateKeepAwakeAsync, deactivateKeepAwake } from '@symbiote-native/keep-awake';
+import {
+  activateKeepAwakeAsync,
+  deactivateKeepAwake,
+} from '@symbiote-native/keep-awake';
 
 // framework-scoped entry points re-export the same free functions, plus a lifecycle
 // hook/composable/service:
 import { useKeepAwake } from '@symbiote-native/keep-awake/react';
 import { useKeepAwake } from '@symbiote-native/keep-awake/vue';
+import { useKeepAwake } from '@symbiote-native/keep-awake/svelte';
+import { createKeepAwake } from '@symbiote-native/keep-awake/solid';
 import { KeepAwakeService } from '@symbiote-native/keep-awake/angular';
 ```
 
-Each hook/composable/service activates a lock on mount (optionally registering `options.listener`
-once activation resolves) and deactivates it on unmount — mirroring upstream's own
-`useKeepAwake(tag?, options?)`.
+Each hook/composable/rune/primitive/service activates a lock on mount (optionally registering
+`options.listener` once activation resolves) and deactivates it on unmount — mirroring upstream's
+own `useKeepAwake(tag?, options?)`. Solid's `createKeepAwake(tag?, options?)` does it from the
+primitive body, releasing through `onCleanup`.
 
 ## Test it
 
 No Fabric/Descriptor angle at all — keep-awake is a pure async-function + `EventEmitter` listener
 surface, never a view. Tests inject a fake native-module object in place of the real
 `requireNativeModule` resolution (`src/core/keep-awake.test.ts`,
-`src/{react,vue,angular}/**/*.test.{ts,tsx}`, `vitest`), the same pattern
+`src/{react,vue,svelte,solid,angular}/**/*.test.{ts,tsx}`, `vitest`), the same pattern
 `@symbiote-native/battery` and `@symbiote-native/device` use — no `installFabric()`-driven Fabric
 assertions on the core level, only the adapter lifecycle tests mount through the fake Fabric slot
 to prove activate-on-mount/deactivate-on-unmount. Native rendering itself is verified on-device —

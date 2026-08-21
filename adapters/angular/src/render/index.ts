@@ -10,6 +10,7 @@ import {
   createSurface,
   disposeRoot,
   dlog,
+  reportUncaughtError,
   toPublicInstance,
   type ISymbioteNode,
   type IRootTag,
@@ -62,7 +63,35 @@ function asAngularHost(hostNode: SymbioteSurface | ISymbioteNode): Element {
 // to the wrapper as projectable content.
 function createDetachedViewHost(): ISymbioteNode {
   const descriptor = descriptorFor('View');
-  return toPublicInstance(createEngineElement(descriptor.component, descriptor.isText));
+  return toPublicInstance(
+    createEngineElement(descriptor.component, descriptor.isText),
+  );
+}
+
+// Angular's whole unhandled-error funnel: INTERNAL_APPLICATION_ERROR_HANDLER resolves this token
+// and hands it everything the framework caught on the app's behalf — a scheduled (async) tick that
+// threw, a template listener that threw, a rejected pending task. Routed to the engine so an
+// Angular app reaches the same native redbox as a React one instead of a console line nobody sees
+// off a dev machine.
+//
+// There is deliberately no caught-vs-uncaught split here, unlike the React adapter's
+// onUncaughtError/onCaughtError pair. Angular has no error boundary, and every path where the app
+// DID handle something keeps clear of this seam on its own: a `@defer` block with an `@error`
+// branch renders that branch (defer/rendering.ts calls handleUncaughtError only when there is
+// none), `resource()` parks the failure in its own error signal, and an app-level try/catch or
+// `catchError` never reaches Angular at all. So anything arriving here is by construction
+// unclaimed, and the redbox is the right answer for all of it.
+//
+// Two things this must not do. It must not also call `super.handleError` — reportUncaughtError
+// picks exactly one channel (host reporter or console) precisely because RN routes console.error
+// into LogBox too, so the pair would double-report every error. And it must not throw: the
+// scheduler invokes this from inside its own `catch` (zoneless_scheduling_impl.ts's tick), where a
+// second throw escapes to the host and kills the "report and keep running" behaviour the provider
+// exists for.
+class SymbioteErrorHandler extends ErrorHandler {
+  override handleError(error: unknown): void {
+    reportUncaughtError(error, { origin: 'angular render' });
+  }
 }
 
 interface IMountedApp {
@@ -81,7 +110,10 @@ export interface IMountOptions {
   wrapperComponent?: Type<unknown>;
 }
 
-function applyInputs(cmpRef: ComponentRef<unknown>, initialProps: object | undefined): void {
+function applyInputs(
+  cmpRef: ComponentRef<unknown>,
+  initialProps: object | undefined,
+): void {
   if (initialProps === undefined) return;
   for (const [key, value] of Object.entries(initialProps)) {
     cmpRef.setInput(key, value);
@@ -118,7 +150,23 @@ export function mount(
         provide: RendererFactory2,
         useValue: new SymbioteRendererFactory(surface),
       },
-      { provide: DOCUMENT, useValue: { head: surface, body: surface } },
+      // `getElementById` is not decoration: `resource()` resolves TransferState, whose root
+      // factory runs `retrieveTransferredState(doc, appId)` ->
+      // `doc.getElementById(appId + '-state')` (core/src/transfer_state.ts:156) to pick up
+      // server-rendered state. A stub without it makes that a TypeError, and because the throw
+      // happens while the component is being constructed, the ENTIRE screen renders nothing —
+      // white body under a native header that navigation drew anyway, no error surfaced. The
+      // `optional: true` on the injector lookup does not help: the token resolves, its factory
+      // is what throws. Returning null is the honest client answer — there is no server here, so
+      // `script?.tagName` short-circuits and the caller gets `{}`.
+      {
+        provide: DOCUMENT,
+        useValue: {
+          head: surface,
+          body: surface,
+          getElementById: (): null => null,
+        },
+      },
       // createEnvironmentInjector with a null parent scopes this injector to {'environment'}
       // only (see EnvironmentNgModuleRefAdapter), so providedIn:'root' tokens — ApplicationRef
       // included — never resolve (R3Injector.get walks up for a `scopes` containing 'root', and
@@ -142,9 +190,11 @@ export function mount(
       // `injector.get(ErrorHandler)`; a normal `bootstrapApplication` registers that token by
       // default, but our from-scratch environment injector never did, so the lookup itself threw
       // NG0201 and replaced the real error with "No provider found for ErrorHandler" — any async
-      // tick() exception crashed hard, uncaught, instead of being reported. Providing the
-      // default `ErrorHandler` restores `console.error('ERROR', e)` and keep running.
-      { provide: ErrorHandler, useClass: ErrorHandler },
+      // tick() exception crashed hard, uncaught, instead of being reported. The token still has to
+      // be provided for exactly that reason; what it resolves to is now SymbioteErrorHandler
+      // (see above), which reports through the engine instead of Angular's `console.error('ERROR',
+      // e)` and, like the default, returns rather than rethrows so the app keeps running.
+      { provide: ErrorHandler, useClass: SymbioteErrorHandler },
       ColorSchemeService,
       WindowDimensionsService,
     ],

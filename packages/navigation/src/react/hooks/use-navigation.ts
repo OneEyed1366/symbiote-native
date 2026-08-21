@@ -5,12 +5,18 @@
 // ../../core/navigation-events; this hook only reads NavigationContext and binds identity.
 
 import { useMemo } from 'react';
-import type { INavigationEventListener, INavigationEventName } from '../../core';
+import type {
+  INavigationEventListener,
+  INavigationEventName,
+} from '../../core';
 import { useRequiredNavigationContext } from '../navigation-context';
 import type { IAnyNavigatorHandle } from '../navigation-context';
 
 export type INavigationHandle = IAnyNavigatorHandle & {
-  addListener: (event: INavigationEventName, listener: INavigationEventListener) => () => void;
+  addListener: (
+    event: INavigationEventName,
+    listener: INavigationEventListener,
+  ) => () => void;
   // Walks exactly ONE hop up navigation-context.ts's `parent` chain to the enclosing navigator's
   // handle - e.g. a Tab screen nested inside a Stack screen calling getParent() to push a new
   // Stack route. Callers narrow the union themselves ('push' in parent, etc.). Deliberately NOT

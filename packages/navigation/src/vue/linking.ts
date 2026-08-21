@@ -30,7 +30,10 @@ export function useLinkingIntegration(
   let cancelled = false;
   let subscription: IEventSubscription | undefined;
 
-  function applyRoute(url: string, dispatch: (name: string, params?: unknown) => void): void {
+  function applyRoute(
+    url: string,
+    dispatch: (name: string, params?: unknown) => void,
+  ): void {
     const route = resolveRouteFromUrl(config, url);
     if (route === null) {
       dlog(`useLinkingIntegration: no route resolved for "${url}"`);
@@ -42,7 +45,9 @@ export function useLinkingIntegration(
   onMounted(() => {
     const handle = navigatorHandle.value;
     if (handle === null) {
-      dlog('useLinkingIntegration: navigatorHandle is not yet available at mount time');
+      dlog(
+        'useLinkingIntegration: navigatorHandle is not yet available at mount time',
+      );
       return;
     }
 

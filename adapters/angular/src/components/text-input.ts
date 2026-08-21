@@ -86,12 +86,19 @@ import {
   TextInputHost,
 } from '../primitives';
 
-export type { ITextInputHandle, ITextInputSelection, IInputMode, IEnterKeyHint, ISubmitBehavior };
+export type {
+  ITextInputHandle,
+  ITextInputSelection,
+  IInputMode,
+  IEnterKeyHint,
+  ISubmitBehavior,
+};
 
 // Mirrors React's ITextInputProps minus nothing (TextInput has no children) — declared
 // per-adapter over the shared accessibility base because Angular's input surface aliases the
 // aria-* keys to camelCase @Inputs, unlike the plain agnostic fields shared across adapters.
-export interface IAngularTextInputProps extends IAccessibilityProps, IAriaProps {
+export interface IAngularTextInputProps
+  extends IAccessibilityProps, IAriaProps {
   value?: string;
   defaultValue?: string;
   placeholder?: string;
@@ -158,12 +165,18 @@ export type IAngularTextInputInputs = Omit<
 @Component({
   selector: 'TextInput',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SymbioteHostPropsDirective, TextInputHost, MultilineTextInputHost],
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [
-    { provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => TextInput), multi: true },
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => TextInput),
+      multi: true,
+    },
   ],
   template: `
     @if (isMultiline) {
@@ -277,8 +290,10 @@ export class TextInput
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -390,7 +405,9 @@ export class TextInput
     const node = this.hostNode;
     if (node === undefined) return;
     dlog('TextInput autoFocus -> focus command');
-    this.cancelAutoFocus = whenCommitted(node, () => dispatchViewCommand(node, 'focus', []));
+    this.cancelAutoFocus = whenCommitted(node, () =>
+      dispatchViewCommand(node, 'focus', []),
+    );
   }
 
   ngOnDestroy(): void {
@@ -458,7 +475,12 @@ export class TextInput
   clear(): void {
     const node = this.hostNode;
     if (node === undefined) return;
-    dispatchViewCommand(node, 'setTextAndSelection', [this.mostRecentEventCount, '', 0, 0]);
+    dispatchViewCommand(node, 'setTextAndSelection', [
+      this.mostRecentEventCount,
+      '',
+      0,
+      0,
+    ]);
     this.lastNativeText = '';
   }
 
@@ -488,12 +510,20 @@ export class TextInput
     const value = this.value;
     if (!shouldCommandText(this.lastNativeText, value)) return;
     const selStart = this.selection?.start ?? SELECTION_NONE;
-    const selEnd = this.selection?.end ?? this.selection?.start ?? SELECTION_NONE;
+    const selEnd =
+      this.selection?.end ?? this.selection?.start ?? SELECTION_NONE;
     const count = this.mostRecentEventCount;
-    dlog(`TextInput setTextAndSelection count=${count} text=${JSON.stringify(value)}`);
+    dlog(
+      `TextInput setTextAndSelection count=${count} text=${JSON.stringify(value)}`,
+    );
     this.lastNativeText = value;
     whenCommitted(node, () =>
-      dispatchViewCommand(node, 'setTextAndSelection', [count, value, selStart, selEnd]),
+      dispatchViewCommand(node, 'setTextAndSelection', [
+        count,
+        value,
+        selStart,
+        selEnd,
+      ]),
     );
   }
 
@@ -558,8 +588,10 @@ export class TextInput
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,

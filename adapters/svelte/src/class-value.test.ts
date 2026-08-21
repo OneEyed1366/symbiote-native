@@ -11,11 +11,12 @@ import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
 import type { IFakeNode } from '@symbiote-native/test-utils';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { normalizeSvelteClass, resolveSvelteClass } from './class-value';
 import { mount, unmount } from './render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -41,29 +42,35 @@ describe('normalizeSvelteClass', () => {
   // verbatim, so without this the map reaches resolveClassName's "already a resolved style"
   // branch and silently merges as an inline style instead of painting a class.
   it('flattens a clsx map to the truthy keys, in declaration order', () => {
-    expect(normalizeSvelteClass({ card: true, active: false, wide: true })).toBe('card wide');
+    expect(
+      normalizeSvelteClass({ card: true, active: false, wide: true }),
+    ).toBe('card wide');
   });
 
   // why: a clsx map's value is routinely the result of `cond && x` or an optional read, so
   // null/undefined must read as a plain "off" — not a crash and not a stray literal class token.
   it('treats null/undefined map values as "does not apply"', () => {
-    expect(normalizeSvelteClass({ card: true, active: null, wide: undefined })).toBe('card');
+    expect(
+      normalizeSvelteClass({ card: true, active: null, wide: undefined }),
+    ).toBe('card');
   });
 
   // why: `['card', cond && 'card-on']` is the array-form clsx idiom; `cond && 'x'` evaluates to
   // `false` when off, and that hole must never become the literal string `"false"` in the class
   // list — it must disappear the same way it does for `{ active: false }`.
   it('flattens an array, dropping the falsy holes a `cond && name` expression leaves', () => {
-    expect(normalizeSvelteClass(['card', false, 'card-on', null, undefined])).toBe('card card-on');
+    expect(
+      normalizeSvelteClass(['card', false, 'card-on', null, undefined]),
+    ).toBe('card card-on');
   });
 
   // why: real clsx (the library Svelte's own `set_class` delegates to) accepts arbitrarily nested
   // arrays and maps, e.g. `['card', ['wide', { active }]]` — app authors coming from that
   // convention expect the adapter's normalization to match it, not just the flat cases.
   it('recurses through nested arrays and maps, matching clsx', () => {
-    expect(normalizeSvelteClass(['card', ['wide', { active: true, off: false }]])).toBe(
-      'card wide active',
-    );
+    expect(
+      normalizeSvelteClass(['card', ['wide', { active: true, off: false }]]),
+    ).toBe('card wide active');
   });
 
   // why: the whole disambiguation rule (skill §22b) hinges on this case — a style object's values
@@ -94,14 +101,29 @@ describe('normalizeSvelteClass', () => {
 describe('resolveSvelteClass', () => {
   beforeEach(() => {
     clearGlobalStyles();
-    registerStyles({ card: { padding: 8 }, cardOn: { opacity: 1 } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 8 },
+      },
+      {
+        tokens: ['cardOn'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { opacity: 1 },
+      },
+    ]);
   });
 
   // why: normalizing a clsx map to a string is only half the job — the host node needs the actual
   // resolved style object, so resolveSvelteClass must carry the flattened string on through the
   // style registry rather than stopping at normalizeSvelteClass's output.
   it('resolves a clsx map through the registry', () => {
-    expect(resolveSvelteClass({ card: true, missing: false })).toEqual({ padding: 8 });
+    expect(resolveSvelteClass({ card: true, missing: false })).toEqual({
+      padding: 8,
+    });
   });
 
   // why: pins the disambiguation boundary at the RESOLVE step too, not just normalize — an
@@ -116,18 +138,41 @@ describe('resolveSvelteClass', () => {
 const ROOT_TAG = 91_811;
 // Written NEXT TO the real View.svelte, not into src/: the compiled output keeps View's own
 // relative imports ('../runes/attachments'), which only resolve from that directory.
-const VIEW_OUT = join(__dirname, 'components', '.smoke-compiled-class-value-view.mjs');
-const PARENT_OUT = join(__dirname, 'components', '.smoke-compiled-class-value-parent.mjs');
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const VIEW_OUT = join(
+  __dirname,
+  'components',
+  '.smoke-compiled-class-value-view.mjs',
+);
+const PARENT_OUT = join(
+  __dirname,
+  'components',
+  '.smoke-compiled-class-value-parent.mjs',
+);
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
-function compileToFile(source: string, filename: string, outPath: string): void {
-  writeFileSync(outPath, compile(source, { ...COMPILE_OPTIONS, filename }).js.code);
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
+  writeFileSync(
+    outPath,
+    compile(source, { ...COMPILE_OPTIONS, filename }).js.code,
+  );
 }
 
-function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeNode | undefined {
+function findLive(
+  node: IFakeNode,
+  predicate: (n: IFakeNode) => boolean,
+): IFakeNode | undefined {
   if (predicate(node)) return node;
   for (const child of node.children) {
     const found = findLive(child, predicate);
@@ -156,7 +201,8 @@ async function loadParent(): Promise<Component> {
     throw new Error('Parent.svelte produced no default export');
   }
   const component: unknown = mod.default;
-  if (typeof component !== 'function') throw new Error('default export is not a component');
+  if (typeof component !== 'function')
+    throw new Error('default export is not a component');
   return component;
 }
 
@@ -166,7 +212,20 @@ describe('a clsx `class` on a real compiled View', () => {
   beforeEach(() => {
     fabric.reset();
     clearGlobalStyles();
-    registerStyles({ card: { padding: 8 }, cardOn: { opacity: 1 } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 8 },
+      },
+      {
+        tokens: ['cardOn'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { opacity: 1 },
+      },
+    ]);
   });
 
   afterEach(() => {
@@ -186,10 +245,13 @@ describe('a clsx `class` on a real compiled View', () => {
     await tick();
     await tick();
 
-    const target = findLive(fabric.appRoot(), node => node.props.testID === 'clsx-target');
+    const target = findLive(
+      fabric.appRoot(),
+      node => node.props.testID === 'clsx-target',
+    );
     expect(target).toBeDefined();
-    // `card cardOn` has no compound entry registered, so the per-class merge runs and both
-    // halves land; `style` is the explicit half and wins the flatten (the fake Fabric spreads
+    // `card` and `cardOn` are two independent single-token rules, so both land; `style` is the
+    // author's explicit half and wins the flatten (the fake Fabric spreads
     // the flattened style onto the node's props, so the fields read off `props` directly).
     expect(target?.props.padding).toBe(8);
     expect(target?.props.opacity).toBe(1);

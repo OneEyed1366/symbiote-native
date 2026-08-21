@@ -103,7 +103,9 @@ describe('useLocales', () => {
     getLocales.mockReturnValue(FAKE_LOCALES_UPDATED);
     invalidate();
 
-    await vi.waitFor(() => expect(results[results.length - 1]).toEqual(FAKE_LOCALES_UPDATED));
+    await vi.waitFor(() =>
+      expect(results[results.length - 1]).toEqual(FAKE_LOCALES_UPDATED),
+    );
   });
 
   it('unsubscribes from the native listener on unmount', () => {

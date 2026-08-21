@@ -11,7 +11,9 @@ export function useBatteryLevel(): number {
 
   useEffect(() => {
     getBatteryLevelAsync().then(setBatteryLevel);
-    const subscription = addBatteryLevelListener(event => setBatteryLevel(event.batteryLevel));
+    const subscription = addBatteryLevelListener(event =>
+      setBatteryLevel(event.batteryLevel),
+    );
     return () => subscription.remove();
   }, []);
 

@@ -9,6 +9,7 @@
     { "path": "adapters/vue" },
     { "path": "adapters/angular" },
     { "path": "adapters/svelte" },
+    { "path": "adapters/solid" },
     { "path": "packages/application" },
     { "path": "packages/slider" },
     { "path": "packages/splash-screen" },

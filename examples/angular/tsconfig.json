@@ -7,7 +7,10 @@
     // ambient names. tsconfig.angular.json (the real ngc build config) already sets this; mirrored
     // here so editor diagnostics for the whole example (not just App.ts) match the real build.
     "lib": ["ES2022", "DOM"],
-    "types": [],
+    // `include` covers `e2e/**` too, and those specs are Detox-on-Jest — without the Jest globals
+    // this config reported 101 TS2593/TS2304 on `describe`/`it`/`beforeAll`, noise that hides a
+    // real error in app code. `examples/react/tsconfig.json` has carried `["jest"]` all along.
+    "types": ["jest"],
     "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
   },
   "include": ["**/*.ts"],

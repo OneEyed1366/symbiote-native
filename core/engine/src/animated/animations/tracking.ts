@@ -42,6 +42,9 @@ export class AnimatedTracking extends AnimatedNode {
   // structurally and a field would shadow it under useDefineForClassFields). The
   // target moved: launch a fresh animation toward its new value.
   update(): void {
-    this.value.animate(this.createAnimation(this.__getValue()), this.endCallback);
+    this.value.animate(
+      this.createAnimation(this.__getValue()),
+      this.endCallback,
+    );
   }
 }

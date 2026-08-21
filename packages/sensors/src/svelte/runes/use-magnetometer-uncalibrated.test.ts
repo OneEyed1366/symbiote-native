@@ -14,16 +14,24 @@ import metroSvelteTransformer from '@symbiote-native/svelte/metro-svelte-transfo
 
 const {
   compileSvelteModuleFile,
-}: { compileSvelteModuleFile: (src: string, filename: string) => string } = metroSvelteTransformer;
+}: { compileSvelteModuleFile: (src: string, filename: string) => string } =
+  metroSvelteTransformer;
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
 const ROOT_TAG = 91_656;
-const PROBE_OUT = join(__dirname, '.smoke-compiled-use-magnetometer-uncalibrated-probe.mjs');
-const RUNE_OUT = join(__dirname, '.smoke-compiled-use-magnetometer-uncalibrated.svelte.mjs');
+const PROBE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-magnetometer-uncalibrated-probe.mjs',
+);
+const RUNE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-magnetometer-uncalibrated.svelte.mjs',
+);
 
 type IListener = (measurement: IMagnetometerUncalibratedMeasurement) => void;
 
@@ -39,12 +47,14 @@ vi.mock('../../core', () => ({
   MagnetometerUncalibrated: {
     addListener: (listener: IListener) => addListenerMock(listener),
     removeAllListeners: vi.fn(),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -60,10 +70,17 @@ afterEach(() => {
   rmSync(RUNE_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 function compileRuneModule(): void {
-  const source = readFileSync(join(__dirname, 'use-magnetometer-uncalibrated.svelte.ts'), 'utf-8');
+  const source = readFileSync(
+    join(__dirname, 'use-magnetometer-uncalibrated.svelte.ts'),
+    'utf-8',
+  );
   writeFileSync(
     RUNE_OUT,
     compileSvelteModuleFile(source, 'use-magnetometer-uncalibrated.svelte.ts'),
@@ -88,7 +105,9 @@ async function loadProbe(): Promise<Component> {
   writeFileSync(PROBE_OUT, result.js.code);
   const mod: unknown = await import(`file://${PROBE_OUT}`);
   if (mod === null || typeof mod !== 'object' || !('default' in mod)) {
-    throw new Error('MagnetometerUncalibratedProbe.svelte produced no default export');
+    throw new Error(
+      'MagnetometerUncalibratedProbe.svelte produced no default export',
+    );
   }
   return mod.default as Component;
 }
@@ -100,7 +119,8 @@ async function mountMagnetometerUncalibrated(
   const Probe = await loadProbe();
   mount(ROOT_TAG, Probe, {
     updateIntervalMs,
-    onValue: (measurement: IMagnetometerUncalibratedMeasurement | null) => values.push(measurement),
+    onValue: (measurement: IMagnetometerUncalibratedMeasurement | null) =>
+      values.push(measurement),
   });
   await tick();
 }

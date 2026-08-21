@@ -36,10 +36,13 @@ export function injectNavigationState<TResult>(
 
   const result = signal(selector({ routes: [route] }));
 
-  const unsubscribe = context.emitter.addListener(NAVIGATION_EVENT_STATE, (state: unknown) => {
-    if (!isNavigatorState(state)) return;
-    result.set(selector(state));
-  });
+  const unsubscribe = context.emitter.addListener(
+    NAVIGATION_EVENT_STATE,
+    (state: unknown) => {
+      if (!isNavigatorState(state)) return;
+      result.set(selector(state));
+    },
+  );
   destroyRef.onDestroy(unsubscribe);
 
   return result.asReadonly();

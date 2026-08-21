@@ -5,7 +5,11 @@
 // buildScrollViewHandle exactly (same lazy-getter shape); the adapter supplies the node getter
 // and its own framework-specific ref field (see react/screen.ts's IReactSearchBarOptions - the
 // ref itself is per-adapter, same split as IPressableProps).
-import { dispatchViewCommand, dlog, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  dispatchViewCommand,
+  dlog,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
 
 export interface ISearchBarCommands {
   focus(): void;
@@ -21,7 +25,10 @@ export interface ISearchBarCommands {
 // stale handle outlived its screen) was the one unlogged gap, silently indistinguishable from
 // "the command fired but did nothing". Investigation instrumentation (HeaderOptionsScreen
 // unresponsive-buttons bug); kept behind DEBUG per <keep_logs_gate_behind_DEBUG>, never removed.
-function warnIfDetached(command: string, node: ISymbioteNode | null): node is ISymbioteNode {
+function warnIfDetached(
+  command: string,
+  node: ISymbioteNode | null,
+): node is ISymbioteNode {
   if (node !== null) return true;
   dlog(
     `SearchBarCommands.${command}: skipped, node is null (ref never attached) at t=${Date.now()}`,
@@ -45,7 +52,9 @@ function makeCommand(
 
 // `getNode` is a LAZY getter, read on every call - see buildScrollViewHandle's comment for why
 // an eager capture would freeze `null`.
-export function buildSearchBarHandle(getNode: () => ISymbioteNode | null): ISearchBarCommands {
+export function buildSearchBarHandle(
+  getNode: () => ISymbioteNode | null,
+): ISearchBarCommands {
   return {
     focus: makeCommand(getNode, 'focus'),
     blur: makeCommand(getNode, 'blur'),

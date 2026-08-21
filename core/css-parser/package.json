@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/css-parser",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Build-time CSS/SCSS/Less/Stylus compiler for SymbioteNative — compiles stylesheets to React Native style objects, resolved at runtime via a cross-adapter class-name registry.",
   "license": "MIT",
   "repository": {
@@ -56,8 +56,7 @@
   },
   "dependencies": {
     "@react-native/metro-babel-transformer": "catalog:",
-    "postcss": "catalog:",
-    "postcss-value-parser": "catalog:"
+    "lightningcss": "catalog:"
   },
   "devDependencies": {
     "sass": "catalog:",

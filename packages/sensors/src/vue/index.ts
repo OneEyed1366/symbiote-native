@@ -8,7 +8,11 @@ export type { IAccelerometerMeasurement } from '../core';
 export { useBarometer } from './composables/use-barometer';
 export type { IBarometerMeasurement } from '../core';
 export { useDeviceMotion } from './composables/use-device-motion';
-export { DeviceMotionOrientation, gravity, type IDeviceMotionMeasurement } from '../core';
+export {
+  DeviceMotionOrientation,
+  gravity,
+  type IDeviceMotionMeasurement,
+} from '../core';
 export { useGyroscope } from './composables/use-gyroscope';
 export type { IGyroscopeMeasurement } from '../core';
 export { useLightSensor } from './composables/use-light-sensor';

@@ -8,7 +8,13 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
 import {
   AndroidHaptics,
   ImpactFeedbackStyle,
@@ -25,15 +31,19 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Haptics];
 const lineColor = LINE_COLOR[lineInfo.line];
 
-const IMPACT_STYLES: readonly { style: ImpactFeedbackStyle; label: string }[] = [
-  { style: ImpactFeedbackStyle.Light, label: 'Light' },
-  { style: ImpactFeedbackStyle.Medium, label: 'Medium' },
-  { style: ImpactFeedbackStyle.Heavy, label: 'Heavy' },
-  { style: ImpactFeedbackStyle.Rigid, label: 'Rigid' },
-  { style: ImpactFeedbackStyle.Soft, label: 'Soft' },
-];
+const IMPACT_STYLES: readonly { style: ImpactFeedbackStyle; label: string }[] =
+  [
+    { style: ImpactFeedbackStyle.Light, label: 'Light' },
+    { style: ImpactFeedbackStyle.Medium, label: 'Medium' },
+    { style: ImpactFeedbackStyle.Heavy, label: 'Heavy' },
+    { style: ImpactFeedbackStyle.Rigid, label: 'Rigid' },
+    { style: ImpactFeedbackStyle.Soft, label: 'Soft' },
+  ];
 
-const NOTIFICATION_TYPES: readonly { type: NotificationFeedbackType; label: string }[] = [
+const NOTIFICATION_TYPES: readonly {
+  type: NotificationFeedbackType;
+  label: string;
+}[] = [
   { type: NotificationFeedbackType.Success, label: 'Success' },
   { type: NotificationFeedbackType.Warning, label: 'Warning' },
   { type: NotificationFeedbackType.Error, label: 'Error' },
@@ -41,9 +51,11 @@ const NOTIFICATION_TYPES: readonly { type: NotificationFeedbackType; label: stri
 
 // AndroidHaptics is a string enum keyed PascalCase-with-underscores (Gesture_Start, Toggle_On,
 // ...) — deriving the button caption from the key avoids hand-typing all 17 labels twice.
-const ANDROID_HAPTICS: readonly { type: AndroidHaptics; label: string }[] = Object.entries(
-  AndroidHaptics,
-).map(([key, value]) => ({ type: value, label: key.replace(/_/g, ' ') }));
+const ANDROID_HAPTICS: readonly { type: AndroidHaptics; label: string }[] =
+  Object.entries(AndroidHaptics).map(([key, value]) => ({
+    type: value,
+    label: key.replace(/_/g, ' '),
+  }));
 
 const lastFired = ref<string | null>(null);
 
@@ -70,9 +82,15 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="haptics-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="haptics-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -81,9 +99,10 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
         <View class="hero-copy">
           <Text class="hero-title">Haptics</Text>
           <Text class="hero-body"
-            >@symbiote-native/haptics — impact/notification/selection feedback via iOS's Taptic
-            Engine and Android's Vibrator API, plus a direct Android haptics-engine path. The
-            Simulator plays no physical feedback; a real device is needed to feel it.</Text
+            >@symbiote-native/haptics — impact/notification/selection feedback
+            via iOS's Taptic Engine and Android's Vibrator API, plus a direct
+            Android haptics-engine path. The Simulator plays no physical
+            feedback; a real device is needed to feel it.</Text
           >
         </View>
       </View>
@@ -128,7 +147,11 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
         </View>
       </View>
 
-      <View v-if="Platform.OS === 'android'" testID="haptics-android-card" class="haptics-card">
+      <View
+        v-if="Platform.OS === 'android'"
+        testID="haptics-android-card"
+        class="haptics-card"
+      >
         <Text class="haptics-card-title">Android haptics</Text>
         <View class="button-row">
           <ActionButton
@@ -144,9 +167,11 @@ function fireAndroidHaptic(type: AndroidHaptics): void {
 
       <View testID="haptics-last-fired-card" class="haptics-last-fired-card">
         <Text class="haptics-last-fired-label">LAST FIRED</Text>
-        <Text testID="haptics-last-fired-value" class="haptics-last-fired-value">{{
-          lastFired ?? 'nothing yet'
-        }}</Text>
+        <Text
+          testID="haptics-last-fired-value"
+          class="haptics-last-fired-value"
+          >{{ lastFired ?? 'nothing yet' }}</Text
+        >
       </View>
     </ScrollView>
   </SafeAreaView>

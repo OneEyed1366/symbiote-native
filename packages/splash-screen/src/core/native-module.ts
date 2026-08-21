@@ -33,5 +33,7 @@ type IRNBootSplashSpec = {
 // throw never reaches the app. That is a defect in THAT adapter, tracked separately — it is not a
 // reason to stop throwing here.
 export function getHideAnimationConstants(): IHideAnimationConstants {
-  return getEnforcingNativeModule<IRNBootSplashSpec>(RN_BOOT_SPLASH_MODULE_NAME).getConstants();
+  return getEnforcingNativeModule<IRNBootSplashSpec>(
+    RN_BOOT_SPLASH_MODULE_NAME,
+  ).getConstants();
 }

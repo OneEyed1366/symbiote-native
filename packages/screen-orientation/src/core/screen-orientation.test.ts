@@ -50,7 +50,8 @@ const {
   removeOrientationChangeListeners,
   removeOrientationChangeListener,
 } = await import('./screen-orientation');
-const { Orientation, OrientationLock, WebOrientationLock } = await import('./types');
+const { Orientation, OrientationLock, WebOrientationLock } =
+  await import('./types');
 const { Dimensions } = await import('react-native');
 
 afterEach(() => {
@@ -85,27 +86,33 @@ describe('Positive (delegates to the native module without error)', () => {
 
       await lockPlatformAsync({ screenOrientationConstantAndroid: 1 });
 
-      expect(FAKE_NATIVE_SCREEN_ORIENTATION.lockPlatformAsync).toHaveBeenCalledWith(1);
+      expect(
+        FAKE_NATIVE_SCREEN_ORIENTATION.lockPlatformAsync,
+      ).toHaveBeenCalledWith(1);
     });
 
     it('forwards the iOS orientation array on iOS', async () => {
       fakePlatform.OS = 'ios';
 
-      await lockPlatformAsync({ screenOrientationArrayIOS: [Orientation.PORTRAIT_UP] });
+      await lockPlatformAsync({
+        screenOrientationArrayIOS: [Orientation.PORTRAIT_UP],
+      });
 
-      expect(FAKE_NATIVE_SCREEN_ORIENTATION.lockPlatformAsync).toHaveBeenCalledWith([
-        Orientation.PORTRAIT_UP,
-      ]);
+      expect(
+        FAKE_NATIVE_SCREEN_ORIENTATION.lockPlatformAsync,
+      ).toHaveBeenCalledWith([Orientation.PORTRAIT_UP]);
     });
 
     it('forwards the web orientation lock on web', async () => {
       fakePlatform.OS = 'web';
 
-      await lockPlatformAsync({ screenOrientationLockWeb: WebOrientationLock.LANDSCAPE });
+      await lockPlatformAsync({
+        screenOrientationLockWeb: WebOrientationLock.LANDSCAPE,
+      });
 
-      expect(FAKE_NATIVE_SCREEN_ORIENTATION.lockPlatformAsync).toHaveBeenCalledWith(
-        WebOrientationLock.LANDSCAPE,
-      );
+      expect(
+        FAKE_NATIVE_SCREEN_ORIENTATION.lockPlatformAsync,
+      ).toHaveBeenCalledWith(WebOrientationLock.LANDSCAPE);
     });
 
     // why: getOrientationLockAsync's own fallback (below) must reflect a platform-specific lock
@@ -113,11 +120,14 @@ describe('Positive (delegates to the native module without error)', () => {
     it('records the applied lock as OrientationLock.OTHER for the getOrientationLockAsync fallback', async () => {
       fakePlatform.OS = 'android';
       await lockPlatformAsync({ screenOrientationConstantAndroid: 1 });
-      const { getOrientationLockAsync: native } = FAKE_NATIVE_SCREEN_ORIENTATION;
+      const { getOrientationLockAsync: native } =
+        FAKE_NATIVE_SCREEN_ORIENTATION;
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_SCREEN_ORIENTATION.getOrientationLockAsync = undefined;
 
-      await expect(getOrientationLockAsync()).resolves.toBe(OrientationLock.OTHER);
+      await expect(getOrientationLockAsync()).resolves.toBe(
+        OrientationLock.OTHER,
+      );
 
       FAKE_NATIVE_SCREEN_ORIENTATION.getOrientationLockAsync = native;
     });
@@ -149,11 +159,14 @@ describe('Positive (delegates to the native module without error)', () => {
     // the wrapper already has
     it('falls back to the last lock set via lockAsync when the native method is absent', async () => {
       await lockAsync(OrientationLock.LANDSCAPE);
-      const { getOrientationLockAsync: native } = FAKE_NATIVE_SCREEN_ORIENTATION;
+      const { getOrientationLockAsync: native } =
+        FAKE_NATIVE_SCREEN_ORIENTATION;
       // @ts-expect-error -- simulating a platform where the native method is absent
       FAKE_NATIVE_SCREEN_ORIENTATION.getOrientationLockAsync = undefined;
 
-      await expect(getOrientationLockAsync()).resolves.toBe(OrientationLock.LANDSCAPE);
+      await expect(getOrientationLockAsync()).resolves.toBe(
+        OrientationLock.LANDSCAPE,
+      );
 
       FAKE_NATIVE_SCREEN_ORIENTATION.getOrientationLockAsync = native;
     });
@@ -162,7 +175,9 @@ describe('Positive (delegates to the native module without error)', () => {
   describe('getPlatformOrientationLockAsync', () => {
     it('wraps a numeric native value as screenOrientationConstantAndroid on Android', async () => {
       fakePlatform.OS = 'android';
-      FAKE_NATIVE_SCREEN_ORIENTATION.getPlatformOrientationLockAsync.mockResolvedValueOnce(1);
+      FAKE_NATIVE_SCREEN_ORIENTATION.getPlatformOrientationLockAsync.mockResolvedValueOnce(
+        1,
+      );
 
       await expect(getPlatformOrientationLockAsync()).resolves.toEqual({
         screenOrientationConstantAndroid: 1,
@@ -171,9 +186,9 @@ describe('Positive (delegates to the native module without error)', () => {
 
     it('wraps an array native value as screenOrientationArrayIOS on iOS', async () => {
       fakePlatform.OS = 'ios';
-      FAKE_NATIVE_SCREEN_ORIENTATION.getPlatformOrientationLockAsync.mockResolvedValueOnce([
-        Orientation.LANDSCAPE_LEFT,
-      ]);
+      FAKE_NATIVE_SCREEN_ORIENTATION.getPlatformOrientationLockAsync.mockResolvedValueOnce(
+        [Orientation.LANDSCAPE_LEFT],
+      );
 
       await expect(getPlatformOrientationLockAsync()).resolves.toEqual({
         screenOrientationArrayIOS: [Orientation.LANDSCAPE_LEFT],
@@ -207,7 +222,9 @@ describe('Positive (delegates to the native module without error)', () => {
 
   describe('supportsOrientationLockAsync', () => {
     it('delegates to the native module', async () => {
-      await expect(supportsOrientationLockAsync(OrientationLock.PORTRAIT)).resolves.toBe(true);
+      await expect(
+        supportsOrientationLockAsync(OrientationLock.PORTRAIT),
+      ).resolves.toBe(true);
     });
   });
 
@@ -231,7 +248,10 @@ describe('Positive (delegates to the native module without error)', () => {
 
       addOrientationChangeListener(listener);
 
-      expect(Dimensions.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+      expect(Dimensions.addEventListener).toHaveBeenCalledWith(
+        'change',
+        expect.any(Function),
+      );
       expect(FAKE_NATIVE_SCREEN_ORIENTATION.addListener).not.toHaveBeenCalled();
     });
 
@@ -241,7 +261,8 @@ describe('Positive (delegates to the native module without error)', () => {
       fakePlatform.OS = 'ios';
       const listener = vi.fn();
       addOrientationChangeListener(listener);
-      const nativeCallback = FAKE_NATIVE_SCREEN_ORIENTATION.addListener.mock.calls[0]?.[1];
+      const nativeCallback =
+        FAKE_NATIVE_SCREEN_ORIENTATION.addListener.mock.calls[0]?.[1];
       const event = {
         orientationLock: OrientationLock.LANDSCAPE,
         orientationInfo: { orientation: Orientation.LANDSCAPE_LEFT },
@@ -265,7 +286,8 @@ describe('Positive (delegates to the native module without error)', () => {
       );
       const listener = vi.fn();
       addOrientationChangeListener(listener);
-      const dimensionsCallback = vi.mocked(Dimensions.addEventListener).mock.calls[0]?.[1];
+      const dimensionsCallback = vi.mocked(Dimensions.addEventListener).mock
+        .calls[0]?.[1];
 
       await dimensionsCallback?.({ window: {} as never, screen: {} as never });
 
@@ -339,9 +361,9 @@ describe('Negative (native method absent / invalid input must throw, not silentl
       fakePlatform.OS = 'ios';
 
       // @ts-expect-error -- simulating a caller passing a bogus orientation value
-      await expect(lockPlatformAsync({ screenOrientationArrayIOS: [999] })).rejects.toThrow(
-        'is not a valid Orientation',
-      );
+      await expect(
+        lockPlatformAsync({ screenOrientationArrayIOS: [999] }),
+      ).rejects.toThrow('is not a valid Orientation');
     });
 
     // why: screenOrientationArrayIOS is documented as an array — a caller that (from plain JS,
@@ -351,9 +373,9 @@ describe('Negative (native method absent / invalid input must throw, not silentl
       fakePlatform.OS = 'ios';
 
       // @ts-expect-error -- simulating a caller passing a non-array value from plain JS
-      await expect(lockPlatformAsync({ screenOrientationArrayIOS: 'landscape' })).rejects.toThrow(
-        'cannot be called with landscape',
-      );
+      await expect(
+        lockPlatformAsync({ screenOrientationArrayIOS: 'landscape' }),
+      ).rejects.toThrow('cannot be called with landscape');
     });
 
     it('throws a TypeError when no matching platform option is supplied', async () => {
@@ -369,7 +391,9 @@ describe('Negative (native method absent / invalid input must throw, not silentl
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_SCREEN_ORIENTATION.lockPlatformAsync = undefined;
 
-      await expect(lockPlatformAsync({ screenOrientationConstantAndroid: 1 })).rejects.toThrow(
+      await expect(
+        lockPlatformAsync({ screenOrientationConstantAndroid: 1 }),
+      ).rejects.toThrow(
         'lockPlatformAsync is not available on ScreenOrientation',
       );
 
@@ -409,15 +433,20 @@ describe('Negative (native method absent / invalid input must throw, not silentl
   describe('supportsOrientationLockAsync', () => {
     it('throws a TypeError on an invalid lock value', async () => {
       // @ts-expect-error -- simulating a caller passing a bogus lock value
-      await expect(supportsOrientationLockAsync(999)).rejects.toThrow('Invalid Orientation Lock');
+      await expect(supportsOrientationLockAsync(999)).rejects.toThrow(
+        'Invalid Orientation Lock',
+      );
     });
 
     it('throws UnavailabilityError when the native method is absent', async () => {
-      const { supportsOrientationLockAsync: native } = FAKE_NATIVE_SCREEN_ORIENTATION;
+      const { supportsOrientationLockAsync: native } =
+        FAKE_NATIVE_SCREEN_ORIENTATION;
       // @ts-expect-error -- simulating a platform where the native method is absent
       FAKE_NATIVE_SCREEN_ORIENTATION.supportsOrientationLockAsync = undefined;
 
-      await expect(supportsOrientationLockAsync(OrientationLock.PORTRAIT)).rejects.toThrow();
+      await expect(
+        supportsOrientationLockAsync(OrientationLock.PORTRAIT),
+      ).rejects.toThrow();
 
       FAKE_NATIVE_SCREEN_ORIENTATION.supportsOrientationLockAsync = native;
     });
@@ -459,17 +488,17 @@ describe('falsy Android constant — upstream parity', () => {
     it('throws the generic "no option supplied" error for Android constant 0 instead of locking', async () => {
       fakePlatform.OS = 'android';
 
-      await expect(lockPlatformAsync({ screenOrientationConstantAndroid: 0 })).rejects.toThrow(
-        'cannot be called with undefined option properties',
-      );
+      await expect(
+        lockPlatformAsync({ screenOrientationConstantAndroid: 0 }),
+      ).rejects.toThrow('cannot be called with undefined option properties');
     });
 
     it('throws the generic "no option supplied" error for NaN instead of the isNaN-specific message', async () => {
       fakePlatform.OS = 'android';
 
-      await expect(lockPlatformAsync({ screenOrientationConstantAndroid: NaN })).rejects.toThrow(
-        'cannot be called with undefined option properties',
-      );
+      await expect(
+        lockPlatformAsync({ screenOrientationConstantAndroid: NaN }),
+      ).rejects.toThrow('cannot be called with undefined option properties');
     });
   });
 });

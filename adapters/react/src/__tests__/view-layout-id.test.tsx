@@ -33,7 +33,9 @@ describe('View/Text layout + id alias props', () => {
     it('folds id to nativeID and never leaks a raw id prop', () => {
       mount(ROOT_TAG, <App />);
       // The app's View is the RCTView carrying nativeID (the synthetic root never does).
-      const view = fabric.find(n => n.viewName === 'RCTView' && n.props.nativeID === 'foo');
+      const view = fabric.find(
+        n => n.viewName === 'RCTView' && n.props.nativeID === 'foo',
+      );
       expect(view, 'a View with nativeID="foo" was created').toBeDefined();
       expect('id' in view!.props).toBe(false);
     });
@@ -42,7 +44,9 @@ describe('View/Text layout + id alias props', () => {
     // unflagged node's onLayout handler would silently never fire on a real host.
     it('flags the View node with onLayout:true', () => {
       mount(ROOT_TAG, <App />);
-      const view = fabric.find(n => n.viewName === 'RCTView' && n.props.nativeID === 'foo');
+      const view = fabric.find(
+        n => n.viewName === 'RCTView' && n.props.nativeID === 'foo',
+      );
       expect(view!.props.onLayout).toBe(true);
     });
 

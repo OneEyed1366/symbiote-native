@@ -29,7 +29,8 @@ slot.dispatchCommand = (_node, name, args) => {
   commands.push({ name, args });
 };
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -46,7 +47,10 @@ function switchNode(): IFakeNode {
 
 describe('Vue Switch on the engine', () => {
   it('passes value through as a strict boolean', async () => {
-    mount(ROOT_TAG, defineComponent({ setup: () => () => h(Switch, { value: true }) }));
+    mount(
+      ROOT_TAG,
+      defineComponent({ setup: () => () => h(Switch, { value: true }) }),
+    );
     await tick();
     expect(switchNode().props.value).toBe(true);
   });
@@ -64,17 +68,25 @@ describe('Vue Switch on the engine', () => {
     await tick();
 
     const setValue = commands.find(c => c.name === 'setValue');
-    expect(setValue, 'a setValue command after a rejected toggle').toBeDefined();
+    expect(
+      setValue,
+      'a setValue command after a rejected toggle',
+    ).toBeDefined();
     expect(setValue!.args[0]).toBe(false);
   });
 
   it('accepts modelValue as an alias for value, never forwarding it to Fabric', async () => {
-    mount(ROOT_TAG, defineComponent({ setup: () => () => h(Switch, { modelValue: true }) }));
+    mount(
+      ROOT_TAG,
+      defineComponent({ setup: () => () => h(Switch, { modelValue: true }) }),
+    );
     await tick();
 
     const node = switchNode();
     expect(node.props.value).toBe(true);
-    expect('modelValue' in node.props, 'modelValue must not reach Fabric').toBe(false);
+    expect('modelValue' in node.props, 'modelValue must not reach Fabric').toBe(
+      false,
+    );
   });
 
   it('emits update:modelValue and update:value alongside valueChange', async () => {
@@ -110,7 +122,8 @@ describe('Vue Switch on the engine', () => {
       ROOT_TAG,
       defineComponent({
         // modelValue is pinned false; the update handler deliberately ignores the toggle.
-        setup: () => () => h(Switch, { modelValue: false, 'onUpdate:modelValue': () => {} }),
+        setup: () => () =>
+          h(Switch, { modelValue: false, 'onUpdate:modelValue': () => {} }),
       }),
     );
     await tick();
@@ -118,7 +131,10 @@ describe('Vue Switch on the engine', () => {
     await tick();
 
     const setValue = commands.find(c => c.name === 'setValue');
-    expect(setValue, 'a setValue command after a v-model-driven rejected toggle').toBeDefined();
+    expect(
+      setValue,
+      'a setValue command after a v-model-driven rejected toggle',
+    ).toBeDefined();
     expect(setValue!.args[0]).toBe(false);
   });
 
@@ -156,7 +172,9 @@ describe('Vue Switch on the engine', () => {
   it('never forwards onValueChange itself onto the native prop bag', async () => {
     mount(
       ROOT_TAG,
-      defineComponent({ setup: () => () => h(Switch, { value: false, onValueChange: () => {} }) }),
+      defineComponent({
+        setup: () => () => h(Switch, { value: false, onValueChange: () => {} }),
+      }),
     );
     await tick();
     expect('onValueChange' in switchNode().props).toBe(false);
@@ -211,7 +229,10 @@ describe('Vue Switch on the engine', () => {
       ROOT_TAG,
       defineComponent({
         setup: () => () =>
-          h(Switch, { value: false, onValueChange: (next: boolean) => (emitted = next) }),
+          h(Switch, {
+            value: false,
+            onValueChange: (next: boolean) => (emitted = next),
+          }),
       }),
     );
     await tick();

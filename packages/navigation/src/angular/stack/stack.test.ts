@@ -70,7 +70,9 @@ const RNS_SCREEN_VIEW_CONFIG: INativeViewConfig = {
 };
 
 const RNS_SCREEN_STACK_VIEW_CONFIG: INativeViewConfig = {
-  directEventTypes: { topFinishTransitioning: directEvent('onFinishTransitioning') },
+  directEventTypes: {
+    topFinishTransitioning: directEvent('onFinishTransitioning'),
+  },
   validAttributes: {},
 };
 
@@ -106,7 +108,8 @@ setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 // Fabric createNode('Stack') call instead of a non-painting anchor.
 registerComposedComponent('Stack');
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -136,7 +139,9 @@ function screenNodes(): IFakeNode[] {
 }
 
 function headerConfigOf(screen: IFakeNode): IFakeNode {
-  const header = screen.children.find(child => child.viewName === HEADER_CONFIG_VIEW);
+  const header = screen.children.find(
+    child => child.viewName === HEADER_CONFIG_VIEW,
+  );
   if (!header) throw new Error('no header config child on screen');
   return header;
 }
@@ -188,7 +193,11 @@ let capturedHost: StackTestHost | undefined;
         [component]="homeComponent"
         [options]="homeOptions"
       ></ng-template>
-      <ng-template symbioteScreen name="Details" [component]="detailsComponent"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Details"
+        [component]="detailsComponent"
+      ></ng-template>
     </Stack>
   `,
 })
@@ -235,7 +244,11 @@ let capturedParamsHost: ParamsStackTestHost | undefined;
         [component]="homeComponent"
         [initialParams]="homeInitialParams"
       ></ng-template>
-      <ng-template symbioteScreen name="Details" [component]="detailsComponent"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Details"
+        [component]="detailsComponent"
+      ></ng-template>
     </Stack>
   `,
 })
@@ -329,11 +342,23 @@ let capturedDynamicHost: DynamicStackTestHost | undefined;
   imports: [Stack, ScreenDirective],
   template: `
     <Stack #nav initialRouteName="Home">
-      <ng-template symbioteScreen name="Home" [component]="homeComponent"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Home"
+        [component]="homeComponent"
+      ></ng-template>
       @if (isDetailsRegistered()) {
-        <ng-template symbioteScreen name="Details" [component]="detailsComponent"></ng-template>
+        <ng-template
+          symbioteScreen
+          name="Details"
+          [component]="detailsComponent"
+        ></ng-template>
       }
-      <ng-template symbioteScreen name="Profile" [component]="profileComponent"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Profile"
+        [component]="profileComponent"
+      ></ng-template>
     </Stack>
   `,
 })
@@ -421,7 +446,9 @@ describe('Angular Stack navigator', () => {
 
   it('mounts the registered screen component as the RNSScreen content', async () => {
     await mountStack();
-    expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
+    expect(
+      findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+    ).toBeDefined();
   });
 
   it('exposes route.params to the pushed screen via injectRoute', async () => {
@@ -448,7 +475,8 @@ describe('Angular Stack navigator', () => {
     const handle = await mountParamsStack();
     // Home mounts first (ParamsScreenComponent, initialParams: {tab:'feed'}), capturing its route.
     const homeRoute = capturedParamRoutes[0];
-    if (homeRoute === undefined) throw new Error('home route was never captured');
+    if (homeRoute === undefined)
+      throw new Error('home route was never captured');
     const homeKey = homeRoute().key;
     handle.push('Details');
     await tick();
@@ -478,7 +506,10 @@ describe('Angular Stack navigator', () => {
   it('nests an RNSSearchBar child, wrapped in an RNSScreenStackHeaderSubview, when headerSearchBarOptions is set', async () => {
     mount(ROOT_TAG, SearchBarStackTestHost, {
       initialProps: {
-        homeOptions: { title: 'Home', headerSearchBarOptions: { placeholder: 'Search' } },
+        homeOptions: {
+          title: 'Home',
+          headerSearchBarOptions: { placeholder: 'Search' },
+        },
       },
     });
     await tick();
@@ -493,7 +524,9 @@ describe('Angular Stack navigator', () => {
   });
 
   it('drives imperative SearchBarCommands (focus/setText/…) through the app-supplied ref', async () => {
-    const searchBarRef: { current: ISearchBarCommands | null } = { current: null };
+    const searchBarRef: { current: ISearchBarCommands | null } = {
+      current: null,
+    };
     mount(ROOT_TAG, SearchBarStackTestHost, {
       initialProps: {
         homeOptions: {
@@ -506,9 +539,15 @@ describe('Angular Stack navigator', () => {
 
     expect(searchBarRef.current).not.toBeNull();
     searchBarRef.current?.focus();
-    expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'focus', args: [] });
+    expect(fabric.commands.at(-1)).toMatchObject({
+      commandName: 'focus',
+      args: [],
+    });
     searchBarRef.current?.setText('preset');
-    expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'setText', args: ['preset'] });
+    expect(fabric.commands.at(-1)).toMatchObject({
+      commandName: 'setText',
+      args: ['preset'],
+    });
   });
 
   it('renders the header config with zero children when there is no search bar', async () => {
@@ -530,10 +569,16 @@ describe('Angular Stack navigator', () => {
     const outer = findInTree(n => n.viewName === MODAL_SCREEN_VIEW);
     if (!outer) throw new Error('no RNSModalScreen mounted');
 
-    const innerStack = outer.children.find(child => child.viewName === STACK_VIEW);
-    if (!innerStack) throw new Error('no inner RNSScreenStack nested inside the modal screen');
-    const innerScreen = innerStack.children.find(child => child.viewName === SCREEN_VIEW);
-    if (!innerScreen) throw new Error('no inner RNSScreen nested inside the inner stack');
+    const innerStack = outer.children.find(
+      child => child.viewName === STACK_VIEW,
+    );
+    if (!innerStack)
+      throw new Error('no inner RNSScreenStack nested inside the modal screen');
+    const innerScreen = innerStack.children.find(
+      child => child.viewName === SCREEN_VIEW,
+    );
+    if (!innerScreen)
+      throw new Error('no inner RNSScreen nested inside the inner stack');
     // The only RNSScreen anywhere is this inner one - the OUTER screen mounted as RNSModalScreen
     // instead, exactly the substitution outerScreenIsModal exists to make.
     expect(screenNodes()).toEqual([innerScreen]);
@@ -555,9 +600,13 @@ describe('Angular Stack navigator', () => {
     await tick();
 
     expect(screenNodes()).toHaveLength(1);
-    expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
     expect(
-      findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'details'),
+      findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+    ).toBeDefined();
+    expect(
+      findInTree(
+        n => n.viewName === 'RCTRawText' && n.props.text === 'details',
+      ),
     ).toBeUndefined();
     expect(handle.canGoBack()).toBe(false);
   });
@@ -577,7 +626,9 @@ describe('Angular Stack navigator', () => {
     await tick();
 
     expect(screenNodes()).toHaveLength(1);
-    expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
+    expect(
+      findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+    ).toBeDefined();
     expect(handle.canGoBack()).toBe(false);
   });
 });

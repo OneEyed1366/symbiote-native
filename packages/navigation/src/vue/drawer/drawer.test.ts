@@ -25,7 +25,12 @@ import { Animated, mount, unmount, Dimensions } from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Drawer } from './index';
 import type { IDrawerNavigatorHandle } from './index';
-import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '../composables';
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+  useRoute,
+} from '../composables';
 
 const ROOT_TAG = 4704;
 const TOUCH_START = 'topTouchStart';
@@ -66,7 +71,8 @@ function installRequestAnimationFrame(): void {
 }
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -92,7 +98,10 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   const found: string[] = [];
   const collect = (list: readonly IFakeNode[]): void => {
     for (const node of list) {
-      if (node.viewName === 'RCTRawText' && typeof node.props.text === 'string') {
+      if (
+        node.viewName === 'RCTRawText' &&
+        typeof node.props.text === 'string'
+      ) {
         found.push(node.props.text);
       }
       collect(node.children);
@@ -145,7 +154,9 @@ function swipe(path: readonly ITouchFrame[]): void {
   };
   const [start, ...rest] = path;
   fire(TOUCH_START, start);
-  rest.forEach((frame, i) => fire(i === rest.length - 1 ? TOUCH_END : TOUCH_MOVE, frame));
+  rest.forEach((frame, i) =>
+    fire(i === rest.length - 1 ? TOUCH_END : TOUCH_MOVE, frame),
+  );
 }
 
 const OPEN_SWIPE: readonly ITouchFrame[] = [
@@ -181,7 +192,11 @@ function mountDrawer(
     ROOT_TAG,
     defineComponent({
       setup: () => () =>
-        h(Drawer, { ref: handleRef, initialRouteName: 'Home', ...props }, () => children),
+        h(
+          Drawer,
+          { ref: handleRef, initialRouteName: 'Home', ...props },
+          () => children,
+        ),
     }),
   );
 }
@@ -409,10 +424,14 @@ describe('Vue Drawer navigator', () => {
         ROOT_TAG,
         defineComponent({
           setup: () => () =>
-            h(Drawer, { initialRouteName: 'Home', drawerPosition: 'right' }, () => [
-              h(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-              h(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-            ]),
+            h(
+              Drawer,
+              { initialRouteName: 'Home', drawerPosition: 'right' },
+              () => [
+                h(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+                h(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+              ],
+            ),
         }),
       );
       await tick();
@@ -434,10 +453,14 @@ describe('Vue Drawer navigator', () => {
           setup: () => () =>
             // Passed as a literal 'drawer-position' key, not 'drawerPosition' - mirroring what a
             // template's `:drawer-position="right"` binding actually lands in $attrs as.
-            h(Drawer, { initialRouteName: 'Home', 'drawer-position': 'right' }, () => [
-              h(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-              h(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-            ]),
+            h(
+              Drawer,
+              { initialRouteName: 'Home', 'drawer-position': 'right' },
+              () => [
+                h(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+                h(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+              ],
+            ),
         }),
       );
       await tick();

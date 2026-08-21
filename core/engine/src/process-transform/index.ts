@@ -54,7 +54,9 @@ function getKeyAndValueFromCSSTransform(
         const unitOfMeasurement = matches[3];
 
         if (value !== 0 && !unitOfMeasurement) {
-          dlog(`processTransform: ${key}(${args}) length must have a unit unless 0`);
+          dlog(
+            `processTransform: ${key}(${args}) length must have a unit unless 0`,
+          );
         }
 
         if (unitOfMeasurement === '%') {
@@ -119,7 +121,10 @@ export function processTransform(
 
   let matches: RegExpExecArray | null;
   while ((matches = TRANSFORM_REGEX.exec(transform))) {
-    const { key, value } = getKeyAndValueFromCSSTransform(matches[1], matches[2]);
+    const { key, value } = getKeyAndValueFromCSSTransform(
+      matches[1],
+      matches[2],
+    );
     if (value !== undefined) {
       transformArray.push({ [key]: value });
     }
@@ -136,11 +141,15 @@ function warnInvalidTransforms(transform: ReadonlyArray<IRawTransform>): void {
   for (const transformation of transform) {
     const keys = Object.keys(transformation);
     if (keys.length !== 1) {
-      dlog(`processTransform: each transform object must have exactly one key, got ${keys.length}`);
+      dlog(
+        `processTransform: each transform object must have exactly one key, got ${keys.length}`,
+      );
       continue;
     }
     if (keys[0] === 'matrix' && transform.length > 1) {
-      dlog('processTransform: a matrix transform must be the only transform in the list');
+      dlog(
+        'processTransform: a matrix transform must be the only transform in the list',
+      );
     }
   }
 }

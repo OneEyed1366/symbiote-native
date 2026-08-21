@@ -33,9 +33,15 @@ export interface IPanResponderGestureState {
 }
 
 // (event, gestureState) -> boolean: the should-set / termination-request gate.
-type IActiveCallback = (event: ISymbioteEvent, gestureState: IPanResponderGestureState) => boolean;
+type IActiveCallback = (
+  event: ISymbioteEvent,
+  gestureState: IPanResponderGestureState,
+) => boolean;
 // (event, gestureState) -> void: grant / move / release / terminate side effects.
-type IPassiveCallback = (event: ISymbioteEvent, gestureState: IPanResponderGestureState) => void;
+type IPassiveCallback = (
+  event: ISymbioteEvent,
+  gestureState: IPanResponderGestureState,
+) => void;
 
 export interface IPanResponderCallbacks {
   onStartShouldSetPanResponder?: IActiveCallback;
@@ -105,7 +111,9 @@ const SINGLE_TOUCH_COUNT = 1;
 const DEFAULT_BLOCK_NATIVE_RESPONDER = true;
 
 function toFiniteNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 // Pull one touch out of an untyped array element, skipping anything that does not
@@ -233,21 +241,37 @@ function centroidDimension(
 
 const NO_CENTROID = -1;
 
-function dimensionOf(record: ITouchRecord, isXAxis: boolean, ofCurrent: boolean): number {
+function dimensionOf(
+  record: ITouchRecord,
+  isXAxis: boolean,
+  ofCurrent: boolean,
+): number {
   if (ofCurrent) return isXAxis ? record.currentPageX : record.currentPageY;
   return isXAxis ? record.previousPageX : record.previousPageY;
 }
 
-function currentCentroidXOfChanged(touchHistory: ITouchHistory, after: number): number {
+function currentCentroidXOfChanged(
+  touchHistory: ITouchHistory,
+  after: number,
+): number {
   return centroidDimension(touchHistory, after, true, true);
 }
-function currentCentroidYOfChanged(touchHistory: ITouchHistory, after: number): number {
+function currentCentroidYOfChanged(
+  touchHistory: ITouchHistory,
+  after: number,
+): number {
   return centroidDimension(touchHistory, after, false, true);
 }
-function previousCentroidXOfChanged(touchHistory: ITouchHistory, after: number): number {
+function previousCentroidXOfChanged(
+  touchHistory: ITouchHistory,
+  after: number,
+): number {
   return centroidDimension(touchHistory, after, true, false);
 }
-function previousCentroidYOfChanged(touchHistory: ITouchHistory, after: number): number {
+function previousCentroidYOfChanged(
+  touchHistory: ITouchHistory,
+  after: number,
+): number {
   return centroidDimension(touchHistory, after, false, false);
 }
 function currentCentroidXAll(touchHistory: ITouchHistory): number {
@@ -277,7 +301,8 @@ function updateGestureStateFromHistory(
   const nextDx = gestureState.dx + (x - prevX);
   const nextDy = gestureState.dy + (y - prevY);
 
-  const dt = touchHistory.mostRecentTimeStamp - gestureState._accountsForMovesUpTo;
+  const dt =
+    touchHistory.mostRecentTimeStamp - gestureState._accountsForMovesUpTo;
   if (dt > 0) {
     gestureState.vx = (nextDx - gestureState.dx) / dt;
     gestureState.vy = (nextDy - gestureState.dy) / dt;
@@ -307,8 +332,13 @@ function initializeGestureState(gestureState: IPanResponderGestureState): void {
 
 // The timestamp this frame advances to: the touch-history clock when shared attached a
 // store, else the most recent of the live touches (headless direct-call path).
-function frameTimestampOf(event: ISymbioteEvent, touches: ITouchPoint[]): number {
-  return touchHistoryOf(event)?.mostRecentTimeStamp ?? mostRecentTimestamp(touches);
+function frameTimestampOf(
+  event: ISymbioteEvent,
+  touches: ITouchPoint[],
+): number {
+  return (
+    touchHistoryOf(event)?.mostRecentTimeStamp ?? mostRecentTimestamp(touches)
+  );
 }
 
 // Advance the gesture for a move frame. With a touch-history store (the device / shared
@@ -401,7 +431,10 @@ const PanResponder = {
         // Skip a duplicate dispatch of the same frame: when two touches change at
         // once the responder system fires twice, but the geometry was already
         // folded in on the first call.
-        if (gestureState._accountsForMovesUpTo === frameTimestampOf(event, touches)) {
+        if (
+          gestureState._accountsForMovesUpTo ===
+          frameTimestampOf(event, touches)
+        ) {
           return false;
         }
         updateGestureStateOnMove(gestureState, event, touches);
@@ -415,14 +448,19 @@ const PanResponder = {
         const touches = readTouches(event);
         const touchHistory = touchHistoryOf(event);
         // x0/y0 is the non-cumulative centroid at grant time (RN: currentCentroid).
-        gestureState.x0 = touchHistory ? currentCentroidXAll(touchHistory) : centroidX(touches);
-        gestureState.y0 = touchHistory ? currentCentroidYAll(touchHistory) : centroidY(touches);
+        gestureState.x0 = touchHistory
+          ? currentCentroidXAll(touchHistory)
+          : centroidX(touches);
+        gestureState.y0 = touchHistory
+          ? currentCentroidYAll(touchHistory)
+          : centroidY(touches);
         gestureState.dx = 0;
         gestureState.dy = 0;
         // The grant frame is already accounted for, so the first move's velocity
         // is measured from here, not from time 0.
         gestureState._accountsForMovesUpTo = frameTimestampOf(event, touches);
-        gestureState.numberActiveTouches = touchHistory?.numberActiveTouches ?? touches.length;
+        gestureState.numberActiveTouches =
+          touchHistory?.numberActiveTouches ?? touches.length;
         config.onPanResponderGrant?.(event, gestureState);
         return config.onShouldBlockNativeResponder === undefined
           ? DEFAULT_BLOCK_NATIVE_RESPONDER
@@ -435,14 +473,18 @@ const PanResponder = {
 
       onResponderStart(event: ISymbioteEvent): void {
         gestureState.numberActiveTouches =
-          touchHistoryOf(event)?.numberActiveTouches ?? readTouches(event).length;
+          touchHistoryOf(event)?.numberActiveTouches ??
+          readTouches(event).length;
         config.onPanResponderStart?.(event, gestureState);
       },
 
       onResponderMove(event: ISymbioteEvent): void {
         const touches = readTouches(event);
         // Same duplicate-frame guard as the capture path.
-        if (gestureState._accountsForMovesUpTo === frameTimestampOf(event, touches)) {
+        if (
+          gestureState._accountsForMovesUpTo ===
+          frameTimestampOf(event, touches)
+        ) {
           return;
         }
         updateGestureStateOnMove(gestureState, event, touches);
@@ -451,7 +493,8 @@ const PanResponder = {
 
       onResponderEnd(event: ISymbioteEvent): void {
         gestureState.numberActiveTouches =
-          touchHistoryOf(event)?.numberActiveTouches ?? readTouches(event).length;
+          touchHistoryOf(event)?.numberActiveTouches ??
+          readTouches(event).length;
         config.onPanResponderEnd?.(event, gestureState);
       },
 

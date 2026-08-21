@@ -16,7 +16,11 @@ import { h, isVNode, type Component, type VNode } from '@vue/runtime-core';
 import { dlog } from '@symbiote-native/engine';
 import { splitLayoutProps } from '@symbiote-native/components';
 import { createScrollView } from './shared';
-export type { IScrollViewProps, IScrollViewEmits, IScrollViewHandle } from './shared';
+export type {
+  IScrollViewProps,
+  IScrollViewEmits,
+  IScrollViewHandle,
+} from './shared';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -27,7 +31,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isHostType(type: VNode['type']): type is string | Component {
   if (typeof type === 'string') return true;
   return (
-    (typeof type === 'object' || typeof type === 'function') && type !== null && !isVNode(type)
+    (typeof type === 'object' || typeof type === 'function') &&
+    type !== null &&
+    !isVNode(type)
   );
 }
 
@@ -49,7 +55,8 @@ export const ScrollView = createScrollView({
     const { outer, inner } = splitLayoutProps(input.layoutSplitStyle);
     // `class` is stripped here: layoutSplitStyle already folded its resolved value into
     // outer/inner above, so forwarding the raw prop too would re-apply its LAYOUT half a second time.
-    const { class: _classAppliedViaSplit, ...innerScrollOuterProps } = input.scrollOuterProps;
+    const { class: _classAppliedViaSplit, ...innerScrollOuterProps } =
+      input.scrollOuterProps;
     const innerScrollView = h(
       input.scrollViewIntrinsic,
       {
@@ -71,6 +78,10 @@ export const ScrollView = createScrollView({
     }
     const rcProps = isRecord(rc.props) ? rc.props : {};
     dlog('Vue ScrollView.ANDROID refreshControl=WRAP');
-    return h(rc.type, { ...rcProps, style: outer }, { default: () => [innerScrollView] });
+    return h(
+      rc.type,
+      { ...rcProps, style: outer },
+      { default: () => [innerScrollView] },
+    );
   },
 });

@@ -26,7 +26,11 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="screen-orientation-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="screen-orientation-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -37,8 +41,9 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           <View class="hero-copy">
             <Text class="hero-title">Screen Orientation</Text>
             <Text class="hero-body">
-              @symbiote-native/screen-orientation — lock the screen to portrait/landscape, or
-              unlock it back to the system default, with live orientation-change updates.
+              @symbiote-native/screen-orientation — lock the screen to
+              portrait/landscape, or unlock it back to the system default, with
+              live orientation-change updates.
             </Text>
           </View>
         </View>
@@ -47,11 +52,15 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           <Text class="capability-card-title">Live orientation</Text>
           <View class="capability-row">
             <Text class="capability-label">Orientation</Text>
-            <Text testID="screen-orientation-value" class="value-text">{{ orientationLabel() }}</Text>
+            <Text testID="screen-orientation-value" class="value-text">{{
+              orientationLabel()
+            }}</Text>
           </View>
           <View class="capability-row">
             <Text class="capability-label">Orientation lock</Text>
-            <Text testID="screen-orientation-lock-value" class="value-text">{{ orientationLockLabel() }}</Text>
+            <Text testID="screen-orientation-lock-value" class="value-text">{{
+              orientationLockLabel()
+            }}</Text>
           </View>
         </View>
 

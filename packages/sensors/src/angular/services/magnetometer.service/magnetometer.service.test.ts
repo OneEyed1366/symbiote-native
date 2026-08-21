@@ -20,18 +20,26 @@ vi.mock('../../../core', () => ({
   Magnetometer: {
     addListener: (listener: (measurement: IMagnetometerMeasurement) => void) =>
       addListenerMock(listener),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
 const ROOT_TAG = 942;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
-const MEASUREMENT: IMagnetometerMeasurement = { x: 0.1, y: 0.2, z: 0.3, timestamp: 123 };
+const MEASUREMENT: IMagnetometerMeasurement = {
+  x: 0.1,
+  y: 0.2,
+  z: 0.3,
+  timestamp: 123,
+};
 
 let capturedResult: Signal<IMagnetometerMeasurement | null> | undefined;
-let capturedListener: ((measurement: IMagnetometerMeasurement) => void) | undefined;
+let capturedListener:
+  ((measurement: IMagnetometerMeasurement) => void) | undefined;
 
 @Component({
   selector: 'symbiote-magnetometer-host',
@@ -107,7 +115,8 @@ describe('MagnetometerService.connect', () => {
       mount(ROOT_TAG, MagnetometerHost);
       await tick();
 
-      if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+      if (capturedListener === undefined)
+        throw new Error('addListener callback was not captured');
       capturedListener(MEASUREMENT);
 
       expect(capturedResult?.()).toEqual(MEASUREMENT);

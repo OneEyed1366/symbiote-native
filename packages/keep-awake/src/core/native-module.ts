@@ -12,7 +12,10 @@ export type INativeKeepAwakeModule = {
   isAvailableAsync?(): Promise<boolean>;
   activate?(tag: string): Promise<void>;
   deactivate?(tag: string): Promise<void>;
-  addListenerForTag?(tag: string, listener: KeepAwakeListener): EventSubscription;
+  addListenerForTag?(
+    tag: string,
+    listener: KeepAwakeListener,
+  ): EventSubscription;
 };
 
 export const expoKeepAwake = requireNativeModule<INativeKeepAwakeModule>(

@@ -6,7 +6,11 @@
   // (a Svelte `bind:this` on THIS component resolves to whatever THIS component exports, so the
   // wrapper must re-declare + delegate rather than re-exporting the child's exports directly) —
   // the Svelte twin of the React/Vue SectionList.
-  import type { ISectionListProps, ISectionListHandle, ISection } from './section-list-props';
+  import type {
+    ISectionListProps,
+    ISectionListHandle,
+    ISection,
+  } from './section-list-props';
 
   export type { ISectionListProps, ISectionListHandle, ISection };
 </script>
@@ -77,6 +81,7 @@
   footer={props.footer}
   empty={props.empty}
   keyExtractor={props.keyExtractor}
+  getItemLayout={props.getItemLayout}
   stickySectionHeadersEnabled={props.stickySectionHeadersEnabled}
   inverted={props.inverted}
   extraData={props.extraData}

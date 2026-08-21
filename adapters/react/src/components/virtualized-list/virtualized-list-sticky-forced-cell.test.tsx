@@ -21,7 +21,9 @@ interface IRow {
 const ROOT_TAG = 44;
 const ITEM_HEIGHT = 100;
 const VIEWPORT = 100;
-const DATA: IRow[] = Array.from({ length: 20 }, (_unused, index) => ({ id: index }));
+const DATA: IRow[] = Array.from({ length: 20 }, (_unused, index) => ({
+  id: index,
+}));
 
 const fabric = installFabric();
 beforeEach(() => fabric.reset());
@@ -31,7 +33,10 @@ afterEach(() => unmount(ROOT_TAG));
 function renderedRows(nodes: IFakeNode[]): string[] {
   const rows: string[] = [];
   for (const node of nodes) {
-    if (typeof node.props.text === 'string' && node.props.text.startsWith('row-')) {
+    if (
+      typeof node.props.text === 'string' &&
+      node.props.text.startsWith('row-')
+    ) {
       rows.push(node.props.text);
     }
     rows.push(...renderedRows(node.children));
@@ -72,14 +77,18 @@ function App(): ReactElement {
     // and a scroll to the middle of the list genuinely evicts index 0.
     windowSize: 1,
     stickyHeaderIndices: [0, 10],
-    renderItem: ({ item }) => createElement('symbiote-text', {}, `row-${item.id}`),
+    renderItem: ({ item }) =>
+      createElement('symbiote-text', {}, `row-${item.id}`),
   });
 }
 
 describe('VirtualizedList force-mounts the sticky header below the window', () => {
   it('keeps the sticky index-0 cell mounted after scrolling its origin position off-window', () => {
     mount(ROOT_TAG, <App />);
-    expect(fabric.committed.length, 'VirtualizedList committed').toBeGreaterThan(0);
+    expect(
+      fabric.committed.length,
+      'VirtualizedList committed',
+    ).toBeGreaterThan(0);
 
     findScrollView(); // sanity: the inner ScrollView committed.
     fabric.fireEvent(findScrollView().instanceHandle, 'topLayout', {
@@ -98,13 +107,19 @@ describe('VirtualizedList force-mounts the sticky header below the window', () =
     const rows = renderedRows(fabric.committed);
     // The forced sticky cell: index 0 stays mounted even though it is far outside the
     // in-window range.
-    expect(rows.includes('row-0'), 'sticky header at index 0 stays force-mounted').toBe(true);
+    expect(
+      rows.includes('row-0'),
+      'sticky header at index 0 stays force-mounted',
+    ).toBe(true);
     // Real windowing still holds for everything else: indices strictly between the forced
     // sticky cell and the window are NOT rendered.
     expect(rows.includes('row-1'), 'index 1 stays windowed out').toBe(false);
     expect(rows.includes('row-4'), 'index 4 stays windowed out').toBe(false);
     // The window itself is resident.
-    expect(rows.includes('row-5') || rows.includes('row-6'), 'window cell resident').toBe(true);
+    expect(
+      rows.includes('row-5') || rows.includes('row-6'),
+      'window cell resident',
+    ).toBe(true);
   });
 
   it('wraps the forced cell in the sticky-header wrapper, same as an in-window sticky cell', () => {
@@ -123,7 +138,10 @@ describe('VirtualizedList force-mounts the sticky header below the window', () =
     });
 
     const stickyWrappers = collectStickyWrappers(fabric.committed);
-    expect(stickyWrappers.length, 'the forced sticky cell got wrapped').toBeGreaterThan(0);
+    expect(
+      stickyWrappers.length,
+      'the forced sticky cell got wrapped',
+    ).toBeGreaterThan(0);
     expect(
       stickyWrappers.some(wrapper => renderedRows([wrapper]).includes('row-0')),
       'row-0 (the forced cell) is inside a sticky wrapper',

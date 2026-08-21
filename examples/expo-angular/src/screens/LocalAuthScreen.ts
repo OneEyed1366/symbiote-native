@@ -1,5 +1,11 @@
 import { Component, signal } from '@angular/core';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   AuthenticationType,
   SecurityLevel,
@@ -73,7 +79,11 @@ function securityLevelLabel(level: SecurityLevel): string {
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="local-auth-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="local-auth-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -84,9 +94,10 @@ function securityLevelLabel(level: SecurityLevel): string {
           <View class="hero-copy">
             <Text class="hero-title">Local auth</Text>
             <Text class="hero-body">
-              @symbiote-native/local-auth — FaceID/TouchID on iOS, the Fingerprint/Biometric API on
-              Android. A simulator with no enrolled biometrics reports "not enrolled"; a real
-              device with FaceID/TouchID/fingerprint set up is needed to see a live prompt.
+              @symbiote-native/local-auth — FaceID/TouchID on iOS, the
+              Fingerprint/Biometric API on Android. A simulator with no enrolled
+              biometrics reports "not enrolled"; a real device with
+              FaceID/TouchID/fingerprint set up is needed to see a live prompt.
             </Text>
           </View>
         </View>
@@ -98,13 +109,17 @@ function securityLevelLabel(level: SecurityLevel): string {
           <View testID="local-auth-hardware" class="auth-capability-row">
             <Text class="auth-capability-label">Hardware present</Text>
             <View [class]="statusBadgeClass(hasHardware())">
-              <Text class="auth-status-text">{{ statusLabel(hasHardware()) }}</Text>
+              <Text class="auth-status-text">{{
+                statusLabel(hasHardware())
+              }}</Text>
             </View>
           </View>
           <View testID="local-auth-enrolled" class="auth-capability-row">
             <Text class="auth-capability-label">Enrolled</Text>
             <View [class]="statusBadgeClass(isEnrolled())">
-              <Text class="auth-status-text">{{ statusLabel(isEnrolled()) }}</Text>
+              <Text class="auth-status-text">{{
+                statusLabel(isEnrolled())
+              }}</Text>
             </View>
           </View>
           <View class="auth-capability-row">
@@ -114,7 +129,9 @@ function securityLevelLabel(level: SecurityLevel): string {
           <View class="auth-capability-row">
             <Text class="auth-capability-label">Supported types</Text>
             @if (supportedTypes(); as types) {
-              <Text class="auth-value-text">{{ supportedTypesLabelOf(types) }}</Text>
+              <Text class="auth-value-text">{{
+                supportedTypesLabelOf(types)
+              }}</Text>
             } @else {
               <Text class="auth-value-text">checking…</Text>
             }
@@ -126,7 +143,8 @@ function securityLevelLabel(level: SecurityLevel): string {
             <Text class="auth-card-title">Authenticate</Text>
           </View>
           <Text class="info-text">
-            Prompts FaceID/TouchID on iOS, or the Biometric/Fingerprint dialog on Android.
+            Prompts FaceID/TouchID on iOS, or the Biometric/Fingerprint dialog
+            on Android.
           </Text>
           <ActionButton
             testID="local-auth-authenticate-button"
@@ -145,13 +163,18 @@ function securityLevelLabel(level: SecurityLevel): string {
           @if (authResult(); as result) {
             <View
               testID="local-auth-result"
-              [class]="'auth-result auth-result-' + (result.success ? 'success' : 'error')"
+              [class]="
+                'auth-result auth-result-' +
+                (result.success ? 'success' : 'error')
+              "
             >
               <Text class="auth-result-text">
                 {{
                   result.success
                     ? 'Success'
-                    : 'Failed: ' + result.error + (result.warning ? ' (' + result.warning + ')' : '')
+                    : 'Failed: ' +
+                      result.error +
+                      (result.warning ? ' (' + result.warning + ')' : '')
                 }}
               </Text>
             </View>
@@ -179,10 +202,16 @@ export class LocalAuthScreen {
   readonly isAuthenticating = signal(false);
 
   constructor() {
-    hasHardwareAsync().then(value => this.hasHardware.set(toCapabilityStatus(value)));
-    isEnrolledAsync().then(value => this.isEnrolled.set(toCapabilityStatus(value)));
+    hasHardwareAsync().then(value =>
+      this.hasHardware.set(toCapabilityStatus(value)),
+    );
+    isEnrolledAsync().then(value =>
+      this.isEnrolled.set(toCapabilityStatus(value)),
+    );
     getEnrolledLevelAsync().then(value => this.enrolledLevel.set(value));
-    supportedAuthenticationTypesAsync().then(value => this.supportedTypes.set(value));
+    supportedAuthenticationTypesAsync().then(value =>
+      this.supportedTypes.set(value),
+    );
   }
 
   handleAuthenticate(): void {
@@ -207,7 +236,9 @@ export class LocalAuthScreen {
   }
 
   supportedTypesLabelOf(types: AuthenticationType[]): string {
-    return types.length === 0 ? 'none' : types.map(authenticationTypeLabel).join(', ');
+    return types.length === 0
+      ? 'none'
+      : types.map(authenticationTypeLabel).join(', ');
   }
 
   statusBadgeClass(status: ICapabilityStatus): string {
@@ -215,6 +246,10 @@ export class LocalAuthScreen {
   }
 
   statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+    return status === 'checking'
+      ? 'CHECKING…'
+      : status === 'yes'
+        ? 'YES'
+        : 'NO';
   }
 }

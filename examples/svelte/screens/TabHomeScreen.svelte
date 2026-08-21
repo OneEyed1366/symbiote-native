@@ -10,22 +10,28 @@
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TabsDemo];
 </script>
 
-<SafeAreaView class="screen"
-  ><View class="section"
-    ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text"
-        >{`${lineInfo.code} · ${lineInfo.label}`}</Text
-      ></View
-    ><View class="hero-card"
-      ><View
+<SafeAreaView class="screen">
+  <View class="section">
+    <View class={`line-tag line-tag-${lineInfo.line}`}>
+      <Text class="line-tag-text">
+        {`${lineInfo.code} · ${lineInfo.label}`}
+      </Text>
+    </View>
+    <View class="hero-card">
+      <View
         class="hero-badge"
         style={{ backgroundColor: LINE_COLOR.structure }}
-        ><Text class="hero-badge-text">TB</Text></View
-      ><View class="hero-copy"
-        ><Text class="hero-title">Tabs</Text><Text class="hero-body"
-          >A bottom-tabs navigator — icon, badge, and tint, each tab a real native view.</Text
-        ></View
-      ></View
-    ><Text class="info-text">{`focused: ${isFocused.current}`}</Text></View
-  ></SafeAreaView
->
+      >
+        <Text class="hero-badge-text">TB</Text>
+      </View>
+      <View class="hero-copy">
+        <Text class="hero-title">Tabs</Text>
+        <Text class="hero-body">
+          A bottom-tabs navigator — icon, badge, and tint, each tab a real
+          native view.
+        </Text>
+      </View>
+    </View>
+    <Text class="info-text">{`focused: ${isFocused.current}`}</Text>
+  </View>
+</SafeAreaView>

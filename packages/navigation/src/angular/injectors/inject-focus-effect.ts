@@ -26,8 +26,14 @@ export function injectFocusEffect(effect: IFocusEffectCallback): void {
     cleanup = undefined;
   };
 
-  const unsubscribeFocus = context.emitter.addListener(NAVIGATION_EVENT_FOCUS, runEffect);
-  const unsubscribeBlur = context.emitter.addListener(NAVIGATION_EVENT_BLUR, runCleanup);
+  const unsubscribeFocus = context.emitter.addListener(
+    NAVIGATION_EVENT_FOCUS,
+    runEffect,
+  );
+  const unsubscribeBlur = context.emitter.addListener(
+    NAVIGATION_EVENT_BLUR,
+    runCleanup,
+  );
 
   destroyRef.onDestroy(() => {
     unsubscribeFocus();

@@ -298,58 +298,51 @@ for the two-`mount()` proof.
 
 ### Why `In`/`Out` are components, not hooks — a real bug, not a style choice
 
-Confirmed, not hypothetical: an EARLIER version exposed this as
-`useTunnelIn(children)`/`useTunnelOut()` hooks, called directly inside one
-component (`App`) in `examples/react/App.tsx`. That produced a **silent
-white screen on device**, no thrown error, no `console.error`, from the very
-first commit (not just after tapping the demo button). Root cause, traced
-end to end:
-
-1. `useTunnelIn`'s sync effect wrote `children` into the shared Map and
-   called `notify()` on every render, with nothing to compare against.
-2. `useTunnelOut()`, called from the SAME component (`App`), subscribes via
-   `useSyncExternalStore` — `notify()` forces a re-render of THAT component.
-3. `App` re-renders → `useTunnelIn` runs again → `notify()` fires again →
-   step 2 repeats. Forever. This custom renderer's synchronous commit loop
-   (`updateContainerSync` + `flushSyncWork()`, no React concurrent
-   scheduler) has no "Maximum update depth exceeded" guard to catch it and
-   throw — it just hangs the JS thread.
-
-Two tempting hook-level non-fixes were considered and rejected:
-- **`useMemo`-stabilize the JSX before passing it in** — does NOT reliably
-  fix it: React documents `useMemo`'s cache as a discardable performance
-  optimization, not a correctness guarantee, so relying on its reference
-  staying stable across renders is fragile.
-- **An explicit `useTunnelIn(children, deps)` dependency list** (the
-  `useEffect`/`useMemo` contract) — works, but only patches the symptom: it
-  still lets a caller reintroduce the exact same class of bug by forgetting
-  `deps`, or by listing an incomplete dependency set.
-
-**The actual fix is structural, not a comparison to get right**: make `In`
-and `Out` SEPARATE COMPONENTS. `useSyncExternalStore`'s only lever is
-"force-rerender the component that subscribed" — as long as that's `Out`
-alone, the forced update has nowhere to bounce back to, even when `In` and
-`Out` are direct siblings under the SAME parent (confirmed by
-`create-tunnel.test.tsx`'s "does NOT loop" test, which renders both as
-children of one component and drives a toggle through a real native event —
-`onLayout`/`topLayout`, the same dispatch path `modal.test.tsx`/
-`switch.test.ts` use — asserting the render count stays bounded). This is
-also why the Vue twin never had this bug at all: Vue's `In`/`Out` were
-ALREADY separate components with independent reactive scopes from the
-start — the same structural property, arrived at for a different reason
-(a composable can't accept template markup).
-
-**Vue's `createTunnel` twin needs none of this** — not a smaller version of
-the same fix, structurally immune. `In` and `Out` are separate Vue
-components, each with its OWN reactive scope; writing to the shared
-`reactive` Map from `In` only re-triggers whichever component actually READS
-that Map in ITS OWN render (`Out`) — never `In` itself, even when `In` and
-`Out` are both descendants of the same parent. React's version has no
-per-hook reactive scope to isolate the update to — `useSyncExternalStore`'s
-only lever is "re-render the WHOLE component that called it," which is
-exactly `App` here, the same component that also calls `useTunnelIn`. This is
-the concrete reason the two adapters' `createTunnel` APIs are shaped
-differently, not just a naming/idiom choice.
+```
+tunnel_hooks_bug := {
+  history: "earlier createTunnel exposed useTunnelIn(children)/useTunnelOut()
+            hooks, called directly in one component (App, examples/react/App.tsx)",
+  symptom: "silent white screen on device, no thrown error/console.error,
+            from the first commit — not just after tapping the demo button",
+  root_cause: [
+    "useTunnelIn's sync effect writes children into the shared Map + calls
+     notify() every render, nothing to compare against",
+    "useTunnelOut(), called from the SAME component, subscribes via
+     useSyncExternalStore ⟶ notify() forces that component's re-render",
+    "App re-renders ⟶ useTunnelIn runs again ⟶ notify() fires again ⟶
+     infinite loop",
+  ],
+  why_uncaught: "this renderer's sync commit loop (updateContainerSync +
+                 flushSyncWork(), no React concurrent scheduler) has no
+                 'Maximum update depth exceeded' guard — hangs the JS
+                 thread instead of throwing",
+  ruled_out: [
+    "useMemo-stabilize the JSX ⟶ not reliable — React docs: useMemo's cache
+     is a discardable perf optimization, not a correctness guarantee",
+    "explicit useTunnelIn(children, deps) dep-list ⟶ works but only patches
+     the symptom — a caller can still forget/underspecify deps and
+     reintroduce the same bug",
+  ],
+  fix: "structural: In and Out are SEPARATE components. useSyncExternalStore's
+        only lever is 're-render the component that subscribed' — confined
+        to Out alone, the forced update has nowhere to bounce back, even
+        when In/Out are siblings under the same parent",
+  verified: "create-tunnel.test.tsx 'does NOT loop' test — In/Out rendered as
+             children of one component, toggled via a real native event
+             (onLayout/topLayout, same dispatch path as modal.test.tsx/
+             switch.test.ts) — asserts bounded render count",
+  vue_twin: "Vue's createTunnel never hit this: In/Out were ALREADY separate
+             components with independent reactive scopes (for an unrelated
+             reason — a composable can't accept template markup) ⟶ writing
+             to the shared reactive Map from In only re-triggers whoever
+             READS it (Out), never In itself, even as siblings. React's
+             useSyncExternalStore has no per-hook reactive scope — it
+             re-renders the WHOLE calling component, which for the hook
+             version was also the caller of useTunnelIn (App). This is why
+             the two adapters' createTunnel APIs are shaped differently,
+             not a naming/idiom choice.",
+}
+```
 
 ## See also
 
@@ -359,7 +352,7 @@ differently, not just a naming/idiom choice.
   composable can't accept template markup; only a component has a slot),
   but land on the SAME components-not-hooks shape this file's React version
   needed for correctness, not just idiom.
-- `angular-adapter` (§15) — the Angular twins, `PortalDirective`/
+- `angular-adapter-portal` — the Angular twins, `PortalDirective`/
   `PortalOutletDirective` and `createTunnel`'s `TunnelInDirective`/
   `TunnelOut`. Neither can be a per-call factory like React's/Vue's —
   Angular has no runtime component synthesis (no JIT under Metro/Hermes) —
@@ -375,3 +368,179 @@ differently, not just a naming/idiom choice.
   runtime.
 - `symbiote-engine-core` — `isSymbioteNode`, the `mirror` WeakMap, and the
   commit/reconcile model this scope decision rests on.
+
+## Solid — `Portal` + `createTunnel` (2026-08-20)
+
+`adapters/solid/src/create-portal/index.tsx` · `adapters/solid/src/create-tunnel/index.tsx`.
+Both were absent; the barrel said so in two places and blamed `solid-js/web`'s DOM-bound
+`Portal`/`Dynamic`. That reason held for the RE-EXPORT and for nothing else — neither feature
+needs `Dynamic`, and both are ~40 lines over `solid-js/universal`.
+
+```
+solid_portal := {
+  spelling: "<Portal mount={node}> component, NOT createPortal(children, target)",
+  why: [
+    "Solid evaluates JSX eagerly at the position written; a component's `children` prop is the
+     only lazy shape in the language, so a call-form portal would BUILD the content first",
+    "same signature solid-js/web ships for the same job",
+    "per-adapter spelling is already the rule (Angular = a structural directive pair)",
+  ],
+  mechanism: "one engine ANCHOR per instance as a fragment host + the renderer's own `insert`.
+              The commit walk FLATTENS an anchor's children into its parent (renderableChildren,
+              core/engine/src/commit.ts), so portaled content is a DIRECT Fabric child of the
+              target — no wrapper view, unlike solid-js/web's container div. Teardown is one
+              removeNode(target, host): the whole subtree leaves with the anchor.",
+  renderer_change: "removeNode HOISTED + exported from adapters/solid/src/renderer.ts, the same
+                    precedent as replaceText — createRenderer() returns only the 11 names the JSX
+                    compiler imports, and removeNode is not among them.",
+  trap: "`Portal` is one of babel-plugin-jsx-dom-expressions' ten builtIns (For, Show, Switch,
+         Match, Suspense, SuspenseList, Portal, Index, Dynamic, ErrorBoundary). Written with NO
+         import in scope, the compiler injects `import { Portal } from '<moduleName>'` = our
+         ./renderer, which does not export it -> undefined component. Measured against
+         babel-preset-solid 1.9.12. An explicit import wins and the compiler injects nothing.
+         Same rule already governs For/Show in this adapter.",
+}
+```
+
+`createTunnel` keeps the React/Vue shape exactly — `In`/`Out` minted per call, closed over a
+`createSignal<readonly (() => JSX.Element)[]>`. Solid needs neither Svelte's workaround (a data
+object + a prop) nor Angular's (no runtime component synthesis). React's infinite-loop hazard is
+structurally unreachable: a component body runs ONCE inside `untrack`, and a signal write re-runs
+only its readers (`Out`'s `<For>`).
+
+### Portal vs Tunnel — they do NOT overlap (measured, not asserted)
+
+Each row below is pinned by a test in the two Solid suites.
+
+| | `Portal` | `createTunnel` |
+|---|---|---|
+| Reach | same surface only | any surface, incl. a separately `mount()`ed one |
+| Destination must cooperate | **no** — any already-mounted node, incl. one you only hold a `ref` to | **yes** — an `<Out/>` must be rendered there |
+| Placement | that node's exact position/z/clip/layout box, interleaved with its own children | one collection point, registration order |
+| Reactive scope of the content | the **CALL SITE**'s owner — context, ErrorBoundary, Suspense resolve from where it was written | the **OUT SITE**'s owner |
+| Node identity | nodes are MOVED (host A empties when it moves to host B) | content is re-created per `Out` |
+| Target vanishes | content goes with it (it is a child) | nothing painted until an `Out` exists |
+
+So the answer to "is one redundant": **no.** Portal uniquely buys (a) an arbitrary target that
+renders no outlet — the only route to a third-party native container you hold a ref to — and (b)
+call-site context/error-boundary preservation, which React documents as a portal guarantee.
+Tunnel uniquely buys cross-surface reach, which is exactly BECAUSE it moves nothing.
+
+### One real bug this surfaced — `adapters/solid/src/render.ts`
+
+`teardown()` cleared the renderer's single `activeSurface` unconditionally. With two surfaces up,
+unmounting the FIRST left the second mounted but permanently uncommitted — every later mutation
+hit renderer.ts's post-unmount guard and was dropped, silently. Cross-surface `createTunnel` is
+the first code in the repo to reach it. Now cleared only when the surface going away IS the
+active one, falling back to the most recently mounted remaining surface.
+
+**Still not at parity, and it pre-dates this work:** the Solid renderer commits ONE surface per
+process (`activeSurface`, forced by the compiled-JSX contract — see renderer.ts's header). So with
+two surfaces mounted, only the most recent one receives commits: a tunnel's TARGET paints
+correctly, but the SOURCE surface stops repainting its own tree after the target mounts. React has
+no such limit. Fixing it means either walking `parent` to the root on every mutation (rejected as
+too hot for the prop path) or committing every live surface — a renderer-seam redesign, not a
+portal/tunnel change.
+
+## Vue — `<Teleport>` + `createTunnel` (2026-08-20)
+
+`adapters/vue/src/create-portal/index.ts` · `adapters/vue/src/create-tunnel/index.ts`.
+
+A parity audit read Vue as having NO portal in any spelling. Half right: the validating
+`Teleport` wrapper had existed in `runtime-helpers/` all along, but only the
+`@symbiote-native/vue/runtime-helpers` SUBPATH exported it — never the package barrel, whose
+comment ("Teleport stays same-surface-only by design") described a capability no consumer of
+`@symbiote-native/vue` could import. Fixed by moving it to `create-portal/` (the layout every
+other adapter uses) and exporting it from the barrel; `runtime-helpers` keeps a re-export because
+Metro rewrites compiled `from 'vue'` to that module, and its `export *` would otherwise resolve
+`Teleport` to the unguarded original.
+
+```
+vue_portal := {
+  spelling: "<Teleport :to=\"nodeRef\">, Vue's OWN built-in — not a hand-rolled parallel API",
+  renderer_options_added: "NONE. resolveTarget consults `querySelector` only for the STRING
+                           form of `to`; an object target is returned untouched. Vue's own
+                           Teleport suite passes against @vue/runtime-test, whose querySelector
+                           throws — measured, then re-measured here over the engine.",
+  our_only_addition: "a runtime guard on `to` (isTeleportTarget). Vue's answer to a bad target
+                      is a dev-only warn plus a null target, which paints nothing.",
+  the_one_real_gap_closed: "the guard was isSymbioteNode-only, so the SURFACE ROOT — legal in
+                            React's IPortalContainer union — threw. Widened to
+                            `instanceof SymbioteSurface || isSymbioteNode`.",
+  no_wrapper_node: "Teleport marks its landing zone with two createText('') nodes; this renderer
+                    maps those to engine ANCHORS and the commit walk drops them
+                    (renderableChildren). Content is a DIRECT Fabric child of the target,
+                    interleaved with the target's own children — unlike a DOM portal's container.
+                    Proven by breaking it: mapping createText('') to a real element instead makes
+                    the target's children read ['own-child', undefined, 'ported', undefined].",
+}
+```
+
+Every row of the Portal-vs-Tunnel table above holds for Vue with the same answers, each pinned by
+a test. The `provide`/`inject` pair is the sharp one: Teleport keeps the content's vnode in the
+call site's component tree and moves only host nodes, so `inject` resolves at the CALL SITE; the
+tunnel's `In` hands over a SLOT that `Out` invokes, so it resolves at the OUT site.
+
+## Svelte — `Portal` (2026-08-20)
+
+`adapters/svelte/src/create-portal/index.ts`. The adapter shipped `createTunnel` and no portal in
+any spelling; the barrel claimed createPortal "has no Svelte twin … no equivalent in a framework
+with no reconciler". Wrong — a portal needs a retained tree you can move a subtree within, not a
+reconciler.
+
+```
+svelte_portal := {
+  spelling: "<Portal mount={node}> component with a `children` snippet",
+  why_not_a_call: "NOT Solid's eager-evaluation reason — probed, `{#snippet children()}` compiles
+                   to `const children = ($$anchor) => {…}`, already lazy. Svelte's reason is that
+                   it has NO EXPRESSION FORM FOR MARKUP at all: no h(), no JSX value. Markup lives
+                   only in a template, so a snippet prop is the only way to hand a block of it to
+                   something else.",
+  body_is_hand_written_ts: "FORCED, not preferred. `{@render children()}` always renders at the
+                   component's OWN anchor; the template language has no render-into-node-X form.
+                   Probe: `{@render children()}` -> `$.snippet(node, () => $$props.children)`.
+                   Portal makes the SAME call and substitutes one argument, its own anchor.
+                   Precedent for a hand-written body: modules/animated/create-animated-component.ts.",
+  mechanism: "TWO ShimComments (= engine anchors, flattened by renderableChildren): a fragment
+              `host`, and a `renderAnchor` child that $.snippet renders before. Content is
+              therefore a DIRECT Fabric child of the target, no wrapper. Relocation and teardown
+              are one call each, on the host.",
+  target: "ShimElement | ISymbioteNode | SymbioteSurface — React's two members plus the ShimElement
+           a bind:this/{@attach} actually hands a Svelte author. ShimElement attaches in the SHIM
+           tree (lazy makeLive, so pre-first-commit targets work); a raw ISymbioteNode has no
+           surface back-pointer, so the surface comes off the Portal's own call-site anchor
+           (`internals` IS the anchor node in this adapter).",
+  guard_throws_via_effect: "validated inside the Portal's $effect, so `expect(() => mount()).toThrow()`
+                   does NOT catch it — vitest reports an Uncaught Exception instead. Test through
+                   `<svelte:boundary onerror>`, which is both idiomatic and a real assertion.",
+}
+```
+
+### The community `use:portal` action — measured, not assumed
+
+Probed against the installed svelte 5.56.8, because "reuse the ecosystem's own primitive" is a fair
+question for an adapter that shims the DOM rather than binding a renderer seam:
+
+- `use:` on a COMPONENT is a **compile error** (`component_invalid_directive`), and app code in this
+  adapter never authors a raw host tag — so the community spelling is unreachable from app code by
+  construction. Svelte's own rule, not a shim gap. `{@attach}` / `fromAction(portal, …)` compiles
+  and is the reachable equivalent (runes/attachments.ts already forwards attachments to the host tag).
+- The action BODY (`target.appendChild(node)` + `node.remove()`) **works verbatim over the shim** —
+  pinned by a test in the portal suite. So the shim is not thin here.
+- It is still not React parity: what it relocates is the ELEMENT the directive sits on, i.e. a
+  wrapper view the target then contains, and it can never move a fragment of several nodes or
+  content that renders no element. Hence the component, and the action test documents the gap.
+
+`<svelte:boundary>` already runs over the shim (`adapters/svelte/src/boundary.smoke.test.ts`).
+
+### Two false greens this suite produced before it was believed
+
+1. **"removes the content on unmount" could not fail.** Deleting the effect's detach entirely still
+   left the target painting nothing — Svelte's own teardown removes the CONTENT from the host, and
+   the leaked host is an anchor Fabric never sees. The falsifiable assertion is the RETAINED-tree
+   one (`target.engineNode.children.length === 0`), which the test now reports out through a control
+   object for exactly that purpose.
+2. **A "move the nodes instead of the container" break did NOT falsify the reactive-update test** —
+   as long as the block ANCHORS move too, the shim routes later updates correctly. The container's
+   value is relocation/teardown bookkeeping, not update routing. What does falsify that test is a
+   surface that fails to propagate into the relocated subtree.

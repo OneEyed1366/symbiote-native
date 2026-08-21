@@ -1,5 +1,7 @@
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
-const { withSymbioteAngularMetroConfig } = require('@symbiote-native/angular/metro-config');
+const {
+  withSymbioteAngularMetroConfig,
+} = require('@symbiote-native/angular/metro-config');
 
 const projectRoot = __dirname;
 
@@ -26,7 +28,8 @@ const config = {
   // ./metro-css-parser export). Angular has no compiler-plugin conflict here: the ngc/linker
   // pipeline (see the block comment above) only ever sees .ts files, never .css.
   transformer: {
-    babelTransformerPath: require.resolve('@symbiote-native/angular/metro-css-parser'),
+    babelTransformerPath:
+      require.resolve('@symbiote-native/angular/metro-css-parser'),
   },
   resolver: {
     // sourceExts + the ngc-outDir CSS-redirect resolveRequest — see

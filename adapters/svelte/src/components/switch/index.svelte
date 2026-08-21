@@ -27,7 +27,11 @@
     valueFromChange,
     renderSwitch,
   } from '@symbiote-native/components';
-  import { dispatchViewCommand, dlog, type ISymbioteEvent } from '@symbiote-native/engine';
+  import {
+    dispatchViewCommand,
+    dlog,
+    type ISymbioteEvent,
+  } from '@symbiote-native/engine';
   import { PLATFORM } from './switch-platform';
   import { createDescriptorChildrenSync } from '../../descriptor-to-svelte';
   import { createAttachmentsSync } from '../../runes/attachments';
@@ -67,7 +71,10 @@
     // accept/reject control via the snap-back effect below — see TextInput's identical
     // mechanism (text-input/index.svelte) for why echoing unconditionally would break that.
     if (onValueChange === undefined) value = next;
-    switchState = switchReducer(switchState, { type: 'native-reported', value: next });
+    switchState = switchReducer(switchState, {
+      type: 'native-reported',
+      value: next,
+    });
   }
 
   // Snap-back: when native reported a value the parent rejected (the value prop did not
@@ -102,7 +109,11 @@
         thumbColor,
         ios_backgroundColor,
         style,
-        passthrough: { ...passthrough, class: className, onChange: handleChange },
+        passthrough: {
+          ...passthrough,
+          class: className,
+          onChange: handleChange,
+        },
       },
       PLATFORM,
     ),

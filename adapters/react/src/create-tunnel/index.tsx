@@ -15,7 +15,13 @@
 // lives anywhere - same surface or a different one - and never touches a Fabric node
 // directly, so there's no "target must already be mounted" guard to satisfy.
 
-import { Fragment, useEffect, useId, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 
 export interface ITunnel {
   /** Renders nothing; registers its children under the tunnel from wherever it's mounted —

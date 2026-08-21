@@ -1,0 +1,38 @@
+// SCSS tile. Sass reduces this to plain CSS text before the compiler sees any of it, so every
+// scoping and cascade mechanism downstream is unaware the language existed — this file only has
+// to prove the reduction actually ran.
+//
+// It proves it three ways at once, each of which leaves a value nowhere in the source: a
+// variable, a mixin, and arithmetic. `13px * 2` is authored nowhere as `26px`, so a tile with
+// 26px of horizontal padding can only have come from Sass. And `&.scss-tile-on` is compiled to
+// the COMPOUND `.scss-tile.scss-tile-on`, not to a descendant — nesting that produced a
+// descendant selector would hit the combinator limit the limits sheet demonstrates.
+//
+// sass/less/stylus are lazy-optional: css-parser imports one only when a file of that language
+// shows up, and they are devDependencies of this app, never of the shipped bundle.
+
+$scss-gold: #f0b429;
+$scss-unit: 13px;
+
+@mixin scss-pill($radius) {
+  border-radius: $radius;
+  border-width: 2px;
+}
+
+.scss-tile {
+  @include scss-pill(14px);
+  padding: $scss-unit ($scss-unit * 2);
+  border-color: $scss-gold;
+  background-color: #16243a;
+
+  &.scss-tile-on {
+    border-color: #a3d94f;
+    background-color: #1f4d7a;
+  }
+}
+
+.scss-tile-text {
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: bold;
+}

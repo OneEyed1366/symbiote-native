@@ -51,7 +51,11 @@ function yesNoLabel(value: boolean | undefined): string {
   imports: [SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="network-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="network-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -62,9 +66,10 @@ function yesNoLabel(value: boolean | undefined): string {
           <View class="hero-copy">
             <Text class="hero-title">Network</Text>
             <Text class="hero-body">
-              @symbiote-native/network — live network state via NetworkStateService, plus the
-              device's IP address and airplane-mode check. Toggle Wi-Fi or airplane mode on the
-              device to see the live card update on its own.
+              @symbiote-native/network — live network state via
+              NetworkStateService, plus the device's IP address and
+              airplane-mode check. Toggle Wi-Fi or airplane mode on the device
+              to see the live card update on its own.
             </Text>
           </View>
         </View>
@@ -116,10 +121,12 @@ export class NetworkScreen {
   constructor() {
     effect(() => {
       this.networkState();
-      Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(([ip, airplaneMode]) => {
-        this.ipAddress.set(ip);
-        this.isAirplaneMode.set(airplaneMode);
-      });
+      Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
+        ([ip, airplaneMode]) => {
+          this.ipAddress.set(ip);
+          this.isAirplaneMode.set(airplaneMode);
+        },
+      );
     });
   }
 

@@ -29,7 +29,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 const fakeStatusBar: IFakeStatusBar = { setHidden: () => {} };
-const registeredModules: Record<string, unknown> = { StatusBarManager: fakeStatusBar };
+const registeredModules: Record<string, unknown> = {
+  StatusBarManager: fakeStatusBar,
+};
 
 // The device hub our code registers, captured so a test can act as "native".
 let deviceHub: IDeviceHub | undefined;
@@ -37,7 +39,10 @@ let registerCallCount = 0;
 
 function installRegisterCallableModule(): void {
   Object.assign(globalThis, {
-    RN$registerCallableModule: (name: string, factory: () => IDeviceHub): void => {
+    RN$registerCallableModule: (
+      name: string,
+      factory: () => IDeviceHub,
+    ): void => {
       if (name !== 'RCTDeviceEventEmitter') return;
       registerCallCount += 1;
       deviceHub = factory();
@@ -83,10 +88,15 @@ describe('getNativeModule', () => {
         nativeModuleProxy: { StatusBarManager: fakeStatusBar },
       });
 
-      expect(getNativeModule<IFakeStatusBar>('StatusBarManager')).toBe(fakeStatusBar);
+      expect(getNativeModule<IFakeStatusBar>('StatusBarManager')).toBe(
+        fakeStatusBar,
+      );
       expect(getNativeModule('NopeManager')).toBeNull();
 
-      Object.assign(globalThis, { __turboModuleProxy: savedTurbo, nativeModuleProxy: undefined });
+      Object.assign(globalThis, {
+        __turboModuleProxy: savedTurbo,
+        nativeModuleProxy: undefined,
+      });
     });
 
     // why: the source comment on getNativeModule notes a bridgeless HostObject "may
@@ -110,7 +120,10 @@ describe('getNativeModule', () => {
       expect(() => getNativeModule('AnyManager')).not.toThrow();
       expect(getNativeModule('AnyManager')).toBeNull();
 
-      Object.assign(globalThis, { __turboModuleProxy: savedTurbo, nativeModuleProxy: undefined });
+      Object.assign(globalThis, {
+        __turboModuleProxy: savedTurbo,
+        nativeModuleProxy: undefined,
+      });
     });
   });
 });
@@ -120,7 +133,9 @@ describe('getEnforcingNativeModule', () => {
     // why: StatusBar (and similar hard-dependents) call the enforcing variant
     // precisely so a present module reaches them unchanged, not wrapped or copied.
     it('returns the module when it is registered', () => {
-      expect(getEnforcingNativeModule<IFakeStatusBar>('StatusBarManager')).toBe(fakeStatusBar);
+      expect(getEnforcingNativeModule<IFakeStatusBar>('StatusBarManager')).toBe(
+        fakeStatusBar,
+      );
     });
   });
 
@@ -129,7 +144,9 @@ describe('getEnforcingNativeModule', () => {
     // fail loudly and name the missing module, instead of a silent no-op that hides
     // a missing autolink until a user reports the feature "does nothing".
     it('throws naming the missing module', () => {
-      expect(() => getEnforcingNativeModule('NopeManager')).toThrow(/NopeManager.*not registered/);
+      expect(() => getEnforcingNativeModule('NopeManager')).toThrow(
+        /NopeManager.*not registered/,
+      );
     });
   });
 });

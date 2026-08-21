@@ -26,12 +26,12 @@ Unlike a plain RN native module, `expo-crypto`'s native code is discovered by
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
@@ -48,13 +48,12 @@ src/core/     getRandomBytes / getRandomBytesAsync / getRandomValues / randomUUI
               option/result types, and the CryptoError validation-error class.
               native-module.ts resolves the native module via expo-modules-core's
               requireNativeModule.
-src/react/    @symbiote-native/crypto/react   — export * from '../core'
-src/vue/      @symbiote-native/crypto/vue     — export * from '../core'
 src/angular/  @symbiote-native/crypto/angular — export * from '../core'
 ```
 
-No per-adapter lifecycle wrapper exists because there's nothing to subscribe to or clean up —
-each adapter entry is a single-file re-export.
+`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
+physical per-framework file, since there's nothing to subscribe to or clean up. `./angular` stays
+a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
 
@@ -77,7 +76,9 @@ function CryptoScreen() {
   }, []);
 
   const handleHash = () => {
-    digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(setHash);
+    digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(
+      setHash,
+    );
   };
 
   return (
@@ -111,7 +112,10 @@ onMounted(() => {
 });
 
 function handleHash(): void {
-  void digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(value => {
+  void digestStringAsync(
+    CryptoDigestAlgorithm.SHA256,
+    'Confirm it is you',
+  ).then(value => {
     hash.value = value;
   });
 }
@@ -158,8 +162,8 @@ export class CryptoScreen {
   readonly hash = signal('');
 
   handleHash(): void {
-    digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(value =>
-      this.hash.set(value),
+    digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(
+      value => this.hash.set(value),
     );
   }
 }

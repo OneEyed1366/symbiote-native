@@ -25,29 +25,31 @@
   let isLoud = $state(false);
 </script>
 
-<!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16 (whitespace between
-     symbiote-*-producing tags compiles to a real, invalid RCTRawText child). -->
-<View class="section-nested"
-  ><Text class="section-label">Compound class · scoped style block</Text><View
-    class="row"
-    ><View class="badge" testID="compound-badge-plain"
-      ><Text class="badge-text">plain</Text></View
-    ><View class="badge loud" testID="compound-badge-loud"
-      ><Text class="badge-text">loud</Text></View
-    ><View class={['badge', isLoud && 'loud']} testID="compound-badge-dynamic"
-      ><Text class="badge-text">dynamic</Text></View
-    ></View
-  ><Text class="note-text" testID="compound-badge-readout"
-    >{isLoud
+<View class="section-nested">
+  <Text class="section-label">Compound class · scoped style block</Text>
+  <View class="row">
+    <View class="badge" testID="compound-badge-plain">
+      <Text class="badge-text">plain</Text>
+    </View>
+    <View class="badge loud" testID="compound-badge-loud">
+      <Text class="badge-text">loud</Text>
+    </View>
+    <View class={['badge', isLoud && 'loud']} testID="compound-badge-dynamic">
+      <Text class="badge-text">dynamic</Text>
+    </View>
+  </View>
+  <Text class="note-text" testID="compound-badge-readout">
+    {isLoud
       ? 'dynamic badge carries both tokens — flame border, same pill shape'
-      : 'dynamic badge carries only .badge — grey border'}</Text
-  ><ActionButton
+      : 'dynamic badge carries only .badge — grey border'}
+  </Text>
+  <ActionButton
     testID="compound-badge-toggle"
     title={isLoud ? 'Drop .loud' : 'Add .loud'}
     color="#ff3e00"
     onPress={() => (isLoud = !isLoud)}
-  /></View
->
+  />
+</View>
 
 <style>
   .badge {
@@ -58,10 +60,15 @@
     background-color: #262626;
   }
 
-  /* Restates ONLY the two colours: the padding and radius above must survive on `badge loud`. */
+  /* Restates ONLY the two colours: the padding and radius above must survive on `badge loud`.
+     The lit fill was #3a1400 — a brown so dark it read as the same near-black as `.badge`'s own
+     #262626, so the toggle below looked dead and the 1px ring was the only thing carrying the
+     state. This badge's LABEL never changes, so its pixels are the whole signal. Still exactly
+     two colour declarations, so the rule proves what it always did. Same fix react/App.css
+     already carries for its own `.badge.loud`. */
   .badge.loud {
     border-color: #ff3e00;
-    background-color: #3a1400;
+    background-color: #a32d00;
   }
 
   .badge-text {

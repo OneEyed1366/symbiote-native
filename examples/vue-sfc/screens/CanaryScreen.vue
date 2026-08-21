@@ -24,8 +24,8 @@
   DrawerHomeScreen.vue / StatePersistenceScreen.vue.
 
   Non-template constructs handled the SFC way: RefreshControl is element-valued, so it is built in
-  script via a computed h() and bound (:refresh-control); Animated.View / Animated.ScrollView are
-  dotted, so they are aliased to <AnimatedView> / <AnimatedScrollView>; FlatList renders its cell
+  script via a computed h() and bound (:refresh-control); Animated.View / Animated.ScrollView
+  are used as dotted tags, which the SFC compiler resolves off the setup binding; FlatList renders its cell
   through the #item scoped slot; Pressable's children take the press state through a scoped slot
   (#default="{ pressed }").
 -->
@@ -81,9 +81,6 @@ import ParityDemo from '../components/ParityDemo.vue';
 import { nativeNumber } from '../components/event-utils';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
-
-const AnimatedView = Animated.View;
-const AnimatedScrollView = Animated.ScrollView;
 
 const CHIP_WIDTH = 72;
 const CHIP_GAP = 12;
@@ -648,6 +645,16 @@ const rotationStyle = {
             <Text class="list-row-text">{{ item.label }}</Text>
           </View>
         </template>
+        <!-- This list measures its own cells (no getItemLayout), and the divider is CHROME the
+             list renders BETWEEN them — so it belongs to the distance from one row to the next,
+             not to either row's height. That is the case the offset table has to get right; a
+             model built by summing heights alone is short by every divider it skipped, and the
+             content below a windowed-out region slides up and back as the window moves
+             (core/components buildOffsets). Deliberately on the MVCP list: prepend-without-jump
+             is exactly where an offset being off by a few points is visible. -->
+        <template #separator>
+          <View class="mvcp-divider" />
+        </template>
       </FlatList>
       <ActionButton
         title="Prepend 5"
@@ -659,7 +666,7 @@ const rotationStyle = {
            box below (not the page): the bright bar above SMOOTHLY fades to near-invisible
            and lifts, on the UI thread (no jank, no per-frame JS). Proves Animated.ScrollView
            + Animated.event native attach. -->
-      <AnimatedView
+      <Animated.View
         class="parity-header"
         :style="{
           opacity: parityHeaderOpacity,
@@ -667,9 +674,9 @@ const rotationStyle = {
         }"
       >
         <Text class="parity-header-text">HEADER — fades as you scroll ↓</Text>
-      </AnimatedView>
+      </Animated.View>
       <!-- box-list160 is shared with the MVCP FlatList above. -->
-      <AnimatedScrollView
+      <Animated.ScrollView
         class="box-list160"
         :scroll-event-throttle="16"
         @scroll="onParityScroll"
@@ -677,7 +684,7 @@ const rotationStyle = {
         <View v-for="i in scrollRows" :key="i" class="scroll-demo-row">
           <Text class="list-row-text">{{ `scroll me · row ${i}` }}</Text>
         </View>
-      </AnimatedScrollView>
+      </Animated.ScrollView>
       <Text class="tiny-center"
         >↑ drag inside the box — the bar above reacts</Text
       >

@@ -51,13 +51,17 @@ import {
   ViewHost,
 } from '../../primitives';
 
-export type { IPressState, IPressableAndroidRippleConfig } from '@symbiote-native/components';
+export type {
+  IPressState,
+  IPressableAndroidRippleConfig,
+} from '@symbiote-native/components';
 
 // The full logical Pressable surface, callback-shaped press/hover events included. Touchable* and
 // TouchableNativeFeedback still take their OWN onPress/onPressIn/... as @Input() callbacks (that is
 // a separate, not-yet-converted decision) and derive their public prop types from this - so it keeps
 // the callback fields even though the Pressable component below no longer implements them directly.
-export interface IAngularPressableProps extends IAccessibilityProps, IAriaProps {
+export interface IAngularPressableProps
+  extends IAccessibilityProps, IAriaProps {
   onPress?: IPressHandler;
   onPressIn?: IPressHandler;
   onPressOut?: IPressHandler;
@@ -83,7 +87,8 @@ export interface IAngularPressableProps extends IAccessibilityProps, IAriaProps 
   nextFocusLeft?: number;
   nextFocusRight?: number;
   nextFocusUp?: number;
-  style?: IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
+  style?:
+    IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
 }
 
 // What the Pressable component itself takes as plain @Input()s: the full surface minus the press/
@@ -105,7 +110,9 @@ export type IAngularPressableInputs = Omit<
   | 'onAccessibilityEscape'
 >;
 
-function isStyleFn(value: unknown): value is (state: IPressState) => IStyleProp<IViewStyle> {
+function isStyleFn(
+  value: unknown,
+): value is (state: IPressState) => IStyleProp<IViewStyle> {
   return typeof value === 'function';
 }
 
@@ -118,7 +125,9 @@ function asSymbioteEvent(event: unknown): ISymbioteEvent | undefined {
 @Component({
   selector: 'Pressable, symbiote-pressable',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [ViewHost, SymbioteHostPropsDirective],
   template: `
@@ -186,10 +195,13 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
   @Input() accessibilityRole?: IAngularPressableProps['accessibilityRole'];
   @Input() accessibilityState?: IAccessibilityStateValue;
   @Input() accessibilityValue?: IAngularPressableProps['accessibilityValue'];
-  @Input() accessibilityActions?: IAngularPressableProps['accessibilityActions'];
+  @Input()
+  accessibilityActions?: IAngularPressableProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -215,7 +227,8 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
   @Input() id?: string;
   @Input() role?: IAngularPressableProps['role'];
 
-  @ViewChild('host', { read: ElementRef }) private hostElement?: ElementRef<unknown>;
+  @ViewChild('host', { read: ElementRef })
+  private hostElement?: ElementRef<unknown>;
 
   // INTERNAL mutable state, driven by the press machine rather than by an @Input, so ngOnChanges
   // can never cover it - it carries its OWN signal, which is what lets the memoized bag below stay
@@ -293,7 +306,10 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
       accessibilityLabel: this.accessibilityLabel,
       accessibilityHint: this.accessibilityHint,
       accessibilityRole: this.accessibilityRole,
-      accessibilityState: resolveDisabledAccessibilityState(this.accessibilityState, this.disabled),
+      accessibilityState: resolveDisabledAccessibilityState(
+        this.accessibilityState,
+        this.disabled,
+      ),
       accessibilityValue: this.accessibilityValue,
       accessibilityActions: this.accessibilityActions,
       accessibilityLabelledBy: this.accessibilityLabelledBy,
@@ -304,8 +320,10 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       'aria-label': this.ariaLabel,
       'aria-busy': this.ariaBusy,
@@ -327,7 +345,9 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
   }
 
   get resolvedRippleProps(): Record<string, unknown> | undefined {
-    return this.android_ripple === undefined ? undefined : rippleProps(this.android_ripple);
+    return this.android_ripple === undefined
+      ? undefined
+      : rippleProps(this.android_ripple);
   }
 
   // Flat bag for `[symbioteHostProps]` (Renderer2.setProperty per key) - see primitives/shared.ts.
@@ -352,32 +372,38 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
       accessible: this.accessible,
       ...this.foldedAccessibility,
       android_disableSound: this.android_disableSound,
-      nativeBackgroundAndroid: this.resolvedRippleProps?.nativeBackgroundAndroid,
-      nativeForegroundAndroid: this.resolvedRippleProps?.nativeForegroundAndroid,
+      nativeBackgroundAndroid:
+        this.resolvedRippleProps?.nativeBackgroundAndroid,
+      nativeForegroundAndroid:
+        this.resolvedRippleProps?.nativeForegroundAndroid,
     };
   });
 
   handlePressIn(event: unknown): void {
     const symbioteEvent = asSymbioteEvent(event);
-    if (shouldSuppressPress(this.disabled) || symbioteEvent === undefined) return;
+    if (shouldSuppressPress(this.disabled) || symbioteEvent === undefined)
+      return;
     this.handlers.handlePressIn(symbioteEvent);
   }
 
   handlePressOut(event: unknown): void {
     const symbioteEvent = asSymbioteEvent(event);
-    if (shouldSuppressPress(this.disabled) || symbioteEvent === undefined) return;
+    if (shouldSuppressPress(this.disabled) || symbioteEvent === undefined)
+      return;
     this.handlers.handlePressOut(symbioteEvent);
   }
 
   handlePress(event: unknown): void {
     const symbioteEvent = asSymbioteEvent(event);
-    if (shouldSuppressPress(this.disabled) || symbioteEvent === undefined) return;
+    if (shouldSuppressPress(this.disabled) || symbioteEvent === undefined)
+      return;
     this.handlers.handlePress(symbioteEvent);
   }
 
   handleResponderMove(event: unknown): void {
     const symbioteEvent = asSymbioteEvent(event);
-    if (shouldSuppressPress(this.disabled) || symbioteEvent === undefined) return;
+    if (shouldSuppressPress(this.disabled) || symbioteEvent === undefined)
+      return;
     this.handlers.handleResponderMove(symbioteEvent);
   }
 
@@ -398,14 +424,18 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
   // is listening anyway, mirroring core's noteHoverNoop but off `.observed` instead of an @Input.
   private noteHoverNoop(): void {
     if (this.hoverIn.observed || this.hoverOut.observed) {
-      dlog('Pressable hover is a no-op on this host (no pointer-enter/leave event)');
+      dlog(
+        'Pressable hover is a no-op on this host (no pointer-enter/leave event)',
+      );
     }
   }
 
   // Wraps an @Output() as an IPressHandler only while it has a subscriber, so an unbound
   // (longPress) still skips arming the timer, matching createPressHandlers' "undefined means
   // nobody cares" contract.
-  private emitterHandler(emitter: EventEmitter<ISymbioteEvent>): IPressHandler | undefined {
+  private emitterHandler(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): IPressHandler | undefined {
     return emitter.observed ? event => emitter.emit(event) : undefined;
   }
 

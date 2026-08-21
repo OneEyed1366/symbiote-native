@@ -1,0 +1,39 @@
+/* Value/unit handling. Read the shorthand note before "fixing" any of these snapshots. */
+
+/* KNOWN BUG, DELIBERATELY PINNED: multi-value shorthand silently drops every value past the
+   first. `padding: 8px 16px` compiles to `{padding: 8}` with no warning. The snapshot below
+   records the BROKEN output on purpose — it is the baseline a library swap must reproduce, not
+   a behaviour to preserve. Fixing the bug is expected to change these bytes. */
+.shorthand {
+  padding: 8px 16px;
+  margin: 4px 8px 12px 16px;
+  border-width: 1px 2px;
+}
+
+.units {
+  width: 50%;
+  height: 120px;
+  font-size: 1.5rem;
+  line-height: 1.4;
+  margin-top: -8px;
+  opacity: 0.5;
+  flex-grow: 2;
+}
+
+.calc {
+  width: calc(100% - 24px);
+  padding-top: calc(8px * 2);
+}
+
+.colors {
+  color: red;
+  background-color: #0f1e30;
+  border-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Not in PROPERTY_TABLE -> dropped with one deduped console.warn per property name. */
+.unsupported {
+  animation: spin 1s linear infinite;
+  cursor: pointer;
+  float: left;
+}

@@ -13,14 +13,19 @@
 // An uncommitted or unknown input surfaces as null.
 
 import { ElementRef } from '@angular/core';
-import { getNativeTag, isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  getNativeTag,
+  isSymbioteNode,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
 
 export type { IHostInstance } from '@symbiote-native/engine';
 
 function resolveHostNode(candidate: unknown): ISymbioteNode | null {
   if (candidate === null || candidate === undefined) return null;
   if (isSymbioteNode(candidate)) return candidate;
-  if (candidate instanceof ElementRef) return resolveHostNode(candidate.nativeElement);
+  if (candidate instanceof ElementRef)
+    return resolveHostNode(candidate.nativeElement);
   const maybeHost = candidate as { nativeElement?: unknown };
   if (typeof maybeHost.nativeElement !== 'undefined') {
     return resolveHostNode(maybeHost.nativeElement);
@@ -29,7 +34,8 @@ function resolveHostNode(candidate: unknown): ISymbioteNode | null {
 }
 
 export function findNodeHandle(componentOrHandle: unknown): number | null {
-  if (componentOrHandle === null || componentOrHandle === undefined) return null;
+  if (componentOrHandle === null || componentOrHandle === undefined)
+    return null;
   if (typeof componentOrHandle === 'number') return componentOrHandle;
   const node = resolveHostNode(componentOrHandle);
   return node ? (getNativeTag(node) ?? null) : null;

@@ -8,7 +8,11 @@
 
 import { defineComponent } from '@vue/runtime-core';
 import type { Component } from '@vue/runtime-core';
-import type { IDrawerScreenOptions, IRoute, IDrawerNavigatorHandle } from '../core';
+import type {
+  IDrawerScreenOptions,
+  IRoute,
+  IDrawerNavigatorHandle,
+} from '../core';
 
 export type IDrawerScreenOptionsArgs = {
   route: IRoute<unknown>;
@@ -26,7 +30,10 @@ export type IDrawerScreenProps = {
   initialParams?: unknown;
 };
 
-export const DrawerScreen = defineComponent<IDrawerScreenProps>(() => () => null, {
-  name: 'DrawerScreen',
-  inheritAttrs: false,
-});
+export const DrawerScreen = defineComponent<IDrawerScreenProps>(
+  () => () => null,
+  {
+    name: 'DrawerScreen',
+    inheritAttrs: false,
+  },
+);

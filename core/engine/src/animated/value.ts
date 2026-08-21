@@ -151,13 +151,18 @@ export class AnimatedValue extends AnimatedWithChildren {
     platformConfig?: IPlatformConfig,
   ): void {
     this.__makeNative(platformConfig);
-    nativeAnimated.startAnimatingNode(nativeId, this.__getNativeTag(), config, result => {
-      onEnd(result.finished);
-      if (result.value !== undefined) {
-        this.__onNativeUpdate(result.value, result.offset);
-        flushValue(this);
-      }
-    });
+    nativeAnimated.startAnimatingNode(
+      nativeId,
+      this.__getNativeTag(),
+      config,
+      result => {
+        onEnd(result.finished);
+        if (result.value !== undefined) {
+          this.__onNativeUpdate(result.value, result.offset);
+          flushValue(this);
+        }
+      },
+    );
   }
 
   override __getNativeConfig(): INativeNodeConfig {
@@ -200,7 +205,10 @@ export class AnimatedValue extends AnimatedWithChildren {
     this.stopAnimation(callback);
     this.value = this.startingValue;
     if (this.isNative) {
-      nativeAnimated.setAnimatedNodeValue(this.__getNativeTag(), this.startingValue);
+      nativeAnimated.setAnimatedNodeValue(
+        this.__getNativeTag(),
+        this.startingValue,
+      );
     }
   }
 

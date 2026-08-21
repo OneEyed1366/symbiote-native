@@ -18,7 +18,7 @@
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '../../render';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { RefreshControl } from '../refresh-control';
 import { ScrollView } from './index.android';
@@ -30,7 +30,8 @@ const ROOT_TAG = 512;
 const REFRESH_WRAPPER_VIEW = 'PullToRefreshView';
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -51,7 +52,8 @@ function committedRefreshWrapper(): IFakeNode {
     if (node.viewName === REFRESH_WRAPPER_VIEW) found = node;
   });
   expect(found, `a ${REFRESH_WRAPPER_VIEW} was committed`).toBeDefined();
-  if (found === undefined) throw new Error('unreachable: refresh wrapper missing');
+  if (found === undefined)
+    throw new Error('unreachable: refresh wrapper missing');
   return found;
 }
 
@@ -62,7 +64,10 @@ function mountAndroidScrollView(props: Record<string, unknown>): Promise<void> {
       setup: () => () =>
         h(
           ScrollView,
-          { ...props, refreshControl: h(RefreshControl, { refreshing: false }) },
+          {
+            ...props,
+            refreshControl: h(RefreshControl, { refreshing: false }),
+          },
           { default: () => [h('symbiote-text')] },
         ),
     }),
@@ -76,7 +81,14 @@ describe('Android ScrollView + RefreshControl class/style split', () => {
       // why: the bug this file guards — a class-only layout prop (registered via the shared style
       // registry) is invisible to plain `userStyle`, so before the fix the wrapper never received
       // it and the whole scroll content collapsed on a real Android device.
-      registerStyles({ grow: { flex: 1 } });
+      registerRules([
+        {
+          tokens: ['grow'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { flex: 1 },
+        },
+      ]);
       await mountAndroidScrollView({ class: 'grow' });
 
       expect(committedRefreshWrapper().props.flex).toBe(1);
@@ -94,7 +106,14 @@ describe('Android ScrollView + RefreshControl class/style split', () => {
       // why: RN's own class/inline-style precedence rule — the later, more specific :style value
       // must win over a class default on the same property, even after the two are merged for the
       // Android wrap.
-      registerStyles({ grow: { flex: 1, height: 100 } });
+      registerRules([
+        {
+          tokens: ['grow'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { flex: 1, height: 100 },
+        },
+      ]);
       await mountAndroidScrollView({ class: 'grow', style: { height: 200 } });
 
       const wrapper = committedRefreshWrapper();

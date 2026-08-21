@@ -1,0 +1,32 @@
+/*
+ * DeepLinkingScreen's own leftovers — the URL field and the resolved-route box. Everything shared
+ * with the other tour screens (.demo-section, .line-tag*, .hero-*, .info-text, .note-text) comes
+ * from App.css; only what is unique to this screen lives here, screen-prefixed because the
+ * class registry is global.
+ *
+ * Palette is App.css's: #0b1020 ground, #151c33 card, #26304f edge, #f4f6fb / #9aa6c4 type.
+ */
+
+.deep-link-field {
+  height: 44px;
+  border-radius: 10px;
+  border-width: 1px;
+  border-color: #26304f;
+  padding-left: 14px;
+  padding-right: 14px;
+  color: #f4f6fb;
+  font-size: 16px;
+  background-color: #151c33;
+}
+
+.deep-link-result {
+  height: 120px;
+  padding: 12px;
+  border-radius: 10px;
+  background-color: #0f1526;
+}
+
+.deep-link-result-text {
+  color: #9aa6c4;
+  font-size: 15px;
+}

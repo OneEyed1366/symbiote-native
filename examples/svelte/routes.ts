@@ -10,6 +10,7 @@
 export const ROUTE_NAME = {
   Menu: 'Menu',
   Canary: 'Canary',
+  ApiPlayground: 'ApiPlayground',
   Details: 'Details',
   HeaderOptions: 'HeaderOptions',
   SheetDemo: 'SheetDemo',
@@ -19,6 +20,8 @@ export const ROUTE_NAME = {
   HooksDemo: 'HooksDemo',
   DeepLinking: 'DeepLinking',
   StatePersistence: 'StatePersistence',
+  Benchmark: 'Benchmark',
+  StyleShowcase: 'StyleShowcase',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

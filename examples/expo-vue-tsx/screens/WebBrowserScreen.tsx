@@ -1,6 +1,13 @@
 import { defineComponent, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/vue';
 import {
   coolDownAsync,
   dismissBrowser,
@@ -38,7 +45,10 @@ export const WebBrowserScreen = defineComponent(
 
     function handleOpen() {
       lastResult.value = 'opening…';
-      openBrowserAsync(url.value, { toolbarColor: '#0b1622', controlsColor: lineColor })
+      openBrowserAsync(url.value, {
+        toolbarColor: '#0b1622',
+        controlsColor: lineColor,
+      })
         .then(result => {
           if (!isMounted) return;
           lastResult.value = `type: ${result.type}`;
@@ -120,8 +130,9 @@ export const WebBrowserScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Web Browser</Text>
               <Text class="hero-body">
-                @symbiote-native/web-browser — an in-app browser that keeps the user inside the
-                app, unlike Linking.openURL handing them off to the system browser.
+                @symbiote-native/web-browser — an in-app browser that keeps the
+                user inside the app, unlike Linking.openURL handing them off to
+                the system browser.
               </Text>
             </View>
           </View>
@@ -151,9 +162,10 @@ export const WebBrowserScreen = defineComponent(
               color={lineColor}
             />
             <Text class="web-browser-note">
-              iOS resolves once the browser closes — cancel when the user dismissed it, dismiss
-              when the Dismiss button did. Android resolves opened the moment the Custom Tab
-              launches and never reports the close, and cannot be dismissed programmatically.
+              iOS resolves once the browser closes — cancel when the user
+              dismissed it, dismiss when the Dismiss button did. Android
+              resolves opened the moment the Custom Tab launches and never
+              reports the close, and cannot be dismissed programmatically.
             </Text>
           </View>
 
@@ -172,13 +184,21 @@ export const WebBrowserScreen = defineComponent(
               <Text class="web-browser-card-title">Custom Tabs service</Text>
               <View class="web-browser-row">
                 <Text class="web-browser-row-label">Warmed service</Text>
-                <Text testID="web-browser-service-package" class="web-browser-value-text">
-                  {servicePackage.value === null ? '(none)' : servicePackage.value}
+                <Text
+                  testID="web-browser-service-package"
+                  class="web-browser-value-text"
+                >
+                  {servicePackage.value === null
+                    ? '(none)'
+                    : servicePackage.value}
                 </Text>
               </View>
               <View class="web-browser-row">
                 <Text class="web-browser-row-label">Supporting browsers</Text>
-                <Text testID="web-browser-supporting-browsers" class="web-browser-value-text">
+                <Text
+                  testID="web-browser-supporting-browsers"
+                  class="web-browser-value-text"
+                >
                   {supportingBrowsers.value}
                 </Text>
               </View>
@@ -201,9 +221,10 @@ export const WebBrowserScreen = defineComponent(
                 color={lineColor}
               />
               <Text class="web-browser-note">
-                Android only. getCustomTabsSupportingBrowsersAsync throws on iOS — its native stub
-                is registered without the Async suffix, so the availability check fires before the
-                empty-result branch is reached.
+                Android only. getCustomTabsSupportingBrowsersAsync throws on iOS
+                — its native stub is registered without the Async suffix, so the
+                availability check fires before the empty-result branch is
+                reached.
               </Text>
             </View>
           )}

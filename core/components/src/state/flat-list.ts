@@ -15,7 +15,10 @@ export interface IRow<ItemT> {
   startIndex: number;
 }
 
-export function chunkIntoRows<ItemT>(data: readonly ItemT[], columns: number): IRow<ItemT>[] {
+export function chunkIntoRows<ItemT>(
+  data: readonly ItemT[],
+  columns: number,
+): IRow<ItemT>[] {
   const rows: IRow<ItemT>[] = [];
   for (let start = 0; start < data.length; start += columns) {
     rows.push({ items: data.slice(start, start + columns), startIndex: start });
@@ -45,17 +48,23 @@ export function expandRowViewability<ItemT>(
   keyExtractor?: (item: ItemT, index: number) => string,
 ): IViewableItemsChangedInfo<ItemT> {
   return {
-    viewableItems: info.viewableItems.flatMap(token => expandRowToken(token, keyExtractor)),
+    viewableItems: info.viewableItems.flatMap(token =>
+      expandRowToken(token, keyExtractor),
+    ),
     changed: info.changed.flatMap(token => expandRowToken(token, keyExtractor)),
   };
 }
 
 // The divider between rows shows real items, not the IRow wrapper: its leading item is the
 // LAST item of the row above, its trailing item the FIRST item of the row below.
-export function lastItemOfRow<ItemT>(row: IRow<ItemT> | undefined): ItemT | undefined {
+export function lastItemOfRow<ItemT>(
+  row: IRow<ItemT> | undefined,
+): ItemT | undefined {
   return row !== undefined ? row.items[row.items.length - 1] : undefined;
 }
 
-export function firstItemOfRow<ItemT>(row: IRow<ItemT> | undefined): ItemT | undefined {
+export function firstItemOfRow<ItemT>(
+  row: IRow<ItemT> | undefined,
+): ItemT | undefined {
   return row !== undefined ? row.items[0] : undefined;
 }

@@ -1,0 +1,54 @@
+{
+  "name": "solid-canary",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "android:release": "react-native run-android --mode Release",
+    "ios": "react-native run-ios",
+    "ios:release": "react-native run-ios --mode Release",
+    "lint": "eslint .",
+    "pretypecheck": "css-dts .",
+    "typecheck": "tsc --noEmit",
+    "dev": "react-native start --reset-cache",
+    "start": "react-native start"
+  },
+  "dependencies": {
+    "@symbiote-native/android": "^0.1.2",
+    "@symbiote-native/components": "file:../../.tarballs/symbiote-native-components-0.4.0.tgz",
+    "@symbiote-native/engine": "file:../../.tarballs/symbiote-native-engine-0.2.0.tgz",
+    "@symbiote-native/navigation": "file:./symbiote-native-navigation-2.1.0.tgz",
+    "@symbiote-native/slider": "file:./symbiote-native-slider-5.1.0.tgz",
+    "@symbiote-native/solid": "file:../../.tarballs/symbiote-native-solid-0.1.0.tgz",
+    "@symbiote-native/splash-screen": "^3.1.0",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "solid-js": "^1.9.14"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "20.1.0",
+    "@react-native-community/cli-platform-android": "20.1.0",
+    "@react-native-community/cli-platform-ios": "20.1.0",
+    "@react-native/babel-preset": "0.86.0",
+    "@react-native/codegen": "0.86.0",
+    "@react-native/eslint-config": "0.86.0",
+    "@react-native/gradle-plugin": "0.86.0",
+    "@react-native/metro-config": "0.86.0",
+    "@react-native/typescript-config": "0.86.0",
+    "@symbiote-native/css-parser": "file:../../.tarballs/symbiote-native-css-parser-0.3.0.tgz",
+    "@types/node": "^26.0.0",
+    "@types/react": "^19.2.0",
+    "eslint": "^8.19.0",
+    "less": "^4.6.7",
+    "prettier": "^3.9.1",
+    "sass": "^1.101.0",
+    "stylus": "^0.64.0",
+    "typescript": "~6.0.0"
+  },
+  "engines": {
+    "node": ">= 22.11.0"
+  }
+}

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
-import { getAdvertisingId, usePermissions } from '@symbiote-native/tracking-transparency/react';
+import {
+  getAdvertisingId,
+  usePermissions,
+} from '@symbiote-native/tracking-transparency/react';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -32,7 +35,11 @@ export function TrackingTransparencyScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="tracking-transparency-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="tracking-transparency-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -43,18 +50,30 @@ export function TrackingTransparencyScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Tracking Transparency</Text>
             <Text className="hero-body">
-              @symbiote-native/tracking-transparency — the iOS App Tracking Transparency prompt
-              (always granted on Android) plus the advertising-ID getter.
+              @symbiote-native/tracking-transparency — the iOS App Tracking
+              Transparency prompt (always granted on Android) plus the
+              advertising-ID getter.
             </Text>
           </View>
         </View>
 
-        <View testID="tracking-transparency-permission-card" className="feature-card">
+        <View
+          testID="tracking-transparency-permission-card"
+          className="feature-card"
+        >
           <View className="feature-card-header">
             <Text className="feature-card-title">Permission</Text>
           </View>
-          <ValueRow label="Status" value={status === null ? 'checking…' : status.status} />
-          <ValueRow label="Granted" value={status === null ? 'checking…' : status.granted ? 'Yes' : 'No'} />
+          <ValueRow
+            label="Status"
+            value={status === null ? 'checking…' : status.status}
+          />
+          <ValueRow
+            label="Granted"
+            value={
+              status === null ? 'checking…' : status.granted ? 'Yes' : 'No'
+            }
+          />
           <ActionButton
             testID="tracking-transparency-get-button"
             title="Get"
@@ -69,7 +88,10 @@ export function TrackingTransparencyScreen() {
           />
         </View>
 
-        <View testID="tracking-transparency-advertising-id-card" className="feature-card">
+        <View
+          testID="tracking-transparency-advertising-id-card"
+          className="feature-card"
+        >
           <View className="feature-card-header">
             <Text className="feature-card-title">Advertising ID</Text>
           </View>

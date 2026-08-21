@@ -57,7 +57,11 @@ export async function sendSMSAsync(
   return expoSms.sendSMSAsync(recipients, message, nativeOptions);
 }
 
-function normalizeAttachments(attachments: ISmsAttachment | ISmsAttachment[]): ISmsAttachment[] {
+function normalizeAttachments(
+  attachments: ISmsAttachment | ISmsAttachment[],
+): ISmsAttachment[] {
   const list = Array.isArray(attachments) ? attachments : [attachments];
-  return Platform.OS === 'android' ? list.slice(0, ANDROID_ATTACHMENT_LIMIT) : list;
+  return Platform.OS === 'android'
+    ? list.slice(0, ANDROID_ATTACHMENT_LIMIT)
+    : list;
 }

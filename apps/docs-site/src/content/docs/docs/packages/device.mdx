@@ -20,11 +20,12 @@ live-subscription surface.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -37,12 +38,14 @@ versions — never install either yourself, and never add the `expo` meta-packag
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-device`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
-  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper
-  uses — and it isn't the standard Expo setup flow either, since this project never installs the
-  `expo` meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every future `expo-modules-core` package with zero further native changes.
+  `expo-device`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every future `expo-modules-core` package with zero further
+  native changes.
 </Aside>
 
 `expo-device` needs no runtime permission on either platform — every constant and function here
@@ -50,8 +53,8 @@ reads plain system/build information, nothing gated by a permission prompt.
 
 ## Usage
 
-All four adapters — React, Vue, Angular, Svelte — re-export the exact same constants and free
-functions; there is no per-adapter hook/composable/service to reach for, since nothing here
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same constants and
+free functions; there is no per-adapter hook/composable/service to reach for, since nothing here
 holds live state or a subscription.
 
 <Tabs syncKey="framework">
@@ -91,6 +94,7 @@ holds live state or a subscription.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -128,6 +132,7 @@ holds live state or a subscription.
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -178,6 +183,7 @@ holds live state or a subscription.
 
     There's no per-instance service to `inject()` here — every constant/function is a plain
     export off the core package, read straight in the constructor or class-field initializer.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -215,6 +221,52 @@ holds live state or a subscription.
 
     There's no per-instance rune to reach for here either — every constant/function is a plain
     export off the core package, read straight in the script block or an `$effect`.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal, onMount } from 'solid-js';
+    import { Text, View } from '@symbiote-native/solid';
+    import {
+      brand,
+      deviceName,
+      getMaxMemoryAsync,
+      getUptimeAsync,
+      isDevice,
+      modelName,
+      osName,
+      osVersion,
+    } from '@symbiote-native/device/solid';
+
+    export default function DeviceInfo() {
+      const [uptime, setUptime] = createSignal<number | null>(null);
+      const [maxMemory, setMaxMemory] = createSignal<number | null>(null);
+
+      onMount(() => {
+        getUptimeAsync().then(setUptime);
+        getMaxMemoryAsync().then(setMaxMemory);
+      });
+
+      return (
+        <View>
+          <Text>{isDevice ? 'Real device' : 'Simulator/emulator'}</Text>
+          <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
+          <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
+          <Text>{deviceName ?? 'unnamed device'}</Text>
+          <Text>{uptime() === null ? 'checking uptime…' : `Uptime: ${uptime()}ms`}</Text>
+          <Text>
+            {maxMemory() === null ? 'checking memory…' : `Max memory: ${maxMemory()} bytes`}
+          </Text>
+        </View>
+      );
+    }
+    ```
+
+    The constants (`isDevice`, `brand`, `modelName`, `osName`, `osVersion`, `deviceName`) are read
+    once at import time and need no signal - only the two async calls do. There's no per-instance
+    primitive to reach for here either - every constant/function is a plain export off the core
+    package.
+
   </TabItem>
 </Tabs>
 
@@ -224,61 +276,65 @@ holds live state or a subscription.
 
 Resolved once, eagerly, at import time, straight off the native module:
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `isDevice` | `boolean` | `true` on a real device, `false` in a simulator/emulator (always `true` on web) |
-| `brand` | `string \| null` | The consumer-visible brand of the hardware, e.g. `"google"`, `"Apple"` |
-| `manufacturer` | `string \| null` | The actual device manufacturer, which may differ from `brand` |
-| `modelId` | `string \| null` | Internal model identifier, e.g. `"iPhone7,2"`. `@platform ios` |
-| `modelName` | `string \| null` | Human-friendly model name, e.g. `"Pixel 2"`, `"iPhone XS Max"` |
-| `designName` | `string \| null` | The industrial design name/code name of the device. `@platform android` |
-| `productName` | `string \| null` | The device's overall product name. `@platform android` |
-| `deviceType` | `DeviceType \| null` | `UNKNOWN`/`PHONE`/`TABLET`/`DESKTOP`/`TV`, determined from screen size on Android |
-| `deviceYearClass` | `number \| null` | The [device year class](https://github.com/facebook/device-year-class) of the hardware |
-| `totalMemory` | `number \| null` | Total memory accessible to the kernel, in bytes |
-| `supportedCpuArchitectures` | `string[] \| null` | Supported processor architecture versions the device expects binaries to target |
-| `osName` | `string \| null` | The OS name, e.g. `"Android"`, `"iOS"`, `"iPadOS"` |
-| `osVersion` | `string \| null` | Human-readable OS version string, e.g. `"12.3.1"` |
-| `osBuildId` | `string \| null` | Build ID that more precisely identifies the OS version |
-| `osInternalBuildId` | `string \| null` | Internal build ID of the OS |
-| `osBuildFingerprint` | `string \| null` | Full build fingerprint string. `@platform android` |
-| `platformApiLevel` | `number \| null` | The Android SDK version currently running. `@platform android` |
-| `deviceName` | `string \| null` | Human-readable device name, may be user-set |
+| Field                       | Type                 | Description                                                                            |
+| --------------------------- | -------------------- | -------------------------------------------------------------------------------------- |
+| `isDevice`                  | `boolean`            | `true` on a real device, `false` in a simulator/emulator (always `true` on web)        |
+| `brand`                     | `string \| null`     | The consumer-visible brand of the hardware, e.g. `"google"`, `"Apple"`                 |
+| `manufacturer`              | `string \| null`     | The actual device manufacturer, which may differ from `brand`                          |
+| `modelId`                   | `string \| null`     | Internal model identifier, e.g. `"iPhone7,2"`. `@platform ios`                         |
+| `modelName`                 | `string \| null`     | Human-friendly model name, e.g. `"Pixel 2"`, `"iPhone XS Max"`                         |
+| `designName`                | `string \| null`     | The industrial design name/code name of the device. `@platform android`                |
+| `productName`               | `string \| null`     | The device's overall product name. `@platform android`                                 |
+| `deviceType`                | `DeviceType \| null` | `UNKNOWN`/`PHONE`/`TABLET`/`DESKTOP`/`TV`, determined from screen size on Android      |
+| `deviceYearClass`           | `number \| null`     | The [device year class](https://github.com/facebook/device-year-class) of the hardware |
+| `totalMemory`               | `number \| null`     | Total memory accessible to the kernel, in bytes                                        |
+| `supportedCpuArchitectures` | `string[] \| null`   | Supported processor architecture versions the device expects binaries to target        |
+| `osName`                    | `string \| null`     | The OS name, e.g. `"Android"`, `"iOS"`, `"iPadOS"`                                     |
+| `osVersion`                 | `string \| null`     | Human-readable OS version string, e.g. `"12.3.1"`                                      |
+| `osBuildId`                 | `string \| null`     | Build ID that more precisely identifies the OS version                                 |
+| `osInternalBuildId`         | `string \| null`     | Internal build ID of the OS                                                            |
+| `osBuildFingerprint`        | `string \| null`     | Full build fingerprint string. `@platform android`                                     |
+| `platformApiLevel`          | `number \| null`     | The Android SDK version currently running. `@platform android`                         |
+| `deviceName`                | `string \| null`     | Human-readable device name, may be user-set                                            |
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `getDeviceTypeAsync(): Promise<DeviceType>` | Same value as the `deviceType` constant, fetched fresh |
-| `getUptimeAsync(): Promise<number>` | Milliseconds since the device's last reboot (Android doesn't count deep-sleep time) |
-| `getMaxMemoryAsync(): Promise<number>` | Maximum memory the Java VM will use, in bytes; the native `-1` "no limit" sentinel is normalized to `Number.MAX_SAFE_INTEGER`. `@platform android` |
-| `isRootedExperimentalAsync(): Promise<boolean>` | Best-effort root (Android) / jailbreak (iOS) check — bypasses exist on both platforms, so `false` is not a guarantee |
-| `isSideLoadingEnabledAsync(): Promise<boolean>` | Whether apps can be installed via `ACTION_INSTALL_PACKAGE` outside the system app store. `@platform android` |
-| `getPlatformFeaturesAsync(): Promise<string[]>` | Platform-specific feature strings the system reports; resolves `[]` on iOS/web instead of throwing. `@platform android` |
-| `hasPlatformFeatureAsync(feature: string): Promise<boolean>` | Whether a specific system feature string is present; resolves `false` on iOS/web instead of throwing. `@platform android` |
+| Signature                                                    | Description                                                                                                                                        |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getDeviceTypeAsync(): Promise<DeviceType>`                  | Same value as the `deviceType` constant, fetched fresh                                                                                             |
+| `getUptimeAsync(): Promise<number>`                          | Milliseconds since the device's last reboot (Android doesn't count deep-sleep time)                                                                |
+| `getMaxMemoryAsync(): Promise<number>`                       | Maximum memory the Java VM will use, in bytes; the native `-1` "no limit" sentinel is normalized to `Number.MAX_SAFE_INTEGER`. `@platform android` |
+| `isRootedExperimentalAsync(): Promise<boolean>`              | Best-effort root (Android) / jailbreak (iOS) check — bypasses exist on both platforms, so `false` is not a guarantee                               |
+| `isSideLoadingEnabledAsync(): Promise<boolean>`              | Whether apps can be installed via `ACTION_INSTALL_PACKAGE` outside the system app store. `@platform android`                                       |
+| `getPlatformFeaturesAsync(): Promise<string[]>`              | Platform-specific feature strings the system reports; resolves `[]` on iOS/web instead of throwing. `@platform android`                            |
+| `hasPlatformFeatureAsync(feature: string): Promise<boolean>` | Whether a specific system feature string is present; resolves `false` on iOS/web instead of throwing. `@platform android`                          |
 
 ### `DeviceType`
 
-| Field | Value | Description |
-| --- | --- | --- |
-| `UNKNOWN` | `0` | An unrecognized device type |
-| `PHONE` | `1` | Mobile phone handsets |
-| `TABLET` | `2` | Tablet computers |
-| `DESKTOP` | `3` | Desktop or laptop computers |
-| `TV` | `4` | TV-based interfaces |
+| Field     | Value | Description                 |
+| --------- | ----- | --------------------------- |
+| `UNKNOWN` | `0`   | An unrecognized device type |
+| `PHONE`   | `1`   | Mobile phone handsets       |
+| `TABLET`  | `2`   | Tablet computers            |
+| `DESKTOP` | `3`   | Desktop or laptop computers |
+| `TV`      | `4`   | TV-based interfaces         |
 
 ## Notes
 
-<Aside type="note" title="Every function except the platform-feature pair throws when unavailable">
-  Every function above throws `UnavailabilityError` when its native method is missing, **except**
-  `getPlatformFeaturesAsync`/`hasPlatformFeatureAsync`, which resolve to `[]`/`false` instead — a
-  platform-feature query on a platform with no such concept (iOS) is a normal "no" answer, not an
-  error, matching upstream's own behavior.
+<Aside
+  type="note"
+  title="Every function except the platform-feature pair throws when unavailable"
+>
+  Every function above throws `UnavailabilityError` when its native method is
+  missing, **except** `getPlatformFeaturesAsync`/`hasPlatformFeatureAsync`,
+  which resolve to `[]`/`false` instead — a platform-feature query on a platform
+  with no such concept (iOS) is a normal "no" answer, not an error, matching
+  upstream's own behavior.
 </Aside>
 
 ## How the wrapper works
 
-`@symbiote-native/device` ships zero React/Vue/Angular logic in `expo-device` itself — its
+`@symbiote-native/device` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-device` itself — its
 constants and functions are hand-ported, verbatim, into this package's own `core/`, resolving the
 native module through `expo-modules-core`'s `requireNativeModule` rather than the `expo`
 meta-package this project never installs:
@@ -290,10 +346,11 @@ packages/device/src/
 ├── react/    # @symbiote-native/device/react   — export * from '../core'
 ├── vue/      # @symbiote-native/device/vue     — export * from '../core'
 ├── svelte/   # @symbiote-native/device/svelte  — export * from '../core'
+├── solid/    # @symbiote-native/device/solid   — export * from '../core'
 └── angular/  # @symbiote-native/device/angular — export * from '../core'
 ```
 
-Same shape as [local auth](/docs/packages/local-auth/)'s three adapter entries: single-file
+Same shape as [local auth](/docs/packages/local-auth/)'s five adapter entries: single-file
 re-exports with no lifecycle code at all, since every export here is either an eagerly-resolved
 constant or a stateless one-shot call — there is nothing for a hook, composable, or service to
 subscribe to or clean up. The native code itself is never vendored or copied —

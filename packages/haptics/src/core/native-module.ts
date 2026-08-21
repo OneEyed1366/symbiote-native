@@ -1,5 +1,9 @@
 import { requireNativeModule } from 'expo-modules-core';
-import type { AndroidHaptics, ImpactFeedbackStyle, NotificationFeedbackType } from './types';
+import type {
+  AndroidHaptics,
+  ImpactFeedbackStyle,
+  NotificationFeedbackType,
+} from './types';
 
 const EXPO_HAPTICS_MODULE_NAME = 'ExpoHaptics';
 
@@ -17,4 +21,6 @@ export type INativeHapticsModule = {
   performHapticsAsync?(type: AndroidHaptics): Promise<void>;
 };
 
-export const expoHaptics = requireNativeModule<INativeHapticsModule>(EXPO_HAPTICS_MODULE_NAME);
+export const expoHaptics = requireNativeModule<INativeHapticsModule>(
+  EXPO_HAPTICS_MODULE_NAME,
+);

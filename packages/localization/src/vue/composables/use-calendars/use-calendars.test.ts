@@ -9,7 +9,11 @@ import { defineComponent, h, type Ref } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installFabric } from '@symbiote-native/test-utils';
-import { CalendarIdentifier, Weekday, type Calendar } from '../../../core/types';
+import {
+  CalendarIdentifier,
+  Weekday,
+  type Calendar,
+} from '../../../core/types';
 import { useCalendars } from './index';
 
 const ROOT_TAG = 9955;

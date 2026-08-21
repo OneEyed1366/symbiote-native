@@ -21,7 +21,11 @@ tag only exists after the first commit, so read it from an `$effect`:
 
 ```svelte
 <script lang="ts">
-  import { findNodeHandle, hostInstance, type ShimElement } from '@symbiote-native/svelte';
+  import {
+    findNodeHandle,
+    hostInstance,
+    type ShimElement,
+  } from '@symbiote-native/svelte';
 
   let box = $state.raw<ShimElement | null>(null);
   let tag = $state<number | null>(null);
@@ -40,9 +44,7 @@ tag only exists after the first commit, so read it from an `$effect`:
   }
 </script>
 
-<symbiote-view p={{ testID: 'ref-box' }} bind:this={box}>
-  ...
-</symbiote-view>
+<symbiote-view p={{ testID: 'ref-box' }} bind:this={box}> ... </symbiote-view>
 ```
 
 Source: `examples/svelte/components/RefApiDemo.svelte` — the port of React's
@@ -60,7 +62,7 @@ surface before reaching for the raw host tag.
 The Svelte compiler rejects `use:`/`transition:`/`class:`/`style:` on a
 **component** ("This type of directive is not valid on components"), and app
 code here never authors a host element by hand for an ordinary component.
-`{@attach fn}` is the one directive-shaped construct that *does* compile on a
+`{@attach fn}` is the one directive-shaped construct that _does_ compile on a
 component: it lands as a prop keyed by a real JS `Symbol`
 (`createAttachmentKey()`), which rides through `$props()`/`...rest` untouched
 — `routeProp` only ever walks string keys — and every Symbiote component that
@@ -126,7 +128,7 @@ round-trips this exact shape end to end against a real compiled component.
 `@symbiote-native/navigation`'s stack renders react-native-screens' native
 views (`RNSScreen`, `RNSScreenStackHeaderConfig`, `RNSSearchBar`, …) through
 `<svelte:element this={'RNSScreen'}>`, because a literal `<RNSScreen>` in a
-template would parse as a component reference, not an element. A *dynamic*
+template would parse as a component reference, not an element. A _dynamic_
 tag compiles through Svelte's generic `setAttribute` codegen instead of the
 custom-element `p=` property-set path, so `p={bag}` as a plain attribute
 silently does nothing there. An attachment sidesteps that path entirely by
@@ -134,7 +136,9 @@ assigning the property from plain JS:
 
 ```ts
 // packages/navigation/src/svelte/attachments.ts
-export function hostProps(props: Record<string, unknown>): (node: unknown) => void {
+export function hostProps(
+  props: Record<string, unknown>,
+): (node: unknown) => void {
   return node => {
     if (!isShimElement(node)) return;
     node.p = props;
@@ -143,20 +147,20 @@ export function hostProps(props: Record<string, unknown>): (node: unknown) => vo
 ```
 
 ```svelte
-<svelte:element this={'RNSScreen'} {@attach hostProps(plan.screenProps)}>
+<svelte:element this={"RNSScreen"} {@attach hostProps(plan.screenProps)}>
   ...
 </svelte:element>
 ```
 
 ## Which one?
 
-| You have… | Use |
-| --- | --- |
-| A raw `symbiote-view`/`symbiote-text` tag you wrote yourself | `bind:this` + `hostInstance()`/`findNodeHandle()` |
-| A component with its own exported imperative functions (`ScrollView.scrollTo`, …) | that component's own `bind:this` |
-| An ordinary Symbiote component (`View`, `Pressable`, …) and you just need the node | `{@attach}` |
-| A third-party Svelte action | `{@attach fromAction(action, () => arg)}` |
-| A `<svelte:element>` native leaf (a capitalized, un-hyphenated native view name) | `{@attach}` setting `node.p` |
+| You have…                                                                          | Use                                               |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------- |
+| A raw `symbiote-view`/`symbiote-text` tag you wrote yourself                       | `bind:this` + `hostInstance()`/`findNodeHandle()` |
+| A component with its own exported imperative functions (`ScrollView.scrollTo`, …)  | that component's own `bind:this`                  |
+| An ordinary Symbiote component (`View`, `Pressable`, …) and you just need the node | `{@attach}`                                       |
+| A third-party Svelte action                                                        | `{@attach fromAction(action, () => arg)}`         |
+| A `<svelte:element>` native leaf (a capitalized, un-hyphenated native view name)   | `{@attach}` setting `node.p`                      |
 
 <Aside type="caution" title="Symbol keys don't survive every forwarding shape">
   `{@attach}` reaches the host node only through components that spread

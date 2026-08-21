@@ -87,12 +87,16 @@ interface INativeDialogManagerAndroid {
 
 function readDialogConstants(raw: unknown): IAndroidDialogConstants {
   if (!isRecord(raw)) {
-    dlog('Alert: DialogManagerAndroid.getConstants() returned a non-object — using defaults');
+    dlog(
+      'Alert: DialogManagerAndroid.getConstants() returned a non-object — using defaults',
+    );
     return ANDROID_DIALOG_CONSTANTS;
   }
   const action = (key: 'buttonClicked' | 'dismissed'): string =>
     typeof raw[key] === 'string' ? raw[key] : ANDROID_DIALOG_CONSTANTS[key];
-  const buttonKey = (key: 'buttonPositive' | 'buttonNegative' | 'buttonNeutral'): number =>
+  const buttonKey = (
+    key: 'buttonPositive' | 'buttonNegative' | 'buttonNeutral',
+  ): number =>
     typeof raw[key] === 'number' ? raw[key] : ANDROID_DIALOG_CONSTANTS[key];
   return {
     buttonClicked: action('buttonClicked'),
@@ -109,10 +113,16 @@ export const Alert: IAlertStatic & { prompt: () => void } = {
   // The Android dialog path. RN keeps at most three buttons and maps them, last-to-first,
   // onto positive/negative/neutral; onAction reads the native button-key constant back and
   // fires that button's onPress. Non-throwing: no module -> no-op.
-  alert(title?: string, message?: string, buttons?: IAlertButtons, options?: IAlertOptions): void {
+  alert(
+    title?: string,
+    message?: string,
+    buttons?: IAlertButtons,
+    options?: IAlertOptions,
+  ): void {
     dlog('Alert.alert (android)');
 
-    const manager = getNativeModule<INativeDialogManagerAndroid>(DIALOG_MANAGER);
+    const manager =
+      getNativeModule<INativeDialogManagerAndroid>(DIALOG_MANAGER);
     if (manager === null) {
       dlog(`Alert.alert: "${DIALOG_MANAGER}" unresolved — no-op`);
       return;

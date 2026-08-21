@@ -39,4 +39,6 @@ export type INativeDeviceModule = {
   hasPlatformFeatureAsync?(feature: string): Promise<boolean>;
 };
 
-export const expoDevice = requireNativeModule<INativeDeviceModule>(EXPO_DEVICE_MODULE_NAME);
+export const expoDevice = requireNativeModule<INativeDeviceModule>(
+  EXPO_DEVICE_MODULE_NAME,
+);

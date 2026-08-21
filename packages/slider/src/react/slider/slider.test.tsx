@@ -7,7 +7,11 @@
 
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/react';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Slider } from '.';
 
@@ -18,7 +22,12 @@ const fakeColor = (value: unknown): string => `processed(${value})`;
 
 const RNC_SLIDER_VIEW_CONFIG = {
   bubblingEventTypes: {
-    topChange: { phasedRegistrationNames: { bubbled: 'onChange', captured: 'onChangeCapture' } },
+    topChange: {
+      phasedRegistrationNames: {
+        bubbled: 'onChange',
+        captured: 'onChangeCapture',
+      },
+    },
     topRNCSliderValueChange: {
       phasedRegistrationNames: {
         bubbled: 'onRNCSliderValueChange',
@@ -28,8 +37,12 @@ const RNC_SLIDER_VIEW_CONFIG = {
   },
   directEventTypes: {
     topRNCSliderSlidingStart: { registrationName: 'onRNCSliderSlidingStart' },
-    topRNCSliderSlidingComplete: { registrationName: 'onRNCSliderSlidingComplete' },
-    topRNCSliderAccessibilityAction: { registrationName: 'onRNCSliderAccessibilityAction' },
+    topRNCSliderSlidingComplete: {
+      registrationName: 'onRNCSliderSlidingComplete',
+    },
+    topRNCSliderAccessibilityAction: {
+      registrationName: 'onRNCSliderAccessibilityAction',
+    },
   },
   validAttributes: {
     value: true,
@@ -47,12 +60,15 @@ const RNC_SLIDER_VIEW_CONFIG = {
 };
 
 const fabric = installFabric();
-setNativeViewConfigSource(name => (name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined));
+setNativeViewConfigSource(name =>
+  name === SLIDER_VIEW ? RNC_SLIDER_VIEW_CONFIG : undefined,
+);
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function findInTree(
   predicate: (node: IFakeNode) => boolean,
@@ -80,7 +96,9 @@ function currentSliderNode(): IFakeNode {
 
 function sliderWrapperNode(): IFakeNode {
   const node = findInTree(
-    n => n.viewName === 'RCTView' && n.children.some(child => child.viewName === SLIDER_VIEW),
+    n =>
+      n.viewName === 'RCTView' &&
+      n.children.some(child => child.viewName === SLIDER_VIEW),
   );
   if (!node) throw new Error('no committed Slider wrapper exists');
   return node;
@@ -96,7 +114,12 @@ describe('React Slider wrapper', () => {
       // being nested rather than mounted at the root.
       mount(
         ROOT_TAG,
-        createElement(Slider, { value: 0.5, minimumValue: 0, maximumValue: 1, step: 0.1 }),
+        createElement(Slider, {
+          value: 0.5,
+          minimumValue: 0,
+          maximumValue: 1,
+          step: 0.1,
+        }),
       );
       const props = sliderNode().props;
       expect(props.value).toBe(0.5);
@@ -124,7 +147,10 @@ describe('React Slider wrapper', () => {
       // why: resolveSliderLowerLimit/UpperLimit only fall back to the sentinels when the caller
       // gave nothing — an explicit limit must reach the native node untouched, not get
       // overwritten by the default.
-      mount(ROOT_TAG, createElement(Slider, { value: 0.5, lowerLimit: 0.2, upperLimit: 0.8 }));
+      mount(
+        ROOT_TAG,
+        createElement(Slider, { value: 0.5, lowerLimit: 0.2, upperLimit: 0.8 }),
+      );
       const props = sliderNode().props;
       expect(props.lowerLimit).toBe(0.2);
       expect(props.upperLimit).toBe(0.8);
@@ -170,12 +196,17 @@ describe('React Slider wrapper', () => {
       let changed: number | undefined;
       mount(
         ROOT_TAG,
-        createElement(Slider, { value: 0.2, onValueChange: (v: number) => (changed = v) }),
+        createElement(Slider, {
+          value: 0.2,
+          onValueChange: (v: number) => (changed = v),
+        }),
       );
       const node = sliderNode();
       fabric.fireEvent(node.instanceHandle, 'topChange', { value: 0.7 });
       expect(changed).toBe(0.7);
-      fabric.fireEvent(node.instanceHandle, 'topRNCSliderValueChange', { value: 0.42 });
+      fabric.fireEvent(node.instanceHandle, 'topRNCSliderValueChange', {
+        value: 0.42,
+      });
       expect(changed).toBe(0.42);
     });
 
@@ -191,8 +222,12 @@ describe('React Slider wrapper', () => {
         }),
       );
       const node = sliderNode();
-      fabric.fireEvent(node.instanceHandle, 'topRNCSliderSlidingStart', { value: 0.1 });
-      fabric.fireEvent(node.instanceHandle, 'topRNCSliderSlidingComplete', { value: 0.9 });
+      fabric.fireEvent(node.instanceHandle, 'topRNCSliderSlidingStart', {
+        value: 0.1,
+      });
+      fabric.fireEvent(node.instanceHandle, 'topRNCSliderSlidingComplete', {
+        value: 0.9,
+      });
       expect(startedAt).toBe(0.1);
       expect(completedAt).toBe(0.9);
     });
@@ -200,7 +235,10 @@ describe('React Slider wrapper', () => {
     it('resolves disabled from accessibilityState when no explicit boolean', () => {
       mount(
         ROOT_TAG,
-        createElement(Slider, { value: 0.2, accessibilityState: { disabled: true } }),
+        createElement(Slider, {
+          value: 0.2,
+          accessibilityState: { disabled: true },
+        }),
       );
       expect(sliderNode().props.disabled).toBe(true);
     });
@@ -218,7 +256,9 @@ describe('React Slider wrapper', () => {
         }),
       );
       expect(sliderNode().props.disabled).toBe(false);
-      expect(sliderNode().props.accessibilityState).toEqual({ disabled: false });
+      expect(sliderNode().props.accessibilityState).toEqual({
+        disabled: false,
+      });
     });
 
     it('renders the step indicator when renderStepNumber is set', () => {
@@ -232,7 +272,9 @@ describe('React Slider wrapper', () => {
           renderStepNumber: true,
         }),
       );
-      expect(fabric.find(n => n.props.testID === 'StepsIndicator-Container')).toBeDefined();
+      expect(
+        fabric.find(n => n.props.testID === 'StepsIndicator-Container'),
+      ).toBeDefined();
     });
 
     it('renders a custom StepMarker overlay per step instead of the default indicator', () => {
@@ -247,12 +289,22 @@ describe('React Slider wrapper', () => {
           maximumValue: 1,
           step: 0.5,
           StepMarker: ({ index }: { index: number }) =>
-            createElement('symbiote-text', { testID: `custom-marker-${index}` }, String(index)),
+            createElement(
+              'symbiote-text',
+              { testID: `custom-marker-${index}` },
+              String(index),
+            ),
         }),
       );
-      expect(fabric.find(n => n.props.testID === 'StepsIndicator-Container')).toBeDefined();
-      expect(fabric.find(n => n.props.testID === 'custom-marker-0')).toBeDefined();
-      expect(fabric.find(n => n.props.testID === 'custom-marker-2')).toBeDefined();
+      expect(
+        fabric.find(n => n.props.testID === 'StepsIndicator-Container'),
+      ).toBeDefined();
+      expect(
+        fabric.find(n => n.props.testID === 'custom-marker-0'),
+      ).toBeDefined();
+      expect(
+        fabric.find(n => n.props.testID === 'custom-marker-2'),
+      ).toBeDefined();
     });
 
     it('marks the step matching the current value as stepMarked in the custom overlay', () => {
@@ -267,7 +319,13 @@ describe('React Slider wrapper', () => {
           minimumValue: 0,
           maximumValue: 1,
           step: 0.5,
-          StepMarker: ({ index, stepMarked }: { index: number; stepMarked: boolean }) => {
+          StepMarker: ({
+            index,
+            stepMarked,
+          }: {
+            index: number;
+            stepMarked: boolean;
+          }) => {
             if (stepMarked) markedIndex = index;
             return createElement('symbiote-view');
           },
@@ -299,7 +357,10 @@ describe('React Slider wrapper', () => {
     });
 
     it('does NOT leak the JS onValueChange callback to the native node as a prop', () => {
-      mount(ROOT_TAG, createElement(Slider, { value: 0.2, onValueChange: () => undefined }));
+      mount(
+        ROOT_TAG,
+        createElement(Slider, { value: 0.2, onValueChange: () => undefined }),
+      );
       expect(typeof sliderNode().props.onValueChange).not.toBe('function');
     });
   });

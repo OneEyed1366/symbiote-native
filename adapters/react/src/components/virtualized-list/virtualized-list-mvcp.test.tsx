@@ -38,7 +38,12 @@
 
 import { createElement, createRef, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FlatList, mount, unmount, type IFlatListHandle } from '@symbiote-native/react';
+import {
+  FlatList,
+  mount,
+  unmount,
+  type IFlatListHandle,
+} from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 interface ICommandCall {
@@ -53,8 +58,12 @@ interface IScrollToIndexFailure {
 }
 
 const ROOT_TAG = 41;
-const MVCP_DATA = Array.from({ length: 20 }, (_unused, index) => ({ id: index }));
-const FAIL_DATA = Array.from({ length: 100 }, (_unused, index) => ({ id: index }));
+const MVCP_DATA = Array.from({ length: 20 }, (_unused, index) => ({
+  id: index,
+}));
+const FAIL_DATA = Array.from({ length: 100 }, (_unused, index) => ({
+  id: index,
+}));
 
 const listRef = createRef<IFlatListHandle>();
 const failures: IScrollToIndexFailure[] = [];
@@ -93,8 +102,12 @@ function MvcpApp(): ReactElement {
     keyExtractor: item => `k-${item.id}`,
     // A header occupies child 0, so RN bumps minIndexForVisible by 1 (1 -> 2).
     ListHeaderComponent: () => createElement('symbiote-text', {}, 'header'),
-    maintainVisibleContentPosition: { minIndexForVisible: 1, autoscrollToTopThreshold: 10 },
-    renderItem: ({ item }) => createElement('symbiote-text', {}, `row-${item.id}`),
+    maintainVisibleContentPosition: {
+      minIndexForVisible: 1,
+      autoscrollToTopThreshold: 10,
+    },
+    renderItem: ({ item }) =>
+      createElement('symbiote-text', {}, `row-${item.id}`),
   });
 }
 
@@ -104,7 +117,8 @@ function FailPathApp(): ReactElement {
     keyExtractor: item => `k-${item.id}`,
     // No getItemLayout: cells are unmeasured in headless (no real onLayout), so a far
     // target has no resolvable offset.
-    renderItem: ({ item }) => createElement('symbiote-text', {}, `row-${item.id}`),
+    renderItem: ({ item }) =>
+      createElement('symbiote-text', {}, `row-${item.id}`),
     onScrollToIndexFailed: info => failures.push(info),
     ref: listRef,
   });
@@ -116,10 +130,15 @@ describe('VirtualizedList MVCP forwarding and scrollToIndex failure path (Positi
   // one row too early (the header instead of the caller's intended first data row).
   it('forwards maintainVisibleContentPosition to the scroll view, bumping minIndexForVisible for the header', () => {
     mount(ROOT_TAG, <MvcpApp />);
-    expect(fabric.committed.length, 'MVCP FlatList committed').toBeGreaterThan(0);
+    expect(fabric.committed.length, 'MVCP FlatList committed').toBeGreaterThan(
+      0,
+    );
 
     const scrollView = findScrollView(fabric.committed);
-    expect(scrollView, 'scroll view node found in committed tree').toBeDefined();
+    expect(
+      scrollView,
+      'scroll view node found in committed tree',
+    ).toBeDefined();
 
     const mvcp = scrollView!.props.maintainVisibleContentPosition;
     expect(typeof mvcp).toBe('object');
@@ -128,7 +147,9 @@ describe('VirtualizedList MVCP forwarding and scrollToIndex failure path (Positi
     const minIndex = Reflect.get(Object(mvcp), 'minIndexForVisible');
     const autoscroll = Reflect.get(Object(mvcp), 'autoscrollToTopThreshold');
     expect(minIndex, 'minIndexForVisible bumped 1->2 for the header').toBe(2);
-    expect(autoscroll, 'autoscrollToTopThreshold passes through as 10').toBe(10);
+    expect(autoscroll, 'autoscrollToTopThreshold passes through as 10').toBe(
+      10,
+    );
   });
 
   // why: scrolling to a far, never-rendered index with no getItemLayout has no real offset to
@@ -136,7 +157,10 @@ describe('VirtualizedList MVCP forwarding and scrollToIndex failure path (Positi
   // instead of silently jumping to a guessed offset, which would land the user somewhere wrong.
   it('fires onScrollToIndexFailed for an unmeasured cell and dispatches no scrollTo', () => {
     mount(ROOT_TAG, <FailPathApp />);
-    expect(fabric.committed.length, 'fail-path FlatList committed').toBeGreaterThan(0);
+    expect(
+      fabric.committed.length,
+      'fail-path FlatList committed',
+    ).toBeGreaterThan(0);
     expect(listRef.current, 'fail-path FlatList ref attached').not.toBeNull();
 
     const scrollsBefore = commands.filter(c => c.name === 'scrollTo').length;

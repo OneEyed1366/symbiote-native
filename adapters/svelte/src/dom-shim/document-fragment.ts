@@ -16,7 +16,8 @@ export class ShimDocumentFragment extends ShimNode {
   override cloneNode(deep?: boolean): ShimDocumentFragment {
     const clone = new ShimDocumentFragment();
     if (deep === true) {
-      for (const child of this.children) clone.appendChild(child.cloneNode(true));
+      for (const child of this.children)
+        clone.appendChild(child.cloneNode(true));
     }
     return clone;
   }

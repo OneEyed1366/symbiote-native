@@ -6,14 +6,11 @@
   logs `commit … incremental` ~60×/run), the native one offloads it. Each dot keeps
   its own Animated.Value so a JS run and a native run never touch the same node.
 
-  Animated.View is dotted, so it can't be a template tag — aliased to <AnimatedView>.
 -->
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, type Ref } from 'vue';
 import { View, Text, Animated } from '@symbiote-native/vue';
 import ActionButton from './ActionButton.vue';
-
-const AnimatedView = Animated.View;
 
 const SLIDE_DISTANCE = 220;
 
@@ -89,7 +86,7 @@ const freezeJs = (): void => {
 
     <!-- native-driven perpetual pulse -->
     <View class="pulse-frame">
-      <AnimatedView
+      <Animated.View
         testID="pulse-dot"
         class="pulse-dot"
         :style="{ opacity: pulseOpacity, transform: [{ scale: pulseScale }] }"
@@ -98,7 +95,7 @@ const freezeJs = (): void => {
 
     <!-- JS-driven slide: a commit per frame -->
     <View class="slide-track">
-      <AnimatedView
+      <Animated.View
         testID="slide-js-dot"
         class="js-slide-dot"
         :style="{ transform: [{ translateX: jsX }] }"
@@ -113,7 +110,7 @@ const freezeJs = (): void => {
 
     <!-- native-driven slide: offloaded, zero JS frames -->
     <View class="slide-track">
-      <AnimatedView
+      <Animated.View
         testID="slide-native-dot"
         class="native-slide-dot"
         :style="{ transform: [{ translateX: nativeX }] }"

@@ -5,9 +5,19 @@
 // Tab needs no react-native-screens ViewConfig at all (pure-JS UI).
 
 import '@angular/compiler';
-import { Component, CUSTOM_ELEMENTS_SCHEMA, ViewChild, signal, type Signal } from '@angular/core';
+import {
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  ViewChild,
+  signal,
+  type Signal,
+} from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, unmount, registerComposedComponent } from '@symbiote-native/angular';
+import {
+  mount,
+  unmount,
+  registerComposedComponent,
+} from '@symbiote-native/angular';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Tab } from './index';
 import type { ITabNavigatorHandle } from './index';
@@ -17,7 +27,8 @@ import { injectRoute } from '../injectors/inject-route';
 import type { IRoute } from '../../core';
 
 const ROOT_TAG = 5121;
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 const fabric = installFabric();
 // On a real Metro build, adapters/angular's babel-register-composed.cjs auto-registers `Tab`
@@ -53,7 +64,8 @@ let capturedProfileInstance: ProfileScreenComponent | undefined;
   selector: 'feed-screen',
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: `<symbiote-text>feed</symbiote-text><symbiote-text>{{ paramsLabel() }}</symbiote-text>`,
+  template: `<symbiote-text>feed</symbiote-text
+    ><symbiote-text>{{ paramsLabel() }}</symbiote-text>`,
 })
 class FeedScreenComponent {
   // Real screens (e.g. examples/angular's TabHomeScreen) call injectIsFocused() - see the
@@ -227,9 +239,13 @@ describe('Angular Tab navigator', () => {
     // item selected, matching which screen is actually mounted.
     it("mounts only the initial route's content and marks it focused in the tab bar", async () => {
       await mountTab();
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'feed')).toBeDefined();
       expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'profile'),
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'feed'),
+      ).toBeDefined();
+      expect(
+        findInTree(
+          n => n.viewName === 'RCTRawText' && n.props.text === 'profile',
+        ),
       ).toBeUndefined();
       const items = tabItemNodes();
       expect(items).toHaveLength(2);
@@ -246,7 +262,9 @@ describe('Angular Tab navigator', () => {
       handle.jumpTo('Profile');
       await tick();
       expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'profile'),
+        findInTree(
+          n => n.viewName === 'RCTRawText' && n.props.text === 'profile',
+        ),
       ).toBeDefined();
       expect(
         findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'feed'),
@@ -263,10 +281,16 @@ describe('Angular Tab navigator', () => {
       await mountTab();
       const items = tabItemNodes();
       // Feed: no tabBarLabel, falls back to title 'Feed'; badge '3' painted as a child text.
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'Feed')).toBeDefined();
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === '3')).toBeDefined();
+      expect(
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'Feed'),
+      ).toBeDefined();
+      expect(
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === '3'),
+      ).toBeDefined();
       // Profile: explicit tabBarLabel 'Me' wins over the route name.
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'Me')).toBeDefined();
+      expect(
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'Me'),
+      ).toBeDefined();
       expect(items).toHaveLength(2);
     });
 
@@ -288,11 +312,17 @@ describe('Angular Tab navigator', () => {
         locationY: 0,
         timestamp: Date.now(),
       };
-      fabric.fireEvent(profileItem.instanceHandle, 'topTouchStart', nativeEvent);
+      fabric.fireEvent(
+        profileItem.instanceHandle,
+        'topTouchStart',
+        nativeEvent,
+      );
       fabric.fireEvent(profileItem.instanceHandle, 'topTouchEnd', nativeEvent);
       await tick();
       expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'profile'),
+        findInTree(
+          n => n.viewName === 'RCTRawText' && n.props.text === 'profile',
+        ),
       ).toBeDefined();
     });
 
@@ -357,7 +387,8 @@ describe('Angular Tab navigator', () => {
       const handle = await mountTab();
       await tick();
       const key = capturedFeedInstance?.route().key;
-      if (key === undefined) throw new Error('Feed route never registered a key');
+      if (key === undefined)
+        throw new Error('Feed route never registered a key');
       handle.setParams({ query: 'cats' }, key);
       await tick();
       expect(capturedFeedInstance?.paramsLabel()).toBe('{"query":"cats"}');
@@ -372,9 +403,13 @@ describe('Angular Tab navigator', () => {
       const handle = await mountTab();
       handle.jumpTo('does-not-exist');
       await tick();
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'feed')).toBeDefined();
       expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'profile'),
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'feed'),
+      ).toBeDefined();
+      expect(
+        findInTree(
+          n => n.viewName === 'RCTRawText' && n.props.text === 'profile',
+        ),
       ).toBeUndefined();
       const items = tabItemNodes();
       expect(items[0].props.accessibilityState).toEqual({ selected: true });
@@ -414,7 +449,8 @@ describe('Angular Tab navigator', () => {
     it('keeps the focused route and its params when an unrelated screen unregisters', async () => {
       const host = await mountToggleTab();
       const key = capturedFeedInstance?.route().key;
-      if (key === undefined) throw new Error('Feed route never registered a key');
+      if (key === undefined)
+        throw new Error('Feed route never registered a key');
       host.nav.setParams({ query: 'cats' }, key);
       await tick();
 
@@ -423,7 +459,9 @@ describe('Angular Tab navigator', () => {
 
       expect(capturedFeedInstance?.route().key).toBe(key);
       expect(capturedFeedInstance?.paramsLabel()).toBe('{"query":"cats"}');
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'feed')).toBeDefined();
+      expect(
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'feed'),
+      ).toBeDefined();
     });
 
     // why: when the FOCUSED screen is the one that unregisters there is no route left to stay on,
@@ -434,7 +472,9 @@ describe('Angular Tab navigator', () => {
       host.nav.jumpTo('Profile');
       await tick();
       expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'profile'),
+        findInTree(
+          n => n.viewName === 'RCTRawText' && n.props.text === 'profile',
+        ),
       ).toBeDefined();
 
       host.isProfileRegistered.set(false);
@@ -442,9 +482,13 @@ describe('Angular Tab navigator', () => {
 
       expect(tabItemLabels()).toEqual(['Feed']);
       expect(
-        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'profile'),
+        findInTree(
+          n => n.viewName === 'RCTRawText' && n.props.text === 'profile',
+        ),
       ).toBeUndefined();
-      expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'feed')).toBeDefined();
+      expect(
+        findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'feed'),
+      ).toBeDefined();
     });
   });
 });

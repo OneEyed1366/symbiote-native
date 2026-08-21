@@ -9,7 +9,10 @@ import {
   type OnChanges,
 } from '@angular/core';
 import type { ControlValueAccessor } from '@angular/forms';
-import { renderSwitch, resolveAccessibilityProps } from '@symbiote-native/components';
+import {
+  renderSwitch,
+  resolveAccessibilityProps,
+} from '@symbiote-native/components';
 import type {
   ISwitchPlatform,
   ISwitchProps,
@@ -33,7 +36,10 @@ import {
   type IViewStyle,
 } from '@symbiote-native/engine';
 
-export type { ISwitchProps, ISwitchTrackColor } from '@symbiote-native/components';
+export type {
+  ISwitchProps,
+  ISwitchTrackColor,
+} from '@symbiote-native/components';
 
 export type ISwitchInputs = Pick<
   ISwitchProps,
@@ -88,7 +94,9 @@ function isSwitchEvent(event: unknown): event is ISymbioteEvent {
 // concrete subclasses are real @Components — ngc's AOT build (NG2007) requires it the moment the
 // base itself carries decorated members (@Output() here), mirroring ScrollViewBase.
 @Directive()
-export abstract class SwitchBase implements ISwitchInputs, ControlValueAccessor, OnChanges {
+export abstract class SwitchBase
+  implements ISwitchInputs, ControlValueAccessor, OnChanges
+{
   // The value/change lifecycle as real Angular events: `(valueChange)="onToggle($event)"`, not
   // `[onValueChange]="onToggle"` — mirrors Pressable's press/hover @Output() conversion. Unlike
   // Pressable's createPressHandlers, handleChange() below calls `.emit()` unconditionally: it needs
@@ -191,7 +199,10 @@ export abstract class SwitchBase implements ISwitchInputs, ControlValueAccessor,
     if (next === undefined) return;
 
     this.valueChange.emit(next);
-    this.switchState = switchReducer(this.switchState, { type: 'native-reported', value: next });
+    this.switchState = switchReducer(this.switchState, {
+      type: 'native-reported',
+      value: next,
+    });
 
     const hostNode = readSwitchNode(node);
     if (hostNode === null) return;

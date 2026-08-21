@@ -12,6 +12,7 @@ import {
   insertBefore,
   removeChild,
   routeProp,
+  setNodeHidden,
   setText,
   SymbioteSurface,
   type ISymbioteNode,
@@ -52,7 +53,11 @@ function applyProps(node: ISymbioteNode, props: IProps): void {
   }
 }
 
-function applyUpdate(node: ISymbioteNode, oldProps: IProps, newProps: IProps): void {
+function applyUpdate(
+  node: ISymbioteNode,
+  oldProps: IProps,
+  newProps: IProps,
+): void {
   for (const key of Object.keys(oldProps)) {
     if (isReservedProp(key)) continue;
     if (!Object.hasOwn(newProps, key)) routeProp(node, key, undefined);
@@ -68,7 +73,9 @@ function applyUpdate(node: ISymbioteNode, oldProps: IProps, newProps: IProps): v
 // createPortal(children, node)). Mirrors the Vue renderer's identical IHostElement union.
 type IContainer = SymbioteSurface | ISymbioteNode;
 
-function isSurfaceContainer(container: IContainer): container is SymbioteSurface {
+function isSurfaceContainer(
+  container: IContainer,
+): container is SymbioteSurface {
   return container instanceof SymbioteSurface;
 }
 
@@ -113,7 +120,9 @@ const reconciler = createReconciler<
   getRootHostContext: () => ({ isInsideText: false }),
   getChildHostContext(parentHostContext, type) {
     const isInsideText = descriptorFor(type).isText;
-    return parentHostContext.isInsideText === isInsideText ? parentHostContext : { isInsideText };
+    return parentHostContext.isInsideText === isInsideText
+      ? parentHostContext
+      : { isInsideText };
   },
   getPublicInstance: instance => toPublicInstance(instance),
 
@@ -175,8 +184,12 @@ const reconciler = createReconciler<
   resetTextContent: () => {},
   hideTextInstance: node => setText(node, ''),
   unhideTextInstance: (node, text) => setText(node, text),
-  hideInstance: () => {},
-  unhideInstance: () => {},
+  // `Activity mode="hidden"` and a re-suspending `Suspense` both reach the tree through these.
+  // They were no-ops, so hidden content went on painting — stacked on top of whatever replaced
+  // it — and only the mount/unmount half of Activity appeared to work. The engine owns the
+  // reversible half (see setNodeHidden): the author's own style stays untouched underneath.
+  hideInstance: node => setNodeHidden(node, true),
+  unhideInstance: node => setNodeHidden(node, false),
 
   beforeActiveInstanceBlur: () => {},
   afterActiveInstanceBlur: () => {},
@@ -190,7 +203,9 @@ const reconciler = createReconciler<
   },
   getCurrentUpdatePriority: () => currentUpdatePriority,
   resolveUpdatePriority: () =>
-    currentUpdatePriority !== NoEventPriority ? currentUpdatePriority : DefaultEventPriority,
+    currentUpdatePriority !== NoEventPriority
+      ? currentUpdatePriority
+      : DefaultEventPriority,
 
   maySuspendCommit: () => false,
   NotPendingTransition: null,

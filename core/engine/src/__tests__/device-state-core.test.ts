@@ -55,14 +55,18 @@ beforeAll(() => {
       const module = registeredModules[name];
       return isType<T>(module) ? module : null;
     },
-    RN$registerCallableModule: (name: string, factory: () => IDeviceHub): void => {
+    RN$registerCallableModule: (
+      name: string,
+      factory: () => IDeviceHub,
+    ): void => {
       if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
     },
   });
 });
 
 function requireHub(): IDeviceHub {
-  if (deviceHub === undefined) throw new Error('the device hub was never installed');
+  if (deviceHub === undefined)
+    throw new Error('the device hub was never installed');
   return deviceHub;
 }
 
@@ -142,7 +146,9 @@ describe('Appearance (integration: resolves via the shared native harness)', () 
 // computeInset / resolveKeyboardAvoidingLayout is enumerated here, not just the happy path.
 describe('readKeyboardFrame / readLayoutFrame (returns undefined on a malformed payload, never throws)', () => {
   const frame = readLayoutFrame({ y: 0, height: 800 });
-  const keyboard = readKeyboardFrame({ endCoordinates: { screenY: 500, height: 300 } });
+  const keyboard = readKeyboardFrame({
+    endCoordinates: { screenY: 500, height: 300 },
+  });
 
   // why: a well-formed onLayout/keyboard-event payload is the whole point of these
   // readers — the rest of the KAV math depends on them extracting the right fields.
@@ -159,13 +165,17 @@ describe('readKeyboardFrame / readLayoutFrame (returns undefined on a malformed 
     expect(readLayoutFrame({ y: 0 })).toBeUndefined();
     expect(readLayoutFrame({ y: '0', height: 800 })).toBeUndefined();
     expect(readKeyboardFrame({})).toBeUndefined();
-    expect(readKeyboardFrame({ endCoordinates: { screenY: 500 } })).toBeUndefined();
+    expect(
+      readKeyboardFrame({ endCoordinates: { screenY: 500 } }),
+    ).toBeUndefined();
   });
 });
 
 describe('computeInset', () => {
   const frame = readLayoutFrame({ y: 0, height: 800 });
-  const keyboard = readKeyboardFrame({ endCoordinates: { screenY: 500, height: 300 } });
+  const keyboard = readKeyboardFrame({
+    endCoordinates: { screenY: 500, height: 300 },
+  });
 
   // why: before either frame has been measured (no onLayout yet, or the keyboard
   // hasn't opened) there is nothing to avoid, so the inset must be a safe 0 rather
@@ -200,7 +210,9 @@ describe('resolveKeyboardAvoidingLayout', () => {
       style: { flex: 1 },
     });
     expect(layout.kind).toBe('wrapper');
-    expect(layout.kind === 'wrapper' && Array.isArray(layout.wrapperStyle)).toBe(true);
+    expect(
+      layout.kind === 'wrapper' && Array.isArray(layout.wrapperStyle),
+    ).toBe(true);
     if (layout.kind === 'wrapper' && Array.isArray(layout.wrapperStyle)) {
       expect(layout.wrapperStyle[1]).toEqual({ paddingBottom: 300 });
     }
@@ -218,7 +230,9 @@ describe('resolveKeyboardAvoidingLayout', () => {
       contentContainerStyle: { padding: 8 },
     });
     expect(layout.kind).toBe('nested');
-    expect(layout.kind === 'nested' && layout.wrapperStyle).toEqual({ flex: 1 });
+    expect(layout.kind === 'nested' && layout.wrapperStyle).toEqual({
+      flex: 1,
+    });
     if (layout.kind === 'nested' && Array.isArray(layout.innerStyle)) {
       expect(layout.innerStyle[1]).toEqual({ bottom: 120 });
     }
@@ -274,7 +288,10 @@ describe('resolveKeyboardAvoidingLayout', () => {
   // the component must degrade to a plain passthrough wrapper instead of picking
   // an arbitrary behavior on the caller's behalf.
   it('passes the style through untouched when no behavior is given', () => {
-    const layout = resolveKeyboardAvoidingLayout({ effectiveInset: 200, style: { flex: 1 } });
+    const layout = resolveKeyboardAvoidingLayout({
+      effectiveInset: 200,
+      style: { flex: 1 },
+    });
     expect(layout).toEqual({ kind: 'wrapper', wrapperStyle: { flex: 1 } });
   });
 });

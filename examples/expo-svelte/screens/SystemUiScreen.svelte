@@ -2,11 +2,16 @@
   // @symbiote-native/system-ui tour stop — fetches the root view's background color on mount, then
   // three buttons (Red/Blue/Reset) each set it and re-fetch, mirroring DeviceScreen's
   // fetch-then-render actions shape. Svelte twin of ../../expo-vue-sfc/screens/SystemUiScreen.vue.
-  //
-  // Markup formatting is load-bearing: siblings are packed edge-to-edge and every text node stays
-  // on ONE source line — see MenuScreen.svelte's header and svelte-adapter-dom-shim §16.
-  import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/svelte';
-  import { getBackgroundColorAsync, setBackgroundColorAsync } from '@symbiote-native/system-ui/svelte';
+  import {
+    SafeAreaView,
+    ScrollView,
+    Text,
+    View,
+  } from '@symbiote-native/svelte';
+  import {
+    getBackgroundColorAsync,
+    setBackgroundColorAsync,
+  } from '@symbiote-native/system-ui/svelte';
   import ActionButton from '../components/ActionButton.svelte';
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -43,22 +48,60 @@
   });
 </script>
 
-<SafeAreaView class="screen"
-  ><ScrollView testID="system-ui-scroll" class="screen" contentContainerStyle="scroll-content"
-    ><View class={`line-tag line-tag-${lineInfo.line}`}
-      ><Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text></View
-    ><View class="hero-card"
-      ><View class="hero-badge" style={{ backgroundColor: lineColor }}
-        ><Text class="hero-badge-text">{lineInfo.code}</Text></View
-      ><View class="hero-copy"
-        ><Text class="hero-title">System UI</Text><Text class="hero-body">@symbiote-native/system-ui — sets and reads the root view's background color.</Text></View
-      ></View
-    ><View testID="system-ui-card" class="system-ui-card"
-      ><Text class="system-ui-card-title">Background color</Text><View class="system-ui-row"
-        ><Text class="system-ui-row-label">Current</Text><Text testID="system-ui-background-color-value" class="system-ui-value-text">{backgroundColor ?? 'not set'}</Text></View
-      ><View class="button-row"
-        ><ActionButton testID="system-ui-set-red-button" title="Red" onPress={handleSetRed} color={RED} /><ActionButton testID="system-ui-set-blue-button" title="Blue" onPress={handleSetBlue} color={BLUE} /><ActionButton testID="system-ui-reset-button" title="Reset" onPress={handleReset} color={lineColor} /></View
-      ></View
-    ></ScrollView
-  ></SafeAreaView
->
+<SafeAreaView class="screen">
+  <ScrollView
+    testID="system-ui-scroll"
+    class="screen"
+    contentContainerStyle="scroll-content"
+  >
+    <View class={`line-tag line-tag-${lineInfo.line}`}>
+      <Text class="line-tag-text">
+        {`${lineInfo.code} · ${lineInfo.label}`}
+      </Text>
+    </View>
+    <View class="hero-card">
+      <View class="hero-badge" style={{ backgroundColor: lineColor }}>
+        <Text class="hero-badge-text">{lineInfo.code}</Text>
+      </View>
+      <View class="hero-copy">
+        <Text class="hero-title">System UI</Text>
+        <Text class="hero-body">
+          @symbiote-native/system-ui — sets and reads the root view's background
+          color.
+        </Text>
+      </View>
+    </View>
+    <View testID="system-ui-card" class="system-ui-card">
+      <Text class="system-ui-card-title">Background color</Text>
+      <View class="system-ui-row">
+        <Text class="system-ui-row-label">Current</Text>
+        <Text
+          testID="system-ui-background-color-value"
+          class="system-ui-value-text"
+        >
+          {backgroundColor ?? 'not set'}
+        </Text>
+      </View>
+      <View class="button-row">
+        <ActionButton
+          testID="system-ui-set-red-button"
+          title="Red"
+          onPress={handleSetRed}
+          color={RED}
+        />
+        <ActionButton
+          testID="system-ui-set-blue-button"
+          title="Blue"
+          onPress={handleSetBlue}
+          color={BLUE}
+        />
+        <ActionButton
+          testID="system-ui-reset-button"
+          title="Reset"
+          onPress={handleReset}
+          color={lineColor}
+        />
+      </View>
+    </View>
+  </ScrollView>
+</SafeAreaView>

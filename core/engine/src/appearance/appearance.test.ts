@@ -42,10 +42,14 @@ beforeEach(async () => {
   };
 
   globalThis.__turboModuleProxy = <T>(name: string): T | null => {
-    const module: unknown = name === 'Appearance' && moduleLinked ? fakeAppearance : undefined;
+    const module: unknown =
+      name === 'Appearance' && moduleLinked ? fakeAppearance : undefined;
     return isPresent<T>(module) ? module : null;
   };
-  globalThis.RN$registerCallableModule = (name: string, factory: () => IDeviceHub): void => {
+  globalThis.RN$registerCallableModule = (
+    name: string,
+    factory: () => IDeviceHub,
+  ): void => {
     if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
   };
 

@@ -111,6 +111,9 @@ What already exists on our side to build this:
 - Gap: no public "get current retained root(s)" accessor exists yet — a
   small engine API addition.
 
+See the `symbiote-engine-core` skill for the full mutation API, node-identity
+(the `mirror` WeakMap), and commit mechanics these hooks sit on top of.
+
 Recommended location: a new `packages/devtools` (sibling to
 `packages/slider`), NOT folded into `@symbiote-native/engine` itself — it
 pulls in a dev-only dependency plus a separate Vite/React-DOM build, which
@@ -132,7 +135,8 @@ would violate keeping the engine dependency-light.
   Building a second diff engine here would duplicate the clone-on-write
   diffing already centralized once in `commit.ts` — rejected per
   `<clone_on_write_lives_in_engine>`; revisit only if a real perf problem is
-  MEASURED on a large tree, not preemptively.
+  MEASURED on a large tree, not preemptively — see `symbiote-perf-measurement`
+  for how to actually take that measurement instead of guessing.
 - **Tree push is lazy, gated on panel subscription.** The app-side
   `setupPlugin(client)` registers the post-commit hook only after receiving a
   `subscribe` message from the panel, and unregisters it on
@@ -174,132 +178,73 @@ would violate keeping the engine dependency-light.
 
 ### v0 step list — progress
 
-1. ✅ **Done (2026-08-16).** Spiked `withRozenite` against `examples/svelte`'s
-   `metro.config.js` — clean composition, no conflicts. Confirmed facts (not
-   guessed from docs — verified by decompiling `dist/index.cjs`): the real
-   package is `@rozenite/metro@2.1.0`, exporting `withRozenite(config,
-   {enabled: process.env.WITH_ROZENITE === 'true'})`; it returns an async
-   config function and only overrides `watchFolders` /
-   `resolver.extraNodeModules` / `resolver.resolveRequest` (chains through
-   any pre-existing `resolveRequest` rather than replacing it) /
-   `server.enhanceMiddleware` — it never touches `transformer`, so the
-   Svelte SFC babel transformer and the `esm-env`/SIGSEGV resolver
-   workaround (see `<examples_vs_dot_examples>` in root CLAUDE.md) are
-   untouched. Verified with `react-native bundle`: flag-off and flag-on
-   bundles are **byte-identical** (`shasum` match) — flag-off is a provable
-   true no-op.
-2. ✅ **Done (2026-08-16).** Added `getActiveSurfaces()` to
-   `@symbiote-native/engine`'s public surface: new neutral module
-   `core/engine/src/surface-registry.ts` (mirrors `post-commit.ts`'s shape —
-   no import cycle between `surface.ts` and `commit.ts`), `createSurface()`
-   registers, `disposeRoot()` (in `commit.ts`) unregisters, both exported
-   from `core/engine/src/index.ts` alongside `registerPostCommit`/
-   `runPostCommitHooks` (which weren't in the public barrel before this).
-   4 unit tests in `core/engine/src/surface-registry.test.ts`, full engine
-   suite + typecheck + lint green. Zero adapter code touched.
-3. ✅ **Done (2026-08-16), folded together with steps 4-6 of the original list.**
-   Built `packages/devtools` (`@symbiote-native/devtools`, workspace-internal,
-   `private: true`, no real `publishConfig` build overlay yet — a
-   placeholder `{access:"restricted"}` was needed only to satisfy this
-   repo's `require-package-fields` ESLint gate). Files: `react-native.ts`
-   (app-side entry), `src/protocol.ts` (shared message shapes), `src/
-   serialize-tree.ts` (pure `ISymbioteNode` → JSON-safe bounded tree, tested
-   — array cap 50, depth cap 5, string cap 500, stable per-node id via
-   `WeakMap<ISymbioteNode, number>`), `src/tree-inspector-panel.tsx` (plain
-   React DOM: tree view + props panel, no search/hover — matches the
-   resolved v0 UI scope). Originally wired into `examples/svelte/index.js` +
-   `babel.config.js` behind an explicit `WITH_ROZENITE` env var (inline-flags
-   babel plugin, mirroring `DEBUG`); **changed 2026-08-16 to on-by-default
-   for any dev build** — `index.js` now gates on RN's own `__DEV__` runtime
-   global directly (`if (__DEV__) require('@symbiote-native/devtools/react-
-   native')`), no inline-flag plumbing needed since `__DEV__` already exists
-   at runtime; `metro.config.js` gates on `NODE_ENV !== 'production'` (see
-   the "Architecture decisions" section above for why). Bonus finding from
-   verifying this change: Metro's `--dev false` build doesn't just skip
-   executing the `if (__DEV__)` branch, it DEAD-CODE-ELIMINATES it entirely —
-   confirmed via `grep`, a `--dev true` bundle has 6 hits for
-   `symbiote-devtools-inspector`/`getRozeniteDevToolsClient`, a `--dev false`
-   bundle has 0 — stronger than the old env-var-flag version, where Metro's
-   dev bundler left the `if` branch present (just unreached) even with the
-   flag off. All green: package typecheck, whole-project typecheck, syncpack,
-   5/5 vitest, and a Metro-level smoke on both the original flag mechanism
-   and the new `__DEV__`-based one (`--dev true`/`--dev false` bundles
-   diffed as above; `examples/svelte`'s own files are outside root ESLint's
-   scope, so no lint step applies to them).
+1. ✅ **Done (2026-08-16).** Spiked `withRozenite` against `examples/svelte`.
 
-   **Important correction to Rozenite's own docs, confirmed against the
-   real installed package, not assumed:** `rozenite.dev/docs/plugin-
-   development/plugin-development` shows `react-native.ts` exporting
-   `export default function setupPlugin(client: DevToolsPluginClient<...>)`,
-   implying Rozenite auto-discovers an installed plugin and calls that
-   export with a ready-made client. The real `@rozenite/plugin-bridge@2.1.0`
-   (verified via `npm pack` + reading its actual `.d.ts`) exports NEITHER a
-   `DevToolsPluginClient` type NOR any such auto-invoke mechanism — its only
-   client constructor is `getRozeniteDevToolsClient(pluginId): Promise
-   <client>`, which the caller must invoke itself. Confirmed against a real
-   precedent too: the official Redux DevTools plugin also wires up
-   explicitly from the app's own code (`rozeniteDevToolsEnhancer()` called
-   from `store.ts`), not via silent discovery. **`@rozenite/middleware`'s
-   plugin auto-discovery is real but narrower than the docs imply — it only
-   drives the browser DevTools panel side** (scans `node_modules` for a
-   `dist/rozenite.json` manifest; confirmed live via the `[Rozenite]
-   Loaded...` log), NOT anything injected into the app's own JS bundle.
-   `@rozenite/metro`'s `withRozenite()` only touches `watchFolders`/
-   `resolver`/`server.enhanceMiddleware` — it does not inject any app-code
-   import. So the app-side plugin entry needs an EXPLICIT `require(...)` in
-   the consuming app — originally flag-gated the same way `DEBUG` already is
-   in this repo (inline-flags babel plugin), now gated on `__DEV__` directly
-   (see above). Do not trust rozenite.dev's `plugin-development` code sample
-   at face value for the app-side contract — verify against the installed
-   package's own `.d.ts` first.
+```
+§step1_metro_spike := {
+  verified: "withRozenite composes cleanly with examples/svelte's metro.config.js, no conflicts",
+  facts: "@rozenite/metro@2.1.0 (confirmed by decompiling dist/index.cjs, not docs) exports withRozenite(config, {enabled: process.env.WITH_ROZENITE==='true'}); returns an async config fn; overrides ONLY watchFolders/resolver.extraNodeModules/resolver.resolveRequest (chains any pre-existing resolveRequest)/server.enhanceMiddleware — never touches transformer, so the Svelte SFC babel transformer and the esm-env/SIGSEGV resolver workaround (examples_vs_dot_examples in root CLAUDE.md) are untouched",
+  proof: "react-native bundle: flag-off vs flag-on bundles are byte-identical (shasum match) — flag-off is a provable true no-op"
+}
+```
 
-   **Real device/browser DevTools panel rendering is still UNVERIFIED.**
-   Everything above proves Metro-level bundling and plugin discovery by the
-   dev-middleware; nobody has yet opened an actual React Native DevTools
-   browser session against a running app and confirmed the tree panel
-   visually renders. This needs a real simulator/device run — a genuine gap
-   to close before calling v0 "done", separate from the parity work below.
+2. ✅ **Done (2026-08-16).** Added a public "active surfaces" accessor to the engine.
 
-   **Update 2026-08-16, first real device test: the panel tab appeared but
-   stayed blank.** Console showed `:8081/devtools/assets/tree-inspector-
-   panel-*.js` 404ing (plus a harmless `:8888` connection-refused — that's
-   just the frontend trying a live-reload Vite dev server we never started,
-   not the actual blocker). Root cause, found by reading
-   `@rozenite/middleware`'s own `dist/index.js`: a plugin's `dist/` is ONLY
-   ever served under `/plugins/<plugin>/**` (`app.get('/plugins/:plugin/
-   *others', ...)`, `pluginPath = path.join(plugin.path, 'dist')`) — never
-   at the site root. `@rozenite/vite-plugin` sets no `base` at all
-   (confirmed: zero references to `base` anywhere in its own `dist/
-   index.js`), so Vite's default (`base: '/'`) emitted an ABSOLUTE
-   `<script src="/devtools/assets/....js">` in the built panel HTML. A
-   browser resolves that against the origin ROOT, missing the
-   `/plugins/<plugin>/` prefix — 404, so the panel's own script never loads
-   and React never mounts (which is also why nothing rendered, not even the
-   "Connecting to SymbioteNative…" loading text — the whole bundle never
-   ran). **Fix: `base: './'` in `packages/devtools/vite.config.ts`** — Vite
-   then emits a relative `../devtools/assets/....js`, which resolves
-   correctly against wherever the HTML itself was actually served from.
-   Verified in the rebuilt `dist/devtools/tree-inspector-panel.html`.
+```
+§step2_engine_registry := {
+  added: "getActiveSurfaces() on @symbiote-native/engine's public surface",
+  files: "core/engine/src/surface-registry.ts (new, mirrors post-commit.ts's shape — no import cycle between surface.ts/commit.ts); createSurface() registers, disposeRoot() (commit.ts) unregisters; both exported from core/engine/src/index.ts alongside registerPostCommit/runPostCommitHooks (not previously in the public barrel)",
+  verified: "4 unit tests core/engine/src/surface-registry.test.ts; full engine suite + typecheck + lint green; zero adapter code touched"
+}
+```
 
-   **Second gotcha hit while re-packing to test the fix — a NEW instance of
-   the documented `<examples_vs_dot_examples>` stale-tarball trap, plus a
-   variant nobody had hit before:** `npm pack` (used once, by mistake) left
-   `"@symbiote-native/engine": "workspace:*"` and `"catalog:"` literally in
-   the packed `package.json` — exactly the breakage the root CLAUDE.md
-   already warns about; redone with `pnpm pack`, which resolves them to
-   real versions correctly. But `pnpm pack` ALSO silently produced a tarball
-   missing `dist/` entirely on the first attempt, despite `dist` being
-   listed in `package.json`'s `files` array — because `dist/` is
-   git-ignored (root `.gitignore`) and untracked, and pnpm's packer only
-   picks up `files`-listed paths that git can see, `.gitignore` or not
-   (unlike plain `npm pack`, which prioritizes an explicit `files` field
-   over `.gitignore`). Fix: `git add -f packages/devtools/dist` before
-   `pnpm pack` (then `git reset packages/devtools/dist` after — don't leave
-   a build artifact staged). This will bite every future re-pack of this
-   package until it has a real publish pipeline; `packages/slider` avoids
-   it by naming its build output `build/` — check whether that's *why*, or
-   whether `packages/slider` has just never actually hit this because
-   nobody `pnpm pack`'d it locally before.
+3. ✅ **Done (2026-08-16), folded together with steps 4-6 of the original list.** Built
+   `packages/devtools` and wired it into `examples/svelte`.
+
+```
+§step3_package_scaffold := {
+  built: "packages/devtools (@symbiote-native/devtools) — workspace-internal, private:true, placeholder publishConfig{access:'restricted'} only to satisfy this repo's require-package-fields ESLint gate, no real build overlay yet",
+  files: ["react-native.ts — app-side entry", "src/protocol.ts — shared message shapes",
+          "src/serialize-tree.ts — pure ISymbioteNode -> JSON-safe bounded tree, tested: array cap 50, depth cap 5, string cap 500, stable per-node id via WeakMap<ISymbioteNode, number>",
+          "src/tree-inspector-panel.tsx — plain React DOM: tree view + props panel, no search/hover (matches the resolved v0 UI scope)"],
+  wiring: "originally wired into examples/svelte/index.js + babel.config.js behind an explicit WITH_ROZENITE env var (inline-flags babel plugin, mirroring DEBUG) ⟶ changed 2026-08-16 to on-by-default for any dev build: index.js gates on RN's own __DEV__ runtime global (if (__DEV__) require('@symbiote-native/devtools/react-native')); metro.config.js gates on NODE_ENV !== 'production' (see Architecture decisions above for why)",
+  bonus_finding: "Metro's --dev false DEAD-CODE-ELIMINATES the if(__DEV__) branch entirely, not just skips it — grep: --dev true bundle has 6 hits for symbiote-devtools-inspector/getRozeniteDevToolsClient, --dev false has 0 (stronger than the old env-var-flag version, which left the branch present but unreached)",
+  verified: "package typecheck, whole-project typecheck, syncpack, 5/5 vitest, Metro smoke on both the old flag mechanism and the new __DEV__ one (--dev true/false bundles diffed as above); examples/svelte is outside root ESLint's scope, so no lint step applies there"
+}
+
+§step3a_rozenite_docs_correction := {
+  claim: "rozenite.dev/docs/plugin-development/plugin-development shows react-native.ts exporting `export default function setupPlugin(client: DevToolsPluginClient<...>)`, implying auto-discovery + auto-invoke of an installed plugin",
+  reality: "real @rozenite/plugin-bridge@2.1.0 (verified via npm pack + reading its actual .d.ts) exports NEITHER a DevToolsPluginClient type NOR any auto-invoke mechanism — its only client constructor is getRozeniteDevToolsClient(pluginId): Promise<client>, which the caller must invoke itself",
+  precedent: "the official Redux DevTools plugin also wires up explicitly from app code (rozeniteDevToolsEnhancer() in store.ts), not silent discovery",
+  real_autodiscovery_scope: "@rozenite/middleware's plugin auto-discovery IS real but only drives the BROWSER DevTools panel side (scans node_modules for a dist/rozenite.json manifest, confirmed via the '[Rozenite] Loaded...' log) — NOT anything injected into the app's own JS bundle. @rozenite/metro's withRozenite() only touches watchFolders/resolver/server.enhanceMiddleware, no app-code import injected",
+  consequence: "the app-side plugin entry needs an EXPLICIT require(...) in the consuming app — see `wiring` above",
+  rule: "do not trust rozenite.dev's plugin-development code sample at face value for the app-side contract — verify against the installed package's own .d.ts first"
+}
+```
+
+   **Real device/browser panel rendering was still UNVERIFIED at this point** — everything
+   above proves Metro-level bundling and dev-middleware plugin discovery only; nobody had
+   yet opened a real RN DevTools browser session against a running app to confirm the tree
+   panel visually renders.
+
+```
+§step3b_first_device_test_blank_panel := {
+  bug: "panel tab appeared but stayed blank",
+  symptom: ":8081/devtools/assets/tree-inspector-panel-*.js 404'd (plus a harmless :8888 connection-refused from the frontend's live-reload Vite probe — not the real blocker, no dev server was started)",
+  root_cause: "@rozenite/middleware's dist/index.js serves a plugin's dist/ ONLY under /plugins/<plugin>/** (app.get('/plugins/:plugin/*others', ...), pluginPath = path.join(plugin.path, 'dist')) — never at the site root. @rozenite/vite-plugin sets no `base` at all (zero refs to `base` anywhere in its own dist/index.js), so Vite's default base:'/' emitted an ABSOLUTE <script src=\"/devtools/assets/....js\"> in the built panel HTML — a browser resolves that against the origin ROOT, missing the /plugins/<plugin>/ prefix ⟶ 404, so the panel's own script never loads and React never mounts (nothing rendered, not even the 'Connecting to SymbioteNative…' loading text)",
+  fix: "base: './' in packages/devtools/vite.config.ts — Vite then emits a relative ../devtools/assets/....js, resolving correctly wherever the HTML was served from",
+  verified: "confirmed in the rebuilt dist/devtools/tree-inspector-panel.html"
+}
+
+§step3c_repack_stale_tarball_trap := {
+  bug: "npm pack (used once, by mistake) left \"@symbiote-native/engine\": \"workspace:*\" and \"catalog:\" literally in the packed package.json — exactly the breakage examples_vs_dot_examples already warns about",
+  fix_1: "redo with pnpm pack, which resolves workspace:*/catalog: to real versions",
+  new_variant: "pnpm pack ALSO silently produced a tarball missing dist/ entirely on the first attempt, despite dist listed in package.json's files array — because dist/ is git-ignored (root .gitignore) and untracked, and pnpm's packer only picks up files-listed paths git can see, .gitignore or not (unlike plain npm pack, which prioritizes an explicit files field over .gitignore)",
+  fix_2: "git add -f packages/devtools/dist before pnpm pack, then git reset packages/devtools/dist after (don't leave a build artifact staged)",
+  blast_radius: "will bite every future re-pack of this package until it has a real publish pipeline; packages/slider avoids it by naming its build output build/ — unconfirmed whether that's WHY, or whether slider has just never been pnpm pack'd locally before"
+}
+```
+
 4. **Next up.** Re-verify on a real device/simulator now that the base-path
    fix is in (`examples/svelte`'s `@symbiote-native/devtools` copy was
    reinstalled via the corrected `pnpm pack` tarball) — confirm the panel

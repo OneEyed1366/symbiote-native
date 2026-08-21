@@ -38,7 +38,10 @@ interface IDisplayMetrics {
 }
 interface IDeviceInfoModule {
   getConstants(): {
-    Dimensions: { window?: IDisplayMetrics; windowPhysicalPixels?: IDisplayMetrics };
+    Dimensions: {
+      window?: IDisplayMetrics;
+      windowPhysicalPixels?: IDisplayMetrics;
+    };
   };
 }
 
@@ -52,10 +55,13 @@ function resolveScreenScale(): number | null {
     return null;
   }
   const dimensions = deviceInfo.getConstants().Dimensions;
-  const scale = dimensions.window?.scale ?? dimensions.windowPhysicalPixels?.scale;
+  const scale =
+    dimensions.window?.scale ?? dimensions.windowPhysicalPixels?.scale;
   // A non-positive scale would make the round/divide nonsensical; treat as missing.
   if (typeof scale !== 'number' || scale <= 0) {
-    dlog(`StyleSheet: DeviceInfo scale invalid (${String(scale)}) — hairlineWidth falls back`);
+    dlog(
+      `StyleSheet: DeviceInfo scale invalid (${String(scale)}) — hairlineWidth falls back`,
+    );
     return null;
   }
   return scale;
@@ -100,9 +106,14 @@ const stylePreprocessors = new Map<string, IStylePreprocessor>();
 // Register a value-rewriter for one style property (RN's setStyleAttributePreprocessor,
 // StyleSheetExports.js:151). EXPERIMENTAL in RN; used internally for color/transform.
 // Overwriting an existing preprocessor warns, matching RN's __DEV__ guard.
-function setStyleAttributePreprocessor(property: string, process: IStylePreprocessor): void {
+function setStyleAttributePreprocessor(
+  property: string,
+  process: IStylePreprocessor,
+): void {
   if (stylePreprocessors.has(property)) {
-    dlog(`StyleSheet.setStyleAttributePreprocessor: overwriting "${property}" preprocessor`);
+    dlog(
+      `StyleSheet.setStyleAttributePreprocessor: overwriting "${property}" preprocessor`,
+    );
   }
   stylePreprocessors.set(property, process);
 }
@@ -137,7 +148,9 @@ export const StyleSheet = {
   // Identity at runtime, like RN, but the NamedStyles constraint preserves each
   // string-literal style value (flexDirection: 'row' stays 'row', not string) and
   // validates entries, so `styles.box` is assignable to a ViewStyle prop.
-  create<T extends INamedStyles<T> | IStyleRecord>(styles: T & IStyleRecord): T {
+  create<T extends INamedStyles<T> | IStyleRecord>(
+    styles: T & IStyleRecord,
+  ): T {
     return styles;
   },
 

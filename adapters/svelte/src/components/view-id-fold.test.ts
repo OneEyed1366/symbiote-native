@@ -20,7 +20,8 @@ import type { Component } from 'svelte';
 import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -32,7 +33,8 @@ const ROOT_TAG = 91_601;
 const compiledFiles: string[] = [];
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -44,18 +46,35 @@ afterEach(() => {
   compiledFiles.length = 0;
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
   compiledFiles.push(outPath);
 }
 
-async function loadParent(propsSource: string, variant: string): Promise<Component> {
+async function loadParent(
+  propsSource: string,
+  variant: string,
+): Promise<Component> {
   const viewSource = readFileSync(join(__dirname, 'View.svelte'), 'utf8');
-  const viewOut = join(__dirname, `.smoke-compiled-view-id-fold-view-${variant}.mjs`);
-  const parentOut = join(__dirname, `.smoke-compiled-view-id-fold-parent-${variant}.mjs`);
+  const viewOut = join(
+    __dirname,
+    `.smoke-compiled-view-id-fold-view-${variant}.mjs`,
+  );
+  const parentOut = join(
+    __dirname,
+    `.smoke-compiled-view-id-fold-parent-${variant}.mjs`,
+  );
   compileToFile(viewSource, 'View.svelte', viewOut);
 
   compileToFile(
@@ -79,7 +98,10 @@ describe('View.svelte id -> nativeID fold (real compiled source)', () => {
   // Fabric has no `id` prop at all, so a raw `id` reaching the committed tree would be dead
   // weight at best and a foreign-prop warning at worst; only `nativeID` may ever land.
   it('folds a raw id into nativeID, dropping the raw id key', async () => {
-    const Parent = await loadParent(`<View id="foo" testID="probe" />`, 'plain-id');
+    const Parent = await loadParent(
+      `<View id="foo" testID="probe" />`,
+      'plain-id',
+    );
     mount(ROOT_TAG, Parent);
     await tick();
     await tick();
@@ -112,7 +134,10 @@ describe('View.svelte id -> nativeID fold (real compiled source)', () => {
   // `nativeID` (the pre-existing, pre-fold contract) must keep working byte-for-byte once `id`
   // support is added.
   it('keeps an explicit nativeID when no id is passed', async () => {
-    const Parent = await loadParent(`<View nativeID="plain" testID="probe" />`, 'nativeid-only');
+    const Parent = await loadParent(
+      `<View nativeID="plain" testID="probe" />`,
+      'nativeid-only',
+    );
     mount(ROOT_TAG, Parent);
     await tick();
     await tick();

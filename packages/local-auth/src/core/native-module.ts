@@ -17,11 +17,15 @@ export type INativeLocalAuthenticationModule = {
   isEnrolledAsync?(): Promise<boolean>;
   getEnrolledLevelAsync?(): Promise<SecurityLevel>;
   authenticateAsync?(
-    options: ILocalAuthenticationOptions & { promptMessage: string; cancelLabel: string },
+    options: ILocalAuthenticationOptions & {
+      promptMessage: string;
+      cancelLabel: string;
+    },
   ): Promise<ILocalAuthenticationResult>;
   cancelAuthenticate?(): Promise<void>;
 };
 
-export const expoLocalAuthentication = requireNativeModule<INativeLocalAuthenticationModule>(
-  EXPO_LOCAL_AUTHENTICATION_MODULE_NAME,
-);
+export const expoLocalAuthentication =
+  requireNativeModule<INativeLocalAuthenticationModule>(
+    EXPO_LOCAL_AUTHENTICATION_MODULE_NAME,
+  );

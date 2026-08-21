@@ -7,7 +7,13 @@
 -->
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
 import {
   CellularGeneration,
   allowsVoipAsync,
@@ -53,7 +59,8 @@ const isoCountryCode = ref<string | null>(null);
 const carrierName = ref<string | null>(null);
 const mobileCountryCode = ref<string | null>(null);
 const mobileNetworkCode = ref<string | null>(null);
-const { status: permissionStatus, request: requestPermission } = usePermissions();
+const { status: permissionStatus, request: requestPermission } =
+  usePermissions();
 
 onMounted(() => {
   void Promise.all([
@@ -79,8 +86,12 @@ const generationText = computed(() =>
 const allowsVoipText = computed(() => valueLabel(allowsVoip.value));
 const isoCountryCodeText = computed(() => valueLabel(isoCountryCode.value));
 const carrierNameText = computed(() => valueLabel(carrierName.value));
-const mobileCountryCodeText = computed(() => valueLabel(mobileCountryCode.value));
-const mobileNetworkCodeText = computed(() => valueLabel(mobileNetworkCode.value));
+const mobileCountryCodeText = computed(() =>
+  valueLabel(mobileCountryCode.value),
+);
+const mobileNetworkCodeText = computed(() =>
+  valueLabel(mobileNetworkCode.value),
+);
 const permissionLabel = computed(() =>
   permissionStatus.value === null ? 'checking…' : permissionStatus.value.status,
 );
@@ -88,9 +99,15 @@ const permissionLabel = computed(() =>
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="cellular-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="cellular-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -99,9 +116,10 @@ const permissionLabel = computed(() =>
         <View class="hero-copy">
           <Text class="hero-title">Cellular</Text>
           <Text class="hero-body"
-            >@symbiote-native/cellular — cellular generation and carrier/SIM info. Every field
-            except generation is Android-only upstream (iOS/web return null); a physical device
-            with an active SIM is needed for real values.</Text
+            >@symbiote-native/cellular — cellular generation and carrier/SIM
+            info. Every field except generation is Android-only upstream
+            (iOS/web return null); a physical device with an active SIM is
+            needed for real values.</Text
           >
         </View>
       </View>
@@ -110,7 +128,11 @@ const permissionLabel = computed(() =>
         <Text class="cellular-card-title">Cellular info</Text>
         <View class="cellular-row">
           <Text class="cellular-row-label">Generation</Text>
-          <Text testID="cellular-generation-value" class="cellular-value-text">{{ generationText }}</Text>
+          <Text
+            testID="cellular-generation-value"
+            class="cellular-value-text"
+            >{{ generationText }}</Text
+          >
         </View>
         <template v-if="Platform.OS === 'android'">
           <View class="cellular-row">
@@ -140,7 +162,11 @@ const permissionLabel = computed(() =>
         <Text class="cellular-card-title">Permission</Text>
         <View class="cellular-row">
           <Text class="cellular-row-label">Phone-state permission status</Text>
-          <Text testID="cellular-permission-value" class="cellular-value-text">{{ permissionLabel }}</Text>
+          <Text
+            testID="cellular-permission-value"
+            class="cellular-value-text"
+            >{{ permissionLabel }}</Text
+          >
         </View>
         <ActionButton
           testID="cellular-request-permission"

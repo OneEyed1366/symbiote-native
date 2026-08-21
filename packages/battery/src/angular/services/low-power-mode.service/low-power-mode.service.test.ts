@@ -17,14 +17,16 @@ const removeMock = vi.fn();
 const isLowPowerModeEnabledAsyncMock = vi.fn(async () => true);
 
 vi.mock('../../../core', () => ({
-  addLowPowerModeListener: (listener: (event: { lowPowerMode: boolean }) => void) =>
-    addListenerMock(listener),
+  addLowPowerModeListener: (
+    listener: (event: { lowPowerMode: boolean }) => void,
+  ) => addListenerMock(listener),
   isLowPowerModeEnabledAsync: () => isLowPowerModeEnabledAsyncMock(),
 }));
 
 const ROOT_TAG = 973;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedResult: Signal<boolean> | undefined;
 let capturedListener: ((event: { lowPowerMode: boolean }) => void) | undefined;
@@ -82,7 +84,8 @@ describe('LowPowerModeService.connect', () => {
     mount(ROOT_TAG, LowPowerModeHost);
     await tick();
 
-    if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+    if (capturedListener === undefined)
+      throw new Error('addListener callback was not captured');
     capturedListener({ lowPowerMode: true });
 
     expect(capturedResult?.()).toBe(true);

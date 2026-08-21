@@ -32,11 +32,17 @@ export type INavigationEventListener<TData = unknown> = (data: TData) => void;
 
 export type INavigationEmitter = {
   emit: (event: INavigationEventName, data?: unknown) => void;
-  addListener: (event: INavigationEventName, listener: INavigationEventListener) => () => void;
+  addListener: (
+    event: INavigationEventName,
+    listener: INavigationEventListener,
+  ) => () => void;
 };
 
 export function createNavigationEmitter(): INavigationEmitter {
-  const listenersByEvent = new Map<INavigationEventName, Set<INavigationEventListener>>();
+  const listenersByEvent = new Map<
+    INavigationEventName,
+    Set<INavigationEventListener>
+  >();
 
   function addListener(
     event: INavigationEventName,

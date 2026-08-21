@@ -1,4 +1,11 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
 import { watchStepCount, type IPedometerResult } from '../../../core';
 
 // Angular twin of React's `usePedometer` hook / Vue's `usePedometer` composable. Angular has no

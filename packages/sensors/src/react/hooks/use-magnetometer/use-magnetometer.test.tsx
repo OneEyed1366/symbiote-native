@@ -17,17 +17,20 @@ import { installFabric } from '@symbiote-native/test-utils';
 import { useMagnetometer } from './index';
 import type { IMagnetometerMeasurement } from '../../../core';
 
-const { addListener, removeAllListeners, setUpdateInterval, remove } = vi.hoisted(() => {
-  const remove = vi.fn();
-  return {
-    addListener: vi.fn((_listener: (measurement: IMagnetometerMeasurement) => void) => ({
+const { addListener, removeAllListeners, setUpdateInterval, remove } =
+  vi.hoisted(() => {
+    const remove = vi.fn();
+    return {
+      addListener: vi.fn(
+        (_listener: (measurement: IMagnetometerMeasurement) => void) => ({
+          remove,
+        }),
+      ),
+      removeAllListeners: vi.fn(),
+      setUpdateInterval: vi.fn(),
       remove,
-    })),
-    removeAllListeners: vi.fn(),
-    setUpdateInterval: vi.fn(),
-    remove,
-  };
-});
+    };
+  });
 
 vi.mock('../../../core', () => ({
   Magnetometer: { addListener, removeAllListeners, setUpdateInterval },
@@ -67,14 +70,21 @@ describe('useMagnetometer', () => {
       // a fired event that never reaches the return value would make it useless.
       mount(ROOT_TAG, createElement(Probe, {}));
 
-      const measurement: IMagnetometerMeasurement = { x: 0.1, y: 0.2, z: 0.3, timestamp: 123 };
+      const measurement: IMagnetometerMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.3,
+        timestamp: 123,
+      };
       const listener = addListener.mock.calls[0][0];
       listener(measurement);
 
       // The mock invokes the listener directly, outside the engine's event dispatcher
       // (setEventDispatcher in render.ts), which is what normally flushes a native-driven
       // setState synchronously — so the resulting re-render lands on a later microtask here.
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(measurement));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(measurement),
+      );
     });
 
     it('replaces the previous measurement rather than merging with it', async () => {
@@ -82,14 +92,28 @@ describe('useMagnetometer', () => {
       // axis values behind after a real reading changes.
       mount(ROOT_TAG, createElement(Probe, {}));
       const listener = addListener.mock.calls[0][0];
-      const first: IMagnetometerMeasurement = { x: 0.1, y: 0.2, z: 0.3, timestamp: 1 };
-      const second: IMagnetometerMeasurement = { x: 9, y: 9, z: 9, timestamp: 2 };
+      const first: IMagnetometerMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.3,
+        timestamp: 1,
+      };
+      const second: IMagnetometerMeasurement = {
+        x: 9,
+        y: 9,
+        z: 9,
+        timestamp: 2,
+      };
 
       listener(first);
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(first));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(first),
+      );
       listener(second);
 
-      await vi.waitFor(() => expect(results[results.length - 1]).toEqual(second));
+      await vi.waitFor(() =>
+        expect(results[results.length - 1]).toEqual(second),
+      );
     });
 
     it('unsubscribes from the native listener on unmount', () => {

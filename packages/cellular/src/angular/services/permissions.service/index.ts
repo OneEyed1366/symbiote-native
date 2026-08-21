@@ -31,7 +31,9 @@ export class PermissionsService {
     if (!this.isAutoFetchStarted) {
       this.isAutoFetchStarted = true;
       this.get().catch((cause: unknown) => {
-        this.fetchError.set(cause instanceof Error ? cause : new Error(String(cause)));
+        this.fetchError.set(
+          cause instanceof Error ? cause : new Error(String(cause)),
+        );
       });
     }
     return this.status.asReadonly();

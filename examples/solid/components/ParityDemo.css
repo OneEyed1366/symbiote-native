@@ -1,0 +1,50 @@
+.parity-text {
+  color: #cdd6ee;
+  font-size: 14px;
+}
+
+.parity-note {
+  color: #cdd6ee;
+  font-size: 13px;
+}
+
+.parity-long-press-row {
+  color: #cdd6ee;
+  font-size: 15px;
+  padding: 12px;
+  border-radius: 10px;
+  background-color: #20304f;
+}
+
+.parity-input {
+  color: #e8ecf7;
+  padding: 12px;
+  border-radius: 10px;
+  background-color: #131c33;
+  border-width: 1px;
+  border-color: #7aa2e3;
+}
+
+.parity-list {
+  height: 120px;
+  border-radius: 10px;
+  background-color: #131c33;
+}
+
+.parity-section-list {
+  height: 200px;
+  border-radius: 10px;
+  background-color: #131c33;
+}
+
+/* Own name: App.css already has a `.section-header` for the canary's own chrome. */
+.parity-section-header {
+  color: #0b1120;
+  font-size: 13px;
+  font-weight: bold;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  padding-left: 12px;
+  padding-right: 12px;
+  background-color: #7aa2e3;
+}

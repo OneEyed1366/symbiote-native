@@ -44,18 +44,32 @@ const fabric = installFabric();
 const installed: unknown = globalThis.nativeFabricUIManager;
 if (!isRecord(installed)) throw new Error('fabric slot was not installed');
 
-installed.cloneNodeWithNewProps = (node: IFakeNode, patch: Record<string, unknown>): IFakeNode => ({
+installed.cloneNodeWithNewProps = (
+  node: IFakeNode,
+  patch: Record<string, unknown>,
+): IFakeNode => ({
   ...node,
   props: mergeProps(node.props, patch),
 });
 installed.cloneNodeWithNewChildrenAndProps = (
   node: IFakeNode,
   patch: Record<string, unknown>,
-): IFakeNode => ({ ...node, props: mergeProps(node.props, patch), children: [] });
+): IFakeNode => ({
+  ...node,
+  props: mergeProps(node.props, patch),
+  children: [],
+});
 // Canned geometry, keyed off the node's tag so we can prove the RIGHT node was measured.
 installed.measure = (
   _node: IFakeNode,
-  cb: (x: number, y: number, w: number, h: number, px: number, py: number) => void,
+  cb: (
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    px: number,
+    py: number,
+  ) => void,
 ): void => cb(1, 2, 100, 50, 11, 22);
 installed.measureInWindow = (
   _node: IFakeNode,
@@ -93,17 +107,24 @@ function mountApp(): { box: unknown; anchor: unknown } {
     );
   }
   mount(ROOT_TAG, <App />);
-  if (box == null || anchor == null) throw new Error('host refs handed back nothing');
+  if (box == null || anchor == null)
+    throw new Error('host refs handed back nothing');
   return { box, anchor };
 }
 
-function method(instance: unknown, name: string): (...args: unknown[]) => unknown {
+function method(
+  instance: unknown,
+  name: string,
+): (...args: unknown[]) => unknown {
   const candidate = Reflect.get(Object(instance), name);
-  if (typeof candidate !== 'function') throw new Error(`ref instance has no ${name}() method`);
+  if (typeof candidate !== 'function')
+    throw new Error(`ref instance has no ${name}() method`);
   return (...args: unknown[]) => Reflect.apply(candidate, instance, args);
 }
 
-function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findCommitted(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   function walk(node: IFakeNode): IFakeNode | undefined {
     if (predicate(node)) return node;
     for (const child of node.children) {
@@ -133,9 +154,18 @@ describe('React imperative host-component ref API', () => {
       method(
         box,
         'measure',
-      )((x: number, y: number, w: number, h: number, px: number, py: number) => {
-        seen = `${x},${y},${w},${h},${px},${py}`;
-      });
+      )(
+        (
+          x: number,
+          y: number,
+          w: number,
+          h: number,
+          px: number,
+          py: number,
+        ) => {
+          seen = `${x},${y},${w},${h},${px},${py}`;
+        },
+      );
       expect(seen).toBe('1,2,100,50,11,22');
     });
 
@@ -159,9 +189,12 @@ describe('React imperative host-component ref API', () => {
       const { box, anchor } = mountApp();
       const anchorTag = findNodeHandle(anchor);
       let seen = '';
-      method(box, 'measureLayout')(anchor, (left: number, top: number, w: number, h: number) => {
-        seen = `${left},${top},${w},${h}`;
-      });
+      method(box, 'measureLayout')(
+        anchor,
+        (left: number, top: number, w: number, h: number) => {
+          seen = `${left},${top},${w},${h}`;
+        },
+      );
       expect(seen).toBe(`${anchorTag},6,100,50`);
     });
 
@@ -183,8 +216,13 @@ describe('React imperative host-component ref API', () => {
     it('merges a partial setNativeProps style onto the box instead of replacing it', () => {
       const { box } = mountApp();
       method(box, 'setNativeProps')({ style: { opacity: 0.25 } });
-      const updated = findCommitted(n => n.viewName === 'RCTView' && n.props.opacity === 0.25);
-      expect(updated, 'setNativeProps re-committed the box with opacity 0.25').toBeDefined();
+      const updated = findCommitted(
+        n => n.viewName === 'RCTView' && n.props.opacity === 0.25,
+      );
+      expect(
+        updated,
+        'setNativeProps re-committed the box with opacity 0.25',
+      ).toBeDefined();
       // opacity is added while the declarative width/height survive the merge.
       expect(updated!.props.width).toBe(50);
       expect(updated!.props.height).toBe(50);

@@ -13,7 +13,9 @@ import { useBatteryState } from './index';
 const { addListener, getBatteryStateAsync, remove } = vi.hoisted(() => {
   const remove = vi.fn();
   return {
-    addListener: vi.fn((_listener: (event: { batteryState: number }) => void) => ({ remove })),
+    addListener: vi.fn(
+      (_listener: (event: { batteryState: number }) => void) => ({ remove }),
+    ),
     getBatteryStateAsync: vi.fn(async () => 2),
     remove,
   };
@@ -22,7 +24,13 @@ const { addListener, getBatteryStateAsync, remove } = vi.hoisted(() => {
 vi.mock('../../../core', () => ({
   addBatteryStateListener: addListener,
   getBatteryStateAsync,
-  BatteryState: { UNKNOWN: 0, UNPLUGGED: 1, CHARGING: 2, FULL: 3, NOT_CHARGING: 4 },
+  BatteryState: {
+    UNKNOWN: 0,
+    UNPLUGGED: 1,
+    CHARGING: 2,
+    FULL: 3,
+    NOT_CHARGING: 4,
+  },
 }));
 
 const ROOT_TAG = 952;

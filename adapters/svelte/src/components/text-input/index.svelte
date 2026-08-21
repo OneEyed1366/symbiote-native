@@ -89,7 +89,9 @@
   // plain, direct property read on the raw `$props()` proxy. `source` is a closed interface (no
   // index signature), so `Object.keys` + bracket-indexing would need an `as` cast; `Object.entries`
   // falls onto TS's `entries(o: {}): [string, any][]` overload instead, which needs no cast.
-  function forwardProps(source: Omit<ITextInputProps, 'value'>): Record<string, unknown> {
+  function forwardProps(
+    source: Omit<ITextInputProps, 'value'>,
+  ): Record<string, unknown> {
     const resolved = resolveAccessibilityProps(source);
     const result: Record<string, unknown> = {};
     for (const [key, propValue] of Object.entries(resolved)) {
@@ -205,9 +207,17 @@
     if (engineNode === undefined) return;
     if (!shouldCommandText(lastNativeText, currentValue)) return;
     const selStart = rest.selection?.start ?? SELECTION_NONE;
-    const selEnd = rest.selection?.end ?? rest.selection?.start ?? SELECTION_NONE;
-    dlog(`TextInput setTextAndSelection count=${count} text=${JSON.stringify(currentValue)}`);
-    dispatchViewCommand(engineNode, 'setTextAndSelection', [count, currentValue, selStart, selEnd]);
+    const selEnd =
+      rest.selection?.end ?? rest.selection?.start ?? SELECTION_NONE;
+    dlog(
+      `TextInput setTextAndSelection count=${count} text=${JSON.stringify(currentValue)}`,
+    );
+    dispatchViewCommand(engineNode, 'setTextAndSelection', [
+      count,
+      currentValue,
+      selStart,
+      selEnd,
+    ]);
     lastNativeText = currentValue;
   });
 
@@ -217,7 +227,8 @@
   // controlled-write effect above relies on.
   $effect(() => {
     const engineNode = hostShim?.engineNode;
-    if (autoFocused || engineNode === undefined || rest.autoFocus !== true) return;
+    if (autoFocused || engineNode === undefined || rest.autoFocus !== true)
+      return;
     autoFocused = true;
     dlog('TextInput autoFocus -> focus command');
     dispatchViewCommand(engineNode, 'focus', []);
@@ -241,7 +252,12 @@
   export function clear(): void {
     const engineNode = hostShim?.engineNode;
     if (engineNode === undefined) return;
-    dispatchViewCommand(engineNode, 'setTextAndSelection', [mostRecentEventCount, '', 0, 0]);
+    dispatchViewCommand(engineNode, 'setTextAndSelection', [
+      mostRecentEventCount,
+      '',
+      0,
+      0,
+    ]);
     lastNativeText = '';
   }
 

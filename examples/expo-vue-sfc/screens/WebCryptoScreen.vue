@@ -7,7 +7,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
-import { webCrypto, polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/vue';
+import {
+  webCrypto,
+  polyfillWebCrypto,
+} from '@symbiote-native/standard-web-crypto/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -41,9 +44,15 @@ function handleInstallPolyfill(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="web-crypto-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="web-crypto-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -52,8 +61,9 @@ function handleInstallPolyfill(): void {
         <View class="hero-copy">
           <Text class="hero-title">Web Crypto</Text>
           <Text class="hero-body"
-            >@symbiote-native/standard-web-crypto — a Web Crypto API `getRandomValues` polyfill
-            built on @symbiote-native/crypto's native random source.</Text
+            >@symbiote-native/standard-web-crypto — a Web Crypto API
+            `getRandomValues` polyfill built on @symbiote-native/crypto's native
+            random source.</Text
           >
         </View>
       </View>
@@ -67,9 +77,11 @@ function handleInstallPolyfill(): void {
           :color="lineColor"
         />
         <View v-if="randomBytesResult !== null" class="web-crypto-result-box">
-          <Text testID="web-crypto-random-bytes-result-value" class="web-crypto-result-text">{{
-            randomBytesResult
-          }}</Text>
+          <Text
+            testID="web-crypto-random-bytes-result-value"
+            class="web-crypto-result-text"
+            >{{ randomBytesResult }}</Text
+          >
         </View>
       </View>
 
@@ -83,9 +95,11 @@ function handleInstallPolyfill(): void {
         />
         <View v-if="polyfillInstalledResult !== null" class="web-crypto-row">
           <Text class="web-crypto-row-label">globalThis.crypto defined</Text>
-          <Text testID="web-crypto-polyfill-result-value" class="web-crypto-value-text">{{
-            polyfillInstalledResult ? 'Yes' : 'No'
-          }}</Text>
+          <Text
+            testID="web-crypto-polyfill-result-value"
+            class="web-crypto-value-text"
+            >{{ polyfillInstalledResult ? 'Yes' : 'No' }}</Text
+          >
         </View>
       </View>
     </ScrollView>

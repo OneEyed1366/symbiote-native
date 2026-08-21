@@ -17,7 +17,10 @@ export function createInitialSwitchState(): ISwitchState {
   return { lastNativeReport: null };
 }
 
-export function switchReducer(state: ISwitchState, action: ISwitchAction): ISwitchState {
+export function switchReducer(
+  state: ISwitchState,
+  action: ISwitchAction,
+): ISwitchState {
   switch (action.type) {
     case 'native-reported':
       // Always a fresh object, even when the boolean is unchanged from the prior report:
@@ -39,6 +42,11 @@ export function valueFromChange(event: ISymbioteEvent): boolean | undefined {
 // re-push cannot cover this: when the handler is a no-op the prop never changes, so the
 // retained tree never diverges and nothing re-commits. The imperative command is the only
 // correction path. No report yet (null) or agreement → no command.
-export function shouldSnapBack(state: ISwitchState, fabricValue: boolean): boolean {
-  return state.lastNativeReport !== null && state.lastNativeReport !== fabricValue;
+export function shouldSnapBack(
+  state: ISwitchState,
+  fabricValue: boolean,
+): boolean {
+  return (
+    state.lastNativeReport !== null && state.lastNativeReport !== fabricValue
+  );
 }

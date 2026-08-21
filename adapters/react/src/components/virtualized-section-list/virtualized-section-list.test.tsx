@@ -49,7 +49,8 @@ function App(): ReactElement {
       createElement('symbiote-text', {}, `header:${section.title}`),
     renderSectionFooter: ({ section }: { section: ISectionShape }) =>
       createElement('symbiote-text', {}, `footer:${section.title}`),
-    renderItem: ({ item }: { item: IRow }) => createElement('symbiote-text', {}, item.label),
+    renderItem: ({ item }: { item: IRow }) =>
+      createElement('symbiote-text', {}, item.label),
   });
 }
 

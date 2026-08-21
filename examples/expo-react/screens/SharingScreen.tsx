@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/react';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/react';
 import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -20,7 +26,8 @@ function CapabilityRow({
   label: string;
   status: ICapabilityStatus;
 }) {
-  const text = status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+  const text =
+    status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
   return (
     <View testID={testID} className="capability-row">
       <Text className="capability-label">{label}</Text>
@@ -49,7 +56,7 @@ export function SharingScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    isAvailableAsync().then((available) => {
+    isAvailableAsync().then(available => {
       if (isMounted) {
         setIsAvailable(toCapabilityStatus(available));
       }
@@ -70,7 +77,11 @@ export function SharingScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="sharing-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="sharing-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -81,8 +92,9 @@ export function SharingScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Sharing</Text>
             <Text className="hero-body">
-              @symbiote-native/sharing — hands a local file to the platform share sheet
-              (UIActivityViewController on iOS, the Android chooser).
+              @symbiote-native/sharing — hands a local file to the platform
+              share sheet (UIActivityViewController on iOS, the Android
+              chooser).
             </Text>
           </View>
         </View>
@@ -91,7 +103,11 @@ export function SharingScreen() {
           <View className="feature-card-header">
             <Text className="feature-card-title">Capabilities</Text>
           </View>
-          <CapabilityRow testID="sharing-available" label="Available" status={isAvailable} />
+          <CapabilityRow
+            testID="sharing-available"
+            label="Available"
+            status={isAvailable}
+          />
         </View>
 
         <View testID="sharing-share-card" className="feature-card">
@@ -99,9 +115,10 @@ export function SharingScreen() {
             <Text className="feature-card-title">Share a file</Text>
           </View>
           <Text className="info-text">
-            A real, readable local file URI is required — a file:// path, not a http(s) URL, which
-            is not downloaded first. This app has no file-system package, so supply a path that
-            already exists on the device.
+            A real, readable local file URI is required — a file:// path, not a
+            http(s) URL, which is not downloaded first. This app has no
+            file-system package, so supply a path that already exists on the
+            device.
           </Text>
           <TextInput
             testID="sharing-uri-input"

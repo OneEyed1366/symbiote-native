@@ -48,7 +48,11 @@ export const SystemUiScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="system-ui-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="system-ui-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -59,8 +63,8 @@ export const SystemUiScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">System UI</Text>
               <Text class="hero-body">
-                @symbiote-native/system-ui — reads and sets the root view's background color,
-                affecting the whole app.
+                @symbiote-native/system-ui — reads and sets the root view's
+                background color, affecting the whole app.
               </Text>
             </View>
           </View>
@@ -69,7 +73,10 @@ export const SystemUiScreen = defineComponent(
             <View class="auth-card-header">
               <Text class="auth-card-title">Background color</Text>
             </View>
-            <ValueRow label="Current" value={backgroundColor.value ?? 'not set'} />
+            <ValueRow
+              label="Current"
+              value={backgroundColor.value ?? 'not set'}
+            />
             <ActionButton
               testID="system-ui-red-button"
               title="Red"

@@ -61,7 +61,9 @@ const fakeNativeAnimated = {
   setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
   flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
   extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-  startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
+  startListeningToAnimatedNodeValue: record(
+    'startListeningToAnimatedNodeValue',
+  ),
   stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
   getValue: record('getValue'),
   addAnimatedEventToView: record('addAnimatedEventToView'),
@@ -95,12 +97,19 @@ describe('Animated native value listener', () => {
     mount(ROOT_TAG, <App />);
 
     // useNativeDriver makes `opacity` native; capture the native tag it was created as.
-    Animated.timing(opacity, { toValue: 1, duration: 100, useNativeDriver: true }).start();
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
 
     const valueCreate = callsOf('createAnimatedNode').find(call => {
       const config = call.args[1];
       return (
-        typeof config === 'object' && config !== null && 'type' in config && config.type === 'value'
+        typeof config === 'object' &&
+        config !== null &&
+        'type' in config &&
+        config.type === 'value'
       );
     });
     const valueTag = valueCreate?.args[0];
@@ -112,9 +121,11 @@ describe('Animated native value listener', () => {
       received = state.value;
     });
 
-    expect(callsOf('startListeningToAnimatedNodeValue').some(c => c.args[0] === valueTag)).toBe(
-      true,
-    );
+    expect(
+      callsOf('startListeningToAnimatedNodeValue').some(
+        c => c.args[0] === valueTag,
+      ),
+    ).toBe(true);
 
     // native reports a mid-flight value via the device bus -> the JS listener fires
     emitDevice('onAnimatedValueUpdate', { tag: valueTag, value: 0.5 });
@@ -123,9 +134,11 @@ describe('Animated native value listener', () => {
 
     // removing the last listener stops the native stream
     opacity.removeListener(listenerId);
-    expect(callsOf('stopListeningToAnimatedNodeValue').some(c => c.args[0] === valueTag)).toBe(
-      true,
-    );
+    expect(
+      callsOf('stopListeningToAnimatedNodeValue').some(
+        c => c.args[0] === valueTag,
+      ),
+    ).toBe(true);
 
     received = undefined;
     emitDevice('onAnimatedValueUpdate', { tag: valueTag, value: 0.9 });

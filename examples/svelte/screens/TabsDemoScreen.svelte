@@ -14,8 +14,8 @@
   import TabProfileScreen from './TabProfileScreen.svelte';
 </script>
 
-<Tab initialRouteName="Home"
-  ><TabScreen
+<Tab initialRouteName="Home">
+  <TabScreen
     name="Home"
     component={TabHomeScreen}
     options={{
@@ -23,13 +23,15 @@
       tabBarIcon: '🏠',
       tabBarActiveTintColor: LINE_COLOR.structure,
     }}
-  /><TabScreen
+  />
+  <TabScreen
     name="Search"
     component={TabSearchScreen}
     options={{ tabBarLabel: 'Search', tabBarIcon: '🔍', tabBarBadge: 3 }}
-  /><TabScreen
+  />
+  <TabScreen
     name="Profile"
     component={TabProfileScreen}
     options={{ tabBarLabel: 'Profile', tabBarIcon: '👤' }}
-  /></Tab
->
+  />
+</Tab>

@@ -9,6 +9,7 @@ import {
   Renderer2,
   type SimpleChanges,
 } from '@angular/core';
+import { countAngular } from '../diagnostics';
 import {
   flattenStyle,
   isSymbioteNode,
@@ -61,7 +62,9 @@ function isStyleValue<T>(value: unknown): value is IStyleProp<T> {
   );
 }
 
-export function anchorStyleProp<T>(elementRef: ElementRef<unknown>): IStyleProp<T> | undefined {
+export function anchorStyleProp<T>(
+  elementRef: ElementRef<unknown>,
+): IStyleProp<T> | undefined {
   const value = anchorHostStyle(elementRef);
   return isStyleValue<T>(value) ? value : undefined;
 }
@@ -70,7 +73,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function shallowStyleEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+function shallowStyleEqual(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): boolean {
   const aKeys = Object.keys(a);
   if (aKeys.length !== Object.keys(b).length) return false;
   return aKeys.every(key => a[key] === b[key]);
@@ -97,7 +103,9 @@ export function stableAnchorStyle(
   previous: unknown,
 ): Record<string, unknown> {
   const next = flattenStyle([anchorHostStyle(elementRef), explicitStyle]);
-  return isRecord(previous) && shallowStyleEqual(previous, next) ? previous : next;
+  return isRecord(previous) && shallowStyleEqual(previous, next)
+    ? previous
+    : next;
 }
 
 const ON_PREFIX = /^on[A-Z]/;
@@ -166,9 +174,11 @@ export class SymbioteStyleInputDirective implements DoCheck, OnChanges {
   // check re-dirties the view every tick and free-runs CD, the hazard `stableAnchorStyle` above
   // prevents one level up.
   ngDoCheck(): void {
+    countAngular('styleChecks');
     const current = anchorHostStyle(this.elementRef);
     if (isAnchorStyleUnchanged(this.lastAnchorStyle, current)) return;
     this.lastAnchorStyle = current;
+    countAngular('styleMarks');
     this.cdr.markForCheck();
   }
 }
@@ -178,7 +188,9 @@ export class SymbioteStyleInputDirective implements DoCheck, OnChanges {
 // above into a CD loop.
 function isAnchorStyleUnchanged(previous: unknown, next: unknown): boolean {
   if (Object.is(previous, next)) return true;
-  return isRecord(previous) && isRecord(next) && shallowStyleEqual(previous, next);
+  return (
+    isRecord(previous) && isRecord(next) && shallowStyleEqual(previous, next)
+  );
 }
 
 /**
@@ -194,9 +206,16 @@ function isAnchorStyleUnchanged(previous: unknown, next: unknown): boolean {
  * custom renderer's `setProperty`, so the engine's `routeProp` handles them as usual.
  */
 @Directive()
-export abstract class SymbiotePrimitiveHost implements OnChanges {
+export abstract class SymbiotePrimitiveHost implements DoCheck, OnChanges {
   private readonly renderer = inject(Renderer2);
   private readonly elementRef = inject(ElementRef);
+
+  // Counting only. Angular calls this once per view per check, so it is the only honest measure of
+  // how much tree a tick walks - and with CheckAlways primitives that is the whole application, not
+  // the screen on top. One integer increment next to a template refresh is not measurable.
+  ngDoCheck(): void {
+    countAngular('viewsChecked');
+  }
 
   @Input() style?: IStyleProp<unknown>;
 
@@ -210,8 +229,18 @@ export abstract class SymbiotePrimitiveHost implements OnChanges {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!('style' in changes)) return;
-    const value = this.style === undefined ? undefined : flattenStyle(this.style);
-    this.renderer.setProperty(this.elementRef.nativeElement, 'style', value);
+    const value =
+      this.style === undefined ? undefined : flattenStyle(this.style);
+    this.setHostProp('style', value);
+  }
+
+  /**
+   * Push one resolved prop onto the host element. `protected` rather than exposing the injected
+   * Renderer2/ElementRef, so a subclass applying its own defaults (TextHost) uses the same single
+   * write path this base already uses for `style`.
+   */
+  protected setHostProp(key: string, value: unknown): void {
+    this.renderer.setProperty(this.elementRef.nativeElement, key, value);
   }
 }
 
@@ -246,16 +275,48 @@ export class SymbioteHostPropsDirective {
   // Reference stability is the point, not just the allocation: a fresh function on every push
   // defeats every downstream identity check on the bag, so nothing upstream could ever conclude
   // "this bag is unchanged" while a callback prop was in it.
-  private readonly wrappers = new WeakMap<object, (...args: unknown[]) => unknown>();
+  private readonly wrappers = new WeakMap<
+    object,
+    (...args: unknown[]) => unknown
+  >();
+
+  // Values pushed by the previous bag, so a push writes only what actually moved. Copied rather
+  // than aliased: a component is free to hand back the same object with mutated fields.
+  private pushed: Record<string, unknown> = {};
 
   get node(): unknown {
     return this.elementRef.nativeElement;
   }
 
+  // MEASURED 2026-08-20, headless 1000-row create: writing every key of every bag cost 104 000
+  // engine setProp calls where Solid's identical screen cost 12 000 — and 90 000 of them carried
+  // `undefined`. A composed component's bag is a FIXED-SHAPE literal (Pressable's is ~48 keys,
+  // most of them unset on any given instance), so the first push of a fresh node spends most of
+  // its work deleting keys the node never had. Diffing per key removes exactly that: an unset key
+  // is skipped on mount and still written the moment it changes to or from a real value.
   set symbioteHostProps(props: Record<string, unknown>) {
+    const pushed = this.pushed;
+    // Only keys the node actually carries, so the vanished-key sweep below walks a handful rather
+    // than the bag's whole declared shape.
+    const next: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(props)) {
-      this.renderer.setProperty(this.elementRef.nativeElement, key, this.wrapCallback(key, value));
+      if (value !== undefined) next[key] = value;
+      if (Object.is(pushed[key], value)) continue;
+      this.renderer.setProperty(
+        this.elementRef.nativeElement,
+        key,
+        this.wrapCallback(key, value),
+      );
     }
+    // A bag's key SET is not fixed across pushes — resolveAccessibilityProps folds aria-* aliases
+    // into a different shape once any of them holds a value — and a key that vanishes must clear
+    // the prop rather than leave the last value on the native view. A key still IN the bag was
+    // already handled above, `undefined` included.
+    for (const key of Object.keys(pushed)) {
+      if (key in props) continue;
+      this.renderer.setProperty(this.elementRef.nativeElement, key, undefined);
+    }
+    this.pushed = next;
   }
 
   // A flat-bag `onX` callback (responder negotiation, onLongPress, …) is invoked by the engine's

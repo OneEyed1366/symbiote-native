@@ -15,14 +15,19 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
-import { createSurface, disposeRoot, type SymbioteSurface } from '@symbiote-native/engine';
+import {
+  createSurface,
+  disposeRoot,
+  type SymbioteSurface,
+} from '@symbiote-native/engine';
 import { patchGlobals, restoreGlobals } from './patch-globals';
 import { ShimElement } from './element';
 import { ShimDocumentFragment } from './document-fragment';
 import { createRootShimElement } from '../root-element';
 
 // RN sets both before any app code runs; a bare vitest sandbox has neither.
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -30,7 +35,8 @@ if (globalThis.navigator === undefined) {
 const ROOT_TAG = 91_304;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let surface: SymbioteSurface | undefined;
 

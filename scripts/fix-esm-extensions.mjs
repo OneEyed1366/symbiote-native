@@ -21,12 +21,19 @@ import { esmExtensionBuildDirs } from './lib/build-dirs.mjs';
 const EXT_RE = /\.(js|jsx|mjs|cjs|json|svelte)$/;
 const RELATIVE_RE = /^\.\.?\//; // a specifier we rewrite: './x' or '../x'
 
-function listJsFiles(dir) {
+// tsc emits `.js` for a `.ts` input and `.jsx` for a `.tsx` input whenever `jsx: 'preserve'` is set
+// — which adapters/solid does, because Solid's JSX is compiled by babel-preset-solid in the consuming
+// app's Metro, never by tsc. Both are emitted output this has to scan AND resolve TO: a build/index.js
+// importing './components/View' where only View.jsx exists would otherwise be reported UNRESOLVED and
+// fail the publish gate.
+const EMITTED_EXTS = ['.js', '.jsx'];
+
+function listEmittedFiles(dir) {
   const out = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...listJsFiles(full));
-    else if (entry.isFile() && entry.name.endsWith('.js')) out.push(full);
+    if (entry.isDirectory()) out.push(...listEmittedFiles(full));
+    else if (entry.isFile() && EMITTED_EXTS.some(ext => entry.name.endsWith(ext))) out.push(full);
   }
   return out;
 }
@@ -39,21 +46,27 @@ const PLATFORM_SUFFIXES = ['ios', 'android', 'native'];
 // straight past `.ios`/`.android`, always resolving to the same (headless-fallback) file on every
 // platform. Mirrors react-native-builder-bob's ESM extension-fixer, which skips these same imports.
 function hasPlatformSibling(dirPath, baseName) {
-  return PLATFORM_SUFFIXES.some((platform) => fs.existsSync(path.join(dirPath, `${baseName}.${platform}.js`)));
+  return PLATFORM_SUFFIXES.some(platform =>
+    EMITTED_EXTS.some(ext => fs.existsSync(path.join(dirPath, `${baseName}.${platform}${ext}`))),
+  );
 }
 
 // Returns the fixed specifier, `'skip'` for an intentional platform-split no-op, or `null` when
 // nothing on disk matches (a real "unresolved" case the caller should report).
 function resolveSpecifier(fromFile, spec) {
   const base = path.resolve(path.dirname(fromFile), spec);
-  if (fs.existsSync(base + '.js')) {
-    if (hasPlatformSibling(path.dirname(base), path.basename(base))) return 'skip';
-    return spec + '.js';
+  for (const ext of EMITTED_EXTS) {
+    if (fs.existsSync(base + ext)) {
+      if (hasPlatformSibling(path.dirname(base), path.basename(base))) return 'skip';
+      return spec + ext;
+    }
   }
   if (fs.existsSync(base) && fs.statSync(base).isDirectory()) {
-    if (fs.existsSync(path.join(base, 'index.js'))) {
-      if (hasPlatformSibling(base, 'index')) return 'skip';
-      return spec + '/index.js';
+    for (const ext of EMITTED_EXTS) {
+      if (fs.existsSync(path.join(base, `index${ext}`))) {
+        if (hasPlatformSibling(base, 'index')) return 'skip';
+        return `${spec}/index${ext}`;
+      }
     }
   }
   return null;
@@ -139,7 +152,19 @@ function scanRegex(source, start) {
 // or after one of these keywords. Judged off the code-only tail, so a quote inside a regex like
 // `/['"]/` never mis-opens a string. Keeps division (`a / b`) from being read as a regex.
 const REGEX_PRECEDING_KEYWORDS = new Set([
-  'return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'do', 'else', 'yield', 'await', 'case',
+  'return',
+  'typeof',
+  'instanceof',
+  'in',
+  'of',
+  'new',
+  'delete',
+  'void',
+  'do',
+  'else',
+  'yield',
+  'await',
+  'case',
 ]);
 const REGEX_PRECEDING_PUNCTUATORS = new Set([...'([{,;:?=+-*/%&|^!~<>']);
 
@@ -170,7 +195,7 @@ export function rewriteEsmSpecifiers(source, resolve) {
   let importsFixed = 0;
   const unresolved = [];
 
-  for (let i = 0; i < source.length; ) {
+  for (let i = 0; i < source.length;) {
     const c = source[i];
     const next = source[i + 1];
 
@@ -226,9 +251,9 @@ export function fixEsmExtensions(buildDir) {
   let importsFixed = 0;
   const unresolved = [];
 
-  for (const file of listJsFiles(buildDir)) {
+  for (const file of listEmittedFiles(buildDir)) {
     const original = fs.readFileSync(file, 'utf8');
-    const resolve = (spec) => (EXT_RE.test(spec) ? 'skip' : resolveSpecifier(file, spec));
+    const resolve = spec => (EXT_RE.test(spec) ? 'skip' : resolveSpecifier(file, spec));
     const result = rewriteEsmSpecifiers(original, resolve);
 
     importsFixed += result.importsFixed;
@@ -261,7 +286,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`Import specifiers fixed: ${totalImports}`);
   if (allUnresolved.length) {
     console.error(`\nUNRESOLVED (${allUnresolved.length}) - fix or investigate before publishing:`);
-    allUnresolved.forEach((u) => console.error('  ' + u));
+    allUnresolved.forEach(u => console.error('  ' + u));
     process.exit(1);
   }
 }

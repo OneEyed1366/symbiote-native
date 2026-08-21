@@ -46,10 +46,14 @@ type IFakeManager = {
 
 function installFakeManager(manager: IFakeManager | null): void {
   globalThis.__turboModuleProxy = <T>(name: string): T | null =>
-    name === 'ActionSheetManager' && manager !== null && isPresent<T>(manager) ? manager : null;
+    name === 'ActionSheetManager' && manager !== null && isPresent<T>(manager)
+      ? manager
+      : null;
 }
 
-function defaultFakeManager(): Required<Pick<IFakeManager, 'showActionSheetWithOptions'>> &
+function defaultFakeManager(): Required<
+  Pick<IFakeManager, 'showActionSheetWithOptions'>
+> &
   IFakeManager {
   return {
     showActionSheetWithOptions(
@@ -94,7 +98,11 @@ describe('ActionSheetIOS', () => {
     it('passes options through, normalizes a single destructiveButtonIndex, and delivers the chosen index', () => {
       let chosen = -1;
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['A', 'B', 'Cancel'], cancelButtonIndex: 2, destructiveButtonIndex: 1 },
+        {
+          options: ['A', 'B', 'Cancel'],
+          cancelButtonIndex: 2,
+          destructiveButtonIndex: 1,
+        },
         idx => {
           chosen = idx;
         },
@@ -125,7 +133,10 @@ describe('ActionSheetIOS', () => {
     // why: when the caller supplies no destructiveButtonIndex at all, normalization must not
     // invent one — an action sheet with no destructive row must reach native with none.
     it('omitting destructiveButtonIndex leaves destructiveButtonIndices unset', () => {
-      ActionSheetIOS.showActionSheetWithOptions({ options: ['A', 'B'] }, () => undefined);
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['A', 'B'] },
+        () => undefined,
+      );
       expect(captured?.destructiveButtonIndices).toBeUndefined();
     });
 
@@ -140,7 +151,10 @@ describe('ActionSheetIOS', () => {
           activityTypeResult = activityType;
         },
       );
-      expect(capturedShare).toEqual({ message: 'hello', url: 'https://example.com' });
+      expect(capturedShare).toEqual({
+        message: 'hello',
+        url: 'https://example.com',
+      });
       expect(completedResult).toBe(true);
       expect(activityTypeResult).toBe('com.apple.UIKit.activity.Mail');
     });
@@ -150,7 +164,8 @@ describe('ActionSheetIOS', () => {
     // silently resolve as success.
     it('showShareActionSheetWithOptions delivers the failure callback on native error', () => {
       installFakeManager({
-        showActionSheetWithOptions: defaultFakeManager().showActionSheetWithOptions,
+        showActionSheetWithOptions:
+          defaultFakeManager().showActionSheetWithOptions,
         showShareActionSheetWithOptions(_options, failureCallback): void {
           failureCallback({ message: 'user cancelled' });
         },
@@ -213,7 +228,8 @@ describe('ActionSheetIOS', () => {
     // function" on such a host.
     it('dismissActionSheet is a no-op when the module resolves but lacks dismissActionSheet', () => {
       installFakeManager({
-        showActionSheetWithOptions: defaultFakeManager().showActionSheetWithOptions,
+        showActionSheetWithOptions:
+          defaultFakeManager().showActionSheetWithOptions,
       });
       expect(() => ActionSheetIOS.dismissActionSheet()).not.toThrow();
       expect(dismissCalled).toBe(false);

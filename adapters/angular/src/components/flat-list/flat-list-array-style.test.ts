@@ -1,7 +1,11 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFabric } from '@symbiote-native/test-utils';
+import {
+  advanceTicks,
+  installFabric,
+  waitForQuiet,
+} from '@symbiote-native/test-utils';
 import { flattenStyle } from '@symbiote-native/engine';
 
 import { mount, unmount } from '../../render';
@@ -50,7 +54,12 @@ const chips: IChip[] = Array.from({ length: 24 }, (_unused, index) => ({
       <ng-template vListItem let-item>
         <symbiote-view
           [testID]="'chip-' + item.n"
-          [style]="flattenStyle([{ height: 72, width: 64 }, { backgroundColor: chipColor(item) }])"
+          [style]="
+            flattenStyle([
+              { height: 72, width: 64 },
+              { backgroundColor: chipColor(item) },
+            ])
+          "
         >
           <symbiote-text>{{ item.n }}</symbiote-text>
         </symbiote-view>
@@ -96,7 +105,10 @@ describe('FlatList array-composed item style', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    const chip0 = findCommitted(fabric.committed, node => node.props.testID === 'chip-0');
+    const chip0 = findCommitted(
+      fabric.committed,
+      node => node.props.testID === 'chip-0',
+    );
     expect(chip0?.props).toMatchObject({
       height: 72,
       width: 64,
@@ -118,14 +130,16 @@ describe('FlatList array-composed item style', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    let previous = fabric.counts.completeRoot;
-    let stillGrowing = false;
-    for (let tick = 0; tick < 10; tick += 1) {
-      await new Promise<void>(resolve => setTimeout(resolve, 0));
-      const current = fabric.counts.completeRoot;
-      if (current > previous) stillGrowing = true;
-      previous = current;
-    }
-    expect(stillGrowing).toBe(false);
+    // Settle on a real condition FIRST, then observe. The previous shape counted ten fixed
+    // macrotasks and asserted no growth across them, which only held while the machine was idle:
+    // under a loaded full-suite run the window had not finished committing when the count began,
+    // and a harness that gave up early read as free-running change detection. If CD genuinely
+    // free-ran, waitForQuiet never settles and throws — the failure this test is here to catch.
+    const settled = await waitForQuiet(
+      () => fabric.counts.completeRoot,
+      'flat-list window commits',
+    );
+    await advanceTicks(10);
+    expect(fabric.counts.completeRoot).toBe(settled);
   });
 });

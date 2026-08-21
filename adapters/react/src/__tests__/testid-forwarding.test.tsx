@@ -45,8 +45,13 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 // KeyboardAvoidingView subscribes to the native Keyboard hub on mount; install the minimal fake
 // device-event hub + KeyboardObserver the dedicated keyboard tests use so it mounts headless.
 // (Harness setup, not part of the testID contract.)
-const fakeKeyboardObserver = { addListener: (): void => {}, removeListeners: (): void => {} };
-const fakeModules: Record<string, unknown> = { KeyboardObserver: fakeKeyboardObserver };
+const fakeKeyboardObserver = {
+  addListener: (): void => {},
+  removeListeners: (): void => {},
+};
+const fakeModules: Record<string, unknown> = {
+  KeyboardObserver: fakeKeyboardObserver,
+};
 Object.assign(globalThis, {
   __turboModuleProxy: (name: string): unknown => fakeModules[name] ?? null,
   RN$registerCallableModule: (): void => {},
@@ -76,36 +81,78 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
         createElement(Text, {}, 'x'),
       ),
   ],
-  ['ScrollView', id => createElement(ScrollView, { testID: id }, createElement(Text, {}, 'x'))],
+  [
+    'ScrollView',
+    id =>
+      createElement(ScrollView, { testID: id }, createElement(Text, {}, 'x')),
+  ],
   ['TextInput', id => createElement(TextInput, { testID: id })],
   ['Switch', id => createElement(Switch, { testID: id, value: false })],
   ['ActivityIndicator', id => createElement(ActivityIndicator, { testID: id })],
   ['Button', id => createElement(Button, { testID: id, title: 'x' })],
-  ['Pressable', id => createElement(Pressable, { testID: id }, createElement(Text, {}, 'x'))],
+  [
+    'Pressable',
+    id =>
+      createElement(Pressable, { testID: id }, createElement(Text, {}, 'x')),
+  ],
   [
     'TouchableOpacity',
-    id => createElement(TouchableOpacity, { testID: id }, createElement(Text, {}, 'x')),
+    id =>
+      createElement(
+        TouchableOpacity,
+        { testID: id },
+        createElement(Text, {}, 'x'),
+      ),
   ],
   [
     'TouchableHighlight',
-    id => createElement(TouchableHighlight, { testID: id }, createElement(Text, {}, 'x')),
+    id =>
+      createElement(
+        TouchableHighlight,
+        { testID: id },
+        createElement(Text, {}, 'x'),
+      ),
   ],
   [
     'TouchableWithoutFeedback',
-    id => createElement(TouchableWithoutFeedback, { testID: id }, createElement(View, {})),
+    id =>
+      createElement(
+        TouchableWithoutFeedback,
+        { testID: id },
+        createElement(View, {}),
+      ),
   ],
   [
     'TouchableNativeFeedback',
-    id => createElement(TouchableNativeFeedback, { testID: id }, createElement(Text, {}, 'x')),
+    id =>
+      createElement(
+        TouchableNativeFeedback,
+        { testID: id },
+        createElement(Text, {}, 'x'),
+      ),
   ],
-  ['SafeAreaView', id => createElement(SafeAreaView, { testID: id }, createElement(Text, {}, 'x'))],
+  [
+    'SafeAreaView',
+    id =>
+      createElement(SafeAreaView, { testID: id }, createElement(Text, {}, 'x')),
+  ],
   [
     'KeyboardAvoidingView',
-    id => createElement(KeyboardAvoidingView, { testID: id }, createElement(Text, {}, 'x')),
+    id =>
+      createElement(
+        KeyboardAvoidingView,
+        { testID: id },
+        createElement(Text, {}, 'x'),
+      ),
   ],
   [
     'Modal',
-    id => createElement(Modal, { testID: id, visible: true }, createElement(Text, {}, 'x')),
+    id =>
+      createElement(
+        Modal,
+        { testID: id, visible: true },
+        createElement(Text, {}, 'x'),
+      ),
   ],
   [
     'InputAccessoryView',
@@ -122,7 +169,8 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(FlatList, {
         testID: id,
         data: [1],
-        renderItem: (info: { item: unknown }) => createElement(Text, {}, String(info.item)),
+        renderItem: (info: { item: unknown }) =>
+          createElement(Text, {}, String(info.item)),
       }),
   ],
   [
@@ -131,7 +179,8 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(SectionList, {
         testID: id,
         sections: [{ title: 's', data: [1] }],
-        renderItem: (info: { item: unknown }) => createElement(Text, {}, String(info.item)),
+        renderItem: (info: { item: unknown }) =>
+          createElement(Text, {}, String(info.item)),
       }),
   ],
   [
@@ -140,9 +189,12 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(VirtualizedList, {
         testID: id,
         data: [1],
-        getItem: (data: unknown, index: number) => (Array.isArray(data) ? data[index] : undefined),
-        getItemCount: (data: unknown) => (Array.isArray(data) ? data.length : 0),
-        renderItem: (info: { item: unknown }) => createElement(Text, {}, String(info.item)),
+        getItem: (data: unknown, index: number) =>
+          Array.isArray(data) ? data[index] : undefined,
+        getItemCount: (data: unknown) =>
+          Array.isArray(data) ? data.length : 0,
+        renderItem: (info: { item: unknown }) =>
+          createElement(Text, {}, String(info.item)),
       }),
   ],
   [
@@ -151,10 +203,14 @@ const cases: ReadonlyArray<readonly [string, (id: string) => ReactElement]> = [
       createElement(VirtualizedSectionList, {
         testID: id,
         sections: [{ title: 's', data: [1] }],
-        renderItem: (info: { item: unknown }) => createElement(Text, {}, String(info.item)),
+        renderItem: (info: { item: unknown }) =>
+          createElement(Text, {}, String(info.item)),
       }),
   ],
-  ['RefreshControl', id => createElement(RefreshControl, { testID: id, refreshing: false })],
+  [
+    'RefreshControl',
+    id => createElement(RefreshControl, { testID: id, refreshing: false }),
+  ],
   ['Animated.View', id => createElement(Animated.View, { testID: id })],
   ['Animated.Text', id => createElement(Animated.Text, { testID: id }, 'x')],
 ];

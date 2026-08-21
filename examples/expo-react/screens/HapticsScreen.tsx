@@ -1,5 +1,11 @@
 import { useCallback, useState } from 'react';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/react';
 import {
   AndroidHaptics,
   ImpactFeedbackStyle,
@@ -13,15 +19,19 @@ import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
-const IMPACT_STYLES: readonly { label: string; style: ImpactFeedbackStyle }[] = [
-  { label: 'Light', style: ImpactFeedbackStyle.Light },
-  { label: 'Medium', style: ImpactFeedbackStyle.Medium },
-  { label: 'Heavy', style: ImpactFeedbackStyle.Heavy },
-  { label: 'Rigid', style: ImpactFeedbackStyle.Rigid },
-  { label: 'Soft', style: ImpactFeedbackStyle.Soft },
-];
+const IMPACT_STYLES: readonly { label: string; style: ImpactFeedbackStyle }[] =
+  [
+    { label: 'Light', style: ImpactFeedbackStyle.Light },
+    { label: 'Medium', style: ImpactFeedbackStyle.Medium },
+    { label: 'Heavy', style: ImpactFeedbackStyle.Heavy },
+    { label: 'Rigid', style: ImpactFeedbackStyle.Rigid },
+    { label: 'Soft', style: ImpactFeedbackStyle.Soft },
+  ];
 
-const NOTIFICATION_TYPES: readonly { label: string; type: NotificationFeedbackType }[] = [
+const NOTIFICATION_TYPES: readonly {
+  label: string;
+  type: NotificationFeedbackType;
+}[] = [
   { label: 'Success', type: NotificationFeedbackType.Success },
   { label: 'Warning', type: NotificationFeedbackType.Warning },
   { label: 'Error', type: NotificationFeedbackType.Error },
@@ -47,7 +57,10 @@ const ANDROID_HAPTICS: readonly { label: string; type: AndroidHaptics }[] = [
   { label: 'Virtual key release', type: AndroidHaptics.Virtual_Key_Release },
   { label: 'No haptics', type: AndroidHaptics.No_Haptics },
   { label: 'Segment tick', type: AndroidHaptics.Segment_Tick },
-  { label: 'Segment frequent tick', type: AndroidHaptics.Segment_Frequent_Tick },
+  {
+    label: 'Segment frequent tick',
+    type: AndroidHaptics.Segment_Frequent_Tick,
+  },
   { label: 'Text handle move', type: AndroidHaptics.Text_Handle_Move },
 ];
 
@@ -64,29 +77,42 @@ export function HapticsScreen() {
 
   const [lastFired, setLastFired] = useState<string | null>(null);
 
-  const handleImpact = useCallback((style: ImpactFeedbackStyle, label: string) => {
-    impactAsync(style);
-    setLastFired(`impactAsync(${label})`);
-  }, []);
+  const handleImpact = useCallback(
+    (style: ImpactFeedbackStyle, label: string) => {
+      impactAsync(style);
+      setLastFired(`impactAsync(${label})`);
+    },
+    [],
+  );
 
-  const handleNotification = useCallback((type: NotificationFeedbackType, label: string) => {
-    notificationAsync(type);
-    setLastFired(`notificationAsync(${label})`);
-  }, []);
+  const handleNotification = useCallback(
+    (type: NotificationFeedbackType, label: string) => {
+      notificationAsync(type);
+      setLastFired(`notificationAsync(${label})`);
+    },
+    [],
+  );
 
   const handleSelection = useCallback(() => {
     selectionAsync();
     setLastFired('selectionAsync()');
   }, []);
 
-  const handleAndroidHaptic = useCallback((type: AndroidHaptics, label: string) => {
-    performAndroidHapticsAsync(type);
-    setLastFired(`performAndroidHapticsAsync(${label})`);
-  }, []);
+  const handleAndroidHaptic = useCallback(
+    (type: AndroidHaptics, label: string) => {
+      performAndroidHapticsAsync(type);
+      setLastFired(`performAndroidHapticsAsync(${label})`);
+    },
+    [],
+  );
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="haptics-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="haptics-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -97,9 +123,10 @@ export function HapticsScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Haptics</Text>
             <Text className="hero-body">
-              @symbiote-native/haptics — impact/notification/selection vibration feedback via
-              iOS's Taptic Engine and Android's Vibrator API. A simulator won't produce physical
-              feedback; a real device is needed to feel it.
+              @symbiote-native/haptics — impact/notification/selection vibration
+              feedback via iOS's Taptic Engine and Android's Vibrator API. A
+              simulator won't produce physical feedback; a real device is needed
+              to feel it.
             </Text>
           </View>
         </View>
@@ -156,7 +183,8 @@ export function HapticsScreen() {
               <Text className="feature-card-title">Android haptics</Text>
             </View>
             <Text className="info-text">
-              performAndroidHapticsAsync() drives the device haptics engine directly — Android only.
+              performAndroidHapticsAsync() drives the device haptics engine
+              directly — Android only.
             </Text>
             <View className="button-row">
               {ANDROID_HAPTICS.map(({ label, type }) => (

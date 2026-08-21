@@ -12,7 +12,14 @@
 // Children arrive as a (scoped) default slot so `v-slot="{ pressed }"` mirrors React's
 // children-as-function.
 
-import { defineComponent, h, ref, shallowRef, type EmitFn, type VNode } from '@vue/runtime-core';
+import {
+  defineComponent,
+  h,
+  ref,
+  shallowRef,
+  type EmitFn,
+  type VNode,
+} from '@vue/runtime-core';
 import {
   createPressHandlers,
   createPressRuntime,
@@ -44,7 +51,10 @@ import { View } from '../components';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 import type { ICtx } from '../utils/component-helpers';
 
-export type { IPressState, IPressableAndroidRippleConfig } from '@symbiote-native/components';
+export type {
+  IPressState,
+  IPressableAndroidRippleConfig,
+} from '@symbiote-native/components';
 
 export type IPressableEmits = {
   press: (event: ISymbioteEvent) => boolean;
@@ -97,7 +107,8 @@ export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   delayHoverIn?: number;
   delayHoverOut?: number;
   testID?: string;
-  style?: IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
+  style?:
+    IStyleProp<IViewStyle> | ((state: IPressState) => IStyleProp<IViewStyle>);
   // Unlike `style`, never a function of press state - a CSS class is compiled statically, so a
   // press-state-dependent look still needs `style`'s function form.
   class?: IClassNameValue;
@@ -111,7 +122,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isStyleFn(value: unknown): value is (state: IPressState) => IStyleProp<IViewStyle> {
+function isStyleFn(
+  value: unknown,
+): value is (state: IPressState) => IStyleProp<IViewStyle> {
   return typeof value === 'function';
 }
 
@@ -124,7 +137,8 @@ function numberOr(value: unknown, fallback: number): number {
 function asRectOffset(value: unknown): IRectOffset | undefined {
   if (typeof value === 'number') return value;
   if (!isRecord(value)) return undefined;
-  const rect: { top?: number; left?: number; bottom?: number; right?: number } = {};
+  const rect: { top?: number; left?: number; bottom?: number; right?: number } =
+    {};
   if (typeof value.top === 'number') rect.top = value.top;
   if (typeof value.left === 'number') rect.left = value.left;
   if (typeof value.bottom === 'number') rect.bottom = value.bottom;
@@ -133,18 +147,24 @@ function asRectOffset(value: unknown): IRectOffset | undefined {
 }
 
 // android_ripple arrives untyped; keep only the fields the shared rippleProps reads.
-function asRippleConfig(value: unknown): IPressableAndroidRippleConfig | undefined {
+function asRippleConfig(
+  value: unknown,
+): IPressableAndroidRippleConfig | undefined {
   if (!isRecord(value)) return undefined;
   const config: IPressableAndroidRippleConfig = {};
   if (typeof value.color === 'string') config.color = value.color;
-  if (typeof value.borderless === 'boolean') config.borderless = value.borderless;
+  if (typeof value.borderless === 'boolean')
+    config.borderless = value.borderless;
   if (typeof value.radius === 'number') config.radius = value.radius;
-  if (typeof value.foreground === 'boolean') config.foreground = value.foreground;
+  if (typeof value.foreground === 'boolean')
+    config.foreground = value.foreground;
   return config;
 }
 
 // The user's accessibilityState, narrowed to the known fields (the disabled merge happens after).
-function asAccessibilityState(value: unknown): IAccessibilityStateValue | undefined {
+function asAccessibilityState(
+  value: unknown,
+): IAccessibilityStateValue | undefined {
   if (!isRecord(value)) return undefined;
   const state: IAccessibilityStateValue = {};
   if (typeof value.disabled === 'boolean') state.disabled = value.disabled;
@@ -228,7 +248,8 @@ export const Pressable = defineComponent(
     return () => {
       const attrs = normalizeVueAttrs(rawAttrs);
       const disabled = attrs.disabled === true ? true : undefined;
-      const cancelable = typeof attrs.cancelable === 'boolean' ? attrs.cancelable : undefined;
+      const cancelable =
+        typeof attrs.cancelable === 'boolean' ? attrs.cancelable : undefined;
 
       const config: IPressMachineConfig = {
         onPress: event => emit('press', event),
@@ -236,7 +257,10 @@ export const Pressable = defineComponent(
         onPressOut: event => emit('pressOut', event),
         onPressMove: event => emit('pressMove', event),
         onLongPress: event => emit('longPress', event),
-        delayLongPress: numberOr(attrs.delayLongPress, DEFAULT_DELAY_LONG_PRESS_MS),
+        delayLongPress: numberOr(
+          attrs.delayLongPress,
+          DEFAULT_DELAY_LONG_PRESS_MS,
+        ),
         unstable_pressDelay: numberOr(attrs.unstable_pressDelay, 0),
         hitSlop: asRectOffset(attrs.hitSlop),
         pressRetentionOffset: asRectOffset(attrs.pressRetentionOffset),
@@ -263,16 +287,21 @@ export const Pressable = defineComponent(
       };
       if (typeof attrs.android_disableSound === 'boolean')
         viewProps.android_disableSound = attrs.android_disableSound;
-      Object.assign(viewProps, buildPressableListeners(handlers, { disabled, cancelable }));
+      Object.assign(
+        viewProps,
+        buildPressableListeners(handlers, { disabled, cancelable }),
+      );
 
-      const content: VNode[] | VNode = slots.default !== undefined ? slots.default(state) : [];
+      const content: VNode[] | VNode =
+        slots.default !== undefined ? slots.default(state) : [];
 
       // android_ripple rides a dedicated inner View; on iOS the prop is undefined, so the child
       // renders unwrapped, no extra node.
       const ripple = isRecord(attrs.android_ripple)
         ? rippleProps(asRippleConfig(attrs.android_ripple) ?? {})
         : undefined;
-      const inner = ripple !== undefined ? [h(View, ripple, () => content)] : content;
+      const inner =
+        ripple !== undefined ? [h(View, ripple, () => content)] : content;
 
       // Children go to the host View as a FUNCTION slot, never a raw array: View is a
       // functional component, and an array child makes Vue normalize it to a default

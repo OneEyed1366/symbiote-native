@@ -7,37 +7,59 @@
   logcat for the announce + module-resolution dlogs; on iOS via Accessibility Inspector.
 -->
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { View, Text, AccessibilityInfo } from '@symbiote-native/vue'
+import { ref, onMounted } from 'vue';
+import { View, Text, AccessibilityInfo } from '@symbiote-native/vue';
 
-const screenReader = ref('querying…')
+const screenReader = ref('querying…');
 
 onMounted(() => {
   // A non-throwing getter proves the native module name resolved (Android
   // 'AccessibilityInfo' / iOS 'AccessibilityManager'); a reject means wrong name.
   AccessibilityInfo.isScreenReaderEnabled()
-    .then(enabled => { screenReader.value = enabled ? 'on' : 'off' })
-    .catch(() => { screenReader.value = 'unavailable' })
-  AccessibilityInfo.announceForAccessibility('symbiote accessibility online')
-})
+    .then(enabled => {
+      screenReader.value = enabled ? 'on' : 'off';
+    })
+    .catch(() => {
+      screenReader.value = 'unavailable';
+    });
+  AccessibilityInfo.announceForAccessibility('symbiote accessibility online');
+});
 </script>
 
 <template>
   <View class="section-nested">
-    <Text class="section-label">Accessibility · props → native · aria/role transform · AccessibilityInfo</Text>
+    <Text class="section-label"
+      >Accessibility · props → native · aria/role transform ·
+      AccessibilityInfo</Text
+    >
     <!-- getter readout: 'off' (no screen reader) proves the module resolved -->
     <Text class="info-text">{{ `screen reader: ${screenReader}` }}</Text>
     <!-- canonical accessibility*: content-desc 'a11y-canonical-label' + role=header -->
-    <View :accessible="true" accessibility-role="header" accessibility-label="a11y-canonical-label" class="a11y-card">
+    <View
+      :accessible="true"
+      accessibility-role="header"
+      accessibility-label="a11y-canonical-label"
+      class="a11y-card"
+    >
       <Text class="info-text">canonical label + role=header</Text>
     </View>
     <!-- web aria and role aliases MUST fold: content-desc should be
          'a11y-aria-label', a raw aria-label attribute must not reach the native node -->
-    <View :accessible="true" role="button" aria-label="a11y-aria-label" class="a11y-card">
+    <View
+      :accessible="true"
+      role="button"
+      aria-label="a11y-aria-label"
+      class="a11y-card"
+    >
       <Text class="info-text">aria-label + role=button</Text>
     </View>
     <!-- accessibilityState: uiautomator shows enabled=false / selected=true -->
-    <View :accessible="true" accessibility-label="a11y-state" :accessibility-state="{ disabled: true, selected: true }" class="a11y-card">
+    <View
+      :accessible="true"
+      accessibility-label="a11y-state"
+      :accessibility-state="{ disabled: true, selected: true }"
+      class="a11y-card"
+    >
       <Text class="info-text">state: disabled + selected</Text>
     </View>
   </View>

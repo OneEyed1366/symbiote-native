@@ -8,7 +8,12 @@
 
 import { createElement, createRef, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FlatList, mount, unmount, type IFlatListHandle } from '@symbiote-native/react';
+import {
+  FlatList,
+  mount,
+  unmount,
+  type IFlatListHandle,
+} from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
 interface ICommandCall {
@@ -49,7 +54,8 @@ function App(): ReactElement {
       offset: ITEM_HEIGHT * index,
       index,
     }),
-    renderItem: ({ item }) => createElement('symbiote-text', {}, `row-${item.id}`),
+    renderItem: ({ item }) =>
+      createElement('symbiote-text', {}, `row-${item.id}`),
     ref: listRef,
   });
 }
@@ -66,7 +72,10 @@ describe('VirtualizedList imperative scroll routes through the native scrollTo c
 
     listRef.current!.scrollToOffset({ offset: 200, animated: true });
     const scrolls = scrollCommands();
-    expect(scrolls.length, 'animated scrollToOffset dispatches one scrollTo').toBe(1);
+    expect(
+      scrolls.length,
+      'animated scrollToOffset dispatches one scrollTo',
+    ).toBe(1);
 
     const [x, y, animated] = scrolls[0].args;
     // A vertical list scrolls along y; x stays 0.
@@ -87,7 +96,10 @@ describe('VirtualizedList imperative scroll routes through the native scrollTo c
     listRef.current!.scrollToOffset({ offset: 200, animated: true });
     listRef.current!.scrollToOffset({ offset: 80, animated: false });
     const scrolls = scrollCommands();
-    expect(scrolls.length, 'instant scrollToOffset also dispatches a scrollTo').toBe(2);
+    expect(
+      scrolls.length,
+      'instant scrollToOffset also dispatches a scrollTo',
+    ).toBe(2);
 
     const [x, y, animated] = scrolls[1].args;
     expect(x).toBe(0);

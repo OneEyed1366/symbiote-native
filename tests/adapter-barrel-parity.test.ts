@@ -17,8 +17,14 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = path.resolve(__dirname, '..');
-const ADAPTERS = ['react', 'vue', 'angular', 'svelte'] as const;
-const SHARED_BARRELS = ['core/engine/src/index.ts', 'core/components/src/index.ts'];
+// All five adapters are in scope. 'solid' was held out while that adapter sat at L1 (static paint),
+// when its barrel carried only mount/unmount/findNodeHandle and would have reported every shared
+// name as drift; it joined at L4, and what it still genuinely lacks is named in KNOWN_GAPS.
+const ADAPTERS = ['react', 'vue', 'angular', 'svelte', 'solid'] as const;
+const SHARED_BARRELS = [
+  'core/engine/src/index.ts',
+  'core/components/src/index.ts',
+];
 
 type IAdapter = (typeof ADAPTERS)[number];
 
@@ -32,6 +38,35 @@ const KNOWN_GAPS: Readonly<Record<string, readonly IAdapter[]>> = {
   ITextInputProps: ['angular'],
 };
 
+// Candidate file names for a relative `export *` target, in resolution order.
+const MODULE_SUFFIXES = ['.ts', '.tsx', '/index.ts', '/index.tsx'];
+
+// Resolves the target of an `export *` to a file this scan can read. Only a relative specifier has
+// one; a package specifier is refused rather than skipped, since skipping would under-report the
+// barrel and invent gaps for names it does export.
+function starTarget(node: ts.ExportDeclaration, fromPath: string): string {
+  const specifier = node.moduleSpecifier;
+  if (
+    specifier === undefined ||
+    !ts.isStringLiteral(specifier) ||
+    !specifier.text.startsWith('.')
+  ) {
+    throw new Error(
+      `${fromPath}: \`export *\` from a package is not supported by the parity scan`,
+    );
+  }
+  const base = path.join(path.dirname(fromPath), specifier.text);
+  const found = MODULE_SUFFIXES.map(suffix => `${base}${suffix}`).find(
+    candidate => fs.existsSync(path.join(REPO_ROOT, candidate)),
+  );
+  if (found === undefined) {
+    throw new Error(
+      `${fromPath}: cannot resolve \`export * from '${specifier.text}'\``,
+    );
+  }
+  return found;
+}
+
 function exportedNames(relativePath: string): Set<string> {
   const absolute = path.join(REPO_ROOT, relativePath);
   const source = ts.createSourceFile(
@@ -43,20 +78,28 @@ function exportedNames(relativePath: string): Set<string> {
   const names = new Set<string>();
   source.forEachChild(node => {
     if (!ts.isExportDeclaration(node)) return;
-    // `export * from './x'` hides names from this scan; a shared barrel that starts using one
-    // would silently shrink the contract, so fail loudly instead of under-reporting.
+    // `export * from './x'` hides names behind the file it names — Solid's barrel re-exports its
+    // whole components module that way. Read through it rather than under-report the surface.
     if (node.exportClause === undefined) {
-      throw new Error(`${relativePath}: \`export *\` is not supported by the parity scan`);
+      for (const name of exportedNames(starTarget(node, relativePath)))
+        names.add(name);
+      return;
     }
     if (!ts.isNamedExports(node.exportClause)) return;
-    for (const element of node.exportClause.elements) names.add(element.name.text);
+    for (const element of node.exportClause.elements)
+      names.add(element.name.text);
   });
   return names;
 }
 
-const sharedNames = new Set(SHARED_BARRELS.flatMap(barrel => [...exportedNames(barrel)]));
+const sharedNames = new Set(
+  SHARED_BARRELS.flatMap(barrel => [...exportedNames(barrel)]),
+);
 const adapterNames = new Map<IAdapter, Set<string>>(
-  ADAPTERS.map(adapter => [adapter, exportedNames(`adapters/${adapter}/src/index.ts`)]),
+  ADAPTERS.map(adapter => [
+    adapter,
+    exportedNames(`adapters/${adapter}/src/index.ts`),
+  ]),
 );
 
 function sortedKey(adapters: readonly IAdapter[]): string {
@@ -68,8 +111,11 @@ function sortedKey(adapters: readonly IAdapter[]): string {
 function actualGaps(): Map<string, IAdapter[]> {
   const gaps = new Map<string, IAdapter[]>();
   for (const name of sharedNames) {
-    const exporting = ADAPTERS.filter(adapter => adapterNames.get(adapter)?.has(name));
-    if (exporting.length === 0 || exporting.length === ADAPTERS.length) continue;
+    const exporting = ADAPTERS.filter(adapter =>
+      adapterNames.get(adapter)?.has(name),
+    );
+    if (exporting.length === 0 || exporting.length === ADAPTERS.length)
+      continue;
     gaps.set(
       name,
       ADAPTERS.filter(adapter => !exporting.includes(adapter)),
@@ -109,7 +155,8 @@ describe('adapter barrel parity', () => {
       }
     }
     for (const name of Object.keys(KNOWN_GAPS)) {
-      if (!gaps.has(name)) problems.push(`${name}: gap is closed - delete its KNOWN_GAPS entry`);
+      if (!gaps.has(name))
+        problems.push(`${name}: gap is closed - delete its KNOWN_GAPS entry`);
     }
 
     // One newline-joined string, not an array: Vitest abbreviates a failing array to
@@ -149,8 +196,13 @@ describe('adapter barrel parity', () => {
       'PixelRatio',
     ];
     for (const adapter of ADAPTERS) {
-      const missing = RUNTIME_MODULES.filter(name => !adapterNames.get(adapter)?.has(name));
-      expect(missing, `@symbiote-native/${adapter} is missing runtime modules`).toEqual([]);
+      const missing = RUNTIME_MODULES.filter(
+        name => !adapterNames.get(adapter)?.has(name),
+      );
+      expect(
+        missing,
+        `@symbiote-native/${adapter} is missing runtime modules`,
+      ).toEqual([]);
     }
   });
 });

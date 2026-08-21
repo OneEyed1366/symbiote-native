@@ -31,7 +31,8 @@ import type { ISvelteClassValue } from '../../class-value';
 
 export type { IVirtualizedListHandle };
 
-export interface IVirtualizedListProps<ItemT> extends IAccessibilityProps, IAriaProps {
+export interface IVirtualizedListProps<ItemT>
+  extends IAccessibilityProps, IAriaProps {
   data: unknown;
   getItem: (data: unknown, index: number) => ItemT;
   getItemCount: (data: unknown) => number;
@@ -114,14 +115,15 @@ export type { ISeparators, ISeparatorProps, ISymbioteEvent, ISymbioteNode };
 // component forwarding down to VirtualizedList) so the field list lives in exactly one place.
 // resolveAccessibilityProps folds aria-*/role into their accessibility* twins first (idempotent —
 // calling it twice, once per forwarding hop, is a documented no-op once the aria keys are gone).
-export function pickAccessibilityProps<T extends IAccessibilityProps & IAriaProps>(
-  props: T,
-): IAccessibilityProps {
+export function pickAccessibilityProps<
+  T extends IAccessibilityProps & IAriaProps,
+>(props: T): IAccessibilityProps {
   const resolved = resolveAccessibilityProps(props);
   const picked: IAccessibilityProps = {};
   if (resolved.testID !== undefined) picked.testID = resolved.testID;
   if (resolved.nativeID !== undefined) picked.nativeID = resolved.nativeID;
-  if (resolved.accessible !== undefined) picked.accessible = resolved.accessible;
+  if (resolved.accessible !== undefined)
+    picked.accessible = resolved.accessible;
   if (resolved.accessibilityLabel !== undefined)
     picked.accessibilityLabel = resolved.accessibilityLabel;
   if (resolved.accessibilityHint !== undefined)
@@ -153,25 +155,30 @@ export function pickAccessibilityProps<T extends IAccessibilityProps & IAriaProp
     picked.accessibilityElementsHidden = resolved.accessibilityElementsHidden;
   }
   if (resolved.accessibilityIgnoresInvertColors !== undefined) {
-    picked.accessibilityIgnoresInvertColors = resolved.accessibilityIgnoresInvertColors;
+    picked.accessibilityIgnoresInvertColors =
+      resolved.accessibilityIgnoresInvertColors;
   }
   if (resolved.accessibilityLanguage !== undefined) {
     picked.accessibilityLanguage = resolved.accessibilityLanguage;
   }
   if (resolved.accessibilityRespondsToUserInteraction !== undefined) {
-    picked.accessibilityRespondsToUserInteraction = resolved.accessibilityRespondsToUserInteraction;
+    picked.accessibilityRespondsToUserInteraction =
+      resolved.accessibilityRespondsToUserInteraction;
   }
   if (resolved.accessibilityShowsLargeContentViewer !== undefined) {
-    picked.accessibilityShowsLargeContentViewer = resolved.accessibilityShowsLargeContentViewer;
+    picked.accessibilityShowsLargeContentViewer =
+      resolved.accessibilityShowsLargeContentViewer;
   }
   if (resolved.accessibilityLargeContentTitle !== undefined) {
-    picked.accessibilityLargeContentTitle = resolved.accessibilityLargeContentTitle;
+    picked.accessibilityLargeContentTitle =
+      resolved.accessibilityLargeContentTitle;
   }
   if (resolved.onAccessibilityAction !== undefined)
     picked.onAccessibilityAction = resolved.onAccessibilityAction;
   if (resolved.onAccessibilityTap !== undefined)
     picked.onAccessibilityTap = resolved.onAccessibilityTap;
-  if (resolved.onMagicTap !== undefined) picked.onMagicTap = resolved.onMagicTap;
+  if (resolved.onMagicTap !== undefined)
+    picked.onMagicTap = resolved.onMagicTap;
   if (resolved.onAccessibilityEscape !== undefined)
     picked.onAccessibilityEscape = resolved.onAccessibilityEscape;
   return picked;

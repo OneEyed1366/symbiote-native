@@ -28,7 +28,9 @@ const searchBarRef = ref<ISearchBarCommands | null>(null);
 // A resolver function (not a plain object) so its bar-button/menu onPress handlers can close over
 // the LIVE navigation handle and round-trip the pressed action back onto the route via
 // setParams(), which HeaderOptionsScreen below reads via useRoute() to display.
-export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation }) => ({
+export const headerOptionsScreenOptions: IScreenOptionsResolver = ({
+  navigation,
+}) => ({
   title: 'Header Options',
   headerShown: true,
   headerTranslucent: true,
@@ -48,7 +50,8 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation 
     {
       type: 'button',
       title: 'Info',
-      onPress: () => navigation.setParams({ lastHeaderAction: 'left bar button: Info' }),
+      onPress: () =>
+        navigation.setParams({ lastHeaderAction: 'left bar button: Info' }),
     },
   ],
   headerRightBarButtonItems: [
@@ -61,13 +64,15 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation 
           {
             type: 'action',
             title: 'Share',
-            onPress: () => navigation.setParams({ lastHeaderAction: 'menu: Share' }),
+            onPress: () =>
+              navigation.setParams({ lastHeaderAction: 'menu: Share' }),
           },
           {
             type: 'action',
             title: 'Delete',
             destructive: true,
-            onPress: () => navigation.setParams({ lastHeaderAction: 'menu: Delete' }),
+            onPress: () =>
+              navigation.setParams({ lastHeaderAction: 'menu: Delete' }),
           },
         ],
       },
@@ -89,12 +94,16 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation 
     hintTextColor: '#41506a',
     headerIconColor: LINE_COLOR.presentation,
     onChangeText: text => navigation.setParams({ lastSearchText: text }),
-    onSearchButtonPress: text => navigation.setParams({ lastSearchSubmitted: text }),
+    onSearchButtonPress: text =>
+      navigation.setParams({ lastSearchSubmitted: text }),
     onFocus: () => navigation.setParams({ lastSearchBarEvent: 'focused' }),
     onBlur: () => navigation.setParams({ lastSearchBarEvent: 'blurred' }),
-    onCancelButtonPress: () => navigation.setParams({ lastSearchBarEvent: 'cancel pressed' }),
-    onClose: () => navigation.setParams({ lastSearchBarEvent: 'closed (Android)' }),
-    onOpen: () => navigation.setParams({ lastSearchBarEvent: 'opened (Android)' }),
+    onCancelButtonPress: () =>
+      navigation.setParams({ lastSearchBarEvent: 'cancel pressed' }),
+    onClose: () =>
+      navigation.setParams({ lastSearchBarEvent: 'closed (Android)' }),
+    onOpen: () =>
+      navigation.setParams({ lastSearchBarEvent: 'opened (Android)' }),
   },
 });
 
@@ -107,7 +116,9 @@ export const HeaderOptionsScreen = defineComponent(
   () => {
     const route = useRoute();
     return () => {
-      const params = isHeaderOptionsParams(route.value.params) ? route.value.params : {};
+      const params = isHeaderOptionsParams(route.value.params)
+        ? route.value.params
+        : {};
       const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HeaderOptions];
       return (
         <SafeAreaView class="screen">
@@ -116,14 +127,18 @@ export const HeaderOptionsScreen = defineComponent(
               <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
             </View>
             <View class="hero-card">
-              <View class="hero-badge" style={{ backgroundColor: LINE_COLOR.presentation }}>
+              <View
+                class="hero-badge"
+                style={{ backgroundColor: LINE_COLOR.presentation }}
+              >
                 <Text class="hero-badge-text">HD</Text>
               </View>
               <View class="hero-copy">
                 <Text class="hero-title">Header options</Text>
                 <Text class="hero-body">
-                  Bar buttons, a right-side menu, a native search bar, and headerLargeTitle — every
-                  headerSearchBarOptions callback wired to a live control below.
+                  Bar buttons, a right-side menu, a native search bar, and
+                  headerLargeTitle — every headerSearchBarOptions callback wired
+                  to a live control below.
                 </Text>
               </View>
             </View>
@@ -143,8 +158,9 @@ export const HeaderOptionsScreen = defineComponent(
               {`last search bar event: ${params.lastSearchBarEvent ?? 'none yet — focus/blur/cancel the search bar'}`}
             </Text>
             <Text class="note-text">
-              Pull down to reveal the search bar (headerSearchBarOptions), or use the buttons below to
-              drive it imperatively through its SearchBarCommands ref.
+              Pull down to reveal the search bar (headerSearchBarOptions), or
+              use the buttons below to drive it imperatively through its
+              SearchBarCommands ref.
             </Text>
             <ActionButton
               testID="search-bar-focus"

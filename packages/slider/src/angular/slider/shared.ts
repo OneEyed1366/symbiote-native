@@ -72,7 +72,10 @@ import {
 
 export type ISliderProps = Omit<
   ISliderBaseProps,
-  'onValueChange' | 'onSlidingStart' | 'onSlidingComplete' | 'onAccessibilityAction'
+  | 'onValueChange'
+  | 'onSlidingStart'
+  | 'onSlidingComplete'
+  | 'onAccessibilityAction'
 >;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -88,7 +91,9 @@ function asStyle(value: unknown): ISliderProps['style'] {
 }
 
 @Directive()
-export abstract class SliderBase implements ISliderProps, OnChanges, ControlValueAccessor {
+export abstract class SliderBase
+  implements ISliderProps, OnChanges, ControlValueAccessor
+{
   @Input() value?: number;
   @Input() minimumValue?: number;
   @Input() maximumValue?: number;
@@ -122,8 +127,10 @@ export abstract class SliderBase implements ISliderProps, OnChanges, ControlValu
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -200,7 +207,9 @@ export abstract class SliderBase implements ISliderProps, OnChanges, ControlValu
     if (value !== undefined) this.slidingComplete.emit(value);
   };
 
-  protected readonly handleAccessibilityAction = (event: ISymbioteEvent): void => {
+  protected readonly handleAccessibilityAction = (
+    event: ISymbioteEvent,
+  ): void => {
     this.accessibilityAction.emit(event);
   };
 
@@ -280,8 +289,10 @@ export abstract class SliderBase implements ISliderProps, OnChanges, ControlValu
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       onAccessibilityTap: this.onAccessibilityTap,
       onMagicTap: this.onMagicTap,
@@ -349,9 +360,16 @@ export abstract class SliderBase implements ISliderProps, OnChanges, ControlValu
       upperLimit,
       disabled: resolveSliderDisabled(disabled, accessibilityState),
       inverted,
-      thumbTintColor: resolveThumbTintColor(thumbTintColor, false, hasThumbImage),
+      thumbTintColor: resolveThumbTintColor(
+        thumbTintColor,
+        false,
+        hasThumbImage,
+      ),
       thumbImage: nativeThumbImage,
-      accessibilityState: resolveSliderAccessibilityState(disabled, accessibilityState),
+      accessibilityState: resolveSliderAccessibilityState(
+        disabled,
+        accessibilityState,
+      ),
       width: this.width,
       style,
       passthrough: {
@@ -384,6 +402,9 @@ export abstract class SliderBase implements ISliderProps, OnChanges, ControlValu
       inverted,
       platform: this.platform,
     });
-    return renderSlider(view, this.platform, { steps, onLayout: this.handleLayout });
+    return renderSlider(view, this.platform, {
+      steps,
+      onLayout: this.handleLayout,
+    });
   }
 }

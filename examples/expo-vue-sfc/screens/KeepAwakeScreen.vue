@@ -8,7 +8,10 @@
 <script setup lang="ts">
 import { defineComponent, onMounted, ref } from 'vue';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
-import { isAvailableAsync, useKeepAwake } from '@symbiote-native/keep-awake/vue';
+import {
+  isAvailableAsync,
+  useKeepAwake,
+} from '@symbiote-native/keep-awake/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -46,9 +49,15 @@ function handleToggle(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="keep-awake-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="keep-awake-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -57,8 +66,8 @@ function handleToggle(): void {
         <View class="hero-copy">
           <Text class="hero-title">Keep Awake</Text>
           <Text class="hero-body"
-            >@symbiote-native/keep-awake — keeps the screen on for as long as a component holding
-            useKeepAwake() stays mounted.</Text
+            >@symbiote-native/keep-awake — keeps the screen on for as long as a
+            component holding useKeepAwake() stays mounted.</Text
           >
         </View>
       </View>
@@ -67,9 +76,15 @@ function handleToggle(): void {
         <Text class="keep-awake-card-title">Screen lock</Text>
         <View class="keep-awake-row">
           <Text class="keep-awake-row-label">Available</Text>
-          <View :class="`keep-awake-status-badge keep-awake-status-badge-${isAvailable}`">
+          <View
+            :class="`keep-awake-status-badge keep-awake-status-badge-${isAvailable}`"
+          >
             <Text class="keep-awake-status-text">{{
-              isAvailable === 'checking' ? 'CHECKING…' : isAvailable === 'yes' ? 'YES' : 'NO'
+              isAvailable === 'checking'
+                ? 'CHECKING…'
+                : isAvailable === 'yes'
+                  ? 'YES'
+                  : 'NO'
             }}</Text>
           </View>
         </View>

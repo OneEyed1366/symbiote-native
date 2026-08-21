@@ -18,7 +18,9 @@ export type ISliderAccessibilityState = {
 // Mirror the library's `passedValue`: NaN or a falsy value (incl. 0) becomes undefined, so the
 // native view falls back to its own default initial value rather than receiving NaN/0 as a
 // write. Entered once it still acts as the initial value (the slider is uncontrolled after).
-export function sanitizeSliderValue(value: number | undefined): number | undefined {
+export function sanitizeSliderValue(
+  value: number | undefined,
+): number | undefined {
   if (value === undefined) return undefined;
   return Number.isNaN(value) || !value ? undefined : value;
 }
@@ -44,17 +46,23 @@ export function resolveSliderAccessibilityState(
 }
 
 // Default the slide limits to the unbounded sentinels when unset (the native, non-web case).
-export function resolveSliderLowerLimit(lowerLimit: number | undefined): number {
+export function resolveSliderLowerLimit(
+  lowerLimit: number | undefined,
+): number {
   return lowerLimit ?? SLIDER_LIMIT_MIN_VALUE;
 }
 
-export function resolveSliderUpperLimit(upperLimit: number | undefined): number {
+export function resolveSliderUpperLimit(
+  upperLimit: number | undefined,
+): number {
   return upperLimit ?? SLIDER_LIMIT_MAX_VALUE;
 }
 
 // The value the native value/sliding events carry as nativeEvent.value. nativeEvent is an
 // untyped Record, so narrow; a non-number payload yields undefined (no callback fired upstream).
-export function valueFromSliderEvent(event: ISymbioteEvent): number | undefined {
+export function valueFromSliderEvent(
+  event: ISymbioteEvent,
+): number | undefined {
   const value = event.nativeEvent.value;
   return typeof value === 'number' ? value : undefined;
 }
@@ -91,7 +99,10 @@ export function shouldPassNativeThumbImage(
 }
 
 // The library warns when the limits cross; surfaced as a pure predicate so the adapter logs it.
-export function isInvalidLimitConfig(lowerLimit: number, upperLimit: number): boolean {
+export function isInvalidLimitConfig(
+  lowerLimit: number,
+  upperLimit: number,
+): boolean {
   return lowerLimit >= upperLimit;
 }
 

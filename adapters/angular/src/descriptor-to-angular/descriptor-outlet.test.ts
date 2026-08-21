@@ -79,7 +79,9 @@ function currentOutletChild() {
 })
 class DescriptorOutletHost {
   readonly node = signal<IDescriptor>(
-    el('symbiote-view', { testID: 'root', style: { width: 10 } }, [txt({}, ['hello'])]),
+    el('symbiote-view', { testID: 'root', style: { width: 10 } }, [
+      txt({}, ['hello']),
+    ]),
   );
 
   constructor() {
@@ -120,7 +122,9 @@ describe('DescriptorOutlet', () => {
       // otherwise every unrelated re-render of a parent would recommit every descriptor-driven
       // component underneath it, defeating the point of diffing at all.
       capturedHost?.node.set(
-        el('symbiote-view', { testID: 'root', style: { width: 10 } }, [txt({}, ['hello'])]),
+        el('symbiote-view', { testID: 'root', style: { width: 10 } }, [
+          txt({}, ['hello']),
+        ]),
       );
       await flushAngular();
 
@@ -138,7 +142,9 @@ describe('DescriptorOutlet', () => {
       // Fabric's clone-on-write model wants the SAME retained node updated in place, not a
       // fresh `createNode` per re-render.
       capturedHost?.node.set(
-        el('symbiote-view', { testID: 'root', style: { width: 20 } }, [txt({}, ['hello'])]),
+        el('symbiote-view', { testID: 'root', style: { width: 20 } }, [
+          txt({}, ['hello']),
+        ]),
       );
       await flushAngular();
 
@@ -156,7 +162,9 @@ describe('DescriptorOutlet', () => {
       // that stops a prop from "sticking" once a render fn stops supplying it — e.g. a style
       // key that only applies conditionally. Every other test in this file only ever CHANGES or
       // KEEPS existing prop keys, so this branch had zero coverage before.
-      capturedHost?.node.set(el('symbiote-view', { testID: 'root' }, [txt({}, ['hello'])]));
+      capturedHost?.node.set(
+        el('symbiote-view', { testID: 'root' }, [txt({}, ['hello'])]),
+      );
       await flushAngular();
 
       const root = currentOutletChild();
@@ -175,7 +183,9 @@ describe('DescriptorOutlet', () => {
       // what makes text content reactive at all — every other test in this file leaves the
       // child string "hello" untouched across renders, changing only the PARENT's props.
       capturedHost?.node.set(
-        el('symbiote-view', { testID: 'root', style: { width: 10 } }, [txt({}, ['goodbye'])]),
+        el('symbiote-view', { testID: 'root', style: { width: 10 } }, [
+          txt({}, ['goodbye']),
+        ]),
       );
       await flushAngular();
 
@@ -218,7 +228,10 @@ describe('DescriptorOutlet', () => {
       })
       class TwoChildHost {
         readonly node = signal<IDescriptor>(
-          el('symbiote-view', { testID: 'root' }, [txt({}, ['hello']), txt({}, ['world'])]),
+          el('symbiote-view', { testID: 'root' }, [
+            txt({}, ['hello']),
+            txt({}, ['world']),
+          ]),
         );
 
         constructor() {
@@ -235,11 +248,15 @@ describe('DescriptorOutlet', () => {
       // why: patchChildren's remove branch (rendered children beyond the new, shorter list)
       // must `removeChild` exactly the trailing ones — the surviving first child keeps its
       // Fabric identity, it is not cleared and recreated as a side effect of the shrink.
-      capturedTwoChildHost?.node.set(el('symbiote-view', { testID: 'root' }, [txt({}, ['hello'])]));
+      capturedTwoChildHost?.node.set(
+        el('symbiote-view', { testID: 'root' }, [txt({}, ['hello'])]),
+      );
       await flushAngular();
 
       const root = currentOutletChild();
-      expect(fabric.serialize([root])).toBe('RCTView(RCTText(RCTRawText "hello"))');
+      expect(fabric.serialize([root])).toBe(
+        'RCTView(RCTText(RCTRawText "hello"))',
+      );
       expect(root.children[0]).toBe(survivingChildBefore);
     });
 
@@ -255,7 +272,9 @@ describe('DescriptorOutlet', () => {
       // place, it is a genuinely different element, so it must go through createElement +
       // replaceChild and get a fresh Fabric identity. This is the branch `sameElement` exists
       // to protect and the original file never exercised it.
-      capturedHost?.node.set(el('symbiote-text', { testID: 'root' }, ['replaced']));
+      capturedHost?.node.set(
+        el('symbiote-text', { testID: 'root' }, ['replaced']),
+      );
       await flushAngular();
 
       const after = currentOutletChild();
@@ -279,7 +298,9 @@ describe('DescriptorOutlet', () => {
       })
       class ConditionalHost {
         readonly visible = signal(true);
-        readonly node = signal<IDescriptor>(el('symbiote-view', { testID: 'child' }, []));
+        readonly node = signal<IDescriptor>(
+          el('symbiote-view', { testID: 'child' }, []),
+        );
 
         constructor() {
           // eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -308,7 +329,8 @@ describe('DescriptorOutlet', () => {
       // `cloneNodeWithNewChildren`) — re-reading from the freshly committed tree, not the
       // stale `parent` reference captured above, which still points at the pre-removal clone.
       const parentAfter = fabric.appRoot().children[0];
-      if (!parentAfter) throw new Error('parent View did not survive the toggle');
+      if (!parentAfter)
+        throw new Error('parent View did not survive the toggle');
       expect(parentAfter.children).toHaveLength(0);
     });
   });

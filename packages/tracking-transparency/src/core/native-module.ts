@@ -16,6 +16,7 @@ export type INativeTrackingTransparencyModule = {
   getPermissionsAsync?(): Promise<PermissionResponse>;
 };
 
-export const expoTrackingTransparency = requireNativeModule<INativeTrackingTransparencyModule>(
-  EXPO_TRACKING_TRANSPARENCY_MODULE_NAME,
-);
+export const expoTrackingTransparency =
+  requireNativeModule<INativeTrackingTransparencyModule>(
+    EXPO_TRACKING_TRANSPARENCY_MODULE_NAME,
+  );

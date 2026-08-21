@@ -9,7 +9,13 @@ import { Easing, type IEasingFunction } from '../easing';
 import { dlog } from '../../debug';
 import type { INativeAnimationConfig } from '../native/native-animated';
 import { BaseAnimation, type IAnimationConfig } from './base';
-import { cancelFrame, clearTimer, requestFrame, setTimer, type ITimerHandle } from './raf';
+import {
+  cancelFrame,
+  clearTimer,
+  requestFrame,
+  setTimer,
+  type ITimerHandle,
+} from './raf';
 
 export interface ITimingAnimationConfig extends IAnimationConfig {
   toValue: number;
@@ -97,14 +103,17 @@ export class TimingAnimation extends BaseAnimation {
   private onFrame(): void {
     const now = Date.now();
     if (now >= this.startTime + this.duration) {
-      this.onUpdate(this.fromValue + this.easing(1) * (this.toValue - this.fromValue));
+      this.onUpdate(
+        this.fromValue + this.easing(1) * (this.toValue - this.fromValue),
+      );
       this.__notifyAnimationEnd({ finished: true });
       return;
     }
 
     this.onUpdate(
       this.fromValue +
-        this.easing((now - this.startTime) / this.duration) * (this.toValue - this.fromValue),
+        this.easing((now - this.startTime) / this.duration) *
+          (this.toValue - this.fromValue),
     );
     if (this.__active) {
       this.animationFrame = requestFrame(() => this.onFrame());

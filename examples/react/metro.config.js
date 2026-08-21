@@ -16,13 +16,21 @@ const config = {
   // @symbiote-native/react ships this transformer itself, the framework-agnostic path
   // mirrored by the Vue and Angular examples' own adapter's ./metro-css-parser export.
   transformer: {
-    babelTransformerPath: require.resolve('@symbiote-native/react/metro-css-parser'),
+    babelTransformerPath:
+      require.resolve('@symbiote-native/react/metro-css-parser'),
   },
   resolver: {
     // Teach Metro that a style file is a source file (the transformer turns it into a module).
     // scss/sass/less/styl are optional SCSS/Sass/Less/Stylus preprocessor sources handled by
     // core/css-parser/src/preprocessors.ts, which reduces each to plain CSS before compiling.
-    sourceExts: [...defaultConfig.resolver.sourceExts, 'css', 'scss', 'sass', 'less', 'styl'],
+    sourceExts: [
+      ...defaultConfig.resolver.sourceExts,
+      'css',
+      'scss',
+      'sass',
+      'less',
+      'styl',
+    ],
   },
 };
 

@@ -56,6 +56,12 @@
   --line-structure: #4fd1a5;
   --line-introspection: #b18cf5;
   --line-routing: #f2789a;
+  /* Amber — the only warm hue in the set, so the benchmark's timing screen never reads as one
+     of the navigation lines at a glance. */
+  --line-performance: #f5a524;
+  /* Yellow-green, the one wide hue gap the six above leave open — the styling showcase is not
+     a navigation line either, and this reads apart from Structure's mint at badge size. */
+  --line-styling: #a3d94f;
 }
 
 /* shared / common. .section is the outermost content wrapper directly inside a demo screen's
@@ -79,12 +85,20 @@
   padding-top: 24px;
   padding-bottom: 24px;
 }
+/* `flex-wrap` because RN, like CSS, defaults to nowrap: a row of three buttons whose titles are
+   long enough ("countStore.update(-1) · countStore.set(0) · countStore.update(+1)") runs off the
+   right edge and the third one is simply unreachable — no scrollbar, no clipping indicator,
+   nothing to suggest a button is missing. Wrapping is the only behaviour that degrades honestly
+   on a phone width. Rows whose children carry `.flex1` are unaffected: `flex: 1` gives a 0
+   basis, so they share one line exactly as before. */
 .row {
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 12px;
 }
 .row-tight {
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 8px;
 }
 /* no hyphen: kebabToCamel only rewrites "-[a-z]", so ".flex-1" would parse to "flex-1"
@@ -115,12 +129,20 @@
 
 /* ActionButton — every demo screen's tappable action, replacing RN's stock unstyled <Button>.
    borderColor/color stay dynamic (ActionButton's own `color` prop, one per call site — the
-   per-feature color-coding a class can't parametrize), everything else is the shared chrome. */
+   per-feature color-coding a class can't parametrize), everything else is the shared chrome.
+
+   The borderColor/color defaults below are NOT decoration. RN defaults borderColor AND Text color
+   to BLACK, which on this --paper button is nothing at all, so a call site that borrows these two
+   classes WITHOUT ActionButton's inline color prop paints a black ring around black glyphs —
+   which is exactly what api-playground/NumberStepper.svelte did (its − and + were unreadable).
+   routeProp always writes [classStyle, explicitStyle], so ActionButton's own inline color still
+   wins wherever it is supplied; this only fills the hole underneath it. */
 .action-button {
   align-items: center;
   justify-content: center;
   border-radius: 12px;
   border-width: 1.5px;
+  border-color: var(--mist);
   padding-top: 12px;
   padding-bottom: 12px;
   padding-left: 16px;
@@ -128,6 +150,7 @@
   background-color: var(--paper);
 }
 .action-button-text {
+  color: var(--chalk-bright);
   font-size: 15px;
   font-weight: bold;
 }
@@ -263,8 +286,13 @@
 }
 
 /* NativeModulesDemo */
+/* Same nowrap trap as `.row` above, and the API playground is where it actually bit: RunesDemo's
+   "Mutate $state.raw (no re-render)" + "Reassign $state.raw" pair is ~480pt of buttons in a 342pt
+   row, StoresDemo's three countStore buttons ~585pt. The overflowing button was invisible AND
+   untappable. */
 .row-align-center {
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
 }
@@ -511,8 +539,11 @@
   align-items: center;
   border-width: 1px;
 }
-/* color (pressed ternary) stays dynamic */
+/* color (pressed ternary) stays dynamic where a call site supplies one — CanaryScreen's Pressable
+   does. The default below covers the call sites that do NOT (api-playground's CompositionDemo and
+   TemplateSyntaxDemo), where RN's black Text default left the label invisible on --ink. */
 .pressable-label {
+  color: var(--chalk);
   font-size: 15px;
 }
 /* width/marginRight stay dynamic — they reference the CHIP_WIDTH/CHIP_GAP script
@@ -529,6 +560,17 @@
   color: var(--ink);
   font-size: 18px;
   font-weight: bold;
+}
+/* Height is deliberately fat, not decorative: this divider is the chrome BETWEEN rows that the
+   offset table has to account for, and a 1px hairline would hide a mis-modelled gap. Insets match
+   .mvcp-row's padding on BOTH sides so it reads as part of the row rhythm instead of bleeding
+   under the container's rounded corner. */
+.mvcp-divider {
+  height: 8px;
+  margin-left: 14px;
+  margin-right: 14px;
+  border-radius: 2px;
+  background-color: #26304f;
 }
 .mvcp-row {
   padding-top: 10px;
@@ -701,6 +743,12 @@
 .line-tag-routing {
   background-color: var(--line-routing);
 }
+.line-tag-performance {
+  background-color: var(--line-performance);
+}
+.line-tag-styling {
+  background-color: var(--line-styling);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -745,6 +793,14 @@
   border-left-width: 3px;
   border-left-color: var(--line-routing);
 }
+.menu-row-performance {
+  border-left-width: 3px;
+  border-left-color: var(--line-performance);
+}
+.menu-row-styling {
+  border-left-width: 3px;
+  border-left-color: var(--line-styling);
+}
 
 .menu-badge {
   width: 34px;
@@ -767,6 +823,12 @@
 }
 .menu-badge-routing {
   background-color: var(--line-routing);
+}
+.menu-badge-performance {
+  background-color: var(--line-performance);
+}
+.menu-badge-styling {
+  background-color: var(--line-styling);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -801,4 +863,189 @@
 }
 .menu-row-hint-routing {
   color: var(--line-routing);
+}
+.menu-row-hint-performance {
+  color: var(--line-performance);
+}
+.menu-row-hint-styling {
+  color: var(--line-styling);
+}
+
+/* BenchmarkScreen (screens/BenchmarkScreen.svelte) + its frame-rate meter
+   (components/JsFrameRateMeter.svelte). Colors that vary per call site — the meter's accent and
+   every ActionButton tint — stay inline, exactly like the other demo screens; the chrome lives
+   here. Byte-identical to examples/react/App.css's own bench block: the benchmark screen is a
+   ruler shared across the four canaries, so a difference in the numbers has to be readable as a
+   difference in the ADAPTER, never in the padding. */
+.bench-meter {
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+
+.bench-meter-row {
+  flex-direction: row;
+  gap: 12px;
+}
+
+.bench-metric {
+  flex: 1;
+  align-items: center;
+  gap: 2px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-radius: 12px;
+  background-color: var(--ink);
+}
+
+.bench-metric-value {
+  font-size: 26px;
+  font-weight: bold;
+}
+
+.bench-metric-label {
+  color: var(--mist);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+/* The two suite buttons, side by side under the meter: one per mount mode, so the mode is picked
+   by the press instead of by a separate toggle that could disagree with the numbers on screen. */
+.bench-run-row {
+  flex-direction: row;
+  gap: 12px;
+}
+
+/* Shown only while a suite runs. A step can hold the JS thread for hundreds of milliseconds, so
+   without this the screen is indistinguishable from a hung one. */
+.bench-progress {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background-color: #0f1e30;
+}
+.bench-progress-text {
+  flex: 1;
+  color: var(--chalk);
+  font-size: 13px;
+}
+.bench-progress-count {
+  color: var(--mist);
+  font-size: 13px;
+}
+
+/* Both modes' results side by side — the label stretches, the two number columns stay at a fixed
+   width so they line up down the table. */
+.bench-compare-row {
+  flex-direction: row;
+  align-items: center;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.bench-compare-label {
+  flex: 1;
+  color: var(--mist);
+  font-size: 13px;
+}
+.bench-compare-cell {
+  width: 96px;
+  text-align: right;
+  color: var(--chalk);
+  font-size: 13px;
+}
+.bench-compare-head-cell {
+  width: 96px;
+  text-align: right;
+  color: var(--mist);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+/* The sticky-header stress block. Bounded height so the frame counters stay on screen while the
+   inner list is being dragged — the whole point of putting the two next to each other. */
+.bench-sticky {
+  height: 320px;
+  border-radius: 12px;
+  background-color: #0f1e30;
+}
+
+/* The virtualized row list. Bounded height because a FlatList inside a ScrollView has no
+   viewport of its own to window against, and without one it would mount every row - which is
+   precisely the mode it exists to contrast with. */
+.bench-rows-viewport {
+  height: 420px;
+  border-radius: 12px;
+  background-color: #0f1e30;
+}
+
+/* One operation: the button stretches, the last measured duration sits beside it at a fixed
+   width so the column of numbers stays aligned across rows of different button widths. */
+.bench-op-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.bench-op-result {
+  width: 88px;
+  text-align: right;
+  color: var(--chalk);
+  font-size: 14px;
+}
+
+.bench-history-row {
+  color: var(--mist);
+  font-size: 13px;
+}
+
+/* A benchmark list row — kept deliberately plain (id, label, remove) so what is measured is the
+   engine's commit path and not a decorative row's own layout cost. */
+.bench-row {
+  /* Fixed so FlatList's getItemLayout is exact in virtualized mode, and so a row occupies the
+     same box in both mount modes - otherwise the two modes would not be comparable. */
+  height: 44px;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 8px;
+  background-color: var(--paper);
+}
+
+/* Tinted rather than filled with the line color: the row's own text keeps its contrast, and
+   the accent edge matches the menu-row-<line> language used everywhere else. */
+.bench-row-selected {
+  background-color: #3a2c10;
+  border-left-width: 3px;
+  border-left-color: var(--line-performance);
+}
+
+.bench-row-id {
+  width: 56px;
+  color: var(--mist);
+  font-size: 12px;
+}
+
+.bench-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+
+.bench-row-remove {
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+}
+
+.bench-row-remove-text {
+  color: var(--mist);
+  font-size: 18px;
+  font-weight: bold;
 }

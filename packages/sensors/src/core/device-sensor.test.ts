@@ -7,7 +7,11 @@ import type { INativeSensorModule } from './device-sensor';
 // react-native-bootsplash is faked in the splash-screen package's own composable tests.
 vi.mock('expo-modules-core', () => ({
   Platform: { OS: 'ios' },
-  PermissionStatus: { GRANTED: 'granted', UNDETERMINED: 'undetermined', DENIED: 'denied' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    UNDETERMINED: 'undetermined',
+    DENIED: 'denied',
+  },
 }));
 
 const { DeviceSensor, PermissionStatus } = await import('./device-sensor');
@@ -25,10 +29,15 @@ function createFakeNativeModule(
 ): INativeSensorModule<IFakeMeasurement> {
   const listeners = new Set<(measurement: IFakeMeasurement) => void>();
   return {
-    addListener: vi.fn((_eventName: string, listener: (measurement: IFakeMeasurement) => void) => {
-      listeners.add(listener);
-      return { remove: () => listeners.delete(listener) };
-    }),
+    addListener: vi.fn(
+      (
+        _eventName: string,
+        listener: (measurement: IFakeMeasurement) => void,
+      ) => {
+        listeners.add(listener);
+        return { remove: () => listeners.delete(listener) };
+      },
+    ),
     listenerCount: vi.fn(() => listeners.size),
     removeAllListeners: vi.fn(() => listeners.clear()),
     ...overrides,
@@ -52,7 +61,10 @@ describe('DeviceSensor', () => {
 
       sensor.addListener(listener);
 
-      expect(nativeModule.addListener).toHaveBeenCalledWith('customDidUpdate', listener);
+      expect(nativeModule.addListener).toHaveBeenCalledWith(
+        'customDidUpdate',
+        listener,
+      );
     });
 
     it('reports hasListeners()/getListenerCount() from the native module, including the zero boundary', () => {
@@ -90,7 +102,9 @@ describe('DeviceSensor', () => {
     });
 
     it('forwards setUpdateInterval to the native module when the platform supports it', () => {
-      const nativeModule = createFakeNativeModule({ setUpdateInterval: vi.fn() });
+      const nativeModule = createFakeNativeModule({
+        setUpdateInterval: vi.fn(),
+      });
       const sensor = new DeviceSensor(nativeModule, 'mockDidUpdate');
 
       sensor.setUpdateInterval(1234);
@@ -99,7 +113,9 @@ describe('DeviceSensor', () => {
     });
 
     it('forwards isAvailableAsync to the native module when the platform supports it', async () => {
-      const nativeModule = createFakeNativeModule({ isAvailableAsync: vi.fn(async () => true) });
+      const nativeModule = createFakeNativeModule({
+        isAvailableAsync: vi.fn(async () => true),
+      });
       const sensor = new DeviceSensor(nativeModule, 'mockDidUpdate');
 
       await expect(sensor.isAvailableAsync()).resolves.toBe(true);
@@ -134,7 +150,9 @@ describe('DeviceSensor', () => {
       });
       const sensor = new DeviceSensor(nativeModule, 'mockDidUpdate');
 
-      await expect(sensor.requestPermissionsAsync()).resolves.toBe(nativeResponse);
+      await expect(sensor.requestPermissionsAsync()).resolves.toBe(
+        nativeResponse,
+      );
     });
   });
 

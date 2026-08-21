@@ -1,0 +1,27 @@
+/* CSS Modules: no `.module.*` file exists anywhere in the real corpus, so the whole scoped
+   name-map emission path was unsnapshotted until this fixture. */
+.card {
+  padding: 12px;
+}
+
+.card.big {
+  padding: 20px;
+}
+
+/* `composes` is NOT implemented — it is dropped like any other unknown property, with a warn.
+   Pinned as-is: lightningcss resolves composes natively, so this is exactly the byte that is
+   EXPECTED to change when it lands. */
+.inherited {
+  composes: card;
+  color: #fff;
+}
+
+/* Opts one selector out of module scoping — registers under its plain name. */
+:global(.legacy-reset) {
+  margin: 0;
+}
+
+/* Partial :global under a scoped key: the collapsed key is scoped, the `legacy` token is not. */
+.card :global(.legacy) {
+  border-width: 1px;
+}

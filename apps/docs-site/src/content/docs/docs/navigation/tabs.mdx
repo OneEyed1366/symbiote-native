@@ -12,10 +12,11 @@ paints its bar with ordinary `View`/`Text` primitives in JS — there is no nati
 component underneath.
 
 <Aside type="caution">
-  Only the **focused** route's screen is ever mounted. Switching tabs unmounts the previous
-  screen's component and mounts the new one from scratch — its state does not survive a switch
-  away and back, and its constructor/setup re-runs every time it regains focus. If you need to
-  react to that, see [`useIsFocused()`/`useFocusEffect()` (Angular: `injectIsFocused()`/
+  Only the **focused** route's screen is ever mounted. Switching tabs unmounts
+  the previous screen's component and mounts the new one from scratch — its
+  state does not survive a switch away and back, and its constructor/setup
+  re-runs every time it regains focus. If you need to react to that, see
+  [`useIsFocused()`/`useFocusEffect()` (Angular: `injectIsFocused()`/
   `injectFocusEffect()`)](/docs/navigation/hooks/) below.
 </Aside>
 
@@ -46,6 +47,7 @@ there is no `push`/`pop`, only `jumpTo` between the existing tabs.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -70,6 +72,7 @@ there is no `push`/`pop`, only `jumpTo` between the existing tabs.
       </Tab>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -118,6 +121,7 @@ there is no `push`/`pop`, only `jumpTo` between the existing tabs.
     `injectRoute()`/`injectTabNavigation()` (Angular) or `useRoute()`/`useTabNavigation()`
     (React/Vue), the same as [Stack's screens](/docs/navigation/stack/). `HomeTabScreen`/
     `SearchTabScreen` read theirs the same way.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -148,6 +152,45 @@ there is no `push`/`pop`, only `jumpTo` between the existing tabs.
     with `useRoute()`/`useTabNavigation()` — both return a boxed getter, unwrapped via `.current` —
     the same as [Stack's screens](/docs/navigation/stack/). `TabHomeScreen.svelte`/
     `TabSearchScreen.svelte` read theirs the same way.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Tab } from '@symbiote-native/navigation/solid';
+    import type { ITabOptions } from '@symbiote-native/navigation/solid';
+    import { TabHomeScreen } from './TabHomeScreen';
+    import { TabSearchScreen } from './TabSearchScreen';
+
+    const homeTabOptions: ITabOptions = {
+      tabBarLabel: 'Home',
+      tabBarIcon: '🏠',
+      tabBarActiveTintColor: '#4fd1a5',
+    };
+
+    const searchTabOptions: ITabOptions = {
+      tabBarLabel: 'Search',
+      tabBarIcon: '🔍',
+      tabBarBadge: 3,
+    };
+
+    export function TabsDemoScreen() {
+      return (
+        <Tab initialRouteName="Home">
+          <Tab.Screen name="Home" component={TabHomeScreen} options={homeTabOptions} />
+          <Tab.Screen name="Search" component={TabSearchScreen} options={searchTabOptions} />
+        </Tab>
+      );
+    }
+    ```
+
+    Solid's JSX takes the dotted `Tab.Screen` form directly, no standalone `TabScreen` needed the
+    way Vue/Svelte's templates require. Screens are discovered the same way Stack's are: Solid
+    cannot inspect `children` either, so each `<Tab.Screen>` registers itself on a context-based
+    collector, not a children scan. A screen that needs its own `route`/`navigation` reads them
+    with `useRoute()`/`useTabNavigation()` (Solid: [Stack's screens](/docs/navigation/stack/)):
+    both hand back an **accessor**, called at the read site (`navigation().jumpTo(...)`), since a
+    Solid component body runs once. `TabHomeScreen`/`TabSearchScreen` read theirs the same way.
+
   </TabItem>
 </Tabs>
 
@@ -183,25 +226,25 @@ in `options` or shared across every tab via `screenOptions`:
 `ITabNavigatorHandle` — the shape of the object every adapter exposes (a forwarded ref in React,
 `expose()` in Vue, the `Tab` class itself in Angular):
 
-| Method | Signature | Description |
-| --- | --- | --- |
-| `jumpTo` | `(name: string, params?: unknown) => void` | Moves focus to the tab route named `name`. Never adds, removes, or reorders tabs |
-| `setParams` | `(params: unknown, key: string) => void` | Merges `params` into the route matched by `key`. `key` is **required** here, unlike Stack's `setParams`, whose key defaults to the focused route |
+| Method      | Signature                                  | Description                                                                                                                                      |
+| ----------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `jumpTo`    | `(name: string, params?: unknown) => void` | Moves focus to the tab route named `name`. Never adds, removes, or reorders tabs                                                                 |
+| `setParams` | `(params: unknown, key: string) => void`   | Merges `params` into the route matched by `key`. `key` is **required** here, unlike Stack's `setParams`, whose key defaults to the focused route |
 
 ### Tab options
 
 `ITabOptions` — passed as `options` on a single `<Tab.Screen>` (or `screenOptions` on `<Tab>` for
 every tab at once; a screen's own `options` win on a per-field basis):
 
-| Option | Type | Description |
-| --- | --- | --- |
-| `title` | `string` | Fallback label used when `tabBarLabel` is unset |
-| `tabBarLabel` | `string` | Explicit tab bar label text |
-| `tabBarIcon` | `IDescriptor \| string` | Tab icon: a pre-built descriptor node, or a bare string rendered as a label-style glyph (e.g. an emoji). Not a render-prop callback |
-| `tabBarBadge` | `string \| number` | Badge value shown on the tab icon |
-| `tabBarActiveTintColor` | color | Tint color for the label/icon when the tab is focused (site default `#007AFF`) |
-| `tabBarInactiveTintColor` | color | Tint color for the label/icon when unfocused (site default `#8e8e93`) |
-| `tabBarStyle` | style object | Style override for the tab bar container |
+| Option                    | Type                    | Description                                                                                                                         |
+| ------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `title`                   | `string`                | Fallback label used when `tabBarLabel` is unset                                                                                     |
+| `tabBarLabel`             | `string`                | Explicit tab bar label text                                                                                                         |
+| `tabBarIcon`              | `IDescriptor \| string` | Tab icon: a pre-built descriptor node, or a bare string rendered as a label-style glyph (e.g. an emoji). Not a render-prop callback |
+| `tabBarBadge`             | `string \| number`      | Badge value shown on the tab icon                                                                                                   |
+| `tabBarActiveTintColor`   | color                   | Tint color for the label/icon when the tab is focused (site default `#007AFF`)                                                      |
+| `tabBarInactiveTintColor` | color                   | Tint color for the label/icon when unfocused (site default `#8e8e93`)                                                               |
+| `tabBarStyle`             | style object            | Style override for the tab bar container                                                                                            |
 
 ## Related
 

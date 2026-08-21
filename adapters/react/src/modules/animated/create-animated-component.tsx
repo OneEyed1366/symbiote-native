@@ -118,7 +118,9 @@ export function createAnimatedComponent<P extends IAnimatableProps>(
     const passthroughStyle = readPassthroughStyle(passthrough);
     if (passthroughStyle !== undefined) {
       reduced.style =
-        reduced.style === undefined ? passthroughStyle : [reduced.style, passthroughStyle];
+        reduced.style === undefined
+          ? passthroughStyle
+          : [reduced.style, passthroughStyle];
     }
     const childProps: P & { ref: (instance: unknown) => void } = Object.assign(
       Object.create(null),

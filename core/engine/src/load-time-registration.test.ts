@@ -49,11 +49,16 @@ const REGISTRATION_CALLEE = /^(register|set)[A-Z]/;
 
 function collectSourceFiles(dir: string, out: string[]): void {
   for (const entry of readdirSync(dir)) {
-    if (entry === 'node_modules' || entry === 'build' || entry === 'build-ngc') continue;
+    if (entry === 'node_modules' || entry === 'build' || entry === 'build-ngc')
+      continue;
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
       collectSourceFiles(full, out);
-    } else if (full.endsWith('.ts') && !full.endsWith('.d.ts') && !full.includes('.test.')) {
+    } else if (
+      full.endsWith('.ts') &&
+      !full.endsWith('.d.ts') &&
+      !full.includes('.test.')
+    ) {
       out.push(full);
     }
   }
@@ -69,7 +74,10 @@ function parse(file: string): ts.SourceFile {
 }
 
 // './x' -> the file it actually resolves to, so importers and importees can be compared by path.
-function resolveSpecifier(fromFile: string, specifier: string): string | undefined {
+function resolveSpecifier(
+  fromFile: string,
+  specifier: string,
+): string | undefined {
   if (!specifier.startsWith('.')) return undefined;
   const base = resolve(dirname(fromFile), specifier);
   for (const candidate of [`${base}.ts`, join(base, 'index.ts')]) {
@@ -99,10 +107,15 @@ function analyze(file: string): IModuleFacts {
 
   const isExported = (node: ts.Node): boolean =>
     ts.canHaveModifiers(node) &&
-    (ts.getModifiers(node) ?? []).some(m => m.kind === ts.SyntaxKind.ExportKeyword);
+    (ts.getModifiers(node) ?? []).some(
+      m => m.kind === ts.SyntaxKind.ExportKeyword,
+    );
 
   for (const statement of source.statements) {
-    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
+    if (
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteral(statement.moduleSpecifier)
+    ) {
       const clause = statement.importClause;
       // No import clause at all == `import './m';` — the one form inline-requires cannot defer,
       // because there is no binding for it to chase to a use site.
@@ -111,7 +124,8 @@ function analyze(file: string): IModuleFacts {
         if (target !== undefined) bareImports.push(target);
       } else if (clause.isTypeOnly !== true) {
         // `import type ...` is erased at compile time and carries no runtime dependency.
-        if (clause.name !== undefined) valueImportedNames.push(clause.name.text);
+        if (clause.name !== undefined)
+          valueImportedNames.push(clause.name.text);
         const named = clause.namedBindings;
         if (named !== undefined && ts.isNamedImports(named)) {
           for (const element of named.elements) {
@@ -132,7 +146,8 @@ function analyze(file: string): IModuleFacts {
     ) {
       if (ts.isVariableStatement(statement)) {
         for (const declaration of statement.declarationList.declarations) {
-          if (ts.isIdentifier(declaration.name)) exportedNames.push(declaration.name.text);
+          if (ts.isIdentifier(declaration.name))
+            exportedNames.push(declaration.name.text);
         }
       } else if (statement.name !== undefined) {
         exportedNames.push(statement.name.text);
@@ -140,7 +155,10 @@ function analyze(file: string): IModuleFacts {
     }
 
     // A top-level expression statement calling an imported register*/set* function.
-    if (ts.isExpressionStatement(statement) && ts.isCallExpression(statement.expression)) {
+    if (
+      ts.isExpressionStatement(statement) &&
+      ts.isCallExpression(statement.expression)
+    ) {
       const callee = statement.expression.expression;
       if (ts.isIdentifier(callee) && REGISTRATION_CALLEE.test(callee.text)) {
         if (importedNames.has(callee.text)) registrations.push(callee.text);
@@ -164,7 +182,9 @@ describe('load-time registrations survive an inline-requires production bundle',
     let scratchDir: string;
 
     beforeEach(() => {
-      scratchDir = mkdtempSync(join(tmpdir(), 'load-time-registration-fixture-'));
+      scratchDir = mkdtempSync(
+        join(tmpdir(), 'load-time-registration-fixture-'),
+      );
     });
 
     afterEach(() => {
@@ -250,7 +270,10 @@ describe('load-time registrations survive an inline-requires production bundle',
         'registry.ts',
         'export function registerFactory(name: string, impl: unknown): void {}\n',
       );
-      writeModule('consumer.ts', "import { Thing } from './thing';\nconsole.log(Thing);\n");
+      writeModule(
+        'consumer.ts',
+        "import { Thing } from './thing';\nconsole.log(Thing);\n",
+      );
 
       expect(scanScratchDir()).toEqual([]);
     });
@@ -258,7 +281,8 @@ describe('load-time registrations survive an inline-requires production bundle',
 
   it('is never reachable only through a lazy re-export', () => {
     const files: string[] = [];
-    for (const root of SCANNED_ROOTS) collectSourceFiles(join(REPO_ROOT, root), files);
+    for (const root of SCANNED_ROOTS)
+      collectSourceFiles(join(REPO_ROOT, root), files);
 
     const facts = new Map(files.map(file => [file, analyze(file)]));
 

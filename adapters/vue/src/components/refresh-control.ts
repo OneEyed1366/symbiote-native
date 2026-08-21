@@ -54,14 +54,19 @@ function foldAttrs(attrs: Record<string, unknown>): IForwardBag {
   return resolveAccessibilityProps(bag);
 }
 
-export const RefreshControl = defineComponent<IRefreshControlProps, IRefreshControlEmits>(
+export const RefreshControl = defineComponent<
+  IRefreshControlProps,
+  IRefreshControlEmits
+>(
   (_props, { attrs: rawAttrs, emit, slots }) => {
     return () => {
       const nativeProps = foldAttrs(normalizeVueAttrs(rawAttrs));
       dlog('RefreshControl -> PullToRefreshView');
       dlog(`RefreshControl refreshing=${String(nativeProps.refreshing)}`);
       if (nativeProps.enabled !== undefined)
-        dlog(`RefreshControl enabled=${String(nativeProps.enabled)} (Android-only)`);
+        dlog(
+          `RefreshControl enabled=${String(nativeProps.enabled)} (Android-only)`,
+        );
       dlog('RefreshControl refresh emit wired');
       return h(
         'symbiote-refresh-control',

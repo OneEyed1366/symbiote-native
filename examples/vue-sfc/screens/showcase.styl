@@ -1,0 +1,25 @@
+// Stylus tile — the same variable / mixin / arithmetic proof in Stylus's indented syntax, which
+// is also the strongest evidence of the three that a preprocessor ran: this file is not valid
+// CSS at all, so a tile that paints means Stylus reduced it first. `styl-unit * 2` gives 18px.
+
+styl-rose = #f58fb0
+styl-unit = 9px
+
+styl-pill(radius)
+  border-radius radius
+  border-width 2px
+
+.styl-tile
+  styl-pill(22px)
+  padding styl-unit (styl-unit * 2)
+  border-color styl-rose
+  background-color #16243a
+
+  &.styl-tile-on
+    border-color #a3d94f
+    background-color #1f4d7a
+
+.styl-tile-text
+  color #ffffff
+  font-size 12px
+  font-weight bold

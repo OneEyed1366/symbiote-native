@@ -30,9 +30,13 @@ import { setNativeViewConfigSource } from '@symbiote-native/engine';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import type { INavigatorHandle } from '../../core';
 import { findLive, findLiveByTestId } from '../fabric-tree.test-helper';
-import { createSvelteHarness, loadComponent } from '../svelte-compile.test-helper';
+import {
+  createSvelteHarness,
+  loadComponent,
+} from '../svelte-compile.test-helper';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -53,13 +57,20 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
     validAttributes: { screenId: true, activityState: true },
   },
   RNSScreenStack: { directEventTypes: {}, validAttributes: {} },
-  RNSScreenStackHeaderConfig: { directEventTypes: {}, validAttributes: { title: true } },
-  RNSScreenContentWrapper: { directEventTypes: {}, validAttributes: { collapsable: true } },
+  RNSScreenStackHeaderConfig: {
+    directEventTypes: {},
+    validAttributes: { title: true },
+  },
+  RNSScreenContentWrapper: {
+    directEventTypes: {},
+    validAttributes: { collapsable: true },
+  },
 };
 
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let harness = createSvelteHarness('runes');
 
@@ -128,7 +139,10 @@ function mismatchProbeSource(hookFile: string, hookName: string): string {
  <symbiote-view p={{ testID: 'mismatch', accessibilityLabel: message }} />`;
 }
 
-async function mountWithScreen(variant: string, screenSource: string): Promise<unknown> {
+async function mountWithScreen(
+  variant: string,
+  screenSource: string,
+): Promise<unknown> {
   const dir = __dirname;
   harness.compileSource(dir, `${variant}-screen`, screenSource);
   const app = harness.compileSource(
@@ -160,7 +174,8 @@ function isStackHandle(value: unknown): value is INavigatorHandle {
 }
 
 function probeLabel(testID: string): string {
-  const label = findLiveByTestId(fabric.appRoot(), testID)?.props?.accessibilityLabel;
+  const label = findLiveByTestId(fabric.appRoot(), testID)?.props
+    ?.accessibilityLabel;
   return typeof label === 'string' ? label : '';
 }
 
@@ -176,7 +191,9 @@ describe('navigation runes (real compiled components)', () => {
       // native screen's topAppear hasn't fired yet - see the focus/blur test below).
       await mountWithScreen('surface', PROBE_SOURCE);
       // name:params | routeCount | focusRuns | cleanupRuns | typeof push | typeof addListener | rootScope | isFocused
-      expect(probeLabel('probe')).toBe('home:none|1|0|0|function|function|true|false');
+      expect(probeLabel('probe')).toBe(
+        'home:none|1|0|0|function|function|true|false',
+      );
     });
 
     it('runs useFocusEffect and flips useIsFocused together on native focus/blur', async () => {
@@ -213,7 +230,8 @@ describe('navigation runes (real compiled components)', () => {
       // selector (routes.length) must also see the new count.
       const handle = await mountWithScreen('state', PROBE_SOURCE);
       expect(probeLabel('probe').split('|')[1]).toBe('1');
-      if (!isStackHandle(handle)) throw new Error('Stack did not expose a navigator handle');
+      if (!isStackHandle(handle))
+        throw new Error('Stack did not expose a navigator handle');
 
       handle.push('details');
       await tick();
@@ -226,7 +244,8 @@ describe('navigation runes (real compiled components)', () => {
       // route key without a remount - the scope value is a getter specifically so a param update
       // reaches an already-mounted screen (navigation-context.ts's header comment).
       const handle = await mountWithScreen('params', PROBE_SOURCE);
-      if (!isStackHandle(handle)) throw new Error('Stack did not expose a navigator handle');
+      if (!isStackHandle(handle))
+        throw new Error('Stack did not expose a navigator handle');
       expect(probeLabel('probe').split('|')[0]).toBe('home:none');
 
       handle.setParams('updated');
@@ -245,7 +264,9 @@ describe('navigation runes (real compiled components)', () => {
         'mismatch-tab',
         mismatchProbeSource('use-tab-navigation.svelte', 'useTabNavigation'),
       );
-      expect(probeLabel('mismatch')).toContain('nearest navigator is not a Tab');
+      expect(probeLabel('mismatch')).toContain(
+        'nearest navigator is not a Tab',
+      );
     });
 
     it('throws a named error when useDrawerNavigation meets a Stack ancestor', async () => {
@@ -254,9 +275,14 @@ describe('navigation runes (real compiled components)', () => {
       // the original test happened to cover.
       await mountWithScreen(
         'mismatch-drawer',
-        mismatchProbeSource('use-drawer-navigation.svelte', 'useDrawerNavigation'),
+        mismatchProbeSource(
+          'use-drawer-navigation.svelte',
+          'useDrawerNavigation',
+        ),
       );
-      expect(probeLabel('mismatch')).toContain('nearest navigator is not a Drawer');
+      expect(probeLabel('mismatch')).toContain(
+        'nearest navigator is not a Drawer',
+      );
     });
 
     it('throws when a rune is used outside any navigator', async () => {

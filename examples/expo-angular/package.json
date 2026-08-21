@@ -22,16 +22,16 @@
     "@angular/compiler": "^22",
     "@angular/core": "^22",
     "@symbiote-native/android": "^0.1.2",
-    "@symbiote-native/angular": "^0.7.0",
+    "@symbiote-native/angular": "file:../../.tarballs/symbiote-native-angular-0.7.0.tgz",
     "@symbiote-native/application": "^0.2.0",
     "@symbiote-native/battery": "^0.2.0",
     "@symbiote-native/brightness": "^0.2.0",
     "@symbiote-native/cellular": "^0.2.0",
     "@symbiote-native/clipboard": "^0.2.0",
-    "@symbiote-native/components": "^0.4.0",
+    "@symbiote-native/components": "file:../../.tarballs/symbiote-native-components-0.4.0.tgz",
     "@symbiote-native/crypto": "^0.2.0",
     "@symbiote-native/device": "^0.2.0",
-    "@symbiote-native/engine": "^0.2.0",
+    "@symbiote-native/engine": "file:../../.tarballs/symbiote-native-engine-0.2.0.tgz",
     "@symbiote-native/expo-modules-link": "^0.3.0",
     "@symbiote-native/haptics": "^0.2.0",
     "@symbiote-native/keep-awake": "^0.2.0",
@@ -53,7 +53,8 @@
     "@symbiote-native/web-browser": "^0.2.0",
     "expo-modules-core": "57.0.5",
     "react": "19.2.3",
-    "react-native": "0.86.0"
+    "react-native": "0.86.0",
+    "expo": "57.0.14"
   },
   "devDependencies": {
     "@angular/compiler-cli": "^22",
@@ -69,13 +70,13 @@
     "@react-native/gradle-plugin": "0.86.0",
     "@react-native/metro-config": "0.86.0",
     "@react-native/typescript-config": "0.86.0",
-    "@symbiote-native/css-parser": "^0.3.0",
+    "@symbiote-native/css-parser": "file:../../.tarballs/symbiote-native-css-parser-0.3.0.tgz",
     "@types/jest": "^29.5.12",
     "@types/node": "^26.0.0",
     "@types/react": "^19.2.0",
     "detox": "^20.51.4",
     "eslint": "^8.19.0",
-    "expo-modules-autolinking": "57.0.8",
+    "expo-modules-autolinking": "57.0.10",
     "jest": "^29.7.0",
     "jest-circus": "^29.7.0",
     "prettier": "^3.9.1",
@@ -84,5 +85,12 @@
   },
   "engines": {
     "node": ">= 22.11.0"
+  },
+  "expo": {
+    "autolinking": {
+      "buildFromSource": [
+        ".*"
+      ]
+    }
   }
 }

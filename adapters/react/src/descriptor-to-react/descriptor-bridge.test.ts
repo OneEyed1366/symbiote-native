@@ -22,7 +22,8 @@ interface IReactish {
 }
 
 function inspect(node: unknown): IReactish {
-  if (!isRecord(node) || !isRecord(node.props)) throw new Error('not a react element');
+  if (!isRecord(node) || !isRecord(node.props))
+    throw new Error('not a react element');
   return { type: node.type, key: node.key, props: node.props };
 }
 
@@ -50,7 +51,9 @@ describe('el() / txt()', () => {
     // type a hand-written el('symbiote-text', ...) would, not a distinct text-node shape.
     it('makes txt() a symbiote-text element', () => {
       const textChild = tree.children[0];
-      expect(typeof textChild !== 'string' && textChild.type === 'symbiote-text').toBe(true);
+      expect(
+        typeof textChild !== 'string' && textChild.type === 'symbiote-text',
+      ).toBe(true);
     });
   });
 });
@@ -103,17 +106,24 @@ describe('renderActivityIndicator', () => {
     // that a platform's own default color (iOS GRAY here) fills in when the caller passes none.
     it('maps a named size to its enum and keeps the iOS default color', () => {
       const ios = renderActivityIndicator(
-        { animating: true, hidesWhenStopped: true, size: 'large', passthrough: { testID: 't' } },
+        {
+          animating: true,
+          hidesWhenStopped: true,
+          size: 'large',
+          passthrough: { testID: 't' },
+        },
         { defaultColor: '#999999', nativeExtras: {} },
       );
       expect(ios.type).toBe('symbiote-view');
       expect(ios.props.testID).toBe('t');
 
       const spinner = ios.children[0];
-      expect(typeof spinner !== 'string' && spinner.type === 'symbiote-activity-indicator').toBe(
-        true,
-      );
-      if (typeof spinner === 'string') throw new Error('spinner should be a descriptor');
+      expect(
+        typeof spinner !== 'string' &&
+          spinner.type === 'symbiote-activity-indicator',
+      ).toBe(true);
+      if (typeof spinner === 'string')
+        throw new Error('spinner should be a descriptor');
       expect(spinner.props.size).toBe('large');
       expect(spinner.props.color).toBe('#999999');
       expect(spinner.props.style).toEqual({ width: 36, height: 36 });
@@ -124,12 +134,21 @@ describe('renderActivityIndicator', () => {
     // required styleAttr/indeterminate native extras still ride through untouched.
     it('omits a null platform color and forwards android nativeExtras', () => {
       const android = renderActivityIndicator(
-        { animating: true, hidesWhenStopped: true, size: 'small', passthrough: {} },
-        { defaultColor: null, nativeExtras: { styleAttr: 'Normal', indeterminate: true } },
+        {
+          animating: true,
+          hidesWhenStopped: true,
+          size: 'small',
+          passthrough: {},
+        },
+        {
+          defaultColor: null,
+          nativeExtras: { styleAttr: 'Normal', indeterminate: true },
+        },
       );
       const spinner = android.children[0];
       expect(typeof spinner).not.toBe('string');
-      if (typeof spinner === 'string') throw new Error('spinner should be a descriptor');
+      if (typeof spinner === 'string')
+        throw new Error('spinner should be a descriptor');
       expect('color' in spinner.props).toBe(false);
       expect(spinner.props.indeterminate).toBe(true);
     });

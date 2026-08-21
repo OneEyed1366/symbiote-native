@@ -28,7 +28,8 @@ function startsOf(): INativeCall[] {
 }
 function configOf(call: INativeCall): Record<string, unknown> {
   const config = call.args[2];
-  if (typeof config !== 'object' || config === null) throw new Error('start config missing');
+  if (typeof config !== 'object' || config === null)
+    throw new Error('start config missing');
   return { ...config };
 }
 
@@ -47,8 +48,12 @@ beforeAll(() => {
     setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
     flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
     extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-    startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
-    stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
+    startListeningToAnimatedNodeValue: record(
+      'startListeningToAnimatedNodeValue',
+    ),
+    stopListeningToAnimatedNodeValue: record(
+      'stopListeningToAnimatedNodeValue',
+    ),
     getValue: record('getValue'),
     addAnimatedEventToView: record('addAnimatedEventToView'),
     removeAnimatedEventFromView: record('removeAnimatedEventFromView'),
@@ -68,7 +73,9 @@ describe('Animated.loop native offload — Positive', () => {
   // JS wakes up every cycle just to restart native, defeating the whole point of offloading.
   it('an infinite loop of a single native timing issues one start with iterations -1', () => {
     const opacity = new AnimatedValue(0);
-    loop(timing(opacity, { toValue: 1, duration: 100, useNativeDriver: true })).start();
+    loop(
+      timing(opacity, { toValue: 1, duration: 100, useNativeDriver: true }),
+    ).start();
 
     const starts = startsOf();
     expect(starts).toHaveLength(1);
@@ -92,9 +99,12 @@ describe('Animated.loop native offload — Positive', () => {
   it('iterations:0 finishes immediately without starting any animation, native or JS', () => {
     const opacity = new AnimatedValue(0);
     let finished: boolean | undefined;
-    loop(timing(opacity, { toValue: 1, duration: 100, useNativeDriver: true }), {
-      iterations: 0,
-    }).start(result => {
+    loop(
+      timing(opacity, { toValue: 1, duration: 100, useNativeDriver: true }),
+      {
+        iterations: 0,
+      },
+    ).start(result => {
       finished = result.finished;
     });
 
@@ -127,7 +137,9 @@ describe('Animated.loop — falls back to JS restart when it cannot offload', ()
   // loop restarts in JS instead of silently running on native the caller never asked for.
   it('a single timing WITHOUT useNativeDriver cannot offload: no native start is issued at all', () => {
     const opacity = new AnimatedValue(0);
-    loop(timing(opacity, { toValue: 1, duration: 0 }), { iterations: 2 }).start();
+    loop(timing(opacity, { toValue: 1, duration: 0 }), {
+      iterations: 2,
+    }).start();
 
     // The JS-restart path drives the value via AnimatedValue.animate(), never through native.
     expect(startsOf()).toHaveLength(0);

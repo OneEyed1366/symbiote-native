@@ -8,7 +8,10 @@
 // RN's AccessibilityInfo.js Android branches.
 
 import { createDeviceEventModule } from '../native-modules';
-import { type IEventEmitterModule, type IEventSubscription } from '../native-events';
+import {
+  type IEventEmitterModule,
+  type IEventSubscription,
+} from '../native-events';
 import { dlog } from '../debug';
 import {
   isBoolean,
@@ -38,7 +41,9 @@ const ACCESSIBILITY_MODULE = 'AccessibilityInfo';
 // Public event name -> the Android device event the native side emits. Android renames
 // most of them; events with no Android source (iOS-only) are absent and yield an inert
 // subscription. (RN maps both `change` and `screenReaderChanged` to touchExplorationDidChange.)
-const ANDROID_DEVICE_EVENT: Partial<Record<IAccessibilityChangeEventName, string>> = {
+const ANDROID_DEVICE_EVENT: Partial<
+  Record<IAccessibilityChangeEventName, string>
+> = {
   screenReaderChanged: 'touchExplorationDidChange',
   reduceMotionChanged: 'reduceMotionDidChange',
   highTextContrastChanged: 'highTextContrastDidChange',
@@ -61,7 +66,10 @@ interface INativeAccessibilityInfoAndroid extends IEventEmitterModule {
   isHighTextContrastEnabled?(onSuccess: IStateCallback): void;
   isAccessibilityServiceEnabled?(onSuccess: IStateCallback): void;
   announceForAccessibility(announcement: string): void;
-  getRecommendedTimeoutMillis?(original: number, onSuccess: (timeout: number) => void): void;
+  getRecommendedTimeoutMillis?(
+    original: number,
+    onSuccess: (timeout: number) => void,
+  ): void;
   addListener(eventType: string): void;
   removeListeners(count: number): void;
 }
@@ -69,10 +77,11 @@ interface INativeAccessibilityInfoAndroid extends IEventEmitterModule {
 // Lazily resolved so importing this module has no native side effect. `null` when
 // unlinked. The lazy-resolve + lazy-emitter shape lives in `createDeviceEventModule`
 // (native-modules.ts); Android adds no self-subscription on top of it.
-const deviceEventModule = createDeviceEventModule<INativeAccessibilityInfoAndroid>({
-  moduleName: ACCESSIBILITY_MODULE,
-  moduleLogPrefix: 'AccessibilityInfo(android): module',
-});
+const deviceEventModule =
+  createDeviceEventModule<INativeAccessibilityInfoAndroid>({
+    moduleName: ACCESSIBILITY_MODULE,
+    moduleLogPrefix: 'AccessibilityInfo(android): module',
+  });
 
 function getModule(): INativeAccessibilityInfoAndroid | null {
   return deviceEventModule.getModule();
@@ -86,7 +95,9 @@ function getEmitter() {
 // unlinked OR the optional method is absent on this host; mirrors RN's "missing query ->
 // false" contract for the cross-platform getters. The dlog records the miss.
 function queryState(
-  pick: (module: INativeAccessibilityInfoAndroid) => ((s: IStateCallback) => void) | undefined,
+  pick: (
+    module: INativeAccessibilityInfoAndroid,
+  ) => ((s: IStateCallback) => void) | undefined,
   label: string,
 ): Promise<boolean> {
   const module = getModule();
@@ -107,7 +118,10 @@ function queryState(
 class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
   // Screen reader on Android == touch exploration (TalkBack).
   isScreenReaderEnabled(): Promise<boolean> {
-    return queryState(m => m.isTouchExplorationEnabled, 'isScreenReaderEnabled');
+    return queryState(
+      m => m.isTouchExplorationEnabled,
+      'isScreenReaderEnabled',
+    );
   }
 
   isReduceMotionEnabled(): Promise<boolean> {
@@ -133,7 +147,10 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
   }
 
   isHighTextContrastEnabled(): Promise<boolean> {
-    return queryState(m => m.isHighTextContrastEnabled, 'isHighTextContrastEnabled');
+    return queryState(
+      m => m.isHighTextContrastEnabled,
+      'isHighTextContrastEnabled',
+    );
   }
 
   // iOS-only "Increase Contrast"; Android has no equivalent, so resolve false (RN parity).
@@ -147,14 +164,19 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
   }
 
   isAccessibilityServiceEnabled(): Promise<boolean> {
-    return queryState(m => m.isAccessibilityServiceEnabled, 'isAccessibilityServiceEnabled');
+    return queryState(
+      m => m.isAccessibilityServiceEnabled,
+      'isAccessibilityServiceEnabled',
+    );
   }
 
   // Post a string to be announced by the screen reader. No-op without a module.
   announceForAccessibility(announcement: string): void {
     const module = getModule();
     if (module === null) {
-      dlog('AccessibilityInfo(android).announceForAccessibility -> no module (no-op)');
+      dlog(
+        'AccessibilityInfo(android).announceForAccessibility -> no module (no-op)',
+      );
       return;
     }
     module.announceForAccessibility(announcement);
@@ -196,7 +218,10 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
   // routing (isSymbioteNode guard + dispatch) lives in shared.ts, identical on both
   // platforms; Android has no early-return special case, so it passes no shouldSkip
   // hook - every event reaches the slot.
-  sendAccessibilityEvent(handle: IAccessibilityHandle, eventType: IAccessibilityEventType): void {
+  sendAccessibilityEvent(
+    handle: IAccessibilityHandle,
+    eventType: IAccessibilityEventType,
+  ): void {
     routeSendAccessibilityEvent('android', handle, eventType);
   }
 
@@ -222,4 +247,5 @@ class AccessibilityInfoAndroid implements IAccessibilityInfoStatic {
   }
 }
 
-export const AccessibilityInfo: IAccessibilityInfoStatic = new AccessibilityInfoAndroid();
+export const AccessibilityInfo: IAccessibilityInfoStatic =
+  new AccessibilityInfoAndroid();

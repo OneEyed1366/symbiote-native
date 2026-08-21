@@ -19,24 +19,28 @@ cellular is that almost the entire carrier/SIM surface is Android-only — iOS e
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 <Aside type="caution" title="Every field except generation is Android-only">
-  `allowsVoipAsync`, `getIsoCountryCodeAsync`, `getCarrierNameAsync`, `getMobileCountryCodeAsync`,
-  and `getMobileNetworkCodeAsync` each short-circuit to `null` on iOS before ever reaching the
-  native module — iOS exposes no equivalent carrier/SIM API. Only `getCellularGenerationAsync`
-  works on both platforms. A Simulator/emulator with no active SIM also reports `null`/`UNKNOWN`
-  for nearly everything — a physical device with an active SIM is needed for real values.
+  `allowsVoipAsync`, `getIsoCountryCodeAsync`, `getCarrierNameAsync`,
+  `getMobileCountryCodeAsync`, and `getMobileNetworkCodeAsync` each
+  short-circuit to `null` on iOS before ever reaching the native module — iOS
+  exposes no equivalent carrier/SIM API. Only `getCellularGenerationAsync` works
+  on both platforms. A Simulator/emulator with no active SIM also reports
+  `null`/`UNKNOWN` for nearly everything — a physical device with an active SIM
+  is needed for real values.
 </Aside>
 
 <Aside type="note">
-  `getPermissionsAsync`/`requestPermissionsAsync` are Android-only in effect — every other platform
-  needs no permission to read cellular info at all, and both functions resolve an already-`GRANTED`
-  response there without ever reaching a native module.
+  `getPermissionsAsync`/`requestPermissionsAsync` are Android-only in effect —
+  every other platform needs no permission to read cellular info at all, and
+  both functions resolve an already-`GRANTED` response there without ever
+  reaching a native module.
 </Aside>
 
 ## Installation
@@ -50,14 +54,15 @@ versions — never install either yourself, and never add the `expo` meta-packag
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-cellular`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
-  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses —
-  and it isn't the standard Expo setup flow either, since this project never installs the `expo`
-  meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every other `expo-modules-core` package with zero further native changes. Reading carrier/SIM
-  info on Android additionally needs the `READ_PHONE_STATE` permission declared in your app's
-  `AndroidManifest.xml`.
+  `expo-cellular`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every other `expo-modules-core` package with zero further
+  native changes. Reading carrier/SIM info on Android additionally needs the
+  `READ_PHONE_STATE` permission declared in your app's `AndroidManifest.xml`.
 </Aside>
 
 ## Usage
@@ -86,6 +91,7 @@ adapter, with no hook/composable/service in the way:
       return <Text>{carrierName ?? `generation ${generation}`}</Text>;
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -107,6 +113,7 @@ adapter, with no hook/composable/service in the way:
       <Text>{{ carrierName ?? `generation ${generation}` }}</Text>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -132,6 +139,7 @@ adapter, with no hook/composable/service in the way:
 
     There's no per-instance service to `inject()` here — every function is a plain free function
     off the core package, same as `@symbiote-native/local-auth`.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -153,6 +161,28 @@ adapter, with no hook/composable/service in the way:
 
     There's no per-instance rune to reach for here either — every function is a plain free
     function off the core package, called straight from `$effect`.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { Text } from '@symbiote-native/solid';
+    import { CellularGeneration, getCellularGenerationAsync, getCarrierNameAsync } from '@symbiote-native/cellular';
+
+    export function CellularInfo() {
+      const [generation, setGeneration] = createSignal<CellularGeneration | null>(null);
+      const [carrierName, setCarrierName] = createSignal<string | null>(null);
+
+      getCellularGenerationAsync().then(setGeneration);
+      getCarrierNameAsync().then(setCarrierName); // Android only — always null on iOS
+
+      return <Text>{carrierName() ?? `generation ${generation()}`}</Text>;
+    }
+    ```
+
+    No Solid primitive is needed here either: each function is a plain free function off the
+    core package, called directly in the component body, which runs once.
+
   </TabItem>
 </Tabs>
 
@@ -177,6 +207,7 @@ adapter, with no hook/composable/service in the way:
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -193,6 +224,7 @@ adapter, with no hook/composable/service in the way:
       </Pressable>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -216,6 +248,7 @@ adapter, with no hook/composable/service in the way:
       readonly error = this.permissions.error;
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -235,6 +268,27 @@ adapter, with no hook/composable/service in the way:
       <Text>{permissions.error ? 'Retry check' : 'Request permission'}</Text>
     </Pressable>
     ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Pressable, Text } from '@symbiote-native/solid';
+    import { createPermissions } from '@symbiote-native/cellular/solid';
+
+    export function CellularPermission() {
+      const { status, error, request, get } = createPermissions();
+
+      return (
+        <>
+          <Text>{error() ? `check failed: ${error()!.message}` : (status()?.status ?? 'checking…')}</Text>
+          <Pressable onPress={() => (error() ? get() : request())}>
+            <Text>{error() ? 'Retry check' : 'Request permission'}</Text>
+          </Pressable>
+        </>
+      );
+    }
+    ```
+
   </TabItem>
 </Tabs>
 
@@ -245,31 +299,31 @@ tells those two apart; `get()` re-runs the check without prompting the user.
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `getCellularGenerationAsync(): Promise<CellularGeneration>` | Gets the generation of the device's current cellular connection |
-| `allowsVoipAsync(): Promise<boolean \| null>` | *Deprecated upstream.* Whether the SIM's carrier allows VoIP calls on its network. `@platform android` — always `null` on iOS |
-| `getIsoCountryCodeAsync(): Promise<string \| null>` | ISO country code of the current registered operator's MCC. `@platform android` — always `null` on iOS |
-| `getCarrierNameAsync(): Promise<string \| null>` | Name of the user's cellular service provider. `@platform android` — always `null` on iOS |
-| `getMobileCountryCodeAsync(): Promise<string \| null>` | Mobile country code (MCC) of the current registered operator. `@platform android` — always `null` on iOS |
-| `getMobileNetworkCodeAsync(): Promise<string \| null>` | Mobile network code (MNC) of the current registered operator. `@platform android` — always `null` on iOS |
-| `getPermissionsAsync(): Promise<PermissionResponse>` | Checks the user's permission for accessing cellular info. Delegates to the native module only on Android; always resolves an already-granted response elsewhere |
-| `requestPermissionsAsync(): Promise<PermissionResponse>` | Asks the user for permission to access cellular info. Same Android-only/elsewhere-granted split as `getPermissionsAsync` |
+| Signature                                                   | Description                                                                                                                                                     |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getCellularGenerationAsync(): Promise<CellularGeneration>` | Gets the generation of the device's current cellular connection                                                                                                 |
+| `allowsVoipAsync(): Promise<boolean \| null>`               | _Deprecated upstream._ Whether the SIM's carrier allows VoIP calls on its network. `@platform android` — always `null` on iOS                                   |
+| `getIsoCountryCodeAsync(): Promise<string \| null>`         | ISO country code of the current registered operator's MCC. `@platform android` — always `null` on iOS                                                           |
+| `getCarrierNameAsync(): Promise<string \| null>`            | Name of the user's cellular service provider. `@platform android` — always `null` on iOS                                                                        |
+| `getMobileCountryCodeAsync(): Promise<string \| null>`      | Mobile country code (MCC) of the current registered operator. `@platform android` — always `null` on iOS                                                        |
+| `getMobileNetworkCodeAsync(): Promise<string \| null>`      | Mobile network code (MNC) of the current registered operator. `@platform android` — always `null` on iOS                                                        |
+| `getPermissionsAsync(): Promise<PermissionResponse>`        | Checks the user's permission for accessing cellular info. Delegates to the native module only on Android; always resolves an already-granted response elsewhere |
+| `requestPermissionsAsync(): Promise<PermissionResponse>`    | Asks the user for permission to access cellular info. Same Android-only/elsewhere-granted split as `getPermissionsAsync`                                        |
 
 ### `usePermissions()`
 
-| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Svelte (`/svelte`) | Signature | Returns |
-| --- | --- | --- | --- | --- | --- |
-| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions` | `()` | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null` |
+| React (`/react`) | Vue (`/vue`)     | Angular (`/angular`)           | Svelte (`/svelte`) | Solid (`/solid`)     | Signature | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------- | ---------------- | ------------------------------ | ------------------ | --------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions`   | `createPermissions` | `()`      | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null`. Solid: `{ status: Accessor<PermissionResponse \| null>, error: Accessor<Error \| null>, request, get }` |
 
 ### `usePermissions()` return value
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `status` | `PermissionResponse \| null` | The permission status last read, `null` until the first fetch resolves |
-| `error` | `Error \| null` | Why the automatic fetch left `status` at `null`. Cleared by the next successful `get()`/`request()` |
+| Field     | Type                                | Description                                                                                                                  |
+| --------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `status`  | `PermissionResponse \| null`        | The permission status last read, `null` until the first fetch resolves                                                       |
+| `error`   | `Error \| null`                     | Why the automatic fetch left `status` at `null`. Cleared by the next successful `get()`/`request()`                          |
 | `request` | `() => Promise<PermissionResponse>` | Asks the user for the permission, then updates `status` and clears `error`. Rejects to its caller when the native call fails |
-| `get` | `() => Promise<PermissionResponse>` | Re-reads the current status without prompting. Same update and rejection behavior as `request` |
+| `get`     | `() => Promise<PermissionResponse>` | Re-reads the current status without prompting. Same update and rejection behavior as `request`                               |
 
 React hands those back positionally, as `[status, request, get, error]`, so existing two- and
 three-element destructuring keeps working. Vue wraps `status` and `error` in refs; Angular exposes
@@ -278,11 +332,11 @@ returns both as getters, read as `permissions.status` / `permissions.error`.
 
 Read together, the two fields separate the three states:
 
-| `status` | `error` | Meaning |
-| --- | --- | --- |
-| `null` | `null` | Not fetched yet |
-| `null` | `Error` | The automatic fetch failed |
-| `PermissionResponse` | `null` | Fetched |
+| `status`             | `error` | Meaning                    |
+| -------------------- | ------- | -------------------------- |
+| `null`               | `null`  | Not fetched yet            |
+| `null`               | `Error` | The automatic fetch failed |
+| `PermissionResponse` | `null`  | Fetched                    |
 
 Every variant auto-fetches the current permission status once on mount/`connect()`, and updates
 again whenever `request`/`get` resolves. A failure in that automatic fetch lands in `error` instead
@@ -293,13 +347,13 @@ caller. Angular's auto-fetch is latched to at most one run per service instance,
 
 ### `CellularGeneration`
 
-| Member | Value | Description |
-| --- | --- | --- |
-| `UNKNOWN` | `0` | The device's connection generation could not be determined |
-| `CELLULAR_2G` | `1` | 2nd generation (GPRS/EDGE-class) connection |
-| `CELLULAR_3G` | `2` | 3rd generation (UMTS/HSPA-class) connection |
-| `CELLULAR_4G` | `3` | 4th generation (LTE-class) connection |
-| `CELLULAR_5G` | `4` | 5th generation (NR-class) connection |
+| Member        | Value | Description                                                |
+| ------------- | ----- | ---------------------------------------------------------- |
+| `UNKNOWN`     | `0`   | The device's connection generation could not be determined |
+| `CELLULAR_2G` | `1`   | 2nd generation (GPRS/EDGE-class) connection                |
+| `CELLULAR_3G` | `2`   | 3rd generation (UMTS/HSPA-class) connection                |
+| `CELLULAR_4G` | `3`   | 4th generation (LTE-class) connection                      |
+| `CELLULAR_5G` | `4`   | 5th generation (NR-class) connection                       |
 
 ## Notes
 
@@ -307,7 +361,7 @@ caller. Angular's auto-fetch is latched to at most one run per service instance,
   `getCellularGenerationAsync` catches the `SecurityException`, logs it natively, and resolves
   `CellularGeneration.UNKNOWN` — it never rejects. Check `getPermissionsAsync()` when `UNKNOWN`
   comes back instead of reading it as "no cellular data".
-- **The carrier/SIM getters need the SIM *ready*, not merely present.** All five go through a
+- **The carrier/SIM getters need the SIM _ready_, not merely present.** All five go through a
   `TelephonyManager` accessor that yields `null` unless `simState == SIM_STATE_READY`, so a
   PIN-locked or still-initializing SIM produces exactly the `null` an iPhone produces —
   and `getCellularGenerationAsync` falls to `UNKNOWN` on the same check.
@@ -319,7 +373,7 @@ caller. Angular's auto-fetch is latched to at most one run per service instance,
 
 ## How the wrapper works
 
-`@symbiote-native/cellular` ships **zero React/Vue/Angular logic in `expo-cellular` itself** — that
+`@symbiote-native/cellular` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-cellular` itself** — that
 package's own types file hard-imports `PermissionResponse`/`PermissionStatus` from the `expo`
 meta-package (which this project never installs), so its functions, enum, and types are hand-ported,
 verbatim, into this package's own `core/`, changing only that one import line to pull from
@@ -334,12 +388,13 @@ packages/cellular/src/
 ├── react/hooks/use-permissions   @symbiote-native/cellular/react
 ├── vue/composables/use-permissions @symbiote-native/cellular/vue
 ├── svelte/runes/use-permissions  @symbiote-native/cellular/svelte
+├── solid/primitives/use-permissions @symbiote-native/cellular/solid
 └── angular/services/permissions.service @symbiote-native/cellular/angular
 ```
 
 `usePermissions` is written once as a shared pattern and reapplied identically in
 [brightness](/docs/packages/brightness/#how-the-wrapper-works); every other export is a stateless
-free function, re-exported verbatim by all four adapters, same as
+free function, re-exported verbatim by all five adapters, same as
 [local-auth](/docs/packages/local-auth/). The native code itself is never vendored or copied —
 `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
 guide](/docs/howtos/expo-native-module-setup/)).

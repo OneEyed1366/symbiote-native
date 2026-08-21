@@ -48,7 +48,11 @@
   import { hostProps } from '../attachments';
   import { getNavigationScope } from '../navigation-context';
   import { SCREEN_REGISTRY_HOST_PROPS } from '../registry-host';
-  import { setScreenCollector, toRegistry, withoutScreen } from '../screen-registry';
+  import {
+    setScreenCollector,
+    toRegistry,
+    withoutScreen,
+  } from '../screen-registry';
   import type { IRegisteredScreen } from '../screen-registry';
   import type { IScreenProps, ISvelteScreenOptions } from '../screen-props';
   import StackScreen from './stack-screen.svelte';
@@ -100,7 +104,11 @@
       dlog('Stack: no <Stack.Screen> children registered');
       // Deliberately NOT memoized: markers may still be registering, and the next derivation run
       // should get a real initial route rather than being stuck on this placeholder.
-      return createInitialNavigatorState({ key: routeIdPrefix, name: '', params: undefined });
+      return createInitialNavigatorState({
+        key: routeIdPrefix,
+        name: '',
+        params: undefined,
+      });
     }
     seededState = createInitialNavigatorState(
       createRoute(startRouteName, registry.get(startRouteName)?.initialParams),
@@ -114,7 +122,9 @@
   // derivation because it is PURE - it hands back the same state reference when nothing changed, so
   // it writes no state and cannot re-trigger itself; `dispatch` below then persists the pruned
   // history, since it reduces over this value rather than over `pushedState`.
-  const state = $derived(reconcileStackRoutes(pushedState ?? seedState(), [...registry.keys()]));
+  const state = $derived(
+    reconcileStackRoutes(pushedState ?? seedState(), [...registry.keys()]),
+  );
 
   function dispatch(action: INavigatorAction): void {
     pushedState = navigatorReducer(state, action);
@@ -185,7 +195,8 @@
       emitterFor(route.key).emit(NAVIGATION_EVENT_STATE, current);
     }
     for (const routeKey of [...emitters.keys()]) {
-      if (!current.routes.some(route => route.key === routeKey)) emitters.delete(routeKey);
+      if (!current.routes.some(route => route.key === routeKey))
+        emitters.delete(routeKey);
     }
   });
 
@@ -196,7 +207,8 @@
   // never removed.
   const stackProps = resolveStackProps({
     passthrough: {
-      [STACK_ON_FINISH_TRANSITIONING]: () => dlog(`Stack: onFinishTransitioning at t=${Date.now()}`),
+      [STACK_ON_FINISH_TRANSITIONING]: () =>
+        dlog(`Stack: onFinishTransitioning at t=${Date.now()}`),
     },
   });
 
@@ -221,4 +233,29 @@
   }
 </script>
 
-<symbiote-view p={STACK_ROOT_PROPS}><symbiote-text p={SCREEN_REGISTRY_HOST_PROPS}>{@render children?.()}</symbiote-text><svelte:element this={RNS_SCREEN_STACK_VIEW_NAME} {@attach hostProps(stackProps)}>{#each state.routes as route, index (route.key)}{@const screenComponent = componentFor(route)}{#if screenComponent !== undefined}<StackScreen {route} {index} routeCount={state.routes.length} options={optionsFor(route)} navigation={handle} emitter={emitterFor(route.key)} parentScope={parentScope?.current} component={screenComponent} onPopRequested={popOne} />{/if}{/each}</svelte:element></symbiote-view>
+<symbiote-view p={STACK_ROOT_PROPS}>
+  <symbiote-text p={SCREEN_REGISTRY_HOST_PROPS}>
+    {@render children?.()}
+  </symbiote-text>
+  <svelte:element
+    this={RNS_SCREEN_STACK_VIEW_NAME}
+    {@attach hostProps(stackProps)}
+  >
+    {#each state.routes as route, index (route.key)}
+      {@const screenComponent = componentFor(route)}
+      {#if screenComponent !== undefined}
+        <StackScreen
+          {route}
+          {index}
+          routeCount={state.routes.length}
+          options={optionsFor(route)}
+          navigation={handle}
+          emitter={emitterFor(route.key)}
+          parentScope={parentScope?.current}
+          component={screenComponent}
+          onPopRequested={popOne}
+        />
+      {/if}
+    {/each}
+  </svelte:element>
+</symbiote-view>

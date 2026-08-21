@@ -12,7 +12,11 @@
 // so `emit('viewableItemsChanged', info)` types `info` as `IViewableItemsChangedInfo<T>` and the
 // consumer's `@viewable-items-changed` payload is `T`, never `unknown`.
 
-import type { ObjectEmitsOptions, SetupContext, SlotsType } from '@vue/runtime-core';
+import type {
+  ObjectEmitsOptions,
+  SetupContext,
+  SlotsType,
+} from '@vue/runtime-core';
 
 // The `E | {}` and `Record<string, any>` slot default are
 // load-bearing: they make the generic ctx assignable to defineComponent's generic-setup overload

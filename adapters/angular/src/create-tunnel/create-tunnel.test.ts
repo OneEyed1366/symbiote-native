@@ -31,7 +31,8 @@ const SOURCE_TAG = 920;
 const TARGET_TAG = 921;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 const settle = async (): Promise<void> => {
   await tick();
   await tick();
@@ -53,7 +54,8 @@ function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
 function findText(text: string): IFakeNode | undefined {
   let found: IFakeNode | undefined;
   walk(fabric.committed, node => {
-    if (node.viewName === 'RCTRawText' && node.props.text === text) found = node;
+    if (node.viewName === 'RCTRawText' && node.props.text === text)
+      found = node;
   });
   return found;
 }
@@ -137,7 +139,10 @@ describe('createTunnel (Angular) — genuine cross-surface delivery', () => {
       mount(SOURCE_TAG, SourceApp);
       mount(TARGET_TAG, TargetApp);
       await settle();
-      expect(findText('still here'), 'present while the source is mounted').toBeDefined();
+      expect(
+        findText('still here'),
+        'present while the source is mounted',
+      ).toBeDefined();
 
       // why: TunnelInDirective.ngOnDestroy must unregister from the shared store — otherwise a
       // torn-down source (e.g. a closed screen) would leave its content stuck painting on the

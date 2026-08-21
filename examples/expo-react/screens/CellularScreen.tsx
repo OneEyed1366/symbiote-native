@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/react';
 import {
   CellularGeneration,
   allowsVoipAsync,
@@ -50,8 +56,12 @@ export function CellularScreen() {
   const [allowsVoip, setAllowsVoip] = useState<boolean | null>(null);
   const [isoCountryCode, setIsoCountryCode] = useState<string | null>(null);
   const [carrierName, setCarrierName] = useState<string | null>(null);
-  const [mobileCountryCode, setMobileCountryCode] = useState<string | null>(null);
-  const [mobileNetworkCode, setMobileNetworkCode] = useState<string | null>(null);
+  const [mobileCountryCode, setMobileCountryCode] = useState<string | null>(
+    null,
+  );
+  const [mobileNetworkCode, setMobileNetworkCode] = useState<string | null>(
+    null,
+  );
   const [permissionStatus, requestPermission] = usePermissions();
 
   useEffect(() => {
@@ -78,11 +88,16 @@ export function CellularScreen() {
     };
   }, []);
 
-  const permissionLabel = permissionStatus === null ? 'checking…' : permissionStatus.status;
+  const permissionLabel =
+    permissionStatus === null ? 'checking…' : permissionStatus.status;
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="cellular-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="cellular-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -93,9 +108,10 @@ export function CellularScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Cellular</Text>
             <Text className="hero-body">
-              @symbiote-native/cellular — cellular generation and carrier/SIM info. Every field
-              except generation is Android-only upstream (iOS/web return null); a physical
-              device with an active SIM is needed for real values.
+              @symbiote-native/cellular — cellular generation and carrier/SIM
+              info. Every field except generation is Android-only upstream
+              (iOS/web return null); a physical device with an active SIM is
+              needed for real values.
             </Text>
           </View>
         </View>
@@ -106,7 +122,9 @@ export function CellularScreen() {
           </View>
           <View className="capability-row">
             <Text className="capability-label">Generation</Text>
-            <Text className="value-text">{generation === null ? 'checking…' : generationLabel(generation)}</Text>
+            <Text className="value-text">
+              {generation === null ? 'checking…' : generationLabel(generation)}
+            </Text>
           </View>
           {Platform.OS === 'android' && (
             <>
@@ -124,11 +142,15 @@ export function CellularScreen() {
               </View>
               <View className="capability-row">
                 <Text className="capability-label">Mobile country code</Text>
-                <Text className="value-text">{valueLabel(mobileCountryCode)}</Text>
+                <Text className="value-text">
+                  {valueLabel(mobileCountryCode)}
+                </Text>
               </View>
               <View className="capability-row">
                 <Text className="capability-label">Mobile network code</Text>
-                <Text className="value-text">{valueLabel(mobileNetworkCode)}</Text>
+                <Text className="value-text">
+                  {valueLabel(mobileNetworkCode)}
+                </Text>
               </View>
             </>
           )}
@@ -139,7 +161,9 @@ export function CellularScreen() {
             <Text className="feature-card-title">Permission</Text>
           </View>
           <View className="capability-row">
-            <Text className="capability-label">Phone-state permission status</Text>
+            <Text className="capability-label">
+              Phone-state permission status
+            </Text>
             <Text className="value-text">{permissionLabel}</Text>
           </View>
           <ActionButton

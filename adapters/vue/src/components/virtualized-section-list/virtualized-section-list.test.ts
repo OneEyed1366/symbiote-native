@@ -16,7 +16,12 @@
 //
 // No Negative group: the public props have no throwing path.
 
-import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
+import {
+  defineComponent,
+  h,
+  ref,
+  type FunctionalComponent,
+} from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   VirtualizedSectionList,
@@ -28,9 +33,10 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 // VirtualizedSectionList is a generic component (generic construct signature), which h()'s overloads
 // can't resolve. Drive it through a loose functional-component handle (generic-component h() limit).
-const VirtualizedSectionListHost = VirtualizedSectionList as unknown as FunctionalComponent<
-  Record<string, unknown>
->;
+const VirtualizedSectionListHost =
+  VirtualizedSectionList as unknown as FunctionalComponent<
+    Record<string, unknown>
+  >;
 
 type ICommandCall = {
   name: string;
@@ -81,7 +87,8 @@ slot.dispatchCommand = (_node, name, args) => {
   commands.push({ name, args });
 };
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -112,7 +119,9 @@ function findScrollView(): IFakeNode {
   return node;
 }
 
-function sectionList(extra: Record<string, unknown>): ReturnType<typeof defineComponent> {
+function sectionList(
+  extra: Record<string, unknown>,
+): ReturnType<typeof defineComponent> {
   return defineComponent({
     setup: () => () =>
       h(
@@ -129,13 +138,17 @@ function sectionList(extra: Record<string, unknown>): ReturnType<typeof defineCo
           sectionFooter: ({ section }: { section: ISectionShape }) => [
             h('symbiote-text', {}, `footer:${section.title}`),
           ],
-          item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)],
+          item: ({ item }: { item: IRow }) => [
+            h('symbiote-text', {}, item.label),
+          ],
         },
       ),
   });
 }
 
-async function mountWithViewport(extra: Record<string, unknown> = {}): Promise<void> {
+async function mountWithViewport(
+  extra: Record<string, unknown> = {},
+): Promise<void> {
   mount(ROOT_TAG, sectionList(extra));
   await tick();
   const scrollView = findScrollView();
@@ -189,11 +202,37 @@ describe('Vue VirtualizedSectionList flattens sections into one windowed stream'
       expect(listRef.value, 'handle attached').not.toBeNull();
       // Flattened [h:A,a0,a1,foot:A,h:B,b0,b1,foot:B]: section B's first item lands at flat index 5
       // -> offset 5 * ITEM_HEIGHT.
-      listRef.value!.scrollToLocation({ sectionIndex: 1, itemIndex: 1, animated: false });
+      listRef.value!.scrollToLocation({
+        sectionIndex: 1,
+        itemIndex: 1,
+        animated: false,
+      });
       const scrolls = commands.filter(c => c.name === 'scrollTo');
       expect(scrolls.length, 'one scrollTo from scrollToLocation').toBe(1);
       expect(scrolls[0].args[1]).toBe(5 * ITEM_HEIGHT);
       expect(scrolls[0].args[2]).toBe(false);
+    });
+
+    it('calls getItemLayout with the sections array, not the flattened entries', async () => {
+      // why: RN hands its inner VirtualizedList `data={this.props.sections}`, so a user's
+      // getItemLayout receives the SECTIONS. Ours streams the flattened entries as `data`, so
+      // without the wrapper the very same callback would be handed a different first argument
+      // here than on RN — silently, since the layout it returns still looks plausible.
+      const seen: unknown[] = [];
+      await mountWithViewport({
+        getItemLayout: (data: unknown, index: number) => {
+          seen.push(data);
+          return { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index };
+        },
+      });
+
+      expect(seen.length, 'getItemLayout was invoked').toBeGreaterThan(0);
+      for (const data of seen) {
+        expect(
+          data,
+          'getItemLayout receives the sections array by identity',
+        ).toBe(SECTIONS);
+      }
     });
   });
 });

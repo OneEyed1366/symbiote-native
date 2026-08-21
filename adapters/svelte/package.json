@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/svelte",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "SymbioteNative's Svelte adapter — a DOM shim over stock compiled Svelte output driving real native iOS/Android views through the same engine as every other adapter.",
   "license": "MIT",
   "repository": {

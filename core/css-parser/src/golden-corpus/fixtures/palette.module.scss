@@ -1,0 +1,15 @@
+// A .module.* file whose source is a preprocessor — the two features stack, and neither has
+// real-corpus coverage.
+$ink: #c8c8c8;
+
+.swatch {
+  color: $ink;
+
+  &.inverted {
+    color: #000;
+  }
+}
+
+:global(.raw-swatch) {
+  padding: 6px;
+}

@@ -20,18 +20,24 @@ vi.mock('../../../core', () => ({
   LightSensor: {
     addListener: (listener: (measurement: ILightSensorMeasurement) => void) =>
       addListenerMock(listener),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
 const ROOT_TAG = 942;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
-const MEASUREMENT: ILightSensorMeasurement = { illuminance: 42, timestamp: 123 };
+const MEASUREMENT: ILightSensorMeasurement = {
+  illuminance: 42,
+  timestamp: 123,
+};
 
 let capturedResult: Signal<ILightSensorMeasurement | null> | undefined;
-let capturedListener: ((measurement: ILightSensorMeasurement) => void) | undefined;
+let capturedListener:
+  ((measurement: ILightSensorMeasurement) => void) | undefined;
 
 @Component({
   selector: 'symbiote-light-sensor-host',
@@ -108,7 +114,8 @@ describe('LightSensorService.connect', () => {
       mount(ROOT_TAG, LightSensorHost);
       await tick();
 
-      if (capturedListener === undefined) throw new Error('addListener callback was not captured');
+      if (capturedListener === undefined)
+        throw new Error('addListener callback was not captured');
       capturedListener(MEASUREMENT);
 
       expect(capturedResult?.()).toEqual(MEASUREMENT);

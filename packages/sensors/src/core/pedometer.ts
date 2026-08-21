@@ -27,13 +27,18 @@ const DEFAULT_PERMISSION_RESPONSE: PermissionResponse = {
   status: PermissionStatus.GRANTED,
 };
 
-export function watchStepCount(callback: IPedometerUpdateCallback): EventSubscription {
+export function watchStepCount(
+  callback: IPedometerUpdateCallback,
+): EventSubscription {
   return exponentPedometer.addListener(PEDOMETER_UPDATE_EVENT_NAME, callback);
 }
 
 // iOS only in practice (Android has no native getStepCountAsync) — proven by the same
 // optional-native-method check upstream uses, not a Platform.OS branch.
-export async function getStepCountAsync(start: Date, end: Date): Promise<IPedometerResult> {
+export async function getStepCountAsync(
+  start: Date,
+  end: Date,
+): Promise<IPedometerResult> {
   if (!exponentPedometer.getStepCountAsync) {
     throw new UnavailabilityError('ExponentPedometer', 'getStepCountAsync');
   }

@@ -13,7 +13,11 @@
     ISection,
   } from './virtualized-section-list-props';
 
-  export type { IVirtualizedSectionListProps, IVirtualizedSectionListHandle, ISection };
+  export type {
+    IVirtualizedSectionListProps,
+    IVirtualizedSectionListHandle,
+    ISection,
+  };
 </script>
 
 <script lang="ts" generics="ItemT">
@@ -30,7 +34,10 @@
   import { Platform, dlog, type ISymbioteNode } from '@symbiote-native/engine';
   import VirtualizedList from '../virtualized-list/index.svelte';
   import { pickAccessibilityProps } from '../virtualized-list/virtualized-list-props';
-  import type { IVirtualizedListHandle, IScrollViewHandle } from '../virtualized-list/virtualized-list-props';
+  import type {
+    IVirtualizedListHandle,
+    IScrollViewHandle,
+  } from '../virtualized-list/virtualized-list-props';
   import type { IVirtualizedSectionListProps as IProps } from './virtualized-section-list-props';
   import { pickAttachmentProps } from '../../runes/attachments';
 
@@ -50,7 +57,11 @@
 
   // RN sticks section headers by default only on iOS; Android does not unless asked.
   const stickyHeaderIndices = $derived(
-    resolveStickySectionHeaders(props.stickySectionHeadersEnabled, headerIndices, Platform.OS),
+    resolveStickySectionHeaders(
+      props.stickySectionHeadersEnabled,
+      headerIndices,
+      Platform.OS,
+    ),
   );
   // DIAGNOSTIC (2026-08-13, tracking why stickyHeaderIndices comes back undefined on Android
   // despite the demo passing the bare `stickySectionHeadersEnabled` shorthand): the previous
@@ -78,11 +89,35 @@
   function getEntryCount(): number {
     return entries.length;
   }
-  function entryKeyExtractor(entry: ISectionEntry<ItemT>, index: number): string {
+  function entryKeyExtractor(
+    entry: ISectionEntry<ItemT>,
+    index: number,
+  ): string {
     return sectionEntryKey(entry, index, props.keyExtractor);
   }
 
-  function entrySeparatorProps(entryProps: ISeparatorProps<ISectionEntry<ItemT>>): ISeparatorProps<ItemT> {
+  // Hand the callback `sections`, not the entries: RN's inner VirtualizedList gets
+  // `data={this.props.sections}` (VirtualizedSectionList.js:216) while ours streams the FLATTENED
+  // entries, so the same user code would otherwise see a different argument here than on RN.
+  //
+  // UPSTREAM-DIVERGENCE(react-native): the flat INDEX matches RN's (two rows per section, header
+  // and footer) only while the `sectionSeparator` snippet is unset. With it, flattenSections emits
+  // an extra 'section-separator' row per boundary that RN renders inside the neighbouring cell, so
+  // indices shift by one per boundary from the second section on. Deliberate - that row is how this
+  // adapter paints the separator; a caller combining the two must account for it.
+  const entryItemLayout = $derived.by(() => {
+    const getItemLayout = props.getItemLayout;
+    if (getItemLayout === undefined) return undefined;
+    return (
+      _entries: unknown,
+      index: number,
+    ): { length: number; offset: number; index: number } =>
+      getItemLayout(props.sections, index);
+  });
+
+  function entrySeparatorProps(
+    entryProps: ISeparatorProps<ISectionEntry<ItemT>>,
+  ): ISeparatorProps<ItemT> {
     return {
       ...entryProps,
       leadingItem: unwrapEntryItem(entryProps.leadingItem),
@@ -100,9 +135,15 @@
     viewPosition?: number;
     animated?: boolean;
   }): void {
-    const flatIndex = scrollLocationToFlatIndex(headerIndices, params.sectionIndex, params.itemIndex);
+    const flatIndex = scrollLocationToFlatIndex(
+      headerIndices,
+      params.sectionIndex,
+      params.itemIndex,
+    );
     if (flatIndex === undefined) {
-      dlog(`VirtualizedSectionList scrollToLocation: section ${params.sectionIndex} out of range`);
+      dlog(
+        `VirtualizedSectionList scrollToLocation: section ${params.sectionIndex} out of range`,
+      );
       return;
     }
     dlog(
@@ -155,7 +196,12 @@
   {:else if entry.kind === 'section-separator'}
     {@render props.sectionSeparator?.()}
   {:else}
-    {@render props.item({ item: entry.item, index: entry.itemIndex, section: entry.section, separators })}
+    {@render props.item({
+      item: entry.item,
+      index: entry.itemIndex,
+      section: entry.section,
+      separators,
+    })}
   {/if}
 {/snippet}
 
@@ -176,7 +222,8 @@
   footer={props.footer}
   empty={props.empty}
   keyExtractor={entryKeyExtractor}
-  stickyHeaderIndices={stickyHeaderIndices}
+  getItemLayout={entryItemLayout}
+  {stickyHeaderIndices}
   inverted={props.inverted}
   extraData={props.extraData}
   onEndReached={props.onEndReached}

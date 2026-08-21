@@ -21,7 +21,10 @@ const EXPO_WEB_BROWSER_MODULE_NAME = 'ExpoWebBrowser';
 //           getCustomTabsSupportingBrowsersAsync. There is no way to dismiss a Custom Tab and no
 //           native auth session; the user has to press the tab's own close button.
 export type INativeWebBrowserModule = {
-  openBrowserAsync?(url: string, options: IProcessedOpenOptions): Promise<IWebBrowserResult>;
+  openBrowserAsync?(
+    url: string,
+    options: IProcessedOpenOptions,
+  ): Promise<IWebBrowserResult>;
   dismissBrowser?(): Promise<IWebBrowserDismissResult>;
   openAuthSessionAsync?(
     url: string,

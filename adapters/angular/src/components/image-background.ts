@@ -37,12 +37,19 @@ import {
   type IViewStyle,
 } from '@symbiote-native/engine';
 import { Image } from './image';
-import { anchorHostStyle, SymbioteStyleInputDirective, ViewHost } from '../primitives';
+import {
+  anchorHostStyle,
+  SymbioteStyleInputDirective,
+  ViewHost,
+} from '../primitives';
 
 // Mirrors React's IImageBackgroundProps minus children (Angular takes children via <ng-content>):
 // every forwarding Image prop flows onto the inner image; `style` is the WRAPPER View style and
 // `imageStyle` the inner image's.
-export interface IAngularImageBackgroundProps extends Omit<IImageProps, 'style'> {
+export interface IAngularImageBackgroundProps extends Omit<
+  IImageProps,
+  'style'
+> {
   style?: IStyleProp<IViewStyle>;
   // A bare string resolves through the shared style registry, like `class` on the wrapper.
   imageStyle?: IStyleProp<IViewStyle> | string;
@@ -68,7 +75,9 @@ export type IAngularImageBackgroundInputs = Omit<
 @Component({
   selector: 'ImageBackground',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [Image, ViewHost],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -108,10 +117,16 @@ export type IAngularImageBackgroundInputs = Omit<
         [screenReaderFocusable]="folded.screenReaderFocusable"
         [accessibilityViewIsModal]="folded.accessibilityViewIsModal"
         [accessibilityElementsHidden]="folded.accessibilityElementsHidden"
-        [accessibilityIgnoresInvertColors]="folded.accessibilityIgnoresInvertColors"
+        [accessibilityIgnoresInvertColors]="
+          folded.accessibilityIgnoresInvertColors
+        "
         [accessibilityLanguage]="folded.accessibilityLanguage"
-        [accessibilityRespondsToUserInteraction]="folded.accessibilityRespondsToUserInteraction"
-        [accessibilityShowsLargeContentViewer]="folded.accessibilityShowsLargeContentViewer"
+        [accessibilityRespondsToUserInteraction]="
+          folded.accessibilityRespondsToUserInteraction
+        "
+        [accessibilityShowsLargeContentViewer]="
+          folded.accessibilityShowsLargeContentViewer
+        "
         [accessibilityLargeContentTitle]="folded.accessibilityLargeContentTitle"
         (loadStart)="loadStart.emit($event)"
         (load)="load.emit($event)"
@@ -170,8 +185,10 @@ export class ImageBackground implements IAngularImageBackgroundInputs {
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -248,8 +265,10 @@ export class ImageBackground implements IAngularImageBackgroundInputs {
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,

@@ -10,9 +10,15 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { SafeAreaView, Text, View } from '@symbiote-native/vue';
-import { deserializeNavigatorState, serializeNavigatorState } from '@symbiote-native/navigation';
+import {
+  deserializeNavigatorState,
+  serializeNavigatorState,
+} from '@symbiote-native/navigation';
 import type { INavigatorState } from '@symbiote-native/navigation';
-import { useNavigation, useNavigationState } from '@symbiote-native/navigation/vue';
+import {
+  useNavigation,
+  useNavigationState,
+} from '@symbiote-native/navigation/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -24,14 +30,19 @@ const restoreError = ref<string | undefined>(undefined);
 
 function onSerialize(): void {
   restoreError.value = undefined;
-  snapshot.value = JSON.stringify(serializeNavigatorState(state.value), null, 2);
+  snapshot.value = JSON.stringify(
+    serializeNavigatorState(state.value),
+    null,
+    2,
+  );
 }
 
 function onRestore(): void {
   if (snapshot.value === undefined) return;
   const handle = navigation.value;
   if (!('reset' in handle)) {
-    restoreError.value = 'this screen is not mounted under a Stack — reset() is unavailable';
+    restoreError.value =
+      'this screen is not mounted under a Stack — reset() is unavailable';
     return;
   }
   try {
@@ -39,7 +50,8 @@ function onRestore(): void {
     handle.reset(deserializeNavigatorState(parsed));
     restoreError.value = undefined;
   } catch (error) {
-    restoreError.value = error instanceof Error ? error.message : 'restore failed';
+    restoreError.value =
+      error instanceof Error ? error.message : 'restore failed';
   }
 }
 
@@ -50,21 +62,28 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StatePersistence];
   <SafeAreaView class="screen">
     <View class="section">
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: LINE_COLOR.routing }">
+        <View
+          class="hero-badge"
+          :style="{ backgroundColor: LINE_COLOR.routing }"
+        >
           <Text class="hero-badge-text">SP</Text>
         </View>
         <View class="hero-copy">
           <Text class="hero-title">State persistence</Text>
           <Text class="hero-body"
-            >The Stack's own state serialized out and deserialized back in — restoring
-            exactly where you left off.</Text
+            >The Stack's own state serialized out and deserialized back in —
+            restoring exactly where you left off.</Text
           >
         </View>
       </View>
-      <Text class="info-text">{{ `current stack depth: ${state.routes.length}` }}</Text>
+      <Text class="info-text">{{
+        `current stack depth: ${state.routes.length}`
+      }}</Text>
       <ActionButton
         testID="persist-serialize"
         title="Serialize current stack"
@@ -77,7 +96,9 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StatePersistence];
         :onPress="onRestore"
         :color="LINE_COLOR.routing"
       />
-      <Text v-if="restoreError !== undefined" class="info-text">{{ `error: ${restoreError}` }}</Text>
+      <Text v-if="restoreError !== undefined" class="info-text">{{
+        `error: ${restoreError}`
+      }}</Text>
       <View class="box-list160">
         <Text testID="persist-snapshot" class="list-row-text">{{
           snapshot ?? 'tap Serialize to capture the current route stack as JSON'

@@ -50,7 +50,9 @@ const fakeNativeAnimated = {
   setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
   flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
   extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-  startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
+  startListeningToAnimatedNodeValue: record(
+    'startListeningToAnimatedNodeValue',
+  ),
   stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
   getValue: record('getValue'),
   addAnimatedEventToView: record('addAnimatedEventToView'),
@@ -63,7 +65,8 @@ Object.assign(globalThis, {
 const fabric = installFabric();
 const ROOT_TAG = 51;
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function callsOf(method: string): INativeCall[] {
   return nativeCalls.filter(call => call.method === method);
@@ -118,7 +121,10 @@ describe('Vue ScrollView sticky native scroll attach', () => {
       await tick();
 
       const attach = callsOf('addAnimatedEventToView');
-      expect(attach, 'sticky scroll attaches an Animated.event to the native view').toHaveLength(1);
+      expect(
+        attach,
+        'sticky scroll attaches an Animated.event to the native view',
+      ).toHaveLength(1);
       expect(attach[0].args[0], 'bound to the committed scroll view tag').toBe(
         scrollViewNode().tag,
       );

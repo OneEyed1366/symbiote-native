@@ -14,4 +14,7 @@ export {
   deleteItemAsync,
   canUseBiometricAuthentication,
 } from './secure-store';
-export type { IKeychainAccessibilityConstant, ISecureStoreOptions } from './types';
+export type {
+  IKeychainAccessibilityConstant,
+  ISecureStoreOptions,
+} from './types';

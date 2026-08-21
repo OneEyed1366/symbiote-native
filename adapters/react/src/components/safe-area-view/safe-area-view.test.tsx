@@ -58,7 +58,9 @@ describe('SafeAreaView', () => {
   // silently degrade to a plain View — the product contract IS the distinct native view name.
   it('commits a SafeAreaView wrapping its children under the app container', () => {
     mount(ROOT_TAG, <App />);
-    expect(fabric.serialize(fabric.appRoot().children)).toBe('SafeAreaView(RCTView)');
+    expect(fabric.serialize(fabric.appRoot().children)).toBe(
+      'SafeAreaView(RCTView)',
+    );
   });
 
   // why: SafeAreaView has no JS-side layout math of its own (the header comment: "there is no

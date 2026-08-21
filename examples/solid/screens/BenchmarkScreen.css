@@ -1,0 +1,149 @@
+/*
+ * BenchmarkScreen's own chrome. The frame-rate meter's half lives in
+ * ../components/JsFrameRateMeter.css, per this app's one-stylesheet-per-component split. Colors
+ * that vary per call site — the meter's accent and every ActionButton tint — stay inline, exactly
+ * like the other demo screens.
+ *
+ * Literal hex, not var(--…): a custom property resolves only inside the file declaring it
+ * (App.css), so a var() here would ship as a literal string and never paint.
+ *
+ * GEOMETRY IS VERBATIM from examples/react's App.css and must stay that way: .bench-row's 44px
+ * agrees with BenchmarkScreen.tsx's BENCH_ROW_HEIGHT (FlatList's getItemLayout is exact only while
+ * the two match), and .bench-sticky / .bench-rows-viewport pin the viewport heights every canary
+ * measures inside. COLORS are this canary's palette instead — #0b1020 ground, #151c33 card,
+ * #0f1729 sunken panel, #cdd6ee / #7f8db3 type — because the screen has to read as part of the app
+ * it sits in. Only #f5a524 (the Performance line) and #3a2c10 (its selected-row tint) are shared
+ * verbatim with the other canaries: those are line colors, not the per-framework accent.
+ */
+
+/* The two suite buttons, side by side under the meter: one per mount mode, so the mode is picked
+   by the press instead of by a separate toggle that could disagree with the numbers on screen. */
+.bench-run-row {
+  flex-direction: row;
+  gap: 12px;
+}
+
+.bench-progress {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background-color: #0f1729;
+}
+
+.bench-progress-text {
+  flex: 1;
+  color: #cdd6ee;
+  font-size: 13px;
+}
+
+.bench-progress-count {
+  color: #7f8db3;
+  font-size: 13px;
+}
+
+.bench-compare-row {
+  flex-direction: row;
+  align-items: center;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.bench-compare-label {
+  flex: 1;
+  color: #7f8db3;
+  font-size: 13px;
+}
+
+.bench-compare-cell {
+  width: 96px;
+  text-align: right;
+  color: #cdd6ee;
+  font-size: 13px;
+}
+
+.bench-compare-head-cell {
+  width: 96px;
+  text-align: right;
+  color: #7f8db3;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+/* Both sticky boxes share one height so a difference between them isolates virtualization from
+   stickiness itself rather than from how much of each list is on screen. */
+.bench-sticky {
+  height: 320px;
+  border-radius: 12px;
+  background-color: #0f1729;
+}
+
+.bench-rows-viewport {
+  height: 420px;
+  border-radius: 12px;
+  background-color: #0f1729;
+}
+
+.bench-op-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.bench-op-result {
+  width: 88px;
+  text-align: right;
+  color: #cdd6ee;
+  font-size: 14px;
+}
+
+.bench-history-row {
+  color: #7f8db3;
+  font-size: 13px;
+}
+
+.bench-row {
+  /* Fixed so FlatList's getItemLayout is exact in virtualized mode, and so a row occupies the
+     same box in both mount modes — otherwise the two modes would not be comparable. */
+  height: 44px;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 8px;
+  background-color: #151c33;
+}
+
+.bench-row-selected {
+  background-color: #3a2c10;
+  border-left-width: 3px;
+  border-left-color: #f5a524;
+}
+
+.bench-row-id {
+  width: 56px;
+  color: #7f8db3;
+  font-size: 12px;
+}
+
+.bench-row-label {
+  color: #cdd6ee;
+  font-size: 14px;
+}
+
+.bench-row-remove {
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+}
+
+.bench-row-remove-text {
+  color: #7f8db3;
+  font-size: 18px;
+  font-weight: bold;
+}

@@ -1,7 +1,21 @@
 import { defineComponent, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { Ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/vue';
-import { getStringAsync, getUrlAsync, hasStringAsync, hasUrlAsync, setStringAsync, setUrlAsync } from '@symbiote-native/clipboard';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/vue';
+import {
+  getStringAsync,
+  getUrlAsync,
+  hasStringAsync,
+  hasUrlAsync,
+  setStringAsync,
+  setUrlAsync,
+} from '@symbiote-native/clipboard';
 import { useClipboard } from '@symbiote-native/clipboard/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -13,13 +27,21 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   return value ? 'yes' : 'no';
 }
 
-function CapabilityRow(props: { testID: string; label: string; status: ICapabilityStatus }) {
+function CapabilityRow(props: {
+  testID: string;
+  label: string;
+  status: ICapabilityStatus;
+}) {
   return (
     <View testID={props.testID} class="auth-capability-row">
       <Text class="auth-capability-label">{props.label}</Text>
       <View class={`auth-status-badge auth-status-badge-${props.status}`}>
         <Text class="auth-status-text">
-          {props.status === 'checking' ? 'CHECKING…' : props.status === 'yes' ? 'YES' : 'NO'}
+          {props.status === 'checking'
+            ? 'CHECKING…'
+            : props.status === 'yes'
+              ? 'YES'
+              : 'NO'}
         </Text>
       </View>
     </View>
@@ -99,7 +121,11 @@ export const ClipboardScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="clipboard-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="clipboard-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -110,9 +136,9 @@ export const ClipboardScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Clipboard</Text>
               <Text class="hero-body">
-                @symbiote-native/clipboard — reads and writes the system clipboard text/URL
-                content, plus a change listener. iOS 16+ may prompt for paste permission on every
-                read.
+                @symbiote-native/clipboard — reads and writes the system
+                clipboard text/URL content, plus a change listener. iOS 16+ may
+                prompt for paste permission on every read.
               </Text>
             </View>
           </View>
@@ -124,7 +150,11 @@ export const ClipboardScreen = defineComponent(
             <Text testID="clipboard-current-text" class="auth-value-text">
               {clipboardText.value || '(empty)'}
             </Text>
-            <CapabilityRow testID="clipboard-has-string" label="Has text" status={hasString.value} />
+            <CapabilityRow
+              testID="clipboard-has-string"
+              label="Has text"
+              status={hasString.value}
+            />
           </View>
 
           <View testID="clipboard-copy-card" class="auth-card">
@@ -141,7 +171,12 @@ export const ClipboardScreen = defineComponent(
               placeholderTextColor="#41506a"
               class="text-input"
             />
-            <ActionButton testID="clipboard-copy-button" title="Copy text" onPress={handleCopy} color={lineColor} />
+            <ActionButton
+              testID="clipboard-copy-button"
+              title="Copy text"
+              onPress={handleCopy}
+              color={lineColor}
+            />
           </View>
 
           {Platform.OS === 'ios' && (
@@ -149,8 +184,15 @@ export const ClipboardScreen = defineComponent(
               <View class="auth-card-header">
                 <Text class="auth-card-title">URL</Text>
               </View>
-              <ValueRow label="Current URL" value={urlValue.value ?? '(none)'} />
-              <CapabilityRow testID="clipboard-has-url" label="Has URL" status={hasUrl.value} />
+              <ValueRow
+                label="Current URL"
+                value={urlValue.value ?? '(none)'}
+              />
+              <CapabilityRow
+                testID="clipboard-has-url"
+                label="Has URL"
+                status={hasUrl.value}
+              />
               <TextInput
                 testID="clipboard-url-input"
                 value={urlInput.value}
@@ -161,7 +203,12 @@ export const ClipboardScreen = defineComponent(
                 placeholderTextColor="#41506a"
                 class="text-input"
               />
-              <ActionButton testID="clipboard-set-url-button" title="Set URL" onPress={handleSetUrl} color={lineColor} />
+              <ActionButton
+                testID="clipboard-set-url-button"
+                title="Set URL"
+                onPress={handleSetUrl}
+                color={lineColor}
+              />
             </View>
           )}
         </ScrollView>

@@ -8,7 +8,10 @@
 // BackHandler.ios.js stub. Mirrors RN's Libraries/Utilities/BackHandler.android.js.
 
 import { createDeviceEventModule } from '../native-modules';
-import { type IEventEmitterModule, type IEventSubscription } from '../native-events';
+import {
+  type IEventEmitterModule,
+  type IEventSubscription,
+} from '../native-events';
 import { dlog } from '../debug';
 
 // The native module name RN registers this under. NOTE: this is the name the
@@ -28,7 +31,8 @@ const BACK_PRESS_EVENT = {
   hardwareBackPress: 'hardwareBackPress',
 } as const;
 
-export type IBackPressEventName = (typeof BACK_PRESS_EVENT)[keyof typeof BACK_PRESS_EVENT];
+export type IBackPressEventName =
+  (typeof BACK_PRESS_EVENT)[keyof typeof BACK_PRESS_EVENT];
 
 // A handler returns true to consume the back press (stop the chain); any
 // falsy/void result lets earlier-registered handlers run, and ultimately the
@@ -122,7 +126,10 @@ class BackHandlerImpl {
 
   // Legacy unsubscribe kept for RN parity. The modern path is the subscription's
   // remove() returned by addEventListener.
-  removeEventListener(_eventName: IBackPressEventName, handler: IBackPressHandler): void {
+  removeEventListener(
+    _eventName: IBackPressEventName,
+    handler: IBackPressHandler,
+  ): void {
     const index = backPressSubscriptions.indexOf(handler);
     if (index !== -1) {
       backPressSubscriptions.splice(index, 1);

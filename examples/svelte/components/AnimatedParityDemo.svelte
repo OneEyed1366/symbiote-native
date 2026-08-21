@@ -2,13 +2,10 @@
   // The rest of the Animated surface: ValueXY (2D), tracking (chase a moving target),
   // and diffClamp (a collapsing header). Each is a thin port of the RN node.
   //
-  // Animated.View is dotted, so it can't be a template tag — aliased to <AnimatedView>.
   // A JSX `{...panResponder.panHandlers}` spread stays a spread — Svelte 5 supports
   // `{...obj}` on components directly, no v-bind-style rewrite needed.
   import { View, Text, Animated, PanResponder } from '@symbiote-native/svelte';
   import ActionButton from './ActionButton.svelte';
-
-  const AnimatedView = Animated.View;
 
   const XY_SPAN = 96;
   const TRACK_DISTANCE = 200;
@@ -80,50 +77,57 @@
   };
 </script>
 
-<!-- Edge-to-edge markup between siblings: svelte-adapter-dom-shim skill §16. -->
-<View class="section-nested"
-  ><Text class="section-label">Animated · ValueXY / tracking / diffClamp</Text
-  ><Text class="drag-hint">drag the purple box →</Text><View class="xy-frame"
-    ><AnimatedView
+<View class="section-nested">
+  <Text class="section-label">Animated · ValueXY / tracking / diffClamp</Text>
+  <Text class="drag-hint">drag the purple box →</Text>
+  <View class="xy-frame">
+    <Animated.View
       {...panResponder.panHandlers}
       class="xy-box"
       style={{ transform: xy.getTranslateTransform() }}
-    /></View
-  ><View class="track-row"
-    ><AnimatedView
+    />
+  </View>
+  <View class="track-row">
+    <Animated.View
       class="lead-dot"
       style={{ transform: [{ translateX: lead }] }}
-    /></View
-  ><View class="track-row"
-    ><AnimatedView
+    />
+  </View>
+  <View class="track-row">
+    <Animated.View
       testID="follow-dot"
       class="follow-dot"
       style={{ transform: [{ translateX: follow }] }}
-    /></View
-  ><ActionButton
+    />
+  </View>
+  <ActionButton
     testID="track-btn"
     title="Move target (follower chases)"
     onPress={moveLead}
     color="#4299e1"
-  /><View class="collapse-frame"
-    ><AnimatedView
+  />
+  <View class="collapse-frame">
+    <Animated.View
       class="collapse-header"
       style={{ transform: [{ translateY: headerOffset }] }}
-      ><Text class="collapse-header-text">collapsing header</Text></AnimatedView
-    ></View
-  ><View class="row-tight"
-    ><View class="flex1"
-      ><ActionButton
+    >
+      <Text class="collapse-header-text">collapsing header</Text>
+    </Animated.View>
+  </View>
+  <View class="row-tight">
+    <View class="flex1">
+      <ActionButton
         title="Scroll ↓"
         onPress={() => scrollBy(40)}
         color="#38b2ac"
-      /></View
-    ><View class="flex1"
-      ><ActionButton
+      />
+    </View>
+    <View class="flex1">
+      <ActionButton
         title="Scroll ↑"
         onPress={() => scrollBy(-40)}
         color="#38b2ac"
-      /></View
-    ></View
-  ></View
->
+      />
+    </View>
+  </View>
+</View>

@@ -27,17 +27,18 @@
   });
 </script>
 
-<SafeAreaView class="screen"
-  ><View class="section"
-    ><Text class="section-label">Navigation demo · Details screen</Text><Text
-      class="info-text">{`route.params: ${paramsLabel}`}</Text
-    ><Text class="info-text"
-      >{`canGoBack: ${navigation.current.canGoBack()}`}</Text
-    ><ActionButton
+<SafeAreaView class="screen">
+  <View class="section">
+    <Text class="section-label">Navigation demo · Details screen</Text>
+    <Text class="info-text">{`route.params: ${paramsLabel}`}</Text>
+    <Text class="info-text">
+      {`canGoBack: ${navigation.current.canGoBack()}`}
+    </Text>
+    <ActionButton
       testID="nav-pop"
       title="← Pop back"
       onPress={() => navigation.current.pop()}
       color={LINE_COLOR.primitives}
-    /></View
-  ></SafeAreaView
->
+    />
+  </View>
+</SafeAreaView>

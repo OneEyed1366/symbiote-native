@@ -59,7 +59,9 @@ interface INormalizedTouch {
 }
 
 function toFiniteNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 // Pull a recordable touch out of an untyped entry. RN's getTouchIdentifier throws on
@@ -69,13 +71,21 @@ function normalizeTouch(raw: unknown): INormalizedTouch | undefined {
   const identifier = toFiniteNumber(raw.identifier);
   const pageX = toFiniteNumber(raw.pageX);
   const pageY = toFiniteNumber(raw.pageY);
-  if (identifier === undefined || pageX === undefined || pageY === undefined) return undefined;
+  if (identifier === undefined || pageX === undefined || pageY === undefined)
+    return undefined;
   if (identifier < 0 || identifier > MAX_TOUCH_BANK) return undefined;
-  return { identifier, pageX, pageY, timestamp: toFiniteNumber(raw.timestamp) ?? 0 };
+  return {
+    identifier,
+    pageX,
+    pageY,
+    timestamp: toFiniteNumber(raw.timestamp) ?? 0,
+  };
 }
 
 // The changed touches for this frame (start/move/end), defensively read.
-function changedTouchesOf(nativeEvent: Record<string, unknown>): INormalizedTouch[] {
+function changedTouchesOf(
+  nativeEvent: Record<string, unknown>,
+): INormalizedTouch[] {
   const raw = nativeEvent.changedTouches;
   if (!Array.isArray(raw)) return [];
   const out: INormalizedTouch[] = [];
@@ -148,7 +158,8 @@ export function recordTouchTrack(
   nativeEvent: Record<string, unknown>,
 ): void {
   if (kind === 'move') {
-    for (const touch of changedTouchesOf(nativeEvent)) shiftTouchRecord(touch, true);
+    for (const touch of changedTouchesOf(nativeEvent))
+      shiftTouchRecord(touch, true);
     return;
   }
   if (kind === 'start') {
@@ -160,7 +171,8 @@ export function recordTouchTrack(
     }
     return;
   }
-  for (const touch of changedTouchesOf(nativeEvent)) shiftTouchRecord(touch, false);
+  for (const touch of changedTouchesOf(nativeEvent))
+    shiftTouchRecord(touch, false);
   touchHistory.numberActiveTouches = activeTouchCount(nativeEvent);
   if (touchHistory.numberActiveTouches === 1) {
     for (let i = 0; i < touchBank.length; i++) {

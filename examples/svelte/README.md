@@ -31,15 +31,14 @@ and lets stock compiled Svelte output run unchanged. Three consequences show up 
   (element-by-element `document.createElement`) instead of `from_html()` (an `innerHTML` assignment
   on a `<template>`), so the shim needs no HTML parser. `css: 'external'` keeps Svelte from
   injecting `<style>` into a `document.head` that does not meaningfully exist.
-- **Whitespace between sibling tags is a correctness bug, not a formatting preference.** Svelte
-  collapses whitespace between two sibling non-text nodes into a real text node, which becomes a
-  real `RCTRawText` — illegal under a non-`Text` parent on device. Every multi-sibling region in
-  this app is therefore packed edge-to-edge with zero characters between a closing tag and the next
-  opening one, and every text node stays on ONE source line however long (Svelte trims a text
-  node's leading/trailing whitespace but never condenses what is inside it, so a sentence wrapped
-  across source lines ships its literal newline into the `RCTText`). Both are audited from the repo
-  root with `node scripts/audit-svelte-stray-whitespace.mjs` — it must report `0 stray separators`
-  and `0 wrapped text nodes`.
+- **Markup whitespace is free — write it normally.** It was not always: whitespace between two
+  sibling nodes compiles to a real text node, which used to become an `RCTRawText`, illegal under
+  a non-`Text` parent on device, so this app was packed edge-to-edge. That is fixed structurally —
+  the shim maps a whitespace-only text node under a parent that takes no raw text to an anchor
+  (`svelte-adapter-dom-shim` §16b) — and a sentence wrapped across source lines is folded back to
+  single spaces by `collapseTextWhitespace()` in `svelte.config.js` and in Metro's transformer.
+  `node scripts/audit-svelte-stray-whitespace.mjs` still gates the second half, checking the
+  pipeline's OUTPUT rather than your source: `0 wrapped text nodes`.
 - **Styling goes through plain CSS classes** (`App.css` + `@symbiote-native/css-parser`), not
   in-component `<style>` blocks — Svelte's own scoped-style path is a documented, not-yet-built
   seam on this adapter.
@@ -79,7 +78,7 @@ Editing `metro.config.js` or `svelte.config.js` needs a Metro cache reset
 
 ```sh
 npx svelte-check --threshold error                       # 0 errors expected
-node ../../scripts/audit-svelte-stray-whitespace.mjs     # from the repo root; 0 / 0 expected
+node ../../scripts/audit-svelte-stray-whitespace.mjs     # from the repo root; 0 wrapped text nodes
 npx react-native bundle --platform ios     --entry-file index.js --dev false --bundle-output /tmp/svelte-ios.jsbundle
 npx react-native bundle --platform android --entry-file index.js --dev false --bundle-output /tmp/svelte-android.jsbundle
 ```

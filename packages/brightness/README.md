@@ -3,8 +3,8 @@
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-brightness`](https://github.com/expo/expo/tree/main/packages/expo-brightness) — screen
 brightness get/set, Android-only system-brightness-mode control, an iOS-only brightness-change
-listener, and permission get/request — usable from **every** adapter, React, Vue, and Angular, not
-just React. Unlike [`@symbiote-native/sensors`](../sensors) — a `DeviceSensor` class per instance,
+listener, and permission get/request — usable from **every** adapter: React, Vue, Svelte, Solid,
+and Angular, not just React. Unlike [`@symbiote-native/sensors`](../sensors) — a `DeviceSensor` class per instance,
 subscribed through a hook/composable/service — this package's surface is mostly stateless free
 async functions plus one listener; only the permission surface gets its own lifecycle hook/
 composable/service, mirroring upstream's own `usePermissions`. Built the same way as
@@ -31,13 +31,13 @@ Unlike a plain RN native module, `expo-brightness`'s native code is discovered b
 this repo use — this needs wiring into the native host app **once**, covering this package and
 every other `expo-modules-core` package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
-| Android | `AndroidManifest.xml` — `android.permission.WRITE_SETTINGS`, required to set the system-wide brightness (`setSystemBrightnessAsync`/`setSystemBrightnessModeAsync`) |
+| Platform | Touches                                                                                                                                                             |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one)                 |
+| Android  | `AndroidManifest.xml` — `android.permission.WRITE_SETTINGS`, required to set the system-wide brightness (`setSystemBrightnessAsync`/`setSystemBrightnessModeAsync`) |
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. Reference
@@ -55,14 +55,17 @@ src/core/                 isAvailableAsync, get/setBrightnessAsync, the Android-
                           ExpoBrightness through expo-modules-core's requireNativeModule.
 src/react/hooks/           @symbiote-native/brightness/react   — usePermissions
 src/vue/composables/       @symbiote-native/brightness/vue     — usePermissions (same name)
+src/svelte/runes/          @symbiote-native/brightness/svelte  — usePermissions (same name)
+src/solid/primitives/      @symbiote-native/brightness/solid   — createPermissions (Solid says
+                                                                 create*, not use*)
 src/angular/services/      @symbiote-native/brightness/angular — PermissionsService
 ```
 
 Each adapter's hook/composable/service wraps the same one-shot `getPermissionsAsync`/
 `requestPermissionsAsync` pair in its own lifecycle idiom (auto-fetch on mount, exposed as a
-tuple/object/signal). Every other export — brightness get/set, the system-brightness-mode surface,
-the listener — is a stateless free-function re-export, written once in `core/` and shared verbatim
-by all three adapters.
+tuple/object/accessor/signal). Every other export — brightness get/set, the system-brightness-mode
+surface, the listener — is a stateless free-function re-export, written once in `core/` and shared
+verbatim by every adapter.
 
 ## Use it
 
@@ -84,13 +87,17 @@ function BrightnessScreen() {
   useEffect(() => {
     getBrightnessAsync().then(setBrightness);
     // iOS only — never fires on Android, so there the value only changes via setBrightnessAsync.
-    const subscription = addBrightnessListener(event => setBrightness(event.brightness));
+    const subscription = addBrightnessListener(event =>
+      setBrightness(event.brightness),
+    );
     return () => subscription.remove();
   }, []);
 
   return (
     <View>
-      <Text>{brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`}</Text>
+      <Text>
+        {brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`}
+      </Text>
       <Pressable onPress={() => setBrightnessAsync(0.5)}>
         <Text>Set to 50%</Text>
       </Pressable>
@@ -117,20 +124,25 @@ import {
 import { usePermissions } from '@symbiote-native/brightness/vue';
 
 const brightness = ref<number | null>(null);
-const { status: permissionStatus, request: requestPermission } = usePermissions();
+const { status: permissionStatus, request: requestPermission } =
+  usePermissions();
 
 let subscription: EventSubscription | undefined;
 
 onMounted(() => {
   void getBrightnessAsync().then(value => (brightness.value = value));
-  subscription = addBrightnessListener(event => (brightness.value = event.brightness));
+  subscription = addBrightnessListener(
+    event => (brightness.value = event.brightness),
+  );
 });
 onUnmounted(() => subscription?.remove());
 </script>
 
 <template>
   <View>
-    <Text>{{ brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%` }}</Text>
+    <Text>{{
+      brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`
+    }}</Text>
     <Pressable @press="setBrightnessAsync(0.5)">
       <Text>Set to 50%</Text>
     </Pressable>
@@ -160,9 +172,13 @@ import {
   template: `
     <View>
       <Text>{{ brightnessLabel() }}</Text>
-      <Pressable (press)="setBrightnessAsync(0.5)"><Text>Set to 50%</Text></Pressable>
+      <Pressable (press)="setBrightnessAsync(0.5)"
+        ><Text>Set to 50%</Text></Pressable
+      >
       <Text>{{ permissionStatus()?.status ?? 'checking…' }}</Text>
-      <Pressable (press)="permissionsService.request()"><Text>Request permission</Text></Pressable>
+      <Pressable (press)="permissionsService.request()"
+        ><Text>Request permission</Text></Pressable
+      >
     </View>
   `,
 })
@@ -182,7 +198,9 @@ export class BrightnessScreen {
   }
 
   setBrightnessAsync(value: number): void {
-    setBrightnessAsync(value).then(() => getBrightnessAsync().then(result => this.brightness.set(result)));
+    setBrightnessAsync(value).then(() =>
+      getBrightnessAsync().then(result => this.brightness.set(result)),
+    );
   }
 }
 ```
@@ -230,18 +248,25 @@ Plus `BrightnessMode` (enum: `UNKNOWN`/`AUTOMATIC`/`MANUAL`), `BrightnessEvent`,
 verbatim from `expo-modules-core`, never the `expo` meta-package.
 
 ```ts
-import { getBrightnessAsync, setBrightnessAsync } from '@symbiote-native/brightness';
+import {
+  getBrightnessAsync,
+  setBrightnessAsync,
+} from '@symbiote-native/brightness';
 
 // framework-scoped entry points re-export the same free functions, plus a usePermissions
 // hook/composable/service:
 import { usePermissions } from '@symbiote-native/brightness/react';
 import { usePermissions } from '@symbiote-native/brightness/vue';
+import { usePermissions } from '@symbiote-native/brightness/svelte';
+import { createPermissions } from '@symbiote-native/brightness/solid';
 import { PermissionsService } from '@symbiote-native/brightness/angular';
 ```
 
-`usePermissions` (React/Vue) auto-fetches the current permission status on mount and returns a
-`[status, request, get]` tuple (React) / `{ status, request, get }` object (Vue); Angular's
-`PermissionsService.connect()` does the same, returning a readonly `Signal`:
+`usePermissions` (React/Vue/Svelte) auto-fetches the current permission status on mount and
+returns a `[status, request, get]` tuple (React) / a `{ status, request, get }` object (Vue refs,
+Svelte getters). Solid's `createPermissions` fetches synchronously from the primitive body and
+returns the same object with `status`/`error` as ACCESSORS; Angular's
+`PermissionsService.connect()` returns a readonly `Signal`:
 
 ```ts
 // React
@@ -249,6 +274,12 @@ const [status, request] = usePermissions();
 
 // Vue
 const { status, request } = usePermissions();
+
+// Svelte — a boxed getter, read as permissions.status
+const permissions = usePermissions();
+
+// Solid — accessors, so status() is what a tracked scope reads
+const { status, request } = createPermissions();
 
 // Angular
 readonly status = inject(PermissionsService).connect();
@@ -275,7 +306,8 @@ readonly status = inject(PermissionsService).connect();
 
 No Fabric/Descriptor angle at all — brightness is a pure async-function + listener + permission
 surface, never a view. Tests inject a fake native-module object in place of the real
-`requireNativeModule` resolution (`src/core/*.test.ts`, `src/{react,vue,angular}/**/*.test.{ts,tsx}`,
+`requireNativeModule` resolution (`src/core/*.test.ts`,
+`src/{react,vue,svelte,solid,angular}/**/*.test.{ts,tsx}`,
 `vitest`), the same pattern `expo-brightness` itself uses upstream — no `installFabric()`, no
 ViewConfig. Native rendering itself is verified on-device (see the parent
 [README](../../README.md) for the project's testing model).

@@ -6,7 +6,7 @@
 // (connectAnimatedNodeToView), hands the curve to native, and keeps the JS-committed prop frozen
 // while native drives.
 //
-// Compiles the REAL AnimatedView.svelte (not a hand-written stand-in) through svelte/compiler,
+// Compiles the REAL View.svelte (not a hand-written stand-in) through svelte/compiler and wraps
 // same pattern as components/switch/switch.smoke.test.ts: write the compiled output CO-LOCATED
 // with the real source (its own `import ... from './animated-props-runtime'` / `'../../dom-shim'`
 // resolve relative to wherever the compiled file lives), then dynamic-import it.
@@ -32,7 +32,8 @@ import { timing } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -42,7 +43,8 @@ interface INativeCall {
   args: unknown[];
 }
 const nativeCalls: INativeCall[] = [];
-let lastStartCallback: ((result: { finished: boolean; value?: number }) => void) | null = null;
+let lastStartCallback:
+  ((result: { finished: boolean; value?: number }) => void) | null = null;
 const createdNodeTags = new Set<number>();
 
 function record(method: string): (...args: unknown[]) => void {
@@ -53,7 +55,9 @@ function record(method: string): (...args: unknown[]) => void {
 
 function assertNodeExists(tag: unknown, method: string): void {
   if (typeof tag !== 'number' || !createdNodeTags.has(tag)) {
-    throw new Error(`${method} referenced animated node ${String(tag)} before createAnimatedNode`);
+    throw new Error(
+      `${method} referenced animated node ${String(tag)} before createAnimatedNode`,
+    );
   }
 }
 
@@ -65,12 +69,18 @@ const fakeNativeAnimated = {
   connectAnimatedNodes(parentTag: number, childTag: number): void {
     assertNodeExists(parentTag, 'connectAnimatedNodes(parent)');
     assertNodeExists(childTag, 'connectAnimatedNodes(child)');
-    nativeCalls.push({ method: 'connectAnimatedNodes', args: [parentTag, childTag] });
+    nativeCalls.push({
+      method: 'connectAnimatedNodes',
+      args: [parentTag, childTag],
+    });
   },
   disconnectAnimatedNodes: record('disconnectAnimatedNodes'),
   connectAnimatedNodeToView(nodeTag: number, viewTag: number): void {
     assertNodeExists(nodeTag, 'connectAnimatedNodeToView');
-    nativeCalls.push({ method: 'connectAnimatedNodeToView', args: [nodeTag, viewTag] });
+    nativeCalls.push({
+      method: 'connectAnimatedNodeToView',
+      args: [nodeTag, viewTag],
+    });
   },
   disconnectAnimatedNodeFromView: record('disconnectAnimatedNodeFromView'),
   restoreDefaultValues: record('restoreDefaultValues'),
@@ -81,7 +91,10 @@ const fakeNativeAnimated = {
     config: Record<string, unknown>,
     endCallback: (result: { finished: boolean; value?: number }) => void,
   ): void {
-    nativeCalls.push({ method: 'startAnimatingNode', args: [animationId, nodeTag, config] });
+    nativeCalls.push({
+      method: 'startAnimatingNode',
+      args: [animationId, nodeTag, config],
+    });
     lastStartCallback = endCallback;
   },
   stopAnimation: record('stopAnimation'),
@@ -89,7 +102,9 @@ const fakeNativeAnimated = {
   setAnimatedNodeOffset: record('setAnimatedNodeOffset'),
   flattenAnimatedNodeOffset: record('flattenAnimatedNodeOffset'),
   extractAnimatedNodeOffset: record('extractAnimatedNodeOffset'),
-  startListeningToAnimatedNodeValue: record('startListeningToAnimatedNodeValue'),
+  startListeningToAnimatedNodeValue: record(
+    'startListeningToAnimatedNodeValue',
+  ),
   stopListeningToAnimatedNodeValue: record('stopListeningToAnimatedNodeValue'),
   getValue: record('getValue'),
   addAnimatedEventToView: record('addAnimatedEventToView'),
@@ -102,7 +117,8 @@ Object.assign(globalThis, {
 const fabric = installFabric();
 const ROOT_TAG = 91_101;
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 // fabric.find() walks the CREATION log, which never reflects a later clone's props
 // (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must
@@ -111,7 +127,10 @@ const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0))
 // root-element.ts's own mount target is ITSELF an unlabeled `symbiote-view` (RCTView, {}
 // props), sitting between the AppContainer and AnimatedView's real host node — so the search
 // must key on a prop only our own AnimatedView carries (testID), not the generic viewName.
-function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeNode | undefined {
+function findLive(
+  node: IFakeNode,
+  predicate: (n: IFakeNode) => boolean,
+): IFakeNode | undefined {
   if (predicate(node)) return node;
   for (const child of node.children) {
     const found = findLive(child, predicate);
@@ -121,8 +140,12 @@ function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeN
 }
 
 function appView(): IFakeNode {
-  const node = findLive(fabric.appRoot(), n => n.props.testID === 'animated-driver-box');
-  if (node === undefined) throw new Error('no node with testID="animated-driver-box" committed');
+  const node = findLive(
+    fabric.appRoot(),
+    n => n.props.testID === 'animated-driver-box',
+  );
+  if (node === undefined)
+    throw new Error('no node with testID="animated-driver-box" committed');
   return node;
 }
 
@@ -136,22 +159,34 @@ function configType(config: unknown): unknown {
     : undefined;
 }
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
-const VIEW_OUT = join(__dirname, '.smoke-compiled-animated-view.mjs');
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
+const COMPONENTS_DIR = join(__dirname, '..', '..', 'components');
+// The compiled base sits NEXT TO its real source, so its own relative imports resolve.
+const VIEW_OUT = join(COMPONENTS_DIR, '.smoke-compiled-animated-view.mjs');
 const PARENT_OUT = join(__dirname, '.smoke-compiled-driver-parent.mjs');
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
 
 async function loadParent(): Promise<Component> {
-  const viewSource = readFileSync(join(__dirname, 'AnimatedView.svelte'), 'utf8');
-  compileToFile(viewSource, 'AnimatedView.svelte', VIEW_OUT);
+  const viewSource = readFileSync(join(COMPONENTS_DIR, 'View.svelte'), 'utf8');
+  compileToFile(viewSource, 'View.svelte', VIEW_OUT);
 
   compileToFile(
     `<script>
-       import AnimatedView from './.smoke-compiled-animated-view.mjs';
+       import View from '../../components/.smoke-compiled-animated-view.mjs';
+       import { createAnimatedComponent } from './create-animated-component';
+       const AnimatedView = createAnimatedComponent(View);
        let { style } = $props();
      </script>
      <AnimatedView {style} testID="animated-driver-box" />`,
@@ -188,7 +223,10 @@ describe('Animated.View (real compiled source) native driver (Positive)', () => 
   it('mirrors the value graph into native and binds it to the committed view', async () => {
     const DriverParent = await loadParent();
     const opacity = new AnimatedValue(0);
-    const slide = opacity.interpolate({ inputRange: [0, 1], outputRange: [0, 100] });
+    const slide = opacity.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 100],
+    });
 
     mount(ROOT_TAG, DriverParent, {
       style: { opacity, transform: [{ translateX: slide }] },
@@ -198,13 +236,17 @@ describe('Animated.View (real compiled source) native driver (Positive)', () => 
     const viewTag = appView().tag;
 
     let finished = false;
-    timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start(result => {
-      finished = result.finished;
-    });
+    timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start(
+      result => {
+        finished = result.finished;
+      },
+    );
 
     const created = callsOf('createAnimatedNode');
     const createdTypes = created.map(call => configType(call.args[1]));
-    expect(createdTypes).toEqual(expect.arrayContaining(['value', 'style', 'props']));
+    expect(createdTypes).toEqual(
+      expect.arrayContaining(['value', 'style', 'props']),
+    );
 
     expect(callsOf('connectAnimatedNodes').length).toBeGreaterThanOrEqual(2);
 
@@ -212,7 +254,9 @@ describe('Animated.View (real compiled source) native driver (Positive)', () => 
     expect(connectView).toHaveLength(1);
     expect(connectView[0].args[1]).toBe(viewTag);
 
-    const valueCreate = created.find(call => configType(call.args[1]) === 'value');
+    const valueCreate = created.find(
+      call => configType(call.args[1]) === 'value',
+    );
     const valueTag = valueCreate?.args[0];
     const start = callsOf('startAnimatingNode');
     expect(start).toHaveLength(1);

@@ -42,7 +42,8 @@ const ROOT_TAG = 91_001;
 const TMP_DIR = join(__dirname, '../build/__smoke__/mount-pipeline');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -56,7 +57,10 @@ afterEach(() => {
 
 let compileCounter = 0;
 
-async function compileComponent(source: string, name: string): Promise<Component> {
+async function compileComponent(
+  source: string,
+  name: string,
+): Promise<Component> {
   const result = compile(source, {
     generate: 'client',
     filename: `${name}.svelte`,
@@ -78,7 +82,10 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
     it('mounts a static symbiote-text and commits it under the root symbiote-view', async () => {
       // why: proves the whole chain end to end — compiled Svelte output believing it talks
       // to a real DOM actually reaches a committed native Fabric node, not just a shim tree.
-      const Hello = await compileComponent('<symbiote-text p={{}}>hello</symbiote-text>', 'Hello');
+      const Hello = await compileComponent(
+        '<symbiote-text p={{}}>hello</symbiote-text>',
+        'Hello',
+      );
 
       mount(ROOT_TAG, Hello);
       await tick();
@@ -107,7 +114,9 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       await tick();
       await tick();
       await tick();
-      expect(fabric.serialize([fabric.appRoot()])).toContain('RCTRawText "count 1"');
+      expect(fabric.serialize([fabric.appRoot()])).toContain(
+        'RCTRawText "count 1"',
+      );
     });
 
     // root-element.ts's wrapper ShimElement sits between the engine's synthetic flex:1
@@ -120,7 +129,10 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
     it('gives the root wrapper flex:1 so a flex:1 app root actually fills the screen', async () => {
       // why: a wrapper missing flex:1 is a silent visual regression (nothing throws), so
       // this pins the one prop that prevents it.
-      const Hello = await compileComponent('<symbiote-text p={{}}>hello</symbiote-text>', 'Hello');
+      const Hello = await compileComponent(
+        '<symbiote-text p={{}}>hello</symbiote-text>',
+        'Hello',
+      );
 
       mount(ROOT_TAG, Hello);
       await tick();
@@ -138,11 +150,16 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       // (render.ts's own header comment) — mount() must self-teardown rather than stacking a
       // second Svelte app onto the same target, or the tree would carry both components'
       // committed nodes side by side.
-      const Hello = await compileComponent('<symbiote-text p={{}}>hello</symbiote-text>', 'HelloA');
+      const Hello = await compileComponent(
+        '<symbiote-text p={{}}>hello</symbiote-text>',
+        'HelloA',
+      );
       mount(ROOT_TAG, Hello);
       await tick();
       await tick();
-      expect(fabric.serialize([fabric.appRoot()])).toContain('RCTRawText "hello"');
+      expect(fabric.serialize([fabric.appRoot()])).toContain(
+        'RCTRawText "hello"',
+      );
 
       const Goodbye = await compileComponent(
         '<symbiote-text p={{}}>goodbye</symbiote-text>',
@@ -167,7 +184,10 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       // teardown a direct unmount() call produces, reached through the C++ entry point instead.
       expect(typeof globalThis.RN$stopSurface).toBe('function');
 
-      const Hello = await compileComponent('<symbiote-text p={{}}>hello</symbiote-text>', 'HelloB');
+      const Hello = await compileComponent(
+        '<symbiote-text p={{}}>hello</symbiote-text>',
+        'HelloB',
+      );
       mount(ROOT_TAG, Hello);
       await tick();
       await tick();

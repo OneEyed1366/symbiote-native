@@ -4,9 +4,10 @@
 import type { INativeSensorModule } from '../../device-sensor';
 import type { ILightSensorMeasurement } from '../../light-sensor';
 
-export const exponentLightSensor: INativeSensorModule<ILightSensorMeasurement> = {
-  addListener: () => ({ remove: () => {} }),
-  listenerCount: () => 0,
-  removeAllListeners: () => {},
-  isAvailableAsync: async () => false,
-};
+export const exponentLightSensor: INativeSensorModule<ILightSensorMeasurement> =
+  {
+    addListener: () => ({ remove: () => {} }),
+    listenerCount: () => 0,
+    removeAllListeners: () => {},
+    isAvailableAsync: async () => false,
+  };

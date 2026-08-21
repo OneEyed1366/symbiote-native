@@ -21,7 +21,9 @@ import type {
 // time (both the structured `icon` field AND the flat native keys reach native - RNS's own
 // prepareHeaderBarButtonItems keeps both), and resolves image assets through the same resolver
 // the Image component uses.
-function prepareIcon(icon: IHeaderBarButtonIcon | undefined): Record<string, unknown> {
+function prepareIcon(
+  icon: IHeaderBarButtonIcon | undefined,
+): Record<string, unknown> {
   if (!icon) return {};
   switch (icon.type) {
     case 'sfSymbol':
@@ -31,7 +33,9 @@ function prepareIcon(icon: IHeaderBarButtonIcon | undefined): Record<string, unk
     case 'imageSource':
       return { imageSource: imageStatics.resolveAssetSource(icon.imageSource) };
     case 'templateSource':
-      return { templateSource: imageStatics.resolveAssetSource(icon.templateSource) };
+      return {
+        templateSource: imageStatics.resolveAssetSource(icon.templateSource),
+      };
   }
 }
 
@@ -40,7 +44,11 @@ type ISharedItem = IHeaderBarButtonItemAction | IHeaderBarButtonItemMenu;
 // The one id algorithm both the payload tagger (prepareMenuItems/prepareHeaderBarButtonItems)
 // and the dispatch-lookup builder (collectMenuHandlers/collectBarButtonHandlers) call - so a
 // change to the id scheme genuinely can't desync payload tagging from dispatch lookup.
-function buildMenuId(path: string, index: number, side: 'left' | 'right'): string {
+function buildMenuId(
+  path: string,
+  index: number,
+  side: 'left' | 'right',
+): string {
   return `${path}-${index}-${side}`;
 }
 
@@ -54,18 +62,26 @@ function prepareTitleStyle(
   if (!titleStyle) return undefined;
   return {
     ...titleStyle,
-    color: titleStyle.color === undefined ? undefined : processColor(titleStyle.color),
+    color:
+      titleStyle.color === undefined
+        ? undefined
+        : processColor(titleStyle.color),
   };
 }
 
-function prepareBadge(badge: ISharedItem['badge']): Record<string, unknown> | undefined {
+function prepareBadge(
+  badge: ISharedItem['badge'],
+): Record<string, unknown> | undefined {
   if (!badge) return undefined;
   return {
     ...badge,
     style: badge.style
       ? {
           ...badge.style,
-          color: badge.style.color === undefined ? undefined : processColor(badge.style.color),
+          color:
+            badge.style.color === undefined
+              ? undefined
+              : processColor(badge.style.color),
           backgroundColor:
             badge.style.backgroundColor === undefined
               ? undefined
@@ -81,7 +97,9 @@ function prepareBadge(badge: ISharedItem['badge']): Record<string, unknown> | un
 // headerRightBarButtonItems array it's nested in - not just the one bad field - so bar buttons and
 // menu actions never reached native at all, despite the buttonId/menuId dispatch wiring itself
 // being entirely correct.
-function excludeOnPress<T extends { onPress: unknown }>(item: T): Omit<T, 'onPress'> {
+function excludeOnPress<T extends { onPress: unknown }>(
+  item: T,
+): Omit<T, 'onPress'> {
   const { onPress: _onPress, ...rest } = item;
   return rest;
 }
@@ -95,12 +113,15 @@ function prepareSharedFields(
     ...(item.type === 'button' ? excludeOnPress(item) : item),
     ...prepareIcon(item.icon),
     titleStyle: prepareTitleStyle(item.titleStyle),
-    tintColor: item.tintColor === undefined ? undefined : processColor(item.tintColor),
+    tintColor:
+      item.tintColor === undefined ? undefined : processColor(item.tintColor),
     badge: prepareBadge(item.badge),
   };
 }
 
-type IMenuLike = { items: (IHeaderBarButtonMenuAction | IHeaderBarButtonSubmenu)[] };
+type IMenuLike = {
+  items: (IHeaderBarButtonMenuAction | IHeaderBarButtonSubmenu)[];
+};
 
 // Recursively tags every menu action with a `menuId` derived from its tree position
 // (`${path}-${index}-${side}`), mirroring RNS's own prepareMenu exactly - the id must match what
@@ -117,7 +138,11 @@ function prepareMenuItems<T extends IMenuLike>(
       const currentPath = path ? `${path}.${menuIndex}` : `${menuIndex}`;
       const icon = prepareIcon(menuItem.icon);
       if (menuItem.type === 'submenu') {
-        return { ...menuItem, ...icon, ...prepareMenuItems(menuItem, index, side, currentPath) };
+        return {
+          ...menuItem,
+          ...icon,
+          ...prepareMenuItems(menuItem, index, side, currentPath),
+        };
       }
       return {
         ...excludeOnPress(menuItem),
@@ -139,7 +164,8 @@ export function prepareHeaderBarButtonItems(
   return items.map((item, index) => {
     if (item.type === 'spacing') return item;
     const prepared = prepareSharedFields(item);
-    if (item.type === 'button') return { ...prepared, buttonId: buildButtonId(index, side) };
+    if (item.type === 'button')
+      return { ...prepared, buttonId: buildButtonId(index, side) };
     return { ...prepared, menu: prepareMenuItems(item.menu, index, side) };
   });
 }
@@ -176,7 +202,10 @@ function collectBarButtonHandlers(
   });
 }
 
-function readStringField(record: Record<string, unknown>, key: string): string | undefined {
+function readStringField(
+  record: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const value = record[key];
   return typeof value === 'string' ? value : undefined;
 }

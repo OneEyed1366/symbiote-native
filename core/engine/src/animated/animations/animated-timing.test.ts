@@ -9,7 +9,14 @@
 // rejects.
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { AnimatedValue, Easing, parallel, sequence, spring, timing } from '@symbiote-native/engine';
+import {
+  AnimatedValue,
+  Easing,
+  parallel,
+  sequence,
+  spring,
+  timing,
+} from '@symbiote-native/engine';
 import type { IEndResult } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 
@@ -51,10 +58,12 @@ describe('Animated drivers over real rAF frames — Positive', () => {
 
     let endCount = 0;
     const result = await new Promise<IEndResult>(resolve => {
-      timing(value, { toValue: 1, duration: 100, easing: Easing.linear }).start(r => {
-        endCount += 1;
-        resolve(r);
-      });
+      timing(value, { toValue: 1, duration: 100, easing: Easing.linear }).start(
+        r => {
+          endCount += 1;
+          resolve(r);
+        },
+      );
     });
 
     expect(result.finished).toBe(true);
@@ -73,9 +82,11 @@ describe('Animated drivers over real rAF frames — Positive', () => {
   it('duration:0 jumps straight to toValue synchronously, without scheduling a frame', () => {
     const value = new AnimatedValue(0);
     let finished: boolean | undefined;
-    timing(value, { toValue: 1, duration: 0, easing: Easing.linear }).start(result => {
-      finished = result.finished;
-    });
+    timing(value, { toValue: 1, duration: 0, easing: Easing.linear }).start(
+      result => {
+        finished = result.finished;
+      },
+    );
     // No `await` / timer tick anywhere above: if this passed, the whole thing ran synchronously.
     expect(value.__getValue()).toBe(1);
     expect(finished).toBe(true);
@@ -111,7 +122,11 @@ describe('Animated drivers over real rAF frames — Positive', () => {
 
   it('stop() mid-flight reports finished:false and a value below the target', async () => {
     const value = new AnimatedValue(0);
-    const composite = timing(value, { toValue: 1, duration: 500, easing: Easing.linear });
+    const composite = timing(value, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.linear,
+    });
 
     const result = await new Promise<IEndResult>(resolve => {
       composite.start(resolve);
@@ -125,7 +140,9 @@ describe('Animated drivers over real rAF frames — Positive', () => {
   it('spring settles at its toValue and ends finished', async () => {
     const value = new AnimatedValue(0);
     const result = await new Promise<IEndResult>(resolve => {
-      spring(value, { toValue: 1, stiffness: 200, damping: 20, mass: 1 }).start(resolve);
+      spring(value, { toValue: 1, stiffness: 200, damping: 20, mass: 1 }).start(
+        resolve,
+      );
     });
 
     expect(result.finished).toBe(true);

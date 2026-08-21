@@ -101,7 +101,9 @@ export type IAngularModalInputs = Omit<
 @Component({
   selector: 'Modal',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [ModalHost, ViewHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -154,8 +156,10 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -216,7 +220,10 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
     // Queue on a microtask so the reducer runs AFTER this CD pass renders with the OLD state —
     // the keep-alive frame. A synchronous dispatch here would unmount in the same pass.
     queueMicrotask(() => {
-      this.state = modalReducer(this.state, isVisible ? { type: 'show' } : { type: 'hide' });
+      this.state = modalReducer(
+        this.state,
+        isVisible ? { type: 'show' } : { type: 'hide' },
+      );
       this.changeDetector.markForCheck();
     });
   }
@@ -269,7 +276,10 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
   readonly hostProps = computed<Record<string, unknown>>(() => {
     this.hostPropsRevision();
     const descriptorProps = this.descriptor.props;
-    return { ...descriptorProps, style: [anchorHostStyle(this.elementRef), descriptorProps.style] };
+    return {
+      ...descriptorProps,
+      style: [anchorHostStyle(this.elementRef), descriptorProps.style],
+    };
   });
 
   get containerStyle(): unknown {
@@ -283,7 +293,9 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
 
   // Typed as the a11y intersection WITH the string index (the bag renderModal spreads into the
   // host props), so resolveAccessibilityProps's result stays assignable to passthrough.
-  private accessibilityInputs(): IAccessibilityProps & IAriaProps & Record<string, unknown> {
+  private accessibilityInputs(): IAccessibilityProps &
+    IAriaProps &
+    Record<string, unknown> {
     return {
       testID: this.testID,
       accessible: this.accessible,
@@ -301,8 +313,10 @@ export class Modal implements IAngularModalInputs, OnInit, OnChanges, DoCheck {
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,

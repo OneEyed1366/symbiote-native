@@ -1,6 +1,19 @@
-import { Component, Injector, Signal, effect, inject, signal } from '@angular/core';
+import {
+  Component,
+  Injector,
+  Signal,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { requireOptionalNativeModule } from 'expo-modules-core';
-import { SafeAreaView, ScrollView, SymbioteHostPropsDirective, Text, View } from '@symbiote-native/angular';
+import {
+  SafeAreaView,
+  ScrollView,
+  SymbioteHostPropsDirective,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   AccelerometerService,
   DeviceMotionService,
@@ -36,7 +49,8 @@ type INativeSensorProbe = {
 };
 
 function probeNativeAvailability(nativeModuleName: string): Promise<boolean> {
-  const nativeModule = requireOptionalNativeModule<INativeSensorProbe>(nativeModuleName);
+  const nativeModule =
+    requireOptionalNativeModule<INativeSensorProbe>(nativeModuleName);
   if (!nativeModule?.isAvailableAsync) {
     return Promise.resolve(false);
   }
@@ -125,7 +139,11 @@ type IAxisSensorCard = {
   imports: [SafeAreaView, ScrollView, SymbioteHostPropsDirective, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="sensors-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="sensors-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -136,9 +154,10 @@ type IAxisSensorCard = {
           <View class="hero-copy">
             <Text class="hero-title">Sensors</Text>
             <Text class="hero-body">
-              @symbiote-native/sensors — live readings from five expo-sensors-backed hooks. A
-              simulator reports every CoreMotion/CMPedometer-backed sensor as unavailable; a
-              real device is needed to see live readings.
+              @symbiote-native/sensors — live readings from five
+              expo-sensors-backed hooks. A simulator reports every
+              CoreMotion/CMPedometer-backed sensor as unavailable; a real device
+              is needed to see live readings.
             </Text>
           </View>
         </View>
@@ -147,8 +166,13 @@ type IAxisSensorCard = {
           <View [symbioteHostProps]="card.cardHostProps" class="sensor-card">
             <View class="sensor-card-header">
               <Text class="sensor-card-title">{{ card.title }}</Text>
-              <View [symbioteHostProps]="card.statusHostProps" [class]="statusBadgeClass(card.status())">
-                <Text class="sensor-status-text">{{ statusLabel(card.status()) }}</Text>
+              <View
+                [symbioteHostProps]="card.statusHostProps"
+                [class]="statusBadgeClass(card.status())"
+              >
+                <Text class="sensor-status-text">{{
+                  statusLabel(card.status())
+                }}</Text>
               </View>
             </View>
             @switch (card.status()) {
@@ -166,15 +190,21 @@ type IAxisSensorCard = {
                   <View class="sensor-reading-row">
                     <View class="sensor-reading-chip">
                       <Text class="sensor-reading-label">X</Text>
-                      <Text class="sensor-reading-value">{{ reading.x.toFixed(3) }}</Text>
+                      <Text class="sensor-reading-value">{{
+                        reading.x.toFixed(3)
+                      }}</Text>
                     </View>
                     <View class="sensor-reading-chip">
                       <Text class="sensor-reading-label">Y</Text>
-                      <Text class="sensor-reading-value">{{ reading.y.toFixed(3) }}</Text>
+                      <Text class="sensor-reading-value">{{
+                        reading.y.toFixed(3)
+                      }}</Text>
                     </View>
                     <View class="sensor-reading-chip">
                       <Text class="sensor-reading-label">Z</Text>
-                      <Text class="sensor-reading-value">{{ reading.z.toFixed(3) }}</Text>
+                      <Text class="sensor-reading-value">{{
+                        reading.z.toFixed(3)
+                      }}</Text>
                     </View>
                   </View>
                 }
@@ -186,8 +216,13 @@ type IAxisSensorCard = {
         <View testID="sensor-card-device-motion" class="sensor-card">
           <View class="sensor-card-header">
             <Text class="sensor-card-title">Device motion</Text>
-            <View testID="sensor-status-device-motion" [class]="statusBadgeClass(deviceMotionStatus())">
-              <Text class="sensor-status-text">{{ statusLabel(deviceMotionStatus()) }}</Text>
+            <View
+              testID="sensor-status-device-motion"
+              [class]="statusBadgeClass(deviceMotionStatus())"
+            >
+              <Text class="sensor-status-text">{{
+                statusLabel(deviceMotionStatus())
+              }}</Text>
             </View>
           </View>
           @switch (deviceMotionStatus()) {
@@ -202,20 +237,28 @@ type IAxisSensorCard = {
             }
             @case ('live') {
               @if (deviceMotion(); as motion) {
-                <Text class="info-text">{{ 'interval: ' + motion.interval.toFixed(1) + 'ms' }}</Text>
+                <Text class="info-text">{{
+                  'interval: ' + motion.interval.toFixed(1) + 'ms'
+                }}</Text>
                 @if (motion.rotation; as rotation) {
                   <View class="sensor-reading-row">
                     <View class="sensor-reading-chip">
                       <Text class="sensor-reading-label">ALPHA</Text>
-                      <Text class="sensor-reading-value">{{ rotation.alpha.toFixed(3) }}</Text>
+                      <Text class="sensor-reading-value">{{
+                        rotation.alpha.toFixed(3)
+                      }}</Text>
                     </View>
                     <View class="sensor-reading-chip">
                       <Text class="sensor-reading-label">BETA</Text>
-                      <Text class="sensor-reading-value">{{ rotation.beta.toFixed(3) }}</Text>
+                      <Text class="sensor-reading-value">{{
+                        rotation.beta.toFixed(3)
+                      }}</Text>
                     </View>
                     <View class="sensor-reading-chip">
                       <Text class="sensor-reading-label">GAMMA</Text>
-                      <Text class="sensor-reading-value">{{ rotation.gamma.toFixed(3) }}</Text>
+                      <Text class="sensor-reading-value">{{
+                        rotation.gamma.toFixed(3)
+                      }}</Text>
                     </View>
                   </View>
                 }
@@ -227,8 +270,13 @@ type IAxisSensorCard = {
         <View testID="sensor-card-pedometer" class="sensor-card">
           <View class="sensor-card-header">
             <Text class="sensor-card-title">Pedometer</Text>
-            <View testID="sensor-status-pedometer" [class]="statusBadgeClass(pedometerStatus())">
-              <Text class="sensor-status-text">{{ statusLabel(pedometerStatus()) }}</Text>
+            <View
+              testID="sensor-status-pedometer"
+              [class]="statusBadgeClass(pedometerStatus())"
+            >
+              <Text class="sensor-status-text">{{
+                statusLabel(pedometerStatus())
+              }}</Text>
             </View>
           </View>
           @switch (pedometerStatus()) {
@@ -243,7 +291,10 @@ type IAxisSensorCard = {
             }
             @case ('live') {
               @if (pedometer(); as steps) {
-                <Text testID="sensors-pedometer-steps" class="sensor-reading-value">
+                <Text
+                  testID="sensors-pedometer-steps"
+                  class="sensor-reading-value"
+                >
                   {{ steps.steps + ' steps' }}
                 </Text>
               }
@@ -262,18 +313,27 @@ export class SensorsScreen {
 
   private readonly injector = inject(Injector);
 
-  private readonly accelerometer: Signal<IAccelerometerMeasurement | null> = inject(AccelerometerService).connect();
-  private readonly gyroscope: Signal<IGyroscopeMeasurement | null> = inject(GyroscopeService).connect();
-  private readonly magnetometer: Signal<IMagnetometerMeasurement | null> = inject(MagnetometerService).connect();
-  readonly deviceMotion: Signal<IDeviceMotionMeasurement | null> = inject(DeviceMotionService).connect();
-  readonly pedometer: Signal<IPedometerResult | null> = inject(PedometerService).connect();
+  private readonly accelerometer: Signal<IAccelerometerMeasurement | null> =
+    inject(AccelerometerService).connect();
+  private readonly gyroscope: Signal<IGyroscopeMeasurement | null> =
+    inject(GyroscopeService).connect();
+  private readonly magnetometer: Signal<IMagnetometerMeasurement | null> =
+    inject(MagnetometerService).connect();
+  readonly deviceMotion: Signal<IDeviceMotionMeasurement | null> =
+    inject(DeviceMotionService).connect();
+  readonly pedometer: Signal<IPedometerResult | null> =
+    inject(PedometerService).connect();
 
   readonly deviceMotionStatus = sensorCardStatus(
     this.deviceMotion,
     () => probeNativeAvailability(NATIVE_MODULE_NAME.DeviceMotion),
     this.injector,
   );
-  readonly pedometerStatus = sensorCardStatus(this.pedometer, () => isPedometerAvailableAsync(), this.injector);
+  readonly pedometerStatus = sensorCardStatus(
+    this.pedometer,
+    () => isPedometerAvailableAsync(),
+    this.injector,
+  );
 
   readonly axisCards: IAxisSensorCard[] = [
     {

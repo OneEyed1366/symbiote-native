@@ -1,7 +1,10 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
-import { isAvailableAsync, useKeepAwake } from '@symbiote-native/keep-awake/vue';
+import {
+  isAvailableAsync,
+  useKeepAwake,
+} from '@symbiote-native/keep-awake/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -55,7 +58,11 @@ export const KeepAwakeScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="keep-awake-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="keep-awake-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -66,8 +73,8 @@ export const KeepAwakeScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Keep Awake</Text>
               <Text class="hero-body">
-                @symbiote-native/keep-awake — keeps the screen on for as long as a component
-                holding useKeepAwake() stays mounted.
+                @symbiote-native/keep-awake — keeps the screen on for as long as
+                a component holding useKeepAwake() stays mounted.
               </Text>
             </View>
           </View>
@@ -78,12 +85,20 @@ export const KeepAwakeScreen = defineComponent(
             </View>
             <ValueRow
               label="isAvailableAsync"
-              value={isAvailable.value === null ? 'checking…' : isAvailable.value ? 'true' : 'false'}
+              value={
+                isAvailable.value === null
+                  ? 'checking…'
+                  : isAvailable.value
+                    ? 'true'
+                    : 'false'
+              }
             />
             <ValueRow label="Held" value={isHeld.value ? 'true' : 'false'} />
             <ActionButton
               testID="keep-awake-toggle-button"
-              title={isHeld.value ? 'Release keep-awake' : 'Activate keep-awake'}
+              title={
+                isHeld.value ? 'Release keep-awake' : 'Activate keep-awake'
+              }
               onPress={handleToggle}
               color={lineColor}
             />

@@ -9,7 +9,11 @@
 import '@angular/compiler';
 import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles, type ISymbioteEvent } from '@symbiote-native/engine';
+import {
+  clearGlobalStyles,
+  registerRules,
+  type ISymbioteEvent,
+} from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -17,7 +21,8 @@ import { Modal } from './index';
 
 const ROOT_TAG = 912;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedHost: ModalHostFixture | undefined;
 let capturedOrientationHost: ModalOrientationHostFixture | undefined;
@@ -46,7 +51,11 @@ class ModalHostFixture {
   standalone: true,
   imports: [Modal],
   template: `
-    <Modal [visible]="true" [testID]="'modal'" (orientationChange)="received = $event">
+    <Modal
+      [visible]="true"
+      [testID]="'modal'"
+      (orientationChange)="received = $event"
+    >
       <symbiote-text>Hello</symbiote-text>
     </Modal>
   `,
@@ -63,7 +72,9 @@ class ModalOrientationHostFixture {
   selector: 'symbiote-modal-hidden-host',
   standalone: true,
   imports: [Modal],
-  template: `<Modal [visible]="false" [testID]="'modal'"><symbiote-text>Hi</symbiote-text></Modal>`,
+  template: `<Modal [visible]="false" [testID]="'modal'"
+    ><symbiote-text>Hi</symbiote-text></Modal
+  >`,
 })
 class ModalHiddenHostFixture {}
 
@@ -120,14 +131,25 @@ describe('Modal (no throwing path — see file header)', () => {
 
     const node = fabric.find(n => n.props.testID === 'modal');
     if (!node) throw new Error('no modal host node was created');
-    fabric.fireEvent(node.instanceHandle, 'topOrientationChange', { orientation: 'landscape' });
+    fabric.fireEvent(node.instanceHandle, 'topOrientationChange', {
+      orientation: 'landscape',
+    });
 
     expect(capturedOrientationHost?.received?.type).toBe('orientationChange');
-    expect(capturedOrientationHost?.received?.nativeEvent.orientation).toBe('landscape');
+    expect(capturedOrientationHost?.received?.nativeEvent.orientation).toBe(
+      'landscape',
+    );
   });
 
   it('resolves a class= on the Modal use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ sheet: { backgroundColor: 'purple' } });
+    registerRules([
+      {
+        tokens: ['sheet'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'purple' },
+      },
+    ]);
 
     mount(ROOT_TAG, ModalHostFixture);
     await tick();

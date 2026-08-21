@@ -1,7 +1,11 @@
 import { dlog } from '@symbiote-native/engine';
 import { hide } from './hide';
 import { getHideAnimationConstants } from './native-module';
-import type { IHideAnimationConfig, IHideAnimationConstants, IHideAnimationFailure } from './types';
+import type {
+  IHideAnimationConfig,
+  IHideAnimationConstants,
+  IHideAnimationFailure,
+} from './types';
 
 type IReadinessState = {
   layoutReady: boolean;
@@ -35,7 +39,9 @@ export class HideAnimationController {
   // dlog is DEBUG-gated, so it is the developer's seam, not the report: config.onError is the
   // channel the app actually hears about this on.
   private readonly reportFailure = (failure: IHideAnimationFailure): void => {
-    dlog(`splash-screen: hide animation degraded at "${failure.stage}": ${String(failure.error)}`);
+    dlog(
+      `splash-screen: hide animation degraded at "${failure.stage}": ${String(failure.error)}`,
+    );
     this.readiness.onError?.(failure);
   };
 

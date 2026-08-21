@@ -17,11 +17,19 @@ That is good for Volar typing, but unsafe for raw Fabric passthrough: if the
 component does not manually put a host `onX` callback back onto the host node, the
 engine never sees the event prop.
 
+The engine-side half of this — how `onX` props resolve to Fabric events vs plain
+props once they reach the host node — is `routeProp` in `core/engine/src/node.ts`;
+see `symbiote-engine-core` for that mechanism. This skill owns only the adapter-side
+decision of what stays in `emits` vs what stays in `$attrs` before it gets there.
+
 ## When to use this skill
 
 Use before changing any Vue adapter component event surface, especially when:
 
-- Volar/SFC shows event payloads as `any`.
+- Volar/SFC shows event payloads as `any` (fix here is Rule 4's
+  `defineComponent<Props, Emits>`; a raw-TSX component with a JSX-factory Volar
+  error instead of a payload-typing one is a different root cause — see
+  `vue-adapter-tsx-typecheck`).
 - A public prop type contains React-style `onX` callbacks.
 - You are adding `defineComponent<Props, Emits>`.
 - You are deciding whether `scroll`, `layout`, `focus`, `blur`, `press`,
@@ -124,7 +132,8 @@ export const Switch = defineComponent<ISwitchProps, ISwitchEmits>(
 ```
 
 Keep `inheritAttrs: false`; normalize attrs with `normalizeVueAttrs(rawAttrs)` when
-Vue templates may pass kebab-case props.
+Vue templates may pass kebab-case props — see `vue-adapter-attrs-normalization` for
+why that call is mandatory (Vue never camelCases undeclared `$attrs`).
 
 ## Rule 5 — do not convert raw passthrough events blindly
 

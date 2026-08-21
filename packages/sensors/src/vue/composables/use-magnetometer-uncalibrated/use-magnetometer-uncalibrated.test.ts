@@ -32,7 +32,8 @@ vi.mock('../../../core', () => ({
   MagnetometerUncalibrated: {
     addListener: (listener: IListener) => addListenerMock(listener),
     removeAllListeners: vi.fn(),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
@@ -97,8 +98,18 @@ describe('useMagnetometerUncalibrated (Vue)', () => {
       // why: each native event is a full snapshot, not a delta — merging would leave stale
       // axis values behind after a real reading changes.
       const measurement = mountMagnetometerUncalibrated();
-      const first: IMagnetometerUncalibratedMeasurement = { x: 0.1, y: 0.2, z: 0.3, timestamp: 1 };
-      const second: IMagnetometerUncalibratedMeasurement = { x: 9, y: 9, z: 9, timestamp: 2 };
+      const first: IMagnetometerUncalibratedMeasurement = {
+        x: 0.1,
+        y: 0.2,
+        z: 0.3,
+        timestamp: 1,
+      };
+      const second: IMagnetometerUncalibratedMeasurement = {
+        x: 9,
+        y: 9,
+        z: 9,
+        timestamp: 2,
+      };
 
       registeredListener?.(first);
       expect(measurement.value).toEqual(first);

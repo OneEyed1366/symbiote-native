@@ -7,9 +7,19 @@ import { exponentDeviceMotion } from './native/exponent-device-motion';
 // from raw acceleration.
 export type IDeviceMotionMeasurement = {
   acceleration: null | { x: number; y: number; z: number; timestamp: number };
-  accelerationIncludingGravity: { x: number; y: number; z: number; timestamp: number };
+  accelerationIncludingGravity: {
+    x: number;
+    y: number;
+    z: number;
+    timestamp: number;
+  };
   rotation: { alpha: number; beta: number; gamma: number; timestamp: number };
-  rotationRate: null | { alpha: number; beta: number; gamma: number; timestamp: number };
+  rotationRate: null | {
+    alpha: number;
+    beta: number;
+    gamma: number;
+    timestamp: number;
+  };
   interval: number;
   orientation: DeviceMotionOrientation;
 };

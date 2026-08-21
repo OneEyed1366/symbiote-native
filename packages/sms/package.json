@@ -1,7 +1,7 @@
 {
   "name": "@symbiote-native/sms",
-  "version": "0.2.0",
-  "description": "expo-sms wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, and Angular adapters. Opens the system SMS composer prefilled with recipients and a message.",
+  "version": "0.3.0",
+  "description": "expo-sms wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Opens the system SMS composer prefilled with recipients and a message.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -19,9 +19,10 @@
   "types": "src/core/index.ts",
   "exports": {
     ".": "./src/core/index.ts",
-    "./vue": "./src/vue/index.ts",
-    "./react": "./src/react/index.ts",
-    "./svelte": "./src/svelte/index.ts",
+    "./vue": "./src/core/index.ts",
+    "./react": "./src/core/index.ts",
+    "./svelte": "./src/core/index.ts",
+    "./solid": "./src/core/index.ts",
     "./angular": {
       "types": "./build-ngc/angular/index.d.ts",
       "react-native": "./build-ngc/angular/index.js",
@@ -48,16 +49,20 @@
         "default": "./build/core/index.js"
       },
       "./vue": {
-        "types": "./build/vue/index.d.ts",
-        "default": "./build/vue/index.js"
+        "types": "./build/core/index.d.ts",
+        "default": "./build/core/index.js"
       },
       "./react": {
-        "types": "./build/react/index.d.ts",
-        "default": "./build/react/index.js"
+        "types": "./build/core/index.d.ts",
+        "default": "./build/core/index.js"
       },
       "./svelte": {
-        "types": "./build/svelte/index.d.ts",
-        "default": "./build/svelte/index.js"
+        "types": "./build/core/index.d.ts",
+        "default": "./build/core/index.js"
+      },
+      "./solid": {
+        "types": "./build/core/index.d.ts",
+        "default": "./build/core/index.js"
       },
       "./angular": {
         "types": "./build-ngc/angular/index.d.ts",
@@ -81,12 +86,14 @@
     "@symbiote-native/angular": ">=0.6.2",
     "@symbiote-native/engine": ">=0.1.7",
     "@symbiote-native/react": ">=0.2.8",
+    "@symbiote-native/solid": ">=0.0.1",
     "@symbiote-native/svelte": ">=0.1.0",
     "@symbiote-native/vue": ">=0.3.8",
     "@angular/core": ">=20",
     "@vue/runtime-core": "^3.5.13",
     "react": ">=19.0.0",
     "react-native": ">=0.86",
+    "solid-js": ">=1.9.0",
     "svelte": ">=5.56.0",
     "vue": ">=3.5.0"
   },
@@ -95,6 +102,9 @@
       "optional": true
     },
     "@symbiote-native/react": {
+      "optional": true
+    },
+    "@symbiote-native/solid": {
       "optional": true
     },
     "@symbiote-native/svelte": {
@@ -112,6 +122,9 @@
     "react": {
       "optional": true
     },
+    "solid-js": {
+      "optional": true
+    },
     "svelte": {
       "optional": true
     },
@@ -126,6 +139,7 @@
     "@symbiote-native/angular": "workspace:*",
     "@symbiote-native/engine": "workspace:*",
     "@symbiote-native/react": "workspace:*",
+    "@symbiote-native/solid": "workspace:*",
     "@symbiote-native/svelte": "workspace:*",
     "@symbiote-native/test-utils": "workspace:*",
     "@symbiote-native/vue": "workspace:*",
@@ -133,6 +147,7 @@
     "@types/react": "catalog:",
     "@vue/runtime-core": "catalog:",
     "react": "catalog:",
+    "solid-js": "catalog:",
     "svelte": "catalog:",
     "typescript": "catalog:"
   }

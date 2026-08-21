@@ -1,7 +1,11 @@
 import { defineComponent, onMounted, onUnmounted, ref } from 'vue';
 import type { Ref } from 'vue';
 import { SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
-import { hasAction, isAvailableAsync, requestReview } from '@symbiote-native/store-review/vue';
+import {
+  hasAction,
+  isAvailableAsync,
+  requestReview,
+} from '@symbiote-native/store-review/vue';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
@@ -59,7 +63,11 @@ export const StoreReviewScreen = defineComponent(
 
     return () => (
       <SafeAreaView class="screen">
-        <ScrollView testID="store-review-scroll" class="screen" contentContainerStyle="scroll-content">
+        <ScrollView
+          testID="store-review-scroll"
+          class="screen"
+          contentContainerStyle="scroll-content"
+        >
           <View class={`line-tag line-tag-${lineInfo.line}`}>
             <Text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
           </View>
@@ -70,8 +78,9 @@ export const StoreReviewScreen = defineComponent(
             <View class="hero-copy">
               <Text class="hero-title">Store Review</Text>
               <Text class="hero-body">
-                @symbiote-native/store-review — the native in-app App Store/Play Store review
-                prompt, with a store-URL fallback the caller supplies explicitly.
+                @symbiote-native/store-review — the native in-app App Store/Play
+                Store review prompt, with a store-URL fallback the caller
+                supplies explicitly.
               </Text>
             </View>
           </View>
@@ -82,11 +91,23 @@ export const StoreReviewScreen = defineComponent(
             </View>
             <ValueRow
               label="isAvailableAsync"
-              value={isAvailable.value === null ? 'checking…' : isAvailable.value ? 'true' : 'false'}
+              value={
+                isAvailable.value === null
+                  ? 'checking…'
+                  : isAvailable.value
+                    ? 'true'
+                    : 'false'
+              }
             />
             <ValueRow
               label="hasAction"
-              value={canTakeAction.value === null ? 'checking…' : canTakeAction.value ? 'true' : 'false'}
+              value={
+                canTakeAction.value === null
+                  ? 'checking…'
+                  : canTakeAction.value
+                    ? 'true'
+                    : 'false'
+              }
             />
             <ActionButton
               testID="store-review-request-button"
@@ -96,10 +117,11 @@ export const StoreReviewScreen = defineComponent(
             />
             <ValueRow label="Last result" value={lastResult.value} />
             <Text class="info-text">
-              resolved means the call completed, not that a prompt appeared. On Android the Play
-              dialog only shows for a build installed from Google Play (internal test track,
-              internal app sharing, or production); a sideloaded debug build resolves silently.
-              iOS shows it in debug builds. Both stores also enforce a quota.
+              resolved means the call completed, not that a prompt appeared. On
+              Android the Play dialog only shows for a build installed from
+              Google Play (internal test track, internal app sharing, or
+              production); a sideloaded debug build resolves silently. iOS shows
+              it in debug builds. Both stores also enforce a quota.
             </Text>
           </View>
         </ScrollView>

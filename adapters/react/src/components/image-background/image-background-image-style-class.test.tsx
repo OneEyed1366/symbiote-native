@@ -11,7 +11,7 @@
 // suite, not here.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { ImageBackground, mount, unmount } from '@symbiote-native/react';
 import { installFabric } from '@symbiote-native/test-utils';
 
@@ -33,10 +33,27 @@ describe('ImageBackground imageStyle/className class-name resolution', () => {
       // image (imageStyle), and vice versa. Registering DISTINCT style keys with DISTINCT
       // properties proves the resolution actually targets the right node, not just that
       // *a* value happened to be absent from the wrong one.
-      registerStyles({ overlay: { opacity: 0.5 }, wrapperClass: { backgroundColor: '#123456' } });
+      registerRules([
+        {
+          tokens: ['overlay'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { opacity: 0.5 },
+        },
+        {
+          tokens: ['wrapperClass'],
+          specificity: [0, 1, 0],
+          order: 1,
+          style: { backgroundColor: '#123456' },
+        },
+      ]);
       mount(
         ROOT_TAG,
-        <ImageBackground source={SOURCE} imageStyle="overlay" className="wrapperClass" />,
+        <ImageBackground
+          source={SOURCE}
+          imageStyle="overlay"
+          className="wrapperClass"
+        />,
       );
 
       const image = fabric.find(node => node.viewName === 'RCTImageView');
@@ -45,7 +62,9 @@ describe('ImageBackground imageStyle/className class-name resolution', () => {
       expect('backgroundColor' in image!.props).toBe(false);
 
       const wrapper = fabric.find(
-        node => node.viewName === 'RCTView' && node.props.pointerEvents !== 'box-none',
+        node =>
+          node.viewName === 'RCTView' &&
+          node.props.pointerEvents !== 'box-none',
       );
       expect(wrapper, 'wrapper RCTView was created').toBeDefined();
       expect(wrapper!.props.backgroundColor).toBe('#123456');
@@ -56,7 +75,10 @@ describe('ImageBackground imageStyle/className class-name resolution', () => {
       // why: imageStyle's type is `IStyleProp<IViewStyle> | string` — the string branch must
       // not be the only supported shape; a caller with an inline/computed style object needs
       // the original renderImageBackground contract preserved.
-      mount(ROOT_TAG, <ImageBackground source={SOURCE} imageStyle={{ opacity: 0.25 }} />);
+      mount(
+        ROOT_TAG,
+        <ImageBackground source={SOURCE} imageStyle={{ opacity: 0.25 }} />,
+      );
 
       const image = fabric.find(node => node.viewName === 'RCTImageView');
       expect(image!.props.opacity).toBe(0.25);

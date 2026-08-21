@@ -23,7 +23,9 @@ import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 // it there, so it's added locally, exactly like Image's IImageProps. Not destructured below, so
 // it rides into `...passthrough` and lands on the SAME wrapper View `style` targets (see
 // renderActivityIndicator's wrapperProps).
-export type IActivityIndicatorProps = IActivityIndicatorBaseProps & { class?: IClassNameValue };
+export type IActivityIndicatorProps = IActivityIndicatorBaseProps & {
+  class?: IClassNameValue;
+};
 
 function normalizeSize(size: unknown): IActivityIndicatorSize {
   if (size === 'large') return 'large';
@@ -47,7 +49,14 @@ export function createActivityIndicator(platform: IActivityIndicatorPlatform) {
         // Defaults match RN (animating / hidesWhenStopped true, size 'small'); the rest of
         // attrs (testID, accessibility, onLayout) forwards onto the wrapper via passthrough.
         const attrs = normalizeVueAttrs(rawAttrs);
-        const { animating, color, hidesWhenStopped, size, style, ...passthrough } = attrs;
+        const {
+          animating,
+          color,
+          hidesWhenStopped,
+          size,
+          style,
+          ...passthrough
+        } = attrs;
         return descriptorToVue(
           renderActivityIndicator(
             {

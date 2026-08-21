@@ -9,7 +9,9 @@ const IOS_DEFAULT_COLOR = '#999999';
 @Component({
   selector: 'ActivityIndicator',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   imports: [DescriptorOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<symbiote-descriptor-outlet [node]="descriptor" />`,

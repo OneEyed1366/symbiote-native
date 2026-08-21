@@ -202,7 +202,8 @@ export type IServiceActionResult = {
   servicePackage?: string;
 };
 
-export type IWebBrowserAuthSessionResult = IWebBrowserRedirectResult | IWebBrowserResult;
+export type IWebBrowserAuthSessionResult =
+  IWebBrowserRedirectResult | IWebBrowserResult;
 export type IWebBrowserMayInitWithUrlResult = IServiceActionResult;
 export type IWebBrowserWarmUpResult = IServiceActionResult;
 export type IWebBrowserCoolDownResult = IServiceActionResult;

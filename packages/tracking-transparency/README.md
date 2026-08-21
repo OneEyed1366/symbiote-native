@@ -3,9 +3,9 @@
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-tracking-transparency`](https://github.com/expo/expo/tree/main/packages/expo-tracking-transparency)
 — the iOS App Tracking Transparency prompt, permission get/request, and the advertising-ID getter
-— usable from **every** adapter, React, Vue, and Angular, not just React. Like
+— usable from **every** adapter, React, Vue, Svelte, Solid, and Angular, not just React. Like
 [`@symbiote-native/brightness`](../brightness), this package's surface is mostly stateless free
-async functions; only the permission surface gets its own lifecycle hook/composable/service,
+async functions; only the permission surface gets its own per-adapter lifecycle wrapper,
 mirroring upstream's own `usePermissions`. Built the same way as
 [`@symbiote-native/local-auth`](../local-auth), [`@symbiote-native/battery`](../battery), and
 [`@symbiote-native/brightness`](../brightness) — an `expo-modules-core`-based wrapper (see the
@@ -34,13 +34,13 @@ Unlike a plain RN native module, `expo-tracking-transparency`'s native code is d
 this repo use — this needs wiring into the native host app **once**, covering this package and
 every other `expo-modules-core` package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| iOS | `Info.plist` — `NSUserTrackingUsageDescription`, required to show the ATT prompt |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| iOS      | `Info.plist` — `NSUserTrackingUsageDescription`, required to show the ATT prompt                                                                    |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list — live in the `symbiote-expo-native-module` skill. The Android
@@ -56,13 +56,16 @@ src/core/                 getAdvertisingId, get/requestTrackingPermissionsAsync,
                           expo-modules-core's requireNativeModule.
 src/react/hooks/           @symbiote-native/tracking-transparency/react   — usePermissions
 src/vue/composables/       @symbiote-native/tracking-transparency/vue     — usePermissions (same name)
+src/svelte/runes/          @symbiote-native/tracking-transparency/svelte  — usePermissions (same name)
+src/solid/primitives/      @symbiote-native/tracking-transparency/solid   — createPermissions
+                           (Solid reserves `use*` for consuming existing state)
 src/angular/services/      @symbiote-native/tracking-transparency/angular — PermissionsService
 ```
 
-Each adapter's hook/composable/service wraps the same one-shot `getTrackingPermissionsAsync`/
-`requestTrackingPermissionsAsync` pair in its own lifecycle idiom (auto-fetch on mount, exposed as
-a tuple/object/signal). `getAdvertisingId`/`isAvailable` are stateless free-function re-exports,
-written once in `core/` and shared verbatim by all three adapters.
+Each adapter's wrapper puts the same one-shot `getTrackingPermissionsAsync`/
+`requestTrackingPermissionsAsync` pair in its own lifecycle idiom (auto-fetch when the wrapper is
+created, exposed as a tuple/object/signal/accessor). `getAdvertisingId`/`isAvailable` are stateless
+free-function re-exports, written once in `core/` and shared verbatim by every adapter.
 
 Upstream's own `createPermissionHook`/`useTrackingPermissions` is **not** ported — that helper is
 React-only (built on `useState`/`useEffect`), and this repo's convention is for each adapter to
@@ -98,7 +101,8 @@ function TrackingScreen() {
 import { usePermissions } from '@symbiote-native/tracking-transparency/vue';
 import { getAdvertisingId } from '@symbiote-native/tracking-transparency';
 
-const { status: permissionStatus, request: requestPermission } = usePermissions();
+const { status: permissionStatus, request: requestPermission } =
+  usePermissions();
 </script>
 
 <template>
@@ -117,7 +121,10 @@ const { status: permissionStatus, request: requestPermission } = usePermissions(
 ```ts
 // Angular
 import { Component, inject } from '@angular/core';
-import { PermissionsService, getAdvertisingId } from '@symbiote-native/tracking-transparency/angular';
+import {
+  PermissionsService,
+  getAdvertisingId,
+} from '@symbiote-native/tracking-transparency/angular';
 
 @Component({
   selector: 'TrackingScreen',
@@ -128,7 +135,9 @@ import { PermissionsService, getAdvertisingId } from '@symbiote-native/tracking-
       <Pressable (press)="permissionsService.request()">
         <Text>Request tracking permission</Text>
       </Pressable>
-      <Pressable (press)="logAdvertisingId()"><Text>Log advertising ID</Text></Pressable>
+      <Pressable (press)="logAdvertisingId()"
+        ><Text>Log advertising ID</Text></Pressable
+      >
     </View>
   `,
 })
@@ -142,7 +151,30 @@ export class TrackingScreen {
 }
 ```
 
-All three examples mirror the real canary demo screens —
+```tsx
+// Solid — the accessors are CALLED; a Solid component body runs once, so a snapshot would freeze.
+import { createPermissions } from '@symbiote-native/tracking-transparency/solid';
+import { getAdvertisingId } from '@symbiote-native/tracking-transparency';
+
+function TrackingScreen() {
+  const { status: permissionStatus, request: requestPermission } =
+    createPermissions();
+
+  return (
+    <View>
+      <Text>{permissionStatus()?.status ?? 'checking…'}</Text>
+      <Pressable onPress={() => void requestPermission()}>
+        <Text>Request tracking permission</Text>
+      </Pressable>
+      <Pressable onPress={() => console.log(getAdvertisingId())}>
+        <Text>Log advertising ID</Text>
+      </Pressable>
+    </View>
+  );
+}
+```
+
+The examples above mirror the real canary demo screens —
 `examples/expo-react/screens/TrackingTransparencyScreen.tsx`,
 `examples/expo-vue-sfc/screens/TrackingTransparencyScreen.vue`,
 `examples/expo-vue-tsx/screens/TrackingTransparencyScreen.tsx`,
@@ -168,25 +200,34 @@ Plus `PermissionStatus`/`PermissionResponse`/`PermissionExpiration`/`PermissionH
 re-exported verbatim from `expo-modules-core`, never the `expo` meta-package.
 
 ```ts
-import { getAdvertisingId, getTrackingPermissionsAsync } from '@symbiote-native/tracking-transparency';
+import {
+  getAdvertisingId,
+  getTrackingPermissionsAsync,
+} from '@symbiote-native/tracking-transparency';
 
-// framework-scoped entry points re-export the same free functions, plus a usePermissions
-// hook/composable/service:
+// framework-scoped entry points re-export the same free functions, plus a per-adapter
+// permission wrapper:
 import { usePermissions } from '@symbiote-native/tracking-transparency/react';
 import { usePermissions } from '@symbiote-native/tracking-transparency/vue';
+import { usePermissions } from '@symbiote-native/tracking-transparency/svelte';
+import { createPermissions } from '@symbiote-native/tracking-transparency/solid';
 import { PermissionsService } from '@symbiote-native/tracking-transparency/angular';
 ```
 
-`usePermissions` (React/Vue) auto-fetches the current permission status on mount and returns a
-`[status, request, get]` tuple (React) / `{ status, request, get }` object (Vue); Angular's
-`PermissionsService.connect()` does the same, returning a readonly `Signal`:
+`usePermissions` auto-fetches the current permission status on mount and returns a
+`[status, request, get, error]` tuple (React) / `{ status, error, request, get }` object
+(Vue/Svelte); Solid's `createPermissions` returns the same object with `Accessor`s instead of
+`Ref`s, and Angular's `PermissionsService.connect()` returns a readonly `Signal`:
 
 ```ts
 // React
 const [status, request] = usePermissions();
 
-// Vue
+// Vue / Svelte
 const { status, request } = usePermissions();
+
+// Solid — status is an accessor, called at the read site
+const { status, request } = createPermissions();
 
 // Angular
 readonly status = inject(PermissionsService).connect();
@@ -204,7 +245,7 @@ readonly status = inject(PermissionsService).connect();
 
 No Fabric/Descriptor angle at all — tracking-transparency is a pure async-function + permission
 surface, never a view. Tests inject a fake native-module object in place of the real
-`requireNativeModule` resolution (`src/core/*.test.ts`, `src/{react,vue,angular}/**/*.test.{ts,tsx}`,
+`requireNativeModule` resolution (`src/core/*.test.ts`, `src/{react,vue,svelte,solid,angular}/**/*.test.{ts,tsx}`,
 `vitest`), the same pattern `expo-tracking-transparency` itself uses upstream — no
 `installFabric()` for the core layer, no ViewConfig. Native rendering itself is verified on-device
 (see the parent [README](../../README.md) for the project's testing model).

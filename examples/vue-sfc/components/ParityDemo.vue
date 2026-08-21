@@ -9,7 +9,7 @@
   Vue surface (the adapter maps them onto the renderItem family internally).
 -->
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue'
+import { ref, shallowRef } from 'vue';
 import {
   View,
   Text,
@@ -21,65 +21,110 @@ import {
   type IHostInstance,
   type IFlatListHandle,
   type ISection,
-} from '@symbiote-native/vue'
-import ActionButton from './ActionButton.vue'
+} from '@symbiote-native/vue';
+import ActionButton from './ActionButton.vue';
 
-const PARITY_ROW_H = 30
-const parityRows = Array.from({ length: 30 }, (_unused, index) => ({ id: `pr-${index}`, n: index }))
+const PARITY_ROW_H = 30;
+const parityRows = Array.from({ length: 30 }, (_unused, index) => ({
+  id: `pr-${index}`,
+  n: index,
+}));
 // Tall sections (taller than the list viewport) so the sticky cross-talk is visible: as
 // you scroll, the next section header should reach the top and PUSH the pinned one off.
-const sectionData = (prefix: string, label: string): { id: string; label: string }[] =>
-  Array.from({ length: 8 }, (_unused, index) => ({ id: `${prefix}${index}`, label: `${label} ${index}` }))
+const sectionData = (
+  prefix: string,
+  label: string,
+): { id: string; label: string }[] =>
+  Array.from({ length: 8 }, (_unused, index) => ({
+    id: `${prefix}${index}`,
+    label: `${label} ${index}`,
+  }));
 const paritySections: ISection<{ id: string; label: string }>[] = [
   { title: 'Fruit', data: sectionData('f', 'apple') },
   { title: 'Tools', data: sectionData('t', 'hammer') },
   { title: 'Cities', data: sectionData('c', 'porto') },
-]
+];
 
-const listRef = shallowRef<IFlatListHandle | null>(null)
-const titleRef = shallowRef<IHostInstance | null>(null)
-const longPressMsg = ref('long-press or tap the row below')
-const dismissMsg = ref('focus the field, then Hide keyboard')
+const listRef = shallowRef<IFlatListHandle | null>(null);
+const titleRef = shallowRef<IHostInstance | null>(null);
+const longPressMsg = ref('long-press or tap the row below');
+const dismissMsg = ref('focus the field, then Hide keyboard');
 
-const keyExtractor = (item: { id: string; n: number }): string => item.id
-const getItemLayout = (_data: unknown, index: number): { length: number; offset: number; index: number } =>
-  ({ length: PARITY_ROW_H, offset: PARITY_ROW_H * index, index })
-const sectionKeyExtractor = (item: { id: string; label: string }): string => item.id
+const keyExtractor = (item: { id: string; n: number }): string => item.id;
+const getItemLayout = (
+  _data: unknown,
+  index: number,
+): { length: number; offset: number; index: number } => ({
+  length: PARITY_ROW_H,
+  offset: PARITY_ROW_H * index,
+  index,
+});
+const sectionKeyExtractor = (item: { id: string; label: string }): string =>
+  item.id;
 
-const scrollDown = (): void => { listRef.value?.scrollToOffset({ offset: 20 * PARITY_ROW_H, animated: true }) }
-const scrollTop = (): void => { listRef.value?.scrollToOffset({ offset: 0, animated: false }) }
+const scrollDown = (): void => {
+  listRef.value?.scrollToOffset({ offset: 20 * PARITY_ROW_H, animated: true });
+};
+const scrollTop = (): void => {
+  listRef.value?.scrollToOffset({ offset: 0, animated: false });
+};
 const focusTitle = (): void => {
   if (titleRef.value !== null) {
-    AccessibilityInfo.sendAccessibilityEvent(titleRef.value, 'focus')
+    AccessibilityInfo.sendAccessibilityEvent(titleRef.value, 'focus');
   }
-}
+};
 
 // `parityRow`'s height references the script const PARITY_ROW_H, which a CSS selector has
 // no way to read — that one property stays dynamic via :style alongside the static
 // `class="parity-row"` (defined in App.css) for justifyContent/padding.
-const parityRowHeightStyle = { height: PARITY_ROW_H }
+const parityRowHeightStyle = { height: PARITY_ROW_H };
 </script>
 
 <template>
   <View class="section-nested">
-    <Text ref="titleRef" class="section-label">Parity checks · longPress · dismiss · animated scroll · sticky · a11y focus</Text>
+    <Text ref="titleRef" class="section-label"
+      >Parity checks · longPress · dismiss · animated scroll · sticky · a11y
+      focus</Text
+    >
 
     <!-- #10 Text.onLongPress synthesis: hold ~0.5s (suppresses tap) vs quick tap -->
     <Text
-      @long-press="() => { longPressMsg = 'long press! (tap was suppressed)' }"
-      @press="() => { longPressMsg = 'tap' }"
-      class="long-press-row">{{ longPressMsg }}</Text>
+      @long-press="
+        () => {
+          longPressMsg = 'long press! (tap was suppressed)';
+        }
+      "
+      @press="
+        () => {
+          longPressMsg = 'tap';
+        }
+      "
+      class="long-press-row"
+      >{{ longPressMsg }}</Text
+    >
 
     <!-- #15 Keyboard.dismiss: blurs whatever input holds focus without needing a ref -->
     <TextInput
       placeholder="focus me…"
       placeholder-text-color="#41506a"
-      @focus="() => { dismissMsg = 'keyboard up — tap Hide keyboard' }"
-      @blur="() => { dismissMsg = 'blurred (keyboard down)' }"
+      @focus="
+        () => {
+          dismissMsg = 'keyboard up — tap Hide keyboard';
+        }
+      "
+      @blur="
+        () => {
+          dismissMsg = 'blurred (keyboard down)';
+        }
+      "
       class="focus-input"
     />
     <Text class="note-text">{{ dismissMsg }}</Text>
-    <ActionButton title="Hide keyboard" :onPress="() => Keyboard.dismiss()" color="#42b883" />
+    <ActionButton
+      title="Hide keyboard"
+      :onPress="() => Keyboard.dismiss()"
+      color="#42b883"
+    />
 
     <!-- #12 animated VirtualizedList scroll: smooth (native command) vs instant.
          A fixed height with no wrapper: the vertical ScrollView clips to its own
@@ -100,17 +145,27 @@ const parityRowHeightStyle = { height: PARITY_ROW_H }
     </FlatList>
     <View class="row">
       <View class="flex1">
-        <ActionButton title="Scroll ▼ animated" :onPress="scrollDown" color="#42b883" />
+        <ActionButton
+          title="Scroll ▼ animated"
+          :onPress="scrollDown"
+          color="#42b883"
+        />
       </View>
       <View class="flex1">
-        <ActionButton title="Top · instant" :onPress="scrollTop" color="#42b883" />
+        <ActionButton
+          title="Top · instant"
+          :onPress="scrollTop"
+          color="#42b883"
+        />
       </View>
     </View>
 
     <!-- #13 sticky section headers. Drag the inner list: each header pins at the top.
          Cross-talk check: as the NEXT header reaches the top it should PUSH the pinned
          one off (nextHeaderLayoutY not yet wired, watch push vs overlap). -->
-    <Text class="section-label">SectionList · sticky (scroll: next header should push prev off)</Text>
+    <Text class="section-label"
+      >SectionList · sticky (scroll: next header should push prev off)</Text
+    >
     <SectionList
       testID="sticky-section-list"
       :sections="paritySections"
@@ -130,7 +185,11 @@ const parityRowHeightStyle = { height: PARITY_ROW_H }
 
     <!-- #14 a11y focus: node-based sendAccessibilityEvent routes through the Fabric
          slot on both platforms (enable TalkBack/VoiceOver to feel the focus jump) -->
-    <ActionButton title="Focus the panel title (a11y)" :onPress="focusTitle" color="#42b883" />
+    <ActionButton
+      title="Focus the panel title (a11y)"
+      :onPress="focusTitle"
+      color="#42b883"
+    />
   </View>
 </template>
 

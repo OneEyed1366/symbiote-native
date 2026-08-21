@@ -74,7 +74,8 @@ typecheck pass) that has nothing real to check yet.
 **What NOT to touch at tier 1** (all of these are legitimate *later* steps, not omissions):
 
 - `pnpm-workspace.yaml`'s `catalog:` — no new `expo-*`/`react-native-*` version pin until real
-  implementation lands and an actual dependency needs pinning.
+  implementation lands and an actual dependency needs pinning; `symbiote-dependency-catalog`
+  covers the catalog mechanics once that pin is real.
 - `examples/*` — native wiring (Podfile, Android Gradle autolinking, `MainApplication.kt`/
   `AppDelegate` bootstrap, Info.plist entries) is its own later step, not part of scaffolding
   the package skeleton.
@@ -97,3 +98,10 @@ typecheck pass) that has nothing real to check yet.
 - `npm-oidc-trusted-publishing` — scope/name squatting checks and the manual-publish + trust
   setup the user runs after a tier-1 skeleton is ready.
 - `grill-me` — the interview mechanism for resolving the tier question with the user.
+- `symbiote-release-publishing` — versioning/changesets/CI publish mechanics for the *real*
+  release once a package moves past its first manual `0.0.1` publish.
+- `symbiote-file-layout` — where `packages/<pkg>` sits in the monorepo map and the adapter
+  bucket conventions (`components/`/`modules/`/`utils/` vs the framework-idiomatic lifecycle
+  folder) once tier 3 starts adding adapter code.
+- `symbiote-expo-package-catalog` — the audited inventory of `.vendors/expo/packages` and
+  priority queue for picking which Expo package to port next.

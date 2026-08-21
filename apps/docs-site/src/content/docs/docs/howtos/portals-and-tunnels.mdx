@@ -8,7 +8,7 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 You want to render content somewhere other than its own JSX/template
 position — a toast, an overlay — and need to know which mechanism applies.
 
-## Same surface: `createPortal` (React) / `Teleport` (Vue) / `*portal` (Angular)
+## Same surface: `createPortal` (React) / `Teleport` (Vue) / `*portal` (Angular) / `Portal` (Svelte, Solid)
 
 Both move content to an already-mounted node within the **same** mounted
 surface as the call site:
@@ -44,6 +44,22 @@ surface as the call site:
       <View *portal="overlayHost"><Text>Ported via *portal</Text></View>
     }
     ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    Solid spells it `<Portal mount={...}>`, not a `createPortal()` call, because JSX in Solid
+    evaluates eagerly at the position it's written, so a `createPortal(children, target)` call
+    would build the toast's nodes before anything decided whether to portal them. `children` is
+    the only lazily-evaluated shape Solid has, which is what a component prop gives you:
+
+    ```tsx
+    // Solid
+    const [overlay, setOverlay] = createSignal<ISymbioteNode | null>(null);
+    // ...
+    <View ref={setOverlay} />
+    {overlay() ? <Portal mount={overlay()}><Text>ported in</Text></Portal> : null}
+    ```
+
   </TabItem>
   <TabItem label="Svelte">
     Svelte has no same-surface portal primitive at all — not even a partial one.
@@ -60,10 +76,10 @@ resolves once it actually commits — a plain ref is `null` on the entire first
 render.
 
 <Aside type="caution" title="Same-surface only, permanently">
-  Stock React Native has no portal at all (Fabric's persistent host config
-  never implements the mutation-mode container ops it needs). SymbioteNative's React
-  adapter runs in mutation mode, so `createPortal` structurally works — but
-  only within the surface that owns the commit. A target in a second,
+  Stock React Native has no portal at all (Fabric's persistent host config never
+  implements the mutation-mode container ops it needs). SymbioteNative's React
+  adapter runs in mutation mode, so `createPortal` structurally works — but only
+  within the surface that owns the commit. A target in a second,
   independently-mounted surface silently never repaints; this is not a gap to
   eventually close, see `createTunnel` below instead.
 </Aside>
@@ -84,6 +100,7 @@ surface, use `createTunnel()` instead — a shared store, not a node reference:
     // wherever the content originates, any surface:
     <overlayTunnel.In><ToastCard /></overlayTunnel.In>
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -108,6 +125,22 @@ surface, use `createTunnel()` instead — a shared store, not a node reference:
     }
     <tunnel-out [tunnel]="overlayTunnel" />
     ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    // Solid - module-level singleton, importable from any surface
+    export const overlayTunnel = createTunnel();
+
+    // wherever it should paint:
+    <overlayTunnel.Out />
+    // wherever the content originates, any surface:
+    <overlayTunnel.In><ToastCard /></overlayTunnel.In>
+    ```
+
+    Same shape as React and Vue: Solid components are ordinary functions, so `createTunnel()` can
+    mint a fresh `In`/`Out` pair per call, closed over that tunnel's own registry.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -135,6 +168,7 @@ surface, use `createTunnel()` instead — a shared store, not a node reference:
     `tunnel.In`/`tunnel.Out` — a `.svelte` file compiles to one fixed, top-level component, so
     there's no per-call factory `createTunnel()` could bake a registry into via closure the way
     Vue's `defineComponent` can.
+
   </TabItem>
 </Tabs>
 
@@ -152,8 +186,9 @@ As separate components, `Out`'s forced re-render never bounces back into
   always-on-top system surface) → `createTunnel`.
 
 Import both from your adapter's package (`@symbiote-native/react`, `@symbiote-native/vue`,
-`@symbiote-native/angular`, `@symbiote-native/svelte`). Angular exposes the same two mechanisms as
-directives instead of components/hooks: `*portal`/`*tunnelIn` and
-`<tunnel-out>`. Svelte exposes only the second mechanism — `createTunnel`, as `TunnelIn`/
-`TunnelOut` components taking an explicit `tunnel` prop — it has no same-surface portal
-primitive at all.
+`@symbiote-native/angular`, `@symbiote-native/svelte`, `@symbiote-native/solid`). Angular exposes the
+same two mechanisms as directives instead of components/hooks: `*portal`/`*tunnelIn` and
+`<tunnel-out>`. Solid has both mechanisms too, spelled `<Portal mount={...}>` and `createTunnel()`'s
+`In`/`Out`; same-surface portal now ships on every adapter except Svelte, which exposes only the
+second mechanism, `createTunnel`, as `TunnelIn`/`TunnelOut` components taking an explicit `tunnel`
+prop.

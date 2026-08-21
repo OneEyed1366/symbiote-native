@@ -1,6 +1,9 @@
 import { Component } from '@angular/core';
 import { SafeAreaView, Text, View } from '@symbiote-native/angular';
-import { injectRoute, injectStackNavigation } from '@symbiote-native/navigation/angular';
+import {
+  injectRoute,
+  injectStackNavigation,
+} from '@symbiote-native/navigation/angular';
 import { ActionButton } from '../components/ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
 
@@ -23,7 +26,9 @@ function openedFromLabel(params: unknown): string {
       <View class="section">
         <Text class="section-label">Navigation demo · Details screen</Text>
         <Text class="info-text">{{ 'route.params: ' + paramsLabel }}</Text>
-        <Text class="info-text">{{ 'canGoBack: ' + navigation.canGoBack() }}</Text>
+        <Text class="info-text">{{
+          'canGoBack: ' + navigation.canGoBack()
+        }}</Text>
         <ActionButton
           testID="nav-pop"
           title="← Pop back"

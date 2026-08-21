@@ -26,9 +26,15 @@ export type {
 export { ImageBackground } from './components/image-background';
 export type { IImageBackgroundProps } from './components/image-background';
 export { ScrollView } from './components/scroll-view';
-export type { IScrollViewProps, IScrollViewHandle } from './components/scroll-view';
+export type {
+  IScrollViewProps,
+  IScrollViewHandle,
+} from './components/scroll-view';
 export { TextInput } from './components/text-input';
-export type { ITextInputProps, ITextInputHandle } from './components/text-input';
+export type {
+  ITextInputProps,
+  ITextInputHandle,
+} from './components/text-input';
 export { InputAccessoryView } from './components/input-accessory-view';
 export type { IInputAccessoryViewProps } from './components/input-accessory-view';
 export { KeyboardAvoidingView } from './components/keyboard-avoiding-view';
@@ -73,7 +79,11 @@ export type { IButtonProps } from './components/button';
 export { FlatList } from './components/flat-list';
 export type { IFlatListProps, IFlatListHandle } from './components/flat-list';
 export { SectionList } from './components/section-list';
-export type { ISectionListProps, ISectionListHandle, ISection } from './components/section-list';
+export type {
+  ISectionListProps,
+  ISectionListHandle,
+  ISection,
+} from './components/section-list';
 export { VirtualizedSectionList } from './components/virtualized-section-list';
 export type {
   IVirtualizedSectionListProps,
@@ -89,7 +99,12 @@ export type {
   IViewabilityConfigCallbackPair,
 } from './components/virtualized-list';
 
-export type { IViewStyle, ITextStyle, IFlexAlign, IFlexJustify } from './utils/styles';
+export type {
+  IViewStyle,
+  ITextStyle,
+  IFlexAlign,
+  IFlexJustify,
+} from './utils/styles';
 export { mount, unmount } from './render';
 // createPortal: react-reconciler's Fiber-level portal, working here because @symbiote-native/react is
 // mutation-mode (unlike stock RN's persistent-mode Fabric renderer, which doesn't support it —
@@ -133,7 +148,11 @@ export { Platform, StyleSheet } from '@symbiote-native/engine';
 // Color utilities: PlatformColor / DynamicColorIOS build opaque platform colors;
 // processColor runs a color through the injected platform processor. All pure /
 // seam-backed, so they live in shared and the adapter re-exports them.
-export { PlatformColor, DynamicColorIOS, processColor } from '@symbiote-native/engine';
+export {
+  PlatformColor,
+  DynamicColorIOS,
+  processColor,
+} from '@symbiote-native/engine';
 export type {
   IColorValue,
   IOpaqueColorValue,
@@ -151,7 +170,10 @@ export {
 // Diagnostics, gated by DEBUG (<keep_logs_gate_behind_DEBUG>): app code logs through the same
 // seam the engine does instead of a bare console.log.
 export { dlog, isDebug } from '@symbiote-native/engine';
-export type { INativeViewConfig, INativeViewConfigSource } from '@symbiote-native/engine';
+export type {
+  INativeViewConfig,
+  INativeViewConfigSource,
+} from '@symbiote-native/engine';
 export type {
   IPlatformStatic,
   IPlatformOSType,
@@ -267,7 +289,11 @@ export type {
   IThemeAttrBackground,
   IRippleBackground,
 } from './components/touchable-native-feedback';
-export type { ISymbioteEvent, ISymbioteNode, IRootTag } from '@symbiote-native/engine';
+export type {
+  ISymbioteEvent,
+  ISymbioteNode,
+  IRootTag,
+} from '@symbiote-native/engine';
 // Component-detail types carrying no framework element or ref, so they are defined once in
 // @symbiote-native/components and every adapter re-exports the SAME type
 // (<prop_types_split_agnostic_vs_per_adapter>).

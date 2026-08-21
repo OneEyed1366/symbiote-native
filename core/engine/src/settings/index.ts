@@ -51,7 +51,9 @@ let settingsModule: INativeSettingsManager | null | undefined;
 function getModule(): INativeSettingsManager | null {
   if (settingsModule === undefined) {
     settingsModule = getNativeModule<INativeSettingsManager>(SETTINGS_MODULE);
-    dlog(`Settings: module ${settingsModule ? 'resolved' : 'NOT resolved (null)'}`);
+    dlog(
+      `Settings: module ${settingsModule ? 'resolved' : 'NOT resolved (null)'}`,
+    );
   }
   return settingsModule;
 }
@@ -65,7 +67,9 @@ function getSnapshot(): Record<string, unknown> {
     const module = getModule();
     const constants = module?.getConstants().settings;
     snapshot = isRecord(constants) ? { ...constants } : {};
-    dlog(`Settings: snapshot seeded with ${Object.keys(snapshot).length} key(s)`);
+    dlog(
+      `Settings: snapshot seeded with ${Object.keys(snapshot).length} key(s)`,
+    );
   }
   return snapshot;
 }

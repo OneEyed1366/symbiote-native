@@ -19,16 +19,24 @@ import metroSvelteTransformer from '@symbiote-native/svelte/metro-svelte-transfo
 
 const {
   compileSvelteModuleFile,
-}: { compileSvelteModuleFile: (src: string, filename: string) => string } = metroSvelteTransformer;
+}: { compileSvelteModuleFile: (src: string, filename: string) => string } =
+  metroSvelteTransformer;
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
 const ROOT_TAG = 91_630;
-const PROBE_OUT = join(__dirname, '.smoke-compiled-use-screen-orientation-probe.mjs');
-const RUNE_OUT = join(__dirname, '.smoke-compiled-use-screen-orientation.svelte.mjs');
+const PROBE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-screen-orientation-probe.mjs',
+);
+const RUNE_OUT = join(
+  __dirname,
+  '.smoke-compiled-use-screen-orientation.svelte.mjs',
+);
 
 type IScreenOrientationState = { orientation: number; orientationLock: number };
 type IOrientationChangeEvent = {
@@ -47,7 +55,8 @@ const getOrientationAsyncMock = vi.fn(async (): Promise<number> => 1);
 const getOrientationLockAsyncMock = vi.fn(async (): Promise<number> => 0);
 
 vi.mock('../../core', () => ({
-  addOrientationChangeListener: (listener: IListener) => addListenerMock(listener),
+  addOrientationChangeListener: (listener: IListener) =>
+    addListenerMock(listener),
   getOrientationAsync: () => getOrientationAsyncMock(),
   getOrientationLockAsync: () => getOrientationLockAsyncMock(),
   Orientation: { UNKNOWN: 0, PORTRAIT_UP: 1 },
@@ -55,7 +64,8 @@ vi.mock('../../core', () => ({
 }));
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -74,13 +84,23 @@ afterEach(() => {
   rmSync(RUNE_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 // $state/$effect require Svelte's MODULE compiler, not the component compiler — a bare,
 // uncompiled rune call throws `rune_outside_svelte` at runtime.
 function compileRuneModule(): void {
-  const source = readFileSync(join(__dirname, 'use-screen-orientation.svelte.ts'), 'utf-8');
-  writeFileSync(RUNE_OUT, compileSvelteModuleFile(source, 'use-screen-orientation.svelte.ts'));
+  const source = readFileSync(
+    join(__dirname, 'use-screen-orientation.svelte.ts'),
+    'utf-8',
+  );
+  writeFileSync(
+    RUNE_OUT,
+    compileSvelteModuleFile(source, 'use-screen-orientation.svelte.ts'),
+  );
 }
 
 async function loadProbe(): Promise<Component> {
@@ -103,9 +123,13 @@ async function loadProbe(): Promise<Component> {
   return mod.default as Component;
 }
 
-async function mountScreenOrientation(values: IScreenOrientationState[]): Promise<void> {
+async function mountScreenOrientation(
+  values: IScreenOrientationState[],
+): Promise<void> {
   const Probe = await loadProbe();
-  mount(ROOT_TAG, Probe, { onValue: (state: IScreenOrientationState) => values.push(state) });
+  mount(ROOT_TAG, Probe, {
+    onValue: (state: IScreenOrientationState) => values.push(state),
+  });
   await tick();
 }
 
@@ -120,11 +144,16 @@ describe('useScreenOrientation (Svelte)', () => {
       // pair is the rune's OWN initial value rather than a value that happens to arrive before
       // the mocks resolve in a race.
       getOrientationAsyncMock.mockReturnValue(new Promise<number>(() => {}));
-      getOrientationLockAsyncMock.mockReturnValue(new Promise<number>(() => {}));
+      getOrientationLockAsyncMock.mockReturnValue(
+        new Promise<number>(() => {}),
+      );
       const values: IScreenOrientationState[] = [];
       await mountScreenOrientation(values);
 
-      expect(values[values.length - 1]).toEqual({ orientation: 0, orientationLock: 9 });
+      expect(values[values.length - 1]).toEqual({
+        orientation: 0,
+        orientationLock: 9,
+      });
     });
 
     it('updates to the fetched value once BOTH getOrientationAsync() and getOrientationLockAsync() resolve', async () => {
@@ -134,7 +163,10 @@ describe('useScreenOrientation (Svelte)', () => {
       await mountScreenOrientation(values);
 
       await vi.waitFor(() =>
-        expect(values[values.length - 1]).toEqual({ orientation: 1, orientationLock: 0 }),
+        expect(values[values.length - 1]).toEqual({
+          orientation: 1,
+          orientationLock: 0,
+        }),
       );
     });
 
@@ -145,9 +177,14 @@ describe('useScreenOrientation (Svelte)', () => {
       // actually verifies that claim, not merely asserting it once at mount.
       const values: IScreenOrientationState[] = [];
       await mountScreenOrientation(values);
-      await vi.waitFor(() => expect(values[values.length - 1].orientation).toBe(1));
+      await vi.waitFor(() =>
+        expect(values[values.length - 1].orientation).toBe(1),
+      );
 
-      registeredListener?.({ orientationLock: 5, orientationInfo: { orientation: 3 } });
+      registeredListener?.({
+        orientationLock: 5,
+        orientationInfo: { orientation: 3 },
+      });
       await tick();
 
       expect(addListenerMock).toHaveBeenCalledTimes(1);
@@ -159,12 +196,20 @@ describe('useScreenOrientation (Svelte)', () => {
       // that could observably tear.
       const values: IScreenOrientationState[] = [];
       await mountScreenOrientation(values);
-      await vi.waitFor(() => expect(values[values.length - 1].orientation).toBe(1));
+      await vi.waitFor(() =>
+        expect(values[values.length - 1].orientation).toBe(1),
+      );
 
-      registeredListener?.({ orientationLock: 5, orientationInfo: { orientation: 3 } });
+      registeredListener?.({
+        orientationLock: 5,
+        orientationInfo: { orientation: 3 },
+      });
       await tick();
 
-      expect(values[values.length - 1]).toEqual({ orientation: 3, orientationLock: 5 });
+      expect(values[values.length - 1]).toEqual({
+        orientation: 3,
+        orientationLock: 5,
+      });
     });
 
     it('removes the subscription exactly once on unmount', async () => {

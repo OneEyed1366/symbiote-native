@@ -68,7 +68,10 @@ export type ISpringConfig = Omit<ISpringAnimationConfig, 'toValue'> & {
 } & IWithOnComplete;
 export type IDecayConfig = IDecayAnimationConfig & IWithOnComplete;
 
-export function timing(value: AnimatedValue, config: ITimingConfig): ICompositeAnimation {
+export function timing(
+  value: AnimatedValue,
+  config: ITimingConfig,
+): ICompositeAnimation {
   return {
     start(callback?: IEndCallback): void {
       const onEnd = combineCallbacks(callback, config);
@@ -83,7 +86,10 @@ export function timing(value: AnimatedValue, config: ITimingConfig): ICompositeA
           ),
         );
       } else {
-        value.animate(new TimingAnimation({ ...config, toValue: target }), onEnd);
+        value.animate(
+          new TimingAnimation({ ...config, toValue: target }),
+          onEnd,
+        );
       }
     },
     stop(): void {
@@ -94,7 +100,8 @@ export function timing(value: AnimatedValue, config: ITimingConfig): ICompositeA
     },
     _nativeLoop(iterations: number, callback?: IEndCallback): boolean {
       const target = config.toValue;
-      if (target instanceof AnimatedNode || !canOffloadLoop(config)) return false;
+      if (target instanceof AnimatedNode || !canOffloadLoop(config))
+        return false;
       // One native animation carrying `iterations` runs the loop in native; the
       // completion callback only fires when the count exhausts (never for -1).
       value.animate(
@@ -106,7 +113,10 @@ export function timing(value: AnimatedValue, config: ITimingConfig): ICompositeA
   };
 }
 
-export function spring(value: AnimatedValue, config: ISpringConfig): ICompositeAnimation {
+export function spring(
+  value: AnimatedValue,
+  config: ISpringConfig,
+): ICompositeAnimation {
   return {
     start(callback?: IEndCallback): void {
       const onEnd = combineCallbacks(callback, config);
@@ -121,12 +131,16 @@ export function spring(value: AnimatedValue, config: ISpringConfig): ICompositeA
           ),
         );
       } else {
-        value.animate(new SpringAnimation({ ...config, toValue: target }), onEnd);
+        value.animate(
+          new SpringAnimation({ ...config, toValue: target }),
+          onEnd,
+        );
       }
     },
     _nativeLoop(iterations: number, callback?: IEndCallback): boolean {
       const target = config.toValue;
-      if (target instanceof AnimatedNode || !canOffloadLoop(config)) return false;
+      if (target instanceof AnimatedNode || !canOffloadLoop(config))
+        return false;
       value.animate(
         new SpringAnimation({ ...config, toValue: target, iterations }),
         combineCallbacks(callback, config),
@@ -142,10 +156,16 @@ export function spring(value: AnimatedValue, config: ISpringConfig): ICompositeA
   };
 }
 
-export function decay(value: AnimatedValue, config: IDecayConfig): ICompositeAnimation {
+export function decay(
+  value: AnimatedValue,
+  config: IDecayConfig,
+): ICompositeAnimation {
   return {
     start(callback?: IEndCallback): void {
-      value.animate(new DecayAnimation(config), combineCallbacks(callback, config));
+      value.animate(
+        new DecayAnimation(config),
+        combineCallbacks(callback, config),
+      );
     },
     stop(): void {
       value.stopAnimation();
@@ -213,7 +233,9 @@ export function parallel(
   return result;
 }
 
-export function sequence(animations: ICompositeAnimation[]): ICompositeAnimation {
+export function sequence(
+  animations: ICompositeAnimation[],
+): ICompositeAnimation {
   let current = 0;
   return {
     start(callback?: IEndCallback, isLooping?: boolean): void {
@@ -262,8 +284,13 @@ export function delay(time: number): ICompositeAnimation {
   });
 }
 
-export function stagger(time: number, animations: ICompositeAnimation[]): ICompositeAnimation {
-  return parallel(animations.map((animation, i) => sequence([delay(time * i), animation])));
+export function stagger(
+  time: number,
+  animations: ICompositeAnimation[],
+): ICompositeAnimation {
+  return parallel(
+    animations.map((animation, i) => sequence([delay(time * i), animation])),
+  );
 }
 
 export interface ILoopAnimationConfig {
@@ -293,7 +320,11 @@ export function loop(
         return;
       }
       const restart = (result: IEndResult = { finished: true }): void => {
-        if (isFinished || iterationsSoFar === iterations || result.finished === false) {
+        if (
+          isFinished ||
+          iterationsSoFar === iterations ||
+          result.finished === false
+        ) {
           callback?.(result);
         } else {
           iterationsSoFar++;

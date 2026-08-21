@@ -19,7 +19,9 @@ const fabric = installFabric();
 
 let capturedHost: ActivityIndicatorHost | undefined;
 
-function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findCommitted(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   const visit = (node: IFakeNode): IFakeNode | undefined => {
     if (predicate(node)) return node;
     for (const child of node.children) {
@@ -42,7 +44,9 @@ function findSpinner(): IFakeNode {
 }
 
 function findWrapper(): IFakeNode {
-  const node = findCommitted(n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none');
+  const node = findCommitted(
+    n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+  );
   if (!node) throw new Error('no ActivityIndicator wrapper was created');
   return node;
 }
@@ -90,7 +94,9 @@ describe('ActivityIndicator (no throwing path — see file header)', () => {
     mount(ROOT_TAG, ActivityIndicatorHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    expect(fabric.serialize(fabric.appRoot().children)).toBe('RCTView(ActivityIndicatorView)');
+    expect(fabric.serialize(fabric.appRoot().children)).toBe(
+      'RCTView(ActivityIndicatorView)',
+    );
 
     const spinner = findSpinner();
     expect(spinner.props.animating).toBe(false);

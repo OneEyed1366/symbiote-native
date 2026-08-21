@@ -7,7 +7,12 @@
 // independent of whether the template is ever instantiated).
 
 import { Directive, Input, type Type } from '@angular/core';
-import type { ISearchBarCommands, ISearchBarOptions, IScreenOptions, IRoute } from '../core';
+import type {
+  ISearchBarCommands,
+  ISearchBarOptions,
+  IScreenOptions,
+  IRoute,
+} from '../core';
 import type { INavigatorHandle } from '../core';
 
 // The imperative ref (focus/blur/clearText/setText/cancelSearch/toggleCancelButton) carries a
@@ -21,7 +26,10 @@ export type IAngularSearchBarOptions = ISearchBarOptions & {
   ref?: { current: ISearchBarCommands | null };
 };
 
-export type IAngularScreenOptions = Omit<IScreenOptions, 'headerSearchBarOptions'> & {
+export type IAngularScreenOptions = Omit<
+  IScreenOptions,
+  'headerSearchBarOptions'
+> & {
   headerSearchBarOptions?: IAngularSearchBarOptions;
 };
 
@@ -34,7 +42,9 @@ export type IScreenOptionsArgs = {
   navigation: INavigatorHandle;
 };
 
-export type IScreenOptionsResolver = (args: IScreenOptionsArgs) => IAngularScreenOptions;
+export type IScreenOptionsResolver = (
+  args: IScreenOptionsArgs,
+) => IAngularScreenOptions;
 
 @Directive({
   selector: 'ng-template[symbioteScreen]',

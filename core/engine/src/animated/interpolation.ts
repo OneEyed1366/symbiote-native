@@ -94,15 +94,21 @@ function findRange(input: number, inputRange: readonly number[]): number {
 }
 
 function checkValidInputRange(arr: readonly number[]): void {
-  if (arr.length < 2) throw new Error('inputRange must have at least 2 elements');
+  if (arr.length < 2)
+    throw new Error('inputRange must have at least 2 elements');
   for (let i = 1; i < arr.length; ++i) {
     if (!(arr[i] >= arr[i - 1])) {
-      throw new Error(`inputRange must be monotonically non-decreasing ${String(arr)}`);
+      throw new Error(
+        `inputRange must be monotonically non-decreasing ${String(arr)}`,
+      );
     }
   }
 }
 
-function checkInfiniteRange(name: string, arr: readonly number[] | readonly string[]): void {
+function checkInfiniteRange(
+  name: string,
+  arr: readonly number[] | readonly string[],
+): void {
   if (arr.length < 2) throw new Error(`${name} must have at least 2 elements`);
   if (arr.length === 2 && arr[0] === -Infinity && arr[1] === Infinity) {
     throw new Error(`${name} cannot be ]-infinity;+infinity[ ${String(arr)}`);
@@ -173,7 +179,9 @@ interface ITemplateComponents {
 // it can be rebuilt around the interpolated numbers. Ported from RN
 // AnimatedInterpolation.js:186 (mapStringToNumericComponents), with RN's packed-
 // int decode replaced by color.ts's RgbaValue (DRY: one RGBA parser).
-function mapStringToNumericComponents(input: string): IColorComponents | ITemplateComponents {
+function mapStringToNumericComponents(
+  input: string,
+): IColorComponents | ITemplateComponents {
   const color: IRgbaValue | undefined = normalizeColor(input);
   if (color !== undefined) {
     return { isColor: true, components: [color.r, color.g, color.b, color.a] };
@@ -191,7 +199,9 @@ function mapStringToNumericComponents(input: string): IColorComponents | ITempla
     lastMatchEnd = match.index + match[0].length;
   }
   if (components.length === 0) {
-    throw new Error('outputRange must contain color or value with numeric component');
+    throw new Error(
+      'outputRange must contain color or value with numeric component',
+    );
   }
   if (lastMatchEnd < input.length) {
     components.push(input.substring(lastMatchEnd));
@@ -223,17 +233,20 @@ function createStringInterpolation(
   }
   const firstLength = decomposed[0].components.length;
   if (!decomposed.every(output => output.components.length === firstLength)) {
-    throw new Error('All elements of output range should have the same number of components');
+    throw new Error(
+      'All elements of output range should have the same number of components',
+    );
   }
 
   // Per token position, the numeric values across all output strings, a number
   // output range the scalar path can interpolate. Colors are already all-numeric;
   // templates keep only the numeric tokens (the literal text is rejoined later).
-  const numericComponents: ReadonlyArray<ReadonlyArray<number>> = decomposed.map(output =>
-    output.isColor
-      ? output.components
-      : output.components.filter((c): c is number => typeof c === 'number'),
-  );
+  const numericComponents: ReadonlyArray<ReadonlyArray<number>> =
+    decomposed.map(output =>
+      output.isColor
+        ? output.components
+        : output.components.filter((c): c is number => typeof c === 'number'),
+    );
   const interpolations = numericComponents[0].map((_, tokenIndex) =>
     createNumericInterpolation({
       inputRange: config.inputRange,
@@ -252,7 +265,9 @@ function createStringInterpolation(
     return input => {
       const values = interpolations.map(interpolation => interpolation(input));
       let i = 0;
-      return template.map(c => (typeof c === 'number' ? values[i++] : c)).join('');
+      return template
+        .map(c => (typeof c === 'number' ? values[i++] : c))
+        .join('');
     };
   }
 
@@ -283,5 +298,8 @@ export function createInterpolation(
   if (isStringOutputRange(config.outputRange)) {
     return createStringInterpolation(config, config.outputRange);
   }
-  return createNumericInterpolation({ ...config, outputRange: config.outputRange });
+  return createNumericInterpolation({
+    ...config,
+    outputRange: config.outputRange,
+  });
 }

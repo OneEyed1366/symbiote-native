@@ -26,5 +26,9 @@ export default {
   // the `<style>` block away — see its header for why Svelte's own CSS output is unusable here.
   // `collapseTextWhitespace` runs last — it only touches Text node content, never the
   // style/attribute/class output the other two rewrite, so its position doesn't affect them.
-  preprocess: [forbidWebOnlyConstructs(), scopedStyles(), collapseTextWhitespace()],
+  preprocess: [
+    forbidWebOnlyConstructs(),
+    scopedStyles(),
+    collapseTextWhitespace(),
+  ],
 };

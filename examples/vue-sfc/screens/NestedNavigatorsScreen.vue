@@ -13,7 +13,15 @@ import NestedTabInfoScreen from './NestedTabInfoScreen.vue';
 
 <template>
   <Tab initial-route-name="NestedHome">
-    <TabScreen name="NestedHome" :component="NestedTabHomeScreen" :options="{ tabBarLabel: 'Home' }" />
-    <TabScreen name="NestedInfo" :component="NestedTabInfoScreen" :options="{ tabBarLabel: 'Info' }" />
+    <TabScreen
+      name="NestedHome"
+      :component="NestedTabHomeScreen"
+      :options="{ tabBarLabel: 'Home' }"
+    />
+    <TabScreen
+      name="NestedInfo"
+      :component="NestedTabInfoScreen"
+      :options="{ tabBarLabel: 'Info' }"
+    />
   </Tab>
 </template>

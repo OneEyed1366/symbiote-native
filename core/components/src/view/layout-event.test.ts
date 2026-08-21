@@ -23,17 +23,23 @@ function makeEvent(nativeEvent: Record<string, unknown>): ISymbioteEvent {
 
 describe('readLayoutField', () => {
   it('reads width out of a well-formed layout event', () => {
-    const event = makeEvent({ layout: { x: 0, y: 0, width: 320, height: 480 } });
+    const event = makeEvent({
+      layout: { x: 0, y: 0, width: 320, height: 480 },
+    });
     expect(readLayoutField(event, 'width')).toBe(320);
   });
 
   it('reads height out of a well-formed layout event', () => {
-    const event = makeEvent({ layout: { x: 0, y: 0, width: 320, height: 480 } });
+    const event = makeEvent({
+      layout: { x: 0, y: 0, width: 320, height: 480 },
+    });
     expect(readLayoutField(event, 'height')).toBe(480);
   });
 
   it('reads y out of a well-formed layout event', () => {
-    const event = makeEvent({ layout: { x: 0, y: 42, width: 320, height: 480 } });
+    const event = makeEvent({
+      layout: { x: 0, y: 42, width: 320, height: 480 },
+    });
     expect(readLayoutField(event, 'y')).toBe(42);
   });
 

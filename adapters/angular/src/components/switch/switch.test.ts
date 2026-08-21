@@ -15,7 +15,7 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -31,7 +31,11 @@ let capturedHost: SwitchHost | undefined;
   standalone: true,
   imports: [Switch],
   template: `
-    <Switch [value]="value" (valueChange)="onValueChange($event)" (change)="onChange($event)">
+    <Switch
+      [value]="value"
+      (valueChange)="onValueChange($event)"
+      (change)="onChange($event)"
+    >
     </Switch>
   `,
 })
@@ -83,7 +87,8 @@ class SwitchColorHost {}
 })
 class SwitchClassHost {}
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function switchNode(): ReturnType<typeof fabric.find> {
   return fabric.find(n => n.viewName === 'Switch');
@@ -132,7 +137,10 @@ describe('Switch', () => {
     const node = switchNode();
     expect(node).toBeDefined();
 
-    fabric.fireEvent(node?.instanceHandle, 'topChange', { value: true, eventCount: 1 });
+    fabric.fireEvent(node?.instanceHandle, 'topChange', {
+      value: true,
+      eventCount: 1,
+    });
     await tick();
 
     const host = capturedHost;
@@ -149,7 +157,9 @@ describe('Switch', () => {
     await tick();
 
     const node = switchNode();
-    fabric.fireEvent(node?.instanceHandle, 'topChange', { value: 'not-a-boolean' });
+    fabric.fireEvent(node?.instanceHandle, 'topChange', {
+      value: 'not-a-boolean',
+    });
     await tick();
 
     expect(capturedHost?.onValueChange).not.toHaveBeenCalled();
@@ -169,7 +179,10 @@ describe('Switch', () => {
     await tick();
 
     const setValue = fabric.commands.find(c => c.commandName === 'setValue');
-    expect(setValue, 'a setValue command after a rejected toggle').toBeDefined();
+    expect(
+      setValue,
+      'a setValue command after a rejected toggle',
+    ).toBeDefined();
     expect(setValue?.args[0]).toBe(false);
   });
 
@@ -187,7 +200,14 @@ describe('Switch', () => {
   // getter's resolved style — without it, a class= at the use site addClass-toggles the
   // non-painting anchor and never reaches the real committed <symbiote-switch> one level down.
   it('resolves a class= on the Switch use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ card: { backgroundColor: 'red' } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'red' },
+      },
+    ]);
 
     mount(ROOT_TAG, SwitchClassHost);
     await tick();

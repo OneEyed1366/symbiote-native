@@ -1,5 +1,9 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
-import { Dimensions, type IDimensionsSet, type IDisplayMetrics } from '@symbiote-native/engine';
+import {
+  Dimensions,
+  type IDimensionsSet,
+  type IDisplayMetrics,
+} from '@symbiote-native/engine';
 
 /**
  * Angular twin of React's `useWindowDimensions` and Vue's `useWindowDimensions` composable. The
@@ -28,9 +32,12 @@ export class WindowDimensionsService {
       }
     };
 
-    const subscription = Dimensions.addEventListener('change', (set: IDimensionsSet) => {
-      handleChange(set.window);
-    });
+    const subscription = Dimensions.addEventListener(
+      'change',
+      (set: IDimensionsSet) => {
+        handleChange(set.window);
+      },
+    );
     // Re-check once after subscribing to close the gap between construction and the listener.
     handleChange(Dimensions.get('window'));
 

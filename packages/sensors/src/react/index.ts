@@ -8,7 +8,11 @@ export type { IAccelerometerMeasurement } from '../core';
 export { useBarometer } from './hooks/use-barometer';
 export type { IBarometerMeasurement } from '../core';
 export { useDeviceMotion } from './hooks/use-device-motion';
-export { DeviceMotionOrientation, gravity, type IDeviceMotionMeasurement } from '../core';
+export {
+  DeviceMotionOrientation,
+  gravity,
+  type IDeviceMotionMeasurement,
+} from '../core';
 export { useGyroscope } from './hooks/use-gyroscope';
 export type { IGyroscopeMeasurement } from '../core';
 export { useLightSensor } from './hooks/use-light-sensor';

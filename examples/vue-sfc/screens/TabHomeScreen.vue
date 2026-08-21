@@ -13,17 +13,22 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TabsDemo];
   <SafeAreaView class="screen">
     <View class="section">
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: LINE_COLOR.structure }">
+        <View
+          class="hero-badge"
+          :style="{ backgroundColor: LINE_COLOR.structure }"
+        >
           <Text class="hero-badge-text">TB</Text>
         </View>
         <View class="hero-copy">
           <Text class="hero-title">Tabs</Text>
           <Text class="hero-body"
-            >A bottom-tabs navigator — icon, badge, and tint, each tab a real native
-            view.</Text
+            >A bottom-tabs navigator — icon, badge, and tint, each tab a real
+            native view.</Text
           >
         </View>
       </View>

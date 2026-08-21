@@ -7,7 +7,11 @@
 // that's not reachable here (only core's public API is), so an UnavailabilityError from
 // `addListener` is just swallowed by the trailing `.catch(() => {})` instead - same net effect.
 import { useEffect, useId } from 'react';
-import { activateKeepAwakeAsync, deactivateKeepAwake, type KeepAwakeOptions } from '../../../core';
+import {
+  activateKeepAwakeAsync,
+  deactivateKeepAwake,
+  type KeepAwakeOptions,
+} from '../../../core';
 import { createKeepAwakeListenerAttachment } from '../../../core/listener-attachment';
 
 export function useKeepAwake(tag?: string, options?: KeepAwakeOptions): void {
@@ -17,7 +21,10 @@ export function useKeepAwake(tag?: string, options?: KeepAwakeOptions): void {
   useEffect(() => {
     // Per effect run, not per hook call - a changed tag tears the old attachment down with the
     // rest of the cleanup and starts a fresh one.
-    const attachment = createKeepAwakeListenerAttachment(tagOrDefault, options?.listener);
+    const attachment = createKeepAwakeListenerAttachment(
+      tagOrDefault,
+      options?.listener,
+    );
 
     activateKeepAwakeAsync(tagOrDefault)
       .then(() => attachment.attach())

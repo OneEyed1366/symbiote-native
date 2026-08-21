@@ -29,9 +29,14 @@ vi.mock('expo-modules-core', () => ({
   },
 }));
 
-const { notificationAsync, impactAsync, selectionAsync, performAndroidHapticsAsync } =
-  await import('./haptics');
-const { NotificationFeedbackType, ImpactFeedbackStyle, AndroidHaptics } = await import('./types');
+const {
+  notificationAsync,
+  impactAsync,
+  selectionAsync,
+  performAndroidHapticsAsync,
+} = await import('./haptics');
+const { NotificationFeedbackType, ImpactFeedbackStyle, AndroidHaptics } =
+  await import('./types');
 
 afterEach(() => {
   fakePlatform.OS = 'ios';
@@ -79,12 +84,16 @@ describe('impactAsync', () => {
     // why: the documented default collision weight is Medium.
     it('defaults to Medium and delegates to the native module', async () => {
       await impactAsync();
-      expect(FAKE_NATIVE_HAPTICS.impactAsync).toHaveBeenCalledWith(ImpactFeedbackStyle.Medium);
+      expect(FAKE_NATIVE_HAPTICS.impactAsync).toHaveBeenCalledWith(
+        ImpactFeedbackStyle.Medium,
+      );
     });
 
     it('passes through an explicit style', async () => {
       await impactAsync(ImpactFeedbackStyle.Rigid);
-      expect(FAKE_NATIVE_HAPTICS.impactAsync).toHaveBeenCalledWith(ImpactFeedbackStyle.Rigid);
+      expect(FAKE_NATIVE_HAPTICS.impactAsync).toHaveBeenCalledWith(
+        ImpactFeedbackStyle.Rigid,
+      );
     });
   });
 
@@ -94,7 +103,9 @@ describe('impactAsync', () => {
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_HAPTICS.impactAsync = undefined;
 
-      await expect(impactAsync()).rejects.toThrow('impactAsync is not available on expo-haptics');
+      await expect(impactAsync()).rejects.toThrow(
+        'impactAsync is not available on expo-haptics',
+      );
 
       FAKE_NATIVE_HAPTICS.impactAsync = native;
     });
@@ -137,7 +148,9 @@ describe('performAndroidHapticsAsync', () => {
     it('delegates to the native module on Android', async () => {
       fakePlatform.OS = 'android';
       await performAndroidHapticsAsync(AndroidHaptics.Confirm);
-      expect(FAKE_NATIVE_HAPTICS.performHapticsAsync).toHaveBeenCalledWith(AndroidHaptics.Confirm);
+      expect(FAKE_NATIVE_HAPTICS.performHapticsAsync).toHaveBeenCalledWith(
+        AndroidHaptics.Confirm,
+      );
     });
   });
 
@@ -151,9 +164,9 @@ describe('performAndroidHapticsAsync', () => {
       // @ts-expect-error -- simulating a platform where the native module has no such method
       FAKE_NATIVE_HAPTICS.performHapticsAsync = undefined;
 
-      await expect(performAndroidHapticsAsync(AndroidHaptics.Confirm)).rejects.toThrow(
-        'performHapticsAsync is not available on expo-haptics',
-      );
+      await expect(
+        performAndroidHapticsAsync(AndroidHaptics.Confirm),
+      ).rejects.toThrow('performHapticsAsync is not available on expo-haptics');
 
       FAKE_NATIVE_HAPTICS.performHapticsAsync = native;
     });

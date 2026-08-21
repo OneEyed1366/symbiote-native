@@ -3,14 +3,23 @@
 // react/hooks/use-typed-navigation.test.tsx.
 
 import { defineComponent, h } from '@vue/runtime-core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource, Dimensions } from '@symbiote-native/vue';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+  Dimensions,
+} from '@symbiote-native/vue';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
 import { Tab } from '../tabs';
 import { Drawer } from '../drawer';
-import { useDrawerNavigation, useStackNavigation, useTabNavigation } from './index';
+import {
+  useDrawerNavigation,
+  useStackNavigation,
+  useTabNavigation,
+} from './index';
 
 const ROOT_TAG = 4613;
 const SCREEN_VIEW = 'RNSScreen';
@@ -24,7 +33,9 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
       topWillAppear: { registrationName: 'onWillAppear' },
       topWillDisappear: { registrationName: 'onWillDisappear' },
       topDismissed: { registrationName: 'onDismissed' },
-      topHeaderBackButtonClicked: { registrationName: 'onHeaderBackButtonClicked' },
+      topHeaderBackButtonClicked: {
+        registrationName: 'onHeaderBackButtonClicked',
+      },
     },
     validAttributes: {
       screenId: true,
@@ -36,7 +47,9 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
     },
   },
   [STACK_VIEW]: {
-    directEventTypes: { topFinishTransitioning: { registrationName: 'onFinishTransitioning' } },
+    directEventTypes: {
+      topFinishTransitioning: { registrationName: 'onFinishTransitioning' },
+    },
     validAttributes: {},
   },
 };
@@ -48,7 +61,8 @@ Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -63,6 +77,21 @@ function textScreen(label: string) {
 // per navigator kind. Each gets its own Positive (correct navigator -> concretely-typed handle, no
 // union-narrowing needed at the call site) and Negative (wrong navigator -> throws instead of
 // silently handing back a handle missing the methods the caller expects) pair.
+
+// `mount()` no longer lets a render error escape: adapters/vue/src/render.ts installs a default
+// `app.config.errorHandler` that routes it to the engine's shared reporter, so on a device the
+// error reaches the redbox instead of aborting the AppRegistry runnable mid-bring-up. The
+// contract these tests guard is unchanged — a mismatched navigator still fails loudly and names
+// the mismatch — only the channel moved, so the assertion follows it.
+function expectReportedError(mountApp: () => void, pattern: RegExp): void {
+  const reportError = vi.fn();
+  Object.assign(globalThis, { ErrorUtils: { reportError } });
+
+  mountApp();
+
+  expect(reportError).toHaveBeenCalled();
+  expect(String(reportError.mock.calls[0]?.[0])).toMatch(pattern);
+}
 
 describe('useStackNavigation', () => {
   describe('Positive', () => {
@@ -85,7 +114,10 @@ describe('useStackNavigation', () => {
           setup: () => () =>
             h(Stack, { initialRouteName: 'Home' }, () => [
               h(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-              h(Stack.Screen, { name: 'Details', component: textScreen('details') }),
+              h(Stack.Screen, {
+                name: 'Details',
+                component: textScreen('details'),
+              }),
             ]),
         }),
       );
@@ -107,18 +139,23 @@ describe('useStackNavigation', () => {
         };
       });
 
-      expect(() =>
-        mount(
-          ROOT_TAG,
-          defineComponent({
-            setup: () => () =>
-              h(Tab, { initialRouteName: 'Home' }, () => [
-                h(Tab.Screen, { name: 'Home', component: TrackedHomeTab }),
-                h(Tab.Screen, { name: 'Search', component: textScreen('search') }),
-              ]),
-          }),
-        ),
-      ).toThrow(/nearest navigator is not a Stack/);
+      expectReportedError(
+        () =>
+          mount(
+            ROOT_TAG,
+            defineComponent({
+              setup: () => () =>
+                h(Tab, { initialRouteName: 'Home' }, () => [
+                  h(Tab.Screen, { name: 'Home', component: TrackedHomeTab }),
+                  h(Tab.Screen, {
+                    name: 'Search',
+                    component: textScreen('search'),
+                  }),
+                ]),
+            }),
+          ),
+        /nearest navigator is not a Stack/,
+      );
     });
   });
 });
@@ -142,7 +179,10 @@ describe('useTabNavigation', () => {
           setup: () => () =>
             h(Tab, { initialRouteName: 'Home' }, () => [
               h(Tab.Screen, { name: 'Home', component: TrackedHomeTab }),
-              h(Tab.Screen, { name: 'Search', component: textScreen('search') }),
+              h(Tab.Screen, {
+                name: 'Search',
+                component: textScreen('search'),
+              }),
             ]),
         }),
       );
@@ -162,18 +202,26 @@ describe('useTabNavigation', () => {
         };
       });
 
-      expect(() =>
-        mount(
-          ROOT_TAG,
-          defineComponent({
-            setup: () => () =>
-              h(Stack, { initialRouteName: 'Home' }, () => [
-                h(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-                h(Stack.Screen, { name: 'Details', component: textScreen('details') }),
-              ]),
-          }),
-        ),
-      ).toThrow(/nearest navigator is not a Tab/);
+      expectReportedError(
+        () =>
+          mount(
+            ROOT_TAG,
+            defineComponent({
+              setup: () => () =>
+                h(Stack, { initialRouteName: 'Home' }, () => [
+                  h(Stack.Screen, {
+                    name: 'Home',
+                    component: TrackedHomeScreen,
+                  }),
+                  h(Stack.Screen, {
+                    name: 'Details',
+                    component: textScreen('details'),
+                  }),
+                ]),
+            }),
+          ),
+        /nearest navigator is not a Tab/,
+      );
     });
   });
 });
@@ -197,7 +245,10 @@ describe('useDrawerNavigation', () => {
           setup: () => () =>
             h(Drawer, { initialRouteName: 'Home' }, () => [
               h(Drawer.Screen, { name: 'Home', component: TrackedHomeScreen }),
-              h(Drawer.Screen, { name: 'Profile', component: textScreen('profile') }),
+              h(Drawer.Screen, {
+                name: 'Profile',
+                component: textScreen('profile'),
+              }),
             ]),
         }),
       );
@@ -217,18 +268,26 @@ describe('useDrawerNavigation', () => {
         };
       });
 
-      expect(() =>
-        mount(
-          ROOT_TAG,
-          defineComponent({
-            setup: () => () =>
-              h(Stack, { initialRouteName: 'Home' }, () => [
-                h(Stack.Screen, { name: 'Home', component: TrackedHomeScreen }),
-                h(Stack.Screen, { name: 'Details', component: textScreen('details') }),
-              ]),
-          }),
-        ),
-      ).toThrow(/nearest navigator is not a Drawer/);
+      expectReportedError(
+        () =>
+          mount(
+            ROOT_TAG,
+            defineComponent({
+              setup: () => () =>
+                h(Stack, { initialRouteName: 'Home' }, () => [
+                  h(Stack.Screen, {
+                    name: 'Home',
+                    component: TrackedHomeScreen,
+                  }),
+                  h(Stack.Screen, {
+                    name: 'Details',
+                    component: textScreen('details'),
+                  }),
+                ]),
+            }),
+          ),
+        /nearest navigator is not a Drawer/,
+      );
     });
   });
 });

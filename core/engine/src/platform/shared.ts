@@ -17,7 +17,8 @@ export const PLATFORM_CONSTANTS = 'PlatformConstants';
 // defaults. '' mirrors iOS "unknown OS version"; Android uses 0 for an unknown API level.
 export const UNKNOWN_VERSION = '';
 
-export type IPlatformOSType = 'ios' | 'android' | 'macos' | 'windows' | 'web' | 'native';
+export type IPlatformOSType =
+  'ios' | 'android' | 'macos' | 'windows' | 'web' | 'native';
 
 // RN's Platform.select spec: any subset of OS keys, optionally with `default`. Each
 // platform resolver consults only its own key, then `native`, then `default`.
@@ -61,9 +62,13 @@ export function createConstantsResolver<TConstants>(
   return () => {
     if (cached !== undefined) return cached;
 
-    const module = getNativeModule<{ getConstants(): TConstants }>(PLATFORM_CONSTANTS);
+    const module = getNativeModule<{ getConstants(): TConstants }>(
+      PLATFORM_CONSTANTS,
+    );
     if (module === null) {
-      dlog('Platform: PlatformConstants not resolvable via native bridge — using defaults');
+      dlog(
+        'Platform: PlatformConstants not resolvable via native bridge — using defaults',
+      );
       return undefined;
     }
 

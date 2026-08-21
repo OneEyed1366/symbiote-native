@@ -12,7 +12,11 @@
 import { defineComponent, h, ref, shallowRef } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { View, mount, unmount } from '@symbiote-native/vue';
-import { createElement, isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  createElement,
+  isSymbioteNode,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { findNodeHandle, type IHostInstance } from './index';
 
@@ -25,12 +29,16 @@ const GRAFTED_LABEL = 'grafted';
 const fabric = installFabric();
 
 // A macrotask boundary drains the engine's coalesced commit before the assert reads it.
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 // The renderer grafts the public-instance API onto every host node; a ref-held node therefore
 // carries the imperative methods. Narrowed by presence so the test calls them without a cast.
 function isHostInstance(el: unknown): el is IHostInstance {
-  return isSymbioteNode(el) && typeof Reflect.get(el, 'setNativeProps') === 'function';
+  return (
+    isSymbioteNode(el) &&
+    typeof Reflect.get(el, 'setNativeProps') === 'function'
+  );
 }
 
 function findCommitted(
@@ -65,7 +73,9 @@ describe('Vue findNodeHandle on the engine', () => {
       };
       mount(
         ROOT_TAG,
-        defineComponent({ setup: () => () => h(View, { nativeID: PROBE_ID, ref: setNode }) }),
+        defineComponent({
+          setup: () => () => h(View, { nativeID: PROBE_ID, ref: setNode }),
+        }),
       );
       await tick();
 
@@ -76,7 +86,8 @@ describe('Vue findNodeHandle on the engine', () => {
       // Find OUR view, not the synthetic flex root (also an RCTView), by its marker prop.
       const committed = fabric.find(n => n.props.nativeID === PROBE_ID);
       expect(committed, 'the probed RCTView was committed').toBeDefined();
-      if (committed === undefined) throw new Error('unreachable: probed RCTView missing');
+      if (committed === undefined)
+        throw new Error('unreachable: probed RCTView missing');
 
       // The engine node resolves to the committed reactTag...
       expect(findNodeHandle(node)).toBe(committed.tag);
@@ -104,13 +115,16 @@ describe('Vue findNodeHandle on the engine', () => {
       };
       mount(
         ROOT_TAG,
-        defineComponent({ setup: () => () => h(View, { nativeID: PROBE_ID, ref: setNode }) }),
+        defineComponent({
+          setup: () => () => h(View, { nativeID: PROBE_ID, ref: setNode }),
+        }),
       );
       await tick();
 
       const committed = fabric.find(n => n.props.nativeID === PROBE_ID);
       expect(committed, 'the probed RCTView was committed').toBeDefined();
-      if (committed === undefined) throw new Error('unreachable: probed RCTView missing');
+      if (committed === undefined)
+        throw new Error('unreachable: probed RCTView missing');
 
       expect(findNodeHandle(deepRef)).toBe(committed.tag);
     });
@@ -155,7 +169,9 @@ describe('Vue host ref exposes the engine public instance', () => {
     };
     mount(
       ROOT_TAG,
-      defineComponent({ setup: () => () => h(View, { nativeID: PROBE_ID, ref: setNode }) }),
+      defineComponent({
+        setup: () => () => h(View, { nativeID: PROBE_ID, ref: setNode }),
+      }),
     );
     await tick();
 
@@ -165,7 +181,9 @@ describe('Vue host ref exposes the engine public instance', () => {
 
     // The grafted imperative surface is present, exactly like React's getPublicInstance.
     expect(typeof node.measure, 'measure is grafted').toBe('function');
-    expect(typeof node.setNativeProps, 'setNativeProps is grafted').toBe('function');
+    expect(typeof node.setNativeProps, 'setNativeProps is grafted').toBe(
+      'function',
+    );
 
     // Driving setNativeProps through the ref re-commits the prop onto the committed view. The
     // engine clone carries the CHANGED props, so the grafted label identifies our view.
@@ -174,6 +192,9 @@ describe('Vue host ref exposes the engine public instance', () => {
       fabric.committed,
       n => n.props.accessibilityLabel === GRAFTED_LABEL,
     );
-    expect(committed, 'setNativeProps re-committed the prop onto the view').toBeDefined();
+    expect(
+      committed,
+      'setNativeProps re-committed the prop onto the view',
+    ).toBeDefined();
   });
 });

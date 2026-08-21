@@ -24,7 +24,10 @@
   // `<svelte:element>` is forbidden (svelte-adapter-dom-shim skill §4/§7 - its shim surface isn't
   // implemented), so the horizontal/vertical choice is two static branches sharing one
   // `{#snippet listBody()}`, not a dynamic tag.
-  import type { IVirtualizedListProps, IVirtualizedListHandle } from './virtualized-list-props';
+  import type {
+    IVirtualizedListProps,
+    IVirtualizedListHandle,
+  } from './virtualized-list-props';
 
   export type { IVirtualizedListProps, IVirtualizedListHandle };
 </script>
@@ -51,6 +54,7 @@
     listEffectSignature,
     nextStickyHeaderY,
     readLayoutLength,
+    readLayoutOffset,
     readLayoutNumber,
     readScrollOffset,
     reduceList,
@@ -85,7 +89,10 @@
     SCROLL_VIEW_STICKY_CONTEXT_KEY,
     type IScrollViewStickyContext,
   } from '../scroll-view/scroll-view-sticky-context';
-  import { pickAccessibilityProps, type IVirtualizedListProps as IProps } from './virtualized-list-props';
+  import {
+    pickAccessibilityProps,
+    type IVirtualizedListProps as IProps,
+  } from './virtualized-list-props';
   import { createAttachmentsSync } from '../../runes/attachments';
 
   let props: IProps<ItemT> = $props();
@@ -104,13 +111,17 @@
 
   // Offset we're imperatively driving native to before hostShim's engine node is live. Fresh
   // object identity each push so the commit path re-applies it even when the value repeats.
-  let commandedOffset = $state.raw<{ x: number; y: number } | undefined>(undefined);
+  let commandedOffset = $state.raw<{ x: number; y: number } | undefined>(
+    undefined,
+  );
   // Bumped on a render-relevant change so `metrics` re-runs - listState is a PLAIN object
   // (not $state), mutating it triggers nothing on its own.
   let version = $state(0);
   let separatorVersion = $state(0);
 
-  const scrollHandle: IScrollViewHandle = buildScrollViewHandle(() => hostShim?.engineNode ?? null);
+  const scrollHandle: IScrollViewHandle = buildScrollViewHandle(
+    () => hostShim?.engineNode ?? null,
+  );
 
   // The one folded state cell — the Svelte twin of Vue's plain listState / React's stateRef.
   const listState: IListState<ItemT> = createInitialListState<ItemT>();
@@ -147,9 +158,11 @@
       horizontal: props.horizontal === true,
       inverted: props.inverted === true,
       onEndReached: props.onEndReached,
-      onEndReachedThreshold: props.onEndReachedThreshold ?? DEFAULT_END_REACHED_THRESHOLD,
+      onEndReachedThreshold:
+        props.onEndReachedThreshold ?? DEFAULT_END_REACHED_THRESHOLD,
       onStartReached: props.onStartReached,
-      onStartReachedThreshold: props.onStartReachedThreshold ?? DEFAULT_START_REACHED_THRESHOLD,
+      onStartReachedThreshold:
+        props.onStartReachedThreshold ?? DEFAULT_START_REACHED_THRESHOLD,
       onRefresh: props.onRefresh,
       refreshing: props.refreshing,
       progressViewOffset: props.progressViewOffset,
@@ -157,9 +170,11 @@
       viewabilityConfig: props.viewabilityConfig,
       viewabilityConfigCallbackPairs: props.viewabilityConfigCallbackPairs,
       onScrollToIndexFailed: props.onScrollToIndexFailed,
-      initialNumToRender: props.initialNumToRender ?? DEFAULT_INITIAL_NUM_TO_RENDER,
+      initialNumToRender:
+        props.initialNumToRender ?? DEFAULT_INITIAL_NUM_TO_RENDER,
       initialScrollIndex: props.initialScrollIndex,
-      maxToRenderPerBatch: props.maxToRenderPerBatch ?? DEFAULT_MAX_TO_RENDER_PER_BATCH,
+      maxToRenderPerBatch:
+        props.maxToRenderPerBatch ?? DEFAULT_MAX_TO_RENDER_PER_BATCH,
       updateCellsBatchingPeriod:
         props.updateCellsBatchingPeriod ?? DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
       windowSize: props.windowSize ?? DEFAULT_WINDOW_SIZE,
@@ -207,7 +222,11 @@
   }
 
   function keyFor(index: number): string {
-    return resolveItemKey(narrowed.getItem(narrowed.data, index), index, narrowed.keyExtractor);
+    return resolveItemKey(
+      narrowed.getItem(narrowed.data, index),
+      index,
+      narrowed.keyExtractor,
+    );
   }
 
   function scrollToPixel(offset: number, animated: boolean): void {
@@ -221,11 +240,16 @@
       return;
     }
     commandedOffset = undefined;
-    dlog(`VirtualizedList scrollTo offset=${clamped} animated=${animated} (horizontal=${narrowed.horizontal})`);
+    dlog(
+      `VirtualizedList scrollTo offset=${clamped} animated=${animated} (horizontal=${narrowed.horizontal})`,
+    );
     scrollHandle.scrollTo({ x: target.x, y: target.y, animated });
   }
 
-  function runEffects(effects: IListEffect<ItemT>[], inputs: IListReducerInputs<ItemT>): void {
+  function runEffects(
+    effects: IListEffect<ItemT>[],
+    inputs: IListReducerInputs<ItemT>,
+  ): void {
     const p = narrowed;
     for (const effect of effects) {
       switch (effect.kind) {
@@ -300,14 +324,17 @@
   });
 
   const hasStickyHeaders = $derived(
-    narrowed.stickyHeaderIndices !== undefined && narrowed.stickyHeaderIndices.length > 0,
+    narrowed.stickyHeaderIndices !== undefined &&
+      narrowed.stickyHeaderIndices.length > 0,
   );
   // Resolved dynamically, exactly like React (adapters/react/.../scroll-view/shared.ts:267). Do
   // not hardcode this false to keep the JS listener alive - RN gates native the same way
   // (AnimatedWithChildren.js:74 `if (!this.__isNative)`) and the pin is the native transform, not
   // the listener, so forcing JS mode only trades away the native driver: header lag on iOS,
   // outright failure on Android (commit debounce 15ms vs iOS's 64ms - render-scroll-sticky.ts).
-  const nativeStickyAvailable = $derived(hasStickyHeaders && isNativeAnimatedAvailable());
+  const nativeStickyAvailable = $derived(
+    hasStickyHeaders && isNativeAnimatedAvailable(),
+  );
   // RN's FlatList/SectionList expose no invertStickyHeaders of their own (only ScrollView does) -
   // sticky headers always pin to the top here, matching RN.
   const forwarding = $derived(
@@ -332,12 +359,16 @@
   // keeps headers pinned via onScroll.
   $effect(() => {
     if (!nativeStickyAvailable) {
-      dlog('VirtualizedList sticky attachStickyScroll skipped: nativeStickyAvailable=false');
+      dlog(
+        'VirtualizedList sticky attachStickyScroll skipped: nativeStickyAvailable=false',
+      );
       return;
     }
     const node = hostShim?.engineNode;
     if (node === undefined) {
-      dlog('VirtualizedList sticky attachStickyScroll skipped: engineNode not ready yet');
+      dlog(
+        'VirtualizedList sticky attachStickyScroll skipped: engineNode not ready yet',
+      );
       return;
     }
     dlog('VirtualizedList sticky attachStickyScroll attached');
@@ -359,7 +390,10 @@
     if (forwarding.mode !== 'sticky-js') return handleScroll;
     return animatedEvent(
       [{ nativeEvent: { contentOffset: { y: scrollAnimatedValue } } }],
-      { listener: (...args: unknown[]) => forwardScrollEvent(handleScroll, args) },
+      {
+        listener: (...args: unknown[]) =>
+          forwardScrollEvent(handleScroll, args),
+      },
     );
   });
 
@@ -416,14 +450,23 @@
     return (event: ISymbioteEvent): void => {
       const length = readLayoutLength(event, narrowed.horizontal);
       if (length === undefined) return;
-      dlog(`VirtualizedList cell ${index} measured length=${length}`);
-      dispatch({ kind: 'measure', index, length });
+      const offset = readLayoutOffset(event, narrowed.horizontal);
+      dlog(
+        `VirtualizedList cell ${index} measured length=${length} offset=${offset ?? 'none'}`,
+      );
+      dispatch({ kind: 'measure', index, length, offset });
     };
   }
 
-  function mergeSeparator(gapIndex: number, patch: Partial<ISeparatorProps<ItemT>>): void {
+  function mergeSeparator(
+    gapIndex: number,
+    patch: Partial<ISeparatorProps<ItemT>>,
+  ): void {
     if (!isSeparatorGapInRange(gapIndex, listState.metrics.count)) return;
-    separatorOverrides.set(gapIndex, { ...separatorOverrides.get(gapIndex), ...patch });
+    separatorOverrides.set(gapIndex, {
+      ...separatorOverrides.get(gapIndex),
+      ...patch,
+    });
     separatorVersion += 1;
   }
 
@@ -439,7 +482,10 @@
         mergeSeparator(index - 1, { highlighted: false });
         mergeSeparator(index, { highlighted: false });
       },
-      updateProps: (select: 'leading' | 'trailing', newProps: Record<string, unknown>): void => {
+      updateProps: (
+        select: 'leading' | 'trailing',
+        newProps: Record<string, unknown>,
+      ): void => {
         mergeSeparator(select === 'leading' ? index - 1 : index, newProps);
       },
     };
@@ -448,8 +494,15 @@
   // ---- imperative handle: component instance exports, the Svelte twin of Vue's expose() /
   // React's useImperativeHandle. A parent does `<VirtualizedList bind:this={ref} .../>` and calls
   // `ref.scrollToIndex(...)`. ----
-  export function scrollToOffset(params: { offset: number; animated?: boolean }): void {
-    dispatch({ kind: 'scroll-to-offset', offset: params.offset, animated: params.animated ?? true });
+  export function scrollToOffset(params: {
+    offset: number;
+    animated?: boolean;
+  }): void {
+    dispatch({
+      kind: 'scroll-to-offset',
+      offset: params.offset,
+      animated: params.animated ?? true,
+    });
   }
   export function scrollToIndex(params: {
     index: number;
@@ -520,11 +573,16 @@
     };
   });
 
-  const scrollViewIntrinsics = $derived(selectScrollIntrinsics(narrowed.horizontal, narrowed.contentContainerStyle));
+  const scrollViewIntrinsics = $derived(
+    selectScrollIntrinsics(narrowed.horizontal, narrowed.contentContainerStyle),
+  );
 
   const resolvedStyle = $derived(
     narrowed.inverted
-      ? [narrowed.style, narrowed.horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE]
+      ? [
+          narrowed.style,
+          narrowed.horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE,
+        ]
       : narrowed.style,
   );
   const resolvedContentContainerStyle = $derived(
@@ -545,7 +603,10 @@
 
   const outerBag = $derived.by(() => {
     const bag: Record<string, unknown> = {
-      style: [scrollViewIntrinsics.scrollViewBaseStyle, layoutSplit !== undefined ? layoutSplit.inner : resolvedStyle],
+      style: [
+        scrollViewIntrinsics.scrollViewBaseStyle,
+        layoutSplit !== undefined ? layoutSplit.inner : resolvedStyle,
+      ],
       horizontal: narrowed.horizontal,
       // RN defaults nested scrolling ON (ScrollView.js `nestedScrollEnabled ?? true`). This file
       // hand-rolls the raw scroll intrinsic instead of rendering <ScrollView>, so it never
@@ -560,18 +621,26 @@
     // forwarding.scrollEventThrottle (not the raw prop): folds in the sticky-mode default
     // (1 native / 16 JS-fallback) when unset - without it a sticky header rebuilt off too-sparse
     // scroll events pins/collides late.
-    if (forwarding.scrollEventThrottle !== undefined) bag.scrollEventThrottle = forwarding.scrollEventThrottle;
-    if (narrowed.onScrollBeginDrag !== undefined) bag.onScrollBeginDrag = narrowed.onScrollBeginDrag;
-    if (narrowed.onScrollEndDrag !== undefined) bag.onScrollEndDrag = narrowed.onScrollEndDrag;
-    if (narrowed.onMomentumScrollBegin !== undefined) bag.onMomentumScrollBegin = narrowed.onMomentumScrollBegin;
-    if (narrowed.onMomentumScrollEnd !== undefined) bag.onMomentumScrollEnd = narrowed.onMomentumScrollEnd;
+    if (forwarding.scrollEventThrottle !== undefined)
+      bag.scrollEventThrottle = forwarding.scrollEventThrottle;
+    if (narrowed.onScrollBeginDrag !== undefined)
+      bag.onScrollBeginDrag = narrowed.onScrollBeginDrag;
+    if (narrowed.onScrollEndDrag !== undefined)
+      bag.onScrollEndDrag = narrowed.onScrollEndDrag;
+    if (narrowed.onMomentumScrollBegin !== undefined)
+      bag.onMomentumScrollBegin = narrowed.onMomentumScrollBegin;
+    if (narrowed.onMomentumScrollEnd !== undefined)
+      bag.onMomentumScrollEnd = narrowed.onMomentumScrollEnd;
     if (narrowed.keyboardShouldPersistTaps !== undefined) {
       bag.keyboardShouldPersistTaps = narrowed.keyboardShouldPersistTaps;
     }
-    if (narrowed.keyboardDismissMode !== undefined) bag.keyboardDismissMode = narrowed.keyboardDismissMode;
-    if (narrowed.stickyHeaderIndices !== undefined) bag.stickyHeaderIndices = narrowed.stickyHeaderIndices;
+    if (narrowed.keyboardDismissMode !== undefined)
+      bag.keyboardDismissMode = narrowed.keyboardDismissMode;
+    if (narrowed.stickyHeaderIndices !== undefined)
+      bag.stickyHeaderIndices = narrowed.stickyHeaderIndices;
     if (narrowed.maintainVisibleContentPosition !== undefined) {
-      bag.maintainVisibleContentPosition = narrowed.maintainVisibleContentPosition;
+      bag.maintainVisibleContentPosition =
+        narrowed.maintainVisibleContentPosition;
     }
     // Object.assign merges a bag already built field-by-field (pickAccessibilityProps), not a raw
     // spread of `props`, so this stays inside the object-bag convention (svelte-adapter-dom-shim
@@ -597,10 +666,15 @@
     PLATFORM.refreshControlMode === 'wrap' && refreshControlProps !== undefined,
   );
 
-  const contentBag = $derived({ style: resolvedContentContainerStyle, collapsable: false });
+  const contentBag = $derived({
+    style: resolvedContentContainerStyle,
+    collapsable: false,
+  });
 
   const stickySet = $derived(
-    narrowed.stickyHeaderIndices !== undefined ? new Set(narrowed.stickyHeaderIndices) : undefined,
+    narrowed.stickyHeaderIndices !== undefined
+      ? new Set(narrowed.stickyHeaderIndices)
+      : undefined,
   );
   $effect(() => {
     dlog(
@@ -624,7 +698,6 @@
       keyFor,
       stickyIndices: stickySet,
       hasHeader,
-      hasSeparators: props.separator !== undefined,
     });
   });
   // forcedStickyCell prepended to the window cells so BOTH walk through the SAME keyed {#each}.
@@ -638,7 +711,11 @@
       : (plan?.cells ?? []),
   );
   const cellInvertedStyle = $derived(
-    narrowed.inverted ? (narrowed.horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE) : undefined,
+    narrowed.inverted
+      ? narrowed.horizontal
+        ? INVERTED_X_STYLE
+        : INVERTED_Y_STYLE
+      : undefined,
   );
 
   // Reads separatorVersion so a .highlight()/.unhighlight()/.updateProps() call (ISeparators, above)
@@ -656,47 +733,133 @@
   }
 </script>
 
-{#snippet listBody()}<!--
-  No whitespace between sibling {#if} blocks below, or between each-block siblings, or around the
-  spacers. Svelte only trims LEADING/TRAILING whitespace of a fragment; whitespace BETWEEN two
-  sibling non-text nodes collapses to a text node and is kept (Svelte compiler utils.js
-  clean_nodes, verified against 5.56.8), which would land as a stray RCTRawText child of this
-  scroll content - invalid on real Fabric for a non-Text view (dom-shim/text.ts). Caught by
-  virtualized-list.smoke.test.ts asserting an exact windowed child count; keep it exact this way
-  if you touch this block.
--->{#if hasHeader}<symbiote-view p={{}}>{@render props.header?.()}</symbiote-view>{/if}{#if metrics.count === FIRST_INDEX}{#if props.empty}<symbiote-view p={{}}>{@render props.empty()}</symbiote-view>{/if}{:else if plan}{#if plan.leadingExtent > EMPTY_OFFSET}<symbiote-view
-        p={{ style: narrowed.horizontal ? { width: plan.leadingExtent } : { height: plan.leadingExtent } }}
-      ></symbiote-view>{/if}{#each allCells as cell (cell.key)}{#if stickySet?.has(cell.index)}<ScrollViewStickyHeader onLayout={stickyLayoutFor(cell.index)} nextHeaderLayoutY={nextStickyHeaderYFor(cell.index)}>{@render props.item({
-          item: narrowed.getItem(narrowed.data, cell.index),
-          index: cell.index,
-          separators: makeSeparators(cell.index),
-        })}</ScrollViewStickyHeader>{:else}<symbiote-view p={{ onLayout: makeCellMeasure(cell.index), style: cellInvertedStyle }}>{@render props.item({
-          item: narrowed.getItem(narrowed.data, cell.index),
-          index: cell.index,
-          separators: makeSeparators(cell.index),
-        })}</symbiote-view>{/if}{#if plan.forcedStickyCell && cell.index === plan.forcedStickyCell.index && plan.gapExtent > EMPTY_OFFSET}<symbiote-view
-        p={{ style: narrowed.horizontal ? { width: plan.gapExtent } : { height: plan.gapExtent } }}
-      ></symbiote-view>{/if}{#if props.separator && cell.index < metrics.last && cell.index !== plan.forcedStickyCell?.index}<symbiote-view p={{}}>{@render props.separator(separatorPropsFor(cell.index))}</symbiote-view>{/if}{/each}{#if plan.trailingExtent > EMPTY_OFFSET}<symbiote-view
-        p={{ style: narrowed.horizontal ? { width: plan.trailingExtent } : { height: plan.trailingExtent } }}
-      ></symbiote-view>{/if}{/if}{#if props.footer}<symbiote-view p={{}}>{@render props.footer()}</symbiote-view>{/if}
+{#snippet listBody()}
+  <!--
+  Svelte keeps the whitespace between the sibling blocks below as ' ' text nodes; the shim drops
+  each one because this scroll content takes no raw text (dom-shim/text.ts, §16b). That is what
+  lets virtualized-list.smoke.test.ts still assert an exact windowed child count.
+-->
+  {#if hasHeader}
+    <symbiote-view p={{}}>
+      {@render props.header?.()}
+    </symbiote-view>
+  {/if}
+  {#if metrics.count === FIRST_INDEX}
+    {#if props.empty}
+      <symbiote-view p={{}}>
+        {@render props.empty()}
+      </symbiote-view>
+    {/if}
+  {:else if plan}
+    {#if plan.leadingExtent > EMPTY_OFFSET}
+      <symbiote-view
+        p={{
+          style: narrowed.horizontal
+            ? { width: plan.leadingExtent }
+            : { height: plan.leadingExtent },
+        }}
+      />
+    {/if}
+    {#each allCells as cell (cell.key)}
+      {#if stickySet?.has(cell.index)}
+        <ScrollViewStickyHeader
+          onLayout={stickyLayoutFor(cell.index)}
+          nextHeaderLayoutY={nextStickyHeaderYFor(cell.index)}
+        >
+          {@render props.item({
+            item: narrowed.getItem(narrowed.data, cell.index),
+            index: cell.index,
+            separators: makeSeparators(cell.index),
+          })}
+          {#if props.separator && cell.index < metrics.count - 1}
+            <symbiote-view p={{}}>
+              {@render props.separator(separatorPropsFor(cell.index))}
+            </symbiote-view>
+          {/if}
+        </ScrollViewStickyHeader>
+      {:else}
+        <symbiote-view
+          p={{
+            onLayout: makeCellMeasure(cell.index),
+            style: cellInvertedStyle,
+          }}
+        >
+          {@render props.item({
+            item: narrowed.getItem(narrowed.data, cell.index),
+            index: cell.index,
+            separators: makeSeparators(cell.index),
+          })}
+          {#if props.separator && cell.index < metrics.count - 1}
+            <symbiote-view p={{}}>
+              {@render props.separator(separatorPropsFor(cell.index))}
+            </symbiote-view>
+          {/if}
+        </symbiote-view>
+      {/if}
+      {#if plan.forcedStickyCell && cell.index === plan.forcedStickyCell.index && plan.gapExtent > EMPTY_OFFSET}
+        <symbiote-view
+          p={{
+            style: narrowed.horizontal
+              ? { width: plan.gapExtent }
+              : { height: plan.gapExtent },
+          }}
+        />
+      {/if}
+    {/each}
+    {#if plan.trailingExtent > EMPTY_OFFSET}
+      <symbiote-view
+        p={{
+          style: narrowed.horizontal
+            ? { width: plan.trailingExtent }
+            : { height: plan.trailingExtent },
+        }}
+      />
+    {/if}
+  {/if}
+  {#if props.footer}
+    <symbiote-view p={{}}>
+      {@render props.footer()}
+    </symbiote-view>
+  {/if}
 {/snippet}
 
-{#snippet scrollBody()}<!--
-  Same no-whitespace-between-siblings rule as listBody() above: the optional sibling
-  RefreshControl and the content container are two siblings of one parent when RefreshControl is
-  NOT wrapping (iOS), so they must sit edge-to-edge with zero characters between them.
--->{#if !shouldWrapRefreshControl && refreshControlProps !== undefined}<RefreshControl {...refreshControlProps} />{/if}{#if narrowed.horizontal}<symbiote-horizontal-scroll-content p={contentBag}>{@render listBody()}</symbiote-horizontal-scroll-content>{:else}<symbiote-scroll-content p={contentBag}>{@render listBody()}</symbiote-scroll-content>{/if}{/snippet}
+{#snippet scrollBody()}
+  <!--
+  Same as listBody() above: on iOS the non-wrapping RefreshControl and the content container are
+  siblings of one parent, and the gap between them is dropped before it reaches Fabric.
+-->
+  {#if !shouldWrapRefreshControl && refreshControlProps !== undefined}
+    <RefreshControl {...refreshControlProps} />
+  {/if}
+  {#if narrowed.horizontal}
+    <symbiote-horizontal-scroll-content p={contentBag}>
+      {@render listBody()}
+    </symbiote-horizontal-scroll-content>
+  {:else}
+    <symbiote-scroll-content p={contentBag}>
+      {@render listBody()}
+    </symbiote-scroll-content>
+  {/if}
+{/snippet}
 
 {#if shouldWrapRefreshControl && refreshControlProps !== undefined}
   <RefreshControl {...refreshControlProps} style={layoutSplit?.outer}>
     {#if narrowed.horizontal}
-      <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-horizontal-scroll-view>
+      <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>
+        {@render scrollBody()}
+      </symbiote-horizontal-scroll-view>
     {:else}
-      <symbiote-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-scroll-view>
+      <symbiote-scroll-view p={outerBag} bind:this={hostShim}>
+        {@render scrollBody()}
+      </symbiote-scroll-view>
     {/if}
   </RefreshControl>
 {:else if narrowed.horizontal}
-  <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-horizontal-scroll-view>
+  <symbiote-horizontal-scroll-view p={outerBag} bind:this={hostShim}>
+    {@render scrollBody()}
+  </symbiote-horizontal-scroll-view>
 {:else}
-  <symbiote-scroll-view p={outerBag} bind:this={hostShim}>{@render scrollBody()}</symbiote-scroll-view>
+  <symbiote-scroll-view p={outerBag} bind:this={hostShim}>
+    {@render scrollBody()}
+  </symbiote-scroll-view>
 {/if}

@@ -11,7 +11,8 @@ encrypted key/value storage in the iOS Keychain and the Android Keystore, option
 the device's own biometrics — so every SymbioteNative adapter can reach it, not just React. Like
 [store review](/docs/packages/store-review/) and [local auth](/docs/packages/local-auth/), every
 export is a free function with no per-instance state, so there is no hook/composable/service to
-wrap — the React, Vue, and Angular entry points are plain re-exports of the same `core`.
+wrap — the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same
+`core`.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -19,11 +20,12 @@ wrap — the React, Vue, and Angular entry points are plain re-exports of the sa
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -36,12 +38,14 @@ versions — never install either yourself, and never add the `expo` meta-packag
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-secure-store`'s native code is discovered by `expo-modules-autolinking`, a different
-  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
-  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
-  installs the `expo` meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every other `expo-modules-core` package with zero further native changes.
+  `expo-secure-store`'s native code is discovered by `expo-modules-autolinking`,
+  a different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every other `expo-modules-core` package with zero further
+  native changes.
 </Aside>
 
 The package's `native-link.json` also asks `symbiote-expo-link` for a
@@ -52,22 +56,24 @@ install; neither overwrites a value your app already set.
 <Aside type="caution" title="Android Auto Backup has to exclude the store">
   `symbiote-expo-link` sets two attributes on your app's `<application>` element:
 
-  ```xml
-  android:fullBackupContent="@xml/secure_store_backup_rules"
-  android:dataExtractionRules="@xml/secure_store_data_extraction_rules"
-  ```
+```xml
+android:fullBackupContent="@xml/secure_store_backup_rules"
+android:dataExtractionRules="@xml/secure_store_data_extraction_rules"
+```
 
-  The rule files themselves ship inside `expo-secure-store` and merge in automatically. They
-  matter: Auto Backup would otherwise upload the encrypted entries while leaving the Keystore keys
-  that decrypt them behind, so a restore onto a new device hands your app values it can no longer
-  read. If your app already sets either attribute, yours is kept and the install prints a notice —
-  merge the rules by hand in that case.
+The rule files themselves ship inside `expo-secure-store` and merge in automatically. They
+matter: Auto Backup would otherwise upload the encrypted entries while leaving the Keystore keys
+that decrypt them behind, so a restore onto a new device hands your app values it can no longer
+read. If your app already sets either attribute, yours is kept and the install prints a notice —
+merge the rules by hand in that case.
+
 </Aside>
 
 ## Usage
 
-All four adapters re-export the exact same functions; there is no per-adapter
-hook/composable/service to reach for, since nothing here holds live state or a subscription.
+All five adapters (React, Vue, Angular, Svelte, Solid) re-export the exact same functions; there's
+no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+subscription.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
@@ -89,6 +95,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -125,6 +132,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
       </View>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -163,6 +171,7 @@ hook/composable/service to reach for, since nothing here holds live state or a s
 
     There's no per-instance service to `inject()` here — every function is a plain export off the
     core package, called straight from a template event binding.
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -195,6 +204,31 @@ hook/composable/service to reach for, since nothing here holds live state or a s
 
     There's no per-instance rune to reach for here either — every function is a plain export off
     the core package, called straight from `onPress`.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { Button, Text, View } from '@symbiote-native/solid';
+    import { deleteItemAsync, getItemAsync, setItemAsync } from '@symbiote-native/secure-store/solid';
+
+    export function SessionToken() {
+      const [token, setToken] = createSignal<string | null>(null);
+
+      return (
+        <View>
+          <Text>{token() ?? 'no token stored'}</Text>
+          <Button title="Save" onPress={() => setItemAsync('session-token', 'abc123')} />
+          <Button title="Read" onPress={() => getItemAsync('session-token').then(setToken)} />
+          <Button title="Forget" onPress={() => deleteItemAsync('session-token').then(() => setToken(null))} />
+        </View>
+      );
+    }
+    ```
+
+    There's no per-instance primitive to reach for here either: every function is a plain export
+    off the core package, called straight from `onPress`.
+
   </TabItem>
 </Tabs>
 
@@ -224,43 +258,43 @@ enforce it at all, so this option can only be verified on a real device.
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `isAvailableAsync(): Promise<boolean>` | Whether the SecureStore API is usable on this device. Resolves `true` on Android and iOS. Says nothing about app permissions |
-| `getItemAsync(key, options?): Promise<string \| null>` | Reads the stored value. `null` when there is no entry for the key, or when the key has been invalidated |
-| `getItem(key, options?): string \| null` | Same read, synchronously. Blocks the JavaScript thread |
-| `setItemAsync(key, value, options?): Promise<void>` | Stores a key–value pair. Rejects if the value cannot be stored |
-| `setItem(key, value, options?): void` | Same write, synchronously. Blocks the JavaScript thread |
-| `deleteItemAsync(key, options?): Promise<void>` | Deletes the value stored under `key` |
-| `canUseBiometricAuthentication(): boolean` | Whether a value can be stored with `requireAuthentication` — `true` when the device supports biometrics and the enrolled method is strong enough |
+| Signature                                              | Description                                                                                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `isAvailableAsync(): Promise<boolean>`                 | Whether the SecureStore API is usable on this device. Resolves `true` on Android and iOS. Says nothing about app permissions                     |
+| `getItemAsync(key, options?): Promise<string \| null>` | Reads the stored value. `null` when there is no entry for the key, or when the key has been invalidated                                          |
+| `getItem(key, options?): string \| null`               | Same read, synchronously. Blocks the JavaScript thread                                                                                           |
+| `setItemAsync(key, value, options?): Promise<void>`    | Stores a key–value pair. Rejects if the value cannot be stored                                                                                   |
+| `setItem(key, value, options?): void`                  | Same write, synchronously. Blocks the JavaScript thread                                                                                          |
+| `deleteItemAsync(key, options?): Promise<void>`        | Deletes the value stored under `key`                                                                                                             |
+| `canUseBiometricAuthentication(): boolean`             | Whether a value can be stored with `requireAuthentication` — `true` when the device supports biometrics and the enrolled method is strong enough |
 
 Keys may contain alphanumeric characters, `.`, `-` and `_`, and must be non-empty. Anything else
 throws before the native call is made.
 
 ### `ISecureStoreOptions`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `keychainService` | `string \| undefined` | Android: the key pair's `Alias`. iOS: the item's `kSecAttrService`. An item stored with one needs the same one to be read back |
-| `requireAuthentication` | `boolean \| undefined` | Require the device's own authentication to reach the value |
-| `authenticationPrompt` | `string \| undefined` | Message shown in the prompt raised by `requireAuthentication` |
-| `keychainAccessible` | `IKeychainAccessibilityConstant \| undefined` | When the entry is accessible, via iOS's `kSecAttrAccessible`. iOS only. Defaults to `WHEN_UNLOCKED` |
-| `accessGroup` | `string \| undefined` | The keychain access group the entry belongs to. iOS only |
+| Field                   | Type                                          | Description                                                                                                                    |
+| ----------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `keychainService`       | `string \| undefined`                         | Android: the key pair's `Alias`. iOS: the item's `kSecAttrService`. An item stored with one needs the same one to be read back |
+| `requireAuthentication` | `boolean \| undefined`                        | Require the device's own authentication to reach the value                                                                     |
+| `authenticationPrompt`  | `string \| undefined`                         | Message shown in the prompt raised by `requireAuthentication`                                                                  |
+| `keychainAccessible`    | `IKeychainAccessibilityConstant \| undefined` | When the entry is accessible, via iOS's `kSecAttrAccessible`. iOS only. Defaults to `WHEN_UNLOCKED`                            |
+| `accessGroup`           | `string \| undefined`                         | The keychain access group the entry belongs to. iOS only                                                                       |
 
 ### Accessibility constants
 
 Values for `options.keychainAccessible`, exported from the package root. iOS only — Android's
 native module declares none of them, so they read `undefined` there.
 
-| Constant | Meaning |
-| --- | --- |
-| `WHEN_UNLOCKED` | Readable only while the device is unlocked. The default |
-| `WHEN_UNLOCKED_THIS_DEVICE_ONLY` | Same, and never migrated to a new device by a backup |
-| `AFTER_FIRST_UNLOCK` | Readable after the device has been unlocked once since boot — including while locked afterwards |
-| `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` | Same, and never migrated to a new device by a backup |
-| `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY` | Requires a passcode to store at all; removing the passcode deletes the entry |
-| `ALWAYS` | Readable regardless of lock state. Deprecated upstream — least secure |
-| `ALWAYS_THIS_DEVICE_ONLY` | Same, never migrated by a backup. Deprecated upstream |
+| Constant                              | Meaning                                                                                         |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `WHEN_UNLOCKED`                       | Readable only while the device is unlocked. The default                                         |
+| `WHEN_UNLOCKED_THIS_DEVICE_ONLY`      | Same, and never migrated to a new device by a backup                                            |
+| `AFTER_FIRST_UNLOCK`                  | Readable after the device has been unlocked once since boot — including while locked afterwards |
+| `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` | Same, and never migrated to a new device by a backup                                            |
+| `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`  | Requires a passcode to store at all; removing the passcode deletes the entry                    |
+| `ALWAYS`                              | Readable regardless of lock state. Deprecated upstream — least secure                           |
+| `ALWAYS_THIS_DEVICE_ONLY`             | Same, never migrated by a backup. Deprecated upstream                                           |
 
 ## Notes
 
@@ -277,10 +311,10 @@ native module declares none of them, so they read `undefined` there.
 
 ## How the wrapper works
 
-`@symbiote-native/secure-store` ships zero React/Vue/Angular logic — `expo-secure-store`'s own JS
-is hand-ported into this package's `core/`, resolving the native module through
-`expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package this project never
-installs:
+`@symbiote-native/secure-store` ships zero React/Vue/Angular/Svelte/Solid logic —
+`expo-secure-store`'s own JS is hand-ported into this package's `core/`, resolving the native
+module through `expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package
+this project never installs:
 
 ```
 packages/secure-store/src/
@@ -289,11 +323,12 @@ packages/secure-store/src/
 ├── react/    # @symbiote-native/secure-store/react   — export * from '../core'
 ├── vue/      # @symbiote-native/secure-store/vue     — export * from '../core'
 ├── svelte/   # @symbiote-native/secure-store/svelte  — export * from '../core'
-└── angular/  # @symbiote-native/secure-store/angular — export * from '../core'
+├── angular/  # @symbiote-native/secure-store/angular — export * from '../core'
+└── solid/    # @symbiote-native/secure-store/solid   — export * from '../core'
 ```
 
 Same shape as [store review](/docs/packages/store-review/)'s and
-[local auth](/docs/packages/local-auth/)'s four adapter entries: single-file re-exports with no
+[local auth](/docs/packages/local-auth/)'s five adapter entries: single-file re-exports with no
 lifecycle code, since every export is a stateless free function — there is nothing for a hook,
 composable, rune, or service to subscribe to or clean up. The native code itself is never vendored or
 copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native

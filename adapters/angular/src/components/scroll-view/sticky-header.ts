@@ -96,7 +96,9 @@ export class ScrollViewStickyHeader
   // The animated node driving the transform (RN's animatedTranslateY), replaced by the
   // rebuild-interpolation effect. When the scroll value is native, this interpolation runs on the UI
   // thread: the smooth pin.
-  private animatedTranslateY: AnimatedInterpolation = new AnimatedValue(0).interpolate({
+  private animatedTranslateY: AnimatedInterpolation = new AnimatedValue(
+    0,
+  ).interpolate({
     inputRange: [-1, 0],
     outputRange: [0, 0],
   });
@@ -135,13 +137,17 @@ export class ScrollViewStickyHeader
     // anchor style first so the fixed transform/zIndex below still wins on conflict.
     return [
       anchorHostStyle(this.elementRef),
-      { transform: [{ translateY: this.animatedTranslateY }], zIndex: STICKY_HEADER_Z_INDEX },
+      {
+        transform: [{ translateY: this.animatedTranslateY }],
+        zIndex: STICKY_HEADER_Z_INDEX,
+      },
     ];
   }
 
   // Stable reference (bound once) so AnimatedView's directive does not re-wire the layout listener
   // every change-detection pass.
-  private readonly onHostLayout = (event: ISymbioteEvent): void => this.handleLayout(event);
+  private readonly onHostLayout = (event: ISymbioteEvent): void =>
+    this.handleLayout(event);
 
   // Also a stable reference, not a getter: jsonEqual (commit.ts) can't structurally compare the
   // embedded onLayout function, so a fresh object here would read as "props changed" on every
@@ -156,7 +162,9 @@ export class ScrollViewStickyHeader
 
   // The EXPLICIT debounced translateY overrides the committed transform for hit-testing while
   // animatedTranslateY does the smooth (native-driven) pin (RN ScrollViewStickyHeader.js).
-  get passthrough(): { style: { transform: Array<{ translateY: number }> } } | null {
+  get passthrough(): {
+    style: { transform: Array<{ translateY: number }> };
+  } | null {
     return this.state.translateY !== null
       ? { style: { transform: [{ translateY: this.state.translateY }] } }
       : null;
@@ -181,7 +189,10 @@ export class ScrollViewStickyHeader
         case 'rebuild-interpolation': {
           // Detach the old listener, build a fresh interpolation onto the shared scroll value, and
           // wire the settled-value listener (symbiote is always Fabric; RN attaches it only there).
-          if (this.interpolation !== undefined && this.listenerId !== undefined) {
+          if (
+            this.interpolation !== undefined &&
+            this.listenerId !== undefined
+          ) {
             this.interpolation.removeListener(this.listenerId);
             this.listenerId = undefined;
           }
@@ -200,7 +211,8 @@ export class ScrollViewStickyHeader
         case 'schedule-debounce':
           // The animated value updates several times per frame; debounce the settled value into the
           // committed transform so hit detection stays current (a Fabric issue, worse on Android).
-          if (this.debounceTimer !== undefined) clearTimeout(this.debounceTimer);
+          if (this.debounceTimer !== undefined)
+            clearTimeout(this.debounceTimer);
           this.debounceTimer = setTimeout(() => {
             this.debounceTimer = undefined;
             this.dispatch({ kind: 'debounce-fired', value: effect.value });
@@ -233,8 +245,13 @@ export class ScrollViewStickyHeader
     this.changeDetector.markForCheck();
   }
 
-  private readonly animatedValueListener = ({ value }: { value: number | string }): void => {
-    if (typeof value === 'number') this.dispatch({ kind: 'animated-tick', value });
+  private readonly animatedValueListener = ({
+    value,
+  }: {
+    value: number | string;
+  }): void => {
+    if (typeof value === 'number')
+      this.dispatch({ kind: 'animated-tick', value });
   };
 
   private teardown(): void {

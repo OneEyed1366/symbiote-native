@@ -49,7 +49,9 @@ async function waitForText(
     if (matches(last)) return;
     await sleep(250);
   }
-  throw new Error(`${id} never matched within ${timeoutMs}ms; last text was "${last}"`);
+  throw new Error(
+    `${id} never matched within ${timeoutMs}ms; last text was "${last}"`,
+  );
 }
 
 describe('Angular canary lists & scroll', () => {
@@ -90,8 +92,16 @@ describe('Angular canary lists & scroll', () => {
     // Both Texts are written as multi-line {{ }} interpolations, which keep their surrounding
     // whitespace/newlines (documented Angular gotcha) — match by content via getAttributes()
     // instead of an exact by.text(), which the incidental whitespace would break.
-    await waitForText('angular-dimensions', text => /\d+×\d+/.test(text), 5_000);
-    await waitForText('angular-keyboard', text => /keyboard (up|down)/.test(text), 5_000);
+    await waitForText(
+      'angular-dimensions',
+      text => /\d+×\d+/.test(text),
+      5_000,
+    );
+    await waitForText(
+      'angular-keyboard',
+      text => /keyboard (up|down)/.test(text),
+      5_000,
+    );
   });
 
   it('renders the Angular chips FlatList nested in the ScrollView', async () => {

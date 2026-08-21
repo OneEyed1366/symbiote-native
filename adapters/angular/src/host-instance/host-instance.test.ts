@@ -21,14 +21,20 @@
 
 import { ElementRef } from '@angular/core';
 import { describe, expect, it } from 'vitest';
-import { createElement, createSurface, getNativeTag } from '@symbiote-native/engine';
+import {
+  createElement,
+  createSurface,
+  getNativeTag,
+} from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 import { findNodeHandle } from './index';
 
 installFabric();
 const ROOT_TAG = 708;
 
-async function committedNode(rootTag: number): Promise<ReturnType<typeof createElement>> {
+async function committedNode(
+  rootTag: number,
+): Promise<ReturnType<typeof createElement>> {
   const surface = createSurface(rootTag);
   const node = createElement('RCTView');
   surface.appendChild(node);

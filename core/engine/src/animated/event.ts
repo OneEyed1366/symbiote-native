@@ -18,7 +18,10 @@ import { dlog } from '../debug';
 import { getNativeTag, whenCommitted } from '../commit';
 import { isSymbioteNode, type ISymbioteNode } from '../node';
 import { AnimatedNode, flushValue } from './graph';
-import { isNativeAnimatedAvailable, nativeAnimated } from './native/native-animated';
+import {
+  isNativeAnimatedAvailable,
+  nativeAnimated,
+} from './native/native-animated';
 import { isRecord } from '../type-guards';
 
 // A leaf in the mapping is an AnimatedNode; every interior position is a nested
@@ -27,13 +30,12 @@ type IMapping = AnimatedNode | { readonly [key: string]: IMapping };
 
 export interface IEventConfig {
   readonly listener?: (...args: unknown[]) => void;
-  // RN parity: real apps pass `useNativeDriver` on Animated.event (RN effectively
-  // requires it). Accepted for source-compatibility but NOT consumed here; event()
-  // always returns the JS handler, so the mapped value is driven per-event on the JS
-  // thread. True UI-thread scroll driving does exist, but via the separate imperative
-  // attachNativeEvent path (ScrollView wires it internally), never through this flag.
-  // Unlike animation configs (animations/base.ts), where useNativeDriver IS honored,
-  // here it is currently inert.
+  // Honored, despite what this comment used to claim: __isNative() below gates the
+  // native attach on this flag plus a present native module, and the adapter's leaf
+  // lifecycle then binds the event to the committed view tag — zero JS per event.
+  // Without it the mapped values are driven per-event on the JS thread. The imperative
+  // attachNativeEvent path (ScrollView wires it internally) reaches the same place for
+  // a handler that is never passed as a prop.
   readonly useNativeDriver?: boolean;
 }
 
@@ -46,9 +48,13 @@ interface IMappedValue {
 // A value node settable from an event field. AnimatedValue carries setValue; we
 // duck-type it (rather than importing AnimatedValue) to keep this leaf-agnostic
 // and avoid a value<->event import cycle.
-function settableValue(node: AnimatedNode): ((value: number) => void) | undefined {
+function settableValue(
+  node: AnimatedNode,
+): ((value: number) => void) | undefined {
   const candidate = Reflect.get(node, 'setValue');
-  return typeof candidate === 'function' ? value => candidate.call(node, value) : undefined;
+  return typeof candidate === 'function'
+    ? value => candidate.call(node, value)
+    : undefined;
 }
 
 // Walk the mapping to every leaf AnimatedNode, recording its key path. Shared by
@@ -75,7 +81,10 @@ function collectMappedValues(
 // Pull the numeric field at `path` out of one event argument. Returns undefined
 // when the path is absent or the leaf is not a number, so a malformed event is a
 // no-op rather than a throw inside an event dispatch.
-function extractAtPath(event: unknown, path: readonly string[]): number | undefined {
+function extractAtPath(
+  event: unknown,
+  path: readonly string[],
+): number | undefined {
   let current: unknown = event;
   for (const key of path) {
     if (!isRecord(current)) return undefined;
@@ -145,7 +154,9 @@ export class AnimatedEvent {
   __attach(viewTag: number, eventName: string): void {
     for (const mapped of this.mappedValues) {
       mapped.node.__makeNative();
-      dlog(`event: attach ${eventName} path=${mapped.path.join('.')} -> view=${viewTag}`);
+      dlog(
+        `event: attach ${eventName} path=${mapped.path.join('.')} -> view=${viewTag}`,
+      );
       nativeAnimated.addAnimatedEventToView(viewTag, eventName, {
         nativeEventPath: mapped.path,
         animatedValueTag: mapped.node.__getNativeTag(),
@@ -157,7 +168,11 @@ export class AnimatedEvent {
   __detach(viewTag: number, eventName: string): void {
     for (const mapped of this.mappedValues) {
       dlog(`event: detach ${eventName} -> view=${viewTag}`);
-      nativeAnimated.removeAnimatedEventFromView(viewTag, eventName, mapped.node.__getNativeTag());
+      nativeAnimated.removeAnimatedEventFromView(
+        viewTag,
+        eventName,
+        mapped.node.__getNativeTag(),
+      );
     }
     this.attachedNatively = false;
   }
@@ -172,7 +187,9 @@ export class AnimatedEvent {
         if (!this.attachedNatively) {
           // Paths are stored relative to `nativeEvent` (the native module excludes
           // that prefix); the JS event arg still carries it, so re-add it here.
-          const nativeEvent = isRecord(args[0]) ? Reflect.get(args[0], 'nativeEvent') : undefined;
+          const nativeEvent = isRecord(args[0])
+            ? Reflect.get(args[0], 'nativeEvent')
+            : undefined;
           for (const mapped of this.mappedValues) {
             const extracted = extractAtPath(nativeEvent, mapped.path);
             if (extracted === undefined) continue;
@@ -234,7 +251,8 @@ export function attachNativeEvent(
   return {
     detach(): void {
       cancel();
-      if (attachedTag !== undefined) animatedEvent.__detach(attachedTag, eventName);
+      if (attachedTag !== undefined)
+        animatedEvent.__detach(attachedTag, eventName);
     },
   };
 }
@@ -255,7 +273,8 @@ export function attachNativeEventHandler(
   const accessor = Reflect.get(handler, '__getEvent');
   if (typeof accessor !== 'function') return undefined;
   const animatedEvent: unknown = accessor.call(handler);
-  if (!(animatedEvent instanceof AnimatedEvent) || !animatedEvent.__isNative()) return undefined;
+  if (!(animatedEvent instanceof AnimatedEvent) || !animatedEvent.__isNative())
+    return undefined;
   const event = animatedEvent;
   let attachedTag: number | undefined;
 
@@ -304,7 +323,8 @@ export function unforkEvent(
   existing: IAnimatedEventHandler | IEventListener | undefined,
   listener: IEventListener,
 ): void {
-  const animatedEvent = existing === undefined ? undefined : getAnimatedEvent(existing);
+  const animatedEvent =
+    existing === undefined ? undefined : getAnimatedEvent(existing);
   animatedEvent?.__removeListener(listener);
 }
 

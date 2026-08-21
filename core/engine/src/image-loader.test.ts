@@ -13,7 +13,10 @@ let imageStatics: typeof import('./image-loader').imageStatics;
 let setImageSourceResolver: typeof import('./image-source-resolver').setImageSourceResolver;
 
 type ICapturedGetSize = { uri: string };
-type ICapturedGetSizeWithHeaders = { uri: string; headers: Record<string, string> };
+type ICapturedGetSizeWithHeaders = {
+  uri: string;
+  headers: Record<string, string>;
+};
 type ICapturedPrefetch = { uri: string; requestId?: number };
 
 let capturedGetSize: ICapturedGetSize | null;
@@ -30,7 +33,10 @@ function isPresent<T>(value: unknown): value is T {
 // without duplicating the whole beforeEach setup per test.
 type IFakeImageLoader = {
   getSize(uri: string): Promise<unknown>;
-  getSizeWithHeaders(uri: string, headers: Record<string, string>): Promise<unknown>;
+  getSizeWithHeaders(
+    uri: string,
+    headers: Record<string, string>,
+  ): Promise<unknown>;
   prefetchImage(uri: string, requestId?: number): Promise<unknown>;
   abortRequest?(requestId: number): void;
   queryCache(uris: string[]): Promise<unknown>;
@@ -38,7 +44,9 @@ type IFakeImageLoader = {
 
 function installFakeImageLoader(loader: IFakeImageLoader | null): void {
   globalThis.__turboModuleProxy = <T>(name: string): T | null =>
-    name === 'ImageLoader' && loader !== null && isPresent<T>(loader) ? loader : null;
+    name === 'ImageLoader' && loader !== null && isPresent<T>(loader)
+      ? loader
+      : null;
 }
 
 function defaultFakeImageLoader(): IFakeImageLoader {
@@ -47,7 +55,10 @@ function defaultFakeImageLoader(): IFakeImageLoader {
       capturedGetSize = { uri };
       return Promise.resolve([100, 200]);
     },
-    getSizeWithHeaders(uri: string, headers: Record<string, string>): Promise<unknown> {
+    getSizeWithHeaders(
+      uri: string,
+      headers: Record<string, string>,
+    ): Promise<unknown> {
       capturedGetSizeWithHeaders = { uri, headers };
       return Promise.resolve({ width: 300, height: 400 });
     },
@@ -102,18 +113,26 @@ describe('imageStatics', () => {
     // why: the iOS spec resolves a {width, height} OBJECT for this call (unlike getSize's array),
     // so toImageSize must accept both shapes without the caller branching on which method it was.
     it('getSizeWithHeaders resolves width/height from the native {width, height} object', async () => {
-      const size = await imageStatics.getSizeWithHeaders('https://example.com/b.png', {
+      const size = await imageStatics.getSizeWithHeaders(
+        'https://example.com/b.png',
+        {
+          Authorization: 'x',
+        },
+      );
+      expect(size).toEqual({ width: 300, height: 400 });
+      expect(capturedGetSizeWithHeaders?.headers).toEqual({
         Authorization: 'x',
       });
-      expect(size).toEqual({ width: 300, height: 400 });
-      expect(capturedGetSizeWithHeaders?.headers).toEqual({ Authorization: 'x' });
     });
 
     it('prefetch resolves true and reports a monotonic requestId via the callback', async () => {
       let reportedId: number | null = null;
-      const ok = await imageStatics.prefetch('https://example.com/c.png', id => {
-        reportedId = id;
-      });
+      const ok = await imageStatics.prefetch(
+        'https://example.com/c.png',
+        id => {
+          reportedId = id;
+        },
+      );
       expect(ok).toBe(true);
       expect(reportedId).toBe(1);
       // iOS: prefetchImage is called with only the uri (no requestId arg forwarded to native).
@@ -124,8 +143,12 @@ describe('imageStatics', () => {
     // never collide on the same id, or abortPrefetch(idA) could cancel request B instead.
     it('prefetch requestId keeps increasing across calls, never repeats', async () => {
       const ids: number[] = [];
-      await imageStatics.prefetch('https://example.com/c1.png', id => ids.push(id));
-      await imageStatics.prefetch('https://example.com/c2.png', id => ids.push(id));
+      await imageStatics.prefetch('https://example.com/c1.png', id =>
+        ids.push(id),
+      );
+      await imageStatics.prefetch('https://example.com/c2.png', id =>
+        ids.push(id),
+      );
       expect(ids).toEqual([1, 2]);
     });
 
@@ -154,7 +177,9 @@ describe('imageStatics', () => {
 
     it('resolveAssetSource runs the currently-installed source resolver', () => {
       setImageSourceResolver(source => ({ uri: `resolved:${String(source)}` }));
-      expect(imageStatics.resolveAssetSource(42)).toEqual({ uri: 'resolved:42' });
+      expect(imageStatics.resolveAssetSource(42)).toEqual({
+        uri: 'resolved:42',
+      });
     });
 
     it('resolveAssetSource is the identity when no resolver has been installed', () => {
@@ -168,7 +193,9 @@ describe('imageStatics', () => {
     // never linked the ImageLoader native module — a swallowed failure here would hang callers.
     it('getSize rejects when the ImageLoader native module is not available', async () => {
       installFakeImageLoader(null);
-      await expect(imageStatics.getSize('https://example.com/a.png')).rejects.toThrow(
+      await expect(
+        imageStatics.getSize('https://example.com/a.png'),
+      ).rejects.toThrow(
         'Image.getSize: ImageLoader native module is not available',
       );
     });
@@ -181,9 +208,9 @@ describe('imageStatics', () => {
         ...defaultFakeImageLoader(),
         getSize: () => Promise.resolve('not-a-size'),
       });
-      await expect(imageStatics.getSize('https://example.com/a.png')).rejects.toThrow(
-        'unexpected size result from native',
-      );
+      await expect(
+        imageStatics.getSize('https://example.com/a.png'),
+      ).rejects.toThrow('unexpected size result from native');
     });
 
     // why: getSize offers BOTH a callback and a Promise return value (a superset of RN's
@@ -211,9 +238,9 @@ describe('imageStatics', () => {
         ...defaultFakeImageLoader(),
         prefetchImage: () => Promise.reject(new Error('network down')),
       });
-      await expect(imageStatics.prefetch('https://example.com/c.png')).rejects.toThrow(
-        'network down',
-      );
+      await expect(
+        imageStatics.prefetch('https://example.com/c.png'),
+      ).rejects.toThrow('network down');
     });
 
     it('queryCache rejects when native queryCache rejects', async () => {
@@ -221,7 +248,9 @@ describe('imageStatics', () => {
         ...defaultFakeImageLoader(),
         queryCache: () => Promise.reject(new Error('cache lookup failed')),
       });
-      await expect(imageStatics.queryCache(['https://a'])).rejects.toThrow('cache lookup failed');
+      await expect(imageStatics.queryCache(['https://a'])).rejects.toThrow(
+        'cache lookup failed',
+      );
     });
   });
 });

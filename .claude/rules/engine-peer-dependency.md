@@ -72,3 +72,24 @@ singleton.
 Full incident writeup, the `mobile-mcp` live-repro method (device tap vs. imperative-ref tap
 diverging), and the throwaway `node_modules` diagnostic-patch technique used to confirm it:
 `.changeset/engine-peer-dependency-singleton.md`.
+
+## The `workspace:*` devDependency is not optional bookkeeping — without it nothing commits
+
+The parenthetical above ("plus `workspace:*` under `devDependencies` for local dev/test") reads like
+tidiness. It is load-bearing. A `@symbiote-native/*` peer with no matching devDependency sends pnpm
+to the public registry for a package that only exists in this workspace:
+
+```
+packages/web-browser: ERR_PNPM_FETCH_404
+GET https://registry.npmjs.org/@symbiote-native%2Fsolid: Not Found
+```
+
+`optional: true` in `peerDependenciesMeta` does NOT prevent this — it suppresses auto-install, not
+workspace resolution. And `.husky/pre-commit` runs a dependency-status check that shells out to
+`pnpm install`, so a manifest in this state blocks **every commit in the repo**, not just its own
+package's build. Measured 2026-08-21 while adding `./solid` entries to twelve companion packages.
+
+Add both halves in the same edit, then `pnpm install --lockfile-only` and commit `pnpm-lock.yaml`
+alongside the manifests. `packages/battery/package.json` is the reference shape: every framework it
+declares as a peer also appears in `devDependencies` (`@symbiote-native/<fw>: workspace:*` and the
+framework itself at `catalog:`).

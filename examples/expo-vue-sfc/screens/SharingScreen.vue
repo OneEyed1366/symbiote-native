@@ -5,7 +5,13 @@
 -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/vue';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/vue';
 import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/vue';
 import ActionButton from '../components/ActionButton.vue';
 import { ROUTE_NAME } from '../routes';
@@ -51,9 +57,15 @@ function handleShare(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="sharing-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="sharing-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -62,8 +74,9 @@ function handleShare(): void {
         <View class="hero-copy">
           <Text class="hero-title">Sharing</Text>
           <Text class="hero-body"
-            >@symbiote-native/sharing — opens the platform share sheet for a local file. Outgoing
-            only: it hands a file to another app, it does not receive one.</Text
+            >@symbiote-native/sharing — opens the platform share sheet for a
+            local file. Outgoing only: it hands a file to another app, it does
+            not receive one.</Text
           >
         </View>
       </View>
@@ -72,22 +85,27 @@ function handleShare(): void {
         <Text class="sharing-card-title">Capabilities</Text>
         <View testID="sharing-available" class="sharing-row">
           <Text class="sharing-row-label">Available</Text>
-          <View :class="`sharing-status-badge sharing-status-badge-${isAvailable}`">
-            <Text class="sharing-status-text">{{ toBadgeText(isAvailable) }}</Text>
+          <View
+            :class="`sharing-status-badge sharing-status-badge-${isAvailable}`"
+          >
+            <Text class="sharing-status-text">{{
+              toBadgeText(isAvailable)
+            }}</Text>
           </View>
         </View>
         <Text class="sharing-note"
-          >Reports on the native module, not on any device capability — it is true on every iOS and
-          Android build.</Text
+          >Reports on the native module, not on any device capability — it is
+          true on every iOS and Android build.</Text
         >
       </View>
 
       <View testID="sharing-share-card" class="sharing-card">
         <Text class="sharing-card-title">Share a file</Text>
         <Text class="sharing-note"
-          >A real local file URI is required — something like file:///…/document.pdf that already
-          exists and is readable. This app has no file-system package to create one, so type a path
-          you know is there. Anything else comes back below as the native error.</Text
+          >A real local file URI is required — something like
+          file:///…/document.pdf that already exists and is readable. This app
+          has no file-system package to create one, so type a path you know is
+          there. Anything else comes back below as the native error.</Text
         >
         <TextInput
           testID="sharing-uri-input"
@@ -106,7 +124,9 @@ function handleShare(): void {
         />
         <View class="sharing-row">
           <Text class="sharing-row-label">Last result</Text>
-          <Text testID="sharing-result" class="sharing-value-text">{{ lastResult }}</Text>
+          <Text testID="sharing-result" class="sharing-value-text">{{
+            lastResult
+          }}</Text>
         </View>
       </View>
     </ScrollView>

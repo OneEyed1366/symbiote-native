@@ -20,17 +20,19 @@ updates, the same seed-then-subscribe shape as battery's own hooks — everythin
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 <Aside type="note">
-  `NetworkStateType.BLUETOOTH`, `WIMAX`, `VPN`, and `OTHER` are Android-only — iOS never reports
-  them. `isInternetReachable` always matches `isConnected` on iOS; on Android it additionally checks
-  internet capability, confirmed internet access, and (for VPN connections) non-zero downstream
-  bandwidth, so it can be `false` while `isConnected` is `true`.
+  `NetworkStateType.BLUETOOTH`, `WIMAX`, `VPN`, and `OTHER` are Android-only —
+  iOS never reports them. `isInternetReachable` always matches `isConnected` on
+  iOS; on Android it additionally checks internet capability, confirmed internet
+  access, and (for VPN connections) non-zero downstream bandwidth, so it can be
+  `false` while `isConnected` is `true`.
 </Aside>
 
 ## Installation
@@ -44,12 +46,14 @@ versions — never install either yourself, and never add the `expo` meta-packag
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-network`'s native code is discovered by `expo-modules-autolinking`, a different mechanism
-  from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative wrapper uses —
-  and it isn't the standard Expo setup flow either, since this project never installs the `expo`
-  meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every other `expo-modules-core` package with zero further native changes.
+  `expo-network`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every other `expo-modules-core` package with zero further
+  native changes.
 </Aside>
 
 ## Usage
@@ -68,6 +72,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       return <Text>{networkState.isConnected ? `Connected via ${networkState.type}` : 'Offline'}</Text>;
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -81,6 +86,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       <Text>{{ networkState.isConnected ? `Connected via ${networkState.type}` : 'Offline' }}</Text>
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -97,6 +103,7 @@ versions — never install either yourself, and never add the `expo` meta-packag
       readonly networkState = inject(NetworkStateService).connect();
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -109,6 +116,20 @@ versions — never install either yourself, and never add the `expo` meta-packag
 
     <Text>{networkState.current.isConnected ? `Connected via ${networkState.current.type}` : 'Offline'}</Text>
     ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createNetworkState } from '@symbiote-native/network/solid';
+
+    export default function ConnectionStatus() {
+      const networkState = createNetworkState(); // Accessor<NetworkState>, {} until the first reading arrives
+
+      return <Text>{networkState().isConnected ? `Connected via ${networkState().type}` : 'Offline'}</Text>;
+    }
+    ```
+
   </TabItem>
 </Tabs>
 
@@ -118,7 +139,10 @@ The stateless functions are already framework-agnostic — import them straight 
 root, on any adapter:
 
 ```ts
-import { getIpAddressAsync, isAirplaneModeEnabledAsync } from '@symbiote-native/network';
+import {
+  getIpAddressAsync,
+  isAirplaneModeEnabledAsync,
+} from '@symbiote-native/network';
 
 const ipAddress = await getIpAddressAsync(); // "0.0.0.0" if it could not be retrieved
 const airplaneMode = await isAirplaneModeEnabledAsync();
@@ -128,43 +152,43 @@ const airplaneMode = await isAirplaneModeEnabledAsync();
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `getNetworkStateAsync(): Promise<NetworkState>` | Gets the device's current network connection state — `{ type, isConnected, isInternetReachable }` |
-| `getIpAddressAsync(): Promise<string>` | Gets the device's current IPv4 address. Resolves `"0.0.0.0"` if it could not be retrieved |
-| `isAirplaneModeEnabledAsync(): Promise<boolean>` | Tells if the device is in airplane mode |
+| Signature                                              | Description                                                                                                                                                                                                                    |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `getNetworkStateAsync(): Promise<NetworkState>`        | Gets the device's current network connection state — `{ type, isConnected, isInternetReachable }`                                                                                                                              |
+| `getIpAddressAsync(): Promise<string>`                 | Gets the device's current IPv4 address. Resolves `"0.0.0.0"` if it could not be retrieved                                                                                                                                      |
+| `isAirplaneModeEnabledAsync(): Promise<boolean>`       | Tells if the device is in airplane mode                                                                                                                                                                                        |
 | `addNetworkStateListener(listener): EventSubscription` | Subscribes to network-state-change events (connection type, connected, internet reachable); call `.remove()` on the returned subscription to unsubscribe. The primitive `useNetworkState`/`NetworkStateService.connect()` wrap |
 
 ### `useNetworkState()` / `NetworkStateService.connect()`
 
-| React (`/react`) | Vue (`/vue`) | Angular (`/angular`) | Svelte (`/svelte`) | Signature | Returns |
-| --- | --- | --- | --- | --- | --- |
-| `useNetworkState` | `useNetworkState` | `NetworkStateService.connect()` | `useNetworkState` | `()` | Live `NetworkState` — plain value (React), `Ref<NetworkState>` (Vue), `Signal<NetworkState>` (Angular), `{ readonly current: NetworkState }` (Svelte, read as `.current`), seeded `{}` |
+| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Svelte (`/svelte`) | Solid (`/solid`)          | Signature | Returns                                                                                                                                                                                |
+| ----------------- | ----------------- | -------------------------------- | ------------------- | --------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useNetworkState` | `useNetworkState` | `NetworkStateService.connect()` | `useNetworkState`  | `createNetworkState` | `()`      | Live `NetworkState` — plain value (React), `Ref<NetworkState>` (Vue), `Signal<NetworkState>` (Angular), `{ readonly current: NetworkState }` (Svelte, read as `.current`), `Accessor<NetworkState>` (Solid), seeded `{}` |
 
 ### `NetworkState` / `NetworkStateEvent`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `type` | `NetworkStateType \| undefined` | The current network connection type |
-| `isConnected` | `boolean \| undefined` | Whether there is an active network connection — does not mean internet is reachable. `false` when `type` is `NONE`/`UNKNOWN`, `true` otherwise |
-| `isInternetReachable` | `boolean \| undefined` | Whether the internet is reachable over the current connection — see the caveat above for the Android-vs-iOS check difference |
+| Field                 | Type                            | Description                                                                                                                                    |
+| --------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`                | `NetworkStateType \| undefined` | The current network connection type                                                                                                            |
+| `isConnected`         | `boolean \| undefined`          | Whether there is an active network connection — does not mean internet is reachable. `false` when `type` is `NONE`/`UNKNOWN`, `true` otherwise |
+| `isInternetReachable` | `boolean \| undefined`          | Whether the internet is reachable over the current connection — see the caveat above for the Android-vs-iOS check difference                   |
 
 `NetworkStateEvent` is a plain alias of `NetworkState`, passed as the argument to
 `addNetworkStateListener`'s listener.
 
 ### `NetworkStateType`
 
-| Member | Value | Description |
-| --- | --- | --- |
-| `NONE` | `'NONE'` | No active network connection detected |
-| `UNKNOWN` | `'UNKNOWN'` | The connection type could not be determined |
-| `CELLULAR` | `'CELLULAR'` | Active connection over mobile data |
-| `WIFI` | `'WIFI'` | Active connection over Wi-Fi |
-| `BLUETOOTH` | `'BLUETOOTH'` | Active connection over Bluetooth. `@platform android` |
-| `ETHERNET` | `'ETHERNET'` | Active connection over Ethernet |
-| `WIMAX` | `'WIMAX'` | Active connection over WiMAX. `@platform android` |
-| `VPN` | `'VPN'` | Active connection over VPN. `@platform android` |
-| `OTHER` | `'OTHER'` | Active connection over any other type. `@platform android` |
+| Member      | Value         | Description                                                |
+| ----------- | ------------- | ---------------------------------------------------------- |
+| `NONE`      | `'NONE'`      | No active network connection detected                      |
+| `UNKNOWN`   | `'UNKNOWN'`   | The connection type could not be determined                |
+| `CELLULAR`  | `'CELLULAR'`  | Active connection over mobile data                         |
+| `WIFI`      | `'WIFI'`      | Active connection over Wi-Fi                               |
+| `BLUETOOTH` | `'BLUETOOTH'` | Active connection over Bluetooth. `@platform android`      |
+| `ETHERNET`  | `'ETHERNET'`  | Active connection over Ethernet                            |
+| `WIMAX`     | `'WIMAX'`     | Active connection over WiMAX. `@platform android`          |
+| `VPN`       | `'VPN'`       | Active connection over VPN. `@platform android`            |
+| `OTHER`     | `'OTHER'`     | Active connection over any other type. `@platform android` |
 
 ## Notes
 
@@ -189,7 +213,7 @@ const airplaneMode = await isAirplaneModeEnabledAsync();
 
 ## How the wrapper works
 
-`@symbiote-native/network` ships **zero React/Vue/Angular logic in `expo-network` itself** — that
+`@symbiote-native/network` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-network` itself** — that
 package's own JS is hand-ported, verbatim, into this package's own `core/` (its types file has no
 `expo` meta-package import to swap out in the first place, unlike local-auth's or brightness's):
 

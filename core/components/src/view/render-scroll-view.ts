@@ -7,7 +7,11 @@
 // integrates, stays in the adapter's .ios/.android files.
 
 import { Platform } from '@symbiote-native/engine';
-import type { IStyleProp, ISymbioteEvent, IViewStyle } from '@symbiote-native/engine';
+import type {
+  IStyleProp,
+  ISymbioteEvent,
+  IViewStyle,
+} from '@symbiote-native/engine';
 import type { ISymbioteIntrinsic } from '../component-names/shared';
 import { readLayoutField } from './layout-event';
 
@@ -28,12 +32,16 @@ export function readLayoutDimension(
 // "no Platform.OS" rule governs component-intrinsic selection, not a value transform
 // RN itself platform-branches. `default` mirrors iOS so any non-ios/android host stays
 // defined (select would otherwise yield undefined). Numeric rates pass through unchanged.
-export function resolveDecelerationRate(rate: 'normal' | 'fast' | number): number {
+export function resolveDecelerationRate(
+  rate: 'normal' | 'fast' | number,
+): number {
   if (typeof rate === 'number') return rate;
   // select() types as `number | undefined`; the always-present `default` makes the
   // `??` fallback unreachable, but it narrows the return to a plain `number` (no cast).
   if (rate === 'normal')
-    return Platform.select({ ios: 0.998, android: 0.985, default: 0.998 }) ?? 0.998;
+    return (
+      Platform.select({ ios: 0.998, android: 0.985, default: 0.998 }) ?? 0.998
+    );
   return Platform.select({ ios: 0.99, android: 0.9, default: 0.99 }) ?? 0.99;
 }
 
@@ -95,7 +103,12 @@ export function selectScrollIntrinsics(
     ? [contentContainerStyle, { flexDirection: 'row' }]
     : contentContainerStyle;
 
-  return { scrollViewIntrinsic, contentIntrinsic, scrollViewBaseStyle, contentStyle };
+  return {
+    scrollViewIntrinsic,
+    contentIntrinsic,
+    scrollViewBaseStyle,
+    contentStyle,
+  };
 }
 
 // When sticky headers are active the scroll offset must reach the AnimatedValue; RN raises the scroll
@@ -138,12 +151,15 @@ export interface IScrollForwarding {
   collapsableChildren: boolean;
 }
 
-export function resolveScrollForwarding(inputs: IScrollForwardingInputs): IScrollForwarding {
+export function resolveScrollForwarding(
+  inputs: IScrollForwardingInputs,
+): IScrollForwarding {
   // maintainVisibleContentPosition (and Android snapToAlignment) anchor against MOUNTED cell views;
   // Android Fabric view-flattens layout-only cells away, so RN keeps them as real views with
   // collapsableChildren={false} on the content container (ScrollView.js preserveChildren). No-op on iOS.
   const collapsableChildren =
-    inputs.maintainVisibleContentPosition !== undefined || inputs.snapToAlignment !== undefined;
+    inputs.maintainVisibleContentPosition !== undefined ||
+    inputs.snapToAlignment !== undefined;
   if (!inputs.hasStickyHeaders) {
     return {
       mode: 'plain',
@@ -156,14 +172,16 @@ export function resolveScrollForwarding(inputs: IScrollForwardingInputs): IScrol
   if (inputs.nativeStickyAvailable) {
     return {
       mode: 'sticky-native',
-      scrollEventThrottle: inputs.scrollEventThrottle ?? STICKY_NATIVE_SCROLL_THROTTLE,
+      scrollEventThrottle:
+        inputs.scrollEventThrottle ?? STICKY_NATIVE_SCROLL_THROTTLE,
       capturesViewportHeight,
       collapsableChildren,
     };
   }
   return {
     mode: 'sticky-js',
-    scrollEventThrottle: inputs.scrollEventThrottle ?? STICKY_JS_SCROLL_THROTTLE,
+    scrollEventThrottle:
+      inputs.scrollEventThrottle ?? STICKY_JS_SCROLL_THROTTLE,
     capturesViewportHeight,
     collapsableChildren,
   };
@@ -176,7 +194,10 @@ export type IContentSize = { width: number; height: number };
 // onContentSizeChange from the inner content view's onLayout, but that fires on every layout
 // pass; RN dedupes so the user handler only sees real size changes (ScrollView.js). First
 // measurement (last === null) always counts as a change.
-export function didContentSizeChange(last: IContentSize | null, next: IContentSize): boolean {
+export function didContentSizeChange(
+  last: IContentSize | null,
+  next: IContentSize,
+): boolean {
   if (last === null) return true;
   return last.width !== next.width || last.height !== next.height;
 }

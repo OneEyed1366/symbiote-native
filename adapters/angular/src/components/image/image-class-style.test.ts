@@ -5,7 +5,7 @@
 import '@angular/compiler';
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -78,7 +78,14 @@ function committedNode(testID: string): IFakeNode | undefined {
 
 beforeEach(() => {
   fabric.reset();
-  registerStyles({ card: { backgroundColor: 'red' } });
+  registerRules([
+    {
+      tokens: ['card'],
+      specificity: [0, 1, 0],
+      order: 0,
+      style: { backgroundColor: 'red' },
+    },
+  ]);
 });
 afterEach(() => {
   unmount(ROOT_TAG);
@@ -99,11 +106,20 @@ describe('Image anchor class= resolution', () => {
   // addClass. Without the platform component's ngDoCheck poll of the anchor style the bag would
   // keep the class it was built with, and a `[class.x]` that flips after mount would never repaint.
   it('picks up a class toggled after mount, with no @Input change', async () => {
-    registerStyles({ dark: { backgroundColor: 'black' } });
+    registerRules([
+      {
+        tokens: ['dark'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'black' },
+      },
+    ]);
 
     mount(ROOT_TAG, ImageToggleHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
-    expect(committedNode('photo-toggle')?.props.backgroundColor).toBeUndefined();
+    expect(
+      committedNode('photo-toggle')?.props.backgroundColor,
+    ).toBeUndefined();
 
     toggleFixture?.enableDark();
     await new Promise<void>(resolve => setTimeout(resolve, 0));

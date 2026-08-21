@@ -13,13 +13,14 @@
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, ScrollView } from '@symbiote-native/vue';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 513;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -39,7 +40,11 @@ function mountScrollView(contentContainerStyle: unknown): Promise<void> {
     ROOT_TAG,
     defineComponent({
       setup: () => () =>
-        h(ScrollView, { contentContainerStyle }, { default: () => [h('symbiote-text')] }),
+        h(
+          ScrollView,
+          { contentContainerStyle },
+          { default: () => [h('symbiote-text')] },
+        ),
     }),
   );
   return tick();
@@ -50,7 +55,14 @@ describe('Vue ScrollView contentContainerStyle class-name support', () => {
     it('resolves a class-name string onto the content view, not the outer scroll view', async () => {
       // why: the class-name path is the regression this file guards, and it must land on the
       // content container, not the outer RCTScrollView that pans it.
-      registerStyles({ padded: { padding: 20 } });
+      registerRules([
+        {
+          tokens: ['padded'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { padding: 20 },
+        },
+      ]);
       await mountScrollView('padded');
 
       expect(committedContentView().props.padding).toBe(20);

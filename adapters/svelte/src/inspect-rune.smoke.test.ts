@@ -46,7 +46,8 @@ const ROOT_TAG = 91_002;
 const TMP_DIR = join(__dirname, '../build/__smoke__/inspect-rune');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -60,7 +61,11 @@ afterEach(() => {
 
 let compileCounter = 0;
 
-async function compileComponent(source: string, name: string, dev?: boolean): Promise<Component> {
+async function compileComponent(
+  source: string,
+  name: string,
+  dev?: boolean,
+): Promise<Component> {
   const result = compile(source, {
     generate: 'client',
     filename: `${name}.svelte`,
@@ -112,12 +117,15 @@ describe('$inspect under the svelte adapter mount pipeline', () => {
       await tick();
       await tick();
 
-      const log = (globalThis as { __inspectLog?: number[] }).__inspectLog ?? [];
+      const log =
+        (globalThis as { __inspectLog?: number[] }).__inspectLog ?? [];
       // The component itself still renders and re-renders correctly (count reaches 2) — only
       // the $inspect probe is silently gone, proving svelte/compiler stripped the call site
       // rather than the mount pipeline breaking reactivity.
       expect(log).toEqual([]);
-      expect(fabric.serialize([fabric.appRoot()])).toContain('RCTRawText "count 2"');
+      expect(fabric.serialize([fabric.appRoot()])).toContain(
+        'RCTRawText "count 2"',
+      );
     });
   });
 
@@ -145,7 +153,8 @@ describe('$inspect under the svelte adapter mount pipeline', () => {
       await tick();
       await tick();
 
-      const log = (globalThis as { __inspectLog?: number[] }).__inspectLog ?? [];
+      const log =
+        (globalThis as { __inspectLog?: number[] }).__inspectLog ?? [];
       expect(log).toEqual([0, 1, 2]);
     });
   });

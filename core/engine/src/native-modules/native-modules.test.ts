@@ -5,7 +5,11 @@
 // captures the device hub so installDeviceEventHub() doesn't throw.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDeviceEventModule, getEnforcingNativeModule, getNativeModule } from './index';
+import {
+  createDeviceEventModule,
+  getEnforcingNativeModule,
+  getNativeModule,
+} from './index';
 
 interface IDeviceHub {
   emit: (eventType: string, ...args: unknown[]) => void;
@@ -15,7 +19,10 @@ let deviceHub: IDeviceHub | undefined;
 
 beforeEach(() => {
   deviceHub = undefined;
-  globalThis.RN$registerCallableModule = (name: string, factory: () => IDeviceHub): void => {
+  globalThis.RN$registerCallableModule = (
+    name: string,
+    factory: () => IDeviceHub,
+  ): void => {
     if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
   };
 });
@@ -48,7 +55,9 @@ describe('getNativeModule (Positive)', () => {
     const fakeModule = { ping: (): string => 'pong' };
     globalThis.nativeModuleProxy = { BridgelessOnly: fakeModule };
 
-    expect(getNativeModule<typeof fakeModule>('BridgelessOnly')).toBe(fakeModule);
+    expect(getNativeModule<typeof fakeModule>('BridgelessOnly')).toBe(
+      fakeModule,
+    );
   });
 
   // why: a HostObject access for an unlinked name can THROW natively (per the
@@ -82,7 +91,9 @@ describe('getEnforcingNativeModule', () => {
     globalThis.__turboModuleProxy = <T>(name: string): T | null =>
       name === 'MustExist' && isPresent<T>(fakeModule) ? fakeModule : null;
 
-    expect(getEnforcingNativeModule<typeof fakeModule>('MustExist')).toBe(fakeModule);
+    expect(getEnforcingNativeModule<typeof fakeModule>('MustExist')).toBe(
+      fakeModule,
+    );
   });
 
   // why: this is the entire reason the "enforcing" variant exists -- a hard
@@ -98,7 +109,10 @@ describe('getEnforcingNativeModule', () => {
 describe('createDeviceEventModule', () => {
   it('resolves the native module once and caches it across repeated getModule() calls', () => {
     let resolveCount = 0;
-    const fakeModule = { addListener: (): void => {}, removeListeners: (): void => {} };
+    const fakeModule = {
+      addListener: (): void => {},
+      removeListeners: (): void => {},
+    };
     globalThis.__turboModuleProxy = <T>(name: string): T | null => {
       if (name !== 'FakeModule') return null;
       resolveCount += 1;
@@ -160,7 +174,9 @@ describe('createDeviceEventModule', () => {
       moduleLogPrefix: 'BoundModule: module',
     });
 
-    const sub = deviceEventModule.getEmitter().addListener('someEvent', () => {});
+    const sub = deviceEventModule
+      .getEmitter()
+      .addListener('someEvent', () => {});
     expect(fakeModule.addListener).toHaveBeenCalledWith('someEvent');
     sub.remove();
     expect(fakeModule.removeListeners).toHaveBeenCalledWith(1);
@@ -174,14 +190,18 @@ describe('createDeviceEventModule', () => {
   it('does not bind a resolved module that lacks the observe-counter methods', () => {
     const shapelessModule = { getConstants: (): Record<string, never> => ({}) };
     globalThis.__turboModuleProxy = <T>(name: string): T | null =>
-      name === 'ShapelessModule' && isPresent<T>(shapelessModule) ? shapelessModule : null;
+      name === 'ShapelessModule' && isPresent<T>(shapelessModule)
+        ? shapelessModule
+        : null;
 
     const deviceEventModule = createDeviceEventModule<typeof shapelessModule>({
       moduleName: 'ShapelessModule',
       moduleLogPrefix: 'ShapelessModule: module',
     });
 
-    expect(() => deviceEventModule.getEmitter().addListener('someEvent', () => {})).not.toThrow();
+    expect(() =>
+      deviceEventModule.getEmitter().addListener('someEvent', () => {}),
+    ).not.toThrow();
     expect(deviceEventModule.getModule()).toBe(shapelessModule);
   });
 
@@ -201,7 +221,10 @@ describe('createDeviceEventModule', () => {
   });
 
   it('onEmitterCreated receives the SAME emitter and module getEmitter()/getModule() hand back', () => {
-    const fakeModule = { addListener: (): void => {}, removeListeners: (): void => {} };
+    const fakeModule = {
+      addListener: (): void => {},
+      removeListeners: (): void => {},
+    };
     globalThis.__turboModuleProxy = <T>(name: string): T | null =>
       name === 'HookModule' && isPresent<T>(fakeModule) ? fakeModule : null;
 

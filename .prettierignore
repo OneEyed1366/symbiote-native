@@ -1,11 +1,31 @@
-# Prettier already skips node_modules by default; the rest are build/generated
-# artifacts and the RN example apps, which own their formatting via the
-# @react-native eslint/prettier toolchain (see examples/*/.prettierrc.js).
+# Prettier already skips node_modules by default; everything below is generated or
+# owned by another tool that rewrites it.
 build/
 dist/
 *.tsbuildinfo
 *.jsbundle
 pnpm-lock.yaml
-ios/Pods/
+# Unanchored on purpose. A pattern with a slash inside it is anchored to the ignore
+# file's own directory, so plain `ios/Pods/` matched ONLY a repo-root ios/Pods — every
+# example's CocoaPods sandbox sailed straight through once examples/ stopped being
+# ignored wholesale (it caught them by accident before).
+**/ios/Pods/
 
-examples/
+# examples/ IS formatted (the `format` script's glob includes it). These three are the
+# parts of an example tree that a tool other than prettier owns:
+#   package-lock.json  npm writes it; the examples are standalone `npm install` trees
+#                      (<examples_vs_dot_examples>), so each carries a real lockfile.
+#   *.xcassets/        Xcode owns these Contents.json files and rewrites them on save.
+#   *.tgz              the `pnpm pack` tarballs of in-progress packages, installed via
+#                      `file:` — binary, and transient by design.
+package-lock.json
+*.xcassets/
+*.tgz
+
+# `css-dts` writes these next to each .module.css and rewrites them on every `pretypecheck`.
+# Formatting them would make the on-disk copy diverge from the generator's output on the very
+# next run, so the CI format gate would fail against a file nobody edited.
+*.module.css.d.ts
+*.module.scss.d.ts
+*.module.less.d.ts
+*.module.styl.d.ts

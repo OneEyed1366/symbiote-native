@@ -3,7 +3,11 @@
 // Fabric names are the codegen spec's registered name (the new-arch name), not the legacy
 // paperComponentName (RCTSwitch, …).
 
-import { buildDescriptors, makeDescriptorFor, type ISymbioteIntrinsic } from './shared';
+import {
+  buildDescriptors,
+  makeDescriptorFor,
+  type ISymbioteIntrinsic,
+} from './shared';
 export type { ISymbioteIntrinsic, IComponentDescriptor } from './shared';
 
 const IOS_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {

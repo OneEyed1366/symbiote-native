@@ -26,7 +26,12 @@ import { Animated, mount, unmount, Dimensions } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Drawer } from './index';
 import type { IDrawerNavigatorHandle } from './index';
-import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '../hooks';
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+  useRoute,
+} from '../hooks';
 
 const ROOT_TAG = 704;
 const TOUCH_START = 'topTouchStart';
@@ -94,7 +99,10 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   const found: string[] = [];
   const collect = (list: readonly IFakeNode[]): void => {
     for (const node of list) {
-      if (node.viewName === 'RCTRawText' && typeof node.props.text === 'string') {
+      if (
+        node.viewName === 'RCTRawText' &&
+        typeof node.props.text === 'string'
+      ) {
         found.push(node.props.text);
       }
       collect(node.children);
@@ -154,7 +162,9 @@ function swipe(path: readonly ITouchFrame[]): void {
   act(() => {
     const [start, ...rest] = path;
     fire(TOUCH_START, start);
-    rest.forEach((frame, i) => fire(i === rest.length - 1 ? TOUCH_END : TOUCH_MOVE, frame));
+    rest.forEach((frame, i) =>
+      fire(i === rest.length - 1 ? TOUCH_END : TOUCH_MOVE, frame),
+    );
   });
 }
 
@@ -205,7 +215,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { initialRouteName: 'Home' },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       expect(findAllText(fabric.committed)).toContain('home');
@@ -223,7 +236,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { ref, initialRouteName: 'Home' },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       act(() => ref.current?.openDrawer());
@@ -239,7 +255,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { ref, initialRouteName: 'Home' },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       act(() => ref.current?.openDrawer());
@@ -257,7 +276,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { ref, initialRouteName: 'Home' },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       act(() => ref.current?.toggleDrawer());
@@ -276,7 +298,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { ref, initialRouteName: 'Home' },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       act(() => ref.current?.jumpTo('Profile'));
@@ -294,7 +319,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { ref, initialRouteName: 'Home' },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       act(() => ref.current?.jumpTo('Nowhere'));
@@ -314,7 +342,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { ref, initialRouteName: 'Home' },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       act(() => ref.current?.openDrawer());
@@ -335,7 +366,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { ref, initialRouteName: 'Home' },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       act(() => ref.current?.openDrawer());
@@ -355,7 +389,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { initialRouteName: 'Home' },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       expect(isOpenByOverlay()).toBe(false);
@@ -372,7 +409,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { initialRouteName: 'Home' },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       swipe(UNDER_THRESHOLD_SWIPE);
@@ -388,7 +428,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { initialRouteName: 'Home', swipeEnabled: false },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       // Same geometry as the passing OPEN_SWIPE case above - the only variable is swipeEnabled.
@@ -406,7 +449,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { initialRouteName: 'Home' },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       swipe(MID_SCREEN_SWIPE);
@@ -423,7 +469,10 @@ describe('React Drawer navigator', () => {
           Drawer,
           { initialRouteName: 'Home', drawerPosition: 'right' },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       expect(isOpenByOverlay()).toBe(false);
@@ -467,8 +516,14 @@ describe('React Drawer navigator', () => {
           createElement(
             Drawer,
             { ref, initialRouteName: 'Home' },
-            createElement(Drawer.Screen, { name: 'Home', component: TrackedHomeScreen }),
-            createElement(Drawer.Screen, { name: 'Profile', component: TrackedProfileScreen }),
+            createElement(Drawer.Screen, {
+              name: 'Home',
+              component: TrackedHomeScreen,
+            }),
+            createElement(Drawer.Screen, {
+              name: 'Profile',
+              component: TrackedProfileScreen,
+            }),
           ),
         );
       });
@@ -491,7 +546,9 @@ describe('React Drawer navigator', () => {
             initialRouteName: 'Home',
             screenOptions: { drawerLabel: 'Shared Label' },
             renderDrawerContent: ({ state, descriptors }) => {
-              const homeRoute = state.routes.find(route => route.name === 'Home');
+              const homeRoute = state.routes.find(
+                route => route.name === 'Home',
+              );
               capturedDrawerLabel = homeRoute
                 ? descriptors[homeRoute.key]?.options.drawerLabel
                 : undefined;
@@ -499,7 +556,10 @@ describe('React Drawer navigator', () => {
             },
           },
           createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       expect(capturedDrawerLabel).toBe('Shared Label');
@@ -526,8 +586,14 @@ describe('React Drawer navigator', () => {
         createElement(
           Drawer,
           { ref, initialRouteName: 'Home' },
-          createElement(Drawer.Screen, { name: 'Home', component: TrackedHomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Home',
+            component: TrackedHomeScreen,
+          }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       // Drawer paints no native RNSScreen (unlike Stack), so there is no onAppear to wait for - the

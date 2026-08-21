@@ -31,12 +31,16 @@ import {
 // this module — the base of the cycle — is already fully evaluated).
 type IDocumentLike = { createTextNode(value: string): ShimNode };
 let documentFactory: (() => IDocumentLike) | undefined;
-export function registerShimDocumentFactory(factory: () => IDocumentLike): void {
+export function registerShimDocumentFactory(
+  factory: () => IDocumentLike,
+): void {
   documentFactory = factory;
 }
 function shimDocument(): IDocumentLike {
   if (documentFactory === undefined) {
-    throw new Error('svelte dom-shim: document accessed before its module finished loading');
+    throw new Error(
+      'svelte dom-shim: document accessed before its module finished loading',
+    );
   }
   return documentFactory();
 }
@@ -101,7 +105,8 @@ export abstract class ShimNode {
   }
 
   appendChild<T extends ShimNode>(node: T): T {
-    for (const single of normalizeInsertable(node)) this.insertOne(single, null);
+    for (const single of normalizeInsertable(node))
+      this.insertOne(single, null);
     return node;
   }
 

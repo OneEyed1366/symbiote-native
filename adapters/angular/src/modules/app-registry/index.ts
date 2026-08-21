@@ -23,7 +23,9 @@ export type IComponentProvider = () => Type<unknown>;
 // a pre-authored standalone @Component whose template renders `<ng-content>` — the Angular idiom
 // for "render my children" (mount() projects the root's host node into it, the twin of React's
 // createElement(Wrapper, null, rootElement)).
-export type IWrapperComponentProvider = (appParameters: IAppParameters) => Type<unknown>;
+export type IWrapperComponentProvider = (
+  appParameters: IAppParameters,
+) => Type<unknown>;
 
 function runnableFor(
   componentProvider: IComponentProvider,

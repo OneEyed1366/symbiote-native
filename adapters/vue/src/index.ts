@@ -2,8 +2,15 @@
 // each RendererOptions call onto the engine's mutation API; all Fabric clone-on-write
 // lives in the engine, shared with every other adapter. App code names only @symbiote-native/vue.
 
-export { mount, unmount } from './render';
-// Teleport stays same-surface-only by design - see create-tunnel.ts for why.
+export { mount, unmount, setAppConfigurator } from './render';
+export type { IAppConfigurator } from './render';
+// The portal: Vue's own <Teleport>, guarded so `to` must be a node/surface this renderer actually
+// mounted (there is no querySelector). It MOVES host nodes, so it reaches any already-mounted
+// target in the SAME surface — including one you only hold a ref to — and keeps the content's
+// reactive owner at the call site (provide/inject resolve from where it was written). Reaching a
+// second, independently mount()ed surface is a different mechanism: createTunnel, which copies
+// into an <Out/> the destination has to render. See create-portal/index.ts.
+export { Teleport, type ITeleportTarget } from './create-portal';
 export { createTunnel, type ITunnel } from './create-tunnel';
 export { View, Text } from './components';
 export type {
@@ -66,7 +73,10 @@ export type {
 export { Button } from './components/button';
 export type { IButtonProps } from './components/button';
 export { TextInput } from './components/text-input';
-export type { ITextInputProps, ITextInputHandle } from './components/text-input';
+export type {
+  ITextInputProps,
+  ITextInputHandle,
+} from './components/text-input';
 export { VirtualizedList } from './components/virtualized-list';
 export type {
   IVirtualizedListProps,
@@ -107,7 +117,10 @@ export type {
 export { SafeAreaView } from './components/safe-area-view';
 export type { ISafeAreaViewProps } from './components/safe-area-view';
 export { RefreshControl } from './components/refresh-control';
-export type { IRefreshControlProps, IRefreshControlEmits } from './components/refresh-control';
+export type {
+  IRefreshControlProps,
+  IRefreshControlEmits,
+} from './components/refresh-control';
 export { descriptorToVue } from './descriptor-to-vue';
 // Exported so an external wrapper package (e.g. @symbiote-native/slider/vue over a third-party
 // native view) can fold its incoming attrs/v-model through the SAME transform rather than
@@ -233,7 +246,11 @@ export {
   dlog,
   isDebug,
 } from '@symbiote-native/engine';
-export type { ISymbioteEvent, ISymbioteNode, IRootTag } from '@symbiote-native/engine';
+export type {
+  ISymbioteEvent,
+  ISymbioteNode,
+  IRootTag,
+} from '@symbiote-native/engine';
 // Style + Platform value types and the native-view-config seam: pure / seam-backed, so
 // they live in the engine and both adapters re-export them (parity with the React adapter).
 export type {
@@ -250,8 +267,14 @@ export type {
 // Wired once by the app entry on a real host (like setColorProcessor): hands the engine
 // RN's ViewConfig registry so third-party Fabric views auto-derive their metadata.
 // setDeviceEventSource is the third seam of the same set and travels with them.
-export { setNativeViewConfigSource, setDeviceEventSource } from '@symbiote-native/engine';
-export type { INativeViewConfig, INativeViewConfigSource } from '@symbiote-native/engine';
+export {
+  setNativeViewConfigSource,
+  setDeviceEventSource,
+} from '@symbiote-native/engine';
+export type {
+  INativeViewConfig,
+  INativeViewConfigSource,
+} from '@symbiote-native/engine';
 // Component-detail types carrying no framework element or ref, so they are defined once in
 // @symbiote-native/components and every adapter re-exports the SAME type.
 export type {

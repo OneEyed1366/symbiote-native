@@ -58,7 +58,7 @@ function webOnlyConstructGuard() {
 
 // The `<style>` preprocessor, loaded the same lazy way and for the same reason. Unlike the guard
 // above (which only throws and hands the source back untouched), this one REWRITES the source —
-// it compiles the style block into registerStyles() output and scopes every `class` in the
+// it compiles the style block into registerRules() output and scopes every `class` in the
 // component's own markup — so its returned `code` is what compile() must be given. See
 // src/preprocessor/scoped-styles.ts for why Svelte's own `result.css` cannot be used instead.
 let scopedStylesPromise;

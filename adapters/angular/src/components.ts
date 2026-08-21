@@ -112,7 +112,10 @@ export type {
   IVSectionItemContext,
 } from './components/virtualized-section-list';
 export { SectionList } from './components/section-list';
-export type { ISectionListHandle, ISectionListProps } from './components/section-list';
+export type {
+  ISectionListHandle,
+  ISectionListProps,
+} from './components/section-list';
 
 // Re-export primitive hosts so composed components can import them from the public barrel too.
 export {

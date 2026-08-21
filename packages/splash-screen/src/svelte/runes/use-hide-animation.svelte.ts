@@ -26,7 +26,11 @@ export function useHideAnimation(getConfig: () => IHideAnimationConfig): {
   $effect(() => {
     const config = getConfig();
     controller.updateConfig(config);
-    result = computeHideAnimationStyles(config, controller.constants, controller);
+    result = computeHideAnimationStyles(
+      config,
+      controller.constants,
+      controller,
+    );
   });
 
   return {

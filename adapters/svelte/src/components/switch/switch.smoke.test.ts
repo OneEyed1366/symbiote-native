@@ -20,7 +20,8 @@ import type { Component } from 'svelte';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -47,7 +48,8 @@ const IOS_BACKGROUND_BORDER_RADIUS = 16;
 const STYLE_MARGIN_TOP = 8;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -62,9 +64,17 @@ afterEach(() => {
   rmSync(COLOR_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
@@ -224,7 +234,10 @@ describe('Switch (real compiled index.svelte)', () => {
 
     // Native flips to true; the parent's onValueChange is a no-op, so `value` stays false —
     // this is exactly the case shouldSnapBack() exists to correct.
-    fabric.fireEvent(node.instanceHandle, 'topChange', { value: true, eventCount: 1 });
+    fabric.fireEvent(node.instanceHandle, 'topChange', {
+      value: true,
+      eventCount: 1,
+    });
     await tick();
     await tick();
 
@@ -248,7 +261,10 @@ describe('Switch (real compiled index.svelte)', () => {
     expect(node).toBeDefined();
     if (node === undefined) return;
 
-    fabric.fireEvent(node.instanceHandle, 'topChange', { value: true, eventCount: 1 });
+    fabric.fireEvent(node.instanceHandle, 'topChange', {
+      value: true,
+      eventCount: 1,
+    });
     await tick();
     await tick();
 
@@ -278,7 +294,10 @@ describe('Switch (real compiled index.svelte)', () => {
     // Native flips to true; there is no onValueChange to arbitrate, so the bindable echo in
     // handleChange must fire and `boundValue` (read back via onRead) must follow it — with no
     // corrective `setValue` command, since nothing ever disagreed with native's report.
-    fabric.fireEvent(node.instanceHandle, 'topChange', { value: true, eventCount: 1 });
+    fabric.fireEvent(node.instanceHandle, 'topChange', {
+      value: true,
+      eventCount: 1,
+    });
     await tick();
     await tick();
 

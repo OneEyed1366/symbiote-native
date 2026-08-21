@@ -46,7 +46,11 @@ import {
   type IAriaProps,
 } from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
-import { wrapStickyHeaders, type IStickyHeaderComponentType } from './sticky-header';
+import {
+  wrapStickyHeaders,
+  type IStickyHeaderComponentType,
+  type IStickyHeaderHandle,
+} from './sticky-header';
 
 export type { IScrollViewHandle } from '@symbiote-native/components';
 
@@ -68,7 +72,12 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   bounces?: boolean;
   decelerationRate?: 'normal' | 'fast' | number;
   scrollEventThrottle?: number;
-  contentInset?: { top?: number; left?: number; bottom?: number; right?: number };
+  contentInset?: {
+    top?: number;
+    left?: number;
+    bottom?: number;
+    right?: number;
+  };
   contentOffset?: { x: number; y: number };
   refreshControl?: ReactElement<IClonableRefreshControl>;
   removeClippedSubviews?: boolean;
@@ -107,11 +116,17 @@ export interface IScrollViewProps extends IAccessibilityProps, IAriaProps {
   alwaysBounceHorizontal?: boolean;
   alwaysBounceVertical?: boolean;
   centerContent?: boolean;
-  scrollIndicatorInsets?: { top?: number; left?: number; bottom?: number; right?: number };
+  scrollIndicatorInsets?: {
+    top?: number;
+    left?: number;
+    bottom?: number;
+    right?: number;
+  };
   indicatorStyle?: 'default' | 'black' | 'white';
   directionalLockEnabled?: boolean;
   automaticallyAdjustKeyboardInsets?: boolean;
-  contentInsetAdjustmentBehavior?: 'automatic' | 'scrollableAxes' | 'never' | 'always';
+  contentInsetAdjustmentBehavior?:
+    'automatic' | 'scrollableAxes' | 'never' | 'always';
   minimumZoomScale?: number;
   maximumZoomScale?: number;
   zoomScale?: number;
@@ -178,7 +193,9 @@ export interface IPreparedScrollView {
   nativeStickyAvailable: boolean;
 }
 
-export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScrollView {
+export function usePreparedScrollView(
+  rawProps: IScrollViewProps,
+): IPreparedScrollView {
   // ScrollView forwards its outer props straight to the native scroll view (not a View
   // wrapper), so it folds aria/role into accessibility* here before forwarding.
   const props = resolveAccessibilityProps(rawProps);
@@ -201,7 +218,8 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
   } = props;
 
   const isHorizontal = horizontal === true;
-  const hasStickyHeaders = stickyHeaderIndices !== undefined && stickyHeaderIndices.length > 0;
+  const hasStickyHeaders =
+    stickyHeaderIndices !== undefined && stickyHeaderIndices.length > 0;
 
   // A single AnimatedValue tracks the scroll offset and drives every sticky header's
   // translateY (RN's _scrollAnimatedValue). Stable across renders via a ref so the headers'
@@ -213,7 +231,9 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
   const scrollAnimatedValue = scrollAnimatedValueRef.current;
   // Inverted sticky headers stick to the BOTTOM, so they need the viewport height (RN reads
   // it in _handleLayout). Tracked here and fed back into the wrapped headers.
-  const [viewportHeight, setViewportHeight] = useState<number | undefined>(undefined);
+  const [viewportHeight, setViewportHeight] = useState<number | undefined>(
+    undefined,
+  );
 
   // Sticky-header cross-talk (RN ScrollView.js _headerLayoutYs, line 754): a child-index→measured-y
   // map the parent keeps so each header can learn where the NEXT sticky header starts (its push-off
@@ -223,12 +243,61 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
   const headerLayoutYsRef = useRef<Map<number, number> | null>(null);
   if (headerLayoutYsRef.current === null) headerLayoutYsRef.current = new Map();
   const headerLayoutYs = headerLayoutYsRef.current;
-  const [, bumpHeaderLayout] = useState(0);
+
+  // The mounted headers by child index (RN's _stickyHeaderRefs, ScrollView.js:750), so a fresh
+  // measurement reaches its predecessor directly.
+  const stickyHeaderRefsRef = useRef<Map<number, IStickyHeaderHandle> | null>(
+    null,
+  );
+  if (stickyHeaderRefsRef.current === null)
+    stickyHeaderRefsRef.current = new Map();
+  const stickyHeaderRefs = stickyHeaderRefsRef.current;
+
+  const onHeaderRef = (
+    index: number,
+    handle: IStickyHeaderHandle | null,
+  ): void => {
+    if (handle === null) stickyHeaderRefs.delete(index);
+    else stickyHeaderRefs.set(index, handle);
+  };
+
+  // Measurements waiting to be handed to their predecessors, flushed together (see below).
+  const pendingHeaderYsRef = useRef<Map<number, number> | null>(null);
+  if (pendingHeaderYsRef.current === null)
+    pendingHeaderYsRef.current = new Map();
+  const pendingHeaderYs = pendingHeaderYsRef.current;
+  const flushScheduledRef = useRef(false);
+
+  const flushHeaderYs = (): void => {
+    flushScheduledRef.current = false;
+    if (stickyHeaderIndices === undefined) return;
+    for (const [index, y] of pendingHeaderYs) {
+      const previousIndex =
+        stickyHeaderIndices[stickyHeaderIndices.indexOf(index) - 1];
+      if (previousIndex === undefined) continue;
+      stickyHeaderRefs.get(previousIndex)?.setNextHeaderY(y);
+    }
+    pendingHeaderYs.clear();
+  };
+
+  // RN _onStickyHeaderLayout (ScrollView.js:1136): record this header's y, then hand it to the
+  // PREVIOUS sticky header as its push-off collision point.
+  //
+  // The handoff is COALESCED rather than immediate, and that is the point. Cross-talk runs BACKWARDS
+  // (a header learns its collision point from the one after it), so a mount measures every header
+  // and walks the chain end to start. Pushing each value the moment it arrives makes every link its
+  // own update generation - a setState on the predecessor, whose effect setStates again - and React
+  // caps nested updates at 50: three headers go unnoticed, two hundred abort the app with "Maximum
+  // update depth exceeded", which reads like an infinite loop but is really depth. Draining on a
+  // microtask puts one burst of layouts into ONE render pass, so depth stops tracking header count.
   const onHeaderLayoutY = (index: number, y: number): void => {
     if (headerLayoutYs.get(index) === y) return;
     headerLayoutYs.set(index, y);
     dlog(`ScrollView sticky-header layoutY index=${index} y=${y}`);
-    bumpHeaderLayout(tick => tick + 1);
+    pendingHeaderYs.set(index, y);
+    if (flushScheduledRef.current) return;
+    flushScheduledRef.current = true;
+    void Promise.resolve().then(flushHeaderYs);
   };
 
   // A class-name string resolves through the shared registry before it reaches the
@@ -241,8 +310,12 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
   // The per-axis intrinsics, base style, and content style come from the shared selector
   // (@symbiote-native/components): on Android horizontal resolves to its own ViewManager, on iOS both
   // map back to RCTScrollView; here we only pass the axis.
-  const { scrollViewIntrinsic, contentIntrinsic, scrollViewBaseStyle, contentStyle } =
-    selectScrollIntrinsics(isHorizontal, resolvedContentContainerStyle);
+  const {
+    scrollViewIntrinsic,
+    contentIntrinsic,
+    scrollViewBaseStyle,
+    contentStyle,
+  } = selectScrollIntrinsics(isHorizontal, resolvedContentContainerStyle);
 
   const outerProps: Record<string, unknown> = { ...outer };
   // className is pulled out above (unlike the rest of `...outer`) so `layoutSplitStyle` below can
@@ -310,8 +383,13 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
   // onContentSizeChange is synthesized from the content view's own onLayout (RN
   // _handleContentOnLayout): read width/height off nativeEvent.layout and fire only when the
   // size actually changed (dedupe via a ref, like RN). Composed with any content onLayout.
-  const lastContentSizeRef = useRef<{ width: number; height: number } | null>(null);
-  const contentProps: Record<string, unknown> = { style: contentStyle, collapsable: false };
+  const lastContentSizeRef = useRef<{ width: number; height: number } | null>(
+    null,
+  );
+  const contentProps: Record<string, unknown> = {
+    style: contentStyle,
+    collapsable: false,
+  };
   // maintainVisibleContentPosition (and Android snapToAlignment) anchor against the metrics
   // of MOUNTED cell views. Android Fabric view-flattens layout-only cells away, so the native
   // MaintainVisibleScrollPositionHelper has nothing to anchor to and the list jumps on prepend.
@@ -343,8 +421,7 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
         invertStickyHeaders,
         viewportHeight,
         StickyHeaderComponent,
-        headerLayoutYs,
-        onHeaderLayoutY,
+        { headerLayoutYs, onHeaderLayoutY, onHeaderRef },
       )
     : children;
 
@@ -355,11 +432,18 @@ export function usePreparedScrollView(rawProps: IScrollViewProps): IPreparedScro
   // its own NativeScrollContentView the same way (ScrollView.js, collapsable={false};
   // ReactScrollView.java: "the 'content' View … non-collapsable so it will never be
   // View-flattened away"). iOS doesn't flatten, so this is a no-op there.
-  const content = createElement(contentIntrinsic, contentProps, contentChildren);
+  const content = createElement(
+    contentIntrinsic,
+    contentProps,
+    contentChildren,
+  );
 
   // resolveClassName(undefined) is a cheap {} no-op, so this is safe with no className too.
   const resolvedClassName = isClassNameValue(className) ? className : undefined;
-  const layoutSplitStyle: IStyleProp<IViewStyle> = [resolveClassName(resolvedClassName), style];
+  const layoutSplitStyle: IStyleProp<IViewStyle> = [
+    resolveClassName(resolvedClassName),
+    style,
+  ];
 
   return {
     scrollViewIntrinsic,

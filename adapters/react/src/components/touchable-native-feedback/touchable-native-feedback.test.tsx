@@ -17,7 +17,12 @@
 // a proof that the real Android/API23 foreground path works — that needs a real Android/detox run.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { View, TouchableNativeFeedback, mount, unmount } from '@symbiote-native/react';
+import {
+  View,
+  TouchableNativeFeedback,
+  mount,
+  unmount,
+} from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 130;
@@ -34,7 +39,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 // The responder is the Pressable's own RCTView, the first non-box-none RCTView created.
 function responderHandle(): unknown {
-  const view = fabric.find(n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none');
+  const view = fabric.find(
+    n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+  );
   if (!view) throw new Error('no RCTView (Pressable responder) was created');
   return view.instanceHandle;
 }
@@ -59,10 +66,12 @@ describe('React TouchableNativeFeedback', () => {
     expect(sel.type).toBe('ThemeAttrAndroid');
     expect(sel.attribute).toBe('selectableItemBackground');
 
-    expect(TouchableNativeFeedback.SelectableBackground(12).rippleRadius).toBe(12);
-    expect(TouchableNativeFeedback.SelectableBackgroundBorderless().attribute).toBe(
-      'selectableItemBackgroundBorderless',
+    expect(TouchableNativeFeedback.SelectableBackground(12).rippleRadius).toBe(
+      12,
     );
+    expect(
+      TouchableNativeFeedback.SelectableBackgroundBorderless().attribute,
+    ).toBe('selectableItemBackgroundBorderless');
 
     const ripple = TouchableNativeFeedback.Ripple('#fff', true);
     expect(ripple.type).toBe('RippleAndroid');
@@ -76,13 +85,17 @@ describe('React TouchableNativeFeedback', () => {
   it('lands the ripple background on the committed node as nativeBackgroundAndroid', () => {
     mount(
       ROOT_TAG,
-      <TouchableNativeFeedback background={TouchableNativeFeedback.Ripple('#00f', false)}>
+      <TouchableNativeFeedback
+        background={TouchableNativeFeedback.Ripple('#00f', false)}
+      >
         <View />
       </TouchableNativeFeedback>,
     );
     const props = feedbackProps();
     const bg = props.nativeBackgroundAndroid;
-    expect(isRecord(bg) && bg.type === 'RippleAndroid' && bg.color === '#00f').toBe(true);
+    expect(
+      isRecord(bg) && bg.type === 'RippleAndroid' && bg.color === '#00f',
+    ).toBe(true);
     // without useForeground the foreground prop must be absent.
     expect(props.nativeForegroundAndroid).toBeUndefined();
   });
@@ -118,7 +131,9 @@ describe('React TouchableNativeFeedback', () => {
       </TouchableNativeFeedback>,
     );
     const bg = feedbackProps().nativeBackgroundAndroid;
-    expect(isRecord(bg) && bg.attribute === 'selectableItemBackground').toBe(true);
+    expect(isRecord(bg) && bg.attribute === 'selectableItemBackground').toBe(
+      true,
+    );
   });
 
   // characterization [Platform.OS resolves to 'ios' headless — see file header]: useForeground
@@ -139,7 +154,9 @@ describe('React TouchableNativeFeedback', () => {
     const props = feedbackProps();
     expect(props.nativeForegroundAndroid).toBeUndefined();
     const bg = props.nativeBackgroundAndroid;
-    expect(isRecord(bg) && bg.type === 'RippleAndroid' && bg.color === '#0f0').toBe(true);
+    expect(
+      isRecord(bg) && bg.type === 'RippleAndroid' && bg.color === '#0f0',
+    ).toBe(true);
   });
 
   // why: canUseNativeForeground() is exposed as a static so callers can branch their own UI on

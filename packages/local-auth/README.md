@@ -26,12 +26,12 @@ Unlike a plain RN native module, `expo-local-authentication`'s native code is di
 into the native host app **once**, covering this package and every other
 `expo-modules-core` package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
@@ -52,13 +52,12 @@ src/core/     hasHardwareAsync / isEnrolledAsync / getEnrolledLevelAsync /
               AuthenticationType, SecurityLevel, and the option/result/error types.
               native-module.ts resolves the native module via expo-modules-core's
               requireNativeModule.
-src/react/    @symbiote-native/local-auth/react   — export * from '../core'
-src/vue/      @symbiote-native/local-auth/vue     — export * from '../core'
 src/angular/  @symbiote-native/local-auth/angular — export * from '../core'
 ```
 
-No per-adapter lifecycle wrapper exists because there's nothing to subscribe to or clean up —
-each adapter entry is a single-file re-export.
+`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
+physical per-framework file, since there's nothing to subscribe to or clean up. `./angular` stays
+a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
 
@@ -77,7 +76,8 @@ import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/rea
 function LocalAuthScreen() {
   const [hasHardware, setHasHardware] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
-  const [authResult, setAuthResult] = useState<ILocalAuthenticationResult | null>(null);
+  const [authResult, setAuthResult] =
+    useState<ILocalAuthenticationResult | null>(null);
 
   useEffect(() => {
     hasHardwareAsync().then(setHasHardware);
@@ -85,12 +85,18 @@ function LocalAuthScreen() {
   }, []);
 
   const handleAuthenticate = () => {
-    authenticateAsync({ promptMessage: 'Confirm it is you' }).then(setAuthResult);
+    authenticateAsync({ promptMessage: 'Confirm it is you' }).then(
+      setAuthResult,
+    );
   };
 
   return (
     <View>
-      <Text>{hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled'}</Text>
+      <Text>
+        {hasHardware && isEnrolled
+          ? 'Ready to authenticate'
+          : 'No biometrics enrolled'}
+      </Text>
       <Pressable onPress={handleAuthenticate}>
         <Text>Authenticate</Text>
       </Pressable>
@@ -99,7 +105,11 @@ function LocalAuthScreen() {
           <Text>Cancel</Text>
         </Pressable>
       )}
-      {authResult && <Text>{authResult.success ? 'Success' : `Failed: ${authResult.error}`}</Text>}
+      {authResult && (
+        <Text>
+          {authResult.success ? 'Success' : `Failed: ${authResult.error}`}
+        </Text>
+      )}
     </View>
   );
 }
@@ -136,14 +146,20 @@ function handleAuthenticate(): void {
 
 <template>
   <View>
-    <Text>{{ hasHardware && isEnrolled ? 'Ready to authenticate' : 'No biometrics enrolled' }}</Text>
+    <Text>{{
+      hasHardware && isEnrolled
+        ? 'Ready to authenticate'
+        : 'No biometrics enrolled'
+    }}</Text>
     <Pressable @press="handleAuthenticate">
       <Text>Authenticate</Text>
     </Pressable>
     <Pressable v-if="Platform.OS === 'android'" @press="cancelAuthenticate">
       <Text>Cancel</Text>
     </Pressable>
-    <Text v-if="authResult">{{ authResult.success ? 'Success' : `Failed: ${authResult.error}` }}</Text>
+    <Text v-if="authResult">{{
+      authResult.success ? 'Success' : `Failed: ${authResult.error}`
+    }}</Text>
   </View>
 </template>
 ```
@@ -165,7 +181,11 @@ import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/ang
   imports: [Pressable, Text, View],
   template: `
     <View>
-      <Text>{{ hasHardware() && isEnrolled() ? 'Ready to authenticate' : 'No biometrics enrolled' }}</Text>
+      <Text>{{
+        hasHardware() && isEnrolled()
+          ? 'Ready to authenticate'
+          : 'No biometrics enrolled'
+      }}</Text>
       <Pressable (press)="handleAuthenticate()">
         <Text>Authenticate</Text>
       </Pressable>
@@ -175,7 +195,9 @@ import type { ILocalAuthenticationResult } from '@symbiote-native/local-auth/ang
         </Pressable>
       }
       @if (authResult(); as result) {
-        <Text>{{ result.success ? 'Success' : 'Failed: ' + result.error }}</Text>
+        <Text>{{
+          result.success ? 'Success' : 'Failed: ' + result.error
+        }}</Text>
       }
     </View>
   `,
@@ -192,7 +214,9 @@ export class LocalAuthScreen {
   }
 
   handleAuthenticate(): void {
-    authenticateAsync({ promptMessage: 'Confirm it is you' }).then(value => this.authResult.set(value));
+    authenticateAsync({ promptMessage: 'Confirm it is you' }).then(value =>
+      this.authResult.set(value),
+    );
   }
 
   handleCancel(): void {
@@ -229,7 +253,10 @@ from upstream's `LocalAuthentication.types.ts`, renamed with this repo's `I`-pre
 for exported types (`ts-js-best-practices`).
 
 ```ts
-import { authenticateAsync, hasHardwareAsync } from '@symbiote-native/local-auth';
+import {
+  authenticateAsync,
+  hasHardwareAsync,
+} from '@symbiote-native/local-auth';
 // or the framework-scoped entry points — identical surface, re-exported verbatim:
 import { authenticateAsync } from '@symbiote-native/local-auth/react';
 import { authenticateAsync } from '@symbiote-native/local-auth/vue';
@@ -241,7 +268,7 @@ import { authenticateAsync } from '@symbiote-native/local-auth/angular';
 - **`not_enrolled` on Android almost always means the device's own lock screen has no PIN,
   pattern, or password set.** A real symptom on a fresh emulator or factory-reset device:
   `authenticateAsync` resolves `{ success: false, error: 'not_enrolled', warning:
-  'KeyguardManager#isDeviceSecure() returned false' }`. This is **not** a missing app
+'KeyguardManager#isDeviceSecure() returned false' }`. This is **not** a missing app
   permission — the manifest permission this package needs is an ordinary build-time merge with
   no runtime prompt, so there's nothing for your app to request. The fix lives on the device:
   Settings → Security → Screen lock → set a PIN/pattern/password, then optionally enroll a

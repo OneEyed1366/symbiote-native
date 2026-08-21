@@ -1,6 +1,10 @@
 import { requireNativeModule } from 'expo-modules-core';
 import type { EventSubscription } from 'expo-modules-core';
-import type { BrightnessEvent, BrightnessMode, PermissionResponse } from './types';
+import type {
+  BrightnessEvent,
+  BrightnessMode,
+  PermissionResponse,
+} from './types';
 
 const EXPO_BRIGHTNESS_MODULE_NAME = 'ExpoBrightness';
 

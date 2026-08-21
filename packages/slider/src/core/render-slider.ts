@@ -7,9 +7,16 @@
 // width measurement that feeds `view.width`.
 
 import { dlog } from '@symbiote-native/engine';
-import type { IStyleProp, IViewStyle, ISymbioteEvent } from '@symbiote-native/engine';
+import type {
+  IStyleProp,
+  IViewStyle,
+  ISymbioteEvent,
+} from '@symbiote-native/engine';
 import { el } from '@symbiote-native/components';
-import type { IDescriptor, IDescriptorChild } from '@symbiote-native/components';
+import type {
+  IDescriptor,
+  IDescriptorChild,
+} from '@symbiote-native/components';
 import { RNC_SLIDER_VIEW_NAME } from './constants';
 import type { ISliderPlatform, ISliderViewProps } from './slider-props';
 
@@ -27,21 +34,32 @@ export function resolveSliderNativeStyle(
   width: number | undefined,
   platform: ISliderPlatform,
 ): IStyleProp<IViewStyle> {
-  const base: IViewStyle = { zIndex: 1, alignContent: 'center', alignItems: 'center' };
-  const sized: IStyleProp<IViewStyle> = width === undefined ? base : [base, { width }];
+  const base: IViewStyle = {
+    zIndex: 1,
+    alignContent: 'center',
+    alignItems: 'center',
+  };
+  const sized: IStyleProp<IViewStyle> =
+    width === undefined ? base : [base, { width }];
   return [platform.defaultStyle, sized];
 }
 
 // The outer wrapper centers the native slider and gives it the platform default height; the
 // caller's style layers on top, exactly as the library composes [defaultStyle, props.style]. The
 // caller's style is opaque (`unknown`) — the engine flattens the array — so it is not narrowed.
-export function resolveSliderWrapperStyle(style: unknown, platform: ISliderPlatform): unknown {
+export function resolveSliderWrapperStyle(
+  style: unknown,
+  platform: ISliderPlatform,
+): unknown {
   return [platform.defaultStyle, style, { justifyContent: 'center' }];
 }
 
 // The native `RNCSlider` leaf alone (no wrapper). Adapters that compose a custom step overlay
 // (a per-adapter StepMarker element) assemble the wrapper themselves and drop this leaf in.
-export function renderSliderNative(view: ISliderViewProps, platform: ISliderPlatform): IDescriptor {
+export function renderSliderNative(
+  view: ISliderViewProps,
+  platform: ISliderPlatform,
+): IDescriptor {
   dlog(
     `Slider render value=${String(view.value)} disabled=${String(view.disabled)} width=${String(view.width)}`,
   );

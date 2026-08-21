@@ -15,13 +15,17 @@ import type { ISearchBarCommands } from '@symbiote-native/navigation';
 import type { IScreenOptionsResolver } from '@symbiote-native/navigation/svelte';
 import { LINE_COLOR } from '../navigation-lines';
 
-export const searchBarRef: { current: ISearchBarCommands | null } = { current: null };
+export const searchBarRef: { current: ISearchBarCommands | null } = {
+  current: null,
+};
 
 // Registered on the root Stack's <Screen options={headerOptionsScreenOptions}> (App.svelte) — a
 // resolver function (not a plain object) so its bar-button/menu onPress handlers can close over
 // the LIVE navigation handle and round-trip the pressed action back onto the route via
 // setParams(), which HeaderOptionsScreen.svelte then reads via useRoute() to display.
-export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation }) => ({
+export const headerOptionsScreenOptions: IScreenOptionsResolver = ({
+  navigation,
+}) => ({
   title: 'Header Options',
   headerShown: true,
   headerTranslucent: true,
@@ -42,7 +46,8 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation 
     {
       type: 'button',
       title: 'Info',
-      onPress: () => navigation.setParams({ lastHeaderAction: 'left bar button: Info' }),
+      onPress: () =>
+        navigation.setParams({ lastHeaderAction: 'left bar button: Info' }),
     },
   ],
   headerRightBarButtonItems: [
@@ -55,13 +60,15 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation 
           {
             type: 'action',
             title: 'Share',
-            onPress: () => navigation.setParams({ lastHeaderAction: 'menu: Share' }),
+            onPress: () =>
+              navigation.setParams({ lastHeaderAction: 'menu: Share' }),
           },
           {
             type: 'action',
             title: 'Delete',
             destructive: true,
-            onPress: () => navigation.setParams({ lastHeaderAction: 'menu: Delete' }),
+            onPress: () =>
+              navigation.setParams({ lastHeaderAction: 'menu: Delete' }),
           },
         ],
       },
@@ -83,11 +90,15 @@ export const headerOptionsScreenOptions: IScreenOptionsResolver = ({ navigation 
     hintTextColor: '#8a8a8a',
     headerIconColor: LINE_COLOR.presentation,
     onChangeText: text => navigation.setParams({ lastSearchText: text }),
-    onSearchButtonPress: text => navigation.setParams({ lastSearchSubmitted: text }),
+    onSearchButtonPress: text =>
+      navigation.setParams({ lastSearchSubmitted: text }),
     onFocus: () => navigation.setParams({ lastSearchBarEvent: 'focused' }),
     onBlur: () => navigation.setParams({ lastSearchBarEvent: 'blurred' }),
-    onCancelButtonPress: () => navigation.setParams({ lastSearchBarEvent: 'cancel pressed' }),
-    onClose: () => navigation.setParams({ lastSearchBarEvent: 'closed (Android)' }),
-    onOpen: () => navigation.setParams({ lastSearchBarEvent: 'opened (Android)' }),
+    onCancelButtonPress: () =>
+      navigation.setParams({ lastSearchBarEvent: 'cancel pressed' }),
+    onClose: () =>
+      navigation.setParams({ lastSearchBarEvent: 'closed (Android)' }),
+    onOpen: () =>
+      navigation.setParams({ lastSearchBarEvent: 'opened (Android)' }),
   },
 });

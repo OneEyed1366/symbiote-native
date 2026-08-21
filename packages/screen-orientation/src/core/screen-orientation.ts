@@ -1,9 +1,16 @@
 // Hand-ported from .vendors/expo/packages/expo-screen-orientation/src/ScreenOrientation.ts
 // (sdk-57). Unlike battery, upstream ScreenOrientation throws UnavailabilityError when the
 // native method is absent — same convention as packages/network/src/core/network.ts.
-import { Platform, UnavailabilityError, type EventSubscription } from 'expo-modules-core';
+import {
+  Platform,
+  UnavailabilityError,
+  type EventSubscription,
+} from 'expo-modules-core';
 import { Dimensions } from 'react-native';
-import { expoScreenOrientation, type IPlatformOrientationParam } from './native-module';
+import {
+  expoScreenOrientation,
+  type IPlatformOrientationParam,
+} from './native-module';
 import {
   Orientation,
   OrientationLock,
@@ -19,7 +26,9 @@ let _orientationChangeSubscribers: EventSubscription[] = [];
 let _lastOrientationLock: OrientationLock = OrientationLock.UNKNOWN;
 
 /** Locks the screen to the given orientation. */
-export async function lockAsync(orientationLock: OrientationLock): Promise<void> {
+export async function lockAsync(
+  orientationLock: OrientationLock,
+): Promise<void> {
   if (!expoScreenOrientation.lockAsync) {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'lockAsync');
   }
@@ -43,12 +52,17 @@ export async function lockAsync(orientationLock: OrientationLock): Promise<void>
 // Ported verbatim for parity; do NOT fix without recording a deliberate divergence.
 /** Locks the screen to a platform-specific orientation param — Android constant, iOS
  * orientation array, or web `WebOrientationLock`. */
-export async function lockPlatformAsync(options: PlatformOrientationInfo): Promise<void> {
+export async function lockPlatformAsync(
+  options: PlatformOrientationInfo,
+): Promise<void> {
   if (!expoScreenOrientation.lockPlatformAsync) {
     throw new UnavailabilityError(NATIVE_MODULE_NAME, 'lockPlatformAsync');
   }
-  const { screenOrientationConstantAndroid, screenOrientationArrayIOS, screenOrientationLockWeb } =
-    options;
+  const {
+    screenOrientationConstantAndroid,
+    screenOrientationArrayIOS,
+    screenOrientationLockWeb,
+  } = options;
   let platformOrientationParam: IPlatformOrientationParam | undefined;
   if (Platform.OS === 'android' && screenOrientationConstantAndroid) {
     if (isNaN(screenOrientationConstantAndroid)) {
@@ -75,12 +89,16 @@ export async function lockPlatformAsync(options: PlatformOrientationInfo): Promi
   } else if (Platform.OS === 'web' && screenOrientationLockWeb) {
     const webOrientationLocks = Object.values(WebOrientationLock);
     if (!webOrientationLocks.includes(screenOrientationLockWeb)) {
-      throw new TypeError(`Invalid Web Orientation Lock: ${screenOrientationLockWeb}`);
+      throw new TypeError(
+        `Invalid Web Orientation Lock: ${screenOrientationLockWeb}`,
+      );
     }
     platformOrientationParam = screenOrientationLockWeb;
   }
   if (!platformOrientationParam) {
-    throw new TypeError('lockPlatformAsync cannot be called with undefined option properties');
+    throw new TypeError(
+      'lockPlatformAsync cannot be called with undefined option properties',
+    );
   }
   await expoScreenOrientation.lockPlatformAsync(platformOrientationParam);
   _lastOrientationLock = OrientationLock.OTHER;
@@ -113,8 +131,12 @@ export async function getOrientationLockAsync(): Promise<OrientationLock> {
 
 /** Gets the current orientation lock as a platform-specific value. */
 export async function getPlatformOrientationLockAsync(): Promise<PlatformOrientationInfo> {
-  const platformOrientationLock = await expoScreenOrientation.getPlatformOrientationLockAsync?.();
-  if (Platform.OS === 'android' && typeof platformOrientationLock === 'number') {
+  const platformOrientationLock =
+    await expoScreenOrientation.getPlatformOrientationLockAsync?.();
+  if (
+    Platform.OS === 'android' &&
+    typeof platformOrientationLock === 'number'
+  ) {
     return { screenOrientationConstantAndroid: platformOrientationLock };
   }
   if (Platform.OS === 'ios' && Array.isArray(platformOrientationLock)) {
@@ -131,7 +153,10 @@ export async function supportsOrientationLockAsync(
   orientationLock: OrientationLock,
 ): Promise<boolean> {
   if (!expoScreenOrientation.supportsOrientationLockAsync) {
-    throw new UnavailabilityError(NATIVE_MODULE_NAME, 'supportsOrientationLockAsync');
+    throw new UnavailabilityError(
+      NATIVE_MODULE_NAME,
+      'supportsOrientationLockAsync',
+    );
   }
   const orientationLocks = Object.values(OrientationLock);
   if (!orientationLocks.includes(orientationLock)) {
@@ -145,7 +170,9 @@ export function addOrientationChangeListener(
   listener: OrientationChangeListener,
 ): EventSubscription {
   if (typeof listener !== 'function') {
-    throw new TypeError(`addOrientationChangeListener cannot be called with ${listener}`);
+    throw new TypeError(
+      `addOrientationChangeListener cannot be called with ${listener}`,
+    );
   }
   const subscription = createDidUpdateDimensionsSubscription(listener);
   _orientationChangeSubscribers.push(subscription);
@@ -162,12 +189,16 @@ export function removeOrientationChangeListeners(): void {
 }
 
 /** Removes a single orientation-change listener's subscription. */
-export function removeOrientationChangeListener(subscription: EventSubscription): void {
+export function removeOrientationChangeListener(
+  subscription: EventSubscription,
+): void {
   if (!subscription || !subscription.remove) {
     throw new TypeError('Must pass in a valid subscription');
   }
   subscription.remove();
-  _orientationChangeSubscribers = _orientationChangeSubscribers.filter(sub => sub !== subscription);
+  _orientationChangeSubscribers = _orientationChangeSubscribers.filter(
+    sub => sub !== subscription,
+  );
 }
 
 // IMPORTANT: Android doesn't emit `expoDidUpdateDimensions` — RN's own Dimensions module does,

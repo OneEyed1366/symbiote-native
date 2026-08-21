@@ -5,13 +5,18 @@
     "outDir": "build"
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.test-helper.ts"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.test-helper.ts"
+  ],
   "references": [
     { "path": "../../core/engine" },
     { "path": "../../core/components" },
     { "path": "../../adapters/vue" },
     { "path": "../../adapters/react" },
     { "path": "../../adapters/angular" },
-    { "path": "../../adapters/svelte" }
+    { "path": "../../adapters/svelte" },
+    { "path": "../../adapters/solid" }
   ]
 }

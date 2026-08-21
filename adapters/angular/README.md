@@ -1,7 +1,7 @@
 # @symbiote-native/angular
 
 The **Angular adapter** for [SymbioteNative](../../README.md) — render real native iOS/Android views
-from Angular, on the *same* untouched core as React and Vue, with React Native's own renderer
+from Angular, on the _same_ untouched core as React and Vue, with React Native's own renderer
 never in the path. It is a `Renderer2`/`RendererFactory2` whose calls map onto the engine's
 four-call mutation API; `@symbiote-native/engine` does the clone-on-write commit into Fabric.
 
@@ -34,7 +34,7 @@ own top-level dependencies. There's no `create-symbiote` scaffolder yet, so the 
 
 ## Use it
 
-The native entry reaches the *same* `registerRunnable` seam as React and Vue — only the adapter
+The native entry reaches the _same_ `registerRunnable` seam as React and Vue — only the adapter
 changes. It hands the surface's `rootTag` to `mount` from `@symbiote-native/angular`, which drives the
 engine through Angular's `Renderer2`:
 
@@ -94,7 +94,7 @@ detection + the descriptor→`createElement` bridge).
 One deliberate gap, tracked, not blocking the canary — **third-party React component packages**
 (`@react-native-community/slider`) run only under the React adapter: their body calls React hooks
 off the React dispatcher, which is null under Angular. `@symbiote-native/slider` (this repo's own
-wrapper) *does* ship a real Angular build, reachable through the same `createNode`-by-ViewConfig
+wrapper) _does_ ship a real Angular build, reachable through the same `createNode`-by-ViewConfig
 path Angular uses for its own primitives — that wrapper is what makes a third-party native view
 usable from a non-React adapter at all.
 

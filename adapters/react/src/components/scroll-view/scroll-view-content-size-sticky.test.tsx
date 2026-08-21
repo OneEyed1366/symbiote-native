@@ -20,7 +20,11 @@ import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { View, Text, mount, unmount } from '@symbiote-native/react';
 import { ScrollView } from './index';
-import { ScrollViewStickyHeader, type IStickyHeaderComponentProps } from './sticky-header';
+import {
+  ScrollViewStickyHeader,
+  type IStickyHeaderComponentProps,
+  type IStickyHeaderHandle,
+} from './sticky-header';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 53;
@@ -63,16 +67,38 @@ function headerText(children: IStickyHeaderComponentProps['children']): string {
   return typeof inner === 'string' ? inner : '';
 }
 
-// Spy wrapper: records the nextHeaderLayoutY it is handed, then delegates to the real header so
-// the genuine onLayout recorder (which reports this header's own y up to the parent) still runs.
+// Spy wrapper: records the next-header y this header is handed, then delegates to the real header
+// so the genuine onLayout recorder (which reports this header's own y up to the parent) still runs.
+// The value arrives IMPERATIVELY through the ref, not as a prop (RN ScrollView.js:1141) — that is
+// what keeps one header's layout from re-rendering every child — so the spy wraps the handle. A
+// custom StickyHeaderComponent has to forward the ref for the same reason.
 function SpyStickyHeader(props: IStickyHeaderComponentProps): ReactElement {
-  nextYByHeader.set(headerText(props.children), props.nextHeaderLayoutY);
-  return createElement(ScrollViewStickyHeader, props);
+  const label = headerText(props.children);
+  const parentRef = props.ref;
+  return createElement(ScrollViewStickyHeader, {
+    ...props,
+    ref: (handle: IStickyHeaderHandle | null): void => {
+      if (typeof parentRef !== 'function') return;
+      if (handle === null) {
+        parentRef(null);
+        return;
+      }
+      parentRef({
+        setNextHeaderY: (y: number): void => {
+          nextYByHeader.set(label, y);
+          handle.setNextHeaderY(y);
+        },
+      });
+    },
+  });
 }
 
 function StickyApp(): ReactElement {
   return (
-    <ScrollView stickyHeaderIndices={[0, 2]} StickyHeaderComponent={SpyStickyHeader}>
+    <ScrollView
+      stickyHeaderIndices={[0, 2]}
+      StickyHeaderComponent={SpyStickyHeader}
+    >
       <Text>H0</Text>
       <View />
       <Text>H1</Text>
@@ -98,7 +124,9 @@ describe('ScrollView content-size + sticky headers', () => {
     mount(ROOT_TAG, <App />);
 
     // The synthesizer puts an onLayout on the content node, so Fabric raises the onLayout flag.
-    const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+    const content = fabric.find(
+      node => node.viewName === 'RCTScrollContentView',
+    );
     expect(content, 'RCTScrollContentView was created').toBeDefined();
     expect(content!.props.onLayout).toBe(true);
 
@@ -132,7 +160,9 @@ describe('ScrollView content-size + sticky headers', () => {
   it('wraps the flagged sticky child and sets a scrollEventThrottle', () => {
     mount(ROOT_TAG, <App />);
 
-    const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+    const content = fabric.find(
+      node => node.viewName === 'RCTScrollContentView',
+    );
     expect(content, 'RCTScrollContentView was created').toBeDefined();
 
     const text = fabric.find(
@@ -143,21 +173,27 @@ describe('ScrollView content-size + sticky headers', () => {
     // The Text must NOT be a direct child of the content node. It sits inside the sticky wrapper.
     expect(content!.children.includes(text!)).toBe(false);
     // The wrapper is the content child whose subtree contains the Text.
-    const wrapper = content!.children.find(child => subtreeContains(child, text!));
+    const wrapper = content!.children.find(child =>
+      subtreeContains(child, text!),
+    );
     expect(wrapper, 'a sticky wrapper wraps the flagged child').toBeDefined();
     // The wrapper is a real (non-flattened) view carrying a transform: the sticky translateY.
     expect(wrapper!.props.collapsable).toBe(false);
     const transform = wrapper!.props.transform;
     expect(Array.isArray(transform)).toBe(true);
     expect(
-      Array.isArray(transform) && transform.some(entry => isRecord(entry) && 'translateY' in entry),
+      Array.isArray(transform) &&
+        transform.some(entry => isRecord(entry) && 'translateY' in entry),
     ).toBe(true);
 
     // The second child (the plain View at index 1) is NOT flagged, so it stays unwrapped.
     const plainView = content!.children.find(
       child => child !== wrapper && child.viewName === 'RCTView',
     );
-    expect(plainView, 'the non-sticky child stays an unwrapped direct content child').toBeDefined();
+    expect(
+      plainView,
+      'the non-sticky child stays an unwrapped direct content child',
+    ).toBeDefined();
 
     // onScroll is wired on the scroll view so the sticky AnimatedValue tracks the offset.
     const outer = fabric.find(node => node.viewName === 'RCTScrollView');
@@ -170,7 +206,7 @@ describe('ScrollView content-size + sticky headers', () => {
   // headers, the EARLIER header must receive the LATER header's y, while the LAST stays
   // undefined — and it must resolve by INDEX order, not by which layout event arrives first
   // (real devices don't guarantee layout-callback ordering).
-  it('feeds the earlier sticky header the next header y by index order', () => {
+  it('feeds the earlier sticky header the next header y by index order', async () => {
     mount(ROOT_TAG, <StickyApp />);
 
     // Before any layout: neither header knows the next one's y.
@@ -179,7 +215,8 @@ describe('ScrollView content-size + sticky headers', () => {
     // The two sticky wrappers are the transform-bearing Animated.View nodes, in document order:
     // [0] = H0, [1] = H1. Fire a real topLayout at each via the registered event handler.
     const stickyWrappers = fabric.created.filter(
-      node => Array.isArray(node.props.transform) && node.props.collapsable === false,
+      node =>
+        Array.isArray(node.props.transform) && node.props.collapsable === false,
     );
     expect(stickyWrappers.length).toBe(2);
 
@@ -191,6 +228,10 @@ describe('ScrollView content-size + sticky headers', () => {
     fabric.fireEvent(stickyWrappers[0].instanceHandle, 'topLayout', {
       layout: { x: 0, y: 0, width: 320, height: 40 },
     });
+
+    // The handoff is coalesced onto a microtask so a mount's worth of layouts lands in one render
+    // pass (see usePreparedScrollView), so drain it before asserting.
+    await Promise.resolve();
 
     // H0 (earlier) must learn H1's y as its push-off collision point; H1 (last) stays undefined.
     expect(nextYByHeader.get('H0')).toBe(100);

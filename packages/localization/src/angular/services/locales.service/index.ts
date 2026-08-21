@@ -1,4 +1,11 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
 import { addLocaleListener, getLocales, type Locale } from '../../../core';
 
 // Angular twin of React's `useLocales` hook and Vue's `useLocales` composable. See

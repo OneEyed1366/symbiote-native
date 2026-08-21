@@ -1,4 +1,11 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
 import { Barometer, type IBarometerMeasurement } from '../../../core';
 
 // Angular twin of React's `useBarometer` hook / Vue's `useBarometer` composable. Angular has no
@@ -23,7 +30,9 @@ export class BarometerService {
         if (updateIntervalMs !== undefined) {
           Barometer.setUpdateInterval(updateIntervalMs);
         }
-        const subscription = Barometer.addListener(next => measurement.set(next));
+        const subscription = Barometer.addListener(next =>
+          measurement.set(next),
+        );
         onCleanup(() => subscription.remove());
       },
       { injector: this.injector },

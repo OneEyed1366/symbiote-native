@@ -40,7 +40,8 @@ const DATA: IRow[] = Array.from({ length: ITEM_COUNT }, (_unused, index) => ({
   label: `row-${index}`,
 }));
 
-const Separator = (): ReactElement => createElement('symbiote-view', { style: { height: 1 } });
+const Separator = (): ReactElement =>
+  createElement('symbiote-view', { style: { height: 1 } });
 const Header = (): ReactElement => createElement('symbiote-text', {}, 'HEADER');
 const Footer = (): ReactElement => createElement('symbiote-text', {}, 'FOOTER');
 
@@ -150,7 +151,9 @@ describe('React FlatList virtualization on the engine (Positive)', () => {
 
     const labels = collectRowLabels();
     expect(labels.size, 'item rows committed').toBeGreaterThan(0);
-    expect(labels.size, 'window far smaller than the full data').toBeLessThan(WINDOW_CEILING);
+    expect(labels.size, 'window far smaller than the full data').toBeLessThan(
+      WINDOW_CEILING,
+    );
     // The window starts at the top: row-0 present, a deep row absent.
     expect(labels.has('row-0')).toBe(true);
     expect(labels.has(DEEP_ROW)).toBe(false);
@@ -169,7 +172,9 @@ describe('React FlatList virtualization on the engine (Positive)', () => {
     scrollTo(scrollView.instanceHandle, DEEP_OFFSET);
 
     const labels = collectRowLabels();
-    expect(labels.size, 'window stays bounded after scroll').toBeLessThan(WINDOW_CEILING);
+    expect(labels.size, 'window stays bounded after scroll').toBeLessThan(
+      WINDOW_CEILING,
+    );
     // The deep row is now resident...
     expect(labels.has(DEEP_ROW)).toBe(true);
     // ...and the early rows have fallen out of the window (real shift, not append).
@@ -186,12 +191,18 @@ describe('React FlatList virtualization on the engine (Positive)', () => {
     // Mid-list: the trailing buffer does NOT yet reach the last row, so onEndReached must
     // NOT fire, exactly the misfire the old count-based gating allowed.
     scrollTo(scrollView.instanceHandle, MID_OFFSET);
-    expect(collectRowLabels().has('row-999'), 'last row absent at mid offset').toBe(false);
+    expect(
+      collectRowLabels().has('row-999'),
+      'last row absent at mid offset',
+    ).toBe(false);
     expect(endReachedCount()).toBe(0);
 
     // To the bottom: row-999 enters the window, distance collapses to ~0, fires exactly once.
     scrollTo(scrollView.instanceHandle, BOTTOM_OFFSET);
-    expect(collectRowLabels().has('row-999'), 'last row resident at the bottom').toBe(true);
+    expect(
+      collectRowLabels().has('row-999'),
+      'last row resident at the bottom',
+    ).toBe(true);
     expect(endReachedCount()).toBe(1);
 
     // A redundant scroll at the same bottom (same content length) must NOT double-fire.
@@ -234,10 +245,14 @@ describe('React FlatList virtualization on the engine (Positive)', () => {
     scrollTo(scrollView.instanceHandle, BOTTOM_OFFSET);
     const startBeforeReturn = startReachedCount();
     scrollTo(scrollView.instanceHandle, 0);
-    expect(collectRowLabels().has('row-0'), 'row-0 resident again at the top').toBe(true);
+    expect(
+      collectRowLabels().has('row-0'),
+      'row-0 resident again at the top',
+    ).toBe(true);
     expect(startReachedCount()).toBe(startBeforeReturn + 1);
     // The reported distance from the start at offset 0 floors to ~0.
-    const lastStartDistance = startReachedDistances[startReachedDistances.length - 1];
+    const lastStartDistance =
+      startReachedDistances[startReachedDistances.length - 1];
     expect(lastStartDistance).toBe(0);
 
     // A redundant scroll at the same top (same content length) must NOT double-fire.
@@ -259,7 +274,10 @@ describe('React FlatList multi-column composition (Positive)', () => {
   const MULTI_COLUMN_ROOT_TAG = 24;
   const multiColumnData = DATA.slice(0, 6); // -> 3 full rows of 2, no partial row
 
-  const separatorCalls: Array<{ leadingLabel?: string; trailingLabel?: string }> = [];
+  const separatorCalls: Array<{
+    leadingLabel?: string;
+    trailingLabel?: string;
+  }> = [];
   function RowSeparator(props: ISeparatorProps<IRow>): ReactElement {
     separatorCalls.push({
       leadingLabel: props.leadingItem?.label,
@@ -330,9 +348,10 @@ describe('React FlatList multi-column composition (Positive)', () => {
     // IRow<ItemT> wrapper here would be a type-contract violation invisible to a plain smoke test.
     mountMultiColumnWithViewport();
 
-    expect(separatorCalls.length, 'at least one separator rendered between rows').toBeGreaterThan(
-      0,
-    );
+    expect(
+      separatorCalls.length,
+      'at least one separator rendered between rows',
+    ).toBeGreaterThan(0);
     for (const call of separatorCalls) {
       // Every captured item is a real row-0/1's label ("row-N"), never something shaped like an
       // IRow (which has no `.label` of its own).
@@ -341,7 +360,10 @@ describe('React FlatList multi-column composition (Positive)', () => {
     }
     // The first separator sits between row 0 (items row-0/row-1) and row 1 (items row-2/row-3):
     // leading = last item of row 0, trailing = first item of row 1.
-    expect(separatorCalls[0]).toEqual({ leadingLabel: 'row-1', trailingLabel: 'row-2' });
+    expect(separatorCalls[0]).toEqual({
+      leadingLabel: 'row-1',
+      trailingLabel: 'row-2',
+    });
   });
 
   it('expands row-level viewability to one token per real item, not one per row', () => {

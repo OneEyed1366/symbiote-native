@@ -22,9 +22,11 @@ import { PermissionStatus, type PermissionResponse } from '../../core';
 
 const {
   compileSvelteModuleFile,
-}: { compileSvelteModuleFile: (src: string, filename: string) => string } = metroSvelteTransformer;
+}: { compileSvelteModuleFile: (src: string, filename: string) => string } =
+  metroSvelteTransformer;
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -50,7 +52,11 @@ const requestPermissionsAsyncMock = vi.fn(async () => GRANTED);
 vi.mock('../../core', () => ({
   getPermissionsAsync: () => getPermissionsAsyncMock(),
   requestPermissionsAsync: () => requestPermissionsAsyncMock(),
-  PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    DENIED: 'denied',
+    UNDETERMINED: 'undetermined',
+  },
 }));
 
 const ROOT_TAG = 91_621;
@@ -58,7 +64,8 @@ const PROBE_OUT = join(__dirname, '.smoke-compiled-use-permissions-probe.mjs');
 const RUNE_OUT = join(__dirname, '.smoke-compiled-use-permissions.svelte.mjs');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -74,13 +81,23 @@ afterEach(() => {
   rmSync(RUNE_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
 // $state/$effect need Svelte's MODULE compiler, not the component compiler — a bare, uncompiled
 // rune call throws `rune_outside_svelte` at runtime.
 function compileRuneModule(): void {
-  const source = readFileSync(join(__dirname, 'use-permissions.svelte.ts'), 'utf-8');
-  writeFileSync(RUNE_OUT, compileSvelteModuleFile(source, 'use-permissions.svelte.ts'));
+  const source = readFileSync(
+    join(__dirname, 'use-permissions.svelte.ts'),
+    'utf-8',
+  );
+  writeFileSync(
+    RUNE_OUT,
+    compileSvelteModuleFile(source, 'use-permissions.svelte.ts'),
+  );
 }
 
 type IPermissions = {
@@ -93,7 +110,9 @@ type IPermissions = {
 // Node only reports an unhandled rejection a macrotask after the promise settles, so a plain
 // `await` on the rune's own boxed state is too early to prove one did not happen. The mount
 // itself has to run inside the window, hence the passed-through result.
-async function collectUnhandledRejections<T>(run: () => Promise<T>): Promise<[T, unknown[]]> {
+async function collectUnhandledRejections<T>(
+  run: () => Promise<T>,
+): Promise<[T, unknown[]]> {
   const unhandled: unknown[] = [];
   const onUnhandledRejection = (reason: unknown): void => {
     unhandled.push(reason);
@@ -130,11 +149,21 @@ async function loadProbe(): Promise<Component> {
 }
 
 function isPermissions(value: unknown): value is IPermissions {
-  return typeof value === 'object' && value !== null && 'request' in value && 'get' in value;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'request' in value &&
+    'get' in value
+  );
 }
 
 function isPermissionResponse(value: unknown): value is PermissionResponse {
-  return typeof value === 'object' && value !== null && 'granted' in value && 'status' in value;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'granted' in value &&
+    'status' in value
+  );
 }
 
 async function mountPermissions(): Promise<{
@@ -238,11 +267,16 @@ describe('usePermissions (Svelte)', () => {
     // native rejection escaped the rune entirely as an unhandled promise rejection and left
     // `status` at null — indistinguishable from "still fetching".
     it('surfaces a mount-fetch rejection as `error` instead of leaving it unhandled', async () => {
-      getPermissionsAsyncMock.mockRejectedValueOnce(new Error('permission read failed'));
+      getPermissionsAsyncMock.mockRejectedValueOnce(
+        new Error('permission read failed'),
+      );
 
-      const [{ api }, unhandled] = await collectUnhandledRejections(mountPermissions);
+      const [{ api }, unhandled] =
+        await collectUnhandledRejections(mountPermissions);
 
-      await vi.waitFor(() => expect(api.error?.message).toBe('permission read failed'));
+      await vi.waitFor(() =>
+        expect(api.error?.message).toBe('permission read failed'),
+      );
       expect(unhandled).toEqual([]);
       // null status + non-null error is the pair a consumer reads as "the fetch failed"
       expect(api.status).toBeNull();
@@ -251,7 +285,9 @@ describe('usePermissions (Svelte)', () => {
     // why: a consumer that retries by hand after a failed mount fetch must end up with a clean
     // slate — a stale error next to a freshly fetched status would keep reading as "broken".
     it('clears the recorded error once a later get() succeeds', async () => {
-      getPermissionsAsyncMock.mockRejectedValueOnce(new Error('permission read failed'));
+      getPermissionsAsyncMock.mockRejectedValueOnce(
+        new Error('permission read failed'),
+      );
       const { api } = await mountPermissions();
       await vi.waitFor(() => expect(api.error).not.toBeNull());
 

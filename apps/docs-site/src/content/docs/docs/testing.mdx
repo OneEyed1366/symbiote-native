@@ -34,20 +34,21 @@ pnpm -C examples/react e2e:build:android && pnpm -C examples/react e2e:test:andr
 ```
 
 The `e2e:*` scripts live in each example's own `package.json`
-(`examples/react`, `examples/vue-sfc`, `examples/vue-tsx`, `examples/angular`),
-not the repo root.
+(`examples/react`, `examples/vue-sfc`, `examples/vue-tsx`, `examples/angular`,
+`examples/svelte`), not the repo root.
 
-<Aside type="tip" title="One spec file, shared across React and Vue">
-  Detox attaches to the stock React Native host **below** the layer SymbioteNative
-  replaces — it drives the real native views through Fabric's own
-  accessibility tree, the same way it would for a plain React Native app.
-  The same `canary-journeys` e2e spec runs unmodified across `examples/react`,
-  `examples/vue-sfc`, and `examples/vue-tsx`, as long as each exposes the
-  same `testID`s. A component that mounts but behaves wrong under one
-  adapter — say, a native-driven `Animated` view that renders but never
-  actually animates — fails the same assertion the same way regardless of
-  which framework rendered it. `examples/angular` has its own Detox e2e
-  harness today but doesn't yet share that exact spec file.
+<Aside type="tip" title="One spec file, shared across React, Vue, and Svelte">
+  Detox attaches to the stock React Native host **below** the layer
+  SymbioteNative replaces — it drives the real native views through Fabric's own
+  accessibility tree, the same way it would for a plain React Native app. The
+  same `canary-journeys` e2e spec runs unmodified across `examples/react`,
+  `examples/vue-sfc`, `examples/vue-tsx`, and `examples/svelte`, as long as
+  each exposes the same `testID`s. A component that mounts but behaves wrong
+  under one adapter — say, a native-driven `Animated` view that renders but
+  never actually animates — fails the same assertion the same way regardless
+  of which framework rendered it. `examples/angular` has its own Detox e2e
+  harness today but doesn't yet share that exact spec file. `examples/solid`
+  has no Detox e2e harness yet at all.
 </Aside>
 
 ## A gotcha specific to perpetual animations
@@ -58,7 +59,10 @@ heartbeat pulse, a spinner) never reports idle, so `device.launchApp()`
 hangs. Disable synchronization for that launch:
 
 ```ts
-await device.launchApp({ newInstance: true, launchArgs: { detoxEnableSynchronization: 0 } });
+await device.launchApp({
+  newInstance: true,
+  launchArgs: { detoxEnableSynchronization: 0 },
+});
 ```
 
 You then drive individual assertions with explicit `waitFor(...)` calls

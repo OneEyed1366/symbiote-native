@@ -12,7 +12,9 @@ export type ITabScreenOptionsArgs = {
   navigation: ITabNavigatorHandle;
 };
 
-export type ITabScreenOptionsResolver = (props: ITabScreenOptionsArgs) => ITabOptions;
+export type ITabScreenOptionsResolver = (
+  props: ITabScreenOptionsArgs,
+) => ITabOptions;
 
 @Directive({
   selector: 'ng-template[symbioteTabScreen]',

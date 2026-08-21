@@ -37,7 +37,11 @@ const fakePlatform = { OS: 'android' as 'ios' | 'android' };
 
 vi.mock('expo-modules-core', () => ({
   Platform: fakePlatform,
-  PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    DENIED: 'denied',
+    UNDETERMINED: 'undetermined',
+  },
   UnavailabilityError: class UnavailabilityError extends Error {
     constructor(moduleName: string, propertyName: string) {
       super(`${propertyName} is not available on ${moduleName}`);
@@ -73,7 +77,9 @@ describe('getCellularGenerationAsync', () => {
       // same native call must fire on both platforms.
       fakePlatform.OS = 'ios';
       await expect(getCellularGenerationAsync()).resolves.toBe(3);
-      expect(FAKE_NATIVE_CELLULAR.getCellularGenerationAsync).toHaveBeenCalledTimes(1);
+      expect(
+        FAKE_NATIVE_CELLULAR.getCellularGenerationAsync,
+      ).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -131,7 +137,9 @@ describe('getIsoCountryCodeAsync', () => {
     it('resolves null on iOS without calling the native module', async () => {
       fakePlatform.OS = 'ios';
       await expect(getIsoCountryCodeAsync()).resolves.toBeNull();
-      expect(FAKE_NATIVE_CELLULAR.getIsoCountryCodeAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_CELLULAR.getIsoCountryCodeAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('delegates to the native module on Android', async () => {
@@ -187,7 +195,9 @@ describe('getMobileCountryCodeAsync', () => {
     it('resolves null on iOS without calling the native module', async () => {
       fakePlatform.OS = 'ios';
       await expect(getMobileCountryCodeAsync()).resolves.toBeNull();
-      expect(FAKE_NATIVE_CELLULAR.getMobileCountryCodeAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_CELLULAR.getMobileCountryCodeAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('delegates to the native module on Android', async () => {
@@ -215,7 +225,9 @@ describe('getMobileNetworkCodeAsync', () => {
     it('resolves null on iOS without calling the native module', async () => {
       fakePlatform.OS = 'ios';
       await expect(getMobileNetworkCodeAsync()).resolves.toBeNull();
-      expect(FAKE_NATIVE_CELLULAR.getMobileNetworkCodeAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_CELLULAR.getMobileNetworkCodeAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('delegates to the native module on Android', async () => {
@@ -291,7 +303,9 @@ describe('requestPermissionsAsync', () => {
         granted: true,
         canAskAgain: true,
       });
-      expect(FAKE_NATIVE_CELLULAR.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+      expect(
+        FAKE_NATIVE_CELLULAR.requestPermissionsAsync,
+      ).toHaveBeenCalledTimes(1);
     });
 
     it('resolves a plain GRANTED literal on iOS without calling the native module', async () => {
@@ -302,7 +316,9 @@ describe('requestPermissionsAsync', () => {
         granted: true,
         canAskAgain: true,
       });
-      expect(FAKE_NATIVE_CELLULAR.requestPermissionsAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_CELLULAR.requestPermissionsAsync,
+      ).not.toHaveBeenCalled();
     });
   });
 

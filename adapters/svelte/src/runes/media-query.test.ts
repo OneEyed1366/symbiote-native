@@ -22,7 +22,8 @@ import { installFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import { createWidthQuery, orientation } from './media-query';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -41,7 +42,8 @@ const TABLET_PORTRAIT: IDimensionsPayload = {
 };
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 const addEventListener = Dimensions.addEventListener.bind(Dimensions);
 let removals: Array<ReturnType<typeof vi.fn>> = [];
@@ -49,12 +51,14 @@ let removals: Array<ReturnType<typeof vi.fn>> = [];
 beforeEach(() => {
   fabric.reset();
   removals = [];
-  vi.spyOn(Dimensions, 'addEventListener').mockImplementation((type, listener) => {
-    const subscription: IEventSubscription = addEventListener(type, listener);
-    const remove = vi.fn(() => subscription.remove());
-    removals.push(remove);
-    return { remove };
-  });
+  vi.spyOn(Dimensions, 'addEventListener').mockImplementation(
+    (type, listener) => {
+      const subscription: IEventSubscription = addEventListener(type, listener);
+      const remove = vi.fn(() => subscription.remove());
+      removals.push(remove);
+      return { remove };
+    },
+  );
   Dimensions.set(PHONE_PORTRAIT);
 });
 
@@ -106,7 +110,9 @@ async function mountProbe(values: IQueryState[]): Promise<void> {
   if (typeof probe !== 'function')
     throw new Error('MediaQueryProbe.svelte default export is not a component');
   const component: Component = probe;
-  mount(ROOT_TAG, component, { onValue: (state: IQueryState) => values.push(state) });
+  mount(ROOT_TAG, component, {
+    onValue: (state: IQueryState) => values.push(state),
+  });
   await tick();
 }
 
@@ -118,25 +124,33 @@ describe('Positive — orientation and createWidthQuery, direct reads', () => {
   // not a coin flip" (height >= width). Untested, this boundary could silently flip to
   // landscape-on-tie with no test catching it.
   it('treats a square window as portrait, not a coin flip', () => {
-    Dimensions.set({ window: { width: 500, height: 500, scale: 1, fontScale: 1 } });
+    Dimensions.set({
+      window: { width: 500, height: 500, scale: 1, fontScale: 1 },
+    });
     expect(orientation.current).toBe('portrait');
   });
 
   it('is landscape when width exceeds height', () => {
-    Dimensions.set({ window: { width: 800, height: 400, scale: 1, fontScale: 1 } });
+    Dimensions.set({
+      window: { width: 800, height: 400, scale: 1, fontScale: 1 },
+    });
     expect(orientation.current).toBe('landscape');
   });
 
   // why: the source comment states both bounds are INCLUSIVE, matching CSS min-width/max-width —
   // a width exactly at the bound must still match, not fall just outside it.
   it('matches minWidth exactly (inclusive lower bound)', () => {
-    Dimensions.set({ window: { width: 600, height: 800, scale: 1, fontScale: 1 } });
+    Dimensions.set({
+      window: { width: 600, height: 800, scale: 1, fontScale: 1 },
+    });
     const query = createWidthQuery({ minWidth: 600 });
     expect(query.current).toBe(true);
   });
 
   it('matches maxWidth exactly (inclusive upper bound)', () => {
-    Dimensions.set({ window: { width: 599, height: 800, scale: 1, fontScale: 1 } });
+    Dimensions.set({
+      window: { width: 599, height: 800, scale: 1, fontScale: 1 },
+    });
     const query = createWidthQuery({ maxWidth: 599 });
     expect(query.current).toBe(true);
   });

@@ -24,8 +24,17 @@
 <script lang="ts">
   import type { Component } from 'svelte';
   import { onDestroy, tick } from 'svelte';
-  import { AnimatedValue, Dimensions, PanResponder, dlog, timing } from '@symbiote-native/engine';
-  import type { IPanResponderGestureState, ISymbioteEvent } from '@symbiote-native/engine';
+  import {
+    AnimatedValue,
+    Dimensions,
+    PanResponder,
+    dlog,
+    timing,
+  } from '@symbiote-native/engine';
+  import type {
+    IPanResponderGestureState,
+    ISymbioteEvent,
+  } from '@symbiote-native/engine';
   // The ONLY import from the adapter's main barrel: `Animated.View` is a compiled `.svelte`
   // component, so unlike PanResponder/Dimensions/AnimatedValue (pure engine re-exports, taken
   // from the engine directly here) it has no `.svelte`-free home to import from.
@@ -63,7 +72,11 @@
   import type { INavigationScopeValue } from '../navigation-context';
   import NavigationScope from '../navigation-scope.svelte';
   import { SCREEN_REGISTRY_HOST_PROPS } from '../registry-host';
-  import { setScreenCollector, toRegistry, withoutScreen } from '../screen-registry';
+  import {
+    setScreenCollector,
+    toRegistry,
+    withoutScreen,
+  } from '../screen-registry';
   import type { IRegisteredScreen } from '../screen-registry';
   import type { IDrawerScreenProps } from '../drawer-screen-props';
   import type { IDrawerProps } from './drawer-props';
@@ -103,7 +116,9 @@
     swipeMinVelocity,
   });
 
-  let screens = $state.raw<IRegisteredScreen<IDrawerScreenProps['options']>[]>([]);
+  let screens = $state.raw<IRegisteredScreen<IDrawerScreenProps['options']>[]>(
+    [],
+  );
   setScreenCollector<IDrawerScreenProps['options']>({
     kind: 'drawer',
     register: screen => {
@@ -123,10 +138,16 @@
 
   function seedState(): IDrawerRouterState {
     if (seededState !== undefined) return seededState;
-    const routes: IRoute<unknown>[] = [...registry.entries()].map(([name, entry]) => {
-      routeSequence += 1;
-      return { key: `${routeIdPrefix}-${name}-${routeSequence}`, name, params: entry.initialParams };
-    });
+    const routes: IRoute<unknown>[] = [...registry.entries()].map(
+      ([name, entry]) => {
+        routeSequence += 1;
+        return {
+          key: `${routeIdPrefix}-${name}-${routeSequence}`,
+          name,
+          params: entry.initialParams,
+        };
+      },
+    );
     if (routes.length === 0) {
       dlog('Drawer: no <Drawer.Screen> children registered');
       // Deliberately not memoized - markers may still be registering.
@@ -164,17 +185,23 @@
   }
 
   export function openDrawer(): void {
-    dlog(`Drawer: openDrawer() called, isOpen=${state.isOpen} at t=${Date.now()}`);
+    dlog(
+      `Drawer: openDrawer() called, isOpen=${state.isOpen} at t=${Date.now()}`,
+    );
     animateProgressTo(true);
     dispatch({ type: 'openDrawer' });
   }
   export function closeDrawer(): void {
-    dlog(`Drawer: closeDrawer() called, isOpen=${state.isOpen} at t=${Date.now()}`);
+    dlog(
+      `Drawer: closeDrawer() called, isOpen=${state.isOpen} at t=${Date.now()}`,
+    );
     animateProgressTo(false);
     dispatch({ type: 'closeDrawer' });
   }
   export function toggleDrawer(): void {
-    dlog(`Drawer: toggleDrawer() called, isOpen=${state.isOpen} at t=${Date.now()}`);
+    dlog(
+      `Drawer: toggleDrawer() called, isOpen=${state.isOpen} at t=${Date.now()}`,
+    );
     animateProgressTo(!state.isOpen);
     dispatch({ type: 'toggleDrawer' });
   }
@@ -189,7 +216,12 @@
     if (wasOpen && !state.isOpen) animateProgressTo(false);
   }
 
-  const handle: IDrawerNavigatorHandle = { openDrawer, closeDrawer, toggleDrawer, jumpTo };
+  const handle: IDrawerNavigatorHandle = {
+    openDrawer,
+    closeDrawer,
+    toggleDrawer,
+    jumpTo,
+  };
 
   // The window width is read fresh AT GESTURE TIME rather than through a reactive
   // window-dimensions rune: it is only ever consumed inside these PanResponder callbacks (never
@@ -224,8 +256,13 @@
       dlog('Drawer: gesture grant');
       dragStartProgress = state.isOpen ? 1 : 0;
     },
-    onPanResponderMove: (_event: ISymbioteEvent, gestureState: IPanResponderGestureState): void => {
-      progress.setValue(resolveDragProgress(gestureState, dragStartProgress, options));
+    onPanResponderMove: (
+      _event: ISymbioteEvent,
+      gestureState: IPanResponderGestureState,
+    ): void => {
+      progress.setValue(
+        resolveDragProgress(gestureState, dragStartProgress, options),
+      );
     },
     onPanResponderRelease: (
       _event: ISymbioteEvent,
@@ -288,12 +325,16 @@
 
   const panelTranslateX = $derived(
     animated
-      ? progress.interpolate(resolveDrawerSlotInterpolation(geometry, 'panel').translateX)
+      ? progress.interpolate(
+          resolveDrawerSlotInterpolation(geometry, 'panel').translateX,
+        )
       : undefined,
   );
   const contentTranslateX = $derived(
     animated
-      ? progress.interpolate(resolveDrawerSlotInterpolation(geometry, 'content').translateX)
+      ? progress.interpolate(
+          resolveDrawerSlotInterpolation(geometry, 'content').translateX,
+        )
       : undefined,
   );
   // The overlay is a full-screen absolutely-positioned sibling BELOW content in paint order (see
@@ -310,14 +351,22 @@
       ? undefined
       : {
           opacity: progress.interpolate(overlayInterpolation.opacity),
-          transform: [{ translateX: progress.interpolate(overlayInterpolation.translateX) }],
+          transform: [
+            {
+              translateX: progress.interpolate(overlayInterpolation.translateX),
+            },
+          ],
         },
   );
   const contentStyle = $derived(
-    contentTranslateX === undefined ? undefined : { transform: [{ translateX: contentTranslateX }] },
+    contentTranslateX === undefined
+      ? undefined
+      : { transform: [{ translateX: contentTranslateX }] },
   );
   const panelStyle = $derived(
-    panelTranslateX === undefined ? undefined : { transform: [{ translateX: panelTranslateX }] },
+    panelTranslateX === undefined
+      ? undefined
+      : { transform: [{ translateX: panelTranslateX }] },
   );
 
   const focusedRoute = $derived(state.routes[state.index]);
@@ -327,7 +376,9 @@
     if (focusedRoute === undefined) return undefined;
     const entry = registry.get(focusedRoute.name);
     if (entry === undefined) {
-      dlog(`Drawer: no screen registered for route name "${focusedRoute.name}"`);
+      dlog(
+        `Drawer: no screen registered for route name "${focusedRoute.name}"`,
+      );
       return undefined;
     }
     return {
@@ -345,7 +396,8 @@
     entry: IRegisteredScreen<IDrawerScreenProps['options']>,
     route: IRoute<unknown>,
   ): IDrawerScreenOptions {
-    if (typeof entry.options === 'function') return entry.options({ route, navigation: handle });
+    if (typeof entry.options === 'function')
+      return entry.options({ route, navigation: handle });
     return entry.options ?? {};
   }
 
@@ -354,7 +406,10 @@
     for (const route of state.routes) {
       const entry = registry.get(route.name);
       if (entry === undefined) continue;
-      map[route.key] = { options: resolveDrawerScreenOptions(entry, route), navigation: handle };
+      map[route.key] = {
+        options: resolveDrawerScreenOptions(entry, route),
+        navigation: handle,
+      };
     }
     return map;
   });
@@ -385,11 +440,14 @@
 
   // renderDrawer emits its slots as root children IN `drawerChildOrder`'s order, so the two zip
   // together - the same index-pairing Vue's own render loop does.
-  const slotDescriptors = $derived.by<Partial<Record<IDrawerSlot, IDescriptor>>>(() => {
+  const slotDescriptors = $derived.by<
+    Partial<Record<IDrawerSlot, IDescriptor>>
+  >(() => {
     const map: Partial<Record<IDrawerSlot, IDescriptor>> = {};
     order.forEach((slot, index) => {
       const descriptor = root.children[index];
-      if (typeof descriptor !== 'string' && descriptor !== undefined) map[slot] = descriptor;
+      if (typeof descriptor !== 'string' && descriptor !== undefined)
+        map[slot] = descriptor;
     });
     return map;
   });
@@ -400,7 +458,87 @@
   });
 </script>
 
-{#snippet screenContent()}{#if focusedScreen !== undefined}{@const FocusedComponent = focusedScreen.component}<NavigationScope value={focusedScreen.scope}><FocusedComponent /></NavigationScope>{/if}{/snippet}{#snippet contentSlot()}{@const descriptor = slotDescriptors.content}{#if descriptor !== undefined}{#if contentStyle !== undefined}<Animated.View {...descriptor.props} style={[descriptor.props.style, contentStyle]}>{@render screenContent()}</Animated.View>{:else}<symbiote-view p={descriptor.props}>{@render screenContent()}</symbiote-view>{/if}{/if}{/snippet}{#snippet overlaySlot()}{@const descriptor = slotDescriptors.overlay}{#if descriptor !== undefined}{#if overlayStyle !== undefined}<Animated.View {...descriptor.props} style={[descriptor.props.style, overlayStyle]} />{:else}<symbiote-view p={descriptor.props} />{/if}{/if}{/snippet}{#snippet panelSlot()}{@const descriptor = slotDescriptors.panel}{#if descriptor !== undefined}{#if panelStyle !== undefined}<Animated.View {...descriptor.props} style={[descriptor.props.style, panelStyle]}>{@render drawerContent?.({ state, descriptors, navigation: handle })}</Animated.View>{:else}<symbiote-view p={descriptor.props}>{@render drawerContent?.({ state, descriptors, navigation: handle })}</symbiote-view>{/if}{/if}{/snippet}<symbiote-view p={rootProps}><symbiote-text p={SCREEN_REGISTRY_HOST_PROPS}>{@render children?.()}</symbiote-text>{#each order as slot (slot)}{#if slot === 'content'}{@render contentSlot()}{:else if slot === 'overlay'}{@render overlaySlot()}{:else}{@render panelSlot()}{/if}{/each}</symbiote-view>
+{#snippet screenContent()}
+  {#if focusedScreen !== undefined}
+    {@const FocusedComponent = focusedScreen.component}
+    <NavigationScope value={focusedScreen.scope}>
+      <FocusedComponent />
+    </NavigationScope>
+  {/if}
+{/snippet}
+
+{#snippet contentSlot()}
+  {@const descriptor = slotDescriptors.content}
+  {#if descriptor !== undefined}
+    {#if contentStyle !== undefined}
+      <Animated.View
+        {...descriptor.props}
+        style={[descriptor.props.style, contentStyle]}
+      >
+        {@render screenContent()}
+      </Animated.View>
+    {:else}
+      <symbiote-view p={descriptor.props}>
+        {@render screenContent()}
+      </symbiote-view>
+    {/if}
+  {/if}
+{/snippet}
+
+{#snippet overlaySlot()}
+  {@const descriptor = slotDescriptors.overlay}
+  {#if descriptor !== undefined}
+    {#if overlayStyle !== undefined}
+      <Animated.View
+        {...descriptor.props}
+        style={[descriptor.props.style, overlayStyle]}
+      />
+    {:else}
+      <symbiote-view p={descriptor.props} />
+    {/if}
+  {/if}
+{/snippet}
+
+{#snippet panelSlot()}
+  {@const descriptor = slotDescriptors.panel}
+  {#if descriptor !== undefined}
+    {#if panelStyle !== undefined}
+      <Animated.View
+        {...descriptor.props}
+        style={[descriptor.props.style, panelStyle]}
+      >
+        {@render drawerContent?.({
+          state,
+          descriptors,
+          navigation: handle,
+        })}
+      </Animated.View>
+    {:else}
+      <symbiote-view p={descriptor.props}>
+        {@render drawerContent?.({
+          state,
+          descriptors,
+          navigation: handle,
+        })}
+      </symbiote-view>
+    {/if}
+  {/if}
+{/snippet}
+
+<symbiote-view p={rootProps}>
+  <symbiote-text p={SCREEN_REGISTRY_HOST_PROPS}>
+    {@render children?.()}
+  </symbiote-text>
+  {#each order as slot (slot)}
+    {#if slot === 'content'}
+      {@render contentSlot()}
+    {:else if slot === 'overlay'}
+      {@render overlaySlot()}
+    {:else}
+      {@render panelSlot()}
+    {/if}
+  {/each}
+</symbiote-view>
 
 <!-- --- Explicit gap list vs the real react-native-gesture-handler + react-native-reanimated
      @react-navigation/drawer (confirmed against its current docs, mirrored verbatim from the

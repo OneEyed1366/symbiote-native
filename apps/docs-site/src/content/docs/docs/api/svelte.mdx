@@ -6,10 +6,17 @@ description: The Svelte adapter public contract.
 Import app-facing APIs from `@symbiote-native/svelte`:
 
 ```ts
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from '@symbiote-native/svelte';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/svelte';
 ```
 
-Svelte drives the same engine as React/Vue/Angular, but through a different
+Svelte drives the same engine as React/Vue/Angular/Solid, but through a different
 seam: Svelte has no official custom-renderer API yet (`createRenderer` from
 `svelte/renderer` is still an unmerged proposal), so this adapter patches a
 handful of `globalThis` DOM classes instead — stock compiled Svelte output
@@ -44,7 +51,7 @@ is the reference for the full config.
 - Children: a `children` prop typed `Snippet`, rendered internally via
   `{@render children?.()}` — not Svelte 4's `<slot />`.
 - Render children: a component that passes state back renders `{@render
-  children?.(state)}` internally; the caller matches it with a named
+children?.(state)}` internally; the caller matches it with a named
   `{#snippet children(state)}` block, Svelte's twin of a scoped slot.
 - Refs: Symbiote components forward no `bind:this` of their own — `{@attach fn}`
   is the default way to reach a host node. A raw `symbiote-view`/`symbiote-text`
@@ -58,10 +65,10 @@ is the reference for the full config.
 ## Common events
 
 ```svelte
-<Pressable onPress={onPress} onLongPress={onLongPress} />
+<Pressable {onPress} {onLongPress} />
 <Switch bind:value={enabled} />
 <TextInput bind:value={text} onValueChange={(text, event) => onChange(event)} />
-<View onLayout={onLayout} />
+<View {onLayout} />
 ```
 
 `TextInput`'s `onValueChange` fires `(text, event)` — the same merged shape
@@ -75,7 +82,7 @@ because an `EventEmitter` only carries one value.
   import { Pressable, Text } from '@symbiote-native/svelte';
 </script>
 
-<Pressable onPress={onPress}>
+<Pressable {onPress}>
   {#snippet children({ pressed })}
     <Text>{pressed ? 'Release' : 'Press me'}</Text>
   {/snippet}
@@ -134,16 +141,16 @@ through the same style registry every adapter's `class`/`className`/`:class`
 path shares:
 
 ```svelte
+<View class="card">
+  <Text>Scoped — no other component's .card collides</Text>
+</View>
+
 <style>
   .card {
     padding: 16px;
     background-color: #13243a;
   }
 </style>
-
-<View class="card">
-  <Text>Scoped — no other component's .card collides</Text>
-</View>
 ```
 
 `:global(.name)` escapes scoping the same way it does in real Svelte. Svelte's
@@ -174,7 +181,9 @@ term, and this adapter's lifecycle-helper bucket is named `runes/` to match:
   const scheme = useColorScheme();
 </script>
 
-<Text>{dimensions.current.width}×{dimensions.current.height} · {scheme.current}</Text>
+<Text
+  >{dimensions.current.width}×{dimensions.current.height} · {scheme.current}</Text
+>
 ```
 
 Each returns a **boxed getter** (`{ get current() { ... } }`), not a bare
@@ -251,7 +260,7 @@ there's no working wrapper-component example to show here yet.
 ## Error boundaries (`<svelte:boundary>`)
 
 Svelte 5's own `<svelte:boundary>` is currently **Svelte-exclusive** among the
-four adapters — React's `componentDidCatch` boundary and Vue's
+five adapters — React's `componentDidCatch` boundary and Vue's
 `onErrorCaptured` aren't documented patterns here yet:
 
 ```svelte
@@ -273,4 +282,4 @@ Do not pass React component packages to the Svelte adapter. A third-party
 React Native package that ships a JavaScript React component still uses the
 React dispatcher internally. Non-React adapters need native-view wrappers
 instead — see the [Slider package](/docs/packages/slider/) for the reference
-implementation, shipping on React, Vue, Angular, and Svelte alike.
+implementation, shipping on React, Vue, Angular, Svelte, and Solid alike.

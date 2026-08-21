@@ -7,7 +7,7 @@
 import '@angular/compiler';
 import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -82,7 +82,14 @@ describe('Pressable (no throwing path — see file header)', () => {
   });
 
   it('resolves a class= on the Pressable use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ card: { backgroundColor: 'red' } });
+    registerRules([
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'red' },
+      },
+    ]);
 
     mount(ROOT_TAG, PressableHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -94,7 +101,9 @@ describe('Pressable (no throwing path — see file header)', () => {
 
 // Fabric is clone-on-write: a prop update yields a NEW node in the committed tree, never in
 // `created`, so a post-mutation assertion must walk the live committed child set.
-function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findCommitted(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   const stack = [...fabric.committed];
   while (stack.length > 0) {
     const node = stack.pop();
@@ -111,7 +120,11 @@ let memoHost: MemoHost | undefined;
   selector: 'symbiote-pressable-memo-host',
   standalone: true,
   imports: [Pressable],
-  template: `<Pressable [testID]="'memo'" [class.on]="on()" [style]="explicit()"></Pressable>`,
+  template: `<Pressable
+    [testID]="'memo'"
+    [class.on]="on()"
+    [style]="explicit()"
+  ></Pressable>`,
 })
 class MemoHost {
   on = signal(false);
@@ -137,15 +150,26 @@ describe('Pressable memoized hostProps stays correct', () => {
   // serves the pre-toggle style forever. Verified: removing that poll turns this test red (and the
   // static-class test above with it).
   it('forwards a dynamic [class.on] toggle onto the committed view', async () => {
-    registerStyles({ on: { backgroundColor: 'lime' } });
+    registerRules([
+      {
+        tokens: ['on'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'lime' },
+      },
+    ]);
     mount(ROOT_TAG, MemoHost);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
-    expect(findCommitted(n => n.props.testID === 'memo')?.props.backgroundColor).toBeUndefined();
+    expect(
+      findCommitted(n => n.props.testID === 'memo')?.props.backgroundColor,
+    ).toBeUndefined();
 
     memoHost?.on.set(true);
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    expect(findCommitted(n => n.props.testID === 'memo')?.props.backgroundColor).toBe('lime');
+    expect(
+      findCommitted(n => n.props.testID === 'memo')?.props.backgroundColor,
+    ).toBe('lime');
   });
 
   // why: the @Input half of the same bag — proves inputsRevision actually invalidates it.
@@ -156,7 +180,9 @@ describe('Pressable memoized hostProps stays correct', () => {
     memoHost?.explicit.set({ opacity: 0.5 });
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    expect(findCommitted(n => n.props.testID === 'memo')?.props.opacity).toBe(0.5);
+    expect(findCommitted(n => n.props.testID === 'memo')?.props.opacity).toBe(
+      0.5,
+    );
   });
 
   // why: `pressed` is mutated by the press machine, outside Angular's input system entirely. If it
@@ -167,7 +193,9 @@ describe('Pressable memoized hostProps stays correct', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
     const node = fabric.find(n => n.props.testID === 'pressed-style');
-    expect(findCommitted(n => n.props.testID === 'pressed-style')?.props.opacity).toBe(1);
+    expect(
+      findCommitted(n => n.props.testID === 'pressed-style')?.props.opacity,
+    ).toBe(1);
 
     const now = Date.now();
     const touch = { identifier: 1, pageX: 10, pageY: 10, timestamp: now };
@@ -177,7 +205,9 @@ describe('Pressable memoized hostProps stays correct', () => {
     });
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    expect(findCommitted(n => n.props.testID === 'pressed-style')?.props.opacity).toBe(0.2);
+    expect(
+      findCommitted(n => n.props.testID === 'pressed-style')?.props.opacity,
+    ).toBe(0.2);
   });
 });
 
@@ -185,7 +215,10 @@ describe('Pressable memoized hostProps stays correct', () => {
   selector: 'symbiote-pressable-pressed-style-host',
   standalone: true,
   imports: [Pressable],
-  template: `<Pressable [testID]="'pressed-style'" [style]="pressedStyle"></Pressable>`,
+  template: `<Pressable
+    [testID]="'pressed-style'"
+    [style]="pressedStyle"
+  ></Pressable>`,
 })
 class PressedStyleHost {
   // A stable arrow (TouchableHighlight's shape) so the @Input reference never moves — the only

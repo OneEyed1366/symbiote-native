@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/react';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/react';
 import {
   canUseBiometricAuthentication,
   deleteItemAsync,
@@ -28,7 +34,8 @@ function CapabilityRow({
   label: string;
   status: ICapabilityStatus;
 }) {
-  const text = status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+  const text =
+    status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
   return (
     <View testID={testID} className="capability-row">
       <Text className="capability-label">{label}</Text>
@@ -52,21 +59,24 @@ export function SecureStoreScreen() {
   const lineColor = LINE_COLOR[lineInfo.line];
 
   const [isAvailable, setIsAvailable] = useState<ICapabilityStatus>('checking');
-  const [canUseBiometrics, setCanUseBiometrics] = useState<ICapabilityStatus>('checking');
+  const [canUseBiometrics, setCanUseBiometrics] =
+    useState<ICapabilityStatus>('checking');
   const [inputText, setInputText] = useState('');
   const [storedValue, setStoredValue] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState('idle');
 
   useEffect(() => {
     let isMounted = true;
-    isAvailableAsync().then((available) => {
+    isAvailableAsync().then(available => {
       if (!isMounted) {
         return;
       }
       setIsAvailable(toCapabilityStatus(available));
       // canUseBiometricAuthentication throws when the native module is missing entirely, so it
       // only runs once availability has come back positive.
-      setCanUseBiometrics(available ? toCapabilityStatus(canUseBiometricAuthentication()) : 'no');
+      setCanUseBiometrics(
+        available ? toCapabilityStatus(canUseBiometricAuthentication()) : 'no',
+      );
     });
     return () => {
       isMounted = false;
@@ -80,7 +90,9 @@ export function SecureStoreScreen() {
   }, []);
 
   const handleRead = useCallback(() => {
-    readBack('read').catch((error: Error) => setLastResult(`read failed: ${error.message}`));
+    readBack('read').catch((error: Error) =>
+      setLastResult(`read failed: ${error.message}`),
+    );
   }, [readBack]);
 
   const handleSave = useCallback(() => {
@@ -97,7 +109,9 @@ export function SecureStoreScreen() {
       authenticationPrompt: 'Unlock to store the demo value',
     })
       .then(() => readBack('saved (authenticated)'))
-      .catch((error: Error) => setLastResult(`authenticated save failed: ${error.message}`));
+      .catch((error: Error) =>
+        setLastResult(`authenticated save failed: ${error.message}`),
+      );
   }, [inputText, readBack]);
 
   const handleDelete = useCallback(() => {
@@ -106,12 +120,18 @@ export function SecureStoreScreen() {
         setStoredValue(null);
         setLastResult('deleted');
       })
-      .catch((error: Error) => setLastResult(`delete failed: ${error.message}`));
+      .catch((error: Error) =>
+        setLastResult(`delete failed: ${error.message}`),
+      );
   }, []);
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="secure-store-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="secure-store-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -122,8 +142,9 @@ export function SecureStoreScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Secure Store</Text>
             <Text className="hero-body">
-              @symbiote-native/secure-store — encrypted key/value storage in the iOS Keychain and
-              the Android Keystore. Save a value, kill the app, relaunch, and read it back.
+              @symbiote-native/secure-store — encrypted key/value storage in the
+              iOS Keychain and the Android Keystore. Save a value, kill the app,
+              relaunch, and read it back.
             </Text>
           </View>
         </View>
@@ -132,7 +153,11 @@ export function SecureStoreScreen() {
           <View className="feature-card-header">
             <Text className="feature-card-title">Capabilities</Text>
           </View>
-          <CapabilityRow testID="secure-store-available" label="Available" status={isAvailable} />
+          <CapabilityRow
+            testID="secure-store-available"
+            label="Available"
+            status={isAvailable}
+          />
           <CapabilityRow
             testID="secure-store-biometrics"
             label="Biometrics usable"

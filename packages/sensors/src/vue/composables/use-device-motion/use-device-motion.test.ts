@@ -31,7 +31,8 @@ vi.mock('../../../core', () => ({
   DeviceMotion: {
     addListener: (listener: IListener) => addListenerMock(listener),
     removeAllListeners: vi.fn(),
-    setUpdateInterval: (intervalMs: number) => setUpdateIntervalMock(intervalMs),
+    setUpdateInterval: (intervalMs: number) =>
+      setUpdateIntervalMock(intervalMs),
   },
 }));
 
@@ -47,7 +48,9 @@ beforeEach(() => {
 
 afterEach(() => unmount(ROOT_TAG));
 
-function mountDeviceMotion(updateIntervalMs?: number): Ref<IDeviceMotionMeasurement | null> {
+function mountDeviceMotion(
+  updateIntervalMs?: number,
+): Ref<IDeviceMotionMeasurement | null> {
   let measurement: Ref<IDeviceMotionMeasurement | null> | undefined;
   mount(
     ROOT_TAG,

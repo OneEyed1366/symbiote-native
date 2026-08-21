@@ -22,7 +22,12 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Tab } from './index';
 import type { ITabNavigatorHandle } from './index';
 import type { IRoute } from '../../core';
-import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '../hooks';
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+  useRoute,
+} from '../hooks';
 
 const ROOT_TAG = 640;
 const TOUCH_START = 'topTouchStart';
@@ -98,7 +103,11 @@ type ITabHandleRef = { current: ITabNavigatorHandle | null };
 // {#if} fixture in svelte/tabs/tabs.smoke.test.ts.
 let hideProfile: () => void = () => {};
 
-function ToggleHost({ navRef }: { navRef: ITabHandleRef }): ReturnType<typeof createElement> {
+function ToggleHost({
+  navRef,
+}: {
+  navRef: ITabHandleRef;
+}): ReturnType<typeof createElement> {
   const [isProfileRegistered, setIsProfileRegistered] = useState(true);
   hideProfile = () => setIsProfileRegistered(false);
   return createElement(
@@ -165,7 +174,10 @@ describe('React Tab navigator', () => {
           Tab,
           { ref, initialRouteName: 'Home' },
           createElement(Tab.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Tab.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Tab.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       act(() => ref.current?.jumpTo('Profile'));
@@ -184,7 +196,10 @@ describe('React Tab navigator', () => {
           Tab,
           { initialRouteName: 'Home' },
           createElement(Tab.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Tab.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Tab.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       expect(findAllText(fabric.committed)).toContain('home');
@@ -203,7 +218,10 @@ describe('React Tab navigator', () => {
           Tab,
           { ref, initialRouteName: 'Home' },
           createElement(Tab.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Tab.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Tab.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       act(() => ref.current?.jumpTo('Nowhere'));
@@ -225,7 +243,10 @@ describe('React Tab navigator', () => {
           Tab,
           { ref, initialRouteName: 'Home' },
           createElement(Tab.Screen, { name: 'Home', component: HomeScreen }),
-          createElement(Tab.Screen, { name: 'Profile', component: ParamsScreen }),
+          createElement(Tab.Screen, {
+            name: 'Profile',
+            component: ParamsScreen,
+          }),
         ),
       );
       act(() => ref.current?.jumpTo('Profile', { id: 42 }));
@@ -246,7 +267,10 @@ describe('React Tab navigator', () => {
             component: HomeScreen,
             options: { tabBarBadge: 3 },
           }),
-          createElement(Tab.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Tab.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       expect(findAllText(tabBarRow().children)).toContain('3');
@@ -289,8 +313,14 @@ describe('React Tab navigator', () => {
           createElement(
             Tab,
             { ref, initialRouteName: 'Home' },
-            createElement(Tab.Screen, { name: 'Home', component: TrackedHomeScreen }),
-            createElement(Tab.Screen, { name: 'Profile', component: TrackedProfileScreen }),
+            createElement(Tab.Screen, {
+              name: 'Home',
+              component: TrackedHomeScreen,
+            }),
+            createElement(Tab.Screen, {
+              name: 'Profile',
+              component: TrackedProfileScreen,
+            }),
           ),
         );
       });
@@ -322,8 +352,14 @@ describe('React Tab navigator', () => {
         createElement(
           Tab,
           { ref, initialRouteName: 'Home' },
-          createElement(Tab.Screen, { name: 'Home', component: TrackedHomeScreen }),
-          createElement(Tab.Screen, { name: 'Profile', component: ProfileScreen }),
+          createElement(Tab.Screen, {
+            name: 'Home',
+            component: TrackedHomeScreen,
+          }),
+          createElement(Tab.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
       // Tab paints no native RNSScreen (unlike Stack), so there is no onAppear to wait for - the
@@ -354,7 +390,8 @@ describe('React Tab navigator', () => {
     it('keeps the focused route and its params when an unrelated screen unregisters', () => {
       const navRef = mountToggleTab();
       const homeKey = capturedHomeRoute?.key;
-      if (homeKey === undefined) throw new Error('Home route key was never observed');
+      if (homeKey === undefined)
+        throw new Error('Home route key was never observed');
       act(() => navRef.current?.setParams({ sort: 'trending' }, homeKey));
 
       act(() => hideProfile());

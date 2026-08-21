@@ -39,24 +39,31 @@ describe('positive — a valid persisted state round-trips through JSON', () => 
 });
 
 describe('negative — malformed persisted data is rejected with a specific error', () => {
-  const ERROR_MESSAGE = 'deserializeNavigatorState: persisted value is not a valid navigator state';
+  const ERROR_MESSAGE =
+    'deserializeNavigatorState: persisted value is not a valid navigator state';
 
   it('rejects a payload missing the routes array', () => {
-    expect(() => deserializeNavigatorState({ notRoutes: [] })).toThrow(ERROR_MESSAGE);
-  });
-
-  it('rejects a payload whose routes are not route-shaped', () => {
-    expect(() => deserializeNavigatorState({ routes: [{ key: 'r1' }] })).toThrow(ERROR_MESSAGE);
-  });
-
-  it('rejects a route missing its name, key present', () => {
-    expect(() => deserializeNavigatorState({ routes: [{ key: 'r1', params: undefined }] })).toThrow(
+    expect(() => deserializeNavigatorState({ notRoutes: [] })).toThrow(
       ERROR_MESSAGE,
     );
   });
 
+  it('rejects a payload whose routes are not route-shaped', () => {
+    expect(() =>
+      deserializeNavigatorState({ routes: [{ key: 'r1' }] }),
+    ).toThrow(ERROR_MESSAGE);
+  });
+
+  it('rejects a route missing its name, key present', () => {
+    expect(() =>
+      deserializeNavigatorState({ routes: [{ key: 'r1', params: undefined }] }),
+    ).toThrow(ERROR_MESSAGE);
+  });
+
   it('rejects a non-object payload', () => {
-    expect(() => deserializeNavigatorState('not a state')).toThrow(ERROR_MESSAGE);
+    expect(() => deserializeNavigatorState('not a state')).toThrow(
+      ERROR_MESSAGE,
+    );
     expect(() => deserializeNavigatorState(null)).toThrow(ERROR_MESSAGE);
     expect(() => deserializeNavigatorState(undefined)).toThrow(ERROR_MESSAGE);
   });

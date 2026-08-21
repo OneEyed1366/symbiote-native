@@ -87,7 +87,10 @@ describe('Positive (delegates to the native module without error)', () => {
     // `options` argument doesn't silently become `undefined` on the native side
     it('writes the given text and forwards the default options object', async () => {
       await expect(setStringAsync('hello')).resolves.toBe(true);
-      expect(FAKE_NATIVE_CLIPBOARD.setStringAsync).toHaveBeenCalledWith('hello', {});
+      expect(FAKE_NATIVE_CLIPBOARD.setStringAsync).toHaveBeenCalledWith(
+        'hello',
+        {},
+      );
     });
   });
 
@@ -106,7 +109,9 @@ describe('Positive (delegates to the native module without error)', () => {
   describe('setUrlAsync', () => {
     it('forwards the URL to the native module', async () => {
       await setUrlAsync('https://example.com');
-      expect(FAKE_NATIVE_CLIPBOARD.setUrlAsync).toHaveBeenCalledWith('https://example.com');
+      expect(FAKE_NATIVE_CLIPBOARD.setUrlAsync).toHaveBeenCalledWith(
+        'https://example.com',
+      );
     });
   });
 
@@ -124,14 +129,18 @@ describe('Positive (delegates to the native module without error)', () => {
         data: 'data:image/png;base64,abc',
         size: { width: 1, height: 1 },
       });
-      expect(FAKE_NATIVE_CLIPBOARD.getImageAsync).toHaveBeenCalledWith({ format: 'png' });
+      expect(FAKE_NATIVE_CLIPBOARD.getImageAsync).toHaveBeenCalledWith({
+        format: 'png',
+      });
     });
   });
 
   describe('setImageAsync', () => {
     it('forwards the base64 image to the native module', async () => {
       await setImageAsync('base64==');
-      expect(FAKE_NATIVE_CLIPBOARD.setImageAsync).toHaveBeenCalledWith('base64==');
+      expect(FAKE_NATIVE_CLIPBOARD.setImageAsync).toHaveBeenCalledWith(
+        'base64==',
+      );
     });
   });
 
@@ -175,14 +184,18 @@ describe('Negative (an absent optional native method must throw, not silently no
           pending = hasStringAsync();
         }).not.toThrow();
 
-        await expect(pending).rejects.toThrow('hasStringAsync is not available on Clipboard');
+        await expect(pending).rejects.toThrow(
+          'hasStringAsync is not available on Clipboard',
+        );
       }));
   });
 
   describe('getUrlAsync', () => {
     it('rejects with an UnavailabilityError-shaped error on a platform without URL support', () =>
       withNativeMethodRemoved('getUrlAsync', async () => {
-        await expect(getUrlAsync()).rejects.toThrow('getUrlAsync is not available on Clipboard');
+        await expect(getUrlAsync()).rejects.toThrow(
+          'getUrlAsync is not available on Clipboard',
+        );
       }));
   });
 
@@ -198,7 +211,9 @@ describe('Negative (an absent optional native method must throw, not silently no
   describe('hasUrlAsync', () => {
     it('rejects with an UnavailabilityError-shaped error on a platform without URL support', () =>
       withNativeMethodRemoved('hasUrlAsync', async () => {
-        await expect(hasUrlAsync()).rejects.toThrow('hasUrlAsync is not available on Clipboard');
+        await expect(hasUrlAsync()).rejects.toThrow(
+          'hasUrlAsync is not available on Clipboard',
+        );
       }));
   });
 

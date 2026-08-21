@@ -21,7 +21,7 @@ logo images, and `NativeModulesDemo`'s `LOGO_URI`/`PREFETCH_URI`), while
 | --- | --- | --- |
 | react | `reactnative.dev` | `reactnative.dev/img/tiny_logo.png` |
 | vue-tsx · vue-sfc | `vuejs.org` | `vuejs.org/images/logo.png` |
-| svelte | `svelte.com` | `svelte.dev/favicon.png` |
+| svelte | `svelte.dev` | `svelte.dev/favicon.png` |
 | angular | `angular.dev` | `angular.io/assets/images/logos/angular/angular.png` |
 
 The prefetch demo appends `?warm=symbiote` to the same asset (a distinct cache

@@ -97,7 +97,10 @@ export { isSymbioteEvent };
 // Forward a wrapped scroll event to the user's ScrollHandler. The Animated.event listener
 // hands raw args; the first is the original SymbioteEvent, which we narrow with a runtime
 // guard (no cast) and pass through unchanged so the user sees the same event RN would deliver.
-export function forwardScrollEvent(handler: IScrollHandler, args: readonly unknown[]): void {
+export function forwardScrollEvent(
+  handler: IScrollHandler,
+  args: readonly unknown[],
+): void {
   const first = args[0];
   if (isSymbioteEvent(first)) handler(first);
 }
@@ -111,7 +114,9 @@ export function forwardScrollEvent(handler: IScrollHandler, args: readonly unkno
 // `getNode` is a LAZY getter (React `() => ref.current`, Vue `() => nodeRef.value`), read on
 // every call, NOT the node captured once. The node is null at mount and only set after the
 // element commits, so an eager capture would freeze `null` and every command would no-op.
-export function buildScrollViewHandle(getNode: () => ISymbioteNode | null): IScrollViewHandle {
+export function buildScrollViewHandle(
+  getNode: () => ISymbioteNode | null,
+): IScrollViewHandle {
   return {
     scrollTo: (options): void => {
       const node = getNode();
@@ -143,11 +148,16 @@ export function buildScrollViewHandle(getNode: () => ISymbioteNode | null): IScr
 // _updateAnimatedNodeAttachment / AnimatedImplementation.attachNativeEvent (ScrollView.js:1087).
 // The value then tracks scroll on the UI thread and the sticky-header interpolations ride it
 // natively (no JS jitter). Returns the detach function the adapter's effect calls on cleanup.
-export function attachStickyScroll(node: ISymbioteNode, value: AnimatedValue): () => void {
+export function attachStickyScroll(
+  node: ISymbioteNode,
+  value: AnimatedValue,
+): () => void {
   const attachment = attachNativeEvent(node, 'onScroll', [
     { nativeEvent: { contentOffset: { y: value } } },
   ]);
-  dlog(`STICKY[attach] attachStickyScroll onScroll -> value#${value.__getNativeTag?.() ?? 'js'}`);
+  dlog(
+    `STICKY[attach] attachStickyScroll onScroll -> value#${value.__getNativeTag?.() ?? 'js'}`,
+  );
   return () => {
     dlog('STICKY[attach] attachStickyScroll detached');
     attachment.detach();

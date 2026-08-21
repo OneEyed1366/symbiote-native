@@ -4,4 +4,8 @@ export {
   selectionAsync,
   performAndroidHapticsAsync,
 } from './haptics';
-export { NotificationFeedbackType, ImpactFeedbackStyle, AndroidHaptics } from './types';
+export {
+  NotificationFeedbackType,
+  ImpactFeedbackStyle,
+  AndroidHaptics,
+} from './types';

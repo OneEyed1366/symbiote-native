@@ -13,7 +13,10 @@
 </script>
 
 <script lang="ts">
-  import { renderImageBackground, resolveAccessibilityProps } from '@symbiote-native/components';
+  import {
+    renderImageBackground,
+    resolveAccessibilityProps,
+  } from '@symbiote-native/components';
   import { resolveClassName } from '@symbiote-native/engine';
   import { createAttachmentsSync } from '../../runes/attachments';
   import type { ShimElement } from '../../dom-shim';
@@ -78,4 +81,7 @@
   });
 </script>
 
-<symbiote-view p={wrapperBag} bind:this={hostShim}><symbiote-image p={imageBag} />{@render children?.()}</symbiote-view>
+<symbiote-view p={wrapperBag} bind:this={hostShim}>
+  <symbiote-image p={imageBag} />
+  {@render children?.()}
+</symbiote-view>

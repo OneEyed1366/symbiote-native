@@ -57,6 +57,7 @@ import {
   isSeparatorGapInRange,
   listEffectSignature,
   readLayoutLength,
+  readLayoutOffset,
   readScrollOffset,
   reduceList,
   resolveItemKey,
@@ -160,7 +161,11 @@ export interface IVirtualizedListProps<ItemT> {
 // any annotation at the call site. Slots return VNode[] (Vue scoped-slot contract); the
 // slots-to-render-props bridge folds them into the single-VNode render-fns the windowing layer wants.
 export type IVirtualizedListSlots<ItemT> = {
-  item: (info: { item: ItemT; index: number; separators: ISeparators }) => VNode[] | VNode;
+  item: (info: {
+    item: ItemT;
+    index: number;
+    separators: ISeparators;
+  }) => VNode[] | VNode;
   separator?: (props: ISeparatorProps<ItemT>) => VNode[] | VNode;
   header?: () => VNode[] | VNode;
   footer?: () => VNode[] | VNode;
@@ -289,7 +294,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 function isComponent(value: unknown): value is Component {
-  return typeof value === 'function' || (typeof value === 'object' && value !== null);
+  return (
+    typeof value === 'function' || (typeof value === 'object' && value !== null)
+  );
 }
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' ? value : fallback;
@@ -354,7 +361,9 @@ export const VirtualizedList = defineComponent(
     const separatorVersion = ref(EMPTY_OFFSET);
     // The offset we are imperatively driving native to. A fresh object identity each push so the
     // commit path re-applies it even when the numeric value repeats. undefined = none pending.
-    const commandedOffset = ref<{ x: number; y: number } | undefined>(undefined);
+    const commandedOffset = ref<{ x: number; y: number } | undefined>(
+      undefined,
+    );
 
     // shallowRef, NOT ref: the ScrollView handle closes over the engine scroll node, reached by
     // identity through the engine's WeakMap mirror. A deep ref would proxy the object and every
@@ -377,7 +386,10 @@ export const VirtualizedList = defineComponent(
     // The one folded state cell (the Vue twin of React's stateRef); plus the per-gap separator
     // overrides + the adapter-owned debounce/fill timers.
     const listState: IListState<ItemT> = createInitialListState<ItemT>();
-    const separatorOverrides = new Map<number, Partial<ISeparatorProps<unknown>>>();
+    const separatorOverrides = new Map<
+      number,
+      Partial<ISeparatorProps<unknown>>
+    >();
     let viewableTimer: ReturnType<typeof setTimeout> | null = null;
     let batchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -404,21 +416,29 @@ export const VirtualizedList = defineComponent(
         horizontal: props.horizontal === true,
         inverted: props.inverted === true,
         onEndReached: listens('onEndReached')
-          ? (info: { distanceFromEnd: number }): void => emit('endReached', info)
+          ? (info: { distanceFromEnd: number }): void =>
+              emit('endReached', info)
           : undefined,
-        onEndReachedThreshold: asNumber(props.onEndReachedThreshold, DEFAULT_END_REACHED_THRESHOLD),
+        onEndReachedThreshold: asNumber(
+          props.onEndReachedThreshold,
+          DEFAULT_END_REACHED_THRESHOLD,
+        ),
         onStartReached: listens('onStartReached')
-          ? (info: { distanceFromStart: number }): void => emit('startReached', info)
+          ? (info: { distanceFromStart: number }): void =>
+              emit('startReached', info)
           : undefined,
         onStartReachedThreshold: asNumber(
           props.onStartReachedThreshold,
           DEFAULT_START_REACHED_THRESHOLD,
         ),
-        onRefresh: listens('onRefresh') ? (): void => emit('refresh') : undefined,
+        onRefresh: listens('onRefresh')
+          ? (): void => emit('refresh')
+          : undefined,
         refreshing: props.refreshing === true,
         progressViewOffset: props.progressViewOffset,
         onViewableItemsChanged: listens('onViewableItemsChanged')
-          ? (info: IViewableItemsChangedInfo<ItemT>): void => emit('viewableItemsChanged', info)
+          ? (info: IViewableItemsChangedInfo<ItemT>): void =>
+              emit('viewableItemsChanged', info)
           : undefined,
         viewabilityConfig: props.viewabilityConfig,
         viewabilityConfigCallbackPairs: props.viewabilityConfigCallbackPairs,
@@ -429,9 +449,15 @@ export const VirtualizedList = defineComponent(
               averageItemLength: number;
             }): void => emit('scrollToIndexFailed', info)
           : undefined,
-        initialNumToRender: asNumber(props.initialNumToRender, DEFAULT_INITIAL_NUM_TO_RENDER),
+        initialNumToRender: asNumber(
+          props.initialNumToRender,
+          DEFAULT_INITIAL_NUM_TO_RENDER,
+        ),
         initialScrollIndex: props.initialScrollIndex,
-        maxToRenderPerBatch: asNumber(props.maxToRenderPerBatch, DEFAULT_MAX_TO_RENDER_PER_BATCH),
+        maxToRenderPerBatch: asNumber(
+          props.maxToRenderPerBatch,
+          DEFAULT_MAX_TO_RENDER_PER_BATCH,
+        ),
         updateCellsBatchingPeriod: asNumber(
           props.updateCellsBatchingPeriod,
           DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
@@ -502,7 +528,10 @@ export const VirtualizedList = defineComponent(
 
     // Execute the reducer's effects with Vue primitives. `inputs` is threaded through so a
     // fire-viewable fires against the same pairs the reduce used.
-    const runEffects = (effects: IListEffect<ItemT>[], inputs: IListReducerInputs<ItemT>): void => {
+    const runEffects = (
+      effects: IListEffect<ItemT>[],
+      inputs: IListReducerInputs<ItemT>,
+    ): void => {
       const p = narrowed.value;
       for (const effect of effects) {
         switch (effect.kind) {
@@ -601,13 +630,22 @@ export const VirtualizedList = defineComponent(
       (event: ISymbioteEvent): void => {
         const length = readLayoutLength(event, narrowed.value.horizontal);
         if (length === undefined) return;
-        dlog(`Vue VirtualizedList cell ${index} measured length=${length}`);
-        dispatch({ kind: 'measure', index, length });
+        const offset = readLayoutOffset(event, narrowed.value.horizontal);
+        dlog(
+          `Vue VirtualizedList cell ${index} measured length=${length} offset=${offset ?? 'none'}`,
+        );
+        dispatch({ kind: 'measure', index, length, offset });
       };
 
-    const mergeSeparator = (gapIndex: number, patch: Partial<ISeparatorProps<unknown>>): void => {
+    const mergeSeparator = (
+      gapIndex: number,
+      patch: Partial<ISeparatorProps<unknown>>,
+    ): void => {
       if (!isSeparatorGapInRange(gapIndex, listState.metrics.count)) return;
-      separatorOverrides.set(gapIndex, { ...separatorOverrides.get(gapIndex), ...patch });
+      separatorOverrides.set(gapIndex, {
+        ...separatorOverrides.get(gapIndex),
+        ...patch,
+      });
       separatorVersion.value += 1;
     };
 
@@ -622,7 +660,10 @@ export const VirtualizedList = defineComponent(
         mergeSeparator(index - 1, { highlighted: false });
         mergeSeparator(index, { highlighted: false });
       },
-      updateProps: (select: 'leading' | 'trailing', newProps: Record<string, unknown>): void => {
+      updateProps: (
+        select: 'leading' | 'trailing',
+        newProps: Record<string, unknown>,
+      ): void => {
         mergeSeparator(select === 'leading' ? index - 1 : index, newProps);
       },
     });
@@ -662,7 +703,8 @@ export const VirtualizedList = defineComponent(
       getNativeScrollRef: (): IScrollViewHandle | null => scrollHandle.value,
       getScrollableNode: (): IScrollViewHandle | null => scrollHandle.value,
       getScrollResponder: (): IScrollViewHandle | null => scrollHandle.value,
-      getScrollNode: (): ISymbioteNode | null => scrollHandle.value?.getScrollNode() ?? null,
+      getScrollNode: (): ISymbioteNode | null =>
+        scrollHandle.value?.getScrollNode() ?? null,
       recordInteraction: (): void => {
         dispatch({ kind: 'record-interaction' });
       },
@@ -694,7 +736,9 @@ export const VirtualizedList = defineComponent(
       void separatorVersion.value;
 
       if (p.renderItem === undefined)
-        dlog('Vue VirtualizedList: no #item slot provided — cells render empty');
+        dlog(
+          'Vue VirtualizedList: no #item slot provided — cells render empty',
+        );
 
       dlog(
         `Vue VirtualizedList window [${m.first}, ${m.last}] of ${m.count} ` +
@@ -703,7 +747,9 @@ export const VirtualizedList = defineComponent(
 
       const children: VNode[] = [];
       const stickySet =
-        p.stickyHeaderIndices !== undefined ? new Set(p.stickyHeaderIndices) : undefined;
+        p.stickyHeaderIndices !== undefined
+          ? new Set(p.stickyHeaderIndices)
+          : undefined;
 
       const header = resolveElement(p.listHeaderComponent);
       if (header !== undefined) {
@@ -728,7 +774,6 @@ export const VirtualizedList = defineComponent(
           keyFor,
           stickyIndices: stickySet,
           hasHeader: header !== undefined,
-          hasSeparators: p.itemSeparatorComponent !== undefined,
         });
         renderedStickyIndices = plan.stickyChildPositions;
 
@@ -736,7 +781,9 @@ export const VirtualizedList = defineComponent(
           children.push(
             h('symbiote-view', {
               key: 'spacer-leading',
-              style: p.horizontal ? { width: plan.leadingExtent } : { height: plan.leadingExtent },
+              style: p.horizontal
+                ? { width: plan.leadingExtent }
+                : { height: plan.leadingExtent },
             }),
           );
         }
@@ -749,6 +796,14 @@ export const VirtualizedList = defineComponent(
 
         // Wraps one cell identically whether it's the force-mounted sticky cell ahead of the
         // window or an in-window cell from the loop below — same measuring View, same key shape.
+        // RN renders the separator INSIDE the cell's own measuring wrapper
+        // (VirtualizedListCellRenderer.js:218-221), and that placement is load-bearing rather than
+        // cosmetic. As a SIBLING it is an extra flex child, so the chrome between two cells becomes
+        // gap + separator + gap while a spacer collapsing that region replaces it with one gap —
+        // the leading spacer then lands every cell below it short by (separator + gap), and the
+        // content visibly jumps by that amount each time the window's first index moves. Measured
+        // at exactly 17px on device 2026-08-19 (a 1px divider under a 16px container gap); see
+        // .claude/rules/list-geometry-feedback-loop.md.
         const pushCell = (cell: IListCellPlan): void => {
           const item = p.getItem(p.data, cell.index);
           const content = p.renderItem?.({
@@ -756,6 +811,20 @@ export const VirtualizedList = defineComponent(
             index: cell.index,
             separators: makeSeparators(cell.index),
           });
+          const separator =
+            // RN gates the separator on the last index of the DATA, not of the WINDOW
+            // (VirtualizedList.js:793 `const end = getItemCount(data) - 1`), and now that the separator
+            // lives INSIDE the measuring wrapper that distinction is load-bearing: gating on the window
+            // would make a cell's own measured height change as the window slides past it. Device-measured
+            // 2026-08-19 as a run of cells all shifting by exactly the divider's 1px.
+            cell.index < m.count - 1
+              ? renderSeparatorElement(
+                  p.itemSeparatorComponent,
+                  item,
+                  p.getItem(p.data, cell.index + 1),
+                  separatorOverrides.get(cell.index),
+                )
+              : undefined;
           children.push(
             h(
               'symbiote-view',
@@ -764,7 +833,7 @@ export const VirtualizedList = defineComponent(
                 onLayout: makeCellMeasure(cell.index),
                 style: cellInverted,
               },
-              [content],
+              separator === undefined ? [content] : [content, separator],
             ),
           );
         };
@@ -778,26 +847,16 @@ export const VirtualizedList = defineComponent(
             children.push(
               h('symbiote-view', {
                 key: 'spacer-gap',
-                style: p.horizontal ? { width: plan.gapExtent } : { height: plan.gapExtent },
+                style: p.horizontal
+                  ? { width: plan.gapExtent }
+                  : { height: plan.gapExtent },
               }),
             );
           }
         }
 
         for (let cellPos = 0; cellPos < plan.cells.length; cellPos += 1) {
-          const cell = plan.cells[cellPos];
-          pushCell(cell);
-          if (cell.index < m.last) {
-            const separator = renderSeparatorElement(
-              p.itemSeparatorComponent,
-              p.getItem(p.data, cell.index),
-              p.getItem(p.data, cell.index + 1),
-              separatorOverrides.get(cell.index),
-            );
-            if (separator !== undefined) {
-              children.push(h('symbiote-view', { key: `sep-${cell.key}` }, [separator]));
-            }
-          }
+          pushCell(plan.cells[cellPos]);
         }
 
         if (plan.trailingExtent > EMPTY_OFFSET) {
@@ -844,16 +903,19 @@ export const VirtualizedList = defineComponent(
       }
       // A pending imperative/initial scroll rides down as contentOffset (fallback for the
       // pre-mount window before the handle attaches).
-      if (commandedOffset.value !== undefined) scrollProps.contentOffset = commandedOffset.value;
+      if (commandedOffset.value !== undefined)
+        scrollProps.contentOffset = commandedOffset.value;
       // Headers in the window stick; an empty list leaves the prop off entirely.
-      if (renderedStickyIndices.length > 0) scrollProps.stickyHeaderIndices = renderedStickyIndices;
+      if (renderedStickyIndices.length > 0)
+        scrollProps.stickyHeaderIndices = renderedStickyIndices;
       // Forward maintainVisibleContentPosition to the ScrollView so it anchors the in-window cells.
       // minIndexForVisible is bumped by 1 when a ListHeaderComponent occupies child 0.
       if (p.maintainVisibleContentPosition !== undefined) {
         scrollProps.maintainVisibleContentPosition = {
           ...p.maintainVisibleContentPosition,
           minIndexForVisible:
-            p.maintainVisibleContentPosition.minIndexForVisible + (header !== undefined ? 1 : 0),
+            p.maintainVisibleContentPosition.minIndexForVisible +
+            (header !== undefined ? 1 : 0),
         };
       }
       // Pull-to-refresh: when a @refresh listener is present, build a RefreshControl for the

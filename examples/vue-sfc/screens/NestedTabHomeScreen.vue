@@ -14,7 +14,9 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 const navigation = useNavigation();
 const parent = computed(() => navigation.value.getParent());
-const canPopParent = computed(() => parent.value !== undefined && 'pop' in parent.value);
+const canPopParent = computed(
+  () => parent.value !== undefined && 'pop' in parent.value,
+);
 const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.NestedNavigators];
 
 function popParent(): void {
@@ -27,17 +29,22 @@ function popParent(): void {
   <SafeAreaView class="screen">
     <View class="section">
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
-        <View class="hero-badge" :style="{ backgroundColor: LINE_COLOR.structure }">
+        <View
+          class="hero-badge"
+          :style="{ backgroundColor: LINE_COLOR.structure }"
+        >
           <Text class="hero-badge-text">NN</Text>
         </View>
         <View class="hero-copy">
           <Text class="hero-title">Nested navigators</Text>
           <Text class="hero-body"
-            >A Tab navigator nested inside a Stack screen, reaching its parent's own
-            navigation handle through getParent().</Text
+            >A Tab navigator nested inside a Stack screen, reaching its parent's
+            own navigation handle through getParent().</Text
           >
         </View>
       </View>

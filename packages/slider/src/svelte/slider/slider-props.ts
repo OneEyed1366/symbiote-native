@@ -6,7 +6,10 @@
 //     Vue takes as a `#stepMarker` scoped slot, React as `StepMarker: FC<IStepMarkerProps>`.
 import type { Snippet } from 'svelte';
 import type { IClassNameValue } from '@symbiote-native/engine';
-import type { ISliderProps as ISliderBaseProps, IStepMarkerProps } from '../../core';
+import type {
+  ISliderProps as ISliderBaseProps,
+  IStepMarkerProps,
+} from '../../core';
 
 export type ISliderProps = ISliderBaseProps & {
   class?: IClassNameValue;

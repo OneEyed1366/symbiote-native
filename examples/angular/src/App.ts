@@ -21,14 +21,24 @@ import {
   inject,
   runInInjectionContext,
 } from '@angular/core';
-import { Stack, ScreenDirective, injectLinkingIntegration } from '@symbiote-native/navigation/angular';
+import {
+  Stack,
+  ScreenDirective,
+  injectLinkingIntegration,
+} from '@symbiote-native/navigation/angular';
 import type { IAngularScreenOptions } from '@symbiote-native/navigation/angular';
 import { hide } from '@symbiote-native/splash-screen/angular';
 import { MenuScreen } from './screens/MenuScreen';
 import { CanaryScreen } from './screens/CanaryScreen';
 import { DetailsScreen } from './screens/DetailsScreen';
-import { HeaderOptionsScreen, headerOptionsScreenOptions } from './screens/HeaderOptionsScreen';
-import { SheetDemoScreen, sheetDemoScreenOptions } from './screens/SheetDemoScreen';
+import {
+  HeaderOptionsScreen,
+  headerOptionsScreenOptions,
+} from './screens/HeaderOptionsScreen';
+import {
+  SheetDemoScreen,
+  sheetDemoScreenOptions,
+} from './screens/SheetDemoScreen';
 import { TabsDemoScreen } from './screens/TabsDemoScreen';
 import { DrawerDemoScreen } from './screens/DrawerDemoScreen';
 import { NestedNavigatorsScreen } from './screens/NestedNavigatorsScreen';
@@ -36,8 +46,10 @@ import { HooksDemoScreen } from './screens/HooksDemoScreen';
 import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
 import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { ReactiveStyleScreen } from './screens/ReactiveStyleScreen';
+import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
+import { BenchmarkScreen } from './screens/BenchmarkScreen';
+import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
-import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
 // Static look lives in App.css — a plain global .css file, compiled at build time by
 // @symbiote-native/css-parser and resolved at runtime through the shared style registry every
@@ -52,18 +64,96 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
   imports: [Stack, ScreenDirective],
   template: `
     <Stack #nav initialRouteName="Menu">
-      <ng-template symbioteScreen name="Menu" [component]="menuScreen" [options]="menuOptions"></ng-template>
-      <ng-template symbioteScreen name="Canary" [component]="canaryScreen" [options]="canaryOptions"></ng-template>
-      <ng-template symbioteScreen name="Details" [component]="detailsScreen" [options]="detailsOptions"></ng-template>
-      <ng-template symbioteScreen name="HeaderOptions" [component]="headerOptionsScreen" [options]="headerOptionsOptions"></ng-template>
-      <ng-template symbioteScreen name="SheetDemo" [component]="sheetDemoScreen" [options]="sheetDemoOptions"></ng-template>
-      <ng-template symbioteScreen name="TabsDemo" [component]="tabsDemoScreen" [options]="tabsDemoOptions"></ng-template>
-      <ng-template symbioteScreen name="DrawerDemo" [component]="drawerDemoScreen" [options]="drawerDemoOptions"></ng-template>
-      <ng-template symbioteScreen name="NestedNavigators" [component]="nestedNavigatorsScreen" [options]="nestedNavigatorsOptions"></ng-template>
-      <ng-template symbioteScreen name="HooksDemo" [component]="hooksDemoScreen" [options]="hooksDemoOptions"></ng-template>
-      <ng-template symbioteScreen name="DeepLinking" [component]="deepLinkingScreen" [options]="deepLinkingOptions"></ng-template>
-      <ng-template symbioteScreen name="StatePersistence" [component]="statePersistenceScreen" [options]="statePersistenceOptions"></ng-template>
-      <ng-template symbioteScreen name="ReactiveStyle" [component]="reactiveStyleScreen" [options]="reactiveStyleOptions"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Menu"
+        [component]="menuScreen"
+        [options]="menuOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Canary"
+        [component]="canaryScreen"
+        [options]="canaryOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Details"
+        [component]="detailsScreen"
+        [options]="detailsOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="HeaderOptions"
+        [component]="headerOptionsScreen"
+        [options]="headerOptionsOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="SheetDemo"
+        [component]="sheetDemoScreen"
+        [options]="sheetDemoOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="TabsDemo"
+        [component]="tabsDemoScreen"
+        [options]="tabsDemoOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="DrawerDemo"
+        [component]="drawerDemoScreen"
+        [options]="drawerDemoOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="NestedNavigators"
+        [component]="nestedNavigatorsScreen"
+        [options]="nestedNavigatorsOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="HooksDemo"
+        [component]="hooksDemoScreen"
+        [options]="hooksDemoOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="DeepLinking"
+        [component]="deepLinkingScreen"
+        [options]="deepLinkingOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="StatePersistence"
+        [component]="statePersistenceScreen"
+        [options]="statePersistenceOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="ReactiveStyle"
+        [component]="reactiveStyleScreen"
+        [options]="reactiveStyleOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="ApiPlayground"
+        [component]="apiPlaygroundScreen"
+        [options]="apiPlaygroundOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Benchmark"
+        [component]="benchmarkScreen"
+        [options]="benchmarkOptions"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="StyleShowcase"
+        [component]="styleShowcaseScreen"
+        [options]="styleShowcaseOptions"
+      ></ng-template>
     </Stack>
   `,
 })
@@ -83,6 +173,9 @@ export class AppComponent implements OnInit, AfterViewInit {
   readonly deepLinkingScreen = DeepLinkingScreen;
   readonly statePersistenceScreen = StatePersistenceScreen;
   readonly reactiveStyleScreen = ReactiveStyleScreen;
+  readonly apiPlaygroundScreen = ApiPlaygroundScreen;
+  readonly benchmarkScreen = BenchmarkScreen;
+  readonly styleShowcaseScreen = StyleShowcaseScreen;
 
   readonly menuOptions: IAngularScreenOptions = {
     title: 'Navigation Demos',
@@ -184,6 +277,36 @@ export class AppComponent implements OnInit, AfterViewInit {
     headerShown: true,
     headerTranslucent: true,
     headerTintColor: LINE_COLOR.primitives,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly apiPlaygroundOptions: IAngularScreenOptions = {
+    title: 'API Playground',
+    headerShown: true,
+    headerTranslucent: true,
+    headerTintColor: LINE_COLOR.primitives,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly benchmarkOptions: IAngularScreenOptions = {
+    title: 'Benchmark',
+    headerShown: true,
+    headerTranslucent: true,
+    headerTintColor: LINE_COLOR.performance,
+    headerTitleColor: '#ffffff',
+    headerStyle: DARK_HEADER_STYLE,
+    headerUserInterfaceStyle: 'dark',
+  };
+
+  readonly styleShowcaseOptions: IAngularScreenOptions = {
+    title: 'Styling showcase',
+    headerShown: true,
+    headerTranslucent: true,
+    headerTintColor: LINE_COLOR.styling,
     headerTitleColor: '#ffffff',
     headerStyle: DARK_HEADER_STYLE,
     headerUserInterfaceStyle: 'dark',

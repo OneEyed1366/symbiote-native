@@ -22,8 +22,8 @@
 //     compiled-text assertion structurally cannot: does the declaration actually reach the
 //     committed Fabric node, and does per-component scoping actually prevent cross-component
 //     bleed at runtime.
-//   - `resolveClassName`'s core resolution algorithm (exact match, kebab->camel fallback, compound
-//     permutation search, array/object passthrough) — N/A: covered directly at
+//   - `resolveClassName`'s core resolution algorithm (token-subset matching, cascade ordering,
+//     array/object passthrough) — N/A: covered directly at
 //     core/engine/src/style-registry/{style-registry,scope,scoped-conformance}.test.ts. This file
 //     only proves index.svelte's own `class` prop actually FEEDS a scoped token into that
 //     resolver at runtime (static and dynamic clsx forms) — covered below.
@@ -46,7 +46,8 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import { scopedStyles } from '../preprocessor/scoped-styles';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -57,7 +58,10 @@ const CARD_A_OUT = join(__dirname, '.smoke-compiled-scoped-card-a.mjs');
 const CARD_B_OUT = join(__dirname, '.smoke-compiled-scoped-card-b.mjs');
 const DYNAMIC_OUT = join(__dirname, '.smoke-compiled-scoped-dynamic.mjs');
 const COMPOUND_OUT = join(__dirname, '.smoke-compiled-scoped-compound.mjs');
-const PARTIAL_GLOBAL_OUT = join(__dirname, '.smoke-compiled-scoped-partial-global.mjs');
+const PARTIAL_GLOBAL_OUT = join(
+  __dirname,
+  '.smoke-compiled-scoped-partial-global.mjs',
+);
 const PARENT_OUT = join(__dirname, '.smoke-compiled-scoped-parent.mjs');
 const OUTPUTS = [
   VIEW_OUT,
@@ -69,11 +73,16 @@ const OUTPUTS = [
   PARENT_OUT,
 ];
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 const preprocess = scopedStyles();
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -84,9 +93,16 @@ afterEach(() => {
   for (const output of OUTPUTS) rmSync(output, { force: true });
 });
 
-async function compileToFile(source: string, filename: string, outPath: string): Promise<void> {
+async function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): Promise<void> {
   const { code } = await preprocess.markup({ content: source, filename });
-  writeFileSync(outPath, compile(code, { ...COMPILE_OPTIONS, filename }).js.code);
+  writeFileSync(
+    outPath,
+    compile(code, { ...COMPILE_OPTIONS, filename }).js.code,
+  );
 }
 
 async function loadDefault(outPath: string): Promise<Component> {
@@ -179,7 +195,11 @@ const PARTIAL_GLOBAL = `<script>
 
 // The real `View.svelte` is compiled once next to its own source, so its relative
 // `../runes/attachments` import still resolves, and every fixture imports THAT file.
-async function buildFixture(source: string, name: string, outPath: string): Promise<void> {
+async function buildFixture(
+  source: string,
+  name: string,
+  outPath: string,
+): Promise<void> {
   await compileToFile(
     readFileSync(join(__dirname, 'View.svelte'), 'utf8'),
     'View.svelte',
@@ -251,7 +271,7 @@ describe('svelte <style> block (real preprocess + compile + mount)', () => {
       const node = findLive('d');
       expect(node).toBeDefined();
       expect(node?.props.padding).toBe(7);
-      expect(node?.props.color).toBe('#ffffff');
+      expect(node?.props.color).toBe('#fff');
     });
 
     // why: a compound selector (`.card.big`) must LAYER over its own single-class rules rather

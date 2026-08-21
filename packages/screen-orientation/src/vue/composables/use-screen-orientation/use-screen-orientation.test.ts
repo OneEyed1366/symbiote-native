@@ -26,7 +26,8 @@ const getOrientationAsyncMock = vi.fn(async () => 1);
 const getOrientationLockAsyncMock = vi.fn(async () => 0);
 
 vi.mock('../../../core', () => ({
-  addOrientationChangeListener: (listener: IListener) => addListenerMock(listener),
+  addOrientationChangeListener: (listener: IListener) =>
+    addListenerMock(listener),
   getOrientationAsync: () => getOrientationAsyncMock(),
   getOrientationLockAsync: () => getOrientationLockAsyncMock(),
   Orientation: { UNKNOWN: 0, PORTRAIT_UP: 1 },
@@ -77,7 +78,10 @@ describe('useScreenOrientation (Vue)', () => {
   it('starts at Orientation/OrientationLock UNKNOWN before the initial fetch resolves', () => {
     const screenOrientation = mountScreenOrientation();
 
-    expect(screenOrientation.value).toEqual({ orientation: 0, orientationLock: 9 });
+    expect(screenOrientation.value).toEqual({
+      orientation: 0,
+      orientationLock: 9,
+    });
   });
 
   // why: the composable must actually apply the values core's one-shot getters resolve to, not
@@ -86,7 +90,10 @@ describe('useScreenOrientation (Vue)', () => {
     const screenOrientation = mountScreenOrientation();
 
     await vi.waitFor(() =>
-      expect(screenOrientation.value).toEqual({ orientation: 1, orientationLock: 0 }),
+      expect(screenOrientation.value).toEqual({
+        orientation: 1,
+        orientationLock: 0,
+      }),
     );
   });
 
@@ -96,9 +103,15 @@ describe('useScreenOrientation (Vue)', () => {
     const screenOrientation = mountScreenOrientation();
     await vi.waitFor(() => expect(screenOrientation.value.orientation).toBe(1));
 
-    registeredListener?.({ orientationLock: 5, orientationInfo: { orientation: 3 } });
+    registeredListener?.({
+      orientationLock: 5,
+      orientationInfo: { orientation: 3 },
+    });
 
-    expect(screenOrientation.value).toEqual({ orientation: 3, orientationLock: 5 });
+    expect(screenOrientation.value).toEqual({
+      orientation: 3,
+      orientationLock: 5,
+    });
   });
 
   // why: an unmounted component must not keep a live native subscription — that would leak a

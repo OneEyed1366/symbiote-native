@@ -1,0 +1,27 @@
+/*
+ * Chrome unique to the Drawer demo: the slide-out panel and its rows. The shared tour
+ * vocabulary (.demo-section, .line-tag*, .hero-*, .info-text) lives in App.css.
+ */
+
+.drawer-panel {
+  padding: 16px;
+  gap: 8px;
+}
+
+/* Menu rows inside that panel — MenuScreen's row look, kept local so the two cannot drift into
+   each other through the shared registry. */
+.drawer-menu-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  background-color: #0b1020;
+  border-width: 1px;
+  border-color: #26304f;
+}
+.drawer-menu-row-label {
+  color: #f4f6fb;
+  font-size: 16px;
+  font-weight: 700;
+}

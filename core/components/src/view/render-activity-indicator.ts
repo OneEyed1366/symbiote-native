@@ -10,7 +10,11 @@
 // file supplies those bits via `platform`.
 
 import { dlog } from '@symbiote-native/engine';
-import type { IStyleProp, IViewStyle, ISymbioteEvent } from '@symbiote-native/engine';
+import type {
+  IStyleProp,
+  IViewStyle,
+  ISymbioteEvent,
+} from '@symbiote-native/engine';
 import { el } from '../descriptor';
 import type { IDescriptor } from '../descriptor';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
@@ -20,7 +24,8 @@ export type IActivityIndicatorSize = 'small' | 'large' | number;
 // Author-facing props: the framework-agnostic public surface every adapter exposes. The
 // fields are identical across adapters (no framework element / ref / children), so they live
 // here once; each adapter only supplies its lifecycle + descriptor bridge.
-export interface IActivityIndicatorProps extends IAccessibilityProps, IAriaProps {
+export interface IActivityIndicatorProps
+  extends IAccessibilityProps, IAriaProps {
   animating?: boolean;
   color?: string;
   size?: IActivityIndicatorSize;
@@ -68,10 +73,16 @@ type INativeSize = {
 
 function resolveSize(size: IActivityIndicatorSize): INativeSize {
   if (size === 'small') {
-    return { sizeStyle: { width: SIZE_SMALL_PX, height: SIZE_SMALL_PX }, sizeProp: 'small' };
+    return {
+      sizeStyle: { width: SIZE_SMALL_PX, height: SIZE_SMALL_PX },
+      sizeProp: 'small',
+    };
   }
   if (size === 'large') {
-    return { sizeStyle: { width: SIZE_LARGE_PX, height: SIZE_LARGE_PX }, sizeProp: 'large' };
+    return {
+      sizeStyle: { width: SIZE_LARGE_PX, height: SIZE_LARGE_PX },
+      sizeProp: 'large',
+    };
   }
   return { sizeStyle: { width: size, height: size } };
 }
@@ -106,5 +117,7 @@ export function renderActivityIndicator(
     style: [CONTAINER_STYLE, view.style],
   };
 
-  return el('symbiote-view', wrapperProps, [el('symbiote-activity-indicator', nativeProps)]);
+  return el('symbiote-view', wrapperProps, [
+    el('symbiote-activity-indicator', nativeProps),
+  ]);
 }

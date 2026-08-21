@@ -79,7 +79,9 @@ export abstract class BaseAnimation implements IAnimation {
 
   // A native driver overrides this with its curve config (`{type:'frames'|'spring'|'decay', ...}`).
   protected getNativeAnimationConfig(): INativeAnimationConfig {
-    throw new Error('This animation type cannot be offloaded to the native driver');
+    throw new Error(
+      'This animation type cannot be offloaded to the native driver',
+    );
   }
 
   // If useNativeDriver was requested and the module is present, mirror the value
@@ -90,7 +92,9 @@ export abstract class BaseAnimation implements IAnimation {
   protected startNativeIfNeeded(animatedValue: AnimatedValue): boolean {
     if (!this.nativeDriverRequested) return false;
     if (!isNativeAnimatedAvailable()) {
-      dlog('useNativeDriver requested but native animated module is missing; using JS driver');
+      dlog(
+        'useNativeDriver requested but native animated module is missing; using JS driver',
+      );
       return false;
     }
     this.nativeId = generateNativeAnimationId();

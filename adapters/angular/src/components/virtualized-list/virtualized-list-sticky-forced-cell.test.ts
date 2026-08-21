@@ -25,10 +25,13 @@ interface IRow {
   id: number;
 }
 
-const rows: IRow[] = Array.from({ length: 20 }, (_unused, index) => ({ id: index }));
+const rows: IRow[] = Array.from({ length: 20 }, (_unused, index) => ({
+  id: index,
+}));
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 @Component({
   selector: 'symbiote-virtualized-list-sticky-forced-cell-host',
@@ -45,7 +48,9 @@ const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0))
       [stickyHeaderIndices]="stickyHeaderIndices"
     >
       <ng-template vListItem let-item>
-        <symbiote-text [testID]="'row-' + item.id">{{ 'row-' + item.id }}</symbiote-text>
+        <symbiote-text [testID]="'row-' + item.id">{{
+          'row-' + item.id
+        }}</symbiote-text>
       </ng-template>
     </VirtualizedList>
   `,
@@ -80,7 +85,10 @@ function findScrollView(): IFakeNode {
 function renderedRows(nodes: readonly IFakeNode[]): string[] {
   const found: string[] = [];
   for (const node of nodes) {
-    if (typeof node.props.testID === 'string' && node.props.testID.startsWith('row-')) {
+    if (
+      typeof node.props.testID === 'string' &&
+      node.props.testID.startsWith('row-')
+    ) {
       found.push(node.props.testID);
     }
     found.push(...renderedRows(node.children));
@@ -91,7 +99,11 @@ function renderedRows(nodes: readonly IFakeNode[]): string[] {
 // Ancestor depth (from the committed root) of the first node carrying the given testID, or
 // undefined when absent. Used to detect the extra sticky-wrapper host node — see the "wraps the
 // forced cell" test below.
-function depthOf(nodes: readonly IFakeNode[], testID: string, depth = 0): number | undefined {
+function depthOf(
+  nodes: readonly IFakeNode[],
+  testID: string,
+  depth = 0,
+): number | undefined {
   for (const node of nodes) {
     if (node.props.testID === testID) return depth;
     const found = depthOf(node.children, testID, depth + 1);
@@ -138,15 +150,23 @@ describe('VirtualizedList force-mounts the sticky header below the window', () =
     const rendered = renderedRows(fabric.committed);
     // The forced sticky cell: index 0 stays mounted even though it is far outside the in-window
     // range.
-    expect(rendered.includes('row-0'), 'sticky header at index 0 stays force-mounted').toBe(true);
+    expect(
+      rendered.includes('row-0'),
+      'sticky header at index 0 stays force-mounted',
+    ).toBe(true);
     // Real windowing still holds for everything else: indices strictly between the forced sticky
     // cell and the window are NOT rendered.
-    expect(rendered.includes('row-1'), 'index 1 stays windowed out').toBe(false);
-    expect(rendered.includes('row-4'), 'index 4 stays windowed out').toBe(false);
-    // The window itself is resident.
-    expect(rendered.includes('row-5') || rendered.includes('row-6'), 'window cell resident').toBe(
-      true,
+    expect(rendered.includes('row-1'), 'index 1 stays windowed out').toBe(
+      false,
     );
+    expect(rendered.includes('row-4'), 'index 4 stays windowed out').toBe(
+      false,
+    );
+    // The window itself is resident.
+    expect(
+      rendered.includes('row-5') || rendered.includes('row-6'),
+      'window cell resident',
+    ).toBe(true);
   });
 
   // why: the forced cell is a SEPARATE render branch from the windowed `@for` loop (index.ts

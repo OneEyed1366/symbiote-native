@@ -62,7 +62,8 @@ beforeEach(() => {
   if (slot) {
     slot.measure = (_node, callback) => callback(1, 2, 30, 40, 5, 6);
     slot.measureInWindow = (_node, callback) => callback(10, 20, 30, 40);
-    slot.measureLayout = (_node, _relativeToNode, _onFail, onSuccess) => onSuccess(1, 2, 30, 40);
+    slot.measureLayout = (_node, _relativeToNode, _onFail, onSuccess) =>
+      onSuccess(1, 2, 30, 40);
   }
 });
 
@@ -70,7 +71,9 @@ describe('toPublicInstance', () => {
   it('grafts the six imperative methods onto the retained node', () => {
     const instance = toPublicInstance(createElement('RCTView'));
     for (const name of METHOD_NAMES) {
-      expect(typeof methodOf(instance, name), `${name} is a function`).toBe('function');
+      expect(typeof methodOf(instance, name), `${name} is a function`).toBe(
+        'function',
+      );
     }
   });
 
@@ -106,7 +109,9 @@ describe('toPublicInstance', () => {
     // first commit) must not throw -- it silently no-ops until the node exists on Fabric.
     it('is a no-op when the node has not been committed yet', () => {
       const instance = toPublicInstance(createElement('RCTView'));
-      expect(() => instance.setNativeProps({ nativeID: 'ignored' })).not.toThrow();
+      expect(() =>
+        instance.setNativeProps({ nativeID: 'ignored' }),
+      ).not.toThrow();
     });
   });
 
@@ -200,13 +205,17 @@ describe('toPublicInstance', () => {
     it('focus() dispatches a "focus" view command at the committed handle', () => {
       const instance = mountCommitted();
       instance.focus();
-      expect(fabric.commands.map(command => command.commandName)).toEqual(['focus']);
+      expect(fabric.commands.map(command => command.commandName)).toEqual([
+        'focus',
+      ]);
     });
 
     it('blur() dispatches a "blur" view command at the committed handle', () => {
       const instance = mountCommitted();
       instance.blur();
-      expect(fabric.commands.map(command => command.commandName)).toEqual(['blur']);
+      expect(fabric.commands.map(command => command.commandName)).toEqual([
+        'blur',
+      ]);
     });
 
     // why: calling focus() before the node is committed must not throw or dispatch

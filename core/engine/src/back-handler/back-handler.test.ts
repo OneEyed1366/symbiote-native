@@ -34,10 +34,15 @@ beforeEach(async () => {
 
   globalThis.__turboModuleProxy = <T>(name: string): T | null => {
     const module: unknown =
-      name === 'DeviceEventManager' && moduleLinked ? fakeDeviceEventManager : undefined;
+      name === 'DeviceEventManager' && moduleLinked
+        ? fakeDeviceEventManager
+        : undefined;
     return isPresent<T>(module) ? module : null;
   };
-  globalThis.RN$registerCallableModule = (name: string, factory: () => IDeviceHub): void => {
+  globalThis.RN$registerCallableModule = (
+    name: string,
+    factory: () => IDeviceHub,
+  ): void => {
     if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
   };
 
@@ -58,7 +63,8 @@ async function loadBackHandler(): Promise<void> {
 }
 
 function emitBack(): void {
-  if (deviceHub === undefined) throw new Error('BackHandler must install the device hub');
+  if (deviceHub === undefined)
+    throw new Error('BackHandler must install the device hub');
   deviceHub.emit('hardwareBackPress');
 }
 
@@ -74,10 +80,13 @@ describe('BackHandler', () => {
         calls.push('first');
         return false;
       });
-      const subSecond = BackHandler.addEventListener('hardwareBackPress', () => {
-        calls.push('second');
-        return true;
-      });
+      const subSecond = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => {
+          calls.push('second');
+          return true;
+        },
+      );
 
       const exitsBefore = exitAppCount;
       emitBack();
@@ -162,8 +171,14 @@ describe('BackHandler', () => {
         calls += 1;
         return true;
       };
-      const subFirst = BackHandler.addEventListener('hardwareBackPress', handler);
-      const subSecond = BackHandler.addEventListener('hardwareBackPress', handler);
+      const subFirst = BackHandler.addEventListener(
+        'hardwareBackPress',
+        handler,
+      );
+      const subSecond = BackHandler.addEventListener(
+        'hardwareBackPress',
+        handler,
+      );
 
       emitBack();
       expect(calls).toBe(1);

@@ -11,7 +11,7 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -19,7 +19,8 @@ import { RefreshControl } from './index';
 
 const ROOT_TAG = 914;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedHost: RefreshControlHostFixture | undefined;
 
@@ -80,7 +81,14 @@ describe('RefreshControl (no throwing path — see file header)', () => {
   });
 
   it('resolves a class= on the RefreshControl use site onto the real committed view, not the anchor', async () => {
-    registerStyles({ spinner: { backgroundColor: 'green' } });
+    registerRules([
+      {
+        tokens: ['spinner'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { backgroundColor: 'green' },
+      },
+    ]);
 
     mount(ROOT_TAG, RefreshControlHostFixture);
     await tick();

@@ -8,7 +8,9 @@
 // inverted rarely does) must be read live through a closure rather than copied.
 import type { AnimatedValue } from '@symbiote-native/engine';
 
-export const SCROLL_VIEW_STICKY_CONTEXT_KEY = Symbol('symbiote-scroll-view-sticky');
+export const SCROLL_VIEW_STICKY_CONTEXT_KEY = Symbol(
+  'symbiote-scroll-view-sticky',
+);
 
 export type IScrollViewStickyContext = {
   scrollAnimatedValue: AnimatedValue;

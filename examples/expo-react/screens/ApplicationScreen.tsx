@@ -1,5 +1,11 @@
 import { useCallback, useState } from 'react';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/react';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/react';
 import {
   applicationId,
   applicationName,
@@ -67,7 +73,11 @@ export function ApplicationScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="application-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="application-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -78,8 +88,9 @@ export function ApplicationScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Application</Text>
             <Text className="hero-body">
-              @symbiote-native/application — native app version/build/name/ID constants, plus
-              install-time, Android ID/install-referrer, and iOS vendor ID/release-type lookups.
+              @symbiote-native/application — native app version/build/name/ID
+              constants, plus install-time, Android ID/install-referrer, and iOS
+              vendor ID/release-type lookups.
             </Text>
           </View>
         </View>
@@ -88,7 +99,10 @@ export function ApplicationScreen() {
           <View className="feature-card-header">
             <Text className="feature-card-title">Constants</Text>
           </View>
-          <ValueRow label="Version" value={nativeApplicationVersion ?? 'unknown'} />
+          <ValueRow
+            label="Version"
+            value={nativeApplicationVersion ?? 'unknown'}
+          />
           <ValueRow label="Build" value={nativeBuildVersion ?? 'unknown'} />
           <ValueRow label="Name" value={applicationName ?? 'unknown'} />
           <ValueRow label="ID" value={applicationId ?? 'unknown'} />
@@ -104,7 +118,9 @@ export function ApplicationScreen() {
             onPress={handleGetInstallationTime}
             color={lineColor}
           />
-          {installedAt !== null && <ValueRow label="Installed at" value={installedAt} />}
+          {installedAt !== null && (
+            <ValueRow label="Installed at" value={installedAt} />
+          )}
         </View>
 
         {Platform.OS === 'android' && (
@@ -118,14 +134,18 @@ export function ApplicationScreen() {
               onPress={handleGetAndroidId}
               color={lineColor}
             />
-            {androidId !== null && <ValueRow label="Android ID" value={androidId} />}
+            {androidId !== null && (
+              <ValueRow label="Android ID" value={androidId} />
+            )}
             <ActionButton
               testID="application-install-referrer-button"
               title="Get install referrer"
               onPress={handleGetInstallReferrer}
               color={lineColor}
             />
-            {installReferrer !== null && <ValueRow label="Install referrer" value={installReferrer} />}
+            {installReferrer !== null && (
+              <ValueRow label="Install referrer" value={installReferrer} />
+            )}
           </View>
         )}
 
@@ -140,14 +160,18 @@ export function ApplicationScreen() {
               onPress={handleGetIosVendorId}
               color={lineColor}
             />
-            {iosVendorId !== null && <ValueRow label="Vendor ID" value={iosVendorId} />}
+            {iosVendorId !== null && (
+              <ValueRow label="Vendor ID" value={iosVendorId} />
+            )}
             <ActionButton
               testID="application-ios-release-type-button"
               title="Get release type"
               onPress={handleGetIosReleaseType}
               color={lineColor}
             />
-            {iosReleaseType !== null && <ValueRow label="Release type" value={iosReleaseType} />}
+            {iosReleaseType !== null && (
+              <ValueRow label="Release type" value={iosReleaseType} />
+            )}
           </View>
         )}
       </ScrollView>

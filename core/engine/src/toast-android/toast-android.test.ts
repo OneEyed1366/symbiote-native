@@ -29,7 +29,11 @@ beforeEach(async () => {
     show: (message: string, duration: number): void => {
       showArgs = [message, duration];
     },
-    showWithGravity: (message: string, duration: number, gravity: number): void => {
+    showWithGravity: (
+      message: string,
+      duration: number,
+      gravity: number,
+    ): void => {
       gravityArgs = [message, duration, gravity];
     },
     showWithGravityAndOffset: (
@@ -43,7 +47,9 @@ beforeEach(async () => {
     },
   };
 
-  const registeredModules: Record<string, unknown> = { ToastAndroid: fakeToast };
+  const registeredModules: Record<string, unknown> = {
+    ToastAndroid: fakeToast,
+  };
   globalThis.__turboModuleProxy = <T>(name: string): T | null => {
     const module = registeredModules[name];
     return isPresent<T>(module) ? module : null;
@@ -76,13 +82,33 @@ describe('ToastAndroid (module present)', () => {
   });
 
   it('showWithGravity forwards all args', () => {
-    ToastAndroid.showWithGravity('grav', ToastAndroid.LONG, ToastAndroid.CENTER);
-    expect(gravityArgs).toEqual(['grav', ToastAndroid.LONG, ToastAndroid.CENTER]);
+    ToastAndroid.showWithGravity(
+      'grav',
+      ToastAndroid.LONG,
+      ToastAndroid.CENTER,
+    );
+    expect(gravityArgs).toEqual([
+      'grav',
+      ToastAndroid.LONG,
+      ToastAndroid.CENTER,
+    ]);
   });
 
   it('showWithGravityAndOffset forwards all args', () => {
-    ToastAndroid.showWithGravityAndOffset('off', ToastAndroid.SHORT, ToastAndroid.BOTTOM, 25, 50);
-    expect(offsetArgs).toEqual(['off', ToastAndroid.SHORT, ToastAndroid.BOTTOM, 25, 50]);
+    ToastAndroid.showWithGravityAndOffset(
+      'off',
+      ToastAndroid.SHORT,
+      ToastAndroid.BOTTOM,
+      25,
+      50,
+    );
+    expect(offsetArgs).toEqual([
+      'off',
+      ToastAndroid.SHORT,
+      ToastAndroid.BOTTOM,
+      25,
+      50,
+    ]);
   });
 });
 
@@ -92,12 +118,17 @@ describe('ToastAndroid (module present, malformed constants payload)', () => {
   // constants object, with only the bad/missing keys defaulted.
   it('falls back to the RN-conventional default for a missing or non-numeric key, keeps the valid ones', async () => {
     const partialToast = {
-      getConstants: (): Record<string, unknown> => ({ SHORT: 'not-a-number', LONG: 2 }),
+      getConstants: (): Record<string, unknown> => ({
+        SHORT: 'not-a-number',
+        LONG: 2,
+      }),
       show: (): void => undefined,
       showWithGravity: (): void => undefined,
       showWithGravityAndOffset: (): void => undefined,
     };
-    const registeredModules: Record<string, unknown> = { ToastAndroid: partialToast };
+    const registeredModules: Record<string, unknown> = {
+      ToastAndroid: partialToast,
+    };
     globalThis.__turboModuleProxy = <T>(name: string): T | null => {
       const module = registeredModules[name];
       return isPresent<T>(module) ? module : null;

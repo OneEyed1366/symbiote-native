@@ -18,7 +18,9 @@ import {
   type IHideAnimationResult,
 } from '../../../core';
 
-export function useHideAnimation(config: IHideAnimationConfig): IHideAnimationResult {
+export function useHideAnimation(
+  config: IHideAnimationConfig,
+): IHideAnimationResult {
   const controllerRef = useRef<HideAnimationController | null>(null);
   if (controllerRef.current == null) {
     controllerRef.current = new HideAnimationController(config);

@@ -12,7 +12,7 @@
 // it here is what surfaces the diagnosis in `svelte-check` and in the editor's language server,
 // which run the preprocessor pipeline but never Metro.
 //
-// `scopedStyles()` compiles a component's own <style> block into registerStyles() output and
+// `scopedStyles()` compiles a component's own <style> block into registerRules() output and
 // scopes every class in that component's markup. Metro's transformer runs it itself, so the
 // bundle is correct either way; registering it HERE is what stops svelte-check and the editor
 // from reporting `css_unused_selector` on every rule in a scoped block (Svelte's own scoping
@@ -31,7 +31,11 @@ import { scopedStyles } from '@symbiote-native/svelte/scoped-styles';
 import { collapseTextWhitespace } from '@symbiote-native/svelte/collapse-text-whitespace';
 
 export default {
-  preprocess: [forbidWebOnlyConstructs(), scopedStyles(), collapseTextWhitespace()],
+  preprocess: [
+    forbidWebOnlyConstructs(),
+    scopedStyles(),
+    collapseTextWhitespace(),
+  ],
   compilerOptions: {
     fragments: 'tree',
     css: 'external',

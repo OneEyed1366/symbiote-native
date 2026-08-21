@@ -7,7 +7,14 @@
 -->
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/vue';
 import {
   getStringAsync,
   getUrlAsync,
@@ -85,9 +92,15 @@ function handleSetUrl(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="clipboard-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="clipboard-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -96,8 +109,8 @@ function handleSetUrl(): void {
         <View class="hero-copy">
           <Text class="hero-title">Clipboard</Text>
           <Text class="hero-body"
-            >@symbiote-native/clipboard — read and write the system clipboard's text and URL
-            content, plus a live change-listener composable.</Text
+            >@symbiote-native/clipboard — read and write the system clipboard's
+            text and URL content, plus a live change-listener composable.</Text
           >
         </View>
       </View>
@@ -111,9 +124,15 @@ function handleSetUrl(): void {
         </View>
         <View class="clipboard-capability-row">
           <Text class="clipboard-capability-label">Has text</Text>
-          <View :class="`clipboard-status-badge clipboard-status-badge-${hasString}`">
+          <View
+            :class="`clipboard-status-badge clipboard-status-badge-${hasString}`"
+          >
             <Text class="clipboard-status-text">{{
-              hasString === 'checking' ? 'CHECKING…' : hasString === 'yes' ? 'YES' : 'NO'
+              hasString === 'checking'
+                ? 'CHECKING…'
+                : hasString === 'yes'
+                  ? 'YES'
+                  : 'NO'
             }}</Text>
           </View>
         </View>
@@ -136,7 +155,11 @@ function handleSetUrl(): void {
         />
       </View>
 
-      <View v-if="Platform.OS === 'ios'" testID="clipboard-url-card" class="clipboard-card">
+      <View
+        v-if="Platform.OS === 'ios'"
+        testID="clipboard-url-card"
+        class="clipboard-card"
+      >
         <Text class="clipboard-card-title">URL (iOS only)</Text>
         <TextInput
           testID="clipboard-url-input"
@@ -161,9 +184,15 @@ function handleSetUrl(): void {
         </View>
         <View class="clipboard-capability-row">
           <Text class="clipboard-capability-label">Has URL</Text>
-          <View :class="`clipboard-status-badge clipboard-status-badge-${hasUrl}`">
+          <View
+            :class="`clipboard-status-badge clipboard-status-badge-${hasUrl}`"
+          >
             <Text class="clipboard-status-text">{{
-              hasUrl === 'checking' ? 'CHECKING…' : hasUrl === 'yes' ? 'YES' : 'NO'
+              hasUrl === 'checking'
+                ? 'CHECKING…'
+                : hasUrl === 'yes'
+                  ? 'YES'
+                  : 'NO'
             }}</Text>
           </View>
         </View>

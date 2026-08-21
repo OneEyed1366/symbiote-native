@@ -9,8 +9,12 @@ import {
   type IEventSubscription,
 } from '@symbiote-native/engine';
 
-export function useColorScheme(): { readonly current: IColorSchemeName | null } {
-  let colorScheme = $state<IColorSchemeName | null>(Appearance.getColorScheme());
+export function useColorScheme(): {
+  readonly current: IColorSchemeName | null;
+} {
+  let colorScheme = $state<IColorSchemeName | null>(
+    Appearance.getColorScheme(),
+  );
 
   $effect(() => {
     // Re-read on mount in case the scheme changed between this function's own call and the
@@ -18,9 +22,11 @@ export function useColorScheme(): { readonly current: IColorSchemeName | null } 
     // (never a read), so the effect has no dependency on it and runs exactly once on mount,
     // cleaning up exactly once on unmount.
     colorScheme = Appearance.getColorScheme();
-    const subscription: IEventSubscription = Appearance.addChangeListener(preferences => {
-      colorScheme = preferences.colorScheme;
-    });
+    const subscription: IEventSubscription = Appearance.addChangeListener(
+      preferences => {
+        colorScheme = preferences.colorScheme;
+      },
+    );
     return () => subscription.remove();
   });
 

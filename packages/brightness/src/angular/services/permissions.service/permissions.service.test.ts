@@ -22,7 +22,11 @@ const { getPermissionsAsync, requestPermissionsAsync } = vi.hoisted(() => ({
 vi.mock('../../../core', () => ({
   getPermissionsAsync,
   requestPermissionsAsync,
-  PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    DENIED: 'denied',
+    UNDETERMINED: 'undetermined',
+  },
 }));
 
 const GRANTED: PermissionResponse = {
@@ -40,14 +44,17 @@ const DENIED: PermissionResponse = {
 
 const ROOT_TAG = 973;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 let capturedStatus: Signal<PermissionResponse | null> | undefined;
 let capturedService: PermissionsService | undefined;
 
 // Node only reports an unhandled rejection a macrotask after the promise settles, so a plain
 // `await tick()` on the service's own signals is too early to prove one did not happen.
-async function collectUnhandledRejections(run: () => Promise<void>): Promise<unknown[]> {
+async function collectUnhandledRejections(
+  run: () => Promise<void>,
+): Promise<unknown[]> {
   const unhandled: unknown[] = [];
   const onUnhandledRejection = (reason: unknown): void => {
     unhandled.push(reason);
@@ -160,9 +167,13 @@ describe('PermissionsService.connect', () => {
       await tick();
       expect(capturedStatus?.()).toEqual(GRANTED);
 
-      requestPermissionsAsync.mockRejectedValueOnce(new Error('permission request failed'));
+      requestPermissionsAsync.mockRejectedValueOnce(
+        new Error('permission request failed'),
+      );
 
-      await expect(capturedService?.request()).rejects.toThrow('permission request failed');
+      await expect(capturedService?.request()).rejects.toThrow(
+        'permission request failed',
+      );
       // status must stay at the last known-good value, not be clobbered by the failed call
       expect(capturedStatus?.()).toEqual(GRANTED);
     });
@@ -172,9 +183,13 @@ describe('PermissionsService.connect', () => {
       await tick();
       expect(capturedStatus?.()).toEqual(GRANTED);
 
-      getPermissionsAsync.mockRejectedValueOnce(new Error('permission query failed'));
+      getPermissionsAsync.mockRejectedValueOnce(
+        new Error('permission query failed'),
+      );
 
-      await expect(capturedService?.get()).rejects.toThrow('permission query failed');
+      await expect(capturedService?.get()).rejects.toThrow(
+        'permission query failed',
+      );
       expect(capturedStatus?.()).toEqual(GRANTED);
     });
 
@@ -182,7 +197,9 @@ describe('PermissionsService.connect', () => {
     // a native rejection escaped the service entirely as an unhandled promise rejection and left
     // the signal at null — indistinguishable from "still fetching".
     it('surfaces an auto-fetch rejection as `error` instead of leaving it unhandled', async () => {
-      getPermissionsAsync.mockRejectedValueOnce(new Error('permission query failed'));
+      getPermissionsAsync.mockRejectedValueOnce(
+        new Error('permission query failed'),
+      );
 
       // mounted before the listener goes up, but the rejection can only be reported once the
       // microtask queue drains — no turn passes between these two lines
@@ -201,7 +218,9 @@ describe('PermissionsService.connect', () => {
     // clears — so every later connect() fired another native call, unbounded once connect() is
     // reached from a change-detected expression instead of a field initializer.
     it('does not retry the auto-fetch on a later connect() after it failed', async () => {
-      getPermissionsAsync.mockRejectedValueOnce(new Error('permission query failed'));
+      getPermissionsAsync.mockRejectedValueOnce(
+        new Error('permission query failed'),
+      );
       mount(ROOT_TAG, PermissionsHost);
       await tick();
 
@@ -216,7 +235,9 @@ describe('PermissionsService.connect', () => {
     // why: a consumer that retries by hand after a failed auto-fetch must end up with a clean
     // slate — a stale error next to a freshly fetched status would keep reading as "broken".
     it('clears the recorded error once a later get() succeeds', async () => {
-      getPermissionsAsync.mockRejectedValueOnce(new Error('permission query failed'));
+      getPermissionsAsync.mockRejectedValueOnce(
+        new Error('permission query failed'),
+      );
       mount(ROOT_TAG, PermissionsHost);
       await tick();
       expect(capturedService?.error()).not.toBe(null);

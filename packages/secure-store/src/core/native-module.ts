@@ -1,5 +1,8 @@
 import { requireNativeModule } from 'expo-modules-core';
-import type { IKeychainAccessibilityConstant, ISecureStoreOptions } from './types';
+import type {
+  IKeychainAccessibilityConstant,
+  ISecureStoreOptions,
+} from './types';
 
 const EXPO_SECURE_STORE_MODULE_NAME = 'ExpoSecureStore';
 
@@ -18,11 +21,28 @@ export type INativeSecureStoreModule = {
   WHEN_PASSCODE_SET_THIS_DEVICE_ONLY?: IKeychainAccessibilityConstant;
   WHEN_UNLOCKED?: IKeychainAccessibilityConstant;
   WHEN_UNLOCKED_THIS_DEVICE_ONLY?: IKeychainAccessibilityConstant;
-  getValueWithKeyAsync?(key: string, options: ISecureStoreOptions): Promise<string | null>;
-  getValueWithKeySync?(key: string, options: ISecureStoreOptions): string | null;
-  setValueWithKeyAsync?(value: string, key: string, options: ISecureStoreOptions): Promise<boolean>;
-  setValueWithKeySync?(value: string, key: string, options: ISecureStoreOptions): boolean;
-  deleteValueWithKeyAsync?(key: string, options: ISecureStoreOptions): Promise<void>;
+  getValueWithKeyAsync?(
+    key: string,
+    options: ISecureStoreOptions,
+  ): Promise<string | null>;
+  getValueWithKeySync?(
+    key: string,
+    options: ISecureStoreOptions,
+  ): string | null;
+  setValueWithKeyAsync?(
+    value: string,
+    key: string,
+    options: ISecureStoreOptions,
+  ): Promise<boolean>;
+  setValueWithKeySync?(
+    value: string,
+    key: string,
+    options: ISecureStoreOptions,
+  ): boolean;
+  deleteValueWithKeyAsync?(
+    key: string,
+    options: ISecureStoreOptions,
+  ): Promise<void>;
   canUseBiometricAuthentication?(): boolean;
 };
 

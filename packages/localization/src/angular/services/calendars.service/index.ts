@@ -1,5 +1,16 @@
-import { effect, inject, Injectable, Injector, signal, type Signal } from '@angular/core';
-import { addCalendarListener, getCalendars, type Calendar } from '../../../core';
+import {
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  signal,
+  type Signal,
+} from '@angular/core';
+import {
+  addCalendarListener,
+  getCalendars,
+  type Calendar,
+} from '../../../core';
 
 // Angular twin of React's `useCalendars` hook and Vue's `useCalendars` composable — mirrors
 // LocalesService's shape exactly.
@@ -15,7 +26,9 @@ export class CalendarsService {
 
     effect(
       onCleanup => {
-        const subscription = addCalendarListener(() => calendars.set(getCalendars()));
+        const subscription = addCalendarListener(() =>
+          calendars.set(getCalendars()),
+        );
         onCleanup(() => subscription.remove());
       },
       { injector: this.injector },

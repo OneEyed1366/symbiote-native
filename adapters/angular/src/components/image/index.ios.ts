@@ -13,7 +13,12 @@ import {
   SymbioteHostPropsDirective,
   SymbioteStyleInputDirective,
 } from '../../primitives';
-import { IMAGE_INPUTS, IMAGE_OUTPUTS, ImageBase, resolveImageProps } from './shared';
+import {
+  IMAGE_INPUTS,
+  IMAGE_OUTPUTS,
+  ImageBase,
+  resolveImageProps,
+} from './shared';
 export { setImageSourceResolver } from './shared';
 export type {
   IImageProps,
@@ -27,7 +32,9 @@ export type {
 @Component({
   selector: 'Image',
   standalone: true,
-  hostDirectives: [{ directive: SymbioteStyleInputDirective, inputs: ['style'] }],
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [ImageHost, SymbioteHostPropsDirective],
   inputs: IMAGE_INPUTS,

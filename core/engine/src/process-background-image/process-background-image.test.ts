@@ -15,7 +15,10 @@ const PROCESSED_COLOR = 0x7f_b5_ff_d9;
 
 function installRealisticColorProcessor(): void {
   setColorProcessor(value => {
-    if (typeof value === 'string' && /^(rgba?|hsla?|#|red|blue|green)/i.test(value.trim())) {
+    if (
+      typeof value === 'string' &&
+      /^(rgba?|hsla?|#|red|blue|green)/i.test(value.trim())
+    ) {
       return PROCESSED_COLOR;
     }
     return null;
@@ -32,7 +35,8 @@ describe('processBackgroundImage', () => {
       installRealisticColorProcessor();
       const [gradient] = processBackgroundImage('linear-gradient(red, blue)');
       expect(gradient?.type).toBe('linear-gradient');
-      if (gradient?.type !== 'linear-gradient') throw new Error('expected linear-gradient');
+      if (gradient?.type !== 'linear-gradient')
+        throw new Error('expected linear-gradient');
       expect(gradient.direction).toEqual({ type: 'angle', value: 180 });
       expect(gradient.colorStops).toEqual([
         { color: PROCESSED_COLOR, position: null },
@@ -42,16 +46,25 @@ describe('processBackgroundImage', () => {
 
     it('parses an angle direction with a unit', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('linear-gradient(45deg, red, blue)');
-      if (gradient?.type !== 'linear-gradient') throw new Error('expected linear-gradient');
+      const [gradient] = processBackgroundImage(
+        'linear-gradient(45deg, red, blue)',
+      );
+      if (gradient?.type !== 'linear-gradient')
+        throw new Error('expected linear-gradient');
       expect(gradient.direction).toEqual({ type: 'angle', value: 45 });
     });
 
     it('converts grad/rad/turn units to degrees', () => {
       installRealisticColorProcessor();
-      const [grad] = processBackgroundImage('linear-gradient(100grad, red, blue)');
-      const [rad] = processBackgroundImage('linear-gradient(3.14159265rad, red, blue)');
-      const [turn] = processBackgroundImage('linear-gradient(0.5turn, red, blue)');
+      const [grad] = processBackgroundImage(
+        'linear-gradient(100grad, red, blue)',
+      );
+      const [rad] = processBackgroundImage(
+        'linear-gradient(3.14159265rad, red, blue)',
+      );
+      const [turn] = processBackgroundImage(
+        'linear-gradient(0.5turn, red, blue)',
+      );
       if (
         grad?.type !== 'linear-gradient' ||
         rad?.type !== 'linear-gradient' ||
@@ -66,22 +79,34 @@ describe('processBackgroundImage', () => {
 
     it('parses a keyword direction', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('linear-gradient(to right, red, blue)');
-      if (gradient?.type !== 'linear-gradient') throw new Error('expected linear-gradient');
+      const [gradient] = processBackgroundImage(
+        'linear-gradient(to right, red, blue)',
+      );
+      if (gradient?.type !== 'linear-gradient')
+        throw new Error('expected linear-gradient');
       expect(gradient.direction).toEqual({ type: 'angle', value: 90 });
     });
 
     it('parses a diagonal keyword direction to the keyword form', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('linear-gradient(to top right, red, blue)');
-      if (gradient?.type !== 'linear-gradient') throw new Error('expected linear-gradient');
-      expect(gradient.direction).toEqual({ type: 'keyword', value: 'to top right' });
+      const [gradient] = processBackgroundImage(
+        'linear-gradient(to top right, red, blue)',
+      );
+      if (gradient?.type !== 'linear-gradient')
+        throw new Error('expected linear-gradient');
+      expect(gradient.direction).toEqual({
+        type: 'keyword',
+        value: 'to top right',
+      });
     });
 
     it('parses percentage color-stop positions', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('linear-gradient(red 0%, blue 100%)');
-      if (gradient?.type !== 'linear-gradient') throw new Error('expected linear-gradient');
+      const [gradient] = processBackgroundImage(
+        'linear-gradient(red 0%, blue 100%)',
+      );
+      if (gradient?.type !== 'linear-gradient')
+        throw new Error('expected linear-gradient');
       expect(gradient.colorStops).toEqual([
         { color: PROCESSED_COLOR, position: '0%' },
         { color: PROCESSED_COLOR, position: '100%' },
@@ -90,8 +115,11 @@ describe('processBackgroundImage', () => {
 
     it('expands a double-position color stop into two stops', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('linear-gradient(red 0% 50%, blue 100%)');
-      if (gradient?.type !== 'linear-gradient') throw new Error('expected linear-gradient');
+      const [gradient] = processBackgroundImage(
+        'linear-gradient(red 0% 50%, blue 100%)',
+      );
+      if (gradient?.type !== 'linear-gradient')
+        throw new Error('expected linear-gradient');
       expect(gradient.colorStops).toEqual([
         { color: PROCESSED_COLOR, position: '0%' },
         { color: PROCESSED_COLOR, position: '50%' },
@@ -101,8 +129,11 @@ describe('processBackgroundImage', () => {
 
     it('parses the transition-hint syntax (color, position, color)', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('linear-gradient(red, 20%, blue)');
-      if (gradient?.type !== 'linear-gradient') throw new Error('expected linear-gradient');
+      const [gradient] = processBackgroundImage(
+        'linear-gradient(red, 20%, blue)',
+      );
+      if (gradient?.type !== 'linear-gradient')
+        throw new Error('expected linear-gradient');
       expect(gradient.colorStops).toEqual([
         { color: PROCESSED_COLOR, position: null },
         { color: null, position: '20%' },
@@ -112,14 +143,21 @@ describe('processBackgroundImage', () => {
 
     it('rejects a transition hint as the first or last stop', () => {
       installRealisticColorProcessor();
-      expect(processBackgroundImage('linear-gradient(20%, red, blue)')).toEqual([]);
-      expect(processBackgroundImage('linear-gradient(red, blue, 20%)')).toEqual([]);
+      expect(processBackgroundImage('linear-gradient(20%, red, blue)')).toEqual(
+        [],
+      );
+      expect(processBackgroundImage('linear-gradient(red, blue, 20%)')).toEqual(
+        [],
+      );
     });
 
     it('does not let an internal rgba() comma break color-stop splitting', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('linear-gradient(rgba(0, 0, 0, .5), blue)');
-      if (gradient?.type !== 'linear-gradient') throw new Error('expected linear-gradient');
+      const [gradient] = processBackgroundImage(
+        'linear-gradient(rgba(0, 0, 0, .5), blue)',
+      );
+      if (gradient?.type !== 'linear-gradient')
+        throw new Error('expected linear-gradient');
       expect(gradient.colorStops).toHaveLength(2);
     });
 
@@ -133,7 +171,9 @@ describe('processBackgroundImage', () => {
 
     it('returns an empty array for an invalid angle', () => {
       installRealisticColorProcessor();
-      expect(processBackgroundImage('linear-gradient(45xyz, red, blue)')).toEqual([]);
+      expect(
+        processBackgroundImage('linear-gradient(45xyz, red, blue)'),
+      ).toEqual([]);
     });
 
     // why: a stop position with no recognized unit (not px, not %) is unresolvable —
@@ -141,7 +181,9 @@ describe('processBackgroundImage', () => {
     // drop the position.
     it('rejects a color-stop position with no recognized unit', () => {
       installRealisticColorProcessor();
-      expect(processBackgroundImage('linear-gradient(red 10, blue)')).toEqual([]);
+      expect(processBackgroundImage('linear-gradient(red 10, blue)')).toEqual(
+        [],
+      );
     });
   });
 
@@ -149,7 +191,8 @@ describe('processBackgroundImage', () => {
     it('defaults to ellipse/farthest-corner/center when unspecified', () => {
       installRealisticColorProcessor();
       const [gradient] = processBackgroundImage('radial-gradient(red, blue)');
-      if (gradient?.type !== 'radial-gradient') throw new Error('expected radial-gradient');
+      if (gradient?.type !== 'radial-gradient')
+        throw new Error('expected radial-gradient');
       expect(gradient.shape).toBe('ellipse');
       expect(gradient.size).toBe('farthest-corner');
       expect(gradient.position).toEqual({ top: '50%', left: '50%' });
@@ -157,43 +200,60 @@ describe('processBackgroundImage', () => {
 
     it('parses an explicit shape and size keyword', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('radial-gradient(circle closest-side, red, blue)');
-      if (gradient?.type !== 'radial-gradient') throw new Error('expected radial-gradient');
+      const [gradient] = processBackgroundImage(
+        'radial-gradient(circle closest-side, red, blue)',
+      );
+      if (gradient?.type !== 'radial-gradient')
+        throw new Error('expected radial-gradient');
       expect(gradient.shape).toBe('circle');
       expect(gradient.size).toBe('closest-side');
     });
 
     it('defaults an explicit single-length size to a circle shape', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('radial-gradient(20px, red, blue)');
-      if (gradient?.type !== 'radial-gradient') throw new Error('expected radial-gradient');
+      const [gradient] = processBackgroundImage(
+        'radial-gradient(20px, red, blue)',
+      );
+      if (gradient?.type !== 'radial-gradient')
+        throw new Error('expected radial-gradient');
       expect(gradient.shape).toBe('circle');
       expect(gradient.size).toEqual({ x: 20, y: 20 });
     });
 
     it('parses an explicit two-length size', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('radial-gradient(20px 30px, red, blue)');
-      if (gradient?.type !== 'radial-gradient') throw new Error('expected radial-gradient');
+      const [gradient] = processBackgroundImage(
+        'radial-gradient(20px 30px, red, blue)',
+      );
+      if (gradient?.type !== 'radial-gradient')
+        throw new Error('expected radial-gradient');
       expect(gradient.size).toEqual({ x: 20, y: 30 });
     });
 
     it('rejects an ellipse explicitly paired with a single explicit size', () => {
       installRealisticColorProcessor();
-      expect(processBackgroundImage('radial-gradient(ellipse 20px, red, blue)')).toEqual([]);
+      expect(
+        processBackgroundImage('radial-gradient(ellipse 20px, red, blue)'),
+      ).toEqual([]);
     });
 
     it('parses "at <keyword position>" (2-keyword form resolves via the left/top keys — "right" is expressed as left: 100%, matching RN)', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('radial-gradient(at top right, red, blue)');
-      if (gradient?.type !== 'radial-gradient') throw new Error('expected radial-gradient');
+      const [gradient] = processBackgroundImage(
+        'radial-gradient(at top right, red, blue)',
+      );
+      if (gradient?.type !== 'radial-gradient')
+        throw new Error('expected radial-gradient');
       expect(gradient.position).toEqual({ top: '0%', left: '100%' });
     });
 
     it('parses "at <length-percentage> <length-percentage>"', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('radial-gradient(at 25% 75%, red, blue)');
-      if (gradient?.type !== 'radial-gradient') throw new Error('expected radial-gradient');
+      const [gradient] = processBackgroundImage(
+        'radial-gradient(at 25% 75%, red, blue)',
+      );
+      if (gradient?.type !== 'radial-gradient')
+        throw new Error('expected radial-gradient');
       expect(gradient.position).toEqual({ top: '75%', left: '25%' });
     });
 
@@ -202,7 +262,8 @@ describe('processBackgroundImage', () => {
       const [gradient] = processBackgroundImage(
         'radial-gradient(circle farthest-side at left top, red, blue)',
       );
-      if (gradient?.type !== 'radial-gradient') throw new Error('expected radial-gradient');
+      if (gradient?.type !== 'radial-gradient')
+        throw new Error('expected radial-gradient');
       expect(gradient.shape).toBe('circle');
       expect(gradient.size).toBe('farthest-side');
       expect(gradient.position).toEqual({ top: '0%', left: '0%' });
@@ -212,8 +273,11 @@ describe('processBackgroundImage', () => {
     // 2-keyword and 4-token forms already covered — CSS defaults the OTHER axis to center.
     it('parses "at <single keyword position>", defaulting the other axis to center', () => {
       installRealisticColorProcessor();
-      const [gradient] = processBackgroundImage('radial-gradient(at right, red, blue)');
-      if (gradient?.type !== 'radial-gradient') throw new Error('expected radial-gradient');
+      const [gradient] = processBackgroundImage(
+        'radial-gradient(at right, red, blue)',
+      );
+      if (gradient?.type !== 'radial-gradient')
+        throw new Error('expected radial-gradient');
       expect(gradient.position).toEqual({ left: '100%', top: '50%' });
     });
 
@@ -225,7 +289,8 @@ describe('processBackgroundImage', () => {
       const [gradient] = processBackgroundImage(
         'radial-gradient(at right 20px bottom 30px, red, blue)',
       );
-      if (gradient?.type !== 'radial-gradient') throw new Error('expected radial-gradient');
+      if (gradient?.type !== 'radial-gradient')
+        throw new Error('expected radial-gradient');
       expect(gradient.position).toEqual({ right: 20, bottom: 30 });
     });
   });
@@ -242,10 +307,14 @@ describe('processBackgroundImage', () => {
         {
           type: 'linear-gradient',
           direction: '45deg',
-          colorStops: [{ color: 'red', positions: undefined }, { color: 'blue' }],
+          colorStops: [
+            { color: 'red', positions: undefined },
+            { color: 'blue' },
+          ],
         },
       ]);
-      if (gradient?.type !== 'linear-gradient') throw new Error('expected linear-gradient');
+      if (gradient?.type !== 'linear-gradient')
+        throw new Error('expected linear-gradient');
       expect(gradient.direction).toEqual({ type: 'angle', value: 45 });
       expect(gradient.colorStops).toEqual([
         { color: 'red', position: null },
@@ -263,7 +332,8 @@ describe('processBackgroundImage', () => {
           ],
         },
       ]);
-      if (gradient?.type !== 'linear-gradient') throw new Error('expected linear-gradient');
+      if (gradient?.type !== 'linear-gradient')
+        throw new Error('expected linear-gradient');
       expect(gradient.colorStops).toEqual([
         { color: 'red', position: '0%' },
         { color: 'red', position: '50%' },
@@ -281,7 +351,8 @@ describe('processBackgroundImage', () => {
           colorStops: [{ color: 'red' }, { color: 'blue' }],
         },
       ]);
-      if (gradient?.type !== 'radial-gradient') throw new Error('expected radial-gradient');
+      if (gradient?.type !== 'radial-gradient')
+        throw new Error('expected radial-gradient');
       expect(gradient.shape).toBe('circle');
       expect(gradient.size).toBe('closest-side');
       expect(gradient.position).toEqual({ bottom: '10%', right: '20%' });
@@ -289,7 +360,9 @@ describe('processBackgroundImage', () => {
 
     it('zeroes the whole list on an invalid color stop (web semantics: paint none)', () => {
       expect(
-        processBackgroundImage([{ type: 'linear-gradient', colorStops: [{ color: null }] }]),
+        processBackgroundImage([
+          { type: 'linear-gradient', colorStops: [{ color: null }] },
+        ]),
       ).toEqual([]);
     });
 
@@ -299,7 +372,11 @@ describe('processBackgroundImage', () => {
     it('rejects an array-form linear-gradient with an unrecognized direction', () => {
       expect(
         processBackgroundImage([
-          { type: 'linear-gradient', direction: 'sideways', colorStops: [{ color: 'red' }] },
+          {
+            type: 'linear-gradient',
+            direction: 'sideways',
+            colorStops: [{ color: 'red' }],
+          },
         ]),
       ).toEqual([]);
     });
@@ -307,7 +384,11 @@ describe('processBackgroundImage', () => {
     it('rejects an array-form radial-gradient with an invalid shape', () => {
       expect(
         processBackgroundImage([
-          { type: 'radial-gradient', shape: 'hexagon', colorStops: [{ color: 'red' }] },
+          {
+            type: 'radial-gradient',
+            shape: 'hexagon',
+            colorStops: [{ color: 'red' }],
+          },
         ]),
       ).toEqual([]);
     });
@@ -315,7 +396,11 @@ describe('processBackgroundImage', () => {
     it('rejects an array-form radial-gradient with an invalid size', () => {
       expect(
         processBackgroundImage([
-          { type: 'radial-gradient', size: 'huge', colorStops: [{ color: 'red' }] },
+          {
+            type: 'radial-gradient',
+            size: 'huge',
+            colorStops: [{ color: 'red' }],
+          },
         ]),
       ).toEqual([]);
     });
@@ -324,7 +409,9 @@ describe('processBackgroundImage', () => {
     // error) — the loop just produces nothing for it, matching "no image" rather than a
     // crash on an unrecognized entry.
     it('produces nothing for an entry whose type is neither gradient kind', () => {
-      expect(processBackgroundImage([{ type: 'conic-gradient', colorStops: [] }])).toEqual([]);
+      expect(
+        processBackgroundImage([{ type: 'conic-gradient', colorStops: [] }]),
+      ).toEqual([]);
     });
   });
 

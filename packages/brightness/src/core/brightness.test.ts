@@ -9,8 +9,14 @@ const FAKE_NATIVE_BRIGHTNESS = {
   isUsingSystemBrightnessAsync: vi.fn(async () => true),
   getSystemBrightnessModeAsync: vi.fn(async () => 1),
   setSystemBrightnessModeAsync: vi.fn(async () => undefined),
-  getPermissionsAsync: vi.fn(async () => ({ status: 'granted', granted: true })),
-  requestPermissionsAsync: vi.fn(async () => ({ status: 'granted', granted: true })),
+  getPermissionsAsync: vi.fn(async () => ({
+    status: 'granted',
+    granted: true,
+  })),
+  requestPermissionsAsync: vi.fn(async () => ({
+    status: 'granted',
+    granted: true,
+  })),
   addListener: vi.fn(() => ({ remove: vi.fn() })),
 };
 
@@ -30,7 +36,11 @@ const fakePlatform = { OS: 'ios' as 'ios' | 'android' };
 
 vi.mock('expo-modules-core', () => ({
   Platform: fakePlatform,
-  PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    DENIED: 'denied',
+    UNDETERMINED: 'undetermined',
+  },
   UnavailabilityError: class UnavailabilityError extends Error {
     constructor(moduleName: string, propertyName: string) {
       super(`${propertyName} is not available on ${moduleName}`);
@@ -109,7 +119,9 @@ describe('setBrightnessAsync', () => {
   describe('Positive', () => {
     it('delegates an in-range value to the native module unchanged', async () => {
       await setBrightnessAsync(0.4);
-      expect(FAKE_NATIVE_BRIGHTNESS.setBrightnessAsync).toHaveBeenCalledWith(0.4);
+      expect(FAKE_NATIVE_BRIGHTNESS.setBrightnessAsync).toHaveBeenCalledWith(
+        0.4,
+      );
     });
 
     // why: the native API is documented 0..1 — a caller passing an out-of-range value must be
@@ -158,7 +170,9 @@ describe('getSystemBrightnessAsync', () => {
     it('delegates to getBrightnessAsync on non-Android platforms, without touching the Android-only native method', async () => {
       fakePlatform.OS = 'ios';
       await expect(getSystemBrightnessAsync()).resolves.toBe(0.5);
-      expect(FAKE_NATIVE_BRIGHTNESS.getSystemBrightnessAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.getSystemBrightnessAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('delegates to the native module on Android', async () => {
@@ -188,14 +202,20 @@ describe('setSystemBrightnessAsync', () => {
     it('delegates to setBrightnessAsync on non-Android platforms, without touching the Android-only native method', async () => {
       fakePlatform.OS = 'ios';
       await setSystemBrightnessAsync(0.3);
-      expect(FAKE_NATIVE_BRIGHTNESS.setBrightnessAsync).toHaveBeenCalledWith(0.3);
-      expect(FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessAsync).not.toHaveBeenCalled();
+      expect(FAKE_NATIVE_BRIGHTNESS.setBrightnessAsync).toHaveBeenCalledWith(
+        0.3,
+      );
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('delegates to the native module on Android', async () => {
       fakePlatform.OS = 'android';
       await setSystemBrightnessAsync(0.3);
-      expect(FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessAsync).toHaveBeenCalledWith(0.3);
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessAsync,
+      ).toHaveBeenCalledWith(0.3);
     });
 
     // why: clamping is shared with setBrightnessAsync and must apply before the platform branch
@@ -204,7 +224,9 @@ describe('setSystemBrightnessAsync', () => {
     it('clamps out-of-range values before delegating to the native module on Android', async () => {
       fakePlatform.OS = 'android';
       await setSystemBrightnessAsync(2);
-      expect(FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessAsync).toHaveBeenCalledWith(1);
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessAsync,
+      ).toHaveBeenCalledWith(1);
     });
   });
 
@@ -239,13 +261,17 @@ describe('restoreSystemBrightnessAsync', () => {
     it('no-ops on non-Android platforms without calling the native module', async () => {
       fakePlatform.OS = 'ios';
       await restoreSystemBrightnessAsync();
-      expect(FAKE_NATIVE_BRIGHTNESS.restoreSystemBrightnessAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.restoreSystemBrightnessAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('delegates to the native module on Android', async () => {
       fakePlatform.OS = 'android';
       await restoreSystemBrightnessAsync();
-      expect(FAKE_NATIVE_BRIGHTNESS.restoreSystemBrightnessAsync).toHaveBeenCalledTimes(1);
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.restoreSystemBrightnessAsync,
+      ).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -272,7 +298,9 @@ describe('isUsingSystemBrightnessAsync', () => {
     it('resolves false on non-Android platforms without calling the native module', async () => {
       fakePlatform.OS = 'ios';
       await expect(isUsingSystemBrightnessAsync()).resolves.toBe(false);
-      expect(FAKE_NATIVE_BRIGHTNESS.isUsingSystemBrightnessAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.isUsingSystemBrightnessAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('delegates to the native module on Android', async () => {
@@ -304,8 +332,12 @@ describe('getSystemBrightnessModeAsync', () => {
     // on their platform.
     it('resolves UNKNOWN on non-Android platforms without calling the native module', async () => {
       fakePlatform.OS = 'ios';
-      await expect(getSystemBrightnessModeAsync()).resolves.toBe(BrightnessMode.UNKNOWN);
-      expect(FAKE_NATIVE_BRIGHTNESS.getSystemBrightnessModeAsync).not.toHaveBeenCalled();
+      await expect(getSystemBrightnessModeAsync()).resolves.toBe(
+        BrightnessMode.UNKNOWN,
+      );
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.getSystemBrightnessModeAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('delegates to the native module on Android', async () => {
@@ -335,7 +367,9 @@ describe('setSystemBrightnessModeAsync', () => {
     it('no-ops on non-Android platforms without calling the native module', async () => {
       fakePlatform.OS = 'ios';
       await setSystemBrightnessModeAsync(BrightnessMode.AUTOMATIC);
-      expect(FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessModeAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessModeAsync,
+      ).not.toHaveBeenCalled();
     });
 
     // why: UNKNOWN isn't a real mode to set — there's nothing meaningful to ask native to do with
@@ -343,15 +377,17 @@ describe('setSystemBrightnessModeAsync', () => {
     it('no-ops on Android when passed UNKNOWN', async () => {
       fakePlatform.OS = 'android';
       await setSystemBrightnessModeAsync(BrightnessMode.UNKNOWN);
-      expect(FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessModeAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessModeAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('delegates to the native module on Android with a concrete mode', async () => {
       fakePlatform.OS = 'android';
       await setSystemBrightnessModeAsync(BrightnessMode.MANUAL);
-      expect(FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessModeAsync).toHaveBeenCalledWith(
-        BrightnessMode.MANUAL,
-      );
+      expect(
+        FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessModeAsync,
+      ).toHaveBeenCalledWith(BrightnessMode.MANUAL);
     });
   });
 
@@ -362,7 +398,9 @@ describe('setSystemBrightnessModeAsync', () => {
       // @ts-expect-error -- simulating an Android build missing this native method
       FAKE_NATIVE_BRIGHTNESS.setSystemBrightnessModeAsync = undefined;
 
-      await expect(setSystemBrightnessModeAsync(BrightnessMode.MANUAL)).rejects.toThrow(
+      await expect(
+        setSystemBrightnessModeAsync(BrightnessMode.MANUAL),
+      ).rejects.toThrow(
         'setSystemBrightnessModeAsync is not available on expo-brightness',
       );
 
@@ -374,7 +412,10 @@ describe('setSystemBrightnessModeAsync', () => {
 describe('getPermissionsAsync', () => {
   describe('Positive', () => {
     it('passes the native response straight through', async () => {
-      await expect(getPermissionsAsync()).resolves.toEqual({ status: 'granted', granted: true });
+      await expect(getPermissionsAsync()).resolves.toEqual({
+        status: 'granted',
+        granted: true,
+      });
     });
   });
 
@@ -387,7 +428,9 @@ describe('getPermissionsAsync', () => {
         new Error('permission query failed'),
       );
 
-      await expect(getPermissionsAsync()).rejects.toThrow('permission query failed');
+      await expect(getPermissionsAsync()).rejects.toThrow(
+        'permission query failed',
+      );
     });
   });
 });
@@ -408,7 +451,9 @@ describe('requestPermissionsAsync', () => {
         new Error('permission request failed'),
       );
 
-      await expect(requestPermissionsAsync()).rejects.toThrow('permission request failed');
+      await expect(requestPermissionsAsync()).rejects.toThrow(
+        'permission request failed',
+      );
     });
   });
 });

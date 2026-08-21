@@ -8,10 +8,14 @@ import { installFabric } from '@symbiote-native/test-utils';
 import { createSurface, disposeRoot } from '@symbiote-native/engine';
 import type { IDescriptorChild } from '@symbiote-native/components';
 import { createRootShimElement } from './root-element';
-import { createDescriptorChildrenSync, mountDescriptorChildren } from './descriptor-to-svelte';
+import {
+  createDescriptorChildrenSync,
+  mountDescriptorChildren,
+} from './descriptor-to-svelte';
 
 const ROOT_TAG = 91_301;
-const tick = (): Promise<void> => Promise.resolve().then(() => Promise.resolve());
+const tick = (): Promise<void> =>
+  Promise.resolve().then(() => Promise.resolve());
 
 const fabric = installFabric();
 
@@ -33,7 +37,11 @@ describe('mountDescriptorChildren', () => {
       const root = createRootShimElement(surface);
 
       const children: IDescriptorChild[] = [
-        { type: 'symbiote-activity-indicator', props: { animating: true }, children: [] },
+        {
+          type: 'symbiote-activity-indicator',
+          props: { animating: true },
+          children: [],
+        },
       ];
       mountDescriptorChildren(root, children);
       await tick();
@@ -121,11 +129,15 @@ describe('mountDescriptorChildren', () => {
 
       const mounted = mountDescriptorChildren(root, ['hello']);
       await tick();
-      expect(fabric.appRoot().children[0]?.children[0]?.props.text).toBe('hello');
+      expect(fabric.appRoot().children[0]?.children[0]?.props.text).toBe(
+        'hello',
+      );
 
       mounted.update(['world']);
       await tick();
-      expect(fabric.appRoot().children[0]?.children[0]?.props.text).toBe('world');
+      expect(fabric.appRoot().children[0]?.children[0]?.props.text).toBe(
+        'world',
+      );
     });
   });
 
@@ -187,7 +199,9 @@ describe('mountDescriptorChildren', () => {
       ]);
       await tick();
 
-      expect(() => mounted.update(['not a view anymore'])).toThrow(/shape changed/);
+      expect(() => mounted.update(['not a view anymore'])).toThrow(
+        /shape changed/,
+      );
     });
 
     it('throws when a text child is replaced by an element child at the same position', async () => {
@@ -197,9 +211,9 @@ describe('mountDescriptorChildren', () => {
       const mounted = mountDescriptorChildren(root, ['hello']);
       await tick();
 
-      expect(() => mounted.update([{ type: 'symbiote-view', props: {}, children: [] }])).toThrow(
-        /shape changed/,
-      );
+      expect(() =>
+        mounted.update([{ type: 'symbiote-view', props: {}, children: [] }]),
+      ).toThrow(/shape changed/);
     });
 
     it('throws when the element tag name changes at the same position', async () => {
@@ -211,9 +225,9 @@ describe('mountDescriptorChildren', () => {
       ]);
       await tick();
 
-      expect(() => mounted.update([{ type: 'symbiote-text', props: {}, children: [] }])).toThrow(
-        /shape changed/,
-      );
+      expect(() =>
+        mounted.update([{ type: 'symbiote-text', props: {}, children: [] }]),
+      ).toThrow(/shape changed/);
     });
   });
 });
@@ -234,7 +248,9 @@ describe('createDescriptorChildrenSync', () => {
       await tick();
       expect(fabric.appRoot().children[0]?.children.length ?? 0).toBe(0);
 
-      syncChildren(root, [{ type: 'symbiote-view', props: { collapsable: false }, children: [] }]);
+      syncChildren(root, [
+        { type: 'symbiote-view', props: { collapsable: false }, children: [] },
+      ]);
       await tick();
       const child = fabric.appRoot().children[0]?.children[0];
       expect(child?.viewName).toBe('RCTView');

@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { View, Text, Image, I18nManager, Settings } from '@symbiote-native/react';
+import {
+  View,
+  Text,
+  Image,
+  I18nManager,
+  Settings,
+} from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 
 // Three runtime modules, each read live so it only resolves on a
@@ -101,7 +107,11 @@ export function NativeModulesDemo() {
       </View>
       {/* prefetch warms a cold url: not cached → (tap) → cached */}
       <Text className="info-text">{`prefetch cache: ${cacheState}`}</Text>
-      <ActionButton title="Prefetch logo" onPress={prefetchLogo} color="#7fb5ff" />
+      <ActionButton
+        title="Prefetch logo"
+        onPress={prefetchLogo}
+        color="#7fb5ff"
+      />
     </View>
   );
 }

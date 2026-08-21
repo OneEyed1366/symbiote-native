@@ -30,7 +30,9 @@ const paramsLabel = computed(() => {
     <View class="section">
       <Text class="section-label">Navigation demo · Details screen</Text>
       <Text class="info-text">{{ `route.params: ${paramsLabel}` }}</Text>
-      <Text class="info-text">{{ `canGoBack: ${navigation.canGoBack()}` }}</Text>
+      <Text class="info-text">{{
+        `canGoBack: ${navigation.canGoBack()}`
+      }}</Text>
       <ActionButton
         testID="nav-pop"
         title="← Pop back"

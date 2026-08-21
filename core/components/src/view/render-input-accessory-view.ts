@@ -5,7 +5,11 @@
 // onto the intrinsic and the user children (injected by the adapter) nest under it. Shared
 // verbatim across adapters: React and Vue both bridge this Descriptor.
 
-import { dlog, type IStyleProp, type IViewStyle } from '@symbiote-native/engine';
+import {
+  dlog,
+  type IStyleProp,
+  type IViewStyle,
+} from '@symbiote-native/engine';
 import { el, type IDescriptor } from '../descriptor';
 
 // The pre-resolved inputs renderInputAccessoryView paints from. The adapter narrows the typed
@@ -19,10 +23,16 @@ export type IInputAccessoryViewViewProps = {
   passthrough: Record<string, unknown>;
 };
 
-export function renderInputAccessoryView(view: IInputAccessoryViewViewProps): IDescriptor {
-  const props: Record<string, unknown> = { ...view.passthrough, style: view.style };
+export function renderInputAccessoryView(
+  view: IInputAccessoryViewViewProps,
+): IDescriptor {
+  const props: Record<string, unknown> = {
+    ...view.passthrough,
+    style: view.style,
+  };
   if (view.nativeID !== undefined) props.nativeID = view.nativeID;
-  if (view.backgroundColor !== undefined) props.backgroundColor = view.backgroundColor;
+  if (view.backgroundColor !== undefined)
+    props.backgroundColor = view.backgroundColor;
 
   dlog('InputAccessoryView -> RCTInputAccessoryView');
 

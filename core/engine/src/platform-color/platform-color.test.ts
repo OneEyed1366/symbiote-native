@@ -40,7 +40,9 @@ describe('processColor / setColorProcessor', () => {
   });
 
   it('an opaque PlatformColor value is routed through the processor exactly like a CSS string', () => {
-    setColorProcessor(value => (isOpaqueColorValue(value) ? 'resolved-opaque' : null));
+    setColorProcessor(value =>
+      isOpaqueColorValue(value) ? 'resolved-opaque' : null,
+    );
     expect(processColor(PlatformColor('systemBlue'))).toBe('resolved-opaque');
   });
 });
@@ -87,7 +89,9 @@ describe('PlatformColor / DynamicColorIOS — building opaque color values', () 
 describe('isOpaqueColorValue / isProcessableColor — returns false for anything not a real color', () => {
   it('isOpaqueColorValue accepts a semantic or dynamic object, rejects everything else', () => {
     expect(isOpaqueColorValue(PlatformColor('systemBlue'))).toBe(true);
-    expect(isOpaqueColorValue(DynamicColorIOS({ light: '#fff', dark: '#000' }))).toBe(true);
+    expect(
+      isOpaqueColorValue(DynamicColorIOS({ light: '#fff', dark: '#000' })),
+    ).toBe(true);
     // why: a CSS string is a valid color everywhere else in the system, but it is NOT an
     // "opaque" value — the seam must tell the two apart to decide whether processColor is
     // even needed.

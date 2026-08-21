@@ -59,7 +59,9 @@ describe('React ScrollView on the engine', () => {
   it('maps contentContainerStyle + horizontal onto the content node', () => {
     mount(ROOT_TAG, <HorizontalApp />);
 
-    const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+    const content = fabric.find(
+      node => node.viewName === 'RCTScrollContentView',
+    );
     expect(content, 'RCTScrollContentView was created').toBeDefined();
     expect(content!.props.padding).toBe(8);
     expect(content!.props.flexDirection).toBe('row');

@@ -26,7 +26,8 @@ vi.mock('../../../core', () => ({
 
 const ROOT_TAG = 942;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 const EVENT: IClipboardEvent = { contentTypes: [ContentType.HTML] };
 

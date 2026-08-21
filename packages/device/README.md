@@ -28,12 +28,12 @@ Unlike a plain RN native module, `expo-device`'s native code is discovered by
 into the native host app **once**, covering this package and every other `expo-modules-core`
 package with zero further changes:
 
-| Platform | Touches |
-|---|---|
-| iOS | `ios/Podfile` — add `use_expo_modules!` |
-| iOS | `AppDelegate.swift` — Expo's runtime-bootstrap hook |
-| Android | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects |
-| Android | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
+| Platform | Touches                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iOS      | `ios/Podfile` — add `use_expo_modules!`                                                                                                             |
+| iOS      | `AppDelegate.swift` — Expo's runtime-bootstrap hook                                                                                                 |
+| Android  | `settings.gradle` / `app/build.gradle` — resolve and include the Expo Gradle projects                                                               |
+| Android  | `MainApplication.kt` — Expo's bootstrap hook, plus a hand-written native-module name map (there's no `expo` meta-package here to auto-generate one) |
 
 Full mechanics live in the `symbiote-expo-native-module` project skill. Reference
 implementation: `examples/expo-react/ios/Podfile` and
@@ -53,13 +53,12 @@ src/core/     Eager constants (isDevice, brand, manufacturer, modelId, modelName
               isSideLoadingEnabledAsync / getPlatformFeaturesAsync / hasPlatformFeatureAsync,
               and the DeviceType enum. native-module.ts resolves the native module via
               expo-modules-core's requireNativeModule.
-src/react/    @symbiote-native/device/react   — export * from '../core'
-src/vue/      @symbiote-native/device/vue     — export * from '../core'
 src/angular/  @symbiote-native/device/angular — export * from '../core'
 ```
 
-No per-adapter lifecycle wrapper exists because there's nothing to subscribe to or clean up —
-each adapter entry is a single-file re-export.
+`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
+physical per-framework file, since there's nothing to subscribe to or clean up. `./angular` stays
+a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
 
@@ -93,8 +92,14 @@ function DeviceScreen() {
       <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
       <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
       <Text>{deviceName ?? 'unnamed device'}</Text>
-      <Text>{uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}</Text>
-      <Text>{maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes`}</Text>
+      <Text>
+        {uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`}
+      </Text>
+      <Text>
+        {maxMemory === null
+          ? 'checking memory…'
+          : `Max memory: ${maxMemory} bytes`}
+      </Text>
     </View>
   );
 }
@@ -131,8 +136,12 @@ onMounted(() => {
     <Text>{{ `${brand ?? 'unknown'} ${modelName ?? ''}` }}</Text>
     <Text>{{ `${osName ?? 'unknown OS'} ${osVersion ?? ''}` }}</Text>
     <Text>{{ deviceName ?? 'unnamed device' }}</Text>
-    <Text>{{ uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms` }}</Text>
-    <Text>{{ maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes` }}</Text>
+    <Text>{{
+      uptime === null ? 'checking uptime…' : `Uptime: ${uptime}ms`
+    }}</Text>
+    <Text>{{
+      maxMemory === null ? 'checking memory…' : `Max memory: ${maxMemory} bytes`
+    }}</Text>
   </View>
 </template>
 ```
@@ -161,8 +170,14 @@ import {
       <Text>{{ brand ?? 'unknown' }} {{ modelName ?? '' }}</Text>
       <Text>{{ osName ?? 'unknown OS' }} {{ osVersion ?? '' }}</Text>
       <Text>{{ deviceName ?? 'unnamed device' }}</Text>
-      <Text>{{ uptime() === null ? 'checking uptime…' : 'Uptime: ' + uptime() + 'ms' }}</Text>
-      <Text>{{ maxMemory() === null ? 'checking memory…' : 'Max memory: ' + maxMemory() + ' bytes' }}</Text>
+      <Text>{{
+        uptime() === null ? 'checking uptime…' : 'Uptime: ' + uptime() + 'ms'
+      }}</Text>
+      <Text>{{
+        maxMemory() === null
+          ? 'checking memory…'
+          : 'Max memory: ' + maxMemory() + ' bytes'
+      }}</Text>
     </View>
   `,
 })

@@ -1,11 +1,11 @@
 ---
 title: Examples
-description: Small copyable SymbioteNative examples for React, Vue, and Angular.
+description: Small copyable SymbioteNative examples for React, Vue, Angular, Svelte, and Solid.
 ---
 
 Examples stay intentionally small. Each one shows the same native behavior in
-React, Vue, and Angular so you can see which parts are shared and which parts
-are framework-specific.
+React, Vue, Angular, Svelte, and Solid so you can see which parts are shared
+and which parts are framework-specific.
 
 ## Available examples
 
@@ -23,8 +23,9 @@ The native route is the same in every example:
 framework state → adapter component → @symbiote-native/engine → Fabric → native view
 ```
 
-The code shape differs by adapter. React uses callback props and children render
-functions. Vue uses emits, `v-model`, and slots. Angular uses `@Output()`
-`(event)` bindings everywhere, except the permanent scroll-family exception
-(`onScroll` and friends), which stays a callback `@Input()` since it can carry
-an `Animated.event(...)` marker.
+The code shape differs by adapter. React, Svelte, and Solid use camelCase
+callback props (`onPress`) and children render functions. Svelte also adds
+`bind:value` two-way binding on controlled inputs. Vue uses emits, `v-model`,
+and slots. Angular uses `@Output()` `(event)` bindings everywhere, except the
+permanent scroll-family exception (`onScroll` and friends), which stays a
+callback `@Input()` since it can carry an `Animated.event(...)` marker.

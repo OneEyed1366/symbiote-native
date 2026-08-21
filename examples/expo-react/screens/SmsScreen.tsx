@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/react';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/react';
 import { isAvailableAsync, sendSMSAsync } from '@symbiote-native/sms';
 import { ActionButton } from '../components/ActionButton';
 import { ROUTE_NAME } from '../routes';
@@ -20,7 +26,8 @@ function CapabilityRow({
   label: string;
   status: ICapabilityStatus;
 }) {
-  const text = status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+  const text =
+    status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
   return (
     <View testID={testID} className="capability-row">
       <Text className="capability-label">{label}</Text>
@@ -50,7 +57,7 @@ export function SmsScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    isAvailableAsync().then((available) => {
+    isAvailableAsync().then(available => {
       if (isMounted) {
         setIsAvailable(toCapabilityStatus(available));
       }
@@ -63,21 +70,25 @@ export function SmsScreen() {
   const handleSend = useCallback(() => {
     const addresses = recipients
       .split(',')
-      .map((address) => address.trim())
-      .filter((address) => address.length > 0);
+      .map(address => address.trim())
+      .filter(address => address.length > 0);
     if (addresses.length === 0) {
       setLastResult('no recipients');
       return;
     }
     setLastResult('composer open…');
     sendSMSAsync(addresses, message)
-      .then((response) => setLastResult(`result: ${response.result}`))
+      .then(response => setLastResult(`result: ${response.result}`))
       .catch((error: Error) => setLastResult(`send failed: ${error.message}`));
   }, [recipients, message]);
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="sms-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="sms-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -88,8 +99,9 @@ export function SmsScreen() {
           <View className="hero-copy">
             <Text className="hero-title">SMS</Text>
             <Text className="hero-body">
-              @symbiote-native/sms — opens the system SMS composer prefilled with recipients and a
-              message. It never sends anything by itself; the user does.
+              @symbiote-native/sms — opens the system SMS composer prefilled
+              with recipients and a message. It never sends anything by itself;
+              the user does.
             </Text>
           </View>
         </View>
@@ -98,10 +110,15 @@ export function SmsScreen() {
           <View className="feature-card-header">
             <Text className="feature-card-title">Capabilities</Text>
           </View>
-          <CapabilityRow testID="sms-available" label="Available" status={isAvailable} />
+          <CapabilityRow
+            testID="sms-available"
+            label="Available"
+            status={isAvailable}
+          />
           <Text className="info-text">
-            NO is expected on the iOS simulator, which has no Messages app, and on Android devices
-            without telephony hardware. Only a real phone reports YES.
+            NO is expected on the iOS simulator, which has no Messages app, and
+            on Android devices without telephony hardware. Only a real phone
+            reports YES.
           </Text>
         </View>
 
@@ -139,9 +156,10 @@ export function SmsScreen() {
             </Text>
           </View>
           <Text className="info-text">
-            Android always reports unknown — reading the real outcome needs READ_SMS, which Google
-            restricts to default-SMS-app publishers. Treat it as the composer closed, not as a
-            failure. iOS reports sent or cancelled.
+            Android always reports unknown — reading the real outcome needs
+            READ_SMS, which Google restricts to default-SMS-app publishers.
+            Treat it as the composer closed, not as a failure. iOS reports sent
+            or cancelled.
           </Text>
         </View>
       </ScrollView>

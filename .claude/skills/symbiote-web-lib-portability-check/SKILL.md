@@ -14,31 +14,21 @@ its real exports/types.
 
 ## The case that motivated this
 
-`packages/navigation`'s deep-linking layer needed path-pattern matching
-(`/user/:id` → `{id}`). `react-router`'s `matchPath`/`matchRoutes`/`generatePath`
-looked like a perfect, battle-tested, DOM-free fit — the docs even say
-`createMemoryRouter` is "for non-browser environments without a DOM API."
-
-Installing `react-router@8.1.0` and actually reading it disqualified it:
-
-1. **No pure-matcher subpath exists.** The package's only general `.` export
-   eagerly imports `./lib/dom/*` (`BrowserRouter`, `ScrollRestoration`,
-   cookies) and `./lib/server-runtime/*` — DOM/Node code with no business in a
-   Hermes/Metro bundle. `matchPath` is not separately exported without that.
-2. **`peerDependencies` pin `react-dom`.** This DOM-free monorepo never
-   installs it — exactly the foreign-runtime-dependency problem
-   `<react_native_is_an_explicit_top_level_peer>` (CLAUDE.md) warns against for
-   `react-native` itself.
-3. **The param-name typing needs a compile-time literal.** `matchPath<Path
-   extends string>` extracts `:id` via a template-literal-type trick that only
-   fires when `Path` is a literal string at the call site. Symbiote's route
-   patterns come from a runtime config object, so `Path` widens to plain
-   `string` and the extracted param type collapses — using the result forces
-   an `as` cast, which `ts-js-best-practices` forbids outright.
-
-Resolution: hand-rolled a ~40-line `:param`-segment matcher in
-`packages/navigation/src/core/linking-config.ts` instead. Small, exactly fits
-the flat (non-nested) route model, zero dependency risk.
+```
+§1_reactrouter_rejected := {
+  candidate: "react-router@8.1.0 matchPath/matchRoutes/generatePath",
+  looked_like: "DOM-free fit — docs call createMemoryRouter \"for non-browser environments without a DOM API\"",
+  use_case: "packages/navigation deep-linking path-pattern matching (/user/:id → {id})",
+  verdict: "REJECTED after installing react-router@8.1.0 and reading its real exports/types",
+  reasons: [
+    "no pure-matcher subpath — only `.` export eagerly imports ./lib/dom/* (BrowserRouter, ScrollRestoration, cookies) + ./lib/server-runtime/*; matchPath not separately exported",
+    "peerDependencies pin react-dom ⟶ same foreign-runtime problem <react_native_is_an_explicit_top_level_peer> (CLAUDE.md) warns against for react-native itself",
+    "matchPath<Path extends string> extracts :id via template-literal-type trick, fires only on a literal Path; runtime config patterns widen Path to string, param type collapses ⟶ result needs `as`, forbidden by ts-js-best-practices",
+  ],
+  fix: "hand-rolled ~40-line :param-segment matcher, packages/navigation/src/core/linking-config.ts — fits flat (non-nested) route model, zero dependency risk",
+  related: "portable/not-portable Expo-router audit map behind this decision → symbiote-navigation-web-facade-roadmap",
+}
+```
 
 ## The check
 
@@ -67,7 +57,9 @@ already hoisted) and answer three questions from the real package, not docs:
 If any of the three fails, don't force the dependency — hand-roll the small
 piece you actually need (as `linking-config.ts` did) rather than accept a
 foreign-runtime dependency or a forbidden cast to make a "framework-agnostic"
-label true in practice.
+label true in practice. If it passes, add it through the catalog mechanism in
+`symbiote-dependency-catalog` (never a literal version) — this check gates
+*whether*, that skill governs *how*.
 
 ## Verify
 

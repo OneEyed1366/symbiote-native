@@ -23,7 +23,8 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import type { ITextInputHandle } from '@symbiote-native/components';
 import { mount, unmount } from '../../render';
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
@@ -42,7 +43,8 @@ const CAPTURE_OUT = join(__dirname, '.smoke-compiled-capture-parent.mjs');
 const BIND_OUT = join(__dirname, '.smoke-compiled-bind-parent.mjs');
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -55,9 +57,17 @@ afterEach(() => {
   rmSync(BIND_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
@@ -76,7 +86,8 @@ function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
 function committedTextInput(): IFakeNode {
   let found: IFakeNode | undefined;
   walk(fabric.committed, node => {
-    if (node.viewName === SINGLELINE || node.viewName === MULTILINE) found = node;
+    if (node.viewName === SINGLELINE || node.viewName === MULTILINE)
+      found = node;
   });
   expect(found, 'a TextInput was committed').toBeDefined();
   if (found === undefined) throw new Error('unreachable: TextInput missing');
@@ -213,8 +224,13 @@ describe('TextInput (real compiled index.svelte)', () => {
     await tick();
     await tick();
 
-    const setText = fabric.commands.find(c => c.commandName === 'setTextAndSelection');
-    expect(setText, 'a setTextAndSelection command was dispatched').toBeDefined();
+    const setText = fabric.commands.find(
+      c => c.commandName === 'setTextAndSelection',
+    );
+    expect(
+      setText,
+      'a setTextAndSelection command was dispatched',
+    ).toBeDefined();
     expect(setText?.args).toEqual([ACK_COUNT, '', -1, -1]);
   });
 
@@ -227,7 +243,9 @@ describe('TextInput (real compiled index.svelte)', () => {
     await tick();
     await tick();
 
-    expect(fabric.commands.some(c => c.commandName === 'setTextAndSelection')).toBe(false);
+    expect(
+      fabric.commands.some(c => c.commandName === 'setTextAndSelection'),
+    ).toBe(false);
   });
 
   // why: a `topChange` payload that carries an eventCount but no `text` field (a real native
@@ -245,12 +263,16 @@ describe('TextInput (real compiled index.svelte)', () => {
     expect(node).toBeDefined();
     if (node === undefined) return;
 
-    fabric.fireEvent(node.instanceHandle, 'topChange', { eventCount: ACK_COUNT });
+    fabric.fireEvent(node.instanceHandle, 'topChange', {
+      eventCount: ACK_COUNT,
+    });
     await tick();
     await tick();
 
     expect(committedTextInput().props.mostRecentEventCount).toBe(ACK_COUNT);
-    expect(fabric.commands.some(c => c.commandName === 'setTextAndSelection')).toBe(false);
+    expect(
+      fabric.commands.some(c => c.commandName === 'setTextAndSelection'),
+    ).toBe(false);
   });
 
   // why: `selEnd` falls back to `selection.start` when the caller supplies a caret position with
@@ -258,7 +280,10 @@ describe('TextInput (real compiled index.svelte)', () => {
   // the one non-trivial arithmetic branch inside the controlled-write effect, not a passthrough.
   it('falls the command selection end back to start when the parent supplies no end', async () => {
     const CapturingParent = await loadMountable();
-    mount(ROOT_TAG, CapturingParent, { fixedValue: '', selection: { start: 3 } });
+    mount(ROOT_TAG, CapturingParent, {
+      fixedValue: '',
+      selection: { start: 3 },
+    });
     await tick();
     await tick();
 
@@ -266,12 +291,20 @@ describe('TextInput (real compiled index.svelte)', () => {
     expect(node).toBeDefined();
     if (node === undefined) return;
 
-    fabric.fireEvent(node.instanceHandle, 'topChange', { text: 'ab', eventCount: ACK_COUNT });
+    fabric.fireEvent(node.instanceHandle, 'topChange', {
+      text: 'ab',
+      eventCount: ACK_COUNT,
+    });
     await tick();
     await tick();
 
-    const setText = fabric.commands.find(c => c.commandName === 'setTextAndSelection');
-    expect(setText, 'a setTextAndSelection command was dispatched').toBeDefined();
+    const setText = fabric.commands.find(
+      c => c.commandName === 'setTextAndSelection',
+    );
+    expect(
+      setText,
+      'a setTextAndSelection command was dispatched',
+    ).toBeDefined();
     expect(setText?.args).toEqual([ACK_COUNT, '', 3, 3]);
   });
 
@@ -284,7 +317,9 @@ describe('TextInput (real compiled index.svelte)', () => {
     await tick();
     await tick();
 
-    expect(fabric.commands.filter(c => c.commandName === 'focus')).toHaveLength(1);
+    expect(fabric.commands.filter(c => c.commandName === 'focus')).toHaveLength(
+      1,
+    );
   });
 
   // why: the counterpart of the test above — no autoFocus prop must never issue a focus command
@@ -329,9 +364,15 @@ describe('TextInput (real compiled index.svelte)', () => {
     await tick();
 
     const clearCommand = fabric.commands.find(
-      c => c.commandName === 'setTextAndSelection' && c.args[1] === '' && c.args[2] === 0,
+      c =>
+        c.commandName === 'setTextAndSelection' &&
+        c.args[1] === '' &&
+        c.args[2] === 0,
     );
-    expect(clearCommand, 'clear() dispatched setTextAndSelection([count, "", 0, 0])').toBeDefined();
+    expect(
+      clearCommand,
+      'clear() dispatched setTextAndSelection([count, "", 0, 0])',
+    ).toBeDefined();
   });
 
   // why: `setSelection` is part of the same imperative handle as focus/blur/clear but reuses the
@@ -357,7 +398,10 @@ describe('TextInput (real compiled index.svelte)', () => {
     await tick();
 
     const setSelectionCommand = fabric.commands.find(
-      c => c.commandName === 'setTextAndSelection' && c.args[2] === 1 && c.args[3] === 2,
+      c =>
+        c.commandName === 'setTextAndSelection' &&
+        c.args[2] === 1 &&
+        c.args[3] === 2,
     );
     expect(
       setSelectionCommand,
@@ -457,6 +501,8 @@ describe('TextInput (real compiled index.svelte)', () => {
     await tick();
 
     expect(reads.at(-1)).toBe('ab');
-    expect(fabric.commands.some(c => c.commandName === 'setTextAndSelection')).toBe(false);
+    expect(
+      fabric.commands.some(c => c.commandName === 'setTextAndSelection'),
+    ).toBe(false);
   });
 });

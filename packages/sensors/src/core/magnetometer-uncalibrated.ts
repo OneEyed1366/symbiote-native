@@ -12,7 +12,8 @@ export type IMagnetometerUncalibratedMeasurement = {
 
 export class MagnetometerUncalibratedSensor extends DeviceSensor<IMagnetometerUncalibratedMeasurement> {}
 
-const MAGNETOMETER_UNCALIBRATED_DID_UPDATE_EVENT_NAME = 'magnetometerUncalibratedDidUpdate';
+const MAGNETOMETER_UNCALIBRATED_DID_UPDATE_EVENT_NAME =
+  'magnetometerUncalibratedDidUpdate';
 
 export const MagnetometerUncalibrated = new MagnetometerUncalibratedSensor(
   exponentMagnetometerUncalibrated,

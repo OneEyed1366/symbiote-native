@@ -54,7 +54,9 @@ describe('React PanResponder multitouch through the event layer', () => {
     });
 
     function App(): ReactElement {
-      return <View {...responder.panHandlers} style={{ width: 200, height: 200 }} />;
+      return (
+        <View {...responder.panHandlers} style={{ width: 200, height: 200 }} />
+      );
     }
 
     mount(ROOT_TAG, <App />);
@@ -82,11 +84,21 @@ describe('React PanResponder multitouch through the event layer', () => {
       changedTouches: IPoint[],
       timestamp: number,
     ): void => {
-      fabric.fireEvent(handle, type, { touches, changedTouches, target: tag, timestamp });
+      fabric.fireEvent(handle, type, {
+        touches,
+        changedTouches,
+        target: tag,
+        timestamp,
+      });
     };
 
     // A down at (0,0) t=1000 -> granted (one finger).
-    frame('topTouchStart', [point(TOUCH_A, 0, 0, 1_000)], [point(TOUCH_A, 0, 0, 1_000)], 1_000);
+    frame(
+      'topTouchStart',
+      [point(TOUCH_A, 0, 0, 1_000)],
+      [point(TOUCH_A, 0, 0, 1_000)],
+      1_000,
+    );
     // B down at (200,0) t=1000 -> two fingers, A keeps the responder (LCA skip).
     frame(
       'topTouchStart',
@@ -110,10 +122,20 @@ describe('React PanResponder multitouch through the event layer', () => {
       1_020,
     );
     // B lifts at t=1030 -> onResponderEnd, not a move; dx unchanged, active touches drop.
-    frame('topTouchEnd', [point(TOUCH_A, 60, 0, 1_020)], [point(TOUCH_B, 210, 0, 1_030)], 1_030);
+    frame(
+      'topTouchEnd',
+      [point(TOUCH_A, 60, 0, 1_020)],
+      [point(TOUCH_B, 210, 0, 1_030)],
+      1_030,
+    );
     // frame 3, t=1040: A alone moves 60 -> 160. Only the remaining finger contributes:
     // dx advances by +100 to 140. A naive single-centroid would report 160.
-    frame('topTouchMove', [point(TOUCH_A, 160, 0, 1_040)], [point(TOUCH_A, 160, 0, 1_040)], 1_040);
+    frame(
+      'topTouchMove',
+      [point(TOUCH_A, 160, 0, 1_040)],
+      [point(TOUCH_A, 160, 0, 1_040)],
+      1_040,
+    );
     // Release A.
     frame('topTouchEnd', [], [point(TOUCH_A, 160, 0, 1_050)], 1_050);
 

@@ -31,11 +31,19 @@ export function addLocaleListener(
   // invalidate signal for useLocales/the Vue composable/the Angular service below.
   listener: (event?: unknown) => void,
 ): EventSubscription {
-  return ExpoLocalizationModule.addListener('onLocaleSettingsChanged', listener);
+  return ExpoLocalizationModule.addListener(
+    'onLocaleSettingsChanged',
+    listener,
+  );
 }
 
-export function addCalendarListener(listener: (event?: unknown) => void): EventSubscription {
-  return ExpoLocalizationModule.addListener('onCalendarSettingsChanged', listener);
+export function addCalendarListener(
+  listener: (event?: unknown) => void,
+): EventSubscription {
+  return ExpoLocalizationModule.addListener(
+    'onCalendarSettingsChanged',
+    listener,
+  );
 }
 
 export default ExpoLocalizationModule;

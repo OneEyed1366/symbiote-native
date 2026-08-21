@@ -6,15 +6,24 @@
 // full-screen container View that holds the user children (injected by the adapter). Shared
 // verbatim: React and Vue both bridge this Descriptor; the keep-alive state lives in state/modal.ts.
 
-import { dlog, type IStyleProp, type IViewStyle } from '@symbiote-native/engine';
+import {
+  dlog,
+  type IStyleProp,
+  type IViewStyle,
+} from '@symbiote-native/engine';
 import { el, type IDescriptor } from '../descriptor';
 
 export type IModalAnimationType = 'none' | 'slide' | 'fade';
 
-export type IModalPresentationStyle = 'fullScreen' | 'pageSheet' | 'formSheet' | 'overFullScreen';
+export type IModalPresentationStyle =
+  'fullScreen' | 'pageSheet' | 'formSheet' | 'overFullScreen';
 
 export type IModalOrientation =
-  'portrait' | 'portrait-upside-down' | 'landscape' | 'landscape-left' | 'landscape-right';
+  | 'portrait'
+  | 'portrait-upside-down'
+  | 'landscape'
+  | 'landscape-left'
+  | 'landscape-right';
 
 // What Fabric puts on `nativeEvent` for topOrientationChange — NOT what an onOrientationChange
 // handler receives. The engine registers every `onX` prop as `(event: ISymbioteEvent) => handler(event)`
@@ -91,14 +100,20 @@ export function renderModal(view: IModalViewProps): IDescriptor {
 
   const resolvedPresentationStyle =
     view.presentationStyle ??
-    (view.transparent === true ? PRESENTATION_OVER_FULL_SCREEN : PRESENTATION_FULL_SCREEN);
+    (view.transparent === true
+      ? PRESENTATION_OVER_FULL_SCREEN
+      : PRESENTATION_FULL_SCREEN);
 
   dlog('Modal visible -> committing ModalHostView(container View)');
 
   // collapsable:false keeps the container as a real shadow node (RN sets this so the wrapper is
   // never flattened away under the host). Empty structural children: the adapter injects the
   // user children UNDER this container, never as a direct sibling of the host.
-  const container = el('symbiote-view', { style: containerStyle, collapsable: false }, []);
+  const container = el(
+    'symbiote-view',
+    { style: containerStyle, collapsable: false },
+    [],
+  );
 
   return el(
     'symbiote-modal',

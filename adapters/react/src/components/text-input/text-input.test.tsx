@@ -17,7 +17,13 @@
 
 import { useRef, useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Keyboard, TextInput, mount, unmount, type ITextInputHandle } from '@symbiote-native/react';
+import {
+  Keyboard,
+  TextInput,
+  mount,
+  unmount,
+  type ITextInputHandle,
+} from '@symbiote-native/react';
 
 interface IFakeNode {
   tag: number;
@@ -52,15 +58,27 @@ const slot = {
     props: Record<string, unknown>,
     instanceHandle: unknown,
   ): IFakeNode {
-    const node: IFakeNode = { tag, viewName, props, children: [], instanceHandle };
+    const node: IFakeNode = {
+      tag,
+      viewName,
+      props,
+      children: [],
+      instanceHandle,
+    };
     allCreated.push(node);
     return node;
   },
-  cloneNodeWithNewProps: (node: IFakeNode, newProps: Record<string, unknown>): IFakeNode => ({
+  cloneNodeWithNewProps: (
+    node: IFakeNode,
+    newProps: Record<string, unknown>,
+  ): IFakeNode => ({
     ...node,
     props: newProps,
   }),
-  cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({ ...node, children: [] }),
+  cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({
+    ...node,
+    children: [],
+  }),
   cloneNodeWithNewChildrenAndProps: (
     node: IFakeNode,
     newProps: Record<string, unknown>,
@@ -79,7 +97,11 @@ const slot = {
   registerEventHandler(handler: IEventHandler): void {
     eventHandler = handler;
   },
-  dispatchCommand(handle: unknown, name: string, args: readonly unknown[]): void {
+  dispatchCommand(
+    handle: unknown,
+    name: string,
+    args: readonly unknown[],
+  ): void {
     commands.push({ handle, name, args });
   },
 };
@@ -97,7 +119,10 @@ function inputNode(viewName: string): IFakeNode {
   return node!;
 }
 
-function fireChange(node: IFakeNode, nativeEvent: Record<string, unknown>): void {
+function fireChange(
+  node: IFakeNode,
+  nativeEvent: Record<string, unknown>,
+): void {
   expect(eventHandler, 'an event handler was registered').toBeDefined();
   eventHandler!(node.instanceHandle, 'topChange', nativeEvent);
 }
@@ -131,7 +156,11 @@ describe('TextInput', () => {
     expect(node.props.text).toBe('hi');
     expect(typeof node.props.mostRecentEventCount).toBe('number');
 
-    fireChange(node, { text: 'hix', eventCount: 1, selection: { start: 3, end: 3 } });
+    fireChange(node, {
+      text: 'hix',
+      eventCount: 1,
+      selection: { start: 3, end: 3 },
+    });
     expect(changedText).toBe('hix');
   });
 
@@ -149,7 +178,10 @@ describe('TextInput', () => {
         }}
       />,
     );
-    fireChange(inputNode(SINGLELINE), { eventCount: 1, selection: { start: 0, end: 0 } });
+    fireChange(inputNode(SINGLELINE), {
+      eventCount: 1,
+      selection: { start: 0, end: 0 },
+    });
     expect(calls).toBe(0);
   });
 
@@ -185,15 +217,27 @@ describe('TextInput', () => {
     // "ab" at ACK_COUNT, the parent stores "AB", so the component must command "AB" down.
     function Forced(): ReactElement {
       const [value, setValue] = useState('');
-      return <TextInput value={value} onValueChange={text => setValue(text.toUpperCase())} />;
+      return (
+        <TextInput
+          value={value}
+          onValueChange={text => setValue(text.toUpperCase())}
+        />
+      );
     }
     mount(ROOT_TAG, <Forced />);
 
     const node = inputNode(SINGLELINE);
-    fireChange(node, { text: 'ab', eventCount: ACK_COUNT, selection: { start: 2, end: 2 } });
+    fireChange(node, {
+      text: 'ab',
+      eventCount: ACK_COUNT,
+      selection: { start: 2, end: 2 },
+    });
 
     const setText = commands.find(c => c.name === 'setTextAndSelection');
-    expect(setText, 'a setTextAndSelection command was dispatched').toBeDefined();
+    expect(
+      setText,
+      'a setTextAndSelection command was dispatched',
+    ).toBeDefined();
     expect(setText!.args[0]).toBe(ACK_COUNT);
     expect(setText!.args[1]).toBe('AB');
   });
@@ -224,7 +268,12 @@ describe('TextInput', () => {
   it('folds W3C aliases to their legacy native props and strips the raw aliases', () => {
     mount(
       ROOT_TAG,
-      <TextInput inputMode="numeric" enterKeyHint="done" readOnly selectionColor="#ff0000" />,
+      <TextInput
+        inputMode="numeric"
+        enterKeyHint="done"
+        readOnly
+        selectionColor="#ff0000"
+      />,
     );
 
     const node = inputNode(SINGLELINE);
@@ -233,7 +282,10 @@ describe('TextInput', () => {
     expect(node.props.editable).toBe(false);
     expect(node.props.cursorColor).toBe('#ff0000');
     for (const raw of ['inputMode', 'enterKeyHint', 'readOnly']) {
-      expect(raw in node.props, `raw alias "${raw}" must not reach Fabric`).toBe(false);
+      expect(
+        raw in node.props,
+        `raw alias "${raw}" must not reach Fabric`,
+      ).toBe(false);
     }
   });
 
@@ -270,7 +322,9 @@ describe('TextInput', () => {
   // getting one uninvited would be a visual regression, so the default must actively suppress it.
   it('defaults underlineColorAndroid to transparent', () => {
     mount(ROOT_TAG, <TextInput value="x" />);
-    expect(inputNode(SINGLELINE).props.underlineColorAndroid).toBe('transparent');
+    expect(inputNode(SINGLELINE).props.underlineColorAndroid).toBe(
+      'transparent',
+    );
   });
 
   // why: the transparent default above must not be hardcoded past an explicit caller choice —
@@ -330,7 +384,10 @@ describe('TextInput', () => {
     it('clear() commands setTextAndSelection with an empty string', () => {
       mountHandle().clear();
       const setText = commands.find(c => c.name === 'setTextAndSelection');
-      expect(setText, 'a setTextAndSelection command was dispatched').toBeDefined();
+      expect(
+        setText,
+        'a setTextAndSelection command was dispatched',
+      ).toBeDefined();
       expect(setText!.args[1]).toBe('');
     });
 
@@ -354,7 +411,10 @@ describe('TextInput', () => {
     it('setSelection(start, end) commands setTextAndSelection carrying the current text', () => {
       mountHandle().setSelection(1, 3);
       const setText = commands.find(c => c.name === 'setTextAndSelection');
-      expect(setText, 'a setTextAndSelection command was dispatched').toBeDefined();
+      expect(
+        setText,
+        'a setTextAndSelection command was dispatched',
+      ).toBeDefined();
       expect(setText!.args[1]).toBe('hello');
       expect(setText!.args[2]).toBe(1);
       expect(setText!.args[3]).toBe(3);

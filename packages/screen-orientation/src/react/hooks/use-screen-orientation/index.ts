@@ -12,14 +12,16 @@ import {
 } from '../../../core';
 
 export function useScreenOrientation(): ScreenOrientationState {
-  const [screenOrientation, setScreenOrientation] = useState<ScreenOrientationState>({
-    orientation: Orientation.UNKNOWN,
-    orientationLock: OrientationLock.UNKNOWN,
-  });
+  const [screenOrientation, setScreenOrientation] =
+    useState<ScreenOrientationState>({
+      orientation: Orientation.UNKNOWN,
+      orientationLock: OrientationLock.UNKNOWN,
+    });
 
   useEffect(() => {
     Promise.all([getOrientationAsync(), getOrientationLockAsync()]).then(
-      ([orientation, orientationLock]) => setScreenOrientation({ orientation, orientationLock }),
+      ([orientation, orientationLock]) =>
+        setScreenOrientation({ orientation, orientationLock }),
     );
     const subscription = addOrientationChangeListener(event =>
       setScreenOrientation({

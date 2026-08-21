@@ -97,11 +97,17 @@ describe('FlatList cells stay inside the ScrollView content view', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    const scroll = findTop(fabric.committed, node => node.viewName === 'RCTScrollView');
+    const scroll = findTop(
+      fabric.committed,
+      node => node.viewName === 'RCTScrollView',
+    );
     expect(scroll).toBeDefined();
     if (scroll === undefined) return;
 
-    const chip0InsideScroll = findWithin(scroll, node => node.props.testID === 'chip-0');
+    const chip0InsideScroll = findWithin(
+      scroll,
+      node => node.props.testID === 'chip-0',
+    );
     expect(chip0InsideScroll).toBeDefined();
   });
 });

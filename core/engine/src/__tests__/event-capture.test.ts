@@ -48,8 +48,12 @@ describe('two-phase delivery (positive: no listener ever throws)', () => {
   // target's own handler ever sees the event.
   it('fires the full capture pass (root -> target) before the bubble pass (target -> root)', () => {
     const order: string[] = [];
-    setEventListener(tree.root, 'changeCapture', () => order.push('root capture'));
-    setEventListener(tree.parent, 'changeCapture', () => order.push('parent capture'));
+    setEventListener(tree.root, 'changeCapture', () =>
+      order.push('root capture'),
+    );
+    setEventListener(tree.parent, 'changeCapture', () =>
+      order.push('parent capture'),
+    );
     setEventListener(tree.child, 'change', () => order.push('child bubble'));
     setEventListener(tree.parent, 'change', () => order.push('parent bubble'));
     setEventListener(tree.root, 'change', () => order.push('root bubble'));
@@ -69,9 +73,15 @@ describe('two-phase delivery (positive: no listener ever throws)', () => {
   // its own target listener.
   it("fires the target's own capture listener last in the capture pass", () => {
     const order: string[] = [];
-    setEventListener(tree.root, 'changeCapture', () => order.push('root capture'));
-    setEventListener(tree.parent, 'changeCapture', () => order.push('parent capture'));
-    setEventListener(tree.child, 'changeCapture', () => order.push('child capture'));
+    setEventListener(tree.root, 'changeCapture', () =>
+      order.push('root capture'),
+    );
+    setEventListener(tree.parent, 'changeCapture', () =>
+      order.push('parent capture'),
+    );
+    setEventListener(tree.child, 'changeCapture', () =>
+      order.push('child capture'),
+    );
 
     fabric.fireEvent(tree.child, 'topChange');
     expect(order[2]).toBe('child capture');
@@ -102,7 +112,9 @@ describe('stopPropagation in capture', () => {
       seen.push('parent capture');
       event.stopPropagation();
     });
-    setEventListener(tree.child, 'changeCapture', () => seen.push('child capture'));
+    setEventListener(tree.child, 'changeCapture', () =>
+      seen.push('child capture'),
+    );
 
     fabric.fireEvent(tree.child, 'topChange');
     expect(seen).toEqual(['parent capture']);
@@ -116,7 +128,8 @@ describe('currentTarget in capture', () => {
   it('tracks the capturing node while target stays the dispatch node', () => {
     const targets: string[] = [];
     setEventListener(tree.parent, 'changeCapture', (event: ISymbioteEvent) => {
-      if (event.target === tree.child && event.currentTarget === tree.parent) targets.push('ok');
+      if (event.target === tree.child && event.currentTarget === tree.parent)
+        targets.push('ok');
     });
 
     fabric.fireEvent(tree.child, 'topChange');
@@ -136,8 +149,12 @@ describe('anchor nodes are transparent to capture listener lookup', () => {
     appendChild(anchor, grandchild);
 
     const order: string[] = [];
-    setEventListener(anchor, 'changeCapture', () => order.push('anchor capture'));
-    setEventListener(tree.parent, 'changeCapture', () => order.push('parent capture'));
+    setEventListener(anchor, 'changeCapture', () =>
+      order.push('anchor capture'),
+    );
+    setEventListener(tree.parent, 'changeCapture', () =>
+      order.push('parent capture'),
+    );
 
     fabric.fireEvent(grandchild, 'topChange');
     expect(order).toEqual(['parent capture']);

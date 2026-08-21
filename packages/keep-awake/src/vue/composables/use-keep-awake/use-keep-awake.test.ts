@@ -14,11 +14,14 @@ import { installFabric } from '@symbiote-native/test-utils';
 import { useKeepAwake } from './index';
 
 const ROOT_TAG = 9954;
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 const activateKeepAwakeAsyncMock = vi.fn(async (_tag: string) => undefined);
 const removeSubscriptionMock = vi.fn();
-const addListenerMock = vi.fn((..._args: unknown[]) => ({ remove: removeSubscriptionMock }));
+const addListenerMock = vi.fn((..._args: unknown[]) => ({
+  remove: removeSubscriptionMock,
+}));
 const deactivateKeepAwakeMock = vi.fn(async (_tag: string) => undefined);
 
 // The native-call leaf is mocked rather than the `../../../core` barrel, so that the barrel
@@ -72,7 +75,9 @@ describe('useKeepAwake (Vue)', () => {
     it('activates a default tag on mount', async () => {
       mountKeepAwake();
 
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1),
+      );
       expect(typeof activateKeepAwakeAsyncMock.mock.calls[0][0]).toBe('string');
     });
 
@@ -81,14 +86,18 @@ describe('useKeepAwake (Vue)', () => {
     it('activates the explicit tag when one is given', async () => {
       mountKeepAwake({ tag: 'custom-tag' });
 
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledWith('custom-tag'));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledWith('custom-tag'),
+      );
     });
 
     // why: onUnmounted is the ONLY place a mounted lock gets released — if it doesn't fire, the
     // lock leaks for the app's lifetime.
     it('deactivates the same tag on unmount', async () => {
       mountKeepAwake({ tag: 'custom-tag' });
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1),
+      );
 
       unmount(ROOT_TAG);
 
@@ -100,7 +109,9 @@ describe('useKeepAwake (Vue)', () => {
     it('never touches addListener when no options are given', async () => {
       mountKeepAwake({ tag: 'custom-tag' });
 
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1),
+      );
       expect(addListenerMock).not.toHaveBeenCalled();
     });
 
@@ -111,7 +122,9 @@ describe('useKeepAwake (Vue)', () => {
 
       mountKeepAwake({ tag: 'custom-tag', listener });
 
-      await vi.waitFor(() => expect(addListenerMock).toHaveBeenCalledWith('custom-tag', listener));
+      await vi.waitFor(() =>
+        expect(addListenerMock).toHaveBeenCalledWith('custom-tag', listener),
+      );
     });
   });
 
@@ -120,12 +133,16 @@ describe('useKeepAwake (Vue)', () => {
     // rejection — a failed activation must never attach a listener for a lock that was never
     // actually acquired.
     it('does not register a listener when activateKeepAwakeAsync rejects', async () => {
-      activateKeepAwakeAsyncMock.mockRejectedValueOnce(new Error('activation failed'));
+      activateKeepAwakeAsyncMock.mockRejectedValueOnce(
+        new Error('activation failed'),
+      );
       const listener = vi.fn();
 
       mountKeepAwake({ tag: 'custom-tag', listener });
 
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1),
+      );
       await tick();
       expect(addListenerMock).not.toHaveBeenCalled();
     });
@@ -134,12 +151,16 @@ describe('useKeepAwake (Vue)', () => {
     // warning upstream expo-keep-awake surfaces — the rejection must be swallowed, not become an
     // unhandled promise rejection.
     it('swallows a deactivation rejection when suppressDeactivateWarnings is set', async () => {
-      deactivateKeepAwakeMock.mockRejectedValueOnce(new Error('deactivate failed'));
+      deactivateKeepAwakeMock.mockRejectedValueOnce(
+        new Error('deactivate failed'),
+      );
       const unhandled = vi.fn();
       process.once('unhandledRejection', unhandled);
 
       mountKeepAwake({ tag: 'custom-tag', suppressDeactivateWarnings: true });
-      await vi.waitFor(() => expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(activateKeepAwakeAsyncMock).toHaveBeenCalledTimes(1),
+      );
       unmount(ROOT_TAG);
       await tick();
 

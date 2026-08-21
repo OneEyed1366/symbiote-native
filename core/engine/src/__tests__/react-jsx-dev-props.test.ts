@@ -15,7 +15,11 @@ describe('routeProp strips React JSX dev annotations (__self / __source)', () =>
   describe('stripped', () => {
     it('drops __source', () => {
       const node = createElement('RCTView');
-      routeProp(node, '__source', { fileName: 'App.tsx', lineNumber: 66, columnNumber: 7 });
+      routeProp(node, '__source', {
+        fileName: 'App.tsx',
+        lineNumber: 66,
+        columnNumber: 7,
+      });
       expect('__source' in node.props).toBe(false);
     });
 
@@ -39,7 +43,11 @@ describe('routeProp strips React JSX dev annotations (__self / __source)', () =>
 
     it('keeps a real prop set alongside a dropped dev annotation', () => {
       const node = createElement('RCTView');
-      routeProp(node, '__source', { fileName: 'App.tsx', lineNumber: 66, columnNumber: 7 });
+      routeProp(node, '__source', {
+        fileName: 'App.tsx',
+        lineNumber: 66,
+        columnNumber: 7,
+      });
       routeProp(node, 'style', { flex: 1 });
       // style routes through the class/style merge (routeProp -> commitClassStyle), which stores
       // it as [classStyle, explicitStyle] — no class was set here, so the explicit half carries it.

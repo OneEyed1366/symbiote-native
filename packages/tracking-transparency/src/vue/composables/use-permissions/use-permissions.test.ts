@@ -8,17 +8,22 @@ import { installFabric } from '@symbiote-native/test-utils';
 import { usePermissions } from './index';
 import { PermissionStatus, type PermissionResponse } from '../../../core';
 
-const { getTrackingPermissionsAsync, requestTrackingPermissionsAsync } = vi.hoisted(() => ({
-  getTrackingPermissionsAsync: vi.fn(),
-  requestTrackingPermissionsAsync: vi.fn(),
-}));
+const { getTrackingPermissionsAsync, requestTrackingPermissionsAsync } =
+  vi.hoisted(() => ({
+    getTrackingPermissionsAsync: vi.fn(),
+    requestTrackingPermissionsAsync: vi.fn(),
+  }));
 
 // Same enum-shaped-object mock trick packages/battery/src/vue/composables/use-battery-state's
 // test uses for BatteryState.
 vi.mock('../../../core', () => ({
   getTrackingPermissionsAsync,
   requestTrackingPermissionsAsync,
-  PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    DENIED: 'denied',
+    UNDETERMINED: 'undetermined',
+  },
 }));
 
 const GRANTED: PermissionResponse = {
@@ -48,7 +53,9 @@ afterEach(() => unmount(ROOT_TAG));
 
 // Node only reports an unhandled rejection a macrotask after the promise settles, so a plain
 // `await` on the composable's own refs is too early to prove one did not happen.
-async function collectUnhandledRejections(run: () => Promise<void>): Promise<unknown[]> {
+async function collectUnhandledRejections(
+  run: () => Promise<void>,
+): Promise<unknown[]> {
   const unhandled: unknown[] = [];
   const onUnhandledRejection = (reason: unknown): void => {
     unhandled.push(reason);
@@ -161,7 +168,9 @@ describe('usePermissions (Vue)', () => {
       const { status, get } = mountPermissions();
       await vi.waitFor(() => expect(status.value).toEqual(GRANTED));
 
-      getTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
+      getTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
       await expect(get()).rejects.toThrow('native call failed');
 
       expect(status.value).toEqual(GRANTED);
@@ -171,7 +180,9 @@ describe('usePermissions (Vue)', () => {
       const { status, request } = mountPermissions();
       await vi.waitFor(() => expect(status.value).toEqual(GRANTED));
 
-      requestTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
+      requestTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
       await expect(request()).rejects.toThrow('native call failed');
 
       expect(status.value).toEqual(GRANTED);
@@ -181,13 +192,17 @@ describe('usePermissions (Vue)', () => {
       // why: onMounted's auto-fetch has no caller to reject to. It used to be `void get()`, so a
       // native rejection escaped the composable entirely as an unhandled promise rejection and
       // left `status` at null — indistinguishable from "still fetching".
-      getTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
+      getTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
 
       // mounted before the listener goes up, but the rejection can only be reported once the
       // microtask queue drains — no turn passes between these two lines
       const { status, error } = mountPermissions();
       const unhandled = await collectUnhandledRejections(async () => {
-        await vi.waitFor(() => expect(error.value?.message).toBe('native call failed'));
+        await vi.waitFor(() =>
+          expect(error.value?.message).toBe('native call failed'),
+        );
       });
 
       expect(unhandled).toEqual([]);
@@ -198,7 +213,9 @@ describe('usePermissions (Vue)', () => {
     it('clears the recorded error once a later get() succeeds', async () => {
       // why: a consumer that retries by hand after a failed mount fetch must end up with a clean
       // slate — a stale error next to a freshly fetched status would keep reading as "broken".
-      getTrackingPermissionsAsync.mockRejectedValueOnce(new Error('native call failed'));
+      getTrackingPermissionsAsync.mockRejectedValueOnce(
+        new Error('native call failed'),
+      );
       const { status, error, get } = mountPermissions();
       await vi.waitFor(() => expect(error.value).not.toBe(null));
 

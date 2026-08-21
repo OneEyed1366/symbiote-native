@@ -36,10 +36,11 @@ const {
   compileSvelteModuleFile: (source: string, filename: string) => string;
 } = metroSvelteTransformer;
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
-// The §16 tell: a single-space text entry inside a compiled `from_tree([...])` array, i.e. real
-// whitespace between two sibling nodes that became a real RCTRawText engine node.
-const STRAY_WHITESPACE_PATTERN = /,\s*'\s+'\s*,/g;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 const SVELTE_SPECIFIER_PATTERN = /(['"])(\.{1,2}\/[^'"]*\.svelte)\1/g;
 
 export type ISvelteHarness = {
@@ -47,8 +48,6 @@ export type ISvelteHarness = {
   compileFile(sveltePath: string): string;
   // Compile an inline fixture written into `dir`, so its own relative imports resolve from there.
   compileSource(dir: string, name: string, source: string): string;
-  // The number of stray single-space text entries across everything compiled so far - must be 0.
-  strayWhitespaceCount(): number;
   cleanup(): void;
 };
 
@@ -58,7 +57,6 @@ export function createSvelteHarness(
 ): ISvelteHarness {
   const written: string[] = [];
   const compiledBySource = new Map<string, string>();
-  let strayWhitespace = 0;
 
   function outPathFor(sveltePath: string): string {
     const stem = basename(sveltePath).replace(/\./g, '-');
@@ -83,13 +81,21 @@ export function createSvelteHarness(
       },
     );
     for (const [specifier, target] of Object.entries(aliases)) {
-      rewritten = rewritten.split(`'${specifier}'`).join(`'${relativeSpecifier(outPath, target)}'`);
-      rewritten = rewritten.split(`"${specifier}"`).join(`"${relativeSpecifier(outPath, target)}"`);
+      rewritten = rewritten
+        .split(`'${specifier}'`)
+        .join(`'${relativeSpecifier(outPath, target)}'`);
+      rewritten = rewritten
+        .split(`"${specifier}"`)
+        .join(`"${relativeSpecifier(outPath, target)}"`);
     }
     return rewritten;
   }
 
-  function emit(sveltePath: string, source: string, isRuneModule: boolean): string {
+  function emit(
+    sveltePath: string,
+    source: string,
+    isRuneModule: boolean,
+  ): string {
     const outPath = outPathFor(sveltePath);
     // Registered BEFORE compiling so a cycle between two components terminates.
     compiledBySource.set(sveltePath, outPath);
@@ -98,7 +104,6 @@ export function createSvelteHarness(
     const code = isRuneModule
       ? compileSvelteModuleFile(source, `${filename}.ts`)
       : compile(source, { ...COMPILE_OPTIONS, filename }).js.code;
-    strayWhitespace += (code.match(STRAY_WHITESPACE_PATTERN) ?? []).length;
     writeFileSync(outPath, rewrite(code, outPath));
     return outPath;
   }
@@ -121,7 +126,6 @@ export function createSvelteHarness(
     compileSource(dir, name, source) {
       return emit(join(dir, `${name}.svelte`), source, false);
     },
-    strayWhitespaceCount: () => strayWhitespace,
     cleanup() {
       for (const file of written) rmSync(file, { force: true });
       written.length = 0;

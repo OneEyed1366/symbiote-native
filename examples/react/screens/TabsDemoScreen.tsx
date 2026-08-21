@@ -20,13 +20,17 @@ function TabHomeScreen() {
       <View className="section">
         <TabLineTag />
         <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: LINE_COLOR.structure }}>
+          <View
+            className="hero-badge"
+            style={{ backgroundColor: LINE_COLOR.structure }}
+          >
             <Text className="hero-badge-text">TB</Text>
           </View>
           <View className="hero-copy">
             <Text className="hero-title">Tabs</Text>
             <Text className="hero-body">
-              A bottom-tabs navigator — icon, badge, and tint, each tab a real native view.
+              A bottom-tabs navigator — icon, badge, and tint, each tab a real
+              native view.
             </Text>
           </View>
         </View>
@@ -73,14 +77,22 @@ export function TabsDemoScreen() {
       <Tab.Screen
         name="Home"
         component={TabHomeScreen}
-        options={{ tabBarLabel: 'Home', tabBarIcon: '🏠', tabBarActiveTintColor: LINE_COLOR.structure }}
+        options={{
+          tabBarLabel: 'Home',
+          tabBarIcon: '🏠',
+          tabBarActiveTintColor: LINE_COLOR.structure,
+        }}
       />
       <Tab.Screen
         name="Search"
         component={TabSearchScreen}
         options={{ tabBarLabel: 'Search', tabBarIcon: '🔍', tabBarBadge: 3 }}
       />
-      <Tab.Screen name="Profile" component={TabProfileScreen} options={{ tabBarLabel: 'Profile', tabBarIcon: '👤' }} />
+      <Tab.Screen
+        name="Profile"
+        component={TabProfileScreen}
+        options={{ tabBarLabel: 'Profile', tabBarIcon: '👤' }}
+      />
     </Tab>
   );
 }

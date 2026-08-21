@@ -21,16 +21,18 @@ seed-then-subscribe shape as network's own `useNetworkState`.
 | Android     | ✅ live |
 
 | Framework adapter | Support |
-| ------------------ | ------- |
-| React               | ✅ live |
-| Vue                 | ✅ live |
-| Angular             | ✅ live |
-| Svelte              | ✅ live |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 <Aside type="note" title="Android has no native expoDidUpdateDimensions event">
-  `expo-screen-orientation` doesn't emit its own `expoDidUpdateDimensions` event on Android — the
-  module piggybacks on RN's own `Dimensions.addEventListener('change', ...)` there instead,
-  re-fetching the lock and orientation on every dimensions change. iOS and web both subscribe to
+  `expo-screen-orientation` doesn't emit its own `expoDidUpdateDimensions` event
+  on Android — the module piggybacks on RN's own
+  `Dimensions.addEventListener('change', ...)` there instead, re-fetching the
+  lock and orientation on every dimensions change. iOS and web both subscribe to
   the native `expoDidUpdateDimensions` event directly.
 </Aside>
 
@@ -45,12 +47,14 @@ exact versions — never install either yourself, and never add the `expo` meta-
 project (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 <Aside type="danger" title="Native setup is required before first use">
-  `expo-screen-orientation`'s native code is discovered by `expo-modules-autolinking`, a different
-  mechanism from the `react-native.config.cjs`/podspec autolinking every other SymbioteNative
-  wrapper uses — and it isn't the standard Expo setup flow either, since this project never
-  installs the `expo` meta-package. Follow [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers this package and
-  every other `expo-modules-core` package with zero further native changes.
+  `expo-screen-orientation`'s native code is discovered by
+  `expo-modules-autolinking`, a different mechanism from the
+  `react-native.config.cjs`/podspec autolinking every other SymbioteNative
+  wrapper uses — and it isn't the standard Expo setup flow either, since this
+  project never installs the `expo` meta-package. Follow [How to: wire up an
+  Expo native module](/docs/howtos/expo-native-module-setup/) once per app
+  first; it covers this package and every other `expo-modules-core` package with
+  zero further native changes.
 </Aside>
 
 No platform permission string is needed — locking and reading the current orientation read/write
@@ -79,6 +83,7 @@ system state with no runtime permission prompt on either platform.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -100,6 +105,7 @@ system state with no runtime permission prompt on either platform.
       <Button title="Lock landscape" @press="onLockLandscape" />
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -125,6 +131,7 @@ system state with no runtime permission prompt on either platform.
       }
     }
     ```
+
   </TabItem>
   <TabItem label="Svelte">
     ```svelte
@@ -144,6 +151,31 @@ system state with no runtime permission prompt on either platform.
     <Text>Lock: {screenOrientation.current.orientationLock}</Text>
     <Button title="Lock landscape" onPress={onLockLandscape} />
     ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Button, Text } from '@symbiote-native/solid';
+    import { lockAsync, OrientationLock } from '@symbiote-native/screen-orientation';
+    import { createScreenOrientation } from '@symbiote-native/screen-orientation/solid';
+
+    export default function ScreenOrientationScreen() {
+      const screenOrientation = createScreenOrientation(); // Accessor<ScreenOrientationState>
+
+      function onLockLandscape(): void {
+        void lockAsync(OrientationLock.LANDSCAPE);
+      }
+
+      return (
+        <>
+          <Text>Orientation: {screenOrientation().orientation}</Text>
+          <Text>Lock: {screenOrientation().orientationLock}</Text>
+          <Button title="Lock landscape" onPress={onLockLandscape} />
+        </>
+      );
+    }
+    ```
+
   </TabItem>
 </Tabs>
 
@@ -151,18 +183,18 @@ system state with no runtime permission prompt on either platform.
 
 ### Functions
 
-| Signature | Description |
-| --- | --- |
-| `lockAsync(orientationLock: OrientationLock): Promise<void>` | Locks the screen to the given `OrientationLock`. Throws a `TypeError` for an invalid value; a no-op for `OrientationLock.OTHER` |
-| `lockPlatformAsync(options: PlatformOrientationInfo): Promise<void>` | Locks via a platform-specific param — an Android numeric constant, an iOS `Orientation[]`, or a web `WebOrientationLock` string |
-| `unlockAsync(): Promise<void>` | Unlocks the screen orientation back to `OrientationLock.DEFAULT` |
-| `getOrientationAsync(): Promise<Orientation>` | Gets the device's current screen orientation |
-| `getOrientationLockAsync(): Promise<OrientationLock>` | Gets the current orientation lock, falling back to the last value set via `lockAsync()`/`lockPlatformAsync()` when the native method itself isn't available |
-| `getPlatformOrientationLockAsync(): Promise<PlatformOrientationInfo>` | Gets the current orientation lock as a platform-specific value |
-| `supportsOrientationLockAsync(orientationLock: OrientationLock): Promise<boolean>` | Whether the given orientation lock is supported on this device |
-| `addOrientationChangeListener(listener: OrientationChangeListener): EventSubscription` | Subscribes to orientation-change events — fires whenever orientation or lock changes. The primitive `useScreenOrientation` wraps |
-| `removeOrientationChangeListener(subscription: EventSubscription): void` | Removes a single orientation-change listener's subscription |
-| `removeOrientationChangeListeners(): void` | Removes every orientation-change listener registered via `addOrientationChangeListener()` |
+| Signature                                                                              | Description                                                                                                                                                 |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lockAsync(orientationLock: OrientationLock): Promise<void>`                           | Locks the screen to the given `OrientationLock`. Throws a `TypeError` for an invalid value; a no-op for `OrientationLock.OTHER`                             |
+| `lockPlatformAsync(options: PlatformOrientationInfo): Promise<void>`                   | Locks via a platform-specific param — an Android numeric constant, an iOS `Orientation[]`, or a web `WebOrientationLock` string                             |
+| `unlockAsync(): Promise<void>`                                                         | Unlocks the screen orientation back to `OrientationLock.DEFAULT`                                                                                            |
+| `getOrientationAsync(): Promise<Orientation>`                                          | Gets the device's current screen orientation                                                                                                                |
+| `getOrientationLockAsync(): Promise<OrientationLock>`                                  | Gets the current orientation lock, falling back to the last value set via `lockAsync()`/`lockPlatformAsync()` when the native method itself isn't available |
+| `getPlatformOrientationLockAsync(): Promise<PlatformOrientationInfo>`                  | Gets the current orientation lock as a platform-specific value                                                                                              |
+| `supportsOrientationLockAsync(orientationLock: OrientationLock): Promise<boolean>`     | Whether the given orientation lock is supported on this device                                                                                              |
+| `addOrientationChangeListener(listener: OrientationChangeListener): EventSubscription` | Subscribes to orientation-change events — fires whenever orientation or lock changes. The primitive `useScreenOrientation` wraps                            |
+| `removeOrientationChangeListener(subscription: EventSubscription): void`               | Removes a single orientation-change listener's subscription                                                                                                 |
+| `removeOrientationChangeListeners(): void`                                             | Removes every orientation-change listener registered via `addOrientationChangeListener()`                                                                   |
 
 ### `useScreenOrientation()` config
 
@@ -170,10 +202,10 @@ Takes no arguments — the hook/composable/service seeds and subscribes automati
 
 ### `useScreenOrientation()` return value
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `orientation` | `Orientation` | The device's current screen orientation, seeded `Orientation.UNKNOWN` until the first reading arrives |
-| `orientationLock` | `OrientationLock` | The current orientation lock, seeded `OrientationLock.UNKNOWN` until the first reading arrives |
+| Field             | Type              | Description                                                                                           |
+| ----------------- | ----------------- | ----------------------------------------------------------------------------------------------------- |
+| `orientation`     | `Orientation`     | The device's current screen orientation, seeded `Orientation.UNKNOWN` until the first reading arrives |
+| `orientationLock` | `OrientationLock` | The current orientation lock, seeded `OrientationLock.UNKNOWN` until the first reading arrives        |
 
 React returns this shape as a plain value; Vue returns `Ref<ScreenOrientationState>`; Angular's
 `ScreenOrientationService.connect()` returns `Signal<ScreenOrientationState>`; Svelte returns
@@ -181,77 +213,77 @@ React returns this shape as a plain value; Vue returns `Ref<ScreenOrientationSta
 
 ### `Orientation`
 
-| Member | Value | Description |
-| --- | --- | --- |
-| `UNKNOWN` | `0` | The orientation could not be determined |
-| `PORTRAIT_UP` | `1` | Right-side-up portrait |
-| `PORTRAIT_DOWN` | `2` | Upside-down portrait |
-| `LANDSCAPE_LEFT` | `3` | Landscape, rotated left |
-| `LANDSCAPE_RIGHT` | `4` | Landscape, rotated right |
+| Member            | Value | Description                             |
+| ----------------- | ----- | --------------------------------------- |
+| `UNKNOWN`         | `0`   | The orientation could not be determined |
+| `PORTRAIT_UP`     | `1`   | Right-side-up portrait                  |
+| `PORTRAIT_DOWN`   | `2`   | Upside-down portrait                    |
+| `LANDSCAPE_LEFT`  | `3`   | Landscape, rotated left                 |
+| `LANDSCAPE_RIGHT` | `4`   | Landscape, rotated right                |
 
 ### `OrientationLock`
 
-| Member | Value | Description |
-| --- | --- | --- |
-| `DEFAULT` | `0` | iOS: all orientations except `PORTRAIT_DOWN`. Android: system decides |
-| `ALL` | `1` | All four possible orientations |
-| `PORTRAIT` | `2` | Any portrait orientation |
-| `PORTRAIT_UP` | `3` | Right-side-up portrait only |
-| `PORTRAIT_DOWN` | `4` | Upside-down portrait only |
-| `LANDSCAPE` | `5` | Any landscape orientation |
-| `LANDSCAPE_LEFT` | `6` | Left landscape only |
-| `LANDSCAPE_RIGHT` | `7` | Right landscape only |
-| `OTHER` | `8` | A platform-specific orientation — not a valid `lockAsync()` policy |
-| `UNKNOWN` | `9` | Unknown lock — not a valid `lockAsync()` policy |
+| Member            | Value | Description                                                           |
+| ----------------- | ----- | --------------------------------------------------------------------- |
+| `DEFAULT`         | `0`   | iOS: all orientations except `PORTRAIT_DOWN`. Android: system decides |
+| `ALL`             | `1`   | All four possible orientations                                        |
+| `PORTRAIT`        | `2`   | Any portrait orientation                                              |
+| `PORTRAIT_UP`     | `3`   | Right-side-up portrait only                                           |
+| `PORTRAIT_DOWN`   | `4`   | Upside-down portrait only                                             |
+| `LANDSCAPE`       | `5`   | Any landscape orientation                                             |
+| `LANDSCAPE_LEFT`  | `6`   | Left landscape only                                                   |
+| `LANDSCAPE_RIGHT` | `7`   | Right landscape only                                                  |
+| `OTHER`           | `8`   | A platform-specific orientation — not a valid `lockAsync()` policy    |
+| `UNKNOWN`         | `9`   | Unknown lock — not a valid `lockAsync()` policy                       |
 
 `ALL`/`PORTRAIT` are invalid on devices that don't support `PORTRAIT_DOWN`.
 
 ### `SizeClassIOS`
 
-| Member | Value | Description |
-| --- | --- | --- |
-| `UNKNOWN` | `0` | The size class could not be determined |
-| `COMPACT` | `1` | iOS compact UIKit size class |
-| `REGULAR` | `2` | iOS regular UIKit size class |
+| Member    | Value | Description                            |
+| --------- | ----- | -------------------------------------- |
+| `UNKNOWN` | `0`   | The size class could not be determined |
+| `COMPACT` | `1`   | iOS compact UIKit size class           |
+| `REGULAR` | `2`   | iOS regular UIKit size class           |
 
 ### `WebOrientationLock` / `WebOrientation`
 
-| Member | Value | Description |
-| --- | --- | --- |
-| `PORTRAIT_PRIMARY` | `'portrait-primary'` | The primary portrait orientation |
-| `PORTRAIT_SECONDARY` | `'portrait-secondary'` | The secondary (upside-down) portrait orientation |
-| `PORTRAIT` | `'portrait'` | Any portrait orientation. `WebOrientationLock` only |
-| `LANDSCAPE_PRIMARY` | `'landscape-primary'` | The primary landscape orientation |
-| `LANDSCAPE_SECONDARY` | `'landscape-secondary'` | The secondary (rotated) landscape orientation |
-| `LANDSCAPE` | `'landscape'` | Any landscape orientation. `WebOrientationLock` only |
-| `ANY` | `'any'` | Any orientation. `WebOrientationLock` only |
-| `NATURAL` | `'natural'` | The device's natural orientation. `WebOrientationLock` only |
-| `UNKNOWN` | `'unknown'` | The orientation/lock could not be determined |
+| Member                | Value                   | Description                                                 |
+| --------------------- | ----------------------- | ----------------------------------------------------------- |
+| `PORTRAIT_PRIMARY`    | `'portrait-primary'`    | The primary portrait orientation                            |
+| `PORTRAIT_SECONDARY`  | `'portrait-secondary'`  | The secondary (upside-down) portrait orientation            |
+| `PORTRAIT`            | `'portrait'`            | Any portrait orientation. `WebOrientationLock` only         |
+| `LANDSCAPE_PRIMARY`   | `'landscape-primary'`   | The primary landscape orientation                           |
+| `LANDSCAPE_SECONDARY` | `'landscape-secondary'` | The secondary (rotated) landscape orientation               |
+| `LANDSCAPE`           | `'landscape'`           | Any landscape orientation. `WebOrientationLock` only        |
+| `ANY`                 | `'any'`                 | Any orientation. `WebOrientationLock` only                  |
+| `NATURAL`             | `'natural'`             | The device's natural orientation. `WebOrientationLock` only |
+| `UNKNOWN`             | `'unknown'`             | The orientation/lock could not be determined                |
 
 `WebOrientation` only defines the four primary/secondary members (no `PORTRAIT`/`LANDSCAPE`/
 `ANY`/`NATURAL`) — it describes a resolved orientation, not a lock policy.
 
 ### `PlatformOrientationInfo`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `screenOrientationConstantAndroid` | `number \| undefined` | An Android `ActivityInfo` screen-orientation constant. `@platform android` |
-| `screenOrientationArrayIOS` | `Orientation[] \| undefined` | The set of allowed `Orientation` values on iOS. `@platform ios` |
-| `screenOrientationLockWeb` | `WebOrientationLock \| undefined` | The lock value to pass to the Screen Orientation Web API. `@platform web` |
+| Field                              | Type                              | Description                                                                |
+| ---------------------------------- | --------------------------------- | -------------------------------------------------------------------------- |
+| `screenOrientationConstantAndroid` | `number \| undefined`             | An Android `ActivityInfo` screen-orientation constant. `@platform android` |
+| `screenOrientationArrayIOS`        | `Orientation[] \| undefined`      | The set of allowed `Orientation` values on iOS. `@platform ios`            |
+| `screenOrientationLockWeb`         | `WebOrientationLock \| undefined` | The lock value to pass to the Screen Orientation Web API. `@platform web`  |
 
 ### `ScreenOrientationInfo`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `orientation` | `Orientation` | The resolved orientation |
-| `verticalSizeClass` | `SizeClassIOS \| undefined` | The current vertical UIKit size class. `@platform ios` |
+| Field                 | Type                        | Description                                              |
+| --------------------- | --------------------------- | -------------------------------------------------------- |
+| `orientation`         | `Orientation`               | The resolved orientation                                 |
+| `verticalSizeClass`   | `SizeClassIOS \| undefined` | The current vertical UIKit size class. `@platform ios`   |
 | `horizontalSizeClass` | `SizeClassIOS \| undefined` | The current horizontal UIKit size class. `@platform ios` |
 
 ### `OrientationChangeEvent`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `orientationLock` | `OrientationLock` | The orientation lock in effect when the change fired |
+| Field             | Type                    | Description                                             |
+| ----------------- | ----------------------- | ------------------------------------------------------- |
+| `orientationLock` | `OrientationLock`       | The orientation lock in effect when the change fired    |
 | `orientationInfo` | `ScreenOrientationInfo` | The resolved orientation info at the time of the change |
 
 ## Notes
@@ -277,7 +309,7 @@ React returns this shape as a plain value; Vue returns `Ref<ScreenOrientationSta
 
 ## How the wrapper works
 
-`@symbiote-native/screen-orientation` ships zero React/Vue/Angular logic in
+`@symbiote-native/screen-orientation` ships zero React/Vue/Angular/Svelte/Solid logic in
 `expo-screen-orientation` itself — its functions and types are hand-ported, verbatim, into this
 package's own `core/`, resolving the native module through `expo-modules-core`'s
 `requireNativeModule` rather than the `expo` meta-package this project never installs:

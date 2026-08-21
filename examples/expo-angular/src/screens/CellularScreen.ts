@@ -1,5 +1,11 @@
 import { Component, inject, signal } from '@angular/core';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   CellularGeneration,
   PermissionsService,
@@ -49,7 +55,11 @@ function valueLabel(value: string | boolean | null): string {
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="cellular-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="cellular-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -60,9 +70,10 @@ function valueLabel(value: string | boolean | null): string {
           <View class="hero-copy">
             <Text class="hero-title">Cellular</Text>
             <Text class="hero-body">
-              @symbiote-native/cellular — cellular generation and carrier/SIM info. Every field
-              except generation is Android-only upstream (iOS/web return null); a physical
-              device with an active SIM is needed for real values.
+              @symbiote-native/cellular — cellular generation and carrier/SIM
+              info. Every field except generation is Android-only upstream
+              (iOS/web return null); a physical device with an active SIM is
+              needed for real values.
             </Text>
           </View>
         </View>
@@ -88,11 +99,15 @@ function valueLabel(value: string | boolean | null): string {
             </View>
             <View class="capability-row">
               <Text class="capability-label">Mobile country code</Text>
-              <Text class="value-text">{{ valueLabel(mobileCountryCode()) }}</Text>
+              <Text class="value-text">{{
+                valueLabel(mobileCountryCode())
+              }}</Text>
             </View>
             <View class="capability-row">
               <Text class="capability-label">Mobile network code</Text>
-              <Text class="value-text">{{ valueLabel(mobileNetworkCode()) }}</Text>
+              <Text class="value-text">{{
+                valueLabel(mobileNetworkCode())
+              }}</Text>
             </View>
           }
         </View>

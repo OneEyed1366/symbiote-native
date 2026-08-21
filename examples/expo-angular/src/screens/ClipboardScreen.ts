@@ -1,5 +1,12 @@
 import { Component, Injector, effect, inject, signal } from '@angular/core';
-import { Platform, SafeAreaView, ScrollView, Text, TextInput, View } from '@symbiote-native/angular';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/angular';
 import {
   ClipboardService,
   getStringAsync,
@@ -34,7 +41,11 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
   imports: [ActionButton, SafeAreaView, ScrollView, Text, TextInput, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="clipboard-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="clipboard-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -45,8 +56,9 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           <View class="hero-copy">
             <Text class="hero-title">Clipboard</Text>
             <Text class="hero-body">
-              @symbiote-native/clipboard — read/write the system clipboard, with a live change
-              listener. On iOS 16+ a denied paste permission reads as empty content, not an error.
+              @symbiote-native/clipboard — read/write the system clipboard, with
+              a live change listener. On iOS 16+ a denied paste permission reads
+              as empty content, not an error.
             </Text>
           </View>
         </View>
@@ -60,7 +72,9 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
           <View testID="clipboard-has-string" class="capability-row">
             <Text class="capability-label">Has text</Text>
             <View [class]="statusBadgeClass(hasString())">
-              <Text class="status-badge-text">{{ statusLabel(hasString()) }}</Text>
+              <Text class="status-badge-text">{{
+                statusLabel(hasString())
+              }}</Text>
             </View>
           </View>
         </View>
@@ -119,7 +133,9 @@ function toCapabilityStatus(value: boolean): ICapabilityStatus {
             <View testID="clipboard-has-url" class="capability-row">
               <Text class="capability-label">Has URL</Text>
               <View [class]="statusBadgeClass(hasUrl())">
-                <Text class="status-badge-text">{{ statusLabel(hasUrl()) }}</Text>
+                <Text class="status-badge-text">{{
+                  statusLabel(hasUrl())
+                }}</Text>
               </View>
             </View>
           </View>
@@ -188,7 +204,11 @@ export class ClipboardScreen {
   }
 
   statusLabel(status: ICapabilityStatus): string {
-    return status === 'checking' ? 'CHECKING…' : status === 'yes' ? 'YES' : 'NO';
+    return status === 'checking'
+      ? 'CHECKING…'
+      : status === 'yes'
+        ? 'YES'
+        : 'NO';
   }
 
   private refreshClipboardValue(): void {

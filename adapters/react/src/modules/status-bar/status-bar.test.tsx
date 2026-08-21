@@ -28,11 +28,16 @@ const fakeStatusBarManager = {
     recorded.push({ method: 'setHidden', args: [hidden, withAnimation] });
   },
   setNetworkActivityIndicatorVisible(visible: boolean): void {
-    recorded.push({ method: 'setNetworkActivityIndicatorVisible', args: [visible] });
+    recorded.push({
+      method: 'setNetworkActivityIndicatorVisible',
+      args: [visible],
+    });
   },
 };
 
-const registeredModules: Record<string, unknown> = { StatusBarManager: fakeStatusBarManager };
+const registeredModules: Record<string, unknown> = {
+  StatusBarManager: fakeStatusBarManager,
+};
 
 // The fake proxy hands back a value the caller typed as T; this one guard is the fake's
 // own trust boundary (the real native proxy returns a HostObject directly).
@@ -103,7 +108,9 @@ describe('StatusBar (iOS)', () => {
     expect(StatusBar.setNetworkActivityIndicatorVisible).toBe(
       statusBarImperative.setNetworkActivityIndicatorVisible,
     );
-    expect(StatusBar.setBackgroundColor).toBe(statusBarImperative.setBackgroundColor);
+    expect(StatusBar.setBackgroundColor).toBe(
+      statusBarImperative.setBackgroundColor,
+    );
     expect(StatusBar.setTranslucent).toBe(statusBarImperative.setTranslucent);
   });
 });

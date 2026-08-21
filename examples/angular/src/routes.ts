@@ -18,6 +18,9 @@ export const ROUTE_NAME = {
   DeepLinking: 'DeepLinking',
   StatePersistence: 'StatePersistence',
   ReactiveStyle: 'ReactiveStyle',
+  ApiPlayground: 'ApiPlayground',
+  Benchmark: 'Benchmark',
+  StyleShowcase: 'StyleShowcase',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

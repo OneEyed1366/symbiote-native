@@ -29,7 +29,8 @@ import { PortalDirective, PortalOutletDirective } from './index';
 const ROOT_TAG = 930;
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 const settle = async (): Promise<void> => {
   await tick();
   await tick();
@@ -43,8 +44,16 @@ let capturedHost: HostApp | undefined;
   imports: [ViewHost, TextHost, PortalDirective, PortalOutletDirective],
   template: `
     <View>
-      <View portalOutlet #overlayHostA="portalOutlet" testID="overlay-host-a"></View>
-      <View portalOutlet #overlayHostB="portalOutlet" testID="overlay-host-b"></View>
+      <View
+        portalOutlet
+        #overlayHostA="portalOutlet"
+        testID="overlay-host-a"
+      ></View>
+      <View
+        portalOutlet
+        #overlayHostB="portalOutlet"
+        testID="overlay-host-b"
+      ></View>
       @if (visible()) {
         <View *portal="useFirstOutlet() ? overlayHostA : overlayHostB"
           ><Text>portaled content</Text></View
@@ -106,7 +115,9 @@ function outletPosition(testId: string): number | undefined {
 function portaledContentPosition(): number | undefined {
   return findWithSiblings(
     node =>
-      node.viewName === 'RCTView' && !node.props.testID && containsText(node, 'portaled content'),
+      node.viewName === 'RCTView' &&
+      !node.props.testID &&
+      containsText(node, 'portaled content'),
   )?.index;
 }
 

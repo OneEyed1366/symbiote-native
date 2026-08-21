@@ -1,0 +1,22 @@
+// Less: variable, nesting, and a mixin.
+@accent: #0f1e30;
+
+.pill() {
+  border-radius: 999px;
+  border-width: 1px;
+}
+
+.less-panel {
+  padding: 14px;
+  background-color: @accent;
+
+  .less-title {
+    font-size: 17px;
+    color: lighten(@accent, 40%);
+  }
+}
+
+.less-badge {
+  .pill();
+  border-color: @accent;
+}

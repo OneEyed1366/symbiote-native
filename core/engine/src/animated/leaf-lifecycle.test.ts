@@ -67,17 +67,28 @@ describe('AnimatedProps reconcile against a stable-identity props object (Positi
     const scroll = new AnimatedValue(0);
 
     // The pre-measurement interpolation a sticky header starts with.
-    const firstNode = scroll.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+    const firstNode = scroll.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
     // ONE object for the whole test — Svelte's rest-props proxy.
-    const rest: Record<string, unknown> = { style: { transform: [{ translateY: firstNode }] } };
+    const rest: Record<string, unknown> = {
+      style: { transform: [{ translateY: firstNode }] },
+    };
 
     lifecycle.reconcile(rest, null, true);
-    expect(firstNode.__getChildren().length, 'first node wired into the graph').toBeGreaterThan(0);
+    expect(
+      firstNode.__getChildren().length,
+      'first node wired into the graph',
+    ).toBeGreaterThan(0);
 
     // 'rebuild-interpolation' after measurement: a brand-new node, carried by a fresh style object
     // (sticky-header keeps `animatedStyle` in its own derived precisely so this identity changes),
     // while `rest` itself stays the very same reference.
-    const secondNode = scroll.interpolate({ inputRange: [0, 240], outputRange: [0, 240] });
+    const secondNode = scroll.interpolate({
+      inputRange: [0, 240],
+      outputRange: [0, 240],
+    });
     rest.style = { transform: [{ translateY: secondNode }] };
     lifecycle.reconcile(rest, null, true);
 
@@ -97,8 +108,13 @@ describe('AnimatedProps reconcile against a stable-identity props object (Positi
   it('does not re-wire on genuinely unchanged calls', () => {
     const lifecycle = createAnimatedLeafLifecycle('test');
     const scroll = new AnimatedValue(0);
-    const node = scroll.interpolate({ inputRange: [0, 240], outputRange: [0, 240] });
-    const rest: Record<string, unknown> = { style: { transform: [{ translateY: node }] } };
+    const node = scroll.interpolate({
+      inputRange: [0, 240],
+      outputRange: [0, 240],
+    });
+    const rest: Record<string, unknown> = {
+      style: { transform: [{ translateY: node }] },
+    };
 
     lifecycle.reconcile(rest, null, true);
     const attachedFirst = node.__getChildren()[0];
@@ -108,10 +124,14 @@ describe('AnimatedProps reconcile against a stable-identity props object (Positi
     lifecycle.reconcile(rest, null, true);
     lifecycle.reconcile(rest, null, true);
 
-    expect(node.__getChildren().length, 'no leaf accumulation on repeat calls').toBe(1);
-    expect(node.__getChildren()[0], 'the SAME leaf instance stays attached — no rebuild').toBe(
-      attachedFirst,
-    );
+    expect(
+      node.__getChildren().length,
+      'no leaf accumulation on repeat calls',
+    ).toBe(1);
+    expect(
+      node.__getChildren()[0],
+      'the SAME leaf instance stays attached — no rebuild',
+    ).toBe(attachedFirst);
 
     lifecycle.teardown();
   });
@@ -123,8 +143,13 @@ describe('AnimatedProps reconcile against a stable-identity props object (Positi
   it('rebuilds when the host node identity changes, even with unchanged rest content', () => {
     const lifecycle = createAnimatedLeafLifecycle('test');
     const scroll = new AnimatedValue(0);
-    const styleNode = scroll.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-    const rest: Record<string, unknown> = { style: { transform: [{ translateY: styleNode }] } };
+    const styleNode = scroll.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
+    const rest: Record<string, unknown> = {
+      style: { transform: [{ translateY: styleNode }] },
+    };
     const hostA = createElement('RCTView');
     const hostB = createElement('RCTView');
 
@@ -148,8 +173,13 @@ describe('AnimatedProps reconcile against a stable-identity props object (Positi
   it('rebuilds when wantsNative flips, even with unchanged rest and node', () => {
     const lifecycle = createAnimatedLeafLifecycle('test');
     const scroll = new AnimatedValue(0);
-    const styleNode = scroll.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-    const rest: Record<string, unknown> = { style: { transform: [{ translateY: styleNode }] } };
+    const styleNode = scroll.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
+    const rest: Record<string, unknown> = {
+      style: { transform: [{ translateY: styleNode }] },
+    };
     const host = createElement('RCTView');
 
     lifecycle.reconcile(rest, host, true);
@@ -174,8 +204,13 @@ describe('AnimatedProps reconcile against a stable-identity props object (Positi
   it('never skips while still JS-driven, even on byte-identical repeat calls', () => {
     const lifecycle = createAnimatedLeafLifecycle('test');
     const scroll = new AnimatedValue(0);
-    const styleNode = scroll.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-    const props: Record<string, unknown> = { style: { transform: [{ translateY: styleNode }] } };
+    const styleNode = scroll.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
+    const props: Record<string, unknown> = {
+      style: { transform: [{ translateY: styleNode }] },
+    };
 
     lifecycle.reconcile(props, null, false);
     const attachedFirst = styleNode.__getChildren()[0];
@@ -196,14 +231,22 @@ describe('AnimatedProps reconcile against a stable-identity props object (Positi
   it('teardown detaches the attached leaf from the graph', () => {
     const lifecycle = createAnimatedLeafLifecycle('test');
     const scroll = new AnimatedValue(0);
-    const styleNode = scroll.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-    const rest: Record<string, unknown> = { style: { transform: [{ translateY: styleNode }] } };
+    const styleNode = scroll.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
+    const rest: Record<string, unknown> = {
+      style: { transform: [{ translateY: styleNode }] },
+    };
 
     lifecycle.reconcile(rest, null, true);
     expect(styleNode.__getChildren().length).toBeGreaterThan(0);
 
     lifecycle.teardown();
 
-    expect(styleNode.__getChildren().length, 'teardown removes the leaf as a child').toBe(0);
+    expect(
+      styleNode.__getChildren().length,
+      'teardown removes the leaf as a child',
+    ).toBe(0);
   });
 });

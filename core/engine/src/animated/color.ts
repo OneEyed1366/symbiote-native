@@ -7,7 +7,10 @@
 
 import { AnimatedWithChildren, flushValue } from './graph';
 import { AnimatedValue } from './value';
-import type { INativeNodeConfig, IPlatformConfig } from './native/native-animated';
+import type {
+  INativeNodeConfig,
+  IPlatformConfig,
+} from './native/native-animated';
 
 import { DEFAULT_COLOR, normalizeColor, type IRgbaValue } from './rgba';
 
@@ -25,7 +28,9 @@ interface IRgbaInput {
 export type IColorInput = IRgbaInput | IRgbaValue | string | number;
 
 function isRgbaInput(value: IColorInput): value is IRgbaInput {
-  return typeof value === 'object' && value !== null && 'r' in value && 'g' in value;
+  return (
+    typeof value === 'object' && value !== null && 'r' in value && 'g' in value
+  );
 }
 
 function toChannel(value: IChannel): AnimatedValue {
@@ -77,7 +82,10 @@ export class AnimatedColor extends AnimatedWithChildren {
   // pattern). flushValue dedupes by leaf identity, so a single flush rebuilds
   // every bound prop once even though four channels changed.
   setValue(value: IRgbaValue | string | number): void {
-    const rgba = typeof value === 'object' ? value : (normalizeColor(value) ?? DEFAULT_COLOR);
+    const rgba =
+      typeof value === 'object'
+        ? value
+        : (normalizeColor(value) ?? DEFAULT_COLOR);
     this.withSuspendedCallbacks(() => {
       this.r.setValue(rgba.r);
       this.g.setValue(rgba.g);

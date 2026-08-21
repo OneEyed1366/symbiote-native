@@ -1,0 +1,29 @@
+@use 'sass:color';
+
+// SCSS. No .scss/.less/.styl file exists in the real corpus, so the preprocessor branch of
+// compileCssFile had no golden coverage at all.
+$accent: #ff3e00;
+
+@mixin pill($radius) {
+  border-radius: $radius;
+  border-width: 1px;
+}
+
+.panel {
+  padding: 16px;
+  background-color: color.adjust($accent, $lightness: -20%);
+
+  .nested-title {
+    font-size: 20px;
+    color: $accent;
+  }
+
+  &.compact {
+    padding: 8px;
+  }
+}
+
+.badge {
+  @include pill(999px);
+  border-color: $accent;
+}

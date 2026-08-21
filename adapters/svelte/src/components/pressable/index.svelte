@@ -124,14 +124,21 @@
   // other Svelte component that hand-authors a raw host tag (RefreshControl.svelte, modal/
   // index.svelte).
   const resolved = $derived(
-    resolveAccessibilityProps({ ...rest, accessibilityState: resolvedAccessibilityState }),
+    resolveAccessibilityProps({
+      ...rest,
+      accessibilityState: resolvedAccessibilityState,
+    }),
   );
 
-  const resolvedStyle = $derived(typeof style === 'function' ? style(state) : style);
+  const resolvedStyle = $derived(
+    typeof style === 'function' ? style(state) : style,
+  );
 
   // android_ripple rides a dedicated inner View; on iOS rippleProps() returns undefined, so the
   // child renders unwrapped, no extra node — mirrors React's Pressable + touchable-native-feedback.
-  const ripple = $derived(android_ripple !== undefined ? rippleProps(android_ripple) : undefined);
+  const ripple = $derived(
+    android_ripple !== undefined ? rippleProps(android_ripple) : undefined,
+  );
 
   const bag = $derived({
     ...resolved,

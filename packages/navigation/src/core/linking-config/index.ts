@@ -49,7 +49,9 @@ function normalizeSegment(segment: string): string {
 }
 
 function joinPath(parent: string, child: string): string {
-  const parts = [normalizeSegment(parent), normalizeSegment(child)].filter(part => part.length > 0);
+  const parts = [normalizeSegment(parent), normalizeSegment(child)].filter(
+    part => part.length > 0,
+  );
   return parts.join('/');
 }
 
@@ -68,14 +70,17 @@ function flattenScreens(
       continue;
     }
 
-    const nextParent = entry.path !== undefined ? joinPath(parentPath, entry.path) : parentPath;
+    const nextParent =
+      entry.path !== undefined ? joinPath(parentPath, entry.path) : parentPath;
 
     if (entry.screens !== undefined) {
       flattenScreens(entry.screens, nextParent, out);
     } else if (entry.path !== undefined) {
       out.push({ name, pattern: nextParent });
     } else {
-      dlog(`linking-config: screen "${name}" has neither a path nor nested screens, skipping`);
+      dlog(
+        `linking-config: screen "${name}" has neither a path nor nested screens, skipping`,
+      );
     }
   }
   return out;
@@ -93,12 +98,16 @@ function segmentCount(pattern: string): number {
 // More static segments should win over a param that would also match (e.g. a literal
 // '/user/me' pattern over '/user/:id'), mirroring how react-navigation prefers exact matches.
 function bySpecificity(a: IFlatRoutePattern, b: IFlatRoutePattern): number {
-  const dynamicDiff = dynamicSegmentCount(a.pattern) - dynamicSegmentCount(b.pattern);
+  const dynamicDiff =
+    dynamicSegmentCount(a.pattern) - dynamicSegmentCount(b.pattern);
   if (dynamicDiff !== 0) return dynamicDiff;
   return segmentCount(b.pattern) - segmentCount(a.pattern);
 }
 
-function matchPattern(pattern: string, pathname: string): Record<string, string> | null {
+function matchPattern(
+  pattern: string,
+  pathname: string,
+): Record<string, string> | null {
   const patternSegments = pattern.length === 0 ? [] : pattern.split('/');
   const pathSegments = pathname.length === 0 ? [] : pathname.split('/');
   if (patternSegments.length !== pathSegments.length) return null;
@@ -127,7 +136,9 @@ function stripQueryAndHash(url: string): string {
 // neither applies - an unrecognized scheme/host, not "no route matched".
 function extractPathname(config: ILinkingConfig, url: string): string | null {
   const withoutQuery = stripQueryAndHash(url);
-  const sortedPrefixes = [...config.prefixes].sort((a, b) => b.length - a.length);
+  const sortedPrefixes = [...config.prefixes].sort(
+    (a, b) => b.length - a.length,
+  );
   for (const prefix of sortedPrefixes) {
     if (withoutQuery.startsWith(prefix)) {
       return normalizeSegment(withoutQuery.slice(prefix.length));
@@ -137,14 +148,19 @@ function extractPathname(config: ILinkingConfig, url: string): string | null {
   return null;
 }
 
-export function resolveRouteFromUrl(config: ILinkingConfig, url: string): IRoute<unknown> | null {
+export function resolveRouteFromUrl(
+  config: ILinkingConfig,
+  url: string,
+): IRoute<unknown> | null {
   const pathname = extractPathname(config, url);
   if (pathname === null) {
     dlog(`linking-config: url "${url}" matched no configured prefix`);
     return null;
   }
 
-  const candidates = flattenScreens(config.config.screens, '', []).sort(bySpecificity);
+  const candidates = flattenScreens(config.config.screens, '', []).sort(
+    bySpecificity,
+  );
   for (const candidate of candidates) {
     const params = matchPattern(candidate.pattern, pathname);
     if (params !== null) {
@@ -159,7 +175,9 @@ export function resolveRouteFromUrl(config: ILinkingConfig, url: string): IRoute
     }
   }
 
-  dlog(`linking-config: url "${url}" (path "${pathname}") matched no configured screen`);
+  dlog(
+    `linking-config: url "${url}" (path "${pathname}") matched no configured screen`,
+  );
   return null;
 }
 
@@ -182,7 +200,10 @@ function fillPattern(pattern: string, params: unknown): string | null {
   return segments.join('/');
 }
 
-export function resolveUrlFromRoute(config: ILinkingConfig, route: IRoute<unknown>): string | null {
+export function resolveUrlFromRoute(
+  config: ILinkingConfig,
+  route: IRoute<unknown>,
+): string | null {
   const candidate = flattenScreens(config.config.screens, '', []).find(
     entry => entry.name === route.name,
   );

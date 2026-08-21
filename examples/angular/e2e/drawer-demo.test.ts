@@ -31,7 +31,8 @@ function sleep(ms: number): Promise<void> {
 // canary-native-modules.test.ts).
 async function deviceTap(id: string): Promise<void> {
   const attrs = await element(by.id(id)).getAttributes();
-  if (!('frame' in attrs)) throw new Error(`${id}: getAttributes() returned no frame`);
+  if (!('frame' in attrs))
+    throw new Error(`${id}: getAttributes() returned no frame`);
   const { x, y, width, height } = attrs.frame;
   await device.tap({ x: x + width / 2, y: y + height / 2 });
 }
@@ -41,9 +42,13 @@ async function deviceTap(id: string): Promise<void> {
 // the animateProgressTo transition (JS-driven, per-frame Fabric commits — see the comment below)
 // done once it has moved away from its starting position and then stopped changing for two
 // consecutive reads. Direction-agnostic, so the same helper covers both opening and closing.
-async function waitForTransformSettle(id: string, timeoutMs: number): Promise<void> {
+async function waitForTransformSettle(
+  id: string,
+  timeoutMs: number,
+): Promise<void> {
   const startAttrs = await element(by.id(id)).getAttributes();
-  if (!('frame' in startAttrs)) throw new Error(`${id}: getAttributes() returned no frame`);
+  if (!('frame' in startAttrs))
+    throw new Error(`${id}: getAttributes() returned no frame`);
   const startX = startAttrs.frame.x;
   const deadline = Date.now() + timeoutMs;
   let moved = false;
@@ -118,7 +123,8 @@ describe('Angular Drawer navigator (DrawerDemo)', () => {
     // drawer-panel's frame.x is unchanged (no transition got triggered), not the broken
     // toBeVisible() check.
     const beforeAttrs = await element(by.id('drawer-panel')).getAttributes();
-    if (!('frame' in beforeAttrs)) throw new Error('drawer-panel: getAttributes() returned no frame');
+    if (!('frame' in beforeAttrs))
+      throw new Error('drawer-panel: getAttributes() returned no frame');
     const beforeX = beforeAttrs.frame.x;
 
     await deviceTap('drawer-close-from-settings');
@@ -128,7 +134,8 @@ describe('Angular Drawer navigator (DrawerDemo)', () => {
     await sleep(500);
 
     const afterAttrs = await element(by.id('drawer-panel')).getAttributes();
-    if (!('frame' in afterAttrs)) throw new Error('drawer-panel: getAttributes() returned no frame');
+    if (!('frame' in afterAttrs))
+      throw new Error('drawer-panel: getAttributes() returned no frame');
     if (Math.abs(afterAttrs.frame.x - beforeX) > 2) {
       throw new Error(
         `drawer-panel moved (${beforeX} -> ${afterAttrs.frame.x}) - closeDrawer() should be a no-op here`,

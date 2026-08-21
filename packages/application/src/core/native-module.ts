@@ -1,5 +1,8 @@
 import { requireNativeModule } from 'expo-modules-core';
-import type { ApplicationReleaseType, PushNotificationServiceEnvironment } from './types';
+import type {
+  ApplicationReleaseType,
+  PushNotificationServiceEnvironment,
+} from './types';
 
 const EXPO_APPLICATION_MODULE_NAME = 'ExpoApplication';
 

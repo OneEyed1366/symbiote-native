@@ -15,7 +15,9 @@ export function resolveDisabledAccessibilityState(
   accessibilityState: IAccessibilityStateValue | undefined,
   disabled: boolean | undefined,
 ): IAccessibilityStateValue | undefined {
-  return disabled !== undefined ? { ...accessibilityState, disabled } : accessibilityState;
+  return disabled !== undefined
+    ? { ...accessibilityState, disabled }
+    : accessibilityState;
 }
 
 // The 3 agnostic gating predicates behind the listener bag below. Angular has no bag to spread -
@@ -63,7 +65,8 @@ export function buildPressableListeners(
     onResponderMove: handlers.handleResponderMove,
   };
   if (options.cancelable !== undefined) {
-    listeners.onResponderTerminationRequest = () => isTerminationAllowed(options.cancelable);
+    listeners.onResponderTerminationRequest = () =>
+      isTerminationAllowed(options.cancelable);
   }
   return listeners;
 }
@@ -73,6 +76,8 @@ export function buildPressableListeners(
 // callback on device is explained, not silent (RN onHoverIn/onHoverOut).
 export function noteHoverNoop(onHoverIn: unknown, onHoverOut: unknown): void {
   if (onHoverIn !== undefined || onHoverOut !== undefined) {
-    dlog('Pressable hover is a no-op on this host (no pointer-enter/leave event)');
+    dlog(
+      'Pressable hover is a no-op on this host (no pointer-enter/leave event)',
+    );
   }
 }

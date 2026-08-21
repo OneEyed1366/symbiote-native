@@ -16,7 +16,8 @@ import { ScrollView } from './index.android';
 
 const ROOT_TAG = 919;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function expectCellsProjected(): void {
   expect(fabric.find(node => node.props.testID === 'a')).toBeDefined();

@@ -49,7 +49,10 @@ async function elementShot(id: string, name: string): Promise<Buffer> {
   return readFileSync(path);
 }
 
-async function assertTapRepaints(triggerId: string, targetId: string): Promise<void> {
+async function assertTapRepaints(
+  triggerId: string,
+  targetId: string,
+): Promise<void> {
   const before = await elementShot(targetId, `${targetId}-before-class`);
   await element(by.id(triggerId)).tap();
   await sleep(400);
@@ -95,10 +98,14 @@ describe('Angular symbiote canary controls', () => {
     // gap as toHaveSliderPosition below: settle manually, then assert directly via expect().
     await element(by.id('angular-spinner-switch')).tap();
     await sleep(300);
-    await expect(element(by.id('angular-spinner-switch'))).toHaveToggleValue(false);
+    await expect(element(by.id('angular-spinner-switch'))).toHaveToggleValue(
+      false,
+    );
     await element(by.id('angular-spinner-switch')).tap();
     await sleep(300);
-    await expect(element(by.id('angular-spinner-switch'))).toHaveToggleValue(true);
+    await expect(element(by.id('angular-spinner-switch'))).toHaveToggleValue(
+      true,
+    );
   });
 
   it('adjusts the Angular Slider component and its native position round-trips', async () => {
@@ -183,7 +190,10 @@ describe('Angular symbiote canary controls', () => {
     await bringIntoView('angular-compound-badge-toggle');
     await expect(element(by.id('angular-compound-badge-plain'))).toBeVisible();
     await expect(element(by.id('angular-compound-badge-loud'))).toBeVisible();
-    await assertTapRepaints('angular-compound-badge-toggle', 'angular-compound-badge-dynamic');
+    await assertTapRepaints(
+      'angular-compound-badge-toggle',
+      'angular-compound-badge-dynamic',
+    );
     // Restore, so a later test does not inherit this screen's toggled state.
     await element(by.id('angular-compound-badge-toggle')).tap();
   });

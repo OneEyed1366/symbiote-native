@@ -34,7 +34,10 @@ import { mount, unmount } from '../../render';
 // fabric.find() walks the CREATION log, which never reflects a later clone's props
 // (svelte-adapter-dom-shim skill §15's documented gotcha) — a live-value assertion must
 // instead walk the currently COMMITTED tree.
-function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeNode | undefined {
+function findLive(
+  node: IFakeNode,
+  predicate: (n: IFakeNode) => boolean,
+): IFakeNode | undefined {
   if (predicate(node)) return node;
   for (const child of node.children) {
     const found = findLive(child, predicate);
@@ -43,17 +46,22 @@ function findLive(node: IFakeNode, predicate: (n: IFakeNode) => boolean): IFakeN
   return undefined;
 }
 
-if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+if (globalThis.window === undefined)
+  Object.assign(globalThis, { window: globalThis });
 if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
 const ROOT_TAG = 91_401;
 const OUT = join(__dirname, '.smoke-compiled-activity-indicator.mjs');
-const PARENT_OUT = join(__dirname, '.smoke-compiled-activity-indicator-parent.mjs');
+const PARENT_OUT = join(
+  __dirname,
+  '.smoke-compiled-activity-indicator-parent.mjs',
+);
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -65,9 +73,17 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-const COMPILE_OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' } as const;
+const COMPILE_OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+} as const;
 
-function compileToFile(source: string, filename: string, outPath: string): void {
+function compileToFile(
+  source: string,
+  filename: string,
+  outPath: string,
+): void {
   const result = compile(source, { ...COMPILE_OPTIONS, filename });
   writeFileSync(outPath, result.js.code);
 }
@@ -116,7 +132,10 @@ describe('ActivityIndicator (real compiled index.svelte)', () => {
       await tick();
       await tick();
 
-      const spinner = findLive(fabric.appRoot(), node => node.viewName === 'ActivityIndicatorView');
+      const spinner = findLive(
+        fabric.appRoot(),
+        node => node.viewName === 'ActivityIndicatorView',
+      );
       expect(spinner).toBeDefined();
       expect(spinner?.props.animating).toBe(true);
       expect(spinner?.props.color).toBe('#123456');
@@ -140,7 +159,10 @@ describe('ActivityIndicator (real compiled index.svelte)', () => {
       await tick();
 
       expect(setAnimating, 'setter captured after mount').not.toBeNull();
-      const before = findLive(fabric.appRoot(), node => node.viewName === 'ActivityIndicatorView');
+      const before = findLive(
+        fabric.appRoot(),
+        node => node.viewName === 'ActivityIndicatorView',
+      );
       expect(before).toBeDefined();
       const createdBefore = fabric.counts.createNode;
 
@@ -151,7 +173,10 @@ describe('ActivityIndicator (real compiled index.svelte)', () => {
       // The real proof of "reused, not recreated": no NEW createNode call happened at all —
       // a rebuild would have shown counts.createNode grow by 2 (wrapper + spinner).
       expect(fabric.counts.createNode).toBe(createdBefore);
-      const after = findLive(fabric.appRoot(), node => node.viewName === 'ActivityIndicatorView');
+      const after = findLive(
+        fabric.appRoot(),
+        node => node.viewName === 'ActivityIndicatorView',
+      );
       expect(after?.props.animating).toBe(false);
     });
   });

@@ -5,12 +5,18 @@
 
 import { computed } from '@vue/runtime-core';
 import type { ComputedRef } from '@vue/runtime-core';
-import type { INavigationEventListener, INavigationEventName } from '../../core';
+import type {
+  INavigationEventListener,
+  INavigationEventName,
+} from '../../core';
 import { requireNavigationScope } from '../navigation-context';
 import type { IAnyNavigatorHandle } from '../navigation-context';
 
 export type INavigationHandle = IAnyNavigatorHandle & {
-  addListener: (event: INavigationEventName, listener: INavigationEventListener) => () => void;
+  addListener: (
+    event: INavigationEventName,
+    listener: INavigationEventListener,
+  ) => () => void;
   // Walks exactly ONE hop up the scope's `parent` chain to the enclosing navigator's handle -
   // e.g. a Tab screen nested inside a Stack screen calling getParent() to push a new Stack route.
   // Callers narrow the union themselves ('push' in parent, etc.). Deliberately NOT
@@ -25,6 +31,10 @@ export function useNavigation(): ComputedRef<INavigationHandle> {
   const scope = requireNavigationScope('useNavigation');
   return computed(() => {
     const { navigation, emitter, parent } = scope.value;
-    return { ...navigation, addListener: emitter.addListener, getParent: () => parent?.navigation };
+    return {
+      ...navigation,
+      addListener: emitter.addListener,
+      getParent: () => parent?.navigation,
+    };
   });
 }

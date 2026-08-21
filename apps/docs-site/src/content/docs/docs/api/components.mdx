@@ -16,15 +16,16 @@ pnpm add @symbiote-native/components
 ```
 
 Nearly every consumer gets this transitively: `@symbiote-native/react`,
-`@symbiote-native/vue`, and `@symbiote-native/angular` each depend on it and
-re-export the parts an app touches. Install it directly only when building a new
-adapter or a native-view wrapper. `@symbiote-native/engine` and `react-native`
-(>=0.86) are peer dependencies and stay top-level dependencies of the app.
+`@symbiote-native/vue`, `@symbiote-native/angular`, `@symbiote-native/svelte`,
+and `@symbiote-native/solid` each depend on it and re-export the parts an app
+touches. Install it directly only when building a new adapter or a
+native-view wrapper. `@symbiote-native/engine` and `react-native` (>=0.86)
+are peer dependencies and stay top-level dependencies of the app.
 
 ## Status matrix
 
-Every component below ships on React, Vue, Angular, and Svelte. What differs is
-the framework-shaped surface:
+Every component below ships on React, Vue, Angular, Svelte, and Solid. What
+differs is the framework-shaped surface:
 
 - `View` — React uses `children`; Vue uses the default slot; Svelte takes a
   `children: Snippet` prop rendered with `{@render children?.()}` — closer to
@@ -32,16 +33,25 @@ the framework-shaped surface:
   Svelte's `View` forwards no `bind:this` escape hatch of its own, so
   imperative access goes through the `hostInstance()` rune over a raw
   `symbiote-view` host tag (or a component's own exported functions, e.g.
-  `TextInput`/`ScrollView`'s `focus`/`scrollTo`).
+  `TextInput`/`ScrollView`'s `focus`/`scrollTo`). Solid's `View` is real JSX
+  taking a `children: JSX.Element`, closest to React's shape; `ref` is a real
+  host-instance ref (Solid's compiler rewrites `ref={x}` into a callback prop,
+  which `applyHostRef` fills), no rune indirection needed.
 - `Text` — Text children differ by framework; press events follow callback vs
   emit shape. Svelte's `Text` takes the same object-bag props as `View`
-  (no `IResponderProps`, matching every other adapter's `ITextProps`).
+  (no `IResponderProps`, matching every other adapter's `ITextProps`). Solid's
+  `Text` is the same shape as React's: real JSX, plain `ITextProps` with no
+  `IResponderProps`.
 - `Image` — Source resolution and statics are shared. Svelte's `Image.svelte`
   re-derives the same prop-assembly logic `renderImage()` encapsulates
   (`buildImageBag`, mirroring the source/width-height/resizeMode/tintColor
   folds field-for-field) rather than calling the shared function directly —
   documented duplication, not a behavior difference; statics
   (`getSize`/`prefetch`/`queryCache`/…) attach from the sibling `index.ts`.
+  Solid's `Image` calls `renderImage()` directly through `descriptorToSolid`,
+  like React/Vue: no re-derivation. It is the one primitive written as plain
+  `.ts` rather than `.tsx`: an image is a leaf built entirely from values, so
+  it needs no live-subtree JSX (`.claude/rules/component-render-fn-boundary.md`).
 - `ScrollView` — Imperative handle, refresh, and sticky behavior need
   framework-specific examples. Svelte exposes `scrollTo`/`scrollToEnd`/
   `flashScrollIndicators`/`getScrollNode` as plain exported functions read off
@@ -52,27 +62,46 @@ the framework-shaped surface:
   component only an opaque `Snippet`, with no `Children.toArray`/`slots.default()`
   equivalent to pull "child at index N" out of it, so compose
   `ScrollViewStickyHeader` manually instead (it auto-wires to the parent's
-  scroll offset via Svelte context).
+  scroll offset via Svelte context). Solid has no such gap: `ref={scroller}`
+  on the component compiles to a callback prop that receives the imperative
+  handle, and sticky-header auto-wrap resolves the opaque `children` through
+  Solid's own `children()` helper into an indexable list, then wraps the
+  flagged entries, a coarser update than the plain path (any child change
+  re-runs the wrap), so it is built only when `stickyHeaderIndices` is set.
 - `Pressable` — React uses a render child; Vue uses a scoped slot; Svelte uses
   a named snippet prop, `{#snippet children({ pressed })}...{/snippet}`.
   Events are plain callback props (`onPress`, `onLongPress`, …) exactly like
-  React — Svelte never translates to an emit/Output shape.
+  React — Svelte never translates to an emit/Output shape. Solid's render-prop
+  child is `(state: Accessor<IPressState>) => JSX.Element`, an accessor, not
+  a snapshot value, called once, untracked, the same shape Solid core uses
+  for `<For>`. That divergence from React's `(state) => ReactNode` fixes a
+  real device bug: reading `pressed()` inside a tracked call rebuilt the whole
+  child subtree on every touch and lost the native responder grant mid-gesture
+  (`.claude/rules/solid-descriptor-bridge.md` §4). Events are plain callback
+  props, same names as React.
 - `TextInput` — `onValueChange` maps to `@value-change` on Vue and `(valueChange)`
   on Angular; Svelte keeps the RN name unchanged as a plain callback prop,
   `onValueChange={(text, event) => …}` — the same shape as React, no
   translation layer. `value` is also `$bindable()`, so `bind:value={x}` works
   as sugar on top (Vue's `v-model` equivalent). The controlled write handshake
   (event-count-gated `setTextAndSelection` command) is shared logic across all
-  four.
+  four. Solid's `onValueChange` is the same React-shaped `(text, event) => ...`
+  callback prop; there is no `bind:value`/`v-model` sugar, only the explicit
+  `value`/`onValueChange` pair. `ref` receives the imperative handle
+  (`focus`/`blur`/`clear`/`isFocused`/`setSelection`), matching React's
+  `forwardRef` contract, not the host node.
 - `Switch` — `onValueChange` maps to `@value-change` on Vue and `(valueChange)`
   on Angular; Svelte again keeps `onValueChange` as a plain callback prop,
   React-shaped, with `value` also `$bindable()` for `bind:value={x}`.
   Controlled snap-back (`dispatchViewCommand` when native reports a value the
-  parent rejects) is shared logic.
+  parent rejects) is shared logic. Solid's `onValueChange` is the same
+  React-shaped callback prop, with no `bind:value` sugar; the snap-back effect
+  is a `createEffect` over a signal holding the last native report.
 - `ActivityIndicator` — Mostly shared render-only props. Svelte calls
   `renderActivityIndicator()` directly and syncs its one child through the
   generic `descriptorToSvelte` bridge (`mountDescriptorChildren`) rather than
-  hand-authoring the spinner tag.
+  hand-authoring the spinner tag. Solid also calls `renderActivityIndicator()`
+  directly, through `descriptorToSolid`, the same shape as React/Vue.
 - Lists — Render item/slot shape differs; windowing math is shared. Svelte's
   cell renderer is a **required named snippet prop**, `item`:
   `{#snippet item({ item, index, separators })}...{/snippet}` — not a
@@ -84,6 +113,12 @@ the framework-shaped surface:
   `IFlatListProps`/`IVirtualizedSectionListProps` do not yet extend
   `IAccessibilityProps`/`IAriaProps` on Svelte, so `testID` and
   `accessibilityLabel` have no effect on a Svelte list today, unlike React.
+  Solid's `renderItem` is `(info: Accessor<{ item, index, separators }>) =>
+  JSX.Element`, an accessor-taking render prop, called once untracked, same
+  reasoning as `Pressable`'s child. `SectionList`/`VirtualizedSectionList` and
+  multi-column `FlatList` are implemented and execution-tested, and
+  `IVirtualizedListProps` extends `IAccessibilityProps`/`IAriaProps`, so
+  `testID`/`accessibilityLabel` work the same as on React: no honest gap here.
 - `Animated` — The value graph is shared; component wrapping differs by
   adapter (see the [Animations guide](/docs/learn/animations/)). Svelte has no
   generic `Animated.createAnimatedComponent(Component)` — a compiled Svelte
@@ -94,7 +129,14 @@ the framework-shaped surface:
   `Animated.SectionList` have no Svelte wrapper yet (follow-up, not silently
   dropped); the `Touchable*` family's press-fade is a self-contained
   `setTimeout`-driven tween reproducing `Animated.timing`'s curve, not a real
-  native-thread `useNativeDriver` animation.
+  native-thread `useNativeDriver` animation. Solid DOES have a generic
+  `Animated.createAnimatedComponent(Component)`: a Solid component is a
+  plain function, and `createComponent(Base, props)` wraps any of them the
+  same way `createElement`/`h()` do, so `Animated.View`/`.Text`/`.Image`/
+  `.ScrollView`/`.FlatList`/`.SectionList` are all one shared wrapper, full
+  parity with React. Solid's `Touchable*` press-fade shares the same
+  `setTimeout`-driven-tween shortfall as every other adapter (not a real
+  native-thread animation).
 - `Modal`, `KeyboardAvoidingView`, `SafeAreaView`, `RefreshControl`,
   `ImageBackground`, `InputAccessoryView`, `StatusBar`, `Button` — shared
   render/behavior logic, framework-shaped props and events same as above.
@@ -104,11 +146,24 @@ the framework-shaped surface:
   element-chain. `StatusBar` is the one runtime module with a real
   declarative half on every adapter: Svelte renders nothing and re-applies
   props via `$effect` (the Svelte twin of Vue's `watchEffect`-based version).
+  Solid's `Modal` is the same fixed-host-tag shape as Svelte's: real JSX
+  reading `renderModal()`'s output off the known `descriptor.props`/
+  `descriptor.children[0]` positions, wrapped in a `<Show>` for the
+  keep-alive gate. Solid's `StatusBar` renders `null` and re-applies props
+  from a `createEffect`, the Solid twin of Svelte's `$effect` version.
 - The `Touchable*` family (`TouchableOpacity`, `TouchableHighlight`,
   `TouchableWithoutFeedback`, `TouchableNativeFeedback`) — built on the same
   shared press state machine as `Pressable`. See `Animated`'s honest-gaps note
   above for the one Svelte-specific shortfall (the tween stand-in for a real
-  native-driven fade).
+  native-driven fade). Solid's port is the first written directly against
+  RN's own sources rather than against this repo's React adapter; an
+  audit found the React/Vue/Svelte/Angular ports diverge from RN in ten
+  places the other four have not migrated to yet, so `@symbiote-native/components`
+  carries both forms for now. One divergence Solid keeps deliberately:
+  `TouchableHighlight`'s underlay/dimmed-child styles both stay on the
+  container (RN clones the child to split them; Solid has no `cloneElement`,
+  and a permanent wrapper view would silently re-parent a child's own `flex`
+  with no way for a headless test to catch it).
 - `PanResponder` — an engine-level gesture-recognition module, not a
   component; shared across every adapter unchanged.
 
@@ -130,13 +185,13 @@ Framework-specific when the prop contains framework values:
 
 ## Event naming examples
 
-| Component   | React           | Vue             | Angular            | Svelte          | Payload          |
-| ----------- | --------------- | --------------- | -------------------- | --------------- | ---------------- |
-| `Pressable` | `onPress`       | `@press`        | `(press)`            | `onPress`       | `ISymbioteEvent` |
-| `Pressable` | `onLongPress`   | `@long-press`   | `(longPress)`        | `onLongPress`   | `ISymbioteEvent` |
-| `Switch`    | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `onValueChange` | `boolean`        |
-| `TextInput` | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `onValueChange` | `string`         |
-| `View`      | `onLayout`      | `@layout`       | `(layout)`         | `onLayout`      | `ISymbioteEvent` |
+| Component   | React           | Vue                               | Angular         | Svelte          | Solid           | Payload          |
+| ----------- | --------------- | --------------------------------- | --------------- | --------------- | --------------- | ---------------- |
+| `Pressable` | `onPress`       | `@press`                          | `(press)`       | `onPress`       | `onPress`       | `ISymbioteEvent` |
+| `Pressable` | `onLongPress`   | `@long-press`                     | `(longPress)`   | `onLongPress`   | `onLongPress`   | `ISymbioteEvent` |
+| `Switch`    | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `onValueChange` | `onValueChange` | `boolean`        |
+| `TextInput` | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `onValueChange` | `onValueChange` | `string`         |
+| `View`      | `onLayout`      | `@layout`                         | `(layout)`      | `onLayout`      | `onLayout`      | `ISymbioteEvent` |
 
 `TextInput`'s React/Vue callback fires as `(text, event)` — one value merged
 from what used to be two separate callbacks. Angular can't do that in one
@@ -145,7 +200,10 @@ event alongside text-only `(valueChange)`. Svelte's `onValueChange` fires the
 identical `(text, event)` shape React's does — the adapter is a flat
 object-bag adapter (every prop, handlers included, rides one object handed to
 the shim element's `p` setter), so there is no per-event translation layer to
-begin with: the callback prop name is RN's own name, unchanged.
+begin with: the callback prop name is RN's own name, unchanged. Solid's
+`onValueChange` fires the same `(text, event)` shape too, as an ordinary
+callback prop: Solid JSX props reach the component as plain getters, with no
+compiler-level event translation.
 
 Angular's names (`(press)`, `(longPress)`, `(valueChange)`, `(change)`,
 `(layout)`) are all real `@Output()` `EventEmitter`s, bound like
@@ -158,7 +216,8 @@ marker for native-driven scroll, and `@Output()` only binds a template
 listener expression, never an arbitrary value. Svelte has no `@Output()`
 equivalent at all — every event on every component, scroll-family included,
 is a plain callback prop, so this Angular-only exception has no Svelte
-counterpart to carve out.
+counterpart to carve out. Solid has no `@Output()` equivalent either, for the
+same reason.
 
 Svelte's own two-way-binding primitive, the nearest equivalent to Vue's
 `v-model`, is `$bindable()` (`let { value = $bindable() } = $props()`, wired
@@ -169,7 +228,10 @@ explicit `<TextInput value={x} onValueChange={setX} />` that Svelte shares
 with React. Supplying `onValueChange` on the same instance as `bind:value`
 takes over the echo — the component can't detect binding from the inside, so
 pass one or the other, not both, on one control. See [How to: two-way bind a
-value](/docs/howtos/two-way-binding/) for the full picture.
+value](/docs/howtos/two-way-binding/) for the full picture. Solid has no
+`bind:value`/`v-model` sugar of its own on these components: `value` and
+`onValueChange` are always explicit, the same pair React uses without the
+sugar.
 
 ## Framework event idioms side by side
 
@@ -211,6 +273,19 @@ value](/docs/howtos/two-way-binding/) for the full picture.
     <Pressable onPress={event => console.log(event)} />
     <Switch value={enabled} onValueChange={next => (enabled = next)} />
     ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    // Solid — callback props, same names as React; no emits, no @Output(), no bind: sugar
+    import { createSignal } from 'solid-js';
+    import { Pressable, Switch } from '@symbiote-native/solid';
+
+    const [enabled, setEnabled] = createSignal(false);
+
+    <Pressable onPress={event => console.log(event)} />
+    <Switch value={enabled()} onValueChange={setEnabled} />
+    ```
   </TabItem>
 </Tabs>
 
@@ -231,42 +306,50 @@ produces and reads the returned props/children off known positions
 (`descriptor-to-svelte.ts`) exists only to sync an already-fixed-shape
 `Descriptor`'s children onto a literal host tag without recreating nodes on
 every update — narrower in scope than `descriptorToReact`/`descriptorToVue`,
-not a like-for-like replacement.
+not a like-for-like replacement. Solid's `descriptorToSolid`
+(`descriptor-to-solid.ts`) IS a like-for-like bridge, closer to
+React's/Vue's than Svelte's: it builds a host node once from the descriptor's
+`type`, then re-props it on
+every recompute through a `spread` render effect. A component that takes
+live children (`View`, `Pressable`, `Modal`, ...) skips the bridge entirely and
+emits real JSX instead, since only Solid's own reconciler can reduce a live
+subtree, the same reason there is no `renderView()` in
+`@symbiote-native/components`.
 
-| Export | Signature | Description |
-| --- | --- | --- |
-| `el` | `el(type, props?, children?, key?): IDescriptor` | Build a host-element descriptor of any type; `type` is an open string, so a component can paint a raw Fabric view name as well as a `symbiote-*` primitive |
-| `txt` | `txt(props?, children?): IDescriptor` | Shorthand for a `symbiote-text` descriptor |
-| `IDescriptor` | `{ type, props, children, key? }` | The node every render function returns |
-| `IDescriptorType` | `string` | The host component to paint — kept open, since components register their own host element names with the engine |
-| `IDescriptorProps` | `Record<string, unknown>` | Open prop bag (style, events, accessibility, native props), forwarded onto the framework element verbatim |
-| `IDescriptorChild` | `IDescriptor \| string` | A nested descriptor or a raw text child |
+| Export             | Signature                                        | Description                                                                                                                                                |
+| ------------------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `el`               | `el(type, props?, children?, key?): IDescriptor` | Build a host-element descriptor of any type; `type` is an open string, so a component can paint a raw Fabric view name as well as a `symbiote-*` primitive |
+| `txt`              | `txt(props?, children?): IDescriptor`            | Shorthand for a `symbiote-text` descriptor                                                                                                                 |
+| `IDescriptor`      | `{ type, props, children, key? }`                | The node every render function returns                                                                                                                     |
+| `IDescriptorType`  | `string`                                         | The host component to paint — kept open, since components register their own host element names with the engine                                            |
+| `IDescriptorProps` | `Record<string, unknown>`                        | Open prop bag (style, events, accessibility, native props), forwarded onto the framework element verbatim                                                  |
+| `IDescriptorChild` | `IDescriptor \| string`                          | A nested descriptor or a raw text child                                                                                                                    |
 
 ### Native component names
 
-| Export | Signature | Description |
-| --- | --- | --- |
-| `descriptorFor` | `descriptorFor(type: string): IComponentDescriptor` | Resolve an intrinsic to its Fabric component name for the current platform. An unknown `symbiote-*` type throws (a typo in our own code); any other string passes through as a raw Fabric view name from a library's codegen component |
-| `COMPONENT_DESCRIPTORS` | `Readonly<Record<string, IComponentDescriptor>>` | The platform-selected intrinsic → Fabric name map. The tables are Metro-split (`.ios`/`.android` filename selects, no `Platform.OS` read) |
-| `buildDescriptors` | `buildDescriptors(names): Readonly<Record<string, IComponentDescriptor>>` | Assemble the descriptor map a platform name table exports, pairing each name with its platform-invariant `isText` flag |
-| `makeDescriptorFor` | `makeDescriptorFor(descriptors): (type: string) => IComponentDescriptor` | Bind the resolver above to one descriptor map; each platform file uses it to produce its own `descriptorFor` |
-| `ISymbioteIntrinsic` | union of `'symbiote-view'`, `'symbiote-text'`, `'symbiote-image'`, … | Every intrinsic an adapter may emit. A name table must cover exactly these keys, so a missing primitive is a compile error rather than a runtime gap |
-| `IComponentDescriptor` | `{ component: string; isText: boolean }` | The resolved Fabric name plus whether it lays text (drives the `RCTText`/`RCTVirtualText` nesting choice) |
+| Export                  | Signature                                                                 | Description                                                                                                                                                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `descriptorFor`         | `descriptorFor(type: string): IComponentDescriptor`                       | Resolve an intrinsic to its Fabric component name for the current platform. An unknown `symbiote-*` type throws (a typo in our own code); any other string passes through as a raw Fabric view name from a library's codegen component |
+| `COMPONENT_DESCRIPTORS` | `Readonly<Record<string, IComponentDescriptor>>`                          | The platform-selected intrinsic → Fabric name map. The tables are Metro-split (`.ios`/`.android` filename selects, no `Platform.OS` read)                                                                                              |
+| `buildDescriptors`      | `buildDescriptors(names): Readonly<Record<string, IComponentDescriptor>>` | Assemble the descriptor map a platform name table exports, pairing each name with its platform-invariant `isText` flag                                                                                                                 |
+| `makeDescriptorFor`     | `makeDescriptorFor(descriptors): (type: string) => IComponentDescriptor`  | Bind the resolver above to one descriptor map; each platform file uses it to produce its own `descriptorFor`                                                                                                                           |
+| `ISymbioteIntrinsic`    | union of `'symbiote-view'`, `'symbiote-text'`, `'symbiote-image'`, …      | Every intrinsic an adapter may emit. A name table must cover exactly these keys, so a missing primitive is a compile error rather than a runtime gap                                                                                   |
+| `IComponentDescriptor`  | `{ component: string; isText: boolean }`                                  | The resolved Fabric name plus whether it lays text (drives the `RCTText`/`RCTVirtualText` nesting choice)                                                                                                                              |
 
 ### Render functions
 
 Pure `viewProps → Descriptor`. Visual state enters only through arguments; no
 framework, no lifecycle, no events.
 
-| Function | Signature | Description |
-| --- | --- | --- |
-| `renderActivityIndicator` | `(view: IActivityIndicatorViewProps, platform: IActivityIndicatorPlatform) => IDescriptor` | Paint the spinner; `platform` carries the iOS/Android size-prop split |
-| `renderSwitch` | `(view: ISwitchViewProps, platform: ISwitchPlatform) => IDescriptor` | Paint the switch, mapping the track/thumb color props onto the platform's native names |
-| `renderImage` | `(view: IImageViewProps) => IDescriptor` | Resolve the source, fold the `width`/`height` aliases into style, paint `symbiote-image` |
-| `renderImageBackground` | `(view: IImageBackgroundViewProps) => IDescriptor` | Compose an absolute-fill image behind projected children |
-| `renderInputAccessoryView` | `(view: IInputAccessoryViewViewProps) => IDescriptor` | Assemble the `nativeID`/`backgroundColor` host element |
-| `renderModal` | `(view: IModalViewProps) => IDescriptor` | Paint the modal host, applying the transparent/backdrop overrides on top of the generic `style` prop |
-| `renderTextInput` | `(view: ITextInputViewProps) => IDescriptor` | Pick the single-line or multiline intrinsic and map the resolved native props |
+| Function                   | Signature                                                                                  | Description                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `renderActivityIndicator`  | `(view: IActivityIndicatorViewProps, platform: IActivityIndicatorPlatform) => IDescriptor` | Paint the spinner; `platform` carries the iOS/Android size-prop split                                |
+| `renderSwitch`             | `(view: ISwitchViewProps, platform: ISwitchPlatform) => IDescriptor`                       | Paint the switch, mapping the track/thumb color props onto the platform's native names               |
+| `renderImage`              | `(view: IImageViewProps) => IDescriptor`                                                   | Resolve the source, fold the `width`/`height` aliases into style, paint `symbiote-image`             |
+| `renderImageBackground`    | `(view: IImageBackgroundViewProps) => IDescriptor`                                         | Compose an absolute-fill image behind projected children                                             |
+| `renderInputAccessoryView` | `(view: IInputAccessoryViewViewProps) => IDescriptor`                                      | Assemble the `nativeID`/`backgroundColor` host element                                               |
+| `renderModal`              | `(view: IModalViewProps) => IDescriptor`                                                   | Paint the modal host, applying the transparent/backdrop overrides on top of the generic `style` prop |
+| `renderTextInput`          | `(view: ITextInputViewProps) => IDescriptor`                                               | Pick the single-line or multiline intrinsic and map the resolved native props                        |
 
 `ScrollView`, `Pressable`, the `Touchable*` family, `Button`, and the lists have
 no `render*` function: their cell content or children are the framework's own
@@ -276,70 +359,70 @@ elements, so the shared half is the state and math below, not a descriptor.
 
 Pure reducers and folds. The adapter supplies the lifecycle cell (React
 `useReducer`, Vue `ref`/`watch`, Angular signals, Svelte `$state`/`$effect`
-runes) and executes the effects.
+runes, Solid `createSignal`/`createEffect`) and executes the effects.
 
-| Export | Signature | Description |
-| --- | --- | --- |
-| `createInitialSwitchState` | `() => ISwitchState` | Initial `Switch` state — no native report seen yet |
-| `switchReducer` | `(state: ISwitchState, action: ISwitchAction) => ISwitchState` | Fold a native `change` report into the last-reported value; always returns a fresh object so the snap-back effect re-fires on every report |
-| `shouldSnapBack` | `(state: ISwitchState, fabricValue: boolean) => boolean` | Whether native reported a value the JS-held value rejects, so the switch must be commanded back |
-| `valueFromChange` | `(event: ISymbioteEvent) => boolean \| undefined` | Read the boolean out of a native `Switch` change payload |
-| `createInitialModalState` | `(isVisible: boolean) => IModalState` | Initial `Modal` state, seeded from the first `visible` prop |
-| `modalReducer` | `(state: IModalState, action: IModalAction) => IModalState` | Gate the iOS keep-alive frame across show/hide |
-| `shouldRenderModal` | `(isVisible: boolean, state: IModalState) => boolean` | Whether the modal host should be in the tree this render |
-| `createPressRuntime` | `() => IPressRuntime` | Mutable per-instance press bookkeeping (timers, origin, suppression flags) the handlers write through |
-| `createPressHandlers` | `(config: IPressMachineConfig, runtime: IPressRuntime, host: IPressHost) => IPressHandlers` | The whole press lifecycle — delay, long-press timer, drift test against the responder region, termination |
-| `buildPressableListeners` | `(handlers: IPressHandlers, options: { disabled?, cancelable? }) => Record<string, unknown>` | Turn those handlers into the responder listener bag a host element takes; returns `{}` when disabled |
-| `createTouchableFeedbackRuntime` | `() => ITouchableFeedbackRuntime` | Per-instance timing state for the `Touchable*` feedback animation |
-| `createTouchableFeedbackHandlers` | `(config, runtime, callbacks) => ITouchableFeedbackHandlers` | Press handlers for the `Touchable*` family; the adapter supplies the `Animated` animation through `callbacks` |
-| `computePressOutWait` | `(heldFor: number, minPressDuration: number, delayPressOut: number) => number` | The deactivation floor — how long to keep the pressed visual after release |
-| `resolveTextInputProps` | `(input: ITextInputFoldInput) => IFoldedTextInputProps` | Fold `inputMode`/`autoComplete`/`submitBehavior` and friends into the native prop set |
-| `foldText` | `(value?: string, defaultValue?: string) => string \| undefined` | Resolve the controlled `value` against `defaultValue` |
-| `textFromChange` | `(event: ISymbioteEvent) => string \| undefined` | Read the text out of a native `TextInput` change payload |
-| `eventCountFromChange` | `(event: ISymbioteEvent) => number \| undefined` | Read the native event count, the ordering token behind the controlled-write handshake |
-| `shouldCommandText` | `(lastNativeText: string \| undefined, value: string \| undefined) => value is string` | Whether JS must command text back onto the native input because the two have diverged |
-| `createInitialListState` | `<ItemT>() => IListState<ItemT>` | Initial `VirtualizedList` state — no offsets measured, empty committed window |
-| `reduceList` | `<ItemT>(state, action: IListAction<ItemT>, inputs: IListReducerInputs<ItemT>) => IListReduceResult<ItemT>` | The list orchestration reducer: window recompute → edge reached → viewability → initial scroll → `maintainVisibleContentPosition`, returned as state plus an effect list for the adapter to run |
-| `listEffectSignature` | `<ItemT>(state: IListState<ItemT>) => string` | Stable key over the state fields an effect depends on, so an adapter can skip re-running unchanged effects |
-| `createInitialStickyState` | `() => IStickyHeaderState` | Initial sticky-header state — unmeasured, untranslated |
-| `reduceSticky` | `(state, action: IStickyAction, inputs: IStickyReducerInputs) => IStickyReduceResult` | The per-header sticky machine: the zero-swallow gate, the debounce-delay pick, and the rebuild-on-input-change decision |
-| `stickyEffectSignature` | `(state: IStickyHeaderState) => string` | The same skip-unchanged key for the sticky interpolation effect |
+| Export                            | Signature                                                                                                   | Description                                                                                                                                                                                     |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createInitialSwitchState`        | `() => ISwitchState`                                                                                        | Initial `Switch` state — no native report seen yet                                                                                                                                              |
+| `switchReducer`                   | `(state: ISwitchState, action: ISwitchAction) => ISwitchState`                                              | Fold a native `change` report into the last-reported value; always returns a fresh object so the snap-back effect re-fires on every report                                                      |
+| `shouldSnapBack`                  | `(state: ISwitchState, fabricValue: boolean) => boolean`                                                    | Whether native reported a value the JS-held value rejects, so the switch must be commanded back                                                                                                 |
+| `valueFromChange`                 | `(event: ISymbioteEvent) => boolean \| undefined`                                                           | Read the boolean out of a native `Switch` change payload                                                                                                                                        |
+| `createInitialModalState`         | `(isVisible: boolean) => IModalState`                                                                       | Initial `Modal` state, seeded from the first `visible` prop                                                                                                                                     |
+| `modalReducer`                    | `(state: IModalState, action: IModalAction) => IModalState`                                                 | Gate the iOS keep-alive frame across show/hide                                                                                                                                                  |
+| `shouldRenderModal`               | `(isVisible: boolean, state: IModalState) => boolean`                                                       | Whether the modal host should be in the tree this render                                                                                                                                        |
+| `createPressRuntime`              | `() => IPressRuntime`                                                                                       | Mutable per-instance press bookkeeping (timers, origin, suppression flags) the handlers write through                                                                                           |
+| `createPressHandlers`             | `(config: IPressMachineConfig, runtime: IPressRuntime, host: IPressHost) => IPressHandlers`                 | The whole press lifecycle — delay, long-press timer, drift test against the responder region, termination                                                                                       |
+| `buildPressableListeners`         | `(handlers: IPressHandlers, options: { disabled?, cancelable? }) => Record<string, unknown>`                | Turn those handlers into the responder listener bag a host element takes; returns `{}` when disabled                                                                                            |
+| `createTouchableFeedbackRuntime`  | `() => ITouchableFeedbackRuntime`                                                                           | Per-instance timing state for the `Touchable*` feedback animation                                                                                                                               |
+| `createTouchableFeedbackHandlers` | `(config, runtime, callbacks) => ITouchableFeedbackHandlers`                                                | Press handlers for the `Touchable*` family; the adapter supplies the `Animated` animation through `callbacks`                                                                                   |
+| `computePressOutWait`             | `(heldFor: number, minPressDuration: number, delayPressOut: number) => number`                              | The deactivation floor — how long to keep the pressed visual after release                                                                                                                      |
+| `resolveTextInputProps`           | `(input: ITextInputFoldInput) => IFoldedTextInputProps`                                                     | Fold `inputMode`/`autoComplete`/`submitBehavior` and friends into the native prop set                                                                                                           |
+| `foldText`                        | `(value?: string, defaultValue?: string) => string \| undefined`                                            | Resolve the controlled `value` against `defaultValue`                                                                                                                                           |
+| `textFromChange`                  | `(event: ISymbioteEvent) => string \| undefined`                                                            | Read the text out of a native `TextInput` change payload                                                                                                                                        |
+| `eventCountFromChange`            | `(event: ISymbioteEvent) => number \| undefined`                                                            | Read the native event count, the ordering token behind the controlled-write handshake                                                                                                           |
+| `shouldCommandText`               | `(lastNativeText: string \| undefined, value: string \| undefined) => value is string`                      | Whether JS must command text back onto the native input because the two have diverged                                                                                                           |
+| `createInitialListState`          | `<ItemT>() => IListState<ItemT>`                                                                            | Initial `VirtualizedList` state — no offsets measured, empty committed window                                                                                                                   |
+| `reduceList`                      | `<ItemT>(state, action: IListAction<ItemT>, inputs: IListReducerInputs<ItemT>) => IListReduceResult<ItemT>` | The list orchestration reducer: window recompute → edge reached → viewability → initial scroll → `maintainVisibleContentPosition`, returned as state plus an effect list for the adapter to run |
+| `listEffectSignature`             | `<ItemT>(state: IListState<ItemT>) => string`                                                               | Stable key over the state fields an effect depends on, so an adapter can skip re-running unchanged effects                                                                                      |
+| `createInitialStickyState`        | `() => IStickyHeaderState`                                                                                  | Initial sticky-header state — unmeasured, untranslated                                                                                                                                          |
+| `reduceSticky`                    | `(state, action: IStickyAction, inputs: IStickyReducerInputs) => IStickyReduceResult`                       | The per-header sticky machine: the zero-swallow gate, the debounce-delay pick, and the rebuild-on-input-change decision                                                                         |
+| `stickyEffectSignature`           | `(state: IStickyHeaderState) => string`                                                                     | The same skip-unchanged key for the sticky interpolation effect                                                                                                                                 |
 
 ### ScrollView, lists, and layout helpers
 
 Platform-invariant math and plumbing with no state machine of their own.
 
-| Export | Signature | Description |
-| --- | --- | --- |
-| `resolveDecelerationRate` | `(rate: 'normal' \| 'fast' \| number) => number` | Map RN's named deceleration rates to the numeric native value |
-| `selectScrollIntrinsics` | `(isHorizontal: boolean, contentContainerStyle) => IScrollIntrinsics` | Pick the scroll host/content intrinsics — horizontal scroll is a separate native `ViewManager` on Android |
-| `resolveScrollForwarding` | `(inputs: IScrollForwardingInputs) => IScrollForwarding` | The scroll-forwarding decisions: which `onScroll` path to build (`IScrollForwardMode` — `'plain'`, `'sticky-native'`, `'sticky-js'`), the resolved `scrollEventThrottle`, whether `onLayout` must capture the viewport height, and whether content cells stay un-flattened for `maintainVisibleContentPosition`/snap on Android. It returns decisions, not built handlers — those must stay framework-owned for identity reasons |
-| `buildScrollViewHandle` | `(getNode: () => ISymbioteNode \| null) => IScrollViewHandle` | The imperative handle (`scrollTo`, `scrollToEnd`, `flashScrollIndicators`, …) over a lazily-read host node |
-| `splitLayoutProps` | `(style) => { outer, inner }` | RN's key partition: layout keys (`margin*`, `flex`, …) go to the outer box, visual keys (`background*`, `padding*`, `border*`, …) stay on the inner view, for cases like the Android `RefreshControl` wrap |
-| `forwardScrollEvent` | `(handler, args: readonly unknown[]) => void` | Forward a native scroll event to a user handler, dropping non-event arguments |
-| `isSymbioteEvent` | `(value: unknown) => boolean` | Runtime guard for a normalized engine event |
-| `attachStickyScroll` | `(node: ISymbioteNode, value: AnimatedValue) => () => void` | Attach a native-driven `onScroll` → `Animated.Value` binding; returns the detach function |
-| `computeStickyInterpolation` | `(params: IStickyInterpolationParams) => { inputRange, outputRange }` | The sticky header's interpolation ranges, including the inverted-list case |
-| `nextStickyHeaderY` | `(stickyHeaderIndices, indexOfIndex, headerLayoutYs) => number \| undefined` | The following sticky header's Y, which bounds how far the current one travels |
-| `buildOffsets` | `(count, measured, fixedLayout, averageLength) => …` | Cumulative cell offsets from measured cells, a fixed-layout function, or the running average |
-| `computeWindow` | `(count, offsets, lengths, scrollOffset, …) => …` | The render window for the current scroll position |
-| `buildListPlan` | `(params: IListPlanParams) => IListPlan` | The full cell plan for a pass — which cells render, plus the leading/trailing spacer extents |
-| `computeViewableSet` | `<ItemT>(params: IViewableSetParams<ItemT>) => { tokens, map }` | The currently viewable items, as tokens plus a key-indexed map |
-| `diffViewable` | `<ItemT>(previous, current, currentTokens) => { changed, hasChanged }` | Diff two viewable sets into the payload `onViewableItemsChanged` expects |
-| `resolveItemKey` | `<ItemT>(item, index, keyExtractor?) => string` | The cell key, falling back to the index when no `keyExtractor` is given |
-| `chunkIntoRows` | `<ItemT>(data: readonly ItemT[], columns: number) => IRow<ItemT>[]` | Group flat data into `numColumns` rows for `FlatList` |
-| `rowKeyExtractor` | `<ItemT>(row: IRow<ItemT>) => string` | Stable key for such a row |
-| `flattenSections` | `<ItemT>(sections, withSeparators) => { entries, headerIndices }` | Flatten `SectionList` sections into one entry list plus the sticky header indices |
-| `unwrapEntryItem` | `<ItemT>(entry?: ISectionEntry<ItemT>) => ItemT \| undefined` | Read the item out of a flattened entry, or `undefined` for a header/separator entry |
-| `sectionEntryKey` | `<ItemT>(entry, index, keyExtractor?) => string` | Key for a flattened section entry |
-| `scrollLocationToFlatIndex` | `(headerIndices, sectionIndex, itemIndex) => number` | Translate a `scrollToLocation` section/item pair into the flat index the windowing math uses |
-| `resolveKeyboardAvoidingLayout` | `(params: IResolveKeyboardAvoidingLayoutParams) => IKeyboardAvoidingLayout` | The resolved style/height for `KeyboardAvoidingView`'s current behavior |
-| `computeInset` | `(frame, keyboard, verticalOffset) => number` | The overlap between the measured frame and the keyboard frame |
-| `readKeyboardFrame` | `(payload: unknown) => IKeyboardFrame \| undefined` | Guard-read a native keyboard event payload |
-| `readLayoutFrame` | `(layout: unknown) => IMeasuredFrame \| undefined` | Guard-read an `onLayout` payload |
-| `buttonTextStyle` | `ITextStyle` | The base `Button` label style |
-| `resolveButtonTextStyle` | `(color?: string, disabled?: boolean) => ITextStyle` | Fold `color`/`disabled` into that base style |
-| `BUTTON_ACCESSIBILITY_ROLE` | `'button'` | The role every adapter's `Button` sets |
+| Export                          | Signature                                                                    | Description                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resolveDecelerationRate`       | `(rate: 'normal' \| 'fast' \| number) => number`                             | Map RN's named deceleration rates to the numeric native value                                                                                                                                                                                                                                                                                                                                                                    |
+| `selectScrollIntrinsics`        | `(isHorizontal: boolean, contentContainerStyle) => IScrollIntrinsics`        | Pick the scroll host/content intrinsics — horizontal scroll is a separate native `ViewManager` on Android                                                                                                                                                                                                                                                                                                                        |
+| `resolveScrollForwarding`       | `(inputs: IScrollForwardingInputs) => IScrollForwarding`                     | The scroll-forwarding decisions: which `onScroll` path to build (`IScrollForwardMode` — `'plain'`, `'sticky-native'`, `'sticky-js'`), the resolved `scrollEventThrottle`, whether `onLayout` must capture the viewport height, and whether content cells stay un-flattened for `maintainVisibleContentPosition`/snap on Android. It returns decisions, not built handlers — those must stay framework-owned for identity reasons |
+| `buildScrollViewHandle`         | `(getNode: () => ISymbioteNode \| null) => IScrollViewHandle`                | The imperative handle (`scrollTo`, `scrollToEnd`, `flashScrollIndicators`, …) over a lazily-read host node                                                                                                                                                                                                                                                                                                                       |
+| `splitLayoutProps`              | `(style) => { outer, inner }`                                                | RN's key partition: layout keys (`margin*`, `flex`, …) go to the outer box, visual keys (`background*`, `padding*`, `border*`, …) stay on the inner view, for cases like the Android `RefreshControl` wrap                                                                                                                                                                                                                       |
+| `forwardScrollEvent`            | `(handler, args: readonly unknown[]) => void`                                | Forward a native scroll event to a user handler, dropping non-event arguments                                                                                                                                                                                                                                                                                                                                                    |
+| `isSymbioteEvent`               | `(value: unknown) => boolean`                                                | Runtime guard for a normalized engine event                                                                                                                                                                                                                                                                                                                                                                                      |
+| `attachStickyScroll`            | `(node: ISymbioteNode, value: AnimatedValue) => () => void`                  | Attach a native-driven `onScroll` → `Animated.Value` binding; returns the detach function                                                                                                                                                                                                                                                                                                                                        |
+| `computeStickyInterpolation`    | `(params: IStickyInterpolationParams) => { inputRange, outputRange }`        | The sticky header's interpolation ranges, including the inverted-list case                                                                                                                                                                                                                                                                                                                                                       |
+| `nextStickyHeaderY`             | `(stickyHeaderIndices, indexOfIndex, headerLayoutYs) => number \| undefined` | The following sticky header's Y, which bounds how far the current one travels                                                                                                                                                                                                                                                                                                                                                    |
+| `buildOffsets`                  | `(count, measured, fixedLayout, averageLength) => …`                         | Cumulative cell offsets from measured cells, a fixed-layout function, or the running average                                                                                                                                                                                                                                                                                                                                     |
+| `computeWindow`                 | `(count, offsets, lengths, scrollOffset, …) => …`                            | The render window for the current scroll position                                                                                                                                                                                                                                                                                                                                                                                |
+| `buildListPlan`                 | `(params: IListPlanParams) => IListPlan`                                     | The full cell plan for a pass — which cells render, plus the leading/trailing spacer extents                                                                                                                                                                                                                                                                                                                                     |
+| `computeViewableSet`            | `<ItemT>(params: IViewableSetParams<ItemT>) => { tokens, map }`              | The currently viewable items, as tokens plus a key-indexed map                                                                                                                                                                                                                                                                                                                                                                   |
+| `diffViewable`                  | `<ItemT>(previous, current, currentTokens) => { changed, hasChanged }`       | Diff two viewable sets into the payload `onViewableItemsChanged` expects                                                                                                                                                                                                                                                                                                                                                         |
+| `resolveItemKey`                | `<ItemT>(item, index, keyExtractor?) => string`                              | The cell key, falling back to the index when no `keyExtractor` is given                                                                                                                                                                                                                                                                                                                                                          |
+| `chunkIntoRows`                 | `<ItemT>(data: readonly ItemT[], columns: number) => IRow<ItemT>[]`          | Group flat data into `numColumns` rows for `FlatList`                                                                                                                                                                                                                                                                                                                                                                            |
+| `rowKeyExtractor`               | `<ItemT>(row: IRow<ItemT>) => string`                                        | Stable key for such a row                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `flattenSections`               | `<ItemT>(sections, withSeparators) => { entries, headerIndices }`            | Flatten `SectionList` sections into one entry list plus the sticky header indices                                                                                                                                                                                                                                                                                                                                                |
+| `unwrapEntryItem`               | `<ItemT>(entry?: ISectionEntry<ItemT>) => ItemT \| undefined`                | Read the item out of a flattened entry, or `undefined` for a header/separator entry                                                                                                                                                                                                                                                                                                                                              |
+| `sectionEntryKey`               | `<ItemT>(entry, index, keyExtractor?) => string`                             | Key for a flattened section entry                                                                                                                                                                                                                                                                                                                                                                                                |
+| `scrollLocationToFlatIndex`     | `(headerIndices, sectionIndex, itemIndex) => number`                         | Translate a `scrollToLocation` section/item pair into the flat index the windowing math uses                                                                                                                                                                                                                                                                                                                                     |
+| `resolveKeyboardAvoidingLayout` | `(params: IResolveKeyboardAvoidingLayoutParams) => IKeyboardAvoidingLayout`  | The resolved style/height for `KeyboardAvoidingView`'s current behavior                                                                                                                                                                                                                                                                                                                                                          |
+| `computeInset`                  | `(frame, keyboard, verticalOffset) => number`                                | The overlap between the measured frame and the keyboard frame                                                                                                                                                                                                                                                                                                                                                                    |
+| `readKeyboardFrame`             | `(payload: unknown) => IKeyboardFrame \| undefined`                          | Guard-read a native keyboard event payload                                                                                                                                                                                                                                                                                                                                                                                       |
+| `readLayoutFrame`               | `(layout: unknown) => IMeasuredFrame \| undefined`                           | Guard-read an `onLayout` payload                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `buttonTextStyle`               | `ITextStyle`                                                                 | The base `Button` label style                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `resolveButtonTextStyle`        | `(color?: string, disabled?: boolean) => ITextStyle`                         | Fold `color`/`disabled` into that base style                                                                                                                                                                                                                                                                                                                                                                                     |
+| `BUTTON_ACCESSIBILITY_ROLE`     | `'button'`                                                                   | The role every adapter's `Button` sets                                                                                                                                                                                                                                                                                                                                                                                           |
 
 Constants with the same shared-math role are exported alongside them —
 `DEFAULT_DELAY_LONG_PRESS_MS`, `DEFAULT_PRESS_RECT_OFFSETS`,
@@ -349,23 +432,24 @@ Constants with the same shared-math role are exported alongside them —
 
 ### Accessibility
 
-| Export | Signature | Description |
-| --- | --- | --- |
-| `resolveAccessibilityProps` | `<T extends IAccessibilityProps & IAriaProps>(props: T) => T` | Fold the web aliases (`role`, `aria-*`) into the canonical `accessibility*` props. Returns `props` untouched when no alias is present, so every adapter folds identically |
-| `IAccessibilityProps` | type | The canonical `accessibility*` prop set |
-| `IAriaProps` | type | The `role`/`aria-*` aliases that fold into it |
-| `IAccessibilityRole`, `IRole` | type | The native role union and its web-alias twin |
-| `IAccessibilityStateValue`, `IAccessibilityValue`, `IAccessibilityActionInfo` | type | State, value, and custom-action payload shapes |
+| Export                                                                        | Signature                                                     | Description                                                                                                                                                               |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resolveAccessibilityProps`                                                   | `<T extends IAccessibilityProps & IAriaProps>(props: T) => T` | Fold the web aliases (`role`, `aria-*`) into the canonical `accessibility*` props. Returns `props` untouched when no alias is present, so every adapter folds identically |
+| `IAccessibilityProps`                                                         | type                                                          | The canonical `accessibility*` prop set                                                                                                                                   |
+| `IAriaProps`                                                                  | type                                                          | The `role`/`aria-*` aliases that fold into it                                                                                                                             |
+| `IAccessibilityRole`, `IRole`                                                 | type                                                          | The native role union and its web-alias twin                                                                                                                              |
+| `IAccessibilityStateValue`, `IAccessibilityValue`, `IAccessibilityActionInfo` | type                                                          | State, value, and custom-action payload shapes                                                                                                                            |
 
 ### Shared prop types
 
 `IResponderProps`, `IActivityIndicatorProps`, `ISwitchProps`, and `IButtonProps`
 are fully framework-agnostic at their core, so every adapter's own prop type
 layers only its own class-styling field on top of the shared base rather than
-redeclaring the whole shape — React adds `className?: string`, Vue and
-Svelte both add `class?:` (Svelte's is `ISvelteClassValue`, a wider type that
-additionally accepts a clsx-style object/array, resolved by the adapter
-itself before it reaches the engine). `IImageProps`, `ITextInputProps`,
+redeclaring the whole shape — React adds `className?: string`, Vue, Svelte
+and Solid all add `class?:` (Svelte's is `ISvelteClassValue`, a wider type
+that additionally accepts a clsx-style object/array, resolved by the adapter
+itself before it reaches the engine; Solid's is the plain `IClassNameValue`
+the engine's style registry resolves, matching Vue's). `IImageProps`, `ITextInputProps`,
 `ITextInputHandle`, `IScrollViewHandle`, `IVirtualizedListHandle`, and
 `IVirtualizedSectionListHandle` ship here too; a prop type carrying framework
 children, refs, or render callbacks stays per-adapter by design.

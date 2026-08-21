@@ -7,7 +7,13 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/vue';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/vue';
 import {
   ApplicationReleaseType,
   applicationId,
@@ -81,9 +87,15 @@ function handleGetIosReleaseType(): void {
 
 <template>
   <SafeAreaView class="screen">
-    <ScrollView testID="application-scroll" class="screen" content-container-style="scroll-content">
+    <ScrollView
+      testID="application-scroll"
+      class="screen"
+      content-container-style="scroll-content"
+    >
       <View :class="`line-tag line-tag-${lineInfo.line}`">
-        <Text class="line-tag-text">{{ `${lineInfo.code} · ${lineInfo.label}` }}</Text>
+        <Text class="line-tag-text">{{
+          `${lineInfo.code} · ${lineInfo.label}`
+        }}</Text>
       </View>
       <View class="hero-card">
         <View class="hero-badge" :style="{ backgroundColor: lineColor }">
@@ -92,8 +104,9 @@ function handleGetIosReleaseType(): void {
         <View class="hero-copy">
           <Text class="hero-title">Application</Text>
           <Text class="hero-body"
-            >@symbiote-native/application — app version/build/name/ID, install time, the Android
-            ID and install referrer on Android, the vendor ID and release type on iOS.</Text
+            >@symbiote-native/application — app version/build/name/ID, install
+            time, the Android ID and install referrer on Android, the vendor ID
+            and release type on iOS.</Text
           >
         </View>
       </View>
@@ -102,19 +115,27 @@ function handleGetIosReleaseType(): void {
         <Text class="application-card-title">Info</Text>
         <View class="application-row">
           <Text class="application-row-label">Name</Text>
-          <Text class="application-value-text">{{ applicationName ?? 'unknown' }}</Text>
+          <Text class="application-value-text">{{
+            applicationName ?? 'unknown'
+          }}</Text>
         </View>
         <View class="application-row">
           <Text class="application-row-label">ID</Text>
-          <Text class="application-value-text">{{ applicationId ?? 'unknown' }}</Text>
+          <Text class="application-value-text">{{
+            applicationId ?? 'unknown'
+          }}</Text>
         </View>
         <View class="application-row">
           <Text class="application-row-label">Version</Text>
-          <Text class="application-value-text">{{ nativeApplicationVersion ?? 'unknown' }}</Text>
+          <Text class="application-value-text">{{
+            nativeApplicationVersion ?? 'unknown'
+          }}</Text>
         </View>
         <View class="application-row">
           <Text class="application-row-label">Build</Text>
-          <Text class="application-value-text">{{ nativeBuildVersion ?? 'unknown' }}</Text>
+          <Text class="application-value-text">{{
+            nativeBuildVersion ?? 'unknown'
+          }}</Text>
         </View>
       </View>
 
@@ -130,7 +151,11 @@ function handleGetIosReleaseType(): void {
         </View>
         <View v-if="installationTimeResult !== null" class="application-row">
           <Text class="application-row-label">Installed</Text>
-          <Text testID="application-installation-time-value" class="application-value-text">{{ installationTimeResult }}</Text>
+          <Text
+            testID="application-installation-time-value"
+            class="application-value-text"
+            >{{ installationTimeResult }}</Text
+          >
         </View>
 
         <View v-if="Platform.OS === 'android'" class="button-row">
@@ -149,11 +174,19 @@ function handleGetIosReleaseType(): void {
         </View>
         <View v-if="androidIdResult !== null" class="application-row">
           <Text class="application-row-label">Android ID</Text>
-          <Text testID="application-android-id-value" class="application-value-text">{{ androidIdResult }}</Text>
+          <Text
+            testID="application-android-id-value"
+            class="application-value-text"
+            >{{ androidIdResult }}</Text
+          >
         </View>
         <View v-if="installReferrerResult !== null" class="application-row">
           <Text class="application-row-label">Install referrer</Text>
-          <Text testID="application-install-referrer-value" class="application-value-text">{{ installReferrerResult }}</Text>
+          <Text
+            testID="application-install-referrer-value"
+            class="application-value-text"
+            >{{ installReferrerResult }}</Text
+          >
         </View>
 
         <View v-if="Platform.OS === 'ios'" class="button-row">
@@ -172,11 +205,19 @@ function handleGetIosReleaseType(): void {
         </View>
         <View v-if="iosVendorIdResult !== null" class="application-row">
           <Text class="application-row-label">iOS vendor ID</Text>
-          <Text testID="application-ios-vendor-id-value" class="application-value-text">{{ iosVendorIdResult }}</Text>
+          <Text
+            testID="application-ios-vendor-id-value"
+            class="application-value-text"
+            >{{ iosVendorIdResult }}</Text
+          >
         </View>
         <View v-if="iosReleaseTypeResult !== null" class="application-row">
           <Text class="application-row-label">iOS release type</Text>
-          <Text testID="application-ios-release-type-value" class="application-value-text">{{ iosReleaseTypeResult }}</Text>
+          <Text
+            testID="application-ios-release-type-value"
+            class="application-value-text"
+            >{{ iosReleaseTypeResult }}</Text
+          >
         </View>
       </View>
     </ScrollView>

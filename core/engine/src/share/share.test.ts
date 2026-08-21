@@ -37,7 +37,10 @@ beforeEach(async () => {
       successCallback: (completed: boolean, activityType?: string) => void,
     ): void => {
       lastActionSheetOptions = options;
-      successCallback(completeNextShare, completeNextShare ? SHARED_ACTIVITY : undefined);
+      successCallback(
+        completeNextShare,
+        completeNextShare ? SHARED_ACTIVITY : undefined,
+      );
     },
   };
 
@@ -86,7 +89,9 @@ describe('content validation — shared across both platforms', () => {
   // assert the SPECIFIC message, not just "it rejected something".
   it('content with neither message nor url rejects with the exact validation message', async () => {
     // JSON.parse yields an untyped value so the deliberately-invalid shape needs no cast.
-    const invalidContent: IShareContent = JSON.parse('{"title":"only a title"}');
+    const invalidContent: IShareContent = JSON.parse(
+      '{"title":"only a title"}',
+    );
     await expect(iosShare.share(invalidContent)).rejects.toThrow(
       'At least one of URL or message is required',
     );
@@ -139,7 +144,9 @@ describe('Share (iOS build -> ActionSheetManager)', () => {
     vi.resetModules();
     const fresh = await import('./index.ios');
 
-    await expect(fresh.Share.share({ message: 'hi' })).rejects.toThrow('user cancelled');
+    await expect(fresh.Share.share({ message: 'hi' })).rejects.toThrow(
+      'user cancelled',
+    );
   });
 
   // why: a device without ActionSheetManager linked (unlikely on iOS, but the module is
@@ -160,7 +167,10 @@ describe('Share (iOS build -> ActionSheetManager)', () => {
   // invoke showShareActionSheetWithOptions with the options Share builds - proving the merged
   // INativeActionSheetManager type (imported from ../action-sheet-ios) didn't change behavior.
   it('resolves through the ActionSheetManager module and invokes showShareActionSheetWithOptions with the built options', async () => {
-    await iosShare.share({ message: 'hi', url: 'https://x' }, { subject: 'subj' });
+    await iosShare.share(
+      { message: 'hi', url: 'https://x' },
+      { subject: 'subj' },
+    );
 
     expect(registeredModuleNames).toContain('ActionSheetManager');
     expect(lastActionSheetOptions).not.toBeNull();
@@ -191,7 +201,8 @@ describe('Share (Android build -> ShareModule)', () => {
     globalThis.__turboModuleProxy = <T>(name: string): T | null => {
       if (name !== 'ShareModule') return null;
       const dismissingModule = {
-        share: (): Promise<{ action: string }> => Promise.resolve({ action: 'dismissedAction' }),
+        share: (): Promise<{ action: string }> =>
+          Promise.resolve({ action: 'dismissedAction' }),
       };
       return isPresent<T>(dismissingModule) ? dismissingModule : null;
     };

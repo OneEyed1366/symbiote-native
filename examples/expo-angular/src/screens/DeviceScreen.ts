@@ -66,7 +66,11 @@ function deviceTypeLabel(type: DeviceType | null): string {
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="device-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="device-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -77,8 +81,8 @@ function deviceTypeLabel(type: DeviceType | null): string {
           <View class="hero-copy">
             <Text class="hero-title">Device</Text>
             <Text class="hero-body">
-              @symbiote-native/device — brand/model/OS constants, total memory, and best-effort
-              root/jailbreak detection.
+              @symbiote-native/device — brand/model/OS constants, total memory,
+              and best-effort root/jailbreak detection.
             </Text>
           </View>
         </View>
@@ -107,7 +111,9 @@ function deviceTypeLabel(type: DeviceType | null): string {
           </View>
           <View class="capability-row">
             <Text class="capability-label">OS</Text>
-            <Text class="value-text">{{ osName ?? 'unknown' }} {{ osVersion ?? '' }}</Text>
+            <Text class="value-text"
+              >{{ osName ?? 'unknown' }} {{ osVersion ?? '' }}</Text
+            >
           </View>
           <View class="capability-row">
             <Text class="capability-label">Total memory</Text>
@@ -127,7 +133,9 @@ function deviceTypeLabel(type: DeviceType | null): string {
             (press)="handleGetDeviceType()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="device-type-result" class="value-text">{{ deviceTypeResultLabel() }}</Text>
+          <Text testID="device-type-result" class="value-text">{{
+            deviceTypeResultLabel()
+          }}</Text>
 
           <ActionButton
             testID="device-get-uptime-button"
@@ -135,7 +143,9 @@ function deviceTypeLabel(type: DeviceType | null): string {
             (press)="handleGetUptime()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="device-uptime-result" class="value-text">{{ uptimeResultLabel() }}</Text>
+          <Text testID="device-uptime-result" class="value-text">{{
+            uptimeResultLabel()
+          }}</Text>
 
           <ActionButton
             testID="device-check-rooted-button"
@@ -143,7 +153,9 @@ function deviceTypeLabel(type: DeviceType | null): string {
             (press)="handleCheckRooted()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="device-rooted-result" class="value-text">{{ isRootedResultLabel() }}</Text>
+          <Text testID="device-rooted-result" class="value-text">{{
+            isRootedResultLabel()
+          }}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

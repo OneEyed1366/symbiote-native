@@ -19,7 +19,11 @@ vi.mock('./native/exponent-accelerometer', () => ({
 // Vitest's Oxc transform can't parse — same fake as device-sensor.test.ts.
 vi.mock('expo-modules-core', () => ({
   Platform: { OS: 'ios' },
-  PermissionStatus: { GRANTED: 'granted', UNDETERMINED: 'undetermined', DENIED: 'denied' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    UNDETERMINED: 'undetermined',
+    DENIED: 'denied',
+  },
 }));
 
 const { Accelerometer } = await import('./accelerometer');
@@ -43,7 +47,9 @@ describe('Accelerometer', () => {
       // ExponentAccelerometer, not an accidental stand-in shared with another sensor.
       Accelerometer.setUpdateInterval(1234);
 
-      expect(FAKE_NATIVE_ACCELEROMETER.setUpdateInterval).toHaveBeenCalledWith(1234);
+      expect(FAKE_NATIVE_ACCELEROMETER.setUpdateInterval).toHaveBeenCalledWith(
+        1234,
+      );
     });
 
     it('subscribes through the "accelerometerDidUpdate" event name the native module emits', () => {

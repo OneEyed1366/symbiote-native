@@ -1,4 +1,11 @@
-import { computed, effect, inject, Injectable, Injector, type Signal } from '@angular/core';
+import {
+  computed,
+  effect,
+  inject,
+  Injectable,
+  Injector,
+  type Signal,
+} from '@angular/core';
 import {
   computeHideAnimationStyles,
   HideAnimationController,
@@ -26,7 +33,9 @@ export class HideAnimationService {
   connect(getConfig: () => IHideAnimationConfig): Signal<IHideAnimationResult> {
     const controller = new HideAnimationController(getConfig());
 
-    effect(() => controller.updateConfig(getConfig()), { injector: this.injector });
+    effect(() => controller.updateConfig(getConfig()), {
+      injector: this.injector,
+    });
 
     return computed(() =>
       computeHideAnimationStyles(getConfig(), controller.constants, controller),

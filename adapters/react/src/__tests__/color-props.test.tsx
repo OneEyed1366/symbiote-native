@@ -53,14 +53,19 @@ describe('COLOR_PROPS processing', () => {
       mount(ROOT_TAG, <App />);
 
       // The app's View is the RCTView carrying a color key, not the synthetic root.
-      const view = fabric.find(n => n.viewName === 'RCTView' && COLOR_KEYS.some(k => k in n.props));
+      const view = fabric.find(
+        n => n.viewName === 'RCTView' && COLOR_KEYS.some(k => k in n.props),
+      );
       expect(view, 'a styled RCTView was committed').toBeDefined();
 
       for (const key of COLOR_KEYS) {
-        expect(view!.props[key], `"${key}" must not reach Fabric as the raw string`).not.toBe(
-          'red',
+        expect(
+          view!.props[key],
+          `"${key}" must not reach Fabric as the raw string`,
+        ).not.toBe('red');
+        expect(view!.props[key], `"${key}" must be the processed int`).toBe(
+          PROCESSED_COLOR,
         );
-        expect(view!.props[key], `"${key}" must be the processed int`).toBe(PROCESSED_COLOR);
       }
     });
   });

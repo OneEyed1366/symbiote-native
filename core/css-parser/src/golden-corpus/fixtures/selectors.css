@@ -1,0 +1,80 @@
+/* Selector shapes the real corpus never uses. Every value here is pinned as-is, including the
+   wrong ones — this file exists to make a selector-engine swap (postcss-selector-parser) prove
+   it changed nothing, not to assert the current behaviour is correct. */
+
+/* Compound. Collapses to ONE camelCase key `cardBig` — and `.btn-primary` below collapses to
+   the SAME key as `.btn.primary`, a real collision the registry cannot tell apart. Pinned. */
+.card.big {
+  padding: 16px;
+}
+
+.btn.primary {
+  color: #fff;
+}
+
+.btn-primary {
+  color: #000;
+}
+
+/* Descendant — also collapses, `.card .title` -> `cardTitle`. */
+.card .title {
+  font-size: 18px;
+}
+
+/* Child / adjacent-sibling / general-sibling combinators. RN has no sibling concept; whatever
+   these produce today is the baseline. */
+.list > .item {
+  margin-top: 4px;
+}
+
+.item + .item {
+  margin-top: 8px;
+}
+
+.item ~ .trailing {
+  opacity: 0.5;
+}
+
+/* Comma-grouped selectors — one rule, several keys. */
+.alpha,
+.beta {
+  color: #123456;
+}
+
+/* Id and attribute selectors. The attribute payload holds a colon, which must NOT trip the
+   pseudo-class drop rule below. */
+#root {
+  flex: 1;
+}
+
+[data-role='panel'] {
+  padding: 2px;
+}
+
+[data-token='a:b'] {
+  padding: 3px;
+}
+
+/* Pseudo-classes: the WHOLE rule is dropped, bare or trailing a class. RN has no hover state,
+   and half-applying `opacity` permanently was the worse of the two bugs here. */
+.card:hover {
+  opacity: 0.5;
+}
+
+:hover {
+  opacity: 0.25;
+}
+
+/* Custom properties resolve only within THIS file — a `var()` naming a token from another
+   stylesheet ships the literal string `var(--x)` to Fabric. Both halves pinned below. */
+:root {
+  --local-accent: #ff3e00;
+}
+
+.local-var {
+  color: var(--local-accent);
+}
+
+.foreign-var {
+  color: var(--declared-somewhere-else);
+}

@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, Switch, Text, View } from '@symbiote-native/react';
-import { isAvailableAsync, useKeepAwake } from '@symbiote-native/keep-awake/react';
+import {
+  SafeAreaView,
+  ScrollView,
+  Switch,
+  Text,
+  View,
+} from '@symbiote-native/react';
+import {
+  isAvailableAsync,
+  useKeepAwake,
+} from '@symbiote-native/keep-awake/react';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -39,7 +48,11 @@ export function KeepAwakeScreen() {
 
   return (
     <SafeAreaView className="screen">
-      <ScrollView testID="keep-awake-scroll" className="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="keep-awake-scroll"
+        className="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View className={`line-tag line-tag-${lineInfo.line}`}>
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
@@ -50,8 +63,8 @@ export function KeepAwakeScreen() {
           <View className="hero-copy">
             <Text className="hero-title">Keep Awake</Text>
             <Text className="hero-body">
-              @symbiote-native/keep-awake — keeps the screen on for the lifetime of a mounted
-              component.
+              @symbiote-native/keep-awake — keeps the screen on for the lifetime
+              of a mounted component.
             </Text>
           </View>
         </View>
@@ -60,7 +73,12 @@ export function KeepAwakeScreen() {
           <View className="feature-card-header">
             <Text className="feature-card-title">Keep screen awake</Text>
           </View>
-          <ValueRow label="Available" value={isAvailable === null ? 'checking…' : isAvailable ? 'Yes' : 'No'} />
+          <ValueRow
+            label="Available"
+            value={
+              isAvailable === null ? 'checking…' : isAvailable ? 'Yes' : 'No'
+            }
+          />
           <View testID="keep-awake-toggle-row" className="capability-row">
             <Text className="capability-label">Keep screen awake</Text>
             <Switch

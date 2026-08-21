@@ -5,7 +5,11 @@ export type { IAccelerometerMeasurement } from '../core';
 export { BarometerService } from './services/barometer.service';
 export type { IBarometerMeasurement } from '../core';
 export { DeviceMotionService } from './services/device-motion.service';
-export { DeviceMotionOrientation, gravity, type IDeviceMotionMeasurement } from '../core';
+export {
+  DeviceMotionOrientation,
+  gravity,
+  type IDeviceMotionMeasurement,
+} from '../core';
 export { GyroscopeService } from './services/gyroscope.service';
 export type { IGyroscopeMeasurement } from '../core';
 export { LightSensorService } from './services/light-sensor.service';

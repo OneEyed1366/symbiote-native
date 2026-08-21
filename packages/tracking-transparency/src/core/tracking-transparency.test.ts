@@ -2,8 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const FAKE_NATIVE_TRACKING_TRANSPARENCY = {
   getAdvertisingId: vi.fn(() => 'E9228286-4C4E-4789-9D95-15827DCB291B'),
-  requestPermissionsAsync: vi.fn(async () => ({ status: 'granted', granted: true })),
-  getPermissionsAsync: vi.fn(async () => ({ status: 'granted', granted: true })),
+  requestPermissionsAsync: vi.fn(async () => ({
+    status: 'granted',
+    granted: true,
+  })),
+  getPermissionsAsync: vi.fn(async () => ({
+    status: 'granted',
+    granted: true,
+  })),
 };
 
 // The real ExpoTrackingTransparency native module only exists on device — resolving it via
@@ -24,7 +30,11 @@ const fakePlatform = { OS: 'ios' as 'ios' | 'android' | 'web' };
 
 vi.mock('expo-modules-core', () => ({
   Platform: fakePlatform,
-  PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
+  PermissionStatus: {
+    GRANTED: 'granted',
+    DENIED: 'denied',
+    UNDETERMINED: 'undetermined',
+  },
   UnavailabilityError: class UnavailabilityError extends Error {
     constructor(moduleName: string, propertyName: string) {
       super(`${propertyName} is not available on ${moduleName}`);
@@ -79,7 +89,9 @@ describe('requestTrackingPermissionsAsync', () => {
         canAskAgain: true,
         status: 'granted',
       });
-      expect(FAKE_NATIVE_TRACKING_TRANSPARENCY.requestPermissionsAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_TRACKING_TRANSPARENCY.requestPermissionsAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('always resolves granted on web without calling the native module', async () => {
@@ -94,7 +106,9 @@ describe('requestTrackingPermissionsAsync', () => {
         canAskAgain: true,
         status: 'granted',
       });
-      expect(FAKE_NATIVE_TRACKING_TRANSPARENCY.requestPermissionsAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_TRACKING_TRANSPARENCY.requestPermissionsAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('delegates to the native module on iOS', async () => {
@@ -104,7 +118,9 @@ describe('requestTrackingPermissionsAsync', () => {
         status: 'granted',
         granted: true,
       });
-      expect(FAKE_NATIVE_TRACKING_TRANSPARENCY.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+      expect(
+        FAKE_NATIVE_TRACKING_TRANSPARENCY.requestPermissionsAsync,
+      ).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -113,7 +129,8 @@ describe('requestTrackingPermissionsAsync', () => {
       // why: unlike Android/web, iOS has no safe default to fall back to — a caller that doesn't
       // check availability first needs a named, catchable error instead of a silent no-op.
       fakePlatform.OS = 'ios';
-      const { requestPermissionsAsync: native } = FAKE_NATIVE_TRACKING_TRANSPARENCY;
+      const { requestPermissionsAsync: native } =
+        FAKE_NATIVE_TRACKING_TRANSPARENCY;
       // @ts-expect-error -- simulating a native module build missing this method
       FAKE_NATIVE_TRACKING_TRANSPARENCY.requestPermissionsAsync = undefined;
 
@@ -137,7 +154,9 @@ describe('getTrackingPermissionsAsync', () => {
         canAskAgain: true,
         status: 'granted',
       });
-      expect(FAKE_NATIVE_TRACKING_TRANSPARENCY.getPermissionsAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_TRACKING_TRANSPARENCY.getPermissionsAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('always resolves granted on web without calling the native module', async () => {
@@ -149,7 +168,9 @@ describe('getTrackingPermissionsAsync', () => {
         canAskAgain: true,
         status: 'granted',
       });
-      expect(FAKE_NATIVE_TRACKING_TRANSPARENCY.getPermissionsAsync).not.toHaveBeenCalled();
+      expect(
+        FAKE_NATIVE_TRACKING_TRANSPARENCY.getPermissionsAsync,
+      ).not.toHaveBeenCalled();
     });
 
     it('delegates to the native module on iOS', async () => {
@@ -159,7 +180,9 @@ describe('getTrackingPermissionsAsync', () => {
         status: 'granted',
         granted: true,
       });
-      expect(FAKE_NATIVE_TRACKING_TRANSPARENCY.getPermissionsAsync).toHaveBeenCalledTimes(1);
+      expect(
+        FAKE_NATIVE_TRACKING_TRANSPARENCY.getPermissionsAsync,
+      ).toHaveBeenCalledTimes(1);
     });
   });
 

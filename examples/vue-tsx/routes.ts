@@ -14,6 +14,9 @@ export const ROUTE_NAME = {
   HooksDemo: 'HooksDemo',
   DeepLinking: 'DeepLinking',
   StatePersistence: 'StatePersistence',
+  ApiPlayground: 'ApiPlayground',
+  Benchmark: 'Benchmark',
+  StyleShowcase: 'StyleShowcase',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

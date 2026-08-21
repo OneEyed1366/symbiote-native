@@ -50,7 +50,11 @@ export default defineConfig(
       // signatures, platform stubs all carry placeholder params).
       '@typescript-eslint/no-unused-vars': [
         'warn',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
       ],
       // ADR 0026: a module's files (base + platform variants + co-located test) must all
       // live in the same folder — either flat or entirely inside one X/ subfolder, never split.
@@ -68,7 +72,10 @@ export default defineConfig(
   // react-hooks/exhaustive-deps` comment there fails lint with "Definition for rule not found"
   // instead of being suppressed.
   {
-    files: ['adapters/react/**/*.{ts,tsx}', 'packages/*/src/react/**/*.{ts,tsx}'],
+    files: [
+      'adapters/react/**/*.{ts,tsx}',
+      'packages/*/src/react/**/*.{ts,tsx}',
+    ],
     plugins: { 'react-hooks': reactHooks },
     rules: {
       // Classic Rules of Hooks, the high-signal React-specific checks. The v7 plugin
@@ -124,16 +131,33 @@ export default defineConfig(
     language: 'json/json',
     plugins: {
       json,
-      local: { rules: { 'valid-native-link-manifest': validNativeLinkManifest } },
+      local: {
+        rules: { 'valid-native-link-manifest': validNativeLinkManifest },
+      },
     },
     rules: {
       'local/valid-native-link-manifest': 'error',
     },
   },
 
+  // ── adapters/solid: the JSX augmentation file, and ONLY that file. Adding our host tags to
+  // solid-js's JSX.IntrinsicElements is declaration merging, which requires reopening its `JSX`
+  // namespace — there is no ES-module form of that, so no-namespace cannot be satisfied. The merged
+  // interface is then intentionally empty: its members come from a mapped type
+  // (Record<ISymbioteIntrinsic, …>) so the tag list has ONE source of truth in
+  // @symbiote-native/components, and an interface body cannot express a mapped type — it can only
+  // `extends` it. Scoped to the one file rather than the adapter, so ordinary Solid source still
+  // gets both rules. ──
+  {
+    files: ['adapters/solid/src/jsx.ts'],
+    rules: {
+      '@typescript-eslint/no-namespace': 'off',
+      '@typescript-eslint/no-empty-object-type': 'off',
+    },
+  },
+
   // Future adapters get their own block here, e.g.:
   // { files: ['adapters/angular/**/*.ts'], plugins: { ... }, rules: { ... } },
-  // { files: ['adapters/solid/**/*.{ts,tsx}'], plugins: { solid }, rules: { ...solid.configs.recommended.rules } },
   // { files: ['adapters/svelte/**/*.svelte'], languageOptions: { parser: svelteParser }, rules: { ... } },
 
   // prettier last: switch off every formatting rule, since prettier owns formatting.

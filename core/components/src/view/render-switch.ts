@@ -6,7 +6,11 @@
 // Pure and prop-driven; no hooks, no events. The adapter owns those.
 
 import { dlog } from '@symbiote-native/engine';
-import type { IStyleProp, IViewStyle, ISymbioteEvent } from '@symbiote-native/engine';
+import type {
+  IStyleProp,
+  IViewStyle,
+  ISymbioteEvent,
+} from '@symbiote-native/engine';
 import { el } from '../descriptor';
 import type { IDescriptor } from '../descriptor';
 import type { IAccessibilityProps, IAriaProps } from '../accessibility-props';
@@ -33,7 +37,10 @@ export interface ISwitchProps extends IAccessibilityProps, IAriaProps {
 // (iOS onTintColor/tintColor vs Android trackColorForTrue/trackColorForFalse + trackTintColor
 // for the current value). The adapter's .ios/.android file supplies the mapping.
 export type ISwitchPlatform = {
-  trackColorProps: (value: boolean, trackColor?: ISwitchTrackColor) => Record<string, unknown>;
+  trackColorProps: (
+    value: boolean,
+    trackColor?: ISwitchTrackColor,
+  ) => Record<string, unknown>;
 };
 
 // The pre-resolved inputs the render fn paints from. `value` arrives already folded to a
@@ -60,10 +67,16 @@ function foldIosBackground(
   color: string | undefined,
 ): IStyleProp<IViewStyle> | undefined {
   if (color === undefined) return style;
-  return [style, { backgroundColor: color, borderRadius: IOS_BACKGROUND_BORDER_RADIUS }];
+  return [
+    style,
+    { backgroundColor: color, borderRadius: IOS_BACKGROUND_BORDER_RADIUS },
+  ];
 }
 
-export function renderSwitch(view: ISwitchViewProps, platform: ISwitchPlatform): IDescriptor {
+export function renderSwitch(
+  view: ISwitchViewProps,
+  platform: ISwitchPlatform,
+): IDescriptor {
   dlog(`Switch render value=${view.value} disabled=${String(view.disabled)}`);
 
   // These color props reach Fabric as ordinary props: the shared ViewConfig declares

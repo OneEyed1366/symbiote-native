@@ -37,7 +37,13 @@ describe('Angular nested navigators (Tab nested inside a Stack screen)', () => {
       .toBeVisible()
       .withTimeout(10_000);
     await element(by.text('Info')).tap();
-    await waitFor(element(by.text('A second tab, proving the nested Tab bar switches focus normally.')))
+    await waitFor(
+      element(
+        by.text(
+          'A second tab, proving the nested Tab bar switches focus normally.',
+        ),
+      ),
+    )
       .toBeVisible()
       .withTimeout(10_000);
   });

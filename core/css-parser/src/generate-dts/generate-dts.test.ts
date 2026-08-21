@@ -46,26 +46,45 @@ describe('classNamesToDtsSource', () => {
 
 describe('generateModuleDts', () => {
   it('returns null for a plain (non-module) style file', async () => {
-    const dts = await generateModuleDts('.card { padding: 10px; }', 'theme.css');
+    const dts = await generateModuleDts(
+      '.card { padding: 10px; }',
+      'theme.css',
+    );
 
     expect(dts).toBeNull();
   });
 
   it('generates a .d.ts for a .module.css file, keyed by the ORIGINAL class name', async () => {
-    const dts = await generateModuleDts('.card { padding: 10px; }', 'Card.module.css');
+    const dts = await generateModuleDts(
+      '.card { padding: 10px; }',
+      'Card.module.css',
+    );
 
     expect(dts).toContain('readonly card: string;');
     expect(dts).not.toContain('__module__');
   });
 
   it('preprocesses a .module.scss file the same way', async () => {
-    const dts = await generateModuleDts('.card { .title { padding: 10px; } }', 'Card.module.scss');
+    const dts = await generateModuleDts(
+      '.card { .title { padding: 10px; } }',
+      'Card.module.scss',
+    );
 
-    expect(dts).toContain('readonly cardTitle: string;');
+    // The AUTHORED names: `styles.card` and `styles.title` are what the export map carries, while
+    // `cardTitle` names no class anyone writes. (That nested rule still paints too eagerly — the
+    // registry matches a rule by token SUBSET, so `.card .title` fires wherever `.card.title`
+    // would; sixth trap in .claude/rules/style-registry-collisions.md, and a separate question
+    // from what the module exports.)
+    expect(dts).toContain('readonly card: string;');
+    expect(dts).toContain('readonly title: string;');
+    expect(dts).not.toContain('cardTitle');
   });
 
   it('excludes a :global(...) selector the same way compileCssFile does', async () => {
-    const dts = await generateModuleDts(':global(.reset) { margin: 0; }', 'Card.module.css');
+    const dts = await generateModuleDts(
+      ':global(.reset) { margin: 0; }',
+      'Card.module.css',
+    );
 
     expect(dts).toContain('readonly reset: string;');
   });
@@ -74,14 +93,26 @@ describe('generateModuleDts', () => {
   // compiler in preprocessors.ts) — this proves generateModuleDts's language dispatch actually
   // reaches it, not just SCSS.
   it('preprocesses a .module.less file the same way', async () => {
-    const dts = await generateModuleDts('.card { .title { padding: 10px; } }', 'Card.module.less');
+    const dts = await generateModuleDts(
+      '.card { .title { padding: 10px; } }',
+      'Card.module.less',
+    );
 
-    expect(dts).toContain('readonly cardTitle: string;');
+    // The AUTHORED names: `styles.card` and `styles.title` are what the export map carries, while
+    // `cardTitle` names no class anyone writes. (That nested rule still paints too eagerly — the
+    // registry matches a rule by token SUBSET, so `.card .title` fires wherever `.card.title`
+    // would; sixth trap in .claude/rules/style-registry-collisions.md, and a separate question
+    // from what the module exports.)
+    expect(dts).toContain('readonly card: string;');
+    expect(dts).toContain('readonly title: string;');
+    expect(dts).not.toContain('cardTitle');
   });
 
   // why: a malformed preprocessor source must REJECT, not resolve to a bogus/empty .d.ts that
   // silently ships wrong types — generateModuleDts must not swallow the compiler's own error.
   it('rejects when the source is malformed for its declared preprocessor language', async () => {
-    await expect(generateModuleDts('.card { padding: 10px', 'Card.module.scss')).rejects.toThrow();
+    await expect(
+      generateModuleDts('.card { padding: 10px', 'Card.module.scss'),
+    ).rejects.toThrow();
   });
 });

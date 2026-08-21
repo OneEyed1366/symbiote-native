@@ -3,8 +3,11 @@
 import { useEffect, useState } from 'react';
 import { DeviceMotion, type IDeviceMotionMeasurement } from '../../../core';
 
-export function useDeviceMotion(updateIntervalMs?: number): IDeviceMotionMeasurement | null {
-  const [measurement, setMeasurement] = useState<IDeviceMotionMeasurement | null>(null);
+export function useDeviceMotion(
+  updateIntervalMs?: number,
+): IDeviceMotionMeasurement | null {
+  const [measurement, setMeasurement] =
+    useState<IDeviceMotionMeasurement | null>(null);
 
   useEffect(() => {
     // Re-subscribing on interval change keeps the native update rate in sync with the

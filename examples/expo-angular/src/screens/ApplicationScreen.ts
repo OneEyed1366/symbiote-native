@@ -1,5 +1,11 @@
 import { Component, signal } from '@angular/core';
-import { Platform, SafeAreaView, ScrollView, Text, View } from '@symbiote-native/angular';
+import {
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 import {
   applicationId,
   applicationName,
@@ -29,7 +35,11 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
   imports: [ActionButton, SafeAreaView, ScrollView, Text, View],
   template: `
     <SafeAreaView class="screen">
-      <ScrollView testID="application-scroll" class="screen" contentContainerStyle="scroll-content">
+      <ScrollView
+        testID="application-scroll"
+        class="screen"
+        contentContainerStyle="scroll-content"
+      >
         <View [class]="lineTagClass">
           <Text class="line-tag-text">{{ lineTagLabel }}</Text>
         </View>
@@ -40,8 +50,9 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           <View class="hero-copy">
             <Text class="hero-title">Application</Text>
             <Text class="hero-body">
-              @symbiote-native/application — app version/build/name/id, install time, and the
-              Android ID / iOS vendor ID platform-specific lookups.
+              @symbiote-native/application — app version/build/name/id, install
+              time, and the Android ID / iOS vendor ID platform-specific
+              lookups.
             </Text>
           </View>
         </View>
@@ -50,11 +61,15 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           <Text class="capability-card-title">App identity</Text>
           <View class="capability-row">
             <Text class="capability-label">Version</Text>
-            <Text class="value-text">{{ nativeApplicationVersion ?? 'unknown' }}</Text>
+            <Text class="value-text">{{
+              nativeApplicationVersion ?? 'unknown'
+            }}</Text>
           </View>
           <View class="capability-row">
             <Text class="capability-label">Build</Text>
-            <Text class="value-text">{{ nativeBuildVersion ?? 'unknown' }}</Text>
+            <Text class="value-text">{{
+              nativeBuildVersion ?? 'unknown'
+            }}</Text>
           </View>
           <View class="capability-row">
             <Text class="capability-label">Name</Text>
@@ -74,7 +89,10 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
             (press)="handleGetInstallationTime()"
             [color]="lineColor"
           ></ActionButton>
-          <Text testID="application-installation-time-result" class="value-text">
+          <Text
+            testID="application-installation-time-result"
+            class="value-text"
+          >
             {{ installationTimeLabel() }}
           </Text>
         </View>
@@ -88,7 +106,9 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
               (press)="handleGetAndroidId()"
               [color]="lineColor"
             ></ActionButton>
-            <Text testID="application-android-id-result" class="value-text">{{ androidIdLabel() }}</Text>
+            <Text testID="application-android-id-result" class="value-text">{{
+              androidIdLabel()
+            }}</Text>
 
             <ActionButton
               testID="application-install-referrer-button"
@@ -96,7 +116,10 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
               (press)="handleGetInstallReferrer()"
               [color]="lineColor"
             ></ActionButton>
-            <Text testID="application-install-referrer-result" class="value-text">
+            <Text
+              testID="application-install-referrer-result"
+              class="value-text"
+            >
               {{ installReferrerLabel() }}
             </Text>
           </View>
@@ -111,7 +134,9 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
               (press)="handleGetIosIdForVendor()"
               [color]="lineColor"
             ></ActionButton>
-            <Text testID="application-vendor-id-result" class="value-text">{{ vendorIdLabel() }}</Text>
+            <Text testID="application-vendor-id-result" class="value-text">{{
+              vendorIdLabel()
+            }}</Text>
 
             <ActionButton
               testID="application-release-type-button"
@@ -166,7 +191,9 @@ export class ApplicationScreen {
   }
 
   handleGetIosApplicationReleaseType(): void {
-    getIosApplicationReleaseTypeAsync().then(value => this.releaseType.set(String(value)));
+    getIosApplicationReleaseTypeAsync().then(value =>
+      this.releaseType.set(String(value)),
+    );
   }
 
   installationTimeLabel(): string {

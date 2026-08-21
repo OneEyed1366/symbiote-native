@@ -7,7 +7,13 @@
 // the side-effect import in ../register (pulled in by the package barrel, NOT here, so this module
 // and its tests stay free of the third-party spec).
 
-import { defineComponent, h, ref, type SetupContext, type VNode } from '@vue/runtime-core';
+import {
+  defineComponent,
+  h,
+  ref,
+  type SetupContext,
+  type VNode,
+} from '@vue/runtime-core';
 import {
   descriptorToVue,
   normalizeVueAttrs,
@@ -16,7 +22,11 @@ import {
   Image,
   type IImageSourceProp,
 } from '@symbiote-native/vue';
-import { dlog, type IClassNameValue, type ISymbioteEvent } from '@symbiote-native/engine';
+import {
+  dlog,
+  type IClassNameValue,
+  type ISymbioteEvent,
+} from '@symbiote-native/engine';
 import {
   sanitizeSliderValue,
   resolveSliderDisabled,
@@ -60,7 +70,10 @@ import {
 // the class-routing note on HANDLED_ATTRS below.
 export type ISliderProps = Omit<
   ISliderBaseProps,
-  'onValueChange' | 'onSlidingStart' | 'onSlidingComplete' | 'onAccessibilityAction'
+  | 'onValueChange'
+  | 'onSlidingStart'
+  | 'onSlidingComplete'
+  | 'onAccessibilityAction'
 > & {
   modelValue?: number;
   class?: IClassNameValue;
@@ -92,14 +105,21 @@ function asBoolean(value: unknown): boolean | undefined {
 }
 
 function isImageSourceProp(value: unknown): value is IImageSourceProp {
-  return typeof value === 'number' || (typeof value === 'object' && value !== null);
+  return (
+    typeof value === 'number' || (typeof value === 'object' && value !== null)
+  );
 }
 
 // accessibilityState arrives untyped; narrow its disabled flag for the fold while preserving the
 // other entries at runtime (the resolve spread carries them onto the native node).
-function asAccessibilityState(value: unknown): ISliderAccessibilityState | undefined {
+function asAccessibilityState(
+  value: unknown,
+): ISliderAccessibilityState | undefined {
   if (!isRecord(value)) return undefined;
-  return { ...value, disabled: typeof value.disabled === 'boolean' ? value.disabled : undefined };
+  return {
+    ...value,
+    disabled: typeof value.disabled === 'boolean' ? value.disabled : undefined,
+  };
 }
 
 // The props/handlers the lifecycle consumes itself; everything else (the track tints + images,
@@ -180,14 +200,17 @@ export function createSlider(platform: ISliderPlatform) {
       };
       const handleLayout = (event: ISymbioteEvent): void => {
         const layout = event.nativeEvent.layout;
-        if (isRecord(layout) && typeof layout.width === 'number') width.value = layout.width;
+        if (isRecord(layout) && typeof layout.width === 'number')
+          width.value = layout.width;
       };
 
       return () => {
         const attrs = normalizeVueAttrs(rawAttrs);
 
-        const minimumValue = asNumber(attrs.minimumValue) ?? SLIDER_DEFAULT_MINIMUM_VALUE;
-        const maximumValue = asNumber(attrs.maximumValue) ?? SLIDER_DEFAULT_MAXIMUM_VALUE;
+        const minimumValue =
+          asNumber(attrs.minimumValue) ?? SLIDER_DEFAULT_MINIMUM_VALUE;
+        const maximumValue =
+          asNumber(attrs.maximumValue) ?? SLIDER_DEFAULT_MAXIMUM_VALUE;
         const step = asNumber(attrs.step) ?? SLIDER_DEFAULT_STEP;
         const lowerLimit = resolveSliderLowerLimit(asNumber(attrs.lowerLimit));
         const upperLimit = resolveSliderUpperLimit(asNumber(attrs.upperLimit));
@@ -195,19 +218,27 @@ export function createSlider(platform: ISliderPlatform) {
           dlog('Slider: lowerLimit must be smaller than upperLimit');
         }
         const disabledAttr = asBoolean(attrs.disabled);
-        const accessibilityState = asAccessibilityState(attrs.accessibilityState);
+        const accessibilityState = asAccessibilityState(
+          attrs.accessibilityState,
+        );
         const inverted = asBoolean(attrs.inverted) ?? false;
 
         const hasStepMarker = slots.stepMarker !== undefined;
         const renderStepNumber = asBoolean(attrs.renderStepNumber);
         const hasThumbImage = attrs.thumbImage !== undefined;
-        const showSteps = shouldRenderStepsIndicator(hasStepMarker, renderStepNumber);
+        const showSteps = shouldRenderStepsIndicator(
+          hasStepMarker,
+          renderStepNumber,
+        );
 
         // The native view gets a thumbImage only when there is one AND no custom marker (which
         // draws its own thumb), matching the library. We pass the source raw — the engine runs the
         // image processor derived from RNCSlider's ViewConfig (same path as the color tints), so
         // unlike the plain-RN library wrapper we do NOT pre-call Image.resolveAssetSource here.
-        const nativeThumbImage = shouldPassNativeThumbImage(hasStepMarker, hasThumbImage)
+        const nativeThumbImage = shouldPassNativeThumbImage(
+          hasStepMarker,
+          hasThumbImage,
+        )
           ? attrs.thumbImage
           : undefined;
 
@@ -220,9 +251,16 @@ export function createSlider(platform: ISliderPlatform) {
           upperLimit,
           disabled: resolveSliderDisabled(disabledAttr, accessibilityState),
           inverted,
-          thumbTintColor: resolveThumbTintColor(attrs.thumbTintColor, hasStepMarker, hasThumbImage),
+          thumbTintColor: resolveThumbTintColor(
+            attrs.thumbTintColor,
+            hasStepMarker,
+            hasThumbImage,
+          ),
           thumbImage: nativeThumbImage,
-          accessibilityState: resolveSliderAccessibilityState(disabledAttr, accessibilityState),
+          accessibilityState: resolveSliderAccessibilityState(
+            disabledAttr,
+            accessibilityState,
+          ),
           width: width.value,
           style: attrs.style,
           passthrough: {
@@ -314,7 +352,10 @@ export function createSlider(platform: ISliderPlatform) {
 
 // The wrapper style for the steps path mirrors renderSlider's wrapper (kept here because the
 // custom-marker path builds the wrapper itself rather than going through renderSlider).
-function resolveStepsWrapperStyle(style: unknown, platform: ISliderPlatform): unknown {
+function resolveStepsWrapperStyle(
+  style: unknown,
+  platform: ISliderPlatform,
+): unknown {
   return [platform.defaultStyle, style, { justifyContent: 'center' }];
 }
 
@@ -348,12 +389,16 @@ function renderCustomStepsOverlay(params: ICustomStepsParams): VNode {
       min,
       max,
     });
-    if (marker !== undefined) trackChildren.push(h('symbiote-view', {}, marker));
+    if (marker !== undefined)
+      trackChildren.push(h('symbiote-view', {}, marker));
     if (isImageSourceProp(params.thumbImage) && value === params.currentValue) {
       trackChildren.push(
         h(
           'symbiote-view',
-          { style: THUMB_IMAGE_CONTAINER_STYLE, testID: 'sliderTrackMark-thumbImage' },
+          {
+            style: THUMB_IMAGE_CONTAINER_STYLE,
+            testID: 'sliderTrackMark-thumbImage',
+          },
           [h(Image, { source: params.thumbImage, style: THUMB_IMAGE_STYLE })],
         ),
       );
@@ -364,11 +409,19 @@ function renderCustomStepsOverlay(params: ICustomStepsParams): VNode {
     if (params.renderStepNumber) {
       cellChildren.push(
         h('symbiote-view', { style: STEP_NUMBER_CONTAINER_STYLE }, [
-          h('symbiote-text', { testID: `${index}th-step`, style: { fontSize } }, String(value)),
+          h(
+            'symbiote-text',
+            { testID: `${index}th-step`, style: { fontSize } },
+            String(value),
+          ),
         ]),
       );
     }
-    return h('symbiote-view', { style: STEP_INDICATOR_ELEMENT_STYLE }, cellChildren);
+    return h(
+      'symbiote-view',
+      { style: STEP_INDICATOR_ELEMENT_STYLE },
+      cellChildren,
+    );
   });
   return h(
     'symbiote-view',
