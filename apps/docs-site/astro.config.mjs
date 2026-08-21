@@ -157,6 +157,7 @@ export default defineConfig({
       sidebar: [
         {
           label: 'Start here',
+          collapsed: true,
           items: [
             { label: 'What is SymbioteNative?', slug: 'docs' },
             { label: 'Quick start', slug: 'docs/quick-start' },
@@ -165,6 +166,7 @@ export default defineConfig({
         },
         {
           label: 'Learn',
+          collapsed: true,
           items: [
             { label: 'React guide', slug: 'docs/learn/react' },
             { label: 'Vue guide', slug: 'docs/learn/vue' },
@@ -178,6 +180,7 @@ export default defineConfig({
         },
         {
           label: 'How-tos',
+          collapsed: true,
           items: [
             { label: 'Overview', slug: 'docs/howtos' },
             { label: 'Style a component', slug: 'docs/howtos/styling' },
@@ -203,6 +206,7 @@ export default defineConfig({
         },
         {
           label: 'Navigation',
+          collapsed: true,
           items: [
             { label: 'Overview', slug: 'docs/navigation' },
             { label: 'Stack navigator', slug: 'docs/navigation/stack' },
@@ -215,10 +219,12 @@ export default defineConfig({
         },
         {
           label: 'Testing',
+          collapsed: true,
           items: [{ label: 'Vitest + Detox', slug: 'docs/testing' }],
         },
         {
           label: 'Examples',
+          collapsed: true,
           items: [
             { label: 'Overview', slug: 'docs/examples' },
             { label: 'Counter', slug: 'docs/examples/counter' },
@@ -228,6 +234,7 @@ export default defineConfig({
         },
         {
           label: 'API',
+          collapsed: true,
           items: [
             { label: 'Overview', slug: 'docs/api' },
             { label: 'React', slug: 'docs/api/react' },
@@ -241,6 +248,7 @@ export default defineConfig({
         },
         {
           label: 'Packages',
+          collapsed: true,
           items: [
             { label: 'Slider', slug: 'docs/packages/slider' },
             { label: 'Splash screen', slug: 'docs/packages/splash-screen' },
@@ -273,6 +281,7 @@ export default defineConfig({
         },
         {
           label: 'Project',
+          collapsed: true,
           items: [
             { label: 'Status', slug: 'docs/project/status' },
             { label: 'Roadmap', slug: 'docs/project/roadmap' },
