@@ -25,10 +25,6 @@ buildscript {
         // substitution alone (settings.gradle handles the composite-build inclusion; this line is
         // separate and both are required).
         classpath("expo.modules:expo-module-gradle-plugin")
-        // Same convention, for `expo/android/build.gradle`'s `apply plugin: "expo-autolinking"`
-        // (old-style) — its plugin class lives in the expo-modules-autolinking composite build
-        // (settings.gradle includeBuild's it), which alone is not enough for old-style apply.
-        classpath("expo.modules:expo-autolinking-plugin")
     }
 }
 

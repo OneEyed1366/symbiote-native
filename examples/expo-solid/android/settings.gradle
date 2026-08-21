@@ -2,54 +2,37 @@
 // time, even ahead of a plain `def`.
 pluginManagement {
   includeBuild("../node_modules/@react-native/gradle-plugin")
-  // Provides the `expo-autolinking` plugin id that `expo/android/build.gradle` applies. Not
-  // reported by `expo-modules-autolinking resolve`'s per-module `.plugins` list below (that only
-  // covers linkable native modules — this is the autolinking tool's own meta Gradle plugin, so
-  // it needs its own explicit includeBuild, same as the react-native gradle plugin above.
+  // Provides the `expo-autolinking-settings` plugin id applied below. `expo-autolinking-settings`
+  // then does its OWN internal `includeBuild` of this same directory (for the `expo-autolinking`/
+  // `expo-max-sdk-override-plugin` PROJECT-level plugins `expo/android/build.gradle` applies) —
+  // this line is only for bootstrapping the SETTINGS-level plugin id itself, which has to already
+  // be resolvable before that internal include can run.
   includeBuild("../node_modules/expo-modules-autolinking/android/expo-gradle-plugin")
-
-  def resolvedExpoModulesJson = providers.exec {
-    workingDir(new File(settingsDir, ".."))
-    // The real entry file, not the `.bin/` shim (a shell script `node` can't parse as JS).
-    commandLine("node", "./node_modules/expo-modules-autolinking/bin/expo-modules-autolinking.js",
-                "resolve", "--platform", "android", "--json")
-  }.standardOutput.asText.get()
-
-  def resolvedExpoModules = new groovy.json.JsonSlurper().parseText(resolvedExpoModulesJson)
-
-  // auto-install-peers pulls in the whole phantom `expo` tree too (same unmet-peer cause as
-  // the iOS Podfile's own `use_expo_modules!(exclude: [...])`) — exclude exactly those unwanted
-  // phantom peers instead of allow-listing wanted packages, so a genuinely new expo-modules-core
-  // package is auto-discovered here with zero further edits to this file (see the
-  // symbiote-expo-native-module skill).
-  def unwantedExpoModules = [
-    "expo", "expo-asset", "expo-constants", "expo-file-system",
-    "expo-font", "@expo/dom-webview", "@expo/log-box",
-  ]
-  def wantedExpoModules = resolvedExpoModules.modules
-    .findAll { !unwantedExpoModules.contains(it.packageName) }
-
-  wantedExpoModules.collect { it.plugins ?: [] }.flatten()
-    .each { plugin -> includeBuild(new File(plugin.sourceDir as String)) }
-
-  gradle.ext.wantedExpoModules = wantedExpoModules
 }
-plugins { id("com.facebook.react.settings") }
+plugins {
+  id("com.facebook.react.settings")
+  id("expo-autolinking-settings")
+}
 extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
 rootProject.name = 'CanaryExpo'
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
-// Same double-registration `@react-native/gradle-plugin` needs above: the `pluginManagement`
-// includeBuild alone resolves `apply plugin:`/`plugins{}` ids, but android/build.gradle's
-// `classpath("expo.modules:expo-autolinking-plugin")` is a regular buildscript dependency, which
-// needs this build ALSO registered at the outer (non-pluginManagement) level to be substituted.
-includeBuild('../node_modules/expo-modules-autolinking/android/expo-gradle-plugin')
 
-gradle.ext.wantedExpoModules.each { module ->
-  // `proj`, not `project` — a closure param named `project` would shadow Settings' own
-  // `project(path)` lookup used below.
-  module.projects.each { proj ->
-    include(":${proj.name}")
-    project(":${proj.name}").projectDir = new File(proj.sourceDir as String)
-  }
-}
+// `expoAutolinking.useExpoModules()` (from the `expo-autolinking-settings` plugin above) is the
+// real, first-party mechanism — NOT a hand-rolled reimplementation. It doesn't just `include()`
+// each resolved module's project: it also registers the `gradle.expoGradle` extension that
+// `expo/android/build.gradle`'s own `apply plugin: "expo-autolinking"` needs (crashes with
+// `ExpoGradleExtension not found` without it), and wires the generated Expo module package-list
+// (`ExpoModulesPackageList.kt`) that makes every linked native module discoverable at runtime — a
+// hand-rolled `include()`-only loop silently skips that and leaves modules unregistered. Uses the
+// exact same `expo-modules-autolinking resolve` CLI a hand-rolled version would call directly.
+//
+// auto-install-peers pulls in the whole phantom `expo` tree too (same unmet-peer cause as the
+// iOS Podfile's own `use_expo_modules!(exclude: [...])`) — exclude exactly those unwanted phantom
+// peers instead of allow-listing wanted packages, so a genuinely new expo-modules-core package is
+// auto-discovered with zero further edits to this file (see the symbiote-expo-native-module skill).
+expoAutolinking.exclude = [
+  "expo", "expo-asset", "expo-constants", "expo-file-system",
+  "expo-font", "@expo/dom-webview", "@expo/log-box",
+]
+expoAutolinking.useExpoModules()
