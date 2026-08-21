@@ -376,12 +376,15 @@ const directProvideValue = inject(DIRECT_PROVIDE_KEY, 'not provided');
           >{{ entry }}</Text
         >
 
-        <Text class="section-label">v-text (Partial) + v-pre (Partial)</Text>
+        <Text class="section-label">v-text (Partial) + v-pre (not supported)</Text>
         <Text v-text="vTextValue" class="note-text" testID="v-text-demo" />
-        <Text
-          v-pre
-          class="note-text"
-          >{{ this is NOT compiled — v-pre skips it }}</Text
+        <Text class="note-text"
+          >v-pre is NOT demoed live: it makes the compiler skip codegen for its subtree and emit a
+          DOM-oriented static-content node (hostInsertStaticContent), which our renderer has no
+          host op for — mounting one throws "text must be rendered inside a &lt;Text&gt;" and takes
+          the whole screen's commit down with it (createElement calls fire, the subtree never links
+          into the tree, and the app.config.errorHandler installed below swallows the error
+          silently). Not a partial gap like v-text — genuinely unsupported.</Text
         >
 
         <Text class="section-label">v-once vs v-memo</Text>
