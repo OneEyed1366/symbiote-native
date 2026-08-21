@@ -43,6 +43,9 @@
   /* amber — the benchmark stop is not a navigation line and should not read as one at a
      glance; kept a shade deeper than --line-composition above so the two stay apart. */
   --line-performance: #f5a524;
+  /* yellow-green, the one wide hue gap the lines above leave open — the styling showcase is not
+     a navigation line either, and this reads apart from Structure's mint at badge size. */
+  --line-styling: #a3d94f;
 }
 
 /* shared / common. .section is the outermost content wrapper directly inside a demo screen's
@@ -66,12 +69,20 @@
   padding-top: 24px;
   padding-bottom: 24px;
 }
+/* `flex-wrap` because RN, like CSS, defaults to nowrap: a row of three buttons whose titles are
+   long enough ("bump seed (onBeforeUpdate/onUpdated)", "start scope · stop scope · bump ticks")
+   runs off the right edge and the last one is simply unreachable — no scrollbar, no clipping
+   indicator, nothing to suggest a button is missing. Wrapping is the only behaviour that degrades
+   honestly on a phone width. Children that carry `flex: 1` (.flex1, .color-tile, .sc-pair-half)
+   have a 0 flex-basis, so they still share ONE line and are unaffected. */
 .row {
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 12px;
 }
 .row-tight {
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 8px;
 }
 /* no hyphen: kebabToCamel only rewrites "-[a-z]", so ".flex-1" would parse to "flex-1"
@@ -80,7 +91,9 @@
   flex: 1;
 }
 .section-label {
-  color: #41506a;
+  /* #41506a measured at 1.92:1 against --paper — below WCAG AA (4.5:1), reads as
+     blended-into-background. #9db4d9 keeps the muted blue-gray hue at 7.43:1. */
+  color: #9db4d9;
   font-size: 13px;
 }
 .info-text {
@@ -704,6 +717,9 @@
 .line-tag-performance {
   background-color: var(--line-performance);
 }
+.line-tag-styling {
+  background-color: var(--line-styling);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -756,6 +772,10 @@
   border-left-width: 3px;
   border-left-color: var(--line-performance);
 }
+.menu-row-styling {
+  border-left-width: 3px;
+  border-left-color: var(--line-styling);
+}
 
 .menu-badge {
   width: 34px;
@@ -784,6 +804,9 @@
 }
 .menu-badge-performance {
   background-color: var(--line-performance);
+}
+.menu-badge-styling {
+  background-color: var(--line-styling);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -824,6 +847,9 @@
 }
 .menu-row-hint-performance {
   color: var(--line-performance);
+}
+.menu-row-hint-styling {
+  color: var(--line-styling);
 }
 
 /* BenchmarkScreen (screens/BenchmarkScreen.vue) + its frame-rate meter

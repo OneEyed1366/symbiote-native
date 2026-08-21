@@ -26,6 +26,7 @@ the [slider](/docs/packages/slider/) (a native **view**) or [splash screen](/doc
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 <Aside type="note">
   `isBatteryOptimizationEnabledAsync()` is Android-only — it always resolves
@@ -122,6 +123,19 @@ versions — never install either yourself, and never add the `expo` meta-packag
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createBatteryLevel } from '@symbiote-native/battery/solid';
+
+    export function BatteryLevel() {
+      const batteryLevel = createBatteryLevel(); // Accessor<number>, -1 until the first reading arrives
+
+      return <Text>{batteryLevel()}</Text>;
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ### Battery state
@@ -190,6 +204,20 @@ versions — never install either yourself, and never add the `expo` meta-packag
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createBatteryState } from '@symbiote-native/battery/solid';
+    import { BatteryState } from '@symbiote-native/battery';
+
+    export function ChargingIndicator() {
+      const batteryState = createBatteryState(); // Accessor<BatteryState>, seeded UNKNOWN
+
+      return <Text>{batteryState() === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</Text>;
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ### Low power mode
@@ -252,6 +280,19 @@ versions — never install either yourself, and never add the `expo` meta-packag
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createLowPowerMode } from '@symbiote-native/battery/solid';
+
+    export function LowPowerBadge() {
+      const lowPowerMode = createLowPowerMode(); // Accessor<boolean>, seeded false
+
+      return <Text>{lowPowerMode() ? 'Low Power Mode is on' : null}</Text>;
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ### One-shot functions
@@ -286,16 +327,21 @@ const { batteryLevel, batteryState, lowPowerMode } = await getPowerStateAsync();
 | `addBatteryStateListener(listener): EventSubscription`  | Subscribes to battery state (charging/full/unplugged/unknown) change events                                                                   |
 | `addLowPowerModeListener(listener): EventSubscription`  | Subscribes to Low Power Mode / Power Saver toggle events                                                                                      |
 
-### Hooks / composables / services
+### Hooks / composables / services / primitives
 
-| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Signature | Returns                                                                                                 |
-| ----------------- | ----------------- | ------------------------------- | --------- | ------------------------------------------------------------------------------------------------------- |
-| `useBatteryLevel` | `useBatteryLevel` | `BatteryLevelService.connect()` | `()`      | Live battery level — `number` (React), `Ref<number>` (Vue), `Signal<number>` (Angular), seeded `-1`     |
-| `useBatteryState` | `useBatteryState` | `BatteryStateService.connect()` | `()`      | Live `BatteryState` — plain value (React/Vue `Ref`), `Signal<BatteryState>` (Angular), seeded `UNKNOWN` |
-| `useLowPowerMode` | `useLowPowerMode` | `LowPowerModeService.connect()` | `()`      | Live `boolean` — plain value (React/Vue `Ref`), `Signal<boolean>` (Angular), seeded `false`             |
+| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Svelte (`/svelte`) | Solid (`/solid`)     | Signature | Returns                                                                                                                                          |
+| ----------------- | ----------------- | ------------------------------- | ------------------- | --------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useBatteryLevel` | `useBatteryLevel` | `BatteryLevelService.connect()` | `useBatteryLevel`   | `createBatteryLevel` | `()`      | Live battery level — `number` (React), `Ref<number>` (Vue), `Signal<number>` (Angular), `{ readonly current: number }` (Svelte), `Accessor<number>` (Solid), seeded `-1`           |
+| `useBatteryState` | `useBatteryState` | `BatteryStateService.connect()` | `useBatteryState`   | `createBatteryState` | `()`      | Live `BatteryState` — plain value (React/Vue `Ref`), `Signal<BatteryState>` (Angular), `{ readonly current: BatteryState }` (Svelte), `Accessor<BatteryState>` (Solid), seeded `UNKNOWN` |
+| `useLowPowerMode` | `useLowPowerMode` | `LowPowerModeService.connect()` | `useLowPowerMode`   | `createLowPowerMode` | `()`      | Live `boolean` — plain value (React/Vue `Ref`), `Signal<boolean>` (Angular), `{ readonly current: boolean }` (Svelte), `Accessor<boolean>` (Solid), seeded `false`                  |
 
 Angular's `connect()` returns a `Signal` — read it as `batteryLevel()` in code or in a template,
-same as every other `connect()`-based service in this project.
+same as every other `connect()`-based service in this project. Solid's `create*` primitives return
+an `Accessor` for the same reason: call it as `batteryLevel()`, never destructure it, since a Solid
+component body runs once and a destructured value would freeze at its first reading. Svelte's
+`use*` runes return a boxed getter, `{ readonly current }`, read as `batteryLevel.current` — a
+bare `$state` handed out of a plain function loses its reactivity once destructured, since Svelte 5
+runes are lexically scoped to the file that declares them.
 
 ### `BatteryState`
 
@@ -333,7 +379,7 @@ same as every other `connect()`-based service in this project.
 
 ## How the wrapper works
 
-`@symbiote-native/battery` ships **zero React/Vue/Angular logic in `expo-battery` itself** — that
+`@symbiote-native/battery` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-battery` itself** — that
 package's own JS hard-imports the `expo` meta-package (which this project never installs), so its
 free functions and event-name constants are hand-ported, verbatim, into this package's own
 `core/`, changing only the one import line that now pulls `EventSubscription` from

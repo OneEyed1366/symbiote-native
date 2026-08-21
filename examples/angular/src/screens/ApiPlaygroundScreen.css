@@ -25,6 +25,10 @@
   height: 24px;
   border-radius: 6px;
   background-color: #24304a;
+  /* RN defaults borderColor to BLACK, which is invisible on this panel — so the
+     `[style.borderWidth.px]` swatch animated 1px -> 4px of nothing. A width binding is only
+     observable once the colour is. */
+  border-color: #a3d94f;
 }
 
 .pg-lifecycle-box {
@@ -34,8 +38,12 @@
   gap: 2px;
 }
 
+/* Loud on purpose. This was #1c3a52 against .pg-swatch's #24304a — two dark blues a few points
+   apart, so every binding that flips this class (`[ngClass]`, `[class.x]`, a HostBinding) LOOKED
+   dead on device and read as "the toggle does nothing". A demo swatch has exactly one job: make
+   its own state legible from arm's length. */
 .pg-hb-active {
-  background-color: #1c3a52;
+  background-color: #4fd1a5;
 }
 
 .pg-host-meta-active {

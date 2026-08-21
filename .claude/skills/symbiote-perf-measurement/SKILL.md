@@ -1,6 +1,6 @@
 ---
 name: symbiote-perf-measurement
-description: "Symbiote performance measurement — read BEFORE claiming any part of the engine or an adapter is slow, before optimizing core/engine/src/commit.ts, and before writing or changing a benchmark. Holds the two instruments (the headless vitest micro-bench at core/engine/src/__tests__/reconcile.bench.ts, and the on-device readCommitProfile() seam in commit.ts feeding examples/react's BenchmarkScreen), the industry ruler we report against (js-framework-benchmark / krausest operation list, so numbers stay comparable to Vue/Svelte/Solid/Million), the DIRTY-MARKING design that now guards that walk (ISymbioteNode.dirty + markDirty in node.ts, the early exit in commit.ts, where every mark lives, the four traps — listeners must NOT mark, structural ops mark the parent not the moved child, the root container is marked at the commit entry point because top-level nodes have no parent, anchors are cleared in renderableChildren — and the silent-stale-UI failure mode it introduces), the measured before/after constants (no-op commit on 9761 nodes 3.4 ms -> 0.001 ms; one prop in a 10 005-node sectioned screen 3.2 ms -> 0.063 ms; an unmarked walk was ~0.5 us/node and ~77% of a commit), the rule that a FLAT benchmark tree cannot express a subtree-skip win so a bushy case must sit beside krausest's flat one, and that create-shaped rows are read off min because GC makes their p75 useless, the props-object-per-node-per-commit allocation finding and the --max-semi-space-size=64 requirement that follows from it, and the reasoning rule that a per-adapter spread (React 2 frames / Vue 1 / Svelte 0 on the same screen) CANNOT be caused by engine code every adapter shares. Trigger on 'is X slow', 'optimize reconcile', 'dirty marking', 'why do we drop frames', 'add a benchmark', 'measure the commit path', a GC/jank investigation, or any proposal to port Million.js-style block/edit-map ideas."
+description: "Symbiote performance measurement — read BEFORE claiming any part of the engine or an adapter is slow, before optimizing core/engine/src/commit.ts, and before writing or changing a benchmark. Holds the two instruments (the headless vitest micro-bench at core/engine/src/__tests__/reconcile.bench.ts, and the on-device readCommitProfile() seam in commit.ts feeding examples/react's BenchmarkScreen), the industry ruler we report against (js-framework-benchmark / krausest operation list, so numbers stay comparable to Vue/Svelte/Solid/Million), the DIRTY-MARKING design that now guards that walk (ISymbioteNode.dirty + markDirty in node.ts, the early exit in commit.ts, where every mark lives, the four traps — listeners must NOT mark, structural ops mark the parent not the moved child, the root container is marked at the commit entry point because top-level nodes have no parent, anchors are cleared in renderableChildren — and the silent-stale-UI failure mode it introduces), the measured before/after constants (no-op commit on 9761 nodes 3.4 ms -> 0.001 ms; one prop in a 10 005-node sectioned screen 3.2 ms -> 0.063 ms; an unmarked walk was ~0.5 us/node and ~77% of a commit), the rule that a FLAT benchmark tree cannot express a subtree-skip win so a bushy case must sit beside krausest's flat one, and that create-shaped rows are read off min because GC makes their p75 useless, the props-object-per-node-per-commit allocation finding and the --max-semi-space-size=64 requirement that follows from it, and the reasoning rule that a per-adapter spread (React 2 frames / Vue 1 / Svelte 0 on the same screen) CANNOT be caused by engine code every adapter shares. the FIVE-ADAPTER ANCHOR CENSUS (censusRetainedTree + readCommitProfile's childScans/childFlattens, one anchor-flatten-cost test per adapter) whose measured table — react/solid 0 anchors, vue 2, angular 3001, svelte 4002 per 1000 rows — closes rather than opens the suspect, because nodesVisited is identical under all five and the adapter carrying the MOST anchors is the fastest on device. Trigger on 'is X slow', 'optimize reconcile', 'dirty marking', 'anchors are slow', 'renderableChildren', 'why do we drop frames', 'add a benchmark', 'measure the commit path', a GC/jank investigation, or any proposal to port Million.js-style block/edit-map ideas."
 ---
 
 # Measuring SymbioteNative
@@ -217,6 +217,58 @@ The converse trap, equally important: this bounds the walk from ABOVE only.
 12 ms of that. Three equations, four unknowns — underdetermined. Do not read
 "does not explain the spread" as "is not worth fixing"; they are different claims.
 
+## Three perf hypotheses, one session, and what killed each (2026-08-20)
+
+Chasing Angular's ~3x on a 1000-row build. The order matters: each looked convincing when it was
+picked, and only one survived to a shipped change — which itself bought nothing.
+
+```
+hypothesis                       killed by                       cost of finding out
+ChangeDetectionStrategy.OnPush   headless counters, byte-         one measurement
+                                 identical with and without
+104 000 wasted setProp calls     device A/B after shipping the    a fix, a repack, a device run
+(vs Solid's 12 000, 90 000 of    fix: every row within +-10%,
+them writing undefined)          ms/commit back to 0.7
++33% engine nodes (12/row vs 9)  open — but the arithmetic is     -
+                                 against it, see below
+```
+
+**A reduction in WORK is not a reduction in TIME, and the gap can be total.** Cutting 90 000 engine
+calls to zero changed nothing measurable on Hermes. The calls were real waste and the fix stays —
+104 000 calls to build a byte-identical Fabric tree is indefensible on its own terms — but it
+explained none of the 3x. Report a work-count win as a work-count win; the time claim needs the
+device, every time.
+
+**Sanity-check the arithmetic BEFORE building the fix.** "+33% nodes causes 3x time" requires a
+sharply superlinear cost, and none had been located. That check costs one minute and would have
+demoted the suspect before anyone designed a counter for it. Ask what shape of curve the hypothesis
+implies, then ask whether anything in the code has that shape.
+
+**Design the probe to be able to refute.** The strongest form found here was SUBTRACTIVE and
+in-place: rather than synthesising Angular's node tax inside a faster adapter (where the mechanism
+differs and the headroom hides the effect), strip the composed components out of Angular's own row
+so it retains 9 nodes instead of 12, behind a toggle so both numbers come from one build in one
+session. Same framework, same binary, one variable.
+
+## `ms/commit` at constant `nodes/commit` separates a code regression from a dirty environment
+
+The single most useful diagnostic of the session, and it took seconds:
+
+```
+                    baseline    suspicious run    clean reinstall
+nodes / commit           63              69            60
+ms / commit             0.7             4.8           0.7
+create 1000 rows     2383ms          5464ms        2161ms
+```
+
+The middle column looked like a catastrophic 2.3x regression from a just-installed engine change.
+But the SAME work per commit taking 7x the time cannot be caused by a change that only ever removes
+calls — no code edit makes a fixed amount of work intrinsically slower. It was a stale install; a
+clean reinstall landed back on the baseline. Whenever a benchmark moves right after a package swap,
+read the per-unit number first: if work-per-commit is flat and time-per-commit exploded, suspect the
+environment, not the diff. Corollary: never compare a debug run against a release baseline — and
+say which build produced a number when reporting it.
+
 ## Related paths that look like ours but are not
 
 - Sticky headers have two paths: `sticky-native` (offset attached on the UI
@@ -407,6 +459,7 @@ commits each reactivity system emits, and what it costs around each, varies. `ms
 1.9, Svelte 2.3, Vue 7.2 — is where the real adapter spread lives.
 
 <press_order_changes_the_structural_rows>
+
 ```
 §press_order_regression := {
   bug: "two runs of the SAME adapter, same build, same screen differ up to 4x on structural ops — screen does not pin button-press order; Remove/Append cost scales with current row count (flat parent re-appends every child handle on structural change)",
@@ -417,6 +470,7 @@ commits each reactivity system emits, and what it costs around each, varies. `ms
   open: "fix = screen drives a fixed operation sequence from a known state (reset to N rows before each timed op) — a ruler-contract change in benchmark-screen-spec.md that must land in all five flavors at once or it becomes drift",
 }
 ```
+
 </press_order_changes_the_structural_rows>
 
 ## krausest's OPERATIONS transfer to native. Its SCALE does not.
@@ -424,7 +478,7 @@ commits each reactivity system emits, and what it costs around each, varies. `ms
 Take the operation list verbatim — create/replace/partial-update/select/swap/remove is
 the right vocabulary and keeps our numbers comparable. Do **not** take the row counts.
 
-krausest is a *web* benchmark. 10 000 rows there is 10 000 DOM nodes: heavy, but a
+krausest is a _web_ benchmark. 10 000 rows there is 10 000 DOM nodes: heavy, but a
 browser does it. On a native host the same JSX is a different animal. Measured
 2026-08-18, `examples/react` BenchmarkScreen:
 
@@ -518,12 +572,94 @@ LogBox.ignoreAllLogs(true);
 const reported = new Set();
 globalThis.ErrorUtils?.setGlobalHandler?.(error => {
   const message = String(error?.message ?? error);
-  if (reported.has(message)) return;   // an update loop rethrows forever and buries its own stack
+  if (reported.has(message)) return; // an update loop rethrows forever and buries its own stack
   reported.add(message);
-  console.error('[trap]', message, '\n', String(error?.componentStack ?? error?.stack ?? ''));
+  console.error(
+    '[trap]',
+    message,
+    '\n',
+    String(error?.componentStack ?? error?.stack ?? ''),
+  );
 });
 ```
 
 Lessons: a component is unverified until it runs at the scale it claims to support; a
 bisect on ONE parameter (200 → 5 sections) separated "structural bug" from "scale bug" in
 a single reload, after two static-analysis hypotheses had already been formed and killed.
+
+## The anchor census — measured 2026-08-20, and it closes a suspect rather than opening one
+
+Third instrument, added when Angular's benchmark create looked ~3x slower than the others while its
+point operations were normal. Two halves, both permanent and both release-build-safe:
+
+```
+core/engine/src/commit.ts   readCommitProfile() gains childScans / childScanProbed /
+                            childFlattens / childFlattenProbed / childFlattenWidest
+                            — what renderableChildren costs over the window
+core/engine/src/node.ts     censusRetainedTree(roots) -> nodes / anchors / emptyRawTexts /
+                            renderable / flattenWidths (widest first)
+adapters/*/src/anchor-flatten-cost.test.*   one per adapter: the canary BenchmarkRow x1000
+                            through each REAL reconciler, numbers via dlog (DEBUG=1)
+```
+
+Same list, same row, 1000 rows, five real reconcilers:
+
+```
+adapter    nodes  anchors  renderable  nodes/row  flatten sites  widths
+react       9001        0        9001       9.00              0  -
+solid       9001        0        9001       9.00              0  -
+vue         9003        2        9001       9.00              1  [1002]
+angular    12002     3001        9001      12.00           1001  [1001, 3, 3, 3, ...]
+svelte     13004     4002        9002       13.00           3002  [1001, 5, 5, 5, ...]
+```
+
+```
+§anchor_count_is_an_adapter_property := {
+  react_solid: "a component is a function returning children — zero nodes",
+  vue: "components free, but a v-for FRAGMENT costs 2 anchors, wherever it appears",
+  angular: "one host element per composed component INSTANCE — 3/row here (row + 2 Pressables)",
+  svelte: "TWO anchors per composed component with a render tag, +2 per each-block — 4/row",
+  ⟶ "grepping adapter sources for 'anchor' (4/17/26/15/292 for react/vue/svelte/solid/angular) ranks them WRONG: it measures how much each adapter talks about anchors, not how many it builds",
+}
+```
+
+Per operation, `childScans` / `childFlattens` / widest flatten:
+
+```
+op        react        solid        vue          angular        svelte
+create    9002/0/0     9002/0/0     9004/1/1002  12003/1001/1001  13005/3002/1001
+select       3/0/0        3/0/0        5/1/1002   1006/   2/1001      8/   3/1001
+partial    403/0/0      902/0/0      404/1/1002   1603/ 101/1001    705/ 202/1001
+append    9003/0/0     9002/0/0     9004/1/2002  13003/1001/2001  13005/3002/2001
+```
+
+```
+§anchors_do_not_explain_the_create_gap := {
+  hypothesis: "Angular's anchors defeat renderableChildren's fast path on the 1000-wide list, so every reconcile pays an O(children) scan + a fresh array + recursion",
+  true_part: "defeated, yes — the list flattens on EVERY operation, over 1001 children",
+  falsifier_1: "commits = 1 for every adapter on every op. The wide flatten happens ONCE per commit, not once per child reconcile — there is no quadratic term to find",
+  falsifier_2: "nodesVisited is 9002 for ALL FIVE on create. Anchors are flattened out before reconcile, so the walk does identical work under every adapter — the engine cannot be the source of a per-adapter create gap (the reasoning rule above, now measured rather than argued)",
+  falsifier_3: "SVELTE pays more of this than Angular — 4002 anchors, 3002 flatten sites, 13005 scans vs 12003 — and is the FASTEST adapter on the device table above (Create 875 ms vs React 840 / Vue 1123)",
+  ⟶ "SUSPECT CLOSED. Angular's create cost is above the engine: template instantiation, directive machinery, change detection. Look at angular-adapter §21 / angular-adapter-change-detection, not at commit.ts",
+}
+§why_no_fix_landed := {
+  a_skipped_child_counter: "would make the probe O(1) — saves ~9-11k predicate evaluations per create. But it helps the adapters with NO anchors (they pay only the probe) and barely helps Angular (which still pays the flatten, the recursion and the array), i.e. it widens the very gap it was meant to close. Costs a new mutable field on the hot ISymbioteNode shape — the exact thing ANCHOR_COMPONENT's sentinel-name design avoided — and its drift failure mode is a silent wrong render",
+  b_memoized_flat_list: "kills probe+flatten+recursion, but the cache must also invalidate on a structural change inside any ANCHOR descendant; bubbling a structure version through anchors breaks markDirty's stop-at-first-dirty, and re-validating each anchor is O(anchors) again — no better for the only tree that needs it",
+  c_remove_angular_anchors: "checked, structural. Renderer2.createElement is the only seam and must return a node Angular can appendChild into and use as parentNode for the component's own template; LView[HOST] cannot be empty. anchor-host-registry.ts already does the only thing available — stop it painting",
+  d_taken: "instrument, close the suspect, change nothing. The scans are wide (1001) but happen once per commit, and the adapter that pays most is the fastest",
+  honest_cost_of_the_instrument: "+2 integer increments per renderableChildren call, +3 more per flatten (~24k per Angular create). Same un-gated style as propStats, for the same reason",
+}
+```
+
+Two harness traps this cost a round each:
+
+- **An app-authored Angular component must `registerComposedComponent(selector)` in the test**, as
+  the babel-register-composed plugin does for the real app. Without it the row's host falls through
+  to a real `createNode`: the row measured TEN native views instead of nine and one of its three
+  anchors showed up as a painted view — a different tree, quietly.
+- **Vitest cannot import `@symbiote-native/svelte`'s components** — they are `.svelte` files and no
+  svelte plugin is wired into `vitest.config.ts`. Svelte's column composes a local Pressable stub
+  over the raw `symbiote-view` host tag instead; same node count, same composition depth.
+
+A `core/*` change is invisible to `examples/*` until the pack loop runs, so none of this is on
+device yet — the counters only reach a canary's meter after `pnpm pack` + reinstall + `pod install`.

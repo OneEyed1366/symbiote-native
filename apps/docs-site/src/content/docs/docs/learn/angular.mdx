@@ -19,8 +19,8 @@ import { Aside } from '@astrojs/starlight/components';
   build too — see the [status page](/docs/project/status/) for the exact line.
 </Aside>
 
-The Angular adapter drives the same native Fabric engine as React and Vue
-through a custom `Renderer2`/`RendererFactory2` — Angular's own
+The Angular adapter drives the same native Fabric engine as React, Vue, Svelte,
+and Solid through a custom `Renderer2`/`RendererFactory2` — Angular's own
 framework-agnostic rendering seam. Bootstrap is DOM-less: no
 `platform-browser`, no zone.js. Angular renderer operations become engine
 mutations, then Fabric commits real native views.
@@ -47,7 +47,7 @@ mutations, then Fabric commits real native views.
 </video>
 
 _The `examples/angular` canary — the same component surface and engine as
-the React and Vue canaries, driven through `Renderer2` instead._
+the React, Vue, Svelte, and Solid canaries, driven through `Renderer2` instead._
 
 ## Minimal component
 

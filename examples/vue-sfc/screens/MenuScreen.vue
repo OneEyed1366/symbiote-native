@@ -3,11 +3,13 @@
   pushing its own dedicated demo screen onto the same root Stack. Replaces Canary as the initial
   route; Canary itself is unchanged (just relocated) and reachable from the first row.
 
-  Rows are grouped into 7 thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +  2-letter badge per line, carried through onto each demo screen's own line tag — so the tour
+  Rows are grouped into thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
+  2-letter badge per line, carried through onto each demo screen's own line tag — so the tour
   reads as one system instead of a flat bag of unrelated test screens. Five of the lines are
-  @symbiote-native/navigation itself; the sixth (Composition, the API Playground row) is Vue's own
-  template/API surface — no navigation package involved, still wearing the same wayfinding
-  language. Vue SFC twin of .examples/react/screens/MenuScreen.tsx.
+  @symbiote-native/navigation itself; Composition (the API Playground row) is Vue's own
+  template/API surface and Styling (the showcase row) is the CSS compiler — no navigation package
+  involved in either, both still wearing the same wayfinding language. Vue SFC twin of
+  .examples/react/screens/MenuScreen.tsx.
 -->
 <script setup lang="ts">
 import {
@@ -43,6 +45,11 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     label: 'API Playground',
     route: ROUTE_NAME.ApiPlayground,
     hint: "v-show, KeepAlive, Suspense, provide/inject — Vue's own API surface",
+  },
+  {
+    label: 'Styling showcase',
+    route: ROUTE_NAME.StyleShowcase,
+    hint: 'CSS · Modules · SCSS/Less/Stylus — and what is refused',
   },
   {
     label: 'Header options',
@@ -105,13 +112,14 @@ function lineInfoFor(route: ITourRouteName) {
     >
       <View class="menu-hero">
         <Text class="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
-        <Text class="menu-hero-title">Eleven stops along the stack</Text>
+        <Text class="menu-hero-title">Twelve stops along the stack</Text>
         <Text class="menu-hero-subtitle"
           >Ten rows drive a different line of @symbiote-native/navigation —
           Primitives, Presentation, Structure, Introspection, Routing — on a
           real native stack, plus a Performance stop timing the engine's own
-          commit path. The remaining stop is Composition: Vue's own template/API
-          surface instead.</Text
+          commit path and a Styling stop showing the whole CSS compiler surface.
+          The remaining stop is Composition: Vue's own template/API surface
+          instead.</Text
         >
       </View>
       <Pressable

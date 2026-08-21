@@ -3,6 +3,8 @@ paths:
   - 'examples/**'
   - 'core/components/**'
   - 'core/engine/**'
+  - 'scripts/overlay-local-packages.mjs'
+  - 'scripts/check-bundle-framework-isolation.mjs'
 ---
 
 # A `core/*` change is invisible to `examples/*` — and the failure is a blank white screen
@@ -63,3 +65,80 @@ the INSTALLED copies actually export — run from the example directory:
 
 A miss names the exact symbol and package. Run it after every re-pack; it costs nothing and it is
 the only signal that appears before the simulator.
+
+## The same gap, in CI: `overlay-local-packages.mjs` was `packages/*`-only
+
+`scripts/overlay-local-packages.mjs` exists to give `check-bundle-framework-isolation.mjs`
+this-commit's build instead of the registry version (same problem, CI-side). It only overlaid
+`packages/*` (slider, navigation, …) — `core/engine`, `core/components`, and every
+`adapters/*` stayed on whatever's published, so example source that outruns the last publish of
+those packages fails CI with an error that looks unrelated to staleness.
+
+Measured 2026-08-21: `examples/angular`'s `BenchmarkScreen`/`JsFrameRateMeter` called
+`readCommitProfile`/`registerPostCommit` — real exports of `core/engine`, absent from the
+published `0.2.0` — and got `TS2305: has no exported member`. Its `SectionList` binding to
+`getItemLayout` failed `NG8002` the same way, because `@symbiote-native/angular@0.7.0` (published)
+predates that Input. Both read as ordinary source bugs, not a stale-package symptom.
+
+Fix: `overlay-local-packages.mjs` now also overlays `core/engine`, `core/components`, and
+`adapters/angular` (an `OVERLAY_ONLY` allowlist alongside the `packages/*` prefix match) — picked
+narrowly, not blanket-widened to every `core/`+`adapters/`. Also overlaying `core/css-parser` and
+`adapters/{react,vue,svelte}` was tried and reverted: `core/css-parser` gained a real new
+dependency (`lightningcss`) that the overlay's swap-the-folder-contents trick can't install (it
+never touches `package-lock.json`, only `pnpm pack` + extract over an already-`npm install`ed
+folder — new transitive deps need the full `file:` + reinstall dance from the section above,
+not this overlay), and the Vue/Svelte adapters called a `compileScopedCss` export the registry
+`css-parser` doesn't have either. Widen this allowlist only when a specific example genuinely
+needs it, and check whether the overlaid package pulled in a NEW dependency first.
+
+## A half-migrated example is WORSE than a fully-registry one
+
+Line 90 above named the risk (`compileScopedCss` export the registry `css-parser` lacks) for the
+CI overlay script; the same mismatch hit `examples/*` for real on 2026-08-21, in two stacked
+layers, both invisible to `tsc`/tests/eslint.
+
+**Layer 1.** Someone had switched `engine`/`components`/`css-parser` from registry semver
+(`^0.2.0`) to `file:../../.tarballs/symbiote-native-engine-0.2.0.tgz` in only 2 of 5 examples
+(`solid`, `vue-tsx`). The other 3 (`react`, `svelte`, `angular`) kept the registry range —
+resolving a DIFFERENT build behind the SAME declared version number. Startup crash, module-load
+`TypeError: undefined is not a function`, in every example except the 2 that had fully moved.
+
+**Layer 2, after fixing layer 1.** Each example's OWN framework adapter
+(`@symbiote-native/{react,svelte,angular}`) was STILL on registry semver. The registry adapter's
+compiled preprocessor (`@symbiote-native/svelte/build/preprocessor/scoped-styles.js`) called the
+OLD css-parser export `classTokensIn` — renamed to `compileScopedCss` locally, no version bump —
+which no longer exists in the now-local `css-parser`. Metro-time:
+`does not provide an export named 'classTokensIn'`. The adapter tarballs already sitting in
+`.tarballs/` were clean; only the registry-installed copies carried the stale call.
+
+**Do not assume "internally consistent on registry" is safe to skip.** `vue-sfc` looked fine by
+that reasoning (all deps same-family registry versions) and was left unchecked first — it needed
+the identical fix once actually verified. Check every example the same way; category-based
+exemption is not a substitute.
+
+**Diagnostic** (grep/tsc miss both layers): extract a `.tarballs/*.tgz` and byte-diff its
+`build/*.js` against each example's installed `node_modules/@symbiote-native/<pkg>/build/*.js`.
+Same declared version + different bytes = the tell (layer 1). Then grep the installed adapter's
+build tree for the Metro error's exact missing-export name to find which package still resolves
+the stale API (layer 2).
+
+**Fix — move together, not one dep at a time.** If ANY of an example's `@symbiote-native/*` deps
+sits on a local `.tarballs/*.tgz`, every dep with local-dev churn must move with it — shared
+(`engine`/`components`/`css-parser`) AND that example's own adapter, in the same pass:
+
+```sh
+# per example, once its shared deps go local:
+rm -rf node_modules/@symbiote-native && rm -f package-lock.json && npm install
+cd ios && pod install
+```
+
+A half-migrated example silently mixes an old published API surface with a new local one — worse
+than leaving it fully on the registry.
+
+## `check-bundle-framework-isolation.mjs` also needs Angular's `build/` before bundling
+
+Every other example bundles straight from source; Angular's `index.js` imports
+`./build/angular/src/App` — gitignored `ngc` AOT output, produced only by `npm run ng:build`.
+Bundling before that step fails on the FIRST import with a plain "module not found", which reads
+like a broken example, not a missing build step. Fixed by running `npm run ng:build` in
+`buildBundleSources()` before the `react-native bundle` call, framework-gated on `angular`.

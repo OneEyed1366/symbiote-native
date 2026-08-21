@@ -273,6 +273,35 @@ Verified 2026-08-18 on `examples/react`: probe before `npm run ios:release` = 13
 So "Pods holds debug while I am building Release" is NOT the bug and clearing pods over it wastes
 a build. The failure above is specifically a stale or missing DOWNLOAD, and its signature is a
 LINKER error naming `facebook::react::Sealable` / `getDebug*` — not a probe result on its own.
+
+**`examples/expo-*/node_modules` bloats to 2.2-2.3GB each — 89MB × ~25 duplicated `expo` copies,
+one per `@symbiote-native/*` Expo wrapper.** None of the six `expo-*` examples declares `expo`
+itself as a dependency — every wrapper package (`@symbiote-native/sensors`, `.../battery`, …)
+reaches it only transitively via `expo-sensors`/`expo-battery`/etc. → `expo`. With no root-level
+request anchoring a version, npm's arborist nests a separate `expo` copy (its own `@expo/cli` +
+`config-plugins` + `fingerprint` tree, ~89MB) inside every wrapper's own `node_modules` — even
+though all ~25 copies resolve to the SAME version. `expo-modules-core`, depended on identically by
+every wrapper, hoists fine to one top-level copy; the difference is specifically that nothing
+requests `expo` from the root, not a generic dedup failure. Fix: add `"expo": "<pinned SDK
+version>"` as an explicit dependency in the example's `package.json` — this is also the CORRECT
+shape (a real `create-expo-app` project always declares `expo` directly; wrapper packages expect
+it to already be present) — then `rm -f package-lock.json && rm -rf node_modules && npm install`.
+Verified 2026-08-21 across all six `expo-*` examples: `node_modules` 2.2-2.3GB → 600-660MB each,
+zero nested `expo` copies, no ERESOLVE/peer conflicts. If the pinned `expo` version and the
+catalog's `expo-modules-core`/`expo-sensors`/etc. version ever drift apart, that surfaces as a
+real Expo SDK compatibility bug (modules must ship in lockstep with one SDK release) — fix the
+version skew, don't reach for a workaround.
+
+**Reinstalling any `examples/*` app after a FAILED `npm install` needs the lockfile deleted, not
+just `node_modules`, or a stale `integrity` field blocks the retry — `npm cache clean --force`
+does NOT fix it.** A run that fails partway (e.g. `EINTEGRITY` against a rebuilt `.tarballs/*.tgz`,
+see the re-pack gotcha above) can still write a partial `package-lock.json` recording the OLD
+tarball's hash. The next `npm install` then errors `EINTEGRITY … wanted <old-hash> but got
+<new-hash>` even after `rm -rf node_modules` and even after clearing npm's cache — because the
+stale hash lives in the project's own `package-lock.json`, not in npm's cache. Fix: `rm -f
+package-lock.json` before retrying, same as the `file:` re-pack case — this is the same failure
+shape (stale lockfile integrity vs. changed tarball bytes), just triggered by a failed install
+instead of a re-pack.
 </examples_vs_dot_examples>
 
 <components_split_logic_view_lifecycle>
@@ -448,14 +477,22 @@ bring-up step) should add a `dlog` at its seam as a matter of course.
   source reduces to plain CSS text before the same parser/registry pipeline runs, so every
   scoped/module/`:global()` mechanism above applies identically regardless of source language;
   `sass`/`less`/`stylus` are lazy-optional devDependencies of `@symbiote-native/css-parser` only, never
-  forced on a project that doesn't author them. Cross-adapter class/style resolution (React,
-  Vue, Angular) is exercised for plain CSS and CSS Modules; the preprocessor layer is newer and
-  not yet exercised as heavily end-to-end. `$style.card` property-access type safety (`.d.ts`
-  generation), Svelte's default-scoped styles, and `background-image` (CSS gradients — a real
-  native Fabric prop via `experimental_backgroundImage`, unlike Tailwind; `filter` and
-  `transform-origin` are already done) are recorded in that skill as the remaining open,
-  unimplemented seams. JS style objects via `StyleSheet.create` remain the baseline every
-  adapter supports; the CSS path is additive.
+  forced on a project that doesn't author them. **The whole surface — plain CSS, CSS Modules
+  (`composes`, `:global()`), all three preprocessors, and what the compiler deliberately refuses
+  — is exercised by one screen present in all five examples, `StyleShowcaseScreen` (2026-08-20);
+  React's is device-verified, the other four are ported but not yet built.** Every tile is built
+  so a dropped rule is VISIBLE rather than silent, which is what makes it a regression canary and
+  not a gallery — read it before claiming any part of this pipeline is broken or missing. Three
+  claims this paragraph used to carry are now WRONG and must not be repeated: `$style.card` type
+  safety is closed for standalone `.module.css` (`css-dts` + the TS plugin; only the INLINE
+  `<style module>` typo case is still open), Svelte's default-scoped styles are BUILT (the
+  scoper's third pattern `[local]__svelte-<hash>`, same single lightningcss rename as Vue's
+  `__module__` / `__data-v-`), and `background-image` shipped in 2026-07 alongside `filter` and
+  `transform-origin`. What IS still open is recorded in that skill, and `filter` carries a
+  platform caveat worth knowing before demoing it: on iOS RN paints only `brightness` and
+  `opacity` unless the `enableSwiftUIBasedFilters` flag is on, so `grayscale`/`blur`/`saturate`/
+  `contrast`/`hue-rotate` silently do nothing there. JS style objects via `StyleSheet.create`
+  remain the baseline every adapter supports; the CSS path is additive.
 
 ## Milestones
 

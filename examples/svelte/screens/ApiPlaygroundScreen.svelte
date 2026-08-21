@@ -21,7 +21,6 @@
   import TemplateSyntaxDemo from '../components/api-playground/TemplateSyntaxDemo.svelte';
   import BindingsDemo from '../components/api-playground/BindingsDemo.svelte';
   import EventsActionsDemo from '../components/api-playground/EventsActionsDemo.svelte';
-  import EasingDemo from '../components/api-playground/EasingDemo.svelte';
   import CompositionDemo from '../components/api-playground/CompositionDemo.svelte';
   import StoresDemo from '../components/api-playground/StoresDemo.svelte';
   import SpecialElementsDemo from '../components/api-playground/SpecialElementsDemo.svelte';
@@ -58,7 +57,6 @@
     <TemplateSyntaxDemo />
     <BindingsDemo />
     <EventsActionsDemo />
-    <EasingDemo />
     <CompositionDemo>
       {#snippet header()}
         <Text class="note-text">

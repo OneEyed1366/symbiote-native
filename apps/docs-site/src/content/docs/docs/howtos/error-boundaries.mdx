@@ -1,19 +1,22 @@
 ---
-title: 'How to: catch render errors with <svelte:boundary>'
-description: A real Svelte-only error boundary — a failed snippet and reset(), sourced from the adapter's own smoke test.
+title: 'How to: catch render errors with a boundary'
+description: Real error boundaries on Svelte and Solid - a fallback and reset(), sourced from each adapter's own tests.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Svelte 5 ships a real error-boundary primitive, `<svelte:boundary>`. This is
-currently **Svelte-only** in this project: React's class-component
+Svelte 5 and Solid both ship a real error-boundary primitive -
+`<svelte:boundary>` and solid-js's `<ErrorBoundary>`, re-exported verbatim
+from the Solid adapter barrel. React and Vue don't: React's class-component
 `componentDidCatch` boundary is not exposed as a documented pattern in the
 [React API](/docs/api/react/), and Vue's nearest tool, `onErrorCaptured`, is a
 different shape — a hook you write yourself, not a template construct with
 its own fallback UI. If you need the same fallback-UI behavior on those
 adapters today, you're on your own.
 
-## Basic usage
+## Svelte: `<svelte:boundary>`
+
+### Basic usage
 
 Wrap the part of the tree that might throw during render, and provide a
 `failed` snippet as the fallback:
@@ -42,7 +45,7 @@ Source: `adapters/svelte/src/boundary.smoke.test.ts`, run against the real
 Svelte compiler and asserted against the exact committed Fabric tree, not a
 mock — these examples are transcribed from its real markup.
 
-## Capturing `reset()` for a retry button
+### Capturing `reset()` for a retry button
 
 The trap: `reset` arrives as a snippet parameter, and this looks reasonable
 but silently doesn't work:
@@ -82,7 +85,7 @@ failedBag: reset => {
   captured this way is called as `reset()`, not read as `reset`.
 </Aside>
 
-## What's proven, not just compiled
+### What's proven, not just compiled
 
 `<svelte:boundary>` was compile-verified only before this — the preprocessor
 allowed it and `tsc --build` saw nothing, but nothing in the repo had ever run
@@ -98,3 +101,80 @@ lists rather than `toBeDefined()`:
   without leaving the failed subtree behind as a duplicate;
 - a boundary wrapping a real `{#each}` list survives a reorder + grow +
   shrink in one update without losing track of its own anchor.
+
+## Solid: `<ErrorBoundary>`
+
+No adapter code at all - `ErrorBoundary` is solid-js's own primitive,
+re-exported unchanged from `@symbiote-native/solid`. It catches only what
+throws while its subtree is rendering or updating; an error thrown from an
+event handler (an `onPress`) never reaches it, exactly like Svelte's
+`onerror`.
+
+### Basic usage
+
+```tsx
+import { ErrorBoundary, Show } from 'solid-js';
+import { Text, View } from '@symbiote-native/solid';
+
+<ErrorBoundary
+  fallback={(error, reset) => (
+    <View>
+      <Text testID="failed">{`caught: ${error.message}`}</Text>
+      <ActionButton
+        title="reset"
+        onPress={() => {
+          setExploding(false);
+          reset();
+        }}
+      />
+    </View>
+  )}
+>
+  <Show when={exploding()} fallback={<Text>subtree is healthy</Text>}>
+    <Exploder />
+  </Show>
+</ErrorBoundary>;
+```
+
+- Nothing throws -> the boundary paints no native node of its own.
+- The child throws during render -> the subtree is torn down, `fallback`
+  receives the error and a `reset()` callback, and paints in its place.
+- `reset()` re-runs the subtree - it doesn't un-throw on its own, so clear
+  whatever condition caused the throw (`setExploding(false)` above) before
+  calling it, the same ordering Svelte's retry button needs.
+
+### Event-handler errors need `catchError`, not the boundary
+
+A throw inside `onPress` never reaches `<ErrorBoundary>` - solid-js's
+`catchError` is the tool for that case instead:
+
+```tsx
+import { catchError } from 'solid-js';
+
+const onPress = () =>
+  catchError(
+    () => {
+      throw new Error('thrown inside a handler');
+    },
+    error => setCaught(error.message),
+  );
+```
+
+Source: `examples/solid/components/api-playground/ErrorBoundaryDemo.tsx`
+runs both side by side, since knowing which one applies is the whole
+difficulty.
+
+### What's tested
+
+`adapters/solid/src/render-error-reporting.test.tsx` runs a real
+`<ErrorBoundary>` against the engine's fake Fabric and asserts, not just
+compiles:
+
+- a boundary-caught error stays off the native redbox reporter - writing a
+  boundary is the app saying "I'm handling this," so a full-screen redbox
+  over the fallback it just painted would contradict that, matching React's
+  and Vue's adapters;
+- the fallback commits as the real child in place of the thrown subtree.
+
+Verified via vitest against the fake Fabric tree, not yet exercised on a
+real device.

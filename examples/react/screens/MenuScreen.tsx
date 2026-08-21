@@ -28,6 +28,11 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     hint: 'React hooks, Suspense, Context, refs, error boundaries — live',
   },
   {
+    label: 'Styling showcase',
+    route: ROUTE_NAME.StyleShowcase,
+    hint: 'CSS · Modules · SCSS/Less/Stylus — and what is refused',
+  },
+  {
     label: 'Header options',
     route: ROUTE_NAME.HeaderOptions,
     hint: 'bar buttons, menu, search bar, large title',
@@ -79,7 +84,7 @@ const MENU_ITEMS: readonly IMenuItem[] = [
  * each pushing its own dedicated demo screen onto the same root Stack. Replaces Canary as the
  * initial route; Canary itself is unchanged and reachable from the first row.
  *
- * Rows are grouped into 6 thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
+ * Rows are grouped into 7 thematic "lines" (navigation-lines.ts's ROUTE_LINE_INFO) — a color +
  * 2-letter badge per line, carried through onto each demo screen's own line tag — so the tour
  * reads as one system instead of a flat bag of unrelated test screens. API Playground is the
  * one row that isn't about @symbiote-native/navigation at all — it demos React's OWN API
@@ -97,12 +102,13 @@ export function MenuScreen() {
       >
         <View className="menu-hero">
           <Text className="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
-          <Text className="menu-hero-title">Eleven stops along the stack</Text>
+          <Text className="menu-hero-title">Twelve stops along the stack</Text>
           <Text className="menu-hero-subtitle">
             Each row below drives a different line of
             @symbiote-native/navigation — Primitives, Presentation, Structure,
             Introspection, Routing — on a real native stack, plus a Performance
-            stop timing the engine's own commit path.
+            stop timing the engine's own commit path and a Styling stop showing
+            the whole CSS compiler surface.
           </Text>
         </View>
         {MENU_ITEMS.map(item => {

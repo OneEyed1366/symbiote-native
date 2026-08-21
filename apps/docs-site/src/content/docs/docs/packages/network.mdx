@@ -25,6 +25,7 @@ updates, the same seed-then-subscribe shape as battery's own hooks — everythin
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 <Aside type="note">
   `NetworkStateType.BLUETOOTH`, `WIMAX`, `VPN`, and `OTHER` are Android-only —
@@ -117,6 +118,19 @@ versions — never install either yourself, and never add the `expo` meta-packag
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createNetworkState } from '@symbiote-native/network/solid';
+
+    export default function ConnectionStatus() {
+      const networkState = createNetworkState(); // Accessor<NetworkState>, {} until the first reading arrives
+
+      return <Text>{networkState().isConnected ? `Connected via ${networkState().type}` : 'Offline'}</Text>;
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ### One-shot functions
@@ -147,9 +161,9 @@ const airplaneMode = await isAirplaneModeEnabledAsync();
 
 ### `useNetworkState()` / `NetworkStateService.connect()`
 
-| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Svelte (`/svelte`) | Signature | Returns                                                                                                                                                                                |
-| ----------------- | ----------------- | ------------------------------- | ------------------ | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `useNetworkState` | `useNetworkState` | `NetworkStateService.connect()` | `useNetworkState`  | `()`      | Live `NetworkState` — plain value (React), `Ref<NetworkState>` (Vue), `Signal<NetworkState>` (Angular), `{ readonly current: NetworkState }` (Svelte, read as `.current`), seeded `{}` |
+| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Svelte (`/svelte`) | Solid (`/solid`)          | Signature | Returns                                                                                                                                                                                |
+| ----------------- | ----------------- | -------------------------------- | ------------------- | --------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useNetworkState` | `useNetworkState` | `NetworkStateService.connect()` | `useNetworkState`  | `createNetworkState` | `()`      | Live `NetworkState` — plain value (React), `Ref<NetworkState>` (Vue), `Signal<NetworkState>` (Angular), `{ readonly current: NetworkState }` (Svelte, read as `.current`), `Accessor<NetworkState>` (Solid), seeded `{}` |
 
 ### `NetworkState` / `NetworkStateEvent`
 
@@ -199,7 +213,7 @@ const airplaneMode = await isAirplaneModeEnabledAsync();
 
 ## How the wrapper works
 
-`@symbiote-native/network` ships **zero React/Vue/Angular logic in `expo-network` itself** — that
+`@symbiote-native/network` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-network` itself** — that
 package's own JS is hand-ported, verbatim, into this package's own `core/` (its types file has no
 `expo` meta-package import to swap out in the first place, unlike local-auth's or brightness's):
 

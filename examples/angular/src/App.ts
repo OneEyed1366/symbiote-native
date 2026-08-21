@@ -48,7 +48,7 @@ import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { ReactiveStyleScreen } from './screens/ReactiveStyleScreen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
-import { ProbeScreen } from './screens/ProbeScreen';
+import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { LINE_COLOR } from './navigation-lines';
 // Static look lives in App.css — a plain global .css file, compiled at build time by
@@ -150,9 +150,9 @@ const DARK_HEADER_STYLE = { backgroundColor: '#0b1622' } as const;
       ></ng-template>
       <ng-template
         symbioteScreen
-        name="Probe"
-        [component]="probeScreen"
-        [options]="probeOptions"
+        name="StyleShowcase"
+        [component]="styleShowcaseScreen"
+        [options]="styleShowcaseOptions"
       ></ng-template>
     </Stack>
   `,
@@ -175,7 +175,7 @@ export class AppComponent implements OnInit, AfterViewInit {
   readonly reactiveStyleScreen = ReactiveStyleScreen;
   readonly apiPlaygroundScreen = ApiPlaygroundScreen;
   readonly benchmarkScreen = BenchmarkScreen;
-  readonly probeScreen = ProbeScreen;
+  readonly styleShowcaseScreen = StyleShowcaseScreen;
 
   readonly menuOptions: IAngularScreenOptions = {
     title: 'Navigation Demos',
@@ -302,11 +302,11 @@ export class AppComponent implements OnInit, AfterViewInit {
     headerUserInterfaceStyle: 'dark',
   };
 
-  readonly probeOptions: IAngularScreenOptions = {
-    title: 'Angular probe',
+  readonly styleShowcaseOptions: IAngularScreenOptions = {
+    title: 'Styling showcase',
     headerShown: true,
     headerTranslucent: true,
-    headerTintColor: LINE_COLOR.performance,
+    headerTintColor: LINE_COLOR.styling,
     headerTitleColor: '#ffffff',
     headerStyle: DARK_HEADER_STYLE,
     headerUserInterfaceStyle: 'dark',

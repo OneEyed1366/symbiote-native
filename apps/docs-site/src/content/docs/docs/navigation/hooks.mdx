@@ -1,6 +1,6 @@
 ---
 title: Hooks & focus
-description: Reading the current route/navigator and reacting to screen focus from React, Vue, Angular, and Svelte.
+description: Reading the current route/navigator and reacting to screen focus from React, Vue, Angular, Svelte, and Solid.
 ---
 
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -12,7 +12,11 @@ framework idiom — React, Vue, and Svelte use `useX()`, Angular uses `injectX()
 typo: Angular's own ecosystem convention names an [`inject()`](https://angular.dev/guide/di/dependency-injection)-based
 function `injectX`, the same way this site's [Angular guide](/docs/learn/angular/) documents for
 every other Angular-adapter API. Svelte calls this bucket "runes" rather than "hooks", but the
-function names are identical to React's/Vue's. All four read from the nearest enclosing
+function names are identical to React's/Vue's. Solid splits the bucket by what a primitive does,
+not by a blanket prefix: `useX()` for the ones that only read an existing scope (`useNavigation`/
+`useRoute` and the three narrowed variants, Solid's own `useContext` sense), and `createX()` for
+the ones that own a signal or a subscription (`createIsFocused`/`createFocusEffect`/
+`createNavigationState`, Solid's `createSignal` sense). All five read from the nearest enclosing
 `<Stack>`, `<Tab>`, or `<Drawer>` screen and throw if called outside one.
 
 <Aside type="tip">
@@ -21,9 +25,12 @@ function names are identical to React's/Vue's. All four read from the nearest en
   [Core concepts](/docs/navigation/#core-concepts)). Call `useRoute()`/`useNavigation()` (or
   Angular's `injectRoute()`/`injectNavigation()`), or the navigator-specific narrowed variants
   below. The other three primitives on this page — `useIsFocused()`, `useFocusEffect()`, and
-  `useNavigationState()` — are read the same way and have no other API, at any nesting depth.
+  `useNavigationState()` — are read the same way and have no other API, at any nesting depth
+  (Solid: `createIsFocused()`/`createFocusEffect()`/`createNavigationState()`).
   Svelte's runes return a **boxed getter** (`{ readonly current: T }`), read as `.current` inside
-  a `$derived`/template/`$effect` — the same unwrap pattern as Vue's `ComputedRef.value`.
+  a `$derived`/template/`$effect` — the same unwrap pattern as Vue's `ComputedRef.value`. Solid's
+  primitives return a plain `Accessor<T>` (a `() => T` function), read by calling it, e.g.
+  `route()`, inside a `createMemo`/JSX expression/`createEffect`.
 </Aside>
 
 ## Reading the current route and navigator
@@ -65,6 +72,14 @@ tracks changing values:
     | --- | --- |
     | Navigator handle | `useNavigation(): { readonly current: INavigationHandle }` — boxed getter, read `.current` |
     | Current route | `useRoute(): { readonly current: IRoute<unknown> }` — boxed getter, read `.current` |
+
+  </TabItem>
+  <TabItem label="Solid">
+
+    | Primitive | Signature |
+    | --- | --- |
+    | Navigator handle | `useNavigation(): Accessor<INavigationHandle>` - call to read |
+    | Current route | `useRoute(): Accessor<IRoute<unknown>>` - call to read |
 
   </TabItem>
 </Tabs>
@@ -161,6 +176,25 @@ tracks changing values:
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { useStackNavigation, useRoute } from '@symbiote-native/navigation/solid';
+    import { ActionButton } from '../components/ActionButton';
+
+    function ProfileScreen() {
+      const navigation = useStackNavigation();
+      const route = useRoute();
+
+      return (
+        <ActionButton
+          title={`Push detail for ${route().name}`}
+          onPress={() => navigation().push('Detail', { id: route().params })}
+        />
+      );
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ## Focus lifecycle
@@ -174,10 +208,10 @@ pair instead of once on mount.
   React's `useFocusEffect` must be given a **memoized** callback (wrap it in
   `useCallback`) — a new function identity on every render re-subscribes the
   effect, same as any other `useEffect` dependency. Vue's `useFocusEffect`,
-  Angular's `injectFocusEffect`, and Svelte's `useFocusEffect` need no
-  memoization: `setup()`, a component constructor, and a Svelte component's
-  script each run exactly once, so the callback is captured a single time by
-  value.
+  Angular's `injectFocusEffect`, Svelte's `useFocusEffect`, and Solid's
+  `createFocusEffect` need no memoization: `setup()`, a component constructor,
+  a Svelte component's script, and a Solid component body each run exactly
+  once, so the callback is captured a single time by value.
 </Aside>
 
 `useIsFocused`/`injectIsFocused` always **starts `false`**. It never guesses focus from stack
@@ -216,6 +250,14 @@ transition, not an instant JS-only mount.
     | --- | --- |
     | Is focused | `useIsFocused(): { readonly current: boolean }` — boxed getter, read `.current` |
     | Focus effect | `useFocusEffect(effect: () => (() => void) \| void): void` |
+
+  </TabItem>
+  <TabItem label="Solid">
+
+    | Primitive | Signature |
+    | --- | --- |
+    | Is focused | `createIsFocused(): Accessor<boolean>` - call to read |
+    | Focus effect | `createFocusEffect(effect: () => (() => void) \| void): void` |
 
   </TabItem>
 </Tabs>
@@ -310,6 +352,26 @@ transition, not an instant JS-only mount.
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { createFocusEffect } from '@symbiote-native/navigation/solid';
+
+    function HooksDemoScreen() {
+      const [focusCount, setFocusCount] = createSignal(0);
+
+      createFocusEffect(() => {
+        setFocusCount(count => count + 1);
+        return () => {
+          /* runs on blur */
+        };
+      });
+
+      return <Text>{`focus count: ${focusCount()}`}</Text>;
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ## Subscribing to navigator state
@@ -345,6 +407,13 @@ navigator's state changes.
     | Primitive | Signature |
     | --- | --- |
     | Navigator state | `useNavigationState<T>(selector): { readonly current: T }` — boxed getter, read `.current` |
+
+  </TabItem>
+  <TabItem label="Solid">
+
+    | Primitive | Signature |
+    | --- | --- |
+    | Navigator state | `createNavigationState<T>(selector): Accessor<T>` - call to read |
 
   </TabItem>
 </Tabs>
@@ -416,6 +485,22 @@ navigator's state changes.
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { For } from 'solid-js';
+    import { createNavigationState } from '@symbiote-native/navigation/solid';
+
+    function RouteStackList() {
+      const routeNames = createNavigationState(state => state.routes.map(route => route.name));
+      return (
+        <For each={routeNames()}>
+          {(name, index) => <Text>{`${index()}. ${name}`}</Text>}
+        </For>
+      );
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ## Nested navigators and `getParent()`
@@ -453,8 +538,8 @@ kind of navigator is above it. This is the one place a raw guard is genuinely un
 framework-agnostic core and are importable from the bare `@symbiote-native/navigation` package
 (the same place `IRoute`/`INavigatorState` come from), not from `/react`/`/vue`/`/angular`/`/svelte`.
 Vue's equivalent reads `navigation.value.getParent()`; Svelte's reads
-`navigation.current.getParent()`; Angular's reads `injectTabNavigation().getParent()` — same
-one-hop semantics in all three.
+`navigation.current.getParent()`; Angular's reads `injectTabNavigation().getParent()`; Solid's
+reads `navigation().getParent()` - same one-hop semantics in all four.
 
 ## API
 
@@ -501,6 +586,16 @@ one-hop semantics in all three.
     | `useDrawerNavigation(): { readonly current: IDrawerNavigationHandle }` | `useNavigation()` narrowed to a Drawer handle; throws if the nearest navigator isn't a `Drawer` |
 
   </TabItem>
+  <TabItem label="Solid">
+
+    | Signature | Description |
+    | --- | --- |
+    | `useNavigation(): Accessor<INavigationHandle>` | The current screen's navigator handle (`IAnyNavigatorHandle` union) plus `addListener` and `getParent`. Call to read |
+    | `useStackNavigation(): Accessor<IStackNavigationHandle>` | `useNavigation()` narrowed to a Stack handle; throws if the nearest navigator isn't a `Stack` |
+    | `useTabNavigation(): Accessor<ITabNavigationHandle>` | `useNavigation()` narrowed to a Tab handle; throws if the nearest navigator isn't a `Tab` |
+    | `useDrawerNavigation(): Accessor<IDrawerNavigationHandle>` | `useNavigation()` narrowed to a Drawer handle; throws if the nearest navigator isn't a `Drawer` |
+
+  </TabItem>
 </Tabs>
 
 `isStackNavigatorHandle(handle)`/`isTabNavigatorHandle(handle)`/`isDrawerNavigatorHandle(handle)`
@@ -541,6 +636,13 @@ union since it doesn't statically know the enclosing navigator's kind. See
     | `useRoute(): { readonly current: IRoute<unknown> }` | The current screen's route (`name`, `key`, `params`). Boxed getter, read `.current` |
 
   </TabItem>
+  <TabItem label="Solid">
+
+    | Signature | Description |
+    | --- | --- |
+    | `useRoute(): Accessor<IRoute<unknown>>` | The current screen's route (`name`, `key`, `params`). Call to read |
+
+  </TabItem>
 </Tabs>
 
 ### IsFocused
@@ -572,6 +674,13 @@ union since it doesn't statically know the enclosing navigator's kind. See
     | Signature | Description |
     | --- | --- |
     | `useIsFocused(): { readonly current: boolean }` | Whether this screen is focused right now; starts `false`, flips once the real focus event fires. Boxed getter, read `.current` |
+
+  </TabItem>
+  <TabItem label="Solid">
+
+    | Signature | Description |
+    | --- | --- |
+    | `createIsFocused(): Accessor<boolean>` | Whether this screen is focused right now; starts `false`, flips once the real focus event fires. Call to read |
 
   </TabItem>
 </Tabs>
@@ -607,6 +716,13 @@ union since it doesn't statically know the enclosing navigator's kind. See
     | `useFocusEffect(effect: () => (() => void) \| void): void` | Runs `effect` on focus, runs its returned cleanup on blur. No memoization needed — a Svelte component's script runs exactly once, so the closure is captured a single time by value |
 
   </TabItem>
+  <TabItem label="Solid">
+
+    | Signature | Description |
+    | --- | --- |
+    | `createFocusEffect(effect: () => (() => void) \| void): void` | Runs `effect` on focus, runs its returned cleanup on blur. No memoization needed - a Solid component body runs exactly once, so the closure is captured a single time by value |
+
+  </TabItem>
 </Tabs>
 
 ### NavigationState
@@ -638,6 +754,13 @@ union since it doesn't statically know the enclosing navigator's kind. See
     | Signature | Description |
     | --- | --- |
     | `useNavigationState<T>(selector: (state: INavigatorState) => T): { readonly current: T }` | Selects a value out of the navigator's live state; only `<Stack>` broadcasts live updates, `<Tab>`/`<Drawer>` stay on the initial snapshot. Boxed getter, read `.current` |
+
+  </TabItem>
+  <TabItem label="Solid">
+
+    | Signature | Description |
+    | --- | --- |
+    | `createNavigationState<T>(selector: (state: INavigatorState) => T): Accessor<T>` | Selects a value out of the navigator's live state; only `<Stack>` broadcasts live updates, `<Tab>`/`<Drawer>` stay on the initial snapshot. Call to read |
 
   </TabItem>
 </Tabs>

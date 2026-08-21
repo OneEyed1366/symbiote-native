@@ -23,6 +23,7 @@ pure `EventEmitter` + async-function surface, with no Fabric view or `ViewConfig
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -122,6 +123,27 @@ versions — never install either yourself, and never add the `expo` meta-packag
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createAccelerometer } from '@symbiote-native/sensors/solid';
+
+    export function AccelerometerReading() {
+      const accelerometer = createAccelerometer();
+
+      return (
+        <Text>
+          {accelerometer() && `x ${accelerometer()?.x} · y ${accelerometer()?.y} · z ${accelerometer()?.z}`}
+        </Text>
+      );
+    }
+    ```
+
+    `createAccelerometer` returns an `Accessor<IAccelerometerMeasurement | null>`: call it,
+    `accelerometer()`, everywhere you'd read the value. A component body runs once, so a
+    destructured snapshot would freeze at `null`.
+
+  </TabItem>
 </Tabs>
 
 Every other `DeviceSensor` (Barometer, DeviceMotion, Gyroscope, LightSensor, Magnetometer,
@@ -191,6 +213,19 @@ Unlike every other sensor, upstream `Pedometer` has no shared instance to hang `
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createPedometer } from '@symbiote-native/sensors/solid';
+
+    export function StepCount() {
+      const pedometer = createPedometer(); // Accessor<IPedometerResult | null>
+
+      return <Text>{pedometer() && `${pedometer()?.steps} steps`}</Text>;
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 The one-shot functions (`getStepCountAsync`, `isAvailableAsync`, the permission functions) are
@@ -218,27 +253,30 @@ subscribes to underneath.
 | `getPermissionsAsync` / `requestPermissionsAsync`          | `() => Promise<PermissionResponse>`                      | Reads/asks for the platform permission this sensor needs; a sensor needing none resolves already-granted                     |
 | `hasListeners` / `getListenerCount` / `removeAllListeners` | —                                                        | Inspect or clear this sensor's own subscriptions                                                                             |
 
-### Hooks / composables / runes / services
+### Hooks / composables / runes / services / primitives
 
-| React (`/react`)              | Vue (`/vue`)                  | Angular (`/angular`)                        | Svelte (`/svelte`)            | Signature                              | Returns                                             |
-| ----------------------------- | ----------------------------- | ------------------------------------------- | ----------------------------- | -------------------------------------- | --------------------------------------------------- |
-| `useAccelerometer`            | `useAccelerometer`            | `AccelerometerService.connect()`            | `useAccelerometer`            | `(updateIntervalMs?: number)`          | Live `IAccelerometerMeasurement \| null`            |
-| `useBarometer`                | `useBarometer`                | `BarometerService.connect()`                | `useBarometer`                | `(updateIntervalMs?: number)`          | Live `IBarometerMeasurement \| null`                |
-| `useDeviceMotion`             | `useDeviceMotion`             | `DeviceMotionService.connect()`             | `useDeviceMotion`             | `(updateIntervalMs?: number)`          | Live `IDeviceMotionMeasurement \| null`             |
-| `useGyroscope`                | `useGyroscope`                | `GyroscopeService.connect()`                | `useGyroscope`                | `(updateIntervalMs?: number)`          | Live `IGyroscopeMeasurement \| null`                |
-| `useLightSensor`              | `useLightSensor`              | `LightSensorService.connect()`              | `useLightSensor`              | `(updateIntervalMs?: number)`          | Live `ILightSensorMeasurement \| null`              |
-| `useMagnetometer`             | `useMagnetometer`             | `MagnetometerService.connect()`             | `useMagnetometer`             | `(updateIntervalMs?: number)`          | Live `IMagnetometerMeasurement \| null`             |
-| `useMagnetometerUncalibrated` | `useMagnetometerUncalibrated` | `MagnetometerUncalibratedService.connect()` | `useMagnetometerUncalibrated` | `(updateIntervalMs?: number)`          | Live `IMagnetometerUncalibratedMeasurement \| null` |
-| `usePedometer`                | `usePedometer`                | `PedometerService.connect()`                | `usePedometer`                | `()` — no interval, Pedometer has none | Live `IPedometerResult \| null`                     |
+| React (`/react`)              | Vue (`/vue`)                  | Angular (`/angular`)                        | Svelte (`/svelte`)            | Solid (`/solid`)                 | Signature                                          | Returns                                             |
+| ----------------------------- | ----------------------------- | ------------------------------------------- | ----------------------------- | --------------------------------- | --------------------------------------------------- | --------------------------------------------------- |
+| `useAccelerometer`            | `useAccelerometer`            | `AccelerometerService.connect()`            | `useAccelerometer`            | `createAccelerometer`            | `(updateIntervalMs?: number \| Accessor<number>)`   | Live `IAccelerometerMeasurement \| null`            |
+| `useBarometer`                | `useBarometer`                | `BarometerService.connect()`                | `useBarometer`                | `createBarometer`                | `(updateIntervalMs?: number \| Accessor<number>)`   | Live `IBarometerMeasurement \| null`                |
+| `useDeviceMotion`             | `useDeviceMotion`             | `DeviceMotionService.connect()`             | `useDeviceMotion`             | `createDeviceMotion`             | `(updateIntervalMs?: number \| Accessor<number>)`   | Live `IDeviceMotionMeasurement \| null`             |
+| `useGyroscope`                | `useGyroscope`                | `GyroscopeService.connect()`                | `useGyroscope`                | `createGyroscope`                | `(updateIntervalMs?: number \| Accessor<number>)`   | Live `IGyroscopeMeasurement \| null`                |
+| `useLightSensor`              | `useLightSensor`              | `LightSensorService.connect()`              | `useLightSensor`              | `createLightSensor`              | `(updateIntervalMs?: number \| Accessor<number>)`   | Live `ILightSensorMeasurement \| null`              |
+| `useMagnetometer`             | `useMagnetometer`             | `MagnetometerService.connect()`             | `useMagnetometer`             | `createMagnetometer`             | `(updateIntervalMs?: number \| Accessor<number>)`   | Live `IMagnetometerMeasurement \| null`             |
+| `useMagnetometerUncalibrated` | `useMagnetometerUncalibrated` | `MagnetometerUncalibratedService.connect()` | `useMagnetometerUncalibrated` | `createMagnetometerUncalibrated` | `(updateIntervalMs?: number \| Accessor<number>)`   | Live `IMagnetometerUncalibratedMeasurement \| null` |
+| `usePedometer`                | `usePedometer`                | `PedometerService.connect()`                | `usePedometer`                | `createPedometer`                | `()` — no interval, Pedometer has none              | Live `IPedometerResult \| null`                     |
 
 React/Vue return the measurement directly; Angular's `connect()` returns a `Signal` — read it as
 `accelerometer()` in code or `accelerometer()` in a template. Svelte's rune returns a boxed getter,
 `{ readonly current: IAccelerometerMeasurement | null }` — read it as `.current`, same reason Vue's
 `Ref` needs `.value`: Svelte 5 reactivity is lexically scoped to the declaring module and does not
-survive being returned as a raw value from a plain function. Passing `updateIntervalMs`
-re-subscribes with the new native sampling rate whenever it changes across renders on React; Vue
-and Svelte both apply it once at subscribe time and never react to a later change, since neither
-takes it as a getter.
+survive being returned as a raw value from a plain function. Solid's primitive returns the same
+plain `Accessor<... | null>` shape covered above. Passing `updateIntervalMs` re-subscribes with
+the new native sampling rate whenever it changes across renders on React; Vue and Svelte both
+apply it once at subscribe time and never react to a later change, since neither takes it as a
+getter. Solid takes either form: a plain number applies once at subscribe time like Vue/Svelte,
+or an `Accessor<number | undefined>` re-applies the rate on every later change, with the
+mount-time value still applying synchronously before the first sample.
 
 ### Measurement shapes
 
@@ -300,7 +338,7 @@ takes it as a getter.
 
 ## How the wrapper works
 
-`@symbiote-native/sensors` ships **zero React/Vue/Angular logic in `expo-sensors` itself** — that
+`@symbiote-native/sensors` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-sensors` itself** — that
 package's own JS hard-imports the `expo` meta-package (which this project never installs), so
 every sensor's `DeviceSensor` base class and per-sensor subclass is hand-ported, verbatim, into
 this package's own `core/`, changing only the one import line that now pulls

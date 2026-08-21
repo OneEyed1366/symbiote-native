@@ -37,26 +37,30 @@ typing as something it isn't.
 ## How do I read `route`/`navigation` in a screen?
 
 Call a hook. Every component under a navigator — the screen's own top-level component included —
-reads them with `useNavigation()`/`useRoute()` in React and Vue, or `injectNavigation()`/
-`injectRoute()` in Angular. Better yet, reach for the navigator-specific narrowed variant
-(`useStackNavigation()`/`useTabNavigation()`/`useDrawerNavigation()`, or Angular's
-`injectStackNavigation()`/etc.) so the handle comes back concretely typed with nothing to narrow.
-The navigator does not pass `route`/`navigation` in as a prop or `@Input()`; the hook is the only
-path, and it reads the same at any nesting depth. `useIsFocused()`/`useFocusEffect()`/
-`useNavigationState()` (Angular: `injectIsFocused()`/`injectFocusEffect()`/`injectNavigationState()`)
-work the same way. See [Hooks & focus](/docs/navigation/hooks/).
+reads them with `useNavigation()`/`useRoute()` in React, Vue, Svelte, and Solid, or
+`injectNavigation()`/`injectRoute()` in Angular. Better yet, reach for the navigator-specific
+narrowed variant (`useStackNavigation()`/`useTabNavigation()`/`useDrawerNavigation()`, or
+Angular's `injectStackNavigation()`/etc.) so the handle comes back concretely typed with nothing
+to narrow. The navigator does not pass `route`/`navigation` in as a prop or `@Input()`; the hook
+is the only path, and it reads the same at any nesting depth. `useIsFocused()`/`useFocusEffect()`/
+`useNavigationState()` work the same way in React, Vue, and Svelte; Solid names the same three
+`createIsFocused()`/`createFocusEffect()`/`createNavigationState()`, matching `createSignal`'s
+naming since each owns a signal or subscription, and Angular names them
+`injectIsFocused()`/`injectFocusEffect()`/`injectNavigationState()`. See
+[Hooks & focus](/docs/navigation/hooks/).
 
 ## Why does my effect only run once instead of every time I visit the screen?
 
 Because an ordinary `useEffect`/`onMounted`/constructor with no dependency
 array runs once per **mount**, not once per **visit** — and on a Stack
 navigator, a pushed screen stays mounted the whole time it's on the stack, so
-navigating away and back doesn't remount it. Use `useFocusEffect` (React),
-`injectFocusEffect` (Vue/Angular), or `useIsFocused`/`injectIsFocused` if you
-just need a boolean, to run code on every focus instead of once. In React,
-wrap the callback you pass to `useFocusEffect` in `useCallback` — a new
-callback identity on every render re-subscribes the effect — Vue's and
-Angular's equivalents don't need this. See [Hooks & focus](/docs/navigation/hooks/).
+navigating away and back doesn't remount it. Use `useFocusEffect` (React,
+Vue, Svelte), `createFocusEffect` (Solid), or `injectFocusEffect` (Angular),
+or the boolean-returning `useIsFocused`/`createIsFocused`/`injectIsFocused`,
+to run code on every focus instead of once. In React, wrap the callback you
+pass to `useFocusEffect` in `useCallback` — a new callback identity on every
+render re-subscribes the effect — every other adapter's equivalent doesn't
+need this. See [Hooks & focus](/docs/navigation/hooks/).
 
 ## Why did my Tab/Drawer screen's state reset when I switched back to it?
 
@@ -117,9 +121,9 @@ function for you. See [Tab navigator](/docs/navigation/tabs/).
 
 You have to — Drawer ships no built-in menu UI at all, unlike React
 Navigation's `@react-navigation/drawer`, which gives you `DrawerItemList` for
-free. Supply your own drawer content: React's `renderDrawerContent` prop,
-Vue's `drawerContent` scoped slot, or Angular's `#drawerContent` template.
-See [Drawer navigator](/docs/navigation/drawer/).
+free. Supply your own drawer content: `renderDrawerContent` prop on React and
+Solid, Vue's `drawerContent` scoped slot, Svelte's `drawerContent` snippet, or
+Angular's `#drawerContent` template. See [Drawer navigator](/docs/navigation/drawer/).
 
 ## Can I open a screen as a modal or bottom sheet?
 

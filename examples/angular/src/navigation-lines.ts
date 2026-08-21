@@ -3,7 +3,8 @@ import type { IRouteName } from './routes';
 
 // MenuScreen's tour groups its screens into thematic "lines" — carried through each row's badge,
 // the demo screen's own line tag, and (where the native header/tab bar already takes a tint color)
-// the OS chrome itself. Which part of @symbiote-native/navigation a screen exercises. Kept in sync
+// the OS chrome itself. Which part of @symbiote-native/navigation a screen exercises, plus a
+// Performance line for the benchmark stop and a Styling line for the CSS-compiler showcase. Kept in sync
 // BY HAND with App.css's `:root` `--line-*` tokens — CSS custom properties and this module are
 // different runtimes with no shared import path.
 export const NAV_LINE = {
@@ -13,6 +14,7 @@ export const NAV_LINE = {
   Introspection: 'introspection',
   Routing: 'routing',
   Performance: 'performance',
+  Styling: 'styling',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -30,6 +32,10 @@ export const LINE_COLOR: Record<INavLine, string> = {
   // The only warm hue in the set — the benchmark stop is not a navigation line and should not
   // read as one at a glance.
   [NAV_LINE.Performance]: '#f5a524',
+  // Yellow-green, the one wide hue gap the six lines above leave open — far enough from
+  // Structure's mint (#4fd1a5) and Performance's amber (#f5a524) to read apart at badge size,
+  // and the CSS showcase is not a navigation line either.
+  [NAV_LINE.Styling]: '#a3d94f',
 };
 
 export type INavLineInfo = {
@@ -106,9 +112,9 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'BM',
     label: 'PERFORMANCE LINE',
   },
-  [ROUTE_NAME.Probe]: {
-    line: NAV_LINE.Performance,
-    code: 'PR',
-    label: 'PERFORMANCE LINE',
+  [ROUTE_NAME.StyleShowcase]: {
+    line: NAV_LINE.Styling,
+    code: 'ST',
+    label: 'STYLING LINE',
   },
 };

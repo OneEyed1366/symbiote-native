@@ -26,6 +26,7 @@ seed-then-subscribe shape as network's own `useNetworkState`.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 <Aside type="note" title="Android has no native expoDidUpdateDimensions event">
   `expo-screen-orientation` doesn't emit its own `expoDidUpdateDimensions` event
@@ -149,6 +150,30 @@ system state with no runtime permission prompt on either platform.
     <Text>Orientation: {screenOrientation.current.orientation}</Text>
     <Text>Lock: {screenOrientation.current.orientationLock}</Text>
     <Button title="Lock landscape" onPress={onLockLandscape} />
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Button, Text } from '@symbiote-native/solid';
+    import { lockAsync, OrientationLock } from '@symbiote-native/screen-orientation';
+    import { createScreenOrientation } from '@symbiote-native/screen-orientation/solid';
+
+    export default function ScreenOrientationScreen() {
+      const screenOrientation = createScreenOrientation(); // Accessor<ScreenOrientationState>
+
+      function onLockLandscape(): void {
+        void lockAsync(OrientationLock.LANDSCAPE);
+      }
+
+      return (
+        <>
+          <Text>Orientation: {screenOrientation().orientation}</Text>
+          <Text>Lock: {screenOrientation().orientationLock}</Text>
+          <Button title="Lock landscape" onPress={onLockLandscape} />
+        </>
+      );
+    }
     ```
 
   </TabItem>
@@ -284,7 +309,7 @@ React returns this shape as a plain value; Vue returns `Ref<ScreenOrientationSta
 
 ## How the wrapper works
 
-`@symbiote-native/screen-orientation` ships zero React/Vue/Angular logic in
+`@symbiote-native/screen-orientation` ships zero React/Vue/Angular/Svelte/Solid logic in
 `expo-screen-orientation` itself — its functions and types are hand-ported, verbatim, into this
 package's own `core/`, resolving the native module through `expo-modules-core`'s
 `requireNativeModule` rather than the `expo` meta-package this project never installs:

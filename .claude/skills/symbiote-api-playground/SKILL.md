@@ -95,6 +95,49 @@ If in doubt whether something counts as a clean shim, the test is: does the fix 
 anything about Fabric, Yoga, the native host, or `core/engine/src/commit.ts`'s mutation API? If
 yes, it's not clean — go with (b).
 
+## A live demo that CRASHES can swallow its own crash — check for a global error/warn handler FIRST
+
+```
+§vpre_errorhandler_swallow := {
+  bug: "v-pre live demo in ApiPlaygroundScreen.vue crashes on mount, silently",
+  markup: `<Text v-pre class="note-text">{{ this is NOT compiled — v-pre skips it }}</Text>`,
+  mechanism: "v-pre ⟶ compiler skips codegen for subtree ⟶ emits hostInsertStaticContent
+              (@vue/runtime-dom-only bulk-innerHTML op, DOM-specific) ⟶ this renderer has
+              no host op for it ⟶ throws mid-patch",
+  throw_site: "adapters/vue/src/renderer/index.ts setElementText/insert guard",
+  error: `Text string must be rendered inside a <Text>`,
+  symptom: [
+    "screen never appears, zero console output (no redbox, no warning)",
+    "every nav attempt afterward permanently broken app-wide — JS route index
+     advances each tap, native screen stack never changes, completeRoot never
+     re-fires since top-level insert() for the aborted subtree never ran",
+  ],
+  dlog_signature: "many `createElement` lines ⟶ immediately `reconciled changed=false`
+                    / `no-op (skipped completeRoot)` — objects built, never linked in",
+  why_silent: "same screen's <script setup> installs app.config.errorHandler +
+               app.config.warnHandler GLOBALLY on the whole app (guarded by
+               globalApiInstalled), to demo Vue's global-API surface. Vue's
+               handleError routes the v-pre throw through it, into an
+               appHandlerLog ref that lives on the screen that never renders
+               ⟶ captured, shown nowhere",
+  rule: "any screen legitimately demoing app.config.errorHandler/warnHandler is a
+         console black hole for every OTHER bug on that screen. Total silence
+         (no redbox, no console, dev mode) ⟶ check for an installed handler and
+         temporarily console.error/warn inside it BEFORE chasing engine-level
+         dirty-marking/reconcile theories",
+  ruled_out: [engine_commit.ts_node.ts_surface.ts, vue_Stack_impl,
+              duplicate_@vue/runtime-core_instances, KeepAlive_wrapping,
+              scoped_slot_collisions] ⟶ three static-reading passes, all clean;
+             real cause surfaced in one line once the swallowed error printed,
+  fix_boundary: "not a clean shim (needs real hostInsertStaticContent/compiler
+                 work) ⟶ outcome (b): removed live demo, honest in-screen note
+                 (mirrors useCssModule() treatment)",
+  fix: [".docs/framework-api-surface/vue.md v-pre row: Partial/\"no-op
+         compile-skip\" (measured FALSE) ⟶ No, real mechanism",
+        "same MEASURED-not-assumed bar as v-html/v-text rows in that file"],
+}
+```
+
 ## The stale-tarball gotcha (fixing an adapter is invisible until repacked)
 
 Example apps outside the pnpm workspace (`examples/*`) consume `@symbiote-native/<fw>` as an

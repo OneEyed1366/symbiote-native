@@ -297,12 +297,6 @@ export function TextInput(props: ITextInputProps): JSX.Element {
       ]);
     },
   };
-  // Solid's `ref` is a compile-time construct: on a component the compiler has already rewritten
-  // `ref={handle}` into a callback prop by the time we read it, so calling what we were handed is
-  // the whole job (utils/host-ref.ts explains the rewrite). Not applyHostRef, which is typed for a
-  // host node — this ref receives the handle, matching React's forwardRef contract.
-  if (typeof local.ref === 'function') local.ref(handle);
-
   // Single- and multiline are DIFFERENT native views (RCTSinglelineTextInputView vs
   // RCTMultilineTextInputView), so a runtime flip has to build a new host node rather than re-prop
   // the old one — React remounts, Vue h()s a new type, Svelte swaps an {#if} branch. The memo is
@@ -312,8 +306,23 @@ export function TextInput(props: ITextInputProps): JSX.Element {
   // memo would subscribe to every prop the render fn touches and rebuild the entire input — new
   // native view, lost cursor and keyboard — on every keystroke. (Solid's own `createComponent`
   // untracks for exactly this reason; there is no component here to inherit it from.)
-  return createMemo(() => {
+  const hostTree = createMemo(() => {
     const multiline = local.multiline === true;
     return untrack(() => buildHost(multiline));
   });
+
+  // Solid's `ref` is a compile-time construct: on a component the compiler has already rewritten
+  // `ref={handle}` into a callback prop by the time we read it, so calling what we were handed is
+  // the whole job (utils/host-ref.ts explains the rewrite). Not applyHostRef, which is typed for a
+  // host node — this ref receives the handle, matching React's forwardRef contract.
+  //
+  // Called AFTER `hostTree` has built at least once, not right after `handle` is constructed -
+  // same reasoning as ScrollView's ref-ordering fix (scroll-view/shared.tsx). `handle`'s methods
+  // read `host` LIVE on every call, so calling ref early never caused a visible bug here (unlike
+  // ScrollView, whose handle a consumer - createAnimatedComponent's resolveHostNode - unwrapped
+  // eagerly, once, at ref-call time). Reordered anyway: a future Animated.TextInput would hit the
+  // same permanently-null capture, and matching the safe ordering now costs nothing.
+  if (typeof local.ref === 'function') local.ref(handle);
+
+  return hostTree;
 }

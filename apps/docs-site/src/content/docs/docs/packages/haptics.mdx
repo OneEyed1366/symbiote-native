@@ -25,6 +25,7 @@ from a press handler.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -49,9 +50,9 @@ versions — never install either yourself, and never add the `expo` meta-packag
 
 ## Usage
 
-All four adapters — React, Vue, Angular, Svelte — re-export the exact same free functions; there
-is no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
-subscription. Call one straight from a press handler.
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same free functions;
+there is no per-adapter hook/composable/service to reach for, since nothing here holds live state
+or a subscription. Call one straight from a press handler.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
@@ -215,6 +216,43 @@ subscription. Call one straight from a press handler.
     package, called straight from `onPress`.
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Pressable, Text, View } from '@symbiote-native/solid';
+    import {
+      impactAsync,
+      notificationAsync,
+      selectionAsync,
+      performAndroidHapticsAsync,
+      AndroidHaptics,
+      ImpactFeedbackStyle,
+      NotificationFeedbackType,
+    } from '@symbiote-native/haptics/solid';
+
+    export default function HapticButtons() {
+      return (
+        <View>
+          <Pressable onPress={() => impactAsync(ImpactFeedbackStyle.Medium)}>
+            <Text>Impact</Text>
+          </Pressable>
+          <Pressable onPress={() => notificationAsync(NotificationFeedbackType.Success)}>
+            <Text>Notify</Text>
+          </Pressable>
+          <Pressable onPress={() => selectionAsync()}>
+            <Text>Select</Text>
+          </Pressable>
+          <Pressable onPress={() => performAndroidHapticsAsync(AndroidHaptics.Confirm)}>
+            <Text>Android confirm</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    ```
+
+    Solid follows the same shape - a plain free function off the core package, called straight
+    from `onPress`.
+
+  </TabItem>
 </Tabs>
 
 ## API
@@ -295,7 +333,7 @@ Feedback effects driven directly by Android's haptics engine, via `performAndroi
 
 ## How the wrapper works
 
-`@symbiote-native/haptics` ships **zero React/Vue/Angular logic in `expo-haptics` itself** — that
+`@symbiote-native/haptics` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-haptics` itself** — that
 package's own JS hard-imports `Platform` from the `expo` meta-package (which this project never
 installs), so its functions and enums are hand-ported, verbatim, into this package's own `core/`,
 changing only that one import line to pull `Platform` from `expo-modules-core` instead:
@@ -308,6 +346,7 @@ packages/haptics/src/
 ├── react/    # @symbiote-native/haptics/react   — export * from '../core'
 ├── vue/      # @symbiote-native/haptics/vue     — export * from '../core'
 ├── svelte/   # @symbiote-native/haptics/svelte  — export * from '../core'
+├── solid/    # @symbiote-native/haptics/solid   — export * from '../core'
 └── angular/  # @symbiote-native/haptics/angular — export * from '../core'
 ```
 

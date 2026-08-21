@@ -25,6 +25,7 @@ live-subscription surface.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -52,8 +53,8 @@ reads plain system/build information, nothing gated by a permission prompt.
 
 ## Usage
 
-All four adapters — React, Vue, Angular, Svelte — re-export the exact same constants and free
-functions; there is no per-adapter hook/composable/service to reach for, since nothing here
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same constants and
+free functions; there is no per-adapter hook/composable/service to reach for, since nothing here
 holds live state or a subscription.
 
 <Tabs syncKey="framework">
@@ -222,6 +223,51 @@ holds live state or a subscription.
     export off the core package, read straight in the script block or an `$effect`.
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal, onMount } from 'solid-js';
+    import { Text, View } from '@symbiote-native/solid';
+    import {
+      brand,
+      deviceName,
+      getMaxMemoryAsync,
+      getUptimeAsync,
+      isDevice,
+      modelName,
+      osName,
+      osVersion,
+    } from '@symbiote-native/device/solid';
+
+    export default function DeviceInfo() {
+      const [uptime, setUptime] = createSignal<number | null>(null);
+      const [maxMemory, setMaxMemory] = createSignal<number | null>(null);
+
+      onMount(() => {
+        getUptimeAsync().then(setUptime);
+        getMaxMemoryAsync().then(setMaxMemory);
+      });
+
+      return (
+        <View>
+          <Text>{isDevice ? 'Real device' : 'Simulator/emulator'}</Text>
+          <Text>{`${brand ?? 'unknown'} ${modelName ?? ''}`}</Text>
+          <Text>{`${osName ?? 'unknown OS'} ${osVersion ?? ''}`}</Text>
+          <Text>{deviceName ?? 'unnamed device'}</Text>
+          <Text>{uptime() === null ? 'checking uptime…' : `Uptime: ${uptime()}ms`}</Text>
+          <Text>
+            {maxMemory() === null ? 'checking memory…' : `Max memory: ${maxMemory()} bytes`}
+          </Text>
+        </View>
+      );
+    }
+    ```
+
+    The constants (`isDevice`, `brand`, `modelName`, `osName`, `osVersion`, `deviceName`) are read
+    once at import time and need no signal - only the two async calls do. There's no per-instance
+    primitive to reach for here either - every constant/function is a plain export off the core
+    package.
+
+  </TabItem>
 </Tabs>
 
 ## API
@@ -288,7 +334,7 @@ Resolved once, eagerly, at import time, straight off the native module:
 
 ## How the wrapper works
 
-`@symbiote-native/device` ships zero React/Vue/Angular logic in `expo-device` itself — its
+`@symbiote-native/device` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-device` itself — its
 constants and functions are hand-ported, verbatim, into this package's own `core/`, resolving the
 native module through `expo-modules-core`'s `requireNativeModule` rather than the `expo`
 meta-package this project never installs:
@@ -300,10 +346,11 @@ packages/device/src/
 ├── react/    # @symbiote-native/device/react   — export * from '../core'
 ├── vue/      # @symbiote-native/device/vue     — export * from '../core'
 ├── svelte/   # @symbiote-native/device/svelte  — export * from '../core'
+├── solid/    # @symbiote-native/device/solid   — export * from '../core'
 └── angular/  # @symbiote-native/device/angular — export * from '../core'
 ```
 
-Same shape as [local auth](/docs/packages/local-auth/)'s three adapter entries: single-file
+Same shape as [local auth](/docs/packages/local-auth/)'s five adapter entries: single-file
 re-exports with no lifecycle code at all, since every export here is either an eagerly-resolved
 constant or a stateless one-shot call — there is nothing for a hook, composable, or service to
 subscribe to or clean up. The native code itself is never vendored or copied —

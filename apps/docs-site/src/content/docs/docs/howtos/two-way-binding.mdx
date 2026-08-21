@@ -99,6 +99,30 @@ wiring your own change handler by hand.
     one or the other, not both, on the same control.
 
   </TabItem>
+  <TabItem label="Solid">
+    Solid has no two-way syntax either: no `v-model`, no `$bindable()`. A signal's
+    getter/setter pair already IS the two halves, so the controlled-component idiom is
+    the same flat `value` + `onValueChange` bag React uses, just fed by a signal instead
+    of a hook:
+
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { Switch, TextInput } from '@symbiote-native/solid';
+    import { Slider } from '@symbiote-native/slider/solid';
+
+    const [enabled, setEnabled] = createSignal(false);
+    const [name, setName] = createSignal('');
+    const [volume, setVolume] = createSignal(0.5);
+
+    <Switch value={enabled()} onValueChange={setEnabled} />
+    <TextInput value={name()} onValueChange={setName} />
+    <Slider value={volume()} onValueChange={setVolume} minimumValue={0} maximumValue={1} />
+    ```
+
+    `setEnabled`/`setName`/`setVolume` are handed straight to `onValueChange`: a signal
+    setter already takes the new value as its one argument, so there's no wrapper to write.
+
+  </TabItem>
 </Tabs>
 
 ## Why this isn't fragile

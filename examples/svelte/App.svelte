@@ -46,6 +46,7 @@
   import DeepLinkingScreen from './screens/DeepLinkingScreen.svelte';
   import StatePersistenceScreen from './screens/StatePersistenceScreen.svelte';
   import BenchmarkScreen from './screens/BenchmarkScreen.svelte';
+  import StyleShowcaseScreen from './screens/StyleShowcaseScreen.svelte';
   import { APP_LINKING_CONFIG } from './navigation-linking';
   import { ROUTE_NAME } from './routes';
   import { LINE_COLOR } from './navigation-lines';
@@ -155,6 +156,10 @@
     'Benchmark',
     LINE_COLOR.performance,
   );
+  const styleShowcaseScreenOptions: IScreenOptions = darkHeader(
+    'Styling showcase',
+    LINE_COLOR.styling,
+  );
 
   // `unknown` + a runtime guard, not `INavigatorHandle | null` directly. @symbiote-native/navigation
   // ships Stack as a raw `.svelte` file, and TypeScript resolves an imported `.svelte` module from
@@ -251,5 +256,10 @@
     name={ROUTE_NAME.Benchmark}
     component={BenchmarkScreen}
     options={benchmarkScreenOptions}
+  />
+  <Screen
+    name={ROUTE_NAME.StyleShowcase}
+    component={StyleShowcaseScreen}
+    options={styleShowcaseScreenOptions}
   />
 </Stack>

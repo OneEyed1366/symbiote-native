@@ -1,7 +1,9 @@
 // scripts/check-bundle-framework-isolation.mjs needs each example's `node_modules` to hold
 // THIS commit's build of every multi-framework packages/* package — not whatever version each
 // example's package.json pins from the npm registry, or the check proves nothing about the
-// change actually under review.
+// change actually under review. core/engine and core/components ride along too: example source
+// routinely drifts ahead of their last publish (see the `example-shared-package-staleness`
+// rule), and without the overlay that source fails to even compile against the registry version.
 //
 // Deliberately does NOT touch examples/*/package.json or package-lock.json: the documented local
 // dev loop (<examples_vs_dot_examples> in CLAUDE.md) re-points the dependency at a `file:`
@@ -37,14 +39,23 @@ function packTarball(pkgDir, destDir) {
   return lines[lines.length - 1].trim();
 }
 
+// core/engine and core/components are framework-agnostic and every example depends on them
+// directly, so example source can drift ahead of their last publish the same way it drifts ahead
+// of packages/* (see the `example-shared-package-staleness` rule) — overlay them too. Adapters
+// (adapters/react, /vue, /svelte, /angular) and core/css-parser stay OUT of this list: an adapter
+// overlay would swap in code the example's OWN package.json doesn't pin yet, and css-parser pulls
+// in `lightningcss`, a real dependency the overlay's swap-the-folder-contents trick can't install
+// (it never touches package-lock.json) — both need the full `file:` tarball dance instead.
+const OVERLAY_ONLY = new Set(['core/engine', 'core/components', 'adapters/angular']);
+
 function main() {
-  const multiFrameworkPackages = publishablePackageEntries().filter(entry =>
-    entry.dir.startsWith('packages/'),
+  const localPackages = publishablePackageEntries().filter(
+    entry => entry.dir.startsWith('packages/') || OVERLAY_ONLY.has(entry.dir),
   );
   const packDestination = mkdtempSync(join(tmpdir(), 'symbiote-overlay-pack-'));
 
   try {
-    for (const pkg of multiFrameworkPackages) {
+    for (const pkg of localPackages) {
       const targetDirs = EXAMPLE_DIRS.map(exampleDir =>
         join(REPO_ROOT, exampleDir, 'node_modules', ...pkg.name.split('/')),
       ).filter(existsSync);

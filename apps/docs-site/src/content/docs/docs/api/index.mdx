@@ -15,17 +15,20 @@ framework's API conventions. The reference is organized around that split.
 - [Angular API](/docs/api/angular/) — real `@Output()` `EventEmitter`s,
   `<ng-content>` projection, standalone components, and imports from
   `@symbiote-native/angular`.
-- Svelte API — a DOM shim over stock compiled Svelte output, so components
-  are ordinary Svelte markup with `bind:`, events, and slots working as-is.
-  Imports come from `@symbiote-native/svelte`. A dedicated reference page
-  isn't written yet; see [`adapters/svelte`](https://github.com/OneEyed1366/symbiote-native/tree/master/adapters/svelte)
-  on GitHub in the meantime.
+- [Svelte API](/docs/api/svelte/) — a DOM shim over stock compiled Svelte
+  output, so components are ordinary Svelte markup with `bind:`, events, and
+  slots working as-is. Imports come from `@symbiote-native/svelte`.
+- [Solid API](/docs/api/solid/) - signals and effects for lifecycle, `class`
+  for styling, and a render-prop child (`Pressable`, list `renderItem`) that
+  takes a Solid `Accessor` rather than a snapshot value. Imports come from
+  `@symbiote-native/solid`. Implemented and tested (vitest); not yet proven
+  on-device.
 
 ## Shared APIs
 
 - [Components matrix](/docs/api/components/) — what components exist and how
-  React, Vue, and Angular differ for props, events, slots, and handles.
-  Svelte isn't in this matrix yet.
+  React, Vue, Angular, Svelte, and Solid differ for props, events,
+  slots/snippets/children, and handles.
 - [Core API](/docs/api/core/) — `@symbiote-native/engine` and `@symbiote-native/components`,
   the shared layers that keep adapters thin.
 

@@ -31,7 +31,7 @@ ever mounted at a time, exactly like Tab.
 Drawer ships **no built-in menu UI** — you supply the panel's contents yourself, reading the
 same `{ state, descriptors, navigation }` data in every adapter. How you supply it follows each
 framework's own idiom: a render prop in React, a scoped slot in Vue, a named `TemplateRef` in
-Angular, a snippet in Svelte.
+Angular, a snippet in Svelte, a render prop over an accessor in Solid.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
@@ -188,13 +188,56 @@ Angular, a snippet in Svelte.
     mechanism [Stack's `<Screen>`](/docs/navigation/stack/) uses.
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import type { Accessor } from 'solid-js';
+    import { For } from 'solid-js';
+    import { Drawer } from '@symbiote-native/navigation/solid';
+    import type { IDrawerContentSlotProps } from '@symbiote-native/navigation/solid';
+    import { Pressable, SafeAreaView, Text } from '@symbiote-native/solid';
+    import HomeScreen from './HomeScreen';
+    import SettingsScreen from './SettingsScreen';
+
+    function renderDrawerContent(slot: Accessor<IDrawerContentSlotProps>) {
+      return (
+        <SafeAreaView class="drawer-panel">
+          <For each={slot().state.routes}>
+            {route => (
+              <Pressable onPress={() => slot().navigation.jumpTo(route.name)}>
+                <Text>{slot().descriptors[route.key]?.options.drawerLabel ?? route.name}</Text>
+              </Pressable>
+            )}
+          </For>
+        </SafeAreaView>
+      );
+    }
+
+    export function DrawerDemoScreen() {
+      return (
+        <Drawer initialRouteName="Home" drawerPosition="right" drawerType="slide" drawerContent={renderDrawerContent}>
+          <Drawer.Screen name="Home" component={HomeScreen} options={{ title: 'Home', drawerLabel: 'Home' }} />
+          <Drawer.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings', drawerLabel: 'Settings' }} />
+        </Drawer>
+      );
+    }
+    ```
+
+    `drawerContent` is a render prop over an **accessor** (`(slot: Accessor<IDrawerContentSlotProps>)
+    => JSX.Element`), Solid's twin of React's render-prop and Vue's scoped slot. It's called once and
+    untracked internally, so read `slot().state`/`slot().descriptors`/`slot().navigation`, never
+    destructure `state`/`descriptors` at the callback's own top level - that freezes on an empty
+    navigator (the `<Drawer.Screen>` markers below haven't registered by the time the callback runs).
+    `Drawer` reads `<Drawer.Screen>` markers off a context-based collector, the same registration
+    mechanism [Stack's `<Screen>`](/docs/navigation/stack/) uses.
+
+  </TabItem>
 </Tabs>
 
 ### Opening and closing programmatically
 
 Any component under the Drawer — the screen's own top-level component, or a button/menu action
 nested deeper in the tree — reads the drawer handle with `useDrawerNavigation()` in
-React/Vue/Svelte or `injectDrawerNavigation()` in Angular: the narrowed twin of
+React/Vue/Svelte/Solid or `injectDrawerNavigation()` in Angular: the narrowed twin of
 `useNavigation()`/`injectNavigation()`,
 returning a concretely-typed `IDrawerNavigatorHandle` with `openDrawer()`/`closeDrawer()`/
 `toggleDrawer()` directly, no union to narrow. See [Hooks](/docs/navigation/hooks/) for the full
@@ -206,7 +249,7 @@ hook API.
 
 `IDrawerNavigatorHandle` — the shape of the object every adapter exposes (a forwarded ref in
 React, `expose()` in Vue, the `Drawer` class itself in Angular, the exported functions off
-`bind:this` in Svelte), identical across all four:
+`bind:this` in Svelte, a callback `ref` prop in Solid), identical across all five:
 
 | Method         | Signature                | Description                                                                                                                                                |
 | -------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -272,6 +315,7 @@ How you supply the content differs by framework, matching each one's own idiom f
 | Vue       | `drawerContent` scoped slot       | `<template #drawerContent="{ state, descriptors, navigation }">` in SFC, or a `{ drawerContent: (props) => ... }` slots object in TSX                                            |
 | Angular   | `TemplateRef` via `@ContentChild` | A projected `<ng-template #drawerContent let-ctx>` — the ref variable name **must** be exactly `drawerContent`, read via `@ContentChild('drawerContent', { read: TemplateRef })` |
 | Svelte    | `drawerContent` Snippet prop      | `{#snippet drawerContent(slot: IDrawerContentSlotProps)}...{/snippet}` passed as the `drawerContent` prop on `<Drawer>`                                                          |
+| Solid     | `drawerContent` render prop       | `(slot: Accessor<IDrawerContentSlotProps>) => JSX.Element` passed as the `drawerContent` prop on `<Drawer>`; called once, untracked, read `slot()` inside, not at the callback's own top level |
 
 If you skip the render prop/slot/template entirely, the panel slot renders empty — Drawer never
 falls back to a default menu.
@@ -279,6 +323,7 @@ falls back to a default menu.
 ---
 
 See [`useNavigation()`/`useRoute()`/`useIsFocused()`/`useFocusEffect()` (Angular:
-`injectNavigation()`/`injectRoute()`/`injectIsFocused()`/`injectFocusEffect()`)](/docs/navigation/hooks/)
-across all four adapters, including how to narrow a navigation handle down
+`injectNavigation()`/`injectRoute()`/`injectIsFocused()`/`injectFocusEffect()`; Solid:
+`useNavigation()`/`useRoute()`/`createIsFocused()`/`createFocusEffect()`)](/docs/navigation/hooks/)
+across all five adapters, including how to narrow a navigation handle down
 to `IDrawerNavigatorHandle`.

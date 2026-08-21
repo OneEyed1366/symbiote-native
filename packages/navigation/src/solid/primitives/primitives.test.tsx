@@ -285,44 +285,39 @@ describe('Solid navigation primitives', () => {
 
     // why: the narrowing primitives have a SECOND guard - the nearest navigator being the wrong
     // KIND, which a union handle would otherwise let through to a runtime "push is not a function".
-    it('useTabNavigation throws under a Stack', async () => {
-      const errors: string[] = [];
+    // Asserted off `mount` rather than a try/catch inside the screen. Both are the same throw; the
+    // adapter's root now carries a `catchError` handler (adapters/solid/src/render.ts), and Solid
+    // answers a computation throw by DEFERRING the handler onto the effects queue instead of
+    // rethrowing at the read site — so the guard surfaces out of the mount, not out of the memo
+    // read. The observable claim, that a wrong-kind navigator is a loud failure, is unchanged.
+    it('useTabNavigation throws under a Stack', () => {
       const WrongScreen = () => {
-        try {
-          useTabNavigation()();
-        } catch (error) {
-          errors.push(error instanceof Error ? error.message : String(error));
-        }
+        useTabNavigation()();
         return <symbiote-text>wrong</symbiote-text>;
       };
-      mount(ROOT_TAG, () => (
-        <Stack initialRouteName="Home">
-          <Stack.Screen name="Home" component={WrongScreen} />
-        </Stack>
-      ));
-      await flush();
 
-      expect(errors[0]).toMatch(/nearest navigator is not a Tab/);
+      expect(() =>
+        mount(ROOT_TAG, () => (
+          <Stack initialRouteName="Home">
+            <Stack.Screen name="Home" component={WrongScreen} />
+          </Stack>
+        )),
+      ).toThrow(/nearest navigator is not a Tab/);
     });
 
-    it('useStackNavigation throws under a Tab', async () => {
-      const errors: string[] = [];
+    it('useStackNavigation throws under a Tab', () => {
       const WrongScreen = () => {
-        try {
-          useStackNavigation()();
-        } catch (error) {
-          errors.push(error instanceof Error ? error.message : String(error));
-        }
+        useStackNavigation()();
         return <symbiote-text>wrong</symbiote-text>;
       };
-      mount(ROOT_TAG, () => (
-        <Tab initialRouteName="Feed">
-          <Tab.Screen name="Feed" component={WrongScreen} />
-        </Tab>
-      ));
-      await flush();
 
-      expect(errors[0]).toMatch(/nearest navigator is not a Stack/);
+      expect(() =>
+        mount(ROOT_TAG, () => (
+          <Tab initialRouteName="Feed">
+            <Tab.Screen name="Feed" component={WrongScreen} />
+          </Tab>
+        )),
+      ).toThrow(/nearest navigator is not a Stack/);
     });
   });
 });

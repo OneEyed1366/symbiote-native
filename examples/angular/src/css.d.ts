@@ -3,6 +3,14 @@
 // metro-css-transformer.js) into a registerRules() call; there's no runtime export to type.
 declare module '*.css';
 
+// Same shape for the three optional preprocessor sources — css-parser reduces each to plain CSS
+// before compiling, so a side-effect import of one is indistinguishable downstream from a `.css`
+// one. Exercised by screens/showcase.{scss,less,styl} (StyleShowcaseScreen).
+declare module '*.scss';
+declare module '*.sass';
+declare module '*.less';
+declare module '*.styl';
+
 // Generic (non-literal) fallback for a `.module.css` import — used by `tsc` outside a file that
 // already has its own generated `Card.module.css.d.ts` (see `css-dts`, wired to `pretypecheck`;
 // a real per-file `.d.ts` takes priority over this wildcard once generated). The

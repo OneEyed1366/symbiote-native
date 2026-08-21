@@ -127,10 +127,16 @@
    its own content, leaving a dead empty strip inside the border on the right
    — cap it to its content width instead, capped again at the container so a
    genuinely wide table (the API prop tables) still fills the line. */
+/* `overflow: hidden` alone clips a table wider than the viewport instead of
+   scrolling it, and the 5-framework comparison table overflows on a phone.
+   `overflow-x: auto` keeps it scrollable; `overflow-y: hidden` keeps the
+   border-radius corner clip from the comment above. */
 .sl-markdown-content table {
   border: 1px solid var(--core-line);
   border-radius: 10px;
-  overflow: hidden;
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
   font-size: 0.9em;
   width: fit-content;
   max-width: 100%;

@@ -5,8 +5,9 @@ description: The build-time CSS/SCSS/Sass/Less/Stylus compiler behind SymbioteNa
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-`@symbiote-native/css-parser` compiles a stylesheet — a `.css`/`.module.css` file, a Vue SFC
-`<style>` block, or an SCSS/Sass/Less/Stylus source — into React Native style objects at build
+`@symbiote-native/css-parser` compiles a stylesheet — a `.css`/`.module.css` file, an inline
+`<style>` block in a Vue SFC or a Svelte component, or an SCSS/Sass/Less/Stylus source — into
+React Native style objects at build
 time, inside a Metro transformer. The runtime half lives elsewhere: `@symbiote-native/engine`'s
 `style-registry` (`registerStyles` / `resolveClassName`) is what turns `className="card"` back
 into a style object at render time. What to write in your stylesheets and how classes resolve per
@@ -25,6 +26,7 @@ are produced for iOS and Android from one transform.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -198,6 +200,39 @@ object, not the factory — so no local wrapper file is needed.
       import './theme.css';                     // plain CSS — registers classes globally, no export
       import styles from './Card.module.css';   // CSS Modules — default export is a name→scopedName map
     </script>
+
+    <View class="card" style={styles.highlight} />
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    Solid needs no SFC/`.tsx` transformer of its own - JSX compiles through a plain Babel preset
+    (`@symbiote-native/solid/babel-preset`), not Metro. The only `babelTransformerPath` here is
+    this framework-agnostic stylesheet one, same setup as React's.
+
+    ```js
+    // metro.config.js
+    const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+
+    const defaultConfig = getDefaultConfig(__dirname);
+
+    const config = {
+      transformer: {
+        babelTransformerPath: require.resolve('@symbiote-native/solid/metro-css-parser'),
+      },
+      resolver: {
+        sourceExts: [...defaultConfig.resolver.sourceExts, 'css', 'scss', 'sass', 'less', 'styl'],
+      },
+    };
+
+    module.exports = mergeConfig(defaultConfig, config);
+    ```
+
+    Then import stylesheets from any source file:
+
+    ```tsx
+    import './theme.css';                     // plain CSS — registers classes globally, no export
+    import styles from './Card.module.css';   // CSS Modules — default export is a name→scopedName map
 
     <View class="card" style={styles.highlight} />
     ```

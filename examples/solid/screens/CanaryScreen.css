@@ -1,0 +1,340 @@
+/*
+ * CanaryScreen's own classes — the geometry of the every-primitive tour stop, ported section for
+ * section from examples/react/App.css so the five canaries paint the same screen. Only properties
+ * Yoga and Fabric implement; @symbiote-native/css-parser compiles this at build time and the
+ * engine's routeProp resolves `class` against the registry.
+ *
+ * COLORS ARE THIS TREE'S OWN, GEOMETRY IS SHARED. Sizes, spacing, radii and font sizes match
+ * React's byte for byte, because those are what "the same app written five ways" means. The hexes
+ * do not: examples/solid declares no :root token block and spells its palette literally
+ * (#0b1020 ground, #151c33 card, #7f8db3 muted, #9aa6c4 body, #f4f6fb bright), and the primitives
+ * line wears Solid's own #76b3e1 where React's wears #149eca. That divergence is deliberate and
+ * lives outside this file's remit.
+ *
+ * Classes shared with the rest of the app — .screen, .row, .flex1, .section-label, .line-tag*,
+ * .hero-*, .info-text, .note-text, .list-row-text, .action-button* — stay in App.css and are not
+ * repeated here.
+ */
+
+/* ScrollView's contentContainerStyle. The padding belongs to the content container, not the
+ * ScrollView node, or the last card sits unreachable behind the safe area. */
+.scroll-content {
+  padding-top: 24px;
+  padding-bottom: 40px;
+  padding-left: 24px;
+  padding-right: 24px;
+  align-items: stretch;
+  gap: 20px;
+}
+
+/* ---- live runtime-module readouts ---- */
+
+.header-note {
+  color: #7f8db3;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* borderTopWidth stays a dynamic inline style: StyleSheet.hairlineWidth is a runtime constant
+ * (1/PixelRatio.get()), so no CSS selector can spell it. The border painted here IS the proof
+ * that DeviceInfo's scale resolved. */
+.hairline-note {
+  color: #7f8db3;
+  font-size: 13px;
+  text-align: center;
+  padding-top: 8px;
+  border-top-color: #7f8db3;
+}
+
+.muted-center {
+  color: #7f8db3;
+  font-size: 13px;
+  text-align: center;
+}
+
+.accent-note {
+  color: #76b3e1;
+  font-size: 13px;
+}
+
+.refresh-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ---- counter / text input / switch ---- */
+
+.counter-card {
+  padding-top: 18px;
+  padding-bottom: 18px;
+  border-radius: 16px;
+  background-color: #76b3e1;
+  align-items: center;
+}
+
+.counter-text {
+  color: #0b1020;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* Shared with the KeyboardAvoidingView email field at the bottom of the screen. */
+.text-input {
+  height: 44px;
+  border-radius: 10px;
+  border-width: 1px;
+  border-color: #76b3e1;
+  padding-left: 14px;
+  padding-right: 14px;
+  color: #f4f6fb;
+  font-size: 18px;
+  background-color: #151c33;
+}
+
+.greeting {
+  color: #f4f6fb;
+  font-size: 20px;
+  text-align: center;
+}
+
+.switch-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.switch-label {
+  color: #9aa6c4;
+  font-size: 16px;
+}
+
+.section-tight {
+  gap: 8px;
+}
+
+/* Pin a height so the native RNCSlider track always has room in the flex column. */
+.slider {
+  height: 40px;
+  align-self: stretch;
+}
+
+/* ---- Pressable ---- */
+
+/* Only the press-state-dependent colors stay a style function; the static look lives here. */
+.pressable-card {
+  padding-top: 16px;
+  padding-bottom: 16px;
+  border-radius: 14px;
+  align-items: center;
+  border-width: 1px;
+}
+
+.pressable-label {
+  font-size: 15px;
+}
+
+/* ---- horizontal FlatList ---- */
+
+.chip-list {
+  height: 84px;
+}
+
+/* width/marginRight stay dynamic — they reference the CHIP_WIDTH/CHIP_GAP script consts (also fed
+ * to getItemLayout), which a CSS selector has no way to read; backgroundColor stays dynamic
+ * (item.color, per-chip — telling 24 distinct chips apart at a glance is the windowing demo's
+ * whole point). */
+.chip-card {
+  height: 72px;
+  border-radius: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.chip-number {
+  color: #0b1020;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+/* ---- press retention ---- */
+
+.retention-card {
+  height: 64px;
+  border-radius: 14px;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- maintainVisibleContentPosition ---- */
+
+/* Height is deliberately fat, not decorative: this divider is the chrome BETWEEN rows that the
+ * offset table has to account for, and a 1px hairline would hide a mis-modelled gap. Insets match
+ * .mvcp-row's padding on BOTH sides so it reads as part of the row rhythm instead of bleeding
+ * under the container's rounded corner. */
+.mvcp-divider {
+  height: 8px;
+  margin-left: 14px;
+  margin-right: 14px;
+  border-radius: 2px;
+  background-color: #26304f;
+}
+
+.mvcp-row {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+/* Shared by the MVCP FlatList and the Animated.ScrollView below it. */
+.box-list160 {
+  height: 160px;
+  border-radius: 12px;
+  background-color: #151c33;
+}
+
+/* ---- scroll-driven header (native driver) ---- */
+
+.parity-header {
+  background-color: #76b3e1;
+  border-radius: 12px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  align-items: center;
+}
+
+.parity-header-text {
+  color: #0b1020;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.scroll-demo-row {
+  height: 80px;
+  justify-content: center;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.tiny-center {
+  color: #7f8db3;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ---- modern style props reaching Fabric's C++ parser ---- */
+
+.shadow-card {
+  height: 64px;
+  border-radius: 12px;
+  background-color: #151c33;
+  align-items: center;
+  justify-content: center;
+}
+
+.filter-tile {
+  flex: 1;
+  height: 64px;
+  border-radius: 12px;
+  background-color: #76b3e1;
+  align-items: center;
+  justify-content: center;
+}
+
+.rotated-card {
+  height: 64px;
+  border-radius: 12px;
+  background-color: #76b3e1;
+  align-items: center;
+  justify-content: center;
+}
+
+/* literal hexes, not a custom property — untested whether the css-parser resolves a var() nested
+ * inside a gradient function's stop list, and this demo's whole point is proving background-image
+ * itself works, so it isn't the place to find out. Solid's two brand blues. */
+.gradient-card {
+  height: 64px;
+  border-radius: 12px;
+  background-image: linear-gradient(to right, #2c4f7c, #76b3e1);
+  align-items: center;
+  justify-content: center;
+}
+
+.tile-text {
+  color: #0b1020;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* ---- images ---- */
+
+.web-image {
+  border-radius: 8px;
+  align-self: center;
+}
+
+.logo-image {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  align-self: center;
+}
+
+.bottom-card {
+  height: 200px;
+  border-radius: 16px;
+  background-color: #151c33;
+  align-items: center;
+  justify-content: center;
+}
+
+.bottom-text {
+  color: #76b3e1;
+  font-size: 16px;
+}
+
+/* ---- Modal / portal / tunnel ---- */
+
+/* A transparent Modal paints no scrim of its own — this is the RN pattern of painting one. */
+.modal-overlay {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.modal-card {
+  width: 280px;
+  padding: 24px;
+  border-radius: 20px;
+  background-color: #151c33;
+  align-items: center;
+  gap: 16px;
+}
+
+.modal-title {
+  color: #f4f6fb;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.modal-body {
+  color: #9aa6c4;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* The portal/tunnel target: a persistent, empty layer above the scroll content. */
+.overlay-host {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  bottom: 0px;
+  align-items: center;
+  justify-content: center;
+}

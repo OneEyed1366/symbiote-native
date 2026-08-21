@@ -2,7 +2,8 @@ import { ROUTE_NAME } from './routes';
 import type { IRouteName } from './routes';
 
 // The demo suite groups its tour screens into thematic "lines" — which part of the package each
-// screen exercises, plus a Performance line for the benchmark stop — carried through MenuScreen's row badges, each demo screen's own line tag, and
+// screen exercises, plus a Performance line for the benchmark stop and a Styling line for the
+// CSS-compiler showcase — carried through MenuScreen's row badges, each demo screen's own line tag, and
 // (where the native header/tab bar already takes a tint color) the OS chrome itself. One color per
 // line replaces the single flat accent every row/button used to share. Kept in sync by hand with
 // App.css's `:root` `--line-*` tokens — CSS custom properties and this module are different
@@ -14,6 +15,7 @@ export const NAV_LINE = {
   Introspection: 'introspection',
   Routing: 'routing',
   Performance: 'performance',
+  Styling: 'styling',
 } as const;
 
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
@@ -32,6 +34,10 @@ export const LINE_COLOR: Record<INavLine, string> = {
   // Amber — the only warm hue in the set, so a timing screen never reads as one of the
   // navigation lines at a glance.
   [NAV_LINE.Performance]: '#f5a524',
+  // Yellow-green, the one wide hue gap the six lines above leave open — far enough from
+  // Structure's mint (#4fd1a5) and Performance's amber (#f5a524) to read apart at badge size,
+  // and the CSS showcase is not a navigation line either.
+  [NAV_LINE.Styling]: '#a3d94f',
 };
 
 export type INavLineInfo = {
@@ -41,7 +47,10 @@ export type INavLineInfo = {
 };
 
 // Every route reachable from MenuScreen, minus Menu itself. Deliberately excludes Details — it's a
-// plain push-target off Canary, not one of the 11 tour stops.
+// plain push-target off Canary, not one of the 12 tour stops. StyleShowcase is the 12th and is
+// React-only for now: it rides on top of the 11-stop tour the other canaries share, the way
+// Angular carries its own ReactiveStyle and Probe screens. Porting it to the other five is open
+// debt, recorded in the symbiote-sfc-style-compiler skill.
 export type ITourRouteName = Exclude<
   IRouteName,
   typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details
@@ -102,5 +111,10 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     line: NAV_LINE.Performance,
     code: 'BM',
     label: 'PERFORMANCE LINE',
+  },
+  [ROUTE_NAME.StyleShowcase]: {
+    line: NAV_LINE.Styling,
+    code: 'ST',
+    label: 'STYLING LINE',
   },
 };

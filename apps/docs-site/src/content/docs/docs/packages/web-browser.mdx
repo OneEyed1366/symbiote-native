@@ -11,7 +11,8 @@ browser (`SFSafariViewController` on iOS, Chrome Custom Tabs on Android) plus th
 auth-session flow — so every SymbioteNative adapter can reach it, not just React. Like
 [secure store](/docs/packages/secure-store/) and [local auth](/docs/packages/local-auth/), every
 export is a free function with no per-instance state, so there is no hook/composable/service to
-wrap — the React, Vue, Angular, and Svelte entry points are plain re-exports of the same `core`.
+wrap — the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same
+`core`.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -24,6 +25,7 @@ wrap — the React, Vue, Angular, and Svelte entry points are plain re-exports o
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -53,8 +55,9 @@ and the `<queries>` entry Android needs to see the Custom Tabs service ships ins
 
 ## Usage
 
-All four adapters re-export the exact same functions; there is no per-adapter
-hook/composable/service to reach for, since nothing here holds live state or a subscription.
+All five adapters (React, Vue, Angular, Svelte, Solid) re-export the exact same functions; there
+is no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+subscription.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
@@ -132,6 +135,21 @@ hook/composable/service to reach for, since nothing here holds live state or a s
     </script>
 
     <View><Button title="Read the docs" onPress={onOpen} /></View>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Button, View } from '@symbiote-native/solid';
+    import { openBrowserAsync } from '@symbiote-native/web-browser/solid';
+
+    export default function Docs() {
+      return (
+        <View>
+          <Button title="Read the docs" onPress={() => openBrowserAsync('https://example.com')} />
+        </View>
+      );
+    }
     ```
 
   </TabItem>
@@ -244,6 +262,32 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
     </script>
 
     <View><Text>{code ?? 'not signed in'}</Text><Button title="Sign in" onPress={onSignIn} /></View>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { Button, Text, View } from '@symbiote-native/solid';
+    import { openAuthSessionAsync } from '@symbiote-native/web-browser/solid';
+
+    const AUTHORIZE_URL = 'https://auth.example.com/authorize?redirect_uri=myapp://callback';
+
+    export default function SignIn() {
+      const [code, setCode] = createSignal<string | null>(null);
+
+      async function onSignIn() {
+        const result = await openAuthSessionAsync(AUTHORIZE_URL, 'myapp://callback');
+        setCode(result.type === 'success' ? new URL(result.url).searchParams.get('code') : null);
+      }
+
+      return (
+        <View>
+          <Text>{code() ?? 'not signed in'}</Text>
+          <Button title="Sign in" onPress={onSignIn} />
+        </View>
+      );
+    }
     ```
 
   </TabItem>
@@ -365,7 +409,7 @@ Three pieces of upstream are deliberately left out rather than silently dropped:
 
 ## How the wrapper works
 
-`@symbiote-native/web-browser` ships zero React/Vue/Angular/Svelte logic —
+`@symbiote-native/web-browser` ships zero React/Vue/Angular/Svelte/Solid logic —
 `expo-web-browser`'s own JS is hand-ported into this package's `core/`, resolving the native
 module through `expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package
 this project never installs:
@@ -378,8 +422,14 @@ packages/web-browser/src/
 ├── react/    # @symbiote-native/web-browser/react   — export * from '../core'
 ├── vue/      # @symbiote-native/web-browser/vue     — export * from '../core'
 ├── angular/  # @symbiote-native/web-browser/angular — export * from '../core'
-└── svelte/   # @symbiote-native/web-browser/svelte  — export * from '../core'
+├── svelte/   # @symbiote-native/web-browser/svelte  — export * from '../core'
+└── solid/    # @symbiote-native/web-browser/solid   — export * from '../core'
 ```
+
+The `react`/`vue`/`svelte`/`solid` subpaths above are virtual, not physical folders: each is
+stateless enough (see `barrel-passthrough.md`) that `package.json`'s `exports` points the
+subpath straight at `./src/core/index.ts` rather than a real re-export file. `./angular` is the
+one exception, keeping its own `src/angular/index.ts` and ngc/AOT build as always.
 
 Same shape as [secure store](/docs/packages/secure-store/)'s and
 [local auth](/docs/packages/local-auth/)'s adapter entries: single-file re-exports with no

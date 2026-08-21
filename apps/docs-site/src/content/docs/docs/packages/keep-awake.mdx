@@ -10,9 +10,9 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 for as long as a tag holds an active lock — so every SymbioteNative adapter can reach it, not just
 React. Like [network](/docs/packages/network/), it mixes stateless imperative functions
 (`activateKeepAwakeAsync`/`deactivateKeepAwake`/`isAvailableAsync`/`addListener`) with a lifecycle
-hook/composable/rune/service (`useKeepAwake`) that activates a lock on mount and deactivates it on
-unmount — the tag-generation and activate/deactivate lifecycle is written once and shared by all
-four adapters.
+hook/composable/rune/primitive/service (`useKeepAwake`/`createKeepAwake`) that activates a lock on
+mount and deactivates it on unmount — the tag-generation and activate/deactivate lifecycle is
+written once and shared by all five adapters.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -25,6 +25,7 @@ four adapters.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -124,6 +125,23 @@ way to use this package.
     the component's mount/unmount, same as Vue's `onMounted`/`onUnmounted` pair.
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createKeepAwake } from '@symbiote-native/keep-awake/solid';
+
+    export default function KeepAwakeScreen() {
+      createKeepAwake(); // screen stays on for as long as this owner is alive
+
+      return <Text>Screen will not sleep</Text>;
+    }
+    ```
+
+    `createKeepAwake` has no return value - the body runs once, so activation happens
+    synchronously and release happens via `onCleanup`, matching Vue's `onMounted`/`onUnmounted`
+    pair with no separate mount hook.
+
+  </TabItem>
 </Tabs>
 
 ### Imperative functions
@@ -195,6 +213,22 @@ mount/unmount lifecycle above.
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Button } from '@symbiote-native/solid';
+    import { activateKeepAwakeAsync, deactivateKeepAwake } from '@symbiote-native/keep-awake/solid';
+
+    export default function ManualKeepAwake() {
+      return (
+        <>
+          <Button title="Keep awake" onPress={() => activateKeepAwakeAsync('download-tag')} />
+          <Button title="Allow sleep" onPress={() => deactivateKeepAwake('download-tag')} />
+        </>
+      );
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ## API
@@ -214,7 +248,7 @@ Plus the `ExpoKeepAwakeTag` constant (the shared default tag string, `'ExpoKeepA
 
 | Field                       | Type                            | Default                           | Description                                                                                                                                                                                                                                                     |
 | --------------------------- | ------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tag` (first argument)      | `string \| undefined`           | a per-instance auto-generated tag | The lock tag to activate/deactivate. React derives its default from `useId()`; Vue, Angular, and Svelte fall back to a monotonically-incrementing module-local counter (`keep-awake-tag-1`, `keep-awake-tag-2`, …), since none of them has a `useId` equivalent |
+| `tag` (first argument)      | `string \| undefined`           | a per-instance auto-generated tag | The lock tag to activate/deactivate. React derives its default from `useId()`; Vue, Angular, Svelte, and Solid fall back to a monotonically-incrementing module-local counter (`keep-awake-tag-1`, `keep-awake-tag-2`, …), since none of them has a `useId` equivalent |
 | `options` (second argument) | `KeepAwakeOptions \| undefined` | `undefined`                       | `{ listener?, suppressDeactivateWarnings? }` — see below                                                                                                                                                                                                        |
 
 ### `KeepAwakeOptions`
@@ -236,19 +270,19 @@ Plus the `ExpoKeepAwakeTag` constant (the shared default tag string, `'ExpoKeepA
 
 <Aside
   type="note"
-  title="React/Vue/Angular/Svelte have no shared default-tag mechanism"
+  title="React/Vue/Angular/Svelte/Solid have no shared default-tag mechanism"
 >
   React uses `useId()` for its default per-instance tag, matching upstream
   exactly, so two components calling `useKeepAwake()` concurrently without an
   explicit tag don't clobber each other's activation/deactivation. Vue, Angular,
-  and Svelte have no `useId` equivalent, so all three fall back to a small
+  Svelte, and Solid have no `useId` equivalent, so all four fall back to a small
   monotonically-incrementing module-local counter instead — functionally
   equivalent, just not identical string values across adapters.
 </Aside>
 
 ## How the wrapper works
 
-`@symbiote-native/keep-awake` ships zero React/Vue/Angular logic in `expo-keep-awake` itself —
+`@symbiote-native/keep-awake` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-keep-awake` itself —
 its functions and types are hand-ported, verbatim, into this package's own `core/`, resolving the
 native module through `expo-modules-core`'s `requireNativeModule` rather than the `expo`
 meta-package this project never installs:
@@ -263,15 +297,16 @@ packages/keep-awake/src/
 ├── react/hooks/          @symbiote-native/keep-awake/react   — useKeepAwake
 ├── vue/composables/      @symbiote-native/keep-awake/vue     — useKeepAwake (same name)
 ├── svelte/runes/         @symbiote-native/keep-awake/svelte  — useKeepAwake (same name)
+├── solid/primitives/     @symbiote-native/keep-awake/solid   — createKeepAwake
 └── angular/services/     @symbiote-native/keep-awake/angular — KeepAwakeService (`.connect()`,
                           no return value)
 ```
 
-Each adapter's hook/composable/rune/service is a thin lifecycle wrapper over the same `core`
-functions — activate on mount, register the optional listener once activation resolves,
+Each adapter's hook/composable/rune/primitive/service is a thin lifecycle wrapper over the same
+`core` functions — activate on mount, register the optional listener once activation resolves,
 deactivate on unmount — written once as a shared pattern and reapplied identically across React's
-`useEffect`, Vue's `onMounted`/`onUnmounted`, Svelte's `$effect`, and Angular's `effect()` (the
-same `connect()`/`effect()` pattern
+`useEffect`, Vue's `onMounted`/`onUnmounted`, Svelte's `$effect`, Solid's synchronous body +
+`onCleanup`, and Angular's `effect()` (the same `connect()`/`effect()` pattern
 [battery](/docs/packages/battery/)'s `LowPowerModeService` uses, minus a Signal to return since
 keep-awake is a pure side effect). The native code itself is never vendored or copied —
 `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup

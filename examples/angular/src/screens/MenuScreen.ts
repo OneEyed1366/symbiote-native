@@ -29,6 +29,11 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     hint: 'signals, control flow, DI, lifecycle, pipes',
   },
   {
+    label: 'Styling showcase',
+    route: ROUTE_NAME.StyleShowcase,
+    hint: 'CSS · Modules · SCSS/Less/Stylus — and what is refused',
+  },
+  {
     label: 'Header options',
     route: ROUTE_NAME.HeaderOptions,
     hint: 'bar buttons, menu, search bar, large title',
@@ -78,11 +83,6 @@ const MENU_ITEMS: readonly IMenuItem[] = [
     route: ROUTE_NAME.Benchmark,
     hint: 'js-framework-benchmark ops + JS-thread FPS',
   },
-  {
-    label: 'Angular probe',
-    route: ROUTE_NAME.Probe,
-    hint: 'change-detection passes, renderer writes, cell views',
-  },
 ];
 
 /**
@@ -113,7 +113,8 @@ const MENU_ITEMS: readonly IMenuItem[] = [
             Each row below drives a different @symbiote-native/navigation line —
             Primitives, Presentation, Structure, Introspection, Routing — on a
             real native stack, plus a Performance stop timing the engine's own
-            commit path.
+            commit path and a Styling stop showing the whole CSS compiler
+            surface.
           </Text>
         </View>
         @for (item of menuItems; track item.route) {

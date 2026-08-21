@@ -100,8 +100,12 @@
   border-color: #2c4068;
 }
 
+/* The lit fill has to be LIGHTER, not merely a different navy. It used to be #16305a, which is
+   within a point of `.ap-pill`'s own #20304f in luminance — and PropsUtilsDemo's "toggle tone"
+   button changes nothing else about the pill (its label is deliberately constant), so the whole
+   demo read as a dead button. */
 .ap-pill-on {
-  background-color: #16305a;
+  background-color: #2b6cb0;
   border-color: #7aa2e3;
 }
 
@@ -122,9 +126,14 @@
   border-color: #26304f;
 }
 
+/* Two jobs, and #16305a served neither: it is `.ap-panel`'s own fill, so DynamicSwapDemo's "done"
+   variant (`ap-item ap-item-on`) was pixel-identical to its "info" variant (`ap-panel`) — the
+   component swap the demo exists to show was legible only in the text prefix. And as ForVsIndex-
+   Demo's selection highlight it sat one shade off `.ap-item`'s #0f1729 while the row's text stayed
+   put. #1d4f8f is clear of both. */
 .ap-item-on {
   border-color: #7aa2e3;
-  background-color: #16305a;
+  background-color: #1d4f8f;
 }
 
 .ap-item-text {

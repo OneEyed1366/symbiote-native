@@ -16,15 +16,16 @@ pnpm add @symbiote-native/components
 ```
 
 Nearly every consumer gets this transitively: `@symbiote-native/react`,
-`@symbiote-native/vue`, and `@symbiote-native/angular` each depend on it and
-re-export the parts an app touches. Install it directly only when building a new
-adapter or a native-view wrapper. `@symbiote-native/engine` and `react-native`
-(>=0.86) are peer dependencies and stay top-level dependencies of the app.
+`@symbiote-native/vue`, `@symbiote-native/angular`, `@symbiote-native/svelte`,
+and `@symbiote-native/solid` each depend on it and re-export the parts an app
+touches. Install it directly only when building a new adapter or a
+native-view wrapper. `@symbiote-native/engine` and `react-native` (>=0.86)
+are peer dependencies and stay top-level dependencies of the app.
 
 ## Status matrix
 
-Every component below ships on React, Vue, Angular, and Svelte. What differs is
-the framework-shaped surface:
+Every component below ships on React, Vue, Angular, Svelte, and Solid. What
+differs is the framework-shaped surface:
 
 - `View` — React uses `children`; Vue uses the default slot; Svelte takes a
   `children: Snippet` prop rendered with `{@render children?.()}` — closer to
@@ -32,16 +33,25 @@ the framework-shaped surface:
   Svelte's `View` forwards no `bind:this` escape hatch of its own, so
   imperative access goes through the `hostInstance()` rune over a raw
   `symbiote-view` host tag (or a component's own exported functions, e.g.
-  `TextInput`/`ScrollView`'s `focus`/`scrollTo`).
+  `TextInput`/`ScrollView`'s `focus`/`scrollTo`). Solid's `View` is real JSX
+  taking a `children: JSX.Element`, closest to React's shape; `ref` is a real
+  host-instance ref (Solid's compiler rewrites `ref={x}` into a callback prop,
+  which `applyHostRef` fills), no rune indirection needed.
 - `Text` — Text children differ by framework; press events follow callback vs
   emit shape. Svelte's `Text` takes the same object-bag props as `View`
-  (no `IResponderProps`, matching every other adapter's `ITextProps`).
+  (no `IResponderProps`, matching every other adapter's `ITextProps`). Solid's
+  `Text` is the same shape as React's: real JSX, plain `ITextProps` with no
+  `IResponderProps`.
 - `Image` — Source resolution and statics are shared. Svelte's `Image.svelte`
   re-derives the same prop-assembly logic `renderImage()` encapsulates
   (`buildImageBag`, mirroring the source/width-height/resizeMode/tintColor
   folds field-for-field) rather than calling the shared function directly —
   documented duplication, not a behavior difference; statics
   (`getSize`/`prefetch`/`queryCache`/…) attach from the sibling `index.ts`.
+  Solid's `Image` calls `renderImage()` directly through `descriptorToSolid`,
+  like React/Vue: no re-derivation. It is the one primitive written as plain
+  `.ts` rather than `.tsx`: an image is a leaf built entirely from values, so
+  it needs no live-subtree JSX (`.claude/rules/component-render-fn-boundary.md`).
 - `ScrollView` — Imperative handle, refresh, and sticky behavior need
   framework-specific examples. Svelte exposes `scrollTo`/`scrollToEnd`/
   `flashScrollIndicators`/`getScrollNode` as plain exported functions read off
@@ -52,27 +62,46 @@ the framework-shaped surface:
   component only an opaque `Snippet`, with no `Children.toArray`/`slots.default()`
   equivalent to pull "child at index N" out of it, so compose
   `ScrollViewStickyHeader` manually instead (it auto-wires to the parent's
-  scroll offset via Svelte context).
+  scroll offset via Svelte context). Solid has no such gap: `ref={scroller}`
+  on the component compiles to a callback prop that receives the imperative
+  handle, and sticky-header auto-wrap resolves the opaque `children` through
+  Solid's own `children()` helper into an indexable list, then wraps the
+  flagged entries, a coarser update than the plain path (any child change
+  re-runs the wrap), so it is built only when `stickyHeaderIndices` is set.
 - `Pressable` — React uses a render child; Vue uses a scoped slot; Svelte uses
   a named snippet prop, `{#snippet children({ pressed })}...{/snippet}`.
   Events are plain callback props (`onPress`, `onLongPress`, …) exactly like
-  React — Svelte never translates to an emit/Output shape.
+  React — Svelte never translates to an emit/Output shape. Solid's render-prop
+  child is `(state: Accessor<IPressState>) => JSX.Element`, an accessor, not
+  a snapshot value, called once, untracked, the same shape Solid core uses
+  for `<For>`. That divergence from React's `(state) => ReactNode` fixes a
+  real device bug: reading `pressed()` inside a tracked call rebuilt the whole
+  child subtree on every touch and lost the native responder grant mid-gesture
+  (`.claude/rules/solid-descriptor-bridge.md` §4). Events are plain callback
+  props, same names as React.
 - `TextInput` — `onValueChange` maps to `@value-change` on Vue and `(valueChange)`
   on Angular; Svelte keeps the RN name unchanged as a plain callback prop,
   `onValueChange={(text, event) => …}` — the same shape as React, no
   translation layer. `value` is also `$bindable()`, so `bind:value={x}` works
   as sugar on top (Vue's `v-model` equivalent). The controlled write handshake
   (event-count-gated `setTextAndSelection` command) is shared logic across all
-  four.
+  four. Solid's `onValueChange` is the same React-shaped `(text, event) => ...`
+  callback prop; there is no `bind:value`/`v-model` sugar, only the explicit
+  `value`/`onValueChange` pair. `ref` receives the imperative handle
+  (`focus`/`blur`/`clear`/`isFocused`/`setSelection`), matching React's
+  `forwardRef` contract, not the host node.
 - `Switch` — `onValueChange` maps to `@value-change` on Vue and `(valueChange)`
   on Angular; Svelte again keeps `onValueChange` as a plain callback prop,
   React-shaped, with `value` also `$bindable()` for `bind:value={x}`.
   Controlled snap-back (`dispatchViewCommand` when native reports a value the
-  parent rejects) is shared logic.
+  parent rejects) is shared logic. Solid's `onValueChange` is the same
+  React-shaped callback prop, with no `bind:value` sugar; the snap-back effect
+  is a `createEffect` over a signal holding the last native report.
 - `ActivityIndicator` — Mostly shared render-only props. Svelte calls
   `renderActivityIndicator()` directly and syncs its one child through the
   generic `descriptorToSvelte` bridge (`mountDescriptorChildren`) rather than
-  hand-authoring the spinner tag.
+  hand-authoring the spinner tag. Solid also calls `renderActivityIndicator()`
+  directly, through `descriptorToSolid`, the same shape as React/Vue.
 - Lists — Render item/slot shape differs; windowing math is shared. Svelte's
   cell renderer is a **required named snippet prop**, `item`:
   `{#snippet item({ item, index, separators })}...{/snippet}` — not a
@@ -84,6 +113,12 @@ the framework-shaped surface:
   `IFlatListProps`/`IVirtualizedSectionListProps` do not yet extend
   `IAccessibilityProps`/`IAriaProps` on Svelte, so `testID` and
   `accessibilityLabel` have no effect on a Svelte list today, unlike React.
+  Solid's `renderItem` is `(info: Accessor<{ item, index, separators }>) =>
+  JSX.Element`, an accessor-taking render prop, called once untracked, same
+  reasoning as `Pressable`'s child. `SectionList`/`VirtualizedSectionList` and
+  multi-column `FlatList` are implemented and execution-tested, and
+  `IVirtualizedListProps` extends `IAccessibilityProps`/`IAriaProps`, so
+  `testID`/`accessibilityLabel` work the same as on React: no honest gap here.
 - `Animated` — The value graph is shared; component wrapping differs by
   adapter (see the [Animations guide](/docs/learn/animations/)). Svelte has no
   generic `Animated.createAnimatedComponent(Component)` — a compiled Svelte
@@ -94,7 +129,14 @@ the framework-shaped surface:
   `Animated.SectionList` have no Svelte wrapper yet (follow-up, not silently
   dropped); the `Touchable*` family's press-fade is a self-contained
   `setTimeout`-driven tween reproducing `Animated.timing`'s curve, not a real
-  native-thread `useNativeDriver` animation.
+  native-thread `useNativeDriver` animation. Solid DOES have a generic
+  `Animated.createAnimatedComponent(Component)`: a Solid component is a
+  plain function, and `createComponent(Base, props)` wraps any of them the
+  same way `createElement`/`h()` do, so `Animated.View`/`.Text`/`.Image`/
+  `.ScrollView`/`.FlatList`/`.SectionList` are all one shared wrapper, full
+  parity with React. Solid's `Touchable*` press-fade shares the same
+  `setTimeout`-driven-tween shortfall as every other adapter (not a real
+  native-thread animation).
 - `Modal`, `KeyboardAvoidingView`, `SafeAreaView`, `RefreshControl`,
   `ImageBackground`, `InputAccessoryView`, `StatusBar`, `Button` — shared
   render/behavior logic, framework-shaped props and events same as above.
@@ -104,11 +146,24 @@ the framework-shaped surface:
   element-chain. `StatusBar` is the one runtime module with a real
   declarative half on every adapter: Svelte renders nothing and re-applies
   props via `$effect` (the Svelte twin of Vue's `watchEffect`-based version).
+  Solid's `Modal` is the same fixed-host-tag shape as Svelte's: real JSX
+  reading `renderModal()`'s output off the known `descriptor.props`/
+  `descriptor.children[0]` positions, wrapped in a `<Show>` for the
+  keep-alive gate. Solid's `StatusBar` renders `null` and re-applies props
+  from a `createEffect`, the Solid twin of Svelte's `$effect` version.
 - The `Touchable*` family (`TouchableOpacity`, `TouchableHighlight`,
   `TouchableWithoutFeedback`, `TouchableNativeFeedback`) — built on the same
   shared press state machine as `Pressable`. See `Animated`'s honest-gaps note
   above for the one Svelte-specific shortfall (the tween stand-in for a real
-  native-driven fade).
+  native-driven fade). Solid's port is the first written directly against
+  RN's own sources rather than against this repo's React adapter; an
+  audit found the React/Vue/Svelte/Angular ports diverge from RN in ten
+  places the other four have not migrated to yet, so `@symbiote-native/components`
+  carries both forms for now. One divergence Solid keeps deliberately:
+  `TouchableHighlight`'s underlay/dimmed-child styles both stay on the
+  container (RN clones the child to split them; Solid has no `cloneElement`,
+  and a permanent wrapper view would silently re-parent a child's own `flex`
+  with no way for a headless test to catch it).
 - `PanResponder` — an engine-level gesture-recognition module, not a
   component; shared across every adapter unchanged.
 
@@ -130,13 +185,13 @@ Framework-specific when the prop contains framework values:
 
 ## Event naming examples
 
-| Component   | React           | Vue                               | Angular         | Svelte          | Payload          |
-| ----------- | --------------- | --------------------------------- | --------------- | --------------- | ---------------- |
-| `Pressable` | `onPress`       | `@press`                          | `(press)`       | `onPress`       | `ISymbioteEvent` |
-| `Pressable` | `onLongPress`   | `@long-press`                     | `(longPress)`   | `onLongPress`   | `ISymbioteEvent` |
-| `Switch`    | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `onValueChange` | `boolean`        |
-| `TextInput` | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `onValueChange` | `string`         |
-| `View`      | `onLayout`      | `@layout`                         | `(layout)`      | `onLayout`      | `ISymbioteEvent` |
+| Component   | React           | Vue                               | Angular         | Svelte          | Solid           | Payload          |
+| ----------- | --------------- | --------------------------------- | --------------- | --------------- | --------------- | ---------------- |
+| `Pressable` | `onPress`       | `@press`                          | `(press)`       | `onPress`       | `onPress`       | `ISymbioteEvent` |
+| `Pressable` | `onLongPress`   | `@long-press`                     | `(longPress)`   | `onLongPress`   | `onLongPress`   | `ISymbioteEvent` |
+| `Switch`    | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `onValueChange` | `onValueChange` | `boolean`        |
+| `TextInput` | `onValueChange` | `@value-change`<br />or `v-model` | `(valueChange)` | `onValueChange` | `onValueChange` | `string`         |
+| `View`      | `onLayout`      | `@layout`                         | `(layout)`      | `onLayout`      | `onLayout`      | `ISymbioteEvent` |
 
 `TextInput`'s React/Vue callback fires as `(text, event)` — one value merged
 from what used to be two separate callbacks. Angular can't do that in one
@@ -145,7 +200,10 @@ event alongside text-only `(valueChange)`. Svelte's `onValueChange` fires the
 identical `(text, event)` shape React's does — the adapter is a flat
 object-bag adapter (every prop, handlers included, rides one object handed to
 the shim element's `p` setter), so there is no per-event translation layer to
-begin with: the callback prop name is RN's own name, unchanged.
+begin with: the callback prop name is RN's own name, unchanged. Solid's
+`onValueChange` fires the same `(text, event)` shape too, as an ordinary
+callback prop: Solid JSX props reach the component as plain getters, with no
+compiler-level event translation.
 
 Angular's names (`(press)`, `(longPress)`, `(valueChange)`, `(change)`,
 `(layout)`) are all real `@Output()` `EventEmitter`s, bound like
@@ -158,7 +216,8 @@ marker for native-driven scroll, and `@Output()` only binds a template
 listener expression, never an arbitrary value. Svelte has no `@Output()`
 equivalent at all — every event on every component, scroll-family included,
 is a plain callback prop, so this Angular-only exception has no Svelte
-counterpart to carve out.
+counterpart to carve out. Solid has no `@Output()` equivalent either, for the
+same reason.
 
 Svelte's own two-way-binding primitive, the nearest equivalent to Vue's
 `v-model`, is `$bindable()` (`let { value = $bindable() } = $props()`, wired
@@ -169,7 +228,10 @@ explicit `<TextInput value={x} onValueChange={setX} />` that Svelte shares
 with React. Supplying `onValueChange` on the same instance as `bind:value`
 takes over the echo — the component can't detect binding from the inside, so
 pass one or the other, not both, on one control. See [How to: two-way bind a
-value](/docs/howtos/two-way-binding/) for the full picture.
+value](/docs/howtos/two-way-binding/) for the full picture. Solid has no
+`bind:value`/`v-model` sugar of its own on these components: `value` and
+`onValueChange` are always explicit, the same pair React uses without the
+sugar.
 
 ## Framework event idioms side by side
 
@@ -213,6 +275,18 @@ value](/docs/howtos/two-way-binding/) for the full picture.
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    // Solid — callback props, same names as React; no emits, no @Output(), no bind: sugar
+    import { createSignal } from 'solid-js';
+    import { Pressable, Switch } from '@symbiote-native/solid';
+
+    const [enabled, setEnabled] = createSignal(false);
+
+    <Pressable onPress={event => console.log(event)} />
+    <Switch value={enabled()} onValueChange={setEnabled} />
+    ```
+  </TabItem>
 </Tabs>
 
 ## API
@@ -232,7 +306,15 @@ produces and reads the returned props/children off known positions
 (`descriptor-to-svelte.ts`) exists only to sync an already-fixed-shape
 `Descriptor`'s children onto a literal host tag without recreating nodes on
 every update — narrower in scope than `descriptorToReact`/`descriptorToVue`,
-not a like-for-like replacement.
+not a like-for-like replacement. Solid's `descriptorToSolid`
+(`descriptor-to-solid.ts`) IS a like-for-like bridge, closer to
+React's/Vue's than Svelte's: it builds a host node once from the descriptor's
+`type`, then re-props it on
+every recompute through a `spread` render effect. A component that takes
+live children (`View`, `Pressable`, `Modal`, ...) skips the bridge entirely and
+emits real JSX instead, since only Solid's own reconciler can reduce a live
+subtree, the same reason there is no `renderView()` in
+`@symbiote-native/components`.
 
 | Export             | Signature                                        | Description                                                                                                                                                |
 | ------------------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -277,7 +359,7 @@ elements, so the shared half is the state and math below, not a descriptor.
 
 Pure reducers and folds. The adapter supplies the lifecycle cell (React
 `useReducer`, Vue `ref`/`watch`, Angular signals, Svelte `$state`/`$effect`
-runes) and executes the effects.
+runes, Solid `createSignal`/`createEffect`) and executes the effects.
 
 | Export                            | Signature                                                                                                   | Description                                                                                                                                                                                     |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -363,10 +445,11 @@ Constants with the same shared-math role are exported alongside them —
 `IResponderProps`, `IActivityIndicatorProps`, `ISwitchProps`, and `IButtonProps`
 are fully framework-agnostic at their core, so every adapter's own prop type
 layers only its own class-styling field on top of the shared base rather than
-redeclaring the whole shape — React adds `className?: string`, Vue and
-Svelte both add `class?:` (Svelte's is `ISvelteClassValue`, a wider type that
-additionally accepts a clsx-style object/array, resolved by the adapter
-itself before it reaches the engine). `IImageProps`, `ITextInputProps`,
+redeclaring the whole shape — React adds `className?: string`, Vue, Svelte
+and Solid all add `class?:` (Svelte's is `ISvelteClassValue`, a wider type
+that additionally accepts a clsx-style object/array, resolved by the adapter
+itself before it reaches the engine; Solid's is the plain `IClassNameValue`
+the engine's style registry resolves, matching Vue's). `IImageProps`, `ITextInputProps`,
 `ITextInputHandle`, `IScrollViewHandle`, `IVirtualizedListHandle`, and
 `IVirtualizedSectionListHandle` ship here too; a prop type carrying framework
 children, refs, or render callbacks stays per-adapter by design.

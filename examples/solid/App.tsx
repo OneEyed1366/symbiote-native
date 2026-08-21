@@ -31,6 +31,7 @@ import type {
 } from '@symbiote-native/navigation/solid';
 import { hide } from '@symbiote-native/splash-screen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
+import { BenchmarkScreen } from './screens/BenchmarkScreen';
 import { CanaryScreen } from './screens/CanaryScreen';
 import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
 import { DetailsScreen } from './screens/DetailsScreen';
@@ -45,6 +46,7 @@ import {
   sheetDemoScreenOptions,
 } from './screens/SheetDemoScreen';
 import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
+import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
 import { TabsDemoScreen } from './screens/TabsDemoScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
@@ -56,7 +58,7 @@ import './App.css';
 const HEADER_BACKGROUND = '#0b1020';
 const DETAILS_TRANSITION_DURATION_MS = 300;
 
-// Eight of the twelve headers differ only in title and tint, so they share this builder. Menu
+// Nine of the thirteen headers differ only in title and tint, so they share this builder. Menu
 // (no tint, no headerShown) and Details (a pinned transition) deviate below; HeaderOptions and
 // SheetDemo own their options next to their screens, because those bags carry behavior — a live
 // navigation handle and the formSheet detents — rather than just chrome.
@@ -102,6 +104,11 @@ const deepLinkingScreenOptions = darkHeader('Deep Linking', LINE_COLOR.routing);
 const statePersistenceScreenOptions = darkHeader(
   'State Persistence',
   LINE_COLOR.routing,
+);
+const benchmarkScreenOptions = darkHeader('Benchmark', LINE_COLOR.performance);
+const styleShowcaseScreenOptions = darkHeader(
+  'Styling Showcase',
+  LINE_COLOR.styling,
 );
 
 // Not darkHeader(): Details is the one screen arrived at by deep link rather than by tap, so it
@@ -153,6 +160,11 @@ export default function App() {
         options={apiPlaygroundScreenOptions}
       />
       <Stack.Screen
+        name={ROUTE_NAME.StyleShowcase}
+        component={StyleShowcaseScreen}
+        options={styleShowcaseScreenOptions}
+      />
+      <Stack.Screen
         name={ROUTE_NAME.Details}
         component={DetailsScreen}
         options={detailsScreenOptions}
@@ -196,6 +208,11 @@ export default function App() {
         name={ROUTE_NAME.StatePersistence}
         component={StatePersistenceScreen}
         options={statePersistenceScreenOptions}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.Benchmark}
+        component={BenchmarkScreen}
+        options={benchmarkScreenOptions}
       />
     </Stack>
   );

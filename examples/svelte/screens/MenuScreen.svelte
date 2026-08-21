@@ -47,6 +47,11 @@
       hint: 'runes, snippets, stores, context — Svelte 5’s own surface, live',
     },
     {
+      label: 'Styling showcase',
+      route: ROUTE_NAME.StyleShowcase,
+      hint: 'CSS · Modules · SCSS/Less/Stylus — and what is refused',
+    },
+    {
       label: 'Header options',
       route: ROUTE_NAME.HeaderOptions,
       hint: 'bar buttons, menu, search bar, large title',
@@ -102,12 +107,12 @@
   >
     <View class="menu-hero">
       <Text class="menu-eyebrow">NAVIGATION DEMO SUITE</Text>
-      <Text class="menu-hero-title">Eleven stops along the stack</Text>
+      <Text class="menu-hero-title">Twelve stops along the stack</Text>
       <Text class="menu-hero-subtitle">
         Each row below drives a different line of @symbiote-native/navigation —
         Primitives, Presentation, Structure, Introspection, Routing — on a real
         native stack, plus a Performance stop timing the engine's own commit
-        path.
+        path and a Styling stop showing the whole CSS compiler surface.
       </Text>
     </View>
     {#each MENU_ITEMS as item (item.route)}

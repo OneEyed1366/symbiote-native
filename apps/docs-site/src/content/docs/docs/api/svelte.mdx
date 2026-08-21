@@ -16,7 +16,7 @@ import {
 } from '@symbiote-native/svelte';
 ```
 
-Svelte drives the same engine as React/Vue/Angular, but through a different
+Svelte drives the same engine as React/Vue/Angular/Solid, but through a different
 seam: Svelte has no official custom-renderer API yet (`createRenderer` from
 `svelte/renderer` is still an unmerged proposal), so this adapter patches a
 handful of `globalThis` DOM classes instead — stock compiled Svelte output
@@ -260,7 +260,7 @@ there's no working wrapper-component example to show here yet.
 ## Error boundaries (`<svelte:boundary>`)
 
 Svelte 5's own `<svelte:boundary>` is currently **Svelte-exclusive** among the
-four adapters — React's `componentDidCatch` boundary and Vue's
+five adapters — React's `componentDidCatch` boundary and Vue's
 `onErrorCaptured` aren't documented patterns here yet:
 
 ```svelte
@@ -282,4 +282,4 @@ Do not pass React component packages to the Svelte adapter. A third-party
 React Native package that ships a JavaScript React component still uses the
 React dispatcher internally. Non-React adapters need native-view wrappers
 instead — see the [Slider package](/docs/packages/slider/) for the reference
-implementation, shipping on React, Vue, Angular, and Svelte alike.
+implementation, shipping on React, Vue, Angular, Svelte, and Solid alike.

@@ -49,11 +49,19 @@ function discoverMultiFrameworkPackages() {
   return packages;
 }
 
-function buildBundleSources(exampleDir) {
+function buildBundleSources(framework, exampleDir) {
   const absoluteDir = join(REPO_ROOT, exampleDir);
   const reactNativeBinary = join(absoluteDir, 'node_modules/.bin/react-native');
   if (!existsSync(reactNativeBinary)) {
     throw new Error(`react-native CLI not installed — run \`npm install\` in ${exampleDir} first`);
+  }
+
+  // examples/angular's index.js imports from ./build/angular/src/App, produced by the ngc AOT
+  // compile (`ng:build`) — a gitignored artifact, unlike the other examples' plain TS/SFC entries
+  // that Metro transforms on the fly. Bundling before this step fails with a module-not-found on
+  // the very first import.
+  if (framework === 'angular') {
+    execFileSync('npm', ['run', 'ng:build'], { cwd: absoluteDir, stdio: 'pipe' });
   }
 
   const tmpDir = mkdtempSync(join(tmpdir(), 'symbiote-bundle-isolation-'));
@@ -120,7 +128,7 @@ function main() {
 
     let sources;
     try {
-      sources = buildBundleSources(exampleDir);
+      sources = buildBundleSources(framework, exampleDir);
     } catch (error) {
       hasFailure = true;
       console.log('FAIL (bundle build errored)');

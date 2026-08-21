@@ -10,8 +10,8 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 reading the root view's background color — so every SymbioteNative adapter can reach it, not
 just React. Like [device](/docs/packages/device/) and [local auth](/docs/packages/local-auth/),
 both exports here are one-shot async calls with no per-instance state, so there is no
-hook/composable/service to wrap — the React, Vue, Angular, and Svelte entry points are plain
-re-exports of the same `core`.
+hook/composable/service to wrap — the React, Vue, Angular, Svelte, and Solid entry points are
+plain re-exports of the same `core`.
 
 | OS platform | Support |
 | ----------- | ------- |
@@ -24,6 +24,7 @@ re-exports of the same `core`.
 | Vue               | ✅ live |
 | Angular           | ✅ live |
 | Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -51,9 +52,9 @@ background color, nothing gated by a permission prompt.
 
 ## Usage
 
-All four adapters — React, Vue, Angular, Svelte — re-export the exact same two functions; there
-is no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
-subscription.
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same two functions;
+there is no per-adapter hook/composable/service to reach for, since nothing here holds live state
+or a subscription.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
@@ -137,6 +138,26 @@ subscription.
     ```
 
   </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { onMount } from 'solid-js';
+    import { Text, View } from '@symbiote-native/solid';
+    import { setBackgroundColorAsync } from '@symbiote-native/system-ui/solid';
+
+    export function RootScreen() {
+      onMount(() => {
+        void setBackgroundColorAsync('black');
+      });
+
+      return (
+        <View>
+          <Text>Root background set to black</Text>
+        </View>
+      );
+    }
+    ```
+
+  </TabItem>
 </Tabs>
 
 ## API
@@ -160,7 +181,8 @@ subscription.
 
 ## How the wrapper works
 
-`@symbiote-native/system-ui` ships zero React/Vue/Angular logic in `expo-system-ui` itself — its
+`@symbiote-native/system-ui` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-system-ui`
+itself — its
 two functions are hand-ported, verbatim, into this package's own `core/`, resolving the native
 module through `expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package
 this project never installs:
@@ -173,7 +195,8 @@ packages/system-ui/src/
 ├── react/    # @symbiote-native/system-ui/react   — export * from '../core'
 ├── vue/      # @symbiote-native/system-ui/vue     — export * from '../core'
 ├── angular/  # @symbiote-native/system-ui/angular — export * from '../core'
-└── svelte/   # @symbiote-native/system-ui/svelte  — export * from '../core'
+├── svelte/   # @symbiote-native/system-ui/svelte  — export * from '../core'
+└── solid/    # @symbiote-native/system-ui/solid   — export * from '../core'
 ```
 
 Same shape as [device](/docs/packages/device/)'s and [local auth](/docs/packages/local-auth/)'s

@@ -47,6 +47,7 @@ import DeepLinkingScreen from './screens/DeepLinkingScreen.vue';
 import StatePersistenceScreen from './screens/StatePersistenceScreen.vue';
 import ApiPlaygroundScreen from './screens/ApiPlaygroundScreen.vue';
 import BenchmarkScreen from './screens/BenchmarkScreen.vue';
+import StyleShowcaseScreen from './screens/StyleShowcaseScreen.vue';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
@@ -243,6 +244,19 @@ onMounted(() => hide());
         title: 'Benchmark',
         headerShown: true,
         headerTintColor: LINE_COLOR.performance,
+        headerTranslucent: true,
+        headerTitleColor: '#ffffff',
+        headerStyle: { backgroundColor: '#0b1622' },
+        headerUserInterfaceStyle: 'dark',
+      }"
+    />
+    <Screen
+      :name="ROUTE_NAME.StyleShowcase"
+      :component="StyleShowcaseScreen"
+      :options="{
+        title: 'Styling showcase',
+        headerShown: true,
+        headerTintColor: LINE_COLOR.styling,
         headerTranslucent: true,
         headerTitleColor: '#ffffff',
         headerStyle: { backgroundColor: '#0b1622' },

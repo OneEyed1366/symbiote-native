@@ -40,6 +40,7 @@ import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
 import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
+import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
@@ -221,6 +222,19 @@ function App() {
             title: 'Benchmark',
             headerShown: true,
             headerTintColor: LINE_COLOR.performance,
+            headerTranslucent: true,
+            headerTitleColor: '#ffffff',
+            headerStyle: { backgroundColor: '#0b1622' },
+            headerUserInterfaceStyle: 'dark',
+          }}
+        />
+        <Stack.Screen
+          name={ROUTE_NAME.StyleShowcase}
+          component={StyleShowcaseScreen}
+          options={{
+            title: 'Styling showcase',
+            headerShown: true,
+            headerTintColor: LINE_COLOR.styling,
             headerTranslucent: true,
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },
