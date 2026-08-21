@@ -50,7 +50,8 @@
     "@symbiote-native/web-browser": "^0.2.0",
     "react": "19.2.3",
     "react-native": "0.86.0",
-    "solid-js": "^1.9.14"
+    "solid-js": "^1.9.14",
+    "expo": "57.0.14"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
