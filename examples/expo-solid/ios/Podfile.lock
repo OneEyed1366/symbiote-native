@@ -1942,7 +1942,7 @@ PODS:
     - React-utils (= 0.86.0)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.0)
-  - symbiote-navigation (2.1.0):
+  - symbiote-navigation (2.2.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1964,9 +1964,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - symbiote-navigation/common (= 2.1.0)
+    - symbiote-navigation/common (= 2.2.0)
     - Yoga
-  - symbiote-navigation/common (2.1.0):
+  - symbiote-navigation/common (2.2.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1989,7 +1989,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-splash-screen (3.1.0):
+  - symbiote-splash-screen (3.2.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2352,7 +2352,7 @@ SPEC CHECKSUMS:
   ExpoTrackingTransparency: 43401b22cf6aed3a4a35e0c24d0b320905acc477
   ExpoWebBrowser: 9b98d939d5f1c5dd8f523f0a0683056fb1204434
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
-  hermes-engine: 6a26db0978f1fc8a7d4c2363b92ece1ac1498d85
+  hermes-engine: e2b78acd7602e16e04850a90b4e7a2155e688626
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
   RCTSwiftUI: 5aaf0b07e747ba749dc6acc94d8bd41eea4b570f
@@ -2425,8 +2425,8 @@ SPEC CHECKSUMS:
   ReactCodegen: afe0d436ee089d7bea6418429d8312b1d23a6801
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
-  symbiote-navigation: 741a79a8fe99bebb8830387600667623a729c745
-  symbiote-splash-screen: 42db39d86a9587db884cf1af7bf4b0662600edb9
+  symbiote-navigation: 5f920f88efe70d365fc78e1ff3f1203c99d76ad0
+  symbiote-splash-screen: 029fcc03b4f4ac8332a5ab47664286feb9aab35f
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
 PODFILE CHECKSUM: 3dac5306e73de3946caf2549cd570dcb2fbd8408

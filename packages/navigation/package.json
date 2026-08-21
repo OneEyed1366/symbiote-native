@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/navigation",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Native stack navigator for SymbioteNative, built on react-native-screens' native view primitives (RNSScreen/RNSScreenStack) — one framework-agnostic core, reachable from the React, Vue, Svelte, Solid, and Angular adapters.",
   "license": "MIT",
   "repository": {

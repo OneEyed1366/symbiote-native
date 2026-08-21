@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/store-review",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "expo-store-review wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Prompts the platform's native in-app review flow, with a caller-supplied store-URL fallback in place of upstream's expo-constants-based lookup (this project doesn't depend on expo-constants).",
   "license": "MIT",
   "repository": {
