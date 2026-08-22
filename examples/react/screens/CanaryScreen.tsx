@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react';
 import {
   View,
   Text,
@@ -45,10 +51,15 @@ import { RefApiDemo } from '../components/RefApiDemo';
 import { PlatformColorDemo } from '../components/PlatformColorDemo';
 import { AccessibilityDemo } from '../components/AccessibilityDemo';
 import { ResponderDemo } from '../components/ResponderDemo';
+import { CompoundClassDemo } from '../components/CompoundClassDemo';
 import { ParityDemo } from '../components/ParityDemo';
 import { nativeNumber } from '../components/event-utils';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+
+// Hoisted, not inlined at the prop: a component identity that changes every render would remount
+// the dividers on every list update.
+const MvcpDivider = (): ReactElement => <View className="mvcp-divider" />;
 
 const CHIP_WIDTH = 72;
 const CHIP_GAP = 12;
@@ -209,14 +220,17 @@ export function CanaryScreen() {
           <Text className="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</Text>
         </View>
         <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: LINE_COLOR.primitives }}>
+          <View
+            className="hero-badge"
+            style={{ backgroundColor: LINE_COLOR.primitives }}
+          >
             <Text className="hero-badge-text">CN</Text>
           </View>
           <View className="hero-copy">
             <Text className="hero-title">All primitives</Text>
             <Text className="hero-body">
-              Every @symbiote-native/react primitive, driven straight onto Fabric — no react-native
-              renderer in the path.
+              Every @symbiote-native/react primitive, driven straight onto
+              Fabric — no react-native renderer in the path.
             </Text>
           </View>
         </View>
@@ -299,7 +313,11 @@ export function CanaryScreen() {
           Each working button proves its module name resolved on the bridgeless host. */}
         <View className="row">
           <View className="flex1">
-            <ActionButton title="Alert" onPress={onAlert} color={LINE_COLOR.primitives} />
+            <ActionButton
+              title="Alert"
+              onPress={onAlert}
+              color={LINE_COLOR.primitives}
+            />
           </View>
           {/* ActionSheetIOS drives the iOS-only ActionSheetManager; no Android native
             module exists, so the control is iOS-only by design (not a gap). */}
@@ -315,7 +333,11 @@ export function CanaryScreen() {
         </View>
         <View className="row">
           <View className="flex1">
-            <ActionButton title="Share" onPress={onShare} color={LINE_COLOR.primitives} />
+            <ActionButton
+              title="Share"
+              onPress={onShare}
+              color={LINE_COLOR.primitives}
+            />
           </View>
           <View className="flex1">
             <ActionButton
@@ -429,6 +451,9 @@ export function CanaryScreen() {
         {/* Responder: drag-vs-tap + mid-gesture transfer (move-should-set / takeover) */}
         <ResponderDemo />
 
+        {/* Compound class rule: `.badge.loud` layers over `.badge`, static and dynamic */}
+        <CompoundClassDemo />
+
         {/* Parity checks: longPress · Keyboard.dismiss · animated scroll · sticky · a11y focus */}
         <ParityDemo />
 
@@ -527,6 +552,14 @@ export function CanaryScreen() {
           keyExtractor={item => item.id}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           className="box-list160"
+          // This list measures its own cells (no getItemLayout), and the divider is CHROME the list
+          // renders BETWEEN them — so it belongs to the distance from one row to the next, not to
+          // either row's height. That is the case the offset table has to get right; a model built
+          // by summing heights alone is short by every divider it skipped, and the content below a
+          // windowed-out region slides up and back as the window moves (core/components
+          // buildOffsets). Deliberately on the MVCP list: prepend-without-jump is exactly where an
+          // offset being off by a few points is visible.
+          ItemSeparatorComponent={MvcpDivider}
           renderItem={({ item }) => (
             <View className="mvcp-row">
               <Text className="list-row-text">{item.label}</Text>
@@ -653,7 +686,7 @@ export function CanaryScreen() {
         {/* background-image: a CSS `linear-gradient(...)` authored entirely in App.css
           (.gradient-card), proving @symbiote-native/css-parser's `background-image` → RN's
           `experimental_backgroundImage` raw passthrough works end to end (css-parser →
-          registerStyles → routeProp → core/engine/src/process-background-image → Fabric).
+          registerRules → routeProp → core/engine/src/process-background-image → Fabric).
           PASS: the panel shows a blue-to-orange gradient sweeping left to right. */}
         <View className="gradient-card">
           <Text className="tile-text">background-image · linear-gradient</Text>

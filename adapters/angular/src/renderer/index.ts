@@ -28,6 +28,12 @@ import { descriptorFor } from '@symbiote-native/components';
 import type { Renderer2, RendererFactory2, RendererType2 } from '@angular/core';
 import { isAnchorHostComponent } from '../anchor-host-registry';
 import {
+  countAngular,
+  noteAngularCreate,
+  noteAngularWrite,
+} from '../diagnostics';
+import {
+  flushScrollViewProjections,
   getScrollViewProjection,
   removeScrollViewProjectedChild,
 } from '../components/scroll-view/projection';
@@ -68,7 +74,9 @@ function describeHost(node: IHostElement | null | undefined): string {
   if (node === null || node === undefined) return 'null';
   if (isSurface(node)) return 'surface';
   const anchorId = anchorDebugIds.get(node);
-  return anchorId !== undefined ? `${node.component}#${anchorId}` : node.component;
+  return anchorId !== undefined
+    ? `${node.component}#${anchorId}`
+    : node.component;
 }
 
 const PRIMITIVE_SELECTOR_ALIAS: Record<string, string> = {
@@ -86,7 +94,9 @@ const PRIMITIVE_SELECTOR_ALIAS: Record<string, string> = {
 // but guard anyway for parity with the Vue adapter and to fail loudly on a bad template.
 function assertTextPlacement(child: ISymbioteNode, parent: IHostElement): void {
   if (isRawText(child) && (isSurface(parent) || !parent.isText)) {
-    throw new Error(`Text string "${String(child.props.text)}" must be rendered inside a <Text>`);
+    throw new Error(
+      `Text string "${String(child.props.text)}" must be rendered inside a <Text>`,
+    );
   }
 }
 
@@ -111,10 +121,14 @@ export class SymbioteRenderer implements Renderer2 {
     // any other string flows through as a raw Fabric name (events/processors derived from its
     // ViewConfig). toPublicInstance grafts the imperative API (measure / setNativeProps /
     // focus) onto the raw node in place, returning the SAME identity the commit mirror keys on.
+    countAngular('nodesCreated');
+    noteAngularCreate(name);
     const engineName = PRIMITIVE_SELECTOR_ALIAS[name] ?? name;
     if (isAnchorHostComponent(engineName)) {
       const anchor = tagAnchorForDebug(createAnchor());
-      dlog(`angular createElement ${name} -> anchor host ${describeHost(anchor)}`);
+      dlog(
+        `angular createElement ${name} -> anchor host ${describeHost(anchor)}`,
+      );
       return anchor;
     }
 
@@ -128,12 +142,14 @@ export class SymbioteRenderer implements Renderer2 {
     // Angular structural directives (*ngIf / @if / @for) need anchor nodes to track
     // position. A real retained node the commit walk SKIPS — no native view. Twin of the
     // Vue createComment path.
+    countAngular('nodesCreated');
     const anchor = tagAnchorForDebug(createAnchor());
     dlog(`Angular renderer createComment -> ${describeHost(anchor)}`);
     return anchor;
   }
 
   createText(value: string): IHostNode {
+    countAngular('nodesCreated');
     return createRawText(value);
   }
 
@@ -142,9 +158,12 @@ export class SymbioteRenderer implements Renderer2 {
     // (see parentNode below) — mirrors Angular's own `if (parentRNode !== null)` guard in
     // addLViewToLContainer: skip silently now, the later projection pass places it correctly.
     if (parent === null) return;
+    countAngular('nodesInserted');
     assertTextPlacement(newChild, parent);
     if (isSurface(parent)) {
-      dlog(`Angular renderer appendChild parent=surface child=${describeHost(newChild)}`);
+      dlog(
+        `Angular renderer appendChild parent=surface child=${describeHost(newChild)}`,
+      );
       parent.appendChild(newChild);
     } else {
       const projection = getScrollViewProjection(parent);
@@ -162,8 +181,13 @@ export class SymbioteRenderer implements Renderer2 {
     this.surface.requestCommit();
   }
 
-  insertBefore(parent: IHostElement | null, newChild: IHostNode, refChild: IHostNode | null): void {
+  insertBefore(
+    parent: IHostElement | null,
+    newChild: IHostNode,
+    refChild: IHostNode | null,
+  ): void {
     if (parent === null) return; // see the appendChild guard above
+    countAngular('nodesInserted');
     assertTextPlacement(newChild, parent);
     if (isSurface(parent)) {
       dlog(
@@ -177,10 +201,15 @@ export class SymbioteRenderer implements Renderer2 {
         `Angular renderer insertBefore parent=${describeHost(parent)} child=${describeHost(newChild)} ref=${refChild ? describeHost(refChild) : 'null'} projection=${projection !== undefined}`,
       );
       if (projection !== undefined) {
-        projection.insertProjectedChild(parent, newChild, refChild, (target, child, before) => {
-          if (before === undefined) appendChild(target, child);
-          else insertBefore(target, child, before);
-        });
+        projection.insertProjectedChild(
+          parent,
+          newChild,
+          refChild,
+          (target, child, before) => {
+            if (before === undefined) appendChild(target, child);
+            else insertBefore(target, child, before);
+          },
+        );
       } else if (refChild) {
         insertBefore(parent, newChild, refChild);
       } else {
@@ -194,10 +223,13 @@ export class SymbioteRenderer implements Renderer2 {
     // Detach from the child's own retained parent (a top-level node lives in
     // surface.children with no parent). Angular's `parent` arg is ignored in favor of the
     // authoritative link, mirroring the Vue adapter's remove.
+    countAngular('nodesRemoved');
     const angularParent = _parent !== null ? describeHost(_parent) : 'null';
-    const retainedParent = oldChild.parent !== undefined ? describeHost(oldChild.parent) : 'none';
-    const wasProjected = removeScrollViewProjectedChild(oldChild, (parent, child) =>
-      removeChild(parent, child),
+    const retainedParent =
+      oldChild.parent !== undefined ? describeHost(oldChild.parent) : 'none';
+    const wasProjected = removeScrollViewProjectedChild(
+      oldChild,
+      (parent, child) => removeChild(parent, child),
     );
     dlog(
       `Angular renderer removeChild angularParent=${angularParent} retainedParent=${retainedParent} child=${describeHost(oldChild)} viaProjection=${wasProjected}`,
@@ -228,7 +260,8 @@ export class SymbioteRenderer implements Renderer2 {
   }
 
   nextSibling(node: IHostNode): IHostNode | null {
-    const siblings = node.parent !== undefined ? node.parent.children : this.surface.children;
+    const siblings =
+      node.parent !== undefined ? node.parent.children : this.surface.children;
     const index = siblings.indexOf(node);
     return index >= 0 ? (siblings[index + 1] ?? null) : null;
   }
@@ -243,12 +276,16 @@ export class SymbioteRenderer implements Renderer2 {
 
   setAttribute(el: IHostElement, name: string, value: string): void {
     if (isSurface(el)) return;
+    countAngular('rendererWrites');
+    noteAngularWrite(name);
     routeProp(el, name, value);
     this.surface.requestCommit();
   }
 
   removeAttribute(el: IHostElement, name: string): void {
     if (isSurface(el)) return;
+    countAngular('rendererWrites');
+    noteAngularWrite(name);
     routeProp(el, name, undefined);
     this.surface.requestCommit();
   }
@@ -264,6 +301,8 @@ export class SymbioteRenderer implements Renderer2 {
 
   addClass(el: IHostElement, name: string): void {
     if (isSurface(el)) return;
+    countAngular('rendererWrites');
+    noteAngularWrite('class');
     const tokens = this.classTokens.get(el) ?? new Set<string>();
     tokens.add(name);
     this.classTokens.set(el, tokens);
@@ -275,6 +314,8 @@ export class SymbioteRenderer implements Renderer2 {
     if (isSurface(el)) return;
     const tokens = this.classTokens.get(el);
     if (tokens === undefined) return;
+    countAngular('rendererWrites');
+    noteAngularWrite('class');
     tokens.delete(name);
     routeProp(el, 'class', tokens.size > 0 ? [...tokens].join(' ') : undefined);
     this.surface.requestCommit();
@@ -287,6 +328,8 @@ export class SymbioteRenderer implements Renderer2 {
   // merge writes, and spreading an array as a record would silently produce numeric-index keys.
   setStyle(el: IHostElement, style: string, value: unknown): void {
     if (isSurface(el)) return;
+    countAngular('rendererWrites');
+    noteAngularWrite(`style.${style}`);
     const current = getExplicitStyle(el);
     const base = isRecord(current) ? current : {};
     routeProp(el, 'style', { ...base, [style]: value });
@@ -297,6 +340,8 @@ export class SymbioteRenderer implements Renderer2 {
     if (isSurface(el)) return;
     const current = getExplicitStyle(el);
     if (!isRecord(current)) return;
+    countAngular('rendererWrites');
+    noteAngularWrite(`style.${style}`);
     const { [style]: _removed, ...rest } = current;
     routeProp(el, 'style', rest);
     this.surface.requestCommit();
@@ -306,11 +351,15 @@ export class SymbioteRenderer implements Renderer2 {
   // ViewConfig (identical to React/Vue), so the whole flat-bag prop layer is shared.
   setProperty(el: IHostElement, name: string, value: unknown): void {
     if (isSurface(el)) return;
+    countAngular('rendererWrites');
+    noteAngularWrite(name);
     routeProp(el, name, value);
     this.surface.requestCommit();
   }
 
   setValue(node: IHostNode, value: string): void {
+    countAngular('rendererWrites');
+    noteAngularWrite('#text');
     // A useful permanent seam: text mutations are low-frequency and the one place a stale
     // `{{binding}}` (a change-detection gap) shows up as "the setValue never fired".
     dlog(`Angular renderer setValue "${value}" on ${describeHost(node)}`);
@@ -341,7 +390,20 @@ export class SymbioteRendererFactory implements RendererFactory2 {
 
   constructor(private readonly surface: SymbioteSurface) {}
 
-  createRenderer(_hostElement: unknown, _type: RendererType2 | null): Renderer2 {
+  createRenderer(
+    _hostElement: unknown,
+    _type: RendererType2 | null,
+  ): Renderer2 {
     return (this.renderer ??= new SymbioteRenderer(this.surface));
+  }
+
+  // Not commit coalescing (requestCommit owns that) — this is the one moment where a ScrollView's
+  // two input channels are known to be consistent: Angular has finished writing every `@Input` AND
+  // the renderer has finished every projected insert/remove for this pass, while the surface's
+  // commit is still only queued. Sticky projection reconciles are batched to here for both reasons;
+  // see flushScrollViewProjections.
+  end(): void {
+    countAngular('cdPasses');
+    flushScrollViewProjections();
   }
 }

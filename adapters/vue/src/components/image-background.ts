@@ -1,12 +1,10 @@
 // ImageBackground: the Vue lifecycle half. The composition (the absolute-fill Image behind the
 // children, the dimension-proxy + style-merge math) lives framework-agnostic in
-// @symbiote-native/components/renderImageBackground and is shared verbatim with React; here Vue only
-// narrows the untyped attrs into the typed Image view, folds aria/role, bridges the Descriptor to
-// vnodes, and appends the slot children ON TOP of the inner image.
+// @symbiote-native/components/renderImageBackground, shared verbatim with React; Vue narrows the
+// untyped attrs into the typed Image view, folds aria/role, bridges the Descriptor to vnodes, and
+// appends the slot children ON TOP of the inner image.
 //
-// FUNCTIONAL, not a stateful defineComponent: ImageBackground is render-only (no state). Inputs
-// arrive as attrs (untyped); the typed transform fields are narrowed with runtime guards, the
-// forward-only rest is folded so resolveAccessibilityProps lands aria-* onto the inner image.
+// FUNCTIONAL, not a stateful defineComponent: render-only, no state.
 
 import { h, type FunctionalComponent, type VNode } from '@vue/runtime-core';
 import {
@@ -28,17 +26,14 @@ import {
 import { descriptorToVue } from '../descriptor-to-vue';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
-// The Vue-facing prop surface. React's IImageBackgroundProps carries `children?: ReactNode`; Vue
-// takes children via slots, so this mirrors the same forwarding surface minus that. Every Image
-// prop flows onto the inner image; `style` is the WRAPPER View style, `imageStyle` the inner one.
+// React's IImageBackgroundProps carries `children?: ReactNode`; Vue takes children via slots.
+// `style` is the WRAPPER View style, `imageStyle` the inner one.
 export interface IImageBackgroundProps extends Omit<IImageProps, 'style'> {
   style?: IStyleProp<IViewStyle>;
-  // A bare string is a class name, resolved through the shared style registry (see isStyleProp
-  // below); a style object/array flows through unchanged. Lands on the INNER image, not the
-  // wrapper — see renderImageBackground's `imageStyle` field.
+  // A bare string is a class name; a style object/array flows through unchanged. Lands on the
+  // INNER image, not the wrapper.
   imageStyle?: IStyleProp<IViewStyle> | string;
-  // Forwarded onto the WRAPPER View like `style`, not the inner image — resolves through the
-  // shared style registry.
+  // Forwarded onto the WRAPPER View like `style`, not the inner image.
   class?: IClassNameValue;
 }
 
@@ -50,8 +45,6 @@ function asNumber(value: unknown): number | undefined {
   return typeof value === 'number' ? value : undefined;
 }
 
-// A source is a structured object/array or an opaque require() id (number) the engine's injected
-// resolver expands; any object/array/number is a valid source to forward.
 function asSource(value: unknown): IImageSourceProp | undefined {
   if (typeof value === 'number') return value;
   if (typeof value === 'object' && value !== null) return value;
@@ -72,12 +65,14 @@ function asResizeMode(value: unknown): IResizeMode | undefined {
   return isResizeMode(value) ? value : undefined;
 }
 
-function asCrossOrigin(value: unknown): 'anonymous' | 'use-credentials' | undefined {
-  return value === 'anonymous' || value === 'use-credentials' ? value : undefined;
+function asCrossOrigin(
+  value: unknown,
+): 'anonymous' | 'use-credentials' | undefined {
+  return value === 'anonymous' || value === 'use-credentials'
+    ? value
+    : undefined;
 }
 
-// Object OR array (a style list) passes through: the engine flattens either; primitives degrade
-// to undefined (parity with React, which preserves the StyleProp).
 function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
   return typeof value === 'object' && value !== null;
 }
@@ -86,8 +81,6 @@ function toChildVNode(child: IDescriptorChild): VNode | string {
   return typeof child === 'string' ? child : descriptorToVue(child);
 }
 
-// `style` is the WRAPPER View style; `imageStyle` targets the inner Image. The image transform
-// fields are consumed by the source/style fold; everything else forwards onto the inner image.
 const HANDLED_ATTRS = [
   'style',
   'imageStyle',
@@ -106,9 +99,6 @@ const HANDLED_ATTRS = [
   'referrerPolicy',
 ];
 
-// The forwarded bag carries the aria/role aliases, so it is typed as the a11y intersection (a
-// genuine narrowing: the accumulator is BUILT at that type) so resolveAccessibilityProps folds
-// aria-* into accessibility* before it reaches the inner image.
 type IForwardBag = IAccessibilityProps & IAriaProps & Record<string, unknown>;
 
 function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
@@ -119,12 +109,13 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
   return result;
 }
 
-const ImageBackgroundComponent: FunctionalComponent = (_props, { attrs: rawAttrs, slots }) => {
+const ImageBackgroundComponent: FunctionalComponent = (
+  _props,
+  { attrs: rawAttrs, slots },
+) => {
   const attrs = normalizeVueAttrs(rawAttrs);
   const wrapper = renderImageBackground({
     style: isStyleProp(attrs.style) ? attrs.style : undefined,
-    // A class-name string resolves through the shared style registry, same as `class` above;
-    // an object/array is already style-shaped and passes through as-is.
     imageStyle:
       typeof attrs.imageStyle === 'string'
         ? resolveClassName(attrs.imageStyle)
@@ -150,10 +141,11 @@ const ImageBackgroundComponent: FunctionalComponent = (_props, { attrs: rawAttrs
 
   // wrapper = symbiote-view > [imageDescriptor]; the slot children paint AFTER the image (on top).
   const slotChildren = slots.default !== undefined ? slots.default() : [];
-  return h(wrapper.type, { ...wrapper.props, key: wrapper.key, class: attrs.class }, [
-    ...wrapper.children.map(toChildVNode),
-    ...slotChildren,
-  ]);
+  return h(
+    wrapper.type,
+    { ...wrapper.props, key: wrapper.key, class: attrs.class },
+    [...wrapper.children.map(toChildVNode), ...slotChildren],
+  );
 };
 ImageBackgroundComponent.displayName = 'ImageBackground';
 ImageBackgroundComponent.inheritAttrs = false;

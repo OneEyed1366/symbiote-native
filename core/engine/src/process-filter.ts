@@ -11,7 +11,8 @@ import { isRecord } from './type-guards';
 
 // RN processFilter.js:19-24: pre-compiled patterns.
 const NEWLINE_REGEX = /\n/g;
-const FILTER_FUNCTION_REGEX = /([\w-]+)\(([^()]*|\([^()]*\)|[^()]*\([^()]*\)[^()]*)\)/g;
+const FILTER_FUNCTION_REGEX =
+  /([\w-]+)\(([^()]*|\([^()]*\)|[^()]*\([^()]*\)[^()]*)\)/g;
 const ARGS_WITH_UNITS_REGEX = /([+-]?\d*(\.\d+)?)([a-zA-Z%]+)?/g;
 const WHITESPACE_SPLIT_REGEX = /\s+(?![^(]*\))/;
 const LENGTH_PARSE_REGEX = /([+-]?\d*(\.\d+)?)([\w\W]+)?/g;
@@ -56,7 +57,8 @@ function resolveLength(value: unknown): number | null {
 // else (incl. undefined) is null: unprocessable, like RN.
 function processShadowColor(color: unknown): unknown {
   if (typeof color === 'number') return color;
-  if (typeof color === 'string' || isOpaqueColorValue(color)) return processColor(color);
+  if (typeof color === 'string' || isOpaqueColorValue(color))
+    return processColor(color);
   return null;
 }
 
@@ -88,12 +90,15 @@ export function processFilter(
           return [];
         }
       } else {
-        const camelizedName = filterName === 'hue-rotate' ? 'hueRotate' : filterName;
+        const camelizedName =
+          filterName === 'hue-rotate' ? 'hueRotate' : filterName;
         const amount = getFilterAmount(camelizedName, matches[2]);
         if (amount != null) {
           result.push(filterEntry(camelizedName, amount));
         } else {
-          dlog(`processFilter reject: invalid ${camelizedName} "${matches[2]}"`);
+          dlog(
+            `processFilter reject: invalid ${camelizedName} "${matches[2]}"`,
+          );
           return [];
         }
       }
@@ -102,7 +107,9 @@ export function processFilter(
     for (const filterFunction of filter) {
       const [filterName, filterValue] = Object.entries(filterFunction)[0];
       if (filterName === 'dropShadow') {
-        const dropShadow = isDropShadowValue(filterValue) ? parseDropShadow(filterValue) : null;
+        const dropShadow = isDropShadowValue(filterValue)
+          ? parseDropShadow(filterValue)
+          : null;
         if (dropShadow == null) {
           dlog(`processFilter reject: invalid dropShadow in array`);
           return [];
@@ -155,7 +162,10 @@ function isDropShadowValue(value: unknown): value is IRawDropShadow | string {
 }
 
 // RN processFilter.js:126-186.
-function getFilterAmount(filterName: string, filterArgs: unknown): number | undefined {
+function getFilterAmount(
+  filterName: string,
+  filterArgs: unknown,
+): number | undefined {
   let filterArgAsNumber: number;
   let unit: string | undefined;
   if (typeof filterArgs === 'string') {
@@ -182,7 +192,9 @@ function getFilterAmount(filterName: string, filterArgs: unknown): number | unde
       if (unit !== 'deg' && unit !== 'rad') {
         return undefined;
       }
-      return unit === 'rad' ? RADIANS_TO_DEGREES * filterArgAsNumber : filterArgAsNumber;
+      return unit === 'rad'
+        ? RADIANS_TO_DEGREES * filterArgAsNumber
+        : filterArgAsNumber;
     // blur takes any non-negative CSS length that is not a percent; RN only has DIPs.
     case 'blur':
       if ((unit != null && unit !== 'px') || filterArgAsNumber < 0) {
@@ -197,7 +209,10 @@ function getFilterAmount(filterName: string, filterArgs: unknown): number | unde
     case 'opacity':
     case 'saturate':
     case 'sepia':
-      if ((unit != null && unit !== '%' && unit !== 'px') || filterArgAsNumber < 0) {
+      if (
+        (unit != null && unit !== '%' && unit !== 'px') ||
+        filterArgAsNumber < 0
+      ) {
         return undefined;
       }
       return unit === '%' ? filterArgAsNumber / 100 : filterArgAsNumber;
@@ -207,9 +222,13 @@ function getFilterAmount(filterName: string, filterArgs: unknown): number | unde
 }
 
 // RN processFilter.js:188-256.
-function parseDropShadow(rawDropShadow: string | IRawDropShadow): IParsedDropShadow | null {
+function parseDropShadow(
+  rawDropShadow: string | IRawDropShadow,
+): IParsedDropShadow | null {
   const dropShadow =
-    typeof rawDropShadow === 'string' ? parseDropShadowString(rawDropShadow) : rawDropShadow;
+    typeof rawDropShadow === 'string'
+      ? parseDropShadowString(rawDropShadow)
+      : rawDropShadow;
   if (dropShadow == null) {
     return null;
   }

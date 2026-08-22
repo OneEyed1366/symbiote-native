@@ -1,17 +1,12 @@
 // Re-exports @symbiote-native/css-parser verbatim from INSIDE this package, so a consuming app's own
 // require('@symbiote-native/vue/metro-css-parser') resolves css-parser relative to THIS file's
-// location (adapters/vue/node_modules, where css-parser IS a real dependency — see
-// package.json), not relative to the app's own node_modules, which does not and should not
-// need to declare @symbiote-native/css-parser itself. Node resolves each require() relative to the
-// requiring FILE's own location, so this indirection is what actually removes the extra install
-// step, not pnpm hoisting (which does not propagate this transitively across workspace packages
-// the way a flat classic node_modules would). .cjs, not .js: this package is "type": "module",
-// and Metro's babelTransformerPath loading expects a require()-able module. Used as
-// vue-tsx's babelTransformerPath for standalone .css/.module.css file imports —
-// metro-vue-transformer.cjs (the .vue SFC transformer) requires @symbiote-native/css-parser
-// directly instead, since it needs the individual parse/compile functions, not a Metro
-// transformer object.
-// createCssMetroTransformer is a factory, not a ready transformer — Metro's
-// babelTransformerPath needs the actual {transform, getCacheKey} object it returns,
-// not the css-parser package barrel.
+// location (adapters/vue/node_modules, where css-parser IS a real dependency), not relative to
+// the app's own node_modules — Node resolves each require() relative to the requiring FILE, so
+// this indirection is what removes the app's extra install step, not pnpm hoisting. .cjs, not
+// .js: this package is "type": "module", and Metro's babelTransformerPath loading expects a
+// require()-able module. Used as vue-tsx's babelTransformerPath for standalone .css/.module.css
+// imports; metro-vue-transformer.cjs (the .vue SFC transformer) requires @symbiote-native/css-parser
+// directly instead, since it needs the individual parse/compile functions, not a Metro transformer
+// object. createCssMetroTransformer is a factory — babelTransformerPath needs the actual
+// {transform, getCacheKey} object it returns, not the css-parser package barrel.
 module.exports = require('@symbiote-native/css-parser').createCssMetroTransformer();

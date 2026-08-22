@@ -72,7 +72,8 @@ export const PERMISSIONS = Object.freeze({
   READ_MEDIA_IMAGES: 'android.permission.READ_MEDIA_IMAGES',
   READ_MEDIA_VIDEO: 'android.permission.READ_MEDIA_VIDEO',
   READ_MEDIA_AUDIO: 'android.permission.READ_MEDIA_AUDIO',
-  READ_MEDIA_VISUAL_USER_SELECTED: 'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
+  READ_MEDIA_VISUAL_USER_SELECTED:
+    'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
   WRITE_EXTERNAL_STORAGE: 'android.permission.WRITE_EXTERNAL_STORAGE',
   BLUETOOTH_CONNECT: 'android.permission.BLUETOOTH_CONNECT',
   BLUETOOTH_SCAN: 'android.permission.BLUETOOTH_SCAN',
@@ -112,14 +113,22 @@ interface INativePermissionsAndroid {
 // The DialogManagerAndroid native module that shows the rationale dialog. Typed
 // minimally: symbiote uses only showAlert, and only opportunistically.
 interface INativeDialogManagerAndroid {
-  showAlert(options: IRationale, onError: () => void, onAction: () => void): void;
+  showAlert(
+    options: IRationale,
+    onError: () => void,
+    onAction: () => void,
+  ): void;
 }
 
 // Narrow the native string result into a known RESULTS value. Any unrecognized
 // string is passed through as a IPermissionStatus only when it matches; otherwise
 // we fall back to DENIED: a runtime guard at the trust boundary, not an `as`.
 function toPermissionStatus(value: unknown): IPermissionStatus {
-  if (value === RESULTS.GRANTED || value === RESULTS.DENIED || value === RESULTS.NEVER_ASK_AGAIN) {
+  if (
+    value === RESULTS.GRANTED ||
+    value === RESULTS.DENIED ||
+    value === RESULTS.NEVER_ASK_AGAIN
+  ) {
     return value;
   }
   return RESULTS.DENIED;
@@ -143,8 +152,12 @@ function toStatusMap(value: unknown): Record<string, IPermissionStatus> {
 // smoke flipping a fake module on after its first import). getNativeModule is a cheap proxy
 // lookup, so per-call resolution costs nothing and stays correct. Returns null on iOS / headless.
 function getModule(): INativePermissionsAndroid | null {
-  const module = getNativeModule<INativePermissionsAndroid>(PERMISSIONS_ANDROID_MODULE);
-  dlog(`PermissionsAndroid: module ${module ? 'resolved' : 'NOT resolved (null)'}`);
+  const module = getNativeModule<INativePermissionsAndroid>(
+    PERMISSIONS_ANDROID_MODULE,
+  );
+  dlog(
+    `PermissionsAndroid: module ${module ? 'resolved' : 'NOT resolved (null)'}`,
+  );
   return module;
 }
 
@@ -169,17 +182,27 @@ export const PermissionsAndroid = {
   // is supplied and DialogManagerAndroid is present, show it first; otherwise
   // proceed straight to the native request (dlog the skip). Without the
   // PermissionsAndroid module resolve RESULTS.DENIED. Never throw.
-  async request(permission: IPermission, rationale?: IRationale): Promise<IPermissionStatus> {
+  async request(
+    permission: IPermission,
+    rationale?: IRationale,
+  ): Promise<IPermissionStatus> {
     const permissionsModule = getModule();
     if (permissionsModule === null) {
-      dlog('PermissionsAndroid.request -> module unavailable, resolving DENIED');
+      dlog(
+        'PermissionsAndroid.request -> module unavailable, resolving DENIED',
+      );
       return RESULTS.DENIED;
     }
     dlog(`PermissionsAndroid.request -> ${permission}`);
 
     if (rationale !== undefined) {
-      const shouldShow = await permissionsModule.shouldShowRequestPermissionRationale(permission);
-      const dialogModule = getNativeModule<INativeDialogManagerAndroid>('DialogManagerAndroid');
+      const shouldShow =
+        await permissionsModule.shouldShowRequestPermissionRationale(
+          permission,
+        );
+      const dialogModule = getNativeModule<INativeDialogManagerAndroid>(
+        'DialogManagerAndroid',
+      );
       if (isBoolean(shouldShow) && shouldShow && dialogModule !== null) {
         return new Promise((resolve, reject) => {
           dialogModule.showAlert(
@@ -194,7 +217,9 @@ export const PermissionsAndroid = {
           );
         });
       }
-      dlog('PermissionsAndroid.request -> rationale skipped (DialogManagerAndroid unavailable)');
+      dlog(
+        'PermissionsAndroid.request -> rationale skipped (DialogManagerAndroid unavailable)',
+      );
     }
 
     const status = await permissionsModule.requestPermission(permission);
@@ -203,20 +228,27 @@ export const PermissionsAndroid = {
 
   // Prompt for several permissions at once, resolving a per-permission status
   // map. Without a native module resolve an empty map. Never throw.
-  async requestMultiple(permissions: IPermission[]): Promise<Record<string, IPermissionStatus>> {
+  async requestMultiple(
+    permissions: IPermission[],
+  ): Promise<Record<string, IPermissionStatus>> {
     const permissionsModule = getModule();
     if (permissionsModule === null) {
-      dlog('PermissionsAndroid.requestMultiple -> module unavailable, resolving {}');
+      dlog(
+        'PermissionsAndroid.requestMultiple -> module unavailable, resolving {}',
+      );
       return {};
     }
     dlog(`PermissionsAndroid.requestMultiple -> ${permissions.join(', ')}`);
-    const statuses = await permissionsModule.requestMultiplePermissions(permissions);
+    const statuses =
+      await permissionsModule.requestMultiplePermissions(permissions);
     return toStatusMap(statuses);
   },
 
   // Whether the OS recommends showing a rationale before re-requesting. Without
   // a native module resolve false. Never throw.
-  async shouldShowRequestPermissionRationale(permission: IPermission): Promise<boolean> {
+  async shouldShowRequestPermissionRationale(
+    permission: IPermission,
+  ): Promise<boolean> {
     const permissionsModule = getModule();
     if (permissionsModule === null) {
       dlog(
@@ -224,8 +256,11 @@ export const PermissionsAndroid = {
       );
       return false;
     }
-    dlog(`PermissionsAndroid.shouldShowRequestPermissionRationale -> ${permission}`);
-    const shouldShow = await permissionsModule.shouldShowRequestPermissionRationale(permission);
+    dlog(
+      `PermissionsAndroid.shouldShowRequestPermissionRationale -> ${permission}`,
+    );
+    const shouldShow =
+      await permissionsModule.shouldShowRequestPermissionRationale(permission);
     return isBoolean(shouldShow) ? shouldShow : false;
   },
 };

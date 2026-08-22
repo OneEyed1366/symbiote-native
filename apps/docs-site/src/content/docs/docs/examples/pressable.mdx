@@ -1,6 +1,6 @@
 ---
 title: Pressable example
-description: Press feedback in React, Vue, and Angular.
+description: Press feedback in React, Vue, Angular, Svelte, and Solid.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
@@ -31,6 +31,7 @@ in Angular's case, that its press events are a real `@Output()`.
     .up { opacity: 1; }
     .down { opacity: 0.55; }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -51,6 +52,7 @@ in Angular's case, that its press events are a real `@Output()`.
     .down { opacity: 0.55; }
     </style>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -86,15 +88,67 @@ in Angular's case, that its press events are a real `@Output()`.
     .up { opacity: 1; }
     .down { opacity: 0.55; }
     ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text } from '@symbiote-native/svelte';
+    </script>
+
+    <Pressable onPress={() => console.log('pressed')}>
+      {#snippet children({ pressed })}
+        <Text class={pressed ? 'down' : 'up'}>{pressed ? 'Release' : 'Press me'}</Text>
+      {/snippet}
+    </Pressable>
+
+    <style>
+      .up { opacity: 1; }
+      .down { opacity: 0.55; }
+    </style>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import './Pressable.css';
+    import { Pressable, Text } from '@symbiote-native/solid';
+
+    export function PressableLabel() {
+      return (
+        <Pressable onPress={() => console.log('pressed')}>
+          {state => (
+            <Text class={state().pressed ? 'down' : 'up'}>
+              {state().pressed ? 'Release' : 'Press me'}
+            </Text>
+          )}
+        </Pressable>
+      );
+    }
+    ```
+
+    ```css
+    /* Pressable.css */
+    .up { opacity: 1; }
+    .down { opacity: 0.55; }
+    ```
+
   </TabItem>
 </Tabs>
 
 ## API takeaway
 
 React uses `children: (state) => ReactNode`. Vue uses a scoped default slot:
-`v-slot="{ pressed }"`. Angular has no scoped-slot equivalent for `<ng-content>`,
-so a consumer tracks `pressed` itself off the real `(pressIn)`/`(pressOut)`
-`@Output()`s instead of receiving it from `Pressable` directly. All three read
-from the same shared press state machine underneath. `StyleSheet.create`
-works identically to a CSS class if you'd rather keep style objects inline —
-see the [Styling guide](/docs/learn/styling/).
+`v-slot="{ pressed }"`. Svelte uses a parameterized named snippet prop:
+`{#snippet children({ pressed })}` — Svelte has no `bind:` sugar for a
+component prop like this, so the snippet is the whole mechanism, not shorthand
+over something more explicit. Solid's child function receives an _accessor_,
+`(state: Accessor<IPressState>) => JSX.Element`, called once and read as
+`state().pressed`. Solid has no reconciler to patch a child subtree in
+place, so the value has to cross the boundary lazily, or every press would
+tear down and rebuild it. Angular has no scoped-slot equivalent for
+`<ng-content>`, so a consumer tracks `pressed` itself off the real
+`(pressIn)`/`(pressOut)` `@Output()`s instead of receiving it from `Pressable`
+directly. All five read from the same shared press state machine underneath.
+`StyleSheet.create` works identically to a CSS class if you'd rather keep
+style objects inline — see the [Styling guide](/docs/learn/styling/).

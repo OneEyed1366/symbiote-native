@@ -36,6 +36,7 @@ import {
   type SimpleChanges,
 } from '@angular/core';
 import { dlog } from '@symbiote-native/engine';
+import { countAngular } from '../../diagnostics';
 import type { ISeparators } from '@symbiote-native/components';
 
 let vListOutletInstanceCounter = 0;
@@ -68,7 +69,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // typed at the call site (let-item: ItemT, let-index: number, let-separators: ISeparators).
 @Directive({ selector: '[vListItem]', standalone: true })
 export class VListItemDirective<ItemT = unknown> {
-  readonly templateRef = inject<TemplateRef<IVListItemContext<ItemT>>>(TemplateRef);
+  readonly templateRef =
+    inject<TemplateRef<IVListItemContext<ItemT>>>(TemplateRef);
 
   static ngTemplateContextGuard<T>(
     _dir: VListItemDirective<T>,
@@ -101,7 +103,8 @@ export class VListEmptyDirective {
 // types the `let-` bindings against the separator props.
 @Directive({ selector: '[vListSeparator]', standalone: true })
 export class VListSeparatorDirective<ItemT = unknown> {
-  readonly templateRef = inject<TemplateRef<IVListSeparatorContext<ItemT>>>(TemplateRef);
+  readonly templateRef =
+    inject<TemplateRef<IVListSeparatorContext<ItemT>>>(TemplateRef);
 
   static ngTemplateContextGuard<T>(
     _dir: VListSeparatorDirective<T>,
@@ -130,20 +133,28 @@ export class VListOutletDirective<C = unknown> implements OnChanges, OnDestroy {
         `Angular VListOutlet#${this.instanceId} templateRef CHANGED (was=${changes['templateRef'].previousValue !== undefined} now=${this.templateRef !== undefined}) -> clear + recreate`,
       );
       this.viewContainer.clear();
+      countAngular('outletCreates');
       this.viewRef =
         this.templateRef === undefined
           ? null
-          : this.viewContainer.createEmbeddedView(this.templateRef, this.context);
+          : this.viewContainer.createEmbeddedView(
+              this.templateRef,
+              this.context,
+            );
       return;
     }
     if (this.viewRef !== null && this.context !== undefined) {
-      dlog(`Angular VListOutlet#${this.instanceId} context updated, markForCheck`);
+      countAngular('outletUpdates');
+      dlog(
+        `Angular VListOutlet#${this.instanceId} context updated, markForCheck`,
+      );
       this.updateContext(this.viewRef.context, this.context);
       this.viewRef.markForCheck();
     }
   }
 
   ngOnDestroy(): void {
+    countAngular('outletDestroys');
     dlog(`Angular VListOutlet#${this.instanceId} destroyed`);
     this.viewContainer.clear();
   }
@@ -158,7 +169,10 @@ export class VListOutletDirective<C = unknown> implements OnChanges, OnDestroy {
   }
 }
 
-function copyContextFields(target: Record<string, unknown>, source: Record<string, unknown>): void {
+function copyContextFields(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+): void {
   for (const key of Object.keys(target)) {
     if (!(key in source)) delete target[key];
   }

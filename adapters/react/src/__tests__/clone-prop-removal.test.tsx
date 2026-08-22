@@ -20,7 +20,8 @@ interface IFakeNode {
 
 let committed: IFakeNode[] = [];
 let eventHandler:
-  ((handle: unknown, type: string, event: Record<string, unknown>) => void) | undefined;
+  | ((handle: unknown, type: string, event: Record<string, unknown>) => void)
+  | undefined;
 
 // Fabric-faithful merge: raw props layer onto the node's current props; a null value
 // resets that prop to its default (modelled here as removal).
@@ -43,14 +44,28 @@ const slot = {
     _r: number,
     props: Record<string, unknown>,
     instanceHandle: unknown,
-  ): IFakeNode => ({ viewName, props: { ...props }, children: [], instanceHandle }),
-  cloneNodeWithNewProps: (node: IFakeNode, raw: Record<string, unknown>): IFakeNode => ({
+  ): IFakeNode => ({
+    viewName,
+    props: { ...props },
+    children: [],
+    instanceHandle,
+  }),
+  cloneNodeWithNewProps: (
+    node: IFakeNode,
+    raw: Record<string, unknown>,
+  ): IFakeNode => ({
     ...node,
     props: mergeProps(node.props, raw),
     children: [...node.children],
   }),
-  cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({ ...node, children: [] }),
-  cloneNodeWithNewChildrenAndProps: (node: IFakeNode, raw: Record<string, unknown>): IFakeNode => ({
+  cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({
+    ...node,
+    children: [],
+  }),
+  cloneNodeWithNewChildrenAndProps: (
+    node: IFakeNode,
+    raw: Record<string, unknown>,
+  ): IFakeNode => ({
     ...node,
     props: mergeProps(node.props, raw),
     children: [],
@@ -67,7 +82,11 @@ const slot = {
     committed = childSet;
   },
   registerEventHandler: (
-    handler: (handle: unknown, type: string, event: Record<string, unknown>) => void,
+    handler: (
+      handle: unknown,
+      type: string,
+      event: Record<string, unknown>,
+    ) => void,
   ): void => {
     eventHandler = handler;
   },
@@ -92,11 +111,14 @@ function App(): ReactElement {
         testID: TEST_ID,
         onPress: () => setOpen(true),
         // pressed -> dim; released -> NO opacity key at all (TouchableOpacity's shape).
-        style: ({ pressed }: { pressed: boolean }) => (pressed ? { opacity: ACTIVE_OPACITY } : {}),
+        style: ({ pressed }: { pressed: boolean }) =>
+          pressed ? { opacity: ACTIVE_OPACITY } : {},
       },
       createElement(Text, null, 'tap'),
     ),
-    open ? createElement(View, null, createElement(Text, null, 'opened')) : null,
+    open
+      ? createElement(View, null, createElement(Text, null, 'opened'))
+      : null,
   );
 }
 
@@ -115,19 +137,27 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 describe('clone-on-write prop removal', () => {
-  it('sets opacity on press and fully resets it on release', () => {
-    mount(ROOT_TAG, createElement(App));
+  // Positive only: this is a regression on the commit's merge semantics, not a guard clause —
+  // there is no invalid input here to reject.
+  describe('Positive', () => {
+    // why: `diffProps` sending `{ opacity: null }` must survive a Fabric-faithful MERGE (not
+    // the shared harness's replace) — a merge slot is the only way this bug is observable at all.
+    it('sets opacity on press and fully resets it on release', () => {
+      mount(ROOT_TAG, createElement(App));
 
-    expect(eventHandler, 'an event handler was registered').toBeDefined();
-    const button = findByTestId(committed, TEST_ID);
-    expect(button, 'the button is in the committed tree').toBeDefined();
-    const handle = button!.instanceHandle;
+      expect(eventHandler, 'an event handler was registered').toBeDefined();
+      const button = findByTestId(committed, TEST_ID);
+      expect(button, 'the button is in the committed tree').toBeDefined();
+      const handle = button!.instanceHandle;
 
-    eventHandler!(handle, 'topTouchStart', {});
-    expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(ACTIVE_OPACITY);
+      eventHandler!(handle, 'topTouchStart', {});
+      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
+        ACTIVE_OPACITY,
+      );
 
-    eventHandler!(handle, 'topTouchEnd', {});
-    // The whole point: opacity must be GONE (reset), not stuck at 0.2 after the merge.
-    expect(findByTestId(committed, TEST_ID)?.props.opacity).toBeUndefined();
+      eventHandler!(handle, 'topTouchEnd', {});
+      // The whole point: opacity must be GONE (reset), not stuck at 0.2 after the merge.
+      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBeUndefined();
+    });
   });
 });

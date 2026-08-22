@@ -1,0 +1,328 @@
+---
+title: Crypto
+description: expo-crypto wrapped for every SymbioteNative adapter — cryptographically secure random bytes, UUIDs, and digest hashing.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/crypto` wraps
+[`expo-crypto`](https://github.com/expo/expo/tree/main/packages/expo-crypto) — cryptographically
+secure random bytes, `randomUUID`, and string/buffer digest hashing — so every SymbioteNative
+adapter can reach it. Like [local auth](/docs/packages/local-auth/), every function here is a
+plain sync/async call with no per-instance state or event stream — no hook/composable/service to
+reach for. The AES-encryption surface from upstream's `expo-crypto` (its `aes/` subfolder) is out
+of scope for this pass.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
+
+## Installation
+
+```sh
+pnpm add @symbiote-native/crypto
+```
+
+`expo-crypto` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project
+(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-crypto`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every future `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+No platform permission strings are needed for this package — random-byte generation and digest
+hashing touch no protected device capability.
+
+## Usage
+
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same free functions;
+there is no per-adapter hook/composable/service to reach for, since nothing here holds live state
+or a subscription.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useEffect, useState } from 'react';
+    import { Pressable, Text, View } from '@symbiote-native/react';
+    import {
+      CryptoDigestAlgorithm,
+      digestStringAsync,
+      randomUUID,
+    } from '@symbiote-native/crypto/react';
+
+    export default function CryptoDemo() {
+      const [uuid, setUuid] = useState('');
+      const [hash, setHash] = useState('');
+
+      useEffect(() => {
+        setUuid(randomUUID());
+      }, []);
+
+      const handleHash = () => {
+        digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(setHash);
+      };
+
+      return (
+        <View>
+          <Text>UUID: {uuid}</Text>
+          <Pressable onPress={handleHash}>
+            <Text>Hash a string</Text>
+          </Pressable>
+          {hash && <Text>SHA-256: {hash}</Text>}
+        </View>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue';
+    import { Pressable, Text, View } from '@symbiote-native/vue';
+    import {
+      CryptoDigestAlgorithm,
+      digestStringAsync,
+      randomUUID,
+    } from '@symbiote-native/crypto/vue';
+
+    const uuid = ref('');
+    const hash = ref('');
+
+    onMounted(() => {
+      uuid.value = randomUUID();
+    });
+
+    function handleHash(): void {
+      void digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(value => {
+        hash.value = value;
+      });
+    }
+    </script>
+
+    <template>
+      <View>
+        <Text>UUID: {{ uuid }}</Text>
+        <Pressable @press="handleHash">
+          <Text>Hash a string</Text>
+        </Pressable>
+        <Text v-if="hash">SHA-256: {{ hash }}</Text>
+      </View>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, signal } from '@angular/core';
+    import { Pressable, Text, View } from '@symbiote-native/angular';
+    import {
+      CryptoDigestAlgorithm,
+      digestStringAsync,
+      randomUUID,
+    } from '@symbiote-native/crypto/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Pressable, Text, View],
+      template: `
+        <View>
+          <Text>UUID: {{ uuid() }}</Text>
+          <Pressable (press)="handleHash()">
+            <Text>Hash a string</Text>
+          </Pressable>
+          @if (hash()) {
+            <Text>SHA-256: {{ hash() }}</Text>
+          }
+        </View>
+      `,
+    })
+    export class CryptoDemo {
+      readonly uuid = signal(randomUUID());
+      readonly hash = signal('');
+
+      handleHash(): void {
+        digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(value =>
+          this.hash.set(value),
+        );
+      }
+    }
+    ```
+
+    There's no per-instance service to `inject()` here — every function is a plain free function
+    off the core package.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text, View } from '@symbiote-native/svelte';
+      import {
+        CryptoDigestAlgorithm,
+        digestStringAsync,
+        randomUUID,
+      } from '@symbiote-native/crypto/svelte';
+
+      let uuid = $state('');
+      let hash = $state('');
+
+      $effect(() => {
+        uuid = randomUUID();
+      });
+
+      function handleHash(): void {
+        digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(value => {
+          hash = value;
+        });
+      }
+    </script>
+
+    <View>
+      <Text>UUID: {uuid}</Text>
+      <Pressable onPress={handleHash}>
+        <Text>Hash a string</Text>
+      </Pressable>
+      {#if hash}
+        <Text>SHA-256: {hash}</Text>
+      {/if}
+    </View>
+    ```
+
+    There's no per-instance rune to reach for here either — every function is a plain free
+    function off the core package.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal, onMount } from 'solid-js';
+    import { Pressable, Text, View } from '@symbiote-native/solid';
+    import {
+      CryptoDigestAlgorithm,
+      digestStringAsync,
+      randomUUID,
+    } from '@symbiote-native/crypto/solid';
+
+    export default function CryptoDemo() {
+      const [uuid, setUuid] = createSignal('');
+      const [hash, setHash] = createSignal('');
+
+      onMount(() => {
+        setUuid(randomUUID());
+      });
+
+      function handleHash(): void {
+        digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(setHash);
+      }
+
+      return (
+        <View>
+          <Text>UUID: {uuid()}</Text>
+          <Pressable onPress={handleHash}>
+            <Text>Hash a string</Text>
+          </Pressable>
+          {hash() && <Text>SHA-256: {hash()}</Text>}
+        </View>
+      );
+    }
+    ```
+
+    There's no per-instance primitive to reach for here either - every function is a plain free
+    function off the core package, read straight into a signal.
+
+  </TabItem>
+</Tabs>
+
+## API
+
+### Functions
+
+| Signature                                                                                                             | Description                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `getRandomBytes(byteCount: number): Uint8Array`                                                                       | Synchronously generates `byteCount` cryptographically secure random bytes. `byteCount` must be `0`-`1024` |
+| `getRandomBytesAsync(byteCount: number): Promise<Uint8Array>`                                                         | Same as `getRandomBytes`, asynchronously                                                                  |
+| `getRandomValues<T extends ITypedArray>(typedArray: T): T`                                                            | Fills a provided integer-based `TypedArray` with cryptographically secure random values, in place         |
+| `randomUUID(): string`                                                                                                | A V4 UUID (RFC4122), generated using cryptographically secure random values                               |
+| `digestStringAsync(algorithm: CryptoDigestAlgorithm, data: string, options?: ICryptoDigestOptions): Promise<IDigest>` | Generates a digest of a string, formatted per `options.encoding` (defaults to `CryptoEncoding.HEX`)       |
+| `digest(algorithm: CryptoDigestAlgorithm, data: BufferSource): Promise<ArrayBuffer>`                                  | Generates a digest of raw bytes, returned as an `ArrayBuffer`                                             |
+
+### `CryptoDigestAlgorithm`
+
+| Field    | Value       | Description                   |
+| -------- | ----------- | ----------------------------- |
+| `SHA1`   | `'SHA-1'`   | 160 bits                      |
+| `SHA256` | `'SHA-256'` | 256 bits, collision-resistant |
+| `SHA384` | `'SHA-384'` | 384 bits, collision-resistant |
+| `SHA512` | `'SHA-512'` | 512 bits, collision-resistant |
+| `MD2`    | `'MD2'`     | 128 bits. `@platform ios`     |
+| `MD4`    | `'MD4'`     | 128 bits. `@platform ios`     |
+| `MD5`    | `'MD5'`     | 128 bits                      |
+
+### `CryptoEncoding`
+
+| Field    | Value      | Description                                                |
+| -------- | ---------- | ---------------------------------------------------------- |
+| `HEX`    | `'hex'`    | Hexadecimal string output                                  |
+| `BASE64` | `'base64'` | Base64 string output, with trailing padding, no line wraps |
+
+### `ICryptoDigestOptions`
+
+| Field      | Type             | Default              | Description                             |
+| ---------- | ---------------- | -------------------- | --------------------------------------- |
+| `encoding` | `CryptoEncoding` | `CryptoEncoding.HEX` | Format the digest string is returned in |
+
+## Notes
+
+<Aside type="note" title="Input validation mirrors upstream exactly">
+  `getRandomBytes`/`getRandomBytesAsync` validate `byteCount` is a number in
+  `0`-`1024` (inclusive), throwing a plain `TypeError` otherwise, and floor a
+  fractional count. `digestStringAsync` validates
+  `algorithm`/`data`/`options.encoding` and throws `CryptoError` (a `TypeError`
+  subclass, `code: 'ERR_CRYPTO'`) on an invalid value. `digest` prefers a native
+  `digestAsync` when present; otherwise it allocates a fixed-size output buffer
+  (sized via a per-algorithm length lookup table) and calls the native sync
+  `digest`. This port skips upstream's `__DEV__`/remote-debugger `Math.random`
+  fallback — a React Native debugging-tool concern, not applicable to this
+  package's native-call path.
+</Aside>
+
+## How the wrapper works
+
+`@symbiote-native/crypto` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-crypto` itself — its
+functions, enums, and the `CryptoError` validation class are hand-ported, verbatim, into this
+package's own `core/`, resolving the native module through `expo-modules-core`'s
+`requireNativeModule` rather than the `expo` meta-package this project never installs:
+
+```
+packages/crypto/src/
+├── core/     # framework-agnostic: every function above, CryptoDigestAlgorithm, CryptoEncoding,
+│             # the option/result types, and CryptoError; native-module.ts resolves the native
+│             # module via expo-modules-core's requireNativeModule
+├── react/    # @symbiote-native/crypto/react   — export * from '../core'
+├── vue/      # @symbiote-native/crypto/vue     — export * from '../core'
+├── svelte/   # @symbiote-native/crypto/svelte  — export * from '../core'
+├── solid/    # @symbiote-native/crypto/solid   — export * from '../core'
+└── angular/  # @symbiote-native/crypto/angular — export * from '../core'
+```
+
+Same shape as [local auth](/docs/packages/local-auth/)'s five adapter entries: single-file
+re-exports with no lifecycle code at all, since every function here is stateless and one-shot —
+there is nothing for a hook, composable, or service to subscribe to or clean up. The native code
+itself is never vendored or copied — `expo-modules-autolinking` resolves it straight out of
+`node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

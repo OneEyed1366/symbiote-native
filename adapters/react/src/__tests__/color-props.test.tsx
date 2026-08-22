@@ -43,16 +43,30 @@ afterEach(() => {
 });
 
 describe('COLOR_PROPS processing', () => {
-  it('runs every logical/writing-direction color key through the processor', () => {
-    mount(ROOT_TAG, <App />);
+  // Positive only: COLOR_PROPS membership is a static set check with no invalid-input branch
+  // to reject — a missing key is a silent regression, not something the unit throws on.
+  describe('Positive', () => {
+    // why: Fabric's C++ color parser silently drops a raw CSS string, so EVERY key in
+    // COLOR_PROPS — including the newer logical/writing-direction ones — must be routed through
+    // the processor; missing even one means that prop silently stops working on a real device.
+    it('runs every logical/writing-direction color key through the processor', () => {
+      mount(ROOT_TAG, <App />);
 
-    // The app's View is the RCTView carrying a color key, not the synthetic root.
-    const view = fabric.find(n => n.viewName === 'RCTView' && COLOR_KEYS.some(k => k in n.props));
-    expect(view, 'a styled RCTView was committed').toBeDefined();
+      // The app's View is the RCTView carrying a color key, not the synthetic root.
+      const view = fabric.find(
+        n => n.viewName === 'RCTView' && COLOR_KEYS.some(k => k in n.props),
+      );
+      expect(view, 'a styled RCTView was committed').toBeDefined();
 
-    for (const key of COLOR_KEYS) {
-      expect(view!.props[key], `"${key}" must not reach Fabric as the raw string`).not.toBe('red');
-      expect(view!.props[key], `"${key}" must be the processed int`).toBe(PROCESSED_COLOR);
-    }
+      for (const key of COLOR_KEYS) {
+        expect(
+          view!.props[key],
+          `"${key}" must not reach Fabric as the raw string`,
+        ).not.toBe('red');
+        expect(view!.props[key], `"${key}" must be the processed int`).toBe(
+          PROCESSED_COLOR,
+        );
+      }
+    });
   });
 });

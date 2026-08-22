@@ -1,9 +1,4 @@
-import {
-  ChangeDetectorRef,
-  Component,
-  OnInit,
-  inject,
-} from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import {
   AccessibilityInfo,
   SymbioteHostPropsDirective,
@@ -27,7 +22,7 @@ import './AccessibilityDemo.css';
   standalone: true,
   imports: [View, Text, SymbioteHostPropsDirective],
   template: `
-    <View class="section">
+    <View class="section-nested">
       <Text class="section-label"
         >Accessibility · props → native · aria/role transform ·
         AccessibilityInfo</Text
@@ -83,8 +78,6 @@ export class AccessibilityDemo implements OnInit {
         this.screenReader = 'unavailable';
         this.changeDetector.detectChanges();
       });
-    AccessibilityInfo.announceForAccessibility(
-      'symbiote accessibility online',
-    );
+    AccessibilityInfo.announceForAccessibility('symbiote accessibility online');
   }
 }

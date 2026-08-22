@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "build",
+    // Solid's JSX is compiled by babel-preset-solid (generate:'universal'), never by tsc — the
+    // whole point of the universal renderer is that JSX becomes direct calls into OUR
+    // ./renderer subpath, which tsc knows nothing about. So tsc only TYPE-CHECKS the JSX and
+    // emits it untouched as build/**/*.jsx, which the consuming app's Babel then compiles with
+    // the same preset it already runs over its own source. This overrides the base config's
+    // "react-jsx" (correct for adapters/react, wrong here).
+    "jsx": "preserve",
+    // Type-only: names the package whose `/jsx-runtime` holds the JSX namespace tsc checks
+    // against. We point at OURSELVES — a self-reference through this package's own exports map —
+    // so adapter source is checked by the same namespace a consuming app gets, and a web tag like
+    // <div> is a compile error here too. It is what src/jsx-runtime.ts exists for; that file
+    // carries the full rationale, including why solid-js's own namespace leaves JSX.Element as
+    // `any` in a DOM-less program.
+    "jsxImportSource": "@symbiote-native/solid"
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+  "references": [
+    { "path": "../../core/engine" },
+    { "path": "../../core/components" }
+  ]
+}

@@ -1,0 +1,154 @@
+{
+  "name": "@symbiote-native/screen-orientation",
+  "version": "0.3.0",
+  "description": "expo-screen-orientation wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Orientation locking (lockAsync/lockPlatformAsync/unlockAsync), the current orientation and lock, and an auto-updating orientation-change hook/composable/service.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
+    "directory": "packages/screen-orientation"
+  },
+  "homepage": "https://github.com/OneEyed1366/symbiote-native/tree/master/packages/screen-orientation#readme",
+  "bugs": {
+    "url": "https://github.com/OneEyed1366/symbiote-native/issues"
+  },
+  "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "type": "module",
+  "main": "src/core/index.ts",
+  "module": "src/core/index.ts",
+  "types": "src/core/index.ts",
+  "exports": {
+    ".": "./src/core/index.ts",
+    "./vue": "./src/vue/index.ts",
+    "./react": "./src/react/index.ts",
+    "./svelte": "./src/svelte/index.ts",
+    "./solid": "./src/solid/index.ts",
+    "./angular": {
+      "types": "./build-ngc/angular/index.d.ts",
+      "react-native": "./build-ngc/angular/index.js",
+      "default": "./src/angular/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "build",
+    "build-ngc",
+    "native-link.json",
+    "!src/**/*.test.*",
+    "!src/**/*.spec.*",
+    "!src/**/*.detox.*"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./build/core/index.js",
+    "module": "./build/core/index.js",
+    "types": "./build/core/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./build/core/index.d.ts",
+        "default": "./build/core/index.js"
+      },
+      "./vue": {
+        "types": "./build/vue/index.d.ts",
+        "default": "./build/vue/index.js"
+      },
+      "./react": {
+        "types": "./build/react/index.d.ts",
+        "default": "./build/react/index.js"
+      },
+      "./svelte": {
+        "types": "./build/svelte/index.d.ts",
+        "default": "./build/svelte/index.js"
+      },
+      "./solid": {
+        "types": "./build/solid/index.d.ts",
+        "default": "./build/solid/index.js"
+      },
+      "./angular": {
+        "types": "./build-ngc/angular/index.d.ts",
+        "react-native": "./build-ngc/angular/index.js",
+        "default": "./src/angular/index.ts"
+      }
+    }
+  },
+  "scripts": {
+    "prepare": "pnpm run ng:build",
+    "typecheck": "tsc --build",
+    "clean": "rm -rf build-ngc",
+    "ng:build": "pnpm run clean && ngc -p tsconfig.angular.json",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "expo-screen-orientation": "catalog:",
+    "expo-modules-core": "catalog:"
+  },
+  "peerDependencies": {
+    "@symbiote-native/angular": ">=0.6.2",
+    "@symbiote-native/engine": ">=0.1.7",
+    "@symbiote-native/react": ">=0.2.8",
+    "@symbiote-native/solid": ">=0.0.1",
+    "@symbiote-native/svelte": ">=0.1.0",
+    "@symbiote-native/vue": ">=0.3.8",
+    "@angular/core": ">=20",
+    "@vue/runtime-core": "^3.5.13",
+    "react": ">=19.0.0",
+    "react-native": ">=0.86",
+    "solid-js": ">=1.9.0",
+    "svelte": ">=5.56.0",
+    "vue": ">=3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "@symbiote-native/angular": {
+      "optional": true
+    },
+    "@symbiote-native/react": {
+      "optional": true
+    },
+    "@symbiote-native/solid": {
+      "optional": true
+    },
+    "@symbiote-native/svelte": {
+      "optional": true
+    },
+    "@symbiote-native/vue": {
+      "optional": true
+    },
+    "@angular/core": {
+      "optional": true
+    },
+    "@vue/runtime-core": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@angular/compiler": "catalog:",
+    "@angular/compiler-cli": "catalog:",
+    "@angular/core": "catalog:",
+    "@symbiote-native/angular": "workspace:*",
+    "@symbiote-native/engine": "workspace:*",
+    "@symbiote-native/react": "workspace:*",
+    "@symbiote-native/solid": "workspace:*",
+    "@symbiote-native/svelte": "workspace:*",
+    "@symbiote-native/test-utils": "workspace:*",
+    "@symbiote-native/vue": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@vue/runtime-core": "catalog:",
+    "react": "catalog:",
+    "solid-js": "catalog:",
+    "svelte": "catalog:",
+    "typescript": "catalog:"
+  }
+}

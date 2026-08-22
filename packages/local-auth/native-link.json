@@ -1,0 +1,17 @@
+{
+  "android": {
+    "gradleProjectName": "expo-local-authentication",
+    "modules": [
+      {
+        "importPath": "expo.modules.localauthentication.LocalAuthenticationModule",
+        "className": "LocalAuthenticationModule",
+        "nativeName": "ExpoLocalAuthentication"
+      }
+    ]
+  },
+  "ios": {
+    "infoPlistKeys": {
+      "NSFaceIDUsageDescription": "This app uses Face ID to authenticate you."
+    }
+  }
+}

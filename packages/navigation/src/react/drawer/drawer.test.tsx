@@ -9,14 +9,29 @@
 // native-spec side-effect (../register) never loads headless - matching stack.test.tsx/
 // tabs.test.tsx, even though Drawer itself needs no injected ViewConfig (PanResponder + Animated
 // are pure JS, like Tab's bar).
+//
+// The open/closed + focused-route REDUCER (drawerRouterReducer) and the swipe/geometry MATH
+// (resolveSwipeIntent, resolveDragProgress, shouldClaimDrawerSwipe, ...) are core's own
+// responsibility, covered by core's test suite - this file only proves Drawer's OWN lifecycle
+// wiring: that a real PanResponder gesture and the imperative handle actually reach those pure
+// functions and that the result drives a real Animated.timing + the mounted screen content.
+//
+// No Negative group: Drawer has no guard clause of its own that throws - jumpTo() to an unknown
+// route name, a swipe that misses every threshold, and swipeEnabled: false are all no-ops the
+// shared math already fails closed on, observed here as unchanged state, not a thrown error.
 
 import { act, createElement, createRef, useCallback } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, Dimensions } from '@symbiote-native/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Animated, mount, unmount, Dimensions } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Drawer } from './index';
 import type { IDrawerNavigatorHandle } from './index';
-import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '../hooks';
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+  useRoute,
+} from '../hooks';
 
 const ROOT_TAG = 704;
 const TOUCH_START = 'topTouchStart';
@@ -84,7 +99,10 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   const found: string[] = [];
   const collect = (list: readonly IFakeNode[]): void => {
     for (const node of list) {
-      if (node.viewName === 'RCTRawText' && typeof node.props.text === 'string') {
+      if (
+        node.viewName === 'RCTRawText' &&
+        typeof node.props.text === 'string'
+      ) {
         found.push(node.props.text);
       }
       collect(node.children);
@@ -144,7 +162,9 @@ function swipe(path: readonly ITouchFrame[]): void {
   act(() => {
     const [start, ...rest] = path;
     fire(TOUCH_START, start);
-    rest.forEach((frame, i) => fire(i === rest.length - 1 ? TOUCH_END : TOUCH_MOVE, frame));
+    rest.forEach((frame, i) =>
+      fire(i === rest.length - 1 ? TOUCH_END : TOUCH_MOVE, frame),
+    );
   });
 }
 
@@ -185,288 +205,403 @@ const RIGHT_EDGE_OPEN_SWIPE: readonly ITouchFrame[] = [
 ];
 
 describe('React Drawer navigator', () => {
-  it("mounts only the focused route's content, drawer closed", () => {
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { initialRouteName: 'Home' },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    expect(findAllText(fabric.committed)).toContain('home');
-    expect(findAllText(fabric.committed)).not.toContain('profile');
-    expect(isOpenByOverlay()).toBe(false);
-  });
+  describe('Positive', () => {
+    // why: only the focused route's screen mounts (like Tab, unlike Stack), and the drawer starts
+    // closed by default - the baseline every other case here builds on.
+    it("mounts only the focused route's content, drawer closed", () => {
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { initialRouteName: 'Home' },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      expect(findAllText(fabric.committed)).toContain('home');
+      expect(findAllText(fabric.committed)).not.toContain('profile');
+      expect(isOpenByOverlay()).toBe(false);
+    });
 
-  it('openDrawer() opens the drawer', () => {
-    const ref = createRef<IDrawerNavigatorHandle>();
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { ref, initialRouteName: 'Home' },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    act(() => ref.current?.openDrawer());
-    expect(isOpenByOverlay()).toBe(true);
-  });
-
-  it('closeDrawer() closes an open drawer', () => {
-    const ref = createRef<IDrawerNavigatorHandle>();
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { ref, initialRouteName: 'Home' },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    act(() => ref.current?.openDrawer());
-    act(() => ref.current?.closeDrawer());
-    expect(isOpenByOverlay()).toBe(false);
-  });
-
-  it('toggleDrawer() flips open/closed across two calls', () => {
-    const ref = createRef<IDrawerNavigatorHandle>();
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { ref, initialRouteName: 'Home' },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    act(() => ref.current?.toggleDrawer());
-    expect(isOpenByOverlay()).toBe(true);
-    act(() => ref.current?.toggleDrawer());
-    expect(isOpenByOverlay()).toBe(false);
-  });
-
-  it('jumpTo() switches the focused screen content while closed', () => {
-    const ref = createRef<IDrawerNavigatorHandle>();
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { ref, initialRouteName: 'Home' },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    act(() => ref.current?.jumpTo('Profile'));
-    expect(findAllText(fabric.committed)).toContain('profile');
-    expect(findAllText(fabric.committed)).not.toContain('home');
-  });
-
-  it('jumpTo() to an unknown route name is a no-op', () => {
-    const ref = createRef<IDrawerNavigatorHandle>();
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { ref, initialRouteName: 'Home' },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    act(() => ref.current?.jumpTo('Nowhere'));
-    expect(findAllText(fabric.committed)).toContain('home');
-  });
-
-  it('jumpTo() closes an already-open drawer', () => {
-    const ref = createRef<IDrawerNavigatorHandle>();
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { ref, initialRouteName: 'Home' },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    act(() => ref.current?.openDrawer());
-    expect(isOpenByOverlay()).toBe(true);
-    act(() => ref.current?.jumpTo('Profile'));
-    expect(isOpenByOverlay()).toBe(false);
-    expect(findAllText(fabric.committed)).toContain('profile');
-  });
-
-  it('a valid edge-swipe opens the drawer', () => {
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { initialRouteName: 'Home' },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    expect(isOpenByOverlay()).toBe(false);
-    swipe(OPEN_SWIPE);
-    expect(isOpenByOverlay()).toBe(true);
-  });
-
-  it('a swipe that clears neither the distance nor velocity threshold snaps back closed', () => {
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { initialRouteName: 'Home' },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    swipe(UNDER_THRESHOLD_SWIPE);
-    expect(isOpenByOverlay()).toBe(false);
-  });
-
-  it('swipeEnabled: false suppresses the gesture entirely', () => {
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { initialRouteName: 'Home', swipeEnabled: false },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    // Same geometry as the passing OPEN_SWIPE case above - the only variable is swipeEnabled.
-    swipe(OPEN_SWIPE);
-    expect(isOpenByOverlay()).toBe(false);
-  });
-
-  it('a swipe starting outside the edge zone does not open a left-positioned drawer', () => {
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { initialRouteName: 'Home' },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    swipe(MID_SCREEN_SWIPE);
-    expect(isOpenByOverlay()).toBe(false);
-  });
-
-  it('a valid edge-swipe opens a right-positioned drawer', () => {
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { initialRouteName: 'Home', drawerPosition: 'right' },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    expect(isOpenByOverlay()).toBe(false);
-    swipe(RIGHT_EDGE_OPEN_SWIPE);
-    expect(isOpenByOverlay()).toBe(true);
-  });
-
-  // Before this fix, Drawer never wrapped its focused screen in NavigationContext.Provider at
-  // all, so every one of these hooks threw "must be used within a screen rendered by <Stack>" the
-  // moment a Drawer screen called them. These cases prove the context is now provided and the
-  // focus semantics (focused when it's the current index, blurred otherwise) are wired.
-  it('useNavigation()/useRoute() are usable inside a Drawer screen, and useIsFocused() reflects the focused route', () => {
-    let homeIsFocused: boolean | undefined;
-    let homeRouteName: string | undefined;
-    let profileIsFocused: boolean | undefined;
-
-    function TrackedHomeScreen(): ReturnType<typeof createElement> {
-      const navigation = useNavigation();
-      homeIsFocused = useIsFocused();
-      homeRouteName = useRoute().name;
-      // Merely proving the handle is a real IDrawerNavigatorHandle (openDrawer/jumpTo/...), not
-      // the Stack-only shape this Context value was hard-typed to before the widened union.
-      expect(typeof navigation.jumpTo).toBe('function');
-      return createElement('symbiote-text', {}, 'home');
-    }
-    function TrackedProfileScreen(): ReturnType<typeof createElement> {
-      profileIsFocused = useIsFocused();
-      return createElement('symbiote-text', {}, 'profile');
-    }
-
-    const ref = createRef<IDrawerNavigatorHandle>();
-    // Drawer's own focus-emitting effect runs in the same commit as the initial mount, but the
-    // setIsFocused(true) it triggers inside useIsFocused's listener lands in a follow-up render -
-    // act() is what drains that cascade synchronously (mirrors every other state-changing call in
-    // this file already being act()-wrapped).
-    act(() => {
+    // why: the imperative handle's openDrawer() is the escape hatch for a hamburger-menu button
+    // press (no gesture involved) - it must reach the same isOpen state a swipe does.
+    it('openDrawer() opens the drawer', () => {
+      const ref = createRef<IDrawerNavigatorHandle>();
       mount(
         ROOT_TAG,
         createElement(
           Drawer,
           { ref, initialRouteName: 'Home' },
-          createElement(Drawer.Screen, { name: 'Home', component: TrackedHomeScreen }),
-          createElement(Drawer.Screen, { name: 'Profile', component: TrackedProfileScreen }),
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
         ),
       );
+      act(() => ref.current?.openDrawer());
+      expect(isOpenByOverlay()).toBe(true);
     });
-    expect(homeIsFocused).toBe(true);
-    expect(homeRouteName).toBe('Home');
 
-    act(() => ref.current?.jumpTo('Profile'));
-    expect(profileIsFocused).toBe(true);
-  });
-
-  it('merges navigator-level screenOptions under a screen that does not override them', () => {
-    let capturedDrawerLabel: string | undefined;
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        {
-          initialRouteName: 'Home',
-          screenOptions: { drawerLabel: 'Shared Label' },
-          renderDrawerContent: ({ state, descriptors }) => {
-            const homeRoute = state.routes.find(route => route.name === 'Home');
-            capturedDrawerLabel = homeRoute
-              ? descriptors[homeRoute.key]?.options.drawerLabel
-              : undefined;
-            return null;
-          },
-        },
-        createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    expect(capturedDrawerLabel).toBe('Shared Label');
-  });
-
-  it('useFocusEffect runs on Drawer focus and its cleanup once jumpTo moves focus away', () => {
-    const events: string[] = [];
-    function TrackedHomeScreen(): ReturnType<typeof createElement> {
-      useFocusEffect(
-        useCallback(() => {
-          events.push('effect');
-          return () => events.push('cleanup');
-        }, []),
+    // why: closeDrawer() must work from an already-open state, not just be the default.
+    it('closeDrawer() closes an open drawer', () => {
+      const ref = createRef<IDrawerNavigatorHandle>();
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { ref, initialRouteName: 'Home' },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
       );
-      return createElement('symbiote-text', {}, 'home');
-    }
+      act(() => ref.current?.openDrawer());
+      act(() => ref.current?.closeDrawer());
+      expect(isOpenByOverlay()).toBe(false);
+    });
 
-    const ref = createRef<IDrawerNavigatorHandle>();
-    mount(
-      ROOT_TAG,
-      createElement(
-        Drawer,
-        { ref, initialRouteName: 'Home' },
-        createElement(Drawer.Screen, { name: 'Home', component: TrackedHomeScreen }),
-        createElement(Drawer.Screen, { name: 'Profile', component: ProfileScreen }),
-      ),
-    );
-    // Drawer paints no native RNSScreen (unlike Stack), so there is no onAppear to wait for - the
-    // focused screen's useFocusEffect runs as soon as it mounts.
-    expect(events).toEqual(['effect']);
+    // why: toggleDrawer() must flip relative to the CURRENT state each call, not just always open -
+    // proven across two consecutive calls.
+    it('toggleDrawer() flips open/closed across two calls', () => {
+      const ref = createRef<IDrawerNavigatorHandle>();
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { ref, initialRouteName: 'Home' },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      act(() => ref.current?.toggleDrawer());
+      expect(isOpenByOverlay()).toBe(true);
+      act(() => ref.current?.toggleDrawer());
+      expect(isOpenByOverlay()).toBe(false);
+    });
 
-    act(() => ref.current?.jumpTo('Profile'));
-    expect(events).toEqual(['effect', 'cleanup']);
+    // why: jumpTo() must switch the focused screen's content exactly like Tab's jumpTo, while
+    // leaving the drawer's open/closed state alone when it started closed.
+    it('jumpTo() switches the focused screen content while closed', () => {
+      const ref = createRef<IDrawerNavigatorHandle>();
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { ref, initialRouteName: 'Home' },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      act(() => ref.current?.jumpTo('Profile'));
+      expect(findAllText(fabric.committed)).toContain('profile');
+      expect(findAllText(fabric.committed)).not.toContain('home');
+    });
+
+    // why: jumpTo() to a name with no registered screen must be a no-op (fail closed) - matches
+    // core's own reducer contract, observed here as unchanged focused content.
+    it('jumpTo() to an unknown route name is a no-op', () => {
+      const ref = createRef<IDrawerNavigatorHandle>();
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { ref, initialRouteName: 'Home' },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      act(() => ref.current?.jumpTo('Nowhere'));
+      expect(findAllText(fabric.committed)).toContain('home');
+    });
+
+    // Regression: jumpTo() used to animate off the isOpen ref alone, so an unknown name - a
+    // reducer no-op that leaves isOpen true - still slid the panel shut. State and animation then
+    // disagreed with nothing to recover them: the overlay stayed tappable over an invisible panel.
+    // Asserts on the timing call itself, since the router state (correct all along) never showed
+    // the bug.
+    it('jumpTo() to an unknown route name leaves an open drawer open', () => {
+      const ref = createRef<IDrawerNavigatorHandle>();
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { ref, initialRouteName: 'Home' },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      act(() => ref.current?.openDrawer());
+      const timingSpy = vi.spyOn(Animated, 'timing');
+      act(() => ref.current?.jumpTo('Nowhere'));
+      expect(timingSpy).not.toHaveBeenCalled();
+      expect(isOpenByOverlay()).toBe(true);
+      timingSpy.mockRestore();
+    });
+
+    // why: navigating away by jumpTo() while the drawer is open must also CLOSE it - the real
+    // @react-navigation/drawer behavior a user expects when tapping a drawer menu item.
+    it('jumpTo() closes an already-open drawer', () => {
+      const ref = createRef<IDrawerNavigatorHandle>();
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { ref, initialRouteName: 'Home' },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      act(() => ref.current?.openDrawer());
+      expect(isOpenByOverlay()).toBe(true);
+      act(() => ref.current?.jumpTo('Profile'));
+      expect(isOpenByOverlay()).toBe(false);
+      expect(findAllText(fabric.committed)).toContain('profile');
+    });
+
+    // why: a real edge-swipe that clears both the distance and velocity thresholds must open the
+    // drawer through the SAME PanResponder gesture a real touchscreen would deliver, not just
+    // through the imperative handle.
+    it('a valid edge-swipe opens the drawer', () => {
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { initialRouteName: 'Home' },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      expect(isOpenByOverlay()).toBe(false);
+      swipe(OPEN_SWIPE);
+      expect(isOpenByOverlay()).toBe(true);
+    });
+
+    // why: a swipe that clears NEITHER threshold must snap back closed, not open partway - the
+    // gesture-release decision is all-or-nothing, matching a real drawer's snap behavior.
+    it('a swipe that clears neither the distance nor velocity threshold snaps back closed', () => {
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { initialRouteName: 'Home' },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      swipe(UNDER_THRESHOLD_SWIPE);
+      expect(isOpenByOverlay()).toBe(false);
+    });
+
+    // why: swipeEnabled: false must suppress the gesture ENTIRELY - an otherwise-valid swipe must
+    // have zero effect, not just a harder-to-clear threshold.
+    it('swipeEnabled: false suppresses the gesture entirely', () => {
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { initialRouteName: 'Home', swipeEnabled: false },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      // Same geometry as the passing OPEN_SWIPE case above - the only variable is swipeEnabled.
+      swipe(OPEN_SWIPE);
+      expect(isOpenByOverlay()).toBe(false);
+    });
+
+    // why: regression for a real bug (onStartShouldSetPanResponder reading the always-zero
+    // gestureState.x0 instead of the touch's real start) - a swipe starting mid-screen must NOT
+    // open a left-positioned drawer, only one starting inside the edge zone may.
+    it('a swipe starting outside the edge zone does not open a left-positioned drawer', () => {
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { initialRouteName: 'Home' },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      swipe(MID_SCREEN_SWIPE);
+      expect(isOpenByOverlay()).toBe(false);
+    });
+
+    // why: the same regression's inverse symptom - a right-positioned drawer's edge zone is on the
+    // OPPOSITE side of the screen and its open direction is mirrored (leftward drag), which must
+    // work exactly as well as the left-positioned case above.
+    it('a valid edge-swipe opens a right-positioned drawer', () => {
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { initialRouteName: 'Home', drawerPosition: 'right' },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      expect(isOpenByOverlay()).toBe(false);
+      swipe(RIGHT_EDGE_OPEN_SWIPE);
+      expect(isOpenByOverlay()).toBe(true);
+    });
+
+    // Before this fix, Drawer never wrapped its focused screen in NavigationContext.Provider at
+    // all, so every one of these hooks threw "must be used within a screen rendered by <Stack>" the
+    // moment a Drawer screen called them.
+    // why: a Drawer screen must get the SAME NavigationContext machinery a Stack/Tab screen gets -
+    // a real IDrawerNavigatorHandle from useNavigation(), a real route from useRoute(), and
+    // useIsFocused() tracking which route is currently showing.
+    it('useNavigation()/useRoute() are usable inside a Drawer screen, and useIsFocused() reflects the focused route', () => {
+      let homeIsFocused: boolean | undefined;
+      let homeRouteName: string | undefined;
+      let profileIsFocused: boolean | undefined;
+
+      function TrackedHomeScreen(): ReturnType<typeof createElement> {
+        const navigation = useNavigation();
+        homeIsFocused = useIsFocused();
+        homeRouteName = useRoute().name;
+        // Merely proving the handle is a real IDrawerNavigatorHandle (openDrawer/jumpTo/...), not
+        // the Stack-only shape this Context value was hard-typed to before the widened union.
+        expect(typeof navigation.jumpTo).toBe('function');
+        return createElement('symbiote-text', {}, 'home');
+      }
+      function TrackedProfileScreen(): ReturnType<typeof createElement> {
+        profileIsFocused = useIsFocused();
+        return createElement('symbiote-text', {}, 'profile');
+      }
+
+      const ref = createRef<IDrawerNavigatorHandle>();
+      // Drawer's own focus-emitting effect runs in the same commit as the initial mount, but the
+      // setIsFocused(true) it triggers inside useIsFocused's listener lands in a follow-up render -
+      // act() is what drains that cascade synchronously (mirrors every other state-changing call in
+      // this file already being act()-wrapped).
+      act(() => {
+        mount(
+          ROOT_TAG,
+          createElement(
+            Drawer,
+            { ref, initialRouteName: 'Home' },
+            createElement(Drawer.Screen, {
+              name: 'Home',
+              component: TrackedHomeScreen,
+            }),
+            createElement(Drawer.Screen, {
+              name: 'Profile',
+              component: TrackedProfileScreen,
+            }),
+          ),
+        );
+      });
+      expect(homeIsFocused).toBe(true);
+      expect(homeRouteName).toBe('Home');
+
+      act(() => ref.current?.jumpTo('Profile'));
+      expect(profileIsFocused).toBe(true);
+    });
+
+    // why: screenOptions set at the navigator level must apply to every screen that does NOT
+    // override them itself - the per-screen options fold must merge, not replace.
+    it('merges navigator-level screenOptions under a screen that does not override them', () => {
+      let capturedDrawerLabel: string | undefined;
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          {
+            initialRouteName: 'Home',
+            screenOptions: { drawerLabel: 'Shared Label' },
+            renderDrawerContent: ({ state, descriptors }) => {
+              const homeRoute = state.routes.find(
+                route => route.name === 'Home',
+              );
+              capturedDrawerLabel = homeRoute
+                ? descriptors[homeRoute.key]?.options.drawerLabel
+                : undefined;
+              return null;
+            },
+          },
+          createElement(Drawer.Screen, { name: 'Home', component: HomeScreen }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      expect(capturedDrawerLabel).toBe('Shared Label');
+    });
+
+    // why: unlike Stack (which waits for RNSScreen's native onAppear), Drawer paints its own panel
+    // in pure JS with no native appear/disappear signal - mount must itself count as focus, and
+    // jumpTo-away must run the effect's cleanup, not just leave it dangling until unmount.
+    it('useFocusEffect runs on Drawer focus and its cleanup once jumpTo moves focus away', () => {
+      const events: string[] = [];
+      function TrackedHomeScreen(): ReturnType<typeof createElement> {
+        useFocusEffect(
+          useCallback(() => {
+            events.push('effect');
+            return () => events.push('cleanup');
+          }, []),
+        );
+        return createElement('symbiote-text', {}, 'home');
+      }
+
+      const ref = createRef<IDrawerNavigatorHandle>();
+      mount(
+        ROOT_TAG,
+        createElement(
+          Drawer,
+          { ref, initialRouteName: 'Home' },
+          createElement(Drawer.Screen, {
+            name: 'Home',
+            component: TrackedHomeScreen,
+          }),
+          createElement(Drawer.Screen, {
+            name: 'Profile',
+            component: ProfileScreen,
+          }),
+        ),
+      );
+      // Drawer paints no native RNSScreen (unlike Stack), so there is no onAppear to wait for - the
+      // focused screen's useFocusEffect runs as soon as it mounts.
+      expect(events).toEqual(['effect']);
+
+      act(() => ref.current?.jumpTo('Profile'));
+      expect(events).toEqual(['effect', 'cleanup']);
+    });
   });
 });

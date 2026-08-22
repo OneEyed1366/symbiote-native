@@ -31,9 +31,12 @@ export function useWindowDimensions(): Ref<IDisplayMetrics> {
       }
     };
 
-    subscription = Dimensions.addEventListener('change', (set: IDimensionsSet) => {
-      handleChange(set.window);
-    });
+    subscription = Dimensions.addEventListener(
+      'change',
+      (set: IDimensionsSet) => {
+        handleChange(set.window);
+      },
+    );
     // We may have missed an update between the setup-time `get` and subscribing here;
     // re-check now. If nothing changed, the equality guard filters the no-op.
     handleChange(Dimensions.get('window'));

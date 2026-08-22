@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-application",
+    "modules": [
+      {
+        "importPath": "expo.modules.application.ApplicationModule",
+        "className": "ApplicationModule",
+        "nativeName": "ExpoApplication"
+      }
+    ]
+  }
+}

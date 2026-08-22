@@ -1,0 +1,33 @@
+/* JsFrameRateMeter's own chrome. Literal hex, not var(--...): custom properties resolve only
+   inside the file declaring them (App.css), so a var() here ships as a literal string and never
+   paints — same constraint ReactiveStyleScreen.css records. The accent color stays inline, one
+   per call site, exactly like every other demo component's per-feature tint. */
+
+.bench-meter {
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: #13243a;
+}
+.bench-meter-row {
+  flex-direction: row;
+  gap: 12px;
+}
+.bench-metric {
+  flex: 1;
+  align-items: center;
+  gap: 2px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-radius: 12px;
+  background-color: #0b1622;
+}
+.bench-metric-value {
+  font-size: 26px;
+  font-weight: bold;
+}
+.bench-metric-label {
+  color: #41506a;
+  font-size: 11px;
+  letter-spacing: 1px;
+}

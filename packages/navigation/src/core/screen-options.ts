@@ -20,7 +20,10 @@ import type {
   ISheetInitialDetent,
   ISheetLargestUndimmedDetent,
 } from './navigator-props';
-import { buildHeaderBarButtonDispatch, prepareHeaderBarButtonItems } from './header-bar-buttons';
+import {
+  buildHeaderBarButtonDispatch,
+  prepareHeaderBarButtonItems,
+} from './header-bar-buttons';
 
 // These sentinels must be kept in sync with react-native-screens' native side - they are RNS's
 // own compat values for the 'fitToContents'/'large'/'medium'/'all' legacy presets, replicated
@@ -31,7 +34,9 @@ const SHEET_COMPAT_MEDIUM: number[] = [0.5];
 const SHEET_COMPAT_ALL: number[] = [0.5, 1.0];
 const SHEET_DIMMED_ALWAYS = -1;
 
-function resolveSheetAllowedDetents(compat: ISheetAllowedDetents | undefined): number[] {
+function resolveSheetAllowedDetents(
+  compat: ISheetAllowedDetents | undefined,
+): number[] {
   if (compat === undefined) return SHEET_COMPAT_LARGE;
   if (Array.isArray(compat)) return compat;
   switch (compat) {
@@ -74,7 +79,9 @@ function resolveSheetInitialDetent(
   return compat;
 }
 
-function toOptionalBooleanNativeProp(value: boolean | undefined): IOptionalBooleanNativeProp {
+function toOptionalBooleanNativeProp(
+  value: boolean | undefined,
+): IOptionalBooleanNativeProp {
   if (value === undefined) return 'undefined';
   return value ? 'true' : 'false';
 }
@@ -119,7 +126,9 @@ export function resolveScreenView(
   options: IScreenOptions | undefined,
   passthrough: Record<string, unknown> = {},
 ): IScreenViewProps {
-  const sheetAllowedDetents = resolveSheetAllowedDetents(options?.sheetAllowedDetents);
+  const sheetAllowedDetents = resolveSheetAllowedDetents(
+    options?.sheetAllowedDetents,
+  );
   const lastDetentIndex = sheetAllowedDetents.length - 1;
   return {
     screenId,
@@ -142,7 +151,8 @@ export function resolveScreenView(
     sheetExpandsWhenScrolledToEdge: options?.sheetExpandsWhenScrolledToEdge,
     sheetElevation: options?.sheetElevation,
     sheetShouldOverflowTopInset: options?.sheetShouldOverflowTopInset,
-    sheetDefaultResizeAnimationEnabled: options?.sheetDefaultResizeAnimationEnabled,
+    sheetDefaultResizeAnimationEnabled:
+      options?.sheetDefaultResizeAnimationEnabled,
     statusBarStyle: options?.statusBarStyle,
     statusBarHidden: options?.statusBarHidden,
     statusBarAnimation: options?.statusBarAnimation,

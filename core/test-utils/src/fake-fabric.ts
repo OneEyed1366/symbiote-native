@@ -1,15 +1,11 @@
-// One shared fake `nativeFabricUIManager` for the unit suite. `installFabric()`
-// puts a fresh recording slot on `globalThis` and returns a handle to inspect what the
-// renderer committed. It replaces the per-file slot the smokes each copy-pasted (×65).
+// One shared fake `nativeFabricUIManager` for the unit suite. `installFabric()` puts a
+// fresh recording slot on `globalThis` and returns a handle to inspect what was committed.
 //
-// Faithful persistent (clone-on-write) semantics, identical to what the engine drives
-// against real Fabric: every clone is a NEW identity; `*NewProps` MERGES the payload onto
-// the previous props (the engine always sends a minimal diff — see `diffProps` in
-// commit.ts — and relies on native Fabric to merge it onto the retained props; a removed
-// key arrives as literal `null` and is kept as `null`, not deleted, so a test can still see
-// "explicitly reset" distinct from "never set"); the `*Children` variants reset children
-// (the engine re-appends). A persistence bug in the fake is now fixed once, here, for every
-// test, matching how the real engine's clone-on-write commit path behaves.
+// Mirrors real Fabric's clone-on-write semantics: every clone gets a NEW identity;
+// `*NewProps` MERGES the diff onto previous props (the engine always sends a minimal diff —
+// see `diffProps` in commit.ts). A removed key arrives as literal `null` and stays `null`,
+// not deleted, so a test can tell "explicitly reset" apart from "never set". `*Children`
+// variants reset children (the engine re-appends).
 
 export interface IFakeNode {
   tag: number;
@@ -33,7 +29,11 @@ export interface IFabricRecorder {
   /** Every node ever `createNode`'d this run (clones excluded). */
   created: IFakeNode[];
   /** Every imperative command dispatched at a committed Fabric node. */
-  commands: Array<{ node: IFakeNode; commandName: string; args: readonly unknown[] }>;
+  commands: Array<{
+    node: IFakeNode;
+    commandName: string;
+    args: readonly unknown[];
+  }>;
   /** Call counters, for tests that assert "exactly N native nodes were created". */
   counts: { createNode: number; completeRoot: number };
   /**
@@ -45,16 +45,18 @@ export interface IFabricRecorder {
   /** Find the first `createNode`'d node matching a predicate (e.g. the app's own View). */
   find(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined;
   /** Deliver a native event to the renderer's registered handler. */
-  fireEvent(handle: unknown, topLevelType: string, nativeEvent?: Record<string, unknown>): void;
+  fireEvent(
+    handle: unknown,
+    topLevelType: string,
+    nativeEvent?: Record<string, unknown>,
+  ): void;
   /** Serialize a node list to `RCTView(RCTText(RCTRawText "text"))` shorthand. */
   serialize(nodes: IFakeNode[]): string;
   /** Zero the counters and clear `committed` / `created` (the event handler survives). */
   reset(): void;
 }
 
-// Mirrors real Fabric's clone*WithNewProps merge: `diff` is a minimal payload (only changed
-// keys, plus a removed key sent as literal `null` — kept as `null` here, not deleted, so a
-// test can tell "explicitly reset to default" apart from "never set").
+// See the header comment above for the merge/null-removal semantics this mirrors.
 function mergeFabricProps(
   previous: Record<string, unknown>,
   diff: Record<string, unknown>,
@@ -65,7 +67,11 @@ function mergeFabricProps(
 export function installFabric(): IFabricRecorder {
   let committed: IFakeNode[] = [];
   const created: IFakeNode[] = [];
-  const commands: Array<{ node: IFakeNode; commandName: string; args: readonly unknown[] }> = [];
+  const commands: Array<{
+    node: IFakeNode;
+    commandName: string;
+    args: readonly unknown[];
+  }> = [];
   const counts = { createNode: 0, completeRoot: 0 };
   let eventHandler: IEventHandler | undefined;
 
@@ -78,22 +84,41 @@ export function installFabric(): IFabricRecorder {
       instanceHandle: unknown,
     ): IFakeNode {
       counts.createNode += 1;
-      const node: IFakeNode = { tag, viewName, props, children: [], instanceHandle };
+      const node: IFakeNode = {
+        tag,
+        viewName,
+        props,
+        children: [],
+        instanceHandle,
+      };
       created.push(node);
       return node;
     },
-    cloneNodeWithNewProps: (node: IFakeNode, newProps: Record<string, unknown>): IFakeNode => ({
+    cloneNodeWithNewProps: (
+      node: IFakeNode,
+      newProps: Record<string, unknown>,
+    ): IFakeNode => ({
       ...node,
       props: mergeFabricProps(node.props, newProps),
     }),
-    cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({ ...node, children: [] }),
+    cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({
+      ...node,
+      children: [],
+    }),
     cloneNodeWithNewChildrenAndProps: (
       node: IFakeNode,
       newProps: Record<string, unknown>,
-    ): IFakeNode => ({ ...node, props: mergeFabricProps(node.props, newProps), children: [] }),
+    ): IFakeNode => ({
+      ...node,
+      props: mergeFabricProps(node.props, newProps),
+      children: [],
+    }),
     createChildSet: (): IFakeNode[] => [],
     appendChild(parent: IFakeNode, child: IFakeNode): IFakeNode {
-      if (child.parentFamilyTag !== undefined && child.parentFamilyTag !== parent.tag) {
+      if (
+        child.parentFamilyTag !== undefined &&
+        child.parentFamilyTag !== parent.tag
+      ) {
         throw new Error(
           `Fabric family reparent: child ${child.viewName}#${child.tag} already belongs to parent #${child.parentFamilyTag}, cannot append to ${parent.viewName}#${parent.tag}`,
         );
@@ -112,7 +137,11 @@ export function installFabric(): IFabricRecorder {
     registerEventHandler(handler: IEventHandler): void {
       eventHandler = handler;
     },
-    dispatchCommand(node: IFakeNode, commandName: string, args: readonly unknown[]): void {
+    dispatchCommand(
+      node: IFakeNode,
+      commandName: string,
+      args: readonly unknown[],
+    ): void {
       commands.push({ node, commandName, args });
     },
   };
@@ -120,8 +149,11 @@ export function installFabric(): IFabricRecorder {
   Object.assign(globalThis, { nativeFabricUIManager: slot });
 
   const serializeNode = (node: IFakeNode): string => {
-    const text = node.viewName === 'RCTRawText' ? ` "${String(node.props.text)}"` : '';
-    const kids = node.children.length ? `(${node.children.map(serializeNode).join('')})` : '';
+    const text =
+      node.viewName === 'RCTRawText' ? ` "${String(node.props.text)}"` : '';
+    const kids = node.children.length
+      ? `(${node.children.map(serializeNode).join('')})`
+      : '';
     return `${node.viewName}${text}${kids}`;
   };
 
@@ -145,7 +177,8 @@ export function installFabric(): IFabricRecorder {
       return created.find(predicate);
     },
     fireEvent(handle, topLevelType, nativeEvent = {}): void {
-      if (!eventHandler) throw new Error('no event handler registered by the renderer');
+      if (!eventHandler)
+        throw new Error('no event handler registered by the renderer');
       eventHandler(handle, topLevelType, nativeEvent);
     },
     serialize(nodes): string {

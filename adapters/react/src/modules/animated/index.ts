@@ -39,7 +39,11 @@ import { AnimatedMock } from '@symbiote-native/engine';
 export { createAnimatedComponent } from './create-animated-component';
 // The pure graph leaves now live in @symbiote-native/engine (they extend AnimatedWithChildren,
 // no React); re-exported here so @symbiote-native/react's Animated surface is unchanged.
-export { AnimatedProps, AnimatedStyle, AnimatedTransform } from '@symbiote-native/engine';
+export {
+  AnimatedProps,
+  AnimatedStyle,
+  AnimatedTransform,
+} from '@symbiote-native/engine';
 
 // View/Text/Image are pure host primitives, so wrap them eagerly.
 const AnimatedView = createAnimatedComponent(View);

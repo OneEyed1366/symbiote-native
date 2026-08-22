@@ -1,0 +1,240 @@
+---
+title: Store review
+description: expo-store-review wrapped for every SymbioteNative adapter — prompting the platform's native in-app review flow.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/store-review` wraps
+[`expo-store-review`](https://github.com/expo/expo/tree/main/packages/expo-store-review) —
+prompting the platform's native in-app review flow — so every SymbioteNative adapter can reach it,
+not just React. Like [device](/docs/packages/device/) and
+[local auth](/docs/packages/local-auth/), every export here is a one-shot async call with no
+per-instance state, so there is no hook/composable/service to wrap — the React, Vue, Angular, Svelte, and
+Solid entry points are plain re-exports of the same `core`.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
+
+<Aside
+  type="caution"
+  title="Deliberate deviation from upstream — no expo-constants dependency"
+>
+  Upstream's `storeUrl()` reads
+  `Constants.expoConfig.ios.appStoreUrl`/`.android.playStoreUrl` off
+  `expo-constants`, which requires an Expo-CLI-generated manifest
+  (`app.config`/EAS/updates) that this bare, Metro-only project never produces —
+  this repo doesn't run the Expo CLI at all, so there is no manifest for
+  `expo-constants` to read. This port trims that surface instead: every function
+  that would have read the manifest takes an optional `IStoreReviewUrlOptions`
+  argument (`iosAppStoreUrl` / `androidPlayStoreUrl`), and the caller supplies
+  the store URL explicitly rather than it being resolved from
+  `app.json`/`app.config.js`. There is no standalone `storeUrl()` export — its
+  logic lives inline as a private helper, since every public function now takes
+  the same options argument.
+</Aside>
+
+## Installation
+
+```sh
+npm install @symbiote-native/store-review
+```
+
+`expo-store-review` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project
+(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-store-review`'s native code is discovered by `expo-modules-autolinking`,
+  a different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every other `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+`expo-store-review` needs no runtime permission on either platform.
+
+## Usage
+
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same functions; there
+is no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+subscription.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Button } from '@symbiote-native/react';
+    import { requestReview } from '@symbiote-native/store-review/react';
+
+    export default function RateAppButton() {
+      return (
+        <Button
+          title="Rate this app"
+          onPress={() =>
+            requestReview({
+              iosAppStoreUrl: 'https://apps.apple.com/app/id123456789',
+              androidPlayStoreUrl: 'https://play.google.com/store/apps/details?id=com.example.app',
+            })
+          }
+        />
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { Button } from '@symbiote-native/vue';
+    import { requestReview } from '@symbiote-native/store-review/vue';
+
+    function onRatePress() {
+      void requestReview({
+        iosAppStoreUrl: 'https://apps.apple.com/app/id123456789',
+        androidPlayStoreUrl: 'https://play.google.com/store/apps/details?id=com.example.app',
+      });
+    }
+    </script>
+
+    <template>
+      <Button title="Rate this app" @press="onRatePress" />
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { Button } from '@symbiote-native/angular';
+    import { requestReview } from '@symbiote-native/store-review/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Button],
+      template: `<Button title="Rate this app" (press)="onRatePress()" />`,
+    })
+    export class RateAppButton {
+      onRatePress(): void {
+        void requestReview({
+          iosAppStoreUrl: 'https://apps.apple.com/app/id123456789',
+          androidPlayStoreUrl: 'https://play.google.com/store/apps/details?id=com.example.app',
+        });
+      }
+    }
+    ```
+
+    There's no per-instance service to `inject()` here — every function is a plain export off the
+    core package, called straight from a template event binding.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Button } from '@symbiote-native/svelte';
+      import { requestReview } from '@symbiote-native/store-review/svelte';
+
+      function onRatePress() {
+        void requestReview({
+          iosAppStoreUrl: 'https://apps.apple.com/app/id123456789',
+          androidPlayStoreUrl: 'https://play.google.com/store/apps/details?id=com.example.app',
+        });
+      }
+    </script>
+
+    <Button title="Rate this app" onPress={onRatePress} />
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Button } from '@symbiote-native/solid';
+    import { requestReview } from '@symbiote-native/store-review/solid';
+
+    function onRatePress() {
+      void requestReview({
+        iosAppStoreUrl: 'https://apps.apple.com/app/id123456789',
+        androidPlayStoreUrl: 'https://play.google.com/store/apps/details?id=com.example.app',
+      });
+    }
+
+    export function RateAppButton() {
+      return <Button title="Rate this app" onPress={onRatePress} />;
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+## API
+
+### Functions
+
+| Signature                                                        | Description                                                                                                                                                                                                          |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isAvailableAsync(): Promise<boolean>`                           | Whether the platform has the capabilities to use `requestReview()`'s native flow. iOS resolves `true` unless the app is distributed through TestFlight; Android resolves `true` when the Play Store app is installed |
+| `requestReview(options?: IStoreReviewUrlOptions): Promise<void>` | Opens a native modal letting the user pick a star rating without leaving the app, when the native flow is available. Otherwise falls back to opening the store URL supplied via `options` through `Linking`          |
+| `hasAction(options?: IStoreReviewUrlOptions): Promise<boolean>`  | Whether `requestReview()` is capable of directing the user to some kind of store review flow — either the native flow is available, or a store URL was supplied via `options`                                        |
+
+### `IStoreReviewUrlOptions`
+
+| Field                 | Type                  | Description                                                                                                        |
+| --------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `iosAppStoreUrl`      | `string \| undefined` | The App Store URL to open as a fallback on iOS when the native review flow is unavailable (e.g. TestFlight builds) |
+| `androidPlayStoreUrl` | `string \| undefined` | The Play Store URL to open as a fallback on Android when the native flow is unavailable (e.g. below Android 5.0)   |
+
+## Notes
+
+- **`requestReview()` prefers the native in-app review flow** (iOS `SKStoreReviewController`,
+  Android's Play Core in-app review API) and only falls back to opening the supplied store URL via
+  `Linking` when the native flow is unavailable — matching upstream's own fallback order.
+- **A missing URL on the fallback path logs a warning, never throws** — matching upstream's own
+  `console.warn`-and-continue behavior, just with different wording (pointing at the
+  `IStoreReviewUrlOptions` argument instead of `app.json`).
+- **A resolved `requestReview()` does not mean a prompt appeared** — neither store reports that
+  back, by design, so there is nothing to branch on. Don't gate UI on it.
+- **On Android the prompt only appears for a build installed from Google Play** — internal test
+  track, internal app sharing, or production. A sideloaded debug build completes the whole Play
+  Core flow and shows nothing. iOS does show it in debug builds, so an app that works on iOS and
+  looks dead on Android is behaving correctly.
+- **Both stores enforce a quota**, which is why upstream's guidance is to trigger the prompt after
+  real engagement rather than from a button.
+
+## How the wrapper works
+
+`@symbiote-native/store-review` ships zero React/Vue/Angular/Svelte/Solid logic in
+`expo-store-review` itself — its functions are hand-ported, verbatim apart from the
+`expo-constants` deviation above, into this package's own `core/`, resolving the native module
+through `expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package this
+project never installs:
+
+```
+packages/store-review/src/
+├── core/     # framework-agnostic: isAvailableAsync/requestReview/hasAction, plus the
+│             # IStoreReviewUrlOptions type. native-module.ts resolves the native module via
+│             # expo-modules-core's requireNativeModule
+├── react/    # @symbiote-native/store-review/react   — export * from '../core'
+├── vue/      # @symbiote-native/store-review/vue     — export * from '../core'
+├── angular/  # @symbiote-native/store-review/angular — export * from '../core'
+├── svelte/   # @symbiote-native/store-review/svelte  — export * from '../core'
+└── solid/    # @symbiote-native/store-review/solid   — export * from '../core'
+```
+
+Same shape as [device](/docs/packages/device/)'s and [local auth](/docs/packages/local-auth/)'s
+adapter entries: single-file re-exports with no lifecycle code at all, since every export
+here is a stateless one-shot async call — there is nothing for a hook, composable, or service to
+subscribe to or clean up. The native code itself is never vendored or copied —
+`expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
+guide](/docs/howtos/expo-native-module-setup/)).

@@ -51,11 +51,19 @@ function binarySubdivide(
     } else {
       lo = currentT;
     }
-  } while (Math.abs(currentX) > SUBDIVISION_PRECISION && ++i < SUBDIVISION_MAX_ITERATIONS);
+  } while (
+    Math.abs(currentX) > SUBDIVISION_PRECISION &&
+    ++i < SUBDIVISION_MAX_ITERATIONS
+  );
   return currentT;
 }
 
-function newtonRaphsonIterate(x: number, guess: number, mX1: number, mX2: number): number {
+function newtonRaphsonIterate(
+  x: number,
+  guess: number,
+  mX1: number,
+  mX2: number,
+): number {
   let guessT = guess;
   for (let i = 0; i < NEWTON_ITERATIONS; ++i) {
     const currentSlope = getSlope(guessT, mX1, mX2);
@@ -68,7 +76,12 @@ function newtonRaphsonIterate(x: number, guess: number, mX1: number, mX2: number
   return guessT;
 }
 
-export function bezier(mX1: number, mY1: number, mX2: number, mY2: number): (x: number) => number {
+export function bezier(
+  mX1: number,
+  mY1: number,
+  mX2: number,
+  mY2: number,
+): (x: number) => number {
   if (!(mX1 >= 0 && mX1 <= 1 && mX2 >= 0 && mX2 <= 1)) {
     throw new Error('bezier x values must be in [0, 1] range');
   }
@@ -86,7 +99,11 @@ export function bezier(mX1: number, mY1: number, mX2: number, mY2: number): (x: 
     let currentSample = 1;
     const lastSample = SPLINE_TABLE_SIZE - 1;
 
-    for (; currentSample !== lastSample && sampleValues[currentSample] <= x; ++currentSample) {
+    for (
+      ;
+      currentSample !== lastSample && sampleValues[currentSample] <= x;
+      ++currentSample
+    ) {
       intervalStart += SAMPLE_STEP_SIZE;
     }
     --currentSample;
@@ -104,7 +121,13 @@ export function bezier(mX1: number, mY1: number, mX2: number, mY2: number): (x: 
     if (initialSlope === 0.0) {
       return guessForT;
     }
-    return binarySubdivide(x, intervalStart, intervalStart + SAMPLE_STEP_SIZE, mX1, mX2);
+    return binarySubdivide(
+      x,
+      intervalStart,
+      intervalStart + SAMPLE_STEP_SIZE,
+      mX1,
+      mX2,
+    );
   }
 
   return function bezierEasing(x: number): number {

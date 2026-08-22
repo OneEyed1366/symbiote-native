@@ -2,7 +2,21 @@
   Docs chrome reads the same tokens.css the landing page bonds to, so
   switching frameworks re-skins the whole site, not just the hero.
 */
-:root,
+/* Shared across both themes: layout + font tokens never change with color scheme. */
+:root {
+  --sl-font: var(--font-body);
+  --sl-font-mono: var(--font-mono);
+  --sl-content-width: 52rem;
+  --sl-sidebar-width: 18rem;
+}
+
+/* Bug fix (2026-08): this used to be `:root, :root[data-theme='dark']`, which set
+   these dark-palette values on BARE :root too — that's the same (unscoped)
+   selector Starlight's own light-theme defaults use, so ours always won the
+   cascade (loaded later) regardless of the chosen theme. Result: light theme
+   picked dark bg + light text, unreadable. Scoping strictly to
+   [data-theme='dark'] lets Starlight's own :root light defaults stand until the
+   light block below explicitly overrides them. */
 :root[data-theme='dark'] {
   --sl-color-accent-low: color-mix(in srgb, var(--accent) 22%, var(--core-bg));
   --sl-color-accent: var(--accent);
@@ -16,11 +30,6 @@
   --sl-color-hairline-light: var(--core-line);
   --sl-color-hairline: rgba(255, 255, 255, 0.08);
 
-  --sl-font: var(--font-body);
-  --sl-font-mono: var(--font-mono);
-  --sl-content-width: 52rem;
-  --sl-sidebar-width: 18rem;
-
   /* code blocks (Expressive Code) share the landing's surfaces + per-skin radius */
   --ec-brdRad: var(--radius);
   --ec-brdCol: var(--core-line);
@@ -29,6 +38,32 @@
   --ec-frm-edTabBarBg: var(--core-bg);
   --ec-frm-edTabBarBrdBtmCol: var(--core-line);
   --ec-frm-edActTabIndBtmCol: var(--accent);
+}
+
+/* Light theme's own neutral scale — deliberately literal, not derived from
+   --core-bg/--core-text (those are the dark "native core" palette; reusing them
+   here would just reintroduce the same bug with extra steps). Accent hue still
+   follows the bonded framework skin, same as dark. */
+:root[data-theme='light'] {
+  --sl-color-accent-low: color-mix(in srgb, var(--accent) 14%, #ffffff);
+  --sl-color-accent: var(--accent-2);
+  --sl-color-accent-high: var(--accent-2);
+  --sl-color-text-accent: var(--accent-2);
+  --sl-color-text-invert: #ffffff;
+  --sl-color-white: #1b1f27;
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: rgba(255, 255, 255, 0.88);
+  --sl-color-bg-sidebar: #f6f7f9;
+  --sl-color-hairline-light: rgba(10, 12, 20, 0.12);
+  --sl-color-hairline: rgba(10, 12, 20, 0.08);
+
+  --ec-brdRad: var(--radius);
+  --ec-brdCol: rgba(10, 12, 20, 0.12);
+  --ec-codeBg: #f4f5f7;
+  --ec-frm-edBg: #f4f5f7;
+  --ec-frm-edTabBarBg: #ffffff;
+  --ec-frm-edTabBarBrdBtmCol: rgba(10, 12, 20, 0.12);
+  --ec-frm-edActTabIndBtmCol: var(--accent-2);
 }
 
 .header {
@@ -92,10 +127,16 @@
    its own content, leaving a dead empty strip inside the border on the right
    — cap it to its content width instead, capped again at the container so a
    genuinely wide table (the API prop tables) still fills the line. */
+/* `overflow: hidden` alone clips a table wider than the viewport instead of
+   scrolling it, and the 5-framework comparison table overflows on a phone.
+   `overflow-x: auto` keeps it scrollable; `overflow-y: hidden` keeps the
+   border-radius corner clip from the comment above. */
 .sl-markdown-content table {
   border: 1px solid var(--core-line);
   border-radius: 10px;
-  overflow: hidden;
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
   font-size: 0.9em;
   width: fit-content;
   max-width: 100%;
@@ -141,7 +182,11 @@
    hue stays untouched — that's a severity signal, not a brand color */
 .starlight-aside {
   border-radius: var(--radius);
-  background-color: color-mix(in srgb, var(--sl-color-asides-border) 12%, var(--surface));
+  background-color: color-mix(
+    in srgb,
+    var(--sl-color-asides-border) 12%,
+    var(--surface)
+  );
 }
 
 .starlight-aside__title {

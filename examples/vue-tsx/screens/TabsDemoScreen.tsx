@@ -23,13 +23,17 @@ const TabHomeScreen = defineComponent(
         <View class="section">
           <TabLineTag />
           <View class="hero-card">
-            <View class="hero-badge" style={{ backgroundColor: LINE_COLOR.structure }}>
+            <View
+              class="hero-badge"
+              style={{ backgroundColor: LINE_COLOR.structure }}
+            >
               <Text class="hero-badge-text">TB</Text>
             </View>
             <View class="hero-copy">
               <Text class="hero-title">Tabs</Text>
               <Text class="hero-body">
-                A bottom-tabs navigator — icon, badge, and tint, each tab a real native view.
+                A bottom-tabs navigator — icon, badge, and tint, each tab a real
+                native view.
               </Text>
             </View>
           </View>
@@ -84,14 +88,22 @@ export const TabsDemoScreen = defineComponent(
       <Tab.Screen
         name="Home"
         component={TabHomeScreen}
-        options={{ tabBarLabel: 'Home', tabBarIcon: '🏠', tabBarActiveTintColor: LINE_COLOR.structure }}
+        options={{
+          tabBarLabel: 'Home',
+          tabBarIcon: '🏠',
+          tabBarActiveTintColor: LINE_COLOR.structure,
+        }}
       />
       <Tab.Screen
         name="Search"
         component={TabSearchScreen}
         options={{ tabBarLabel: 'Search', tabBarIcon: '🔍', tabBarBadge: 3 }}
       />
-      <Tab.Screen name="Profile" component={TabProfileScreen} options={{ tabBarLabel: 'Profile', tabBarIcon: '👤' }} />
+      <Tab.Screen
+        name="Profile"
+        component={TabProfileScreen}
+        options={{ tabBarLabel: 'Profile', tabBarIcon: '👤' }}
+      />
     </Tab>
   ),
   { name: 'TabsDemoScreen' },

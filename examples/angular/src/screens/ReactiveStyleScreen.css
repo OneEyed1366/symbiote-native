@@ -1,0 +1,46 @@
+/* Reactive-style canary - see ReactiveStyleScreen.ts for what the grid proves.
+
+   Two constraints: every tile is the SAME size whatever component fills it, so a checkerboard reads
+   at a glance; and the theme classes differ in exactly one declaration, matching the inline style
+   objects on the other axis. Anything else lets a tile pass for the wrong reason.
+
+   Literal hex, not var(--...): custom properties resolve only inside the file declaring them
+   (App.css), so a var() here ships as a literal string and never paints. The rstyle- prefix is
+   because the style registry is one flat Map shared app-wide - an unprefixed .tile collides
+   silently with whichever file registers last. */
+
+.rstyle-grid {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rstyle-cell {
+  width: 92px;
+  gap: 4px;
+}
+.rstyle-tile {
+  width: 92px;
+  height: 48px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.rstyle-a {
+  background-color: #d94a4a;
+}
+.rstyle-b {
+  background-color: #3d8bd9;
+}
+.rstyle-caption {
+  color: #cbd5e1;
+  font-size: 10px;
+}
+.rstyle-tile-text {
+  color: #ffffff;
+  font-size: 10px;
+  padding-left: 4px;
+  padding-top: 4px;
+}
+.rstyle-legend {
+  color: #41506a;
+  font-size: 13px;
+}

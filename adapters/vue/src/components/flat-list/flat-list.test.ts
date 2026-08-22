@@ -5,10 +5,31 @@
 // list forwards `horizontal` to the native RCTScrollView and pins the content view to the full
 // row width, and an imperative scrollToOffset lands as the native scrollTo view command. Vue
 // reactivity is async, so each driving step is followed by a macrotask `tick`.
+//
+// Unit under test: adapters/vue/src/components/flat-list/index.ts's own job — turning a plain
+// `data` array into VirtualizedList's getItem/getItemCount contract, branching single- vs
+// multi-column, gating each emit bridge (endReached/startReached/refresh/scrollToIndexFailed/
+// viewableItemsChanged) on listener presence, and re-exposing the delegate handle. Windowing,
+// row-packing (chunkIntoRows), RefreshControl construction, and scrollToOffset's own math are
+// shared @symbiote-native/components / VirtualizedList logic — asserted here only END-TO-END (the
+// wiring reaches them correctly), not re-derived independently; those units are N/A for this file.
+//
+// No Negative group: FlatList's public props have no throwing path — a malformed `data` (non-array)
+// degrades to an empty list, it never rejects.
 
-import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
+import {
+  defineComponent,
+  h,
+  ref,
+  type FunctionalComponent,
+} from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FlatList, mount, unmount, type IFlatListHandle } from '@symbiote-native/vue';
+import {
+  FlatList,
+  mount,
+  unmount,
+  type IFlatListHandle,
+} from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 // FlatList is a GENERIC component (its setup is `<ItemT,>(props, ctx)`), so its value is a generic
@@ -17,7 +38,9 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 // tests, not type tests, so drive the component through a loose functional-component handle.
 // (Sanctioned cast — generic-component limitation, test-only; the type surface is proven in the
 // JSX example.)
-const FlatListHost = FlatList as unknown as FunctionalComponent<Record<string, unknown>>;
+const FlatListHost = FlatList as unknown as FunctionalComponent<
+  Record<string, unknown>
+>;
 
 type ICommandCall = {
   name: string;
@@ -44,7 +67,8 @@ slot.dispatchCommand = (_node, name, args) => {
   commands.push({ name, args });
 };
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -78,214 +102,248 @@ function findCreated(viewName: string): IFakeNode {
 function rowsWithFlexDirection(): IFakeNode[] {
   const rows: IFakeNode[] = [];
   walk(fabric.committed, node => {
-    if (node.viewName === 'RCTView' && node.props.flexDirection === 'row') rows.push(node);
+    if (node.viewName === 'RCTView' && node.props.flexDirection === 'row')
+      rows.push(node);
   });
   return rows;
 }
 
+function rowsOf(count: number): IRow[] {
+  return Array.from({ length: count }, (_unused, index) => ({
+    id: index,
+    label: `row-${index}`,
+  }));
+}
+
 describe('Vue FlatList on the engine', () => {
-  it('windows a single-column list to a bounded prefix anchored at the top', async () => {
-    const data: IRow[] = Array.from({ length: BIG_COUNT }, (_unused, index) => ({
-      id: index,
-      label: `row-${index}`,
-    }));
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            FlatListHost,
-            {
-              data,
-              keyExtractor: (item: IRow) => `k-${item.id}`,
-              getItemLayout: (_data: unknown, index: number) => ({
-                length: ITEM_HEIGHT,
-                offset: ITEM_HEIGHT * index,
-                index,
-              }),
-            },
-            { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
-          ),
-      }),
-    );
-    await tick();
-    const scrollView = findCreated('RCTScrollView');
-    fabric.fireEvent(scrollView.instanceHandle, 'topLayout', {
-      layout: { x: 0, y: 0, width: 320, height: VIEWPORT_HEIGHT },
-    });
-    await tick();
-
-    const labels = collectRowLabels();
-    expect(labels.size, 'item rows committed').toBeGreaterThan(0);
-    expect(labels.size, 'window far smaller than the full data').toBeLessThan(WINDOW_CEILING);
-    expect(labels.has('row-0')).toBe(true);
-    expect(labels.has('row-900')).toBe(false);
-  });
-
-  it('packs items into flex-row rows for numColumns', async () => {
-    const data: IRow[] = Array.from({ length: 6 }, (_unused, index) => ({
-      id: index,
-      label: `row-${index}`,
-    }));
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            FlatListHost,
-            {
-              data,
-              numColumns: 2,
-              keyExtractor: (item: IRow) => `k-${item.id}`,
-            },
-            { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
-          ),
-      }),
-    );
-    await tick();
-
-    const rows = rowsWithFlexDirection();
-    expect(rows.length, 'three flex-row rows for 6 items in 2 columns').toBe(3);
-    expect(rows[0].children.length, 'a full row holds two column cells').toBe(2);
-    // Every item still renders, just regrouped into rows.
-    expect(collectRowLabels().size).toBe(6);
-  });
-
-  it('forwards horizontal to the native scroll view and pins the content to the row width', async () => {
-    const data: IRow[] = Array.from({ length: HORIZONTAL_COUNT }, (_unused, index) => ({
-      id: index,
-      label: `row-${index}`,
-    }));
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            FlatListHost,
-            {
-              data,
-              horizontal: true,
-              keyExtractor: (item: IRow) => `k-${item.id}`,
-              getItemLayout: (_data: unknown, index: number) => ({
-                length: ITEM_WIDTH,
-                offset: ITEM_WIDTH * index,
-                index,
-              }),
-            },
-            {
-              item: ({ item }: { item: IRow }) => [
-                h('symbiote-view', { style: { width: ITEM_WIDTH, height: 40 } }, [
+  describe('Positive (data-shaping wiring reaches the shared VirtualizedList correctly)', () => {
+    it('windows a single-column list to a bounded prefix anchored at the top', async () => {
+      // why: FlatList must derive getItem/getItemCount from a plain `data` array so the shared
+      // VirtualizedList windowing only ever renders a bounded slice — a naive implementation that
+      // rendered `data` directly would commit all 1000 rows and blow the frame budget on device.
+      const data = rowsOf(BIG_COUNT);
+      mount(
+        ROOT_TAG,
+        defineComponent({
+          setup: () => () =>
+            h(
+              FlatListHost,
+              {
+                data,
+                keyExtractor: (item: IRow) => `k-${item.id}`,
+                getItemLayout: (_data: unknown, index: number) => ({
+                  length: ITEM_HEIGHT,
+                  offset: ITEM_HEIGHT * index,
+                  index,
+                }),
+              },
+              {
+                item: ({ item }: { item: IRow }) => [
                   h('symbiote-text', {}, item.label),
-                ]),
-              ],
-            },
-          ),
-      }),
-    );
-    await tick();
+                ],
+              },
+            ),
+        }),
+      );
+      await tick();
+      const scrollView = findCreated('RCTScrollView');
+      fabric.fireEvent(scrollView.instanceHandle, 'topLayout', {
+        layout: { x: 0, y: 0, width: 320, height: VIEWPORT_HEIGHT },
+      });
+      await tick();
 
-    expect(findCreated('RCTScrollView').props.horizontal).toBe(true);
-    const content = findCreated('RCTScrollContentView');
-    // Pinned to the full row width (not the frame width) so the row overflows and scrolls.
-    expect(content.props.width).toBe(TOTAL_WIDTH);
-    expect(content.props.flexDirection).toBe('row');
-  });
-
-  it('gates RefreshControl on a @refresh listener (the emit bridge wires onRefresh only when listened)', async () => {
-    const data: IRow[] = Array.from({ length: 4 }, (_unused, index) => ({
-      id: index,
-      label: `row-${index}`,
-    }));
-    // With a refresh listener, FlatList bridges onRefresh onto VirtualizedList, which builds the
-    // RefreshControl (iOS PullToRefreshView). This proves both the listener detection and the bridge.
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            FlatListHost,
-            {
-              data,
-              refreshing: false,
-              onRefresh: () => undefined,
-              keyExtractor: (item: IRow) => `k-${item.id}`,
-            },
-            { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
-          ),
-      }),
-    );
-    await tick();
-    expect(
-      fabric.find(node => node.viewName === 'PullToRefreshView'),
-      'RefreshControl built when @refresh is listened',
-    ).toBeDefined();
-
-    unmount(ROOT_TAG);
-    fabric.reset();
-
-    // Without a listener, the bridge stays undefined, so VirtualizedList builds no RefreshControl
-    // (gating preserved — no parasitic control for an unlistened event).
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            FlatListHost,
-            {
-              data,
-              refreshing: false,
-              keyExtractor: (item: IRow) => `k-${item.id}`,
-            },
-            { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
-          ),
-      }),
-    );
-    await tick();
-    expect(
-      fabric.find(node => node.viewName === 'PullToRefreshView'),
-      'no RefreshControl without a @refresh listener',
-    ).toBeUndefined();
-  });
-
-  it('routes an imperative scrollToOffset through the native scrollTo command', async () => {
-    const listRef = ref<IFlatListHandle | null>(null);
-    const data: IRow[] = Array.from({ length: BIG_COUNT }, (_unused, index) => ({
-      id: index,
-      label: `row-${index}`,
-    }));
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            FlatListHost,
-            {
-              ref: listRef,
-              data,
-              keyExtractor: (item: IRow) => `k-${item.id}`,
-              getItemLayout: (_data: unknown, index: number) => ({
-                length: ITEM_HEIGHT,
-                offset: ITEM_HEIGHT * index,
-                index,
-              }),
-            },
-            { item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)] },
-          ),
-      }),
-    );
-    await tick();
-    const scrollView = findCreated('RCTScrollView');
-    fabric.fireEvent(scrollView.instanceHandle, 'topLayout', {
-      layout: { x: 0, y: 0, width: 320, height: VIEWPORT_HEIGHT },
+      const labels = collectRowLabels();
+      expect(labels.size, 'item rows committed').toBeGreaterThan(0);
+      expect(labels.size, 'window far smaller than the full data').toBeLessThan(
+        WINDOW_CEILING,
+      );
+      expect(labels.has('row-0')).toBe(true);
+      expect(labels.has('row-900')).toBe(false);
     });
-    await tick();
 
-    expect(listRef.value, 'FlatList handle attached').not.toBeNull();
-    listRef.value!.scrollToOffset({ offset: 200, animated: true });
-    const scrolls = commands.filter(c => c.name === 'scrollTo');
-    expect(scrolls.length, 'one scrollTo from scrollToOffset').toBe(1);
-    expect(scrolls[0].args[0]).toBe(0);
-    expect(scrolls[0].args[1]).toBe(200);
-    expect(scrolls[0].args[2]).toBe(true);
+    it('packs items into flex-row rows for numColumns', async () => {
+      // why: numColumns must regroup the virtualized stream into whole rows (RN's own
+      // multi-column contract) — every item still renders, just under a flex-row wrapper cell
+      // instead of one cell per item.
+      const data = rowsOf(6);
+      mount(
+        ROOT_TAG,
+        defineComponent({
+          setup: () => () =>
+            h(
+              FlatListHost,
+              {
+                data,
+                numColumns: 2,
+                keyExtractor: (item: IRow) => `k-${item.id}`,
+              },
+              {
+                item: ({ item }: { item: IRow }) => [
+                  h('symbiote-text', {}, item.label),
+                ],
+              },
+            ),
+        }),
+      );
+      await tick();
+
+      const rows = rowsWithFlexDirection();
+      expect(rows.length, 'three flex-row rows for 6 items in 2 columns').toBe(
+        3,
+      );
+      expect(rows[0].children.length, 'a full row holds two column cells').toBe(
+        2,
+      );
+      // Every item still renders, just regrouped into rows.
+      expect(collectRowLabels().size).toBe(6);
+    });
+
+    it('forwards horizontal to the native scroll view and pins the content to the row width', async () => {
+      // why: a horizontal FlatList must size its content view to the full ROW width (not the
+      // frame width), or the list would never be able to scroll past the first screenful.
+      const data = rowsOf(HORIZONTAL_COUNT);
+      mount(
+        ROOT_TAG,
+        defineComponent({
+          setup: () => () =>
+            h(
+              FlatListHost,
+              {
+                data,
+                horizontal: true,
+                keyExtractor: (item: IRow) => `k-${item.id}`,
+                getItemLayout: (_data: unknown, index: number) => ({
+                  length: ITEM_WIDTH,
+                  offset: ITEM_WIDTH * index,
+                  index,
+                }),
+              },
+              {
+                item: ({ item }: { item: IRow }) => [
+                  h(
+                    'symbiote-view',
+                    { style: { width: ITEM_WIDTH, height: 40 } },
+                    [h('symbiote-text', {}, item.label)],
+                  ),
+                ],
+              },
+            ),
+        }),
+      );
+      await tick();
+
+      expect(findCreated('RCTScrollView').props.horizontal).toBe(true);
+      const content = findCreated('RCTScrollContentView');
+      // Pinned to the full row width (not the frame width) so the row overflows and scrolls.
+      expect(content.props.width).toBe(TOTAL_WIDTH);
+      expect(content.props.flexDirection).toBe('row');
+    });
+
+    it('gates RefreshControl on a @refresh listener (the emit bridge wires onRefresh only when listened)', async () => {
+      // why: FlatList must detect the @refresh listener off the vnode's OWN props (declared emits
+      // are stripped from $attrs by Vue) so the RefreshControl the inner list builds is never a
+      // parasitic control for an event nobody listens to.
+      const data = rowsOf(4);
+      mount(
+        ROOT_TAG,
+        defineComponent({
+          setup: () => () =>
+            h(
+              FlatListHost,
+              {
+                data,
+                refreshing: false,
+                onRefresh: () => undefined,
+                keyExtractor: (item: IRow) => `k-${item.id}`,
+              },
+              {
+                item: ({ item }: { item: IRow }) => [
+                  h('symbiote-text', {}, item.label),
+                ],
+              },
+            ),
+        }),
+      );
+      await tick();
+      expect(
+        fabric.find(node => node.viewName === 'PullToRefreshView'),
+        'RefreshControl built when @refresh is listened',
+      ).toBeDefined();
+
+      unmount(ROOT_TAG);
+      fabric.reset();
+
+      mount(
+        ROOT_TAG,
+        defineComponent({
+          setup: () => () =>
+            h(
+              FlatListHost,
+              {
+                data,
+                refreshing: false,
+                keyExtractor: (item: IRow) => `k-${item.id}`,
+              },
+              {
+                item: ({ item }: { item: IRow }) => [
+                  h('symbiote-text', {}, item.label),
+                ],
+              },
+            ),
+        }),
+      );
+      await tick();
+      expect(
+        fabric.find(node => node.viewName === 'PullToRefreshView'),
+        'no RefreshControl without a @refresh listener',
+      ).toBeUndefined();
+    });
+
+    it('routes an imperative scrollToOffset through the native scrollTo command', async () => {
+      // why: the exposed handle must DELEGATE to the inner VirtualizedList's handle, lazily (Vue
+      // resolves a parent ref to the exposed object eagerly, before the inner list even mounts) —
+      // proven by an end-to-end scrollTo landing with the right args, not by re-deriving
+      // scrollToOffset's own math (shared, N/A here).
+      const listRef = ref<IFlatListHandle | null>(null);
+      const data = rowsOf(BIG_COUNT);
+      mount(
+        ROOT_TAG,
+        defineComponent({
+          setup: () => () =>
+            h(
+              FlatListHost,
+              {
+                ref: listRef,
+                data,
+                keyExtractor: (item: IRow) => `k-${item.id}`,
+                getItemLayout: (_data: unknown, index: number) => ({
+                  length: ITEM_HEIGHT,
+                  offset: ITEM_HEIGHT * index,
+                  index,
+                }),
+              },
+              {
+                item: ({ item }: { item: IRow }) => [
+                  h('symbiote-text', {}, item.label),
+                ],
+              },
+            ),
+        }),
+      );
+      await tick();
+      const scrollView = findCreated('RCTScrollView');
+      fabric.fireEvent(scrollView.instanceHandle, 'topLayout', {
+        layout: { x: 0, y: 0, width: 320, height: VIEWPORT_HEIGHT },
+      });
+      await tick();
+
+      expect(listRef.value, 'FlatList handle attached').not.toBeNull();
+      listRef.value!.scrollToOffset({ offset: 200, animated: true });
+      const scrolls = commands.filter(c => c.name === 'scrollTo');
+      expect(scrolls.length, 'one scrollTo from scrollToOffset').toBe(1);
+      expect(scrolls[0].args[0]).toBe(0);
+      expect(scrolls[0].args[1]).toBe(200);
+      expect(scrolls[0].args[2]).toBe(true);
+    });
   });
 });

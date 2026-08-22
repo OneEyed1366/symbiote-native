@@ -49,7 +49,10 @@ export type ISwitchProps = ISwitchBaseProps & { className?: string };
 // command name. Supplied whole by index.ios.ts / index.android.ts (Metro filename-selected).
 export type ISwitchHostPlatform = ISwitchPlatform & { snapBackCommand: string };
 
-export function useSwitchLogic(rawProps: ISwitchProps, platform: ISwitchHostPlatform) {
+export function useSwitchLogic(
+  rawProps: ISwitchProps,
+  platform: ISwitchHostPlatform,
+) {
   // Switch owns its host element rather than rendering through a symbiote View, so it folds
   // aria/role into accessibility* here; the resolved accessibility* fields (plus testID etc.)
   // ride down to the host node via `passthrough`.
@@ -66,7 +69,11 @@ export function useSwitchLogic(rawProps: ISwitchProps, platform: ISwitchHostPlat
   } = props;
 
   const ref = useRef<ISymbioteNode | null>(null);
-  const [state, dispatch] = useReducer(switchReducer, undefined, createInitialSwitchState);
+  const [state, dispatch] = useReducer(
+    switchReducer,
+    undefined,
+    createInitialSwitchState,
+  );
 
   const handleChange = useCallback(
     (event: ISymbioteEvent): void => {

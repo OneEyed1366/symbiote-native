@@ -1,19 +1,15 @@
 // JS-side port of RN's processTransform (Libraries/StyleSheet/processTransform.js).
-// Same root cause as transformOrigin/boxShadow: ReactNativeStyleAttributes registers
-// `transform` with `nativeCSSParsing ? true : {process: processTransform}`, and
-// enableNativeCSSParsing() DEFAULTS TO FALSE, so RN's stock path runs processTransform
-// IN JS. It only does work for a STRING input (parses the CSS string into the entry
-// array); an ARRAY input is returned UNCHANGED. symbiote forwarded a raw string, which
-// Android native cast to ReadableArray and crashed with
-// `java.lang.String cannot be cast to com.facebook.react.bridge.ReadableArray`. This
-// restores the missing JS parse so native always receives the entry array.
+// Same root cause as transformOrigin/boxShadow: RN only parses `transform` in JS when
+// nativeCSSParsing is off (the default), and only for a STRING input - an ARRAY is
+// returned unchanged. symbiote forwarded a raw string once, which Android native cast
+// to ReadableArray and crashed (`String cannot be cast to ReadableArray`). This
+// restores the missing JS parse.
 //
-// CRITICAL: the animated / sticky-header hot path produces transform ARRAYS and flows
-// through commit's processValue on every flush, so the array branch MUST return the
-// byte-identical reference (no decompose, no clone). RN's only array-path work is
-// _validateTransforms, which is __DEV__-only and THROWS via invariant; we never throw
-// into the commit path, so we run a non-throwing check that dlogs and still returns the
-// array unchanged (matching the boxShadow/transformOrigin idiom).
+// CRITICAL: the animated / sticky-header hot path produces transform ARRAYS on every
+// commit flush, so the array branch MUST return the byte-identical reference (no
+// decompose, no clone). RN's only array-path check, _validateTransforms, is __DEV__-only
+// and throws via invariant; we never throw in commit, so we dlog instead and still
+// return the array unchanged.
 
 import { dlog } from '../debug';
 
@@ -58,7 +54,9 @@ function getKeyAndValueFromCSSTransform(
         const unitOfMeasurement = matches[3];
 
         if (value !== 0 && !unitOfMeasurement) {
-          dlog(`processTransform: ${key}(${args}) length must have a unit unless 0`);
+          dlog(
+            `processTransform: ${key}(${args}) length must have a unit unless 0`,
+          );
         }
 
         if (unitOfMeasurement === '%') {
@@ -103,9 +101,8 @@ function getKeyAndValueFromCSSTransform(
   }
 }
 
-// RN processTransform.js:24-50. STRING input is parsed into the entry array; ARRAY input
-// is returned UNCHANGED (RN's only array work, _validateTransforms, is __DEV__-only and
-// throws; we never throw, so we skip it and run a non-throwing dlog sanity check).
+// RN processTransform.js:24-50. String input is parsed into the entry array; array
+// input is returned unchanged (see file header for why).
 export function processTransform(
   transform: ReadonlyArray<IRawTransform> | string | undefined,
 ): ReadonlyArray<IRawTransform> {
@@ -114,8 +111,7 @@ export function processTransform(
   }
 
   if (typeof transform !== 'string') {
-    // Hot path: animated / sticky-header transforms arrive here as arrays. Return the
-    // same reference (no decompose, no clone) so the flush is a no-op.
+    // Hot path: return the same reference, no clone (see file header).
     warnInvalidTransforms(transform);
     return transform;
   }
@@ -125,7 +121,10 @@ export function processTransform(
 
   let matches: RegExpExecArray | null;
   while ((matches = TRANSFORM_REGEX.exec(transform))) {
-    const { key, value } = getKeyAndValueFromCSSTransform(matches[1], matches[2]);
+    const { key, value } = getKeyAndValueFromCSSTransform(
+      matches[1],
+      matches[2],
+    );
     if (value !== undefined) {
       transformArray.push({ [key]: value });
     }
@@ -142,11 +141,15 @@ function warnInvalidTransforms(transform: ReadonlyArray<IRawTransform>): void {
   for (const transformation of transform) {
     const keys = Object.keys(transformation);
     if (keys.length !== 1) {
-      dlog(`processTransform: each transform object must have exactly one key, got ${keys.length}`);
+      dlog(
+        `processTransform: each transform object must have exactly one key, got ${keys.length}`,
+      );
       continue;
     }
     if (keys[0] === 'matrix' && transform.length > 1) {
-      dlog('processTransform: a matrix transform must be the only transform in the list');
+      dlog(
+        'processTransform: a matrix transform must be the only transform in the list',
+      );
     }
   }
 }

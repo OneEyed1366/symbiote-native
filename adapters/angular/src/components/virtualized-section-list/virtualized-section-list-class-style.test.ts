@@ -6,7 +6,7 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 import type { ISection } from '@symbiote-native/components';
 
@@ -15,13 +15,16 @@ import { VirtualizedSectionList, VSectionItemDirective } from './index';
 
 const ROOT_TAG = 954;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 interface IRow {
   id: string;
 }
 
-const sections: ISection<IRow>[] = [{ title: 'A', data: [{ id: 'a1' }, { id: 'a2' }] }];
+const sections: ISection<IRow>[] = [
+  { title: 'A', data: [{ id: 'a1' }, { id: 'a2' }] },
+];
 
 @Component({
   selector: 'symbiote-virtualized-section-list-class-host',
@@ -41,7 +44,14 @@ class VirtualizedSectionListClassHost {
 
 beforeEach(() => {
   fabric.reset();
-  registerStyles({ card: { backgroundColor: 'red' } });
+  registerRules([
+    {
+      tokens: ['card'],
+      specificity: [0, 1, 0],
+      order: 0,
+      style: { backgroundColor: 'red' },
+    },
+  ]);
 });
 afterEach(() => {
   unmount(ROOT_TAG);
@@ -49,12 +59,19 @@ afterEach(() => {
 });
 
 describe('VirtualizedSectionList anchor class= resolution', () => {
+  // why: VirtualizedSectionList is its own ANCHOR_HOST_COMPONENTS entry, two levels above the
+  // ScrollView it ultimately composes through VirtualizedList — neither of those inner fixes
+  // transitively covers this component's OWN use-site class=, since each anchor resolves
+  // independently against its own ElementRef.
   it('resolves a class= on the VirtualizedSectionList use site onto the real committed scroll host', async () => {
     mount(ROOT_TAG, VirtualizedSectionListClassHost);
     await tick();
     await tick();
 
     const node = fabric.find(n => n.props.backgroundColor === 'red');
-    expect(node, 'a real Fabric node carries the class-derived style').toBeDefined();
+    expect(
+      node,
+      'a real Fabric node carries the class-derived style',
+    ).toBeDefined();
   });
 });

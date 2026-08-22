@@ -16,8 +16,12 @@ import {
   type INativeNodeConfig,
   type IPlatformConfig,
 } from './native/native-animated';
-import type { IInterpolationConfig } from './interpolation';
-import type { AnimatedInterpolation } from './interpolation-node';
+import {
+  checkValidRanges,
+  createInterpolation,
+  type IInterpolationConfig,
+} from './interpolation';
+import { dlog } from '../debug';
 
 // Most nodes emit a scalar; a composite node (AnimatedColor) emits its rasterized
 // string (an rgba() value). The payload is the union so one listener map serves
@@ -25,24 +29,6 @@ import type { AnimatedInterpolation } from './interpolation-node';
 export type IValueListener = (state: { value: number | string }) => void;
 
 let nextListenerId = 1;
-
-// AnimatedNode.interpolate (below) needs to construct a real AnimatedInterpolation,
-// but this module cannot value-import interpolation-node.ts: that module already
-// imports AnimatedNode/AnimatedWithChildren FROM here, so importing it back would be
-// a circular value import. Instead interpolate-node.ts injects its own constructor
-// once at module load via registerInterpolationFactory, mirroring how commit.ts's
-// setColorProcessor breaks the same kind of cycle. The two `import type`s above are
-// erased at compile time (verbatimModuleSyntax); only this factory crosses at runtime.
-type IInterpolationFactory = (
-  parent: AnimatedNode,
-  config: IInterpolationConfig,
-) => AnimatedInterpolation;
-
-let createInterpolationNode: IInterpolationFactory | undefined;
-
-export function registerInterpolationFactory(factory: IInterpolationFactory): void {
-  createInterpolationNode = factory;
-}
 
 // Depth of the currently-active withSuspendedCallbacks blocks. While > 0, a
 // composite setter (AnimatedColor.setValue) is driving several channels in a row;
@@ -120,7 +106,10 @@ export class AnimatedNode {
       const config =
         this.platformConfig === undefined
           ? this.__getNativeConfig()
-          : { ...this.__getNativeConfig(), platformConfig: this.platformConfig };
+          : {
+              ...this.__getNativeConfig(),
+              platformConfig: this.platformConfig,
+            };
       nativeAnimated.createAnimatedNode(this.nativeTag, config);
     }
     return this.nativeTag;
@@ -129,7 +118,9 @@ export class AnimatedNode {
   // Each concrete node type (value / interpolation / style / transform / props)
   // overrides this with its native shape; a plain node cannot be offloaded.
   __getNativeConfig(): INativeNodeConfig {
-    throw new Error('This animated node type cannot be used as a native animated node');
+    throw new Error(
+      'This animated node type cannot be used as a native animated node',
+    );
   }
 
   // The current rasterized value. Heterogeneous across the graph: scalar nodes
@@ -145,13 +136,10 @@ export class AnimatedNode {
 
   // Map this node's value before it reaches a prop, e.g. 0..1 -> 0..10. Defined once
   // here (Information Expert: every node subclass wants the identical one-liner)
-  // instead of duplicated per subclass; see registerInterpolationFactory above for
-  // why the concrete constructor is injected rather than imported directly.
+  // instead of duplicated per subclass. AnimatedInterpolation lives at the bottom of
+  // THIS file rather than its own module on purpose — see the comment there.
   interpolate(config: IInterpolationConfig): AnimatedInterpolation {
-    if (createInterpolationNode === undefined) {
-      throw new Error('AnimatedNode.interpolate: interpolation factory not registered');
-    }
-    return createInterpolationNode(this, config);
+    return new AnimatedInterpolation(this, config);
   }
 
   __addChild(_child: AnimatedNode): void {}
@@ -213,7 +201,10 @@ export class AnimatedWithChildren extends AnimatedNode {
       child.__makeNative();
     }
     for (const child of this.children) {
-      nativeAnimated.connectAnimatedNodes(this.__getNativeTag(), child.__getNativeTag());
+      nativeAnimated.connectAnimatedNodes(
+        this.__getNativeTag(),
+        child.__getNativeTag(),
+      );
     }
   }
 
@@ -225,7 +216,10 @@ export class AnimatedWithChildren extends AnimatedNode {
     // A child joining an already-native parent must itself be made native and wired.
     if (this.isNative) {
       child.__makeNative();
-      nativeAnimated.connectAnimatedNodes(this.__getNativeTag(), child.__getNativeTag());
+      nativeAnimated.connectAnimatedNodes(
+        this.__getNativeTag(),
+        child.__getNativeTag(),
+      );
     }
   }
 
@@ -235,7 +229,10 @@ export class AnimatedWithChildren extends AnimatedNode {
       return;
     }
     if (this.isNative && child.__isNative()) {
-      nativeAnimated.disconnectAnimatedNodes(this.__getNativeTag(), child.__getNativeTag());
+      nativeAnimated.disconnectAnimatedNodes(
+        this.__getNativeTag(),
+        child.__getNativeTag(),
+      );
     }
     this.children.splice(index, 1);
     if (this.children.length === 0) {
@@ -251,7 +248,20 @@ export class AnimatedWithChildren extends AnimatedNode {
     super.__callListeners(value);
     // A native-driven node's children are updated natively; don't also walk them
     // here (their values aren't tracked in JS while native owns the animation).
-    if (this.isNative) return;
+    //
+    // Diagnostic seam, permanent: this early return is what silences a JS listener sitting on a
+    // CHILD of a value that was made native (a sticky header's interpolation under a natively
+    // attached scroll value). A consumer whose only driver is that listener then goes dead with no
+    // other symptom - see the sticky-header bootstrap notes. Logged only when children are
+    // actually being skipped, so a childless native value stays quiet.
+    if (this.isNative) {
+      if (this.children.length > 0) {
+        dlog(
+          `STICKY[cascade] native value silences ${this.children.length} child JS listener(s) value=${String(value)}`,
+        );
+      }
+      return;
+    }
     for (const child of this.children) {
       child.__callListeners(numericValueOf(child));
     }
@@ -269,7 +279,9 @@ function numericValueOf(node: AnimatedNode): number {
 // under useDefineForClassFields. So leaves are detected structurally instead.
 function leafUpdate(node: AnimatedNode): (() => void) | undefined {
   const candidate = Reflect.get(node, 'update');
-  return typeof candidate === 'function' ? () => candidate.call(node) : undefined;
+  return typeof candidate === 'function'
+    ? () => candidate.call(node)
+    : undefined;
 }
 
 // Top-down walk to the leaves, then re-pull each leaf (deduped by node identity,
@@ -289,4 +301,83 @@ export function flushValue(rootNode: AnimatedNode): void {
   }
   collect(rootNode);
   leaves.forEach(update => update());
+}
+
+// AnimatedInterpolation: a graph node that maps its parent's numeric value through an
+// interpolation. Ported from RN's AnimatedInterpolation.js (numeric, string-with-units and
+// color output ranges; platform colors stay out of scope, color.ts defers them).
+//
+// IT LIVES HERE, NOT IN ITS OWN MODULE, AND MUST STAY HERE. It used to sit in
+// `interpolation-node.ts` and hand its constructor back to `AnimatedNode.interpolate()` through
+// a `registerInterpolationFactory` call executed at module load — the usual trick for breaking
+// an import cycle (this module owns the base classes that module extended). That trick is
+// UNSOUND under Metro's production bundle: `inlineRequires` (production-only) defers a module's
+// `require()` to the first use of its binding, nothing in the codebase ever names
+// `AnimatedInterpolation` as a value, and a barrel's `export { X } from './x'` compiles to a
+// lazy getter — so the module never evaluated, the factory was never registered, and the first
+// `.interpolate()` on a device threw `interpolation factory not registered`, blanking the screen
+// in RELEASE builds only (dev was fine, every headless test was fine, and the code was even
+// present in the bundle — it just never ran). Adding a bare `import './interpolation-node'` to
+// the barrel does NOT fix it either: Babel merges that import with the adjacent re-export of the
+// same specifier, and the merged dependency stays lazy. Both were tried on device 2026-08-14.
+//
+// Keeping the class next to its base class removes the cycle, the factory, and the entire class
+// of load-order bug with it: `interpolate()` constructs it directly and there is nothing left to
+// register. Do not "tidy" it back into its own file.
+export class AnimatedInterpolation extends AnimatedWithChildren {
+  private readonly parent: AnimatedNode;
+  private readonly config: IInterpolationConfig;
+  private interpolation: ((input: number) => number | string) | undefined;
+
+  constructor(parent: AnimatedNode, config: IInterpolationConfig) {
+    super();
+    this.parent = parent;
+    this.config = config;
+    // Validate eagerly so a bad range fails at construction, not first frame.
+    checkValidRanges(config.inputRange, config.outputRange);
+  }
+
+  private getInterpolation(): (input: number) => number | string {
+    if (this.interpolation === undefined) {
+      this.interpolation = createInterpolation(this.config);
+    }
+    return this.interpolation;
+  }
+
+  override __getValue(): number | string {
+    const parentValue = this.parent.__getValue();
+    if (typeof parentValue !== 'number') {
+      throw new Error('Cannot interpolate an input which is not a number');
+    }
+    return this.getInterpolation()(parentValue);
+  }
+
+  override __attach(): void {
+    this.parent.__addChild(this);
+    super.__attach();
+  }
+
+  override __detach(): void {
+    this.parent.__removeChild(this);
+    super.__detach();
+  }
+
+  // Make the upstream value native first, so the parent->interpolation edge can be
+  // wired when this node is reached from a leaf rather than from the value.
+  override __makeNative(platformConfig?: IPlatformConfig): void {
+    this.parent.__makeNative(platformConfig);
+    super.__makeNative(platformConfig);
+  }
+
+  override __getNativeConfig(): INativeNodeConfig {
+    return {
+      type: 'interpolation',
+      inputRange: this.config.inputRange,
+      outputRange: this.config.outputRange,
+      extrapolateLeft:
+        this.config.extrapolateLeft ?? this.config.extrapolate ?? 'extend',
+      extrapolateRight:
+        this.config.extrapolateRight ?? this.config.extrapolate ?? 'extend',
+    };
+  }
 }

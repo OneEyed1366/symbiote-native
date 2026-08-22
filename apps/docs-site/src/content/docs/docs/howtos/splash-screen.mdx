@@ -5,15 +5,16 @@ description: Generate the native launch-screen binary, wire it into the native p
 
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
-You want a native launch screen shown *before* JS ever runs, hidden once your app is ready. This
+You want a native launch screen shown _before_ JS ever runs, hidden once your app is ready. This
 is [`@symbiote-native/splash-screen`](/docs/packages/splash-screen/) — a wrapper
-over `react-native-bootsplash` reachable from React, Vue, and Angular alike.
+over `react-native-bootsplash` reachable from React, Vue, Angular, Svelte, and Solid alike.
 
 <Aside type="danger" title="This is two setups, not one">
-  Installing the JS package only gets you `hide()`/`useHideAnimation`. The launch screen itself —
-  the native drawable/storyboard shown at boot — has to be **generated** and **wired into your
-  native project files** first. Skipping either step means there is nothing native to hide, or
-  the hide call has no effect.
+  Installing the JS package only gets you `hide()`/`useHideAnimation`. The
+  launch screen itself — the native drawable/storyboard shown at boot — has to
+  be **generated** and **wired into your native project files** first. Skipping
+  either step means there is nothing native to hide, or the hide call has no
+  effect.
 </Aside>
 
 ## 1. Install
@@ -69,8 +70,9 @@ Re-run the same command (with `--brand`/`--dark-*` if you have a generator licen
 the logo or colors change — it's idempotent, not a one-shot scaffold.
 
 <Aside type="note">
-  `--platforms`, `--flavor`, `--html`, `--plist` and the rest of the generator's flags all pass
-  through unchanged — run `npx symbiote-splash-screen generate --help` for the full list.
+  `--platforms`, `--flavor`, `--html`, `--plist` and the rest of the generator's
+  flags all pass through unchanged — run `npx symbiote-splash-screen generate
+  --help` for the full list.
 </Aside>
 
 ## 3. Wire the generated theme into your native entry points
@@ -124,13 +126,14 @@ Run `pod install` inside `ios/` after adding the dependency — `RNBootSplash`'s
 links once CocoaPods has resolved it.
 
 <Aside type="caution" title="Verify the native binary is actually wired">
-  Skipping the Android `RNBootSplash.init` call is **not** silent in JS: calling `hide()` /
-  `isVisible()` before it runs throws `Error: react-native-bootsplash has not been initialized`
-  (a real, frequently-reported setup mistake — see
+  Skipping the Android `RNBootSplash.init` call is **not** silent in JS: calling
+  `hide()` / `isVisible()` before it runs throws `Error: react-native-bootsplash
+  has not been initialized` (a real, frequently-reported setup mistake — see
   [zoontek/react-native-bootsplash#227](https://github.com/zoontek/react-native-bootsplash/issues/227)).
-  A missed iOS storyboard/`Info.plist` step, by contrast, IS silent — the screen just shows the
-  OS default (blank) or the wrong storyboard. Rebuild and run on a real device/simulator after
-  this step and confirm your logo/background shows at cold launch before moving on to step 4.
+  A missed iOS storyboard/`Info.plist` step, by contrast, IS silent — the screen
+  just shows the OS default (blank) or the wrong storyboard. Rebuild and run on
+  a real device/simulator after this step and confirm your logo/background shows
+  at cold launch before moving on to step 4.
 </Aside>
 
 ## 4. Hide it from JS once your app is ready
@@ -148,6 +151,7 @@ mounted:
       hide();
     }, []);
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -158,6 +162,7 @@ mounted:
     onMounted(() => hide());
     </script>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     Called once from the root component's `ngOnInit`:
@@ -173,12 +178,36 @@ mounted:
       }
     }
     ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { hide } from '@symbiote-native/splash-screen/svelte';
+
+      $effect(() => {
+        hide();
+      });
+    </script>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { onMount } from 'solid-js';
+    import { hide } from '@symbiote-native/splash-screen/solid';
+
+    onMount(() => {
+      hide();
+    });
+    ```
+
   </TabItem>
 </Tabs>
 
 If you want a fade transition gated on real readiness (layout committed + logo/brand images
 loaded + your own `ready` flag) instead of an immediate cut, reach for `useHideAnimation` —
-covered with full React/Vue/Angular examples on the
+covered with full React/Vue/Angular/Svelte/Solid examples on the
 [package page](/docs/packages/splash-screen/#the-animated-case-usehideanimation).
 
 ## Known upstream gotchas
@@ -187,9 +216,9 @@ These are `react-native-bootsplash` behaviors this wrapper inherits as-is — wo
 you file a bug against `@symbiote-native/splash-screen` itself:
 
 - **Dark mode follows the OS appearance setting, not an in-app theme toggle.** `darkBackground`/
-  `darkLogo` in the manifest are picked based on `getConstants().darkModeEnabled` — the *system*
+  `darkLogo` in the manifest are picked based on `getConstants().darkModeEnabled` — the _system_
   dark-mode flag read before JS runs, at native paint time. If your app has its own theme
-  switcher independent of the OS setting, the native splash can briefly flash the *other* color
+  switcher independent of the OS setting, the native splash can briefly flash the _other_ color
   scheme for a frame before your JS-driven UI repaints
   ([zoontek/react-native-bootsplash#743](https://github.com/zoontek/react-native-bootsplash/issues/743)).
   There is no JS-side fix — it's a property of native paint happening before any JS runs.
@@ -201,12 +230,12 @@ you file a bug against `@symbiote-native/splash-screen` itself:
 
 ## Recap
 
-| Step | What | Where |
-| --- | --- | --- |
-| 1 | Install the wrapper | `package.json` |
-| 2 | Generate the binary (assets + native config) | `npx symbiote-splash-screen generate` |
-| 3 | Wire the generated theme/storyboard into native entry points | `MainActivity.kt`, `AppDelegate.swift`, `Info.plist` |
-| 4 | Hide it from JS | `hide()` / `useHideAnimation` in app code |
+| Step | What                                                         | Where                                                |
+| ---- | ------------------------------------------------------------ | ---------------------------------------------------- |
+| 1    | Install the wrapper                                          | `package.json`                                       |
+| 2    | Generate the binary (assets + native config)                 | `npx symbiote-splash-screen generate`                |
+| 3    | Wire the generated theme/storyboard into native entry points | `MainActivity.kt`, `AppDelegate.swift`, `Info.plist` |
+| 4    | Hide it from JS                                              | `hide()` / `useHideAnimation` in app code            |
 
 Steps 1–3 are native, one-time setup per app; step 4 is the only part that lives in your
-framework code, and it's identical in shape across React, Vue, and Angular.
+framework code, and it's identical in shape across React, Vue, Angular, Svelte, and Solid.

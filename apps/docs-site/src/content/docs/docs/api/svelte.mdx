@@ -1,0 +1,285 @@
+---
+title: Svelte API
+description: The Svelte adapter public contract.
+---
+
+Import app-facing APIs from `@symbiote-native/svelte`:
+
+```ts
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/svelte';
+```
+
+Svelte drives the same engine as React/Vue/Angular/Solid, but through a different
+seam: Svelte has no official custom-renderer API yet (`createRenderer` from
+`svelte/renderer` is still an unmerged proposal), so this adapter patches a
+handful of `globalThis` DOM classes instead — stock compiled Svelte output
+believes it's talking to the real DOM, while every call actually routes into
+`@symbiote-native/engine`'s mutation API. Components are ordinary `.svelte`
+files; nothing about authoring one is adapter-specific beyond the prop/event
+shape below.
+
+## Installation
+
+```sh
+pnpm add @symbiote-native/svelte react-native svelte
+```
+
+`react-native` and `svelte` stay your app's own top-level dependencies —
+`react-native` is the Metro version anchor, so it has to be pinned at the app
+root. `@symbiote-native/engine` is a peer dependency and installs alongside.
+Metro needs the package's own transformer for `.svelte` files
+(`@symbiote-native/svelte/metro-svelte-transformer`) and two settings that are
+easy to miss: `resolver.unstable_conditionNames: ['browser']` (without it
+Metro resolves Svelte's SSR build and `mount()` throws
+`lifecycle_function_unavailable`), and `compilerOptions.fragments: 'tree'` in
+`svelte.config.js` (so the compiler emits DOM-shim-friendly
+`document.createElement` calls instead of an `innerHTML` template). `examples/svelte`
+is the reference for the full config.
+
+## Component shape
+
+- Events: real camelCase **props**, not `on:x` directives — `onPress`,
+  `onLongPress`, `onValueChange`, `onLayout`. Svelte templates already write
+  props in camelCase, so there's no kebab-case normalization step like Vue's.
+- Children: a `children` prop typed `Snippet`, rendered internally via
+  `{@render children?.()}` — not Svelte 4's `<slot />`.
+- Render children: a component that passes state back renders `{@render
+children?.(state)}` internally; the caller matches it with a named
+  `{#snippet children(state)}` block, Svelte's twin of a scoped slot.
+- Refs: Symbiote components forward no `bind:this` of their own — `{@attach fn}`
+  is the default way to reach a host node. A raw `symbiote-view`/`symbiote-text`
+  tag you author yourself still supports real `bind:this`. See [refs and
+  attachments](/docs/howtos/svelte-refs-and-attachments/) for the full picture.
+- Styles: `style`/`class` props, plus a component's own scoped `<style>`
+  block — see [Scoped styles](#scoped-styles-style) below.
+- Two-way binding: `value = $bindable()` on `TextInput`/`Switch`/[`Slider`](/docs/packages/slider/) —
+  see [Two-way binding](#two-way-binding-bindvalue) below.
+
+## Common events
+
+```svelte
+<Pressable {onPress} {onLongPress} />
+<Switch bind:value={enabled} />
+<TextInput bind:value={text} onValueChange={(text, event) => onChange(event)} />
+<View {onLayout} />
+```
+
+`TextInput`'s `onValueChange` fires `(text, event)` — the same merged shape
+React uses, unlike Angular, which needs a second output for the raw event
+because an `EventEmitter` only carries one value.
+
+## Children
+
+```svelte
+<script lang="ts">
+  import { Pressable, Text } from '@symbiote-native/svelte';
+</script>
+
+<Pressable {onPress}>
+  {#snippet children({ pressed })}
+    <Text>{pressed ? 'Release' : 'Press me'}</Text>
+  {/snippet}
+</Pressable>
+```
+
+List renderers follow the same principle: the data and native list math are
+shared, while the rendered cell is a snippet rather than a React node or a Vue
+slot.
+
+## Refs and handles
+
+```svelte
+<script lang="ts">
+  import { View } from '@symbiote-native/svelte';
+
+  const logMount = (node: unknown) => {
+    console.log('mounted', node);
+    return () => console.log('unmounted', node);
+  };
+</script>
+
+<View testID="target" {@attach logMount} />
+```
+
+`{@attach}` is the one directive-shaped construct the Svelte compiler accepts
+on a component (`use:`/`class:`/`style:` are rejected there), and it reaches
+the committed native node on any ordinary Symbiote component for free. A
+component with its own exported imperative surface (`ScrollView.scrollTo`,
+…) uses that surface directly instead. Full mechanism, including a raw
+`symbiote-*` host tag's `bind:this` + `hostInstance()`/`findNodeHandle()`
+path: [How to: refs and attachments in
+Svelte](/docs/howtos/svelte-refs-and-attachments/).
+
+## Two-way binding (`bind:value`)
+
+`Switch`, `TextInput`, and the [Slider](/docs/packages/slider/) wrapper each
+declare `value = $bindable()`:
+
+```svelte
+<Switch bind:value={enabled} />
+<TextInput bind:value={text} />
+<Slider bind:value={volume} minimumValue={0} maximumValue={1} />
+```
+
+Supplying your own `onValueChange` on the same instance silently disables the
+`bind:` echo — a component can't detect that it's bound from the inside, so
+pick one form per instance. Full pattern, including `$bindable()` for a
+wrapper component of your own: [Two-way binding](/docs/howtos/two-way-binding/).
+
+## Scoped styles (`<style>`)
+
+A component's own `<style>` block is scoped by default, the same as real
+Svelte — every class it declares gets a per-file scope suffix, resolved
+through the same style registry every adapter's `class`/`className`/`:class`
+path shares:
+
+```svelte
+<View class="card">
+  <Text>Scoped — no other component's .card collides</Text>
+</View>
+
+<style>
+  .card {
+    padding: 16px;
+    background-color: #13243a;
+  }
+</style>
+```
+
+`:global(.name)` escapes scoping the same way it does in real Svelte. Svelte's
+own scoping deliberately doesn't reach into a child component's own markup —
+scope a class where it's declared, not where it's used. `@media`/`@keyframes`/
+pseudo-class selectors are dropped with a diagnostic; React Native has no such
+concept. See the [Styling guide](/docs/learn/styling/) for the full compiler
+pipeline shared by every adapter.
+
+## Runtime modules
+
+`@symbiote-native/svelte` re-exports the same runtime utilities as the other
+adapters, so app code keeps one import root: `Platform`, `StyleSheet`,
+`PlatformColor`, `DynamicColorIOS`, `PixelRatio`, `Alert`, `Share`, `Linking`,
+`Keyboard`, `Vibration`, `ActionSheetIOS`, `BackHandler`, `ToastAndroid`,
+`PermissionsAndroid`, `AccessibilityInfo`, `I18nManager`, `Settings`,
+`LayoutAnimation`, `InteractionManager`, `StatusBar`, `AppState`,
+`findNodeHandle`, and `dlog`/`isDebug` for diagnostic logging.
+
+Two reactive reads are **runes** instead of hooks/composables — Svelte's own
+term, and this adapter's lifecycle-helper bucket is named `runes/` to match:
+
+```svelte
+<script lang="ts">
+  import { useWindowDimensions, useColorScheme } from '@symbiote-native/svelte';
+
+  const dimensions = useWindowDimensions();
+  const scheme = useColorScheme();
+</script>
+
+<Text
+  >{dimensions.current.width}×{dimensions.current.height} · {scheme.current}</Text
+>
+```
+
+Each returns a **boxed getter** (`{ get current() { ... } }`), not a bare
+`$state` value — Svelte 5 reactivity is lexically scoped to the module that
+declares it, so a raw `$state` returned from a function loses its reactivity
+for the caller; read `.current` the same way you'd unwrap a Vue `Ref.value`.
+
+On Android, `Keyboard` and `Settings` do nothing until you also install
+[`@symbiote-native/android`](/docs/packages/android/):
+`keyboardDidShow`/`keyboardDidHide` never fire, because Android's only stock
+keyboard-event source is `ReactRootView`'s layout listener and the bridgeless
+surface SymbioteNative mounts never triggers it, and `Settings` reads back `null`,
+because RN's `Settings` has no stock Android implementation at all.
+
+## Animations and gestures
+
+`Animated` (both the JS and native driver, plus the `AnimatedView`/
+`AnimatedText`/`AnimatedImage`/`AnimatedScrollView` components) and
+`PanResponder` are re-exported from `@symbiote-native/svelte` — see the
+[Animations guide](/docs/learn/animations/) for the full surface. `Animated.FlatList`/
+`Animated.SectionList` have no Svelte wrapper yet.
+
+## Cross-surface content (`createTunnel`)
+
+```svelte
+<script lang="ts">
+  import { createTunnel, TunnelIn, TunnelOut } from '@symbiote-native/svelte';
+
+  const overlayTunnel = createTunnel(); // module-level singleton, importable from both surfaces
+  let toastVisible = $state(false);
+</script>
+
+<!-- inside the surface that should paint the content -->
+<TunnelOut tunnel={overlayTunnel} />
+
+<!-- inside any other component, in any surface -->
+{#if toastVisible}
+  <TunnelIn tunnel={overlayTunnel}>
+    <Text>Toast</Text>
+  </TunnelIn>
+{/if}
+```
+
+React's `createPortal` (and Vue's `Teleport`) have no Svelte twin at all —
+`createPortal` is react-reconciler's own Fiber-level `HostPortal` primitive
+with no equivalent in a framework with no reconciler, and Svelte has no
+built-in `Teleport`-shaped relocation either — so `createTunnel` is the only
+cross-surface primitive here, for two independently `mount()`-ed surfaces
+that share no Fabric tree at all. `TunnelIn`/`TunnelOut` take an explicit
+`tunnel` prop rather than `tunnel.In`/`tunnel.Out` member access like
+React/Vue: a `.svelte` file compiles to one fixed, top-level component, so
+there's no runtime factory to construct a fresh pair per `createTunnel()`
+call the way Vue's `defineComponent` can.
+
+## App entry point
+
+```js
+// index.js
+import { createApp } from '@symbiote-native/svelte/bootstrap';
+import App from './App.svelte';
+
+createApp(App).mount('MyApp');
+```
+
+Mirrors React/Vue's `createApp(App).mount(appName)` two-step idiom. The
+lower-level `AppRegistry`/`setHostRegistrar` entry point described in the
+[Core API](/docs/api/core/#app-entry-point-appregistry) is also re-exported
+directly, for app code that wants it. `AppRegistry.setWrapperComponentProvider`
+is re-exported but currently **ignored** on this adapter: Vue composes a
+wrapper via `h(wrapper, ...)` at call time, but a compiled `.svelte` file has
+no equivalent runtime composition of two independently-authored components —
+there's no working wrapper-component example to show here yet.
+
+## Error boundaries (`<svelte:boundary>`)
+
+Svelte 5's own `<svelte:boundary>` is currently **Svelte-exclusive** among the
+five adapters — React's `componentDidCatch` boundary and Vue's
+`onErrorCaptured` aren't documented patterns here yet:
+
+```svelte
+<svelte:boundary onerror={(error, reset) => console.error(error)}>
+  <Child />
+
+  {#snippet failed(error, reset)}
+    <Text>{error.message}</Text>
+  {/snippet}
+</svelte:boundary>
+```
+
+Full behavior, including the `{@const}`-doesn't-capture-`reset()` gotcha: [How
+to: catch render errors with `<svelte:boundary>`](/docs/howtos/error-boundaries/).
+
+## Boundary
+
+Do not pass React component packages to the Svelte adapter. A third-party
+React Native package that ships a JavaScript React component still uses the
+React dispatcher internally. Non-React adapters need native-view wrappers
+instead — see the [Slider package](/docs/packages/slider/) for the reference
+implementation, shipping on React, Vue, Angular, Svelte, and Solid alike.

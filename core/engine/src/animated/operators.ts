@@ -12,7 +12,10 @@
 import { AnimatedNode, AnimatedWithChildren } from './graph';
 import { AnimatedValue } from './value';
 import { dlog } from '../debug';
-import type { INativeNodeConfig, IPlatformConfig } from './native/native-animated';
+import type {
+  INativeNodeConfig,
+  IPlatformConfig,
+} from './native/native-animated';
 
 // Wrap a bare number in an AnimatedValue so every input is a graph node.
 function toNode(input: AnimatedNode | number): AnimatedNode {
@@ -71,7 +74,10 @@ export class AnimatedAddition extends AnimatedBinaryOp {
   }
 
   override __getNativeConfig(): INativeNodeConfig {
-    return { type: 'addition', input: [this.a.__getNativeTag(), this.b.__getNativeTag()] };
+    return {
+      type: 'addition',
+      input: [this.a.__getNativeTag(), this.b.__getNativeTag()],
+    };
   }
 }
 
@@ -81,7 +87,10 @@ export class AnimatedSubtraction extends AnimatedBinaryOp {
   }
 
   override __getNativeConfig(): INativeNodeConfig {
-    return { type: 'subtraction', input: [this.a.__getNativeTag(), this.b.__getNativeTag()] };
+    return {
+      type: 'subtraction',
+      input: [this.a.__getNativeTag(), this.b.__getNativeTag()],
+    };
   }
 }
 
@@ -91,7 +100,10 @@ export class AnimatedMultiplication extends AnimatedBinaryOp {
   }
 
   override __getNativeConfig(): INativeNodeConfig {
-    return { type: 'multiplication', input: [this.a.__getNativeTag(), this.b.__getNativeTag()] };
+    return {
+      type: 'multiplication',
+      input: [this.a.__getNativeTag(), this.b.__getNativeTag()],
+    };
   }
 }
 
@@ -119,7 +131,10 @@ export class AnimatedDivision extends AnimatedBinaryOp {
   }
 
   override __getNativeConfig(): INativeNodeConfig {
-    return { type: 'division', input: [this.a.__getNativeTag(), this.b.__getNativeTag()] };
+    return {
+      type: 'division',
+      input: [this.a.__getNativeTag(), this.b.__getNativeTag()],
+    };
   }
 }
 
@@ -156,7 +171,11 @@ export class AnimatedModulo extends AnimatedWithChildren {
   }
 
   override __getNativeConfig(): INativeNodeConfig {
-    return { type: 'modulus', input: this.a.__getNativeTag(), modulus: this.modulus };
+    return {
+      type: 'modulus',
+      input: this.a.__getNativeTag(),
+      modulus: this.modulus,
+    };
   }
 }
 
@@ -203,15 +222,26 @@ export class AnimatedDiffClamp extends AnimatedWithChildren {
   }
 
   override __getNativeConfig(): INativeNodeConfig {
-    return { type: 'diffclamp', input: this.a.__getNativeTag(), min: this.min, max: this.max };
+    return {
+      type: 'diffclamp',
+      input: this.a.__getNativeTag(),
+      min: this.min,
+      max: this.max,
+    };
   }
 }
 
-export function add(a: AnimatedNode | number, b: AnimatedNode | number): AnimatedAddition {
+export function add(
+  a: AnimatedNode | number,
+  b: AnimatedNode | number,
+): AnimatedAddition {
   return new AnimatedAddition(a, b);
 }
 
-export function subtract(a: AnimatedNode | number, b: AnimatedNode | number): AnimatedSubtraction {
+export function subtract(
+  a: AnimatedNode | number,
+  b: AnimatedNode | number,
+): AnimatedSubtraction {
   return new AnimatedSubtraction(a, b);
 }
 
@@ -222,7 +252,10 @@ export function multiply(
   return new AnimatedMultiplication(a, b);
 }
 
-export function divide(a: AnimatedNode | number, b: AnimatedNode | number): AnimatedDivision {
+export function divide(
+  a: AnimatedNode | number,
+  b: AnimatedNode | number,
+): AnimatedDivision {
   return new AnimatedDivision(a, b);
 }
 
@@ -230,6 +263,10 @@ export function modulo(a: AnimatedNode, modulus: number): AnimatedModulo {
   return new AnimatedModulo(a, modulus);
 }
 
-export function diffClamp(a: AnimatedNode, min: number, max: number): AnimatedDiffClamp {
+export function diffClamp(
+  a: AnimatedNode,
+  min: number,
+  max: number,
+): AnimatedDiffClamp {
   return new AnimatedDiffClamp(a, min, max);
 }

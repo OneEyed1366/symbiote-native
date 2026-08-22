@@ -1,0 +1,23 @@
+<script lang="ts">
+  // Tabs demo · Search tab: registered with a tabBarBadge (TabsDemoScreen.svelte's <TabScreen>).
+  // Svelte twin of examples/vue-sfc/screens/TabSearchScreen.vue.
+  import { SafeAreaView, Text, View } from '@symbiote-native/svelte';
+  import { useIsFocused } from '@symbiote-native/navigation/svelte';
+  import { ROUTE_NAME } from '../routes';
+  import { ROUTE_LINE_INFO } from '../navigation-lines';
+
+  const isFocused = useIsFocused();
+  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TabsDemo];
+</script>
+
+<SafeAreaView class="screen">
+  <View class="section">
+    <View class={`line-tag line-tag-${lineInfo.line}`}>
+      <Text class="line-tag-text">
+        {`${lineInfo.code} · ${lineInfo.label}`}
+      </Text>
+    </View>
+    <Text class="section-label">Search tab</Text>
+    <Text class="info-text">{`focused: ${isFocused.current}`}</Text>
+  </View>
+</SafeAreaView>

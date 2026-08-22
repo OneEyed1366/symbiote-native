@@ -23,49 +23,66 @@ function touch(
   timestamp: number,
   target: number,
 ): Record<string, unknown> {
-  const point = { pageX, pageY, locationX: pageX, locationY: pageY, identifier: 1, timestamp };
+  const point = {
+    pageX,
+    pageY,
+    locationX: pageX,
+    locationY: pageY,
+    identifier: 1,
+    timestamp,
+  };
   return { touches: [point], changedTouches: [point], target, timestamp };
 }
 
 describe('React responder system through the event layer', () => {
-  it('grants, routes a move with dx/dy from the grant point, and releases', () => {
-    const seen: string[] = [];
-    let moveDx = 0;
-    let moveDy = 0;
-    const responder = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        seen.push('grant');
-      },
-      onPanResponderMove: (_event, gesture) => {
-        seen.push('move');
-        moveDx = gesture.dx;
-        moveDy = gesture.dy;
-      },
-      onPanResponderRelease: () => {
-        seen.push('release');
-      },
+  // Positive only: PanResponder always resolves to a granted/moved/released sequence on a
+  // consented gesture — no invalid-input branch for a Negative group to reject.
+  describe('Positive', () => {
+    // why: PanResponder.panHandlers must wire onto the SAME negotiation the raw responder props
+    // use (proven separately in responder-negotiation.test.tsx) — this is the integration check
+    // that the public PanResponder API, not just the low-level callbacks, drives a real drag,
+    // and that gestureState.dx/dy are computed from the GRANT point, not the previous move.
+    it('grants, routes a move with dx/dy from the grant point, and releases', () => {
+      const seen: string[] = [];
+      let moveDx = 0;
+      let moveDy = 0;
+      const responder = PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+          seen.push('grant');
+        },
+        onPanResponderMove: (_event, gesture) => {
+          seen.push('move');
+          moveDx = gesture.dx;
+          moveDy = gesture.dy;
+        },
+        onPanResponderRelease: () => {
+          seen.push('release');
+        },
+      });
+
+      function App(): ReactElement {
+        return (
+          <View {...responder.panHandlers} style={{ width: 50, height: 50 }} />
+        );
+      }
+
+      mount(ROOT_TAG, <App />);
+
+      const viewNode = fabric.appRoot().children[0];
+      expect(viewNode, 'PanResponder View was committed').toBeDefined();
+      const handle = viewNode.instanceHandle;
+      const tag = viewNode.tag;
+
+      // One finger: down at (10,10), drag to (40,55), lift.
+      fabric.fireEvent(handle, 'topTouchStart', touch(10, 10, 1_000, tag));
+      fabric.fireEvent(handle, 'topTouchMove', touch(40, 55, 1_016, tag));
+      fabric.fireEvent(handle, 'topTouchEnd', touch(40, 55, 1_032, tag));
+
+      expect(seen.join(',')).toBe('grant,move,release');
+      // dx/dy are the delta from the grant point: 40-10=30, 55-10=45.
+      expect(moveDx).toBe(30);
+      expect(moveDy).toBe(45);
     });
-
-    function App(): ReactElement {
-      return <View {...responder.panHandlers} style={{ width: 50, height: 50 }} />;
-    }
-
-    mount(ROOT_TAG, <App />);
-
-    const viewNode = fabric.appRoot().children[0];
-    expect(viewNode, 'PanResponder View was committed').toBeDefined();
-    const handle = viewNode.instanceHandle;
-    const tag = viewNode.tag;
-
-    // One finger: down at (10,10), drag to (40,55), lift.
-    fabric.fireEvent(handle, 'topTouchStart', touch(10, 10, 1_000, tag));
-    fabric.fireEvent(handle, 'topTouchMove', touch(40, 55, 1_016, tag));
-    fabric.fireEvent(handle, 'topTouchEnd', touch(40, 55, 1_032, tag));
-
-    expect(seen.join(',')).toBe('grant,move,release');
-    // dx/dy are the delta from the grant point: 40-10=30, 55-10=45.
-    expect(moveDx).toBe(30);
-    expect(moveDy).toBe(45);
   });
 });

@@ -7,7 +7,10 @@
 // Libraries/AppState/AppState.js.
 
 import { createDeviceEventModule } from '../native-modules';
-import { type IEventEmitterModule, type IEventSubscription } from '../native-events';
+import {
+  type IEventEmitterModule,
+  type IEventSubscription,
+} from '../native-events';
 import { dlog } from '../debug';
 
 // The native module name RN registers AppState under, confirmed from its spec
@@ -29,8 +32,10 @@ const APP_STATE_EVENT = {
   blur: 'blur',
 } as const;
 
-export type IAppStateStatus = 'inactive' | 'background' | 'active' | 'extension' | 'unknown';
-export type IAppStateEvent = (typeof APP_STATE_EVENT)[keyof typeof APP_STATE_EVENT];
+export type IAppStateStatus =
+  'inactive' | 'background' | 'active' | 'extension' | 'unknown';
+export type IAppStateEvent =
+  (typeof APP_STATE_EVENT)[keyof typeof APP_STATE_EVENT];
 
 // The AppState native module: getConstants (initial state) plus the observe-counters.
 interface INativeAppState extends IEventEmitterModule {
@@ -101,12 +106,17 @@ class AppStateImpl {
     dlog(`AppState.addEventListener -> ${type}`);
     switch (type) {
       case APP_STATE_EVENT.change:
-        return eventEmitter.addListener(NATIVE_EVENT.stateDidChange, payload => {
-          if (!isStateChangePayload(payload)) return;
-          handler(payload.app_state);
-        });
+        return eventEmitter.addListener(
+          NATIVE_EVENT.stateDidChange,
+          payload => {
+            if (!isStateChangePayload(payload)) return;
+            handler(payload.app_state);
+          },
+        );
       case APP_STATE_EVENT.memoryWarning:
-        return eventEmitter.addListener(NATIVE_EVENT.memoryWarning, () => handler());
+        return eventEmitter.addListener(NATIVE_EVENT.memoryWarning, () =>
+          handler(),
+        );
       case APP_STATE_EVENT.focus:
         return eventEmitter.addListener(NATIVE_EVENT.focusChange, hasFocus => {
           if (hasFocus === true) handler();

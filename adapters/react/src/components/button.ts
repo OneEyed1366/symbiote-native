@@ -6,7 +6,10 @@
 import { createElement, type FC } from 'react';
 import { Text } from '../components';
 import { TouchableOpacity } from './touchable';
-import { BUTTON_ACCESSIBILITY_ROLE, resolveButtonTextStyle } from '@symbiote-native/components';
+import {
+  BUTTON_ACCESSIBILITY_ROLE,
+  resolveButtonTextStyle,
+} from '@symbiote-native/components';
 import type { IButtonProps as IButtonBaseProps } from '@symbiote-native/components';
 
 // IButtonProps is otherwise framework-agnostic (it takes a `title` string, no children / ref), so
@@ -38,11 +41,14 @@ export const Button: FC<IButtonProps> = props => {
   // (testID + TV-focus). Carried as a plain record (the pass-through idiom Image uses) so
   // excess-property typing does not reject the native-only keys. TV-focus is inert on a phone.
   const nativeForward: Record<string, unknown> = { testID };
-  if (hasTVPreferredFocus !== undefined) nativeForward.hasTVPreferredFocus = hasTVPreferredFocus;
+  if (hasTVPreferredFocus !== undefined)
+    nativeForward.hasTVPreferredFocus = hasTVPreferredFocus;
   if (nextFocusDown !== undefined) nativeForward.nextFocusDown = nextFocusDown;
-  if (nextFocusForward !== undefined) nativeForward.nextFocusForward = nextFocusForward;
+  if (nextFocusForward !== undefined)
+    nativeForward.nextFocusForward = nextFocusForward;
   if (nextFocusLeft !== undefined) nativeForward.nextFocusLeft = nextFocusLeft;
-  if (nextFocusRight !== undefined) nativeForward.nextFocusRight = nextFocusRight;
+  if (nextFocusRight !== undefined)
+    nativeForward.nextFocusRight = nextFocusRight;
   if (nextFocusUp !== undefined) nativeForward.nextFocusUp = nextFocusUp;
 
   // RN's Button sets role=button, is accessible, and propagates the disabled accessibility state.

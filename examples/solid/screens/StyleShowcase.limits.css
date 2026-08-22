@@ -1,0 +1,145 @@
+/* The deliberately-unsupported sheet. Every rule below is here to be DROPPED or to behave
+   wrongly, and every one of them prints a warning into the Metro output under the
+   `[@symbiote-native/css-parser]` / `[symbiote-css]` prefix naming this file. A tile that starts
+   painting the red variant is the regression.
+
+   Kept in its own file so the failure modes cannot be mistaken for the working sheet's rules,
+   and so the warning block this file produces at build time reads as one deliberate group. */
+
+:root {
+  --sc-limit-lime: #a3d94f;
+}
+
+/* ---- @media / @supports / @container: dropped whole --------------------------------------
+   React Native evaluates no CSS condition at all — no viewport query engine, no feature query,
+   no container query. The at-rule's visitor returns [] so the walk never descends into it,
+   which is what keeps the rules INSIDE it from being hoisted out and applied unconditionally
+   (taking the at-rule at face value would be strictly worse than dropping it: a
+   `min-width: 900px` rule would paint on every phone).
+
+   Branch in JS instead — useWindowDimensions for a viewport test, Platform for a platform one.
+
+   All three tiles must stay slate. Red means a condition started being honoured. */
+.sc-limit-cond {
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border-width: 2px;
+  border-color: #41506a;
+  background-color: #16243a;
+}
+@media (min-width: 1px) {
+  .sc-limit-cond {
+    border-color: #f2789a;
+    background-color: #7a1f2b;
+  }
+}
+@supports (display: flex) {
+  .sc-limit-cond {
+    border-color: #f2789a;
+    background-color: #7a1f2b;
+  }
+}
+@container (min-width: 1px) {
+  .sc-limit-cond {
+    border-color: #f2789a;
+    background-color: #7a1f2b;
+  }
+}
+
+/* ---- calc() mixing a percentage with a length: dropped with a warning ---------------------
+   RN has no unit that means "a percentage minus some points", so the declaration is refused
+   rather than approximated. It is refused LOUDLY on purpose: the pre-migration evaluator parsed
+   the leading number and stopped, turning `calc(100% - 24px)` into `width: 100`, which RN reads
+   as 100 POINTS — an element authored as "full width minus a gutter" rendered ~100px wide.
+
+   A bare percentage is fine, and calc() over a single unit family still evaluates
+   (`calc(1rem + 4px)` is 20). Express "fill minus a gutter" with flex or parent padding.
+
+   The dropped box gets NO width at all and shrinks to its text; the box above it is the same
+   markup with `width: 100%`. */
+.sc-limit-calc-wrap {
+  align-items: flex-start;
+  gap: 8px;
+}
+.sc-limit-calc-ok {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background-color: #2f7d4f;
+}
+.sc-limit-calc-bad {
+  width: calc(100% - 48px);
+  padding: 8px 10px;
+  border-radius: 8px;
+  background-color: #7a1f2b;
+}
+.sc-limit-calc-text {
+  color: #ffffff;
+  font-size: 12px;
+}
+
+/* ---- the combinator: the one that is WRONG rather than absent ----------------------------
+   `.a .b` (and `>`, `+`, `~`) arrives in the selector AST as a real combinator, but nothing
+   consumes it yet — real descendant matching needs parent pointers, so resolution has to move
+   out of routeProp into the engine's commit walk. Until then the rule keeps only its class
+   TOKENS and matches exactly like `.a.b`: an element carrying BOTH names.
+
+   So the rule below fires in precisely the two places it should not, and the tiles show both:
+
+     nested   parent carries .sc-combo-parent, the child inside it carries .sc-combo-child.
+              The web paints the child red. Here it stays plain — the rule needs both tokens
+              on ONE element and neither has both.
+     merged   one element carrying both names. The web paints nothing (an element is not its
+              own descendant). Here it goes red.
+
+   Give the child its own class instead. Never write a descendant, child, or sibling rule. */
+.sc-combo-parent {
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border-width: 2px;
+  border-color: #41506a;
+  background-color: #16243a;
+}
+.sc-combo-child {
+  padding: 10px;
+  border-radius: 8px;
+  background-color: #1c2c46;
+}
+.sc-combo-parent .sc-combo-child {
+  border-width: 2px;
+  border-color: #f2789a;
+  background-color: #7a1f2b;
+}
+.sc-combo-text {
+  color: #ffffff;
+  font-size: 12px;
+}
+
+/* ---- var() does not cross files ---------------------------------------------------------
+   Custom properties are collected per COMPILED FILE and substituted at build time, so a token
+   declared in App.css's `:root` does not exist here. The reference is dropped with a warning
+   and the declaration goes with it — `--sc-limit-lime` above is declared in THIS file and
+   resolves, `--mist` is App.css's and does not.
+
+   The foreign tile therefore has a border WIDTH and no border colour, so it falls back to RN's
+   default black ring. It used to be worse: the literal string "var(--mist)" shipped to Fabric
+   and painted nothing at all, build-clean.
+
+   Outside the file that declares them, use literals. */
+.sc-limit-var {
+  height: 52px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border-width: 3px;
+  background-color: #16243a;
+}
+.sc-limit-var-local {
+  border-color: var(--sc-limit-lime);
+}
+.sc-limit-var-foreign {
+  border-color: var(--mist);
+}

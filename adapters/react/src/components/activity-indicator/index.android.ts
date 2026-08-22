@@ -1,14 +1,15 @@
-// ActivityIndicator on Android: AndroidProgressBar needs `styleAttr` (it drives the
-// ProgressBar's setStyle(); without it the view throws "setStyle() not called") and
-// `indeterminate: true`, and its default color is the theme (null), per RN's
-// ActivityIndicator.js android branch ({styleAttr:'Normal', indeterminate:true}). Metro
-// picks this on an Android host; no Platform.OS read.
-// device-verify-pending: prop names mirror RN's AndroidProgressBar, proven on a real
-// host by the absence of the "setStyle() not called" red box.
+// AndroidProgressBar needs `styleAttr` (drives ProgressBar.setStyle(); missing it throws
+// "setStyle() not called") and `indeterminate: true`; default color is the theme (null) —
+// mirrors RN's ActivityIndicator.js android branch. Metro selects this file on an Android
+// host, no Platform.OS read needed.
+// device-verify-pending: confirmed by the absence of the setStyle() red box on a real host.
 
 import { descriptorToReact } from '../../descriptor-to-react';
 import { useActivityIndicatorLogic } from './shared';
-import type { IActivityIndicatorPlatform, IActivityIndicatorProps } from './shared';
+import type {
+  IActivityIndicatorPlatform,
+  IActivityIndicatorProps,
+} from './shared';
 export type { IActivityIndicatorProps } from './shared';
 
 const PLATFORM: IActivityIndicatorPlatform = {

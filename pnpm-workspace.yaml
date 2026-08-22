@@ -19,10 +19,6 @@ packages:
   - 'adapters/*'
   - 'packages/*'
   - 'apps/*'
-  # Gitignored dev harness — listing it lets pnpm manage it as a real workspace project
-  # (bin-linking, .pnpm-store symlinks) instead of the ad-hoc node_modules it otherwise
-  # ends up with.
-  - '.examples/*'
 allowBuilds:
   '@parcel/watcher': true
   detox: true
@@ -31,7 +27,7 @@ allowBuilds:
   sharp: true
 minimumReleaseAgeExclude:
   - prettier@3.9.1
-  - '@symbiote-native/angular@0.3.3'
+  - '@symbiote-native/angular@0.3.3 || 0.5.0'
   - '@symbiote-native/components@0.2.3 || 0.2.5'
   - '@symbiote-native/css-parser@0.2.1 || 0.2.2'
   - '@symbiote-native/engine@0.1.4 || 0.1.6'
@@ -41,6 +37,30 @@ minimumReleaseAgeExclude:
   - '@symbiote-native/test-utils@0.1.5'
   - '@symbiote-native/splash-screen@0.1.3 || 2.0.0'
   - '@symbiote-native/navigation@1.0.0'
+  - expo-modules-core@57.0.5
+  - expo-modules-jsi@57.0.3
+  - expo-sensors@57.0.2
+  - expo-modules-autolinking@57.0.8
+  - expo-local-authentication@57.0.2
+  - expo-secure-store@57.0.1
+  - expo-sharing@57.0.8
+  - expo-web-browser@57.0.2
+  - expo-sms@57.0.1
+  - expo-haptics@57.0.1
+  - expo-clipboard@57.0.1
+  - expo-battery@57.0.1
+  - expo-brightness@57.0.1
+  - expo-cellular@57.0.1
+  - expo-network@57.0.1
+  - expo-device@57.0.1
+  - expo-application@57.0.2
+  - expo-crypto@57.0.1
+  - expo-localization@57.0.1
+  - expo-keep-awake@57.0.1
+  - expo-screen-orientation@57.0.1
+  - expo-tracking-transparency@57.0.1
+  - expo-store-review@57.0.1
+  - expo-system-ui@57.0.2
 
 # Single source of truth for dependency versions (pnpm catalogs).
 # A package references a version with `catalog:` (default) or `catalog:<name>`
@@ -61,10 +81,50 @@ catalog:
   '@vue/babel-plugin-jsx': ^1.5.0
   vue: ^3.5.38
   vue-tsc: ^2.2.12
-  '@angular/core': ^22
-  '@angular/common': ^22
-  '@angular/compiler': ^22
-  '@angular/compiler-cli': ^22
+  # PINNED to 22.0.x, deliberately — NOT a lazy pin, and do not widen it back to `^22` without
+  # reading the next paragraph. `@angular/compiler-cli@22.1.0` moved its own `@babel/core`
+  # dependency 7.29.7 -> 8.0.1 and flipped the linker plugin to `api.assertVersion(8)`
+  # (bundles/linker/babel/index.js). Metro/`@react-native/babel-preset` 0.86 is Babel 7.29.7, so
+  # the linker — which we load INSIDE Metro's Babel as stage B of Angular AOT — refuses to run:
+  #   [BABEL] Requires Babel "^8.0.0-0", but was loaded with "7.29.7"
+  # This is not just a version guard we could stub out: the bundle does `import { types } from
+  # '@babel/core'`, resolving to compiler-cli's OWN nested @babel/core@8, so a stubbed
+  # assertVersion would have Babel-8-built AST nodes spliced into a Babel-7 program.
+  # All four must move in lock-step — compiler-cli peer-requires @angular/compiler at an EXACT
+  # version. The unpin condition is RN shipping a Babel 8 preset, or moving the linker out of
+  # Metro into a post-`ngc` pass run under Angular's own Babel 8 (see the angular-adapter skill).
+  '@angular/core': ~22.0.8
+  '@angular/common': ~22.0.8
+  '@angular/compiler': ~22.0.8
+  '@angular/compiler-cli': ~22.0.8
+  # Same lock-step family as the four above — @angular/forms has no runtime Babel/linker
+  # entanglement of its own, but pinning it to the same patch avoids a second, independent
+  # version drift source on top of the one already being managed here.
+  '@angular/forms': ~22.0.8
+  # Measured against 5.56.8 in svelte-adapter-dom-shim (2026-08-10) — `fragments: 'tree'`
+  # (mandatory, §2 of that skill) needs >=5.33. Confirmed a real published npm release:
+  # `pnpm install` resolved this range to 5.56.8 (2026-08-11).
+  svelte: ^5.56.0
+  # Declaration emit for the raw `.svelte` sources we publish (scripts/emit-svelte-declarations.mjs).
+  # Same library `svelte-package` uses for the job; it is also what `svelte-check` runs on internally,
+  # so it moves with `svelte` above, not independently.
+  svelte2tsx: ^0.7.61
+  # 1.9 stable, deliberately NOT 2.0 (RC as of 2026-08). The universal-renderer contract differs
+  # non-cosmetically between the two, so this is a rewrite of adapters/solid/src/renderer.ts, not a
+  # range widening: 2.0 moved the package (`solid-js/universal` -> `@solidjs/universal`), added
+  # `createSentinel`/`cleanupNodes` to RendererOptions, gave `createElement` a second staticProps
+  # argument, replaced `use()` with `applyRef`/`ref`, and changed `effect(fn, init)` to
+  # `effect(fn, effectFn)` — i.e. both the options we implement AND the compiled-output shape our
+  # `/renderer` subpath must satisfy. Full diff recorded in the solid-adapter skill.
+  solid-js: ^1.9.14
+  # Compiles our JSX into universal-renderer calls (`generate: 'universal'` + our `moduleName`).
+  # Moves in lock-step with `solid-js` above — which functions the compiled output imports is a
+  # private contract between the preset and the runtime, not a public API.
+  babel-preset-solid: ^1.9.12
+  # Runs that same compilation under Vite for the headless `solid` vitest project. Needed because
+  # adapters/solid builds with `jsx: 'preserve'` (tsc leaves JSX untouched so the consuming app's
+  # Babel compiles it), which leaves nothing to execute under Vitest without its own transform.
+  vite-plugin-solid: ^2.11.14
 
   # type packages
   '@types/react': ^19.2.0
@@ -79,7 +139,18 @@ catalog:
   vitest: ^4.1.9
   eslint: ^10.6.0
   prettier: ^3.9.1
+  # Root needs it only to READ examples/svelte/.prettierrc.js: prettier loads a resolved
+  # config's `plugins` for EVERY file it covers, not just the .svelte ones, so the root
+  # format sweep over examples/ cannot even reach that tree's .ts files without it. The
+  # sweep's glob still excludes *.svelte (.claude/rules/svelte-prettier-whitespace-safety.md).
+  prettier-plugin-svelte: ^4.1.1
+  # Same reason as the svelte plugin, for apps/docs-site's .astro pages: without it the
+  # format sweep aborts with `No parser could be inferred` on the first one.
+  prettier-plugin-astro: ^0.14.1
   '@eslint/js': ^10.0.1
+  # Official Language Plugin for linting package.json as JSON (not TS/JS) — backs the
+  # local require-readme / require-package-fields rules in eslint.config.js.
+  '@eslint/json': ^2.0.1
   eslint-config-prettier: ^10.1.8
   eslint-plugin-react-hooks: ^7.1.1
   typescript-eslint: ^8.62.0
@@ -89,6 +160,9 @@ catalog:
   syncpack: ^15.3.2
   postcss: ^8.4.49
   postcss-value-parser: ^4.2.0
+  # CSS-Modules renaming / `composes` / `:global()` for core/css-parser. MPL-2.0 while this repo
+  # is MIT: depending on it is fine, vendoring or patching its sources is not.
+  lightningcss: ^1.32.0
   # optional CSS preprocessors — devDependencies of core/css-parser ONLY, never a dependency of
   # that package or any consuming app
   sass: ^1.101.0
@@ -105,7 +179,7 @@ catalog:
   # Published @symbiote-native/* packages. examples/* left the pnpm workspace (2026-07) to
   # become standalone `npm install`-able apps free of pnpm's blockExoticSubdeps guard — its
   # package.json files now carry literal versions/pkg.pr.new URLs directly, not `catalog:`.
-  # These entries remain for .examples/angular's own css-parser dep and stay in lock-step
+  # These entries remain for examples/angular's own css-parser dep and stay in lock-step
   # with each package's release train; internal cross-package deps between
   # core/adapters/packages stay workspace:* (see .syncpackrc.json).
   '@symbiote-native/react': latest
@@ -116,6 +190,7 @@ catalog:
   '@symbiote-native/css-parser': latest
   '@symbiote-native/slider': latest
   '@symbiote-native/splash-screen': latest
+  '@symbiote-native/sensors': latest
   '@symbiote-native/test-utils': latest
 
   # React Native app toolchain — single-versioned. examples/* left the workspace (see above);
@@ -158,6 +233,88 @@ catalog:
   # permanently in lockstep — see .claude/rules/native-proxy-package-files.md.
   react-native-screens: 4.26.0
   react-native-safe-area-context: ^5.5.2
+  # Exact pins: packages/sensors depends on expo-sensors ONLY for its native ios/android folders
+  # (its JS is hand-ported into our own core, never imported — see the
+  # symbiote-expo-native-module skill and .claude/rules/expo-native-module-packaging.md). A caret
+  # range on expo-sensors could resolve a newer native module than the one our hand-ported core
+  # was written against, silently drifting the two apart the same way the codegen-specs libraries
+  # above do. expo-modules-core is expo-sensors' own peer/runtime and must match the same sdk-57
+  # line (expo-sensors 57.0.2 / expo-modules-core 57.0.5, verified against .vendors/expo at
+  # origin/sdk-57).
+  expo-sensors: 57.0.2
+  expo-modules-core: 57.0.5
+  # Same exact-pin reasoning as expo-sensors above: packages/local-auth depends on
+  # expo-local-authentication only for its native ios/android folders (JS hand-ported into our
+  # own core). Version verified against .vendors/expo at origin/sdk-57 — matches the version
+  # already published to npm (57.0.2), same expo-modules-core 57.0.5 peer/runtime as sensors.
+  expo-local-authentication: 57.0.2
+  # Same exact-pin reasoning again: packages/haptics, packages/clipboard, packages/battery each
+  # depend on their matching expo-* package ONLY for its native ios/android folders (JS
+  # hand-ported into our own core). Versions are the real npm-published `latest` as of 2026-07-28
+  # (registry.npmjs.org, not a guess from the .vendors/expo snapshot, which is pinned to an older
+  # 55.0.8 for these three specific packages) — same expo-modules-core 57.0.5 peer/runtime line.
+  expo-haptics: 57.0.1
+  expo-clipboard: 57.0.1
+  expo-battery: 57.0.1
+  # Same exact-pin reasoning as the trio above: packages/brightness, packages/cellular,
+  # packages/network each depend on their matching expo-* package ONLY for its native
+  # ios/android folders (JS hand-ported into our own core). Versions are the real npm-published
+  # `latest` as of 2026-07-29, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-brightness: 57.0.1
+  expo-cellular: 57.0.1
+  expo-network: 57.0.1
+  # Same exact-pin reasoning as the trio above: packages/application depends on expo-application
+  # ONLY for its native ios/android folders (JS hand-ported into our own core). Version verified
+  # against .vendors/expo at origin/sdk-57 (57.0.2) and matches the real npm-published `latest`
+  # as of 2026-07-29 — no drift between the two.
+  expo-application: 57.0.2
+  # Same exact-pin reasoning as the trio above: packages/device depends on expo-device ONLY for
+  # its native ios/android folders (JS hand-ported into our own core). Version verified against
+  # .vendors/expo at origin/sdk-57 (57.0.1), same expo-modules-core 57.0.5 peer/runtime line.
+  expo-device: 57.0.1
+  # Same exact-pin reasoning as the trio above: packages/crypto depends on expo-crypto ONLY for
+  # its native ios/android folders (JS hand-ported into our own core, skipping the aes/ AES
+  # subfolder — out of scope for this pass). Version verified against .vendors/expo at
+  # origin/sdk-57 (57.0.1), same expo-modules-core 57.0.5 peer/runtime line.
+  expo-crypto: 57.0.1
+  # Same exact-pin reasoning as the trio above — this batch closes out tier-1 of the
+  # symbiote-expo-package-catalog priority queue: packages/localization, packages/keep-awake,
+  # packages/screen-orientation, packages/tracking-transparency, packages/store-review, and
+  # packages/system-ui each depend on their matching expo-* package ONLY for its native
+  # ios/android folders (JS hand-ported into our own core). Versions verified against
+  # .vendors/expo at origin/sdk-57, same expo-modules-core 57.0.5 peer/runtime line.
+  # (expo-standard-web-crypto has no native ios/android folders at all — it delegates entirely
+  # to packages/crypto's own getRandomValues — so it needs no catalog entry here.)
+  expo-localization: 57.0.1
+  expo-keep-awake: 57.0.1
+  expo-screen-orientation: 57.0.1
+  expo-tracking-transparency: 57.0.1
+  expo-store-review: 57.0.1
+  expo-system-ui: 57.0.2
+  # Same exact-pin reasoning again — first of tier-2: packages/secure-store depends on
+  # expo-secure-store ONLY for its native ios/android folders (JS hand-ported into our own core).
+  # Version verified against .vendors/expo at origin/sdk-57 (57.0.1) and matches the real
+  # npm-published `latest`, same expo-modules-core 57.0.5 peer/runtime line.
+  expo-secure-store: 57.0.1
+  # Same exact-pin reasoning, continuing tier-2: packages/sharing, packages/web-browser and
+  # packages/sms each depend on their matching expo-* package ONLY for its native ios/android
+  # folders (JS hand-ported into our own core). Versions verified against .vendors/expo at
+  # origin/sdk-57 and against the real npm-published `latest`, same expo-modules-core 57.0.5
+  # peer/runtime line.
+  expo-sharing: 57.0.8
+  expo-web-browser: 57.0.2
+  expo-sms: 57.0.1
+  # Autolinking CLI only (never resolved via the `expo` package) — each native host app needs
+  # it as a direct devDependency so its Podfile/settings.gradle can `require.resolve` it; see
+  # apps/docs-site's expo-native-module-setup howto. Version verified against .vendors/expo at
+  # origin/sdk-57.
+  expo-modules-autolinking: 57.0.8
+  # react-native's own dependency (react-native/package.json pins "^2.2.4") — already present in
+  # every install via that transitive edge; packages/local-auth just makes its own use of it
+  # (authenticateAsync's promptMessage runtime guard, matching expo-local-authentication's own
+  # upstream code 1:1) an explicit direct dependency instead of relying on the transitive one.
+  invariant: ^2.2.4
+  '@types/invariant': ^2.2.37
   '@babel/core': ^7.25.2
   '@types/babel__core': ^7.20.5
   '@babel/preset-env': ^7.25.3

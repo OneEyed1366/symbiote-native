@@ -1,5 +1,50 @@
 # @symbiote-native/components
 
+## 0.5.0
+
+### Minor Changes
+
+- 3acd869: Add Solid.js as a supported framework: a new `@symbiote-native/solid` adapter reaching full
+  component/runtime parity with the other four adapters, plus a `./solid` export subpath on every
+  companion package. Engine and shared-component packages gained portal/tunnel, retained-tree
+  census, and profiling infrastructure that the new adapter (and the others' portal/tunnel work
+  landing alongside it) build on.
+
+## 0.4.0
+
+### Minor Changes
+
+- 388c353: Correct `Modal`'s `onOrientationChange` signature, which promised a payload it never delivered. The
+  engine registers every `onX` listener as `(event: ISymbioteEvent) => handler(event)`, so a handler
+  always receives the full wrapper. `onShow` / `onRequestClose` / `onDismiss` never noticed because
+  they declare no argument, but `onOrientationChange` was typed against the unwrapped payload - a
+  caller following the type read `event.orientation` and got `undefined` forever, while the value sat
+  at `event.nativeEvent.orientation`.
+
+  The handler is now typed `(event: ISymbioteEvent) => void` on every adapter, matching every other
+  payload-carrying event in the codebase (`onLayout`, `onAccessibilityAction`, the press and scroll
+  handlers), each of which narrows at the read site. `IModalOrientationChangeEvent` stays exported and
+  is now documented as what it truthfully describes: the `nativeEvent` payload shape, not the handler
+  argument.
+
+  Code reading `event.orientation` will now fail to compile rather than silently receive `undefined`.
+  Read `event.nativeEvent.orientation` instead.
+
+  Angular additionally stops normalizing the event into `{ orientation }` - a divergence from the
+  other three adapters that also swallowed the event entirely when the payload was not one of the two
+  values it recognized.
+
+### Patch Changes
+
+- 388c353: Keep sticky headers correct when a cell is force-rendered. `VirtualizedList` can render a cell
+  outside the normal virtualization flow — to satisfy `initialScrollIndex`, or to keep a focused row
+  mounted — and the sticky-header reducer treated those cells as if they had arrived through the
+  usual windowing path. The tracked header index then disagreed with what was actually mounted, and
+  the wrong section header stuck (or none did) until the next ordinary scroll correction.
+
+  The reducer now distinguishes force-rendered cells from windowed ones, and each adapter's
+  `VirtualizedList` reports them as such.
+
 ## 0.3.0
 
 ### Minor Changes

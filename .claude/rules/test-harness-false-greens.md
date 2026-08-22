@@ -1,0 +1,153 @@
+---
+paths:
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.smoke.test.ts'
+---
+
+# Four ways a harness in this repo makes a test pass for the wrong reason
+
+All four were found in real files here, and all four look identical to a passing test. A green run
+proves nothing until you have broken the thing the test guards and watched it fail — that discipline
+is the only reliable detector, and each entry below is a case where it caught a test that had been
+"passing" for a while.
+
+## 1. A module-scoped install plus a per-test reset
+
+`installDeviceEventHub` registers ONCE per module and keeps an `installed` flag. A `beforeEach` that
+does `deviceHub = undefined` therefore does not re-arm anything — it just drops the reference, and
+every `deviceEmit` after the FIRST test silently no-ops. Found 2026-08-18 in
+`adapters/angular/src/components/keyboard-avoiding-view/keyboard-avoiding-view.test.ts`: the
+existing "enabled is false → no inset" test was passing because nothing was ever emitted.
+
+The tell: a suite where only the first emit-driven test could actually fail.
+
+Fix both halves — stop resetting a once-per-module install, and make the emit helper **throw** when
+the hub is missing rather than return quietly. A harness that no-ops on a missing precondition
+converts every downstream assertion into a tautology.
+
+## 2. Asserting off `fabric.created` after a second commit
+
+A created node's props are frozen at its first `createNode`; a clone-on-write supersedes it. Read
+`fabric.committed` whenever the assertion is about state after an update (`symbiote-engine-core` §8).
+Reading `created` makes an update test pass forever.
+
+## 3. Finding the node under test by `viewName`
+
+The committed tree carries container nodes of the same view name, so "the first `RCTView`" is
+usually not your node. Found this session in
+`adapters/solid/src/components/class-resolution.test.tsx`: matching on `viewName` made a `flex`
+assertion pass against a wrapper that happens to carry `flex` — a false green that survived a
+deliberate break. Match on `testID`.
+
+## 4. A guard whose failure is the RUN, not the assertion
+
+The inverse case, worth recognising so it is not "fixed" away. In
+`adapters/solid/src/components/keyboard-avoiding-view.test.tsx`, the test pinning
+`readPrefersCrossFadeTransitions` over the raw engine getter has an assertion that passes EITHER
+way — the value is `false` in both. What fails on the break is vitest itself:
+
+```
+⎯⎯ Unhandled Rejection ⎯⎯
+Error: native getter failed
+      Tests  1 passed | 21 skipped
+     Errors  1 error
+```
+
+The leaked rejection is the guard. When a test's real detector is the runner rather than an
+`expect`, say so in the test comment, or someone later will add a "missing" assertion and delete the
+point.
+
+## 5. A timing THRESHOLD tested behind a helper that burns real time
+
+A constant that gates "how long before X" is invisible to any test that awaits a flush helper first.
+The helper sleeps past the threshold, so the assertion reads the same value whether the constant is
+0 or 130 — the test guards the behaviour but not the number.
+
+Measured TWICE in one day (2026-08-19), on the same constant, through different helpers:
+
+- `core/components` + Solid: flipping `TOUCHABLE_MIN_PRESS_DURATION_MS` 0 -> 130 failed NOTHING
+  across 37 passing tests.
+- React, independently: the same flip failed nothing, because every fade assertion sits behind
+  `await flushFrames()`, which burns enough real time for a 130 ms floor to expire on its own.
+
+Both were found only by deliberately breaking the constant and watching zero tests fail. The fix in
+both cases was a test that fires the whole cycle with NO await in it — press-in and press-out
+back to back — so the threshold is the entire difference between a synchronous and a deferred
+release.
+
+Generalised: when a value is a DURATION, the test that pins it must be the one that does not wait.
+If every test in the file awaits something first, the duration is uncovered no matter how many
+tests there are.
+
+## 6. A verification COMMAND that reports a false green — `prettier --check` through the rtk wrapper
+
+Measured 2026-08-20 during the millionjs merge: `prettier --check` run through this environment's
+`rtk` shell wrapper printed `All files formatted correctly` in the SAME run that emitted `[warn]`
+lines naming dirty files. The wrapper summarizes and the summary contradicts the detail; whichever
+is right, the output cannot be trusted as a gate.
+
+This is the same failure class as the five above, one level out: not a test that passes for the
+wrong reason, but a CHECK that reports success while its own output says otherwise. The habit that
+catches it is the same — read the detail lines, not the summary, and confirm a clean result a
+second way (the prettier Node API, or `--list-different`, which prints paths and nothing else)
+before believing a formatting gate.
+
+Generalised: when a tool's summary line and its detail lines disagree, believe the details. A
+summary is a claim; the details are the measurement.
+
+**And it swallows `console.log` from a vitest run outright.** Found 2026-08-20 while probing Vue's
+Teleport: a probe that printed its findings produced NO output through the wrapper, silently — the
+run looked like it had done nothing. The workaround that works is to have the probe WRITE ITS
+RESULT TO A FILE and read the file afterwards. Worth knowing before concluding a probe found
+nothing: the absence of output is not evidence of an absence of behaviour.
+
+**The same wrapper swallows `tsc` too, and there it is worse — there are no detail lines to read.**
+Measured 2026-08-20 on `examples/solid`: the wrapped `npx tsc --noEmit` printed
+`TypeScript compilation completed` and exited 0, while `rtk proxy npx tsc --noEmit` on the SAME
+tree reported `TS7006` and exit 2. Prettier at least contradicted itself out loud; tsc just looks
+clean. So a typecheck gate is only believable through **`rtk proxy`** — and by extension any gate
+whose whole signal is its exit code.
+
+## The rule this leaves
+
+**Every new test gets broken once.** Change the thing it guards, run it, read the failure message,
+restore. Record the message. A test you could not make fail is either redundant or vacuous — say
+which in the report rather than counting it as coverage. Where a break produces the SAME failure as
+an existing test, pick a scenario that fails differently (a distinct number, a distinct shape), or
+the two tests are one test.
+
+## `fabric.find()` returns a PRE-CLONE node — assert on the live tree, never on a search hit
+
+`core/test-utils/src/fake-fabric.ts:177` — `find(predicate)` runs over `created`, the list of every
+node the fake slot has ever built. Fabric is clone-on-write, so **any prop update produces a new
+node and leaves the old one in that list**. `find` matches the original first and hands it back,
+frozen at its pre-update props.
+
+Measured 2026-08-20 while wiring React's `Activity`: `hideInstance` was firing (proved by
+instrumenting it), the engine was committing `display: 'none'` correctly, and the assertion read
+the stale node and reported the fix as dead. Ten minutes went into the wrong half of the system.
+
+Read the LIVE tree instead — walk `fabric.appRoot().children`, the way `Counter.test.tsx` does via
+`fabric.serialize(fabric.appRoot().children)`:
+
+```ts
+function byTestId(id: string) {
+  const walk = nodes => {
+    for (const node of nodes) {
+      if (node.props.testID === id) return node.props;
+      const hit = walk(node.children);
+      if (hit !== undefined) return hit;
+    }
+  };
+  return walk(fabric.appRoot().children);
+}
+```
+
+`find` is still right for a node you only ever read once, before any update touches it.
+
+### And a prop REMOVED on a clone reads as `null`, not `undefined`
+
+Fabric spells "back to the default" as an explicit `null`, so a correctly-cleared prop fails
+`toBeUndefined()`. Assert `expect(props.x ?? null).toBeNull()` — or the absence of the value you
+care about — not the absence of the key.

@@ -44,18 +44,32 @@ const fabric = installFabric();
 const installed: unknown = globalThis.nativeFabricUIManager;
 if (!isRecord(installed)) throw new Error('fabric slot was not installed');
 
-installed.cloneNodeWithNewProps = (node: IFakeNode, patch: Record<string, unknown>): IFakeNode => ({
+installed.cloneNodeWithNewProps = (
+  node: IFakeNode,
+  patch: Record<string, unknown>,
+): IFakeNode => ({
   ...node,
   props: mergeProps(node.props, patch),
 });
 installed.cloneNodeWithNewChildrenAndProps = (
   node: IFakeNode,
   patch: Record<string, unknown>,
-): IFakeNode => ({ ...node, props: mergeProps(node.props, patch), children: [] });
+): IFakeNode => ({
+  ...node,
+  props: mergeProps(node.props, patch),
+  children: [],
+});
 // Canned geometry, keyed off the node's tag so we can prove the RIGHT node was measured.
 installed.measure = (
   _node: IFakeNode,
-  cb: (x: number, y: number, w: number, h: number, px: number, py: number) => void,
+  cb: (
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    px: number,
+    py: number,
+  ) => void,
 ): void => cb(1, 2, 100, 50, 11, 22);
 installed.measureInWindow = (
   _node: IFakeNode,
@@ -93,17 +107,24 @@ function mountApp(): { box: unknown; anchor: unknown } {
     );
   }
   mount(ROOT_TAG, <App />);
-  if (box == null || anchor == null) throw new Error('host refs handed back nothing');
+  if (box == null || anchor == null)
+    throw new Error('host refs handed back nothing');
   return { box, anchor };
 }
 
-function method(instance: unknown, name: string): (...args: unknown[]) => unknown {
+function method(
+  instance: unknown,
+  name: string,
+): (...args: unknown[]) => unknown {
   const candidate = Reflect.get(Object(instance), name);
-  if (typeof candidate !== 'function') throw new Error(`ref instance has no ${name}() method`);
+  if (typeof candidate !== 'function')
+    throw new Error(`ref instance has no ${name}() method`);
   return (...args: unknown[]) => Reflect.apply(candidate, instance, args);
 }
 
-function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | undefined {
+function findCommitted(
+  predicate: (node: IFakeNode) => boolean,
+): IFakeNode | undefined {
   function walk(node: IFakeNode): IFakeNode | undefined {
     if (predicate(node)) return node;
     for (const child of node.children) {
@@ -120,55 +141,91 @@ function findCommitted(predicate: (node: IFakeNode) => boolean): IFakeNode | und
 }
 
 describe('React imperative host-component ref API', () => {
-  it('delivers measure (x, y, width, height, pageX, pageY)', () => {
-    const { box } = mountApp();
-    let seen = '';
-    method(
-      box,
-      'measure',
-    )((x: number, y: number, w: number, h: number, px: number, py: number) => {
-      seen = `${x},${y},${w},${h},${px},${py}`;
+  // Positive only: every method here reads geometry off an already-mounted, already-measured
+  // node — there is no invalid-ref / not-yet-mounted branch exercised by this file (that would
+  // be a separate unmounted-ref scenario, not covered here — see the report).
+  describe('Positive', () => {
+    // why: `measure` must key off the box's OWN current Fabric handle and hand back the exact
+    // 6-tuple libraries like reanimated read positionally — a wrong node or a shuffled arg order
+    // both fail silently on device.
+    it('delivers measure (x, y, width, height, pageX, pageY)', () => {
+      const { box } = mountApp();
+      let seen = '';
+      method(
+        box,
+        'measure',
+      )(
+        (
+          x: number,
+          y: number,
+          w: number,
+          h: number,
+          px: number,
+          py: number,
+        ) => {
+          seen = `${x},${y},${w},${h},${px},${py}`;
+        },
+      );
+      expect(seen).toBe('1,2,100,50,11,22');
     });
-    expect(seen).toBe('1,2,100,50,11,22');
-  });
 
-  it('delivers measureInWindow (x, y, width, height)', () => {
-    const { box } = mountApp();
-    let seen = '';
-    method(
-      box,
-      'measureInWindow',
-    )((x: number, y: number, w: number, h: number) => {
-      seen = `${x},${y},${w},${h}`;
+    // why: measureInWindow is a DIFFERENT 4-arg shape (no relative pageX/pageY) than measure's
+    // 6-arg one — proves the ref wires it to its own slot method, not a truncated `measure`.
+    it('delivers measureInWindow (x, y, width, height)', () => {
+      const { box } = mountApp();
+      let seen = '';
+      method(
+        box,
+        'measureInWindow',
+      )((x: number, y: number, w: number, h: number) => {
+        seen = `${x},${y},${w},${h}`;
+      });
+      expect(seen).toBe('11,22,100,50');
     });
-    expect(seen).toBe('11,22,100,50');
-  });
 
-  it('delivers measureLayout(relative, onSuccess) measured against the anchor', () => {
-    const { box, anchor } = mountApp();
-    const anchorTag = findNodeHandle(anchor);
-    let seen = '';
-    method(box, 'measureLayout')(anchor, (left: number, top: number, w: number, h: number) => {
-      seen = `${left},${top},${w},${h}`;
+    // why: measureLayout measures relative to a DIFFERENT node's handle (the anchor), not the
+    // box's own — this is the one call that must forward a second ref through to the slot.
+    it('delivers measureLayout(relative, onSuccess) measured against the anchor', () => {
+      const { box, anchor } = mountApp();
+      const anchorTag = findNodeHandle(anchor);
+      let seen = '';
+      method(box, 'measureLayout')(
+        anchor,
+        (left: number, top: number, w: number, h: number) => {
+          seen = `${left},${top},${w},${h}`;
+        },
+      );
+      expect(seen).toBe(`${anchorTag},6,100,50`);
     });
-    expect(seen).toBe(`${anchorTag},6,100,50`);
-  });
 
-  it('resolves findNodeHandle to the reactTag, idempotent on a number, null on null', () => {
-    const { anchor } = mountApp();
-    const anchorTag = findNodeHandle(anchor);
-    expect(typeof anchorTag).toBe('number');
-    expect(findNodeHandle(anchorTag)).toBe(anchorTag);
-    expect(findNodeHandle(null)).toBeNull();
-  });
+    // why: findNodeHandle is the seam third-party libraries use to convert a ref to a plain
+    // reactTag — it must be idempotent on an already-numeric tag (so callers can pass either
+    // shape interchangeably) and return null for null rather than throwing, since a ref can
+    // legitimately be null before mount.
+    it('resolves findNodeHandle to the reactTag, idempotent on a number, null on null', () => {
+      const { anchor } = mountApp();
+      const anchorTag = findNodeHandle(anchor);
+      expect(typeof anchorTag).toBe('number');
+      expect(findNodeHandle(anchorTag)).toBe(anchorTag);
+      expect(findNodeHandle(null)).toBeNull();
+    });
 
-  it('merges a partial setNativeProps style onto the box instead of replacing it', () => {
-    const { box } = mountApp();
-    method(box, 'setNativeProps')({ style: { opacity: 0.25 } });
-    const updated = findCommitted(n => n.viewName === 'RCTView' && n.props.opacity === 0.25);
-    expect(updated, 'setNativeProps re-committed the box with opacity 0.25').toBeDefined();
-    // opacity is added while the declarative width/height survive the merge.
-    expect(updated!.props.width).toBe(50);
-    expect(updated!.props.height).toBe(50);
+    // why: setNativeProps is a PARTIAL update (the reanimated/gesture-handler fast path) — it
+    // must merge onto the node's committed props, not replace them, or every declarative style
+    // not named in the patch would vanish on the next native-driven frame.
+    it('merges a partial setNativeProps style onto the box instead of replacing it', () => {
+      const { box } = mountApp();
+      method(box, 'setNativeProps')({ style: { opacity: 0.25 } });
+      const updated = findCommitted(
+        n => n.viewName === 'RCTView' && n.props.opacity === 0.25,
+      );
+      expect(
+        updated,
+        'setNativeProps re-committed the box with opacity 0.25',
+      ).toBeDefined();
+      // opacity is added while the declarative width/height survive the merge.
+      expect(updated!.props.width).toBe(50);
+      expect(updated!.props.height).toBe(50);
+    });
   });
 });

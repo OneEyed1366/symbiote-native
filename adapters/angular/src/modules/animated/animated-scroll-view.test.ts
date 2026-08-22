@@ -15,6 +15,15 @@
 // The fake Fabric harness doesn't simulate Android's real view-flattening or touch dispatch, so
 // these tests only prove the structural/prop invariants that prevent both bugs, not the
 // on-device symptoms themselves — those still need a real Android host.
+//
+// Scope note (Mode B sweep): this is a deliberately NARROW regression-fence file, not a full
+// coverage dictionary of AnimatedScrollView/AnimatedComponentBase — mirrors angular-gaps.test.ts's
+// own stated scope. The broader AnimatedScrollView/AnimatedComponentBase surface (value-driven
+// prop flushing, whenCommitted binding, leaf swap-on-rerender, native Animated.event attach) is
+// the shared AnimatedLeafBinder's contract, covered in isolation by
+// ../animated-leaf-binder.test.ts — not duplicated here. No Negative group: every test below
+// asserts a structural/prop invariant on successful mount, and there is no throwing path in
+// AnimatedScrollView's own template/prop-resolution code to assert against.
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -25,7 +34,8 @@ import { AnimatedScrollView } from './create-animated-component';
 const ROOT_TAG = 927;
 const OVERRIDE_ROOT_TAG = 928;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 class AnimatedScrollViewApp {}
 Component({
@@ -61,6 +71,10 @@ afterEach(() => {
 });
 
 describe('AnimatedScrollView', () => {
+  // why: bug #1 in the file header — projecting content straight into symbiote-scroll-view
+  // with no wrapper lets Android's Fabric view-flattening hoist multiple children up to be
+  // direct children of the native scroll view, which crashes since it hosts exactly one. The
+  // wrapper + `collapsable: false` is what pins the content view and keeps it un-flattened.
   it('wraps multiple projected children in a single non-collapsable content view', async () => {
     mount(ROOT_TAG, AnimatedScrollViewApp);
     await tick();
@@ -72,7 +86,10 @@ describe('AnimatedScrollView', () => {
     const content = scrollView?.children[0];
     expect(content?.viewName).toBe('RCTScrollContentView');
     expect(content?.props.collapsable).toBe(false);
-    expect(content?.children.map(child => child.props.testID)).toEqual(['a', 'b']);
+    expect(content?.children.map(child => child.props.testID)).toEqual([
+      'a',
+      'b',
+    ]);
   });
 
   // Regression test for a THIRD bug in this same bespoke-template class, this one iOS-only (the
@@ -92,6 +109,10 @@ describe('AnimatedScrollView', () => {
     expect(scrollView?.props.flexDirection).toBe('column');
   });
 
+  // why: the default from bug #2 must be a DEFAULT, not a forced value — an app that
+  // deliberately opts a nested ScrollView OUT of nested scrolling (a real, valid RN use case)
+  // needs its own `animatedProps.nestedScrollEnabled: false` to still win, or the fix for the
+  // missing-default bug would regress into an un-overridable hardcoded `true`.
   it('lets an explicit nestedScrollEnabled in animatedProps override the default', async () => {
     mount(OVERRIDE_ROOT_TAG, AnimatedScrollViewOverrideApp);
     await tick();

@@ -138,13 +138,12 @@ export class AnimatedValue extends AnimatedWithChildren {
     }
   }
 
-  // Own the native-driver "start" handshake end-to-end: make this value native, mint
+  // Owns the native-driver "start" handshake end-to-end: make this value native, mint
   // its tag, hand the curve to the native module, and on completion sync the JS value
-  // (no re-flush to bound leaves' native side; native already moved the view). A
-  // driver (BaseAnimation.startNativeIfNeeded) supplies only what IT owns: the curve
-  // config, its own animation id, its platform bag, and its own end callback, never
-  // touching __makeNative / __getNativeTag / __onNativeUpdate / flushValue directly.
-  // Information Expert: this value is the one object that actually holds those internals.
+  // (no re-flush; native already moved the view). The driver (BaseAnimation.
+  // startNativeIfNeeded) supplies only what it owns - curve config, animation id,
+  // platform bag, end callback - never touching __makeNative / __getNativeTag /
+  // __onNativeUpdate / flushValue directly; those internals live here.
   __startNativeAnimation(
     config: INativeAnimationConfig,
     nativeId: number,
@@ -152,13 +151,18 @@ export class AnimatedValue extends AnimatedWithChildren {
     platformConfig?: IPlatformConfig,
   ): void {
     this.__makeNative(platformConfig);
-    nativeAnimated.startAnimatingNode(nativeId, this.__getNativeTag(), config, result => {
-      onEnd(result.finished);
-      if (result.value !== undefined) {
-        this.__onNativeUpdate(result.value, result.offset);
-        flushValue(this);
-      }
-    });
+    nativeAnimated.startAnimatingNode(
+      nativeId,
+      this.__getNativeTag(),
+      config,
+      result => {
+        onEnd(result.finished);
+        if (result.value !== undefined) {
+          this.__onNativeUpdate(result.value, result.offset);
+          flushValue(this);
+        }
+      },
+    );
   }
 
   override __getNativeConfig(): INativeNodeConfig {
@@ -193,10 +197,19 @@ export class AnimatedValue extends AnimatedWithChildren {
     }
   }
 
-  // Stop any animation and reset to the original value.
+  // Stop any animation and reset to the original value. The native graph keeps its OWN copy of
+  // the value, so a native-driven node has to be told as well - otherwise the reset lands in JS
+  // only and the view stays wherever the animation left it. setValue above pushes for the same
+  // reason; RN pushes here too (Libraries/Animated/nodes/AnimatedValue.js:285).
   resetAnimation(callback?: (value: number) => void): void {
     this.stopAnimation(callback);
     this.value = this.startingValue;
+    if (this.isNative) {
+      nativeAnimated.setAnimatedNodeValue(
+        this.__getNativeTag(),
+        this.startingValue,
+      );
+    }
   }
 
   // Drive this value with an animation. Typically called by Animated.timing /

@@ -77,7 +77,10 @@ export interface ISeparatorProps<ItemT> {
 export interface ISeparators {
   highlight(): void;
   unhighlight(): void;
-  updateProps(select: 'leading' | 'trailing', newProps: Record<string, unknown>): void;
+  updateProps(
+    select: 'leading' | 'trailing',
+    newProps: Record<string, unknown>,
+  ): void;
 }
 
 // A viewable item, as reported to onViewableItemsChanged. Mirrors RN's IViewToken
@@ -123,13 +126,20 @@ export interface IVirtualizedListHandle extends IScrollRoutingHandle {
     viewOffset?: number;
     viewPosition?: number;
   }): void;
-  scrollToItem(params: { item: unknown; animated?: boolean; viewPosition?: number }): void;
+  scrollToItem(params: {
+    item: unknown;
+    animated?: boolean;
+    viewPosition?: number;
+  }): void;
   scrollToEnd(params?: { animated?: boolean }): void;
 }
 
 // nativeEvent payload guards. The payloads arrive as `unknown` off the wire, so they
 // are narrowed with runtime checks rather than cast.
-function readNumber(source: Record<string, unknown>, key: string): number | undefined {
+function readNumber(
+  source: Record<string, unknown>,
+  key: string,
+): number | undefined {
   const value = source[key];
   return typeof value === 'number' ? value : undefined;
 }
@@ -138,9 +148,10 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null ? { ...value } : undefined;
 }
 
-// onScroll -> the offset along the scroll axis. Vertical reads contentOffset.y,
-// horizontal reads contentOffset.x.
-export function readScrollOffset(event: ISymbioteEvent, horizontal: boolean): number | undefined {
+export function readScrollOffset(
+  event: ISymbioteEvent,
+  horizontal: boolean,
+): number | undefined {
   const native = asRecord(event.nativeEvent);
   if (native === undefined) return undefined;
   const offset = asRecord(native.contentOffset);
@@ -148,8 +159,25 @@ export function readScrollOffset(event: ISymbioteEvent, horizontal: boolean): nu
   return readNumber(offset, horizontal ? 'x' : 'y');
 }
 
-// onLayout -> the cross-section length of the box along the scroll axis.
-export function readLayoutLength(event: ISymbioteEvent, horizontal: boolean): number | undefined {
+// The cell's own position inside the scroll content, as the host reported it. Paired with
+// readLayoutLength at the same onLayout: this is the value buildOffsets stores VERBATIM, and it is
+// what lets the table describe where the content actually is rather than where a sum of heights
+// says it should be.
+export function readLayoutOffset(
+  event: ISymbioteEvent,
+  horizontal: boolean,
+): number | undefined {
+  const native = asRecord(event.nativeEvent);
+  if (native === undefined) return undefined;
+  const layout = asRecord(native.layout);
+  if (layout === undefined) return undefined;
+  return readNumber(layout, horizontal ? 'x' : 'y');
+}
+
+export function readLayoutLength(
+  event: ISymbioteEvent,
+  horizontal: boolean,
+): number | undefined {
   const native = asRecord(event.nativeEvent);
   if (native === undefined) return undefined;
   const layout = asRecord(native.layout);
@@ -160,27 +188,61 @@ export function readLayoutLength(event: ISymbioteEvent, horizontal: boolean): nu
 // Resolve every cell offset/length from the cache (or getItemLayout), filling gaps with
 // the running average so an unmeasured tail still has a plausible total. Returns the
 // per-index offset table plus the grand total extent.
+//
+// THE COORDINATE SPACE IS THE HOST'S, NOT A MODEL'S. `measuredOffsets` holds each cell's raw y (x
+// when horizontal) exactly as onLayout reported it — content-container relative, so it carries the
+// container's padding, the list header, and whatever spacer stood above the cell at the time. A
+// measured cell is placed at that value VERBATIM. It is never re-derived from a neighbour, never
+// rebased onto a running sum. This is react-native's ListMetricsAggregator: `getCellMetricsApprox`
+// returns a laid-out cell's real frame untouched and approximates only what has never been seen.
+//
+// That "verbatim" is the whole safety property, and it is not a stylistic preference — it is the
+// fix for the canary going blank mid-scroll (diagnosed on device 2026-08-19). The table is not
+// merely an output: buildListPlan sizes the leading spacer from it, the host lays the window's
+// cells out below that spacer, and their measured y — spacer included — comes straight back in
+// here. It is a closed loop. Combining two measurements arithmetically inside that loop feeds the
+// model's own error back to itself: with a Yoga `gap` on the content container (the canary's .grid
+// has one) a spacer is an extra flex child, so its presence shifts the layout by one more gap than
+// any pure-arithmetic model predicts, and differencing two cells measured either side of that
+// change banks the difference. Measured, at one gap per recompute, unbounded — onScroll fires per
+// frame, so the spacer walks thousands of pixels away from reality within a second of dragging and
+// the window lands nowhere near the viewport. Regression test:
+// core/components/src/state/virtualized-list-feedback.test.ts.
+//
+// Unmeasured cells are the only place an estimate lives, and they advance by the average STRIDE
+// (measured cell-origin to cell-origin) rather than by the average LENGTH. A height is not the
+// distance to the next cell: separators, section gaps and container `gap` all live in between, and
+// sizing an unmeasured region by heights alone leaves it short by exactly that chrome.
+//
+// A fixed getItemLayout skips all of it — authoritative by contract, and its offsets are exact.
 export function buildOffsets(
   count: number,
   measured: Map<number, number>,
+  measuredOffsets: Map<number, number>,
   fixedLayout: ((index: number) => ICellLayout) | undefined,
   averageLength: number,
+  averageStride: number,
 ): { offsets: number[]; lengths: number[]; total: number } {
   const offsets: number[] = new Array<number>(count);
   const lengths: number[] = new Array<number>(count);
-  let running = EMPTY_OFFSET;
+  // What the average stride has left over once the average cell is accounted for: the chrome drawn
+  // BETWEEN two cells. Estimating with this rather than the stride itself keeps a cell whose own
+  // length IS known from being overwritten by an average — the stride is only ever used for the
+  // part nobody measured.
+  const interCellChrome = Math.max(EMPTY_OFFSET, averageStride - averageLength);
+  // Where the next cell goes when its own position has never been reported.
+  let cursor = EMPTY_OFFSET;
   for (let index = FIRST_INDEX; index < count; index += 1) {
-    offsets[index] = running;
-    let length: number;
-    if (fixedLayout !== undefined) {
-      length = fixedLayout(index).length;
-    } else {
-      length = measured.get(index) ?? averageLength;
-    }
-    lengths[index] = length;
-    running += length;
+    const layout = fixedLayout?.(index);
+    const known = layout?.offset ?? measuredOffsets.get(index);
+    offsets[index] = known ?? cursor;
+    lengths[index] = layout?.length ?? measured.get(index) ?? averageLength;
+    cursor = offsets[index] + lengths[index] + interCellChrome;
   }
-  return { offsets, lengths, total: running };
+  const last = count - 1;
+  const total =
+    count > FIRST_INDEX ? offsets[last] + lengths[last] : EMPTY_OFFSET;
+  return { offsets, lengths, total };
 }
 
 // Pick the resident window: every index whose box overlaps
@@ -199,7 +261,10 @@ export function computeWindow(
 
   // Before the viewport is known, paint a bounded prefix.
   if (viewportLength <= EMPTY_OFFSET) {
-    return { first: FIRST_INDEX, last: Math.min(count, initialNumToRender) - 1 };
+    return {
+      first: FIRST_INDEX,
+      last: Math.min(count, initialNumToRender) - 1,
+    };
   }
 
   const overscan = ((windowSize - 1) / 2) * viewportLength;
@@ -243,7 +308,10 @@ export function visiblePercent(
 ): number {
   if (cellLength <= EMPTY_OFFSET) return EMPTY_OFFSET;
   const top = Math.max(cellOffset, scrollOffset);
-  const bottom = Math.min(cellOffset + cellLength, scrollOffset + viewportLength);
+  const bottom = Math.min(
+    cellOffset + cellLength,
+    scrollOffset + viewportLength,
+  );
   const visible = Math.max(EMPTY_OFFSET, bottom - top);
   return (visible / cellLength) * FULLY_VISIBLE_PERCENT;
 }
@@ -252,11 +320,15 @@ export function visiblePercent(
 // itemVisiblePercentThreshold compares against the cell's own size;
 // viewAreaCoveragePercentThreshold compares against the viewport. The former wins when
 // set, else the latter, matching RN's precedence.
-export function isCellViewable(percent: number, config: IViewabilityConfig): boolean {
+export function isCellViewable(
+  percent: number,
+  config: IViewabilityConfig,
+): boolean {
   const itemThreshold = config.itemVisiblePercentThreshold;
   if (itemThreshold !== undefined) return percent >= itemThreshold;
   const areaThreshold =
-    config.viewAreaCoveragePercentThreshold ?? DEFAULT_VIEW_AREA_COVERAGE_PERCENT_THRESHOLD;
+    config.viewAreaCoveragePercentThreshold ??
+    DEFAULT_VIEW_AREA_COVERAGE_PERCENT_THRESHOLD;
   return percent > areaThreshold || percent >= FULLY_VISIBLE_PERCENT;
 }
 
@@ -279,6 +351,29 @@ export function offsetForIndex(
   return Math.max(EMPTY_OFFSET, positioned - viewOffset);
 }
 
+// Two layout readings are the SAME measurement unless they differ by more than this.
+//
+// A relayout does not reproduce a float bit-for-bit: the cell positions are derived from a spacer
+// height that is itself a float, so an onLayout that changed nothing observable still comes back a
+// few ulps off. Compared with ===, every one of those counts as a change — the reducer stores it,
+// the spacer derived from it moves in its last bits, Fabric commits the new value, Yoga relays out,
+// and the fresh onLayout starts the next turn. A loop at frame rate, from a difference no screen
+// can show. Device-measured 2026-08-19: 1203 recomputes over one short drag, its log full of
+// `27.33 -> 27.33 (-0.00)`.
+//
+// The smallest change a host can actually express is one device pixel — a third of a point at @3x —
+// so this sits ~30x below any real move and ~1e11 above the noise.
+export const LAYOUT_EPSILON = 0.01;
+
+// `known` is optional because a first measurement has nothing to settle against, and must count as
+// a change.
+export function isSettledLayout(
+  known: number | undefined,
+  reported: number,
+): boolean {
+  return known !== undefined && Math.abs(known - reported) < LAYOUT_EPSILON;
+}
+
 // Running average of known cell lengths, used to size not-yet-measured cells and the
 // trailing spacer so the total is plausible before full measurement.
 export function averageMeasuredLength(measured: Map<number, number>): number {
@@ -286,6 +381,30 @@ export function averageMeasuredLength(measured: Map<number, number>): number {
   let sum = EMPTY_OFFSET;
   for (const length of measured.values()) sum += length;
   return sum / measured.size;
+}
+
+// Average origin-to-origin distance between two ADJACENT measured cells — the length plus whatever
+// chrome the list draws in the gap (a separator, a section gap, the content container's Yoga
+// `gap`). Only adjacent pairs qualify: across a hole the distance covers cells nobody measured.
+//
+// This is what an unmeasured cell advances by, and it is deliberately not averageMeasuredLength.
+// Sizing an unmeasured region by heights alone makes the model shorter than the content, so the
+// spacer standing in for that region under-reserves and everything below it slides up — the
+// jump-and-return the canary showed before the offsets became host-absolute. Falls back to the
+// length average while no adjacent pair has been measured yet.
+export function averageMeasuredStride(
+  measuredOffsets: Map<number, number>,
+  fallback: number,
+): number {
+  let sum = EMPTY_OFFSET;
+  let pairs = EMPTY_OFFSET;
+  for (const [index, offset] of measuredOffsets) {
+    const next = measuredOffsets.get(index + 1);
+    if (next === undefined) continue;
+    sum += next - offset;
+    pairs += 1;
+  }
+  return pairs === EMPTY_OFFSET ? fallback : sum / pairs;
 }
 
 // The largest index whose length has actually been measured (RN
@@ -320,20 +439,25 @@ export function computeStartReached(
   thresholdMultiplier: number,
 ): { distanceFromStart: number; withinThreshold: boolean } {
   let distanceFromStart = scrollOffset;
-  if (distanceFromStart < ON_EDGE_REACHED_EPSILON) distanceFromStart = EMPTY_OFFSET;
+  if (distanceFromStart < ON_EDGE_REACHED_EPSILON)
+    distanceFromStart = EMPTY_OFFSET;
   const threshold = thresholdMultiplier * viewportLength;
   return { distanceFromStart, withinThreshold: distanceFromStart <= threshold };
 }
 
 // Fold the single-config and pairs forms into one list (RN supports either, not both).
 export function buildViewabilityPairs<ItemT>(
-  onViewableItemsChanged: ((info: IViewableItemsChangedInfo<ItemT>) => void) | undefined,
+  onViewableItemsChanged:
+    ((info: IViewableItemsChangedInfo<ItemT>) => void) | undefined,
   viewabilityConfig: IViewabilityConfig | undefined,
   pairs: IViewabilityConfigCallbackPair<ItemT>[] | undefined,
 ): IViewabilityConfigCallbackPair<ItemT>[] {
   const result: IViewabilityConfigCallbackPair<ItemT>[] = [];
   if (onViewableItemsChanged !== undefined) {
-    result.push({ viewabilityConfig: viewabilityConfig ?? {}, onViewableItemsChanged });
+    result.push({
+      viewabilityConfig: viewabilityConfig ?? {},
+      onViewableItemsChanged,
+    });
   }
   if (pairs !== undefined) result.push(...pairs);
   return result;
@@ -363,7 +487,11 @@ export function computeViewableSet<ItemT>(params: IViewableSetParams<ItemT>): {
 } {
   const tokens: IViewToken<ItemT>[] = [];
   const map = new Map<string, IViewToken<ItemT>>();
-  for (let index = params.first; index <= params.last && index < params.count; index += 1) {
+  for (
+    let index = params.first;
+    index <= params.last && index < params.count;
+    index += 1
+  ) {
     const percent = visiblePercent(
       params.offsets[index],
       params.lengths[index],
@@ -371,10 +499,15 @@ export function computeViewableSet<ItemT>(params: IViewableSetParams<ItemT>): {
       params.viewportLength,
     );
     const item = params.getItem(params.data, index);
-    const key = params.keyExtractor ? params.keyExtractor(item, index) : String(index);
+    const key = params.keyExtractor
+      ? params.keyExtractor(item, index)
+      : String(index);
     let anyViewable = false;
     for (const pair of params.pairs) {
-      if (pair.viewabilityConfig.waitForInteraction === true && !params.hasInteracted) {
+      if (
+        pair.viewabilityConfig.waitForInteraction === true &&
+        !params.hasInteracted
+      ) {
         continue;
       }
       if (isCellViewable(percent, pair.viewabilityConfig)) {
@@ -422,7 +555,9 @@ export function diffViewable<ItemT>(
 
 // The largest configured minimumViewTime across all pairs (RN gates the unified pass on
 // the largest value, since we fold all pairs into one classification).
-export function maxMinimumViewTime<ItemT>(pairs: IViewabilityConfigCallbackPair<ItemT>[]): number {
+export function maxMinimumViewTime<ItemT>(
+  pairs: IViewabilityConfigCallbackPair<ItemT>[],
+): number {
   let max = EMPTY_OFFSET;
   for (const pair of pairs) {
     const configured = pair.viewabilityConfig.minimumViewTime;
@@ -437,12 +572,26 @@ export interface IListCellPlan {
 }
 
 export interface IListPlan {
+  // Space before the very first rendered element: the forced sticky cell when one is
+  // present, else the window's own first cell (the old, only, meaning).
   leadingExtent: number;
+  // Space between the forced sticky cell and the window's first cell. Zero whenever
+  // forcedStickyCell is undefined.
+  gapExtent: number;
   trailingExtent: number;
+  // The in-WINDOW cells only ([first..last]) — unchanged meaning from before forcedStickyCell
+  // existed. Does NOT include forcedStickyCell; render that separately, ahead of these.
   cells: IListCellPlan[];
+  // The nearest sticky index BELOW `first`, force-mounted outside the normal window —
+  // the twin of RN's VirtualizedList._ensureClosestStickyHeader (stock RN keeps a
+  // non-contiguous CellRenderMask region for it). Without this, a pinned section's cell
+  // gets destroyed the moment scrolling carries its origin position out of [first,last],
+  // and recreated from scratch (losing its measured layout) every time the window slides
+  // back over it — the actual cause of a sticky header vanishing/flickering mid-scroll,
+  // not a native-driver issue.
+  forcedStickyCell: IListCellPlan | undefined;
   // Child positions (in the final emitted child array) of the sticky headers that landed
-  // in the window. Accounts for the list header, leading spacer, and the per-gap
-  // separators, so the adapter forwards these straight to the ScrollView.
+  // in the window, INCLUDING forcedStickyCell (counted first, at position 0 or 1) when set.
   stickyChildPositions: number[];
 }
 
@@ -456,34 +605,90 @@ export interface IListPlanParams {
   keyFor: (index: number) => string;
   stickyIndices?: ReadonlySet<number>;
   hasHeader: boolean;
-  hasSeparators: boolean;
 }
 
-// Compute the windowed child PLAN: the two spacer extents, the in-window cells (index +
-// key), and the sticky child positions. The adapter walks this plan and creates the host
-// elements (createElement / h) plus the framework cell content. This is the shared half of
-// the render; only the element creation and the user's renderItem stay per-adapter.
+// Find the nearest sticky index strictly below `first` — the RN _ensureClosestStickyHeader
+// backward walk. Returns NO_INDEX when none exists (no sticky section applies yet, or the
+// applicable one is already inside the window).
+function findClosestStickyIndexBelow(
+  first: number,
+  stickyIndices: ReadonlySet<number>,
+): number {
+  for (let index = first - 1; index >= FIRST_INDEX; index -= 1) {
+    if (stickyIndices.has(index)) return index;
+  }
+  return NO_INDEX;
+}
+
+// Compute the windowed child PLAN: the spacer extents, the in-window cells (index + key),
+// the force-mounted sticky cell (if any) ahead of the window, and the sticky child
+// positions. The adapter walks this plan and creates the host elements (createElement / h)
+// plus the framework cell content. This is the shared half of the render; only the element
+// creation and the user's renderItem stay per-adapter.
 export function buildListPlan(params: IListPlanParams): IListPlan {
   const cells: IListCellPlan[] = [];
-  const leadingExtent = params.first > FIRST_INDEX ? params.offsets[params.first] : EMPTY_OFFSET;
-  const renderedExtent =
-    params.last >= params.first
-      ? params.offsets[params.last] + params.lengths[params.last] - params.offsets[params.first]
+  const closestStickyIndex =
+    params.stickyIndices !== undefined
+      ? findClosestStickyIndexBelow(params.first, params.stickyIndices)
+      : NO_INDEX;
+  const forcedStickyCell: IListCellPlan | undefined =
+    closestStickyIndex === NO_INDEX
+      ? undefined
+      : { index: closestStickyIndex, key: params.keyFor(closestStickyIndex) };
+
+  // A spacer stands in for a contiguous run of cells, so its extent is the distance from the first
+  // of them to the far edge of the last — a difference between two positions the host itself
+  // reported, never a sum of heights. That is what carries the chrome BETWEEN those cells
+  // (separators, section gaps, the container's Yoga `gap`) without the model having to know it
+  // exists, and it is why the spacer lands the following cell exactly where it already was: the
+  // spacer occupies one child slot, precisely as the region it replaces began and ended on a cell
+  // boundary. Summing heights instead under-reserves by the chrome; rebasing onto a running model
+  // re-introduces the feedback loop buildOffsets exists to avoid.
+  const regionExtent = (from: number, to: number): number =>
+    to < from
+      ? EMPTY_OFFSET
+      : params.offsets[to] + params.lengths[to] - params.offsets[from];
+
+  const windowLeadingExtent = regionExtent(FIRST_INDEX, params.first - 1);
+  const leadingExtent =
+    forcedStickyCell === undefined
+      ? windowLeadingExtent
+      : regionExtent(FIRST_INDEX, closestStickyIndex - 1);
+  const gapExtent =
+    forcedStickyCell === undefined
+      ? EMPTY_OFFSET
+      : regionExtent(closestStickyIndex + 1, params.first - 1);
+  const trailingExtent =
+    params.last < params.count - 1
+      ? params.total - params.offsets[params.last + 1]
       : EMPTY_OFFSET;
-  const trailingExtent = params.total - leadingExtent - renderedExtent;
 
   const stickyChildPositions: number[] = [];
   // The header (when present) is child 0; the leading spacer (when non-empty) is the next
-  // child. Each cell is one child; a separator after it (when ItemSeparatorComponent is set
-  // and this is not the last cell) is another.
-  let childPosition = (params.hasHeader ? 1 : 0) + (leadingExtent > EMPTY_OFFSET ? 1 : 0);
+  // child; the forced sticky cell (when present) plus its own gap spacer follow. Each cell is
+  // EXACTLY one child — an ItemSeparatorComponent rides INSIDE the cell's own measuring wrapper
+  // (RN VirtualizedListCellRenderer.js:218-221), so it neither shifts these positions nor shows
+  // up in the geometry as chrome the spacers would have to account for separately.
+  let childPosition =
+    (params.hasHeader ? 1 : 0) + (leadingExtent > EMPTY_OFFSET ? 1 : 0);
+  if (forcedStickyCell !== undefined) {
+    stickyChildPositions.push(childPosition);
+    childPosition += 1 + (gapExtent > EMPTY_OFFSET ? 1 : 0);
+  }
   for (let index = params.first; index <= params.last; index += 1) {
     cells.push({ index, key: params.keyFor(index) });
-    if (params.stickyIndices?.has(index) === true) stickyChildPositions.push(childPosition);
+    if (params.stickyIndices?.has(index) === true)
+      stickyChildPositions.push(childPosition);
     childPosition += 1;
-    if (params.hasSeparators && index < params.last) childPosition += 1;
   }
-  return { leadingExtent, trailingExtent, cells, stickyChildPositions };
+  return {
+    leadingExtent,
+    gapExtent,
+    trailingExtent,
+    cells,
+    forcedStickyCell,
+    stickyChildPositions,
+  };
 }
 
 // maintainVisibleContentPosition JS anchor adjustment (RN getDerivedStateFromProps): native MVCP
@@ -493,7 +698,9 @@ export function buildListPlan(params: IListPlanParams): IListPlan {
 // when the anchor sits within autoscrollToTopThreshold). The adapter owns the timing (layout effect /
 // post-flush watch) and the imperative scroll — this returns only WHAT to do, framework-agnostic.
 export type IMvcpAction =
-  { kind: 'none' } | { kind: 'autoscroll-top' } | { kind: 'shift'; offset: number };
+  | { kind: 'none' }
+  | { kind: 'autoscroll-top' }
+  | { kind: 'shift'; offset: number };
 
 export interface IMvcpAdjustmentParams {
   // undefined when maintainVisibleContentPosition is off; the adapter unwraps the prop.
@@ -513,19 +720,26 @@ export interface IMvcpAdjustmentResult {
   action: IMvcpAction;
 }
 
-export function computeMvcpAdjustment(params: IMvcpAdjustmentParams): IMvcpAdjustmentResult {
+export function computeMvcpAdjustment(
+  params: IMvcpAdjustmentParams,
+): IMvcpAdjustmentResult {
   const { minIndexForVisible, count, keyFor } = params;
   if (minIndexForVisible === undefined || count === FIRST_INDEX) {
     return { firstVisibleKey: null, action: { kind: 'none' } };
   }
-  const newFirstVisibleKey = count > minIndexForVisible ? keyFor(minIndexForVisible) : null;
+  const newFirstVisibleKey =
+    count > minIndexForVisible ? keyFor(minIndexForVisible) : null;
   const prevKey = params.prevFirstVisibleKey;
   const settled: IMvcpAdjustmentResult = {
     firstVisibleKey: newFirstVisibleKey,
     action: { kind: 'none' },
   };
 
-  if (prevKey === null || newFirstVisibleKey === null || prevKey === newFirstVisibleKey) {
+  if (
+    prevKey === null ||
+    newFirstVisibleKey === null ||
+    prevKey === newFirstVisibleKey
+  ) {
     return settled;
   }
 
@@ -549,12 +763,16 @@ export function computeMvcpAdjustment(params: IMvcpAdjustmentParams): IMvcpAdjus
   if (insertedExtent <= EMPTY_OFFSET) return settled;
 
   const autoThreshold = params.autoscrollToTopThreshold;
-  const anchoredNearTop = autoThreshold !== undefined && params.scrollOffset <= autoThreshold;
+  const anchoredNearTop =
+    autoThreshold !== undefined && params.scrollOffset <= autoThreshold;
   if (anchoredNearTop) {
     dlog(
       `VirtualizedList MVCP autoscroll-to-top (offset=${params.scrollOffset} <= ${autoThreshold})`,
     );
-    return { firstVisibleKey: newFirstVisibleKey, action: { kind: 'autoscroll-top' } };
+    return {
+      firstVisibleKey: newFirstVisibleKey,
+      action: { kind: 'autoscroll-top' },
+    };
   }
   dlog(
     `VirtualizedList MVCP adjust +${insertedExtent}px ` +
@@ -598,7 +816,10 @@ export function offsetForEnd(total: number, viewportLength: number): number {
 
 // A gap index addresses a real separator only inside [0, count-2]; outside it there is no gap and
 // the write is a no-op (RN bails on the same bounds).
-export function isSeparatorGapInRange(gapIndex: number, count: number): boolean {
+export function isSeparatorGapInRange(
+  gapIndex: number,
+  count: number,
+): boolean {
   return gapIndex >= FIRST_INDEX && gapIndex <= count - 2;
 }
 
@@ -612,13 +833,17 @@ export function decideEdgeReached(params: {
   total: number;
   sentForContentLength: number;
 }): { shouldFire: boolean; nextSentForContentLength: number } {
-  const { withinThreshold, edgeCellRendered, total, sentForContentLength } = params;
+  const { withinThreshold, edgeCellRendered, total, sentForContentLength } =
+    params;
   if (withinThreshold && edgeCellRendered && sentForContentLength !== total) {
     return { shouldFire: true, nextSentForContentLength: total };
   }
   // Re-arm once out of threshold so the next approach can fire again.
   if (!withinThreshold) {
-    return { shouldFire: false, nextSentForContentLength: NO_CONTENT_LENGTH_SENT };
+    return {
+      shouldFire: false,
+      nextSentForContentLength: NO_CONTENT_LENGTH_SENT,
+    };
   }
   return { shouldFire: false, nextSentForContentLength: sentForContentLength };
 }
@@ -639,7 +864,10 @@ export function resolveStickySectionHeaders(
 export function wrapFixedLayout(
   data: unknown,
   getItemLayout:
-    | ((data: unknown, index: number) => { length: number; offset: number; index: number })
+    | ((
+        data: unknown,
+        index: number,
+      ) => { length: number; offset: number; index: number })
     | undefined,
 ): ((index: number) => ICellLayout) | undefined {
   if (getItemLayout === undefined) return undefined;

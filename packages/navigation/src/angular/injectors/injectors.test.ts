@@ -4,6 +4,15 @@
 // proving the injectors react to the real RNS lifecycle, not to a synthetic shortcut. Each
 // injector calls `inject()`, so it is called once per screen component's own constructor (the
 // natural Angular injection-context call site).
+//
+// This layer is deliberately thin per CLAUDE.md's core/adapter split - the actual focus/blur
+// diffing (diffFocusedRoute) and every router reducer (push/pop/jumpTo/...) already have their
+// own canonical, framework-free coverage in core/navigation-events, core/navigator-state,
+// core/tab-router-state, core/drawer-router-state. What belongs HERE is only: does the injector
+// correctly WIRE itself to a live NavigationContextService/emitter and expose the right signal.
+// getParent() is exercised in nested-navigation.test.ts instead (N/A here) - it only has
+// observable behavior once a REAL nested navigator hierarchy exists to walk up through, which
+// this file's fixtures (all single, un-nested navigators) don't construct.
 
 import '@angular/compiler';
 import {
@@ -15,7 +24,11 @@ import {
   type Type,
 } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/angular';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/angular';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
@@ -54,7 +67,8 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -124,7 +138,9 @@ class NavigationRouteScreenComponent {
   constructor() {
     capturedNavigation = injectNavigation();
     capturedRoute = injectRoute();
-    capturedNavigation.addListener('focus', () => focusListenerEvents.push('focus'));
+    capturedNavigation.addListener('focus', () =>
+      focusListenerEvents.push('focus'),
+    );
   }
 }
 
@@ -138,7 +154,9 @@ let capturedRouteCount: Signal<number> | undefined;
 })
 class NavigationStateScreenComponent {
   constructor() {
-    capturedRouteCount = injectNavigationState((state: INavigatorState) => state.routes.length);
+    capturedRouteCount = injectNavigationState(
+      (state: INavigatorState) => state.routes.length,
+    );
   }
 }
 
@@ -150,8 +168,16 @@ let capturedHost: InjectorsTestHost | undefined;
   imports: [Stack, ScreenDirective],
   template: `
     <Stack #nav initialRouteName="Home">
-      <ng-template symbioteScreen name="Home" [component]="homeComponent"></ng-template>
-      <ng-template symbioteScreen name="Details" [component]="detailsComponent"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Home"
+        [component]="homeComponent"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Details"
+        [component]="detailsComponent"
+      ></ng-template>
     </Stack>
   `,
 })
@@ -202,6 +228,27 @@ describe('Angular navigation injectors', () => {
     expect(focusEffectEvents).toEqual(['effect']);
 
     fabric.fireEvent(home.instanceHandle, 'topDisappear', {});
+    await tick();
+    expect(focusEffectEvents).toEqual(['effect', 'cleanup']);
+  });
+
+  // why: DestroyRef.onDestroy runs its own runCleanup() call independently of the blur listener
+  // (source: injectFocusEffect's destroyRef.onDestroy block) - a screen torn down WHILE still
+  // focused (e.g. its whole navigator unmounts) must still run the effect's cleanup, not leak it
+  // just because no 'blur' event happened to fire first.
+  it('injectFocusEffect runs cleanup on destroy even when torn down without a prior blur', async () => {
+    focusEffectEvents.length = 0;
+    capturedHost = undefined;
+    mount(ROOT_TAG, InjectorsTestHost, {
+      initialProps: { homeComponent: FocusEffectScreenComponent },
+    });
+    await tick();
+    const home = screenNodes()[0];
+    fabric.fireEvent(home.instanceHandle, 'topAppear', {});
+    await tick();
+    expect(focusEffectEvents).toEqual(['effect']);
+
+    unmount(ROOT_TAG);
     await tick();
     expect(focusEffectEvents).toEqual(['effect', 'cleanup']);
   });

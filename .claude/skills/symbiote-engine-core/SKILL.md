@@ -9,8 +9,8 @@ The engine is the shared half every adapter sits on. It does exactly two things:
 it holds a **retained, mutable shadow-tree** of `ISymbioteNode`s that adapters
 mutate cheaply, and it translates that tree into Fabric's **persistent,
 clone-on-write** child sets at commit. The mutable-tree → persistent-mirror
-trick is the R2 core (`.docs/decisions/0010`) and it lives ONCE here, so no
-adapter re-implements persistence (`<clone_on_write_lives_in_engine>`).
+trick is the R2 core and it lives ONCE here, so no adapter re-implements
+persistence (`<clone_on_write_lives_in_engine>`).
 
 If you are writing a renderer seam (React host config, Vue `createRenderer`,
 Angular `Renderer2`), your whole job is to map your framework's node ops onto the
@@ -209,6 +209,41 @@ delete (`<keep_logs_gate_behind_DEBUG>`).
    merge fix here once silently dropped every unrelated prop on a second commit;
    caught only because a test asserted a sibling prop survived one.
 
+## 9. One writer, or none — why a subtree cannot be shared with React's own renderer
+
+Measured facts from the vendored sources (2026-08, RN 0.86 / React 19). Recorded because the
+"can we bolt a block/fast-path optimizer onto STOCK react-native" question keeps coming back;
+the answer for props differs from the answer for structure, and both are provable.
+
+```
+react_clones_from_its_own_reference := {
+  where: ".vendors/react/packages/react-native-renderer/src/ReactFiberConfigFabric.js:451-497",
+  code: "cloneInstance(): const node = instance.node; keepChildren ? cloneNodeWithNewProps(node, payload) : cloneNodeWithNewChildren(node)",
+  consequence: "a SECOND writer's clones are invisible to React - it re-clones from its stale
+    instance.node, and rebuilds children from its own fibers, so a foreign child set is erased",
+  reachable_workaround: "patch fiber.stateNode.node up the whole ancestor chain, both alternates
+    - i.e. reimplement the persistent commit from outside. NOT verified, NOT shippable",
+  why_the_engine_exists: "we drive React in MUTATION mode, so the engine is the single writer and
+    owns every clone - this is the mechanical reason, not a stylistic one",
+}
+setNativeProps_is_a_real_fabric_path := {
+  where: "src/private/webapis/dom/nodes/ReactNativeElement.js:205 -> NativeDOM.setNativeProps",
+  proof_of_support: "RN's own JS-driven Animated uses it per frame on a Fabric instance
+    (src/private/animated/createAnimatedPropsHook.js:168-172)",
+  documented_cost: "the fiber keeps the old props, so any React commit reverts the write; RN
+    resyncs with a forced scheduleUpdate() on a 48ms debounce - '3 frames was the highest value
+    where flickering was not observed' (same file, :178-190)",
+  covers: "props on an existing host node (style/color/transform/opacity)",
+  does_not_cover: "text (a <Text>'s content is a child RawText node - React exposes no ref to it)
+    and any structure (children/list/condition), which hits the clone rule above",
+}
+```
+
+Open, unmeasured: React's SHARE of a frame in our stack. Everything about whether a compiled
+edit-list ("million-style blocks") is worth building hangs on it, and no number exists yet.
+Instruments that give it directly: React's `<Profiler>` `actualDuration` (needs a profiling build
+of React - stripped from release) and the Hermes sampling profiler in React Native DevTools.
+
 ## Reference
 
 - Mutation API + node shape: `core/engine/src/node.ts` (read this first).
@@ -221,7 +256,15 @@ delete (`<keep_logs_gate_behind_DEBUG>`).
 - Public barrel (what `@symbiote-native/engine` exports): `core/engine/src/index.ts`.
 - Reactive-adapter manifestations of §3/§6: the `vue-adapter-reactivity` and
   `angular-adapter` skills. Building a NEW adapter on this API: `symbiote-new-adapter`.
-- Decisions: `.docs/decisions/0010` (incremental clone-on-write), `0002`
-  (adapter seam + shared retained tree).
+- §2's structural-adapter split (`setEventListener` called directly vs routed
+  through `routeProp`) in practice: `angular-adapter-events` (`Renderer2.listen`'s
+  anchor-transparency double-fire cause) and `svelte-adapter-dom-shim` (the
+  custom-element codegen path).
+
+Note: earlier revisions of this skill cited numbered ADRs under `.docs/decisions/`
+(`0010` incremental clone-on-write, `0002` adapter seam + shared retained tree). That
+tree is local-only (`.gitignore`: "hidden folders are local-only") and is NOT present
+in a checkout, so those citations were unreadable. The live sources are the code paths
+above plus the sibling skills; do not re-add an ADR path.
 </content>
 </invoke>

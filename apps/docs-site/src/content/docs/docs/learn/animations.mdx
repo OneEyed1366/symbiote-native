@@ -32,16 +32,13 @@ which framework renders them.
 
     <Animated.View style={{ transform: [{ scale }] }} />;
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
     <script setup lang="ts">
     import { onMounted, onUnmounted } from 'vue';
     import { Animated } from '@symbiote-native/vue';
-
-    // Animated.View has a dot in its name, so it can't be a template tag directly —
-    // alias it to a plain identifier first.
-    const AnimatedView = Animated.View;
 
     const pulse = new Animated.Value(0);
     const heartbeat = Animated.loop(
@@ -54,9 +51,10 @@ which framework renders them.
     </script>
 
     <template>
-      <AnimatedView :style="{ transform: [{ scale }] }" />
+      <Animated.View :style="{ transform: [{ scale }] }" />
     </template>
     ```
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -84,21 +82,60 @@ which framework renders them.
       }
     }
     ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Animated } from '@symbiote-native/svelte';
+
+      const pulse = new Animated.Value(0);
+
+      $effect(() => {
+        const heartbeat = Animated.loop(
+          Animated.timing(pulse, { toValue: 1, duration: 1400, useNativeDriver: true }),
+        );
+        heartbeat.start();
+        return () => heartbeat.stop();
+      });
+
+      const scale = pulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.3, 1] });
+    </script>
+
+    <Animated.View style={{ transform: [{ scale }] }} />
+    ```
+
   </TabItem>
 </Tabs>
 
-<Aside type="caution" title="Two different reasons for one workaround">
-  Vue and Angular both need a plain identifier instead of `Animated.View`, but
-  for different reasons. Vue templates simply can't parse a dotted tag name.
-  Angular's reason is deeper: `ngc`'s AOT partial-mode compiler statically
-  evaluates template type-checking and can't trace a component class through
-  property access on an external, pre-compiled namespace object — only through
-  a direct named import binding. `@symbiote-native/angular` exports `AnimatedView`,
-  `AnimatedText`, `AnimatedImage`, `AnimatedScrollView`, `AnimatedFlatList`,
-  and `AnimatedSectionList` as top-level named symbols for exactly this
-  reason; plain `tsc`/Vitest won't catch a dotted alias slipping through, only
-  a real `ngc` build does.
+<Aside type="caution" title="Angular is the one that needs a named import">
+  Vue and Svelte templates both accept `Animated.View` as a tag: the SFC compiler
+  resolves it off the setup binding, and Svelte 5 compiles it to a component
+  thunk. Write the dotted form there.
+
+Angular cannot. `ngc`'s AOT partial-mode compiler statically evaluates template
+type-checking and can't trace a component class through property access on an
+external, pre-compiled namespace object — only through a direct named import
+binding. `@symbiote-native/angular` exports `AnimatedView`, `AnimatedText`,
+`AnimatedImage`, `AnimatedScrollView`, `AnimatedFlatList`, and
+`AnimatedSectionList` as top-level named symbols for exactly this reason; plain
+`tsc`/Vitest won't catch a dotted reference slipping through, only a real `ngc`
+build does.
+
 </Aside>
+
+## Why not Svelte's `transition:`/`animate:`/`in:`/`out:`?
+
+Those directives — along with `use:`, `class:`, and `style:` — are Svelte's own
+**element**-only directives: the compiler itself rejects them on a component tag
+("This type of directive is not valid on components"), the same as it would for
+any third-party Svelte component library, not just SymbioteNative's. Every
+SymbioteNative primitive (`View`, `Text`, …) is a component reference in app code,
+never a raw DOM element, so `<View transition:fade>` simply doesn't compile — this
+is Svelte's own component/element split, not an adapter limitation. `{@attach fn}`
+is the one directive in that family that _is_ legal on a component, and it's your
+route to the underlying host node when you need it; for animation itself, reach
+for the same `Animated` API and `$effect`-driven lifecycle shown above.
 
 ## JS driver vs native driver
 

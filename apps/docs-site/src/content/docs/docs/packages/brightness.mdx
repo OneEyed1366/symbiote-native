@@ -1,0 +1,462 @@
+---
+title: Brightness
+description: expo-brightness wrapped for every SymbioteNative adapter — screen brightness, Android system-brightness mode, and permissions.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/brightness` wraps [`expo-brightness`](https://docs.expo.dev/versions/latest/sdk/brightness/)
+so every SymbioteNative adapter can read and set the screen brightness. Like [battery](/docs/packages/battery/)
+and [cellular](/docs/packages/cellular/), it's built on `expo-modules-core` — a pure async-function +
+`EventEmitter` surface, no Fabric view involved. Its permission surface (`getPermissionsAsync`/
+`requestPermissionsAsync`) shares the exact same `usePermissions()` hook/composable/service shape as
+`@symbiote-native/cellular`, so switching between the two packages needs no relearning; what's unique to
+brightness is an Android-only system-brightness-mode surface and an iOS-only change listener.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
+
+<Aside
+  type="caution"
+  title="getBrightnessAsync/setBrightnessAsync never round-trip on the iOS Simulator"
+>
+  `UIScreen.main.brightness` is a long-standing Apple Simulator limitation,
+  reproducible in any app including stock Expo Go: `set` is silently a no-op and
+  `get` always returns a constant (observed `1.0`), regardless of what was
+  written. This is not a bug in this wrapper — `BrightnessModule.swift`'s
+  `setBrightnessAsync`/`getBrightnessAsync` are a bare, unstubbed
+  `UIScreen.main.brightness` get/set. Android's emulator has no such gap —
+  `WindowManager.LayoutParams.screenBrightness` runs the same framework code
+  path as a real device, so the value genuinely persists there. Test brightness
+  on a real iPhone to see it actually round-trip on iOS.
+</Aside>
+
+<Aside type="note">
+  The Android system-brightness surface (`getSystemBrightnessAsync`,
+  `setSystemBrightnessAsync`, `restoreSystemBrightnessAsync`,
+  `isUsingSystemBrightnessAsync`, `getSystemBrightnessModeAsync`,
+  `setSystemBrightnessModeAsync`) is Android-only. On every other platform each
+  one either delegates to the plain app-local
+  `getBrightnessAsync`/`setBrightnessAsync`, or resolves a fixed no-op value
+  (`isUsingSystemBrightnessAsync` → `false`, `getSystemBrightnessModeAsync` →
+  `BrightnessMode.UNKNOWN`, `restoreSystemBrightnessAsync` → resolves
+  immediately) — matching upstream's own per-platform branches.
+</Aside>
+
+## Installation
+
+```sh
+npm install @symbiote-native/brightness
+```
+
+`expo-brightness` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project
+(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-brightness`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every other `expo-modules-core` package with zero further
+  native changes. On Android, setting the system-wide brightness additionally
+  needs the `WRITE_SETTINGS` permission declared in your app's
+  `AndroidManifest.xml`.
+</Aside>
+
+## Usage
+
+### Reading and setting brightness
+
+There is no live-value hook for brightness itself (unlike [battery](/docs/packages/battery/)'s
+`useBatteryLevel`) — seed from `getBrightnessAsync()` on mount, then subscribe to
+`addBrightnessListener` for live updates. The listener only ever fires on iOS; on Android the value
+only changes in response to your own `setBrightnessAsync` calls.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useEffect, useState } from 'react';
+    import { Pressable, Text, View } from '@symbiote-native/react';
+    import { addBrightnessListener, getBrightnessAsync, setBrightnessAsync } from '@symbiote-native/brightness';
+
+    export default function BrightnessControl() {
+      const [brightness, setBrightness] = useState<number | null>(null);
+
+      useEffect(() => {
+        getBrightnessAsync().then(setBrightness);
+        const subscription = addBrightnessListener(event => setBrightness(event.brightness));
+        return () => subscription.remove();
+      }, []);
+
+      return (
+        <View>
+          <Text>{brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`}</Text>
+          <Pressable onPress={() => setBrightnessAsync(0.5)}>
+            <Text>Set to 50%</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { onMounted, onUnmounted, ref } from 'vue';
+    import { Pressable, Text, View } from '@symbiote-native/vue';
+    import { addBrightnessListener, getBrightnessAsync, setBrightnessAsync } from '@symbiote-native/brightness';
+    import type { EventSubscription } from '@symbiote-native/brightness';
+
+    const brightness = ref<number | null>(null);
+    let subscription: EventSubscription | undefined;
+
+    onMounted(() => {
+      void getBrightnessAsync().then(value => (brightness.value = value));
+      subscription = addBrightnessListener(event => (brightness.value = event.brightness));
+    });
+
+    onUnmounted(() => subscription?.remove());
+    </script>
+
+    <template>
+      <View>
+        <Text>{{ brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%` }}</Text>
+        <Pressable @press="setBrightnessAsync(0.5)">
+          <Text>Set to 50%</Text>
+        </Pressable>
+      </View>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, OnDestroy, signal } from '@angular/core';
+    import { Pressable, Text, View } from '@symbiote-native/angular';
+    import { addBrightnessListener, getBrightnessAsync, setBrightnessAsync } from '@symbiote-native/brightness';
+    import type { EventSubscription } from '@symbiote-native/brightness';
+
+    @Component({
+      standalone: true,
+      imports: [Pressable, Text, View],
+      template: `
+        <View>
+          <Text>{{ brightness() === null ? 'checking…' : (brightness()! * 100 | number: '1.0-0') + '%' }}</Text>
+          <Pressable (press)="setBrightnessAsync(0.5)">
+            <Text>Set to 50%</Text>
+          </Pressable>
+        </View>
+      `,
+    })
+    export class BrightnessControl implements OnDestroy {
+      readonly brightness = signal<number | null>(null);
+      private readonly subscription: EventSubscription;
+
+      constructor() {
+        getBrightnessAsync().then(value => this.brightness.set(value));
+        this.subscription = addBrightnessListener(event => this.brightness.set(event.brightness));
+      }
+
+      ngOnDestroy(): void {
+        this.subscription.remove();
+      }
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text, View } from '@symbiote-native/svelte';
+      import { addBrightnessListener, getBrightnessAsync, setBrightnessAsync } from '@symbiote-native/brightness';
+      import type { EventSubscription } from '@symbiote-native/brightness';
+
+      let brightness = $state<number | null>(null);
+
+      $effect(() => {
+        getBrightnessAsync().then(value => (brightness = value));
+        const subscription: EventSubscription = addBrightnessListener(event => (brightness = event.brightness));
+        return () => subscription.remove();
+      });
+    </script>
+
+    <View>
+      <Text>{brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`}</Text>
+      <Pressable onPress={() => setBrightnessAsync(0.5)}>
+        <Text>Set to 50%</Text>
+      </Pressable>
+    </View>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal, onCleanup } from 'solid-js';
+    import { Pressable, Text, View } from '@symbiote-native/solid';
+    import { addBrightnessListener, getBrightnessAsync, setBrightnessAsync } from '@symbiote-native/brightness';
+    import type { EventSubscription } from '@symbiote-native/brightness';
+
+    export function BrightnessControl() {
+      const [brightness, setBrightness] = createSignal<number | null>(null);
+
+      getBrightnessAsync().then(setBrightness);
+      const subscription: EventSubscription = addBrightnessListener(event => setBrightness(event.brightness));
+      onCleanup(() => subscription.remove());
+
+      return (
+        <View>
+          <Text>{brightness() === null ? 'checking…' : `${Math.round(brightness()! * 100)}%`}</Text>
+          <Pressable onPress={() => setBrightnessAsync(0.5)}>
+            <Text>Set to 50%</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    ```
+
+    The seed fetch and the subscription both fire directly in the component body, not from
+    `onMount`: a Solid body runs once, so this already happens at construction time. `onCleanup`
+    tears the subscription down when the owner disposes.
+
+  </TabItem>
+</Tabs>
+
+### Permission
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Pressable, Text } from '@symbiote-native/react';
+    import { usePermissions } from '@symbiote-native/brightness/react';
+
+    export default function BrightnessPermission() {
+      const [status, request, get, error] = usePermissions();
+
+      return (
+        <>
+          <Text>{error ? `check failed: ${error.message}` : (status?.status ?? 'checking…')}</Text>
+          <Pressable onPress={() => (error ? get() : request())}>
+            <Text>{error ? 'Retry check' : 'Request permission'}</Text>
+          </Pressable>
+        </>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { usePermissions } from '@symbiote-native/brightness/vue';
+
+    const { status, error, request, get } = usePermissions();
+    </script>
+
+    <template>
+      <Text>{{ error ? `check failed: ${error.message}` : (status?.status ?? 'checking…') }}</Text>
+      <Pressable @press="error ? get() : request()">
+        <Text>{{ error ? 'Retry check' : 'Request permission' }}</Text>
+      </Pressable>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { Pressable, Text } from '@symbiote-native/angular';
+    import { PermissionsService } from '@symbiote-native/brightness/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Pressable, Text],
+      template: `
+        <Text>{{ error() ? 'check failed: ' + error()?.message : (status()?.status ?? 'checking…') }}</Text>
+        <Pressable (press)="error() ? permissions.get() : permissions.request()">
+          <Text>{{ error() ? 'Retry check' : 'Request permission' }}</Text>
+        </Pressable>
+      `,
+    })
+    export class BrightnessPermission {
+      readonly permissions = inject(PermissionsService);
+      readonly status = this.permissions.connect();
+      readonly error = this.permissions.error;
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Pressable, Text } from '@symbiote-native/svelte';
+      import { usePermissions } from '@symbiote-native/brightness/svelte';
+
+      const permissions = usePermissions();
+    </script>
+
+    <Text>
+      {permissions.error
+        ? `check failed: ${permissions.error.message}`
+        : (permissions.status?.status ?? 'checking…')}
+    </Text>
+    <Pressable onPress={() => (permissions.error ? permissions.get() : permissions.request())}>
+      <Text>{permissions.error ? 'Retry check' : 'Request permission'}</Text>
+    </Pressable>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Pressable, Text } from '@symbiote-native/solid';
+    import { createPermissions } from '@symbiote-native/brightness/solid';
+
+    export function BrightnessPermission() {
+      const { status, error, request, get } = createPermissions();
+
+      return (
+        <>
+          <Text>{error() ? `check failed: ${error()!.message}` : (status()?.status ?? 'checking…')}</Text>
+          <Pressable onPress={() => (error() ? get() : request())}>
+            <Text>{error() ? 'Retry check' : 'Request permission'}</Text>
+          </Pressable>
+        </>
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+`status` stays `null` both while the first fetch is in flight and after it fails, so `error` is what
+tells those two apart; `get()` re-runs the check without prompting the user.
+
+## API
+
+### Functions
+
+| Signature                                                           | Description                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isAvailableAsync(): Promise<boolean>`                              | Whether `getBrightnessAsync`/`setBrightnessAsync` exist on the native module                                                                                                                                                                                                                                                     |
+| `getBrightnessAsync(): Promise<number>`                             | Current screen brightness between `0` and `1`, inclusive                                                                                                                                                                                                                                                                         |
+| `setBrightnessAsync(value: number): Promise<void>`                  | Sets the screen brightness (`0`..`1`, clamped); iOS only affects the app while foregrounded, Android persists until changed again                                                                                                                                                                                                |
+| `getSystemBrightnessAsync(): Promise<number>`                       | Gets the system-wide brightness. Delegates to `getBrightnessAsync` on every platform except Android, since iOS has no separate system-level value                                                                                                                                                                                |
+| `setSystemBrightnessAsync(value: number): Promise<void>`            | Sets the system-wide brightness. Delegates to `setBrightnessAsync` on every platform except Android                                                                                                                                                                                                                              |
+| `restoreSystemBrightnessAsync(): Promise<void>`                     | Resets the system brightness to the value it had before this app started controlling it. No-op on every platform except Android                                                                                                                                                                                                  |
+| `isUsingSystemBrightnessAsync(): Promise<boolean>`                  | Whether the activity's window has no brightness override of its own, so the system-wide value is what the screen shows. It cannot distinguish "the app set the system value" from "the app never touched brightness" — it reports only that `setBrightnessAsync` is not overriding this window. Always `false` except on Android |
+| `getSystemBrightnessModeAsync(): Promise<BrightnessMode>`           | Gets the system brightness mode. Always resolves `BrightnessMode.UNKNOWN` except on Android                                                                                                                                                                                                                                      |
+| `setSystemBrightnessModeAsync(mode: BrightnessMode): Promise<void>` | Sets the system brightness mode. No-op except on Android, and also a no-op when passed `BrightnessMode.UNKNOWN`                                                                                                                                                                                                                  |
+| `getPermissionsAsync(): Promise<PermissionResponse>`                | Checks the user's permission for accessing the system brightness                                                                                                                                                                                                                                                                 |
+| `requestPermissionsAsync(): Promise<PermissionResponse>`            | Asks the user for permission to access the system brightness                                                                                                                                                                                                                                                                     |
+| `addBrightnessListener(listener): EventSubscription`                | Subscribes to brightness-change events. Only fires on iOS — never on Android; call `.remove()` on the returned subscription to unsubscribe                                                                                                                                                                                       |
+
+### `usePermissions()`
+
+| React (`/react`) | Vue (`/vue`)     | Angular (`/angular`)           | Svelte (`/svelte`) | Solid (`/solid`)     | Signature | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------- | ---------------- | ------------------------------ | ------------------ | --------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usePermissions` | `usePermissions` | `PermissionsService.connect()` | `usePermissions`   | `createPermissions` | `()`      | React: `[PermissionResponse \| null, request, get, Error \| null]` tuple. Vue: `{ status: Ref<PermissionResponse \| null>, error: Ref<Error \| null>, request, get }`. Angular: `Signal<PermissionResponse \| null>` from `connect()`, plus `error: Signal<Error \| null>` and `request()`/`get()` on the service. Svelte: `{ status, error, request, get }`, `status` and `error` getters over `PermissionResponse \| null` / `Error \| null`. Solid: `{ status: Accessor<PermissionResponse \| null>, error: Accessor<Error \| null>, request, get }` |
+
+### `usePermissions()` return value
+
+| Field     | Type                                | Description                                                                                                                  |
+| --------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `status`  | `PermissionResponse \| null`        | The permission status last read, `null` until the first fetch resolves                                                       |
+| `error`   | `Error \| null`                     | Why the automatic fetch left `status` at `null`. Cleared by the next successful `get()`/`request()`                          |
+| `request` | `() => Promise<PermissionResponse>` | Asks the user for the permission, then updates `status` and clears `error`. Rejects to its caller when the native call fails |
+| `get`     | `() => Promise<PermissionResponse>` | Re-reads the current status without prompting. Same update and rejection behavior as `request`                               |
+
+React hands those back positionally, as `[status, request, get, error]`, so existing two- and
+three-element destructuring keeps working. Vue wraps `status` and `error` in refs; Angular exposes
+`status` through `connect()` and `error` as a separate readonly signal on the service; Svelte
+returns both as getters, read as `permissions.status` / `permissions.error`.
+
+Read together, the two fields separate the three states:
+
+| `status`             | `error` | Meaning                    |
+| -------------------- | ------- | -------------------------- |
+| `null`               | `null`  | Not fetched yet            |
+| `null`               | `Error` | The automatic fetch failed |
+| `PermissionResponse` | `null`  | Fetched                    |
+
+Every variant auto-fetches the current permission status once on mount/`connect()`, and updates
+again whenever `request`/`get` resolves. A failure in that automatic fetch lands in `error` instead
+of escaping as an unhandled rejection; `get()`/`request()` called by hand still reject to their
+caller. Angular's auto-fetch is latched to at most one run per service instance, so a later
+`connect()` never re-fetches: call `get()` to retry.
+
+### `BrightnessMode`
+
+| Member      | Value | Description                                                              |
+| ----------- | ----- | ------------------------------------------------------------------------ |
+| `UNKNOWN`   | `0`   | Returned when the brightness mode cannot be determined                   |
+| `AUTOMATIC` | `1`   | Automatic brightness mode, tracking the ambient light sensor             |
+| `MANUAL`    | `2`   | Manual brightness mode, set by the user or by `setSystemBrightnessAsync` |
+
+### `BrightnessEvent`
+
+| Field        | Type     | Description                                                 |
+| ------------ | -------- | ----------------------------------------------------------- |
+| `brightness` | `number` | The current brightness value between `0` and `1`, inclusive |
+
+## Notes
+
+- **`setSystemBrightnessAsync` switches the device out of adaptive brightness.** Before writing the
+  value, the Android module puts `SCREEN_BRIGHTNESS_MODE` into `MANUAL` — the device stays manual
+  afterwards until something sets the mode back, which is what `setSystemBrightnessModeAsync` is
+  for.
+- **The `WRITE_SETTINGS` grant is re-checked on every system write.** `setSystemBrightnessAsync`
+  and `setSystemBrightnessModeAsync` call `Settings.System.canWrite` each time and throw a
+  permissions exception when it is `false` — a grant revoked after the fact surfaces as a rejected
+  promise, not as a `PermissionResponse`, so keep a `catch` on those two even once
+  `requestPermissionsAsync` has resolved granted.
+- **Android quantizes the system value.** `0`..`1` is mapped onto Android's integer `1`..`255`
+  range on write and back on read, so a written brightness round-trips approximately, never
+  exactly. While the device is in `AUTOMATIC` mode, `getSystemBrightnessAsync` reads the
+  auto-brightness _adjustment_ setting instead, rescaled — not the brightness actually on screen.
+- **`restoreSystemBrightnessAsync` clears an override rather than replaying a saved value.** It
+  puts the activity window's brightness back to `BRIGHTNESS_OVERRIDE_NONE`, handing the screen back
+  to the system setting; nothing this app wrote earlier is restored. The same override is why
+  `getBrightnessAsync` reports the _system_ brightness until your first `setBrightnessAsync` call
+  installs one.
+
+## How the wrapper works
+
+`@symbiote-native/brightness` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-brightness` itself** —
+that package's own JS hard-imports `PermissionResponse`/`PermissionStatus` from the `expo`
+meta-package (which this project never installs), so its functions and types are hand-ported,
+verbatim, into this package's own `core/`, changing only that one import line to pull from
+`expo-modules-core` instead:
+
+```
+packages/brightness/src/
+├── core/                       isAvailableAsync/getBrightnessAsync/setBrightnessAsync + the
+│                                 Android system-brightness surface + getPermissionsAsync/
+│                                 requestPermissionsAsync + addBrightnessListener; native-module.ts
+│                                 resolves the single `ExpoBrightness` native module via
+│                                 expo-modules-core's requireNativeModule
+├── react/hooks/use-permissions   @symbiote-native/brightness/react
+├── vue/composables/use-permissions @symbiote-native/brightness/vue
+├── svelte/runes/use-permissions  @symbiote-native/brightness/svelte
+├── solid/primitives/use-permissions @symbiote-native/brightness/solid
+└── angular/services/permissions.service @symbiote-native/brightness/angular
+```
+
+`usePermissions` is the only stateful surface — auto-fetch on mount, expose `get`/`request` as
+imperative callbacks — written once as a shared pattern and reapplied identically in
+[cellular](/docs/packages/cellular/#usepermissions); every other export is a stateless free
+function, re-exported verbatim by all five adapters. The native code itself is never vendored or
+copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native
+setup guide](/docs/howtos/expo-native-module-setup/)).

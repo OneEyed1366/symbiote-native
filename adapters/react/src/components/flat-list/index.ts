@@ -13,7 +13,11 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { dlog, resolveClassName, type ISymbioteEvent } from '@symbiote-native/engine';
+import {
+  dlog,
+  resolveClassName,
+  type ISymbioteEvent,
+} from '@symbiote-native/engine';
 import {
   SINGLE_COLUMN,
   chunkIntoRows,
@@ -32,7 +36,10 @@ import {
   type IViewableItemsChangedInfo,
   type IVirtualizedListHandle,
 } from '../virtualized-list';
-import type { IAccessibilityProps, IAriaProps } from '@symbiote-native/components';
+import type {
+  IAccessibilityProps,
+  IAriaProps,
+} from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 
 type IRenderItem<ItemT> = (info: {
@@ -147,7 +154,10 @@ export function FlatList<ItemT>(
     typeof columnWrapperStyle === 'string'
       ? resolveClassName(columnWrapperStyle)
       : columnWrapperStyle;
-  const rowStyle: IStyleProp<IViewStyle> = [{ flexDirection: 'row' }, resolvedColumnWrapperStyle];
+  const rowStyle: IStyleProp<IViewStyle> = [
+    { flexDirection: 'row' },
+    resolvedColumnWrapperStyle,
+  ];
 
   const renderRow = (info: {
     item: IRow<ItemT>;
@@ -178,14 +188,17 @@ export function FlatList<ItemT>(
       : undefined;
   const rowViewabilityPairs = viewabilityConfigCallbackPairs?.map(pair => ({
     viewabilityConfig: pair.viewabilityConfig,
-    onViewableItemsChanged: (rowInfo: IViewableItemsChangedInfo<IRow<ItemT>>): void => {
+    onViewableItemsChanged: (
+      rowInfo: IViewableItemsChangedInfo<IRow<ItemT>>,
+    ): void => {
       pair.onViewableItemsChanged(expandRowViewability(rowInfo, keyExtractor));
     },
   }));
 
   // The divider between rows shows real items (last of the row above, first of the row below), so
   // the user's separator, typed on ItemT, sees items rather than the IRow wrapper.
-  const rowSeparatorComponent: ComponentType<ISeparatorProps<IRow<ItemT>>> | undefined =
+  const rowSeparatorComponent:
+    ComponentType<ISeparatorProps<IRow<ItemT>>> | undefined =
     ItemSeparatorComponent === undefined
       ? undefined
       : (rowProps): ReactNode =>

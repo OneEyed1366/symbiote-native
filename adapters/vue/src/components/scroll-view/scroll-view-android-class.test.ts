@@ -6,11 +6,19 @@
 // cause and fix: shared.ts's `layoutSplitStyle` (userStyle merged with the resolved `class`
 // style) now feeds splitLayoutProps instead of userStyle alone. Explicit `.android` import:
 // Vitest has no Metro-style platform-extension resolution, unlike the app build.
+//
+// Unit under test: index.android.ts's `assemble` refreshControl-wrap branch, specifically the
+// `splitLayoutProps(input.layoutSplitStyle)` call that feeds the outer AndroidSwipeRefreshLayout.
+// splitLayoutProps itself (which props count as "layout") is shared @symbiote-native/components
+// logic — not re-asserted here, only that layoutSplitStyle (class+style merged) is what reaches
+// it, not userStyle alone.
+//
+// No Negative group: the class/style merge has no throwing path.
 
 import { defineComponent, h } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '../../render';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { RefreshControl } from '../refresh-control';
 import { ScrollView } from './index.android';
@@ -22,7 +30,8 @@ const ROOT_TAG = 512;
 const REFRESH_WRAPPER_VIEW = 'PullToRefreshView';
 
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -43,64 +52,73 @@ function committedRefreshWrapper(): IFakeNode {
     if (node.viewName === REFRESH_WRAPPER_VIEW) found = node;
   });
   expect(found, `a ${REFRESH_WRAPPER_VIEW} was committed`).toBeDefined();
-  if (found === undefined) throw new Error('unreachable: refresh wrapper missing');
+  if (found === undefined)
+    throw new Error('unreachable: refresh wrapper missing');
   return found;
 }
 
+function mountAndroidScrollView(props: Record<string, unknown>): Promise<void> {
+  mount(
+    ROOT_TAG,
+    defineComponent({
+      setup: () => () =>
+        h(
+          ScrollView,
+          {
+            ...props,
+            refreshControl: h(RefreshControl, { refreshing: false }),
+          },
+          { default: () => [h('symbiote-text')] },
+        ),
+    }),
+  );
+  return tick();
+}
+
 describe('Android ScrollView + RefreshControl class/style split', () => {
-  it('carries a class-derived layout prop onto the refresh wrapper, not just an explicit :style one', async () => {
-    registerStyles({ grow: { flex: 1 } });
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            ScrollView,
-            { class: 'grow', refreshControl: h(RefreshControl, { refreshing: false }) },
-            { default: () => [h('symbiote-text')] },
-          ),
-      }),
-    );
-    await tick();
-    expect(committedRefreshWrapper().props.flex).toBe(1);
-  });
+  describe('Positive (the AndroidSwipeRefreshLayout wrapper always receives the layout style)', () => {
+    it('carries a class-derived layout prop onto the refresh wrapper, not just an explicit :style one', async () => {
+      // why: the bug this file guards — a class-only layout prop (registered via the shared style
+      // registry) is invisible to plain `userStyle`, so before the fix the wrapper never received
+      // it and the whole scroll content collapsed on a real Android device.
+      registerRules([
+        {
+          tokens: ['grow'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { flex: 1 },
+        },
+      ]);
+      await mountAndroidScrollView({ class: 'grow' });
 
-  it('still applies an explicit :style layout prop (no class) onto the wrapper — the pre-fix path', async () => {
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            ScrollView,
-            { style: { flex: 1 }, refreshControl: h(RefreshControl, { refreshing: false }) },
-            { default: () => [h('symbiote-text')] },
-          ),
-      }),
-    );
-    await tick();
-    expect(committedRefreshWrapper().props.flex).toBe(1);
-  });
+      expect(committedRefreshWrapper().props.flex).toBe(1);
+    });
 
-  it('merges class and :style layout props onto the wrapper, explicit :style winning on overlap', async () => {
-    registerStyles({ grow: { flex: 1, height: 100 } });
-    mount(
-      ROOT_TAG,
-      defineComponent({
-        setup: () => () =>
-          h(
-            ScrollView,
-            {
-              class: 'grow',
-              style: { height: 200 },
-              refreshControl: h(RefreshControl, { refreshing: false }),
-            },
-            { default: () => [h('symbiote-text')] },
-          ),
-      }),
-    );
-    await tick();
-    const wrapper = committedRefreshWrapper();
-    expect(wrapper.props.flex).toBe(1);
-    expect(wrapper.props.height).toBe(200);
+    it('still applies an explicit :style layout prop (no class) onto the wrapper — the pre-fix path', async () => {
+      // why: layoutSplitStyle must be additive to the existing :style contract, not a replacement
+      // for it — the pre-fix behavior must keep working.
+      await mountAndroidScrollView({ style: { flex: 1 } });
+
+      expect(committedRefreshWrapper().props.flex).toBe(1);
+    });
+
+    it('merges class and :style layout props onto the wrapper, explicit :style winning on overlap', async () => {
+      // why: RN's own class/inline-style precedence rule — the later, more specific :style value
+      // must win over a class default on the same property, even after the two are merged for the
+      // Android wrap.
+      registerRules([
+        {
+          tokens: ['grow'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { flex: 1, height: 100 },
+        },
+      ]);
+      await mountAndroidScrollView({ class: 'grow', style: { height: 200 } });
+
+      const wrapper = committedRefreshWrapper();
+      expect(wrapper.props.flex).toBe(1);
+      expect(wrapper.props.height).toBe(200);
+    });
   });
 });

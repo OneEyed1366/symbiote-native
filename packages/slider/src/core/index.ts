@@ -22,7 +22,11 @@ export {
 } from './slider-state';
 export type { ISliderAccessibilityState } from './slider-state';
 
-export type { ISliderProps, ISliderPlatform, ISliderViewProps } from './slider-props';
+export type {
+  ISliderProps,
+  ISliderPlatform,
+  ISliderViewProps,
+} from './slider-props';
 
 export {
   renderSlider,
@@ -42,4 +46,7 @@ export {
   THUMB_IMAGE_STYLE,
   STEP_NUMBER_CONTAINER_STYLE,
 } from './render-steps-indicator';
-export type { IStepsIndicatorParams, IStepMarkerProps } from './render-steps-indicator';
+export type {
+  IStepsIndicatorParams,
+  IStepMarkerProps,
+} from './render-steps-indicator';

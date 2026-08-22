@@ -1,6 +1,10 @@
 // Unit test for wave-1 component core logic (ImageBackground / InputAccessoryView / Modal).
 // Exercises the shared render fns + Modal state machine alone; no adapter, no Fabric slot.
 // Ported from the headless `wave1-core.smoke.ts`.
+//
+// No Negative group for the three render fns: each is a pure, total function over its typed
+// props (no guard clause, nothing throws) — every scenario below is Positive. The Modal state
+// machine (modalReducer/shouldRenderModal) is likewise total over its two action kinds.
 
 import { describe, expect, it } from 'vitest';
 import { flattenStyle } from '@symbiote-native/engine';
@@ -8,7 +12,11 @@ import type { IDescriptor, IDescriptorChild } from '../descriptor';
 import { renderImageBackground } from '../view/render-image-background';
 import { renderInputAccessoryView } from '../view/render-input-accessory-view';
 import { renderModal } from '../view/render-modal';
-import { createInitialModalState, modalReducer, shouldRenderModal } from '../state/modal';
+import {
+  createInitialModalState,
+  modalReducer,
+  shouldRenderModal,
+} from '../state/modal';
 
 function asDescriptor(child: IDescriptorChild | undefined): IDescriptor {
   if (child === undefined || typeof child === 'string')
@@ -54,6 +62,20 @@ describe('renderImageBackground', () => {
     expect(image.props.resizeMode).toBe('cover');
     expect(image.props.testID).toBe('bg');
   });
+
+  // why: RN's Image would otherwise collapse to its source's intrinsic size — the proxy exists
+  // ONLY to counter an explicit wrapper dimension; when the wrapper never set one (auto-sized
+  // wrapper), forcing a numeric 0 onto the image would incorrectly shrink it instead of leaving
+  // it free to size from the source.
+  it('leaves the proxied image dimension unset when the wrapper never set an explicit one', () => {
+    const auto = renderImageBackground({
+      image: { source: { uri: 'http://x/bg.png' }, passthrough: {} },
+    });
+    const autoImage = asDescriptor(auto.children[0]);
+    const autoStyle = flattenStyle(autoImage.props.style);
+    expect(autoStyle.width).toBeUndefined();
+    expect(autoStyle.height).toBeUndefined();
+  });
 });
 
 describe('renderInputAccessoryView', () => {
@@ -87,7 +109,10 @@ describe('renderInputAccessoryView', () => {
 
 describe('renderModal', () => {
   it('builds a symbiote-modal host with the default attributes', () => {
-    const root = renderModal({ visible: true, passthrough: { testID: 'm', onShow: () => {} } });
+    const root = renderModal({
+      visible: true,
+      passthrough: { testID: 'm', onShow: () => {} },
+    });
     expect(root.type).toBe('symbiote-modal');
     expect(flattenStyle(root.props.style).position).toBe('absolute');
     expect(root.props.animationType).toBe('none');
@@ -110,14 +135,24 @@ describe('renderModal', () => {
   });
 
   it('flips presentationStyle to overFullScreen and the backdrop to transparent when transparent', () => {
-    const transparent = renderModal({ visible: true, transparent: true, passthrough: {} });
+    const transparent = renderModal({
+      visible: true,
+      transparent: true,
+      passthrough: {},
+    });
     expect(transparent.props.presentationStyle).toBe('overFullScreen');
     const container = asDescriptor(transparent.children[0]);
-    expect(flattenStyle(container.props.style).backgroundColor).toBe('transparent');
+    expect(flattenStyle(container.props.style).backgroundColor).toBe(
+      'transparent',
+    );
   });
 
   it('lets backdropColor override the container background', () => {
-    const tinted = renderModal({ visible: true, backdropColor: '#123456', passthrough: {} });
+    const tinted = renderModal({
+      visible: true,
+      backdropColor: '#123456',
+      passthrough: {},
+    });
     const container = asDescriptor(tinted.children[0]);
     expect(flattenStyle(container.props.style).backgroundColor).toBe('#123456');
   });
@@ -130,6 +165,38 @@ describe('renderModal', () => {
       passthrough: {},
     });
     expect(explicit.props.presentationStyle).toBe('pageSheet');
+  });
+
+  // why: 'none' is only the RN default — an explicit animationType must reach the host node
+  // unchanged, or a caller could never opt into 'slide'/'fade'.
+  it('forwards an explicit animationType over the none default', () => {
+    const sliding = renderModal({
+      visible: true,
+      animationType: 'slide',
+      passthrough: {},
+    });
+    expect(sliding.props.animationType).toBe('slide');
+  });
+
+  // why: RCTModalHostView is one node shared by iOS and Android; every platform-only prop
+  // (supportedOrientations/allowSwipeDismissal on iOS, hardwareAccelerated/*Translucent on
+  // Android) must reach it name-for-name, since core/components has no per-platform branch of
+  // its own here — the native side is what ignores the props it doesn't own.
+  it('name-forwards every iOS and Android platform prop onto the host node', () => {
+    const root = renderModal({
+      visible: true,
+      supportedOrientations: ['portrait', 'landscape'],
+      allowSwipeDismissal: true,
+      hardwareAccelerated: true,
+      statusBarTranslucent: true,
+      navigationBarTranslucent: true,
+      passthrough: {},
+    });
+    expect(root.props.supportedOrientations).toEqual(['portrait', 'landscape']);
+    expect(root.props.allowSwipeDismissal).toBe(true);
+    expect(root.props.hardwareAccelerated).toBe(true);
+    expect(root.props.statusBarTranslucent).toBe(true);
+    expect(root.props.navigationBarTranslucent).toBe(true);
   });
 });
 
@@ -147,7 +214,9 @@ describe('modal keep-alive state machine', () => {
   });
 
   it('re-arms the keep-alive on show and is identity-stable when already shown', () => {
-    const hidden = modalReducer(createInitialModalState(true), { type: 'hide' });
+    const hidden = modalReducer(createInitialModalState(true), {
+      type: 'hide',
+    });
     const shown = modalReducer(hidden, { type: 'show' });
     expect(shown.isRendered).toBe(true);
     expect(modalReducer(shown, { type: 'show' })).toBe(shown);
@@ -157,5 +226,8 @@ describe('modal keep-alive state machine', () => {
     expect(shouldRenderModal(false, { isRendered: false })).toBe(false);
     expect(shouldRenderModal(true, { isRendered: false })).toBe(true);
     expect(shouldRenderModal(false, { isRendered: true })).toBe(true);
+    // The steady-state visible case: both inputs true is the ordinary "shown and still shown"
+    // frame, not just a transitional exit-animation state.
+    expect(shouldRenderModal(true, { isRendered: true })).toBe(true);
   });
 });

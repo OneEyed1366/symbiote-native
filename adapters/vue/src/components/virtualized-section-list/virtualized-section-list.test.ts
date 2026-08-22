@@ -5,8 +5,23 @@
 // scrollToLocation maps (sectionIndex, itemIndex) onto the correct flat offset, landing as the
 // native scrollTo command. Vue reactivity is async, so each driving step is followed by a
 // macrotask `tick`.
+//
+// Unit under test: adapters/vue/src/components/virtualized-section-list/index.ts's lifecycle
+// wiring — dispatching each flattened entry (header/item/footer/section-separator) to the right
+// scoped slot via `renderEntry`, and the handle's `scrollToLocation` delegating to
+// `scrollLocationToFlatIndex` + the inner VirtualizedList's `scrollToIndex`. The flattening
+// itself (`flattenSections`) and the offset math (`scrollLocationToFlatIndex`) are shared
+// @symbiote-native/components logic — asserted here only end-to-end (the right text in the right
+// order, the right scrollTo args), not re-derived independently.
+//
+// No Negative group: the public props have no throwing path.
 
-import { defineComponent, h, ref, type FunctionalComponent } from '@vue/runtime-core';
+import {
+  defineComponent,
+  h,
+  ref,
+  type FunctionalComponent,
+} from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   VirtualizedSectionList,
@@ -18,9 +33,10 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 // VirtualizedSectionList is a generic component (generic construct signature), which h()'s overloads
 // can't resolve. Drive it through a loose functional-component handle (generic-component h() limit).
-const VirtualizedSectionListHost = VirtualizedSectionList as unknown as FunctionalComponent<
-  Record<string, unknown>
->;
+const VirtualizedSectionListHost =
+  VirtualizedSectionList as unknown as FunctionalComponent<
+    Record<string, unknown>
+  >;
 
 type ICommandCall = {
   name: string;
@@ -71,7 +87,8 @@ slot.dispatchCommand = (_node, name, args) => {
   commands.push({ name, args });
 };
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
   fabric.reset();
@@ -102,7 +119,9 @@ function findScrollView(): IFakeNode {
   return node;
 }
 
-function sectionList(extra: Record<string, unknown>): ReturnType<typeof defineComponent> {
+function sectionList(
+  extra: Record<string, unknown>,
+): ReturnType<typeof defineComponent> {
   return defineComponent({
     setup: () => () =>
       h(
@@ -119,13 +138,17 @@ function sectionList(extra: Record<string, unknown>): ReturnType<typeof defineCo
           sectionFooter: ({ section }: { section: ISectionShape }) => [
             h('symbiote-text', {}, `footer:${section.title}`),
           ],
-          item: ({ item }: { item: IRow }) => [h('symbiote-text', {}, item.label)],
+          item: ({ item }: { item: IRow }) => [
+            h('symbiote-text', {}, item.label),
+          ],
         },
       ),
   });
 }
 
-async function mountWithViewport(extra: Record<string, unknown> = {}): Promise<void> {
+async function mountWithViewport(
+  extra: Record<string, unknown> = {},
+): Promise<void> {
   mount(ROOT_TAG, sectionList(extra));
   await tick();
   const scrollView = findScrollView();
@@ -136,44 +159,80 @@ async function mountWithViewport(extra: Record<string, unknown> = {}): Promise<v
 }
 
 describe('Vue VirtualizedSectionList flattens sections into one windowed stream', () => {
-  it('renders every section header, item, and footer', async () => {
-    await mountWithViewport();
-    const texts = collectTexts();
-    for (const want of EXPECTED) {
-      expect(texts).toContain(want);
-    }
-  });
+  describe('Positive (the flattened stream renders in order and scrollToLocation lands correctly)', () => {
+    it('renders every section header, item, and footer', async () => {
+      // why: renderEntry must dispatch EVERY flattened entry kind (header/item/footer) to its
+      // matching scoped slot — a missed kind would silently drop content from the list.
+      await mountWithViewport();
+      const texts = collectTexts();
+      for (const want of EXPECTED) {
+        expect(texts).toContain(want);
+      }
+    });
 
-  it('orders the flattened stream header -> items -> footer per section', async () => {
-    await mountWithViewport();
-    const relevant = collectTexts().filter(text => EXPECTED.includes(text));
-    for (let index = 0; index < EXPECTED.length; index += 1) {
-      expect(relevant[index]).toBe(EXPECTED[index]);
-    }
-  });
+    it('orders the flattened stream header -> items -> footer per section', async () => {
+      // why: RN's own section layering contract — each section's header/items/footer must stay
+      // contiguous and in that order in the flat stream, or VirtualizedList's windowing (which
+      // only understands flat indices) would show the wrong slice for a given scroll offset.
+      await mountWithViewport();
+      const relevant = collectTexts().filter(text => EXPECTED.includes(text));
+      for (let index = 0; index < EXPECTED.length; index += 1) {
+        expect(relevant[index]).toBe(EXPECTED[index]);
+      }
+    });
 
-  it('maps scrollToLocation onto the correct flat offset via scrollTo', async () => {
-    const listRef = ref<IVirtualizedSectionListHandle | null>(null);
-    mount(
-      ROOT_TAG,
-      sectionList({
-        ref: listRef,
-        getItemLayout: (_data: unknown, index: number) => ({
-          length: ITEM_HEIGHT,
-          offset: ITEM_HEIGHT * index,
-          index,
+    it('maps scrollToLocation onto the correct flat offset via scrollTo', async () => {
+      // why: proves the handle's scrollToLocation genuinely resolves a (section, item) pair
+      // through the SAME flat index space the render uses — a mismatch here would scroll to the
+      // wrong section on a real device even though the rendered order (above) looks correct.
+      const listRef = ref<IVirtualizedSectionListHandle | null>(null);
+      mount(
+        ROOT_TAG,
+        sectionList({
+          ref: listRef,
+          getItemLayout: (_data: unknown, index: number) => ({
+            length: ITEM_HEIGHT,
+            offset: ITEM_HEIGHT * index,
+            index,
+          }),
         }),
-      }),
-    );
-    await tick();
+      );
+      await tick();
 
-    expect(listRef.value, 'handle attached').not.toBeNull();
-    // Flattened [h:A,a0,a1,foot:A,h:B,b0,b1,foot:B]: section B's first item lands at flat index 5
-    // -> offset 5 * ITEM_HEIGHT.
-    listRef.value!.scrollToLocation({ sectionIndex: 1, itemIndex: 1, animated: false });
-    const scrolls = commands.filter(c => c.name === 'scrollTo');
-    expect(scrolls.length, 'one scrollTo from scrollToLocation').toBe(1);
-    expect(scrolls[0].args[1]).toBe(5 * ITEM_HEIGHT);
-    expect(scrolls[0].args[2]).toBe(false);
+      expect(listRef.value, 'handle attached').not.toBeNull();
+      // Flattened [h:A,a0,a1,foot:A,h:B,b0,b1,foot:B]: section B's first item lands at flat index 5
+      // -> offset 5 * ITEM_HEIGHT.
+      listRef.value!.scrollToLocation({
+        sectionIndex: 1,
+        itemIndex: 1,
+        animated: false,
+      });
+      const scrolls = commands.filter(c => c.name === 'scrollTo');
+      expect(scrolls.length, 'one scrollTo from scrollToLocation').toBe(1);
+      expect(scrolls[0].args[1]).toBe(5 * ITEM_HEIGHT);
+      expect(scrolls[0].args[2]).toBe(false);
+    });
+
+    it('calls getItemLayout with the sections array, not the flattened entries', async () => {
+      // why: RN hands its inner VirtualizedList `data={this.props.sections}`, so a user's
+      // getItemLayout receives the SECTIONS. Ours streams the flattened entries as `data`, so
+      // without the wrapper the very same callback would be handed a different first argument
+      // here than on RN — silently, since the layout it returns still looks plausible.
+      const seen: unknown[] = [];
+      await mountWithViewport({
+        getItemLayout: (data: unknown, index: number) => {
+          seen.push(data);
+          return { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index };
+        },
+      });
+
+      expect(seen.length, 'getItemLayout was invoked').toBeGreaterThan(0);
+      for (const data of seen) {
+        expect(
+          data,
+          'getItemLayout receives the sections array by identity',
+        ).toBe(SECTIONS);
+      }
+    });
   });
 });

@@ -1,0 +1,32 @@
+/* At-rules. None of these reach a native prop today; the plain rule at the bottom proves the
+   surrounding declarations still survive whatever the at-rule handling does. */
+
+@media (min-width: 600px) {
+  .responsive {
+    padding: 32px;
+  }
+}
+
+@supports (display: grid) {
+  .supported {
+    padding: 24px;
+  }
+}
+
+@keyframes spin {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@font-face {
+  font-family: 'Custom';
+  src: url('custom.ttf');
+}
+
+.after-at-rules {
+  padding: 4px;
+}

@@ -1,19 +1,17 @@
 // Button for Angular. The minimal cross-platform button in RN's iOS shape (Button.js): a
 // TouchableOpacity wrapping a Text. The base text style, the role constant, and the color fold are
-// shared in @symbiote-native/components/view; here Angular only composes its TouchableOpacity + a
-// symbiote-text child and re-maps the few Button-owned props. The Angular twin of the React/Vue
-// adapter's Button. No JS-side platform branch, so this stays a flat single file.
+// shared in @symbiote-native/components/view; Angular only composes its TouchableOpacity + a
+// symbiote-text child and re-maps the few Button-owned props. No JS-side platform branch, so this
+// stays a flat single file.
 //
-// RN's Button fixes accessibilityRole="button", marks the root accessible, and propagates `disabled`
-// into the accessibility state; those three win over any caller value. `title` becomes the Text
-// child; disabled forwards straight; touchSoundDisabled maps to the pressable's android_disableSound.
-// Every OTHER field of the shared IButtonProps (title, color, disabled, touchSoundDisabled, testID,
-// TV-focus, accessibility state) is agnostic and stays RE-EXPORTED from @symbiote-native/components
-// verbatim. onPress and the four accessibility callbacks are the
+// RN's Button fixes accessibilityRole="button", marks the root accessible, and propagates
+// `disabled` into the accessibility state; those three win over any caller value. `title` becomes
+// the Text child; disabled forwards straight; touchSoundDisabled maps to the pressable's
+// android_disableSound. Every other field of the shared IButtonProps stays RE-EXPORTED from
+// @symbiote-native/components verbatim. onPress and the four accessibility callbacks are the
 // exceptions: each is a real @Output() here (`press`, `accessibilityAction`, `accessibilityTap`,
-// `magicTap`, `accessibilityEscape`), mirroring the Vue adapter's Button, which forks the SAME onPress
-// field the same way (`Omit<ICoreButtonProps, 'onPress'>` + a `press` emit) — not a new precedent, the
-// existing one extended to accessibility.
+// `magicTap`, `accessibilityEscape`), mirroring the Vue adapter's Button, which forks the same
+// onPress field the same way — not a new precedent, the existing one extended to accessibility.
 
 import {
   CUSTOM_ELEMENTS_SCHEMA,
@@ -24,6 +22,8 @@ import {
   inject,
   Input,
   Output,
+  signal,
+  type DoCheck,
 } from '@angular/core';
 import {
   BUTTON_ACCESSIBILITY_ROLE,
@@ -33,7 +33,12 @@ import {
   type IAriaProps,
   type IButtonProps as ICoreButtonProps,
 } from '@symbiote-native/components';
-import type { ISymbioteEvent, ITextStyle, IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type {
+  ISymbioteEvent,
+  ITextStyle,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
 import { anchorStyleProp, TextHost } from '../primitives';
 import { TouchableOpacity } from './touchable';
 
@@ -81,8 +86,12 @@ export type IButtonProps = Omit<
       [accessibilityElementsHidden]="accessibilityElementsHidden"
       [accessibilityIgnoresInvertColors]="accessibilityIgnoresInvertColors"
       [accessibilityLanguage]="accessibilityLanguage"
-      [accessibilityRespondsToUserInteraction]="accessibilityRespondsToUserInteraction"
-      [accessibilityShowsLargeContentViewer]="accessibilityShowsLargeContentViewer"
+      [accessibilityRespondsToUserInteraction]="
+        accessibilityRespondsToUserInteraction
+      "
+      [accessibilityShowsLargeContentViewer]="
+        accessibilityShowsLargeContentViewer
+      "
       [accessibilityLargeContentTitle]="accessibilityLargeContentTitle"
       (accessibilityAction)="accessibilityAction.emit($event)"
       (accessibilityTap)="accessibilityTap.emit($event)"
@@ -108,7 +117,7 @@ export type IButtonProps = Omit<
     </TouchableOpacity>
   `,
 })
-export class Button implements IButtonProps {
+export class Button implements IButtonProps, DoCheck {
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
   // onto (see anchorHostStyle's doc comment in primitives/shared.ts) — NOT the inner
   // TouchableOpacity/Pressable one level down. RN's real Button takes no `style` prop, so this
@@ -149,8 +158,10 @@ export class Button implements IButtonProps {
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -187,7 +198,23 @@ export class Button implements IButtonProps {
     return resolveButtonTextStyle(this.color, this.disabled);
   }
 
+  // Polled, not read live: a class toggled after mount reaches the anchor through
+  // addClass/removeClass, which dirties nothing, so a plain getter froze at its creation value.
+  // Button cannot use SymbioteStyleInputDirective instead - RN's Button has no `style` prop, so
+  // there is no `style` @Input for it to hang off.
+  //
+  // ngDoCheck runs during the PARENT's refresh even when this view is skipped; the signal write is
+  // what marks this view. The anchor returns the same props.style reference until a commit changes
+  // it, so Object.is makes an unchanged poll free.
+  private readonly anchorStyleValue = signal<
+    IStyleProp<IViewStyle> | undefined
+  >(undefined);
+
+  ngDoCheck(): void {
+    this.anchorStyleValue.set(anchorStyleProp<IViewStyle>(this.elementRef));
+  }
+
   get anchorStyle(): IStyleProp<IViewStyle> | undefined {
-    return anchorStyleProp<IViewStyle>(this.elementRef);
+    return this.anchorStyleValue();
   }
 }

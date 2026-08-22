@@ -21,4 +21,19 @@ function inlineDebugFlag({ types: t }) {
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
   plugins: [inlineDebugFlag],
+  // @react-native/babel-preset hardcodes its own @babel/plugin-transform-typescript call with no
+  // allowDeclareFields, so `declare context: ContextType<...>` (the official React docs' own class-
+  // component context typing idiom, used by ContextProviderDemo.tsx) throws at build time. Running our
+  // own TS transform first, with the flag on, strips the declare field before the preset's copy sees it.
+  overrides: [
+    {
+      test: /\.tsx?$/,
+      plugins: [
+        [
+          require.resolve('@babel/plugin-transform-typescript'),
+          { isTSX: true, allowNamespaces: true, allowDeclareFields: true },
+        ],
+      ],
+    },
+  ],
 };

@@ -28,9 +28,11 @@
 import {
   CUSTOM_ELEMENTS_SCHEMA,
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   ElementRef,
   EventEmitter,
+  forwardRef,
   inject,
   Input,
   Output,
@@ -40,6 +42,7 @@ import {
   type OnDestroy,
   type SimpleChanges,
 } from '@angular/core';
+import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
 import {
   foldText,
   eventCountFromChange,
@@ -79,15 +82,23 @@ import {
   anchorHostStyle,
   MultilineTextInputHost,
   SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
   TextInputHost,
 } from '../primitives';
 
-export type { ITextInputHandle, ITextInputSelection, IInputMode, IEnterKeyHint, ISubmitBehavior };
+export type {
+  ITextInputHandle,
+  ITextInputSelection,
+  IInputMode,
+  IEnterKeyHint,
+  ISubmitBehavior,
+};
 
 // Mirrors React's ITextInputProps minus nothing (TextInput has no children) — declared
 // per-adapter over the shared accessibility base because Angular's input surface aliases the
 // aria-* keys to camelCase @Inputs, unlike the plain agnostic fields shared across adapters.
-export interface IAngularTextInputProps extends IAccessibilityProps, IAriaProps {
+export interface IAngularTextInputProps
+  extends IAccessibilityProps, IAriaProps {
   value?: string;
   defaultValue?: string;
   placeholder?: string;
@@ -154,9 +165,19 @@ export type IAngularTextInputInputs = Omit<
 @Component({
   selector: 'TextInput',
   standalone: true,
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [SymbioteHostPropsDirective, TextInputHost, MultilineTextInputHost],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => TextInput),
+      multi: true,
+    },
+  ],
   template: `
     @if (isMultiline) {
       <symbiote-text-input-multiline
@@ -196,7 +217,13 @@ export type IAngularTextInputInputs = Omit<
   `,
 })
 export class TextInput
-  implements IAngularTextInputInputs, ITextInputHandle, OnChanges, AfterViewInit, OnDestroy
+  implements
+    IAngularTextInputInputs,
+    ITextInputHandle,
+    OnChanges,
+    AfterViewInit,
+    OnDestroy,
+    ControlValueAccessor
 {
   @Input() value?: string;
   @Input() defaultValue?: string;
@@ -263,8 +290,10 @@ export class TextInput
   @Input() accessibilityValue?: IAccessibilityProps['accessibilityValue'];
   @Input() accessibilityActions?: IAccessibilityProps['accessibilityActions'];
   @Input() accessibilityLabelledBy?: string | string[];
-  @Input() importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
-  @Input() accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
+  @Input()
+  importantForAccessibility?: IAccessibilityProps['importantForAccessibility'];
+  @Input()
+  accessibilityLiveRegion?: IAccessibilityProps['accessibilityLiveRegion'];
   @Input() screenReaderFocusable?: boolean;
   @Input() accessibilityViewIsModal?: boolean;
   @Input() accessibilityElementsHidden?: boolean;
@@ -291,6 +320,9 @@ export class TextInput
   // onto (see anchorHostStyle's doc comment) — NOT `hostRef` above, which targets the real inner
   // symbiote-text-input(-multiline) one level down.
   private readonly elementRef = inject(ElementRef);
+  // Only setDisabledState() needs this: it mutates `editable` from OUTSIDE Angular's own binding
+  // path (@angular/forms calling in directly), which doesn't itself schedule a tick under zoneless CD.
+  private readonly changeDetector = inject(ChangeDetectorRef);
 
   // The count native last acknowledged; the controlled write / clear / setSelection echo it so
   // native's eventLag lands on 0 and the write applies. A plain field (read live by the imperative
@@ -304,6 +336,9 @@ export class TextInput
   // synchronous focus getter (RN's TextInputState holds the same).
   private focused = false;
   private cancelAutoFocus?: () => void;
+  // Mirrors SimpleChange.firstChange for the writeValue() path below (@angular/forms' own initial
+  // write, distinct from ngOnChanges' firstChange, which never fires for a forms-driven write).
+  private isFirstFormWrite = true;
 
   get isMultiline(): boolean {
     return this.multiline === true;
@@ -323,12 +358,42 @@ export class TextInput
   ngOnChanges(changes: SimpleChanges): void {
     const valueChange = changes['value'];
     if (valueChange === undefined) return;
-    // The first value is the seed, not a divergence: record it and do not command.
     if (valueChange.firstChange) {
+      // The initial value already reached native via createNode's hostProps — seed
+      // lastNativeText instead of re-commanding it (see commitControlledValue's own comment on
+      // why a redundant re-push isn't just wasteful — it can race a keystroke).
       this.lastNativeText = foldText(this.value, this.defaultValue);
       return;
     }
     this.commitControlledValue();
+  }
+
+  // ControlValueAccessor — @angular/forms calls these straight into this component, bypassing
+  // template bindings/ngOnChanges entirely. `isFirstFormWrite` mirrors SimpleChange.firstChange:
+  // the initial value already reached native via createNode's hostProps, so it must seed
+  // lastNativeText, not re-command (see commitControlledValue's own comment on why a redundant
+  // re-push isn't just wasteful — it can race a keystroke).
+  writeValue(value: string | null): void {
+    this.value = value ?? undefined;
+    if (this.isFirstFormWrite) {
+      this.isFirstFormWrite = false;
+      this.lastNativeText = foldText(this.value, this.defaultValue);
+      return;
+    }
+    this.commitControlledValue();
+  }
+
+  registerOnChange(fn: (value: string) => void): void {
+    this.valueChange.subscribe(fn);
+  }
+
+  registerOnTouched(fn: () => void): void {
+    this.blurEvent.subscribe(() => fn());
+  }
+
+  setDisabledState(isDisabled: boolean): void {
+    this.editable = !isDisabled;
+    this.changeDetector.markForCheck();
   }
 
   // autoFocus is driven in JS, not as a native prop: once the node is committed, command `focus`
@@ -340,7 +405,9 @@ export class TextInput
     const node = this.hostNode;
     if (node === undefined) return;
     dlog('TextInput autoFocus -> focus command');
-    this.cancelAutoFocus = whenCommitted(node, () => dispatchViewCommand(node, 'focus', []));
+    this.cancelAutoFocus = whenCommitted(node, () =>
+      dispatchViewCommand(node, 'focus', []),
+    );
   }
 
   ngOnDestroy(): void {
@@ -408,7 +475,12 @@ export class TextInput
   clear(): void {
     const node = this.hostNode;
     if (node === undefined) return;
-    dispatchViewCommand(node, 'setTextAndSelection', [this.mostRecentEventCount, '', 0, 0]);
+    dispatchViewCommand(node, 'setTextAndSelection', [
+      this.mostRecentEventCount,
+      '',
+      0,
+      0,
+    ]);
     this.lastNativeText = '';
   }
 
@@ -438,12 +510,20 @@ export class TextInput
     const value = this.value;
     if (!shouldCommandText(this.lastNativeText, value)) return;
     const selStart = this.selection?.start ?? SELECTION_NONE;
-    const selEnd = this.selection?.end ?? this.selection?.start ?? SELECTION_NONE;
+    const selEnd =
+      this.selection?.end ?? this.selection?.start ?? SELECTION_NONE;
     const count = this.mostRecentEventCount;
-    dlog(`TextInput setTextAndSelection count=${count} text=${JSON.stringify(value)}`);
+    dlog(
+      `TextInput setTextAndSelection count=${count} text=${JSON.stringify(value)}`,
+    );
     this.lastNativeText = value;
     whenCommitted(node, () =>
-      dispatchViewCommand(node, 'setTextAndSelection', [count, value, selStart, selEnd]),
+      dispatchViewCommand(node, 'setTextAndSelection', [
+        count,
+        value,
+        selStart,
+        selEnd,
+      ]),
     );
   }
 
@@ -508,8 +588,10 @@ export class TextInput
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       'aria-label': this.ariaLabel,

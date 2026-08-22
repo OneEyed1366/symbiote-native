@@ -28,7 +28,9 @@ function transformDataType(value: unknown): unknown {
 
 // Collect the AnimatedNodes nested directly under a list of transform entries,
 // so __attach can subscribe to each and a value change reaches this node.
-function animatedNodesInTransforms(transforms: readonly ITransformEntry[]): AnimatedNode[] {
+function animatedNodesInTransforms(
+  transforms: readonly ITransformEntry[],
+): AnimatedNode[] {
   const nodes: AnimatedNode[] = [];
   for (const entry of transforms) {
     for (const key of Object.keys(entry)) {
@@ -56,7 +58,10 @@ export class AnimatedTransform extends AnimatedWithChildren {
     return new AnimatedTransform(nodes, entries);
   }
 
-  constructor(nodes: readonly AnimatedNode[], transforms: readonly ITransformEntry[]) {
+  constructor(
+    nodes: readonly AnimatedNode[],
+    transforms: readonly ITransformEntry[],
+  ) {
     super();
     this.nodes = nodes;
     this.transforms = transforms;
@@ -80,7 +85,9 @@ export class AnimatedTransform extends AnimatedWithChildren {
       const result: ITransformEntry = {};
       for (const key of Object.keys(entry)) {
         const value = entry[key];
-        result[key] = isAnimatedNode(value) ? value.__getAnimatedValue() : value;
+        result[key] = isAnimatedNode(value)
+          ? value.__getAnimatedValue()
+          : value;
       }
       return result;
     });
@@ -104,9 +111,17 @@ export class AnimatedTransform extends AnimatedWithChildren {
         const value = entry[key];
         if (isAnimatedNode(value)) {
           // __getNativeTag only: creation is edge-free; the connect is a later phase.
-          transforms.push({ type: 'animated', property: key, nodeTag: value.__getNativeTag() });
+          transforms.push({
+            type: 'animated',
+            property: key,
+            nodeTag: value.__getNativeTag(),
+          });
         } else {
-          transforms.push({ type: 'static', property: key, value: transformDataType(value) });
+          transforms.push({
+            type: 'static',
+            property: key,
+            value: transformDataType(value),
+          });
         }
       }
     }

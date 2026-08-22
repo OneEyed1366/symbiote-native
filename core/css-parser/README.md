@@ -33,31 +33,34 @@ as a regular dependency and re-exports it via its own `./metro-css-parser` subpa
 app's `metro.config.js` wires:
 
 ```js
-// metro-css-transformer.js, in the app
-const { createCssMetroTransformer } = require('@symbiote-native/react/metro-css-parser');
-module.exports = createCssMetroTransformer(require('@react-native/metro-babel-transformer'));
-```
-
-```js
 // metro.config.js
 resolver: { sourceExts: [...defaultSourceExts, 'css', 'scss', 'sass', 'less', 'styl'] },
-transformer: { babelTransformerPath: require.resolve('./metro-css-transformer.js') },
+transformer: { babelTransformerPath: require.resolve('@symbiote-native/react/metro-css-parser') },
 ```
+
+The subpath already calls `createCssMetroTransformer` and exports the finished transformer, so an
+app writes no transformer file of its own — point `babelTransformerPath` straight at it. Reach for
+`createCssMetroTransformer` only when building the subpath for a NEW adapter.
 
 From there, a plain stylesheet import just works, from any adapter's own source file:
 
 ```ts
-import styles from './Card.module.css';   // CSS Modules — default export is a name→scopedName map
-import './theme.css';                     // plain CSS — registers classes globally, no export
+import styles from './Card.module.css'; // CSS Modules — default export is a name→scopedName map
+import './theme.css'; // plain CSS — registers classes globally, no export
 ```
 
 ```tsx
-<View className="card" style={styles.highlight} />   // React
+<View className="card" style={styles.highlight} /> // React
 ```
+
 ```html
 <!-- Vue SFC -->
 <view :class="['card', { active: isActive }]" />
-<style scoped>.card { padding: 10px; }</style>
+<style scoped>
+  .card {
+    padding: 10px;
+  }
+</style>
 ```
 
 ## The pipeline
@@ -67,31 +70,48 @@ import './theme.css';                     // plain CSS — registers classes glo
       │  (build time, Metro)                                       │  (runtime, all adapters)
       ▼                                                             ▼
 @symbiote-native/css-parser                              @symbiote-native/engine's style-registry
-  preprocessors.ts → parser.ts (parseCSS)            registerStyles() / resolveClassName()
+  preprocessors → lightning (compileCssToRules)       registerRules() / resolveClassName()
 ```
 
 A preprocessor source is reduced to plain CSS text first (`compileScss`/`compileSass`/
-`compileLess`/`compileStylus`); `parseCSS()` is the single downstream consumer either way, so every
-mechanism below runs identically regardless of source language.
+`compileLess`/`compileStylus`); `compileCssToRules()` is the single downstream consumer either way,
+so every mechanism below runs identically regardless of source language.
 
 ## API surface
 
 ```ts
 import {
-  parseCSS, extractClassName, kebabToCamel,       // core compiler
-  compileCssFile, isCssModuleFile,                 // standalone .css/.module.css files
-  createCssMetroTransformer,                       // Metro babelTransformerPath factory
-  compileScss, compileSass, compileLess, compileStylus, compile, detectLanguage, isStyleFile,
-  classNamesToDtsSource, generateModuleDts,        // .d.ts generation for CSS Modules typing
-  globalClassNamesIn, hashFilePath,
+  compileCssToRules, // core compiler
+  compileScopedCss, // a scoped <style> block, rules + name map
+  compileCssFile,
+  isCssModuleFile, // standalone .css/.module.css files
+  createCssMetroTransformer, // Metro babelTransformerPath factory
+  compileScss,
+  compileSass,
+  compileLess,
+  compileStylus,
+  compile,
+  detectLanguage,
+  isStyleFile,
+  classNamesToDtsSource,
+  generateModuleDts, // .d.ts generation for CSS Modules typing
+  hashFilePath,
 } from '@symbiote-native/css-parser';
 ```
 
-- **`parseCSS(css, { filename? })`** — the compiler core: postcss AST walk, `var()`/`calc()`
-  resolution, selector → camelCase key (`.card` → `card`, `.btn.primary` → `btnPrimary` compound,
-  `.card .title` → `cardTitle` descendant). A selector containing a pseudo-class (`:hover`, …) is
-  dropped whole — RN has no pseudo-class concept, so there is no partial-application semantics to
-  preserve.
+- **`compileCssToRules(css, { filename, pattern?, remToPx? })`** — the compiler core: one
+  lightningcss pass over the typed AST, resolving `var()`/`calc()` and emitting a `rules` array.
+  Each rule carries the class TOKENS its selector was written with — as authored, never camelCased
+  or collapsed into a single key — plus specificity and source order, so the registry matches by
+  token subset instead of reversing a guess. With a CSS-Modules `pattern` it also returns the
+  authored→renamed `exports` map and `globals`, the tokens lightningcss did NOT rename, which is
+  exactly the set the author put inside `:global(...)`. A selector containing a pseudo-class
+  (`:hover`, …) is dropped whole — RN has no pseudo-class concept, so there is no
+  partial-application semantics to preserve.
+- **`compileScopedCss(css, { filename, pattern })`** — the scoped-block form (a Svelte `<style>`, a
+  Vue `<style scoped>`): the same rules plus the authored→scoped name map its markup rewriter
+  resolves every class token through. Both halves come out of ONE compile, so the style side and
+  the markup side cannot disagree on a name.
 - **`compileCssFile` / `isCssModuleFile`** — the standalone-file form: `Card.module.css`'s classes
   are always scoped to a per-file hash and its default export is the name→scopedName map; a plain
   `.css` file registers globally via a side-effect import.
@@ -121,7 +141,7 @@ import {
 
 ## Related packages
 
-- [`@symbiote-native/engine`](../engine) — owns the runtime `style-registry` (`registerStyles` /
+- [`@symbiote-native/engine`](../engine) — owns the runtime `style-registry` (`registerRules` /
   `resolveClassName`) this package's compiled output resolves against, and the class+style merge
   used by every adapter.
 - [`@symbiote-native/react`](../../adapters/react) / [`@symbiote-native/vue`](../../adapters/vue) /

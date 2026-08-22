@@ -24,24 +24,31 @@
   --chalk: #cbd5e1;
   --chalk-bright: #ffffff;
 
-  /* wayfinding line system — the @symbiote-native/navigation demo suite's signature. Its 9 tour
-     screens (MenuScreen's rows) group into 5 thematic "lines" (which part of the package each one
-     exercises), each carrying its own color through a 2-letter badge, a matching hint tint, and
-     (where a screen's own native header/tab bar takes a tint) the OS chrome itself — replacing the
-     single flat accent every row/button used to share. Kept in sync by hand with
-     navigation-lines.ts's LINE_COLOR (CSS custom properties and that module are different
-     runtimes with no shared import path). */
+  /* wayfinding line system — MenuScreen's tour groups into thematic "lines", each carrying its own
+     color through a 2-letter badge, a matching hint tint, and (where a screen's own native
+     header/tab bar takes a tint) the OS chrome itself — which part of @symbiote-native/navigation
+     a screen exercises. Kept in sync by hand with navigation-lines.ts's LINE_COLOR (CSS custom
+     properties and that module are different runtimes with no shared import path). */
   --line-primitives: #dd0031;
   --line-presentation: #5ec8f2;
   --line-structure: #4fd1a5;
   --line-introspection: #b18cf5;
   --line-routing: #f2789a;
+  /* the only warm hue in the set — the benchmark stop is not a navigation line and should
+     not read as one at a glance. */
+  --line-performance: #f5a524;
+  /* yellow-green, the one wide hue gap the six above leave open — the styling showcase is not
+     a navigation line either, and this reads apart from Structure's mint at badge size. */
+  --line-styling: #a3d94f;
 }
 
-/* shared / common. .section is always the outermost content wrapper directly inside a demo
-   screen's SafeAreaView (never a nested inner group — CanaryScreen's own inner groups use
-   .section-tight instead), so its padding matches CanaryScreen's own root .scroll-content
-   edge padding (24px) without double-padding anything nested. */
+/* shared / common. .section is the outermost content wrapper directly inside a demo screen's
+   SafeAreaView (e.g. DetailsScreen, HooksDemoScreen) — a screen with no ScrollView padding of
+   its own, so .section's own 24px is the sole edge inset. CanaryScreen is different: its
+   ScrollView already carries that same 24px via .scroll-content, so anything nested INSIDE it
+   uses .section-tight (no padding, just the tighter 8px gap) or .section-nested (same 24px
+   top/bottom rhythm + 12px gap as .section, but no left/right — the horizontal inset already
+   comes from .scroll-content) instead of plain .section, which would double it to 48px. */
 .section {
   gap: 12px;
   padding: 24px;
@@ -49,12 +56,25 @@
 .section-tight {
   gap: 8px;
 }
+/* CanaryScreen's own extracted demo components (AnimatedDemo, NativeModulesDemo, …) — see the
+   .section comment above for why this exists instead of reusing .section unmodified. */
+.section-nested {
+  gap: 12px;
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+/* `flex-wrap` because RN, like CSS, defaults to nowrap: a row of three buttons whose titles are
+   long enough ("ping tracked · ping untracked · destroy effect") runs off the right edge and the
+   third one is simply unreachable — no scrollbar, no clipping indicator, nothing to suggest a
+   button is missing. Wrapping is the only behaviour that degrades honestly on a phone width. */
 .row {
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 12px;
 }
 .row-tight {
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 8px;
 }
 /* no hyphen: kebabToCamel only rewrites "-[a-z]", so ".flex-1" would parse to "flex-1"
@@ -278,6 +298,11 @@
   font-size: 18px;
   font-weight: bold;
 }
+.mvcp-divider {
+  height: 8px;
+  margin-left: 14px;
+  background-color: #26304f;
+}
 .mvcp-row {
   padding-top: 10px;
   padding-bottom: 10px;
@@ -448,6 +473,12 @@
 .line-tag-routing {
   background-color: var(--line-routing);
 }
+.line-tag-performance {
+  background-color: var(--line-performance);
+}
+.line-tag-styling {
+  background-color: var(--line-styling);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -492,6 +523,14 @@
   border-left-width: 3px;
   border-left-color: var(--line-routing);
 }
+.menu-row-performance {
+  border-left-width: 3px;
+  border-left-color: var(--line-performance);
+}
+.menu-row-styling {
+  border-left-width: 3px;
+  border-left-color: var(--line-styling);
+}
 
 .menu-badge {
   width: 34px;
@@ -514,6 +553,12 @@
 }
 .menu-badge-routing {
   background-color: var(--line-routing);
+}
+.menu-badge-performance {
+  background-color: var(--line-performance);
+}
+.menu-badge-styling {
+  background-color: var(--line-styling);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -548,4 +593,10 @@
 }
 .menu-row-hint-routing {
   color: var(--line-routing);
+}
+.menu-row-hint-performance {
+  color: var(--line-performance);
+}
+.menu-row-hint-styling {
+  color: var(--line-styling);
 }

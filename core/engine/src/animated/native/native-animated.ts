@@ -12,7 +12,10 @@
 
 import { dlog } from '../../debug';
 import { getNativeModule } from '../../native-modules';
-import { NativeEventEmitter, type IEventSubscription } from '../../native-events';
+import {
+  NativeEventEmitter,
+  type IEventSubscription,
+} from '../../native-events';
 import { isRecord } from '../../type-guards';
 
 // Opaque per-platform tuning bag forwarded into a native node/animation config,
@@ -74,7 +77,11 @@ interface INativeAnimatedSpec {
     eventName: string,
     eventMapping: INativeEventMapping,
   ): void;
-  removeAnimatedEventFromView(viewTag: number, eventName: string, animatedNodeTag: number): void;
+  removeAnimatedEventFromView(
+    viewTag: number,
+    eventName: string,
+    animatedNodeTag: number,
+  ): void;
 }
 
 // iOS bridgeless registers the Turbo variant; the legacy name is the fallback.
@@ -123,14 +130,17 @@ let valueUpdateSubscription: IEventSubscription | undefined;
 
 function ensureValueUpdateSubscription(): void {
   if (valueUpdateSubscription !== undefined) return;
-  valueUpdateSubscription = new NativeEventEmitter().addListener(VALUE_UPDATE_EVENT, payload => {
-    if (!isRecord(payload)) return;
-    const tag = Reflect.get(payload, 'tag');
-    const value = Reflect.get(payload, 'value');
-    if (typeof tag === 'number' && typeof value === 'number') {
-      valueListeners.get(tag)?.(value);
-    }
-  });
+  valueUpdateSubscription = new NativeEventEmitter().addListener(
+    VALUE_UPDATE_EVENT,
+    payload => {
+      if (!isRecord(payload)) return;
+      const tag = Reflect.get(payload, 'tag');
+      const value = Reflect.get(payload, 'value');
+      if (typeof tag === 'number' && typeof value === 'number') {
+        valueListeners.get(tag)?.(value);
+      }
+    },
+  );
 }
 
 // Thin pass-throughs. Calls are issued synchronously in dependency order
@@ -168,13 +178,16 @@ export const nativeAnimated = {
     config: INativeAnimationConfig,
     endCallback: INativeEndCallback,
   ): void {
-    dlog(`native: startAnimatingNode id=${animationId} node=${nodeTag} type=${config.type}`);
+    dlog(
+      `native: startAnimatingNode id=${animationId} node=${nodeTag} type=${config.type}`,
+    );
     module()?.startAnimatingNode(animationId, nodeTag, config, endCallback);
   },
   stopAnimation(animationId: number): void {
     module()?.stopAnimation(animationId);
   },
   setAnimatedNodeValue(nodeTag: number, value: number): void {
+    dlog(`native: setAnimatedNodeValue node=${nodeTag} value=${value}`);
     module()?.setAnimatedNodeValue(nodeTag, value);
   },
   setAnimatedNodeOffset(nodeTag: number, offset: number): void {
@@ -209,10 +222,18 @@ export const nativeAnimated = {
       valueUpdateSubscription = undefined;
     }
   },
-  addAnimatedEventToView(viewTag: number, eventName: string, mapping: INativeEventMapping): void {
+  addAnimatedEventToView(
+    viewTag: number,
+    eventName: string,
+    mapping: INativeEventMapping,
+  ): void {
     module()?.addAnimatedEventToView(viewTag, eventName, mapping);
   },
-  removeAnimatedEventFromView(viewTag: number, eventName: string, animatedNodeTag: number): void {
+  removeAnimatedEventFromView(
+    viewTag: number,
+    eventName: string,
+    animatedNodeTag: number,
+  ): void {
     module()?.removeAnimatedEventFromView(viewTag, eventName, animatedNodeTag);
   },
 };

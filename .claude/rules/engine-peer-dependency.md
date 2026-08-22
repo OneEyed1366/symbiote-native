@@ -26,8 +26,8 @@ even the grafted `measure`/`setNativeProps`/`focus` methods) — confirmed by du
 `Object.getOwnPropertySymbols(node).length` (returned 1: a foreign symbol, not zero).
 
 Inside the pnpm workspace this is invisible — pnpm dedupes `workspace:*` siblings. It only
-surfaces in a standalone `npm install` outside the workspace (`examples/*`, per
-`symbiote-dev-examples`), where every `@symbiote-native/*` dependency is a `pkg.pr.new`
+surfaces in a standalone `npm install` outside the workspace (`examples/*`), where every
+`@symbiote-native/*` dependency can be a `pkg.pr.new`
 COMMIT-PINNED URL, not a semver range. Publishing several packages at different points in the
 same session (a normal canary workflow) pins each one's own `@symbiote-native/engine`
 dependency to whatever canary commit was current AT THAT PUBLISH — three packages published an
@@ -72,3 +72,24 @@ singleton.
 Full incident writeup, the `mobile-mcp` live-repro method (device tap vs. imperative-ref tap
 diverging), and the throwaway `node_modules` diagnostic-patch technique used to confirm it:
 `.changeset/engine-peer-dependency-singleton.md`.
+
+## The `workspace:*` devDependency is not optional bookkeeping — without it nothing commits
+
+The parenthetical above ("plus `workspace:*` under `devDependencies` for local dev/test") reads like
+tidiness. It is load-bearing. A `@symbiote-native/*` peer with no matching devDependency sends pnpm
+to the public registry for a package that only exists in this workspace:
+
+```
+packages/web-browser: ERR_PNPM_FETCH_404
+GET https://registry.npmjs.org/@symbiote-native%2Fsolid: Not Found
+```
+
+`optional: true` in `peerDependenciesMeta` does NOT prevent this — it suppresses auto-install, not
+workspace resolution. And `.husky/pre-commit` runs a dependency-status check that shells out to
+`pnpm install`, so a manifest in this state blocks **every commit in the repo**, not just its own
+package's build. Measured 2026-08-21 while adding `./solid` entries to twelve companion packages.
+
+Add both halves in the same edit, then `pnpm install --lockfile-only` and commit `pnpm-lock.yaml`
+alongside the manifests. `packages/battery/package.json` is the reference shape: every framework it
+declares as a peer also appears in `devDependencies` (`@symbiote-native/<fw>: workspace:*` and the
+framework itself at `catalog:`).

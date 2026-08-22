@@ -1,6 +1,6 @@
 ---
 name: symbiote-parity-check
-description: "Symbiote parity-check workflow — verify a component reaches FULL feature-parity across adapters, the P0 'proven by a parity check' gate. Run it as the LAST phase of symbiote-add-component, or standalone to audit an existing component for drift. React is the REFERENCE surface (M1/M2 done, widest prop-edge coverage). Method: (1) enumerate X's complete surface on React — every prop, event, imperative method, and platform (.ios/.android) branch. (2) prop-by-prop DIFF against X on Vue (and each future adapter); any prop/event/method present on React but missing on the other is a P0 gap, NOT a follow-up. (3) confirm parity is STRUCTURAL — the shared half (reducer + renderX + prop resolution) lives in @symbiote-native/components and both adapters call it, rather than each re-implementing the surface (a hand-copied surface that happens to match today will drift). (4) confirm the agnostic public prop type (ISwitchProps etc.) is RE-EXPORTED from @symbiote-native/components by every adapter, never redeclared. (5) smoke both adapters headless (vitest, ADR 0025) + the co-located component tests. Trigger on parity verification, component audit, 'is X at parity across adapters', or finishing an add-component task."
+description: "Symbiote parity-check workflow — verify a component reaches FULL feature-parity across adapters, the P0 'proven by a parity check' gate. Run it as the LAST phase of symbiote-add-component, or standalone to audit an existing component for drift. React is the REFERENCE surface (M1/M2 done, widest prop-edge coverage). Method: (1) enumerate X's complete surface on React — every prop, event, imperative method, and platform (.ios/.android) branch. (2) prop-by-prop DIFF against X on Vue (and each future adapter); any prop/event/method present on React but missing on the other is a P0 gap, NOT a follow-up. (3) confirm parity is STRUCTURAL — the shared half (reducer + renderX + prop resolution) lives in @symbiote-native/components and both adapters call it, rather than each re-implementing the surface (a hand-copied surface that happens to match today will drift). (4) confirm the agnostic public prop type (ISwitchProps etc.) is RE-EXPORTED from @symbiote-native/components by every adapter, never redeclared. (5) smoke both adapters headless (vitest) + the co-located component tests. Trigger on parity verification, component audit, 'is X at parity across adapters', or finishing an add-component task."
 ---
 
 # Symbiote parity-check — proving full feature-parity
@@ -11,12 +11,37 @@ only when X on Y matches X everywhere else — **proven by a parity check**, not
 asserted. This skill is that check. It is the final phase of
 `symbiote-add-component` and a standalone drift audit.
 
-## 1. React is the reference surface
+## 1. React is the reference surface — for ONE of the two axes
 
 React is the validated, widest adapter (M1/M2 done, the reference prop-edge
-coverage). Parity is always measured **against React**: a prop/event/method that
+coverage). CROSS-ADAPTER parity is always measured **against React**: a prop/event/method that
 React's X exposes and another adapter's X does not is a gap to close, not a
 difference to accept.
+
+**But React is NOT the reference for RN conformance, and treating it as one hides the
+worst class of bug.** Measured 2026-08-19 on the Touchable family: an audit against
+`.vendors/react-native/.../Components/Touchable/*.js` found ten divergences from RN, and
+**nine of them were present in ALL FIVE adapters**. Every cross-adapter check was green
+throughout — five implementations agreed with each other and were uniformly wrong. The
+clearest instance: `DEFAULT_MIN_PRESS_DURATION_MS = 130` is Pressability's own default
+(`Pressability.js:264`), and both `TouchableOpacity.js:195` and `TouchableHighlight.js:203`
+override it with `minPressDuration: 0` — so 130 never applies to that family in RN, yet all
+five adapters applied it.
+
+So there are TWO axes, and only the first is what this skill's diff measures:
+
+```
+cross-adapter   do the five agree with each other?    → React is the reference
+RN conformance  do we agree with what we copied?      → .vendors/react-native is the reference
+```
+
+A component is not done because axis 1 is green. Read the RN source for the component you are
+porting — line by line, not by memory — and record every divergence you find even if you do not
+fix it (see §7).
+
+Corollary for tooling: a cross-adapter tree/output diff CANNOT find an axis-2 bug, because it
+reports five-way agreement as clean. Do not build one for this purpose — it would have been
+silent on nine of the ten findings above.
 
 ## 2. The diff — enumerate, then compare
 
@@ -66,10 +91,134 @@ A per-adapter type (children/ref-bearing: `IViewProps`, `IPressableProps`) is
 expected to be separately declared — that's by design, not a gap
 (`symbiote-file-layout` §4).
 
+## 4b. Barrel parity - the passthrough facade, and the drift it hides
+
+Roughly HALF of every adapter's public surface is names it re-exports verbatim from
+`@symbiote-native/engine` / `@symbiote-native/components`. Measured 2026-08-15:
+
+```
+adapter   total names   of which shared passthrough
+react        201                 89
+vue          226                109
+angular      227                 91
+svelte       223                118
+```
+
+**Keep the facade.** The re-export buys two things. (1) One import root: an app moving off RN
+swaps `'react-native'` for `'@symbiote-native/<fw>'` on one line instead of splitting ~40 names
+across two specifiers it would have to memorise. (2) Freedom to move the implementation -
+`Alert`/`Share`/`Dimensions` used to live inside `@symbiote-native/react` and moved to the engine
+with no app noticing, and the boundary still moves in BOTH directions (`StatusBar` sits in the
+same alphabetical list of "plain utilities" but has a real declarative half in Svelte, an
+`$effect`, and a 3.7K file in Vue).
+
+**One argument for the facade is FALSE, do not repeat it:** it does not hide the engine from the
+app's manifest. `@symbiote-native/engine` is a peerDependency of every adapter and is already a
+direct `dependencies` entry in all five example apps. It hides engine from app CODE only -
+exactly the split `<react_native_is_an_explicit_top_level_peer>` already states for `react-native`.
+
+**What IS redundant: the intermediate stub file.** React/Svelte each kept 16/15
+`src/modules/<name>.ts` stub files whose whole body was `export { X } from '@symbiote-native/engine'`
+— Vue/Angular re-export straight from the barrel and prove the hop unnecessary. Deleted 2026-08-15,
+surface byte-identical (react 201->201, svelte 223->223). Do not reintroduce: passthrough belongs
+in the barrel.
+
+**The drift the facade hides is real and recurring** — a missing re-export is NOT a type error,
+`tsc` is blind to it, surfaces only when an app imports the name and can't find it:
+
+```
+§4b2_missing_reexports_closed := {
+  found: "PanResponder absent from Svelte barrel until 2026-08-12; ratchet test found 22 more",
+  closed: "2026-08-15 — totals react 201->219, vue 226->232, angular 227->248, svelte 223->236",
+  items: [
+    "angular had VALUES but not TYPES (IViewStyle/ITextStyle/IFlex*, IPlatform*, INativeViewConfig*, IAccessibility*, IResponderProps, IPressState) — needed to type a style object/Platform.select spec despite props arriving as @Input()s",
+    "app-entry seam split: setNativeViewConfigSource in all four, setColorProcessor + setDeviceEventSource missing from some — the three travel together",
+    "dlog/isDebug reached only 2 adapters; examples/vue-tsx already imports dlog FROM THE ADAPTER, so on the other three that path did not work at all",
+    "component-detail types at 1-2 barrels only: ICellLayout, ISeparatorProps, ISeparators, IModalOrientationChangeEvent, IPressableAndroidRippleConfig, IEnterKeyHint, IInputMode, ISubmitBehavior, ITextInputSelection, IImageStatics",
+  ],
+}
+```
+
+**Two traps found while closing them, both worth re-reading before the next sweep:**
+
+```
+§4b3_traps_while_closing := {
+  trap_1_false_positive: "ITextInputProps looked like an Angular gap, but React/Vue DECLARE their own (ITextInputBaseProps & { className?: string }) rather than re-exporting — per-adapter half of <prop_types_split_agnostic_vs_per_adapter>, not drift. Before closing a gap: check whether the barrel's target file DECLARES a type/interface of that name. Only IImageProps, ITextInputProps, IButtonProps redeclared this way (react+vue)",
+  trap_2_regression: "flattenStyle was REMOVED from Angular, not missing from the other three — reverses a deliberate 2026-07-01 decision exporting it 'for advanced users'. It's the raw collapse; public path is StyleSheet.flatten (same collapse + registered preprocessors), so using flattenStyle silently skips them. Nothing imported it from the adapter (packages/navigation's Angular drawer takes it from the engine directly)",
+}
+```
+
+`tests/adapter-barrel-parity.test.ts` is the ratchet. It parses the barrels as SOURCE (most
+drifting names are types, so a runtime `Object.keys(await import(...))` would see none of them),
+computes every shared name that some adapters export and others don't, and compares that set for
+EQUALITY against `KNOWN_GAPS`. Equality, not containment, is the point: adding a shared name to
+one barrel and forgetting the rest fails with the adapters named, and closing a gap without
+deleting its entry also fails - so the list cannot rot into an allowlist that permits new drift.
+When you add a shared name to one adapter, add it to all four in the same commit.
+
+**In `packages/*` the same duplication first had a cheaper fix: `export * from '../core'`.** Each
+package ships `src/{core,react,vue,svelte,angular}/index.ts`, and the framework barrels used to
+list the ENTIRE core surface by name - 4 copies to keep in sync, per package. 15 packages already
+used `export *`; the 6 that didn't (battery, brightness, keep-awake, localization, network,
+screen-orientation) were converted 2026-08-15, −276 lines, verified identical against
+`git show HEAD:` and `ngc` green (star survives AOT `.d.ts`/`.js`) — works because the package's
+`"."` export already points at core, so nothing is newly exposed.
+
+Two packages deliberately expose a SUBSET of core and must NOT be converted blindly -
+`sensors` withholds 21 names (the `Accelerometer`/`Gyroscope`/`DeviceSensor` classes) and
+`splash-screen` withholds 6 (`HideAnimationController` and the internals `useHideAnimation`
+wraps). `navigation` and `slider` are not passthrough at all (slider's barrel carries the
+load-bearing `import '../register'` side effect - see the Metro `inlineRequires` note in
+CLAUDE.md). Check what a barrel omits before starring it.
+
+**2026-08-17: that fix was itself incomplete for one sub-case, and got superseded there —
+`export * from '../core'` is still correct wherever a physical file must exist for some other
+reason, but for a subpath that needs NOTHING beyond core, not even that one line should exist.**
+The unit of the decision is one adapter SUBPATH, not the whole package - ask whether it is
+genuinely and PERMANENTLY stateless (plain sync/async free functions, enums, constants; no
+per-instance state, no event/subscription stream, so categorically nothing a hook/composable/rune
+could ever wrap - the distinguishing feature vs. `sensors`' real hook is exactly that
+subscribable stream). When it is, delete the physical `src/<fw>/index.ts` and point the subpath
+directly at core in both `exports` and `publishConfig.exports`:
+
+```json
+"exports": {
+  ".": "./src/core/index.ts",
+  "./vue": "./src/core/index.ts",
+  "./react": "./src/core/index.ts",
+  "./svelte": "./src/core/index.ts",
+  "./angular": { "types": "./build-ngc/angular/index.d.ts", "react-native": "./build-ngc/angular/index.js", "default": "./src/angular/index.ts" }
+}
+```
+
+(`publishConfig.exports` mirrors it: `./react`/`./vue`/`./svelte` get the exact value `.` has,
+`{ "types": "./build/core/index.d.ts", "default": "./build/core/index.js" }`.) 12 packages were
+converted this way 2026-08-17: `sharing`, `sms`, `store-review`, `web-browser`, `local-auth`,
+`secure-store`, `device`, `crypto`, `standard-web-crypto`, `system-ui`, `application`, `haptics`.
+`standard-web-crypto`'s three barrels each also had `export { default as webCrypto } from
+'../core'` (`export *` never forwards a default export) - that alias moved into
+`src/core/index.ts` itself once, instead of surviving as three identical copies.
+
+`./angular` is NEVER folded into this, categorically, regardless of statelessness - it builds via
+a separate ngc/AOT pipeline (`build-ngc/`, `symbiote-release-publishing`) with its own tsconfig
+and linker step, so the export target structurally cannot be a bare path like the other three.
+Keep its own conditional-exports block and its own `src/angular/index.ts` even when that file's
+content is also just a re-export.
+
+The same "do NOT convert blindly" exceptions above still gate this - a subpath that withholds
+part of core, carries a load-bearing side effect, or adds real per-framework lifecycle
+(a hook/composable/rune/service subfolder for that adapter) keeps its physical file. This is also
+why "drop all framework subpaths everywhere and make every consuming app hand-write its own
+wrapper" is NOT the right generalization: for the hook/composable/rune-bearing tier, collapsing
+the subpath onto app code would mean every consumer re-implements the same subscription/lifecycle
+logic - exactly what `runtime_modules_layering` / `components_split_logic_view_lifecycle` exist to
+prevent by centralizing it once in the SDK. Only the genuinely-stateless tier gets the direct-alias
+treatment; the lifecycle-bearing tier keeps the subpath-plus-physical-file pattern.
+
 ## 5. Smoke
 
 ```
-pnpm test                        vitest headless — the co-located X tests on both adapters (ADR 0025)
+pnpm test                        vitest headless — the co-located X tests on both adapters
   state/X.test.ts                reducer + predicates (framework-free)
   view/render-X.test.ts          Descriptor snapshot
   components/X/X.test.*          per-adapter lifecycle (React + Vue + Angular)
@@ -81,8 +230,8 @@ detox (device/sim)               anything needing a real Fabric tag — native c
 A native-driven feature green in vitest but untested on a simulator is NOT proven
 at parity — the async-commit-timing class is invisible headless.
 
-Run the detox/simulator leg against `.examples/<app>` (workspace:*-linked), never
-`examples/<app>` (published-catalog canary) — `symbiote-dev-examples`.
+Run the detox/simulator leg against `examples/<app>`. Detox suite mechanics (canary journeys,
+flakiness fixes, the hittability workaround): `symbiote-detox-e2e`.
 
 ## 6. Verdict
 
@@ -90,6 +239,124 @@ Run the detox/simulator leg against `.examples/<app>` (workspace:*-linked), neve
 PARITY        every React prop/event/method/platform-branch present + structural + re-exported + smoke green
 PARTIAL       enumerate the EXACT missing items → they are the remaining work (P0, not a follow-up)
 DRIFT         surfaces match but logic/view is hand-copied in an adapter → extract to core/components
+```
+
+## 7. RN-conformance debt — the running backlog
+
+The project is beta BECAUSE full parity costs time; a dedicated 1-2 sprint alignment pass (no
+features, only RN conformance) is planned once Solid lands. Catching a divergence now is cheaper
+than then — but the point of this section is that a divergence you FIND must be recorded even
+when you do not fix it, or the alignment pass rediscovers it from zero.
+
+Record shape: what RN does (with `file:line` from `.vendors/react-native`), what we do, which
+adapters, why it was not fixed, and what would prove the fix.
+
+### Open — Touchable family (audit 2026-08-19)
+
+- **pressIn duration on responder grant.** RN fades over 0 ms when the press-in arrives with the
+  grant and 150 ms otherwise; we always use 150. UNREACHABLE today: the branch needs
+  `event.dispatchConfig.registrationName`, which our Pressable does not emit. Fixing it means
+  widening the event payload — an engine change, not an adapter one.
+- **Underlay style distribution.** RN puts `opacity` on the CHILD and `backgroundColor` on the
+  container (`TouchableHighlight.js`). React (`cloneElement`) and Vue (`cloneVNode`) now do this
+  and were verified to insert no extra node. **Angular and Solid still put both on the container**
+  — neither can reach the child without a permanent wrapper View, which reparents the child's
+  `flex`, and the fake Fabric does not run Yoga so headless cannot measure the damage. Visible
+  consequence: the underlay colour is itself dimmed by the opacity, so a pressed Touchable looks
+  different there than on React/Vue/RN. `resolveHighlightExtraStyles` already returns `underlay`
+  and `child` separately, so a layout-safe fix is unblocked — it just needs a DEVICE measurement.
+- **Three items ship unpinned** (implemented for parity, no test, device-only by nature):
+  `useNativeDriver: true` (headless has no native module, so both values behave identically);
+  `resetAnimation()` on teardown (root teardown already stops the leaf, so a test greens on broken
+  code too — one was written, proved vacuous, and deleted); and the visual→callback ORDER on
+  Angular (the visual only reaches the tree on a later async CD pass).
+- **No drift-back-in re-activation — all five adapters.** RN's Pressability has a state
+  `RESPONDER_INACTIVE_PRESS_OUT` and transitions back to `RESPONDER_ACTIVE_PRESS_IN` when the
+  finger leaves the retention region and returns, re-firing `onPressIn` (over 150 ms, not 0 —
+  that is the branch `OPACITY_ACTIVE_DURATION_MS` still exists for). Our engine dispatches
+  `pressIn` from exactly one place, `core/engine/src/events/index.ts:391` on topTouchStart, and
+  has no re-activation path at all: once the press drifts out, only pressOut can follow. Closing
+  this is a press-STATE-MACHINE change (`core/components/src/state/pressable.ts` plus the engine's
+  move stream), not an event-payload one — an earlier reading of this gap blamed a missing
+  `dispatchConfig.registrationName` and proposed widening `ISymbioteEvent`, which would not have
+  helped: with one origin the field would always carry the same value.
+- **Press timers are never cancelled on unmount — React, Vue, Angular, Svelte.** Found 2026-08-19
+  while migrating Svelte, OUTSIDE the original ten. `scheduleTimeout` returns a canceller and the
+  shared machine stores it (`runtime.pressDelayCancel`), but nothing calls it when the component
+  goes away: a pending `unstable_pressDelay` timer fires into an unmounted component, calling
+  `onPressIn` and starting an animation on a dead leaf. **Solid is the only adapter that closed
+  this**, via a `createTimeoutScheduler()` that keeps a Set of cancellers and clears them in
+  `onCleanup`. Port that shape to the other four. A test for it was written during the Svelte pass,
+  failed, and was DELETED rather than weakened — write it again with the fix.
+- **A stale header claiming an impossibility cost real work, twice in one day.** Svelte's
+  TouchableOpacity carried a homemade `tweenOpacity` over `setTimeout` and a header stating this
+  adapter has no Animated binding — untrue since `modules/animated` landed, so `useNativeDriver`
+  was structurally unreachable there until someone checked. Earlier the same day the Animated
+  namespace header claimed a generic `createAnimatedComponent` was impossible; a four-line probe
+  refuted it. Treat any header sentence of the form "X is impossible on this adapter" as an
+  untested claim with a date attached, not a finding.
+- **`Pressable` has no `minPressDuration` at all.** Surfaced by deleting
+  `DEFAULT_MIN_PRESS_DURATION_MS` (2026-08-19, once all five adapters had migrated): the constant
+  turned out to have NO production consumer — `core/components/src/state/pressable.ts` never
+  implements a press-duration floor, so RN's 130 ms Pressability default is simply absent for a
+  plain `Pressable`. The Touchable family is correct without it (RN overrides it with 0 there),
+  but a plain Pressable in RN does hold the active visual for 130 ms and ours does not.
+
+### How to run a conformance pass on a component
+
+1. Open the RN source for the component in `.vendors/react-native` and read it line by line. Not
+   from memory — memory is what produced the 130 ms bug in all five adapters at once.
+2. For every constant, default, and branch: find our equivalent and compare the VALUE, not just
+   the presence. A default that exists in both but differs is the easy one to miss.
+3. Check where RN puts each thing, not only what it computes — the underlay bug was a correct
+   value on the wrong node.
+4. Divergence found → fix it in the SHARED layer if every adapter shares it (the usual case: nine
+   of ten were), then migrate adapters additively so the tree never goes red mid-flight.
+5. Anything you cannot fix or cannot pin: append it to the backlog above with its reason.
+
+## Differential input trace — when a bug reproduces on ONE adapter only
+
+A component whose logic lives in `@symbiote-native/components` (a reducer + `renderX`) but
+misbehaves on exactly one adapter CANNOT be broken in that shared logic — every adapter runs the
+same bytes. The defect is necessarily in what that adapter FEEDS the shared layer. Device logs are
+the wrong tool here and actively mislead: they show the reducer emitting sane values (because it
+is sane), so reading them in circles is the predictable failure mode.
+
+Instead write a **differential parity test**: mount the SAME scenario through the broken adapter
+and through React (the reference), wrap the shared entry point to record every `(action, inputs)`
+it receives, and diff the two traces. The divergence localizes the bug to a line.
+
+Reference implementation:
+`adapters/svelte/src/components/virtualized-list/sticky-collision-parity.test.ts`.
+
+Mechanics that matter (each one cost a debugging round when got wrong):
+
+- **One `vi.mock` covers both adapters** — they import the shared function from the same specifier.
+  Use `vi.hoisted` for the trace array (`vi.mock` is hoisted above imports), and `importOriginal`
+  so the real implementation still runs.
+- **Identify each instance by object identity, not by a state field.** Keying the trace by
+  something like `layoutY` merges every instance that starts at 0 into one bucket and hides the
+  divergence. Use a `Map<stateObject, id>`, and RESET it per adapter so ids line up.
+- **Settle between steps.** React batches its updates; Svelte applies them fine-grained. Without an
+  `await tick()` after each event the test compares scheduling, not behavior — the two trees will
+  differ in cell count and every later assertion is noise.
+- **Compare per-step snapshots keyed by instance, not raw call sequences.** Different reactivity
+  granularity legitimately produces different numbers of calls; the semantic state after each step
+  is what must match.
+- **Prove the scenario is not vacuous.** Assert the REFERENCE adapter actually reaches the state
+  under test (e.g. really establishes a collision point). A scenario where the feature never
+  engages passes trivially on both sides and proves nothing — this happened twice, first with a
+  sticky index outside the initial window, then with one outside the viewport.
+- Cross-adapter imports are legitimate HERE (the P0 invariant defines parity as a diff "against
+  the reference adapter"), as a **devDependency** only — the published `files` surface is `build`.
+
+```
+§dit_svelte_sticky_freeze := {
+  date: "2026-08-13",
+  bug: "Svelte VirtualizedList passed the FULL section list into nextStickyHeaderYFor; React's ScrollView hands only renderedStickyIndices (currently mounted headers)",
+  root_cause: "headerLayoutYs is append-only ⟶ a header kept receiving the stale y of a next header already unmounted, pinned against a non-existent obstacle, froze",
+  fix: "filter indices by currently mounted cells (one line)",
+}
 ```
 
 ## Reference
@@ -100,6 +367,9 @@ DRIFT         surfaces match but logic/view is hand-copied in an adapter → ext
   `adapters/vue/src/components/switch/*`; shared half in
   `core/components/src/{state,view}/switch*`.
 - Building the component this check gates: `symbiote-add-component`.
+- Building a brand-new adapter's seam before it can be parity-checked here: `symbiote-new-adapter`.
 - Native-only parity (tag-dependent features): `vue-adapter-reactivity` §2.
-- Testing strategy: `.docs/decisions/0025` (vitest + detox).
+- Testing strategy (vitest headless + detox on device): §5 above, and the live shape in
+any adapter's co-located `*.test.ts` / `examples/*/e2e/`. Do not cite a numbered ADR
+for it — `.docs/decisions/` is local-only per `.gitignore` and absent from a checkout.
 </content>

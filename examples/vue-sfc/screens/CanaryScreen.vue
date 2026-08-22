@@ -24,8 +24,8 @@
   DrawerHomeScreen.vue / StatePersistenceScreen.vue.
 
   Non-template constructs handled the SFC way: RefreshControl is element-valued, so it is built in
-  script via a computed h() and bound (:refresh-control); Animated.View / Animated.ScrollView are
-  dotted, so they are aliased to <AnimatedView> / <AnimatedScrollView>; FlatList renders its cell
+  script via a computed h() and bound (:refresh-control); Animated.View / Animated.ScrollView
+  are used as dotted tags, which the SFC compiler resolves off the setup binding; FlatList renders its cell
   through the #item scoped slot; Pressable's children take the press state through a scoped slot
   (#default="{ pressed }").
 -->
@@ -76,13 +76,11 @@ import RefApiDemo from '../components/RefApiDemo.vue';
 import PlatformColorDemo from '../components/PlatformColorDemo.vue';
 import AccessibilityDemo from '../components/AccessibilityDemo.vue';
 import ResponderDemo from '../components/ResponderDemo.vue';
+import CompoundClassDemo from '../components/CompoundClassDemo.vue';
 import ParityDemo from '../components/ParityDemo.vue';
 import { nativeNumber } from '../components/event-utils';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
-
-const AnimatedView = Animated.View;
-const AnimatedScrollView = Animated.ScrollView;
 
 const CHIP_WIDTH = 72;
 const CHIP_GAP = 12;
@@ -252,7 +250,7 @@ const onToggleStatusBarTranslucent = (): void => {
 const onShare = (): void => {
   void Share.share({
     message: 'Sent from symbiote',
-    url: 'https://reactnative.dev',
+    url: 'https://vuejs.org',
   }).catch(() => {});
 };
 const onAlert = (): void => {
@@ -271,7 +269,7 @@ const onActionSheet = (): void => {
   );
 };
 const onOpenUrl = (): void => {
-  void Linking.openURL('https://reactnative.dev').catch(() => {});
+  void Linking.openURL('https://vuejs.org').catch(() => {});
 };
 
 const onRetentionMove = (event: ISymbioteEvent): void => {
@@ -464,7 +462,7 @@ const rotationStyle = {
         </View>
       </View>
       <ActionButton
-        title="Open reactnative.dev"
+        title="Open vuejs.org"
         :onPress="onOpenUrl"
         :color="LINE_COLOR.primitives"
       />
@@ -553,6 +551,9 @@ const rotationStyle = {
 
       <!-- Responder: drag-vs-tap + mid-gesture transfer (move-should-set / takeover) -->
       <ResponderDemo />
+
+      <!-- Component-local style block: compound selector, static and dynamic class -->
+      <CompoundClassDemo />
 
       <!-- Parity checks: longPress · Keyboard.dismiss · animated scroll · sticky · a11y focus -->
       <ParityDemo />
@@ -644,6 +645,16 @@ const rotationStyle = {
             <Text class="list-row-text">{{ item.label }}</Text>
           </View>
         </template>
+        <!-- This list measures its own cells (no getItemLayout), and the divider is CHROME the
+             list renders BETWEEN them — so it belongs to the distance from one row to the next,
+             not to either row's height. That is the case the offset table has to get right; a
+             model built by summing heights alone is short by every divider it skipped, and the
+             content below a windowed-out region slides up and back as the window moves
+             (core/components buildOffsets). Deliberately on the MVCP list: prepend-without-jump
+             is exactly where an offset being off by a few points is visible. -->
+        <template #separator>
+          <View class="mvcp-divider" />
+        </template>
       </FlatList>
       <ActionButton
         title="Prepend 5"
@@ -655,7 +666,7 @@ const rotationStyle = {
            box below (not the page): the bright bar above SMOOTHLY fades to near-invisible
            and lifts, on the UI thread (no jank, no per-frame JS). Proves Animated.ScrollView
            + Animated.event native attach. -->
-      <AnimatedView
+      <Animated.View
         class="parity-header"
         :style="{
           opacity: parityHeaderOpacity,
@@ -663,9 +674,9 @@ const rotationStyle = {
         }"
       >
         <Text class="parity-header-text">HEADER — fades as you scroll ↓</Text>
-      </AnimatedView>
+      </Animated.View>
       <!-- box-list160 is shared with the MVCP FlatList above. -->
-      <AnimatedScrollView
+      <Animated.ScrollView
         class="box-list160"
         :scroll-event-throttle="16"
         @scroll="onParityScroll"
@@ -673,7 +684,7 @@ const rotationStyle = {
         <View v-for="i in scrollRows" :key="i" class="scroll-demo-row">
           <Text class="list-row-text">{{ `scroll me · row ${i}` }}</Text>
         </View>
-      </AnimatedScrollView>
+      </Animated.ScrollView>
       <Text class="tiny-center"
         >↑ drag inside the box — the bar above reacts</Text
       >
@@ -722,10 +733,10 @@ const rotationStyle = {
       </View>
 
       <!-- Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
-           width/height→style); a screen reader reads "React logo" (alt→accessibilityLabel). -->
+           width/height→style); a screen reader reads "Vue logo" (alt→accessibilityLabel). -->
       <Image
-        src="https://reactnative.dev/img/tiny_logo.png"
-        alt="React logo"
+        src="https://vuejs.org/images/logo.png"
+        alt="Vue logo"
         :width="48"
         :height="48"
         class="web-image"
@@ -756,7 +767,7 @@ const rotationStyle = {
       </KeyboardAvoidingView>
 
       <Image
-        :source="{ uri: 'https://reactnative.dev/img/tiny_logo.png' }"
+        :source="{ uri: 'https://vuejs.org/images/logo.png' }"
         class="logo-image"
       />
 

@@ -6,20 +6,38 @@ description: The React adapter public contract.
 Import app-facing APIs from `@symbiote-native/react`:
 
 ```tsx
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from '@symbiote-native/react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/react';
 ```
 
 The React adapter intentionally feels close to React Native. The difference is
 below the component surface: host mutations go through `@symbiote-native/engine`.
 
+## Installation
+
+```sh
+pnpm add @symbiote-native/react react-native react
+```
+
+`react-native` and `react` stay your app's own top-level dependencies — the
+adapter replaces only the JS renderer that drives them, and `react-native` is
+the Metro version anchor, so it has to be pinned at the app root.
+`@symbiote-native/engine` is a peer dependency and installs alongside.
+
 ## Component shape
 
-| Concern         | React API                                                  |
-| --------------- | ---------------------------------------------------------- |
-| Event callbacks | `onPress`, `onValueChange` (shared by `Switch`/`TextInput`), `onLayout` |
-| Children        | `children?: ReactNode`                                     |
-| Render children | `(state) => ReactNode`, for components such as `Pressable` |
-| Refs            | React refs to host instances or component handles          |
+| Concern         | React API                                                                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Event callbacks | `onPress`, `onValueChange` (shared by `Switch`/`TextInput`), `onLayout`                                                                          |
+| Children        | `children?: ReactNode`                                                                                                                           |
+| Render children | `(state) => ReactNode`, for components such as `Pressable`                                                                                       |
+| Refs            | React refs to host instances or component handles                                                                                                |
 | Styles          | `style={styles.root}` with React Native-style objects, or `className` for a registered CSS class (see the [Styling guide](/docs/learn/styling/)) |
 
 ## Common events
@@ -52,7 +70,12 @@ The adapter re-exports stable runtime utilities and modules so app code can keep
 one import root:
 
 ```tsx
-import { Alert, Dimensions, Platform, StyleSheet } from '@symbiote-native/react';
+import {
+  Alert,
+  Dimensions,
+  Platform,
+  StyleSheet,
+} from '@symbiote-native/react';
 ```
 
 Some modules are pure engine utilities (`Platform`, `StyleSheet`, `PixelRatio`,
@@ -63,6 +86,16 @@ Some modules are pure engine utilities (`Platform`, `StyleSheet`, `PixelRatio`,
 `StatusBar`) that are shared or thinly adapted depending on lifecycle needs.
 `useWindowDimensions`/`useColorScheme` hooks and `findNodeHandle` are also
 re-exported.
+
+On Android, `Keyboard` and `Settings` do nothing until you also install
+[`@symbiote-native/android`](/docs/packages/android/):
+`keyboardDidShow`/`keyboardDidHide` never fire, because Android's only stock
+keyboard-event source is `ReactRootView`'s layout listener and the bridgeless
+surface SymbioteNative mounts never triggers it, and `Settings` reads back `null`,
+because RN's `Settings` has no stock Android implementation at all. That package
+supplies both native modules (`KeyboardObserver`, `SettingsManager`), is picked
+up by Gradle autolinking, and exports nothing from JS — installing it is the
+whole integration.
 
 ## Animations and gestures
 
@@ -89,11 +122,14 @@ this works structurally where it never could in real RN.
 The target (`containerNodeOrRef`) must be an already-mounted SymbioteNative host
 node or `SymbioteSurface` — typically a ref to a persistent "overlay host"
 `View` near the app root — not a CSS-selector-style string. **v1 scope:** the
-target must live in the *same* surface as the portal's call site; portaling
+target must live in the _same_ surface as the portal's call site; portaling
 into a second, independently-mounted surface isn't wired yet.
 
-Vue has the equivalent through its own `Teleport` — see the
-[Vue API reference](/docs/api/vue/#portals-teleport).
+Vue has the equivalent through its own `Teleport`, Angular through
+`PortalDirective`/`PortalOutletDirective`, and Svelte and Solid through their
+own `Portal` — see the [Vue](/docs/api/vue/#portals-teleport),
+[Angular](/docs/api/angular/#portals), [Svelte](/docs/api/svelte/#portals),
+and [Solid](/docs/api/solid/#portals-portal) API references.
 
 ## Cross-surface content (`createTunnel`)
 
@@ -119,7 +155,7 @@ function Toast() {
 }
 ```
 
-`createPortal` only reaches a target in the *same* surface. `createTunnel` is
+`createPortal` only reaches a target in the _same_ surface. `createTunnel` is
 for two independently `mount()`-ed surfaces that share no Fabric tree at all —
 a split-screen embed, a system-level overlay surface. `In`/`Out` share
 nothing but a small store: `In` registers its children wherever it renders,
@@ -127,7 +163,8 @@ any surface; `Out` reads that store and paints in whichever surface actually
 mounts it. Neither touches a Fabric node directly, so there's no ref-timing
 gotcha and no `isSymbioteNode` guard to satisfy.
 
-Vue and Angular have the same primitive — see their own API references.
+Vue, Angular, Svelte, and Solid all have the same primitive — see their own
+API references.
 
 ## App entry point (`AppRegistry`)
 

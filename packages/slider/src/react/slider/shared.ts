@@ -9,7 +9,13 @@
 // library's React Slider component — that component internally calls React hooks off the React
 // dispatcher, so a non-React adapter rendering it directly would crash on a null dispatcher.
 
-import { createElement, forwardRef, useCallback, useEffect, useState } from 'react';
+import {
+  createElement,
+  forwardRef,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 import type {
   FC,
   ForwardRefExoticComponent,
@@ -19,8 +25,16 @@ import type {
 } from 'react';
 import { descriptorToReact, Image } from '@symbiote-native/react';
 import { resolveAccessibilityProps } from '@symbiote-native/components';
-import type { IDescriptor, IDescriptorChild, IImageSourceProp } from '@symbiote-native/components';
-import { dlog, type ISymbioteEvent, type ISymbioteNode } from '@symbiote-native/engine';
+import type {
+  IDescriptor,
+  IDescriptorChild,
+  IImageSourceProp,
+} from '@symbiote-native/components';
+import {
+  dlog,
+  type ISymbioteEvent,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
 import {
   sanitizeSliderValue,
   resolveSliderDisabled,
@@ -86,7 +100,10 @@ function toChild(child: IDescriptorChild): ReactElement | string {
 // renderSlider's Descriptor IS the outer wrapper (symbiote-view hosting the native leaf +
 // optional steps overlay); className is reapplied on it here, exactly like ImageBackground's
 // wrapper.
-function withClassName(descriptor: IDescriptor, className: string | undefined): ReactElement {
+function withClassName(
+  descriptor: IDescriptor,
+  className: string | undefined,
+): ReactElement {
   return createElement(
     descriptor.type,
     { key: descriptor.key, ...descriptor.props, className },
@@ -123,7 +140,9 @@ export function createSlider(platform: ISliderPlatform): ISliderComponent {
       ...passthrough
     } = props;
 
-    const [reportedValue, setReportedValue] = useState<number | undefined>(undefined);
+    const [reportedValue, setReportedValue] = useState<number | undefined>(
+      undefined,
+    );
     const [width, setWidth] = useState(0);
 
     const handleValueChange = useCallback(
@@ -157,7 +176,8 @@ export function createSlider(platform: ISliderPlatform): ISliderComponent {
     );
     const handleLayout = useCallback((event: ISymbioteEvent): void => {
       const layout = event.nativeEvent.layout;
-      if (isRecord(layout) && typeof layout.width === 'number') setWidth(layout.width);
+      if (isRecord(layout) && typeof layout.width === 'number')
+        setWidth(layout.width);
     }, []);
 
     const minimum = minimumValue ?? SLIDER_DEFAULT_MINIMUM_VALUE;
@@ -173,10 +193,16 @@ export function createSlider(platform: ISliderPlatform): ISliderComponent {
 
     const hasStepMarker = StepMarker !== undefined;
     const hasThumbImage = thumbImage !== undefined;
-    const showSteps = shouldRenderStepsIndicator(hasStepMarker, renderStepNumber);
+    const showSteps = shouldRenderStepsIndicator(
+      hasStepMarker,
+      renderStepNumber,
+    );
     // Passed to the native view raw — the engine runs the image processor derived from RNCSlider's
     // ViewConfig — and only when no custom marker draws its own thumb (matches the library).
-    const nativeThumbImage = shouldPassNativeThumbImage(hasStepMarker, hasThumbImage)
+    const nativeThumbImage = shouldPassNativeThumbImage(
+      hasStepMarker,
+      hasThumbImage,
+    )
       ? thumbImage
       : undefined;
 
@@ -189,9 +215,16 @@ export function createSlider(platform: ISliderPlatform): ISliderComponent {
       upperLimit: upper,
       disabled: resolveSliderDisabled(disabled, accessibilityState),
       inverted: inverted ?? false,
-      thumbTintColor: resolveThumbTintColor(thumbTintColor, hasStepMarker, hasThumbImage),
+      thumbTintColor: resolveThumbTintColor(
+        thumbTintColor,
+        hasStepMarker,
+        hasThumbImage,
+      ),
       thumbImage: nativeThumbImage,
-      accessibilityState: resolveSliderAccessibilityState(disabled, accessibilityState),
+      accessibilityState: resolveSliderAccessibilityState(
+        disabled,
+        accessibilityState,
+      ),
       width,
       style,
       passthrough: {
@@ -206,10 +239,18 @@ export function createSlider(platform: ISliderPlatform): ISliderComponent {
     };
 
     if (!showSteps) {
-      return withClassName(renderSlider(view, platform, { onLayout: handleLayout }), className);
+      return withClassName(
+        renderSlider(view, platform, { onLayout: handleLayout }),
+        className,
+      );
     }
 
-    const options = computeStepOptions(minimum, maximum, stepValue, platform.stepResolution);
+    const options = computeStepOptions(
+      minimum,
+      maximum,
+      stepValue,
+      platform.stepResolution,
+    );
     const currentValue = reportedValue ?? view.value ?? minimum;
 
     if (StepMarker !== undefined) {
@@ -225,7 +266,11 @@ export function createSlider(platform: ISliderPlatform): ISliderComponent {
       });
       return createElement(
         'symbiote-view',
-        { style: resolveStepsWrapperStyle(style, platform), onLayout: handleLayout, className },
+        {
+          style: resolveStepsWrapperStyle(style, platform),
+          onLayout: handleLayout,
+          className,
+        },
         overlay,
         descriptorToReact(renderSliderNative(view, platform)),
       );
@@ -248,7 +293,10 @@ export function createSlider(platform: ISliderPlatform): ISliderComponent {
 }
 
 // The wrapper style for the custom-marker steps path mirrors renderSlider's wrapper.
-function resolveStepsWrapperStyle(style: unknown, platform: ISliderPlatform): unknown {
+function resolveStepsWrapperStyle(
+  style: unknown,
+  platform: ISliderPlatform,
+): unknown {
   return [platform.defaultStyle, style, { justifyContent: 'center' }];
 }
 
@@ -291,7 +339,10 @@ function renderCustomStepsOverlay(params: ICustomStepsParams): ReactElement {
             style: THUMB_IMAGE_CONTAINER_STYLE,
             testID: 'sliderTrackMark-thumbImage',
           },
-          createElement(Image, { source: params.thumbImage, style: THUMB_IMAGE_STYLE }),
+          createElement(Image, {
+            source: params.thumbImage,
+            style: THUMB_IMAGE_STYLE,
+          }),
         ),
       );
     }

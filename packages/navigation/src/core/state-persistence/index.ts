@@ -11,11 +11,19 @@ import { isRecord } from '../guards';
 // params: undefined}`, and JSON.stringify drops undefined-valued keys - a JSON round trip of a
 // perfectly valid route legitimately arrives here without a `params` key at all.
 function isRoute(value: unknown): value is IRoute<unknown> {
-  return isRecord(value) && typeof value.key === 'string' && typeof value.name === 'string';
+  return (
+    isRecord(value) &&
+    typeof value.key === 'string' &&
+    typeof value.name === 'string'
+  );
 }
 
 function isNavigatorState(value: unknown): value is INavigatorState {
-  return isRecord(value) && Array.isArray(value.routes) && value.routes.every(isRoute);
+  return (
+    isRecord(value) &&
+    Array.isArray(value.routes) &&
+    value.routes.every(isRoute)
+  );
 }
 
 export function serializeNavigatorState(state: INavigatorState): unknown {
@@ -24,7 +32,9 @@ export function serializeNavigatorState(state: INavigatorState): unknown {
 
 export function deserializeNavigatorState(raw: unknown): INavigatorState {
   if (!isNavigatorState(raw)) {
-    throw new Error('deserializeNavigatorState: persisted value is not a valid navigator state');
+    throw new Error(
+      'deserializeNavigatorState: persisted value is not a valid navigator state',
+    );
   }
   return raw;
 }

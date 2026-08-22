@@ -5,8 +5,9 @@
 //
 // The inset math + the behavior → style/structure decision are framework-agnostic and live in
 // @symbiote-native/components (render-keyboard-avoiding-view), shared verbatim with the Vue adapter.
-// React supplies only the lifecycle: useState for the inset, useRef for the measured frame, a
-// useEffect subscription, and the descriptor-free element assembly around its children.
+// React supplies only the lifecycle: useState for the inset, useRef for the measured frame and
+// the cross-fade setting, the useEffect subscriptions, and the descriptor-free element assembly
+// around its children.
 
 import {
   createElement,
@@ -17,24 +18,39 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { dlog, type ISymbioteEvent } from '@symbiote-native/engine';
+import {
+  dlog,
+  Keyboard,
+  Platform,
+  type ISymbioteEvent,
+} from '@symbiote-native/engine';
 import {
   computeInset,
+  keyboardAvoidingEventNamesFor,
   readKeyboardFrame,
   readLayoutFrame,
+  readPrefersCrossFadeTransitions,
   resolveKeyboardAvoidingLayout,
   DEFAULT_VERTICAL_OFFSET,
   type IKeyboardAvoidingBehavior,
   type IMeasuredFrame,
 } from '@symbiote-native/components';
 import { View, type IViewProps } from '../../components';
-import { Keyboard, KEYBOARD_EVENT } from '../../modules/keyboard';
-import type { IAccessibilityProps, IAriaProps } from '@symbiote-native/components';
+import type {
+  IAccessibilityProps,
+  IAriaProps,
+} from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 
 export type { IKeyboardAvoidingBehavior } from '@symbiote-native/components';
 
-export interface IKeyboardAvoidingViewProps extends IAccessibilityProps, IAriaProps {
+// The two notifications to subscribe to, per host (iOS takes the `will` pair so the view rides
+// up with the keyboard animation; Android has no will-notifications). Resolved ONCE at module
+// scope: Platform.OS is fixed for the process, so recomputing it per render buys nothing.
+const KEYBOARD_EVENTS = keyboardAvoidingEventNamesFor(Platform.OS);
+
+export interface IKeyboardAvoidingViewProps
+  extends IAccessibilityProps, IAriaProps {
   behavior?: IKeyboardAvoidingBehavior;
   // When false, the view passes through untouched; no inset is applied in any
   // behavior mode. RN gates every inset/height computation on `enabled ?? true`
@@ -74,13 +90,36 @@ export const KeyboardAvoidingView: FC<IKeyboardAvoidingViewProps> = props => {
   // next keyboard event's inset math.
   const frameRef = useRef<IMeasuredFrame | undefined>(undefined);
   const initialHeightRef = useRef<number | undefined>(undefined);
+  // A device accessibility setting, not component state: it cannot change mid-session, and
+  // learning it must not re-render. Read once per mount, then fed to every computeInset call.
+  const prefersCrossFadeRef = useRef(false);
+
+  useEffect(() => {
+    void readPrefersCrossFadeTransitions().then(prefers => {
+      prefersCrossFadeRef.current = prefers;
+    });
+  }, []);
 
   useEffect(() => {
     const onShow = (payload: unknown): void => {
       const keyboard = readKeyboardFrame(payload);
-      const next = computeInset(frameRef.current, keyboard, keyboardVerticalOffset);
-      dlog(`KeyboardAvoidingView show -> inset ${next}`);
-      setInset(next);
+      // Functional update, not a read of `inset`: this handler is built inside the effect, so a
+      // direct read would freeze the value from the render that created it — and 'height' mode
+      // feeds the LIVE inset back in to cancel the wrapper's own shrink.
+      setInset(previousInset => {
+        const next = computeInset(
+          frameRef.current,
+          keyboard,
+          keyboardVerticalOffset,
+          {
+            behavior,
+            previousInset,
+            prefersCrossFadeTransitions: prefersCrossFadeRef.current,
+          },
+        );
+        dlog(`KeyboardAvoidingView show -> inset ${next}`);
+        return next;
+      });
     };
     const onHide = (): void => {
       dlog('KeyboardAvoidingView hide -> inset 0');
@@ -88,20 +127,20 @@ export const KeyboardAvoidingView: FC<IKeyboardAvoidingViewProps> = props => {
     };
 
     const subscriptions = [
-      Keyboard.addListener(KEYBOARD_EVENT.didShow, onShow),
-      Keyboard.addListener(KEYBOARD_EVENT.didChangeFrame, onShow),
-      Keyboard.addListener(KEYBOARD_EVENT.didHide, onHide),
+      Keyboard.addListener(KEYBOARD_EVENTS.show, onShow),
+      Keyboard.addListener(KEYBOARD_EVENTS.hide, onHide),
     ];
     return () => {
       for (const subscription of subscriptions) subscription.remove();
     };
-  }, [keyboardVerticalOffset]);
+  }, [behavior, keyboardVerticalOffset]);
 
   const handleLayout = (event: ISymbioteEvent): void => {
     const frame = readLayoutFrame(event.nativeEvent.layout);
     if (frame !== undefined) {
       frameRef.current = frame;
-      if (initialHeightRef.current === undefined) initialHeightRef.current = frame.height;
+      if (initialHeightRef.current === undefined)
+        initialHeightRef.current = frame.height;
     }
     onLayout?.(event);
   };
@@ -136,7 +175,9 @@ export const KeyboardAvoidingView: FC<IKeyboardAvoidingViewProps> = props => {
     wrapStyle: IStyleProp<IViewStyle> | undefined,
     content: ReactNode,
   ): ReactElement {
-    const wrapperProps: IViewProps & { onLayout: (event: ISymbioteEvent) => void } = {
+    const wrapperProps: IViewProps & {
+      onLayout: (event: ISymbioteEvent) => void;
+    } = {
       ...accessibilityRest,
       style: wrapStyle,
       onLayout: handleLayout,

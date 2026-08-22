@@ -7,6 +7,8 @@ export type {
   IManifest,
   IHideAnimationConfig,
   IHideAnimationContainerProps,
+  IHideAnimationFailure,
+  IHideAnimationFailureStage,
   IHideAnimationImageProps,
   IHideAnimationResult,
   IHideAnimationConstants,

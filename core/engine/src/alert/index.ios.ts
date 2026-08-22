@@ -15,7 +15,12 @@
 import { dlog } from '../debug';
 import { getNativeModule } from '../native-modules';
 
-import type { IAlertButtons, IAlertOptions, IAlertStatic, IAlertType } from './shared';
+import type {
+  IAlertButtons,
+  IAlertOptions,
+  IAlertStatic,
+  IAlertType,
+} from './shared';
 
 export type {
   IAlertButton,
@@ -48,7 +53,10 @@ interface IAlertArgs {
 // getNativeModule carries it. The callback `id`/`value` arrive typed because we declare
 // them here, so they cross the trust boundary already narrowed.
 interface INativeAlertManager {
-  alertWithArgs(args: IAlertArgs, callback: (id: number, value: string) => void): void;
+  alertWithArgs(
+    args: IAlertArgs,
+    callback: (id: number, value: string) => void,
+  ): void;
 }
 
 type IPromptCallbackOrButtons = ((text: string) => void) | IAlertButtons;
@@ -90,6 +98,16 @@ function prompt(
       if (btn.isPreferred) {
         preferredButtonKey = String(index);
       }
+      // UPSTREAM-BUG(react-native): Libraries/Alert/Alert.js:173 - a TRAILING button with no text
+      // is left out of the native buttons array while its onPress still occupies callbacks[index],
+      // so that handler can never fire: native has no id to return for a button it was never told
+      // about. Only the last button, only when textless, which reads more like leftover
+      // length - 1 bookkeeping than an intended "omit a blank trailing button" affordance.
+      // Ported for parity; do NOT fix without recording a deliberate divergence.
+      //
+      // The `!== undefined` here IS a deliberate divergence from upstream's truthy `btn.text`:
+      // an explicit `text: ''` is a caller asking for a blank label, not an omission, and this
+      // codebase treats falsy-vs-absent as distinct on principle. Upstream drops that button.
       if (btn.text !== undefined || index < callbackOrButtons.length - 1) {
         buttons.push({ [index]: btn.text ?? '' });
       }
@@ -128,7 +146,12 @@ function prompt(
 // iOS-only, so it lives beyond IAlertStatic on this build.
 export const Alert: IAlertStatic & { prompt: typeof prompt } = {
   // alert delegates to prompt (same AlertManager path), exactly as RN does on iOS.
-  alert(title?: string, message?: string, buttons?: IAlertButtons, options?: IAlertOptions): void {
+  alert(
+    title?: string,
+    message?: string,
+    buttons?: IAlertButtons,
+    options?: IAlertOptions,
+  ): void {
     prompt(title, message, buttons, 'default', undefined, undefined, options);
   },
 

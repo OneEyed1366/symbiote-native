@@ -15,17 +15,17 @@ import {
 } from '@symbiote-native/engine';
 import { mount } from '../../render';
 
-// RN's IComponentProvider: a thunk returning the root component (lazy so the module
-// graph stays cheap until the app actually runs).
+// RN's IComponentProvider. Lazy so the module graph stays cheap until the app actually runs.
 export type IComponentProvider = () => Type<unknown>;
 
-// RN's IWrapperComponentProvider: given the surface's parameters, returns a
-// component to wrap the app root in (e.g. a context provider). Optional. Angular has no
-// runtime template synthesis (no JIT under AOT/Metro — see create-animated-component.ts),
-// so the wrapper must be a pre-authored standalone @Component whose template renders
-// `<ng-content>` — the Angular idiom for "render my children" (mount() projects the root's
-// host node into it, the twin of React's createElement(Wrapper, null, rootElement)).
-export type IWrapperComponentProvider = (appParameters: IAppParameters) => Type<unknown>;
+// RN's IWrapperComponentProvider (e.g. a context provider). Angular has no runtime template
+// synthesis (no JIT under AOT/Metro — see create-animated-component.ts), so the wrapper must be
+// a pre-authored standalone @Component whose template renders `<ng-content>` — the Angular idiom
+// for "render my children" (mount() projects the root's host node into it, the twin of React's
+// createElement(Wrapper, null, rootElement)).
+export type IWrapperComponentProvider = (
+  appParameters: IAppParameters,
+) => Type<unknown>;
 
 function runnableFor(
   componentProvider: IComponentProvider,

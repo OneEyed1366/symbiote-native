@@ -14,7 +14,10 @@ const fabric = installFabric();
 const ROOT_TAG = 73;
 
 // Walk the committed tree to the first node of a given view name.
-function findByViewName(nodes: IFakeNode[], viewName: string): IFakeNode | undefined {
+function findByViewName(
+  nodes: IFakeNode[],
+  viewName: string,
+): IFakeNode | undefined {
   for (const node of nodes) {
     if (node.viewName === viewName) return node;
     const found = findByViewName(node.children, viewName);
@@ -37,7 +40,9 @@ function findTransformView(nodes: IFakeNode[]): IFakeNode | undefined {
 function committedTranslateY(node: IFakeNode): number {
   const transform = Reflect.get(node.props, 'transform');
   if (!Array.isArray(transform)) {
-    throw new Error(`expected a transform array, got ${JSON.stringify(node.props)}`);
+    throw new Error(
+      `expected a transform array, got ${JSON.stringify(node.props)}`,
+    );
   }
   for (const entry of transform) {
     if (typeof entry === 'object' && entry !== null) {
@@ -45,7 +50,9 @@ function committedTranslateY(node: IFakeNode): number {
       if (typeof y === 'number') return y;
     }
   }
-  throw new Error(`no translateY in committed transform ${JSON.stringify(transform)}`);
+  throw new Error(
+    `no translateY in committed transform ${JSON.stringify(transform)}`,
+  );
 }
 
 beforeEach(() => fabric.reset());
@@ -56,7 +63,9 @@ describe('Animated scroll-driven animation', () => {
     const scrollY = new Animated.Value(0);
     // The canonical handler, held by reference so the test can fire it the way the native scroll
     // event would. onScroll is registered through React's event system, not committed as a prop.
-    const onScroll = Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }]);
+    const onScroll = Animated.event([
+      { nativeEvent: { contentOffset: { y: scrollY } } },
+    ]);
 
     function App(): ReactElement {
       return (

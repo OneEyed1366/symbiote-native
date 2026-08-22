@@ -6,11 +6,31 @@ description: The Vue adapter public contract.
 Import app-facing APIs from `@symbiote-native/vue`:
 
 ```ts
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from '@symbiote-native/vue';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from '@symbiote-native/vue';
 ```
 
 Vue drives the same engine as React, but its public API follows Vue conventions.
 That matters most for events, children, and refs.
+
+## Installation
+
+```sh
+pnpm add @symbiote-native/vue react-native vue
+```
+
+`react-native` and `vue` stay your app's own top-level dependencies — this
+package replaces only the JS renderer that drives them, and `react-native` is
+the Metro version anchor, so it has to be pinned at the app root.
+`@symbiote-native/engine` is a peer dependency and installs alongside. TSX needs
+nothing beyond this; SFC additionally needs the Metro transformer for `.vue`
+files.
 
 ## Component shape
 
@@ -21,8 +41,9 @@ That matters most for events, children, and refs.
 - Styles: `:style="styles.root"` with React Native-style objects. Most
   visual components — not just `View`/`Text` anymore — also accept
   `class`/`:class` for a registered class name, resolved through the same
-  style registry as a Vue SFC `<style>` block or a `.module.css` import; see
-  the [Styling guide](/docs/learn/styling/).
+  style registry as a Vue SFC `<style>` block, a Svelte component's own
+  `<style>` block, or a `.module.css` import; see the [Styling
+  guide](/docs/learn/styling/).
 - Attribute names: templates may use kebab-case; the adapter normalizes to
   camelCase.
 
@@ -120,6 +141,16 @@ so app code keeps one import root: `Platform`, `StyleSheet`, `Dimensions`,
 `useWindowDimensions`/`useColorScheme` composables, `findNodeHandle`, and
 `dlog`/`isDebug` for diagnostic logging.
 
+On Android, `Keyboard` and `Settings` do nothing until you also install
+[`@symbiote-native/android`](/docs/packages/android/):
+`keyboardDidShow`/`keyboardDidHide` never fire, because Android's only stock
+keyboard-event source is `ReactRootView`'s layout listener and the bridgeless
+surface SymbioteNative mounts never triggers it, and `Settings` reads back `null`,
+because RN's `Settings` has no stock Android implementation at all. That package
+supplies both native modules (`KeyboardObserver`, `SettingsManager`), is picked
+up by Gradle autolinking, and exports nothing from JS — installing it is the
+whole integration.
+
 ## Animations and gestures
 
 `Animated` (both the JS and native driver) and `PanResponder` are re-exported
@@ -176,14 +207,15 @@ const overlayTunnel = createTunnel(); // module-level singleton, importable from
 </template>
 ```
 
-`Teleport` only reaches a target in the *same* surface. `createTunnel` is for
+`Teleport` only reaches a target in the _same_ surface. `createTunnel` is for
 two independently `mount()`-ed surfaces that share no Fabric tree at all.
 `In` and `Out` are separate components — not composables, since a composable
 can't accept template markup — linked only by a small reactive store: `In`
 registers its slot content wherever it renders, `Out` reads the store and
 paints in whichever surface actually mounts it.
 
-React and Angular have the same primitive — see their own API references.
+React, Angular, Svelte, and Solid all have the same primitive — see their own
+API references.
 
 ## App entry point (`AppRegistry`)
 

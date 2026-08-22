@@ -25,7 +25,10 @@ export type IModalAction =
 
 // Identity-stable when nothing changes (returns the same object) so the adapter's effect/watch
 // triggers no spurious re-render, matching React's guarded setState in Modal.js's effect.
-export function modalReducer(state: IModalState, action: IModalAction): IModalState {
+export function modalReducer(
+  state: IModalState,
+  action: IModalAction,
+): IModalState {
   switch (action.type) {
     case 'show':
       return state.isRendered ? state : { isRendered: true };
@@ -37,6 +40,9 @@ export function modalReducer(state: IModalState, action: IModalAction): IModalSt
 // The visible gate with the keep-alive: a fully hidden modal (not visible AND no longer
 // rendered) contributes no node, exactly as RN's render returns null when _shouldShowModal()
 // is false.
-export function shouldRenderModal(isVisible: boolean, state: IModalState): boolean {
+export function shouldRenderModal(
+  isVisible: boolean,
+  state: IModalState,
+): boolean {
   return isVisible || state.isRendered;
 }

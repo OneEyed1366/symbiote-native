@@ -5,9 +5,29 @@
 // Angular tests drive the real renderer via `mount`/`unmount`, not TestBed). Stack/ScreenDirective
 // are imported from their own modules (NOT the package barrel, './index') so the third-party
 // native-spec side-effect (../register) never loads headless.
+//
+// Route-stack REDUCER logic (navigatorReducer's push/pop/popToTop/popTo/replace/setParams/reset
+// transitions) is core's responsibility and has its own canonical, framework-free coverage in
+// core/navigator-state.test.ts (mirrors react/stack/stack.test.tsx's identical scoping decision -
+// see its own header comment). This file only proves Angular's dispatch->signal->template WIRING
+// works, which push/pop/setParams/reset below already establish as one pattern; popToTop/popTo/
+// replace go through that exact same private `dispatch()` method (see index.ts), so they are N/A
+// here rather than re-proving the same wiring a third/fourth/fifth time.
+//
+// No Negative group: Stack has no guard clause of its own that throws - "refuses to pop the last
+// route" is a no-op the reducer already fails closed on (core's own contract, proven by
+// navigator-state.test.ts's "no-op on a single-route stack" case), observed here only as an
+// unchanged screen count, not a thrown error.
 
 import '@angular/compiler';
-import { Component, CUSTOM_ELEMENTS_SCHEMA, Input, ViewChild, type Signal } from '@angular/core';
+import {
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  Input,
+  ViewChild,
+  signal,
+  type Signal,
+} from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   mount,
@@ -50,7 +70,9 @@ const RNS_SCREEN_VIEW_CONFIG: INativeViewConfig = {
 };
 
 const RNS_SCREEN_STACK_VIEW_CONFIG: INativeViewConfig = {
-  directEventTypes: { topFinishTransitioning: directEvent('onFinishTransitioning') },
+  directEventTypes: {
+    topFinishTransitioning: directEvent('onFinishTransitioning'),
+  },
   validAttributes: {},
 };
 
@@ -64,11 +86,17 @@ const RNS_SEARCH_BAR_VIEW_CONFIG: INativeViewConfig = {
   validAttributes: { placeholder: true },
 };
 
+const MODAL_SCREEN_VIEW = 'RNSModalScreen';
+
 const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   [SCREEN_VIEW]: RNS_SCREEN_VIEW_CONFIG,
   [STACK_VIEW]: RNS_SCREEN_STACK_VIEW_CONFIG,
   [HEADER_CONFIG_VIEW]: RNS_HEADER_CONFIG_VIEW_CONFIG,
   [SEARCH_BAR_VIEW]: RNS_SEARCH_BAR_VIEW_CONFIG,
+  // Same prop/event surface as a plain RNSScreen (resolveScreenRenderPlan's screenProps don't
+  // differ by outer tag) - only WHICH tag gets mounted differs, which is exactly what the modal
+  // test below proves.
+  [MODAL_SCREEN_VIEW]: RNS_SCREEN_VIEW_CONFIG,
 };
 
 const fabric = installFabric();
@@ -80,7 +108,8 @@ setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 // Fabric createNode('Stack') call instead of a non-painting anchor.
 registerComposedComponent('Stack');
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -110,7 +139,9 @@ function screenNodes(): IFakeNode[] {
 }
 
 function headerConfigOf(screen: IFakeNode): IFakeNode {
-  const header = screen.children.find(child => child.viewName === HEADER_CONFIG_VIEW);
+  const header = screen.children.find(
+    child => child.viewName === HEADER_CONFIG_VIEW,
+  );
   if (!header) throw new Error('no header config child on screen');
   return header;
 }
@@ -162,7 +193,11 @@ let capturedHost: StackTestHost | undefined;
         [component]="homeComponent"
         [options]="homeOptions"
       ></ng-template>
-      <ng-template symbioteScreen name="Details" [component]="detailsComponent"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Details"
+        [component]="detailsComponent"
+      ></ng-template>
     </Stack>
   `,
 })
@@ -209,7 +244,11 @@ let capturedParamsHost: ParamsStackTestHost | undefined;
         [component]="homeComponent"
         [initialParams]="homeInitialParams"
       ></ng-template>
-      <ng-template symbioteScreen name="Details" [component]="detailsComponent"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Details"
+        [component]="detailsComponent"
+      ></ng-template>
     </Stack>
   `,
 })
@@ -258,6 +297,92 @@ class SearchBarStackTestHost {
     title: 'Home',
     headerSearchBarOptions: { placeholder: 'Search' },
   };
+}
+
+@Component({
+  selector: 'modal-stack-test-host',
+  standalone: true,
+  imports: [Stack, ScreenDirective],
+  template: `
+    <Stack #nav initialRouteName="Home">
+      <ng-template
+        symbioteScreen
+        name="Home"
+        [component]="homeComponent"
+        [options]="homeOptions"
+      ></ng-template>
+    </Stack>
+  `,
+})
+class ModalStackTestHost {
+  @ViewChild('nav') nav!: Stack;
+
+  homeComponent = HomeScreenComponent;
+  @Input() homeOptions: Record<string, unknown> = {
+    title: 'Home',
+    stackPresentation: 'modal',
+  };
+}
+
+@Component({
+  selector: 'profile-screen',
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `<symbiote-text>profile</symbiote-text>`,
+})
+class ProfileScreenComponent {}
+
+let capturedDynamicHost: DynamicStackTestHost | undefined;
+
+// A host whose marker set SHRINKS at runtime - the Angular shape of "a <Stack.Screen> behind an
+// @if", which StackTestHost's fixed template cannot express.
+@Component({
+  selector: 'dynamic-stack-test-host',
+  standalone: true,
+  imports: [Stack, ScreenDirective],
+  template: `
+    <Stack #nav initialRouteName="Home">
+      <ng-template
+        symbioteScreen
+        name="Home"
+        [component]="homeComponent"
+      ></ng-template>
+      @if (isDetailsRegistered()) {
+        <ng-template
+          symbioteScreen
+          name="Details"
+          [component]="detailsComponent"
+        ></ng-template>
+      }
+      <ng-template
+        symbioteScreen
+        name="Profile"
+        [component]="profileComponent"
+      ></ng-template>
+    </Stack>
+  `,
+})
+class DynamicStackTestHost {
+  @ViewChild('nav') nav!: Stack;
+
+  readonly isDetailsRegistered = signal(true);
+  homeComponent = HomeScreenComponent;
+  detailsComponent = DetailsScreenComponent;
+  profileComponent = ProfileScreenComponent;
+
+  constructor() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    capturedDynamicHost = this;
+  }
+}
+
+async function mountDynamicStack(): Promise<INavigatorHandle> {
+  capturedDynamicHost = undefined;
+  mount(ROOT_TAG, DynamicStackTestHost);
+  await tick();
+  const host = capturedDynamicHost;
+  if (!host) throw new Error('DynamicStackTestHost never mounted');
+  return host.nav;
 }
 
 describe('Angular Stack navigator', () => {
@@ -321,7 +446,9 @@ describe('Angular Stack navigator', () => {
 
   it('mounts the registered screen component as the RNSScreen content', async () => {
     await mountStack();
-    expect(findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home')).toBeDefined();
+    expect(
+      findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+    ).toBeDefined();
   });
 
   it('exposes route.params to the pushed screen via injectRoute', async () => {
@@ -348,7 +475,8 @@ describe('Angular Stack navigator', () => {
     const handle = await mountParamsStack();
     // Home mounts first (ParamsScreenComponent, initialParams: {tab:'feed'}), capturing its route.
     const homeRoute = capturedParamRoutes[0];
-    if (homeRoute === undefined) throw new Error('home route was never captured');
+    if (homeRoute === undefined)
+      throw new Error('home route was never captured');
     const homeKey = homeRoute().key;
     handle.push('Details');
     await tick();
@@ -378,7 +506,10 @@ describe('Angular Stack navigator', () => {
   it('nests an RNSSearchBar child, wrapped in an RNSScreenStackHeaderSubview, when headerSearchBarOptions is set', async () => {
     mount(ROOT_TAG, SearchBarStackTestHost, {
       initialProps: {
-        homeOptions: { title: 'Home', headerSearchBarOptions: { placeholder: 'Search' } },
+        homeOptions: {
+          title: 'Home',
+          headerSearchBarOptions: { placeholder: 'Search' },
+        },
       },
     });
     await tick();
@@ -393,7 +524,9 @@ describe('Angular Stack navigator', () => {
   });
 
   it('drives imperative SearchBarCommands (focus/setText/…) through the app-supplied ref', async () => {
-    const searchBarRef: { current: ISearchBarCommands | null } = { current: null };
+    const searchBarRef: { current: ISearchBarCommands | null } = {
+      current: null,
+    };
     mount(ROOT_TAG, SearchBarStackTestHost, {
       initialProps: {
         homeOptions: {
@@ -406,14 +539,96 @@ describe('Angular Stack navigator', () => {
 
     expect(searchBarRef.current).not.toBeNull();
     searchBarRef.current?.focus();
-    expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'focus', args: [] });
+    expect(fabric.commands.at(-1)).toMatchObject({
+      commandName: 'focus',
+      args: [],
+    });
     searchBarRef.current?.setText('preset');
-    expect(fabric.commands.at(-1)).toMatchObject({ commandName: 'setText', args: ['preset'] });
+    expect(fabric.commands.at(-1)).toMatchObject({
+      commandName: 'setText',
+      args: ['preset'],
+    });
   });
 
   it('renders the header config with zero children when there is no search bar', async () => {
     await mountStack();
     const header = headerConfigOf(screenNodes()[0]);
     expect(header.children).toHaveLength(0);
+  });
+
+  // why: a modally-presented screen has no UINavigationController on iOS (render-stack.ts's
+  // isHeaderInModal comment) - RNSScreenStackHeaderConfig has nothing to attach a native nav bar
+  // to unless the template nests header + content inside a SECOND, inner RNSScreenStack/RNSScreen
+  // pair purely to host it. outerScreenIsModal/isInModal (Stack's template-bound methods) exist
+  // specifically to pick this branch; a plain 'push' screen (every other test in this file) never
+  // exercises it, so this is the only place either method's `true` path is proven at all.
+  it('a modal screen mounts as RNSModalScreen and nests its header inside an inner RNSScreenStack', async () => {
+    mount(ROOT_TAG, ModalStackTestHost);
+    await tick();
+
+    const outer = findInTree(n => n.viewName === MODAL_SCREEN_VIEW);
+    if (!outer) throw new Error('no RNSModalScreen mounted');
+
+    const innerStack = outer.children.find(
+      child => child.viewName === STACK_VIEW,
+    );
+    if (!innerStack)
+      throw new Error('no inner RNSScreenStack nested inside the modal screen');
+    const innerScreen = innerStack.children.find(
+      child => child.viewName === SCREEN_VIEW,
+    );
+    if (!innerScreen)
+      throw new Error('no inner RNSScreen nested inside the inner stack');
+    // The only RNSScreen anywhere is this inner one - the OUTER screen mounted as RNSModalScreen
+    // instead, exactly the substitution outerScreenIsModal exists to make.
+    expect(screenNodes()).toEqual([innerScreen]);
+    expect(headerConfigOf(innerScreen).props.title).toBe('Home');
+  });
+
+  // why: the route list is navigation HISTORY, not a projection of the @ContentChildren query, so
+  // a marker that leaves the query while its route is still pushed used to leave a phantom entry.
+  // Angular feels that worst of the four: its template mounts an RNSScreen per route regardless,
+  // so componentFor() returning null paints a REAL, EMPTY native screen - a blank screen the user
+  // is parked on with no way to tell what happened.
+  it('drops a pushed route whose screen marker leaves the content query', async () => {
+    const handle = await mountDynamicStack();
+    handle.push('Details');
+    await tick();
+    expect(screenNodes()).toHaveLength(2);
+
+    capturedDynamicHost?.isDetailsRegistered.set(false);
+    await tick();
+
+    expect(screenNodes()).toHaveLength(1);
+    expect(
+      findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+    ).toBeDefined();
+    expect(
+      findInTree(
+        n => n.viewName === 'RCTRawText' && n.props.text === 'details',
+      ),
+    ).toBeUndefined();
+    expect(handle.canGoBack()).toBe(false);
+  });
+
+  // why: the pruning must be PERSISTED into the state signal, not recomputed per read - a phantom
+  // left in the signal has the next push rebuild the stack on top of it, and the user then has to
+  // press back TWICE to leave a route they only visited once.
+  it('keeps the pruned history when a new route is pushed afterwards', async () => {
+    const handle = await mountDynamicStack();
+    handle.push('Details');
+    await tick();
+    capturedDynamicHost?.isDetailsRegistered.set(false);
+    await tick();
+    handle.push('Profile');
+    await tick();
+    handle.pop();
+    await tick();
+
+    expect(screenNodes()).toHaveLength(1);
+    expect(
+      findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+    ).toBeDefined();
+    expect(handle.canGoBack()).toBe(false);
   });
 });

@@ -9,15 +9,17 @@ parity through shared layers.
 
 ## Current milestones
 
-| Area              | Status                 | Purpose                                                                                                             |
-| ----------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| React adapter     | On the live switcher      | Reference canary for the engine and Fabric pipe.                                                                    |
-| Vue adapter       | On the live switcher      | First non-React proof of the framework-agnostic seam.                                                               |
-| Angular adapter   | On the live switcher      | Second non-React proof: `Renderer2` seam, DOM-less bootstrap, full component parity.                              |
-| Engine            | In progress               | Retained tree, clone-on-write commits, event normalization.                                                         |
-| Components        | In progress               | Shared state/view layers so adapters inherit parity.                                                                |
-| Android host shim | Active                    | Keeps Android at canary parity with iOS.                                                                             |
-| Navigation package | Shipped                  | Native stack/tab/drawer navigator over `react-native-screens`, shared by every adapter.                             |
+| Area               | Status               | Purpose                                                                                     |
+| ------------------ | -------------------- | ------------------------------------------------------------------------------------------- |
+| React adapter      | On the live switcher | Reference canary for the engine and Fabric pipe.                                            |
+| Vue adapter        | On the live switcher | First non-React proof of the framework-agnostic seam.                                       |
+| Angular adapter    | On the live switcher | Second non-React proof: `Renderer2` seam, DOM-less bootstrap, full component parity.        |
+| Svelte adapter     | On the live switcher | Third non-React proof: a DOM shim over stock compiled Svelte output, full component parity. |
+| Solid adapter      | On the live switcher | Fourth non-React proof: `solid-js/universal`'s `createRenderer`, full component parity. |
+| Engine             | In progress          | Retained tree, clone-on-write commits, event normalization.                                 |
+| Components         | In progress          | Shared state/view layers so adapters inherit parity.                                        |
+| Android host shim  | Active               | Keeps Android at canary parity with iOS.                                                    |
+| Navigation package | Shipped              | Native stack/tab/drawer navigator over `react-native-screens`, shared by every adapter.     |
 
 ## Next adapter work
 
@@ -31,26 +33,45 @@ one permanent exception: the scroll family (`onScroll`, `onScrollBeginDrag`,
 callback input on `ScrollView` and the list components, because it must also
 accept an `Animated.event(...)` marker for native-driven scroll, which
 `@Output()` can't express. Wrapper packages have followed: the Slider package
-now ships an Angular build alongside React and Vue. Svelte and Solid fit the
-same long-term model: thin adapters over the shared engine.
+now ships an Angular build alongside React and Vue.
 
-React, Vue, and Angular keep expanding parity in the meantime: all three
-adapters now have a portal primitive for same-surface content relocation
-(React's `createPortal`, Vue's `Teleport`, Angular's `*portal` directive) plus
-a `createTunnel` primitive for cross-surface delivery — mutation-mode Fabric
-supports this where stock RN's persistent-mode renderer can't. Vue also
-gained `v-model` on controlled components and a working `v-show` directive;
-Angular's `[(value)]` two-way binding covers the same controlled-component
-case idiomatically. All three adapters now share one `AppRegistry` entry
-point over the same `@symbiote-native/engine` core.
+Svelte is the third non-React adapter, done the same long-term way: a thin
+layer over the shared engine — here a DOM shim over stock compiled Svelte
+output, so components stay ordinary Svelte markup with no bespoke compiler
+output. It reaches the same full component parity as React, Vue, and
+Angular, verified on-device on iOS and Android, and the Slider wrapper
+package ships a Svelte build too. It's on the landing page's live framework
+switcher.
+
+Solid is the fourth non-React adapter, built the same long-term way: a thin
+layer over the shared engine, here a Solid custom renderer over
+`solid-js/universal`'s own `createRenderer`, the framework's official
+agnostic seam for non-DOM targets. It reaches the same component parity as
+React, Vue, Angular, and Svelte, including `createPortal`, `createTunnel`,
+`Animated`, and `AppRegistry`, and every companion package now ships a
+`./solid` build too. It's also on the live switcher now, with its own demo
+clip; real-device verification is still pending, verified only in headless
+`vitest` so far.
+
+React, Vue, Angular, Svelte, and Solid keep expanding parity in the meantime:
+all five now have a portal primitive for same-surface content relocation
+(React's `createPortal`, Vue's `Teleport`, Angular's `*portal` directive,
+Svelte's and Solid's own `Portal`) plus a `createTunnel` primitive for
+cross-surface delivery. Mutation-mode Fabric supports this where stock RN's
+persistent-mode renderer can't. Vue also gained `v-model` on controlled components and a
+working `v-show` directive; Angular's `[(value)]` two-way binding covers the
+same controlled-component case idiomatically. All five adapters now share one
+`AppRegistry` entry point over the same `@symbiote-native/engine` core.
 
 ## Package parity with Expo
 
 The [navigation package](/docs/navigation/) closed the biggest gap on the "can a real app ship
-without React Navigation" list. Next up is a run of small, one-dependency native-module wrapper
-packages — Clipboard-class APIs first, following the same recipe as `@symbiote-native/slider` and
-`@symbiote-native/splash-screen` — closing the gap against Expo's package set one module at a
-time. Reanimated, a full worklet-driven animation layer, is the largest remaining piece and is
+without React Navigation" list, and a run of small native-module wrapper packages has followed
+it — Clipboard, Haptics, Sensors, Battery, Device and a dozen more, each wrapping one
+`expo-modules-core` module. Those don't use the autolinking-proxy recipe `@symbiote-native/slider`
+and `@symbiote-native/splash-screen` do: they ship a passive manifest, and a single app-level
+`@symbiote-native/expo-modules-link` postinstall registers whichever ones are installed (see [How
+to: wire up an Expo native module](/docs/howtos/expo-native-module-setup/)). Reanimated, a full worklet-driven animation layer, is the largest remaining piece and is
 saved for last. The end goal is package-surface parity with Expo's SDK: whatever a real app can
 reach for in Expo, a SymbioteNative app can reach for too, off the same untouched native core.
 
@@ -58,13 +79,14 @@ reach for in Expo, a SymbioteNative app can reach for too, off the same untouche
 
 `@symbiote-native/css-parser` compiles plain CSS, CSS Modules, and SCSS/Sass, Less,
 and Stylus preprocessor sources at build time into native style objects,
-resolved at runtime through a class registry shared by React, Vue, and
-Angular, including `box-shadow`, `transform`, `filter`, `transform-origin`,
+resolved at runtime through a class registry shared by React, Vue, Angular,
+Svelte, and Solid, including `box-shadow`, `transform`, `filter`, `transform-origin`,
 and `background-image` (gradients). It also ships type safety for
 `.module.css` imports: a `css-dts` CLI that generates a narrowed, typo-safe
 `.d.ts` next to each CSS Modules file, and a `typescript-plugin` for live
 in-editor autocomplete — see the [styling guide](/docs/learn/styling/) for
-setup. Svelte support and Tailwind CSS remain the open seams in this family.
+setup. Svelte's own `<style>` block (scoped by default) compiles through the
+same pipeline. Tailwind CSS remains the open seam in this family.
 
 ## Component parity rule
 

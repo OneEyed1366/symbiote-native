@@ -6,7 +6,7 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../render';
@@ -14,7 +14,8 @@ import { ImageBackground } from './image-background';
 
 const ROOT_TAG = 917;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function committedImage(): IFakeNode {
   const node = fabric.find(n => n.viewName === 'RCTImageView');
@@ -54,7 +55,14 @@ class ImageBackgroundStyleObjectHost {}
 
 beforeEach(() => {
   fabric.reset();
-  registerStyles({ tinted: { opacity: 0.5 } });
+  registerRules([
+    {
+      tokens: ['tinted'],
+      specificity: [0, 1, 0],
+      order: 0,
+      style: { opacity: 0.5 },
+    },
+  ]);
 });
 afterEach(() => {
   unmount(ROOT_TAG);

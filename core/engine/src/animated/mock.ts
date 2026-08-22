@@ -12,7 +12,14 @@ import { AnimatedValueXY } from './value-xy';
 import { AnimatedColor } from './color';
 import { AnimatedNode } from './graph';
 import { Easing } from './easing';
-import { add, subtract, multiply, divide, modulo, diffClamp } from './operators';
+import {
+  add,
+  subtract,
+  multiply,
+  divide,
+  modulo,
+  diffClamp,
+} from './operators';
 import { event, forkEvent, unforkEvent } from './event';
 import { dlog } from '../debug';
 import type { IEndCallback, IEndResult } from './animation';
@@ -36,7 +43,9 @@ function mockAnimationStart(
         ? callback
         : (result: IEndResult): void => {
             if (inAnimationCallback) {
-              dlog('Ignoring recursive animation callback when running mock animations');
+              dlog(
+                'Ignoring recursive animation callback when running mock animations',
+              );
               return;
             }
             inAnimationCallback = true;
@@ -56,7 +65,9 @@ const emptyAnimation: ICompositeAnimation = {
   reset: () => {},
 };
 
-function mockCompositeAnimation(animations: ICompositeAnimation[]): ICompositeAnimation {
+function mockCompositeAnimation(
+  animations: ICompositeAnimation[],
+): ICompositeAnimation {
   return {
     ...emptyAnimation,
     start: mockAnimationStart(callback => {
@@ -77,7 +88,10 @@ function resolveToValue(toValue: number | AnimatedNode): number {
   return toValue;
 }
 
-function spring(value: AnimatedValue, config: ISpringConfig): ICompositeAnimation {
+function spring(
+  value: AnimatedValue,
+  config: ISpringConfig,
+): ICompositeAnimation {
   return {
     ...emptyAnimation,
     start: mockAnimationStart(callback => {
@@ -87,7 +101,10 @@ function spring(value: AnimatedValue, config: ISpringConfig): ICompositeAnimatio
   };
 }
 
-function timing(value: AnimatedValue, config: ITimingConfig): ICompositeAnimation {
+function timing(
+  value: AnimatedValue,
+  config: ITimingConfig,
+): ICompositeAnimation {
   return {
     ...emptyAnimation,
     start: mockAnimationStart(callback => {
@@ -98,7 +115,10 @@ function timing(value: AnimatedValue, config: ITimingConfig): ICompositeAnimatio
 }
 
 // Decay has no toValue to land on, so RN returns the empty animation (AnimatedMock.js:121).
-function decay(_value: AnimatedValue, _config: IDecayConfig): ICompositeAnimation {
+function decay(
+  _value: AnimatedValue,
+  _config: IDecayConfig,
+): ICompositeAnimation {
   return emptyAnimation;
 }
 
@@ -117,7 +137,10 @@ function delay(_time: number): ICompositeAnimation {
   return emptyAnimation;
 }
 
-function stagger(_time: number, animations: ICompositeAnimation[]): ICompositeAnimation {
+function stagger(
+  _time: number,
+  animations: ICompositeAnimation[],
+): ICompositeAnimation {
   return mockCompositeAnimation(animations);
 }
 

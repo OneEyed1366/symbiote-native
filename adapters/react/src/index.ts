@@ -26,13 +26,17 @@ export type {
 export { ImageBackground } from './components/image-background';
 export type { IImageBackgroundProps } from './components/image-background';
 export { ScrollView } from './components/scroll-view';
-export type { IScrollViewProps, IScrollViewHandle } from './components/scroll-view';
+export type {
+  IScrollViewProps,
+  IScrollViewHandle,
+} from './components/scroll-view';
 export { TextInput } from './components/text-input';
-export type { ITextInputProps, ITextInputHandle } from './components/text-input';
+export type {
+  ITextInputProps,
+  ITextInputHandle,
+} from './components/text-input';
 export { InputAccessoryView } from './components/input-accessory-view';
 export type { IInputAccessoryViewProps } from './components/input-accessory-view';
-export { Keyboard, KEYBOARD_EVENT } from './modules/keyboard';
-export type { IKeyboardEventName } from './modules/keyboard';
 export { KeyboardAvoidingView } from './components/keyboard-avoiding-view';
 export type {
   IKeyboardAvoidingViewProps,
@@ -75,7 +79,11 @@ export type { IButtonProps } from './components/button';
 export { FlatList } from './components/flat-list';
 export type { IFlatListProps, IFlatListHandle } from './components/flat-list';
 export { SectionList } from './components/section-list';
-export type { ISectionListProps, ISectionListHandle, ISection } from './components/section-list';
+export type {
+  ISectionListProps,
+  ISectionListHandle,
+  ISection,
+} from './components/section-list';
 export { VirtualizedSectionList } from './components/virtualized-section-list';
 export type {
   IVirtualizedSectionListProps,
@@ -91,7 +99,12 @@ export type {
   IViewabilityConfigCallbackPair,
 } from './components/virtualized-list';
 
-export type { IViewStyle, ITextStyle, IFlexAlign, IFlexJustify } from './utils/styles';
+export type {
+  IViewStyle,
+  ITextStyle,
+  IFlexAlign,
+  IFlexJustify,
+} from './utils/styles';
 export { mount, unmount } from './render';
 // createPortal: react-reconciler's Fiber-level portal, working here because @symbiote-native/react is
 // mutation-mode (unlike stock RN's persistent-mode Fabric renderer, which doesn't support it —
@@ -135,17 +148,32 @@ export { Platform, StyleSheet } from '@symbiote-native/engine';
 // Color utilities: PlatformColor / DynamicColorIOS build opaque platform colors;
 // processColor runs a color through the injected platform processor. All pure /
 // seam-backed, so they live in shared and the adapter re-exports them.
-export { PlatformColor, DynamicColorIOS, processColor } from '@symbiote-native/engine';
+export {
+  PlatformColor,
+  DynamicColorIOS,
+  processColor,
+} from '@symbiote-native/engine';
 export type {
   IColorValue,
   IOpaqueColorValue,
   IDynamicColorIOSTuple,
 } from '@symbiote-native/engine';
-// Wired once by the app entry on a real host (like setColorProcessor): hands shared
-// RN's ViewConfig registry so third-party Fabric views auto-derive their metadata:
+// The three app-entry seams, wired once on a real host, so the barrel exposes them together.
+// setNativeViewConfigSource hands the engine RN's ViewConfig registry, which is how third-party
+// Fabric views auto-derive their metadata:
 //   setNativeViewConfigSource(name => ReactNativeViewConfigRegistry.get(name))
-export { setNativeViewConfigSource } from '@symbiote-native/engine';
-export type { INativeViewConfig, INativeViewConfigSource } from '@symbiote-native/engine';
+export {
+  setNativeViewConfigSource,
+  setColorProcessor,
+  setDeviceEventSource,
+} from '@symbiote-native/engine';
+// Diagnostics, gated by DEBUG (<keep_logs_gate_behind_DEBUG>): app code logs through the same
+// seam the engine does instead of a bare console.log.
+export { dlog, isDebug } from '@symbiote-native/engine';
+export type {
+  INativeViewConfig,
+  INativeViewConfigSource,
+} from '@symbiote-native/engine';
 export type {
   IPlatformStatic,
   IPlatformOSType,
@@ -154,10 +182,44 @@ export type {
   IPlatformSelectSpec,
 } from '@symbiote-native/engine';
 
-// Runtime modules: native-bridge consumers, same shape as Keyboard/StatusBar:
-// thin JS over getNativeModule + device events, no Fabric component of their own.
-export { Dimensions } from './modules/dimensions';
+// Imperative runtime modules: the SAME module every adapter shares, re-exported straight from
+// @symbiote-native/engine so app code names only @symbiote-native/react (RN's single import
+// root). Thin JS over getNativeModule + device events, no Fabric component of their own.
+export {
+  Alert,
+  Share,
+  ActionSheetIOS,
+  Linking,
+  Vibration,
+  ToastAndroid,
+  Settings,
+  I18nManager,
+  Dimensions,
+  Appearance,
+  AppState,
+  Keyboard,
+  KEYBOARD_EVENT,
+  BackHandler,
+  PermissionsAndroid,
+  PERMISSIONS,
+  RESULTS,
+  LayoutAnimation,
+  PixelRatio,
+} from '@symbiote-native/engine';
 export type {
+  IAlertType,
+  IAlertButtonStyle,
+  IAlertButton,
+  IAlertButtons,
+  IAlertOptions,
+  IShareContent,
+  IShareOptions,
+  IShareAction,
+  IActionSheetIOSOptions,
+  IShareActionSheetIOSOptions,
+  IShareActionSheetError,
+  IUrlEvent,
+  II18nManagerConstants,
   IDisplayMetrics,
   IDisplayMetricsAndroid,
   IDimensionsPayload,
@@ -165,34 +227,29 @@ export type {
   IDimensionsKey,
   IDimensionsChangeListener,
   IDimensionsStatic,
-} from './modules/dimensions';
-export { PixelRatio } from '@symbiote-native/engine';
-export type { IPixelRatioStatic } from '@symbiote-native/engine';
+  IColorSchemeName,
+  IColorSchemePreference,
+  IAppStateStatus,
+  IAppStateEvent,
+  IKeyboardEventName,
+  IKeyboardEvent,
+  IKeyboardMetrics,
+  IBackPressEventName,
+  IBackPressHandler,
+  IPermission,
+  IPermissionStatus,
+  IRationale,
+  ILayoutAnimationType,
+  ILayoutAnimationProperty,
+  ILayoutAnimationConfig,
+  ILayoutAnimationAnim,
+  IPixelRatioStatic,
+} from '@symbiote-native/engine';
+
+// React lifecycle over those core device-state modules.
 export { useWindowDimensions } from './hooks/use-window-dimensions';
-export { Appearance } from './modules/appearance';
-export type { IColorSchemeName, IColorSchemePreference } from './modules/appearance';
 export { useColorScheme } from './hooks/use-color-scheme';
-export { AppState } from './modules/app-state';
-export type { IAppStateStatus, IAppStateEvent } from './modules/app-state';
-export { Alert } from './modules/alert';
-export type {
-  IAlertType,
-  IAlertButtonStyle,
-  IAlertButton,
-  IAlertButtons,
-  IAlertOptions,
-} from './modules/alert';
-export { ActionSheetIOS } from './modules/action-sheet-ios';
-export type {
-  IActionSheetIOSOptions,
-  IShareActionSheetIOSOptions,
-  IShareActionSheetError,
-} from './modules/action-sheet-ios';
-export { Linking } from './modules/linking';
-export type { IUrlEvent } from './modules/linking';
-export { Vibration } from './modules/vibration';
-export { Share } from './modules/share';
-export type { IShareContent, IShareOptions, IShareAction } from './modules/share';
+
 export { AccessibilityInfo } from './modules/accessibility-info';
 export type {
   IAccessibilityChangeEvent,
@@ -202,9 +259,6 @@ export type {
   IAnnounceForAccessibilityOptions,
   IAccessibilityEventType,
 } from './modules/accessibility-info';
-export { I18nManager } from './modules/i18n-manager';
-export type { II18nManagerConstants } from './modules/i18n-manager';
-export { Settings } from './modules/settings';
 
 // Interaction subsystems: gestures, deferred work, and layout transitions.
 export { PanResponder } from '@symbiote-native/engine';
@@ -214,13 +268,6 @@ export type {
   IGestureResponderHandlers,
   IPanResponderInstance,
 } from '@symbiote-native/engine';
-export { LayoutAnimation } from './modules/layout-animation';
-export type {
-  ILayoutAnimationType,
-  ILayoutAnimationProperty,
-  ILayoutAnimationConfig,
-  ILayoutAnimationAnim,
-} from './modules/layout-animation';
 // InteractionManager is pure JS, so it lives in shared; re-exported here so app code
 // names only @symbiote-native/react (RN's single import root).
 export { InteractionManager } from '@symbiote-native/engine';
@@ -232,15 +279,9 @@ export type {
   IHandle,
 } from '@symbiote-native/engine';
 
-// Android-only surface (the second-platform pass). Each is a thin JS shim over an
-// Android native module / Fabric view, inert on iOS (no module → graceful no-op,
-// no native view → degrade to a plain container). Native module name correctness
-// can only be confirmed on a real device/simulator, not headless tests.
-export { BackHandler } from './modules/back-handler';
-export type { IBackPressEventName, IBackPressHandler } from './modules/back-handler';
-export { ToastAndroid } from './modules/toast-android';
-export { PermissionsAndroid, PERMISSIONS, RESULTS } from './modules/permissions-android';
-export type { IPermission, IPermissionStatus, IRationale } from './modules/permissions-android';
+// Android-only surface (the second-platform pass): a thin JS shim over an Android Fabric view,
+// inert on iOS (no native view -> degrades to a plain container). The Android-only MODULES
+// (ToastAndroid, PermissionsAndroid, BackHandler) sit in the engine block above.
 export { TouchableNativeFeedback } from './components/touchable-native-feedback';
 export type {
   ITouchableNativeFeedbackProps,
@@ -248,4 +289,23 @@ export type {
   IThemeAttrBackground,
   IRippleBackground,
 } from './components/touchable-native-feedback';
-export type { ISymbioteEvent } from '@symbiote-native/engine';
+export type {
+  ISymbioteEvent,
+  ISymbioteNode,
+  IRootTag,
+} from '@symbiote-native/engine';
+// Component-detail types carrying no framework element or ref, so they are defined once in
+// @symbiote-native/components and every adapter re-exports the SAME type
+// (<prop_types_split_agnostic_vs_per_adapter>).
+export type {
+  ICellLayout,
+  ISeparatorProps,
+  ISeparators,
+  IModalOrientationChangeEvent,
+  IPressableAndroidRippleConfig,
+  IEnterKeyHint,
+  IInputMode,
+  ISubmitBehavior,
+  ITextInputSelection,
+  IImageStatics,
+} from '@symbiote-native/components';

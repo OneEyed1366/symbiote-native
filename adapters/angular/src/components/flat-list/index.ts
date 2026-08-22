@@ -1,37 +1,35 @@
 // FlatList, the Angular convenience surface over VirtualizedList. It takes a plain `data` array
 // and derives getItem/getItemCount; numColumns packs items into rows (each row a flex-row of N
-// columns), so the virtualized stream is rows, not items (RN's FlatList). All windowing /
-// viewability / batching / imperative scrolling are inherited from VirtualizedList; the data
-// shaping (chunkIntoRows / rowKeyExtractor / expandRowViewability / row-separator unwrap) is shared
-// verbatim from @symbiote-native/components, exactly as the React and Vue FlatLists reuse it. This is the
-// Angular twin of adapters/vue/src/components/flat-list/index.ts.
+// columns), so the virtualized stream is rows, not items (RN's FlatList). Windowing / viewability /
+// batching / imperative scrolling are inherited from VirtualizedList; the data shaping
+// (chunkIntoRows / rowKeyExtractor / expandRowViewability / row-separator unwrap) is shared
+// verbatim from @symbiote-native/components, same as React/Vue's FlatLists.
 //
-// TEMPLATE FORWARDING — both paths RE-STAMP; neither uses a bare `<ng-content>` passthrough.
+// TEMPLATE FORWARDING — both column paths RE-STAMP; neither uses a bare `<ng-content>` passthrough.
 // Angular's @ContentChild does NOT resolve a directive across a SECOND `<ng-content>` re-projection
-// hop (it only sees what was projected directly onto the querying component's own tag) — a bare
-// `<VirtualizedList ...><ng-content></ng-content></VirtualizedList>` here left VirtualizedList's own
-// itemDir/headerDir/etc. undefined, so every cell rendered empty (a real, confirmed device bug — see
-// flat-list.test.ts). Fixed for both column modes the same way:
+// hop (only what's projected directly onto the querying component's own tag) — a bare
+// `<VirtualizedList ...><ng-content></ng-content></VirtualizedList>` left VirtualizedList's own
+// itemDir/headerDir/etc. undefined, rendering every cell empty (confirmed device bug, see
+// flat-list.test.ts). Fixed for both column modes:
 //   * Single column (numColumns <= 1): FlatList captures the app's `<ng-template vListItem>` (and
 //     vListHeader/vListFooter/vListEmpty/vListSeparator) with its OWN @ContentChild — a single,
 //     direct projection hop, which always resolves — then re-authors equivalent `<ng-template>`s on
-//     `<VirtualizedList>`, each forwarding the captured templateRef + context through
+//     `<VirtualizedList>`, forwarding the captured templateRef + context through
 //     VListOutletDirective. Item/index/separators pass through 1:1 (no row wrapping).
-//   * Multi column (numColumns > 1): the same re-stamp, but the app's vListItem is typed for ItemT
-//     while the virtualized stream is rows (IRow<ItemT>), so a plain passthrough couldn't work even if
-//     the projection issue didn't exist. The row vListItem lays out the N columns side by side (each
-//     cell stamps the app's item template via VListOutletDirective with the per-item context {item,
-//     index: row.startIndex + column, separators}), the row vListSeparator unwraps the flanking rows
-//     to their last/first item, and onViewableItemsChanged is wrapped with expandRowViewability so the
-//     caller still sees per-item visibility. This mirrors exactly how Vue's FlatList intercepts
-//     renderItem with renderRow.
+//   * Multi column (numColumns > 1): same re-stamp, but the app's vListItem is typed for ItemT
+//     while the virtualized stream is rows (IRow<ItemT>), so a plain passthrough couldn't work
+//     regardless. The row vListItem lays out the N columns side by side (each cell stamps the
+//     app's item template via VListOutletDirective with context {item, index: row.startIndex +
+//     column, separators}), the row vListSeparator unwraps the flanking rows to their last/first
+//     item, and onViewableItemsChanged is wrapped with expandRowViewability so the caller still
+//     sees per-item visibility — mirrors how Vue's FlatList intercepts renderItem with renderRow.
 //
 // The imperative handle (scrollToIndex / scrollToOffset / scrollToEnd / scrollToItem /
 // recordInteraction / flashScrollIndicators / getScroll* / getNativeScrollRef) is RN's FlatList
-// surface; FlatList re-exposes it by delegating to the inner VirtualizedList (@ViewChild). The
-// element-returning props (renderItem / ItemSeparatorComponent / List{Header,Footer,Empty}Component)
-// are templates in Angular, so they are absent from IFlatListProps, per the per-adapter
-// children/render prop split; everything agnostic mirrors IVirtualizedListProps.
+// surface, delegated straight to the inner VirtualizedList (@ViewChild). The element-returning
+// props (renderItem / ItemSeparatorComponent / List{Header,Footer,Empty}Component) are templates
+// in Angular, so they're absent from IFlatListProps per the per-adapter children/render split;
+// everything else mirrors IVirtualizedListProps.
 
 import {
   CUSTOM_ELEMENTS_SCHEMA,
@@ -44,6 +42,7 @@ import {
   Output,
   ViewChild,
   inject,
+  type DoCheck,
   type OnChanges,
   type SimpleChanges,
 } from '@angular/core';
@@ -81,14 +80,20 @@ import {
   type IVListSeparatorContext,
 } from '../virtualized-list';
 import { VListOutletDirective } from '../virtualized-list/directives';
-import { stableAnchorStyle, ViewHost } from '../../primitives';
+import {
+  stableAnchorStyle,
+  SymbioteStyleInputDirective,
+  ViewHost,
+} from '../../primitives';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 function isRow<ItemT>(value: unknown): value is IRow<ItemT> {
   return (
-    isRecord(value) && Array.isArray(value['items']) && typeof value['startIndex'] === 'number'
+    isRecord(value) &&
+    Array.isArray(value['items']) &&
+    typeof value['startIndex'] === 'number'
   );
 }
 function isSeparators(value: unknown): value is ISeparators {
@@ -130,7 +135,10 @@ export {
   VListItemDirective,
   VListSeparatorDirective,
 } from '../virtualized-list';
-export type { IVListItemContext, IVListSeparatorContext } from '../virtualized-list';
+export type {
+  IVListItemContext,
+  IVListSeparatorContext,
+} from '../virtualized-list';
 
 // FlatList's imperative handle is exactly VirtualizedList's.
 export type IFlatListHandle = IVirtualizedListHandle;
@@ -165,6 +173,9 @@ export type IFlatListInputs<ItemT> = Omit<
 @Component({
   selector: 'FlatList',
   standalone: true,
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
     VirtualizedList,
@@ -254,7 +265,9 @@ export type IFlatListInputs<ItemT> = Omit<
           >
             <ng-container
               [vListOutlet]="separatorDir.templateRef"
-              [vListOutletContext]="rowSeparatorContext(highlighted, leadingItem, trailingItem)"
+              [vListOutletContext]="
+                rowSeparatorContext(highlighted, leadingItem, trailingItem)
+              "
             ></ng-container>
           </ng-template>
         }
@@ -299,7 +312,12 @@ export type IFlatListInputs<ItemT> = Omit<
         [style]="resolvedStyle"
         [contentContainerStyle]="contentContainerStyle"
       >
-        <ng-template vListItem let-item let-index="index" let-separators="separators">
+        <ng-template
+          vListItem
+          let-item
+          let-index="index"
+          let-separators="separators"
+        >
           <ng-container
             [vListOutlet]="itemDir?.templateRef"
             [vListOutletContext]="{ $implicit: item, index, separators }"
@@ -329,7 +347,9 @@ export type IFlatListInputs<ItemT> = Omit<
           >
             <ng-container
               [vListOutlet]="separatorDir.templateRef"
-              [vListOutletContext]="itemSeparatorContext(highlighted, leadingItem, trailingItem)"
+              [vListOutletContext]="
+                itemSeparatorContext(highlighted, leadingItem, trailingItem)
+              "
             ></ng-container>
           </ng-template>
         }
@@ -338,15 +358,21 @@ export type IFlatListInputs<ItemT> = Omit<
   `,
 })
 export class FlatList<ItemT = unknown>
-  implements IFlatListInputs<ItemT>, IVirtualizedListHandle, OnChanges
+  implements IFlatListInputs<ItemT>, IVirtualizedListHandle, DoCheck, OnChanges
 {
   // The list's edge/viewability/failure events as real Angular events: `(endReached)="…"`, not
   // `[onEndReached]="…"` — re-emitted straight from the inner VirtualizedList's own @Output()s (see
   // the template's `(endReached)="endReached.emit($event)"` style forwarding above).
-  @Output() readonly endReached = new EventEmitter<{ distanceFromEnd: number }>();
-  @Output() readonly startReached = new EventEmitter<{ distanceFromStart: number }>();
+  @Output() readonly endReached = new EventEmitter<{
+    distanceFromEnd: number;
+  }>();
+  @Output() readonly startReached = new EventEmitter<{
+    distanceFromStart: number;
+  }>();
   @Output() readonly refresh = new EventEmitter<void>();
-  @Output() readonly viewableItemsChanged = new EventEmitter<IViewableItemsChangedInfo<ItemT>>();
+  @Output() readonly viewableItemsChanged = new EventEmitter<
+    IViewableItemsChangedInfo<ItemT>
+  >();
   @Output() readonly scrollToIndexFailed = new EventEmitter<{
     index: number;
     highestMeasuredFrameIndex: number;
@@ -367,8 +393,10 @@ export class FlatList<ItemT = unknown>
   @Input() onStartReachedThreshold?: number;
   @Input() refreshing?: boolean | null;
   @Input() progressViewOffset?: number;
-  @Input() viewabilityConfig?: IVirtualizedListProps<ItemT>['viewabilityConfig'];
-  @Input() viewabilityConfigCallbackPairs?: IViewabilityConfigCallbackPair<ItemT>[];
+  @Input()
+  viewabilityConfig?: IVirtualizedListProps<ItemT>['viewabilityConfig'];
+  @Input()
+  viewabilityConfigCallbackPairs?: IViewabilityConfigCallbackPair<ItemT>[];
   @Input() initialNumToRender?: number;
   @Input() initialScrollIndex?: number;
   @Input() maxToRenderPerBatch?: number;
@@ -380,10 +408,13 @@ export class FlatList<ItemT = unknown>
     autoscrollToTopThreshold?: number;
   };
   @Input() onScroll?: IVirtualizedListProps<ItemT>['onScroll'];
-  @Input() onScrollBeginDrag?: IVirtualizedListProps<ItemT>['onScrollBeginDrag'];
+  @Input()
+  onScrollBeginDrag?: IVirtualizedListProps<ItemT>['onScrollBeginDrag'];
   @Input() onScrollEndDrag?: IVirtualizedListProps<ItemT>['onScrollEndDrag'];
-  @Input() onMomentumScrollBegin?: IVirtualizedListProps<ItemT>['onMomentumScrollBegin'];
-  @Input() onMomentumScrollEnd?: IVirtualizedListProps<ItemT>['onMomentumScrollEnd'];
+  @Input()
+  onMomentumScrollBegin?: IVirtualizedListProps<ItemT>['onMomentumScrollBegin'];
+  @Input()
+  onMomentumScrollEnd?: IVirtualizedListProps<ItemT>['onMomentumScrollEnd'];
   @Input() scrollEventThrottle?: number;
   @Input() keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
   @Input() keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
@@ -397,7 +428,8 @@ export class FlatList<ItemT = unknown>
   @ContentChild(VListHeaderDirective) headerDir?: VListHeaderDirective;
   @ContentChild(VListFooterDirective) footerDir?: VListFooterDirective;
   @ContentChild(VListEmptyDirective) emptyDir?: VListEmptyDirective;
-  @ContentChild(VListSeparatorDirective) separatorDir?: VListSeparatorDirective<ItemT>;
+  @ContentChild(VListSeparatorDirective)
+  separatorDir?: VListSeparatorDirective<ItemT>;
 
   // The composed inner list (whichever numColumns branch rendered). Its instance IS the
   // IVirtualizedListHandle, so FlatList's handle delegates straight to it.
@@ -427,18 +459,20 @@ export class FlatList<ItemT = unknown>
     return this.columns > SINGLE_COLUMN;
   }
 
+  // ngDoCheck, NOT ngOnChanges: a bare `class=` never becomes an @Input, so ngOnChanges does not
+  // RUN for it and the merge froze at its creation value (a stranded tile on the ReactiveStyle
+  // canary). stableAnchorStyle, not a bare flattenStyle, keeps `resolvedStyle`'s reference stable
+  // across ticks that changed nothing - a fresh object every tick defeats VirtualizedList's own
+  // dedup gate and free-runs CD (see stableAnchorStyle's doc comment).
+  ngDoCheck(): void {
+    this.resolvedStyle = stableAnchorStyle(
+      this.elementRef,
+      this.style,
+      this.resolvedStyle,
+    );
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
-    // Recomputed on EVERY ngOnChanges call, not gated on `changes['style']`: a class= on the
-    // FlatList use site (no matching [style] binding at all) never appears in `changes`, so a
-    // guard here would permanently skip picking up anchorHostStyle for that (the actual bug-report
-    // shape) — ngOnChanges still fires at least once at mount via the required `data` @Input(), and
-    // by then the anchor's class-derived style is already resolved synchronously (routeProp runs
-    // inline from Renderer2.addClass, before this component's own lifecycle hooks). stableAnchorStyle
-    // (not a bare flattenStyle) keeps `resolvedStyle`'s REFERENCE stable across ticks where nothing
-    // actually changed — `[style]="resolvedStyle"` binds onto VirtualizedList's own `@Input() style`,
-    // which feeds its `ngDoCheck` dedup gate; a fresh object every tick would defeat that gate and
-    // free-run change detection forever (see stableAnchorStyle's doc comment).
-    this.resolvedStyle = stableAnchorStyle(this.elementRef, this.style, this.resolvedStyle);
     if (changes['columnWrapperStyle'] !== undefined) {
       // A class-name string resolves through the shared registry before flattenStyle, which
       // only understands style objects/arrays.
@@ -446,11 +480,18 @@ export class FlatList<ItemT = unknown>
         typeof this.columnWrapperStyle === 'string'
           ? resolveClassName(this.columnWrapperStyle)
           : this.columnWrapperStyle;
-      this.rowStyle = flattenStyle([{ flexDirection: 'row' }, resolvedColumnWrapperStyle]);
+      this.rowStyle = flattenStyle([
+        { flexDirection: 'row' },
+        resolvedColumnWrapperStyle,
+      ]);
     }
     if (changes['data'] !== undefined || changes['numColumns'] !== undefined) {
-      this.rows = this.isMultiColumn ? chunkIntoRows(this.data, this.columns) : [];
-      dlog(`Angular FlatList over ${this.data?.length ?? 0} items, ${this.columns} column(s)`);
+      this.rows = this.isMultiColumn
+        ? chunkIntoRows(this.data, this.columns)
+        : [];
+      dlog(
+        `Angular FlatList over ${this.data?.length ?? 0} items, ${this.columns} column(s)`,
+      );
     }
     if (
       changes['viewabilityConfigCallbackPairs'] !== undefined ||
@@ -471,15 +512,24 @@ export class FlatList<ItemT = unknown>
 
   // Viewability over rows expands back to per-item tokens, so the caller sees item-level
   // visibility, not row-level (shared expandRowViewability), matching Vue.
-  rowViewableItemsChanged = (info: IViewableItemsChangedInfo<IRow<ItemT>>): void => {
-    this.viewableItemsChanged.emit(expandRowViewability(info, this.keyExtractor));
+  rowViewableItemsChanged = (
+    info: IViewableItemsChangedInfo<IRow<ItemT>>,
+  ): void => {
+    this.viewableItemsChanged.emit(
+      expandRowViewability(info, this.keyExtractor),
+    );
   };
 
-  private buildRowViewabilityPairs(): IViewabilityConfigCallbackPair<IRow<ItemT>>[] | undefined {
+  private buildRowViewabilityPairs():
+    IViewabilityConfigCallbackPair<IRow<ItemT>>[] | undefined {
     return this.viewabilityConfigCallbackPairs?.map(pair => ({
       viewabilityConfig: pair.viewabilityConfig,
-      onViewableItemsChanged: (rowInfo: IViewableItemsChangedInfo<IRow<ItemT>>): void => {
-        pair.onViewableItemsChanged?.(expandRowViewability(rowInfo, this.keyExtractor));
+      onViewableItemsChanged: (
+        rowInfo: IViewableItemsChangedInfo<IRow<ItemT>>,
+      ): void => {
+        pair.onViewableItemsChanged?.(
+          expandRowViewability(rowInfo, this.keyExtractor),
+        );
       },
     }));
   }
@@ -496,7 +546,9 @@ export class FlatList<ItemT = unknown>
     const handle = isSeparators(separators) ? separators : NOOP_SEPARATORS;
     return row.items.map((item, column) => {
       const index = row.startIndex + column;
-      const key = this.keyExtractor ? this.keyExtractor(item, index) : String(index);
+      const key = this.keyExtractor
+        ? this.keyExtractor(item, index)
+        : String(index);
       return { key, context: { $implicit: item, index, separators: handle } };
     });
   }
@@ -513,8 +565,12 @@ export class FlatList<ItemT = unknown>
     return {
       $implicit: isHighlighted,
       highlighted: isHighlighted,
-      leadingItem: isRow<ItemT>(leadingRow) ? lastItemOfRow(leadingRow) : undefined,
-      trailingItem: isRow<ItemT>(trailingRow) ? firstItemOfRow(trailingRow) : undefined,
+      leadingItem: isRow<ItemT>(leadingRow)
+        ? lastItemOfRow(leadingRow)
+        : undefined,
+      trailingItem: isRow<ItemT>(trailingRow)
+        ? firstItemOfRow(trailingRow)
+        : undefined,
     };
   }
 
@@ -547,7 +603,11 @@ export class FlatList<ItemT = unknown>
   }): void {
     this.listRef?.scrollToIndex(params);
   }
-  scrollToItem(params: { item: unknown; animated?: boolean; viewPosition?: number }): void {
+  scrollToItem(params: {
+    item: unknown;
+    animated?: boolean;
+    viewPosition?: number;
+  }): void {
     this.listRef?.scrollToItem(params);
   }
   scrollToEnd(params?: { animated?: boolean }): void {

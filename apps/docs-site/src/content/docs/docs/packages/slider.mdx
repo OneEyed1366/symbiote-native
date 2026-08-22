@@ -9,18 +9,25 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 [`@react-native-community/slider`](https://github.com/callstack/react-native-slider) so every
 SymbioteNative adapter can render it — without importing that library's React component body. It is
 the reference implementation of the [third-party native-view wrapper](#how-the-wrapper-works)
-pattern: the recipe to follow for any future community RN view.
+pattern: the recipe to follow for any future community RN view. Its counterpart is
+[splash screen](/docs/packages/splash-screen/), which wraps a community library that ships an
+imperative native module and no view at all — both are autolinked through a
+`react-native.config.cjs` + podspec proxy, unlike the `expo-modules-core` packages such as
+[local auth](/docs/packages/local-auth/), whose native code `expo-modules-autolinking` discovers
+instead.
 
 | OS platform | Support |
 | ----------- | ------- |
 | iOS         | ✅ live |
 | Android     | ✅ live |
 
-| Framework adapter | Support    |
-| ------------------ | ---------- |
-| React               | ✅ live    |
-| Vue                 | ✅ live    |
-| Angular             | ✅ live    |
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
 
 ## Installation
 
@@ -32,18 +39,20 @@ pnpm add @react-native-community/slider
 as a workspace dependency the same way the examples do.
 
 <Aside type="caution">
-  `@react-native-community/slider` ships a React component (`Slider.tsx`) built on hooks. Never
-  import that component directly in a non-React adapter — it throws with `Cannot read property
-  'useState' of null` because the React dispatcher is absent. Always import from
-  `@symbiote-native/slider/react`, `@symbiote-native/slider/vue`, or `@symbiote-native/slider/angular`,
-  never from the community package itself.
+  `@react-native-community/slider` ships a React component (`Slider.tsx`) built
+  on hooks. Never import that component directly in a non-React adapter — it
+  throws with `Cannot read property 'useState' of null` because the React
+  dispatcher is absent. Always import from `@symbiote-native/slider/react`,
+  `@symbiote-native/slider/vue`, `@symbiote-native/slider/angular`, or
+  `@symbiote-native/slider/svelte`, never from the community package itself.
 </Aside>
 
 ## Usage
 
 <Aside type="note">
-  The slider is **uncontrolled** during a drag, matching the underlying native view: it does not
-  snap back to `value` while the user is dragging, only after `onSlidingComplete`.
+  The slider is **uncontrolled** during a drag, matching the underlying native
+  view: it does not snap back to `value` while the user is dragging, only after
+  `onSlidingComplete`.
 </Aside>
 
 <Tabs syncKey="framework">
@@ -68,6 +77,7 @@ as a workspace dependency the same way the examples do.
       );
     }
     ```
+
   </TabItem>
   <TabItem label="Vue">
     ```vue
@@ -93,6 +103,7 @@ as a workspace dependency the same way the examples do.
     `v-model` is sugar over the same `value`/`@value-change` pair — write
     `:value="volume" @value-change="volume = $event"` instead if you need the
     explicit form. See the [Vue API reference](/docs/api/vue/#model-bindings-v-model).
+
   </TabItem>
   <TabItem label="Angular">
     ```ts
@@ -121,14 +132,75 @@ as a workspace dependency the same way the examples do.
     `[(value)]` is Angular's banana-in-a-box two-way binding over the same
     `value` input + `valueChange` output pair — write `[value]="volume()"
     (valueChange)="volume.set($event)"` instead if you need the explicit form.
+
+    `Slider` also implements `ControlValueAccessor` directly, so it plugs
+    straight into `@angular/forms` — `[formControl]="volumeControl"` (from
+    `ReactiveFormsModule`) works the same way it does on `TextInput`/`Switch`,
+    no extra import needed. See the [Angular API reference's Forms
+    section](/docs/api/angular/#forms-angularforms) for the full pattern.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Slider } from '@symbiote-native/slider/svelte';
+
+      let volume = $state(0.5);
+    </script>
+
+    <Slider
+      bind:value={volume}
+      minimumValue={0}
+      maximumValue={1}
+      step={0.05}
+      minimumTrackTintColor="#ff3e00"
+      thumbTintColor="#ff3e00"
+    />
+    ```
+
+    `value` is declared `$bindable()`, so `bind:value={x}` works as Svelte's own
+    two-way-binding sugar — the compiler wires the sync at the call site, no
+    adapter plumbing involved. The explicit `value={x} onValueChange={setX}`
+    form still works too and is required if you need to see or react to every
+    reported value yourself; don't pass both on the same instance, since
+    supplying `onValueChange` takes over and the bound variable stops updating
+    from native reports.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { Slider } from '@symbiote-native/slider/solid';
+
+    export default function VolumeControl() {
+      const [volume, setVolume] = createSignal(0.5);
+
+      return (
+        <Slider
+          value={volume()}
+          minimumValue={0}
+          maximumValue={1}
+          step={0.05}
+          onValueChange={setVolume}
+          minimumTrackTintColor="#2c4f7c"
+          thumbTintColor="#2c4f7c"
+        />
+      );
+    }
+    ```
+
+    Solid has no two-way-binding sugar of its own - `value={volume()}` plus `onValueChange={setVolume}`
+    is the whole controlled pattern, a signal read in place of React's `useState` value.
+
   </TabItem>
 </Tabs>
 
 ### Custom step markers
 
 `renderStepNumber` draws the library's built-in step dots. To draw your own marker per step,
-pass a `StepMarker` (React) or fill the `#stepMarker` scoped slot (Vue) — both receive
-`{ stepMarked, currentValue, index, min, max }`:
+pass a `StepMarker` (React), fill the `#stepMarker` scoped slot (Vue), pass a `stepMarker`
+snippet (Svelte), or pass a `StepMarker` render-prop function (Solid, given an accessor) - all
+four receive `{ stepMarked, currentValue, index, min, max }`:
 
 ```tsx
 <Slider
@@ -137,37 +209,127 @@ pass a `StepMarker` (React) or fill the `#stepMarker` scoped slot (Vue) — both
   maximumValue={4}
   step={1}
   StepMarker={({ stepMarked }) => (
-    <View style={{ width: 8, height: 8, borderRadius: 4, opacity: stepMarked ? 1 : 0.4 }} />
+    <View
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        opacity: stepMarked ? 1 : 0.4,
+      }}
+    />
   )}
 />
 ```
+
+```vue
+<template>
+  <Slider :value="2" :minimum-value="0" :maximum-value="4" :step="1">
+    <template #stepMarker="{ stepMarked }">
+      <View
+        :style="{
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          opacity: stepMarked ? 1 : 0.4,
+        }"
+      />
+    </template>
+  </Slider>
+</template>
+```
+
+```svelte
+<Slider value={2} minimumValue={0} maximumValue={4} step={1}
+  >{#snippet stepMarker({ stepMarked })}<View
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        opacity: stepMarked ? 1 : 0.4,
+      }}
+    />{/snippet}</Slider
+>
+```
+
+```tsx
+<Slider
+  value={2}
+  minimumValue={0}
+  maximumValue={4}
+  step={1}
+  StepMarker={marker => (
+    <View
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        opacity: marker().stepMarked ? 1 : 0.4,
+      }}
+    />
+  )}
+/>
+```
+
+Solid's `StepMarker` receives an `Accessor<IStepMarkerProps>`, called once per cell — read
+`marker().stepMarked`, never destructure the accessor itself, or the marker freezes at its first
+report mid-drag.
+
+<Aside type="caution" title="No Angular equivalent yet">
+  Angular has no `StepMarker` slot — it's a deliberate, scoped gap
+  (`packages/slider/src/angular/slider/shared.ts`'s module header), not an
+  oversight. The natural analogue is a `@ContentChild(TemplateRef)
+  stepMarker?: TemplateRef<IStepMarkerProps>` projected per cell via
+  `NgTemplateOutlet`, but wiring an embedded view per cell against the
+  imperative `DescriptorOutlet` patch model is disproportionate complexity for
+  a path no real caller exercises today. Every other prop, including the
+  default `renderStepNumber` indicator, is fully supported on Angular.
+</Aside>
 
 ## API
 
 ### Props
 
 Every prop below is framework-agnostic and shared verbatim by every adapter, **except**
-`StepMarker`, which is per-adapter because it returns a framework element (a React component vs
-a Vue scoped slot) — see [shared vs framework-specific](/docs/api/components/#shared-vs-framework-specific).
+`StepMarker`, which is per-adapter because it returns a framework element (a React component, a
+Vue scoped slot, a Svelte snippet, or a Solid render-prop over an accessor — no Angular
+equivalent yet, see the caution above) — see [shared vs
+framework-specific](/docs/api/components/#shared-vs-framework-specific).
 
-| Prop | Type | Default | Description |
-| --- | --- | --- | --- |
-| `value` | `number` | `0` | The slider's position. Uncontrolled during a drag — it doesn't snap back to `value` until `onSlidingComplete` fires |
-| `minimumValue` / `maximumValue` | `number` | `0` / `1` | Lower/upper bound of the draggable range |
-| `step` | `number` | `0` | Snaps the thumb to increments of this size; `0` draws implicit steps at native resolution (iOS 1000, Android 128) |
-| `lowerLimit` / `upperLimit` | `number` | unbounded | Clamps the draggable range without changing `minimumValue`/`maximumValue` |
-| `minimumTrackTintColor` / `maximumTrackTintColor` / `thumbTintColor` | `IColorValue` | native default | Color of the track before/after the thumb, and of the thumb itself |
-| `thumbImage` / `minimumTrackImage` / `maximumTrackImage` / `trackImage` | `IImageSourceProp` | — | Replaces the corresponding native default image |
-| `thumbSize` | `number` | native default | Diameter of the thumb, in points |
-| `disabled` | `boolean` | `false` | Disables dragging and dims the control to the native disabled look |
-| `inverted` | `boolean` | `false` | Reverses the direction the track fills in |
-| `tapToSeek` | `boolean` | `false` | Tapping anywhere on the track jumps the thumb there, instead of requiring a drag |
-| `vertical` | `boolean` | `false` | Renders the slider top-to-bottom instead of left-to-right |
-| `renderStepNumber` | `boolean` | `false` | Draws the built-in step-number indicator |
-| `StepMarker` (React) / `#stepMarker` (Vue) | render prop / scoped slot | — | Custom per-step marker, replacing `renderStepNumber`'s built-in dot |
-| `onValueChange` | `(value: number) => void` | — | Fires continuously while dragging |
-| `onSlidingStart` / `onSlidingComplete` | `(value: number) => void` | — | Fires once when a drag begins/ends |
-| accessibility / `aria-*` / `testID` / `style` | — | — | Pass through to the native node unchanged |
+| Prop                                                                    | Type                                | Default        | Description                                                                                                         |
+| ----------------------------------------------------------------------- | ----------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `value`                                                                 | `number`                            | `0`            | The slider's position. Uncontrolled during a drag — it doesn't snap back to `value` until `onSlidingComplete` fires |
+| `minimumValue` / `maximumValue`                                         | `number`                            | `0` / `1`      | Lower/upper bound of the draggable range                                                                            |
+| `step`                                                                  | `number`                            | `0`            | Snaps the thumb to increments of this size; `0` draws implicit steps at native resolution (iOS 1000, Android 128)   |
+| `lowerLimit` / `upperLimit`                                             | `number`                            | unbounded      | Clamps the draggable range without changing `minimumValue`/`maximumValue`                                           |
+| `minimumTrackTintColor` / `maximumTrackTintColor` / `thumbTintColor`    | `IColorValue`                       | native default | Color of the track before/after the thumb, and of the thumb itself                                                  |
+| `thumbImage` / `minimumTrackImage` / `maximumTrackImage` / `trackImage` | `IImageSourceProp`                  | —              | Replaces the corresponding native default image                                                                     |
+| `thumbSize`                                                             | `number`                            | native default | Diameter of the thumb, in points                                                                                    |
+| `disabled`                                                              | `boolean`                           | `false`        | Disables dragging and dims the control to the native disabled look                                                  |
+| `inverted`                                                              | `boolean`                           | `false`        | Reverses the direction the track fills in                                                                           |
+| `tapToSeek`                                                             | `boolean`                           | `false`        | Tapping anywhere on the track jumps the thumb there, instead of requiring a drag                                    |
+| `vertical`                                                              | `boolean`                           | `false`        | Renders the slider top-to-bottom instead of left-to-right                                                           |
+| `renderStepNumber`                                                      | `boolean`                           | `false`        | Draws the built-in step-number indicator                                                                            |
+| `StepMarker` (React, Solid) / `#stepMarker` (Vue) / `stepMarker` (Svelte) — no Angular equivalent | render prop / scoped slot / snippet | —              | Custom per-step marker, replacing `renderStepNumber`'s built-in dot                                                 |
+| `onValueChange`                                                         | `(value: number) => void`           | —              | Fires continuously while dragging                                                                                   |
+| `onSlidingStart` / `onSlidingComplete`                                  | `(value: number) => void`           | —              | Fires once when a drag begins/ends                                                                                  |
+| accessibility / `aria-*` / `testID` / `style`                           | —                                   | —              | Pass through to the native node unchanged                                                                           |
+
+## Notes
+
+- **`value={0}` is discarded, not applied.** The shared fold treats `NaN` _and any falsy number,
+  including `0`_, as "no value given", so the native view falls back to its own initial position —
+  mirroring the community component. A slider that must start at zero wants `minimumValue={0}` and
+  no explicit `value`.
+- **A bare slider measures differently per platform.** The iOS entry gives the wrapper a 40pt
+  default height and nudges the step row down 10pt; the Android entry supplies no default height at
+  all, leaving the native view's intrinsic size to decide, and keeps the row at the top. Set an
+  explicit height through `style` if the two have to agree.
+- **A custom `StepMarker` takes over the native thumb.** With a marker present, `thumbImage` is not
+  forwarded to the native view — the marker draws it — and if you pass both, `thumbTintColor` is
+  forced to `transparent` so the marker shows through.
+- **Crossed limits fail quietly.** `lowerLimit >= upperLimit` only reaches a `dlog`, which is off
+  unless `DEBUG` is set, so an inverted pair produces no console warning at all — just a slider that
+  won't move where you expect.
 
 ## How the wrapper works
 
@@ -183,10 +345,11 @@ packages/slider/src/
 ├── register.ts       # side-effect: registers RNCSlider's ViewConfig fallback + event/color processors
 ├── react/            # React lifecycle (hooks) + descriptorToReact bridge
 ├── vue/               # Vue lifecycle (refs/emits) + descriptorToVue bridge
-└── angular/           # Angular lifecycle (@Output EventEmitters) + DescriptorOutlet bridge
+├── angular/           # Angular lifecycle (@Output EventEmitters) + DescriptorOutlet bridge
+└── svelte/            # Svelte lifecycle (runes) + the native-view bridge's descriptor-children mount
 ```
 
-All three adapters import `../register` first (never the library's `Slider.tsx`), then call into the
+Every adapter imports `../register` first (never the library's `Slider.tsx`), then calls into the
 same `core` render — the same logic/view/lifecycle split as every other SymbioteNative component (see
 [how it works](/docs/how-it-works/)). Wrapping a different third-party native view follows
 this same recipe: register its `ViewConfig` fallback and processors as a side effect, then implement the

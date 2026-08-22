@@ -603,6 +603,57 @@ const PlatformColorDemo = defineComponent({
   },
 });
 
+// The compound-class rule, on screen. `.badge.loud` (App.css) restates only two colours, so
+// `.badge`'s padding and radius must survive on an element carrying both tokens — a resolver
+// that returned the compound rule alone instead of layering it over the single-class one would
+// visibly blank the pill's shape here. `.loud` deliberately has no standalone rule, so nothing
+// but `.badge.loud` resolving can change the middle and right badges.
+//
+// The dynamic badge's LABEL is deliberately constant: the e2e journey proves the rule by
+// screenshot-diffing that badge across the toggle, and a label that changed with the state
+// would make the diff pass even with the compound rule dead.
+//
+// Twin of the Vue-SFC and Svelte canaries' CompoundClassDemo, which express the identical three
+// rules inside a per-component scoped style block — same law, different scoping (see the
+// symbiote-sfc-style-compiler skill §5b).
+const CompoundClassDemo = defineComponent({
+  name: 'CompoundClassDemo',
+  setup() {
+    const isLoud = ref(false);
+    return () => (
+      <View class="section-nested">
+        <Text class="section-label">Compound class · App.css</Text>
+        <View class="row">
+          <View class="badge" testID="compound-badge-plain">
+            <Text class="badge-text">plain</Text>
+          </View>
+          <View class="badge loud" testID="compound-badge-loud">
+            <Text class="badge-text">loud</Text>
+          </View>
+          {/* Built at runtime, so the resolver sees a string it never saw at build time. */}
+          <View
+            class={isLoud.value ? 'badge loud' : 'badge'}
+            testID="compound-badge-dynamic"
+          >
+            <Text class="badge-text">dynamic</Text>
+          </View>
+        </View>
+        <Text class="note-text" testID="compound-badge-readout">
+          {isLoud.value
+            ? 'dynamic badge carries both tokens — accent border, same pill shape'
+            : 'dynamic badge carries only .badge — grey border'}
+        </Text>
+        <Button
+          testID="compound-badge-toggle"
+          title={isLoud.value ? 'Drop .loud' : 'Add .loud'}
+          onPress={() => (isLoud.value = !isLoud.value)}
+          color="#42b883"
+        />
+      </View>
+    );
+  },
+});
+
 // Responder: the gesture capabilities exposed here, shown so the grabbed
 // element is the one that moves. Each chip is its OWN responder: it grabs on touch
 // start and drags ITSELF (onResponderMove translates that chip). Drag a chip past a
@@ -708,8 +759,13 @@ const ResponderDemo = defineComponent({
                 }}
                 class="chip"
                 style={{
+                  // White, not #42b883: `.chip`'s own fill IS #42b883, so the grabbed ring used
+                  // to be painted in the chip's background colour and the active state was
+                  // literally invisible. The sibling canaries all ring the chip in a colour that
+                  // reads against their fill (React #7fb5ff on #2b6cb0) — do not "restore" the
+                  // accent here.
                   borderColor:
-                    activeChip.value === index ? '#42b883' : 'transparent',
+                    activeChip.value === index ? '#ffffff' : 'transparent',
                   transform: [
                     {
                       translateX: activeChip.value === index ? chipDx.value : 0,
@@ -1081,7 +1137,7 @@ export const CanaryScreen = defineComponent({
     const onShare = (): void => {
       void Share.share({
         message: 'Sent from symbiote',
-        url: 'https://reactnative.dev',
+        url: 'https://vuejs.org',
       }).catch(() => {});
     };
     const onAlert = (): void => {
@@ -1100,7 +1156,7 @@ export const CanaryScreen = defineComponent({
       );
     };
     const onOpenUrl = (): void => {
-      void Linking.openURL('https://reactnative.dev').catch(() => {});
+      void Linking.openURL('https://vuejs.org').catch(() => {});
     };
 
     const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Canary];
@@ -1255,11 +1311,7 @@ export const CanaryScreen = defineComponent({
               />
             </View>
           </View>
-          <Button
-            title="Open reactnative.dev"
-            onPress={onOpenUrl}
-            color="#42b883"
-          />
+          <Button title="Open vuejs.org" onPress={onOpenUrl} color="#42b883" />
 
           {/* The native UIRefreshControl spinner only shows while iOS holds the scroll
             view pulled-down; our full re-commit snaps the offset back, so we drive
@@ -1365,6 +1417,9 @@ export const CanaryScreen = defineComponent({
 
           {/* Responder: drag-vs-tap + mid-gesture transfer (move-should-set / takeover) */}
           <ResponderDemo />
+
+          {/* Compound class rule: `.badge.loud` layers over `.badge`, static and dynamic */}
+          <CompoundClassDemo />
 
           {/* Parity checks: longPress · Keyboard.dismiss · animated scroll · sticky · a11y focus */}
           <ParityDemo />
@@ -1487,6 +1542,14 @@ export const CanaryScreen = defineComponent({
                     <Text class="list-row-text">{item.label}</Text>
                   </View>
                 ),
+                // This list measures its own cells (no getItemLayout), and the divider is CHROME
+                // the list renders BETWEEN them — so it belongs to the distance from one row to
+                // the next, not to either row's height. That is the case the offset table has to
+                // get right; a model built by summing heights alone is short by every divider it
+                // skipped, and the content below a windowed-out region slides up and back as the
+                // window moves (core/components buildOffsets). Deliberately on the MVCP list:
+                // prepend-without-jump is exactly where a few points of offset error show.
+                separator: () => <View class="mvcp-divider" />,
               } satisfies IFlatListSlots<{ id: string; label: string }>
             }
           </FlatList>
@@ -1587,10 +1650,10 @@ export const CanaryScreen = defineComponent({
           </View>
 
           {/* Image web aliases. PASS: the logo loads via the web-alias fold (src→source uri,
-            width/height→style); a screen reader reads "React logo" (alt→accessibilityLabel). */}
+            width/height→style); a screen reader reads "Vue logo" (alt→accessibilityLabel). */}
           <Image
             src="https://vuejs.org/images/logo.png"
-            alt="React logo"
+            alt="Vue logo"
             width={48}
             height={48}
             class="web-image"

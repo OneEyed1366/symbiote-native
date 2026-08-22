@@ -6,7 +6,7 @@ in **mutation mode** (`appendChild` / `insertBefore` / `removeChild` → the eng
 mutation API); `@symbiote-native/engine` does the clone-on-write commit into Fabric.
 
 This is the **reference adapter**: the known-good driver used to validate the native pipe and the
-commit engine before any other framework lands, so a break in Vue/Svelte/Solid isolates to *that*
+commit engine before any other framework lands, so a break in Vue/Svelte/Solid isolates to _that_
 adapter, not the core.
 
 <div align="center">
@@ -16,7 +16,7 @@ adapter, not the core.
 </div>
 
 > New to SymbioteNative? The [root README](../../README.md) has the architecture and the one fact it
-> rests on — React is just *one client* of `nativeFabricUIManager`.
+> rests on — React is just _one client_ of `nativeFabricUIManager`.
 
 ---
 
@@ -46,7 +46,7 @@ export default function App() {
   return (
     <View style={{ padding: 24 }}>
       <Text>Taps: {count}</Text>
-      <Pressable onPress={() => setCount((c) => c + 1)}>
+      <Pressable onPress={() => setCount(c => c + 1)}>
         <Text>Tap me</Text>
       </Pressable>
     </View>
@@ -54,7 +54,7 @@ export default function App() {
 }
 ```
 
-The native entry registers a low-level *runnable* instead of a React component: RN's Fabric host
+The native entry registers a low-level _runnable_ instead of a React component: RN's Fabric host
 calls it with the surface's `rootTag`, and the renderer takes over from there — `nativeFabric-
 UIManager` is driven directly, RN's own renderer never runs.
 
@@ -94,7 +94,7 @@ path:
   `Appearance` · `PixelRatio` · `AppState`, plus imperative `Alert` · `ActionSheetIOS` · `Share` ·
   `Linking` · `Vibration` · `Keyboard` · `StatusBar` — each reaching its real native module on the
   bridgeless host.
-- **`Animated`, both drivers** — JS *and* native driver side by side (`timing` · `spring` · `loop` ·
+- **`Animated`, both drivers** — JS _and_ native driver side by side (`timing` · `spring` · `loop` ·
   `interpolate` · `ValueXY` · tracking · `diffClamp`). Native offload is proven by jamming the JS
   thread 1.5 s: the native-driven animations keep moving, the JS-driven one stalls.
 - **Third-party native views** — `@react-native-community/slider` used straight from the package

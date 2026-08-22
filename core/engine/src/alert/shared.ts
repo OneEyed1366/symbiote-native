@@ -7,7 +7,8 @@
 
 // The alert `type` strings the spec documents (iOS), as a closed union so a typo can't
 // reach the native call. 'default' = no text input; the rest prompt.
-export type IAlertType = 'default' | 'plain-text' | 'secure-text' | 'login-password';
+export type IAlertType =
+  'default' | 'plain-text' | 'secure-text' | 'login-password';
 
 // The iOS button styles RN documents.
 export type IAlertButtonStyle = 'default' | 'cancel' | 'destructive';
@@ -30,7 +31,12 @@ export interface IAlertOptions {
 // What every platform's Alert exposes to app code. iOS additionally exposes `prompt`,
 // but `alert` is the cross-platform surface, so the shared contract names only it.
 export interface IAlertStatic {
-  alert(title?: string, message?: string, buttons?: IAlertButtons, options?: IAlertOptions): void;
+  alert(
+    title?: string,
+    message?: string,
+    buttons?: IAlertButtons,
+    options?: IAlertOptions,
+  ): void;
 }
 
 // The default positive label RN uses when a button carries no text.

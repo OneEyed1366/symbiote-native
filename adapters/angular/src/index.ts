@@ -27,6 +27,7 @@ export {
   stableAnchorStyle,
   Switch,
   SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
   Text,
   TextInput,
   TouchableHighlight,
@@ -60,6 +61,16 @@ export {
   AnimatedText,
   AnimatedView,
 } from './modules/animated';
+// Exported even though Angular's version maps only the four primitives (View/Text/Image/
+// ScrollView) onto the pre-authored wrappers above and THROWS on anything else — there is no JIT
+// under AOT/Metro, so it cannot synthesize a wrapper at runtime the way the other four adapters
+// do. It ships anyway because portable code (`createAnimatedComponent(View)`) then compiles and
+// runs identically on all five adapters, and the one case Angular cannot serve fails with a
+// message naming the fix (author a standalone @Component over AnimatedComponentBase) instead of
+// failing as a missing export, which names nothing. Found by the barrel audit in
+// `.claude/rules/adapter-parity-audit.md`: it was implemented and tested here all along and simply
+// never reached this file, so `@symbiote-native/angular` consumers could not reach it at all.
+export { createAnimatedComponent } from './modules/animated';
 export type {
   IActivityIndicatorProps,
   IAngularImageBackgroundProps,
@@ -134,7 +145,12 @@ export { DescriptorOutlet } from './descriptor-to-angular';
 // idiom) parameterized by an `@Input()`, rather than a factory returning fresh components per
 // call.
 export { PortalDirective, PortalOutletDirective } from './create-portal';
-export { createTunnel, TunnelInDirective, TunnelOut, type ITunnelStore } from './create-tunnel';
+export {
+  createTunnel,
+  TunnelInDirective,
+  TunnelOut,
+  type ITunnelStore,
+} from './create-tunnel';
 export { SymbioteRenderer, SymbioteRendererFactory } from './renderer';
 // registerComposedComponent lives in the dependency-free leaf ./anchor-host-registry, NOT in the
 // require-cyclic ./renderer — see the leaf header. The babel-register-composed plugin injects the
@@ -249,7 +265,6 @@ export type {
 } from '@symbiote-native/engine';
 export {
   dlog,
-  flattenStyle,
   isDebug,
   Platform,
   processColor,
@@ -258,4 +273,47 @@ export {
   setNativeViewConfigSource,
   StyleSheet,
 } from '@symbiote-native/engine';
-export type { IRootTag, ISymbioteEvent, ISymbioteNode } from '@symbiote-native/engine';
+export type {
+  IRootTag,
+  ISymbioteEvent,
+  ISymbioteNode,
+} from '@symbiote-native/engine';
+// The agnostic style / platform / view-config types behind the values above. Angular takes its
+// component props as @Input()s and exports no per-component prop type, but an app still needs
+// these to type a style object or a Platform.select spec.
+export type {
+  IViewStyle,
+  ITextStyle,
+  IFlexAlign,
+  IFlexJustify,
+  IPlatformStatic,
+  IPlatformOSType,
+  IPlatformConstantsIOS,
+  IPlatformConstantsAndroid,
+  IPlatformSelectSpec,
+  INativeViewConfig,
+  INativeViewConfigSource,
+} from '@symbiote-native/engine';
+export type {
+  IAccessibilityProps,
+  IAriaProps,
+  IAccessibilityRole,
+  IRole,
+  IAccessibilityStateValue,
+  IAccessibilityValue,
+  IAccessibilityActionInfo,
+  IResponderProps,
+  IPressState,
+  IPressableAndroidRippleConfig,
+  IImageStatics,
+} from '@symbiote-native/components';
+
+// Diagnostics: per-window Angular-side counters (change-detection passes, renderer writes, list
+// recomputes, cell views). The engine's readCommitProfile() prices the commit; these say how many
+// times anything ran at all - the number that exposes a change-detection free-run.
+export {
+  readAngularProfile,
+  readAngularProfileDetail,
+  setAngularProfileDetail,
+} from './diagnostics';
+export type { IAngularProfile, IAngularProfileDetail } from './diagnostics';

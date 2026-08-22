@@ -27,7 +27,7 @@ and the option silently falls back to its default. No error, no warning — just
 behavior (e.g. a drawer opening on the default LEFT edge instead of the RIGHT one
 explicitly requested).
 
-Raw-TSX/JSX authoring of the same component (`.examples/vue-tsx`, `@vue/babel-plugin-jsx`)
+Raw-TSX/JSX authoring of the same component (`examples/vue-tsx`, `@vue/babel-plugin-jsx`)
 does **not** trigger this, because JSX is naturally camelCase (`drawerPosition="right"`) —
 that's a coincidence, not a safety net. A fix must handle both authoring styles.
 
@@ -53,23 +53,24 @@ const DrawerImpl = defineComponent<IDrawerProps>(
 This is a **codebase-wide, load-bearing convention** — not incidental, not optional. Import
 it from `@symbiote-native/vue` (it's re-exported from the package root specifically so other
 packages can use it, per `adapters/vue/src/index.ts`'s own comment: "Exported so an
-[external package] can [apply the same fold]").
+[external package] can [apply the same fold]"). `normalizeVueAttrs` only folds key casing —
+it does not classify a key as event-vs-prop; a normalized `attrs.onX`-shaped key still goes
+through the emits/passthrough decision covered by `vue-adapter-events`, and once resolved to
+a prop it flows into the engine's `routeProp` (`symbiote-engine-core`) for the actual
+prop-vs-event split against the ViewConfig.
 
 ## The 2026-07 incident
 
-`packages/navigation/src/vue/{stack,tabs,drawer}.ts` were ported this session **without**
-adopting this convention — they read `rawAttrs.drawerPosition` /
-`rawAttrs.initialRouteName` / `rawAttrs.screenOptions` / etc. directly. Every kebab-authored
-option on `<Stack>`/`<Tab>`/`<Drawer>` in a `.vue` SFC silently fell back to its default.
-Caught via a real iOS simulator screenshot: `.examples/vue-sfc`'s `DrawerDemoScreen.vue`
-declared `drawer-position="right"` but the drawer opened on the left.
-
-Fix: import `normalizeVueAttrs` from `@symbiote-native/vue`, add
-`const attrs = normalizeVueAttrs(rawAttrs);` right after destructuring, replace every
-`rawAttrs.X` read with `attrs.X`. **Do not** "fix" this class of bug by declaring a formal
-`defineComponent({ props: {...} })` schema instead — that diverges from the established
-idiom (verified: no component in this codebase declares formal runtime props; they all use
-attrs + `normalizeVueAttrs`).
+```
+§incident_2026_07_navigation_attrs := {
+  bug: "packages/navigation/src/vue/{stack,tabs,drawer}.ts ported without normalizeVueAttrs",
+  root_cause: "read rawAttrs.drawerPosition / rawAttrs.initialRouteName / rawAttrs.screenOptions directly",
+  effect: "every kebab-authored option on <Stack>/<Tab>/<Drawer> in a .vue SFC silently fell back to its default",
+  repro: "examples/vue-sfc DrawerDemoScreen.vue: drawer-position=\"right\" ⟶ drawer opened LEFT (caught via iOS simulator screenshot)",
+  fix: "import normalizeVueAttrs from '@symbiote-native/vue'; const attrs = normalizeVueAttrs(rawAttrs) right after destructuring; replace every rawAttrs.X read with attrs.X",
+  ruled_out: "formal defineComponent({ props: {...} }) schema ⟶ diverges from established idiom (verified: no component in this codebase declares formal runtime props)",
+}
+```
 
 ## Checklist for any new Vue lifecycle component
 

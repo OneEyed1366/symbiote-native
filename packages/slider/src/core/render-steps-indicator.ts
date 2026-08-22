@@ -6,7 +6,10 @@
 // assembles the overlay itself from these same helpers, dropping its element into each mark.
 
 import { el, txt } from '@symbiote-native/components';
-import type { IDescriptor, IDescriptorChild } from '@symbiote-native/components';
+import type {
+  IDescriptor,
+  IDescriptorChild,
+} from '@symbiote-native/components';
 import type { IViewStyle, ITextStyle } from '@symbiote-native/engine';
 import {
   SLIDER_MARGIN_HORIZONTAL_PADDING,
@@ -54,7 +57,10 @@ export const STEP_NUMBER_CONTAINER_STYLE: IViewStyle = {
 
 // The mark row: flex row, evenly spaced, inset by a fraction of the measured width. `top` is
 // platform-specific (iOS nudges the row down 10pt), supplied via the platform piece.
-export function resolveStepsContainerStyle(width: number, platform: ISliderPlatform): IViewStyle {
+export function resolveStepsContainerStyle(
+  width: number,
+  platform: ISliderPlatform,
+): IViewStyle {
   return {
     flex: 1,
     flexDirection: 'row',
@@ -114,29 +120,51 @@ function renderStepCell(
     trackMarkChildren.push(
       el(
         'symbiote-view',
-        { style: THUMB_IMAGE_CONTAINER_STYLE, testID: 'sliderTrackMark-thumbImage' },
-        [el('symbiote-image', { source: params.thumbImage, style: THUMB_IMAGE_STYLE })],
+        {
+          style: THUMB_IMAGE_CONTAINER_STYLE,
+          testID: 'sliderTrackMark-thumbImage',
+        },
+        [
+          el('symbiote-image', {
+            source: params.thumbImage,
+            style: THUMB_IMAGE_STYLE,
+          }),
+        ],
       ),
     );
   }
 
   const cellChildren: IDescriptorChild[] = [
-    el('symbiote-view', { style: TRACK_MARK_CONTAINER_STYLE }, trackMarkChildren),
+    el(
+      'symbiote-view',
+      { style: TRACK_MARK_CONTAINER_STYLE },
+      trackMarkChildren,
+    ),
   ];
   if (params.renderStepNumber === true) {
     cellChildren.push(
       el('symbiote-view', { style: STEP_NUMBER_CONTAINER_STYLE }, [
-        txt({ testID: `${displayIndex}th-step`, style: { fontSize } satisfies ITextStyle }, [
-          String(value),
-        ]),
+        txt(
+          {
+            testID: `${displayIndex}th-step`,
+            style: { fontSize } satisfies ITextStyle,
+          },
+          [String(value)],
+        ),
       ]),
     );
   }
-  return el('symbiote-view', { style: STEP_INDICATOR_ELEMENT_STYLE }, cellChildren);
+  return el(
+    'symbiote-view',
+    { style: STEP_INDICATOR_ELEMENT_STYLE },
+    cellChildren,
+  );
 }
 
 // The default overlay (no custom StepMarker). pointerEvents none so it never eats the drag.
-export function renderStepsIndicator(params: IStepsIndicatorParams): IDescriptor {
+export function renderStepsIndicator(
+  params: IStepsIndicatorParams,
+): IDescriptor {
   const fontSize = stepNumberFontSize(params.options.length);
   const ordered = orderStepOptions(params.options, params.inverted);
   const cells = ordered.map((value, displayIndex) =>

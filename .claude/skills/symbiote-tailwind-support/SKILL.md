@@ -74,44 +74,41 @@ alongside Metro (real new infrastructure). *(NativeWind proves this specific
 gap IS closeable on Metro — see below — but nobody has built a
 generic/non-Tailwind-specific version of it.)*
 
-**A real, undocumented bug: `hover:`/`focus:` variants are effectively
-broken in wolf-tui's own shipped code.** Verified directly, not assumed: real
-Tailwind v4 output for `hover:bg-blue-500` is the selector
-`.hover\:bg-blue-500:hover { ... }` (trailing pseudo-class on a compound
-selector). wolf-tui's `extractClassName()` only strips a selector that
-**starts** with `:` (`:root`, `::before`) — a trailing `:hover` embedded
-later in a compound selector is never stripped, so the registry key keeps
-the full `hover:bg-blue-500:hover` string. At runtime,
-`resolveClassName('hover:bg-blue-500')` (the literal string a developer
-writes) does exact-match, then a camelCase-fallback, then a
-strip-variant-look-up-base fallback — **none of which produce the actual
-registered key** with `:hover` still appended. The variant only resolves at
-all if the bare, non-hover utility happens to be registered too — a
-coincidental fallback, not a working design. The one unit test that exercises
-this path (`complex-selectors.test.ts`, "parses utility with variant
-prefix") uses a hand-crafted fixture selector with NO trailing `:hover` at
-all, so it never catches this — it tests something Tailwind doesn't actually
-generate.
+```
+wolftui_hover_variant_bug := {
+  claim: "hover:/focus: variants effectively broken in wolf-tui's shipped code — verified
+          directly against real Tailwind v4 output, not assumed",
+  real_output: ".hover\\:bg-blue-500:hover { ... }  (trailing pseudo-class on a compound selector)",
+  root_cause: "extractClassName() only strips a selector that STARTS with ':' (:root, ::before);
+               a trailing :hover later in a compound selector is never stripped",
+  effect: "registry key stays the full 'hover:bg-blue-500:hover'; resolveClassName('hover:bg-blue-500')
+           (exact-match -> camelCase fallback -> strip-variant-lookup-base fallback) never produces
+           that key — the variant only resolves if the bare non-hover utility happens to be
+           registered too, a coincidental fallback, not a working design",
+  test_gap: "complex-selectors.test.ts ('parses utility with variant prefix') uses a hand-crafted
+             fixture with NO trailing :hover — tests a selector shape Tailwind doesn't generate",
+}
 
-**`md:`/breakpoint variants "work" but are not actually responsive.**
-`@media` at-rules round-trip through `postcss`'s `walkRules` (which
-transparently descends into at-rules), so `md:flex-row`'s selector resolves
-to a clean registry key with no pseudo-class problem. But the `@media`
-**condition itself is discarded** — `parseCSS` never inspects the wrapping
-at-rule — so the style registers and applies **unconditionally**, regardless
-of actual terminal/viewport width. There is no breakpoint-switching
-mechanism anywhere in `registry.ts`. None of this is documented as a
-limitation in wolf-tui's own README, which only ever shows plain static
-utilities in its examples (`flex-col p-4 gap-2`) — never a single variant
-example.
+wolftui_breakpoint_bug := {
+  claim: "md:/lg: breakpoint variants 'work' (no crash) but are not actually responsive",
+  mechanism: "postcss's walkRules descends into @media at-rules, so md:flex-row's selector
+              resolves to a clean registry key with no pseudo-class problem",
+  root_cause: "parseCSS never inspects the wrapping @media condition -> discarded",
+  effect: "style registers and applies UNCONDITIONALLY regardless of terminal/viewport width;
+           no breakpoint-switching mechanism anywhere in registry.ts",
+  undocumented: "wolf-tui README examples show only static utilities (flex-col p-4 gap-2),
+                 never a variant example — limitation not disclosed",
+}
+```
 
 **Verdict: do not port wolf-tui's variant/scanning layer as-is.** The
 CSS-generation-to-style-object half (JIT-generated CSS -> `parseCSS` ->
 registry) is legitimate, thin, reusable infrastructure SymbioteNative already has
 an equivalent of. The scanning half is bundler-specific and only partially
-portable. The variant half would import a real bug, not a working feature —
-fix `extractClassName`'s pseudo-class stripping and build a genuine
-interaction/viewport-driven runtime from scratch instead of copying this.
+portable. The variant half would import both bugs above, not a working
+feature — fix `extractClassName`'s pseudo-class stripping and build a
+genuine interaction/viewport-driven runtime from scratch instead of copying
+this.
 
 ## NativeWind v5 — verified via Context7 (2026-07), not memory
 
@@ -148,7 +145,9 @@ SymbioteNative's multi-framework requirement:**
    dispatcher) — this is the exact, already-established failure mode
    documented in this project's own `<third_party_rn_packages_are_react_only>`
    invariant (CLAUDE.md), the same reason
-   `@react-native-community/slider` is React-adapter-only.
+   `@react-native-community/slider` is React-adapter-only. The `symbiote-third-party-native-view`
+   skill documents the general wrapper pattern for this exact problem class
+   (engine `createNode`-by-ViewConfig instead of importing the React component).
 
 So "just wrap NativeWind" would ship a React-only feature and call it done —
 a `<adapters_reach_full_feature_parity>` P0 violation if shipped without the

@@ -39,6 +39,7 @@ import {
   createNavigationEmitter,
   diffFocusedRoute,
   isFocusedRoute,
+  reconcileTabRoutes,
   renderTabBar,
   tabRouterReducer,
 } from '../../core';
@@ -65,7 +66,12 @@ let tabInstanceCounter = 0;
 @Component({
   selector: 'Tab',
   standalone: true,
-  imports: [NgComponentOutlet, NavigationScopeDirective, DescriptorOutlet, View],
+  imports: [
+    NgComponentOutlet,
+    NavigationScopeDirective,
+    DescriptorOutlet,
+    View,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <View [style]="rootStyle">
@@ -100,7 +106,8 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
   // Keyed by name -> the LIVE TabScreenDirective instance - see stack.ts's matching comment for
   // why a snapshot copy would go stale on an in-place `[options]`/`[component]` change.
   private readonly registry = new Map<string, TabScreenDirective>();
-  private tabScreenChildrenSubscription: { unsubscribe: () => void } | undefined;
+  private tabScreenChildrenSubscription:
+    { unsubscribe: () => void } | undefined;
 
   private readonly stateSignal = signal<ITabRouterState | undefined>(undefined);
   readonly state = this.stateSignal.asReadonly();
@@ -114,11 +121,11 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
     this.dispatch({ type: 'setParams', key, params });
 
   ngAfterContentInit(): void {
-    this.rebuildRegistry();
-    this.initializeState();
-    this.tabScreenChildrenSubscription = this.tabScreenChildren.changes.subscribe(() => {
-      this.rebuildRegistry();
-    });
+    this.syncRegistry();
+    this.tabScreenChildrenSubscription =
+      this.tabScreenChildren.changes.subscribe(() => {
+        this.syncRegistry();
+      });
   }
 
   ngOnDestroy(): void {
@@ -141,10 +148,25 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
     }));
   }
 
-  private initializeState(): void {
-    if (this.stateSignal() !== undefined) return;
+  // A <ng-template symbioteTabScreen> can appear or disappear after mount (a marker behind an
+  // @if, a data-driven screen list), so the route list follows the LIVE query instead of staying
+  // frozen at whatever ngAfterContentInit first saw: reconcileTabRoutes (core) keeps each
+  // surviving route's key and accumulated params and moves focus only when the focused route is
+  // the one that left. Runs from the query's own `changes` subscription - an ordinary imperative
+  // callback, deliberately not a computed, since this writes the state signal.
+  private syncRegistry(): void {
+    this.rebuildRegistry();
     const routes = this.routesFromRegistry();
-    if (routes.length === 0) dlog('Tab: no <ng-template symbioteTabScreen> children registered');
+    if (routes.length === 0)
+      dlog('Tab: no <ng-template symbioteTabScreen> children registered');
+    const current = this.stateSignal();
+    if (current !== undefined) {
+      this.stateSignal.set(reconcileTabRoutes(current, routes));
+      return;
+    }
+    // Seeding an empty list would resolve initialRouteName against nothing and lose it once the
+    // markers do arrive, so the state stays unseeded until at least one has registered.
+    if (routes.length === 0) return;
     this.stateSignal.set(createInitialTabState(routes, this.initialRouteName));
   }
 
@@ -154,9 +176,15 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
     this.stateSignal.set(tabRouterReducer(current, action));
   }
 
-  private resolveTabOptions(entry: TabScreenDirective, route: IRoute<unknown>): ITabOptions {
+  private resolveTabOptions(
+    entry: TabScreenDirective,
+    route: IRoute<unknown>,
+  ): ITabOptions {
     const props: ITabScreenOptionsArgs = { route, navigation: this };
-    const own = typeof entry.options === 'function' ? entry.options(props) : entry.options;
+    const own =
+      typeof entry.options === 'function'
+        ? entry.options(props)
+        : entry.options;
     return { ...this.screenOptions, ...own };
   }
 
@@ -193,8 +221,12 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
   focusedRouteEmitter(): INavigationEmitter {
     const key = this.focusedRoute()?.key;
     return untracked(() => {
-      if (key === this.currentEmitterKey && this.currentEmitter) return this.currentEmitter;
-      const { blurKey, focusKey } = diffFocusedRoute(this.currentEmitterKey, key);
+      if (key === this.currentEmitterKey && this.currentEmitter)
+        return this.currentEmitter;
+      const { blurKey, focusKey } = diffFocusedRoute(
+        this.currentEmitterKey,
+        key,
+      );
       if (blurKey !== undefined && this.currentEmitter) {
         dlog('Tab: previous route blurred');
         this.currentEmitter.emit(NAVIGATION_EVENT_BLUR);
@@ -243,12 +275,18 @@ export class Tab implements AfterContentInit, OnDestroy, ITabNavigatorHandle {
     });
 
     const focusedRoute = this.focusedRoute();
-    const focusedEntry = focusedRoute ? this.registry.get(focusedRoute.name) : undefined;
+    const focusedEntry = focusedRoute
+      ? this.registry.get(focusedRoute.name)
+      : undefined;
     const focusedOptions =
       focusedEntry && focusedRoute
         ? this.resolveTabOptions(focusedEntry, focusedRoute)
         : this.screenOptions;
 
-    return renderTabBar({ items, style: focusedOptions?.tabBarStyle, passthrough: {} });
+    return renderTabBar({
+      items,
+      style: focusedOptions?.tabBarStyle,
+      passthrough: {},
+    });
   }
 }

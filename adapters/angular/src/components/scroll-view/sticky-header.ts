@@ -1,20 +1,15 @@
-// Sticky headers: the Angular twin of adapters/{react,vue}/src/components/scroll-view/
-// sticky-header.{tsx,ts}, the JS layer RN implements in ScrollView.js / ScrollViewStickyHeader.js.
-//
-// Source-based: RN does stickiness PURELY IN JS. A single `_scrollAnimatedValue` an Animated.event
-// drives from `onScroll` feeds each flagged header's translateY through an interpolation that pins
-// it to the top (or bottom, inverted) until the next header collides with it. The native Fabric
-// scroll view does NOT honor `stickyHeaderIndices` on its own. The load-bearing top/inverted
-// interpolation math (computeStickyInterpolation) lives framework-agnostic in @symbiote-native/components
-// this file holds the Angular component shell, the layout state, and the interpolation
-// build, sharing the math verbatim with React/Vue. Angular supplies only the lifecycle (inputs +
-// manual change detection instead of useState/useEffect or refs/watch).
+// Sticky headers: RN does stickiness PURELY IN JS (ScrollView.js / ScrollViewStickyHeader.js).
+// A single `_scrollAnimatedValue` an Animated.event drives from `onScroll` feeds each flagged
+// header's translateY through an interpolation that pins it to the top (or bottom, inverted)
+// until the next header collides with it — the native Fabric scroll view does NOT honor
+// `stickyHeaderIndices` on its own. The interpolation math (computeStickyInterpolation) lives
+// framework-agnostic in @symbiote-native/components, shared verbatim with React/Vue; this file
+// holds the Angular component shell, layout state, and interpolation build.
 //
 // This is the public sticky-header WRAPPER for explicit composition. ScrollView also auto-wraps
-// projected direct children named by stickyHeaderIndices through its projection bridge (see
-// projection.ts), because Angular templates cannot map <ng-content> children directly; that auto
-// path intentionally uses this built-in wrapper rather than dynamically instantiating arbitrary
-// custom component classes.
+// projected children named by stickyHeaderIndices through its projection bridge (projection.ts),
+// because Angular templates cannot map <ng-content> children directly; that auto path
+// intentionally reuses this built-in wrapper rather than instantiating arbitrary component types.
 
 import {
   ChangeDetectionStrategy,
@@ -101,7 +96,9 @@ export class ScrollViewStickyHeader
   // The animated node driving the transform (RN's animatedTranslateY), replaced by the
   // rebuild-interpolation effect. When the scroll value is native, this interpolation runs on the UI
   // thread: the smooth pin.
-  private animatedTranslateY: AnimatedInterpolation = new AnimatedValue(0).interpolate({
+  private animatedTranslateY: AnimatedInterpolation = new AnimatedValue(
+    0,
+  ).interpolate({
     inputRange: [-1, 0],
     outputRange: [0, 0],
   });
@@ -140,13 +137,17 @@ export class ScrollViewStickyHeader
     // anchor style first so the fixed transform/zIndex below still wins on conflict.
     return [
       anchorHostStyle(this.elementRef),
-      { transform: [{ translateY: this.animatedTranslateY }], zIndex: STICKY_HEADER_Z_INDEX },
+      {
+        transform: [{ translateY: this.animatedTranslateY }],
+        zIndex: STICKY_HEADER_Z_INDEX,
+      },
     ];
   }
 
   // Stable reference (bound once) so AnimatedView's directive does not re-wire the layout listener
   // every change-detection pass.
-  private readonly onHostLayout = (event: ISymbioteEvent): void => this.handleLayout(event);
+  private readonly onHostLayout = (event: ISymbioteEvent): void =>
+    this.handleLayout(event);
 
   // Also a stable reference, not a getter: jsonEqual (commit.ts) can't structurally compare the
   // embedded onLayout function, so a fresh object here would read as "props changed" on every
@@ -161,7 +162,9 @@ export class ScrollViewStickyHeader
 
   // The EXPLICIT debounced translateY overrides the committed transform for hit-testing while
   // animatedTranslateY does the smooth (native-driven) pin (RN ScrollViewStickyHeader.js).
-  get passthrough(): { style: { transform: Array<{ translateY: number }> } } | null {
+  get passthrough(): {
+    style: { transform: Array<{ translateY: number }> };
+  } | null {
     return this.state.translateY !== null
       ? { style: { transform: [{ translateY: this.state.translateY }] } }
       : null;
@@ -186,7 +189,10 @@ export class ScrollViewStickyHeader
         case 'rebuild-interpolation': {
           // Detach the old listener, build a fresh interpolation onto the shared scroll value, and
           // wire the settled-value listener (symbiote is always Fabric; RN attaches it only there).
-          if (this.interpolation !== undefined && this.listenerId !== undefined) {
+          if (
+            this.interpolation !== undefined &&
+            this.listenerId !== undefined
+          ) {
             this.interpolation.removeListener(this.listenerId);
             this.listenerId = undefined;
           }
@@ -198,14 +204,15 @@ export class ScrollViewStickyHeader
           this.interpolation = next;
           this.animatedTranslateY = next;
           dlog(
-            `Angular ScrollViewStickyHeader interpolation measured=${this.state.measured} y=${this.state.layoutY}`,
+            `STICKY[header] interpolation measured=${this.state.measured} y=${this.state.layoutY}`,
           );
           break;
         }
         case 'schedule-debounce':
           // The animated value updates several times per frame; debounce the settled value into the
           // committed transform so hit detection stays current (a Fabric issue, worse on Android).
-          if (this.debounceTimer !== undefined) clearTimeout(this.debounceTimer);
+          if (this.debounceTimer !== undefined)
+            clearTimeout(this.debounceTimer);
           this.debounceTimer = setTimeout(() => {
             this.debounceTimer = undefined;
             this.dispatch({ kind: 'debounce-fired', value: effect.value });
@@ -238,8 +245,13 @@ export class ScrollViewStickyHeader
     this.changeDetector.markForCheck();
   }
 
-  private readonly animatedValueListener = ({ value }: { value: number | string }): void => {
-    if (typeof value === 'number') this.dispatch({ kind: 'animated-tick', value });
+  private readonly animatedValueListener = ({
+    value,
+  }: {
+    value: number | string;
+  }): void => {
+    if (typeof value === 'number')
+      this.dispatch({ kind: 'animated-tick', value });
   };
 
   private teardown(): void {

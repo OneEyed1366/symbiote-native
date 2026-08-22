@@ -1,7 +1,7 @@
 // Route-name constants shared between App.vue's <Screen name="..."> registrations and every
 // screen's navigation.push(...)/navigation.jumpTo(...) calls — a single source of truth so a
 // typo can't silently create a dead route on one side only. Verbatim port of
-// .examples/react/routes.ts — the route names/keys are framework-agnostic.
+// examples/react/routes.ts — the route names/keys are framework-agnostic.
 
 export const ROUTE_NAME = {
   Menu: 'Menu',
@@ -15,6 +15,9 @@ export const ROUTE_NAME = {
   HooksDemo: 'HooksDemo',
   DeepLinking: 'DeepLinking',
   StatePersistence: 'StatePersistence',
+  ApiPlayground: 'ApiPlayground',
+  Benchmark: 'Benchmark',
+  StyleShowcase: 'StyleShowcase',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

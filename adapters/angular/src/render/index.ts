@@ -10,6 +10,7 @@ import {
   createSurface,
   disposeRoot,
   dlog,
+  reportUncaughtError,
   toPublicInstance,
   type ISymbioteNode,
   type IRootTag,
@@ -62,7 +63,35 @@ function asAngularHost(hostNode: SymbioteSurface | ISymbioteNode): Element {
 // to the wrapper as projectable content.
 function createDetachedViewHost(): ISymbioteNode {
   const descriptor = descriptorFor('View');
-  return toPublicInstance(createEngineElement(descriptor.component, descriptor.isText));
+  return toPublicInstance(
+    createEngineElement(descriptor.component, descriptor.isText),
+  );
+}
+
+// Angular's whole unhandled-error funnel: INTERNAL_APPLICATION_ERROR_HANDLER resolves this token
+// and hands it everything the framework caught on the app's behalf — a scheduled (async) tick that
+// threw, a template listener that threw, a rejected pending task. Routed to the engine so an
+// Angular app reaches the same native redbox as a React one instead of a console line nobody sees
+// off a dev machine.
+//
+// There is deliberately no caught-vs-uncaught split here, unlike the React adapter's
+// onUncaughtError/onCaughtError pair. Angular has no error boundary, and every path where the app
+// DID handle something keeps clear of this seam on its own: a `@defer` block with an `@error`
+// branch renders that branch (defer/rendering.ts calls handleUncaughtError only when there is
+// none), `resource()` parks the failure in its own error signal, and an app-level try/catch or
+// `catchError` never reaches Angular at all. So anything arriving here is by construction
+// unclaimed, and the redbox is the right answer for all of it.
+//
+// Two things this must not do. It must not also call `super.handleError` — reportUncaughtError
+// picks exactly one channel (host reporter or console) precisely because RN routes console.error
+// into LogBox too, so the pair would double-report every error. And it must not throw: the
+// scheduler invokes this from inside its own `catch` (zoneless_scheduling_impl.ts's tick), where a
+// second throw escapes to the host and kills the "report and keep running" behaviour the provider
+// exists for.
+class SymbioteErrorHandler extends ErrorHandler {
+  override handleError(error: unknown): void {
+    reportUncaughtError(error, { origin: 'angular render' });
+  }
 }
 
 interface IMountedApp {
@@ -81,7 +110,10 @@ export interface IMountOptions {
   wrapperComponent?: Type<unknown>;
 }
 
-function applyInputs(cmpRef: ComponentRef<unknown>, initialProps: object | undefined): void {
+function applyInputs(
+  cmpRef: ComponentRef<unknown>,
+  initialProps: object | undefined,
+): void {
   if (initialProps === undefined) return;
   for (const [key, value] of Object.entries(initialProps)) {
     cmpRef.setInput(key, value);
@@ -118,45 +150,51 @@ export function mount(
         provide: RendererFactory2,
         useValue: new SymbioteRendererFactory(surface),
       },
-      { provide: DOCUMENT, useValue: { head: surface, body: surface } },
-      // createEnvironmentInjector with a null parent gives this injector scope
-      // {'environment'} only (see EnvironmentNgModuleRefAdapter), so providedIn:'root'
-      // tokens — ApplicationRef included — never resolve on their own (R3Injector.get
-      // walks up looking for an injector whose `scopes` contains 'root', and a null
-      // parent means that search always dead-ends in NullInjector). platform-browser's
-      // BROWSER_MODULE_PROVIDERS solves this the same way for real DOM apps: it hands
-      // { provide: INJECTOR_SCOPE, useValue: 'root' } to its OWN app-level providers, and
-      // R3Injector's constructor reads that provider and self-tags this.scopes with
-      // 'root'. We do the same here — no PlatformRef, no DOM, just this one provider.
+      // `getElementById` is not decoration: `resource()` resolves TransferState, whose root
+      // factory runs `retrieveTransferredState(doc, appId)` ->
+      // `doc.getElementById(appId + '-state')` (core/src/transfer_state.ts:156) to pick up
+      // server-rendered state. A stub without it makes that a TypeError, and because the throw
+      // happens while the component is being constructed, the ENTIRE screen renders nothing —
+      // white body under a native header that navigation drew anyway, no error surfaced. The
+      // `optional: true` on the injector lookup does not help: the token resolves, its factory
+      // is what throws. Returning null is the honest client answer — there is no server here, so
+      // `script?.tagName` short-circuits and the caller gets `{}`.
+      {
+        provide: DOCUMENT,
+        useValue: {
+          head: surface,
+          body: surface,
+          getElementById: (): null => null,
+        },
+      },
+      // createEnvironmentInjector with a null parent scopes this injector to {'environment'}
+      // only (see EnvironmentNgModuleRefAdapter), so providedIn:'root' tokens — ApplicationRef
+      // included — never resolve (R3Injector.get walks up for a `scopes` containing 'root', and
+      // a null parent always dead-ends in NullInjector). platform-browser solves this the same
+      // way for real DOM apps via BROWSER_MODULE_PROVIDERS: hand { provide: INJECTOR_SCOPE,
+      // useValue: 'root' } to the app-level providers, which R3Injector's constructor reads to
+      // self-tag this.scopes with 'root'. Same trick here, no PlatformRef, no DOM.
       { provide: INJECTOR_SCOPE, useValue: 'root' },
-      // Supplies the real ChangeDetectionSchedulerImpl (microtask-batched, self-scheduling
-      // via ApplicationRef.afterTick) + NoopNgZone + ZONELESS_ENABLED: true — the exact
-      // bundle internalCreateApplication() uses. With ApplicationRef reachable (see above),
-      // there is no more reason for a hand-rolled scheduler: it replaces our old
-      // unconditional `rootView.detectChanges(); cmpView.detectChanges()` (which force-ran
-      // BOTH root views on every tick regardless of cause) with Angular's own tick(), which
-      // only enters an attached view when something actually marked it (RefreshView / Dirty
-      // consumer / HasChildViewsToRefresh). NOTE: this does NOT stop the root's own template
-      // from re-running on a plain press or `ChangeDetectorRef.markForCheck()` anywhere in
-      // the tree — `markViewDirty` (which both native (event) bindings and `markForCheck()`
-      // go through, see SymbioteHostPropsDirective) unconditionally sets RefreshView on
-      // EVERY ancestor up to the root; that is fundamental, unavoidable Angular zoneless
-      // behavior, true in every Angular app, not something this swap changes. What DOES
-      // still protect a sibling branch from an unrelated press is a genuine child
-      // `@Component` boundary — SignalView-compiled children are skip-eligible regardless of
-      // this scheduler.
+      // Supplies the real ChangeDetectionSchedulerImpl (microtask-batched via
+      // ApplicationRef.afterTick) + NoopNgZone + ZONELESS_ENABLED: true — the exact bundle
+      // internalCreateApplication() uses. Replaces the old unconditional
+      // `rootView.detectChanges(); cmpView.detectChanges()` (force-ran both root views on every
+      // tick) with Angular's own tick(), which only enters a view something actually marked
+      // dirty. This does NOT stop the root's own template from re-running on a plain press or
+      // `markForCheck()` anywhere in the tree — `markViewDirty` unconditionally sets RefreshView
+      // on every ancestor up to the root; that's fundamental Angular zoneless behavior, not
+      // something this swap changes. A genuine child `@Component` boundary still protects a
+      // sibling branch from an unrelated press.
       ...provideZonelessChangeDetectionInternal(),
-      // Angular's own INTERNAL_APPLICATION_ERROR_HANDLER (core.mjs) reports a tick()
-      // exception by calling `injector.get(ErrorHandler)` — a normal `bootstrapApplication`
-      // registers this token by default (platform-browser's BROWSER_MODULE_PROVIDERS), but
-      // our from-scratch environment injector never did, so that lookup itself threw
-      // NG0201 and REPLACED whatever the real error was with an unrelated "No provider
-      // found for ErrorHandler" — the real exception never got logged, and the NG0201 itself
-      // propagated out of a bare Timeout callback uncaught (nothing above it in the stack to
-      // catch it), i.e. any async tick() exception, anywhere in the app, crashed hard instead
-      // of being reported. Providing the default `ErrorHandler` (same one bootstrapApplication
-      // ships) restores the intended behavior: `console.error('ERROR', e)` and keep running.
-      { provide: ErrorHandler, useClass: ErrorHandler },
+      // Angular's INTERNAL_APPLICATION_ERROR_HANDLER reports a tick() exception via
+      // `injector.get(ErrorHandler)`; a normal `bootstrapApplication` registers that token by
+      // default, but our from-scratch environment injector never did, so the lookup itself threw
+      // NG0201 and replaced the real error with "No provider found for ErrorHandler" — any async
+      // tick() exception crashed hard, uncaught, instead of being reported. The token still has to
+      // be provided for exactly that reason; what it resolves to is now SymbioteErrorHandler
+      // (see above), which reports through the engine instead of Angular's `console.error('ERROR',
+      // e)` and, like the default, returns rather than rethrows so the app keeps running.
+      { provide: ErrorHandler, useClass: SymbioteErrorHandler },
       ColorSchemeService,
       WindowDimensionsService,
     ],

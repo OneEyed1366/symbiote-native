@@ -33,7 +33,10 @@ const StatusBarAndroidComponent: FC<IStatusBarProps> = props => {
   return null;
 };
 
-const StatusBarAndroid = Object.assign(StatusBarAndroidComponent, statusBarImperative);
+const StatusBarAndroid = Object.assign(
+  StatusBarAndroidComponent,
+  statusBarImperative,
+);
 
 // Android exposes the bar height as a native constant; undefined if the module or the
 // constant is absent. Read lazily (getter, not a value) so nothing touches native at import

@@ -4,6 +4,13 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import prettier from 'eslint-config-prettier';
+import json from '@eslint/json';
+import requireReadme from './eslint-rules/require-readme.js';
+import requirePackageFields from './eslint-rules/require-package-fields.js';
+import requireNativeLinkPackaged from './eslint-rules/require-native-link-packaged.js';
+import excludeTestsFromPublishedFiles from './eslint-rules/exclude-tests-from-published-files.js';
+import validNativeLinkManifest from './eslint-rules/valid-native-link-manifest.js';
+import coLocateModuleFiles from './eslint-rules/co-locate-module-files.js';
 
 // Flat config for the symbiote LIBRARY code only (core / adapters / packages).
 // The RN example apps own their formatting + lint via the @react-native eslint
@@ -32,6 +39,9 @@ export default defineConfig(
     languageOptions: {
       globals: { ...globals.node, ...globals.browser },
     },
+    plugins: {
+      local: { rules: { 'co-locate-module-files': coLocateModuleFiles } },
+    },
     rules: {
       // The Fabric JSI seam (nativeFabricUIManager, ViewConfigs, host element bags)
       // is genuinely untyped at the boundary, so `any` there is the contract rather than a lint slip.
@@ -40,8 +50,15 @@ export default defineConfig(
       // signatures, platform stubs all carry placeholder params).
       '@typescript-eslint/no-unused-vars': [
         'warn',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
       ],
+      // ADR 0026: a module's files (base + platform variants + co-located test) must all
+      // live in the same folder — either flat or entirely inside one X/ subfolder, never split.
+      'local/co-locate-module-files': 'error',
     },
   },
 
@@ -55,7 +72,10 @@ export default defineConfig(
   // react-hooks/exhaustive-deps` comment there fails lint with "Definition for rule not found"
   // instead of being suppressed.
   {
-    files: ['adapters/react/**/*.{ts,tsx}', 'packages/*/src/react/**/*.{ts,tsx}'],
+    files: [
+      'adapters/react/**/*.{ts,tsx}',
+      'packages/*/src/react/**/*.{ts,tsx}',
+    ],
     plugins: { 'react-hooks': reactHooks },
     rules: {
       // Classic Rules of Hooks, the high-signal React-specific checks. The v7 plugin
@@ -76,9 +96,68 @@ export default defineConfig(
     rules: {},
   },
 
+  // ── package.json hygiene: every publishable package (core/adapters/packages) needs a
+  // README next to it, and the field set matching its detected tier (full-library /
+  // codegen-view / native-proxy — see eslint-rules/require-package-fields.js). apps/* is
+  // excluded on purpose: apps/docs-site is a private Astro app, not an npm package. ──
+  {
+    files: ['{core,adapters,packages}/*/package.json'],
+    language: 'json/json',
+    plugins: {
+      json,
+      local: {
+        rules: {
+          'require-readme': requireReadme,
+          'require-package-fields': requirePackageFields,
+          'require-native-link-packaged': requireNativeLinkPackaged,
+          'exclude-tests-from-published-files': excludeTestsFromPublishedFiles,
+        },
+      },
+    },
+    rules: {
+      'local/require-readme': 'error',
+      'local/require-package-fields': 'error',
+      'local/require-native-link-packaged': 'error',
+      'local/exclude-tests-from-published-files': 'error',
+    },
+  },
+
+  // ── expo wrapper manifests: native-link.json is consumed by @symbiote-native/expo-modules-link
+  // at app postinstall, and the aggregator ignores whatever it doesn't recognise rather than
+  // failing. Validating the schema here is the only place a typo surfaces before a Gradle
+  // compile error or a device-only "Cannot find native module". ──
+  {
+    files: ['{core,adapters,packages}/*/native-link.json'],
+    language: 'json/json',
+    plugins: {
+      json,
+      local: {
+        rules: { 'valid-native-link-manifest': validNativeLinkManifest },
+      },
+    },
+    rules: {
+      'local/valid-native-link-manifest': 'error',
+    },
+  },
+
+  // ── adapters/solid: the JSX augmentation file, and ONLY that file. Adding our host tags to
+  // solid-js's JSX.IntrinsicElements is declaration merging, which requires reopening its `JSX`
+  // namespace — there is no ES-module form of that, so no-namespace cannot be satisfied. The merged
+  // interface is then intentionally empty: its members come from a mapped type
+  // (Record<ISymbioteIntrinsic, …>) so the tag list has ONE source of truth in
+  // @symbiote-native/components, and an interface body cannot express a mapped type — it can only
+  // `extends` it. Scoped to the one file rather than the adapter, so ordinary Solid source still
+  // gets both rules. ──
+  {
+    files: ['adapters/solid/src/jsx.ts'],
+    rules: {
+      '@typescript-eslint/no-namespace': 'off',
+      '@typescript-eslint/no-empty-object-type': 'off',
+    },
+  },
+
   // Future adapters get their own block here, e.g.:
   // { files: ['adapters/angular/**/*.ts'], plugins: { ... }, rules: { ... } },
-  // { files: ['adapters/solid/**/*.{ts,tsx}'], plugins: { solid }, rules: { ...solid.configs.recommended.rules } },
   // { files: ['adapters/svelte/**/*.svelte'], languageOptions: { parser: svelteParser }, rules: { ... } },
 
   // prettier last: switch off every formatting rule, since prettier owns formatting.

@@ -3,9 +3,20 @@
 // A setTimeout polyfill stands in for the host's requestAnimationFrame so the drivers' frame
 // loops run under Node. We observe the value through addListener. The Fabric slot is only here
 // so AnimatedValue's flush path doesn't throw; no view is attached.
+//
+// No Negative group: TimingAnimation and the parallel/sequence composition functions accept
+// whatever config they're given and never validate it — there is no invalid input this unit
+// rejects.
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { AnimatedValue, Easing, parallel, sequence, spring, timing } from '@symbiote-native/engine';
+import {
+  AnimatedValue,
+  Easing,
+  parallel,
+  sequence,
+  spring,
+  timing,
+} from '@symbiote-native/engine';
 import type { IEndResult } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 
@@ -39,7 +50,7 @@ beforeAll(() => {
   }
 });
 
-describe('Animated drivers over real rAF frames', () => {
+describe('Animated drivers over real rAF frames — Positive', () => {
   it('timing drives 0 -> 1, fires the callback once, and emits intermediate frames in (0,1)', async () => {
     const value = new AnimatedValue(0);
     const frames: number[] = [];
@@ -47,10 +58,12 @@ describe('Animated drivers over real rAF frames', () => {
 
     let endCount = 0;
     const result = await new Promise<IEndResult>(resolve => {
-      timing(value, { toValue: 1, duration: 100, easing: Easing.linear }).start(r => {
-        endCount += 1;
-        resolve(r);
-      });
+      timing(value, { toValue: 1, duration: 100, easing: Easing.linear }).start(
+        r => {
+          endCount += 1;
+          resolve(r);
+        },
+      );
     });
 
     expect(result.finished).toBe(true);
@@ -63,9 +76,57 @@ describe('Animated drivers over real rAF frames', () => {
     }
   });
 
+  // why: duration:0 is the escape hatch for "jump immediately" (e.g. an animation config built
+  // generically that sometimes gets a zero duration) — it must resolve on the SAME tick, never
+  // schedule a frame that would delay a value the caller expects to be already final.
+  it('duration:0 jumps straight to toValue synchronously, without scheduling a frame', () => {
+    const value = new AnimatedValue(0);
+    let finished: boolean | undefined;
+    timing(value, { toValue: 1, duration: 0, easing: Easing.linear }).start(
+      result => {
+        finished = result.finished;
+      },
+    );
+    // No `await` / timer tick anywhere above: if this passed, the whole thing ran synchronously.
+    expect(value.__getValue()).toBe(1);
+    expect(finished).toBe(true);
+  });
+
+  // why: `delay` defers the START of the frame loop — the value must stay untouched until the
+  // delay elapses, proving the delay is honored rather than folded into the animation's own
+  // progress curve.
+  it('delay defers the start: the value is untouched until the delay elapses', async () => {
+    const value = new AnimatedValue(0);
+    const composite = timing(value, {
+      toValue: 1,
+      duration: 0,
+      delay: 40,
+      easing: Easing.linear,
+    });
+
+    let finished = false;
+    const donePromise = new Promise<void>(resolve => {
+      composite.start(() => {
+        finished = true;
+        resolve();
+      });
+    });
+
+    // Still within the delay window: nothing has moved yet.
+    expect(value.__getValue()).toBe(0);
+    expect(finished).toBe(false);
+
+    await donePromise;
+    expect(value.__getValue()).toBe(1);
+  });
+
   it('stop() mid-flight reports finished:false and a value below the target', async () => {
     const value = new AnimatedValue(0);
-    const composite = timing(value, { toValue: 1, duration: 500, easing: Easing.linear });
+    const composite = timing(value, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.linear,
+    });
 
     const result = await new Promise<IEndResult>(resolve => {
       composite.start(resolve);
@@ -79,7 +140,9 @@ describe('Animated drivers over real rAF frames', () => {
   it('spring settles at its toValue and ends finished', async () => {
     const value = new AnimatedValue(0);
     const result = await new Promise<IEndResult>(resolve => {
-      spring(value, { toValue: 1, stiffness: 200, damping: 20, mass: 1 }).start(resolve);
+      spring(value, { toValue: 1, stiffness: 200, damping: 20, mass: 1 }).start(
+        resolve,
+      );
     });
 
     expect(result.finished).toBe(true);
@@ -114,5 +177,26 @@ describe('Animated drivers over real rAF frames', () => {
     expect(result.finished).toBe(true);
     expect(a.__getValue()).toBe(1);
     expect(b.__getValue()).toBe(1);
+  });
+
+  // why: parallel's stopTogether:true default must propagate a stop to EVERY sibling — a
+  // gesture-driven parallel group (e.g. scale + opacity) must not leave one half still animating
+  // after the other was cancelled.
+  it('parallel stopTogether (default) stops every sibling when one is stopped', async () => {
+    const a = new AnimatedValue(0);
+    const b = new AnimatedValue(0);
+    const group = parallel([
+      timing(a, { toValue: 1, duration: 500, easing: Easing.linear }),
+      timing(b, { toValue: 1, duration: 500, easing: Easing.linear }),
+    ]);
+
+    const result = await new Promise<IEndResult>(resolve => {
+      group.start(resolve);
+      setTimeout(() => group.stop(), 30);
+    });
+
+    expect(result.finished).toBe(false);
+    expect(a.__getValue()).toBeLessThan(1);
+    expect(b.__getValue()).toBeLessThan(1);
   });
 });

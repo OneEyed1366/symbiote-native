@@ -30,6 +30,11 @@ Svelte    a tiny set of DOM-ish ops you provide
 Solid     its universal/runtime custom renderer
 ```
 
+Svelte has no stable official custom-renderer API yet — our adapter instead patches
+`globalThis` DOM classes so compiled Svelte output runs unchanged, a deliberate
+coupling to Svelte's private internals. Different mechanism than the nodeOps table
+below; read `svelte-adapter-dom-shim` before building on that seam.
+
 ## 2. The nodeOps mapping (Vue, literal — your template)
 
 Every method does its mutation + (for coalesced adapters) `surface.requestCommit()`.
@@ -90,6 +95,8 @@ a deep ref (`vue-adapter-reactivity` §1).
     (or host-config.ts)
 [ ] src/components.ts         thin wrappers per primitive + the re-export barrel
 [ ] src/descriptor-to-<fw>.ts the Descriptor → framework element bridge (h() / createElement / imperative)
+                              // children/cells via renderItem-style props? check `vue-adapter-slots` first —
+                              // on Vue those became scoped slots, not a React-style render-prop duality
 [ ] src/host-instance(/.ts)   findNodeHandle(ref) → native tag (framework-shaped ref input)
 [ ] src/<hooks|composables>/  framework-idiomatic lifecycle: use-color-scheme, use-window-dimensions, …
 [ ] one-time wiring           setEventDispatcher(run => …) once at app entry (see React render.ts:
@@ -112,7 +119,7 @@ engine). If adapter code starts growing any of these, it belongs in the engine
 
 ## 7. Build it in layers
 
-So a break localizes (the Vue/Angular plan, `.docs/decisions/0007`):
+So a break localizes (the Vue/Angular plan — and the Svelte and Solid ones after it):
 
 ```
 L1  Static paint   View/Text/Image, no reactivity  → surface paints
@@ -121,8 +128,9 @@ L3  Events         press / change                   → routeProp → setEventLi
 L4  Parity (P0)    @symbiote-native/components via descriptorTo<fw> + lifecycle  → symbiote-add-component
 ```
 
-Mount/build every layer against `.examples/<app>` (workspace:*-linked dev harness),
-never `examples/<app>` (published-catalog canary) — `symbiote-dev-examples`.
+Mount/build every layer against `examples/<app>`, using a `pnpm pack` tarball
+installed via `file:` for the in-progress adapter (CLAUDE.md's
+`<examples_vs_dot_examples>`).
 
 ## Reference
 
@@ -131,8 +139,12 @@ never `examples/<app>` (published-catalog canary) — `symbiote-dev-examples`.
   `adapters/{react,vue}/src/render.ts` (mount/unmount + `RN$stopSurface`).
 - Angular's Renderer2 mapping, AOT-under-Metro, version floor: the `angular-adapter` skill.
 - Async-commit landmines on a coalesced adapter: `vue-adapter-reactivity`.
-- Component parity (L4): the `symbiote-add-component` skill.
+- Component parity (L4): the `symbiote-add-component` skill; verify it landed with `symbiote-parity-check`
+  (prop-by-prop diff against React, the reference surface).
 - Prior art: `wolf-tui/packages/{react,vue,svelte,solid,angular}` (same architecture, ANSI target).
-- Decisions: `.docs/decisions/0002` (adapter seam), `0007` (build in layers), `0008`
-  (React goes through the engine in mutation mode, not native persistent mode).
+- The layered order in §7, and React going through the engine in MUTATION mode rather
+  than its native persistent mode, are both stated as invariants in the repo root
+  `CLAUDE.md` (M1+M2 milestone note) — read there, not from an ADR number. The
+  `.docs/decisions/` tree those used to cite is local-only per `.gitignore` and is not
+  present in a checkout; do not re-add a path into it.
 </content>

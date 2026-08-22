@@ -7,7 +7,12 @@
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, View, AccessibilityInfo } from '@symbiote-native/react';
+import {
+  mount,
+  unmount,
+  View,
+  AccessibilityInfo,
+} from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 // ---- augment the shared slot to record sendAccessibilityEvent ------------
@@ -46,7 +51,9 @@ const fakeAccessibilityInfo = {
   getCurrentVoiceOverState: (onSuccess: (enabled: boolean) => void): void => {
     onSuccess(SCREEN_READER_STATE);
   },
-  getCurrentReduceMotionState: (onSuccess: (enabled: boolean) => void): void => {
+  getCurrentReduceMotionState: (
+    onSuccess: (enabled: boolean) => void,
+  ): void => {
     onSuccess(REDUCE_MOTION_STATE);
   },
   getCurrentBoldTextState: (onSuccess: (enabled: boolean) => void): void => {
@@ -55,16 +62,24 @@ const fakeAccessibilityInfo = {
   getCurrentGrayscaleState: (onSuccess: (enabled: boolean) => void): void => {
     onSuccess(true);
   },
-  getCurrentInvertColorsState: (onSuccess: (enabled: boolean) => void): void => {
+  getCurrentInvertColorsState: (
+    onSuccess: (enabled: boolean) => void,
+  ): void => {
     onSuccess(false);
   },
-  getCurrentReduceTransparencyState: (onSuccess: (enabled: boolean) => void): void => {
+  getCurrentReduceTransparencyState: (
+    onSuccess: (enabled: boolean) => void,
+  ): void => {
     onSuccess(true);
   },
-  getCurrentDarkerSystemColorsState: (onSuccess: (enabled: boolean) => void): void => {
+  getCurrentDarkerSystemColorsState: (
+    onSuccess: (enabled: boolean) => void,
+  ): void => {
     onSuccess(true);
   },
-  getCurrentPrefersCrossFadeTransitionsState: (onSuccess: (enabled: boolean) => void): void => {
+  getCurrentPrefersCrossFadeTransitionsState: (
+    onSuccess: (enabled: boolean) => void,
+  ): void => {
     onSuccess(false);
   },
   announceForAccessibility: (announcement: string): void => {
@@ -85,7 +100,8 @@ const registeredModules: Record<string, unknown> = {
 };
 
 // The device hub our code registers, captured so the test can act as "native".
-let deviceHub: { emit: (eventType: string, ...args: unknown[]) => void } | undefined;
+let deviceHub:
+  { emit: (eventType: string, ...args: unknown[]) => void } | undefined;
 
 function isType<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
@@ -116,14 +132,19 @@ afterEach(() => unmount(ROOT_TAG));
 
 describe('AccessibilityInfo (iOS)', () => {
   it('isScreenReaderEnabled resolves to the module value', async () => {
-    expect(await AccessibilityInfo.isScreenReaderEnabled()).toBe(SCREEN_READER_STATE);
+    expect(await AccessibilityInfo.isScreenReaderEnabled()).toBe(
+      SCREEN_READER_STATE,
+    );
   });
 
   it('a screenReaderChanged listener tracks a native change and stops on remove', async () => {
     let received: unknown;
-    const sub = AccessibilityInfo.addEventListener('screenReaderChanged', state => {
-      received = state;
-    });
+    const sub = AccessibilityInfo.addEventListener(
+      'screenReaderChanged',
+      state => {
+        received = state;
+      },
+    );
     expect(deviceHub).toBeDefined();
     expect(a11yAdded).toBeGreaterThanOrEqual(1);
 
@@ -169,7 +190,9 @@ describe('AccessibilityInfo (iOS)', () => {
   });
 
   it('getRecommendedTimeoutMillis returns the original on iOS', async () => {
-    expect(await AccessibilityInfo.getRecommendedTimeoutMillis(3_000)).toBe(3_000);
+    expect(await AccessibilityInfo.getRecommendedTimeoutMillis(3_000)).toBe(
+      3_000,
+    );
   });
 
   it('sendAccessibilityEvent routes a host ref through the Fabric slot, click is a no-op', () => {

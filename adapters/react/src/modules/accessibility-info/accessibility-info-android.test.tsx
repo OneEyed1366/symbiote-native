@@ -61,7 +61,8 @@ beforeEach(() => {
   mount(ROOT_TAG, <App />);
   if (box == null) throw new Error('host ref handed back nothing');
   const tag = findNodeHandle(box);
-  if (typeof tag !== 'number') throw new Error('findNodeHandle(ref) returned no tag');
+  if (typeof tag !== 'number')
+    throw new Error('findNodeHandle(ref) returned no tag');
   boxTag = tag;
 });
 afterEach(() => unmount(ROOT_TAG));

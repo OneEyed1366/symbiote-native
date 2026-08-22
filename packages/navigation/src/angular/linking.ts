@@ -22,7 +22,10 @@ export function injectLinkingIntegration(
 ): void {
   const destroyRef = inject(DestroyRef);
 
-  function applyRoute(url: string, dispatch: (name: string, params?: unknown) => void): void {
+  function applyRoute(
+    url: string,
+    dispatch: (name: string, params?: unknown) => void,
+  ): void {
     const route = resolveRouteFromUrl(config, url);
     if (route === null) {
       dlog(`injectLinkingIntegration: no route resolved for "${url}"`);

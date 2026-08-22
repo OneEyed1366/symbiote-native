@@ -1,4 +1,10 @@
-import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  OnDestroy,
+  OnInit,
+  inject,
+} from '@angular/core';
 import {
   Button,
   I18nManager,
@@ -25,7 +31,7 @@ const TAP_KEY = 'symbiote.tapCount';
   standalone: true,
   imports: [View, Text, Button, Image],
   template: `
-    <View class="section">
+    <View class="section-nested">
       <Text class="section-label"
         >Runtime modules · I18nManager / Settings / Image statics</Text
       >
@@ -44,9 +50,9 @@ const TAP_KEY = 'symbiote.tapCount';
         color="#dd0031"
       ></Button>
 
-      <Text testID="persist-count" class="info-text"
-        >{{ 'persisted taps: ' + persisted + ' · survives relaunch' }}</Text
-      >
+      <Text testID="persist-count" class="info-text">{{
+        'persisted taps: ' + persisted + ' · survives relaunch'
+      }}</Text>
       <Button
         testID="persist-btn"
         title="Persist a tap"
@@ -56,9 +62,9 @@ const TAP_KEY = 'symbiote.tapCount';
 
       <View class="row-align-center">
         <Image [source]="{ uri: LOGO_URI }" class="logo-thumb" />
-        <Text testID="logo-size" class="info-text-flex"
-          >{{ 'logo size: ' + imageSize }}</Text
-        >
+        <Text testID="logo-size" class="info-text-flex">{{
+          'logo size: ' + imageSize
+        }}</Text>
       </View>
       <Text testID="cache-state" class="info-text">{{
         'prefetch cache: ' + cacheState

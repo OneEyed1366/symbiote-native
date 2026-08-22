@@ -5,7 +5,7 @@
 
 import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { FlatList, mount, unmount } from '@symbiote-native/react';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
@@ -32,7 +32,8 @@ function rowsWithFlexDirection(): IFakeNode[] {
   const rows: IFakeNode[] = [];
   const walk = (nodes: IFakeNode[]): void => {
     for (const node of nodes) {
-      if (node.viewName === 'RCTView' && node.props.flexDirection === 'row') rows.push(node);
+      if (node.viewName === 'RCTView' && node.props.flexDirection === 'row')
+        rows.push(node);
       walk(node.children);
     }
   };
@@ -40,9 +41,21 @@ function rowsWithFlexDirection(): IFakeNode[] {
   return rows;
 }
 
-describe('React FlatList columnWrapperStyle class-name resolution', () => {
+// No Negative group: columnWrapperStyle accepts either a class-name string or a plain style
+// object — both are valid inputs the type allows, so there is no reject path.
+describe('React FlatList columnWrapperStyle class-name resolution (Positive)', () => {
   it('resolves a class-name string onto the row wrapper', () => {
-    registerStyles({ rowGap: { columnGap: 4 } });
+    // why: columnWrapperStyle is typed as `IStyleProp<IViewStyle> | string`, deliberately
+    // widened past the full IClassNameValue union — a bare string must resolve through the
+    // SAME shared style registry as `className`, onto the auto-generated flex-row row view.
+    registerRules([
+      {
+        tokens: ['rowGap'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { columnGap: 4 },
+      },
+    ]);
     mount(
       ROOT_TAG,
       createElement(FlatList<IRow>, {
@@ -61,6 +74,9 @@ describe('React FlatList columnWrapperStyle class-name resolution', () => {
   });
 
   it('still accepts a plain style object unchanged', () => {
+    // why: widening the prop type to accept a string must not break the pre-existing plain
+    // style-object path — a regression here would be a silent breaking change for every caller
+    // that already passes `{ columnGap: ... }` directly.
     mount(
       ROOT_TAG,
       createElement(FlatList<IRow>, {

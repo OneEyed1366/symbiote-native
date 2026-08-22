@@ -35,7 +35,7 @@
 // self-registers instead: `adapters/angular/babel-register-composed.cjs` (a Metro babel preset
 // applied bundle-wide, not scoped to adapters/angular) scans this package's own AOT-compiled
 // (`ngc`) `ɵɵngDeclareComponent({selector: 'Stack', ...})` output and auto-calls
-// `registerComposedComponent('Stack')` at bundle time - same mechanism `.examples/angular`
+// `registerComposedComponent('Stack')` at bundle time - same mechanism `examples/angular`
 // navigation-demo screens and `@symbiote-native/slider`'s `Slider` rely on for their own composed
 // components mounted statically or via `NgComponentOutlet`. Unregistered, `createElement('Stack')`
 // falls through to a real `createNode` call and RN paints its own "Unimplemented component"
@@ -73,6 +73,7 @@ import {
   createInitialNavigatorState,
   createNavigationEmitter,
   navigatorReducer,
+  reconcileStackRoutes,
   resolveHeaderInModalStackStyle,
   resolveScreenRenderPlan,
   resolveStackProps,
@@ -90,13 +91,18 @@ import type {
 import { NavigationScopeDirective } from '../navigation-scope.directive';
 import { SearchBarRefDirective } from '../search-bar-ref.directive';
 import { ScreenDirective } from '../screen.directive';
-import type { IAngularScreenOptions, IScreenOptionsArgs } from '../screen.directive';
+import type {
+  IAngularScreenOptions,
+  IScreenOptionsArgs,
+} from '../screen.directive';
 
 export type { INavigatorHandle } from '../../core';
 
 // backTitleVisible defaults to `true` on both platforms per the codegen spec's own default - no
 // ios/android divergence in v1 scope (mirrors react/stack.ts's own constant exactly).
-const NAVIGATOR_PLATFORM: INavigatorPlatform = { defaultHeaderBackTitleVisible: true };
+const NAVIGATOR_PLATFORM: INavigatorPlatform = {
+  defaultHeaderBackTitleVisible: true,
+};
 
 let stackInstanceCounter = 0;
 
@@ -161,7 +167,9 @@ let stackInstanceCounter = 0;
     </ng-template>
 
     <ng-template #headerAndContentTpl let-route let-index="index">
-      <RNSScreenStackHeaderConfig [symbioteHostProps]="headerConfigProps(route, index)">
+      <RNSScreenStackHeaderConfig
+        [symbioteHostProps]="headerConfigProps(route, index)"
+      >
         @if (hasSearchBar(route)) {
           <RNSScreenStackHeaderSubview [symbioteHostProps]="headerSubviewProps">
             <RNSSearchBar
@@ -171,7 +179,9 @@ let stackInstanceCounter = 0;
           </RNSScreenStackHeaderSubview>
         }
       </RNSScreenStackHeaderConfig>
-      <RNSScreenContentWrapper [symbioteHostProps]="contentWrapperProps(route, index)">
+      <RNSScreenContentWrapper
+        [symbioteHostProps]="contentWrapperProps(route, index)"
+      >
         <ng-container
           [symbioteNavigationScope]="route"
           [navigation]="this"
@@ -184,7 +194,8 @@ let stackInstanceCounter = 0;
   `,
 })
 export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
-  @ContentChildren(ScreenDirective) private readonly screenChildren!: QueryList<ScreenDirective>;
+  @ContentChildren(ScreenDirective)
+  private readonly screenChildren!: QueryList<ScreenDirective>;
 
   @Input() initialRouteName?: string;
   @Input() screenOptions?: IAngularScreenOptions;
@@ -214,7 +225,8 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
 
   readonly push = (name: string, params?: unknown): void =>
     this.dispatch({ type: 'push', route: this.createRoute(name, params) });
-  readonly pop = (count?: number): void => this.dispatch({ type: 'pop', count });
+  readonly pop = (count?: number): void =>
+    this.dispatch({ type: 'pop', count });
   readonly popToTop = (): void => this.dispatch({ type: 'popToTop' });
   readonly popTo = (key: string): void => this.dispatch({ type: 'popTo', key });
   readonly replace = (name: string, params?: unknown): void =>
@@ -223,14 +235,17 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
     this.dispatch({ type: 'setParams', key, params });
   readonly reset = (nextState: INavigatorState): void =>
     this.dispatch({ type: 'reset', state: nextState });
-  readonly canGoBack = (): boolean => (this.stateSignal()?.routes.length ?? 0) > 1;
+  readonly canGoBack = (): boolean =>
+    (this.stateSignal()?.routes.length ?? 0) > 1;
 
   ngAfterContentInit(): void {
     this.rebuildRegistry();
     this.initializeState();
-    this.screenChildrenSubscription = this.screenChildren.changes.subscribe(() => {
-      this.rebuildRegistry();
-    });
+    this.screenChildrenSubscription = this.screenChildren.changes.subscribe(
+      () => {
+        this.rebuildRegistry();
+      },
+    );
   }
 
   ngOnDestroy(): void {
@@ -242,34 +257,66 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
     for (const screen of this.screenChildren) {
       this.registry.set(screen.name, screen);
     }
+    this.reconcileWithRegistry();
+  }
+
+  // A `<ng-template symbioteScreen>` marker can leave the @ContentChildren query (a marker behind
+  // an `@if`, a data-driven screen list) while its route is still in the pushed history, which
+  // would leave that entry with nothing for componentFor() to mount (reconcileStackRoutes' header).
+  // The signal write lives HERE, in the query-change callback, and never in a computed/template
+  // accessor - reconciliation is a reaction to the registry changing, not a derivation of it.
+  private reconcileWithRegistry(): void {
+    const current = this.stateSignal();
+    if (current === undefined) return;
+    const next = reconcileStackRoutes(current, [...this.registry.keys()]);
+    if (next === current) return;
+    this.commitState(next);
   }
 
   private initializeState(): void {
     if (this.stateSignal() !== undefined) return;
-    const initialRouteName = this.initialRouteName ?? this.registry.keys().next().value;
+    const initialRouteName =
+      this.initialRouteName ?? this.registry.keys().next().value;
     if (initialRouteName === undefined) {
       dlog('Stack: no <ng-template symbioteScreen> children registered');
       this.stateSignal.set(
-        createInitialNavigatorState({ key: this.routeIdPrefix, name: '', params: undefined }),
+        createInitialNavigatorState({
+          key: this.routeIdPrefix,
+          name: '',
+          params: undefined,
+        }),
       );
       return;
     }
     this.stateSignal.set(
       createInitialNavigatorState(
-        this.createRoute(initialRouteName, this.registry.get(initialRouteName)?.initialParams),
+        this.createRoute(
+          initialRouteName,
+          this.registry.get(initialRouteName)?.initialParams,
+        ),
       ),
     );
   }
 
   private createRoute(name: string, params: unknown): IRoute<unknown> {
     this.routeSequence += 1;
-    return { key: `${this.routeIdPrefix}-${name}-${this.routeSequence}`, name, params };
+    return {
+      key: `${this.routeIdPrefix}-${name}-${this.routeSequence}`,
+      name,
+      params,
+    };
   }
 
   private dispatch(action: INavigatorAction): void {
     const current = this.stateSignal();
     if (current === undefined) return;
-    const next = navigatorReducer(current, action);
+    this.commitState(navigatorReducer(current, action));
+  }
+
+  // The one write path into stateSignal, shared by a dispatched action and a registry-driven
+  // reconciliation: both invalidate the plan cache, broadcast to every still-live route, and prune
+  // the emitters of routes that are gone.
+  private commitState(next: INavigatorState): void {
     this.planCache.clear();
     this.stateSignal.set(next);
     const liveRouteKeys = new Set(next.routes.map(route => route.key));
@@ -340,7 +387,8 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
       isAndroid: Platform.OS === 'android',
       screenPassthrough: {
         [SCREEN_ON_DISMISSED]: () => this.dispatch({ type: 'pop', count: 1 }),
-        [SCREEN_ON_HEADER_BACK_BUTTON_CLICKED]: () => this.dispatch({ type: 'pop', count: 1 }),
+        [SCREEN_ON_HEADER_BACK_BUTTON_CLICKED]: () =>
+          this.dispatch({ type: 'pop', count: 1 }),
         [SCREEN_ON_APPEAR]: () => {
           dlog(`Stack: route "${route.name}" appeared (focus)`);
           this.emitterFor(route.key).emit(NAVIGATION_EVENT_FOCUS);
@@ -359,14 +407,19 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
   }
 
   outerScreenIsModal(route: IRoute<unknown>, index: number): boolean {
-    return this.planFor(route, index).screenViewName === RNS_MODAL_SCREEN_VIEW_NAME;
+    return (
+      this.planFor(route, index).screenViewName === RNS_MODAL_SCREEN_VIEW_NAME
+    );
   }
 
   isInModal(route: IRoute<unknown>, index: number): boolean {
     return this.planFor(route, index).inModal;
   }
 
-  screenHostProps(route: IRoute<unknown>, index: number): Record<string, unknown> {
+  screenHostProps(
+    route: IRoute<unknown>,
+    index: number,
+  ): Record<string, unknown> {
     return this.planFor(route, index).screenProps;
   }
 
@@ -374,16 +427,25 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
     return { style: resolveHeaderInModalStackStyle() };
   }
 
-  innerScreenProps(route: IRoute<unknown>, index: number): Record<string, unknown> {
+  innerScreenProps(
+    route: IRoute<unknown>,
+    index: number,
+  ): Record<string, unknown> {
     const plan = this.planFor(route, index);
     return { style: plan.innerScreenStyle, activityState: plan.activityState };
   }
 
-  contentWrapperProps(route: IRoute<unknown>, index: number): Record<string, unknown> {
+  contentWrapperProps(
+    route: IRoute<unknown>,
+    index: number,
+  ): Record<string, unknown> {
     return this.planFor(route, index).contentWrapperProps;
   }
 
-  headerConfigProps(route: IRoute<unknown>, index: number): Record<string, unknown> {
+  headerConfigProps(
+    route: IRoute<unknown>,
+    index: number,
+  ): Record<string, unknown> {
     return this.planFor(route, index).headerConfig.props;
   }
 
@@ -391,11 +453,16 @@ export class Stack implements AfterContentInit, OnDestroy, INavigatorHandle {
     return this.mergedOptionsFor(route).headerSearchBarOptions !== undefined;
   }
 
-  searchBarRef(route: IRoute<unknown>): { current: ISearchBarCommands | null } | undefined {
+  searchBarRef(
+    route: IRoute<unknown>,
+  ): { current: ISearchBarCommands | null } | undefined {
     return this.mergedOptionsFor(route).headerSearchBarOptions?.ref;
   }
 
-  searchBarProps(route: IRoute<unknown>, index: number): Record<string, unknown> {
+  searchBarProps(
+    route: IRoute<unknown>,
+    index: number,
+  ): Record<string, unknown> {
     return this.planFor(route, index).searchBarProps ?? {};
   }
 }

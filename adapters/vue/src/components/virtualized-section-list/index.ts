@@ -1,20 +1,16 @@
 // VirtualizedSectionList, the Vue wrapper that flattens sections into one virtualized stream
-// over VirtualizedList. Each section contributes a header row, its item rows, then a footer row
-// (RN counts 2 per section); the flattened tagged sequence is fed to VirtualizedList as one list,
-// so headers/items/footers are all windowed by the same machinery. The flattening, entry keying,
-// separator-item unwrap, and scrollToLocation mapping are shared from @symbiote-native/components; this
-// file wires Vue lifecycle (typed-prop inputs + handle re-expose + the per-entry render dispatch).
-// The Vue twin of the React adapter's VirtualizedSectionList.
+// over VirtualizedList: each section contributes a header row, its item rows, then a footer row
+// (RN counts 2 per section), and the flattened tagged sequence is windowed by the same
+// machinery as one list. Flattening, entry keying, separator-item unwrap, and scrollToLocation
+// mapping are shared from @symbiote-native/components; this file wires Vue lifecycle
+// (typed-prop inputs + handle re-expose + per-entry render dispatch).
 //
-// Typed-emits generic component (mirrors FlatList / VirtualizedList): a GENERIC setup function
-// `<ItemT,>(props: IVirtualizedSectionListProps<ItemT>, ctx: ICtx<IVirtualizedSectionListEmits>)`
-// so the section inputs (sections/renderItem/renderSectionHeader/…) infer ItemT at the call site.
-// For that, those inputs are read from typed `props` (declared in the runtime `props` array); the
-// VirtualizedList passthrough tail (refreshing/style/raw scroll/…) rides through `$attrs` onto the
-// inner list. The three adapter-synthesized events (endReached/startReached/refresh — the exact set
-// React's section list exposes) stay GATED on listener presence: each emit bridge is wired ONLY
-// when the consumer listens (read off the instance vnode props), so the inner VirtualizedList keeps
-// building RefreshControl / computing edge-reached strictly on demand.
+// Typed-emits generic component (mirrors FlatList/VirtualizedList): a GENERIC setup function so
+// section inputs infer ItemT at the call site. Those inputs are read from typed `props`
+// (declared in the runtime `props` array); the VirtualizedList passthrough tail rides through
+// $attrs onto the inner list. The three adapter-synthesized events (endReached/startReached/
+// refresh) stay GATED on listener presence so the inner VirtualizedList keeps building
+// RefreshControl / computing edge-reached strictly on demand.
 
 import {
   defineComponent,
@@ -50,8 +46,8 @@ import { VirtualizedList } from '../virtualized-list';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
 import type { ICtx } from '../../utils/component-helpers';
 
-// VirtualizedList is a generic component (generic construct signature), which h()'s overloads can't
-// resolve. Drive it through a loose functional-component handle (generic-component h() limitation).
+// VirtualizedList's generic construct signature can't be resolved by h()'s overloads, so drive
+// it through a loose functional-component handle instead.
 const VirtualizedListHost = VirtualizedList as unknown as FunctionalComponent<
   Record<string, unknown>
 >;
@@ -64,16 +60,23 @@ export interface IVirtualizedSectionListProps<ItemT> {
   sections: ReadonlyArray<ISection<ItemT>>;
   // Cell + section chrome are Vue scoped slots (#item / #sectionHeader / #sectionFooter /
   // #separator / #sectionSeparator / #header / #footer / #empty), typed by
-  // IVirtualizedSectionListSlots — not renderItem / renderSection* / *Component props (no duality
-  // with the React surface). See utils/slots-to-render-props.
+  // IVirtualizedSectionListSlots - not renderItem / renderSection* / *Component props.
   keyExtractor?: (item: ItemT, index: number) => string;
-  // Stick each section header to the top as the next section scrolls up. Routed to the inner
-  // VirtualizedList's stickyHeaderIndices. Defaults to `Platform.OS === 'ios'`; Android does not
-  // stick by default. Pass true/false to override.
+  // Fixed-layout fast path, FLAT like RN's: the SECTIONS array plus a flat entry index, where every
+  // section contributes two rows beyond its items (header, footer) and the caller accounts for them.
+  // A `({ section, index })` form would be our invention, not parity - `VirtualizedSectionList.js`
+  // has no getItemLayout code at all, the prop rides through `passThroughProps`; that shape is the
+  // community react-native-section-list-get-item-layout, layered on top. Without it a fast scroll
+  // outruns measurement and leaves blank windows.
+  getItemLayout?: (
+    data: ReadonlyArray<ISection<ItemT>> | null,
+    index: number,
+  ) => { length: number; offset: number; index: number };
+  // Routed to the inner VirtualizedList's stickyHeaderIndices. Defaults to
+  // Platform.OS === 'ios'; Android does not stick by default.
   stickySectionHeadersEnabled?: boolean;
-  // Everything below rides through $attrs onto the inner VirtualizedList untouched (it is NOT in
-  // PROP_KEYS). Declared here so consumers get typed props mirroring the React adapter's surface;
-  // the index signature below carries any further passthrough.
+  // Everything below rides through $attrs onto the inner VirtualizedList untouched (NOT in
+  // PROP_KEYS); declared here only so consumers get typed props.
   extraData?: unknown;
   onEndReachedThreshold?: number;
   onStartReachedThreshold?: number;
@@ -89,8 +92,7 @@ export interface IVirtualizedSectionListProps<ItemT> {
     minIndexForVisible: number;
     autoscrollToTopThreshold?: number;
   };
-  // Raw native scroll passthrough: NOT emits, they ride through $attrs onto the inner
-  // VirtualizedList (then its inner ScrollView) untouched.
+  // Raw native scroll passthrough: NOT emits, rides through $attrs onto the inner VirtualizedList.
   onScroll?: (event: ISymbioteEvent) => void;
   onScrollBeginDrag?: (event: ISymbioteEvent) => void;
   onScrollEndDrag?: (event: ISymbioteEvent) => void;
@@ -104,9 +106,7 @@ export interface IVirtualizedSectionListProps<ItemT> {
   [key: string]: unknown;
 }
 
-// The Vue cell/section-chrome surface — scoped slots, the idiomatic twin of React's renderItem /
-// renderSection* / *Component family. ItemT flows in from `sections`, so #item / #sectionHeader are
-// typed without annotation. Slots return VNode[]; the list folds them into the inner stream.
+// ItemT flows in from `sections`, so #item / #sectionHeader are typed without annotation.
 export type IVirtualizedSectionListSlots<ItemT> = {
   item: (info: {
     item: ItemT;
@@ -116,39 +116,42 @@ export type IVirtualizedSectionListSlots<ItemT> = {
   }) => VNode[] | VNode;
   sectionHeader?: (info: { section: ISection<ItemT> }) => VNode[] | VNode;
   sectionFooter?: (info: { section: ISection<ItemT> }) => VNode[] | VNode;
-  // Painted between adjacent sections (after one section's footer, before the next section's
-  // header). The Vue twin of RN's SectionSeparatorComponent.
+  // Painted between adjacent sections (RN's SectionSeparatorComponent).
   sectionSeparator?: () => VNode[] | VNode;
-  // The user's #separator is typed on ItemT; VSL unwraps each entry back to its ItemT before the
-  // inner list invokes it. The chrome slots forward straight down to the inner VirtualizedList.
+  // Typed on ItemT; VSL unwraps each entry back to its ItemT before the inner list invokes it.
   separator?: (props: ISeparatorProps<ItemT>) => VNode[] | VNode;
   header?: () => VNode[] | VNode;
   footer?: () => VNode[] | VNode;
   empty?: () => VNode[] | VNode;
 };
 
-// The adapter-synthesized section-list events. This is the exact set React's section list exposes
-// (onEndReached / onStartReached / onRefresh); React's section list synthesizes no ItemT-carrying
-// event (no onViewableItemsChanged / onScrollToIndexFailed), so the emits type is not generic. The
-// raw native scroll events stay raw $attrs passthrough (see the props interface), NOT emits.
+// The exact set React's section list exposes; no ItemT-carrying event, so the emits type is not
+// generic. Raw native scroll events stay raw $attrs passthrough, NOT emits.
 export type IVirtualizedSectionListEmits = {
   endReached: (info: { distanceFromEnd: number }) => void;
   startReached: (info: { distanceFromStart: number }) => void;
   refresh: () => void;
 };
 
-// The typed inputs VSL reads off `props`; everything else (the VirtualizedList passthrough tail and
-// raw scroll) falls through $attrs onto the inner list. Listed for the runtime `props` declaration
-// (keyof can't derive it: the index signature widens keyof to `string`). The three emit events are
-// deliberately absent (declared as emits below).
-const PROP_KEYS = ['sections', 'keyExtractor', 'stickySectionHeadersEnabled'];
+// Listed for the runtime `props` declaration (keyof can't derive it: the index signature widens
+// keyof to `string`). The three emit events are deliberately absent (declared as emits below).
+// getItemLayout is declared here, not left to $attrs: falling through would hand the user's
+// callback the flattened ENTRIES as its `data` argument instead of the sections (see below).
+const PROP_KEYS = [
+  'sections',
+  'keyExtractor',
+  'getItemLayout',
+  'stickySectionHeadersEnabled',
+];
 
 const EMIT_KEYS = ['endReached', 'startReached', 'refresh'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-function isVirtualizedListHandle(value: unknown): value is IVirtualizedListHandle {
+function isVirtualizedListHandle(
+  value: unknown,
+): value is IVirtualizedListHandle {
   return isRecord(value) && typeof value.scrollToOffset === 'function';
 }
 
@@ -181,10 +184,14 @@ function buildSectionDelegate(
       });
     },
     flashScrollIndicators: () => getInner()?.flashScrollIndicators(),
-    getNativeScrollRef: (): IScrollViewHandle | null => getInner()?.getNativeScrollRef() ?? null,
-    getScrollableNode: (): IScrollViewHandle | null => getInner()?.getScrollableNode() ?? null,
-    getScrollResponder: (): IScrollViewHandle | null => getInner()?.getScrollResponder() ?? null,
-    getScrollNode: (): ISymbioteNode | null => getInner()?.getScrollNode() ?? null,
+    getNativeScrollRef: (): IScrollViewHandle | null =>
+      getInner()?.getNativeScrollRef() ?? null,
+    getScrollableNode: (): IScrollViewHandle | null =>
+      getInner()?.getScrollableNode() ?? null,
+    getScrollResponder: (): IScrollViewHandle | null =>
+      getInner()?.getScrollResponder() ?? null,
+    getScrollNode: (): ISymbioteNode | null =>
+      getInner()?.getScrollNode() ?? null,
     recordInteraction: () => getInner()?.recordInteraction(),
   };
 }
@@ -212,10 +219,8 @@ export const VirtualizedSectionList = defineComponent(
       ),
     );
 
-    // The three section-list events are emits, so Vue strips their onX listeners from $attrs. Detect
-    // listener presence off the instance's own vnode props (what the parent passed), exactly like
-    // FlatList/VirtualizedList, so an emit bridge is wired ONLY when the consumer actually listens
-    // (preserving the inner list's RefreshControl / edge-reached gating).
+    // Emits are stripped from $attrs by Vue; detect listener presence off the instance's own
+    // vnode props instead, so an emit bridge is wired ONLY when the consumer actually listens.
     const instance = getCurrentInstance();
     const listens = (onName: string): boolean => {
       const vnodeProps = instance?.vnode.props;
@@ -223,7 +228,9 @@ export const VirtualizedSectionList = defineComponent(
     };
 
     return () => {
-      const sections: ReadonlyArray<ISection<ItemT>> = Array.isArray(props.sections)
+      const sections: ReadonlyArray<ISection<ItemT>> = Array.isArray(
+        props.sections,
+      )
         ? props.sections
         : [];
       const keyExtractor = props.keyExtractor;
@@ -257,10 +264,14 @@ export const VirtualizedSectionList = defineComponent(
       }): VNode[] | VNode => {
         const entry = info.item;
         if (entry.kind === 'header') {
-          return slots.sectionHeader ? slots.sectionHeader({ section: entry.section }) : [];
+          return slots.sectionHeader
+            ? slots.sectionHeader({ section: entry.section })
+            : [];
         }
         if (entry.kind === 'footer') {
-          return slots.sectionFooter ? slots.sectionFooter({ section: entry.section }) : [];
+          return slots.sectionFooter
+            ? slots.sectionFooter({ section: entry.section })
+            : [];
         }
         if (entry.kind === 'section-separator') {
           return slots.sectionSeparator ? slots.sectionSeparator() : [];
@@ -280,25 +291,54 @@ export const VirtualizedSectionList = defineComponent(
       const entrySeparatorSlot =
         slots.separator === undefined
           ? undefined
-          : (entryProps: ISeparatorProps<ISectionEntry<ItemT>>): VNode[] | VNode =>
+          : (
+              entryProps: ISeparatorProps<ISectionEntry<ItemT>>,
+            ): VNode[] | VNode =>
               slots.separator!({
                 ...entryProps,
                 leadingItem: unwrapEntryItem(entryProps.leadingItem),
                 trailingItem: unwrapEntryItem(entryProps.trailingItem),
               });
 
-      const entryKeyExtractor = (entry: ISectionEntry<ItemT>, index: number): string =>
-        sectionEntryKey(entry, index, keyExtractor);
+      const entryKeyExtractor = (
+        entry: ISectionEntry<ItemT>,
+        index: number,
+      ): string => sectionEntryKey(entry, index, keyExtractor);
+
+      // Hand the callback `sections`, not the entries: RN's inner VirtualizedList gets
+      // `data={this.props.sections}` (VirtualizedSectionList.js:216) while ours streams the
+      // FLATTENED entries, so the same user code would otherwise see a different argument here
+      // than on RN.
+      //
+      // UPSTREAM-DIVERGENCE(react-native): the flat INDEX matches RN's (two rows per section,
+      // header and footer) only while the #sectionSeparator slot is unset. With it,
+      // flattenSections emits an extra 'section-separator' row per boundary that RN renders inside
+      // the neighbouring cell, so indices shift by one per boundary from the second section on.
+      // Deliberate - that row is how this adapter paints the separator; a caller combining the two
+      // must account for it.
+      const getItemLayout = props.getItemLayout;
+      const entryItemLayout =
+        getItemLayout === undefined
+          ? undefined
+          : (
+              _entries: unknown,
+              index: number,
+            ): { length: number; offset: number; index: number } =>
+              getItemLayout(sections, index);
 
       // The three synthesized events become inner-VL handlers ONLY when listened, so the inner list
       // keeps gating (no parasitic RefreshControl / edge-reached work for an unlistened event).
       const endReached = listens('onEndReached')
-        ? (eventInfo: { distanceFromEnd: number }): void => emit('endReached', eventInfo)
+        ? (eventInfo: { distanceFromEnd: number }): void =>
+            emit('endReached', eventInfo)
         : undefined;
       const startReached = listens('onStartReached')
-        ? (eventInfo: { distanceFromStart: number }): void => emit('startReached', eventInfo)
+        ? (eventInfo: { distanceFromStart: number }): void =>
+            emit('startReached', eventInfo)
         : undefined;
-      const refresh = listens('onRefresh') ? (): void => emit('refresh') : undefined;
+      const refresh = listens('onRefresh')
+        ? (): void => emit('refresh')
+        : undefined;
 
       return h(
         VirtualizedListHost,
@@ -306,9 +346,11 @@ export const VirtualizedSectionList = defineComponent(
           ...forwarded,
           ref: setInner,
           data: entries,
-          getItem: (_source: unknown, index: number): ISectionEntry<ItemT> => entries[index],
+          getItem: (_source: unknown, index: number): ISectionEntry<ItemT> =>
+            entries[index],
           getItemCount: (): number => entries.length,
           keyExtractor: entryKeyExtractor,
+          getItemLayout: entryItemLayout,
           stickyHeaderIndices,
           onEndReached: endReached,
           onStartReached: startReached,

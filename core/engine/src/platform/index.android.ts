@@ -4,9 +4,17 @@
 // a different payload from iOS). Metro picks this on an Android host. The module name is
 // the same 'PlatformConstants'; only the shape differs.
 
-import { createConstantsResolver, type IPlatformSelectSpec, type IPlatformStatic } from './shared';
+import {
+  createConstantsResolver,
+  type IPlatformSelectSpec,
+  type IPlatformStatic,
+} from './shared';
 
-export type { IPlatformOSType, IPlatformSelectSpec, IPlatformStatic } from './shared';
+export type {
+  IPlatformOSType,
+  IPlatformSelectSpec,
+  IPlatformStatic,
+} from './shared';
 
 // The filename already selected this host: 'android' is a literal, not a probe.
 const OS_ANDROID = 'android';
@@ -40,7 +48,9 @@ export interface IPlatformConstantsAndroid {
   Manufacturer: string;
 }
 
-function isPlatformConstantsAndroid(value: unknown): value is IPlatformConstantsAndroid {
+function isPlatformConstantsAndroid(
+  value: unknown,
+): value is IPlatformConstantsAndroid {
   if (typeof value !== 'object' || value === null) return false;
   return 'Version' in value && 'uiMode' in value;
 }

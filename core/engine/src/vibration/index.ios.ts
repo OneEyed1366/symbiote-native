@@ -4,7 +4,11 @@
 // core. Metro picks this file on an iOS host; the base vibration.ts re-exports it for
 // web/headless.
 
-import { createVibration, DEFAULT_VIBRATION_LENGTH, type INativeVibration } from './shared';
+import {
+  createVibration,
+  DEFAULT_VIBRATION_LENGTH,
+  type INativeVibration,
+} from './shared';
 
 export type { INativeVibration, IVibrationStatic } from './shared';
 
@@ -35,12 +39,19 @@ function vibrateScheduler(
       return;
     }
   }
-  setTimeout(() => vibrateScheduler(module, id, pattern, repeat, index + 1), pattern[index]);
+  setTimeout(
+    () => vibrateScheduler(module, id, pattern, repeat, index + 1),
+    pattern[index],
+  );
 }
 
 // iOS pattern entry point: a leading 0 means "buzz immediately", otherwise the first
 // entry is the initial wait before the first buzz.
-function vibratePattern(module: INativeVibration, inputPattern: number[], repeat: boolean): void {
+function vibratePattern(
+  module: INativeVibration,
+  inputPattern: number[],
+  repeat: boolean,
+): void {
   if (vibrating) {
     return;
   }
@@ -54,7 +65,10 @@ function vibratePattern(module: INativeVibration, inputPattern: number[], repeat
     vibrating = false;
     return;
   }
-  setTimeout(() => vibrateScheduler(module, ++scheduleId, pattern, repeat, 1), pattern[0]);
+  setTimeout(
+    () => vibrateScheduler(module, ++scheduleId, pattern, repeat, 1),
+    pattern[0],
+  );
 }
 
 export const Vibration = createVibration({

@@ -15,11 +15,16 @@ import {
   type IAccessibilityProps,
   type IAriaProps,
 } from '@symbiote-native/components';
-import type { IClassNameValue, IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type {
+  IClassNameValue,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 
 // The Vue-facing prop surface (React's carries `children?: ReactNode`; Vue takes children via slots).
-export interface IInputAccessoryViewProps extends IAccessibilityProps, IAriaProps {
+export interface IInputAccessoryViewProps
+  extends IAccessibilityProps, IAriaProps {
   // The id a TextInput's inputAccessoryViewID points at to dock above its keyboard.
   nativeID?: string;
   backgroundColor?: string;
@@ -49,7 +54,10 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
   return result;
 }
 
-const InputAccessoryViewComponent: FunctionalComponent = (_props, { attrs: rawAttrs, slots }) => {
+const InputAccessoryViewComponent: FunctionalComponent = (
+  _props,
+  { attrs: rawAttrs, slots },
+) => {
   const attrs = normalizeVueAttrs(rawAttrs);
   const host = renderInputAccessoryView({
     nativeID: asString(attrs.nativeID),

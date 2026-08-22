@@ -1,0 +1,322 @@
+---
+title: Sharing
+description: expo-sharing wrapped for every SymbioteNative adapter — open the platform share sheet for a local file.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/sharing` wraps
+[`expo-sharing`](https://github.com/expo/expo/tree/main/packages/expo-sharing) — the platform
+share sheet that hands a local file to any other app that can accept it — so every SymbioteNative
+adapter can reach it, not just React. Like [secure store](/docs/packages/secure-store/) and
+[local auth](/docs/packages/local-auth/), every export is a free function with no per-instance
+state, so there is no hook/composable/service to wrap — the React, Vue, Angular, Svelte, and
+Solid entry points are plain re-exports of the same `core`.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
+
+## Scope: outgoing share only
+
+`expo-sharing` has two halves, and this package ships one of them.
+
+| Half                                                          | Upstream API                                                                                     | Here              |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------- |
+| **Outgoing** — hand a local file to another app               | `shareAsync`, `isAvailableAsync`                                                                 | ✅ ported in full |
+| **Incoming** — receive files other apps share _into_ your app | `useIncomingShare`, `getSharedPayloads`, `getResolvedSharedPayloadsAsync`, `clearSharedPayloads` | ❌ not ported     |
+
+<Aside
+  type="caution"
+  title="Incoming share needs an iOS Share Extension target"
+>
+  The incoming half is not a thinner JS surface. Upstream's config plugin
+  generates a whole second Xcode target: its own build phases, its own
+  `Info.plist`, an entitlements file, and an App Group ID shared between the app
+  and the extension, plus Android intent filters on the main activity. That is
+  native app-extension scaffolding — the same category `expo-widgets` sits in —
+  and SymbioteNative has no native-target scaffolding story yet, so the surface
+  is documented as out of scope rather than shipped half-working. Everything on
+  this page describes the outgoing half.
+</Aside>
+
+## Installation
+
+```sh
+npm install @symbiote-native/sharing
+```
+
+`expo-sharing` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project
+(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-sharing`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every other `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+The package's `native-link.json` asks `symbiote-expo-link` for the Android Gradle dependency and
+module-map entry on every install. Nothing else is needed: opening the share sheet requires no iOS
+permission, so there is no usage-description string, and the `SharingFileProvider` plus the
+`<queries>` block Android needs on API 30+ ship inside `expo-sharing`'s own manifest and merge
+into your app automatically.
+
+## Usage
+
+All five adapters (React, Vue, Angular, Svelte, Solid) re-export the exact same functions; there's
+no per-adapter hook/composable/service to reach for, since nothing here holds live state or a
+subscription.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useState } from 'react';
+    import { Button, Text, View } from '@symbiote-native/react';
+    import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/react';
+
+    export default function ShareReport({ fileUri }: { fileUri: string }) {
+      const [error, setError] = useState<string | null>(null);
+
+      async function onShare() {
+        if (!(await isAvailableAsync())) {
+          setError('Sharing is not available on this device');
+          return;
+        }
+        await shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Send the report' });
+      }
+
+      return (
+        <View>
+          <Button title="Share the report" onPress={onShare} />
+          {error === null ? null : <Text>{error}</Text>}
+        </View>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { ref } from 'vue';
+    import { Button, Text, View } from '@symbiote-native/vue';
+    import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/vue';
+
+    const props = defineProps<{ fileUri: string }>();
+    const error = ref<string | null>(null);
+
+    async function onShare() {
+      if (!(await isAvailableAsync())) {
+        error.value = 'Sharing is not available on this device';
+        return;
+      }
+      await shareAsync(props.fileUri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Send the report',
+      });
+    }
+    </script>
+
+    <template>
+      <View>
+        <Button title="Share the report" @press="onShare" />
+        <Text v-if="error">{{ error }}</Text>
+      </View>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, input, signal } from '@angular/core';
+    import { Button, Text, View } from '@symbiote-native/angular';
+    import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Button, Text, View],
+      template: `
+        <View>
+          <Button title="Share the report" (press)="onShare()" />
+          @if (error(); as message) {
+            <Text>{{ message }}</Text>
+          }
+        </View>
+      `,
+    })
+    export class ShareReport {
+      readonly fileUri = input.required<string>();
+      readonly error = signal<string | null>(null);
+
+      async onShare(): Promise<void> {
+        if (!(await isAvailableAsync())) {
+          this.error.set('Sharing is not available on this device');
+          return;
+        }
+        await shareAsync(this.fileUri(), {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Send the report',
+        });
+      }
+    }
+    ```
+
+    There's no per-instance service to `inject()` here — both functions are plain exports off the
+    core package, called straight from a template event binding.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Button, Text, View } from '@symbiote-native/svelte';
+      import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/svelte';
+
+      let { fileUri }: { fileUri: string } = $props();
+      let error = $state<string | null>(null);
+
+      async function onShare(): Promise<void> {
+        if (!(await isAvailableAsync())) {
+          error = 'Sharing is not available on this device';
+          return;
+        }
+        await shareAsync(fileUri, { mimeType: 'application/pdf', dialogTitle: 'Send the report' });
+      }
+    </script>
+
+    <View>
+      <Button title="Share the report" onPress={onShare} />
+      {#if error}
+        <Text>{error}</Text>
+      {/if}
+    </View>
+    ```
+
+    There's no per-instance rune to reach for here either — both functions are plain exports off
+    the core package, called straight from `onPress`.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import { Button, Text, View } from '@symbiote-native/solid';
+    import { isAvailableAsync, shareAsync } from '@symbiote-native/sharing/solid';
+
+    export function ShareReport(props: { fileUri: string }) {
+      const [error, setError] = createSignal<string | null>(null);
+
+      async function onShare() {
+        if (!(await isAvailableAsync())) {
+          setError('Sharing is not available on this device');
+          return;
+        }
+        await shareAsync(props.fileUri, { mimeType: 'application/pdf', dialogTitle: 'Send the report' });
+      }
+
+      return (
+        <View>
+          <Button title="Share the report" onPress={onShare} />
+          {error() === null ? null : <Text>{error()}</Text>}
+        </View>
+      );
+    }
+    ```
+
+    There's no per-instance primitive here either: both functions are plain exports off the core
+    package, called straight from `onPress`. `props.fileUri` stays inline rather than destructured,
+    since a component body runs only once and a destructured value would freeze at mount.
+
+  </TabItem>
+</Tabs>
+
+### On iPad
+
+iOS presents the share sheet as a popover on iPad and needs somewhere to point it. Pass the
+rectangle of whatever the user tapped; without one the popover anchors to the bottom-center of the
+presenting view.
+
+```ts
+await shareAsync(fileUri, { anchor: { x: 40, y: 120, width: 1, height: 1 } });
+```
+
+## API
+
+### Functions
+
+| Signature                                  | Description                                                                                                                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `isAvailableAsync(): Promise<boolean>`     | Whether the share sheet can be opened on this device. Resolves `true` on Android and iOS — it reports on the presence of the native module, not on any device capability |
+| `shareAsync(url, options?): Promise<void>` | Opens the platform share sheet for the local file at `url`. Resolves once the sheet is dismissed, whether or not the user picked anything                                |
+
+`url` must be a non-empty string pointing at a file the app can read — a `file://` URI, or a path
+from a file-system API. Anything else throws before the native call is made.
+
+### `ISharingOptions`
+
+| Field         | Type                          | Description                                                                                                                                                         |
+| ------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mimeType`    | `string \| undefined`         | MIME type of the file, deciding which apps the chooser offers. Guessed from the file name when omitted. Android only                                                |
+| `UTI`         | `string \| undefined`         | Uniform Type Identifier of the file. Accepted by the native options record but unread in `expo-sharing@57.0.8`; carried through for forward compatibility. iOS only |
+| `dialogTitle` | `string \| undefined`         | Title of the share dialog. Android renders it as the chooser header; iOS assigns it to the activity controller, where most share sheets ignore it                   |
+| `anchor`      | `ISharingAnchor \| undefined` | Rectangle the iPad popover points at. Ignored on iPhone and on Android. iOS only                                                                                    |
+
+### `ISharingAnchor`
+
+| Field    | Type                  | Description                                                                                             |
+| -------- | --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `x`      | `number \| undefined` | Horizontal offset in points, relative to the presenting view. Defaults to that view's horizontal center |
+| `y`      | `number \| undefined` | Vertical offset in points, relative to the presenting view. Defaults to that view's bottom edge         |
+| `width`  | `number \| undefined` | Width of the anchor rectangle in points. Defaults to `0`                                                |
+| `height` | `number \| undefined` | Height of the anchor rectangle in points. Defaults to `0`                                               |
+
+## Notes
+
+- **`url` has to be local.** A remote `http(s)` URL is not downloaded first — fetch it to a local
+  file yourself, then share that file.
+- **A resolved promise is not a delivery receipt.** Neither platform reports which app the user
+  picked, or whether they picked one at all: the promise resolves when the sheet closes. iOS
+  resolves on every dismissal path, including "picked Print, then cancelled the print dialog".
+- **Android runs one share at a time.** Calling `shareAsync` again while a chooser is still open
+  rejects rather than queueing.
+- **The share sheet can only be verified on a device or simulator.** The headless test suite fakes
+  the native module, so it proves argument marshalling and the error paths, not the sheet itself.
+
+## How the wrapper works
+
+`@symbiote-native/sharing` ships zero React/Vue/Angular/Svelte/Solid logic — `expo-sharing`'s own
+JS is hand-ported into this package's `core/`, resolving the native module through
+`expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package this project never
+installs:
+
+```
+packages/sharing/src/
+├── core/     # framework-agnostic: isAvailableAsync + shareAsync. native-module.ts resolves
+│             # ExpoSharing via requireNativeModule
+├── react/    # @symbiote-native/sharing/react   — export * from '../core'
+├── vue/      # @symbiote-native/sharing/vue     — export * from '../core'
+├── svelte/   # @symbiote-native/sharing/svelte  — export * from '../core'
+├── angular/  # @symbiote-native/sharing/angular — export * from '../core'
+└── solid/    # @symbiote-native/sharing/solid   — export * from '../core'
+```
+
+Same shape as [secure store](/docs/packages/secure-store/)'s and
+[local auth](/docs/packages/local-auth/)'s five adapter entries: single-file re-exports with no
+lifecycle code, since every export is a stateless free function — there is nothing for a hook,
+composable, rune, or service to subscribe to or clean up. The incoming-share half in the scope section
+above is exactly the part that _would_ have needed one. The native code itself is never
+vendored or copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see
+[the native setup guide](/docs/howtos/expo-native-module-setup/)).

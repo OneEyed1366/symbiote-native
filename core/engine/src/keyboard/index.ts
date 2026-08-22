@@ -29,7 +29,8 @@ export const KEYBOARD_EVENT = {
   didChangeFrame: 'keyboardDidChangeFrame',
 } as const;
 
-export type IKeyboardEventName = (typeof KEYBOARD_EVENT)[keyof typeof KEYBOARD_EVENT];
+export type IKeyboardEventName =
+  (typeof KEYBOARD_EVENT)[keyof typeof KEYBOARD_EVENT];
 
 // The soft-keyboard frame in screen coordinates. RN's IKeyboardMetrics: the shape
 // carried by a IKeyboardEvent's endCoordinates (and iOS startCoordinates).
@@ -126,9 +127,15 @@ function getEmitter() {
 }
 
 export const Keyboard = {
-  addListener(eventType: IKeyboardEventName, listener: INativeEventListener): IEventSubscription {
+  addListener(
+    eventType: IKeyboardEventName,
+    listener: INativeEventListener,
+  ): IEventSubscription {
     dlog(`Keyboard.addListener -> ${eventType}`);
-    return trackSubscription(eventType, getEmitter().addListener(eventType, listener));
+    return trackSubscription(
+      eventType,
+      getEmitter().addListener(eventType, listener),
+    );
   },
 
   // Tear down every listener this module added for one event type. The self-subscription
@@ -160,7 +167,9 @@ export const Keyboard = {
   scheduleLayoutAnimation(event: IKeyboardEvent): void {
     const { duration, easing } = event;
     if (duration === 0) return;
-    dlog(`Keyboard.scheduleLayoutAnimation -> duration ${duration}, easing ${easing}`);
+    dlog(
+      `Keyboard.scheduleLayoutAnimation -> duration ${duration}, easing ${easing}`,
+    );
     LayoutAnimation.configureNext({
       duration,
       update: { duration, type: LayoutAnimation.coerceType(easing) },
@@ -172,7 +181,9 @@ export const Keyboard = {
   // nothing holds focus, like RN.
   dismiss(): void {
     const focused = currentlyFocusedInput();
-    dlog(`Keyboard.dismiss -> ${focused ? 'blur focused input' : 'no focused input (no-op)'}`);
+    dlog(
+      `Keyboard.dismiss -> ${focused ? 'blur focused input' : 'no focused input (no-op)'}`,
+    );
     blurTextInput(focused);
   },
 };

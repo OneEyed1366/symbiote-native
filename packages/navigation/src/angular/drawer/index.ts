@@ -65,7 +65,10 @@ import {
   View,
   WindowDimensionsService,
 } from '@symbiote-native/angular';
-import type { IDescriptor, IDescriptorChild } from '@symbiote-native/components';
+import type {
+  IDescriptor,
+  IDescriptorChild,
+} from '@symbiote-native/components';
 import {
   DRAWER_DEFAULT_OVERLAY_COLOR,
   NAVIGATION_EVENT_BLUR,
@@ -132,7 +135,10 @@ let drawerInstanceCounter = 0;
         @for (slot of slotOrder(); track slot) {
           @switch (slot) {
             @case ('content') {
-              <AnimatedView [style]="contentStyle()" [animatedProps]="slotAnimatedProps('content')">
+              <AnimatedView
+                [style]="contentStyle()"
+                [animatedProps]="slotAnimatedProps('content')"
+              >
                 @if (focusedRoute(); as route) {
                   @if (componentForRoute(route); as component) {
                     <ng-container
@@ -153,7 +159,10 @@ let drawerInstanceCounter = 0;
               />
             }
             @case ('panel') {
-              <AnimatedView [style]="panelStyle()" [animatedProps]="slotAnimatedProps('panel')">
+              <AnimatedView
+                [style]="panelStyle()"
+                [animatedProps]="slotAnimatedProps('panel')"
+              >
                 @if (drawerContentTemplate) {
                   <ng-container
                     *ngTemplateOutlet="
@@ -170,7 +179,9 @@ let drawerInstanceCounter = 0;
     }
   `,
 })
-export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNavigatorHandle {
+export class Drawer
+  implements AfterContentInit, OnChanges, OnDestroy, IDrawerNavigatorHandle
+{
   @ContentChildren(DrawerScreenDirective)
   private readonly drawerScreenChildren!: QueryList<DrawerScreenDirective>;
   @ContentChild('drawerContent', { read: TemplateRef })
@@ -187,15 +198,19 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
   @Input() swipeMinDistance?: number;
   @Input() swipeMinVelocity?: number;
 
-  private readonly windowDimensions = inject(WindowDimensionsService).dimensions;
+  private readonly windowDimensions = inject(WindowDimensionsService)
+    .dimensions;
 
   private readonly routeIdPrefix = `drawer-${(drawerInstanceCounter += 1)}`;
   // Keyed by name -> the LIVE DrawerScreenDirective instance - see stack.ts's matching comment
   // for why a snapshot copy would go stale on an in-place `[options]`/`[component]` change.
   private readonly registry = new Map<string, DrawerScreenDirective>();
-  private drawerScreenChildrenSubscription: { unsubscribe: () => void } | undefined;
+  private drawerScreenChildrenSubscription:
+    { unsubscribe: () => void } | undefined;
 
-  private readonly stateSignal = signal<IDrawerRouterState | undefined>(undefined);
+  private readonly stateSignal = signal<IDrawerRouterState | undefined>(
+    undefined,
+  );
   readonly state = this.stateSignal.asReadonly();
 
   private currentEmitterKey: string | undefined;
@@ -221,12 +236,14 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
     this.dispatch({ type: 'toggleDrawer' });
   };
   readonly jumpTo = (name: string): void => {
-    // Captured BEFORE dispatch, mirroring vue/drawer/index.ts's jumpTo: a signal (like Vue's ref)
-    // mutates synchronously inside dispatch, so reading isOpen after it would already see the
-    // reducer's own isOpen: false and never animate the panel closed.
+    // Both sides of the dispatch, mirroring vue/drawer/index.ts's jumpTo: an unregistered name is
+    // a documented reducer no-op that hands the SAME state back, so animating off the pre-dispatch
+    // snapshot alone would slide the panel shut while the router still says isOpen. The signal is
+    // set synchronously inside dispatch, so the second read is already the reducer's own answer.
     const wasOpen = this.stateSignal()?.isOpen ?? false;
     this.dispatch({ type: 'jumpTo', name });
-    if (wasOpen) this.animateProgressTo(false);
+    const isOpenNow = this.stateSignal()?.isOpen ?? false;
+    if (wasOpen && !isOpenNow) this.animateProgressTo(false);
   };
 
   readonly panResponder = PanResponder.create({
@@ -258,9 +275,16 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
       dlog('Drawer: gesture grant');
       this.dragStartProgress = (this.stateSignal()?.isOpen ?? false) ? 1 : 0;
     },
-    onPanResponderMove: (_event: ISymbioteEvent, gestureState: IPanResponderGestureState): void => {
+    onPanResponderMove: (
+      _event: ISymbioteEvent,
+      gestureState: IPanResponderGestureState,
+    ): void => {
       this.progress.setValue(
-        resolveDragProgress(gestureState, this.dragStartProgress, this.optionsSnapshot()),
+        resolveDragProgress(
+          gestureState,
+          this.dragStartProgress,
+          this.optionsSnapshot(),
+        ),
       );
     },
     onPanResponderRelease: (
@@ -286,9 +310,10 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
   ngAfterContentInit(): void {
     this.rebuildRegistry();
     this.initializeState();
-    this.drawerScreenChildrenSubscription = this.drawerScreenChildren.changes.subscribe(() => {
-      this.rebuildRegistry();
-    });
+    this.drawerScreenChildrenSubscription =
+      this.drawerScreenChildren.changes.subscribe(() => {
+        this.rebuildRegistry();
+      });
   }
 
   ngOnDestroy(): void {
@@ -316,7 +341,9 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
     const routes = this.routesFromRegistry();
     if (routes.length === 0)
       dlog('Drawer: no <ng-template symbioteDrawerScreen> children registered');
-    this.stateSignal.set(createInitialDrawerRouterState(routes, this.initialRouteName));
+    this.stateSignal.set(
+      createInitialDrawerRouterState(routes, this.initialRouteName),
+    );
   }
 
   private dispatch(action: IDrawerRouterAction): void {
@@ -341,10 +368,12 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
   // ngOnChanges (below) pushes every input change in here instead, which drawerRoot/slotsMap CAN
   // track correctly since reading a signal (unlike a plain field) IS visible to computed()'s
   // dependency collection.
-  private readonly optionsSnapshot = signal<IDrawerOptions>(this.buildOptionsSnapshot());
-  private readonly drawerStyleSnapshot = signal<IStyleProp<IViewStyle> | undefined>(
-    this.drawerStyle,
+  private readonly optionsSnapshot = signal<IDrawerOptions>(
+    this.buildOptionsSnapshot(),
   );
+  private readonly drawerStyleSnapshot = signal<
+    IStyleProp<IViewStyle> | undefined
+  >(this.drawerStyle);
 
   ngOnChanges(): void {
     this.optionsSnapshot.set(this.buildOptionsSnapshot());
@@ -382,10 +411,13 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
   private readonly drawerRoot = computed<IDescriptor>(() =>
     renderDrawer(
       {
-        overlayColor: this.optionsSnapshot().overlayColor ?? DRAWER_DEFAULT_OVERLAY_COLOR,
+        overlayColor:
+          this.optionsSnapshot().overlayColor ?? DRAWER_DEFAULT_OVERLAY_COLOR,
         drawerStyle: this.drawerStyleSnapshot(),
         contentPassthrough: {},
-        overlayPassthrough: this.isAnimated() ? this.overlayResponderPassthrough() : {},
+        overlayPassthrough: this.isAnimated()
+          ? this.overlayResponderPassthrough()
+          : {},
         panelPassthrough: {},
       },
       this.optionsSnapshot(),
@@ -398,7 +430,8 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
     const map = new Map<IDrawerSlot, IDescriptor>();
     order.forEach((slot, index) => {
       const child: IDescriptorChild | undefined = root.children[index];
-      if (child !== undefined && typeof child !== 'string') map.set(slot, child);
+      if (child !== undefined && typeof child !== 'string')
+        map.set(slot, child);
     });
     return map;
   });
@@ -431,7 +464,9 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
     animatedStyle: () => Record<string, unknown>,
   ): Record<string, unknown> {
     const base = this.slotsMap().get(slot)?.props.style;
-    return this.isAnimated() ? flattenStyle([base, animatedStyle()]) : flattenStyle(base);
+    return this.isAnimated()
+      ? flattenStyle([base, animatedStyle()])
+      : flattenStyle(base);
   }
 
   contentStyle(): Record<string, unknown> {
@@ -450,7 +485,10 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
   overlayStyle(): Record<string, unknown> {
     return this.slotStyle('overlay', () => {
       const g = resolveDrawerGeometry(this.optionsSnapshot());
-      const { opacity, translateX } = resolveDrawerSlotInterpolation(g, 'overlay');
+      const { opacity, translateX } = resolveDrawerSlotInterpolation(
+        g,
+        'overlay',
+      );
       return {
         opacity: this.progress.interpolate(opacity),
         transform: [{ translateX: this.progress.interpolate(translateX) }],
@@ -511,8 +549,12 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
   focusedRouteEmitter(): INavigationEmitter {
     const key = this.focusedRoute()?.key;
     return untracked(() => {
-      if (key === this.currentEmitterKey && this.currentEmitter) return this.currentEmitter;
-      const { blurKey, focusKey } = diffFocusedRoute(this.currentEmitterKey, key);
+      if (key === this.currentEmitterKey && this.currentEmitter)
+        return this.currentEmitter;
+      const { blurKey, focusKey } = diffFocusedRoute(
+        this.currentEmitterKey,
+        key,
+      );
       if (blurKey !== undefined && this.currentEmitter) {
         dlog('Drawer: previous route blurred');
         this.currentEmitter.emit(NAVIGATION_EVENT_BLUR);
@@ -531,7 +573,9 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
     });
   }
 
-  drawerContentContext(currentState: IDrawerRouterState): IDrawerContentContext {
+  drawerContentContext(
+    currentState: IDrawerRouterState,
+  ): IDrawerContentContext {
     const descriptors: IDrawerDescriptorMap = {};
     for (const route of currentState.routes) {
       const entry = this.registry.get(route.name);
@@ -541,6 +585,8 @@ export class Drawer implements AfterContentInit, OnChanges, OnDestroy, IDrawerNa
         navigation: this,
       };
     }
-    return { $implicit: { state: currentState, descriptors, navigation: this } };
+    return {
+      $implicit: { state: currentState, descriptors, navigation: this },
+    };
   }
 }

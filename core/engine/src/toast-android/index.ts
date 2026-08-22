@@ -65,7 +65,9 @@ let toastModule: INativeToastAndroid | null | undefined;
 function getModule(): INativeToastAndroid | null {
   if (toastModule === undefined) {
     toastModule = getNativeModule<INativeToastAndroid>(TOAST_MODULE);
-    dlog(`ToastAndroid: ToastAndroid module ${toastModule ? 'resolved' : 'NOT resolved (null)'}`);
+    dlog(
+      `ToastAndroid: ToastAndroid module ${toastModule ? 'resolved' : 'NOT resolved (null)'}`,
+    );
   }
   return toastModule;
 }
@@ -73,7 +75,10 @@ function getModule(): INativeToastAndroid | null {
 // Read a single numeric constant from the native getConstants() payload, narrowing
 // with a `typeof` guard (no cast) and falling back to the conventional RN value when
 // the module or the key is absent.
-function readConstant(raw: { [key: string]: unknown }, key: keyof IToastConstants): number {
+function readConstant(
+  raw: { [key: string]: unknown },
+  key: keyof IToastConstants,
+): number {
   const value = raw[key];
   return typeof value === 'number' ? value : FALLBACK_CONSTANTS[key];
 }
@@ -113,7 +118,9 @@ export const ToastAndroid = {
   show(message: string, duration: number): void {
     const module = getModule();
     if (module === null) {
-      dlog('ToastAndroid.show -> ToastAndroid native module unavailable, no-op');
+      dlog(
+        'ToastAndroid.show -> ToastAndroid native module unavailable, no-op',
+      );
       return;
     }
     dlog(`ToastAndroid.show -> "${message}" (${duration})`);
@@ -124,10 +131,14 @@ export const ToastAndroid = {
   showWithGravity(message: string, duration: number, gravity: number): void {
     const module = getModule();
     if (module === null) {
-      dlog('ToastAndroid.showWithGravity -> ToastAndroid native module unavailable, no-op');
+      dlog(
+        'ToastAndroid.showWithGravity -> ToastAndroid native module unavailable, no-op',
+      );
       return;
     }
-    dlog(`ToastAndroid.showWithGravity -> "${message}" (${duration}, gravity=${gravity})`);
+    dlog(
+      `ToastAndroid.showWithGravity -> "${message}" (${duration}, gravity=${gravity})`,
+    );
     module.showWithGravity(message, duration, gravity);
   },
 
@@ -149,6 +160,12 @@ export const ToastAndroid = {
     dlog(
       `ToastAndroid.showWithGravityAndOffset -> "${message}" (${duration}, gravity=${gravity}, ${xOffset}, ${yOffset})`,
     );
-    module.showWithGravityAndOffset(message, duration, gravity, xOffset, yOffset);
+    module.showWithGravityAndOffset(
+      message,
+      duration,
+      gravity,
+      xOffset,
+      yOffset,
+    );
   },
 };

@@ -16,7 +16,8 @@ import { ScrollView } from './index.android';
 
 const ROOT_TAG = 919;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 function expectCellsProjected(): void {
   expect(fabric.find(node => node.props.testID === 'a')).toBeDefined();
@@ -91,24 +92,35 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Android ScrollView projects content across every axis x refresh combination', () => {
+  // why: Android's horizontal content view is a distinct native class
+  // (AndroidHorizontalScrollContentView) from the vertical one (RCTView) — each needs its own
+  // <ng-content> declaration reachable through the shared template-outlet, or Angular silently
+  // drops projected children into whichever declaration it resolves last.
   it('horizontal, no refresh control', async () => {
     mount(ROOT_TAG, HorizontalNoRefreshApp);
     await tick();
     expectCellsProjected();
   });
 
+  // why: a projected RefreshControl adds a THIRD static combination (axis x refresh-wrapper) that
+  // must route through the same shared outlet as the refresh-less branches, not a parallel one.
   it('horizontal, with a projected refresh control', async () => {
     mount(ROOT_TAG, HorizontalRefreshApp);
     await tick();
     expectCellsProjected();
   });
 
+  // why: the vertical branch is the baseline RCTView content view — proving it alongside the
+  // horizontal/refresh combinations closes all four static branches the outlet must serve.
   it('vertical, no refresh control', async () => {
     mount(ROOT_TAG, VerticalNoRefreshApp);
     await tick();
     expectCellsProjected();
   });
 
+  // why: `horizontal` can change at runtime (not just at mount), which swaps which native content
+  // view class Angular must project into — the shared outlet must survive that swap without ever
+  // dropping the already-mounted children mid-flip.
   it('survives a runtime vertical -> horizontal axis switch', async () => {
     AxisSwitchApp.horizontal.set(false);
     mount(ROOT_TAG, AxisSwitchApp);

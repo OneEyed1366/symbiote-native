@@ -39,7 +39,10 @@ describe('Animated component bridge', () => {
 
   it('setValue on an interpolated value maps through the leaf', () => {
     const progress = new Animated.Value(0);
-    const faded = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+    const faded = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+    });
 
     function FadeApp(): ReactElement {
       return <Animated.View style={{ opacity: faded }} />;

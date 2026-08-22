@@ -7,7 +7,11 @@
 // barrel imports it; the component modules and their headless tests stay free of the spec.
 
 import '@react-native-community/slider/dist/RNCSliderNativeComponent';
-import { processColor, registerComponent, type IColorValue } from '@symbiote-native/engine';
+import {
+  processColor,
+  registerComponent,
+  type IColorValue,
+} from '@symbiote-native/engine';
 import {
   RNC_SLIDER_VIEW_NAME,
   SLIDER_ON_CHANGE,
@@ -33,7 +37,10 @@ function processSliderColor(value: unknown): unknown {
 registerComponent(RNC_SLIDER_VIEW_NAME, {
   events: [
     { raw: 'topChange', listener: listenerName(SLIDER_ON_CHANGE) },
-    { raw: 'topRNCSliderValueChange', listener: listenerName(SLIDER_ON_VALUE_CHANGE) },
+    {
+      raw: 'topRNCSliderValueChange',
+      listener: listenerName(SLIDER_ON_VALUE_CHANGE),
+    },
     {
       raw: 'topRNCSliderSlidingStart',
       listener: listenerName(SLIDER_ON_SLIDING_START),

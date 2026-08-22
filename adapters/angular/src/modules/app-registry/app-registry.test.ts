@@ -11,7 +11,12 @@ import '@angular/compiler';
 import { Component, Input, type Type } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric } from '@symbiote-native/test-utils';
-import { AppRegistry, setHostRegistrar, type IAppParameters, type IRunnable } from '../..';
+import {
+  AppRegistry,
+  setHostRegistrar,
+  type IAppParameters,
+  type IRunnable,
+} from '../..';
 import { unmount } from '../../render';
 
 const APP_KEY = 'canary';
@@ -21,7 +26,8 @@ const WRAPPED_ROOT_TAG = 213;
 
 // Angular's mount() batches change detection on a microtask, so a committed native tag isn't
 // available synchronously — assertions on the committed tree need one tick, same as Vue.
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 class TestText {}
 Component({
@@ -45,7 +51,8 @@ Component({
   selector: 'symbiote-app-registry-wrapper',
   standalone: true,
   imports: [TestText],
-  template: '<symbiote-text>{{ label }}</symbiote-text><ng-content></ng-content>',
+  template:
+    '<symbiote-text>{{ label }}</symbiote-text><ng-content></ng-content>',
 })(WrapperComponent);
 
 const fabric = installFabric();
@@ -70,11 +77,18 @@ afterEach(() => {
 });
 
 describe('AppRegistry', () => {
+  // why: createAppRegistry's own bookkeeping (the runnables/sections maps, getAppKeys) is a
+  // framework-agnostic engine concern already covered at that level; what's Angular-specific here
+  // is that registerComponent's runnableFor closure is actually handed to the injected host
+  // registrar — the seam examples/angular's native bootstrap depends on to find this app by key.
   it('exposes the app key and bridges the runnable to the host registrar', () => {
     expect(AppRegistry.getAppKeys()).toContain(APP_KEY);
     expect(hostRunnables.get(APP_KEY)).toBeDefined();
   });
 
+  // why: the host (real RN's AppRegistry, or a native bootstrap) invokes the stored runnable
+  // directly with a rootTag it owns — runnableFor must call Angular's `mount()` with that exact
+  // tag, or the native side's surface and the JS-rendered tree never attach to each other.
   it('mounts the tree when the host invokes the runnable with a rootTag', async () => {
     const hostRun = hostRunnables.get(APP_KEY);
     expect(hostRun).toBeDefined();
@@ -86,6 +100,9 @@ describe('AppRegistry', () => {
     expect(fabric.find(n => n.viewName === 'RCTText')).toBeDefined();
   });
 
+  // why: runApplication is the LOCAL-drive path (examples/angular's own dev bootstrap, tests
+  // without a real native host) — it must reach the exact same mount() call the host-registrar
+  // path does, not a second, divergent code path that could drift from it.
   it('runApplication drives the same runnable locally', async () => {
     AppRegistry.runApplication(APP_KEY, { rootTag: ROOT_TAG });
     await tick();
@@ -93,8 +110,14 @@ describe('AppRegistry', () => {
     expect(fabric.find(n => n.viewName === 'RCTText')).toBeDefined();
   });
 
+  // why: Angular has no runtime JIT (see IWrapperComponentProvider's own comment) — a wrapper must
+  // be a pre-authored standalone component whose <ng-content> receives the root's host node,
+  // the AOT-safe twin of React's createElement(Wrapper, null, rootElement). This proves that
+  // projection actually happens, not merely that setWrapperComponentProvider was called.
   it('projects the root component into a registered wrapper via <ng-content>', async () => {
-    AppRegistry.setWrapperComponentProvider(() => WrapperComponent as Type<unknown>);
+    AppRegistry.setWrapperComponentProvider(
+      () => WrapperComponent as Type<unknown>,
+    );
     AppRegistry.registerComponent(WRAPPED_APP_KEY, () => SmokeComponent);
 
     AppRegistry.runApplication(WRAPPED_APP_KEY, { rootTag: WRAPPED_ROOT_TAG });

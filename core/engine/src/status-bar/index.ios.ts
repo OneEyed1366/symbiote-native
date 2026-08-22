@@ -40,10 +40,17 @@ interface INativeStatusBarManager {
 // (deepest/last wins); we direct-apply a single component's props, which is correct for one
 // StatusBar and a fine first cut.
 export function applyStatusBarProps(props: IStatusBarProps): void {
-  const { barStyle, hidden, animated = false, networkActivityIndicatorVisible } = props;
+  const {
+    barStyle,
+    hidden,
+    animated = false,
+    networkActivityIndicatorVisible,
+  } = props;
   const manager = getNativeModule<INativeStatusBarManager>(STATUS_BAR_MANAGER);
   if (manager === null) {
-    dlog('StatusBar: StatusBarManager not resolvable via __turboModuleProxy — skipping');
+    dlog(
+      'StatusBar: StatusBarManager not resolvable via __turboModuleProxy — skipping',
+    );
     return;
   }
   dlog('StatusBar -> applying props to StatusBarManager');
@@ -61,11 +68,17 @@ export function applyStatusBarProps(props: IStatusBarProps): void {
 export const statusBarImperative: IStatusBarImperative = {
   setBarStyle(style, animated = false) {
     dlog('StatusBar.setBarStyle');
-    getNativeModule<INativeStatusBarManager>(STATUS_BAR_MANAGER)?.setStyle(style, animated);
+    getNativeModule<INativeStatusBarManager>(STATUS_BAR_MANAGER)?.setStyle(
+      style,
+      animated,
+    );
   },
   setHidden(hidden, animation = STATIC_HIDE_TRANSITION) {
     dlog('StatusBar.setHidden');
-    getNativeModule<INativeStatusBarManager>(STATUS_BAR_MANAGER)?.setHidden(hidden, animation);
+    getNativeModule<INativeStatusBarManager>(STATUS_BAR_MANAGER)?.setHidden(
+      hidden,
+      animation,
+    );
   },
   setNetworkActivityIndicatorVisible(visible) {
     dlog('StatusBar.setNetworkActivityIndicatorVisible');

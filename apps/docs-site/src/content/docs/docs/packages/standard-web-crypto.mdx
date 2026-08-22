@@ -1,0 +1,247 @@
+---
+title: Standard web crypto
+description: expo-standard-web-crypto wrapped for every SymbioteNative adapter — a partial Web Crypto API polyfill exposing crypto.getRandomValues.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/standard-web-crypto` wraps
+[`expo-standard-web-crypto`](https://github.com/expo/expo/tree/main/packages/expo-standard-web-crypto)
+— a partial W3C [Web Crypto API](https://www.w3.org/TR/WebCryptoAPI/) polyfill exposing
+`crypto.getRandomValues` — usable from **every** SymbioteNative adapter, not just React. Unlike
+every other Expo port in this repo, it ships **no native module of its own**: upstream is a
+~15-line pure-JS shim that delegates straight to `expo-crypto`'s own `getRandomValues`, and this
+port delegates to [`@symbiote-native/crypto`](/docs/packages/crypto/)'s `getRandomValues` instead,
+since this repo already ships that native random source as a sibling package. Like
+[`@symbiote-native/crypto`](/docs/packages/crypto/), every export here is a plain function/object
+with no per-instance state or event stream, so there is no hook/composable/service to reach for —
+the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same `core`.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/standard-web-crypto @symbiote-native/crypto
+```
+
+`@symbiote-native/crypto` comes along as a regular dependency and does the actual native
+random-byte generation — see [its docs page](/docs/packages/crypto/) for `expo-crypto`'s own
+native autolinking requirements (already satisfied in any app that already wires up
+`@symbiote-native/crypto` or `@symbiote-native/device`).
+
+No further native wiring is needed for this package itself — it has **no native module of its
+own** and ships no `native-link.json`, so `symbiote-expo-link` generates nothing for it beyond
+what `@symbiote-native/crypto` already contributes.
+
+## Usage
+
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same default export
+and named function; there is no per-adapter hook/composable/service to reach for, since nothing
+here holds live state or a subscription.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useEffect, useState } from 'react';
+    import { Text, View } from '@symbiote-native/react';
+    import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/react';
+
+    polyfillWebCrypto(); // no-op if globalThis.crypto already exists
+
+    export default function RandomBytes() {
+      const [hex, setHex] = useState('');
+
+      useEffect(() => {
+        const bytes = new Uint8Array(16);
+        webCrypto.getRandomValues(bytes);
+        setHex(Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join(''));
+      }, []);
+
+      return (
+        <View>
+          <Text>{hex || 'generating…'}</Text>
+        </View>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue';
+    import { Text, View } from '@symbiote-native/vue';
+    import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/vue';
+
+    polyfillWebCrypto(); // no-op if globalThis.crypto already exists
+
+    const hex = ref('');
+
+    onMounted(() => {
+      const bytes = new Uint8Array(16);
+      webCrypto.getRandomValues(bytes);
+      hex.value = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    });
+    </script>
+
+    <template>
+      <View>
+        <Text>{{ hex || 'generating…' }}</Text>
+      </View>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, signal } from '@angular/core';
+    import { Text, View } from '@symbiote-native/angular';
+    import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/angular';
+
+    polyfillWebCrypto(); // no-op if globalThis.crypto already exists
+
+    @Component({
+      standalone: true,
+      imports: [Text, View],
+      template: `
+        <View>
+          <Text>{{ hex() || 'generating…' }}</Text>
+        </View>
+      `,
+    })
+    export class RandomBytes {
+      readonly hex = signal('');
+
+      constructor() {
+        const bytes = new Uint8Array(16);
+        webCrypto.getRandomValues(bytes);
+        this.hex.set(Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join(''));
+      }
+    }
+    ```
+
+    There's no per-instance service to `inject()` here — `webCrypto` and `polyfillWebCrypto` are
+    plain exports off the core package, read straight in the constructor or class-field
+    initializer.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text, View } from '@symbiote-native/svelte';
+      import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/svelte';
+
+      polyfillWebCrypto(); // no-op if globalThis.crypto already exists
+
+      let hex = $state('');
+
+      $effect(() => {
+        const bytes = new Uint8Array(16);
+        webCrypto.getRandomValues(bytes);
+        hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+      });
+    </script>
+
+    <View><Text>{hex || 'generating…'}</Text></View>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal, onMount } from 'solid-js';
+    import { Text, View } from '@symbiote-native/solid';
+    import webCrypto, { polyfillWebCrypto } from '@symbiote-native/standard-web-crypto/solid';
+
+    polyfillWebCrypto(); // no-op if globalThis.crypto already exists
+
+    export function RandomBytes() {
+      const [hex, setHex] = createSignal('');
+
+      onMount(() => {
+        const bytes = new Uint8Array(16);
+        webCrypto.getRandomValues(bytes);
+        setHex(Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join(''));
+      });
+
+      return (
+        <View>
+          <Text>{hex() || 'generating…'}</Text>
+        </View>
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+## API
+
+### `webCrypto` / `polyfillWebCrypto()`
+
+| Signature                                                                           | Description                                                                                                                                                                                                                                                             |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `webCrypto: IWebCrypto` (default export)                                            | The resolved Web Crypto object — either the real `globalThis.crypto` if one already exists, or this package's own polyfill instance backed by `@symbiote-native/crypto`                                                                                                 |
+| `webCrypto.getRandomValues<TArray extends ArrayBufferView>(values: TArray): TArray` | Fills `values` with cryptographically random numbers in place and returns it. Throws a `TypeError` if `values` isn't one of the integer TypedArrays `@symbiote-native/crypto` supports (`Int8Array`/`Uint8Array`/`Int16Array`/`Uint16Array`/`Int32Array`/`Uint32Array`) |
+| `polyfillWebCrypto(): void`                                                         | Installs `webCrypto` as `globalThis.crypto` via a getter, for any library that expects the Web Crypto API to already be present. A no-op if `globalThis.crypto` is already defined — it never overwrites an existing implementation                                     |
+
+### `IWebCrypto`
+
+| Field             | Type                                                         | Description                                                                                            |
+| ----------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `getRandomValues` | `<TArray extends ArrayBufferView>(values: TArray) => TArray` | The one method this partial polyfill implements, matching the shape of the real DOM `Crypto` interface |
+
+## Notes
+
+<Aside type="note" title="webCrypto is resolved once, at module-load time">
+  If `globalThis.crypto` already exists when this module first loads (a real Web
+  Crypto implementation), `webCrypto` *is* that object; otherwise it's this
+  package's own `Crypto` class instance backed by `@symbiote-native/crypto`.
+  React Native has no reliable `window` global, so this port checks/defines
+  `globalThis.crypto` rather than upstream's `window.crypto`.
+</Aside>
+
+`getRandomValues` only accepts the integer TypedArrays `@symbiote-native/crypto` can hand to its
+native module — passing any other `ArrayBufferView` (a `DataView`, `Uint8ClampedArray`, a
+`Float32Array`, …) throws a `TypeError`, the same way upstream's own `getRandomValues` rejects an
+unsupported view.
+
+## How the wrapper works
+
+`@symbiote-native/standard-web-crypto` ships **zero native code of its own** — the only Expo
+package in this repo's lineup that doesn't. Upstream's `expo-standard-web-crypto` is itself a
+thin JS shim over `expo-crypto`'s native random source; this port keeps that same shape but swaps
+the delegate:
+
+```
+packages/standard-web-crypto/src/
+├── core/     # framework-agnostic: web-crypto.ts — the Crypto class + webCrypto singleton
+│             # (default export) and polyfillWebCrypto(), delegating to
+│             # @symbiote-native/crypto's getRandomValues. No native-module.ts here — there is
+│             # no native module to resolve.
+├── react/    # @symbiote-native/standard-web-crypto/react   — export * from '../core'
+├── vue/      # @symbiote-native/standard-web-crypto/vue     — export * from '../core'
+├── angular/  # @symbiote-native/standard-web-crypto/angular — export * from '../core'
+├── svelte/   # @symbiote-native/standard-web-crypto/svelte  — export * from '../core'
+└── solid/    # @symbiote-native/standard-web-crypto/solid   — export * from '../core'
+```
+
+Because the package needs no native module, it also needs **no Android/iOS autolinking
+registration step** — unlike every other `expo-modules-core` wrapper in this repo (see [how to:
+wire up an Expo native module](/docs/howtos/expo-native-module-setup/)), there is nothing here for
+`expo-modules-autolinking` to discover. The only native dependency in the chain is
+`@symbiote-native/crypto`'s own module, already covered by that package's install step. Same
+re-export shape as [device](/docs/packages/device/) and [local auth](/docs/packages/local-auth/):
+single-file re-exports with no lifecycle code at all, since every export here is a stateless
+function/object — there is nothing for a hook, composable, or service to subscribe to or clean up.

@@ -21,8 +21,8 @@
   --chalk: #cbd5e1;
   --chalk-bright: #ffffff;
 
-  /* wayfinding line system — the @symbiote-native/navigation demo suite's signature. Its 9 tour
-     screens (MenuScreen's rows) group into 5 thematic "lines" (which part of the package each one
+  /* wayfinding line system — the @symbiote-native/navigation demo suite's signature. Its 12 tour
+     screens (MenuScreen's rows) group into 7 thematic "lines" (which part of the package each one
      exercises), each carrying its own color through a 2-letter badge, a matching hint tint, and
      (where a screen's own native header/tab bar takes a tint) the OS chrome itself — replacing the
      single flat accent every row/button used to share. Kept in sync by hand with
@@ -33,6 +33,12 @@
   --line-structure: #4fd1a5;
   --line-introspection: #b18cf5;
   --line-routing: #f2789a;
+  /* the only warm hue in the set — the benchmark stop is not a navigation line and should
+     not read as one at a glance. */
+  --line-performance: #f5a524;
+  /* yellow-green, the one wide hue gap the six above leave open — the styling showcase is not
+     a navigation line either, and this reads apart from Structure's mint at badge size. */
+  --line-styling: #a3d94f;
 }
 
 /* shared / common. .section is the outermost content wrapper directly inside a demo screen's
@@ -56,12 +62,20 @@
   padding-top: 24px;
   padding-bottom: 24px;
 }
+/* `flex-wrap` because RN, like CSS, defaults to nowrap: a row of three buttons whose titles are
+   long enough (ClassLifecycleDemo's "Unmount · Bump seed prop · skipUpdates: off" measures ~436pt
+   against a 342pt content box) runs off the right edge and the third one is simply unreachable —
+   no scrollbar, no clipping indicator, nothing to suggest a button is missing. Wrapping is the
+   only behaviour that degrades honestly on a phone width. Children that carry `.flex1` keep
+   sharing one line regardless: flex:1 gives them a 0 basis, so they never trip the wrap. */
 .row {
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 12px;
 }
 .row-tight {
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 8px;
 }
 /* no hyphen: kebabToCamel only rewrites "-[a-z]", so ".flex-1" would parse to "flex-1"
@@ -507,6 +521,19 @@
   font-size: 18px;
   font-weight: bold;
 }
+/* Height is deliberately fat, not decorative: this divider is the chrome BETWEEN rows that the
+   offset table has to account for, and a 1px hairline would hide a mis-modelled gap. Insets match
+   .mvcp-row's padding on BOTH sides so it reads as part of the row rhythm instead of bleeding
+   under the container's rounded corner. */
+.mvcp-divider {
+  height: 8px;
+  margin-left: 14px;
+  margin-right: 14px;
+  border-radius: 2px;
+  /* Was #26304f, 1.2:1 against the list's own --paper — a fat bar you still could not see, which
+     defeats the whole reason it is fat. Light enough now to read as a gap at arm's length. */
+  background-color: #5b6e9c;
+}
 .mvcp-row {
   padding-top: 10px;
   padding-bottom: 10px;
@@ -677,6 +704,12 @@
 .line-tag-routing {
   background-color: var(--line-routing);
 }
+.line-tag-performance {
+  background-color: var(--line-performance);
+}
+.line-tag-styling {
+  background-color: var(--line-styling);
+}
 .line-tag-text {
   color: var(--ink);
   font-size: 11px;
@@ -721,6 +754,14 @@
   border-left-width: 3px;
   border-left-color: var(--line-routing);
 }
+.menu-row-performance {
+  border-left-width: 3px;
+  border-left-color: var(--line-performance);
+}
+.menu-row-styling {
+  border-left-width: 3px;
+  border-left-color: var(--line-styling);
+}
 
 .menu-badge {
   width: 34px;
@@ -743,6 +784,12 @@
 }
 .menu-badge-routing {
   background-color: var(--line-routing);
+}
+.menu-badge-performance {
+  background-color: var(--line-performance);
+}
+.menu-badge-styling {
+  background-color: var(--line-styling);
 }
 .menu-badge-text {
   color: var(--ink);
@@ -777,4 +824,238 @@
 }
 .menu-row-hint-routing {
   color: var(--line-routing);
+}
+.menu-row-hint-performance {
+  color: var(--line-performance);
+}
+.menu-row-hint-styling {
+  color: var(--line-styling);
+}
+
+/* Compound-class demo (components/CompoundClassDemo) — the ONE place this app leans on a
+   compound selector. `.badge.loud` restates only the two colours, so `.badge`'s padding and
+   radius have to survive on an element carrying both tokens; a resolver that returned the
+   compound rule alone instead of layering it would blank the pill's shape. `.loud` deliberately
+   has no standalone rule. The Vue-SFC and Svelte canaries express the same three rules inside a
+   per-component scoped style block instead — same law, different scoping. */
+.badge {
+  padding: 8px;
+  border-radius: 999px;
+  border-width: 1px;
+  border-color: #41506a;
+  background-color: var(--paper);
+}
+/* The lit fill was #0f2a20 — a green so dark it read as the same near-black as `.badge`'s own
+   --paper, so the toggle below looked dead and the 1px border was the only thing carrying the
+   state. Still exactly two colour declarations, so the rule proves the same thing it always did:
+   `.badge`'s padding and radius have to survive underneath it. */
+.badge.loud {
+  border-color: var(--line-primitives);
+  background-color: #1d6b4a;
+}
+.badge-text {
+  font-size: 13px;
+  color: var(--chalk);
+}
+
+/* ApiPlaygroundScreen + its demo components (components/Hooks*Demo, components/*Demo below the
+   Fragment/Profiler/etc. cluster) — category-header/category-intro group each of the checklist's
+   4 `##` sections (Hooks, Built-in Components, Component Model, Other); caveat-text flags a
+   Partial row's degraded behavior inline (CaveatNote) instead of assuming the gap away;
+   log-box/error-fallback back the class-lifecycle and error-boundary demos' own readouts. */
+.category-header {
+  color: var(--chalk-bright);
+  font-size: 20px;
+  font-weight: bold;
+  padding-top: 8px;
+}
+.category-intro {
+  color: var(--chalk);
+  font-size: 13px;
+}
+.caveat-text {
+  color: #f6ad55;
+  font-size: 12px;
+}
+.log-box {
+  border-radius: 10px;
+  background-color: #0f1e30;
+  padding: 10px;
+  gap: 4px;
+}
+.error-fallback {
+  border-radius: 10px;
+  background-color: #3b1220;
+  padding: 12px;
+  gap: 6px;
+}
+.error-fallback-title {
+  color: #fca5a5;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* BenchmarkScreen (screens/BenchmarkScreen) + its frame-rate meter
+   (components/JsFrameRateMeter). Colors that vary per call site — the meter's accent and every
+   ActionButton tint — stay inline, exactly like the other demo screens; the chrome lives here. */
+.bench-meter {
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background-color: var(--paper);
+}
+.bench-meter-row {
+  flex-direction: row;
+  gap: 12px;
+}
+.bench-metric {
+  flex: 1;
+  align-items: center;
+  gap: 2px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-radius: 12px;
+  background-color: var(--ink);
+}
+.bench-metric-value {
+  font-size: 26px;
+  font-weight: bold;
+}
+.bench-metric-label {
+  color: var(--mist);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+/* The two suite buttons, side by side under the meter: one per mount mode, so the mode is picked
+   by the press instead of by a separate toggle that could disagree with the numbers on screen. */
+.bench-run-row {
+  flex-direction: row;
+  gap: 12px;
+}
+
+/* Shown only while a suite runs. A step can hold the JS thread for hundreds of milliseconds, so
+   without this the screen is indistinguishable from a hung one. */
+.bench-progress {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background-color: #0f1e30;
+}
+.bench-progress-text {
+  flex: 1;
+  color: var(--chalk);
+  font-size: 13px;
+}
+.bench-progress-count {
+  color: var(--mist);
+  font-size: 13px;
+}
+
+/* Both modes' results side by side — the label stretches, the two number columns stay at a fixed
+   width so they line up down the table. */
+.bench-compare-row {
+  flex-direction: row;
+  align-items: center;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.bench-compare-label {
+  flex: 1;
+  color: var(--mist);
+  font-size: 13px;
+}
+.bench-compare-cell {
+  width: 96px;
+  text-align: right;
+  color: var(--chalk);
+  font-size: 13px;
+}
+.bench-compare-head-cell {
+  width: 96px;
+  text-align: right;
+  color: var(--mist);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+/* The sticky-header stress block. Bounded height so the frame counters stay on screen while the
+   inner list is being dragged — the whole point of putting the two next to each other. */
+.bench-sticky {
+  height: 320px;
+  border-radius: 12px;
+  background-color: #0f1e30;
+}
+
+/* The virtualized row list. Bounded height because a FlatList inside a ScrollView has no
+   viewport of its own to window against, and without one it would mount every row - which is
+   precisely the mode it exists to contrast with. */
+.bench-rows-viewport {
+  height: 420px;
+  border-radius: 12px;
+  background-color: #0f1e30;
+}
+
+/* One operation: the button stretches, the last measured duration sits beside it at a fixed
+   width so the column of numbers stays aligned across rows of different button widths. */
+.bench-op-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.bench-op-result {
+  width: 88px;
+  text-align: right;
+  color: var(--chalk);
+  font-size: 14px;
+}
+.bench-history-row {
+  color: var(--mist);
+  font-size: 13px;
+}
+
+/* A benchmark list row — kept deliberately plain (id, label, remove) so what is measured is the
+   engine's commit path and not a decorative row's own layout cost. */
+.bench-row {
+  /* Fixed so FlatList's getItemLayout is exact in virtualized mode, and so a row occupies the
+     same box in both mount modes - otherwise the two modes would not be comparable. */
+  height: 44px;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 8px;
+  background-color: var(--paper);
+}
+/* Tinted rather than filled with the line color: the row's own text keeps its contrast, and
+   the accent edge matches the menu-row-<line> language used everywhere else. */
+.bench-row-selected {
+  background-color: #3a2c10;
+  border-left-width: 3px;
+  border-left-color: var(--line-performance);
+}
+.bench-row-id {
+  width: 56px;
+  color: var(--mist);
+  font-size: 12px;
+}
+.bench-row-label {
+  color: var(--chalk);
+  font-size: 14px;
+}
+.bench-row-remove {
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+}
+.bench-row-remove-text {
+  color: var(--mist);
+  font-size: 18px;
+  font-weight: bold;
 }

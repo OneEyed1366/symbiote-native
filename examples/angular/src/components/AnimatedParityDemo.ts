@@ -13,7 +13,14 @@
 // external `Animated` namespace object — only a direct named import survives real AOT).
 
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { Animated, AnimatedView, Button, PanResponder, Text, View } from '@symbiote-native/angular';
+import {
+  Animated,
+  AnimatedView,
+  Button,
+  PanResponder,
+  Text,
+  View,
+} from '@symbiote-native/angular';
 
 // static look compiled at build time by @symbiote-native/css-parser
 import './AnimatedParityDemo.css';
@@ -30,8 +37,10 @@ const SCROLL_DURATION_MS = 180;
   standalone: true,
   imports: [View, Text, Button, AnimatedView],
   template: `
-    <View class="section">
-      <Text class="section-label">Animated · ValueXY / tracking / diffClamp</Text>
+    <View class="section-nested">
+      <Text class="section-label"
+        >Animated · ValueXY / tracking / diffClamp</Text
+      >
 
       <Text class="drag-hint">drag the purple box →</Text>
       <View class="xy-frame">
@@ -135,7 +144,11 @@ export class AnimatedParityDemo implements OnInit, OnDestroy {
   // --- diffClamp: a header that collapses as you scroll down, reveals on up ------------------
   private readonly scroll = new Animated.Value(0);
   private scrollPos = 0;
-  readonly headerOffset = Animated.diffClamp(this.scroll, 0, HEADER_COLLAPSE).interpolate({
+  readonly headerOffset = Animated.diffClamp(
+    this.scroll,
+    0,
+    HEADER_COLLAPSE,
+  ).interpolate({
     inputRange: [0, HEADER_COLLAPSE],
     outputRange: [0, -HEADER_COLLAPSE],
   });
@@ -152,7 +165,10 @@ export class AnimatedParityDemo implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Set up once: follow tracks lead. Every lead change re-aims the spring, so the follower
     // lags and chases rather than jumping, the tracking signature.
-    Animated.spring(this.follow, { toValue: this.lead, useNativeDriver: false }).start();
+    Animated.spring(this.follow, {
+      toValue: this.lead,
+      useNativeDriver: false,
+    }).start();
   }
 
   ngOnDestroy(): void {

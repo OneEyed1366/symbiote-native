@@ -70,7 +70,9 @@ export function flattenSections<ItemT>(
 // Unwrap an entry separator-prop into its underlying ItemT (or undefined for a non-item
 // entry: header/footer/section-separator gaps have no item), so the user's
 // ItemSeparatorComponent, typed on ItemT, sees real items.
-export function unwrapEntryItem<ItemT>(entry: ISectionEntry<ItemT> | undefined): ItemT | undefined {
+export function unwrapEntryItem<ItemT>(
+  entry: ISectionEntry<ItemT> | undefined,
+): ItemT | undefined {
   return entry !== undefined && entry.kind === 'item' ? entry.item : undefined;
 }
 
@@ -81,7 +83,8 @@ export function sectionEntryKey<ItemT>(
 ): string {
   if (entry.kind === 'header') return `section-${entry.sectionIndex}`;
   if (entry.kind === 'footer') return `section-${entry.sectionIndex}:footer`;
-  if (entry.kind === 'section-separator') return `section-${entry.sectionIndex}:separator`;
+  if (entry.kind === 'section-separator')
+    return `section-${entry.sectionIndex}:separator`;
   if (keyExtractor) return keyExtractor(entry.item, entry.itemIndex);
   return `entry-${index}`;
 }

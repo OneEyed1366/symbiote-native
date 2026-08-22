@@ -25,7 +25,10 @@ export type IVueSearchBarOptions = ISearchBarOptions & {
   ref?: Ref<ISearchBarCommands | null>;
 };
 
-export type IVueScreenOptions = Omit<IScreenOptions, 'headerSearchBarOptions'> & {
+export type IVueScreenOptions = Omit<
+  IScreenOptions,
+  'headerSearchBarOptions'
+> & {
   headerSearchBarOptions?: IVueSearchBarOptions;
 };
 
@@ -37,7 +40,9 @@ export type IScreenOptionsArgs = {
   navigation: INavigatorHandle;
 };
 
-export type IScreenOptionsResolver = (args: IScreenOptionsArgs) => IVueScreenOptions;
+export type IScreenOptionsResolver = (
+  args: IScreenOptionsArgs,
+) => IVueScreenOptions;
 
 export type IScreenProps = {
   name: string;

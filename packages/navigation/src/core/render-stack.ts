@@ -41,7 +41,11 @@ import type {
   IStackPresentation,
   IStackViewProps,
 } from './navigator-props';
-import { resolveHeaderConfigView, resolveScreenView, resolveSearchBarView } from './screen-options';
+import {
+  resolveHeaderConfigView,
+  resolveScreenView,
+  resolveSearchBarView,
+} from './screen-options';
 
 // Mirrors react-native-screens' ScreenStackItem.tsx (getPositioningStyle): a formSheet's content
 // wrapper does not get `flex: 1`. RNSScreen.mm's updateBounds pushes the sheet's live native size
@@ -101,7 +105,9 @@ export function resolveScreenViewName(
     stackPresentation === 'push' ||
     stackPresentation === 'containedModal' ||
     stackPresentation === 'containedTransparentModal';
-  return isPlainPresentation ? RNS_SCREEN_VIEW_NAME : RNS_MODAL_SCREEN_VIEW_NAME;
+  return isPlainPresentation
+    ? RNS_SCREEN_VIEW_NAME
+    : RNS_MODAL_SCREEN_VIEW_NAME;
 }
 
 export function resolveScreenContentWrapperStyle(
@@ -141,14 +147,23 @@ export function isHeaderInModal(
   isAndroid: boolean,
 ): boolean {
   if (isAndroid) return false;
-  return (stackPresentation ?? STACK_DEFAULT_PRESENTATION) !== 'push' && !headerHidden;
+  return (
+    (stackPresentation ?? STACK_DEFAULT_PRESENTATION) !== 'push' &&
+    !headerHidden
+  );
 }
 
 // Inner-modal wrapper styles for isHeaderInModal: the inner RNSScreenStack fills its outer
 // RNSScreen, and the inner RNSScreen fills the stack absolutely on all four edges. This mirrors
 // react-native-screens' own `styles.container` / `StyleSheet.absoluteFill` for this exact pair.
 const HEADER_IN_MODAL_STACK_STYLE = { flex: 1 };
-const HEADER_IN_MODAL_SCREEN_STYLE = { position: 'absolute', top: 0, start: 0, end: 0, bottom: 0 };
+const HEADER_IN_MODAL_SCREEN_STYLE = {
+  position: 'absolute',
+  top: 0,
+  start: 0,
+  end: 0,
+  bottom: 0,
+};
 
 export function resolveHeaderInModalStackStyle(): Record<string, unknown> {
   return HEADER_IN_MODAL_STACK_STYLE;
@@ -160,7 +175,9 @@ export function resolveHeaderInModalScreenStyle(): Record<string, unknown> {
 
 // The RNSScreen leaf's own props; the adapter spreads this record directly onto the element it
 // builds and appends the header config child and real screen content itself, not here.
-export function resolveScreenProps(view: IScreenViewProps): Record<string, unknown> {
+export function resolveScreenProps(
+  view: IScreenViewProps,
+): Record<string, unknown> {
   return {
     ...view.passthrough,
     screenId: view.screenId,
@@ -175,7 +192,8 @@ export function resolveScreenProps(view: IScreenViewProps): Record<string, unkno
     // coerceChildScrollViewComponentSizeToSize) is driven by that same state, so an async push
     // likely lags one step behind a fast drag. Scoped to formSheet: push/plain-modal screens have
     // no comparable live-resize need.
-    synchronousShadowStateUpdatesEnabled: view.stackPresentation === 'formSheet',
+    synchronousShadowStateUpdatesEnabled:
+      view.stackPresentation === 'formSheet',
     transitionDuration: view.transitionDuration,
     sheetAllowedDetents: view.sheetAllowedDetents,
     // Native RNSScreen's real prop names carry an "Index" suffix (react-native-screens' own
@@ -199,7 +217,9 @@ export function resolveScreenProps(view: IScreenViewProps): Record<string, unkno
 // `style: {flex: 1}` is ours, not react-native-screens': RNSScreenStackView sizes its nav
 // controller to `self.bounds`, which Yoga would otherwise collapse to zero, and (unlike RN's
 // own ScreenStack.tsx) we drive the native view directly (<third_party_rn_packages_are_react_only>).
-export function resolveStackProps(view: IStackViewProps): Record<string, unknown> {
+export function resolveStackProps(
+  view: IStackViewProps,
+): Record<string, unknown> {
   return { style: { flex: 1 }, ...view.passthrough };
 }
 
@@ -257,7 +277,9 @@ export function renderHeaderConfig(
 // The RNSSearchBar leaf's static config props; event handlers ride in `passthrough`.
 // renderHeaderConfig wraps this into the RNSSearchBar Descriptor and nests it as the header
 // config's child.
-export function resolveSearchBarProps(view: ISearchBarViewProps): Record<string, unknown> {
+export function resolveSearchBarProps(
+  view: ISearchBarViewProps,
+): Record<string, unknown> {
   return {
     ...view.passthrough,
     placeholder: view.placeholder,
@@ -368,19 +390,29 @@ export type IScreenRenderPlan = {
   innerScreenStyle: Record<string, unknown>;
 };
 
-export function resolveScreenRenderPlan(input: IScreenRenderPlanInput): IScreenRenderPlan {
+export function resolveScreenRenderPlan(
+  input: IScreenRenderPlanInput,
+): IScreenRenderPlan {
   const { options, isAndroid } = input;
   const headerHidden = options?.headerShown === false;
   const activityState = computeActivityState(input.index, input.routeCount);
 
   const screenProps = resolveScreenProps(
-    resolveScreenView(input.screenId, activityState, options, input.screenPassthrough),
+    resolveScreenView(
+      input.screenId,
+      activityState,
+      options,
+      input.screenPassthrough,
+    ),
   );
 
   const searchBarOptions = options?.headerSearchBarOptions;
   const searchBarProps = searchBarOptions
     ? resolveSearchBarProps(
-        resolveSearchBarView(searchBarOptions, input.searchBarPassthrough ?? {}),
+        resolveSearchBarView(
+          searchBarOptions,
+          input.searchBarPassthrough ?? {},
+        ),
       )
     : undefined;
 
@@ -394,7 +426,10 @@ export function resolveScreenRenderPlan(input: IScreenRenderPlanInput): IScreenR
 
   return {
     activityState,
-    screenViewName: resolveScreenViewName(options?.stackPresentation, isAndroid),
+    screenViewName: resolveScreenViewName(
+      options?.stackPresentation,
+      isAndroid,
+    ),
     screenProps,
     headerConfig,
     searchBarProps,
@@ -407,7 +442,11 @@ export function resolveScreenRenderPlan(input: IScreenRenderPlanInput): IScreenR
       ),
       collapsable: false,
     },
-    inModal: isHeaderInModal(options?.stackPresentation, headerHidden, isAndroid),
+    inModal: isHeaderInModal(
+      options?.stackPresentation,
+      headerHidden,
+      isAndroid,
+    ),
     innerStackStyle: resolveHeaderInModalStackStyle(),
     innerScreenStyle: resolveHeaderInModalScreenStyle(),
   };

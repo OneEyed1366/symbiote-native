@@ -1,9 +1,8 @@
-// The public instance a host ref hands back and the ref -> tag lookup. toPublicInstance and
-// IHostInstance now live in @symbiote-native/engine (they depend only on engine internals, so every
-// adapter inherits the SAME public instance); this module re-exports them so the React surface
-// (`@symbiote-native/react` exports findNodeHandle + IHostInstance, host-config grafts via
-// toPublicInstance) is unchanged. findNodeHandle stays here: it is the React-shaped "ref ->
-// native tag" lookup over the engine's getNativeTag.
+// The public instance a host ref hands back, and the ref -> tag lookup. toPublicInstance and
+// IHostInstance live in @symbiote-native/engine (every adapter inherits the same public instance);
+// this module re-exports them so the React surface (findNodeHandle + IHostInstance, host-config's
+// toPublicInstance graft) is unchanged. findNodeHandle stays React-specific: it is the
+// RN-shaped "ref -> native tag" lookup over the engine's getNativeTag.
 
 import {
   getNativeTag,
@@ -21,8 +20,10 @@ export { toPublicInstance, type IHostInstance };
 export function findNodeHandle(
   componentOrHandle: IHostInstance | ISymbioteNode | number | null | undefined,
 ): number | null {
-  if (componentOrHandle === null || componentOrHandle === undefined) return null;
+  if (componentOrHandle === null || componentOrHandle === undefined)
+    return null;
   if (typeof componentOrHandle === 'number') return componentOrHandle;
-  if (isSymbioteNode(componentOrHandle)) return getNativeTag(componentOrHandle) ?? null;
+  if (isSymbioteNode(componentOrHandle))
+    return getNativeTag(componentOrHandle) ?? null;
   return null;
 }

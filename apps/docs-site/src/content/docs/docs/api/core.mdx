@@ -3,8 +3,24 @@ title: Core API
 description: The shared engine and component layers behind every adapter.
 ---
 
-Most app code should import from `@symbiote-native/react` or `@symbiote-native/vue`. The core
+Most app code should import from `@symbiote-native/react`, `@symbiote-native/vue`,
+`@symbiote-native/angular`, `@symbiote-native/svelte`, or `@symbiote-native/solid`. The core
 packages explain why those adapters can stay thin and consistent.
+
+## Installation
+
+```sh
+pnpm add @symbiote-native/engine
+```
+
+Most apps never install this directly — `@symbiote-native/react`,
+`@symbiote-native/vue`, `@symbiote-native/angular`, `@symbiote-native/svelte`,
+and `@symbiote-native/solid` all declare it as a peer
+dependency, so it arrives with the adapter. Install it by hand only when you are
+writing or debugging an adapter yourself. `react-native` (>=0.86) is a peer
+dependency and stays your app's own top-level dependency either way.
+`@symbiote-native/components` installs the same way — see the
+[Components API](/docs/api/components/#installation).
 
 ## @symbiote-native/engine
 
@@ -40,7 +56,7 @@ entry point RN apps already use, plus `setHostRegistrar` to hand it RN's own
 key:
 
 ```ts
-import { AppRegistry, setHostRegistrar } from '@symbiote-native/react'; // or '@symbiote-native/vue' / '@symbiote-native/angular'
+import { AppRegistry, setHostRegistrar } from '@symbiote-native/react'; // or '@symbiote-native/vue' / '@symbiote-native/angular' / '@symbiote-native/svelte' / '@symbiote-native/solid'
 import { AppRegistry as RNAppRegistry } from 'react-native';
 
 setHostRegistrar(RNAppRegistry);
@@ -55,7 +71,8 @@ AppRegistry.registerComponent('MyApp', () => App);
 `@symbiote-native/engine`'s `createAppRegistry` — the only framework-specific piece
 each adapter supplies is `runnableFor`, the function that turns a component
 provider into a mount call (`createElement` + `mount` for React, `createApp`/`h`
-for Vue, `createComponent` for Angular).
+for Vue, `createComponent` for Angular, its own `mount` for Svelte, and
+`solid-js/universal`'s `createComponent` for Solid).
 
 ## @symbiote-native/components
 
@@ -69,11 +86,11 @@ The component package owns framework-agnostic component logic:
 
 Adapters provide only lifecycle and element bridges:
 
-| Layer                  | React                | Vue                     | Angular                                       |
-| ---------------------- | -------------------- | ----------------------- | ---------------------------------------------- |
-| State lifecycle        | hooks / refs         | refs / watches / expose | zoneless change detection (signals / fields)   |
-| Render bridge          | `descriptorToReact`  | `descriptorToVue`       | `DescriptorOutlet` (proven on some components, migration in progress) |
-| Public framework shape | callbacks / children | emits / slots           | `@Output()` EventEmitters / `<ng-content>`     |
+| Layer                  | React                | Vue                     | Angular                                                               | Svelte                                                                                                                                                                                                                                                        | Solid                                                                                                                                                                                                             |
+| ---------------------- | --------------------- | ------------------------ | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| State lifecycle        | hooks / refs         | refs / watches / expose | zoneless change detection (signals / fields)                          | `$state` / `$effect` runes                                                                                                                                                                                                                                     | signals / effects (`createSignal` / `createEffect`)                                                                                                                                                              |
+| Render bridge          | `descriptorToReact`  | `descriptorToVue`       | `DescriptorOutlet` (proven on some components, migration in progress) | a DOM shim over stock compiled output (`adapters/svelte/src/dom-shim/`), no generic Descriptor walker; each component hand-authors its fixed host tag(s) and reads props/children off known positions, `mountDescriptorChildren` syncing an already-fixed shape | `descriptorToSolid`: builds a host node once, then re-props it through a `spread` render effect; a component taking live children (`View`, `Pressable`, `Modal`, ...) skips the bridge and emits real JSX instead |
+| Public framework shape | callbacks / children | emits / slots           | `@Output()` EventEmitters / `<ng-content>`                            | callback props, same names as React, no emits, no `@Output()`                                                                                                                                                                                                | callback props (`class` for styling); a render-prop child (`Pressable`, list `renderItem`) takes a Solid `Accessor`, not a snapshot value                                                                      |
 
 ## Wrapper authors
 
@@ -81,8 +98,8 @@ Native-view wrapper packages can use the same seam:
 
 - derive native metadata with `setNativeViewConfigSource`;
 - keep shared view logic in a framework-agnostic package;
-- expose thin React, Vue, and Angular wrappers that map framework props/events
-  to engine props and native events.
+- expose thin React, Vue, Angular, Svelte, and Solid wrappers that map framework
+  props/events to engine props and native events.
 
 Do not import a third-party React Native JavaScript component into Vue. Wrap the
 native view, not the React component body.

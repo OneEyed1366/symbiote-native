@@ -23,7 +23,11 @@ import TabProfileScreen from './TabProfileScreen.vue';
     <TabScreen
       name="Home"
       :component="TabHomeScreen"
-      :options="{ tabBarLabel: 'Home', tabBarIcon: '🏠', tabBarActiveTintColor: LINE_COLOR.structure }"
+      :options="{
+        tabBarLabel: 'Home',
+        tabBarIcon: '🏠',
+        tabBarActiveTintColor: LINE_COLOR.structure,
+      }"
     />
     <TabScreen
       name="Search"

@@ -44,7 +44,10 @@ export function buildDescriptors(
 ): Readonly<Record<string, IComponentDescriptor>> {
   const descriptors: Record<string, IComponentDescriptor> = {};
   for (const [intrinsic, component] of Object.entries(names)) {
-    descriptors[intrinsic] = { component, isText: TEXT_INTRINSICS.has(intrinsic) };
+    descriptors[intrinsic] = {
+      component,
+      isText: TEXT_INTRINSICS.has(intrinsic),
+    };
   }
   return descriptors;
 }

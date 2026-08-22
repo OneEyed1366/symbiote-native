@@ -1,6 +1,12 @@
 // Proves the nested RCTScrollView > RCTScrollContentView shape, the contentContainerStyle /
 // horizontal -> content-node mapping, the base clip styles on both axes, and the onScroll
 // round-trip, against the fake Fabric slot, no simulator.
+//
+// SCOPE: this file is the React-side wiring/base-style proof (shared.ts has no core/components
+// counterpart of its own — ScrollView is still a flat adapter file, not yet split per
+// `<components_split_logic_view_lifecycle>`). No Negative group: nothing in the base-style /
+// content-node assembly throws — a missing/odd prop just produces a different visual, never a
+// rejection.
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -37,6 +43,9 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 describe('React ScrollView on the engine', () => {
+  // why: RN's ScrollView is always TWO native views (the scroll frame + a content view Yoga can
+  // grow past the frame) — collapsing to one node would break scrolling entirely, since Fabric
+  // needs a child larger than its clipped parent to have anything to scroll to.
   it('commits the nested scroll view shape under a box-none AppContainer', () => {
     mount(ROOT_TAG, <HorizontalApp />);
     expect(fabric.serialize(fabric.appRoot().children)).toBe(
@@ -44,15 +53,24 @@ describe('React ScrollView on the engine', () => {
     );
   });
 
+  // why: contentContainerStyle styles the SCROLLABLE content, not the clipping frame — it must
+  // land on RCTScrollContentView, and `horizontal` must flip the content's growth axis
+  // (flexDirection: row) so children lay out side-by-side instead of stacking.
   it('maps contentContainerStyle + horizontal onto the content node', () => {
     mount(ROOT_TAG, <HorizontalApp />);
 
-    const content = fabric.find(node => node.viewName === 'RCTScrollContentView');
+    const content = fabric.find(
+      node => node.viewName === 'RCTScrollContentView',
+    );
     expect(content, 'RCTScrollContentView was created').toBeDefined();
     expect(content!.props.padding).toBe(8);
     expect(content!.props.flexDirection).toBe('row');
   });
 
+  // why: the outer/inner style split must stay strict in both directions — a content-container
+  // prop leaking onto the outer node would double-apply padding (Yoga would size the frame by
+  // it too), and the outer node's own base clip/axis styles (overflow, flexDirection, horizontal)
+  // must still be present since native reads them to know how to clip and scroll.
   it('keeps content padding off the outer node and gives it the horizontal base style', () => {
     mount(ROOT_TAG, <HorizontalApp />);
 
@@ -69,6 +87,9 @@ describe('React ScrollView on the engine', () => {
     expect(outer!.props.horizontal).toBe(true);
   });
 
+  // why: onScroll must reach the caller unmodified — RN's ScrollView does no JS-side
+  // transformation of the native scroll payload, so re-wrapping or partially copying it here
+  // would silently drop fields a consumer (e.g. a parallax header) depends on.
   it('delivers the onScroll native event to the handler verbatim', () => {
     mount(ROOT_TAG, <HorizontalApp />);
 

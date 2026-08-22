@@ -1,10 +1,8 @@
-// SectionList: the public, high-level list-of-sections component. It is a thin
-// wrapper over VirtualizedSectionList, mirroring RN's layering
-// (SectionList -> VirtualizedSectionList -> VirtualizedList). All the
+// SectionList: public wrapper over VirtualizedSectionList, mirroring RN's
+// SectionList -> VirtualizedSectionList -> VirtualizedList layering. All
 // section-flattening / windowing / imperative-scroll logic lives in
-// VirtualizedSectionList; this layer only re-exposes the same surface under the
-// SectionList name so existing consumers and the canary keep importing it from
-// here, threading the imperative ref straight through.
+// VirtualizedSectionList; this re-exposes the same surface under the
+// SectionList name, threading the imperative ref straight through.
 
 import { createElement, type ReactElement, type Ref } from 'react';
 import {
@@ -15,9 +13,8 @@ import {
 
 export type { ISection } from '../virtualized-section-list';
 
-// SectionList's public surface is exactly VirtualizedSectionList's. Keep the name
-// distinct so the high-level contract has its own identity even though the shape
-// matches the lower layer one-for-one today.
+// Same shape as VirtualizedSectionList's surface; kept as a distinct name so the
+// high-level contract has its own identity.
 export type ISectionListProps<ItemT> = IVirtualizedSectionListProps<ItemT>;
 export type ISectionListHandle = IVirtualizedSectionListHandle;
 

@@ -1,3 +1,13 @@
+// Angular-specific coverage for ScrollViewProjectionController (projection.ts): Angular templates
+// cannot map a projected <ng-content> child directly onto a wrapper the way React/Vue's render
+// functions can, so stickyHeaderIndices auto-wrapping and RefreshControl-as-projected-child both
+// need this renderer-level engine-node bridge instead. reduceSticky's own decision table (the
+// zero-swallow gate, debounce delay, rebuild ranges) is a core/components state machine covered by
+// its own test — N/A here; this file proves only the Angular-specific wiring: which native view
+// name and child ORDER the projection bridge actually commits per scenario, and that a custom
+// StickyHeaderComponent input is accepted without being instantiated (Angular has no runtime JIT
+// to instantiate an arbitrary component type from an auto-projected position — see projection.ts's
+// wrapRecord comment).
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -9,7 +19,8 @@ import { ScrollView } from './index.ios';
 
 const ROOT_TAG = 918;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 class StickyProjectionApp {}
 Component({
@@ -115,6 +126,9 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Angular ScrollView projection parity', () => {
+  // why: a projected child whose position matches stickyHeaderIndices must be wrapped in a real
+  // Fabric view (collapsable:false, onLayout wired) BEFORE it reaches the content view — otherwise
+  // there is nothing for the sticky interpolation to pin, and the child paints as an ordinary row.
   it('auto-wraps projected children selected by stickyHeaderIndices', async () => {
     mount(ROOT_TAG, StickyProjectionApp);
     await tick();
@@ -129,24 +143,40 @@ describe('Angular ScrollView projection parity', () => {
         node.props.collapsable === false &&
         node.children.some(child => child.props.testID === 'sticky'),
     );
-    expect(stickyWrapper?.props).toMatchObject({ collapsable: false, onLayout: true });
+    expect(stickyWrapper?.props).toMatchObject({
+      collapsable: false,
+      onLayout: true,
+    });
   });
 
+  // why: React/Vue can instantiate an arbitrary StickyHeaderComponent type at the auto-projected
+  // position because their renderers synthesize elements at runtime; Angular's AOT pipeline has no
+  // JIT to do the same, so the auto path must fall back to the built-in wrapper rather than either
+  // instantiating the custom type (impossible) or silently failing to wrap at all.
   it('keeps auto StickyHeaderComponent projection on the built-in AOT-safe wrapper', async () => {
     mount(ROOT_TAG, CustomStickyProjectionApp);
     await tick();
 
     expect(CustomStickyHeader.instantiated).toBe(false);
-    expect(fabric.find(node => node.props.testID === 'custom-sticky-wrapper')).toBeUndefined();
+    expect(
+      fabric.find(node => node.props.testID === 'custom-sticky-wrapper'),
+    ).toBeUndefined();
 
     const stickyWrapper = fabric.find(
       node =>
         node.props.collapsable === false &&
         node.children.some(child => child.props.testID === 'sticky'),
     );
-    expect(stickyWrapper?.props).toMatchObject({ collapsable: false, onLayout: true });
+    expect(stickyWrapper?.props).toMatchObject({
+      collapsable: false,
+      onLayout: true,
+    });
   });
 
+  // why: RN's iOS pull-to-refresh spinner is a sibling ABOVE the scroll content (PullToRefreshView
+  // as the first child, not a wrapper around RCTScrollView), and it is a controlled component —
+  // firing the native topRefresh event must call back into the app's handler AND, once the handler
+  // settles `refreshing` back to false, command the native spinner to stop via setNativeRefreshing.
   it('renders iOS RefreshControl before content and syncs the controlled native spinner', async () => {
     mount(ROOT_TAG, IOSRefreshProjectionApp);
     await tick();
@@ -170,6 +200,10 @@ describe('Angular ScrollView projection parity', () => {
     expect(fabric.commands.at(-1)?.node.tag).toBe(refresh?.tag);
   });
 
+  // why: Android's pull-to-refresh is the OPPOSITE shape from iOS — the RefreshControl wraps the
+  // whole RCTScrollView (PullToRefreshView as the parent, not a sibling) — and the ScrollView's own
+  // class/style-derived layout props must still land on the inner scroll content, not get lost to
+  // the wrapper now sitting between the use site and the scroll view.
   it('wraps an Android projected RefreshControl around the scroll view', async () => {
     mount(ROOT_TAG, AndroidRefreshProjectionApp);
     await tick();

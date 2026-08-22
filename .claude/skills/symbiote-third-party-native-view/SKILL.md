@@ -1,6 +1,6 @@
 ---
 name: symbiote-third-party-native-view
-description: "Symbiote third-party native-VIEW wrapper workflow — read BEFORE making a React-Native library that ships a native VIEW component (@react-native-community/slider, react-native-*, any codegenNativeComponent) usable from a NON-React adapter (Vue/Angular/Svelte/Solid), or building/debugging a @symbiote-native/PKG wrapper package, or deciding where such a wrapper and its native dependency go. This is the realized track of ADR 0014 + the third_party_rn_packages_are_react_only invariant; the reference implementation is @symbiote-native/slider (packages/slider, ADR 0027). Covers: (1) WHY a wrapper at all — the library's default export is a React component (useState/hooks) that throws under a non-React adapter's null dispatcher; you reach the native view through the engine createNode-by-ViewConfig path instead, never by importing the React component. (2) PACKAGE SHAPE — a self-contained packages/PKG package (NOT core/components, NOT an adapter), one framework-agnostic src/core (pure folds + renderX returning a Descriptor) + one thin per-adapter entry (./vue, ./react, ./angular) via the exports map. (3) VIEWCONFIG REGISTRATION — package-level register.ts side-effect imports the codegen native-component SPEC (…/dist/XNativeComponent), pulled by barrels only. (4) ONE-DEPENDENCY NATIVE PROXY PACKAGING — the app lists ONLY @symbiote-native/PKG; @symbiote-native/PKG depends on the native RN library, ships react-native.config.cjs + a proxy podspec + codegenConfig, and autolinking sees @symbiote-native/PKG as the native package. Plain transitive native deps still do NOT autolink; the proxy files are the escape hatch. (5) prop-type split, no-`as` narrowing, headless tests, native simulator verification, and build/wiring checklist. Trigger on: wrap a native library for Vue/Angular, 'use X slider/picker/etc on a non-React adapter', a native view that renders on React but is blank/unlinked elsewhere, or any @symbiote-native/PKG packaging/dependency question."
+description: "Symbiote third-party native-VIEW wrapper workflow — read BEFORE making a React-Native library that ships a native VIEW component (@react-native-community/slider, react-native-*, any codegenNativeComponent) usable from a NON-React adapter (Vue/Angular/Svelte/Solid), or building/debugging a @symbiote-native/PKG wrapper package, or deciding where such a wrapper and its native dependency go. This is the realized track of the third_party_rn_packages_are_react_only invariant; the reference implementation is @symbiote-native/slider (packages/slider). Covers: (1) WHY a wrapper at all — the library's default export is a React component (useState/hooks) that throws under a non-React adapter's null dispatcher; you reach the native view through the engine createNode-by-ViewConfig path instead, never by importing the React component. (2) PACKAGE SHAPE — a self-contained packages/PKG package (NOT core/components, NOT an adapter), one framework-agnostic src/core (pure folds + renderX returning a Descriptor) + one thin per-adapter entry (./vue, ./react, ./angular) via the exports map. (3) VIEWCONFIG REGISTRATION — package-level register.ts side-effect imports the codegen native-component SPEC (…/dist/XNativeComponent), pulled by barrels only. (4) ONE-DEPENDENCY NATIVE PROXY PACKAGING — the app lists ONLY @symbiote-native/PKG; @symbiote-native/PKG depends on the native RN library, ships react-native.config.cjs + a proxy podspec + codegenConfig, and autolinking sees @symbiote-native/PKG as the native package. Plain transitive native deps still do NOT autolink; the proxy files are the escape hatch. (5) prop-type split, no-`as` narrowing, headless tests, native simulator verification, and build/wiring checklist. Trigger on: wrap a native library for Vue/Angular, 'use X slider/picker/etc on a non-React adapter', a native view that renders on React but is blank/unlinked elsewhere, or any @symbiote-native/PKG packaging/dependency question."
 ---
 
 # Symbiote — wrapping a third-party RN native VIEW for non-React adapters
@@ -12,7 +12,7 @@ the React dispatcher, so a non-React adapter (Vue/Angular/Svelte/Solid) renders 
 null dispatcher and it throws `Cannot read property 'useState' of null`. The
 `third_party_rn_packages_are_react_only` invariant states this; this skill is the realized
 way to make such a view work everywhere. Reference: **`@symbiote-native/slider`** (`packages/slider`,
-ADR 0027). SymbioteNative only makes the *native view* framework-agnostic — never the library's
+). SymbioteNative only makes the *native view* framework-agnostic — never the library's
 React *component*.
 
 The whole trick: the engine already derives a view's events + prop processors from RN's
@@ -82,8 +82,8 @@ import '@react-native-community/slider/dist/RNCSliderNativeComponent'; // side-e
 RN autolinking still does **not** recursively link native modules hidden in arbitrary transitive
 dependencies. That part was verified and remains true: if `@symbiote-native/<lib>` merely has a regular
 `dependency` on `@react-native-community/slider` but ships no native proxy metadata, then
-`cd .examples/<app> && npx react-native config` does NOT list a native slider dependency.
-(Verify in `.examples/<app>`, never `examples/<app>` — see `symbiote-dev-examples`.)
+`cd examples/<app> && npx react-native config` does NOT list a native slider dependency.
+(Verify in `examples/<app>`.)
 
 The validated escape hatch is: make `@symbiote-native/<lib>` itself the native package RN autolinks.
 For the reference `@symbiote-native/slider`, the app lists only:
@@ -110,8 +110,6 @@ For `@symbiote-native/slider`, this was verified in three layers:
 
 - `npx react-native config` in `examples/react`, `examples/vue-sfc`, and `examples/vue-tsx` lists
   `@symbiote-native/slider` only (not `@react-native-community/slider`) and includes iOS + Android config.
-  (Historical record, predates the `.examples/` split — a wrapper under active development now
-  verifies this in `.examples/<app>` instead, see `symbiote-dev-examples`.)
 - Android `./gradlew clean app:generateAutolinkingPackageList app:generateAutolinkingNewArchitectureFiles`
   generates `ReactSliderPackage`, `RNCSliderComponentDescriptor`, and `RNCSlider` CMake entries.
 - iOS `pod install --no-repo-update` autolinks `symbiote-slider`, runs Codegen for `RNCSlider`, and
@@ -184,7 +182,7 @@ Vue lifecycle reads untyped `attrs` (narrow with runtime guards, hold any engine
 (`resolveAccessibilityProps(rawProps)` then destructure handled fields, rest → passthrough),
 forwards a native ref via `forwardRef` → the host node.
 
-## Headless testing (ADR 0025)
+## Headless testing
 
 - Inject a codegen-shaped ViewConfig and assert the engine derived it. Mirror
   `adapters/react/src/__tests__/slider.test.tsx`: `installFabric()` +
@@ -198,7 +196,9 @@ forwards a native ref via `forwardRef` → the host node.
 - Cover: native props pass-through, the value-sanitation quirk, tint processing via the derived
   processor, BOTH value rails → `onValueChange`, sliding events, disabled-from-accessibilityState,
   the step overlay renders, and that the JS callback does NOT leak to the native node.
-- Native RENDER on device is the final word (ADR 0012 — headless fakes resolve any name).
+- Native RENDER on device is the final word — headless fakes resolve any name, so a wrong
+  native-module name passes every smoke and fails only on a real host (`CLAUDE.md`
+  `<native_module_name_is_platform_specific>`).
 
 ## Build / wiring checklist
 
@@ -223,14 +223,15 @@ forwards a native ref via `forwardRef` → the host node.
 5. Root `tsconfig.json`: add `{ "path": "packages/<lib>" }`.
 6. Root `vitest.config.ts`: add `packages/**/src/**/*.test.{ts,tsx}`.
 7. Add the descriptor-bridge / attr-fold exports to the adapter barrels (above).
-8. `.examples/<app>` (never `examples/<app>` — see `symbiote-dev-examples`): add ONLY
-   `@symbiote-native/<lib>: workspace:*`; do NOT add the native lib directly unless no proxy exists.
-   Import `{ X } from '@symbiote-native/<lib>/<adapter>'`; `pnpm install`.
-9. Verify: `pnpm deps:check`; package `tsc --build`; package vitest; `cd .examples/<app> && npx
+8. `examples/<app>`: add ONLY `@symbiote-native/<lib>` (a `pnpm pack` tarball via `file:` while
+   developing, CLAUDE.md's `<examples_vs_dot_examples>`); do NOT add the native lib directly
+   unless no proxy exists. Import `{ X } from '@symbiote-native/<lib>/<adapter>'`; `npm install`
+   inside `examples/<app>` (never `pnpm install` from repo root).
+9. Verify: `pnpm deps:check`; package `tsc --build`; package vitest; `cd examples/<app> && npx
    react-native config` shows `@symbiote-native/<lib>` with iOS+Android native config; Android autolinking
    generation succeeds; iOS `pod install --no-repo-update` succeeds; simulator renders.
 10. **Standing step, not optional — after every `pod install`, `grep -c <NativeClassName>
-    Pods/Pods.xcodeproj/project.pbxproj` in `.examples/<app>/ios`, expecting > 0.** A `0` means the
+    Pods/Pods.xcodeproj/project.pbxproj` in `examples/<app>/ios`, expecting > 0.** A `0` means the
     vendoring fix (gotcha below) is missing or broken and the pod silently compiled to an empty
     target — a green `pod install` and a green Xcode build both give zero indication of this; it
     only shows up as a runtime crash. This check is what actually caught the bug in `symbiote-slider`
@@ -257,109 +258,120 @@ forwards a native ref via `forwardRef` → the host node.
 - **CocoaPods file patterns must be relative.** A proxy podspec may resolve the nested native lib
   with Node, but `s.source_files` / subspec `source_files` must be relative to the podspec dir;
   absolute paths fail validation.
-- **CocoaPods' file glob never crosses a symlink — vendor (copy) the nested lib's sources, don't
-  point `source_files` at them in place.** `Sandbox::PathList#read_file_system` enumerates a pod's
-  files with ONE recursive `Dir.glob(root + '**/*', FNM_DOTMATCH)`, and Ruby's `**` never descends
-  into a symlinked subdirectory it meets mid-walk (confirmed by direct reproduction) — true for a
-  `../..` crossing the app's node_modules AND for a same-directory symlink placed right next to the
-  podspec; both fail identically, so "just symlink instead of `..`" is not a fix. Under pnpm the
-  wrapped native lib ALWAYS sits behind a `.pnpm`-store symlink, so this isn't an edge case — it
-  silently breaks the wrapper pattern by default. Symptom: `source_files` matches zero files,
-  CocoaPods downgrades the pod to an empty `PBXAggregateTarget` (grep `Pods.xcodeproj/project.pbxproj`
-  for the pod name's `isa` to check — `PBXAggregateTarget` means broken, `PBXNativeTarget` means
-  real Compile Sources), the native view class never compiles into the binary, and at app startup
-  `RCTThirdPartyComponentsProvider`'s dictionary literal calls `NSClassFromString(@"YourViewClass")`,
-  gets nil, and the `@{...}` literal construction throws `EXC_CRASH`/`SIGABRT` inside
-  `-[__NSPlaceholderDictionary initWithObjects:forKeys:count:]` — a RUNTIME crash on first launch,
-  not a build error (`NSClassFromString` only resolves at runtime, so pod install and the Xcode
-  build both succeed while shipping a broken binary). Fix: in the podspec, before `Pod::Spec.new`,
-  physically vendor the lib's source folders into a `.rn-<lib>` dir inside the wrapper package via
-  `FileUtils.rm_rf` + `mkdir_p` + `cp_r` (re-runs fresh on every `pod install`; gitignore
-  `packages/*/.rn-*`), then point `source_files`/`exclude_files`/`project_header_files` at
-  `.rn-<lib>/...` (a purely-downward relative pattern, no `..`). Companion bug: a subspec's
-  `HEADER_SEARCH_PATHS` must ALSO point at the vendored copy, not the original node_modules
-  location — mixing the two gives two physically distinct files defining the same class with no
-  shared include guard ("redefinition of 'SomeClassName'"). This hit BOTH `symbiote-navigation`
-  (react-native-screens) and `symbiote-slider` in the same session despite slider's "verified
-  working on-device" claim below. **Update (2026-07-04, `packages/splash-screen` session): that
-  claim was WRONG, confirmed by a real crash.** `symbiote-slider.podspec` still used a relative
-  path (`Pathname#relative_path_from`) for `source_files` — never vendored — and `.examples/react`
-  had simply never launched far enough to hit it before (an unrelated build error blocked it
-  first). Once that earlier error was fixed, the app built, launched, and crashed on the JS thread
-  the moment Fabric tried to register third-party components: `RCTThirdPartyComponentsProvider`'s
-  generated `@{...}` dictionary literal inserted a `nil` (from `NSClassFromString(@"RNCSliderComponentView")`
-  returning nil), which Objective-C literals reject outright. `grep -c RNCSliderComponentView
-  Pods/Pods.xcodeproj/project.pbxproj` was **0** — hard proof the class was never compiled in.
-  Fixed for real this time by applying the exact vendoring pattern below directly to
-  `packages/slider/symbiote-slider.podspec` (previously it only existed in the newer
-  `symbiote-splash-screen.podspec`). **Lesson: a wrapper's own claim of "verified on-device" is not
-  proof the vendoring fix is present — grep `Pods.xcodeproj/project.pbxproj` for the native view's
-  ComponentView class name after every `pod install`, for every wrapper, every time; make this a
-  standing step (see the checklist below), not something to trust from prior session notes.** Do
-  NOT rely on `nm`/`strings` on the built `.dylib` as the primary check (slow, requires a full
-  build first) — the `grep`-the-`.pbxproj` check catches the bug right after `pod install`, before
-  spending a build.
-- **A one-dependency proxy podspec breaks the native lib's own documented Swift `import`
-  instructions unless you explicitly restore its module identity.** If the wrapped library's own
-  README/native-init docs say `import RNBootSplash` (or similar) in `AppDelegate.swift`, that
-  import resolves the Clang MODULE compiled for the pod — and CocoaPods derives that module's name
-  from the pod's `s.name` unless told otherwise. Since the proxy pod is deliberately named after
-  OUR package (`symbiote-<lib>`, per the packaging law above), the module compiles as
-  `symbiote_<lib>` and the upstream-documented import breaks with `error no such module 'X'`. Two
-  SEPARATE settings are both required in the proxy podspec, not just one:
-  1. `s.module_name = 'X'` — pins the compiled module's NAME back to what upstream's Swift import
-     expects. Verify: `Pods/Local Podspecs/symbiote-<lib>.podspec.json` → `"module_name": "X"`.
-  2. `s.pod_target_xcconfig = (s.attributes_hash['pod_target_xcconfig'] || {}).merge('DEFINES_MODULE' => 'YES')`
-     — actually makes CocoaPods GENERATE a module map at all. For a static-library pod (no
-     `use_frameworks!`), no module map is emitted unless `DEFINES_MODULE` is `YES`, and
-     `install_modules_dependencies(s)` (the RN-provided helper — the active branch whenever it's
-     available) does NOT set this for you. `module_name` alone is not sufficient; the import still
-     fails with "no such module" until `DEFINES_MODULE` is ALSO set. Verify: `Pods/Target Support
-     Files/symbiote-<lib>/symbiote-<lib>.debug.xcconfig` → `DEFINES_MODULE = YES`; absence of any
-     `.modulemap` file under `Pods/` for the pod's name is the tell this is still missing.
-  Gotcha inside the gotcha: `s.pod_target_xcconfig` has a DSL **writer** but **no plain reader** on
-  `Pod::Specification` — calling `s.pod_target_xcconfig` to read back a value previously set
-  (e.g. by `install_modules_dependencies(s)`, to merge into it) raises `NoMethodError: undefined
-  method 'pod_target_xcconfig'`. Read the raw internal store instead:
-  `s.attributes_hash['pod_target_xcconfig']`. Only wrappers whose upstream docs actually require a
-  Swift `import <Name>` need this (react-native-bootsplash does; most native-VIEW wrappers, whose
-  consumers only ever reach them through JS Descriptor rendering, never need a Swift import at all
-  and can skip both settings).
+```
+gotcha_symlink_vendor := {
+  bug: "CocoaPods' file glob never crosses a symlink — pointing source_files at the nested native lib in place
+        (relative OR same-dir symlink) silently matches zero files",
+  root_cause: "Sandbox::PathList#read_file_system enumerates a pod's files with ONE recursive Dir.glob(root + '**/*',
+        FNM_DOTMATCH); Ruby's ** never descends into a symlinked subdirectory met mid-walk (confirmed by direct
+        reproduction) — true for `../..` crossing the app's node_modules AND a same-dir symlink next to the
+        podspec. Under pnpm the wrapped lib ALWAYS sits behind a .pnpm-store symlink, so this breaks the wrapper
+        pattern by default",
+  symptom: "source_files matches 0 files ⟶ CocoaPods downgrades the pod to an empty PBXAggregateTarget (grep
+        Pods.xcodeproj/project.pbxproj for the pod name's isa: PBXAggregateTarget=broken, PBXNativeTarget=real
+        Compile Sources) ⟶ native view class never compiles in ⟶ at startup RCTThirdPartyComponentsProvider's
+        dict literal calls NSClassFromString(@'YourViewClass'), gets nil, @{...} throws EXC_CRASH/SIGABRT
+        inside -[__NSPlaceholderDictionary initWithObjects:forKeys:count:] — a RUNTIME crash on first launch;
+        pod install AND the Xcode build both succeed",
+  fix: "in the podspec, before Pod::Spec.new, vendor (copy) the lib's source folders into a .rn-<lib> dir inside the
+        wrapper package via FileUtils.rm_rf + mkdir_p + cp_r (re-runs fresh every pod install; gitignore
+        packages/*/.rn-*), then point source_files/exclude_files/project_header_files at .rn-<lib>/... (purely-
+        downward relative, no ..). Companion: a subspec's HEADER_SEARCH_PATHS must ALSO point at the vendored
+        copy, not the original node_modules path — mixing gives two files defining the same class with no shared
+        include guard ('redefinition of SomeClassName')",
+  scope: "hit BOTH symbiote-navigation (react-native-screens) and symbiote-slider same session",
+  regression: "found 2026-07-04, packages/splash-screen session — the 'verified working on-device' claim below was WRONG.
+        symbiote-slider.podspec still used a relative Pathname#relative_path_from for source_files, never
+        vendored; examples/react had simply never built far enough to hit it (an unrelated build error blocked
+        it first). Once fixed: app built, launched, crashed on the JS thread when Fabric registered third-party
+        components — RCTThirdPartyComponentsProvider's @{...} dict literal inserted nil from
+        NSClassFromString(@'RNCSliderComponentView'), which Obj-C literals reject. `grep -c
+        RNCSliderComponentView Pods/Pods.xcodeproj/project.pbxproj` = 0, hard proof the class was never compiled
+        in. Fixed by applying the vendoring pattern to packages/slider/symbiote-slider.podspec (previously only
+        in symbiote-splash-screen.podspec)",
+  lesson: "a wrapper's own 'verified on-device' claim is NOT proof the vendoring fix is present — grep
+        Pods.xcodeproj/project.pbxproj for the native view's ComponentView class name after every pod install,
+        for every wrapper, every time (checklist step 10), never trust prior session notes alone. Do NOT rely on
+        nm/strings on the built .dylib as the primary check (slow, needs a full build first) — the pbxproj grep
+        catches it right after pod install"
+}
+
+gotcha_swift_module_identity := {
+  trigger: "the wrapped library's own README/native-init docs say `import RNBootSplash` (or similar) in
+        AppDelegate.swift — that import resolves the Clang MODULE compiled for the pod, and CocoaPods derives
+        the module name from the pod's s.name unless told otherwise. The proxy pod is deliberately named
+        symbiote-<lib> (packaging law above), so the module compiles as symbiote_<lib> ⟶ upstream import breaks:
+        'error no such module X'",
+  fix: [
+    "s.module_name = 'X' — pins the compiled module NAME to what upstream's Swift import expects. Verify:
+          Pods/Local Podspecs/symbiote-<lib>.podspec.json -> module_name: 'X'",
+    "s.pod_target_xcconfig = (s.attributes_hash['pod_target_xcconfig'] || {}).merge('DEFINES_MODULE' =>
+          'YES') — makes CocoaPods GENERATE a module map at all. A static-library pod (no use_frameworks!)
+          emits none unless DEFINES_MODULE=YES, and install_modules_dependencies(s) (the RN-provided helper,
+          active branch when available) does NOT set this. module_name alone is insufficient — import still
+          fails 'no such module' until DEFINES_MODULE is ALSO set. Verify: Pods/Target Support
+          Files/symbiote-<lib>/symbiote-<lib>.debug.xcconfig -> DEFINES_MODULE = YES; absence of any
+          .modulemap under Pods/ for the pod's name is the tell",
+  ] ⟶ "BOTH settings required, neither alone suffices",
+  nested_gotcha: "s.pod_target_xcconfig has a DSL WRITER but NO plain reader on Pod::Specification — calling it to read back a
+        value previously set (e.g. by install_modules_dependencies(s), to merge into it) raises NoMethodError:
+        undefined method 'pod_target_xcconfig'. Fix: read the raw internal store
+        s.attributes_hash['pod_target_xcconfig']",
+  scope: "only wrappers whose upstream docs require a Swift `import <Name>` need this (react-native-bootsplash does);
+        most native-VIEW wrappers, reached only via JS Descriptor rendering, never need a Swift import and can
+        skip both settings"
+}
+```
 - **Frontmatter / descriptions**: invariant names use angle brackets; a skill `description` field
   forbids them — refer to invariants by name without the brackets.
-- **Update (2026-07-06, `packages/splash-screen` session): a wrapper's `package.json` `"files"`
-  allowlist silently drops `react-native.config.cjs` and the `*.podspec` from the published npm
-  tarball unless BOTH are listed explicitly.** npm's automatic-include set is only `package.json` /
-  `README` / `LICENSE` / the `main` file — a proxy podspec and RN config at the package root are
-  NOT in it, so a `"files": ["src", "build", "build-ngc"]` array (the pattern both
-  `packages/slider` and `packages/splash-screen` actually shipped with) omits them entirely. This
-  is a DIFFERENT, MORE SEVERE failure than the symlink-vendoring gotcha above: that one still
-  produces a podspec (empty/pointing nowhere); this one means the podspec **does not exist at all**
-  in the installed package. Concrete failure: `@symbiote-native/slider` published as `2.0.1` with
-  this bug — any app installing it via `catalog:` (a real npm install, not a workspace symlink) had
-  no podspec for CocoaPods to autolink, so `RNCSliderComponentView` never compiled in, and the app
-  rendered RN's fallback view, `Unimplemented component: <RNCSlider>`, at runtime. Diagnostic: `npx
-  react-native config` in the consuming app returns `undefined` for the dependency's whole entry
-  (not just a missing `ios` key) — that is the tell to go check the INSTALLED copy's own directory
-  listing (`ls node_modules/.pnpm/@symbiote-native+<lib>@…/node_modules/@symbiote-native/<lib>/`)
-  for the podspec/config file before assuming a source-code or vendoring problem. Why this stayed
-  hidden for `packages/splash-screen` despite having the identical `"files"` gap: it was still
-  `workspace:*` (unpublished), so its local source is read directly and npm's `files` filtering
-  never applies — the bug is dormant until first publish, at which point it hits the exact same
-  crash. Fix: add `react-native.config.cjs` and the exact `*.podspec` filename to `"files"` (see
-  checklist step 1), and republish any already-shipped wrapper that's missing them (a version bump
-  + changeset — the already-published broken version stays broken until a new one goes out). Make
-  checklist step 11 (verify the tarball/installed copy) standing practice for every wrapper that
-  has ever been published, the same way step 10's `pbxproj` grep is standing practice for every
-  `pod install`.
+```
+gotcha_files_allowlist := {
+  found: "2026-07-06, packages/splash-screen session",
+  bug: "wrapper's package.json 'files' allowlist silently drops react-native.config.cjs and the *.podspec from the
+        published npm tarball unless BOTH are listed explicitly",
+  root_cause: "npm's automatic-include set is only package.json / README / LICENSE / the main file — a proxy podspec and RN
+        config at the package root are NOT in it, so 'files': ['src', 'build', 'build-ngc'] (the pattern both
+        packages/slider and packages/splash-screen actually shipped with) omits them entirely",
+  severity: "MORE SEVERE than gotcha_symlink_vendor — that one still produces a podspec (empty/pointing nowhere); this
+        one means the podspec does not exist at all in the installed package",
+  incident: "@symbiote-native/slider published as 2.0.1 with this bug — any app installing via catalog: (real npm
+        install, not a workspace symlink) had no podspec for CocoaPods to autolink, so RNCSliderComponentView
+        never compiled in, and the app rendered RN's fallback view, 'Unimplemented component: <RNCSlider>', at
+        runtime",
+  diagnostic: "npx react-native config in the consuming app returns undefined for the dependency's WHOLE entry (not just a
+        missing ios key) — the tell to check the INSTALLED copy's own directory listing (ls
+        node_modules/.pnpm/@symbiote-native+<lib>@…/node_modules/@symbiote-native/<lib>/) for the podspec/config
+        file before assuming a source-code or vendoring problem",
+  why_hidden_for_splash_screen: "identical 'files' gap existed but stayed dormant — package was still workspace:* (unpublished), local source
+        read directly, npm's files filtering never applies until first publish",
+  fix: "add react-native.config.cjs and the exact *.podspec filename to 'files' (checklist step 1); republish any
+        already-shipped wrapper missing them (version bump + changeset — the already-published broken version
+        stays broken until a new one ships)",
+  standing_practice: "checklist step 11 (verify tarball/installed copy) for every wrapper ever published, same as step 10's
+        pbxproj grep for every pod install"
+}
+```
 
 ## References
 
+- `symbiote-new-package-skeleton` — read FIRST if the package doesn't exist yet at all: resolves
+  whether a brand-new package should start as a bare-skeleton (reserve-the-npm-name only, no
+  functional code), core-only, or the full parity this skill otherwise assumes.
 - `packages/slider/**` — the reference implementation (core + vue + react + register + native
   proxy config/podspec + tests).
-- `.docs/decisions/0027-third-party-native-view-wrapper-package.md` — the decision + autolinking
-  citation; `0014` (third-party libs: no fork), `0012` (native module name correctness is
-  device-proven), `0025` (testing), `0026` (folder-as-module).
+- The rationale this skill used to cite as numbered ADRs is in-repo prose now, not a
+  `.docs/decisions/` path (that tree is local-only per `.gitignore` and absent from a
+  checkout): no-fork of third-party libs → `CLAUDE.md`
+  `<third_party_rn_packages_are_react_only>` + `<native_core_is_untouched>`;
+  native-module-name correctness is device-proven → `CLAUDE.md`
+  `<native_module_name_is_platform_specific>`; testing → `symbiote-parity-check` §5;
+  folder-as-module → `symbiote-file-layout` §2. The wrapper-package decision itself is
+  this skill.
 - Sibling skills: `symbiote-add-component` (SymbioteNative's OWN components — the contrast),
   `symbiote-dependency-catalog` (catalog rules), `vue-adapter-reactivity` (node identity / async
-  commit), `symbiote-engine-core` (the mutation API + ViewConfig derivation), `symbiote-parity-check`.
+  commit), `symbiote-engine-core` (the mutation API + ViewConfig derivation), `symbiote-parity-check`,
+  `symbiote-expo-native-module` (the same wrapper problem for an Expo-modules-core package —
+  native MODULE, zero view, EventEmitter/async surface — not this skill's native VIEW/ViewConfig
+  path).
+- Once the wrapper package works, write its docs page per `symbiote-docs-site-package-template`
+  (canonical `## API` section, one sub-table per surface group).

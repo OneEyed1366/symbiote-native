@@ -1,6 +1,6 @@
 ---
 name: symbiote-dependency-catalog
-description: "Symbiote dependency-version management — read BEFORE adding a dependency, bumping a version, scaffolding a new package, or touching ANY package.json / pnpm-workspace.yaml. The monorepo has ONE source of truth for versions: pnpm CATALOGS in pnpm-workspace.yaml. A package NEVER writes a literal version for an external dep — it references `catalog:` (default) or `catalog:NAME`. Covers: (1) the CATALOG LAYOUT — default `catalog:` holds every single-versioned dep (react, react-native 0.86 toolchain, vue, babel, jest, detox, typescript, vitest, prettier, eslint10 + root tooling); the named `catalogs.rn-app` holds ONLY the deps that legitimately cannot share the workspace version. (2) the RULES — prod+dev deps MUST be `catalog:`; peerDependencies are NEVER catalogued (they are compatibility RANGES like `0.86+`, not pins); `@symbiote-native/*` stay `workspace:*`; the `react` override is `'catalog:'` (quoted!). (3) the GUARD — syncpack `policy: catalog` in .syncpackrc.json, run via `pnpm deps:check` / auto-fixed via `pnpm deps:fix`, wired into lint-staged on any package.json / pnpm-workspace.yaml change. (4) the eslint CONSTRAINT — eslint canNOT be unified to the workspace's v10 because @react-native/eslint-config@0.86 peers `^8 || ^9` and examples lint via legacy .eslintrc.js (eslint 10 is flat-config only); this is upstream-forced, hence the rn-app split. (5) WORKFLOWS — add a dep, bump a version, add a package. (6) GOTCHAS — YAML requires quoting `'catalog:'`; `examples/*` is OUTSIDE the pnpm workspace since 2026-07-14 (no catalog:/workspace:* there anymore — see symbiote-dev-examples); pnpm's `blockExoticSubdeps` (10.26+, boolean-only, no allowlist) blocks a pkg.pr.new/git URL dependency's OWN transitive URL subdeps anywhere in a shared pnpm workspace, poisoning every other workspace member's install too. Trigger on any add-dependency / bump-version / version-drift / new-package / 'why two eslints' / package.json edit decision, or 'pkg.pr.new install fails' / 'exotic subdep' / 'ERR_PNPM_EXOTIC_SUBDEP'."
+description: "Symbiote dependency-version management — read BEFORE adding a dependency, bumping a version, scaffolding a new package, or touching ANY package.json / pnpm-workspace.yaml. The monorepo has ONE source of truth for versions: pnpm CATALOGS in pnpm-workspace.yaml. A package NEVER writes a literal version for an external dep — it references `catalog:` (default) or `catalog:NAME`. Covers: (1) the CATALOG LAYOUT — default `catalog:` holds every single-versioned dep (react, react-native 0.86 toolchain, vue, babel, jest, detox, typescript, vitest, prettier, eslint10 + root tooling); the named `catalogs.rn-app` holds ONLY the deps that legitimately cannot share the workspace version. (2) the RULES — prod+dev deps MUST be `catalog:`; peerDependencies are NEVER catalogued (they are compatibility RANGES like `0.86+`, not pins); `@symbiote-native/*` stay `workspace:*`; the `react` override is `'catalog:'` (quoted!). (3) the GUARD — syncpack `policy: catalog` in .syncpackrc.json, run via `pnpm deps:check` / auto-fixed via `pnpm deps:fix`, wired into lint-staged on any package.json / pnpm-workspace.yaml change. (4) the eslint CONSTRAINT — eslint canNOT be unified to the workspace's v10 because @react-native/eslint-config@0.86 peers `^8 || ^9` and examples lint via legacy .eslintrc.js (eslint 10 is flat-config only); this is upstream-forced, hence the rn-app split. (5) WORKFLOWS — add a dep, bump a version, add a package. (6) GOTCHAS — YAML requires quoting `'catalog:'`; `examples/*` is OUTSIDE the pnpm workspace since 2026-07-14 (no catalog:/workspace:* there anymore — literal npm versions or a local `pnpm pack`+`file:` tarball instead); pnpm's `blockExoticSubdeps` (10.26+, boolean-only, no allowlist) blocks a pkg.pr.new/git URL dependency's OWN transitive URL subdeps anywhere in a shared pnpm workspace, poisoning every other workspace member's install too. Trigger on any add-dependency / bump-version / version-drift / new-package / 'why two eslints' / package.json edit decision, or 'pkg.pr.new install fails' / 'exotic subdep' / 'ERR_PNPM_EXOTIC_SUBDEP'."
 ---
 
 # Symbiote dependency-version management
@@ -119,6 +119,8 @@ It also runs in **lint-staged** (`lint-staged.config.js`) on any
 **Add a new package**
 - Reference shared deps with `catalog:` from the start. Peers stay as ranges
   (`>=…`). Local deps stay `workspace:*`. Never paste a literal version.
+- A bare-skeleton package (name-reservation only, no real deps yet) skips this
+  entirely — see `symbiote-new-package-skeleton` for which tier you're actually building.
 
 ## Gotchas
 
@@ -134,17 +136,13 @@ It also runs in **lint-staged** (`lint-staged.config.js`) on any
   graph is the truth; a stray `node_modules/.pnpm/<dep>@<old>` is a peer-resolution
   variant, not a declared dependency.
 - **`examples/*` is OUTSIDE the pnpm workspace entirely (since 2026-07-14) — this catalog/`.syncpackrc.json`
-  chapter no longer applies to it at all.** It was on `"@symbiote-native/*": "catalog:"` before
-  that date; it moved to a standalone `npm install`-able tree (literal versions, pkg.pr.new
-  canary URLs for `@symbiote-native/*` pending real npm releases) because pnpm 10.26+'s
-  `blockExoticSubdeps` (see the dedicated gotcha below) blocks a pkg.pr.new URL anywhere in a
-  SHARED pnpm-workspace lockfile — and `examples/*` shared one with `.examples/*`. Full story:
-  `symbiote-dev-examples` §1b. **`.examples/*` is UNCHANGED** — still in the pnpm workspace, still
-  `workspace:*`, still where all active local-source development happens (that half of this
-  gotcha, incl. the `readlink .examples/<app>/node_modules/@symbiote-native/<pkg>` diagnostic,
-  stays valid — see `symbiote-dev-examples` §5). Do not re-add `examples/*` to
-  `pnpm-workspace.yaml`'s `packages:` to "simplify" version management — that's the exact
-  regression this split fixes.
+  chapter does not apply to it at all.** Every `examples/*/package.json` dependency is a literal
+  version; `@symbiote-native/*` is either a real published version or, while developing a package,
+  a local `pnpm pack`+`file:` tarball (CLAUDE.md's `<examples_vs_dot_examples>`). Install with plain
+  `npm install` inside the example directory, never `pnpm install` from repo root. Do not re-add
+  `examples/*` to `pnpm-workspace.yaml`'s `packages:` — pnpm 10.26+'s `blockExoticSubdeps` (see the
+  dedicated gotcha below) blocks an exotic (URL/git) dependency anywhere in a shared pnpm-workspace
+  lockfile, which is exactly what re-adding it would risk.
 
 - **`blockExoticSubdeps` — a pnpm 10.26+ supply-chain guard that blocks URL/git deps ANYWHERE
   in a shared workspace resolution, not just where you put one.** `.npmrc` key
@@ -163,7 +161,8 @@ It also runs in **lint-staged** (`lint-staged.config.js`) on any
   isolate a workspace member from the shared resolution pass) — the only real fix is keeping
   exotic-URL dependencies out of the pnpm workspace altogether (see `examples/*` above) or
   disabling the guard repo-wide (`block-exotic-subdeps: false` — a real security-policy
-  tradeoff, don't flip it silently).
+  tradeoff, don't flip it silently). The pkg.pr.new URLs that trigger this are produced by the
+  canary publish flow — see `symbiote-release-publishing` for how/when they're generated.
 
 ## Verify
 

@@ -1,0 +1,316 @@
+---
+title: Application
+description: expo-application wrapped for every SymbioteNative adapter — app version/build/name/ID, Android ID, iOS vendor ID.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/application` wraps
+[`expo-application`](https://github.com/expo/expo/tree/main/packages/expo-application) — native
+app version/build/name/ID, the Android ID, install-referrer and install/update-time lookups, and
+the iOS vendor ID / release type / push-notification-service environment — so every
+SymbioteNative adapter can read it. Like [local auth](/docs/packages/local-auth/) (and unlike
+[sensors](/docs/packages/sensors/)' `EventEmitter` + live-subscription surface), everything here
+is either a plain constant resolved once at import time or a one-shot async call with no
+per-instance state.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
+
+## Installation
+
+```sh
+pnpm add @symbiote-native/application
+```
+
+`expo-application` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project
+(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-application`'s native code is discovered by `expo-modules-autolinking`,
+  a different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every future `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+No app-level permission strings are needed — every function here reads app/device metadata that
+carries no runtime or manifest permission.
+
+## Usage
+
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same constants and
+free functions; there is no per-adapter hook/composable/service to reach for, since nothing here
+holds live state or a subscription.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useEffect, useState } from 'react';
+    import { Platform, Text, View } from '@symbiote-native/react';
+    import {
+      applicationId,
+      applicationName,
+      getInstallationTimeAsync,
+      nativeApplicationVersion,
+      nativeBuildVersion,
+    } from '@symbiote-native/application/react';
+
+    export default function ApplicationInfo() {
+      const [installedAt, setInstalledAt] = useState<Date | null>(null);
+
+      useEffect(() => {
+        getInstallationTimeAsync().then(setInstalledAt);
+      }, []);
+
+      return (
+        <View>
+          <Text>{applicationName} ({applicationId})</Text>
+          <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+          {Platform.OS === 'android' && installedAt && (
+            <Text>Installed {installedAt.toLocaleDateString()}</Text>
+          )}
+        </View>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue';
+    import { Platform, Text, View } from '@symbiote-native/vue';
+    import {
+      applicationId,
+      applicationName,
+      getInstallationTimeAsync,
+      nativeApplicationVersion,
+      nativeBuildVersion,
+    } from '@symbiote-native/application/vue';
+
+    const installedAt = ref<Date | null>(null);
+
+    onMounted(() => {
+      void getInstallationTimeAsync().then(value => (installedAt.value = value));
+    });
+    </script>
+
+    <template>
+      <View>
+        <Text>{{ applicationName }} ({{ applicationId }})</Text>
+        <Text>v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</Text>
+        <Text v-if="Platform.OS === 'android' && installedAt">
+          Installed {{ installedAt?.toLocaleDateString() }}
+        </Text>
+      </View>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, signal } from '@angular/core';
+    import { Platform, Text, View } from '@symbiote-native/angular';
+    import {
+      applicationId,
+      applicationName,
+      getInstallationTimeAsync,
+      nativeApplicationVersion,
+      nativeBuildVersion,
+    } from '@symbiote-native/application/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Text, View],
+      template: `
+        <View>
+          <Text>{{ applicationName }} ({{ applicationId }})</Text>
+          <Text>v{{ nativeApplicationVersion }} (build {{ nativeBuildVersion }})</Text>
+          @if (Platform.OS === 'android' && installedAt(); as date) {
+            <Text>Installed {{ date.toLocaleDateString() }}</Text>
+          }
+        </View>
+      `,
+    })
+    export class ApplicationInfo {
+      readonly Platform = Platform;
+      readonly installedAt = signal<Date | null>(null);
+
+      constructor() {
+        getInstallationTimeAsync().then(value => this.installedAt.set(value));
+      }
+    }
+    ```
+
+    There's no per-instance service to `inject()` here — every function is a plain free function
+    off the core package, called straight from the constructor.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Platform, Text, View } from '@symbiote-native/svelte';
+      import {
+        applicationId,
+        applicationName,
+        getInstallationTimeAsync,
+        nativeApplicationVersion,
+        nativeBuildVersion,
+      } from '@symbiote-native/application/svelte';
+
+      let installedAt = $state<Date | null>(null);
+
+      $effect(() => {
+        getInstallationTimeAsync().then(value => (installedAt = value));
+      });
+    </script>
+
+    <View>
+      <Text>{applicationName} ({applicationId})</Text>
+      <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+      {#if Platform.OS === 'android' && installedAt}
+        <Text>Installed {installedAt.toLocaleDateString()}</Text>
+      {/if}
+    </View>
+    ```
+
+    There's no per-instance rune to reach for here either — every function is a plain free
+    function off the core package, called straight from `$effect`.
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal, onMount, Show } from 'solid-js';
+    import { Platform, Text, View } from '@symbiote-native/solid';
+    import {
+      applicationId,
+      applicationName,
+      getInstallationTimeAsync,
+      nativeApplicationVersion,
+      nativeBuildVersion,
+    } from '@symbiote-native/application/solid';
+
+    export function ApplicationInfo() {
+      const [installedAt, setInstalledAt] = createSignal<Date | null>(null);
+
+      onMount(() => {
+        getInstallationTimeAsync().then(setInstalledAt);
+      });
+
+      return (
+        <View>
+          <Text>{applicationName} ({applicationId})</Text>
+          <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+          <Show when={Platform.OS === 'android' && installedAt()}>
+            {date => <Text>Installed {date().toLocaleDateString()}</Text>}
+          </Show>
+        </View>
+      );
+    }
+    ```
+
+    Nothing here needs a Solid primitive either: every function is a plain free function off
+    the core package, called straight from `onMount`. `@symbiote-native/application/solid` re-exports
+    the same `core/` module every other adapter does, so only the import path differs from React.
+
+  </TabItem>
+</Tabs>
+
+## API
+
+### Constants
+
+Resolved once, eagerly, at import time:
+
+| Field                      | Type             | Description                                                                 |
+| -------------------------- | ---------------- | --------------------------------------------------------------------------- |
+| `nativeApplicationVersion` | `string \| null` | Human-readable app version, e.g. `"2.11.0"`                                 |
+| `nativeBuildVersion`       | `string \| null` | Internal build version app stores use to distinguish binaries, e.g. `"114"` |
+| `applicationName`          | `string \| null` | The app's home-screen display name                                          |
+| `applicationId`            | `string \| null` | The Android application ID or iOS bundle ID                                 |
+
+### Functions
+
+| Signature                                                                                      | Description                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getAndroidId(): string`                                                                       | The value of `Settings.Secure.ANDROID_ID` — a hex string unique per app-signing-key/user/device combination. Throws immediately if called off Android, without touching the native module. `@platform android` |
+| `getInstallReferrerAsync(): Promise<string>`                                                   | The Google Play Install Referrer URL, e.g. `"utm_source=google-play&utm_medium=organic"`. `@platform android`                                                                                                  |
+| `getIosIdForVendorAsync(): Promise<string \| null>`                                            | The iOS "identifier for vendor" (IDFV); may resolve `null` shortly after a device restart before the device is unlocked. `@platform ios`                                                                       |
+| `getIosApplicationReleaseTypeAsync(): Promise<ApplicationReleaseType>`                         | The iOS release channel the app was built for. `@platform ios`                                                                                                                                                 |
+| `getIosPushNotificationServiceEnvironmentAsync(): Promise<PushNotificationServiceEnvironment>` | `'development'`, `'production'`, or `null` on the simulator (which doesn't support APN registration). `@platform ios`                                                                                          |
+| `getInstallationTimeAsync(): Promise<Date>`                                                    | When the app was first installed (a reinstall after uninstalling resets this)                                                                                                                                  |
+| `getLastUpdateTimeAsync(): Promise<Date>`                                                      | When the app was last updated via the Google Play Store. `@platform android`                                                                                                                                   |
+
+### `ApplicationReleaseType`
+
+| Field         | Value | Description                          |
+| ------------- | ----- | ------------------------------------ |
+| `UNKNOWN`     | `0`   | Release type could not be determined |
+| `SIMULATOR`   | `1`   | Running on the iOS Simulator         |
+| `ENTERPRISE`  | `2`   | An enterprise-distributed build      |
+| `DEVELOPMENT` | `3`   | A development build                  |
+| `AD_HOC`      | `4`   | An ad-hoc distributed build          |
+| `APP_STORE`   | `5`   | Distributed via the App Store        |
+
+### `PushNotificationServiceEnvironment`
+
+A plain string-literal union, not a struct — carries no `I` prefix (`ts-js-best-practices`):
+`'development' | 'production' | null`, mapping to the `aps-environment` entitlement key.
+
+## Notes
+
+<Aside
+  type="note"
+  title="Every async function throws UnavailabilityError when its native method is absent"
+>
+  E.g. calling an iOS-only function on Android, or vice versa. `getAndroidId()`
+  is the one synchronous exception: it checks `Platform.OS` up front and throws
+  immediately off Android, never touching the native module at all.
+  `getInstallationTimeAsync`/`getLastUpdateTimeAsync` wrap a native epoch-ms
+  number into a `Date` — the native side returns a plain number, not a
+  serialized date string.
+</Aside>
+
+## How the wrapper works
+
+`@symbiote-native/application` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-application` itself —
+its constants and functions are hand-ported, verbatim, into this package's own `core/`, resolving
+the native module through `expo-modules-core`'s `requireNativeModule` rather than the `expo`
+meta-package this project never installs:
+
+```
+packages/application/src/
+├── core/     # framework-agnostic: every constant + function above, ApplicationReleaseType,
+│             # PushNotificationServiceEnvironment; native-module.ts resolves the native module
+│             # via expo-modules-core's requireNativeModule
+├── react/    # @symbiote-native/application/react   — export * from '../core'
+├── vue/      # @symbiote-native/application/vue     — export * from '../core'
+├── svelte/   # @symbiote-native/application/svelte  — export * from '../core'
+└── angular/  # @symbiote-native/application/angular — export * from '../core'
+```
+
+Solid has no `solid/` directory at all: `package.json`'s `"./solid"` export points straight at
+`./src/core/index.ts`. A physical re-export file would add nothing over aliasing the subpath
+directly (`.claude/rules/barrel-passthrough.md`).
+
+Same shape as [local auth](/docs/packages/local-auth/)'s five adapter entries: single-file
+re-exports with no lifecycle code at all, since every export here is either an eagerly-resolved
+constant or a stateless one-shot call — there is nothing for a hook, composable, or service to
+subscribe to or clean up. The native code itself is never vendored or copied —
+`expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
+guide](/docs/howtos/expo-native-module-setup/)).

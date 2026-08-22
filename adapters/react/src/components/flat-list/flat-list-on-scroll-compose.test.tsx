@@ -25,7 +25,10 @@ function renderedRows(nodes: IFakeNode[]): string[] {
   const rows: string[] = [];
   for (const node of nodes) {
     for (const child of node.children) {
-      if (typeof child.props.text === 'string' && child.props.text.startsWith('row-')) {
+      if (
+        typeof child.props.text === 'string' &&
+        child.props.text.startsWith('row-')
+      ) {
         rows.push(child.props.text);
       }
     }
@@ -46,7 +49,8 @@ function App(): ReactElement {
       offset: ITEM_HEIGHT * index,
       index,
     }),
-    renderItem: ({ item }) => createElement('symbiote-text', {}, `row-${item.id}`),
+    renderItem: ({ item }) =>
+      createElement('symbiote-text', {}, `row-${item.id}`),
     onScroll: event => {
       seenEvents.push(event.nativeEvent);
     },
@@ -73,14 +77,22 @@ function findScrollView(): IFakeNode {
   return node;
 }
 
-describe('FlatList user onScroll composes with internal windowing', () => {
+// No Negative group: onScroll composition is a wiring concern (does the user handler still
+// receive events once the internal windowing handler is also attached), not a validation
+// boundary — there is no input FlatList rejects here.
+describe('FlatList user onScroll composes with internal windowing (Positive)', () => {
   it('commits a FlatList containing a scroll view', () => {
+    // why: baseline — the later assertions are meaningless if the list never mounts a scroll
+    // view to fire events against.
     mount(ROOT_TAG, <App />);
     expect(fabric.committed.length).toBeGreaterThan(0);
     expect(findScrollView()).toBeDefined();
   });
 
   it('forwards the user onScroll with the scroll payload', () => {
+    // why: VirtualizedList's internal onScroll must COMPOSE with a user-supplied onScroll, not
+    // replace it — a raw rest-spread handler gets clobbered by the internal one, silently
+    // dropping every app-level scroll-driven-UI hook.
     mount(ROOT_TAG, <App />);
     const scrollView = findScrollView();
 
@@ -100,6 +112,9 @@ describe('FlatList user onScroll composes with internal windowing', () => {
   });
 
   it('keeps the internal windowing handler — the window moves on a deep scroll', () => {
+    // why: the flip side of composition — a user onScroll must not SUPPRESS the internal
+    // windowing handler either, or the list stops recycling rows once the app attaches its
+    // own scroll listener.
     mount(ROOT_TAG, <App />);
     const scrollView = findScrollView();
 

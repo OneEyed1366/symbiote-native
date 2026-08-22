@@ -1,11 +1,25 @@
 // Co-located Angular-driven test for injectStackNavigation/injectTabNavigation/
 // injectDrawerNavigation - the narrowed twins of injectNavigation() that hide the union guard.
-// Angular twin of react/hooks/use-typed-navigation.test.tsx.
+// Angular twin of react/hooks/use-typed-navigation.test.tsx. The underlying
+// isStackNavigatorHandle/isTabNavigatorHandle/isDrawerNavigatorHandle guards already have their
+// own framework-free coverage in core/navigator-handles.test.ts (including the Drawer-also-has-
+// jumpTo disambiguation) - what's proven HERE is only that each injector calls the right guard
+// and throws Angular's own error message when it fails, not the guard logic itself.
+//
+// Each describe block below IS this file's Positive/Negative split, scoped per injector: one
+// positive case (the handle narrows correctly, exposing its concrete method) and one negative
+// case (wrong navigator kind -> throws the SPECIFIC "nearest navigator is not a <Kind>" message,
+// not just "threw something").
 
 import '@angular/compiler';
 import { Component, CUSTOM_ELEMENTS_SCHEMA, Input } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource, Dimensions } from '@symbiote-native/angular';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+  Dimensions,
+} from '@symbiote-native/angular';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 import { Stack } from '../stack';
@@ -14,7 +28,11 @@ import { Tab } from '../tabs';
 import { TabScreenDirective } from '../tab-screen.directive';
 import { Drawer } from '../drawer';
 import { DrawerScreenDirective } from '../drawer-screen.directive';
-import { injectDrawerNavigation, injectStackNavigation, injectTabNavigation } from './index';
+import {
+  injectDrawerNavigation,
+  injectStackNavigation,
+  injectTabNavigation,
+} from './index';
 
 const ROOT_TAG = 5613;
 const SCREEN_VIEW = 'RNSScreen';
@@ -37,7 +55,8 @@ Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -137,8 +156,16 @@ class DrawerThrowingScreenComponent {
   imports: [Stack, ScreenDirective],
   template: `
     <Stack initialRouteName="Home">
-      <ng-template symbioteScreen name="Home" [component]="homeComponent"></ng-template>
-      <ng-template symbioteScreen name="Details" [component]="plainComponent"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Home"
+        [component]="homeComponent"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Details"
+        [component]="plainComponent"
+      ></ng-template>
     </Stack>
   `,
 })
@@ -153,8 +180,16 @@ class StackHost {
   imports: [Tab, TabScreenDirective],
   template: `
     <Tab initialRouteName="Home">
-      <ng-template symbioteTabScreen name="Home" [component]="homeComponent"></ng-template>
-      <ng-template symbioteTabScreen name="Search" [component]="plainComponent"></ng-template>
+      <ng-template
+        symbioteTabScreen
+        name="Home"
+        [component]="homeComponent"
+      ></ng-template>
+      <ng-template
+        symbioteTabScreen
+        name="Search"
+        [component]="plainComponent"
+      ></ng-template>
     </Tab>
   `,
 })
@@ -169,8 +204,16 @@ class TabHost {
   imports: [Drawer, DrawerScreenDirective],
   template: `
     <Drawer initialRouteName="Home">
-      <ng-template symbioteDrawerScreen name="Home" [component]="homeComponent"></ng-template>
-      <ng-template symbioteDrawerScreen name="Profile" [component]="plainComponent"></ng-template>
+      <ng-template
+        symbioteDrawerScreen
+        name="Home"
+        [component]="homeComponent"
+      ></ng-template>
+      <ng-template
+        symbioteDrawerScreen
+        name="Profile"
+        [component]="plainComponent"
+      ></ng-template>
     </Drawer>
   `,
 })
@@ -180,16 +223,26 @@ class DrawerHost {
 }
 
 describe('injectStackNavigation', () => {
+  // why: a screen that KNOWS it only ever renders under a Stack should get `.push` typed
+  // directly, no `isStackNavigatorHandle` narrowing at the call site (this injector's whole
+  // reason to exist over the plain injectNavigation() union).
   it('returns a concretely-typed Stack handle with push, no narrowing needed', async () => {
     canPush = false;
-    mount(ROOT_TAG, StackHost, { initialProps: { homeComponent: StackTrackedScreenComponent } });
+    mount(ROOT_TAG, StackHost, {
+      initialProps: { homeComponent: StackTrackedScreenComponent },
+    });
     await tick();
     expect(canPush).toBe(true);
   });
 
+  // why: mounting a Stack-only injector under a Tab is a real misuse a developer can make -
+  // failing loudly, naming the actual mismatch, beats a silent `undefined.push is not a function`
+  // three lines deeper in the component.
   it('throws when the nearest navigator is a Tab, not a Stack', () => {
     expect(() =>
-      mount(ROOT_TAG, TabHost, { initialProps: { homeComponent: StackThrowingScreenComponent } }),
+      mount(ROOT_TAG, TabHost, {
+        initialProps: { homeComponent: StackThrowingScreenComponent },
+      }),
     ).toThrow(/nearest navigator is not a Stack/);
   });
 });
@@ -197,19 +250,25 @@ describe('injectStackNavigation', () => {
 describe('injectTabNavigation', () => {
   it('returns a concretely-typed Tab handle with jumpTo, no narrowing needed', async () => {
     canJumpTo = false;
-    mount(ROOT_TAG, TabHost, { initialProps: { homeComponent: TabTrackedScreenComponent } });
+    mount(ROOT_TAG, TabHost, {
+      initialProps: { homeComponent: TabTrackedScreenComponent },
+    });
     await tick();
     expect(canJumpTo).toBe(true);
   });
 
   it('throws when the nearest navigator is a Stack, not a Tab', () => {
     expect(() =>
-      mount(ROOT_TAG, StackHost, { initialProps: { homeComponent: TabThrowingScreenComponent } }),
+      mount(ROOT_TAG, StackHost, {
+        initialProps: { homeComponent: TabThrowingScreenComponent },
+      }),
     ).toThrow(/nearest navigator is not a Tab/);
   });
 });
 
 describe('injectDrawerNavigation', () => {
+  // why: Drawer handles ALSO carry `jumpTo` (core/navigator-handles.ts) - proving this injector
+  // returns openDrawer specifically confirms it narrows to Drawer and not accidentally to Tab.
   it('returns a concretely-typed Drawer handle with openDrawer, no narrowing needed', async () => {
     canOpenDrawer = false;
     mount(ROOT_TAG, DrawerHost, {

@@ -3,22 +3,38 @@
 // IDrawerOptions surface, so the full matrix (4 drawerTypes x 2 drawerPositions for the geometry,
 // both edges for the swipe gates) is exercised directly, without the fake-touch-event plumbing
 // react/drawer.test.tsx needs to drive the same math through a live gesture.
+//
+// No Negative group anywhere in this file: every symbol here is a total function over its input
+// type (no guard clause, no throw). A "rejected" gesture/geometry situation surfaces as a `false`/
+// zero return, not an exception, so it is asserted inline within that symbol's own describe block
+// rather than split into a separate Negative section.
 
 import { describe, expect, it } from 'vitest';
 import { createElement } from '@symbiote-native/engine';
-import type { IPanResponderGestureState, ISymbioteEvent } from '@symbiote-native/engine';
+import type {
+  IPanResponderGestureState,
+  ISymbioteEvent,
+} from '@symbiote-native/engine';
 import {
+  DRAWER_DEFAULT_POSITION,
+  DRAWER_DEFAULT_TYPE,
   DRAWER_DEFAULT_WIDTH,
   clamp01,
+  isDrawerAnimated,
+  isDrawerOverlayVisible,
   isHorizontalDrag,
   isSwipeStartInEdge,
   resolveDragProgress,
   resolveDrawerGeometry,
+  resolveDrawerPosition,
+  resolveDrawerSlotInterpolation,
+  resolveDrawerType,
+  resolveDrawerWidth,
   resolveSwipeIntent,
   shouldClaimDrawerSwipe,
   startPageXOf,
 } from './index';
-import type { IDrawerOptions } from './index';
+import type { IDrawerGeometry, IDrawerOptions } from './index';
 
 // A real branded RCTView node so no cast is needed (mirrors
 // core/engine/src/pan-responder/pan-responder.test.ts's own targetNode) - the gesture math here
@@ -35,7 +51,9 @@ function fakeEvent(nativeEvent: Record<string, unknown>): ISymbioteEvent {
   };
 }
 
-function gestureState(overrides: Partial<IPanResponderGestureState>): IPanResponderGestureState {
+function gestureState(
+  overrides: Partial<IPanResponderGestureState>,
+): IPanResponderGestureState {
   return {
     stateID: 1,
     moveX: 0,
@@ -52,11 +70,43 @@ function gestureState(overrides: Partial<IPanResponderGestureState>): IPanRespon
   };
 }
 
+describe('resolveDrawerWidth / resolveDrawerType / resolveDrawerPosition', () => {
+  // why: geometry, swipe-edge and drag-progress math all read these through the same `?? DEFAULT`
+  // fallback (resolveDrawerWidth etc.) instead of each re-deriving its own default, so a caller
+  // that omits an option gets the SAME behavior everywhere - proven directly here rather than only
+  // implied by every other describe block passing a full IDrawerOptions.
+  it('resolveDrawerWidth falls back to the documented default (280) when unset', () => {
+    expect(resolveDrawerWidth({})).toBe(DRAWER_DEFAULT_WIDTH);
+  });
+
+  it('resolveDrawerWidth honors an explicit width over the default', () => {
+    expect(resolveDrawerWidth({ drawerWidth: 320 })).toBe(320);
+  });
+
+  it('resolveDrawerType falls back to the documented default ("front") when unset', () => {
+    expect(resolveDrawerType({})).toBe(DRAWER_DEFAULT_TYPE);
+  });
+
+  it('resolveDrawerType honors an explicit type over the default', () => {
+    expect(resolveDrawerType({ drawerType: 'slide' })).toBe('slide');
+  });
+
+  it('resolveDrawerPosition falls back to the documented default ("left") when unset', () => {
+    expect(resolveDrawerPosition({})).toBe(DRAWER_DEFAULT_POSITION);
+  });
+
+  it('resolveDrawerPosition honors an explicit position over the default', () => {
+    expect(resolveDrawerPosition({ drawerPosition: 'right' })).toBe('right');
+  });
+});
+
 describe('resolveDrawerGeometry', () => {
   const WIDTH = DRAWER_DEFAULT_WIDTH;
 
   it('front + left: only the panel moves off/on screen, content stays put', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'front', drawerPosition: 'left' })).toEqual({
+    expect(
+      resolveDrawerGeometry({ drawerType: 'front', drawerPosition: 'left' }),
+    ).toEqual({
       panelTranslateXClosed: -WIDTH,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -67,7 +117,9 @@ describe('resolveDrawerGeometry', () => {
   });
 
   it('front + right: the panel closes toward the opposite edge from left', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'front', drawerPosition: 'right' })).toEqual({
+    expect(
+      resolveDrawerGeometry({ drawerType: 'front', drawerPosition: 'right' }),
+    ).toEqual({
       panelTranslateXClosed: WIDTH,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -78,7 +130,9 @@ describe('resolveDrawerGeometry', () => {
   });
 
   it('back + left: only the content slides away; the panel never translates', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'back', drawerPosition: 'left' })).toEqual({
+    expect(
+      resolveDrawerGeometry({ drawerType: 'back', drawerPosition: 'left' }),
+    ).toEqual({
       panelTranslateXClosed: 0,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -89,7 +143,9 @@ describe('resolveDrawerGeometry', () => {
   });
 
   it('back + right: content slides the mirrored way, still no overlay', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'back', drawerPosition: 'right' })).toEqual({
+    expect(
+      resolveDrawerGeometry({ drawerType: 'back', drawerPosition: 'right' }),
+    ).toEqual({
       panelTranslateXClosed: 0,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -100,7 +156,9 @@ describe('resolveDrawerGeometry', () => {
   });
 
   it('slide + left: panel and content move together by the same delta', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'slide', drawerPosition: 'left' })).toEqual({
+    expect(
+      resolveDrawerGeometry({ drawerType: 'slide', drawerPosition: 'left' }),
+    ).toEqual({
       panelTranslateXClosed: -WIDTH,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -111,7 +169,9 @@ describe('resolveDrawerGeometry', () => {
   });
 
   it('slide + right: both translate toward the mirrored side', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'slide', drawerPosition: 'right' })).toEqual({
+    expect(
+      resolveDrawerGeometry({ drawerType: 'slide', drawerPosition: 'right' }),
+    ).toEqual({
       panelTranslateXClosed: WIDTH,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -127,7 +187,12 @@ describe('resolveDrawerGeometry', () => {
   // animated interpolation behind isDrawerAnimated() and never reads these numbers for
   // 'permanent' - but the comment is inaccurate about what this function itself returns.
   it('permanent + left: falls through to front\'s non-zero offsets, not "all zero"', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'permanent', drawerPosition: 'left' })).toEqual({
+    expect(
+      resolveDrawerGeometry({
+        drawerType: 'permanent',
+        drawerPosition: 'left',
+      }),
+    ).toEqual({
       panelTranslateXClosed: -WIDTH,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -138,7 +203,12 @@ describe('resolveDrawerGeometry', () => {
   });
 
   it('permanent + right: mirrors front + right', () => {
-    expect(resolveDrawerGeometry({ drawerType: 'permanent', drawerPosition: 'right' })).toEqual({
+    expect(
+      resolveDrawerGeometry({
+        drawerType: 'permanent',
+        drawerPosition: 'right',
+      }),
+    ).toEqual({
       panelTranslateXClosed: WIDTH,
       panelTranslateXOpen: 0,
       contentTranslateXClosed: 0,
@@ -158,32 +228,123 @@ describe('resolveDrawerGeometry', () => {
   });
 });
 
+describe('isDrawerAnimated', () => {
+  // why: 'permanent' is the ONLY type with no gesture/animation - callers gate the whole
+  // interpolation + PanResponder setup behind this before touching resolveDrawerGeometry's
+  // (comment-flagged-inaccurate, see above) non-zero permanent output.
+  it('is true for every animated type (front/back/slide)', () => {
+    expect(isDrawerAnimated({ drawerType: 'front' })).toBe(true);
+    expect(isDrawerAnimated({ drawerType: 'back' })).toBe(true);
+    expect(isDrawerAnimated({ drawerType: 'slide' })).toBe(true);
+  });
+
+  it('is false for permanent', () => {
+    expect(isDrawerAnimated({ drawerType: 'permanent' })).toBe(false);
+  });
+
+  it('defaults to animated ("front") when drawerType is unset', () => {
+    expect(isDrawerAnimated({})).toBe(true);
+  });
+});
+
+describe('isDrawerOverlayVisible', () => {
+  // why: matches resolveDrawerGeometry's own overlayOpacityOpen split - front/slide fade in an
+  // overlay, back/permanent never do (back's stationary panel sits fully behind the content, so
+  // nothing needs dimming).
+  it('is true for front and slide (the overlay-fading types)', () => {
+    expect(isDrawerOverlayVisible({ drawerType: 'front' })).toBe(true);
+    expect(isDrawerOverlayVisible({ drawerType: 'slide' })).toBe(true);
+  });
+
+  it('is false for back and permanent (no overlay)', () => {
+    expect(isDrawerOverlayVisible({ drawerType: 'back' })).toBe(false);
+    expect(isDrawerOverlayVisible({ drawerType: 'permanent' })).toBe(false);
+  });
+});
+
+describe('resolveDrawerSlotInterpolation', () => {
+  // A hand-built geometry (not routed through resolveDrawerGeometry) with every field distinct,
+  // so a slot that reads the WRONG field of the geometry fails loudly instead of coincidentally
+  // matching thanks to two fields sharing a value.
+  const geometry: IDrawerGeometry = {
+    panelTranslateXClosed: -280,
+    panelTranslateXOpen: 0,
+    contentTranslateXClosed: 0,
+    contentTranslateXOpen: 140,
+    overlayOpacityClosed: 0,
+    overlayOpacityOpen: 1,
+  };
+
+  it('content slot interpolates its own translateX field only', () => {
+    expect(resolveDrawerSlotInterpolation(geometry, 'content')).toEqual({
+      translateX: { inputRange: [0, 1], outputRange: [0, 140] },
+    });
+  });
+
+  it('panel slot interpolates its own translateX field only', () => {
+    expect(resolveDrawerSlotInterpolation(geometry, 'panel')).toEqual({
+      translateX: { inputRange: [0, 1], outputRange: [-280, 0] },
+    });
+  });
+
+  // why: the file's own header comment calls out this asymmetry - overlay's translateX tracks
+  // CONTENT's delta, not its own (there is no "overlay" field on IDrawerGeometry at all), because
+  // for `slide` the content itself moves away and an overlay pinned full-screen would stop
+  // covering it. Asserting against panelTranslateX* (140 vs -280) proves it is content's number,
+  // not a coincidence of the fixture.
+  it('overlay slot interpolates opacity AND a translateX that tracks CONTENT, not panel', () => {
+    expect(resolveDrawerSlotInterpolation(geometry, 'overlay')).toEqual({
+      opacity: { inputRange: [0, 1], outputRange: [0, 1] },
+      translateX: { inputRange: [0, 1], outputRange: [0, 140] },
+    });
+  });
+});
+
 describe('isSwipeStartInEdge', () => {
   const SCREEN_WIDTH = 375;
 
   it('left position, closed: a start within the edge zone counts', () => {
-    expect(isSwipeStartInEdge(20, SCREEN_WIDTH, false, { drawerPosition: 'left' })).toBe(true);
+    expect(
+      isSwipeStartInEdge(20, SCREEN_WIDTH, false, { drawerPosition: 'left' }),
+    ).toBe(true);
   });
 
   it('left position, closed: a start past the edge zone does not count', () => {
-    expect(isSwipeStartInEdge(40, SCREEN_WIDTH, false, { drawerPosition: 'left' })).toBe(false);
+    expect(
+      isSwipeStartInEdge(40, SCREEN_WIDTH, false, { drawerPosition: 'left' }),
+    ).toBe(false);
   });
 
   it('right position, closed: a start within the edge zone (measured from the right) counts', () => {
-    expect(isSwipeStartInEdge(360, SCREEN_WIDTH, false, { drawerPosition: 'right' })).toBe(true);
+    expect(
+      isSwipeStartInEdge(360, SCREEN_WIDTH, false, { drawerPosition: 'right' }),
+    ).toBe(true);
   });
 
   it('right position, closed: a start past the edge zone does not count', () => {
-    expect(isSwipeStartInEdge(300, SCREEN_WIDTH, false, { drawerPosition: 'right' })).toBe(false);
+    expect(
+      isSwipeStartInEdge(300, SCREEN_WIDTH, false, { drawerPosition: 'right' }),
+    ).toBe(false);
   });
 
   it('open: any start position counts, regardless of position or distance from the edge', () => {
-    expect(isSwipeStartInEdge(-9_999, SCREEN_WIDTH, true, { drawerPosition: 'left' })).toBe(true);
-    expect(isSwipeStartInEdge(9_999, SCREEN_WIDTH, true, { drawerPosition: 'right' })).toBe(true);
+    expect(
+      isSwipeStartInEdge(-9_999, SCREEN_WIDTH, true, {
+        drawerPosition: 'left',
+      }),
+    ).toBe(true);
+    expect(
+      isSwipeStartInEdge(9_999, SCREEN_WIDTH, true, {
+        drawerPosition: 'right',
+      }),
+    ).toBe(true);
   });
 
   it('honors a custom swipeEdgeWidth over the default', () => {
-    const options: IDrawerOptions = { drawerPosition: 'left', swipeEdgeWidth: 100 };
+    const options: IDrawerOptions = {
+      drawerPosition: 'left',
+      swipeEdgeWidth: 100,
+    };
     expect(isSwipeStartInEdge(80, SCREEN_WIDTH, false, options)).toBe(true);
   });
 });
@@ -232,23 +393,35 @@ describe('resolveSwipeIntent', () => {
   });
 
   it('neither threshold met snaps back to the current closed state', () => {
-    const intent = resolveSwipeIntent(gestureState({ dx: 10, vx: 0.1 }), false, {
-      drawerPosition: 'left',
-    });
+    const intent = resolveSwipeIntent(
+      gestureState({ dx: 10, vx: 0.1 }),
+      false,
+      {
+        drawerPosition: 'left',
+      },
+    );
     expect(intent).toBe('close');
   });
 
   it('neither threshold met snaps back to the current open state', () => {
-    const intent = resolveSwipeIntent(gestureState({ dx: -10, vx: -0.1 }), true, {
-      drawerPosition: 'left',
-    });
+    const intent = resolveSwipeIntent(
+      gestureState({ dx: -10, vx: -0.1 }),
+      true,
+      {
+        drawerPosition: 'left',
+      },
+    );
     expect(intent).toBe('open');
   });
 
   it('right position: the physical drag direction that opens is mirrored', () => {
-    const intent = resolveSwipeIntent(gestureState({ dx: -100, vx: 0 }), false, {
-      drawerPosition: 'right',
-    });
+    const intent = resolveSwipeIntent(
+      gestureState({ dx: -100, vx: 0 }),
+      false,
+      {
+        drawerPosition: 'right',
+      },
+    );
     expect(intent).toBe('open');
   });
 
@@ -265,7 +438,9 @@ describe('resolveSwipeIntent', () => {
       swipeMinDistance: 10,
       swipeMinVelocity: 5,
     };
-    expect(resolveSwipeIntent(gestureState({ dx: 15, vx: 0 }), false, options)).toBe('open');
+    expect(
+      resolveSwipeIntent(gestureState({ dx: 15, vx: 0 }), false, options),
+    ).toBe('open');
   });
 });
 
@@ -316,10 +491,14 @@ describe('resolveDragProgress', () => {
 
   it('clamps the result to [0, 1] past either end', () => {
     expect(
-      resolveDragProgress(gestureState({ dx: WIDTH * 2 }), 0, { drawerPosition: 'left' }),
+      resolveDragProgress(gestureState({ dx: WIDTH * 2 }), 0, {
+        drawerPosition: 'left',
+      }),
     ).toBe(1);
     expect(
-      resolveDragProgress(gestureState({ dx: -WIDTH * 2 }), 1, { drawerPosition: 'left' }),
+      resolveDragProgress(gestureState({ dx: -WIDTH * 2 }), 1, {
+        drawerPosition: 'left',
+      }),
     ).toBe(0);
   });
 });

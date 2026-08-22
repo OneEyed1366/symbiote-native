@@ -44,34 +44,54 @@ afterEach(() => {
 });
 
 describe('PlatformColor / DynamicColorIOS', () => {
-  it('builds the opaque shapes iOS native reads', () => {
-    expect(PlatformColor('systemBlue')).toEqual({ semantic: ['systemBlue'] });
+  // Positive only: building the opaque shapes and delegating them through the processor has no
+  // rejecting branch on valid RN color inputs — no Negative group applies.
+  describe('Positive', () => {
+    // why: RN's own contract for these two factories — PlatformColor produces {semantic:[name]},
+    // DynamicColorIOS produces an opaque {dynamic:{light,dark}} — native reads these SHAPES by
+    // field name, so a drift here breaks silently on iOS regardless of what processColor does.
+    it('builds the opaque shapes iOS native reads', () => {
+      expect(PlatformColor('systemBlue')).toEqual({ semantic: ['systemBlue'] });
 
-    const dynamic = DynamicColorIOS({ light: '#ffffff', dark: '#000000' });
-    expect(isOpaqueColorValue(dynamic)).toBe(true);
-    expect(dynamic.dynamic?.light).toBe('#ffffff');
-  });
+      const dynamic = DynamicColorIOS({ light: '#ffffff', dark: '#000000' });
+      expect(isOpaqueColorValue(dynamic)).toBe(true);
+      expect(dynamic.dynamic?.light).toBe('#ffffff');
+    });
 
-  it('processColor delegates strings and opaque objects to the wired processor', () => {
-    expect(processColor('#abcdef')).toBe(STRING_SENTINEL);
+    // why: processColor is the ONE public seam both a plain CSS string and an opaque
+    // PlatformColor object must flow through identically — proves it isn't special-casing one
+    // shape and passing the other through unprocessed.
+    it('processColor delegates strings and opaque objects to the wired processor', () => {
+      expect(processColor('#abcdef')).toBe(STRING_SENTINEL);
 
-    const semantic = PlatformColor('systemBlue');
-    expect(processColor(semantic)).toEqual({ native: semantic });
-  });
+      const semantic = PlatformColor('systemBlue');
+      expect(processColor(semantic)).toEqual({ native: semantic });
+    });
 
-  it('routes an opaque style color through the processor onto the committed node', () => {
-    mount(ROOT_TAG, <App />);
+    // why: the earlier color seam (commit.ts processValue) routed only strings, so an opaque
+    // style color slipped past unprocessed onto Fabric — this is the regression proving the
+    // object path now reaches the SAME processor as a style-driven commit, not just the direct
+    // processColor() call above.
+    it('routes an opaque style color through the processor onto the committed node', () => {
+      mount(ROOT_TAG, <App />);
 
-    const painted = fabric.find(n => n.props.backgroundColor !== undefined);
-    expect(painted, 'a node carries a backgroundColor').toBeDefined();
+      const painted = fabric.find(n => n.props.backgroundColor !== undefined);
+      expect(painted, 'a node carries a backgroundColor').toBeDefined();
 
-    // The committed prop is the processor's OUTPUT (the native dict), not the raw opaque object.
-    expect(painted!.props.backgroundColor).toEqual({ native: { semantic: ['labelColor'] } });
+      // The committed prop is the processor's OUTPUT (the native dict), not the raw opaque object.
+      expect(painted!.props.backgroundColor).toEqual({
+        native: { semantic: ['labelColor'] },
+      });
 
-    const routedSemantic = seen.some(
-      v =>
-        isOpaqueColorValue(v) && JSON.stringify(v) === JSON.stringify({ semantic: ['labelColor'] }),
-    );
-    expect(routedSemantic, 'the opaque style color reached the processor').toBe(true);
+      const routedSemantic = seen.some(
+        v =>
+          isOpaqueColorValue(v) &&
+          JSON.stringify(v) === JSON.stringify({ semantic: ['labelColor'] }),
+      );
+      expect(
+        routedSemantic,
+        'the opaque style color reached the processor',
+      ).toBe(true);
+    });
   });
 });

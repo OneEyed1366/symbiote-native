@@ -20,17 +20,19 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
-  inject,
 } from '@angular/core';
 import {
-  anchorHostStyle,
   RefreshControlHost,
   ScrollContentView,
   ScrollViewHost,
   SymbioteHostPropsDirective,
+  SymbioteStyleInputDirective,
 } from '../../primitives';
-import { ScrollViewBase, ScrollViewProjectionDirective, SCROLL_VIEW_INPUTS } from './shared';
+import {
+  ScrollViewBase,
+  ScrollViewProjectionDirective,
+  SCROLL_VIEW_INPUTS,
+} from './shared';
 export type { IAngularScrollViewProps, IScrollViewHandle } from './shared';
 
 // The symbiote-* host elements are imported as standalone components; the props directive is
@@ -38,6 +40,9 @@ export type { IAngularScrollViewProps, IScrollViewHandle } from './shared';
 @Component({
   selector: 'ScrollView',
   standalone: true,
+  hostDirectives: [
+    { directive: SymbioteStyleInputDirective, inputs: ['style'] },
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
     ScrollViewHost,
@@ -49,7 +54,10 @@ export type { IAngularScrollViewProps, IScrollViewHandle } from './shared';
   changeDetection: ChangeDetectionStrategy.OnPush,
   inputs: SCROLL_VIEW_INPUTS,
   template: `
-    <symbiote-scroll-view #host="symbioteHost" [symbioteHostProps]="scrollProps">
+    <symbiote-scroll-view
+      #host="symbioteHost"
+      [symbioteHostProps]="scrollProps()"
+    >
       @if (hasProjectedRefreshControl) {
         <symbiote-refresh-control
           #refreshHost="symbioteHost"
@@ -58,7 +66,7 @@ export type { IAngularScrollViewProps, IScrollViewHandle } from './shared';
         ></symbiote-refresh-control>
       }
       <symbiote-scroll-content
-        [symbioteHostProps]="contentProps"
+        [symbioteHostProps]="contentProps()"
         [symbioteScrollViewProjection]="projectionController"
       >
         <ng-content></ng-content>
@@ -66,14 +74,8 @@ export type { IAngularScrollViewProps, IScrollViewHandle } from './shared';
     </symbiote-scroll-view>
   `,
 })
-export class ScrollView extends ScrollViewBase {
-  // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
-  // onto (see anchorHostStyle's doc comment) — NOT `#host` in the template above, which targets
-  // the real inner `symbiote-scroll-view` one level down.
-  private readonly elementRef = inject(ElementRef);
-
-  override get scrollProps(): Record<string, unknown> {
-    const props = super.scrollProps;
-    return { ...props, style: [anchorHostStyle(this.elementRef), props.style] };
-  }
-}
+// Behavior lives entirely in ScrollViewBase; this class exists for the decorator + iOS template.
+// The anchor-style merge that used to be a `scrollProps` override here moved into the base's
+// `scrollProps` computed - a subclass getter cannot override a field, and both platforms merged it
+// identically anyway (see that computed's comment).
+export class ScrollView extends ScrollViewBase {}

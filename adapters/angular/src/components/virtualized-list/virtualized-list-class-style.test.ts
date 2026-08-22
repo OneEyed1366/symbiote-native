@@ -6,7 +6,7 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -15,7 +15,8 @@ import { VListItemDirective } from './directives';
 
 const ROOT_TAG = 952;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 interface IRow {
   id: string;
@@ -57,7 +58,14 @@ class VirtualizedListClassHost {
 
 beforeEach(() => {
   fabric.reset();
-  registerStyles({ card: { backgroundColor: 'red' } });
+  registerRules([
+    {
+      tokens: ['card'],
+      specificity: [0, 1, 0],
+      order: 0,
+      style: { backgroundColor: 'red' },
+    },
+  ]);
 });
 afterEach(() => {
   unmount(ROOT_TAG);
@@ -65,12 +73,18 @@ afterEach(() => {
 });
 
 describe('VirtualizedList anchor class= resolution', () => {
+  // why: VirtualizedList is its own ANCHOR_HOST_COMPONENTS entry, one level ABOVE the ScrollView it
+  // composes — ScrollView's own anchor fix (scroll-view-class-style.test.ts) does not transitively
+  // cover VirtualizedList's use-site class=, since each anchor resolves independently.
   it('resolves a class= on the VirtualizedList use site onto the real committed scroll host', async () => {
     mount(ROOT_TAG, VirtualizedListClassHost);
     await tick();
     await tick();
 
     const node = fabric.find(n => n.props.backgroundColor === 'red');
-    expect(node, 'a real Fabric node carries the class-derived style').toBeDefined();
+    expect(
+      node,
+      'a real Fabric node carries the class-derived style',
+    ).toBeDefined();
   });
 });

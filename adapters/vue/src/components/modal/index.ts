@@ -22,7 +22,6 @@ import {
   type IAriaProps,
   type IModalAnimationType,
   type IModalOrientation,
-  type IModalOrientationChangeEvent,
   type IModalPresentationStyle,
   type IModalState,
 } from '@symbiote-native/components';
@@ -30,6 +29,7 @@ import {
   dlog,
   type IClassNameValue,
   type IStyleProp,
+  type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
 
@@ -65,7 +65,9 @@ export type IModalEmits = {
   show: () => boolean;
   dismiss: () => boolean;
   requestClose: () => boolean;
-  orientationChange: (event: IModalOrientationChangeEvent) => boolean;
+  // Forwarded verbatim, so the listener sees the ISymbioteEvent wrapper the engine delivers; the
+  // orientation is read at event.nativeEvent.orientation (IModalOrientationChangeEvent).
+  orientationChange: (event: ISymbioteEvent) => boolean;
 };
 
 function asBoolean(value: unknown): boolean | undefined {
@@ -77,10 +79,14 @@ function asString(value: unknown): string | undefined {
 }
 
 function asAnimationType(value: unknown): IModalAnimationType | undefined {
-  return value === 'none' || value === 'slide' || value === 'fade' ? value : undefined;
+  return value === 'none' || value === 'slide' || value === 'fade'
+    ? value
+    : undefined;
 }
 
-function asPresentationStyle(value: unknown): IModalPresentationStyle | undefined {
+function asPresentationStyle(
+  value: unknown,
+): IModalPresentationStyle | undefined {
   return value === 'fullScreen' ||
     value === 'pageSheet' ||
     value === 'formSheet' ||
@@ -100,10 +106,15 @@ const ORIENTATIONS: ReadonlyArray<IModalOrientation> = [
 function isOrientation(value: unknown): value is IModalOrientation {
   // .includes() types its arg as IModalOrientation, so a bare string won't pass; .some keeps the
   // ORIENTATIONS list as the single source of truth without an `as` cast.
-  return typeof value === 'string' && ORIENTATIONS.some(orientation => orientation === value);
+  return (
+    typeof value === 'string' &&
+    ORIENTATIONS.some(orientation => orientation === value)
+  );
 }
 
-function asSupportedOrientations(value: unknown): ReadonlyArray<IModalOrientation> | undefined {
+function asSupportedOrientations(
+  value: unknown,
+): ReadonlyArray<IModalOrientation> | undefined {
   if (!Array.isArray(value)) return undefined;
   return value.every(isOrientation) ? value : undefined;
 }
@@ -141,7 +152,9 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
 
 export const Modal = defineComponent<IModalProps, IModalEmits>(
   (_props, { attrs: rawAttrs, slots, emit }) => {
-    const state = ref<IModalState>(createInitialModalState(rawAttrs.visible === true));
+    const state = ref<IModalState>(
+      createInitialModalState(rawAttrs.visible === true),
+    );
 
     // POST-flush so the transition fires AFTER the render that used the OLD state: on visible→hidden
     // the node renders once more (state.isRendered still true → the keep-alive frame), then this
@@ -150,7 +163,10 @@ export const Modal = defineComponent<IModalProps, IModalEmits>(
     watch(
       () => rawAttrs.visible === true,
       isVisible => {
-        state.value = modalReducer(state.value, isVisible ? { type: 'show' } : { type: 'hide' });
+        state.value = modalReducer(
+          state.value,
+          isVisible ? { type: 'show' } : { type: 'hide' },
+        );
       },
       { flush: 'post' },
     );
@@ -169,7 +185,9 @@ export const Modal = defineComponent<IModalProps, IModalEmits>(
         backdropColor: asString(attrs.backdropColor),
         animationType: asAnimationType(attrs.animationType),
         presentationStyle: asPresentationStyle(attrs.presentationStyle),
-        supportedOrientations: asSupportedOrientations(attrs.supportedOrientations),
+        supportedOrientations: asSupportedOrientations(
+          attrs.supportedOrientations,
+        ),
         hardwareAccelerated: asBoolean(attrs.hardwareAccelerated),
         statusBarTranslucent: asBoolean(attrs.statusBarTranslucent),
         navigationBarTranslucent: asBoolean(attrs.navigationBarTranslucent),
@@ -191,7 +209,7 @@ export const Modal = defineComponent<IModalProps, IModalEmits>(
           onShow: (): void => emit('show'),
           onDismiss: (): void => emit('dismiss'),
           onRequestClose: (): void => emit('requestClose'),
-          onOrientationChange: (event: IModalOrientationChangeEvent): void =>
+          onOrientationChange: (event: ISymbioteEvent): void =>
             emit('orientationChange', event),
         },
         [
@@ -211,7 +229,7 @@ export const Modal = defineComponent<IModalProps, IModalEmits>(
       show: (): boolean => true,
       dismiss: (): boolean => true,
       requestClose: (): boolean => true,
-      orientationChange: (_event: IModalOrientationChangeEvent): boolean => true,
+      orientationChange: (_event: ISymbioteEvent): boolean => true,
     },
   },
 );

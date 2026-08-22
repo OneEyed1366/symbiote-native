@@ -15,7 +15,11 @@ export type {
   IVueScreenOptions,
   IVueSearchBarOptions,
 } from './screen';
-export type { IScreenOptions, IStackAnimation, IStackPresentation } from '../core';
+export type {
+  IScreenOptions,
+  IStackAnimation,
+  IStackPresentation,
+} from '../core';
 
 export {
   useNavigation,
@@ -33,7 +37,10 @@ export type {
   ITabNavigationHandle,
   IDrawerNavigationHandle,
 } from './composables';
-export type { INavigationScopeValue, IAnyNavigatorHandle } from './navigation-context';
+export type {
+  INavigationScopeValue,
+  IAnyNavigatorHandle,
+} from './navigation-context';
 
 export { useLinkingIntegration } from './linking';
 export type { ILinkingConfig, IScreenLinkingConfig } from '../core';
@@ -67,4 +74,9 @@ export type {
   IDrawerScreenOptionsResolver,
   IDrawerScreenProps,
 } from './drawer-screen';
-export type { IDrawerOptions, IDrawerScreenOptions, IDrawerType, IDrawerPosition } from '../core';
+export type {
+  IDrawerOptions,
+  IDrawerScreenOptions,
+  IDrawerType,
+  IDrawerPosition,
+} from '../core';

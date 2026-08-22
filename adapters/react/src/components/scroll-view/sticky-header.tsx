@@ -1,14 +1,12 @@
 // Sticky headers: the JS layer RN implements in ScrollView.js / ScrollViewStickyHeader.js.
 //
-// VERDICT (source-based): RN does stickiness PURELY IN JS. ScrollView.js (render, ~line
-// 1690) wraps each child whose index is in `stickyHeaderIndices` in a ScrollViewStickyHeader,
-// fed by a single `_scrollAnimatedValue` an Animated.event drives from `onScroll`
-// (ScrollView.js ~line 1095). The native Fabric scroll view does NOT honor the index array on
-// its own. Forwarding `stickyHeaderIndices` to native is a silent no-op. So we replicate the
-// JS layer: subscribe each flagged child to the scroll offset and translate it to stay pinned.
-// The interpolation mirrors ScrollViewStickyHeader.js (non-inverted + inverted branches) and now
-// lives, framework-agnostic, in @symbiote-native/components (computeStickyInterpolation); this
-// file holds the React component shell, the layout state, and the child-wrapping.
+// RN does stickiness purely in JS: ScrollView.js (~line 1690) wraps each flagged child in a
+// ScrollViewStickyHeader, fed by a single `_scrollAnimatedValue` that Animated.event drives
+// from `onScroll` (~line 1095). The native Fabric scroll view does not honor the index array,
+// so forwarding `stickyHeaderIndices` to native would be a silent no-op - we replicate the JS
+// layer instead. The interpolation mirrors ScrollViewStickyHeader.js and now lives,
+// framework-agnostic, in @symbiote-native/components (computeStickyInterpolation); this file
+// holds only the React component shell, layout state, and child-wrapping.
 
 import {
   Children,
@@ -16,12 +14,14 @@ import {
   isValidElement,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useReducer,
   useRef,
   useState,
   type ComponentType,
   type ReactElement,
   type ReactNode,
+  type Ref,
 } from 'react';
 import {
   AnimatedInterpolation,
@@ -47,13 +47,33 @@ import { Animated } from '../../modules/animated';
 // The props RN passes a sticky header wrapper (ScrollViewStickyHeader.js): the framework-agnostic
 // fields (IStickyHeaderProps) plus the React children slot. A custom StickyHeaderComponent must
 // accept the same shape.
-export type IStickyHeaderComponentProps = IStickyHeaderProps & {
-  children?: ReactNode;
+// What a mounted sticky header exposes to its ScrollView (RN's ScrollView.js:402 ref interface).
+// The parent pushes the NEXT header's measured y straight in here, so one header measuring costs
+// one call instead of a parent re-render.
+export type IStickyHeaderHandle = {
+  setNextHeaderY: (y: number) => void;
 };
 
-export type IStickyHeaderComponentType = ComponentType<IStickyHeaderComponentProps>;
+// How the ScrollView and its sticky headers exchange measurements (RN's _headerLayoutYs +
+// _stickyHeaderRefs, ScrollView.js:750-754). Grouped so the wrapper below keeps a readable
+// parameter list.
+export type IStickyCrossTalk = {
+  headerLayoutYs: ReadonlyMap<number, number>;
+  onHeaderLayoutY: (index: number, y: number) => void;
+  onHeaderRef: (index: number, handle: IStickyHeaderHandle | null) => void;
+};
 
-function readChildOnLayout(child: ReactElement): ((event: ISymbioteEvent) => void) | undefined {
+export type IStickyHeaderComponentProps = IStickyHeaderProps & {
+  children?: ReactNode;
+  ref?: Ref<IStickyHeaderHandle>;
+};
+
+export type IStickyHeaderComponentType =
+  ComponentType<IStickyHeaderComponentProps>;
+
+function readChildOnLayout(
+  child: ReactElement,
+): ((event: ISymbioteEvent) => void) | undefined {
   const childProps = child.props;
   if (typeof childProps !== 'object' || childProps === null) return undefined;
   const handler = Reflect.get(childProps, 'onLayout');
@@ -73,7 +93,35 @@ function firstChild(children: ReactNode): ReactElement | undefined {
 // (@symbiote-native/components); this component supplies only the React lifecycle: the ONE folded
 // state cell, the interpolation-node + listener wiring, the debounce setTimeout, and the re-render.
 export const ScrollViewStickyHeader: IStickyHeaderComponentType = props => {
-  const { inverted, scrollViewHeight, scrollAnimatedValue, nextHeaderLayoutY, children } = props;
+  const {
+    inverted,
+    scrollViewHeight,
+    scrollAnimatedValue,
+    nextHeaderLayoutY,
+    children,
+    ref,
+  } = props;
+
+  // The next header's y lives HERE, not in a prop the parent re-renders to update (RN keeps it in
+  // the child too, ScrollViewStickyHeader.js:65). The prop only seeds the first render; afterwards
+  // the ScrollView pushes updates through setNextHeaderY. That keeps the cost linear - a
+  // parent-state round trip re-renders every child on every header's layout, so N headers cost N
+  // re-renders of N children. At N=200 it churned enough native animated nodes to trip Fabric's view
+  // registry ("Attempt to dequeue already registered component") seconds after mount.
+  const [nextHeaderY, setNextHeaderY] = useState<number | undefined>(
+    nextHeaderLayoutY,
+  );
+  useImperativeHandle(ref, () => ({ setNextHeaderY }), []);
+
+  // The imperative push is a fast path, not the source of truth. When the parent DOES re-render
+  // with a different value the prop wins, because the successor may be gone: a VirtualizedList
+  // unmounts headers as they scroll out, and a value pushed in earlier would otherwise stick
+  // around as a collision point that no longer exists.
+  const lastNextHeaderProp = useRef(nextHeaderLayoutY);
+  if (lastNextHeaderProp.current !== nextHeaderLayoutY) {
+    lastNextHeaderProp.current = nextHeaderLayoutY;
+    setNextHeaderY(nextHeaderLayoutY);
+  }
 
   // The one folded state cell (RN's scattered useState/useRef collapsed into IStickyHeaderState),
   // mutated in place by reduceSticky. Lazily created once.
@@ -84,9 +132,13 @@ export const ScrollViewStickyHeader: IStickyHeaderComponentType = props => {
   // The animated node that drives the transform (RN's animatedTranslateY), rebuilt by the
   // rebuild-interpolation effect. When the scroll value is native, this interpolation runs on the
   // UI thread: the smooth pin.
-  const [animatedTranslateY, setAnimatedTranslateY] = useState<AnimatedInterpolation>(() =>
-    scrollAnimatedValue.interpolate({ inputRange: [-1, 0], outputRange: [0, 0] }),
-  );
+  const [animatedTranslateY, setAnimatedTranslateY] =
+    useState<AnimatedInterpolation>(() =>
+      scrollAnimatedValue.interpolate({
+        inputRange: [-1, 0],
+        outputRange: [0, 0],
+      }),
+    );
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The current interpolation node + its settled-value listener id, held so the next rebuild can
@@ -98,9 +150,14 @@ export const ScrollViewStickyHeader: IStickyHeaderComponentType = props => {
     os: Platform.OS,
     inverted,
     scrollViewHeight,
-    nextHeaderLayoutY,
+    nextHeaderLayoutY: nextHeaderY,
   });
-  inputsRef.current = { os: Platform.OS, inverted, scrollViewHeight, nextHeaderLayoutY };
+  inputsRef.current = {
+    os: Platform.OS,
+    inverted,
+    scrollViewHeight,
+    nextHeaderLayoutY: nextHeaderY,
+  };
 
   // dispatch reaches through a ref because the effect executors dispatch follow-up actions
   // (the listener -> animated-tick, the debounce timer -> debounce-fired).
@@ -123,7 +180,8 @@ export const ScrollViewStickyHeader: IStickyHeaderComponentType = props => {
               outputRange: effect.outputRange,
             });
             listenerIdRef.current = next.addListener(({ value }): void => {
-              if (typeof value === 'number') dispatchRef.current({ kind: 'animated-tick', value });
+              if (typeof value === 'number')
+                dispatchRef.current({ kind: 'animated-tick', value });
             });
             interpolationRef.current = next;
             setAnimatedTranslateY(next);
@@ -132,10 +190,14 @@ export const ScrollViewStickyHeader: IStickyHeaderComponentType = props => {
           case 'schedule-debounce': {
             // The animated value updates several times per frame; debounce the settled value into the
             // committed transform so hit detection stays current (a Fabric issue, worse on Android).
-            if (debounceTimer.current !== null) clearTimeout(debounceTimer.current);
+            if (debounceTimer.current !== null)
+              clearTimeout(debounceTimer.current);
             debounceTimer.current = setTimeout(() => {
               debounceTimer.current = null;
-              dispatchRef.current({ kind: 'debounce-fired', value: effect.value });
+              dispatchRef.current({
+                kind: 'debounce-fired',
+                value: effect.value,
+              });
             }, effect.delay);
             break;
           }
@@ -166,7 +228,7 @@ export const ScrollViewStickyHeader: IStickyHeaderComponentType = props => {
   // dispatches 'layout' itself); also does the initial identity build on mount.
   useEffect(() => {
     dispatchRef.current({ kind: 'inputs-changed' });
-  }, [inverted, scrollViewHeight, nextHeaderLayoutY, scrollAnimatedValue]);
+  }, [inverted, scrollViewHeight, nextHeaderY, scrollAnimatedValue]);
 
   // Detach the listener + clear the debounce on unmount.
   useEffect(
@@ -183,17 +245,24 @@ export const ScrollViewStickyHeader: IStickyHeaderComponentType = props => {
     const y = readLayoutNumber(event, 'y');
     const height = readLayoutNumber(event, 'height');
     // Keep the previous value when a field is absent (RN sets state only on a defined read).
-    dispatch({ kind: 'layout', y: y ?? state.layoutY, height: height ?? state.layoutHeight });
+    dispatch({
+      kind: 'layout',
+      y: y ?? state.layoutY,
+      height: height ?? state.layoutHeight,
+    });
     props.onLayout(event);
     const child = firstChild(children);
-    const childOnLayout = child === undefined ? undefined : readChildOnLayout(child);
+    const childOnLayout =
+      child === undefined ? undefined : readChildOnLayout(child);
     childOnLayout?.(event);
   };
 
   // The EXPLICIT debounced translateY overrides the committed transform for hit-testing, while
   // `animatedTranslateY` does the smooth (native-driven) pin, per RN ScrollViewStickyHeader.js.
   const passthroughAnimatedPropExplicitValues =
-    state.translateY !== null ? { style: { transform: [{ translateY: state.translateY }] } } : null;
+    state.translateY !== null
+      ? { style: { transform: [{ translateY: state.translateY }] } }
+      : null;
 
   // collapsable:false keeps the wrapper a real Yoga node; zIndex makes the pinned header paint
   // OVER the rows scrolling under it. `style` is `unknown` on Animated.View, so the interpolation
@@ -201,7 +270,10 @@ export const ScrollViewStickyHeader: IStickyHeaderComponentType = props => {
   return createElement(
     Animated.View,
     {
-      style: { transform: [{ translateY: animatedTranslateY }], zIndex: STICKY_HEADER_Z_INDEX },
+      style: {
+        transform: [{ translateY: animatedTranslateY }],
+        zIndex: STICKY_HEADER_Z_INDEX,
+      },
       onLayout,
       collapsable: false,
       passthroughAnimatedPropExplicitValues,
@@ -228,10 +300,11 @@ export function wrapStickyHeaders(
   invertStickyHeaders: boolean | undefined,
   scrollViewHeight: number | undefined,
   StickyHeaderComponent: IStickyHeaderComponentType | undefined,
-  headerLayoutYs: ReadonlyMap<number, number>,
-  onHeaderLayoutY: (index: number, y: number) => void,
+  crossTalk: IStickyCrossTalk,
 ): ReactNode {
-  if (stickyHeaderIndices === undefined || stickyHeaderIndices.length === 0) return children;
+  const { headerLayoutYs, onHeaderLayoutY, onHeaderRef } = crossTalk;
+  if (stickyHeaderIndices === undefined || stickyHeaderIndices.length === 0)
+    return children;
   const Wrapper = StickyHeaderComponent ?? ScrollViewStickyHeader;
   return Children.toArray(children).map((child, index) => {
     const indexOfIndex = stickyHeaderIndices.indexOf(index);
@@ -239,7 +312,11 @@ export function wrapStickyHeaders(
     // The next flagged header's measured y, by index order in stickyHeaderIndices (RN
     // ScrollView.js:1695 nextIndex). undefined until that header has measured (or for the last).
     const nextIndex = stickyHeaderIndices[indexOfIndex + 1];
-    const nextHeaderLayoutY = nextStickyHeaderY(stickyHeaderIndices, indexOfIndex, headerLayoutYs);
+    const nextHeaderLayoutY = nextStickyHeaderY(
+      stickyHeaderIndices,
+      indexOfIndex,
+      headerLayoutYs,
+    );
     dlog(
       `ScrollView sticky-header wrap index=${index} next=${nextIndex} nextY=${nextHeaderLayoutY}`,
     );
@@ -247,6 +324,11 @@ export function wrapStickyHeaders(
       Wrapper,
       {
         key: child.key ?? `sticky-${index}`,
+        // Registers this header so the ScrollView can push the NEXT header's y straight in
+        // (RN ScrollView.js:1109). Without it a measurement would have to travel through parent
+        // state, re-rendering every child.
+        ref: (handle: IStickyHeaderHandle | null): void =>
+          onHeaderRef(index, handle),
         nextHeaderLayoutY,
         // RN _onStickyHeaderLayout: record this header's own y, then push it to the previous
         // header as its nextHeaderLayoutY. We record into the parent map; the lookup above feeds

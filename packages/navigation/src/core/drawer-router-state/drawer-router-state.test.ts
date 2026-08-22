@@ -3,9 +3,20 @@
 // never changes shape (see drawer-router-state.ts's header): only which route is focused
 // (`index`) and whether the panel is open (`isOpen`) can change, so every action here is a
 // jumpTo/open/close/toggle over a FIXED route array.
+//
+// No Negative group: drawerRouterReducer never throws - every action either updates state or
+// no-ops back to the SAME reference (asserted explicitly below, not just "didn't crash"). The
+// reducer's `default: return state` branch is unreachable through the exported
+// IDrawerRouterAction union without an `as` cast to fabricate an unknown action type, which is
+// out of the unit's type contract (see the project's no-`as`-casts-in-tests rule) - left N/A
+// rather than tested.
 
 import { describe, expect, it } from 'vitest';
-import { createInitialDrawerRouterState, drawerRouterReducer, focusedDrawerRoute } from './index';
+import {
+  createInitialDrawerRouterState,
+  drawerRouterReducer,
+  focusedDrawerRoute,
+} from './index';
 import type { IDrawerRouterState } from './index';
 
 const HOME = { key: 'home-1', name: 'Home', params: undefined };
@@ -30,25 +41,36 @@ describe('createInitialDrawerRouterState', () => {
   });
 
   it('focuses the route matching initialRouteName', () => {
-    const state = createInitialDrawerRouterState([HOME, PROFILE, SETTINGS], 'Settings');
+    const state = createInitialDrawerRouterState(
+      [HOME, PROFILE, SETTINGS],
+      'Settings',
+    );
     expect(state.index).toBe(2);
     expect(state.isOpen).toBe(false);
   });
 
   it('falls back to the first route when initialRouteName matches nothing', () => {
-    expect(createInitialDrawerRouterState([HOME, PROFILE], 'Nowhere').index).toBe(0);
+    expect(
+      createInitialDrawerRouterState([HOME, PROFILE], 'Nowhere').index,
+    ).toBe(0);
   });
 });
 
 describe('drawerRouterReducer — jumpTo', () => {
   it('focuses the named route', () => {
-    const next = drawerRouterReducer(closedState(0), { type: 'jumpTo', name: 'Profile' });
+    const next = drawerRouterReducer(closedState(0), {
+      type: 'jumpTo',
+      name: 'Profile',
+    });
     expect(next.index).toBe(1);
     expect(next.isOpen).toBe(false);
   });
 
   it('also closes an already-open drawer when jumping to a different route', () => {
-    const next = drawerRouterReducer(openState(0), { type: 'jumpTo', name: 'Profile' });
+    const next = drawerRouterReducer(openState(0), {
+      type: 'jumpTo',
+      name: 'Profile',
+    });
     expect(next.index).toBe(1);
     expect(next.isOpen).toBe(false);
   });
@@ -64,18 +86,24 @@ describe('drawerRouterReducer — jumpTo', () => {
 
   it('is a no-op for an unknown route name, same reference returned', () => {
     const state = closedState(0);
-    expect(drawerRouterReducer(state, { type: 'jumpTo', name: 'Nowhere' })).toBe(state);
+    expect(
+      drawerRouterReducer(state, { type: 'jumpTo', name: 'Nowhere' }),
+    ).toBe(state);
   });
 
   it('is a no-op when already focused on that route while closed, same reference returned', () => {
     const state = closedState(0);
-    expect(drawerRouterReducer(state, { type: 'jumpTo', name: 'Home' })).toBe(state);
+    expect(drawerRouterReducer(state, { type: 'jumpTo', name: 'Home' })).toBe(
+      state,
+    );
   });
 });
 
 describe('drawerRouterReducer — openDrawer', () => {
   it('opens a closed drawer', () => {
-    expect(drawerRouterReducer(closedState(), { type: 'openDrawer' }).isOpen).toBe(true);
+    expect(
+      drawerRouterReducer(closedState(), { type: 'openDrawer' }).isOpen,
+    ).toBe(true);
   });
 
   it('is a no-op on an already-open drawer, same reference returned', () => {
@@ -86,7 +114,9 @@ describe('drawerRouterReducer — openDrawer', () => {
 
 describe('drawerRouterReducer — closeDrawer', () => {
   it('closes an open drawer', () => {
-    expect(drawerRouterReducer(openState(), { type: 'closeDrawer' }).isOpen).toBe(false);
+    expect(
+      drawerRouterReducer(openState(), { type: 'closeDrawer' }).isOpen,
+    ).toBe(false);
   });
 
   it('is a no-op on an already-closed drawer, same reference returned', () => {
@@ -97,11 +127,15 @@ describe('drawerRouterReducer — closeDrawer', () => {
 
 describe('drawerRouterReducer — toggleDrawer', () => {
   it('opens a closed drawer', () => {
-    expect(drawerRouterReducer(closedState(), { type: 'toggleDrawer' }).isOpen).toBe(true);
+    expect(
+      drawerRouterReducer(closedState(), { type: 'toggleDrawer' }).isOpen,
+    ).toBe(true);
   });
 
   it('closes an open drawer', () => {
-    expect(drawerRouterReducer(openState(), { type: 'toggleDrawer' }).isOpen).toBe(false);
+    expect(
+      drawerRouterReducer(openState(), { type: 'toggleDrawer' }).isOpen,
+    ).toBe(false);
   });
 });
 
@@ -111,6 +145,8 @@ describe('focusedDrawerRoute', () => {
   });
 
   it('returns undefined when the route list is empty', () => {
-    expect(focusedDrawerRoute(createInitialDrawerRouterState([]))).toBeUndefined();
+    expect(
+      focusedDrawerRoute(createInitialDrawerRouterState([])),
+    ).toBeUndefined();
   });
 });

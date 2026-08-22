@@ -2,10 +2,15 @@
 // The value graph, easing, interpolation and drivers are pure JS with no React
 // and no native dependency; every adapter re-exports them.
 
-export { AnimatedNode, AnimatedWithChildren, flushValue, type IValueListener } from './graph';
+export {
+  AnimatedNode,
+  AnimatedWithChildren,
+  AnimatedInterpolation,
+  flushValue,
+  type IValueListener,
+} from './graph';
 export { AnimatedValue } from './value';
 export { AnimatedValueXY, type IValueXY } from './value-xy';
-export { AnimatedInterpolation } from './interpolation-node';
 export {
   AnimatedAddition,
   AnimatedSubtraction,
@@ -76,7 +81,16 @@ export {
 // no React/Vue). They live here with the rest of the graph; every adapter's
 // createAnimatedComponent + Animated namespace re-exports them.
 export { AnimatedProps } from './props';
+export {
+  createAnimatedLeafLifecycle,
+  type IAnimatedLeafLifecycle,
+} from './leaf-lifecycle';
 export { AnimatedStyle, AnimatedTransform } from './style';
 export { AnimatedMock } from './mock';
 // Framework-agnostic createAnimatedComponent helpers. Both adapters import them.
-export { reduceProps, isAnimatedNode, readPassthroughStyle, resolveHostNode } from './shared';
+export {
+  reduceProps,
+  isAnimatedNode,
+  readPassthroughStyle,
+  resolveHostNode,
+} from './shared';

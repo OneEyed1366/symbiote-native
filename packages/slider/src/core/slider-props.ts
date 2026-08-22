@@ -1,11 +1,13 @@
-// Slider prop types. Every field of the slider's public surface is framework-agnostic EXCEPT the
-// custom `StepMarker`, which is a render component returning a framework element (React FC vs Vue
-// slot) — since that element type is framework-specific, it can't live in a shared type, so it
-// stays in each adapter's own flavored prop type. ISliderProps here is the shared agnostic base
-// every adapter re-exports and extends; ISliderViewProps is the pre-resolved input the render fn
-// paints.
+// Slider prop types. ISliderProps is the shared agnostic base every adapter re-exports and
+// extends; ISliderViewProps is the pre-resolved input the render fn paints. The custom
+// `StepMarker` field is per-adapter (a framework element return type can't live here) - see
+// CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter>.
 
-import type { IColorValue, IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type {
+  IColorValue,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
 import type {
   IAccessibilityProps,
   IAriaProps,
@@ -14,8 +16,7 @@ import type {
 import type { ISliderAccessibilityState } from './slider-state';
 
 // The agnostic public surface, shared by every adapter. Callbacks take a plain number (the
-// adapter unwraps nativeEvent.value), colors/images/style are agnostic value types. The custom
-// `StepMarker` component is deliberately absent — adapters add it to their own flavored type.
+// adapter unwraps nativeEvent.value); colors/images/style are agnostic value types.
 export interface ISliderProps extends IAccessibilityProps, IAriaProps {
   value?: number;
   minimumValue?: number;
@@ -55,14 +56,13 @@ export type ISliderPlatform = {
   stepsContainerTop: number;
 };
 
-// Pre-resolved inputs the native render paints from. Only the fields that need FOLDING are
-// explicit here (value sanitized, disabled/accessibilityState resolved, limits defaulted, the
-// thumb tint/image resolved against the StepMarker decision); everything that just passes through
-// untouched — minimum/maximumTrackTintColor, the track images, thumbSize, tapToSeek, vertical,
-// accessibility*/testID/aria-*, AND the native event handlers — rides in `passthrough` and lands
-// on the host node verbatim (the engine routes the on*-keyed handlers and runs the ViewConfig
-// color processors). `width` is set only when a step overlay needs it, so the common case has no
-// width:0 first-paint flash.
+// Pre-resolved inputs the native render paints from. Only fields that need FOLDING are explicit
+// here (value sanitized, disabled/accessibilityState resolved, limits defaulted, thumb
+// tint/image resolved against the StepMarker decision); everything else - track colors/images,
+// thumbSize, tapToSeek, vertical, accessibility*/testID/aria-*, and the native event handlers -
+// rides in `passthrough` verbatim (the engine routes on*-keyed handlers and ViewConfig color
+// processors). `width` is set only when a step overlay needs it, avoiding a width:0 first-paint
+// flash in the common case.
 export type ISliderViewProps = {
   value?: number;
   minimumValue: number;

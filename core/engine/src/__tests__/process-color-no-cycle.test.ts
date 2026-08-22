@@ -19,8 +19,13 @@ const filesThatUsedToCycleThroughCommit = [
   path.join(engineSrc, '../process-background-image/index.ts'),
 ];
 
+// This is a single architectural regression guard (a source-text check, not business logic), so
+// there is no Positive/Negative split — the one scenario it proves is "the cycle never comes
+// back": none of the three color processors re-import processColor from commit.ts.
 describe('process-* color processors no longer cycle through commit.ts', () => {
   for (const filePath of filesThatUsedToCycleThroughCommit) {
+    // why: platform-color.ts is the stable leaf that owns color processing; re-importing from
+    // commit.ts would resurrect the 2-hop TDZ-hazard cycle these files were extracted to kill.
     it(`${path.relative(engineSrc, filePath)} does not import from commit`, () => {
       const source = readFileSync(filePath, 'utf8');
       expect(source).not.toContain("from '../commit'");

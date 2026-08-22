@@ -35,7 +35,10 @@ import {
   normalizeVueAttrs,
   useWindowDimensions,
 } from '@symbiote-native/vue';
-import type { IPanResponderGestureState, ISymbioteEvent } from '@symbiote-native/vue';
+import type {
+  IPanResponderGestureState,
+  ISymbioteEvent,
+} from '@symbiote-native/vue';
 import type { IDescriptor } from '@symbiote-native/components';
 import { dlog } from '@symbiote-native/engine';
 import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
@@ -71,7 +74,10 @@ import type {
 } from '../../core';
 import { NavigationScope, injectNavigationScope } from '../navigation-context';
 import { DrawerScreen } from '../drawer-screen';
-import type { IDrawerScreenOptionsArgs, IDrawerScreenProps } from '../drawer-screen';
+import type {
+  IDrawerScreenOptionsArgs,
+  IDrawerScreenProps,
+} from '../drawer-screen';
 
 export type { IDrawerNavigatorHandle, IDrawerDescriptorMap } from '../../core';
 
@@ -113,7 +119,12 @@ function isStyleProp(value: unknown): value is IStyleProp<IViewStyle> {
   return isRecord(value);
 }
 
-const DRAWER_TYPES: ReadonlyArray<IDrawerType> = ['front', 'back', 'slide', 'permanent'];
+const DRAWER_TYPES: ReadonlyArray<IDrawerType> = [
+  'front',
+  'back',
+  'slide',
+  'permanent',
+];
 // .some() itself doesn't narrow `value`'s type back at the call site - the `value is IDrawerType`
 // predicate on THIS function is what lets asDrawerType's ternary return `value` typed, mirroring
 // Modal's isOrientation guard (adapters/vue/src/components/modal.ts).
@@ -126,30 +137,45 @@ function asDrawerType(value: unknown): IDrawerType | undefined {
 
 const DRAWER_POSITIONS: ReadonlyArray<IDrawerPosition> = ['left', 'right'];
 function isDrawerPosition(value: unknown): value is IDrawerPosition {
-  return typeof value === 'string' && DRAWER_POSITIONS.some(position => position === value);
+  return (
+    typeof value === 'string' &&
+    DRAWER_POSITIONS.some(position => position === value)
+  );
 }
 function asDrawerPosition(value: unknown): IDrawerPosition | undefined {
   return isDrawerPosition(value) ? value : undefined;
 }
 
-function asComponent(value: unknown): IDrawerScreenProps['component'] | undefined {
-  if (typeof value === 'function') return value as IDrawerScreenProps['component'];
-  return isRecord(value) ? (value as IDrawerScreenProps['component']) : undefined;
+function asComponent(
+  value: unknown,
+): IDrawerScreenProps['component'] | undefined {
+  if (typeof value === 'function')
+    return value as IDrawerScreenProps['component'];
+  return isRecord(value)
+    ? (value as IDrawerScreenProps['component'])
+    : undefined;
 }
 
 // IDrawerScreenOptions carries only `title`/`drawerLabel`, small enough for direct field guards -
 // kept as a single cast-at-the-edge helper anyway for symmetry with stack.ts/tabs.ts's
 // asScreenOptions/asTabOptions (same CLAUDE.md-sanctioned I/O-edge narrowing).
-function asDrawerScreenOptions(value: unknown): IDrawerScreenOptions | undefined {
+function asDrawerScreenOptions(
+  value: unknown,
+): IDrawerScreenOptions | undefined {
   return isRecord(value) ? (value as IDrawerScreenOptions) : undefined;
 }
 
-function asDrawerScreenOptionsOrResolver(value: unknown): IDrawerScreenProps['options'] {
-  if (typeof value === 'function') return value as IDrawerScreenProps['options'];
+function asDrawerScreenOptionsOrResolver(
+  value: unknown,
+): IDrawerScreenProps['options'] {
+  if (typeof value === 'function')
+    return value as IDrawerScreenProps['options'];
   return asDrawerScreenOptions(value);
 }
 
-function collectRegistry(vnodes: readonly VNode[]): Map<string, IDrawerRegistryEntry> {
+function collectRegistry(
+  vnodes: readonly VNode[],
+): Map<string, IDrawerRegistryEntry> {
   const registry = new Map<string, IDrawerRegistryEntry>();
   for (const vnode of vnodes) {
     if (vnode.type !== DrawerScreen || !isRecord(vnode.props)) continue;
@@ -169,7 +195,8 @@ function resolveDrawerScreenOptions(
   entry: IDrawerRegistryEntry,
   screenComponentProps: IDrawerScreenOptionsArgs,
 ): IDrawerScreenOptions {
-  if (typeof entry.options === 'function') return entry.options(screenComponentProps);
+  if (typeof entry.options === 'function')
+    return entry.options(screenComponentProps);
   return entry.options ?? {};
 }
 
@@ -200,7 +227,9 @@ const DrawerImpl = defineComponent<IDrawerProps>(
     let routeSequence = 0;
     const routeIdPrefix = useId();
 
-    function buildRoutes(registry: Map<string, IDrawerRegistryEntry>): IRoute<unknown>[] {
+    function buildRoutes(
+      registry: Map<string, IDrawerRegistryEntry>,
+    ): IRoute<unknown>[] {
       return Array.from(registry.entries()).map(([name, entry]) => {
         routeSequence += 1;
         return {
@@ -213,10 +242,14 @@ const DrawerImpl = defineComponent<IDrawerProps>(
 
     const initialRegistry = collectRegistry(slots.default?.() ?? []);
     const initialRoutes = buildRoutes(initialRegistry);
-    if (initialRoutes.length === 0) dlog('Drawer: no <Drawer.Screen> children registered');
+    if (initialRoutes.length === 0)
+      dlog('Drawer: no <Drawer.Screen> children registered');
 
     const state = shallowRef(
-      createInitialDrawerRouterState(initialRoutes, asString(attrs.initialRouteName)),
+      createInitialDrawerRouterState(
+        initialRoutes,
+        asString(attrs.initialRouteName),
+      ),
     );
 
     function dispatch(action: Parameters<typeof drawerRouterReducer>[1]): void {
@@ -235,7 +268,9 @@ const DrawerImpl = defineComponent<IDrawerProps>(
     let dragStartProgress = 0;
 
     function animateProgressTo(open: boolean): void {
-      dlog(`Drawer: animateProgressTo(open=${open}) starting at t=${Date.now()}`);
+      dlog(
+        `Drawer: animateProgressTo(open=${open}) starting at t=${Date.now()}`,
+      );
       Animated.timing(progress, {
         toValue: open ? 1 : 0,
         duration: DRAWER_SNAP_DURATION,
@@ -248,28 +283,35 @@ const DrawerImpl = defineComponent<IDrawerProps>(
 
     const handle: IDrawerNavigatorHandle = {
       openDrawer: () => {
-        dlog(`Drawer: openDrawer() called, isOpen=${state.value.isOpen} at t=${Date.now()}`);
+        dlog(
+          `Drawer: openDrawer() called, isOpen=${state.value.isOpen} at t=${Date.now()}`,
+        );
         animateProgressTo(true);
         dispatch({ type: 'openDrawer' });
       },
       closeDrawer: () => {
-        dlog(`Drawer: closeDrawer() called, isOpen=${state.value.isOpen} at t=${Date.now()}`);
+        dlog(
+          `Drawer: closeDrawer() called, isOpen=${state.value.isOpen} at t=${Date.now()}`,
+        );
         animateProgressTo(false);
         dispatch({ type: 'closeDrawer' });
       },
       toggleDrawer: () => {
-        dlog(`Drawer: toggleDrawer() called, isOpen=${state.value.isOpen} at t=${Date.now()}`);
+        dlog(
+          `Drawer: toggleDrawer() called, isOpen=${state.value.isOpen} at t=${Date.now()}`,
+        );
         animateProgressTo(!state.value.isOpen);
         dispatch({ type: 'toggleDrawer' });
       },
       jumpTo: (name: string) => {
-        // Captured BEFORE dispatch: unlike React's isOpenRef (only refreshed at the TOP of the
-        // next render, so it still holds the pre-dispatch value here since React batches the
-        // re-render asynchronously), this ref's `.value` mutates SYNCHRONOUSLY inside dispatch -
-        // reading it after dispatch would already see the reducer's own isOpen: false.
+        // Both sides of the dispatch, because an unregistered name is a documented reducer no-op
+        // that hands the SAME state back: animating off the pre-dispatch snapshot alone would
+        // slide the panel shut while the router still says isOpen. The ref's `.value` mutates
+        // SYNCHRONOUSLY inside dispatch (unlike React's isOpenRef, refreshed only at the top of
+        // the next render), so the second read is already the reducer's own answer.
         const wasOpen = state.value.isOpen;
         dispatch({ type: 'jumpTo', name });
-        if (wasOpen) animateProgressTo(false);
+        if (wasOpen && !state.value.isOpen) animateProgressTo(false);
       },
     };
     expose(handle);
@@ -307,13 +349,23 @@ const DrawerImpl = defineComponent<IDrawerProps>(
         _event: ISymbioteEvent,
         gestureState: IPanResponderGestureState,
       ): void => {
-        progress.setValue(resolveDragProgress(gestureState, dragStartProgress, currentOptions()));
+        progress.setValue(
+          resolveDragProgress(
+            gestureState,
+            dragStartProgress,
+            currentOptions(),
+          ),
+        );
       },
       onPanResponderRelease: (
         _event: ISymbioteEvent,
         gestureState: IPanResponderGestureState,
       ): void => {
-        const intent = resolveSwipeIntent(gestureState, state.value.isOpen, currentOptions());
+        const intent = resolveSwipeIntent(
+          gestureState,
+          state.value.isOpen,
+          currentOptions(),
+        );
         const open = intent === 'open';
         dlog(`Drawer: gesture release -> ${open ? 'open' : 'close'}`);
         animateProgressTo(open);
@@ -366,7 +418,10 @@ const DrawerImpl = defineComponent<IDrawerProps>(
     watch(
       () => focusedKeyOf(state.value),
       nextKey => {
-        const { blurKey, focusKey } = diffFocusedRoute(focusedRouteKey, nextKey);
+        const { blurKey, focusKey } = diffFocusedRoute(
+          focusedRouteKey,
+          nextKey,
+        );
         if (blurKey === undefined && focusKey === undefined) return;
         focusedRouteKey = nextKey;
         nextTick(() => {
@@ -382,24 +437,32 @@ const DrawerImpl = defineComponent<IDrawerProps>(
       },
     );
     onUnmounted(() => {
-      if (focusedRouteKey !== undefined) emitterFor(focusedRouteKey).emit(NAVIGATION_EVENT_BLUR);
+      if (focusedRouteKey !== undefined)
+        emitterFor(focusedRouteKey).emit(NAVIGATION_EVENT_BLUR);
     });
 
     return () => {
       const registry = collectRegistry(slots.default?.() ?? []);
       const options = currentOptions();
-      const drawerStyle = isStyleProp(attrs.drawerStyle) ? attrs.drawerStyle : undefined;
+      const drawerStyle = isStyleProp(attrs.drawerStyle)
+        ? attrs.drawerStyle
+        : undefined;
 
-      if (registry.size === 0) dlog('Drawer: no <Drawer.Screen> children registered');
+      if (registry.size === 0)
+        dlog('Drawer: no <Drawer.Screen> children registered');
 
       const animated = isDrawerAnimated(options);
       const geometry = resolveDrawerGeometry(options);
 
       const panelTranslateX = animated
-        ? progress.interpolate(resolveDrawerSlotInterpolation(geometry, 'panel').translateX)
+        ? progress.interpolate(
+            resolveDrawerSlotInterpolation(geometry, 'panel').translateX,
+          )
         : undefined;
       const contentTranslateX = animated
-        ? progress.interpolate(resolveDrawerSlotInterpolation(geometry, 'content').translateX)
+        ? progress.interpolate(
+            resolveDrawerSlotInterpolation(geometry, 'content').translateX,
+          )
         : undefined;
       // The overlay is a full-screen absolutely-positioned sibling BELOW content in paint order
       // (see render-drawer.ts's drawerChildOrder) - for 'front' that's fine since content never
@@ -418,9 +481,13 @@ const DrawerImpl = defineComponent<IDrawerProps>(
         : undefined;
 
       const focusedRoute = state.value.routes[state.value.index];
-      const focusedEntry = focusedRoute ? registry.get(focusedRoute.name) : undefined;
+      const focusedEntry = focusedRoute
+        ? registry.get(focusedRoute.name)
+        : undefined;
       if (focusedRoute && !focusedEntry) {
-        dlog(`Drawer: no screen registered for route name "${focusedRoute.name}"`);
+        dlog(
+          `Drawer: no screen registered for route name "${focusedRoute.name}"`,
+        );
       }
 
       const content =
@@ -446,17 +513,25 @@ const DrawerImpl = defineComponent<IDrawerProps>(
         const entry = registry.get(route.name);
         if (entry === undefined) continue;
         descriptors[route.key] = {
-          options: resolveDrawerScreenOptions(entry, { route, navigation: handle }),
+          options: resolveDrawerScreenOptions(entry, {
+            route,
+            navigation: handle,
+          }),
           navigation: handle,
         };
       }
 
       const drawerContent =
-        slots.drawerContent?.({ state: state.value, descriptors, navigation: handle }) ?? null;
+        slots.drawerContent?.({
+          state: state.value,
+          descriptors,
+          navigation: handle,
+        }) ?? null;
 
       const root = renderDrawer(
         {
-          overlayColor: asString(attrs.overlayColor) ?? DRAWER_DEFAULT_OVERLAY_COLOR,
+          overlayColor:
+            asString(attrs.overlayColor) ?? DRAWER_DEFAULT_OVERLAY_COLOR,
           drawerStyle,
           contentPassthrough: {},
           overlayPassthrough: animated
@@ -478,7 +553,8 @@ const DrawerImpl = defineComponent<IDrawerProps>(
       const slotDescriptors = new Map<IDrawerSlot, IDescriptor>();
       order.forEach((slot, index) => {
         const descriptor = root.children[index];
-        if (typeof descriptor !== 'string') slotDescriptors.set(slot, descriptor);
+        if (typeof descriptor !== 'string')
+          slotDescriptors.set(slot, descriptor);
       });
 
       const slotChildren: Record<IDrawerSlot, VNode[] | null> = {
@@ -497,7 +573,10 @@ const DrawerImpl = defineComponent<IDrawerProps>(
         overlay:
           overlayOpacity === undefined
             ? undefined
-            : { opacity: overlayOpacity, transform: [{ translateX: overlayTranslateX }] },
+            : {
+                opacity: overlayOpacity,
+                transform: [{ translateX: overlayTranslateX }],
+              },
         panel:
           panelTranslateX === undefined
             ? undefined
@@ -510,10 +589,18 @@ const DrawerImpl = defineComponent<IDrawerProps>(
         const children = slotChildren[slot] ?? [];
         const animatedStyle = slotAnimatedStyle[slot];
         if (animatedStyle === undefined) {
-          return h(descriptor.type, { key: descriptor.key, ...descriptor.props }, children);
+          return h(
+            descriptor.type,
+            { key: descriptor.key, ...descriptor.props },
+            children,
+          );
         }
         const style = [descriptor.props.style, animatedStyle];
-        return h(Animated.View, { key: descriptor.key, ...descriptor.props, style }, children);
+        return h(
+          Animated.View,
+          { key: descriptor.key, ...descriptor.props, style },
+          children,
+        );
       }
 
       const drawerChildren = order

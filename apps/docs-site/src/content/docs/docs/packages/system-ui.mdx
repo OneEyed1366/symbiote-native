@@ -1,0 +1,207 @@
+---
+title: System UI
+description: expo-system-ui wrapped for every SymbioteNative adapter — setting and reading the root view's background color.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/system-ui` wraps
+[`expo-system-ui`](https://github.com/expo/expo/tree/main/packages/expo-system-ui) — setting and
+reading the root view's background color — so every SymbioteNative adapter can reach it, not
+just React. Like [device](/docs/packages/device/) and [local auth](/docs/packages/local-auth/),
+both exports here are one-shot async calls with no per-instance state, so there is no
+hook/composable/service to wrap — the React, Vue, Angular, Svelte, and Solid entry points are
+plain re-exports of the same `core`.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
+
+## Installation
+
+```sh
+npm install @symbiote-native/system-ui
+```
+
+`expo-system-ui` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project
+(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-system-ui`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every other `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+`expo-system-ui` needs no runtime permission on either platform — it only sets/reads a stored
+background color, nothing gated by a permission prompt.
+
+## Usage
+
+All five adapters — React, Vue, Angular, Svelte, Solid — re-export the exact same two functions;
+there is no per-adapter hook/composable/service to reach for, since nothing here holds live state
+or a subscription.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useEffect } from 'react';
+    import { Text, View } from '@symbiote-native/react';
+    import { setBackgroundColorAsync } from '@symbiote-native/system-ui/react';
+
+    export default function RootScreen() {
+      useEffect(() => {
+        void setBackgroundColorAsync('black');
+      }, []);
+
+      return (
+        <View>
+          <Text>Root background set to black</Text>
+        </View>
+      );
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { onMounted } from 'vue';
+    import { Text, View } from '@symbiote-native/vue';
+    import { setBackgroundColorAsync } from '@symbiote-native/system-ui/vue';
+
+    onMounted(() => {
+      void setBackgroundColorAsync('black');
+    });
+    </script>
+
+    <template>
+      <View>
+        <Text>Root background set to black</Text>
+      </View>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import { Text, View } from '@symbiote-native/angular';
+    import { setBackgroundColorAsync } from '@symbiote-native/system-ui/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Text, View],
+      template: `
+        <View>
+          <Text>Root background set to black</Text>
+        </View>
+      `,
+    })
+    export class RootScreen {
+      constructor() {
+        void setBackgroundColorAsync('black');
+      }
+    }
+    ```
+
+    There's no per-instance service to `inject()` here — both functions are plain exports off the
+    core package, called straight in the constructor or wherever the app's root is set up.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text, View } from '@symbiote-native/svelte';
+      import { setBackgroundColorAsync } from '@symbiote-native/system-ui/svelte';
+
+      $effect(() => {
+        void setBackgroundColorAsync('black');
+      });
+    </script>
+
+    <View><Text>Root background set to black</Text></View>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { onMount } from 'solid-js';
+    import { Text, View } from '@symbiote-native/solid';
+    import { setBackgroundColorAsync } from '@symbiote-native/system-ui/solid';
+
+    export function RootScreen() {
+      onMount(() => {
+        void setBackgroundColorAsync('black');
+      });
+
+      return (
+        <View>
+          <Text>Root background set to black</Text>
+        </View>
+      );
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+## API
+
+### Functions
+
+| Signature                                                           | Description                                                                                                                                                                                              |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `setBackgroundColorAsync(color: ColorValue \| null): Promise<void>` | Changes the root view background color. Call this outside of your component tree (e.g. in the root file), since it affects the whole app. `null` clears the override rather than setting an actual color |
+| `getBackgroundColorAsync(): Promise<ColorValue \| null>`            | Gets the current root view background color, in hex format. `null` if the background color is not set                                                                                                    |
+
+## Notes
+
+- **`setBackgroundColorAsync(null)` clears the override** rather than setting an actual color —
+  it's passed straight through to the native module without running `processColor`.
+- **On web, the raw `ColorValue` is passed through untouched** instead of being run through RN's
+  `processColor` — matching upstream, since `processColor` is a native-color-parsing step that
+  doesn't apply on that platform.
+- **On iOS/Android, a non-null color is run through RN's own `processColor` before reaching the
+  native module** — the same conversion RN's style pipeline uses internally.
+
+## How the wrapper works
+
+`@symbiote-native/system-ui` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-system-ui`
+itself — its
+two functions are hand-ported, verbatim, into this package's own `core/`, resolving the native
+module through `expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package
+this project never installs:
+
+```
+packages/system-ui/src/
+├── core/     # framework-agnostic: setBackgroundColorAsync/getBackgroundColorAsync;
+│             # native-module.ts resolves the native module via expo-modules-core's
+│             # requireNativeModule
+├── react/    # @symbiote-native/system-ui/react   — export * from '../core'
+├── vue/      # @symbiote-native/system-ui/vue     — export * from '../core'
+├── angular/  # @symbiote-native/system-ui/angular — export * from '../core'
+├── svelte/   # @symbiote-native/system-ui/svelte  — export * from '../core'
+└── solid/    # @symbiote-native/system-ui/solid   — export * from '../core'
+```
+
+Same shape as [device](/docs/packages/device/)'s and [local auth](/docs/packages/local-auth/)'s
+adapter entries: single-file re-exports with no lifecycle code at all, since every export
+here is a stateless one-shot async call — there is nothing for a hook, composable, or service to
+subscribe to or clean up. The native code itself is never vendored or copied —
+`expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
+guide](/docs/howtos/expo-native-module-setup/)).

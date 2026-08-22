@@ -6,7 +6,7 @@ import type { IRootTag } from './fabric';
 import { commitChildren } from './commit';
 import { dlog } from './debug';
 import { installEventHandler } from './events';
-import type { ISymbioteNode } from './node';
+import { markDirty, type ISymbioteNode } from './node';
 
 export class SymbioteSurface {
   readonly rootTag: IRootTag;
@@ -56,12 +56,16 @@ export class SymbioteSurface {
     });
   }
 
+  // Splices `parent.children` directly instead of going through node.ts's removeChild, so it
+  // owes the same dirty-mark - otherwise a node pulled out of a subtree here leaves that subtree
+  // looking clean and the commit walk skips right over the hole.
   private detach(child: ISymbioteNode): void {
     const parent = child.parent;
     if (parent) {
       const index = parent.children.indexOf(child);
       if (index >= 0) parent.children.splice(index, 1);
       child.parent = undefined;
+      markDirty(parent);
       return;
     }
     const topIndex = this.children.indexOf(child);
@@ -71,6 +75,7 @@ export class SymbioteSurface {
 
 export function createSurface(rootTag: IRootTag): SymbioteSurface {
   installEventHandler();
+  const surface = new SymbioteSurface(rootTag);
   dlog(`surface created root=${rootTag}`);
-  return new SymbioteSurface(rootTag);
+  return surface;
 }

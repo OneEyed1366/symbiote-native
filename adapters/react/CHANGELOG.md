@@ -1,5 +1,154 @@
 # @symbiote-native/react
 
+## 0.4.0
+
+### Minor Changes
+
+- 3acd869: Add Solid.js as a supported framework: a new `@symbiote-native/solid` adapter reaching full
+  component/runtime parity with the other four adapters, plus a `./solid` export subpath on every
+  companion package. Engine and shared-component packages gained portal/tunnel, retained-tree
+  census, and profiling infrastructure that the new adapter (and the others' portal/tunnel work
+  landing alongside it) build on.
+
+### Patch Changes
+
+- Updated dependencies [3acd869]
+  - @symbiote-native/components@0.5.0
+  - @symbiote-native/css-parser@0.4.0
+
+## 0.3.0
+
+### Minor Changes
+
+- 388c353: Close 22 gaps in the adapters' public barrels. About half of each adapter's surface is names
+  re-exported verbatim from `@symbiote-native/engine` and `@symbiote-native/components`, and nothing
+  enforced that the four lists agreed, so they drifted apart. A missing re-export is not a type
+  error, so `tsc` never saw it — it only surfaced when an app tried to import a name and its
+  framework's package turned out not to have it.
+
+  Newly reachable per adapter: React gains `setColorProcessor`, `setDeviceEventSource`, `dlog`,
+  `isDebug`, `ISymbioteNode`, `IRootTag`, `IKeyboardEvent`, `IKeyboardMetrics` and ten
+  component-detail types; Vue gains `setDeviceEventSource` and five types; Angular gains eleven
+  engine types and eleven component types. `ITextInputProps` stays deliberately per-adapter, since
+  React and Vue declare their own over the shared agnostic base and Angular takes props as
+  `@Input()`s.
+
+  `tests/adapter-barrel-parity.test.ts` now enforces this and compares its known-gap list for
+  equality, so adding a shared name to one barrel without the rest fails with the adapters named,
+  and closing a gap without deleting its entry fails too — the list cannot rot into an allowlist.
+
+  Also removes 31 passthrough stub files (`src/modules/x.ts` containing nothing but a re-export from
+  the engine). They were internal, so no import path changes: a pure passthrough belongs in the
+  barrel itself.
+
+- 388c353: Correct `Modal`'s `onOrientationChange` signature, which promised a payload it never delivered. The
+  engine registers every `onX` listener as `(event: ISymbioteEvent) => handler(event)`, so a handler
+  always receives the full wrapper. `onShow` / `onRequestClose` / `onDismiss` never noticed because
+  they declare no argument, but `onOrientationChange` was typed against the unwrapped payload - a
+  caller following the type read `event.orientation` and got `undefined` forever, while the value sat
+  at `event.nativeEvent.orientation`.
+
+  The handler is now typed `(event: ISymbioteEvent) => void` on every adapter, matching every other
+  payload-carrying event in the codebase (`onLayout`, `onAccessibilityAction`, the press and scroll
+  handlers), each of which narrows at the read site. `IModalOrientationChangeEvent` stays exported and
+  is now documented as what it truthfully describes: the `nativeEvent` payload shape, not the handler
+  argument.
+
+  Code reading `event.orientation` will now fail to compile rather than silently receive `undefined`.
+  Read `event.nativeEvent.orientation` instead.
+
+  Angular additionally stops normalizing the event into `{ orientation }` - a divergence from the
+  other three adapters that also swallowed the event entirely when the payload was not one of the two
+  values it recognized.
+
+- 388c353: Stop the React adapter from swallowing render errors. `createContainer` takes three error
+  callbacks and all three were `noop`: a throw anywhere in render made the reconciler abandon the
+  commit, so nothing painted - and nothing was logged either. The app showed a blank screen with an
+  empty console, which reads as "the renderer is broken" rather than "your component threw". It cost
+  this repo a workaround already: a test that needed to prove a throw had to wrap the tree in an
+  error boundary, because `mount()` itself reported nothing.
+
+  All three now route to the host: uncaught (no boundary), caught (a boundary handled it, which
+  decides what the USER sees, not whether the developer hears about it), and recovered. React's own
+  defaults do the same thing - `reportGlobalError` / `console.error` in ReactFiberErrorLogger - and
+  React Native wraps them again to reach the redbox.
+
+  The fourth callback, `onDefaultTransitionIndicator`, stays a no-op on purpose. RN's own renderer
+  says why in as many words: "Native doesn't have a default indicator."
+
+  New engine export `reportUncaughtError(error, { origin, componentStack })`, the shared seam for
+  any adapter that catches something its framework would otherwise have surfaced itself. It reaches
+  `global.ErrorUtils` on a native host - the documented global RN's own
+  `Libraries/vendor/core/ErrorUtils.js` is a one-line re-export of, so no deep import into RN's
+  internals - and falls back to `console.error` anywhere else. Exactly one channel, never both: RN
+  routes `console.error` into LogBox too, and upstream suppresses its own log for that same reason.
+  A thrown non-Error is wrapped so the reporter still gets a message and a stack, and the component
+  stack is attached the way LogBox reads it.
+
+  This is deliberately not the `dlog` channel. `dlog` is DEBUG-gated and therefore the developer's;
+  an error that blanked the screen has to reach the app whether or not anyone turned diagnostics on.
+
+### Patch Changes
+
+- 388c353: Move the AnimatedProps leaf lifecycle into the engine, where it should always have lived. Building
+  a leaf from the current props, swapping it into the value graph new-before-old, binding it to the
+  committed node, going native, rebinding native event props - none of that is framework-specific,
+  and yet it was written four times, once per adapter. They drifted, which is the whole reason this
+  is a changeset and not a refactor.
+
+  Only the Svelte copy ever grew a rebuild guard, after a day of on-device debugging: without it,
+  every scroll-driven passthrough tick tore down and reconnected a brand-new native node even though
+  nothing animated-relevant had changed, and a reconnect landing exactly when scrolling stopped left
+  the view frozen at its post-reset default. The other three copies each look like they have an
+  equivalent and do not. React's `useMemo(() => new AnimatedProps(rest), [rest])` reads like the same
+  reference check but never was one - `rest` comes out of a rest-destructure, so the dependency is a
+  fresh object on every render. Vue's `pendingLeaf === null` answers "has render run yet", not "did
+  anything change". Angular had nothing at all.
+
+  New engine export `createAnimatedLeafLifecycle(label)`. All four adapters now drive it and supply
+  only what is genuinely theirs: WHEN to reconcile (an effect, `onUpdated`, `ngOnChanges`, a
+  `$effect`) and HOW to resolve the host node. Angular additionally keeps its `whenCommitted`
+  deferral, which its batched zoneless change detection requires.
+
+  The guard compares props per key by IDENTITY against a stored SNAPSHOT, never against the caller's
+  own object. That distinction is load-bearing rather than defensive: a caller may legitimately hand
+  back the same object every update and mutate what its keys resolve to (Svelte's rest proxy does
+  exactly this), so storing the reference would compare it with itself, read the same current values
+  through both sides, and conclude nothing ever changes. The rebuild would then be skipped forever
+  and a rebuilt interpolation would never reach the native graph - on device, a sticky header that
+  ignores scrolling entirely.
+
+  It is also gated on the leaf already being native, and that gate points the other way: before the
+  first native connection reconcile must run on every call, because that cadence is what wires a
+  rebuilt interpolation into the shared value's children. Skipping there strands the new node, its
+  listener never fires, and the debounce that would have promoted the chain to native never settles.
+
+  Only the NATIVE half of a reconcile is deferrable, via an optional `scheduleNativeBind` callback -
+  Angular passes `bind => whenCommitted(node, bind)` because its batched zoneless change detection has
+  no committed Fabric tag at `ngAfterViewInit`. Building the leaf and attaching it to the value graph
+  is always synchronous, and that split is load-bearing rather than tidy: a deferred build sits behind
+  a canceller the next reconcile drops, so a component reconciling faster than it commits attaches
+  nothing at all and a sticky header's rebuilt interpolation never reaches the graph.
+
+  Behavior is unchanged for React, Vue and Svelte beyond the guard the first two never had. No public
+  component API moves.
+
+- 388c353: Keep sticky headers correct when a cell is force-rendered. `VirtualizedList` can render a cell
+  outside the normal virtualization flow — to satisfy `initialScrollIndex`, or to keep a focused row
+  mounted — and the sticky-header reducer treated those cells as if they had arrived through the
+  usual windowing path. The tracked header index then disagreed with what was actually mounted, and
+  the wrong section header stuck (or none did) until the next ordinary scroll correction.
+
+  The reducer now distinguishes force-rendered cells from windowed ones, and each adapter's
+  `VirtualizedList` reports them as such.
+
+- Updated dependencies [388c353]
+- Updated dependencies [388c353]
+- Updated dependencies [388c353]
+- Updated dependencies [388c353]
+  - @symbiote-native/css-parser@0.3.0
+  - @symbiote-native/components@0.4.0
+
 ## 0.2.8
 
 ### Patch Changes

@@ -35,7 +35,10 @@ function App(): ReactElement {
       index,
     }),
     renderItem: ({ item }: { item: IRow; index: number }) =>
-      createElement('symbiote-view', { key: item.id, style: { width: ITEM_WIDTH, height: 40 } }),
+      createElement('symbiote-view', {
+        key: item.id,
+        style: { width: ITEM_WIDTH, height: 40 },
+      }),
   });
 }
 
@@ -50,27 +53,31 @@ function findCreated(viewName: string): IFakeNode {
   return node;
 }
 
-describe('horizontal FlatList', () => {
+// No Negative group: `horizontal` is a plain boolean prop with no guard clause — every value
+// it accepts is valid, so there is no reject path to assert against.
+describe('horizontal FlatList (Positive — no throwing path)', () => {
   it('forwards horizontal to the native RCTScrollView', () => {
+    // why: iOS decides the scroll axis from the native RCTScrollView's own `horizontal` prop,
+    // so a dropped forward silently degrades a horizontal list back to vertical.
     mount(ROOT_TAG, createElement(App));
     const scrollView = findCreated('RCTScrollView');
     expect(scrollView.props.horizontal).toBe(true);
   });
 
   it('pins the content view to the full row width as a row', () => {
+    // why: the content view must be pinned to the full row width, not the frame width — else
+    // the row never overflows and the native scroll view has nothing to scroll.
     mount(ROOT_TAG, createElement(App));
     const content = findCreated('RCTScrollContentView');
-    // The content view must be pinned to the full row width, not the frame width. This is
-    // what makes the row overflow and the native scroll view actually scroll.
     expect(content.props.width).toBe(TOTAL_WIDTH);
     expect(content.props.flexDirection).toBe('row');
   });
 
   it('registers an event handler that accepts a layout event', () => {
+    // why: the windowing layout event must be wired through without throwing, or the list
+    // never learns its viewport size and stays stuck on the initial bounded prefix.
     mount(ROOT_TAG, createElement(App));
     const scrollView = findCreated('RCTScrollView');
-    // Sanity: the renderer registered an event handler (fireEvent throws otherwise), and the
-    // windowing layout event is delivered without error.
     expect(() =>
       fabric.fireEvent(scrollView.instanceHandle, 'topLayout', {
         layout: { x: 0, y: 0, width: VIEWPORT_WIDTH, height: 40 },

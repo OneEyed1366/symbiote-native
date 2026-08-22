@@ -1,4 +1,4 @@
-import { EventEmitter } from '@angular/core';
+import { EventEmitter, computed, signal } from '@angular/core';
 import {
   imageStatics,
   renderImage,
@@ -150,15 +150,21 @@ function asNumber(value: unknown): number | undefined {
   return typeof value === 'number' ? value : undefined;
 }
 
-function asCrossOrigin(value: unknown): 'anonymous' | 'use-credentials' | undefined {
-  return value === 'anonymous' || value === 'use-credentials' ? value : undefined;
+function asCrossOrigin(
+  value: unknown,
+): 'anonymous' | 'use-credentials' | undefined {
+  return value === 'anonymous' || value === 'use-credentials'
+    ? value
+    : undefined;
 }
 
 function asStyle(value: unknown): IStyleProp<IViewStyle> | undefined {
   return typeof value === 'object' && value !== null ? value : undefined;
 }
 
-export function resolveImageProps(input: Record<string, unknown>): Record<string, unknown> {
+export function resolveImageProps(
+  input: Record<string, unknown>,
+): Record<string, unknown> {
   const passthrough: IImagePassthroughProps = {
     resizeMethod: input['resizeMethod'] as IImageProps['resizeMethod'],
     blurRadius: asNumber(input['blurRadius']),
@@ -170,12 +176,21 @@ export function resolveImageProps(input: Record<string, unknown>): Record<string
         : undefined,
     testID: asString(input['testID']),
     nativeID: asString(input['nativeID']),
-    accessible: typeof input['accessible'] === 'boolean' ? input['accessible'] : undefined,
+    accessible:
+      typeof input['accessible'] === 'boolean'
+        ? input['accessible']
+        : undefined,
     accessibilityLabel: asString(input['accessibilityLabel']),
     accessibilityHint: asString(input['accessibilityHint']),
-    accessibilityRole: input['accessibilityRole'] as IAccessibilityProps['accessibilityRole'],
-    accessibilityState: input['accessibilityState'] as IAccessibilityProps['accessibilityState'],
-    accessibilityValue: input['accessibilityValue'] as IAccessibilityProps['accessibilityValue'],
+    accessibilityRole: input[
+      'accessibilityRole'
+    ] as IAccessibilityProps['accessibilityRole'],
+    accessibilityState: input[
+      'accessibilityState'
+    ] as IAccessibilityProps['accessibilityState'],
+    accessibilityValue: input[
+      'accessibilityValue'
+    ] as IAccessibilityProps['accessibilityValue'],
     accessibilityActions: input[
       'accessibilityActions'
     ] as IAccessibilityProps['accessibilityActions'],
@@ -213,26 +228,48 @@ export function resolveImageProps(input: Record<string, unknown>): Record<string
       typeof input['accessibilityShowsLargeContentViewer'] === 'boolean'
         ? input['accessibilityShowsLargeContentViewer']
         : undefined,
-    accessibilityLargeContentTitle: asString(input['accessibilityLargeContentTitle']),
+    accessibilityLargeContentTitle: asString(
+      input['accessibilityLargeContentTitle'],
+    ),
     role: input['role'] as IAriaProps['role'],
     'aria-label': asString(input['ariaLabel'] ?? input['aria-label']),
-    'aria-labelledby': asString(input['ariaLabelledBy'] ?? input['aria-labelledby']),
+    'aria-labelledby': asString(
+      input['ariaLabelledBy'] ?? input['aria-labelledby'],
+    ),
     'aria-live': input['ariaLive'] as IAriaProps['aria-live'],
-    'aria-hidden': typeof input['ariaHidden'] === 'boolean' ? input['ariaHidden'] : undefined,
-    'aria-busy': typeof input['ariaBusy'] === 'boolean' ? input['ariaBusy'] : undefined,
+    'aria-hidden':
+      typeof input['ariaHidden'] === 'boolean'
+        ? input['ariaHidden']
+        : undefined,
+    'aria-busy':
+      typeof input['ariaBusy'] === 'boolean' ? input['ariaBusy'] : undefined,
     'aria-checked': input['ariaChecked'] as IAriaProps['aria-checked'],
-    'aria-disabled': typeof input['ariaDisabled'] === 'boolean' ? input['ariaDisabled'] : undefined,
-    'aria-expanded': typeof input['ariaExpanded'] === 'boolean' ? input['ariaExpanded'] : undefined,
-    'aria-selected': typeof input['ariaSelected'] === 'boolean' ? input['ariaSelected'] : undefined,
-    'aria-modal': typeof input['ariaModal'] === 'boolean' ? input['ariaModal'] : undefined,
+    'aria-disabled':
+      typeof input['ariaDisabled'] === 'boolean'
+        ? input['ariaDisabled']
+        : undefined,
+    'aria-expanded':
+      typeof input['ariaExpanded'] === 'boolean'
+        ? input['ariaExpanded']
+        : undefined,
+    'aria-selected':
+      typeof input['ariaSelected'] === 'boolean'
+        ? input['ariaSelected']
+        : undefined,
+    'aria-modal':
+      typeof input['ariaModal'] === 'boolean' ? input['ariaModal'] : undefined,
     'aria-valuemax': asNumber(input['ariaValueMax']),
     'aria-valuemin': asNumber(input['ariaValueMin']),
     'aria-valuenow': asNumber(input['ariaValueNow']),
     'aria-valuetext': asString(input['ariaValueText']),
-    onAccessibilityAction: input['onAccessibilityAction'] as IImageProps['onLoad'],
+    onAccessibilityAction: input[
+      'onAccessibilityAction'
+    ] as IImageProps['onLoad'],
     onAccessibilityTap: input['onAccessibilityTap'] as IImageProps['onLoad'],
     onMagicTap: input['onMagicTap'] as IImageProps['onLoad'],
-    onAccessibilityEscape: input['onAccessibilityEscape'] as IImageProps['onLoad'],
+    onAccessibilityEscape: input[
+      'onAccessibilityEscape'
+    ] as IImageProps['onLoad'],
     onLoadStart: input['onLoadStart'] as IImageProps['onLoadStart'],
     onLoad: input['onLoad'] as IImageProps['onLoad'],
     onLoadEnd: input['onLoadEnd'] as IImageProps['onLoadEnd'],
@@ -442,8 +479,10 @@ export abstract class ImageBase {
       accessibilityElementsHidden: this.accessibilityElementsHidden,
       accessibilityIgnoresInvertColors: this.accessibilityIgnoresInvertColors,
       accessibilityLanguage: this.accessibilityLanguage,
-      accessibilityRespondsToUserInteraction: this.accessibilityRespondsToUserInteraction,
-      accessibilityShowsLargeContentViewer: this.accessibilityShowsLargeContentViewer,
+      accessibilityRespondsToUserInteraction:
+        this.accessibilityRespondsToUserInteraction,
+      accessibilityShowsLargeContentViewer:
+        this.accessibilityShowsLargeContentViewer,
       accessibilityLargeContentTitle: this.accessibilityLargeContentTitle,
       role: this.role,
       ariaLabel: this.ariaLabel,
@@ -473,7 +512,39 @@ export abstract class ImageBase {
     };
   }
 
-  get imageProps(): Record<string, unknown> {
+  // Bridges the non-reactive @Input fields into the reactive graph so imageProps below can be a
+  // memoized computed(). Signal inputs would make this unnecessary, but `input()` is visible only
+  // to the AOT compiler and this package's unit suite runs on JIT - see the
+  // `angular-adapter-change-detection` skill, §6. `signal()`/`computed()` are plain runtime APIs
+  // and need no compiler support, which is what makes this bridge possible at all.
+  //
+  // ImageBase is deliberately UNdecorated, so the ngOnChanges that bumps this lives on each
+  // platform @Component instead of here.
+  //
+  // Every dependency of the bag below is an @Input, which Angular always routes through
+  // ngOnChanges. State assigned OUTSIDE that path needs its OWN signal - never widen this one to
+  // "bump on everything", which silently un-memoizes the bag. The platform anchor style is exactly
+  // such a dependency and carries its own signal.
+  protected readonly inputsRevision = signal(0);
+
+  protected bumpInputsRevision(): void {
+    this.inputsRevision.update(revision => revision + 1);
+  }
+
+  // MEASURED 2026-08-16: as a getter this rebuilt the bag on every refresh of this view, so
+  // `[symbioteHostProps]`'s reference check failed every time and every key was re-pushed through
+  // Renderer2 -> routeProp - pure waste when nothing changed. computed() returns the SAME object
+  // until a tracked dependency actually changes, and the input setter then skips the whole spread.
+  //
+  // A computed FIELD cannot be overridden by a subclass accessor the way a getter can, so the
+  // platform components override buildImageProps() below and this stays the single memoization
+  // point for every platform.
+  readonly imageProps = computed<Record<string, unknown>>(() => {
+    this.inputsRevision();
+    return this.buildImageProps();
+  });
+
+  protected buildImageProps(): Record<string, unknown> {
     return resolveImageProps(this.imageInputProps);
   }
 }

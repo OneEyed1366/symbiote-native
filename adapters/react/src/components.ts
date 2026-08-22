@@ -10,11 +10,13 @@ import {
   resolveAccessibilityProps,
   type IAccessibilityProps,
   type IAriaProps,
+  resolveTextProps,
 } from '@symbiote-native/components';
 import type { IResponderProps } from './utils/responder-props';
 import type { IStyleProp, ITextStyle, IViewStyle } from './utils/styles';
 
-export interface IViewProps extends IAccessibilityProps, IAriaProps, IResponderProps {
+export interface IViewProps
+  extends IAccessibilityProps, IAriaProps, IResponderProps {
   style?: IStyleProp<IViewStyle>;
   // React's own web idiom for a registered class name (RN has no DOM/CSS classes to match
   // against). Resolved through the shared style registry by routeProp's centralized
@@ -39,7 +41,8 @@ export interface IViewProps extends IAccessibilityProps, IAriaProps, IResponderP
   // 'box-none' makes the view itself transparent to touches but not its children.
   pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
   // Enlarge the touch target past the view's visual bounds without affecting layout.
-  hitSlop?: number | { top?: number; left?: number; bottom?: number; right?: number };
+  hitSlop?:
+    number | { top?: number; left?: number; bottom?: number; right?: number };
   // testID / nativeID are inherited from IAccessibilityProps (the shared host-anchor base).
   // RN's modern W3C alias for nativeID. Folded into nativeID before commit (id wins
   // when both are set, matching RN's View.js), never sent to Fabric raw.
@@ -99,4 +102,7 @@ function resolveId({ id, ...rest }: IViewProps): IViewProps {
 export const View: FC<IViewProps> = props =>
   createElement('symbiote-view', resolveAccessibilityProps(resolveId(props)));
 export const Text: FC<ITextProps> = props =>
-  createElement('symbiote-text', resolveAccessibilityProps(props));
+  createElement(
+    'symbiote-text',
+    resolveTextProps(resolveAccessibilityProps(props)),
+  );

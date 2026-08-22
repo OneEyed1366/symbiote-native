@@ -112,7 +112,10 @@ export type {
   IVSectionItemContext,
 } from './components/virtualized-section-list';
 export { SectionList } from './components/section-list';
-export type { ISectionListHandle, ISectionListProps } from './components/section-list';
+export type {
+  ISectionListHandle,
+  ISectionListProps,
+} from './components/section-list';
 
 // Re-export primitive hosts so composed components can import them from the public barrel too.
 export {
@@ -134,6 +137,11 @@ export {
   RefreshControlHost,
   InputAccessoryViewHost,
   SymbioteHostPropsDirective,
+  // Public even though no app names it: it rides `hostDirectives` on every component declaring a
+  // `style` input, so ngtsc writes it into their public type metadata and a consuming app's AOT
+  // build fails with NG3004 without it. Invisible to tsc and vitest; only a consumer's ngc catches
+  // it.
+  SymbioteStyleInputDirective,
   // Exported so an OUT-OF-PACKAGE composed component (e.g. @symbiote-native/slider's Angular wrapper,
   // itself listed in ANCHOR_HOST_COMPONENTS) can merge its own anchor host's class-derived style
   // the same way every in-package composed component does — see anchorHostStyle's doc comment.

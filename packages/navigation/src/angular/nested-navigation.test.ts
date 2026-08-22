@@ -8,11 +8,24 @@
 // navigator; Angular's own hierarchical DI does this automatically, see navigation-context.
 // service.ts's header comment). Mirrors stack.test.ts's fixture since a real Stack is part of
 // this composition; Tab needs no ViewConfig of its own.
+//
+// No Negative group: getParent() never throws - "no ambient navigator above" is a legitimate
+// `undefined` return (first test below), asserted directly rather than a caught error.
 
 import '@angular/compiler';
-import { Component, CUSTOM_ELEMENTS_SCHEMA, Input, ViewChild, type Type } from '@angular/core';
+import {
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  Input,
+  ViewChild,
+  type Type,
+} from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mount, unmount, setNativeViewConfigSource } from '@symbiote-native/angular';
+import {
+  mount,
+  unmount,
+  setNativeViewConfigSource,
+} from '@symbiote-native/angular';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { Stack } from './stack';
@@ -46,7 +59,8 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
 const fabric = installFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
 
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
@@ -55,7 +69,10 @@ function findAllText(nodes: readonly IFakeNode[]): string[] {
   const found: string[] = [];
   const collect = (list: readonly IFakeNode[]): void => {
     for (const node of list) {
-      if (node.viewName === 'RCTRawText' && typeof node.props.text === 'string') {
+      if (
+        node.viewName === 'RCTRawText' &&
+        typeof node.props.text === 'string'
+      ) {
         found.push(node.props.text);
       }
       collect(node.children);
@@ -118,7 +135,11 @@ class NestedTabHomeScreenComponent {
   imports: [Tab, TabScreenDirective],
   template: `
     <Tab initialRouteName="TabHome">
-      <ng-template symbioteTabScreen name="TabHome" [component]="tabHomeComponent"></ng-template>
+      <ng-template
+        symbioteTabScreen
+        name="TabHome"
+        [component]="tabHomeComponent"
+      ></ng-template>
     </Tab>
   `,
 })
@@ -134,8 +155,16 @@ let capturedHost: NestedTestHost | undefined;
   imports: [Stack, ScreenDirective],
   template: `
     <Stack #nav initialRouteName="Root">
-      <ng-template symbioteScreen name="Root" [component]="rootComponent"></ng-template>
-      <ng-template symbioteScreen name="Details" [component]="detailsComponent"></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Root"
+        [component]="rootComponent"
+      ></ng-template>
+      <ng-template
+        symbioteScreen
+        name="Details"
+        [component]="detailsComponent"
+      ></ng-template>
     </Stack>
   `,
 })
@@ -152,6 +181,9 @@ class NestedTestHost {
 }
 
 describe('Angular nested navigators (DI parent chain)', () => {
+  // why: a screen at the TOP of the whole navigation tree has nothing above it to walk up to -
+  // NavigationContextService's `@Optional() @SkipSelf()` read finds no ambient provider, so
+  // getParent() must degrade to `undefined` rather than throw or return a stale/wrong handle.
   it("a root Stack screen's injectNavigation().getParent() is undefined (no ambient navigator above it)", async () => {
     capturedParent = undefined;
     getParentCalled = false;
@@ -165,6 +197,10 @@ describe('Angular nested navigators (DI parent chain)', () => {
     expect(capturedParent).toBeUndefined();
   });
 
+  // why: proves the DI parent chain is not just "returns SOME truthy handle" but the RIGHT one -
+  // the returned handle is exercised end-to-end (an actual `.push()` that lands a real route),
+  // which a handle-identity check alone (`toBeDefined()`) wouldn't distinguish from a handle
+  // that merely LOOKS like a Stack handle's shape.
   it('injectNavigation().getParent() from inside a Tab screen nested in a Stack screen reaches the enclosing Stack, and pushing through it adds a Stack route', async () => {
     capturedParent = undefined;
     capturedHost = undefined;

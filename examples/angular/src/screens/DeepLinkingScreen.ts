@@ -2,7 +2,10 @@ import { Component, signal } from '@angular/core';
 import { SafeAreaView, Text, TextInput, View } from '@symbiote-native/angular';
 import { resolveRouteFromUrl } from '@symbiote-native/navigation';
 import { ActionButton } from '../components/ActionButton';
-import { APP_LINKING_CONFIG, SAMPLE_DEEP_LINK_URL } from '../navigation-linking';
+import {
+  APP_LINKING_CONFIG,
+  SAMPLE_DEEP_LINK_URL,
+} from '../navigation-linking';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -30,15 +33,19 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           <View class="hero-copy">
             <Text class="hero-title">Deep linking</Text>
             <Text class="hero-body">
-              A typed URL resolved to a route through resolveRouteFromUrl, the same path a real
-              deep link or push notification would take.
+              A typed URL resolved to a route through resolveRouteFromUrl, the
+              same path a real deep link or push notification would take.
             </Text>
           </View>
         </View>
         <Text class="info-text">
-          prefixes: symbiotecanaryangular:// · https://canary-angular.symbiote-native.dev
+          prefixes: symbiotecanaryangular:// ·
+          https://canary-angular.symbiote-native.dev
         </Text>
-        <Text class="note-text">Details → details/:id · HeaderOptions → header-options · TabsDemo → tabs</Text>
+        <Text class="note-text"
+          >Details → details/:id · HeaderOptions → header-options · TabsDemo →
+          tabs</Text
+        >
         <TextInput
           testID="deep-link-input"
           [(value)]="url"
@@ -46,9 +53,16 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           placeholderTextColor="#41506a"
           class="text-input"
         />
-        <ActionButton testID="deep-link-resolve" title="Resolve" (press)="onResolve()" [color]="lineColorRouting"></ActionButton>
+        <ActionButton
+          testID="deep-link-resolve"
+          title="Resolve"
+          (press)="onResolve()"
+          [color]="lineColorRouting"
+        ></ActionButton>
         <View class="parity-list">
-          <Text testID="deep-link-result" class="list-row-text">{{ resultText() }}</Text>
+          <Text testID="deep-link-result" class="list-row-text">{{
+            resultText()
+          }}</Text>
         </View>
       </View>
     </SafeAreaView>

@@ -1,0 +1,50 @@
+/* CSS Modules half of the showcase. Every class here is renamed by lightningcss to
+   `<name>__module__<hash-of-this-file-path>`, so nothing in it can collide with App.css or with
+   the plain sheet next door — the opposite of the flat global namespace those two share.
+
+   The default export maps AUTHORED name -> renamed name. Keys are the authored spelling, kebab
+   and all (`styles['sc-chip-base']`), not camelCase: the earlier camelCase convention merged
+   `.legacy-reset` and `.legacyReset` into one key and was removed. `css-dts` generates the
+   sibling .module.css.d.ts from that same map, so a typo is a TS2339 rather than a silent
+   `undefined` reaching the class prop as the literal string "undefined". */
+
+.sc-chip-base {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border-width: 2px;
+  border-color: #41506a;
+  background-color: #41506a;
+}
+
+/* Two hops of `composes`, so the emitted token order is observable rather than asserted:
+   `sc-chip-loud` exports "sc-chip-base… sc-chip-tinted… sc-chip-loud…", composed FIRST. The
+   registry merges a class string left to right, so composed-last would let the base override
+   the composer. Each hop restates `background-color` and nothing else — three chips, three
+   colours, and the round pill shape from the base surviving under both. */
+.sc-chip-tinted {
+  composes: sc-chip-base;
+  background-color: #1f4d7a;
+}
+.sc-chip-loud {
+  composes: sc-chip-tinted;
+  background-color: #2f7d4f;
+  border-color: #a3d94f;
+}
+
+.sc-chip-text {
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* The escape hatch. `:global(...)` opts this one selector out of the rename, so it registers
+   under its bare name and any file in the app can use it. lightningcss (like css-loader) omits
+   a global from `exports` because nothing was renamed; we add it back keyed as itself, so
+   `styles['sc-global-mark']` works and the author never has to drop to a bare string literal.
+   It squares off two corners of whatever pill it lands on — a shape change, so it layers onto
+   the composes chain instead of racing it for a colour, and RN's corner longhands outrank the
+   base's `border-radius` shorthand natively. */
+:global(.sc-global-mark) {
+  border-top-right-radius: 4px;
+  border-bottom-left-radius: 4px;
+}

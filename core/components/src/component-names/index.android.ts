@@ -3,7 +3,11 @@
 // device-verify-pending: source-confirmed from RN's Android ViewManagers, proven on a
 // real host by the absence of a "Can't find ViewManager '<name>'" red box.
 
-import { buildDescriptors, makeDescriptorFor, type ISymbioteIntrinsic } from './shared';
+import {
+  buildDescriptors,
+  makeDescriptorFor,
+  type ISymbioteIntrinsic,
+} from './shared';
 export type { ISymbioteIntrinsic, IComponentDescriptor } from './shared';
 
 const ANDROID_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {

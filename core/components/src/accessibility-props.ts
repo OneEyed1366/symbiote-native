@@ -216,36 +216,37 @@ export interface IAriaProps {
 // RN's web `role` → native `accessibilityRole`. Where the web role has no native
 // counterpart it is forwarded unchanged (the AccessibilityRole union stays open),
 // so the map only lists the values that actually differ.
-const ROLE_TO_ACCESSIBILITY_ROLE: Readonly<Record<string, IAccessibilityRole>> = {
-  alert: 'alert',
-  button: 'button',
-  checkbox: 'checkbox',
-  combobox: 'combobox',
-  grid: 'grid',
-  heading: 'header',
-  img: 'image',
-  link: 'link',
-  list: 'list',
-  listitem: 'list',
-  menu: 'menu',
-  menubar: 'menubar',
-  menuitem: 'menuitem',
-  none: 'none',
-  presentation: 'none',
-  progressbar: 'progressbar',
-  radio: 'radio',
-  radiogroup: 'radiogroup',
-  scrollbar: 'scrollbar',
-  searchbox: 'search',
-  slider: 'adjustable',
-  spinbutton: 'spinbutton',
-  summary: 'summary',
-  switch: 'switch',
-  tab: 'tab',
-  tablist: 'tablist',
-  timer: 'timer',
-  toolbar: 'toolbar',
-};
+const ROLE_TO_ACCESSIBILITY_ROLE: Readonly<Record<string, IAccessibilityRole>> =
+  {
+    alert: 'alert',
+    button: 'button',
+    checkbox: 'checkbox',
+    combobox: 'combobox',
+    grid: 'grid',
+    heading: 'header',
+    img: 'image',
+    link: 'link',
+    list: 'list',
+    listitem: 'list',
+    menu: 'menu',
+    menubar: 'menubar',
+    menuitem: 'menuitem',
+    none: 'none',
+    presentation: 'none',
+    progressbar: 'progressbar',
+    radio: 'radio',
+    radiogroup: 'radiogroup',
+    scrollbar: 'scrollbar',
+    searchbox: 'search',
+    slider: 'adjustable',
+    spinbutton: 'spinbutton',
+    summary: 'summary',
+    switch: 'switch',
+    tab: 'tab',
+    tablist: 'tablist',
+    timer: 'timer',
+    toolbar: 'toolbar',
+  };
 
 function accessibilityRoleFromRole(role: IRole): IAccessibilityRole {
   return ROLE_TO_ACCESSIBILITY_ROLE[role] ?? role;
@@ -280,10 +281,14 @@ function hasAnyAriaKey(props: IAriaProps): boolean {
 // never reach native (the commit layer drops undefined props); the returned
 // object keeps type `T`, spreadable straight into createElement. When no alias
 // is present the input passes through untouched (cheap fast path).
-export function resolveAccessibilityProps<T extends IAccessibilityProps & IAriaProps>(props: T): T {
+export function resolveAccessibilityProps<
+  T extends IAccessibilityProps & IAriaProps,
+>(props: T): T {
   if (!hasAnyAriaKey(props)) return props;
 
-  dlog('resolveAccessibilityProps: folding aria/role aliases into accessibility* props');
+  dlog(
+    'resolveAccessibilityProps: folding aria/role aliases into accessibility* props',
+  );
 
   const {
     role,
@@ -322,7 +327,10 @@ export function resolveAccessibilityProps<T extends IAccessibilityProps & IAriaP
     'aria-valuetext': undefined,
   };
 
-  if (ariaLabelledBy !== undefined && next.accessibilityLabelledBy === undefined) {
+  if (
+    ariaLabelledBy !== undefined &&
+    next.accessibilityLabelledBy === undefined
+  ) {
     next.accessibilityLabelledBy = ariaLabelledBy.split(/\s*,\s*/g);
   }
 

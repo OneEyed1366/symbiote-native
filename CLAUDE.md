@@ -169,29 +169,139 @@ component of their own. New runtime modules follow this split, never the reverse
 </runtime_modules_layering>
 
 <examples_vs_dot_examples>
-`examples/*` are the PUBLIC canary apps. Since 2026-07-14 they are OUTSIDE the
-pnpm workspace entirely (removed from `pnpm-workspace.yaml`'s `packages:`) — a
-standalone `npm install`-able tree with no `catalog:`/`workspace:*` specifiers
-(neither resolves outside a pnpm workspace); every dependency is a literal
-version, and every `@symbiote-native/*` is a pkg.pr.new canary URL pending a real
-npm release. Install with plain `npm install` INSIDE the example directory, never
-`pnpm install` from repo root — that reason is load-bearing: pnpm's
-`blockExoticSubdeps` supply-chain guard blocks a pkg.pr.new URL's own transitive
-URL subdeps anywhere in a SHARED pnpm workspace, which used to poison
-`.examples/*`'s install too when both trees shared one lockfile.
-`.examples/{react,vue-sfc,vue-tsx,angular}` (dot-prefixed, gitignored by the
-existing blanket `.*/` rule — no explicit `.gitignore` entry needed) is UNCHANGED:
-a private, untracked dev harness still inside the pnpm workspace, same apps, full
-native scaffolding, every `@symbiote-native/*` dependency `workspace:*` so local
-source edits in `core/*`/`adapters/*`/`packages/*` are picked up live. **Any task
-that adds, ports, or wires up a component / adapter / third-party wrapper /
-package integrates it ONLY into the matching `.examples/<app>` — never into
-`examples/<app>`.** `examples/<app>` is updated later, deliberately, as its own
-step: a direct literal-version edit in `examples/*/package.json` after a real npm
-publish (no catalog to bump anymore). Full mechanics, the `blockExoticSubdeps`
-root cause, the Metro/`react-native.config.js` fallout, the diagnostic for which
-tree an app is actually linked to, and the 2026-07-04 incident that originally
-motivated the split: the `symbiote-dev-examples` skill.
+`examples/{react,vue-sfc,vue-tsx,angular}` is the ONE tree — public canary AND
+where local component/adapter/package work is developed and demoed. It is
+OUTSIDE the pnpm workspace entirely (not listed in `pnpm-workspace.yaml`'s
+`packages:`) — a standalone `npm install`-able tree with no `catalog:`/
+`workspace:*` specifiers (neither resolves outside a pnpm workspace); every
+dependency is a literal version, `@symbiote-native/*` included, matching the
+real npm consumer experience. Install with plain `npm install` INSIDE the
+example directory, never `pnpm install` from repo root.
+
+**Local development against an unpublished or just-changed `@symbiote-native/*`
+package — the everyday loop, not a fallback:** build a tarball with `pnpm pack`
+from the package's own directory (**never `npm pack`** — it skips the
+`publishConfig` build-artifact swap and leaves `workspace:*` literally in
+`peerDependencies`, which crashes a standalone `npm install` with
+`EUNSUPPORTEDPROTOCOL`), point the target `examples/*/package.json` at it with a
+`file:` specifier, then `npm install` again inside that example directory. A
+pkg.pr.new canary URL is the alternative when a shared/remote preview is needed
+(PR review, cross-machine testing, no local tarball to hand) — see
+`symbiote-release-publishing` for how canary builds are triggered. Either a
+`file:` tarball or a pkg.pr.new URL is TEMPORARY and gets swapped back to a
+literal npm version once the package has a real release.
+
+**Re-packing the SAME package at the SAME version while iterating (the common case — several
+rounds of `pnpm pack` against one unreleased version) needs an extra step, or `npm install`
+silently serves STALE content.** `examples/*/package-lock.json` records an `integrity` hash for
+the `file:` entry from the FIRST install; on a later `pnpm pack` + `npm install` cycle against
+the same path, npm treats the lockfile entry as still satisfied and reuses its OWN cached copy
+under that stale hash — it does not re-read the tarball's current bytes. `node_modules` even
+reports `added N packages`, which reads as success. Symptom: a source change you just packed
+never shows up in `node_modules/@symbiote-native/<pkg>/build/**`. Fix: `rm -f
+examples/*/package-lock.json` (or at least delete the one stale entry) before `npm install` on
+every re-pack of a package you're actively iterating on — `rm -rf node_modules/@symbiote-native`
+alone is NOT enough, the lockfile entry survives that and still short-circuits the reinstall.
+**And the converse also holds: deleting the lockfile alone is not enough either.** Measured
+2026-08-14 — after re-packing `@symbiote-native/engine` and running `rm -f package-lock.json &&
+npm install` in five examples, ONE picked up the new tarball and three silently kept an OLD
+extracted copy (the tell was a build shape from an earlier release, `export { X } from
+'./y.js'` with extensions the current build does not emit). npm treats an already-extracted
+`file:` dependency folder as satisfying the specifier, which did not change. **Delete BOTH:**
+`rm -rf node_modules/@symbiote-native/<pkg> && rm -f package-lock.json && npm install`.
+Verify with a `grep` for a known-new string in the installed `build/**` file, not just install
+output, before trusting a "no changes" observation on device.
+
+**After that reinstall, run `pod install` in the app's `ios/` before the next iOS build.**
+`@symbiote-native/splash-screen`'s podspec vendors react-native-bootsplash's native sources into
+a `.rn-bootsplash/` folder next to itself, and it does so at PODSPEC EVALUATION time — during
+`pod install`, not on package install. An `npm install` that replaces the package folder deletes
+that folder, and the next `xcodebuild` fails with `Build input file cannot be found:
+.../.rn-bootsplash/ios/RNBootSplash.mm`, buried under hundreds of lines of clang argument dumps
+that make it look like a broken toolchain. It is just a stale pod sandbox; `pod install`
+regenerates it (see that podspec's own comment for why the copy exists at all).
+
+**The OTHER post-reinstall iOS failure, and it looks nothing like a pod problem — a LINKER error
+naming React's own C++ internals.** Measured 2026-08-14 on `examples/svelte`:
+
+```
+ld: warning: Could not find or use auto-linked framework 'React_RCTAppDelegate': not found
+ld: warning: Could not find or use auto-linked framework 'UIUtilities': not found
+Undefined symbols for architecture arm64:
+  "facebook::react::Sealable::Sealable()", "facebook::react::ShadowNode::getDebugName() const",
+  "facebook::react::DebugStringConvertible::…", "…::BaseViewProps::getDebugProps() const", …
+  referenced from: RNSSafeAreaViewShadowNode.o, RNSScreenStackHeaderConfigShadowNode.o, Props-*.o
+```
+
+The two `ld: warning` lines are a RED HERRING — those modules live inside the single merged
+`React.framework`, and the same warnings appear in a build that links fine. **Read the
+`referenced from:` object names instead**; they name the third-party Fabric library that is
+actually unsatisfied (here `RNS*` = react-native-screens, pulled in by
+`@symbiote-native/navigation`).
+
+Cause: RN 0.86 links a PREBUILT `React.xcframework`, downloaded per configuration
+(`reactnative-core-0.86.0-debug.tar.gz` ~94MB / `-release.tar.gz` ~30MB). The `getDebug*` /
+`DebugStringConvertible` / `Sealable` surface only exists in the DEBUG flavor. A third-party
+Fabric library compiled in a Debug build references it, so linking a Debug app against the
+release-flavor framework fails exactly this way. CocoaPods will happily reuse a stale extracted
+`Pods/React-Core-prebuilt/` from an earlier install rather than re-extract, because the pod's
+source URL did not change.
+
+Diagnose in one command — the flavor is unambiguous from size and symbols:
+
+```
+B=ios/Pods/React-Core-prebuilt/React.xcframework/ios-arm64_x86_64-simulator/React.framework/React
+stat -f %z "$B"; nm -gU "$B" | grep -c getDebugProps     # release: ~24MB / 0   debug: ~137MB / 80
+```
+
+Fix: `rm -rf ios/Pods/React-Core-prebuilt ios/Pods/ReactNativeCore-artifacts` then `pod install`,
+and re-run the probe above to confirm the debug flavor landed BEFORE spending another build on
+it. Do NOT reach for `RCT_USE_PREBUILT_RNCORE=0` (RN's documented build-from-source escape hatch)
+first — it costs a 30-minute from-source build to work around a stale download.
+
+**But first check whether there is anything to fix at all — the swap is AUTOMATIC, and the probe
+reading "debug" is the normal resting state.** The podspec's `source` URL is hardcoded to the
+`-debug` tarball, so a fresh `pod install` ALWAYS leaves the debug flavor extracted, whatever you
+intend to build. RN then swaps it per build: `React-Core-prebuilt` carries a `before_compile`
+script phase, `[RNCore] Replace React Native Core for the right configuration`, which reads
+`DEBUG=1` out of `GCC_PREPROCESSOR_DEFINITIONS` and runs
+`react-native/scripts/replace-rncore-version.js -c Release|Debug`. Both tarballs sit side by side
+in `Pods/ReactNativeCore-artifacts/`, so the swap is local — no network, no re-download.
+
+Verified 2026-08-18 on `examples/react`: probe before `npm run ios:release` = 131MB / 80 symbols
+(debug); the Release build succeeded and the same probe after = **24MB / 0 symbols** (release).
+So "Pods holds debug while I am building Release" is NOT the bug and clearing pods over it wastes
+a build. The failure above is specifically a stale or missing DOWNLOAD, and its signature is a
+LINKER error naming `facebook::react::Sealable` / `getDebug*` — not a probe result on its own.
+
+**`examples/expo-*/node_modules` bloats to 2.2-2.3GB each — 89MB × ~25 duplicated `expo` copies,
+one per `@symbiote-native/*` Expo wrapper.** None of the six `expo-*` examples declares `expo`
+itself as a dependency — every wrapper package (`@symbiote-native/sensors`, `.../battery`, …)
+reaches it only transitively via `expo-sensors`/`expo-battery`/etc. → `expo`. With no root-level
+request anchoring a version, npm's arborist nests a separate `expo` copy (its own `@expo/cli` +
+`config-plugins` + `fingerprint` tree, ~89MB) inside every wrapper's own `node_modules` — even
+though all ~25 copies resolve to the SAME version. `expo-modules-core`, depended on identically by
+every wrapper, hoists fine to one top-level copy; the difference is specifically that nothing
+requests `expo` from the root, not a generic dedup failure. Fix: add `"expo": "<pinned SDK
+version>"` as an explicit dependency in the example's `package.json` — this is also the CORRECT
+shape (a real `create-expo-app` project always declares `expo` directly; wrapper packages expect
+it to already be present) — then `rm -f package-lock.json && rm -rf node_modules && npm install`.
+Verified 2026-08-21 across all six `expo-*` examples: `node_modules` 2.2-2.3GB → 600-660MB each,
+zero nested `expo` copies, no ERESOLVE/peer conflicts. If the pinned `expo` version and the
+catalog's `expo-modules-core`/`expo-sensors`/etc. version ever drift apart, that surfaces as a
+real Expo SDK compatibility bug (modules must ship in lockstep with one SDK release) — fix the
+version skew, don't reach for a workaround.
+
+**Reinstalling any `examples/*` app after a FAILED `npm install` needs the lockfile deleted, not
+just `node_modules`, or a stale `integrity` field blocks the retry — `npm cache clean --force`
+does NOT fix it.** A run that fails partway (e.g. `EINTEGRITY` against a rebuilt `.tarballs/*.tgz`,
+see the re-pack gotcha above) can still write a partial `package-lock.json` recording the OLD
+tarball's hash. The next `npm install` then errors `EINTEGRITY … wanted <old-hash> but got
+<new-hash>` even after `rm -rf node_modules` and even after clearing npm's cache — because the
+stale hash lives in the project's own `package-lock.json`, not in npm's cache. Fix: `rm -f
+package-lock.json` before retrying, same as the `file:` re-pack case — this is the same failure
+shape (stale lockfile integrity vs. changed tarball bytes), just triggered by a failed install
+instead of a re-pack.
 </examples_vs_dot_examples>
 
 <components_split_logic_view_lifecycle>
@@ -298,6 +408,25 @@ bring-up step) should add a `dlog` at its seam as a matter of course.
   templates). Metro owns the RN-native contract — Hermes bytecode, native-module
   resolution, `.ios.js`/`.android.js` extensions, Fast Refresh — that we cannot
   cheaply reimplement. Not Vite, not Re.Pack.
+- **Never make correctness depend on a module's load-time side effect (a `register*` / `set*`
+  callback) when that module is reached only through a barrel.** Metro turns on `inlineRequires`
+  for production ONLY: it moves a `require()` from the top of a module down to the first place
+  its binding is USED, and a barrel's `export { Thing } from './thing'` compiles to a lazy
+  getter. If nothing ever names `Thing` as a VALUE, `./thing` never evaluates and its
+  registration silently never happens — in RELEASE builds only. Device-diagnosed 2026-08-14:
+  `interpolation-node.ts` registered the factory `AnimatedNode.interpolate()` needed; nothing
+  named `AnimatedInterpolation` as a value (adapters only TYPE it, which `verbatimModuleSyntax`
+  erases), so the first `.interpolate()` threw `interpolation factory not registered` and blanked
+  `examples/vue-sfc`'s screen while dev was perfectly fine. Invisible to `tsc`, to vitest (eager
+  evaluation), and even to grepping the bundle — the code IS bundled, it just never runs.
+  **A bare `import './thing';` next to the re-export does NOT fix it** (tried on device first):
+  Babel merges the two imports of the same specifier into one dependency, and the merged
+  dependency stays lazy. Two shapes actually work: (a) the module is imported ONLY as a bare
+  side-effect import and never re-exported from that barrel — the pattern in
+  `packages/slider/src/{react,vue,svelte,angular}/index.ts` (`import '../register';`); or (b),
+  preferred, **delete the indirection** so nothing needs registering — which is why
+  `AnimatedInterpolation` now lives inside `core/engine/src/animated/graph.ts` next to the base
+  class it extends, with `interpolate()` constructing it directly. See that file's comment.
 - **File layout — folder-as-module for platform/shared groups (see the `symbiote-file-layout`
   skill).** A module that has platform (`X.ios`/`X.android`) and/or shared (`X-shared`)
   variants lives in its OWN folder `X/` with an `index` barrel: `X/index.ts` (base — re-exports the
@@ -315,9 +444,13 @@ bring-up step) should add a `dlog` at its seam as a matter of course.
   surface (shortest simulator loop on macOS, widest prop-edge coverage); Android
   is at canary parity. The `RCTFabricSurface` bootstrap and the Android native
   host-shims (`packages/android`) are both wired.
-- **Primitives:** `View` · `Text` · `Image` · `ScrollView` all done. `Text`
-  carries the only non-trivial nesting (`NativeText` vs `NativeVirtualText` via
-  `TextAncestorContext`).
+- **Primitives:** `View` · `Text` · `Image` · `ScrollView` all done. `Text` carries
+  the only position-dependent view name — a `<Text>` inside another `<Text>` commits
+  as `RCTVirtualText` instead of `RCTText` — and **no adapter implements that.** It is
+  resolved once in the engine's commit walk (`viewNameFor` in `core/engine/src/commit.ts`,
+  which threads `hasTextAncestor` down and re-creates the node when the kind flips);
+  every adapter emits a flat `symbiote-text` and stays out of it. React's original
+  `TextAncestorContext` is gone — do not reintroduce a per-adapter context for this.
 - **Styling — CSS classes are the convention; `StyleSheet.create` remains fully
   supported.** Every current example app (`examples/react`, `examples/vue-sfc`,
   `examples/vue-tsx`, `examples/angular`) styles its static look with a CSS class
@@ -344,14 +477,22 @@ bring-up step) should add a `dlog` at its seam as a matter of course.
   source reduces to plain CSS text before the same parser/registry pipeline runs, so every
   scoped/module/`:global()` mechanism above applies identically regardless of source language;
   `sass`/`less`/`stylus` are lazy-optional devDependencies of `@symbiote-native/css-parser` only, never
-  forced on a project that doesn't author them. Cross-adapter class/style resolution (React,
-  Vue, Angular) is exercised for plain CSS and CSS Modules; the preprocessor layer is newer and
-  not yet exercised as heavily end-to-end. `$style.card` property-access type safety (`.d.ts`
-  generation), Svelte's default-scoped styles, and `background-image` (CSS gradients — a real
-  native Fabric prop via `experimental_backgroundImage`, unlike Tailwind; `filter` and
-  `transform-origin` are already done) are recorded in that skill as the remaining open,
-  unimplemented seams. JS style objects via `StyleSheet.create` remain the baseline every
-  adapter supports; the CSS path is additive.
+  forced on a project that doesn't author them. **The whole surface — plain CSS, CSS Modules
+  (`composes`, `:global()`), all three preprocessors, and what the compiler deliberately refuses
+  — is exercised by one screen present in all five examples, `StyleShowcaseScreen` (2026-08-20);
+  React's is device-verified, the other four are ported but not yet built.** Every tile is built
+  so a dropped rule is VISIBLE rather than silent, which is what makes it a regression canary and
+  not a gallery — read it before claiming any part of this pipeline is broken or missing. Three
+  claims this paragraph used to carry are now WRONG and must not be repeated: `$style.card` type
+  safety is closed for standalone `.module.css` (`css-dts` + the TS plugin; only the INLINE
+  `<style module>` typo case is still open), Svelte's default-scoped styles are BUILT (the
+  scoper's third pattern `[local]__svelte-<hash>`, same single lightningcss rename as Vue's
+  `__module__` / `__data-v-`), and `background-image` shipped in 2026-07 alongside `filter` and
+  `transform-origin`. What IS still open is recorded in that skill, and `filter` carries a
+  platform caveat worth knowing before demoing it: on iOS RN paints only `brightness` and
+  `opacity` unless the `enableSwiftUIBasedFilters` flag is on, so `grayscale`/`blur`/`saturate`/
+  `contrast`/`hue-rotate` silently do nothing there. JS style objects via `StyleSheet.create`
+  remain the baseline every adapter supports; the CSS path is additive.
 
 ## Milestones
 

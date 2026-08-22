@@ -1823,7 +1823,7 @@ PODS:
     - React-utils (= 0.86.0)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.86.0)
-  - symbiote-navigation (1.0.0):
+  - symbiote-navigation (2.2.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1845,9 +1845,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - symbiote-navigation/common (= 1.0.0)
+    - symbiote-navigation/common (= 2.2.0)
     - Yoga
-  - symbiote-navigation/common (1.0.0):
+  - symbiote-navigation/common (2.2.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1870,7 +1870,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-slider (4.0.0):
+  - symbiote-slider (5.2.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1891,9 +1891,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-    - symbiote-slider/common (= 4.0.0)
+    - symbiote-slider/common (= 5.2.0)
     - Yoga
-  - symbiote-slider/common (4.0.0):
+  - symbiote-slider/common (5.2.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1915,7 +1915,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - symbiote-splash-screen (2.0.0):
+  - symbiote-splash-screen (3.2.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2181,7 +2181,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
-  hermes-engine: d6a8bb60366800eaa048d4652d3a098725a101af
+  hermes-engine: 7a85d42b09686f26dba11b310a984d4c8cfcb9d9
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
   RCTSwiftUI: 5aaf0b07e747ba749dc6acc94d8bd41eea4b570f
@@ -2254,11 +2254,11 @@ SPEC CHECKSUMS:
   ReactCodegen: afe0d436ee089d7bea6418429d8312b1d23a6801
   ReactCommon: d5c1bb4427bf51c443de5926aac332c89ddd9363
   ReactNativeDependencies: fa0a54b3f5319ae0e3b9aff32bfee7a424b88e66
-  symbiote-navigation: 9b221794a9a8875b22d0dacfbdcf15218d37fa00
-  symbiote-slider: 5bddb8b0152d284ba25b245b41e64066a88edce4
-  symbiote-splash-screen: 6c2c1e807477d45c3c8f7f3d4a5bda678688ef25
+  symbiote-navigation: 0b4ee3d1bbc7a9a9061f03e369a8efc25f109232
+  symbiote-slider: 2109beedaa64675b6a68a4dcbebc8f490279756d
+  symbiote-splash-screen: 029fcc03b4f4ac8332a5ab47664286feb9aab35f
   Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
-PODFILE CHECKSUM: ddf13891f62870be6b0c3449faaeb28213eb5efc
+PODFILE CHECKSUM: 52535ff777e36b58e86c45571b57df53c0378d71
 
 COCOAPODS: 1.16.2

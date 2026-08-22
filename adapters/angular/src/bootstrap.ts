@@ -5,7 +5,10 @@
 
 import { AppRegistry as RNAppRegistry } from 'react-native';
 import type { Type } from '@angular/core';
-import { bootstrapHost, type IBootstrapHostOptions } from '@symbiote-native/components/bootstrap';
+import {
+  bootstrapHost,
+  type IBootstrapHostOptions,
+} from '@symbiote-native/components/bootstrap';
 import { AppRegistry, setHostRegistrar } from './modules/app-registry';
 
 export type { IBootstrapHostOptions } from '@symbiote-native/components/bootstrap';

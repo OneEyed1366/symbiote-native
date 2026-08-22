@@ -14,7 +14,9 @@ body {
   margin: 0;
   font-family: var(--font-body);
   color: var(--core-text);
-  background: radial-gradient(120% 80% at 78% -12%, var(--glow), transparent 58%), var(--core-bg);
+  background:
+    radial-gradient(120% 80% at 78% -12%, var(--glow), transparent 58%),
+    var(--core-bg);
   transition:
     background-color var(--bond-ms) ease,
     color var(--bond-ms) ease;
@@ -283,11 +285,82 @@ h1 {
   position: relative;
   width: min(104%, 460px);
   overflow: visible;
-  filter: drop-shadow(0 22px 46px rgba(0, 0, 0, 0.4));
 }
 
-/* the mass, tendrils and drips are positioned every frame by JS (live goo);
-   only the face parts animate via CSS */
+/*
+  ── the creature's motion ────────────────────────────────────
+
+  Every moving part of the symbiote is a STATIC path (contoured at build time by
+  src/lib/symbiote-shape.ts) carrying nothing but a `transform` keyframe. That is
+  the whole point of the rewrite: the previous version rebuilt ~21 path `d`
+  attributes from requestAnimationFrame underneath an feGaussianBlur goo filter,
+  which forced WebKit to re-rasterise the filter region on the CPU every frame —
+  smooth in desktop Blink/Gecko, a frozen slideshow on iOS.
+
+  So the rules below may only ever touch `transform` and `opacity`. Anything that
+  changes geometry, layout, or a filter input puts the hero straight back onto
+  the slow path on exactly the devices that can least afford it.
+*/
+.limb {
+  /* resolve the pivot against the viewBox, not the path's own bounding box —
+     every limb swings around a point buried inside the body, not around itself */
+  transform-box: view-box;
+  transform-origin: var(--ox) var(--oy);
+  animation: limb-writhe var(--dur) var(--delay) ease-in-out infinite alternate;
+}
+
+/* the limb sweeps sideways and reaches in and out along its own axis at once,
+   which is enough to read as boneless rather than as a rotating cutout */
+@keyframes limb-writhe {
+  from {
+    transform: rotate(var(--rot-a)) scale(var(--sc-a));
+  }
+  to {
+    transform: rotate(var(--rot-b)) scale(var(--sc-b));
+  }
+}
+
+.mass {
+  transform-box: view-box;
+  transform-origin: 150px 148px;
+  animation: mass-breathe 1.25s ease-in-out infinite alternate;
+}
+
+@keyframes mass-breathe {
+  from {
+    transform: scale(0.985) translateY(0.6px);
+  }
+  to {
+    transform: scale(1.015) translateY(-0.6px);
+  }
+}
+
+/*
+  The grips take the body's own gradient, NOT a flat mid-tone. The flat fill is a
+  leftover from when they were a separately filtered group whose gradient would
+  have clamped; in one shared coordinate space they can reference the real thing,
+  and anything else puts a visible colour step exactly where they leave the body.
+  Fill lives in the markup (`fill="url(#symGrad)"`) for the same reason it does on
+  the mass — one paint source for the whole creature.
+*/
+
+/* the face rides the churning mass — this used to be a per-frame JS translate
+   derived from the lump positions, now it just drifts on its own */
+.face {
+  transform-box: view-box;
+  transform-origin: 150px 148px;
+  animation: face-drift 7.5s ease-in-out infinite alternate;
+}
+
+@keyframes face-drift {
+  from {
+    transform: translate(-1.4px, 1.2px);
+  }
+  to {
+    transform: translate(1.4px, -1.2px);
+  }
+}
+
 .eye,
 .maw {
   transform-box: fill-box;
@@ -300,7 +373,24 @@ h1 {
   animation: chomp 2.4s ease-in-out infinite;
 }
 
-/* the native device the symbiote rewrites — structure fixed, screen follows the skin */
+/*
+  The native device the symbiote rewrites — structure fixed, screen follows the skin.
+
+  NO drop shadow here, deliberately. The original carried one on the whole <svg>,
+  where it shadowed the finished composite and so could never show a step inside
+  the creature. Moving it onto this group instead — to keep the filter off the
+  animating limbs — quietly changed what it shadows: the mass and tendrils are
+  drawn BEFORE the phone and got darkened, the grips are drawn AFTER it and did
+  not, leaving a hard brightness step along every grip outline. That was the seam,
+  and it was loudest on the Angular skin, whose crimson→purple ramp shows a tonal
+  break the low-contrast React blues hide.
+
+  Putting it back on the root would re-filter moving content every frame, which is
+  the whole thing this rewrite removed. And on a near-black page an outer shadow
+  contributes almost nothing anyway — its only visible effect here WAS the
+  darkening that caused the artifact. So it simply goes. Depth comes from the
+  frame's own accent stroke and the glow behind the creature.
+*/
 .phone-frame {
   fill: #0b0c12;
   stroke: color-mix(in srgb, var(--accent) 38%, rgba(255, 255, 255, 0.14));
@@ -367,14 +457,6 @@ h1 {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  transition: fill var(--bond-ms) ease;
-}
-
-/* grip limbs render past the body gradient's range, so they'd clamp to a darker tone
-   and seam against the brighter flank. Pin them to the body's mid-gradient colour
-   (~the tone the flank shows where they root) so the join is invisible. */
-.goo-front {
-  fill: color-mix(in srgb, var(--accent) 64%, var(--accent-2));
   transition: fill var(--bond-ms) ease;
 }
 
@@ -609,6 +691,9 @@ section {
 .trait-fws li[data-fw='angular'] {
   --fw: #e40035;
 }
+.trait-fws li[data-fw='svelte'] {
+  --fw: #ff3e00;
+}
 
 .demo {
   display: grid;
@@ -624,9 +709,35 @@ section {
 }
 
 .demo-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: 18px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  padding-bottom: 10px;
+  scrollbar-color: var(--accent) transparent;
+}
+
+.demo-grid figure {
+  flex: 0 0 min(230px, 44vw);
+  scroll-snap-align: start;
+}
+
+.demo-grid::-webkit-scrollbar {
+  height: 6px;
+}
+
+.demo-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.demo-grid::-webkit-scrollbar-thumb {
+  background: var(--core-line);
+  border-radius: 999px;
+}
+
+.demo-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }
 
 figure {
@@ -647,10 +758,15 @@ figure.is-active {
     0 18px 50px var(--glow);
 }
 
-figure img {
+figure video {
   display: block;
   width: 100%;
   height: auto;
+  /* the width/height attributes reserve the box before metadata arrives, so a
+     lazily-attached clip never shifts the section under the reader */
+  aspect-ratio: 260 / 564;
+  background: rgba(0, 0, 0, 0.3);
+  object-fit: cover;
 }
 
 figcaption {
@@ -662,6 +778,13 @@ figcaption {
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--core-muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+figcaption span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 figcaption .dot {
@@ -678,6 +801,12 @@ figcaption .dot[data-fw='vue'] {
 }
 figcaption .dot[data-fw='angular'] {
   background: #e40035;
+}
+figcaption .dot[data-fw='svelte'] {
+  background: #ff3e00;
+}
+figcaption .dot[data-fw='solid'] {
+  background: #4a8bc2;
 }
 
 /* seam / pipeline — the one real sequence, so it keeps arrows */
@@ -834,15 +963,19 @@ figcaption .dot[data-fw='angular'] {
   color: var(--accent);
 }
 
-/* ── bonding wave (created per click in JS) ─────────────────── */
+/* ── bonding wave (created per click in JS) ─────────────────────
+   Fixed-size and scaled, never resized: growing it via width/height would put
+   layout + paint on every frame of the ripple, right at the moment the reader
+   has just tapped something. The 100px base matches WAVE_BASE in index.astro. */
 .bond-wave {
   position: fixed;
   z-index: 60;
-  width: 0;
-  height: 0;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(0);
   pointer-events: none;
+  will-change: transform, opacity;
 }
 
 /* ── focus ──────────────────────────────────────────────────── */
@@ -869,7 +1002,6 @@ figcaption .dot[data-fw='angular'] {
 
   .demo,
   .proof,
-  .demo-grid,
   .trait-grid {
     grid-template-columns: 1fr;
   }
@@ -892,6 +1024,11 @@ figcaption .dot[data-fw='angular'] {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* The creature keeps its full silhouette — it is baked geometry, so stopping the
+     motion costs nothing visually; only the movement goes away. */
+  .limb,
+  .mass,
+  .face,
   .eye,
   .maw {
     animation: none;

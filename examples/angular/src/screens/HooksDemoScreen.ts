@@ -1,6 +1,10 @@
 import { Component, signal, type Signal } from '@angular/core';
 import { SafeAreaView, Text, View } from '@symbiote-native/angular';
-import { injectFocusEffect, injectIsFocused, injectNavigationState } from '@symbiote-native/navigation/angular';
+import {
+  injectFocusEffect,
+  injectIsFocused,
+  injectNavigationState,
+} from '@symbiote-native/navigation/angular';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -29,16 +33,26 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
           <View class="hero-copy">
             <Text class="hero-title">Hooks</Text>
             <Text class="hero-body">
-              injectFocusEffect, injectIsFocused, and injectNavigationState - introspecting the navigator's
-              own live state from inside a screen.
+              injectFocusEffect, injectIsFocused, and injectNavigationState -
+              introspecting the navigator's own live state from inside a screen.
             </Text>
           </View>
         </View>
-        <Text testID="hooks-is-focused" class="info-text">{{ 'injectIsFocused(): ' + isFocused() }}</Text>
-        <Text testID="hooks-focus-count" class="info-text">{{ 'injectFocusEffect focus count: ' + focusCount() }}</Text>
+        <Text testID="hooks-is-focused" class="info-text">{{
+          'injectIsFocused(): ' + isFocused()
+        }}</Text>
+        <Text testID="hooks-focus-count" class="info-text">{{
+          'injectFocusEffect focus count: ' + focusCount()
+        }}</Text>
         <Text class="info-text">{{ blurText() }}</Text>
-        <Text class="section-label">injectNavigationState() · current route stack</Text>
-        @for (name of routeNames(); track name + '-' + $index; let index = $index) {
+        <Text class="section-label"
+          >injectNavigationState() · current route stack</Text
+        >
+        @for (
+          name of routeNames();
+          track name + '-' + $index;
+          let index = $index
+        ) {
           <Text class="list-row-text">{{ index + '. ' + name }}</Text>
         }
       </View>
@@ -59,7 +73,9 @@ export class HooksDemoScreen {
 
   constructor() {
     this.isFocused = injectIsFocused();
-    this.routeNames = injectNavigationState(state => state.routes.map(route => route.name));
+    this.routeNames = injectNavigationState(state =>
+      state.routes.map(route => route.name),
+    );
 
     injectFocusEffect(() => {
       this.focusCount.update(count => count + 1);

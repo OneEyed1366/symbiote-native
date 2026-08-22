@@ -1,0 +1,12 @@
+{
+  "android": {
+    "gradleProjectName": "expo-brightness",
+    "modules": [
+      {
+        "importPath": "expo.modules.brightness.BrightnessModule",
+        "className": "BrightnessModule",
+        "nativeName": "ExpoBrightness"
+      }
+    ]
+  }
+}

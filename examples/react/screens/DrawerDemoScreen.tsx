@@ -22,19 +22,23 @@ function DrawerHomeScreen() {
           <Text className="line-tag-text">{`${drawerLineInfo.code} · ${drawerLineInfo.label}`}</Text>
         </View>
         <View className="hero-card">
-          <View className="hero-badge" style={{ backgroundColor: LINE_COLOR.structure }}>
+          <View
+            className="hero-badge"
+            style={{ backgroundColor: LINE_COLOR.structure }}
+          >
             <Text className="hero-badge-text">DR</Text>
           </View>
           <View className="hero-copy">
             <Text className="hero-title">Drawer</Text>
             <Text className="hero-body">
-              A swipeable drawer sliding in from the right, driven by the navigator's own gesture
-              handler.
+              A swipeable drawer sliding in from the right, driven by the
+              navigator's own gesture handler.
             </Text>
           </View>
         </View>
         <Text className="info-text">
-          drawerPosition: right · drawerType: slide — swipe from the RIGHT edge, or use a button
+          drawerPosition: right · drawerType: slide — swipe from the RIGHT edge,
+          or use a button
         </Text>
         <ActionButton
           testID="drawer-open"
@@ -79,7 +83,11 @@ type IDrawerContentProps = {
   navigation: IDrawerNavigatorHandle;
 };
 
-function renderDrawerContent({ state, descriptors, navigation }: IDrawerContentProps) {
+function renderDrawerContent({
+  state,
+  descriptors,
+  navigation,
+}: IDrawerContentProps) {
   return (
     <SafeAreaView testID="drawer-panel" className="section-tight drawer-panel">
       <Text className="section-label">Menu</Text>
@@ -90,7 +98,9 @@ function renderDrawerContent({ state, descriptors, navigation }: IDrawerContentP
           className="menu-row"
           onPress={() => navigation.jumpTo(route.name)}
         >
-          <Text className="menu-row-label">{descriptors[route.key]?.options.drawerLabel ?? route.name}</Text>
+          <Text className="menu-row-label">
+            {descriptors[route.key]?.options.drawerLabel ?? route.name}
+          </Text>
         </Pressable>
       ))}
     </SafeAreaView>
@@ -112,7 +122,11 @@ export function DrawerDemoScreen() {
       renderDrawerContent={renderDrawerContent}
       drawerStyle={{ backgroundColor: '#13243a' }}
     >
-      <Drawer.Screen name="Home" component={DrawerHomeScreen} options={{ title: 'Home', drawerLabel: 'Home' }} />
+      <Drawer.Screen
+        name="Home"
+        component={DrawerHomeScreen}
+        options={{ title: 'Home', drawerLabel: 'Home' }}
+      />
       <Drawer.Screen
         name="Settings"
         component={DrawerSettingsScreen}

@@ -28,7 +28,10 @@ export type {
   IRippleBackground,
 } from '@symbiote-native/components';
 
-type ITouchableNativeFeedbackBaseProps = Omit<IPressableProps, 'style' | 'children'> & {
+type ITouchableNativeFeedbackBaseProps = Omit<
+  IPressableProps,
+  'style' | 'children'
+> & {
   background?: INativeFeedbackBackground;
   useForeground?: boolean;
   // A single child element, mirroring RN (it accepts only one View child).
@@ -42,18 +45,28 @@ export type ITouchableNativeFeedbackProps = ITouchableNativeFeedbackBaseProps;
 // `TouchableNativeFeedback.Ripple(...)`, exactly like RN.
 interface ITouchableNativeFeedbackComponent extends FC<ITouchableNativeFeedbackProps> {
   SelectableBackground: (rippleRadius?: number) => IThemeAttrBackground;
-  SelectableBackgroundBorderless: (rippleRadius?: number) => IThemeAttrBackground;
-  Ripple: (color: string, borderless: boolean, rippleRadius?: number) => IRippleBackground;
+  SelectableBackgroundBorderless: (
+    rippleRadius?: number,
+  ) => IThemeAttrBackground;
+  Ripple: (
+    color: string,
+    borderless: boolean,
+    rippleRadius?: number,
+  ) => IRippleBackground;
   canUseNativeForeground: () => boolean;
 }
 
-const TouchableNativeFeedbackImpl: FC<ITouchableNativeFeedbackProps> = props => {
+const TouchableNativeFeedbackImpl: FC<
+  ITouchableNativeFeedbackProps
+> = props => {
   const { background, useForeground = false, children, ...rest } = props;
 
   // RN defaults a missing background to SelectableBackground() so the touchable always has
   // feedback; mirror that here.
   const resolved = background ?? selectableBackground();
-  dlog(`TouchableNativeFeedback render ${resolved.type} useForeground ${useForeground}`);
+  dlog(
+    `TouchableNativeFeedback render ${resolved.type} useForeground ${useForeground}`,
+  );
 
   const nativeProps = backgroundProps(resolved, useForeground);
   // The native ripple props ride a dedicated feedback View nested under the Pressable; the
@@ -62,14 +75,12 @@ const TouchableNativeFeedbackImpl: FC<ITouchableNativeFeedbackProps> = props => 
   return createElement(Pressable, rest, feedback);
 };
 
-const TouchableNativeFeedback: ITouchableNativeFeedbackComponent = Object.assign(
-  TouchableNativeFeedbackImpl,
-  {
+const TouchableNativeFeedback: ITouchableNativeFeedbackComponent =
+  Object.assign(TouchableNativeFeedbackImpl, {
     SelectableBackground: selectableBackground,
     SelectableBackgroundBorderless: selectableBackgroundBorderless,
     Ripple: rippleBackground,
     canUseNativeForeground,
-  },
-);
+  });
 
 export { TouchableNativeFeedback };

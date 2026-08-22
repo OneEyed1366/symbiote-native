@@ -8,6 +8,7 @@ import {
   disposeRoot,
   setEventDispatcher,
   dlog,
+  reportUncaughtError,
   type IRootTag,
   type SymbioteSurface,
 } from '@symbiote-native/engine';
@@ -15,6 +16,49 @@ import reconciler, { withDiscretePriority } from './host-config';
 import { LegacyRoot } from './reconciler-constants';
 
 const noop = (): void => {};
+
+// createContainer's three error callbacks. They were all `noop`, which made a throw anywhere in
+// render vanish: the reconciler abandons the commit, so nothing paints, and nothing is logged
+// either - the app shows a blank screen with no clue in the console. React's own defaults hand
+// the error to the host (ReactFiberErrorLogger.js: reportGlobalError / console.error) and RN
+// wraps them again to reach the redbox (ReactFabric.js: nativeOnUncaughtError); ours route
+// through the engine to the same native channel.
+type IReactErrorInfo = {
+  readonly componentStack?: string | null;
+};
+
+function errorReporter(
+  origin: string,
+): (error: unknown, info: IReactErrorInfo) => void {
+  return (error, info) => {
+    reportUncaughtError(error, { origin, componentStack: info.componentStack });
+  };
+}
+
+const onUncaughtError = errorReporter('react render (no error boundary)');
+// A boundary handled it, so it does NOT reach the native redbox — it goes to , off unless
+// DEBUG is set.
+//
+// This deliberately DIVERGES from upstream, whose nativeOnCaughtError calls the same
+// showErrorDialog as the uncaught path. The argument for upstream's choice is that the boundary
+// decides what the USER sees, not whether the developer hears. The argument against, and the one
+// this project takes: writing an ErrorBoundary IS the developer saying "I know this can throw and
+// I am handling it here". Answering that with a full-screen redbox over the fallback the app just
+// rendered contradicts the thing the app asked for, and it is the only adapter here that did it —
+// Solid's ErrorBoundary is silent, and its canary reads as correct next to React's alarming one.
+// An UNCAUGHT error still hits the redbox; the difference is exactly whether someone claimed it.
+const onCaughtError = (error: unknown, info: IReactErrorInfo): void => {
+  dlog(
+    () =>
+      `react render (caught by error boundary): ${String(error)}${
+        info.componentStack ?? ''
+      }`,
+  );
+};
+// React recovered on its own (a concurrent render retried and succeeded), so this is not fatal -
+// but it is still a real error the app swallowed a first render over. RN keeps React's
+// defaultOnRecoverableError here, which reports it globally.
+const onRecoverableError = errorReporter('react render (recovered)');
 
 // A native event runs the listener (which may call setState) outside React's
 // loop. Run it at discrete priority so the update takes the sync lane, then
@@ -67,9 +111,12 @@ export function mount(rootTag: IRootTag, element: ReactNode): SymbioteSurface {
     false,
     null,
     'symbiote',
-    noop,
-    noop,
-    noop,
+    onUncaughtError,
+    onCaughtError,
+    onRecoverableError,
+    // onDefaultTransitionIndicator - the ONE that is genuinely a no-op. RN's own renderer says
+    // so in as many words: "Native doesn't have a default indicator" (ReactFabric.js's
+    // nativeOnDefaultTransitionIndicator).
     noop,
     null,
   );

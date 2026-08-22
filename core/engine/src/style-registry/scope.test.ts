@@ -1,78 +1,78 @@
-// Unit test for the Vue `<style scoped>` class-name rewriter - a separate responsibility
-// from the CSS class registry, see scope.ts's own doc comment.
+// Unit test for the scoped-style class-name rewriter - a separate responsibility from the CSS
+// class registry, see scope.ts's own doc comment. Pure and total (never throws), so there is no
+// Negative group — every scenario is a Positive rewrite outcome.
 
 import { describe, expect, it } from 'vitest';
-import { scopeClassName } from './scope';
+import { renameClassTokens } from './scope';
 
-describe('scopeClassName', () => {
-  const localNames = new Set(['card']);
+// The rewriter the Vue SFC compiler emits calls to. It handles the three input shapes
+// normalizeClass understands, and the new name is READ from a table the style compiler produced,
+// never rebuilt from a scope id — so a token this map does not carry is another file's and must
+// survive verbatim, kebab spelling included.
+describe('renameClassTokens', () => {
+  const renames = {
+    card: 'card__data-v-a1b2c3d4',
+    'section-label': 'sectionLabel__data-v-a1b2c3d4',
+    sectionLabel: 'sectionLabel__data-v-a1b2c3d4',
+  };
 
-  it('suffixes only the local token in a string, preserving order and spacing', () => {
-    expect(scopeClassName('card foo', localNames, 'a1b2c3d4')).toBe('card__a1b2c3d4 foo');
-  });
-
-  it('normalizes repeated/multiple whitespace to single-space-joined tokens', () => {
-    expect(scopeClassName('card   foo\tbar', localNames, 'a1b2c3d4')).toBe(
-      'card__a1b2c3d4 foo bar',
+  it('renames only the tokens the map carries, preserving order', () => {
+    expect(renameClassTokens('card foo', renames)).toBe(
+      'card__data-v-a1b2c3d4 foo',
     );
   });
 
-  it('rewrites only the local key of a toggle-map object, preserving boolean values', () => {
-    const input = { card: true, foo: false };
-    expect(scopeClassName(input, localNames, 'a1b2c3d4')).toEqual({
-      card__a1b2c3d4: true,
-      foo: false,
-    });
+  it('renames a kebab-authored token through its own spelling', () => {
+    expect(renameClassTokens('section-label', renames)).toBe(
+      'sectionLabel__data-v-a1b2c3d4',
+    );
   });
 
-  it('recurses per element of a mixed string/toggle-map array', () => {
-    const input = ['card base', { card: true, foo: false }];
-    expect(scopeClassName(input, localNames, 'a1b2c3d4')).toEqual([
-      'card__a1b2c3d4 base',
-      { card__a1b2c3d4: true, foo: false },
+  // why: an unmapped token is NOT normalized on the way through. The registry matches class names
+  // as authored, so the foreign spelling is exactly what resolves — rewriting it here would be
+  // this function claiming knowledge it does not have.
+  it('leaves an unmapped kebab token exactly as authored', () => {
+    expect(renameClassTokens('foo-bar', renames)).toBe('foo-bar');
+  });
+
+  it('renames the keys of a toggle map and the entries of an array', () => {
+    expect(renameClassTokens({ card: true, foo: false }, renames)).toEqual({
+      'card__data-v-a1b2c3d4': true,
+      foo: false,
+    });
+    expect(renameClassTokens(['card', { foo: true }], renames)).toEqual([
+      'card__data-v-a1b2c3d4',
+      { foo: true },
     ]);
   });
 
-  it('passes null and undefined through unchanged', () => {
-    expect(scopeClassName(null, localNames, 'a1b2c3d4')).toBeNull();
-    expect(scopeClassName(undefined, localNames, 'a1b2c3d4')).toBeUndefined();
+  it('passes null/undefined through, as normalizeClass would', () => {
+    expect(renameClassTokens(null, renames)).toBeNull();
+    expect(renameClassTokens(undefined, renames)).toBeUndefined();
   });
 
-  it('recognizes a kebab-case token against the camelCase localNames set, emitting the camel form', () => {
-    const camelLocalNames = new Set(['sectionLabel']);
-    expect(scopeClassName('section-label foo', camelLocalNames, 'a1b2c3d4')).toBe(
-      'sectionLabel__a1b2c3d4 foo',
-    );
-  });
-
-  it('normalizes an untouched (non-local) kebab-case token to camelCase too', () => {
-    // foo-bar isn't in localNames, so it isn't suffixed - but the runtime registry only ever
-    // has camelCase keys, so the emitted token must still be normalized or resolveClassName's
-    // exact-match would look up an unregistered literal "foo-bar" key.
-    expect(scopeClassName('card foo-bar', localNames, 'a1b2c3d4')).toBe('card__a1b2c3d4 fooBar');
-  });
-
-  it('recognizes a kebab-case toggle-map key against camelCase localNames', () => {
-    const camelLocalNames = new Set(['sectionLabel']);
-    const input = { 'section-label': true, 'other-thing': false };
-    expect(scopeClassName(input, camelLocalNames, 'a1b2c3d4')).toEqual({
-      sectionLabel__a1b2c3d4: true,
-      otherThing: false,
-    });
-  });
-
+  // why: the rewriter runs at every render of a scoped component — mutating the caller's
+  // `class`/`:class` value in place would corrupt Vue's own reactive state.
   it('does not mutate the input object or array', () => {
     const inputObject = { card: true, foo: false };
     const inputArray = ['card', { card: true }];
     const objectSnapshot = { ...inputObject };
     const arraySnapshot = [...inputArray];
 
-    const resultObject = scopeClassName(inputObject, localNames, 'a1b2c3d4');
-    const resultArray = scopeClassName(inputArray, localNames, 'a1b2c3d4');
+    const resultObject = renameClassTokens(inputObject, renames);
+    const resultArray = renameClassTokens(inputArray, renames);
 
     expect(inputObject).toEqual(objectSnapshot);
     expect(inputArray).toEqual(arraySnapshot);
     expect(resultObject).not.toBe(inputObject);
     expect(resultArray).not.toBe(inputArray);
+  });
+
+  it('an empty string has no tokens to rename and stays empty', () => {
+    expect(renameClassTokens('', renames)).toBe('');
+  });
+
+  it('an empty array has nothing to recurse into', () => {
+    expect(renameClassTokens([], renames)).toEqual([]);
   });
 });

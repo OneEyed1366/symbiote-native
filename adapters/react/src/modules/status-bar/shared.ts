@@ -5,7 +5,10 @@
 // is the one React-coupled type (it names React's FC), so it stays here, not in the engine.
 
 import type { FC } from 'react';
-import type { IStatusBarImperative, IStatusBarProps } from '@symbiote-native/engine';
+import type {
+  IStatusBarImperative,
+  IStatusBarProps,
+} from '@symbiote-native/engine';
 export type {
   IStatusBarProps,
   IStatusBarStyle,
@@ -14,6 +17,7 @@ export type {
 
 // The declarative component plus the imperative surface, mirroring RN. currentHeight is
 // Android-only; on iOS it is absent (RN sets it to null), so it stays optional on the contract.
-export interface IStatusBarComponent extends FC<IStatusBarProps>, IStatusBarImperative {
+export interface IStatusBarComponent
+  extends FC<IStatusBarProps>, IStatusBarImperative {
   currentHeight?: number;
 }

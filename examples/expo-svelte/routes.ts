@@ -1,0 +1,32 @@
+// Route-name constants shared between App.svelte's <Screen name="..."> registrations and every
+// screen's navigation.push(...)/navigation.jumpTo(...) calls — a single source of truth so a
+// typo can't silently create a dead route on one side only. Verbatim port of
+// examples/expo-vue-sfc/routes.ts — the route names/keys are framework-agnostic.
+
+export const ROUTE_NAME = {
+  Menu: 'Menu',
+  Sensors: 'Sensors',
+  LocalAuth: 'LocalAuth',
+  Haptics: 'Haptics',
+  Clipboard: 'Clipboard',
+  Battery: 'Battery',
+  Brightness: 'Brightness',
+  Cellular: 'Cellular',
+  Network: 'Network',
+  Device: 'Device',
+  Application: 'Application',
+  Crypto: 'Crypto',
+  StandardWebCrypto: 'StandardWebCrypto',
+  SystemUi: 'SystemUi',
+  StoreReview: 'StoreReview',
+  KeepAwake: 'KeepAwake',
+  ScreenOrientation: 'ScreenOrientation',
+  Localization: 'Localization',
+  TrackingTransparency: 'TrackingTransparency',
+  SecureStore: 'SecureStore',
+  Sharing: 'Sharing',
+  WebBrowser: 'WebBrowser',
+  Sms: 'Sms',
+} as const;
+
+export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

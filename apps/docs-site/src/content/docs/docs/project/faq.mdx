@@ -32,6 +32,15 @@ renderer does not.
 Apps should pin it explicitly at the top level. SymbioteNative hides most imports from
 app code, not the runtime dependency from the app manifest.
 
+## Does a wrapper package like Haptics or Sensors need setup?
+
+One step, once per app: add `@symbiote-native/expo-modules-link` to
+`dependencies` and `"postinstall": "symbiote-expo-link"` to `scripts`. Every
+wrapper package you install afterwards is picked up on the next install. Skip
+it and the JS imports still resolve — the app fails later, at runtime, with
+`Cannot find native module '<Name>'`. Full setup:
+[Wire up an Expo native module](/docs/howtos/expo-native-module-setup/).
+
 ## Can Vue render any React Native package?
 
 No. A third-party React Native package that exports a JavaScript React component
@@ -51,12 +60,76 @@ Vue, with its own [guide](/docs/learn/angular/), demo GIF, and
 [API reference](/docs/api/angular/), and wrapper packages like Slider ship an
 Angular build too. One thing is still catching up: Angular has its own
 real-device Detox e2e suite, but doesn't yet share the identical
-`canary-journeys` spec file that React and Vue run byte-for-byte. See the
+`canary-journeys` spec file that React, Vue, and Svelte run byte-for-byte. See the
 [status page](/docs/project/status/) for the exact line.
 
-## What about Svelte and Solid?
+## Is Svelte a first-class adapter?
 
-No code exists yet. The architecture is built for thin adapters over the same
-shared engine, so they fit the same long-term model Angular proved out, but
-they stay in architecture diagrams and roadmap text only until that work
-starts.
+Yes. It's a DOM shim over stock compiled Svelte output driving the same
+engine, with full component parity against React, Vue, and Angular, verified
+on-device on iOS and Android (`examples/svelte`). The Slider wrapper package
+ships a Svelte build too, and it's on the landing page's live framework
+switcher, with its own demo clip and [learn guide](/docs/learn/svelte/).
+
+## Can I use Svelte stores, Context, or `svelte/motion`/`svelte/easing` in a SymbioteNative app?
+
+Yes, almost all of Svelte's own runtime works completely unmodified. `svelte/store`
+(`writable`/`readable`/`derived`), `svelte/easing`, `svelte/events`,
+`svelte/attachments`, and nearly all of `svelte/reactivity` (`SvelteMap`, `SvelteSet`,
+`SvelteDate`, `SvelteURL`, `createSubscriber`) are pure JavaScript with zero DOM
+dependency, so the DOM-shim adapter never gets in their way.
+
+`svelte/motion` is the exception, and this page used to list it among the pure ones
+by mistake. `Tween` and `Spring` themselves are pure, but the module's entry point
+constructs a `MediaQuery` at module scope to expose `prefersReducedMotion`:
+
+```js
+// svelte/src/motion/index.js
+import { MediaQuery } from 'svelte/reactivity';
+export const prefersReducedMotion = /*@__PURE__*/ new MediaQuery(
+  '(prefers-reduced-motion: reduce)',
+);
+```
+
+`MediaQuery`'s constructor calls `window.matchMedia`, which React Native does not
+define. The `/*@__PURE__*/` annotation lets a tree-shaking bundler drop that line when
+`prefersReducedMotion` is unused, but Metro does not tree-shake by default, so
+`import { Tween } from 'svelte/motion'` can fail at import time rather than at first
+use. Reach for `Animated` from `@symbiote-native/svelte` for animation, and
+`orientation` / `createWidthQuery` / `useColorScheme` where you would have used a media
+query. Context (`setContext`/
+`getContext`) also works as-is — `@symbiote-native/navigation`'s Svelte port uses it
+internally to hand each mounted route its own navigation scope.
+
+Two members are browser-only and rejected at build time: `svelte/reactivity/window`
+(reads `window.innerWidth`/`scrollY`/etc, which React Native never defines — use
+`innerWidth`/`innerHeight`/`outerWidth`/`outerHeight`/`devicePixelRatio` from
+`@symbiote-native/svelte` instead) and `MediaQuery` from `svelte/reactivity` (built on
+`window.matchMedia` — use `orientation`, `createWidthQuery`, or `useColorScheme` from
+`@symbiote-native/svelte` instead).
+
+## Can I use `<svelte:window>`, `<svelte:document>`, `<svelte:body>`, or `<svelte:head>`?
+
+No — all four fail the build (and are flagged live by `svelte-check`/the editor) with an
+explicit error, rather than silently compiling into something that does nothing on
+native. Use the matching runtime module instead:
+
+- `<svelte:window bind:innerWidth>` / `bind:innerHeight` → `useWindowDimensions()` from
+  `@symbiote-native/svelte` (`const windowSize = useWindowDimensions()`, then read
+  `windowSize.current.width`/`.height`).
+- `<svelte:document bind:visibilityState>` → `AppState` from `@symbiote-native/svelte`
+  (`AppState.currentState`, `AppState.addEventListener('change', handler)`).
+- `<svelte:body>` — no equivalent; there is no native page body to bind listeners to.
+- `<svelte:head>` — no equivalent; native apps have no page head.
+
+## Is Solid a first-class adapter?
+
+Code-wise, yes: it's a Solid custom renderer over `solid-js/universal`'s own
+`createRenderer`, driving the same engine, with the same component-parity
+surface as React, Vue, Angular, and Svelte, including `createPortal`,
+`createTunnel`, `Animated`, and `AppRegistry` (`examples/solid`). Every
+companion package under `packages/*` ships a `./solid` build too, and it has
+its own [guide](/docs/learn/solid/) and [API reference](/docs/api/solid/).
+It's also on the landing page's live framework switcher, with its own demo
+clip. What's still catching up: it hasn't been verified on a real
+iOS/Android device (headless `vitest` only).

@@ -15,7 +15,12 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { dlog, Platform, type ISymbioteEvent, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  dlog,
+  Platform,
+  type ISymbioteEvent,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
 import {
   flattenSections,
   resolveStickySectionHeaders,
@@ -33,14 +38,18 @@ import {
   type IVirtualizedListHandle,
 } from '../virtualized-list';
 import type { IScrollViewHandle } from '../scroll-view';
-import type { IAccessibilityProps, IAriaProps } from '@symbiote-native/components';
+import type {
+  IAccessibilityProps,
+  IAriaProps,
+} from '@symbiote-native/components';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 
 export type { ISection } from '@symbiote-native/components';
 // Re-export the shared handle type so section-list imports it from '../virtualized-section-list'.
 export type { IVirtualizedSectionListHandle };
 
-export interface IVirtualizedSectionListProps<ItemT> extends IAccessibilityProps, IAriaProps {
+export interface IVirtualizedSectionListProps<ItemT>
+  extends IAccessibilityProps, IAriaProps {
   sections: ReadonlyArray<ISection<ItemT>>;
   renderItem: (info: {
     item: ItemT;
@@ -52,8 +61,19 @@ export interface IVirtualizedSectionListProps<ItemT> extends IAccessibilityProps
   renderSectionFooter?: (info: { section: ISection<ItemT> }) => ReactNode;
   // Painted between adjacent sections (after one section's footer, before the next section's
   // header). Mirrors RN's SectionSeparatorComponent.
-  SectionSeparatorComponent?: ComponentType<Record<string, never>> | ReactElement;
+  SectionSeparatorComponent?:
+    ComponentType<Record<string, never>> | ReactElement;
   keyExtractor?: (item: ItemT, index: number) => string;
+  // Fixed-layout fast path, FLAT like RN's: the SECTIONS array plus a flat entry index, where every
+  // section contributes two rows beyond its items (header, footer) and the caller accounts for them.
+  // A `({ section, index })` form would be our invention, not parity - `VirtualizedSectionList.js`
+  // has no getItemLayout code at all, the prop rides through `passThroughProps`; that shape is the
+  // community react-native-section-list-get-item-layout, layered on top. Without it a fast scroll
+  // outruns measurement and leaves blank windows.
+  getItemLayout?: (
+    data: ReadonlyArray<ISection<ItemT>> | null,
+    index: number,
+  ) => { length: number; offset: number; index: number };
   // Stick each section header to the top as the next section scrolls up. Routed to the inner
   // VirtualizedList's stickyHeaderIndices. Defaults to `Platform.OS === 'ios'` (RN
   // SectionList.js:243-244); Android does not stick by default. Pass true/false to override.
@@ -103,7 +123,9 @@ function resolveSeparator(
 }
 
 export function VirtualizedSectionList<ItemT>(
-  props: IVirtualizedSectionListProps<ItemT> & { ref?: Ref<IVirtualizedSectionListHandle> },
+  props: IVirtualizedSectionListProps<ItemT> & {
+    ref?: Ref<IVirtualizedSectionListHandle>;
+  },
 ): ReactElement {
   const {
     ref,
@@ -116,6 +138,9 @@ export function VirtualizedSectionList<ItemT>(
     // streams ISectionEntry<ItemT>, so we wrap it to unwrap each entry back to its ItemT.
     ItemSeparatorComponent,
     keyExtractor,
+    // Also pulled out of `rest`: the inner list streams entries, the user's callback expects
+    // sections. See entryItemLayout below.
+    getItemLayout,
     stickySectionHeadersEnabled,
     ...rest
   } = props;
@@ -181,7 +206,8 @@ export function VirtualizedSectionList<ItemT>(
         listRef.current?.getScrollableNode() ?? null,
       getScrollResponder: (): IScrollViewHandle | null =>
         listRef.current?.getScrollResponder() ?? null,
-      getScrollNode: (): ISymbioteNode | null => listRef.current?.getScrollNode() ?? null,
+      getScrollNode: (): ISymbioteNode | null =>
+        listRef.current?.getScrollNode() ?? null,
       recordInteraction: (): void => {
         listRef.current?.recordInteraction();
       },
@@ -196,10 +222,14 @@ export function VirtualizedSectionList<ItemT>(
   }): ReactNode => {
     const entry = info.item;
     if (entry.kind === 'header') {
-      return renderSectionHeader ? renderSectionHeader({ section: entry.section }) : undefined;
+      return renderSectionHeader
+        ? renderSectionHeader({ section: entry.section })
+        : undefined;
     }
     if (entry.kind === 'footer') {
-      return renderSectionFooter ? renderSectionFooter({ section: entry.section }) : undefined;
+      return renderSectionFooter
+        ? renderSectionFooter({ section: entry.section })
+        : undefined;
     }
     if (entry.kind === 'section-separator') {
       return resolveSeparator(SectionSeparatorComponent);
@@ -214,7 +244,8 @@ export function VirtualizedSectionList<ItemT>(
 
   // The user's ItemSeparatorComponent is typed on ItemT; the inner stream is the entry wrapper, so
   // unwrap each entry back to its ItemT (shared unwrapEntryItem) before handing it to the user.
-  const entrySeparatorComponent: ComponentType<ISeparatorProps<ISectionEntry<ItemT>>> | undefined =
+  const entrySeparatorComponent:
+    ComponentType<ISeparatorProps<ISectionEntry<ItemT>>> | undefined =
     ItemSeparatorComponent === undefined
       ? undefined
       : (entryProps): ReactNode =>
@@ -224,16 +255,38 @@ export function VirtualizedSectionList<ItemT>(
             trailingItem: unwrapEntryItem(entryProps.trailingItem),
           });
 
-  const entryKeyExtractor = (entry: ISectionEntry<ItemT>, index: number): string =>
-    sectionEntryKey(entry, index, keyExtractor);
+  const entryKeyExtractor = (
+    entry: ISectionEntry<ItemT>,
+    index: number,
+  ): string => sectionEntryKey(entry, index, keyExtractor);
+
+  // Hand the callback `sections`, not the entries: RN's inner VirtualizedList gets
+  // `data={this.props.sections}` (VirtualizedSectionList.js:216) while ours streams the FLATTENED
+  // entries, so the same user code would otherwise see a different argument here than on RN.
+  //
+  // UPSTREAM-DIVERGENCE(react-native): the flat INDEX matches RN's (two rows per section, header
+  // and footer) only while SectionSeparatorComponent is unset. With it, flattenSections emits an
+  // extra 'section-separator' row per boundary that RN renders inside the neighbouring cell, so
+  // indices shift by one per boundary from the second section on. Deliberate - that row is how this
+  // adapter paints the separator; a caller combining the two must account for it.
+  const entryItemLayout =
+    getItemLayout === undefined
+      ? undefined
+      : (
+          _entries: unknown,
+          index: number,
+        ): { length: number; offset: number; index: number } =>
+          getItemLayout(sections, index);
 
   return createElement(VirtualizedList<ISectionEntry<ItemT>>, {
     ref: listRef,
     data: entries,
-    getItem: (_source: unknown, index: number): ISectionEntry<ItemT> => entries[index],
+    getItem: (_source: unknown, index: number): ISectionEntry<ItemT> =>
+      entries[index],
     getItemCount: (): number => entries.length,
     renderItem: renderEntry,
     keyExtractor: entryKeyExtractor,
+    getItemLayout: entryItemLayout,
     stickyHeaderIndices,
     ItemSeparatorComponent: entrySeparatorComponent,
     ...rest,

@@ -20,7 +20,6 @@ import { dlog } from '../debug';
 // The one event symbiote observes: an incoming deep link. RN's LinkingEventDefinitions.
 const URL_EVENT = 'url';
 
-// The payload native delivers with the `url` event.
 export interface IUrlEvent {
   url: string;
 }
@@ -44,7 +43,6 @@ export interface INativeLinkingModule extends IEventEmitterModule {
   removeListeners(count: number): void;
 }
 
-// What every platform's Linking exposes to app code.
 export interface ILinkingStatic {
   addEventListener(
     eventType: typeof URL_EVENT,
@@ -94,7 +92,9 @@ export function createLinking(platform: ILinkingPlatform): ILinkingStatic {
 
   function getModule(): INativeLinkingModule | null {
     if (linkingModule === undefined) {
-      linkingModule = getNativeModule<INativeLinkingModule>(platform.moduleName);
+      linkingModule = getNativeModule<INativeLinkingModule>(
+        platform.moduleName,
+      );
       dlog(
         `Linking: ${platform.moduleName} module ${linkingModule ? 'resolved' : 'NOT resolved (null)'}`,
       );
@@ -113,7 +113,9 @@ export function createLinking(platform: ILinkingPlatform): ILinkingStatic {
   }
 
   function moduleUnavailable(): Error {
-    return new Error(`Linking: ${platform.moduleName} native module unavailable`);
+    return new Error(
+      `Linking: ${platform.moduleName} native module unavailable`,
+    );
   }
 
   return {

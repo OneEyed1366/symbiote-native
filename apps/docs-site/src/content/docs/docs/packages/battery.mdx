@@ -1,0 +1,406 @@
+---
+title: Battery
+description: expo-battery wrapped for every SymbioteNative adapter — battery level, charging state, and low-power-mode detection.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/battery` wraps [`expo-battery`](https://docs.expo.dev/versions/latest/sdk/battery/)
+so every SymbioteNative adapter can read battery level, charging state, and low-power-mode. Unlike
+the [slider](/docs/packages/slider/) (a native **view**) or [splash screen](/docs/packages/splash-screen/)
+(one imperative **TurboModule**), `expo-battery` is built on `expo-modules-core` — a pure async-function
+
+- `EventEmitter` surface, no Fabric view or `ViewConfig` involved. Like [sensors](/docs/packages/sensors/),
+  battery exposes three independent subscriptions (level, state, low-power-mode) rather than one
+  combined hook — matching upstream's own `useBatteryLevel`/`useBatteryState`/`useLowPowerMode` being
+  three separate hooks, not one.
+
+| OS platform | Support |
+| ----------- | ------- |
+| iOS         | ✅ live |
+| Android     | ✅ live |
+
+| Framework adapter | Support |
+| ----------------- | ------- |
+| React             | ✅ live |
+| Vue               | ✅ live |
+| Angular           | ✅ live |
+| Svelte            | ✅ live |
+| Solid             | ✅ live |
+
+<Aside type="note">
+  `isBatteryOptimizationEnabledAsync()` is Android-only — it always resolves
+  `false` on iOS, since iOS has no equivalent concept of per-app battery
+  optimization / doze-mode exemption.
+</Aside>
+
+## Installation
+
+```sh
+npm install @symbiote-native/battery
+```
+
+`expo-battery` and `expo-modules-core` come along as regular dependencies, pinned to exact
+versions — never install either yourself, and never add the `expo` meta-package to your project
+(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+
+<Aside type="danger" title="Native setup is required before first use">
+  `expo-battery`'s native code is discovered by `expo-modules-autolinking`, a
+  different mechanism from the `react-native.config.cjs`/podspec autolinking
+  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package. Follow
+  [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  this package and every other `expo-modules-core` package with zero further
+  native changes.
+</Aside>
+
+## Usage
+
+<Aside type="note">
+  Every hook/composable/`connect()` below seeds its initial value from the
+  matching one-shot `get*Async`/`is*Async` call, then subscribes to the matching
+  listener for live updates.
+</Aside>
+
+### Battery level
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Text } from '@symbiote-native/react';
+    import { useBatteryLevel } from '@symbiote-native/battery/react';
+
+    export default function BatteryLevel() {
+      const batteryLevel = useBatteryLevel(); // number, -1 until the first reading arrives
+
+      return <Text>{batteryLevel}</Text>;
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { useBatteryLevel } from '@symbiote-native/battery/vue';
+
+    const batteryLevel = useBatteryLevel(); // Ref<number>, -1 until the first reading arrives
+    </script>
+
+    <template>
+      <Text>{{ batteryLevel }}</Text>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { Text } from '@symbiote-native/angular';
+    import { BatteryLevelService } from '@symbiote-native/battery/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Text],
+      template: `<Text>{{ batteryLevel() }}</Text>`,
+    })
+    export class BatteryLevelDisplay {
+      readonly batteryLevel = inject(BatteryLevelService).connect();
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text } from '@symbiote-native/svelte';
+      import { useBatteryLevel } from '@symbiote-native/battery/svelte';
+
+      const batteryLevel = useBatteryLevel(); // { readonly current: number }, -1 until the first reading arrives
+    </script>
+
+    <Text>{batteryLevel.current}</Text>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createBatteryLevel } from '@symbiote-native/battery/solid';
+
+    export function BatteryLevel() {
+      const batteryLevel = createBatteryLevel(); // Accessor<number>, -1 until the first reading arrives
+
+      return <Text>{batteryLevel()}</Text>;
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Battery state
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Text } from '@symbiote-native/react';
+    import { useBatteryState } from '@symbiote-native/battery/react';
+    import { BatteryState } from '@symbiote-native/battery';
+
+    export default function ChargingIndicator() {
+      const batteryState = useBatteryState();
+
+      return <Text>{batteryState === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</Text>;
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { useBatteryState } from '@symbiote-native/battery/vue';
+    import { BatteryState } from '@symbiote-native/battery';
+
+    const batteryState = useBatteryState();
+    </script>
+
+    <template>
+      <Text>{{ batteryState === BatteryState.CHARGING ? 'Charging' : 'Not charging' }}</Text>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { Text } from '@symbiote-native/angular';
+    import { BatteryStateService } from '@symbiote-native/battery/angular';
+    import { BatteryState } from '@symbiote-native/battery';
+
+    @Component({
+      standalone: true,
+      imports: [Text],
+      template: `<Text>{{ batteryState() === BatteryState.CHARGING ? 'Charging' : 'Not charging' }}</Text>`,
+    })
+    export class ChargingIndicator {
+      // Angular templates can't reach a module-level import directly — expose the enum as a field.
+      readonly BatteryState = BatteryState;
+      readonly batteryState = inject(BatteryStateService).connect();
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text } from '@symbiote-native/svelte';
+      import { useBatteryState } from '@symbiote-native/battery/svelte';
+      import { BatteryState } from '@symbiote-native/battery';
+
+      const batteryState = useBatteryState(); // { readonly current: BatteryState }, seeded UNKNOWN
+    </script>
+
+    <Text>{batteryState.current === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</Text>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createBatteryState } from '@symbiote-native/battery/solid';
+    import { BatteryState } from '@symbiote-native/battery';
+
+    export function ChargingIndicator() {
+      const batteryState = createBatteryState(); // Accessor<BatteryState>, seeded UNKNOWN
+
+      return <Text>{batteryState() === BatteryState.CHARGING ? 'Charging' : 'Not charging'}</Text>;
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Low power mode
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { Text } from '@symbiote-native/react';
+    import { useLowPowerMode } from '@symbiote-native/battery/react';
+
+    export default function LowPowerBadge() {
+      const lowPowerMode = useLowPowerMode();
+
+      return <Text>{lowPowerMode ? 'Low Power Mode is on' : null}</Text>;
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { useLowPowerMode } from '@symbiote-native/battery/vue';
+
+    const lowPowerMode = useLowPowerMode();
+    </script>
+
+    <template>
+      <Text>{{ lowPowerMode ? 'Low Power Mode is on' : null }}</Text>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, inject } from '@angular/core';
+    import { Text } from '@symbiote-native/angular';
+    import { LowPowerModeService } from '@symbiote-native/battery/angular';
+
+    @Component({
+      standalone: true,
+      imports: [Text],
+      template: `<Text>{{ lowPowerMode() ? 'Low Power Mode is on' : null }}</Text>`,
+    })
+    export class LowPowerBadge {
+      readonly lowPowerMode = inject(LowPowerModeService).connect();
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { Text } from '@symbiote-native/svelte';
+      import { useLowPowerMode } from '@symbiote-native/battery/svelte';
+
+      const lowPowerMode = useLowPowerMode(); // { readonly current: boolean }, seeded false
+    </script>
+
+    <Text>{lowPowerMode.current ? 'Low Power Mode is on' : null}</Text>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Text } from '@symbiote-native/solid';
+    import { createLowPowerMode } from '@symbiote-native/battery/solid';
+
+    export function LowPowerBadge() {
+      const lowPowerMode = createLowPowerMode(); // Accessor<boolean>, seeded false
+
+      return <Text>{lowPowerMode() ? 'Low Power Mode is on' : null}</Text>;
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+### One-shot functions
+
+The stateless functions are already framework-agnostic — import them straight from the package
+root, on any adapter:
+
+```ts
+import {
+  isAvailableAsync,
+  getPowerStateAsync,
+  isBatteryOptimizationEnabledAsync, // Android only
+} from '@symbiote-native/battery';
+
+const available = await isAvailableAsync();
+const { batteryLevel, batteryState, lowPowerMode } = await getPowerStateAsync();
+```
+
+## API
+
+### Stateless functions
+
+| Signature                                               | Description                                                                                                                                   |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isAvailableAsync(): Promise<boolean>`                  | Whether the battery API is available on this device — `false` on an iOS Simulator                                                             |
+| `getBatteryLevelAsync(): Promise<number>`               | Battery level between `0` and `1`, inclusive, or `-1` if the device can't report it                                                           |
+| `getBatteryStateAsync(): Promise<BatteryState>`         | Current charging state — see the [`BatteryState`](#batterystate) table below                                                                  |
+| `isLowPowerModeEnabledAsync(): Promise<boolean>`        | Whether Low Power Mode (iOS) / Power Saver (Android) is currently on                                                                          |
+| `isBatteryOptimizationEnabledAsync(): Promise<boolean>` | Whether Android battery optimization is enabled for this app (background tasks may be affected in doze mode) — always resolves `false` on iOS |
+| `getPowerStateAsync(): Promise<PowerState>`             | Combined `{ batteryLevel, batteryState, lowPowerMode }` snapshot, gathered with a single `Promise.all` over the three calls above             |
+| `addBatteryLevelListener(listener): EventSubscription`  | Subscribes to battery level change events; call `.remove()` on the returned subscription to unsubscribe                                       |
+| `addBatteryStateListener(listener): EventSubscription`  | Subscribes to battery state (charging/full/unplugged/unknown) change events                                                                   |
+| `addLowPowerModeListener(listener): EventSubscription`  | Subscribes to Low Power Mode / Power Saver toggle events                                                                                      |
+
+### Hooks / composables / services / primitives
+
+| React (`/react`)  | Vue (`/vue`)      | Angular (`/angular`)            | Svelte (`/svelte`) | Solid (`/solid`)     | Signature | Returns                                                                                                                                          |
+| ----------------- | ----------------- | ------------------------------- | ------------------- | --------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useBatteryLevel` | `useBatteryLevel` | `BatteryLevelService.connect()` | `useBatteryLevel`   | `createBatteryLevel` | `()`      | Live battery level — `number` (React), `Ref<number>` (Vue), `Signal<number>` (Angular), `{ readonly current: number }` (Svelte), `Accessor<number>` (Solid), seeded `-1`           |
+| `useBatteryState` | `useBatteryState` | `BatteryStateService.connect()` | `useBatteryState`   | `createBatteryState` | `()`      | Live `BatteryState` — plain value (React/Vue `Ref`), `Signal<BatteryState>` (Angular), `{ readonly current: BatteryState }` (Svelte), `Accessor<BatteryState>` (Solid), seeded `UNKNOWN` |
+| `useLowPowerMode` | `useLowPowerMode` | `LowPowerModeService.connect()` | `useLowPowerMode`   | `createLowPowerMode` | `()`      | Live `boolean` — plain value (React/Vue `Ref`), `Signal<boolean>` (Angular), `{ readonly current: boolean }` (Svelte), `Accessor<boolean>` (Solid), seeded `false`                  |
+
+Angular's `connect()` returns a `Signal` — read it as `batteryLevel()` in code or in a template,
+same as every other `connect()`-based service in this project. Solid's `create*` primitives return
+an `Accessor` for the same reason: call it as `batteryLevel()`, never destructure it, since a Solid
+component body runs once and a destructured value would freeze at its first reading. Svelte's
+`use*` runes return a boxed getter, `{ readonly current }`, read as `batteryLevel.current` — a
+bare `$state` handed out of a plain function loses its reactivity once destructured, since Svelte 5
+runes are lexically scoped to the file that declares them.
+
+### `BatteryState`
+
+| Member         | Value | Description                                                                                                                 |
+| -------------- | ----- | --------------------------------------------------------------------------------------------------------------------------- |
+| `UNKNOWN`      | `0`   | Battery state is unknown or inaccessible                                                                                    |
+| `UNPLUGGED`    | `1`   | Discharging, not connected to power (Android: `BATTERY_STATUS_DISCHARGING`)                                                 |
+| `CHARGING`     | `2`   | Battery is charging                                                                                                         |
+| `FULL`         | `3`   | Battery level is full                                                                                                       |
+| `NOT_CHARGING` | `4`   | Power connected (AC/USB/wireless) but not actually charging, e.g. a charge-limit or optimized-charging pause — Android only |
+
+### `PowerState`
+
+| Field          | Type           | Description                                                           |
+| -------------- | -------------- | --------------------------------------------------------------------- |
+| `batteryLevel` | `number`       | `0`..`1`, inclusive, or `-1` if the battery level is unknown          |
+| `batteryState` | `BatteryState` | The current charging state, see [`BatteryState`](#batterystate) above |
+| `lowPowerMode` | `boolean`      | `true` if Low Power Mode / Power Saver is on, `false` otherwise       |
+
+## Notes
+
+- **Android stops delivering events while the app is backgrounded.** The native module unregisters
+  its broadcast receivers when the activity enters the background and registers them again on
+  return, and emits no catch-up event — so after a return to the foreground your listener still
+  holds the last value it saw until the next real change. Re-seed from `getPowerStateAsync()` if
+  you need to be current at that moment.
+- **`addBatteryLevelListener` fires far less often on Android.** The Android receiver subscribes to
+  `ACTION_BATTERY_LOW` and `ACTION_BATTERY_OKAY` only, so it reports crossing those thresholds and
+  nothing in between; iOS listens to `UIDevice.batteryLevelDidChangeNotification`, which fires on
+  every reported percentage change. Don't build a percentage readout on the Android event alone.
+- **The iOS Simulator resolves sentinels instead of failing.** `isSupported` is compiled to `false`
+  under `targetEnvironment(simulator)`, but the level and state functions have no simulator branch
+  at all — they read `UIDevice.current` straight through and resolve whatever it reports there. Gate
+  on `isAvailableAsync()` rather than treating a `-1` level as a real reading.
+
+## How the wrapper works
+
+`@symbiote-native/battery` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-battery` itself** — that
+package's own JS hard-imports the `expo` meta-package (which this project never installs), so its
+free functions and event-name constants are hand-ported, verbatim, into this package's own
+`core/`, changing only the one import line that now pulls `EventSubscription` from
+`expo-modules-core` instead of `expo`:
+
+```
+packages/battery/src/
+├── core/              isAvailableAsync/getBatteryLevelAsync/getBatteryStateAsync/
+│                       isLowPowerModeEnabledAsync/isBatteryOptimizationEnabledAsync/
+│                       getPowerStateAsync + addBatteryLevelListener/addBatteryStateListener/
+│                       addLowPowerModeListener; native-module.ts resolves the single
+│                       `ExpoBattery` native module via expo-modules-core's requireNativeModule
+├── react/hooks/        @symbiote-native/battery/react   — useBatteryLevel, useBatteryState, useLowPowerMode
+├── vue/composables/    @symbiote-native/battery/vue     — useBatteryLevel, useBatteryState, useLowPowerMode (same names)
+├── svelte/runes/       @symbiote-native/battery/svelte  — useBatteryLevel, useBatteryState, useLowPowerMode (same names)
+└── angular/services/   @symbiote-native/battery/angular — BatteryLevelService, BatteryStateService, LowPowerModeService
+```
+
+Each adapter's hook/composable/rune/service is a thin lifecycle wrapper — seed from the one-shot
+call, subscribe on mount, unsubscribe on unmount — over the same `core` functions; the subscription
+and seeding logic is written once and shared by all four, the same logic/lifecycle split as every
+other SymbioteNative component (see [how it works](/docs/how-it-works/)). The native code itself
+is never vendored or copied — `expo-modules-autolinking` resolves it straight out of
+`node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

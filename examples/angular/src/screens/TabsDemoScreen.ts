@@ -1,6 +1,10 @@
 import { Component, type Signal } from '@angular/core';
 import { SafeAreaView, Text, View } from '@symbiote-native/angular';
-import { Tab, TabScreenDirective, injectIsFocused } from '@symbiote-native/navigation/angular';
+import {
+  Tab,
+  TabScreenDirective,
+  injectIsFocused,
+} from '@symbiote-native/navigation/angular';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
@@ -25,7 +29,8 @@ const tabLineTagLabel = `${tabsLineInfo.code} · ${tabsLineInfo.label}`;
           <View class="hero-copy">
             <Text class="hero-title">Tabs</Text>
             <Text class="hero-body">
-              A bottom-tabs navigator — icon, badge, and tint, each tab a real native view.
+              A bottom-tabs navigator — icon, badge, and tint, each tab a real
+              native view.
             </Text>
           </View>
         </View>
@@ -109,9 +114,24 @@ export class TabProfileScreen {
   imports: [Tab, TabScreenDirective],
   template: `
     <Tab initialRouteName="Home">
-      <ng-template symbioteTabScreen name="Home" [component]="tabHomeScreen" [options]="homeOptions"></ng-template>
-      <ng-template symbioteTabScreen name="Search" [component]="tabSearchScreen" [options]="searchOptions"></ng-template>
-      <ng-template symbioteTabScreen name="Profile" [component]="tabProfileScreen" [options]="profileOptions"></ng-template>
+      <ng-template
+        symbioteTabScreen
+        name="Home"
+        [component]="tabHomeScreen"
+        [options]="homeOptions"
+      ></ng-template>
+      <ng-template
+        symbioteTabScreen
+        name="Search"
+        [component]="tabSearchScreen"
+        [options]="searchOptions"
+      ></ng-template>
+      <ng-template
+        symbioteTabScreen
+        name="Profile"
+        [component]="tabProfileScreen"
+        [options]="profileOptions"
+      ></ng-template>
     </Tab>
   `,
 })
@@ -125,6 +145,10 @@ export class TabsDemoScreen {
     tabBarIcon: '🏠',
     tabBarActiveTintColor: LINE_COLOR.structure,
   };
-  readonly searchOptions = { tabBarLabel: 'Search', tabBarIcon: '🔍', tabBarBadge: 3 };
+  readonly searchOptions = {
+    tabBarLabel: 'Search',
+    tabBarIcon: '🔍',
+    tabBarBadge: 3,
+  };
   readonly profileOptions = { tabBarLabel: 'Profile', tabBarIcon: '👤' };
 }

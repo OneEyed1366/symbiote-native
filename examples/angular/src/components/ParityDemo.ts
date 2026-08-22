@@ -34,10 +34,13 @@ interface IParityRow {
   n: number;
 }
 
-const parityRows: IParityRow[] = Array.from({ length: 30 }, (_unused, index) => ({
-  id: `pr-${index}`,
-  n: index,
-}));
+const parityRows: IParityRow[] = Array.from(
+  { length: 30 },
+  (_unused, index) => ({
+    id: `pr-${index}`,
+    n: index,
+  }),
+);
 
 interface ISectionEntry {
   id: string;
@@ -75,18 +78,19 @@ const paritySections: ISection<ISectionEntry>[] = [
     SymbioteHostPropsDirective,
   ],
   template: `
-    <View class="section">
+    <View class="section-nested">
       <Text #titleRef class="section-label"
-        >Parity checks · longPress · dismiss · animated scroll · sticky · a11y focus</Text
+        >Parity checks · longPress · dismiss · animated scroll · sticky · a11y
+        focus</Text
       >
 
       <!-- Text.onLongPress synthesis: hold ~0.5s (suppresses tap) vs quick tap. Text's own
            primitive host only declares 'style' as a real @Input() (adapters/angular/src/primitives/
            shared.ts), so onLongPress/onPress bind through the symbioteHostProps bag (a REAL declared
            @Input), not as [onLongPress]/[onPress] directly — see ResponderDemo.ts for the same fix. -->
-      <Text [symbioteHostProps]="longPressHostProps" class="long-press-row"
-        >{{ longPressMsg }}</Text
-      >
+      <Text [symbioteHostProps]="longPressHostProps" class="long-press-row">{{
+        longPressMsg
+      }}</Text>
 
       <!-- Keyboard.dismiss: blurs whatever input holds focus without needing a ref -->
       <TextInput

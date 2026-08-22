@@ -1,5 +1,8 @@
 import { SafeAreaView, Text, View } from '@symbiote-native/react';
-import { useRoute, useStackNavigation } from '@symbiote-native/navigation/react';
+import {
+  useRoute,
+  useStackNavigation,
+} from '@symbiote-native/navigation/react';
 import { ActionButton } from '../components/ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
 

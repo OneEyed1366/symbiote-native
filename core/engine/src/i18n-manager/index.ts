@@ -57,7 +57,8 @@ function readConstants(module: INativeI18nManager): II18nManagerConstants {
   const isRTL = Reflect.get(raw, 'isRTL');
   const doLeftAndRightSwapInRTL = Reflect.get(raw, 'doLeftAndRightSwapInRTL');
   const localeIdentifier = Reflect.get(raw, 'localeIdentifier');
-  if (!isBoolean(isRTL) || !isBoolean(doLeftAndRightSwapInRTL)) return DEFAULT_CONSTANTS;
+  if (!isBoolean(isRTL) || !isBoolean(doLeftAndRightSwapInRTL))
+    return DEFAULT_CONSTANTS;
   const constants: II18nManagerConstants = { isRTL, doLeftAndRightSwapInRTL };
   if (isOptionalString(localeIdentifier) && localeIdentifier !== undefined) {
     constants.localeIdentifier = localeIdentifier;
@@ -85,7 +86,9 @@ export const I18nManager = {
   // without a module: a missing native module must never throw on a device.
   allowRTL(allow: boolean): void {
     if (i18nModule === null) {
-      dlog('I18nManager.allowRTL -> I18nManager native module unavailable, no-op');
+      dlog(
+        'I18nManager.allowRTL -> I18nManager native module unavailable, no-op',
+      );
       return;
     }
     dlog(`I18nManager.allowRTL -> ${allow}`);
@@ -95,7 +98,9 @@ export const I18nManager = {
   // Force RTL regardless of the device locale (takes effect after an app reload).
   forceRTL(force: boolean): void {
     if (i18nModule === null) {
-      dlog('I18nManager.forceRTL -> I18nManager native module unavailable, no-op');
+      dlog(
+        'I18nManager.forceRTL -> I18nManager native module unavailable, no-op',
+      );
       return;
     }
     dlog(`I18nManager.forceRTL -> ${force}`);
@@ -105,7 +110,9 @@ export const I18nManager = {
   // Control whether left/right style properties flip in RTL.
   swapLeftAndRightInRTL(swap: boolean): void {
     if (i18nModule === null) {
-      dlog('I18nManager.swapLeftAndRightInRTL -> I18nManager native module unavailable, no-op');
+      dlog(
+        'I18nManager.swapLeftAndRightInRTL -> I18nManager native module unavailable, no-op',
+      );
       return;
     }
     dlog(`I18nManager.swapLeftAndRightInRTL -> ${swap}`);

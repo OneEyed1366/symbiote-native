@@ -6,7 +6,6 @@ import {
   parseNumeric,
   parseNumericOrPercent,
   parseRawValue,
-  parseTextShadow,
   warnOnce,
 } from './values.ts';
 
@@ -50,9 +49,9 @@ export const PROPERTY_TABLE: Record<string, IPropertyMapping> = {
   overflow: { rnProperty: 'overflow', kind: 'raw' },
   // Only `flex`/`none` are valid RN values; passed through unvalidated per spec.
   display: { rnProperty: 'display', kind: 'raw' },
-  // A genuine 1:1 CSS property (unlike transform/shadow — no shape mismatch), just missing
-  // from the initial table. `2 / 3` string ratios are not accepted here (`parseNumeric`
-  // requires a plain number) — CSS `aspect-ratio: 0.667` works, `aspect-ratio: 2/3` doesn't yet.
+  // A genuine 1:1 CSS property (unlike transform/shadow, no shape mismatch). `2 / 3` string
+  // ratios are not accepted here (`parseNumeric` requires a plain number) — CSS
+  // `aspect-ratio: 0.667` works, `aspect-ratio: 2/3` doesn't yet.
   'aspect-ratio': { rnProperty: 'aspectRatio', kind: 'number' },
   gap: { rnProperty: 'gap', kind: 'dimension' },
   'row-gap': { rnProperty: 'rowGap', kind: 'dimension' },
@@ -82,7 +81,10 @@ export const PROPERTY_TABLE: Record<string, IPropertyMapping> = {
   // from RN's own `processBackgroundImage.js`. RN's own style prop is itself named with an
   // `experimental_` prefix (still evolving upstream), which is why the RN key doesn't just
   // match a kebab→camel rename of the CSS property the way every other entry here does.
-  'background-image': { rnProperty: 'experimental_backgroundImage', kind: 'raw' },
+  'background-image': {
+    rnProperty: 'experimental_backgroundImage',
+    kind: 'raw',
+  },
 
   // Spacing
   margin: { rnProperty: 'margin', kind: 'dimension' },
@@ -108,10 +110,22 @@ export const PROPERTY_TABLE: Record<string, IPropertyMapping> = {
   'border-bottom-color': { rnProperty: 'borderBottomColor', kind: 'raw' },
   'border-left-color': { rnProperty: 'borderLeftColor', kind: 'raw' },
   'border-radius': { rnProperty: 'borderRadius', kind: 'dimension' },
-  'border-top-left-radius': { rnProperty: 'borderTopLeftRadius', kind: 'dimension' },
-  'border-top-right-radius': { rnProperty: 'borderTopRightRadius', kind: 'dimension' },
-  'border-bottom-left-radius': { rnProperty: 'borderBottomLeftRadius', kind: 'dimension' },
-  'border-bottom-right-radius': { rnProperty: 'borderBottomRightRadius', kind: 'dimension' },
+  'border-top-left-radius': {
+    rnProperty: 'borderTopLeftRadius',
+    kind: 'dimension',
+  },
+  'border-top-right-radius': {
+    rnProperty: 'borderTopRightRadius',
+    kind: 'dimension',
+  },
+  'border-bottom-left-radius': {
+    rnProperty: 'borderBottomLeftRadius',
+    kind: 'dimension',
+  },
+  'border-bottom-right-radius': {
+    rnProperty: 'borderBottomRightRadius',
+    kind: 'dimension',
+  },
   'border-style': { rnProperty: 'borderStyle', kind: 'raw' },
 
   // Visual
@@ -130,7 +144,10 @@ export const PROPERTY_TABLE: Record<string, IPropertyMapping> = {
   'letter-spacing': { rnProperty: 'letterSpacing', kind: 'dimension' },
 };
 
-function convertValue(kind: IPropertyValueKind, value: string): number | string {
+function convertValue(
+  kind: IPropertyValueKind,
+  value: string,
+): number | string {
   switch (kind) {
     case 'number':
       return parseNumeric(value);
@@ -143,21 +160,18 @@ function convertValue(kind: IPropertyValueKind, value: string): number | string 
 
 /**
  * Map one CSS declaration to its RN style entry. Returns `null` and warns once per unique
- * unsupported property name (deduped via the caller-owned `warnedProperties` set, so the
- * warning fires once per {@link parseCSS} call, not per occurrence).
+ * unsupported property name, deduped via the caller-owned `warnedProperties` set.
  *
- * `text-shadow` bypasses {@link PROPERTY_TABLE}: RN has no unified CSS-string `textShadow` prop
- * (unlike `transform`/`box-shadow` above) — only three separate legacy props
- * (`textShadowColor`/`Offset`/`Radius`) that take already-decomposed values, so this package is
- * the only place that CAN parse the CSS shorthand; there is no engine-level processor to defer to.
+ * `text-shadow` is absent from {@link PROPERTY_TABLE} and is NOT handled here: RN has no unified
+ * CSS-string `textShadow` prop (unlike `transform`/`box-shadow` above), only three decomposed
+ * legacy props, so it needs the typed AST rather than a value string —
+ * `lightning/declarations.ts`'s `textShadowToStyle` owns it.
  */
 export function mapCSSProperty(
   prop: string,
   value: string,
   warnedProperties: Set<string>,
 ): Record<string, unknown> | null {
-  if (prop === 'text-shadow') return parseTextShadow(value, warnedProperties);
-
   const mapping = PROPERTY_TABLE[prop];
   if (!mapping) {
     warnOnce(

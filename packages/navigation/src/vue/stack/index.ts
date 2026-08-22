@@ -13,7 +13,12 @@
 import { defineComponent, h, shallowRef, useId } from '@vue/runtime-core';
 import type { VNode } from '@vue/runtime-core';
 import { descriptorToVue, normalizeVueAttrs } from '@symbiote-native/vue';
-import { Platform, debugNodeId, dlog, isSymbioteNode } from '@symbiote-native/engine';
+import {
+  Platform,
+  debugNodeId,
+  dlog,
+  isSymbioteNode,
+} from '@symbiote-native/engine';
 import {
   NAVIGATION_EVENT_BLUR,
   NAVIGATION_EVENT_FOCUS,
@@ -35,6 +40,7 @@ import {
   createNavigationEmitter,
   isRecord,
   navigatorReducer,
+  reconcileStackRoutes,
   resolveScreenRenderPlan,
   resolveStackProps,
 } from '../../core';
@@ -47,7 +53,11 @@ import type {
 } from '../../core';
 import { NavigationScope, injectNavigationScope } from '../navigation-context';
 import { Screen } from '../screen';
-import type { IScreenOptionsArgs, IScreenProps, IVueScreenOptions } from '../screen';
+import type {
+  IScreenOptionsArgs,
+  IScreenProps,
+  IVueScreenOptions,
+} from '../screen';
 
 export type { INavigatorHandle } from '../../core';
 
@@ -61,7 +71,9 @@ export type IStackProps = {
 // backTitleVisible defaults to `true` on both platforms per the codegen spec's own default
 // (CT.WithDefault<boolean, 'true'>) - no ios/android divergence in v1 scope, so a single constant
 // stands in for the per-platform injection point ISliderPlatform-style adapters use elsewhere.
-const NAVIGATOR_PLATFORM: INavigatorPlatform = { defaultHeaderBackTitleVisible: true };
+const NAVIGATOR_PLATFORM: INavigatorPlatform = {
+  defaultHeaderBackTitleVisible: true,
+};
 
 type IScreenRegistryEntry = {
   component: IScreenProps['component'];
@@ -92,7 +104,9 @@ function asScreenOptionsOrResolver(value: unknown): IScreenProps['options'] {
   return asScreenOptions(value);
 }
 
-function collectRegistry(vnodes: readonly VNode[]): Map<string, IScreenRegistryEntry> {
+function collectRegistry(
+  vnodes: readonly VNode[],
+): Map<string, IScreenRegistryEntry> {
   const registry = new Map<string, IScreenRegistryEntry>();
   for (const vnode of vnodes) {
     if (vnode.type !== Screen || !isRecord(vnode.props)) continue;
@@ -114,7 +128,9 @@ function resolveScreenOptions(
   screenOptions: IVueScreenOptions | undefined,
 ): IVueScreenOptions {
   const own =
-    typeof entry.options === 'function' ? entry.options(screenOptionsArgs) : entry.options;
+    typeof entry.options === 'function'
+      ? entry.options(screenOptionsArgs)
+      : entry.options;
   return { ...screenOptions, ...own };
 }
 
@@ -167,25 +183,44 @@ const StackImpl = defineComponent<IStackProps>(
       });
     } else {
       initialState = createInitialNavigatorState(
-        createRoute(initialRouteName, initialRegistry.get(initialRouteName)?.initialParams),
+        createRoute(
+          initialRouteName,
+          initialRegistry.get(initialRouteName)?.initialParams,
+        ),
       );
     }
 
     const state = shallowRef<INavigatorState>(initialState);
 
+    // The screen names the render pass below last saw in the slot. A PLAIN local, not a ref: it is
+    // a cache of what was just rendered, never a reactive source, so refreshing it from inside the
+    // render closure is not a state write during render (which would re-trigger the very render
+    // effect that produced it).
+    let registeredNames: readonly string[] = [];
+
+    // A <Stack.Screen> marker can vanish from the slot while its route is still in the pushed
+    // history, which would leave that entry with nothing to render (reconcileStackRoutes' header).
+    // Reconciling on READ rather than writing the ref keeps the repair out of the render pass; the
+    // dispatch below then persists it, so the next push builds on the pruned history.
+    function currentState(): INavigatorState {
+      return reconcileStackRoutes(state.value, registeredNames);
+    }
+
     function dispatch(action: Parameters<typeof navigatorReducer>[1]): void {
-      state.value = navigatorReducer(state.value, action);
+      state.value = navigatorReducer(currentState(), action);
     }
 
     const handle: INavigatorHandle = {
-      push: (name, params) => dispatch({ type: 'push', route: createRoute(name, params) }),
+      push: (name, params) =>
+        dispatch({ type: 'push', route: createRoute(name, params) }),
       pop: count => dispatch({ type: 'pop', count }),
       popToTop: () => dispatch({ type: 'popToTop' }),
       popTo: key => dispatch({ type: 'popTo', key }),
-      replace: (name, params) => dispatch({ type: 'replace', route: createRoute(name, params) }),
+      replace: (name, params) =>
+        dispatch({ type: 'replace', route: createRoute(name, params) }),
       setParams: (params, key) => dispatch({ type: 'setParams', key, params }),
       reset: nextState => dispatch({ type: 'reset', state: nextState }),
-      canGoBack: () => state.value.routes.length > 1,
+      canGoBack: () => currentState().routes.length > 1,
     };
     expose(handle);
 
@@ -195,18 +230,21 @@ const StackImpl = defineComponent<IStackProps>(
     // useEffect, which must be deferred past render to avoid a descendant setState-during-render):
     // Vue's provide/inject + shallowRef.value writes are safe to perform directly inside the
     // render closure below, so the broadcast happens right there, once per render.
-    function broadcastState(): void {
-      for (const route of state.value.routes) {
-        emitterFor(route.key).emit(NAVIGATION_EVENT_STATE, state.value);
+    function broadcastState(current: INavigatorState): void {
+      for (const route of current.routes) {
+        emitterFor(route.key).emit(NAVIGATION_EVENT_STATE, current);
       }
       for (const routeKey of emitters.keys()) {
-        if (!state.value.routes.some(route => route.key === routeKey)) emitters.delete(routeKey);
+        if (!current.routes.some(route => route.key === routeKey))
+          emitters.delete(routeKey);
       }
     }
 
     return () => {
-      broadcastState();
       const registry = collectRegistry(slots.default?.() ?? []);
+      registeredNames = [...registry.keys()];
+      const current = currentState();
+      broadcastState(current);
       const screenOptions = asScreenOptions(attrs.screenOptions);
 
       // Investigation instrumentation (flicker-on-focus bug): STACK_ON_FINISH_TRANSITIONING is
@@ -221,21 +259,31 @@ const StackImpl = defineComponent<IStackProps>(
         },
       });
 
-      const children = state.value.routes.map((route, index) => {
+      const children = current.routes.map((route, index) => {
         const entry = registry.get(route.name);
         if (entry === undefined) {
           dlog(`Stack: no screen registered for route name "${route.name}"`);
           return null;
         }
 
-        const screenOptionsArgs: IScreenOptionsArgs = { route, navigation: handle };
-        const mergedOptions = resolveScreenOptions(entry, screenOptionsArgs, screenOptions);
-        const activityState = computeActivityState(index, state.value.routes.length);
+        const screenOptionsArgs: IScreenOptionsArgs = {
+          route,
+          navigation: handle,
+        };
+        const mergedOptions = resolveScreenOptions(
+          entry,
+          screenOptionsArgs,
+          screenOptions,
+        );
+        const activityState = computeActivityState(
+          index,
+          current.routes.length,
+        );
         // Investigation instrumentation (flicker-on-focus bug): fires on EVERY Stack render, not
         // just on transitions, so the log stream shows whether a route's activityState/index ever
         // changes outside of a push/pop dispatch. Kept behind DEBUG, never removed.
         dlog(
-          `Stack: render route "${route.name}" index=${index}/${state.value.routes.length - 1} ` +
+          `Stack: render route "${route.name}" index=${index}/${current.routes.length - 1} ` +
             `activityState=${activityState} at t=${Date.now()}`,
         );
 
@@ -245,27 +293,36 @@ const StackImpl = defineComponent<IStackProps>(
         const plan = resolveScreenRenderPlan({
           screenId: route.key,
           index,
-          routeCount: state.value.routes.length,
+          routeCount: current.routes.length,
           options: mergedOptions,
           platform: NAVIGATOR_PLATFORM,
           isAndroid: Platform.OS === 'android',
           screenPassthrough: {
             [SCREEN_ON_DISMISSED]: () => dispatch({ type: 'pop', count: 1 }),
-            [SCREEN_ON_HEADER_BACK_BUTTON_CLICKED]: () => dispatch({ type: 'pop', count: 1 }),
+            [SCREEN_ON_HEADER_BACK_BUTTON_CLICKED]: () =>
+              dispatch({ type: 'pop', count: 1 }),
             // onAppear/onDisappear are the definitive visibility boundary (post-transition-
             // animation), so 'focus'/'blur' fire exactly once per transition; onWillAppear/
             // onWillDisappear fire BEFORE the animation runs, so wiring them to emit() too would
             // double-invoke useFocusEffect per transition - they only get a debug log here.
             [SCREEN_ON_WILL_APPEAR]: () =>
-              dlog(`Stack: route "${route.name}" will appear at t=${Date.now()}`),
+              dlog(
+                `Stack: route "${route.name}" will appear at t=${Date.now()}`,
+              ),
             [SCREEN_ON_APPEAR]: () => {
-              dlog(`Stack: route "${route.name}" appeared (focus) at t=${Date.now()}`);
+              dlog(
+                `Stack: route "${route.name}" appeared (focus) at t=${Date.now()}`,
+              );
               routeEmitter.emit(NAVIGATION_EVENT_FOCUS);
             },
             [SCREEN_ON_WILL_DISAPPEAR]: () =>
-              dlog(`Stack: route "${route.name}" will disappear at t=${Date.now()}`),
+              dlog(
+                `Stack: route "${route.name}" will disappear at t=${Date.now()}`,
+              ),
             [SCREEN_ON_DISAPPEAR]: () => {
-              dlog(`Stack: route "${route.name}" disappeared (blur) at t=${Date.now()}`);
+              dlog(
+                `Stack: route "${route.name}" disappeared (blur) at t=${Date.now()}`,
+              );
               routeEmitter.emit(NAVIGATION_EVENT_BLUR);
             },
           },
@@ -292,7 +349,8 @@ const StackImpl = defineComponent<IStackProps>(
                   );
                   const appRef = searchBarOptions.ref;
                   if (appRef === undefined) return;
-                  appRef.value = node === null ? null : buildSearchBarHandle(() => node);
+                  appRef.value =
+                    node === null ? null : buildSearchBarHandle(() => node);
                 },
               }
             : undefined,
@@ -317,22 +375,26 @@ const StackImpl = defineComponent<IStackProps>(
         // sizing (see RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME's comment in core/constants.ts). A
         // `push` screen doesn't need it, but a `formSheet` one is otherwise left with no content
         // ever attached natively.
-        const content = h(RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME, plan.contentWrapperProps, [
-          h(
-            NavigationScope,
-            {
-              value: {
-                route,
-                navigation: handle,
-                emitter: routeEmitter,
-                parent: ambientScopeRef?.value,
+        const content = h(
+          RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME,
+          plan.contentWrapperProps,
+          [
+            h(
+              NavigationScope,
+              {
+                value: {
+                  route,
+                  navigation: handle,
+                  emitter: routeEmitter,
+                  parent: ambientScopeRef?.value,
+                },
               },
-            },
-            // No route/navigation props: the screen reads both through composables off the
-            // NavigationScope provided just above (useRoute / useStackNavigation).
-            () => h(entry.component),
-          ),
-        ]);
+              // No route/navigation props: the screen reads both through composables off the
+              // NavigationScope provided just above (useRoute / useStackNavigation).
+              () => h(entry.component),
+            ),
+          ],
+        );
 
         // react-native-screens' own Screen.tsx swaps in a DIFFERENT Fabric component
         // ('RNSModalScreen') for a modally-presented screen - its native updateLayoutMetrics:
@@ -356,7 +418,10 @@ const StackImpl = defineComponent<IStackProps>(
                   // RNSScreen.mm treats an unset/inactive nested screen as not yet pushed,
                   // leaving it parked at its pre-push transition position (off past the bottom
                   // edge) instead of its real, presented frame.
-                  { style: plan.innerScreenStyle, activityState: plan.activityState },
+                  {
+                    style: plan.innerScreenStyle,
+                    activityState: plan.activityState,
+                  },
                   [descriptorToVue(plan.headerConfig), content],
                 ),
               ]),

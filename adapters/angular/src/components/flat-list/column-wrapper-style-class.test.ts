@@ -5,7 +5,7 @@
 import '@angular/compiler';
 import { Component } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearGlobalStyles, registerStyles } from '@symbiote-native/engine';
+import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -14,7 +14,8 @@ import { VListItemDirective } from '../virtualized-list/directives';
 
 const ROOT_TAG = 953;
 const fabric = installFabric();
-const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+const tick = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 0));
 
 interface IRow {
   id: string;
@@ -36,7 +37,8 @@ function walk(nodes: IFakeNode[], visit: (node: IFakeNode) => void): void {
 function rowsWithFlexDirection(): IFakeNode[] {
   const found: IFakeNode[] = [];
   walk(fabric.committed, node => {
-    if (node.viewName === 'RCTView' && node.props.flexDirection === 'row') found.push(node);
+    if (node.viewName === 'RCTView' && node.props.flexDirection === 'row')
+      found.push(node);
   });
   return found;
 }
@@ -87,7 +89,9 @@ class FlatListColumnStyleObjectHost {
 
 beforeEach(() => {
   fabric.reset();
-  registerStyles({ gap8: { gap: 8 } });
+  registerRules([
+    { tokens: ['gap8'], specificity: [0, 1, 0], order: 0, style: { gap: 8 } },
+  ]);
 });
 afterEach(() => {
   unmount(ROOT_TAG);
