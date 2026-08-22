@@ -77,8 +77,14 @@ directly and routes only `[prop]` bindings through `routeProp`.
 ## 3. Node identity — the rule that bites every adapter
 
 `ISymbioteNode` (`node.ts`) is a branded plain object: `{ component, isText,
-props, listeners, children, parent, dirty, propsDirty, committed }`. That last
-field IS the mirror of what Fabric holds for this node — handle, reactTag,
+props, listeners, children, parent, dirty, propsDirty, structureDirty, committed }`.
+
+The three flags answer three different questions, and blurring them is what the split fixed:
+`dirty` = descend into this subtree; `propsDirty` = this node's own payload can differ;
+`structureDirty` = this node's own CHILD LIST can differ from the committed snapshot. The last
+one is a correctness precondition, not an optimisation — see `commitTargeted` in §4a.
+
+The `committed` field IS the mirror of what Fabric holds for this node — handle, reactTag,
 rootTag, the flat props last sent, the child identities last committed, the
 resolved view name — and every imperative API (§5) resolves through it.
 
@@ -108,6 +114,46 @@ the Proxy reaches `cloneNodeWithNewProps` and fails deep in native, far from the
 cause. `committedOf` restores the check explicitly: the record names its `owner`,
 and `record.owner !== node` means the object handed in is not that node. Locked in
 by `core/engine/src/__tests__/node-identity.test.ts`, including the deep-proxy case.
+
+## 4a. Two commit routes — general, and targeted at one node
+
+`commitContainer` walks DOWN from the synthetic root: correct for everything, and it visits every
+sibling along the path just to hand back the handle their committed record already held. On a
+17 504-node app that is 37 visits to re-commit one node, of which 33 are early exits.
+
+`commitTargeted(node)` (commit.ts) is the other route, and `setNativeProps` — the JS-driven
+Animated frame path — takes it: clone the node, then clone each ancestor up the `committed.parent`
+chain, reusing every sibling handle straight off its own committed record. Never walks down. It is
+the JS twin of what Fabric does natively for the same operation (`UIManager::setNativeProps_-
+DEPRECATED` → `shadowTree.commit(cloneTree(family, …))`), minus that API's stickiness: RN's version
+stores the payload on the ShadowNodeFamily and re-applies it over React's props on every later
+clone, so a declarative write of the same prop can never win again — which is why it is named
+`_DEPRECATED`. Ours has no such side effect.
+
+Measured (`reconcile.bench.ts`, 32 screens × 60 rows): 0.0179 ms → 0.0040 ms p75, 4.5x, and the
+gap widens with app size because what it removes is the sibling scan.
+
+**It falls back to `commitContainer` on anything it cannot prove, and the preconditions are the
+whole design:**
+
+- the node and every ancestor must already be committed;
+- **`structureDirty` must be false on the node AND on every ancestor.** A committed record's
+  `children` is a SNAPSHOT from the last commit. Rebuilding an ancestor's child set from that
+  snapshot is exactly why this route is cheap, and exactly why a stale snapshot silently publishes
+  the OLD structure — a row added since the last commit simply never reaches Fabric, with nothing
+  red anywhere. An earlier version read `record.children` without this check and did precisely
+  that.
+- **Plan first, mutate second.** Every handle is resolved and every precondition checked before a
+  single native call. An earlier version validated the chain up front but resolved sibling handles
+  inside the clone loop, so a mid-loop bail had already re-pointed the node's committed record at a
+  clone that never reached `completeRoot` and had already cleared its dirty flags — the fallback
+  then skipped the node as clean and committed an orphan handle.
+
+Both defects were found by `__tests__/animated-commit-cost.test.ts` and neither was visible to
+`tsc`, to a value assertion, or to any other test in the suite. Its oracle row is the one that
+generalises: **after a targeted commit, a general commit must do nothing** — zero clones, zero
+`completeRoot`. The general path is the reference implementation, so the targeted one is correct
+exactly when it leaves the reference nothing to find.
 
 ## 4. The commit — sync vs async is the adapter's choice
 

@@ -341,8 +341,42 @@ What makes this a design task rather than a one-liner, and what to settle before
   `dirty-marking.test.ts` does exactly that. Whatever replaces the commit must keep that observable
   or change the test deliberately.
 
-Unbuilt, and not measured on device. The 3.9x batching number stays in the table above as a
-measurement of what the CURRENT design costs, not as a recommendation.
+### Built instead: a targeted commit — and it makes the batching question mostly moot
+
+Reading RN's C++ settled the design. `UIManager::setNativeProps_DEPRECATED`
+(`ReactCommon/react/renderer/uimanager/UIManager.cpp:438`) is NOT a free direct write: it stores the
+payload on the `ShadowNodeFamily` and then commits — `shadowTree.commit(cloneTree(family, …))`,
+cloning the path to one family in C++. And `ShadowNode::clone` re-applies those props on every later
+clone, overriding React's (`UIManager.cpp:146`), so the value is STICKY and a declarative write of
+the same prop can never win again. Hence `_DEPRECATED`.
+
+So the cost RN avoids is not "a commit", it is "a commit that walks down from the root in JS" — and
+our semantics are the cleaner ones. `commitTargeted` (see `symbiote-engine-core` §4a) does the same
+shape in JS: clone the node, clone the ancestor chain, reuse every sibling handle off its committed
+record. `setNativeProps` routes through it.
+
+```
+32 screens x 60 rows (~17 504 nodes), p75      min      rme
+1 animated value, general commit    0.0179   0.0159   ±1.67%
+1 animated value, targeted          0.0040   0.0031   ±2.18%     4.5x
+```
+
+Counters agree with the mechanism: 37 visits → 5. Five concurrent animations now cost
+5 x 0.0040 = 0.020 ms/frame separate, against 0.0542 ms for five batched through the GENERAL path —
+so targeted-and-separate already beats batched-and-general, and the 3.9x batching win is no longer
+the thing to build. The batching rows stay in the table as a measurement of the general path.
+
+```
+§the_oracle_pattern := {
+  problem: "a targeted algorithm and the general one emit the same Fabric tree when the targeted one is right, and NOTHING is red when it is wrong",
+  oracle: "after a targeted commit, run the GENERAL commit and assert it does nothing — zero clones, zero completeRoot",
+  why_it_works: "the general path is the reference implementation; anything the targeted one missed is work the reference still finds",
+  caught: ["an ancestor's child set rebuilt from a STALE committed snapshot, so a sibling added since the last commit never reached Fabric", "a non-atomic bail that mutated the committed record and cleared dirty flags before failing, leaving the fallback to commit an orphan handle"],
+  ⟶ "neither was visible to tsc, to a value assertion, or to any other test in the suite",
+}
+```
+
+Not measured on device. What transfers is the ratio and the mechanism.
 
 ## Running the micro-bench
 

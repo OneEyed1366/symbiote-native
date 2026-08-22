@@ -30,6 +30,7 @@ import {
   committedOf,
   markDirty,
   markPropsDirty,
+  markStructureDirty,
   takePropStats,
   VIRTUAL_TEXT_COMPONENT,
   type IMirror,
@@ -352,6 +353,10 @@ function reconcile(
   // whole payload built regardless - so this only ever gates the update path.
   const ownPropsChanged = node.propsDirty;
   node.propsDirty = false;
+  // Cleared here because this call is what re-snapshots `committed.children` below, on both the
+  // create and the update path. Anything that reads that snapshot afterwards is reading a current
+  // one until the next structural op raises the flag again.
+  node.structureDirty = false;
 
   const childInText = node.isText || hasTextAncestor;
   const kids = renderableChildren(node);
@@ -569,7 +574,9 @@ export function commitChildren(
 ): void {
   // The wrapper holds the surface's top-level children; reconcile walks from it so the
   // whole tree, synthetic root included, goes through the same clone-on-write path.
-  rootContainerFor(rootTag).children = children.slice();
+  const container = rootContainerFor(rootTag);
+  container.children = children.slice();
+  markStructureDirty(container);
   commitContainer(rootTag);
 }
 
@@ -697,6 +704,153 @@ export function readCommitProfile(): ICommitProfile {
   return snapshot;
 }
 
+// Re-commit ONE node whose props changed and whose structure did not, by cloning only that node and
+// the chain of ancestors above it - never walking down from the root.
+//
+// This is the JS twin of what Fabric does natively for the same operation. RN's
+// `UIManager::setNativeProps_DEPRECATED` (ReactCommon/react/renderer/uimanager/UIManager.cpp) does
+// `shadowTree.commit(cloneTree(family, ...))`: clone the path to one family, reuse everything else.
+// We cannot call that (it also makes the value STICKY on the ShadowNodeFamily, so a later
+// declarative write of the same prop can never win again - which is why RN's own API is named
+// `_DEPRECATED` and warns in dev). But the SHAPE is right, and it is the shape a general
+// walk-from-the-root cannot express: the general path visits every sibling along the way just to
+// hand back the handle their committed record already held.
+//
+// Measured on a 6-screen fixture (animated-commit-cost.test.ts): the chain is 5 nodes, the walk
+// visits 15. The excess is the app's size, not the animation's, and it is what this removes.
+//
+// Returns false without touching anything when a precondition fails; the caller falls back to the
+// general commit, which is always correct. Preconditions are deliberately strict:
+//   - the node and every ancestor up to the container must already be committed (nothing to clone
+//     from otherwise), and
+//   - the change must be props-only. `viewNameFor` depends on `isText` (readonly) and on whether a
+//     <Text> ancestor exists, so a props write cannot flip it; a STRUCTURAL change could, and takes
+//     the general path.
+//
+// It deliberately does NOT clear the ancestors' `dirty` flags, only the changed node's. An ancestor
+// may be dirty for a reason of its own - another pending change elsewhere in its subtree - and
+// clearing it here would strand that change with no error. Leaving them set costs the next general
+// commit a walk that finds nothing, which is exactly what the oracle test asserts.
+function commitTargeted(node: ISymbioteNode): boolean {
+  const committed = committedOf(node);
+  if (committed === undefined) return false;
+  // The node's own children must be the ones Fabric holds: this path never descends, so a pending
+  // structural change below would be published as if it had not happened.
+  if (node.structureDirty) return false;
+
+  // PLAN FIRST, MUTATE SECOND. Every precondition is checked and every handle resolved before a
+  // single native call is made, so a bail costs nothing and leaves the tree exactly as it was.
+  //
+  // This is not hypothetical tidiness: an earlier version validated the ancestor chain up front but
+  // resolved SIBLING handles inside the clone loop, so a bail half-way had already re-pointed the
+  // node's committed record at a clone that was never handed to completeRoot, and had already
+  // cleared its dirty flags - so the general-path fallback then skipped the node as clean and
+  // committed an orphan handle. The fallback test in animated-commit-cost.test.ts is what caught it.
+  interface IStep {
+    record: IMirror;
+    /** Committed handles of this ancestor's children, in order; the changed slot is filled later. */
+    handles: IFabricNode[];
+    changedIndex: number;
+  }
+  const plan: IStep[] = [];
+  let changedChild: ISymbioteNode = node;
+  let ancestor = committed.parent;
+  while (ancestor !== undefined) {
+    const record = committedOf(ancestor);
+    if (record === undefined) return false;
+    // THE precondition, and the one an earlier version of this function missed. `record.children`
+    // is a SNAPSHOT from the last commit. If this ancestor's real child list has moved on - a row
+    // added, removed, or reordered - rebuilding its child set from that snapshot silently publishes
+    // the OLD structure, with no error anywhere. Caught by the fallback row in
+    // animated-commit-cost.test.ts, which appends a sibling and then animates: without this check
+    // the new sibling never reached Fabric and every other assertion still passed.
+    if (ancestor.structureDirty) {
+      dlog(
+        'commit targeted: ancestor child list moved on, using the general path',
+      );
+      return false;
+    }
+    const handles: IFabricNode[] = [];
+    let changedIndex = -1;
+    for (const child of record.children) {
+      if (child === changedChild) {
+        changedIndex = handles.length;
+        // Placeholder; the real handle only exists after the clone below.
+        handles.push(committed.handle);
+        continue;
+      }
+      const childRecord = committedOf(child);
+      // A sibling with no committed record means a structural change is pending, which this path
+      // cannot express. Bail before touching anything.
+      if (childRecord === undefined) {
+        dlog('commit targeted: uncommitted sibling, using the general path');
+        return false;
+      }
+      handles.push(childRecord.handle);
+    }
+    if (changedIndex < 0) {
+      // The child is not in its parent's committed child list — a move that has not been committed.
+      dlog(
+        'commit targeted: child not in committed set, using the general path',
+      );
+      return false;
+    }
+    plan.push({ record, handles, changedIndex });
+    changedChild = record.owner;
+    ancestor = record.parent;
+  }
+
+  // Counted like the general path's rebuild, because it is one: the meter must not read as though
+  // an animation frame builds no payload just because it took the short route.
+  profile.propsBuilt += 1;
+  const props = fabricProps(node);
+  const propsDiff = diffProps(committed.props, props);
+  if (Object.keys(propsDiff).length === 0) {
+    // Fabric already holds these values. Not an error and not a fallback: the general path would
+    // reach the same conclusion, after walking the tree to get here.
+    node.dirty = false;
+    node.propsDirty = false;
+    dlog(`commit targeted tag=${committed.tag} no-op (props identical)`);
+    return true;
+  }
+
+  const slot = getSlot();
+  const walkStart = performance.now();
+  guardSerializable(propsDiff, committed.viewName, committed.tag);
+  let handle = slot.cloneNodeWithNewProps(committed.handle, propsDiff);
+  stats.cloneProps += 1;
+  committed.handle = handle;
+  committed.props = props;
+  node.dirty = false;
+  node.propsDirty = false;
+
+  // Every ancestor re-clones because a persistent parent points at specific child handles - the
+  // clone-bubble, unavoidable. What IS avoidable is rediscovering the siblings, and the plan above
+  // already holds their handles.
+  for (const step of plan) {
+    const parentHandle = slot.cloneNodeWithNewChildren(step.record.handle);
+    stats.cloneChildren += 1;
+    step.handles[step.changedIndex] = handle;
+    for (const childHandle of step.handles)
+      slot.appendChild(parentHandle, childHandle);
+    step.record.handle = parentHandle;
+    handle = parentHandle;
+  }
+
+  const childSet = slot.createChildSet(committed.rootTag);
+  slot.appendChildToSet(childSet, handle);
+  slot.completeRoot(committed.rootTag, childSet);
+  profile.walkMs += performance.now() - walkStart;
+  profile.commits += 1;
+  profile.nodesVisited += plan.length + 1;
+  runPostCommitHooks();
+  dlog(
+    `commit targeted root=${committed.rootTag} tag=${committed.tag} ` +
+      `chain=${plan.length} keys=${Object.keys(propsDiff)}`,
+  );
+  return true;
+}
+
 // Targeted per-frame prop write for the JS-driven Animated path. RN flushes an
 // animation frame with an in-place `instance.setNativeProps(...)`; we have no
 // in-place mutation (Fabric is persistent), so a frame is one scoped commit: mutate
@@ -733,7 +887,11 @@ export function setNativeProps(
   dlog(
     `setNativeProps root=${record.rootTag} tag=${record.tag} keys=${Object.keys(partial)}`,
   );
-  commitContainer(record.rootTag);
+  // The animation frame path. A JS-driven Animated flush lands here once per animated leaf per
+  // frame, so this is the one caller where walking the whole surface to re-commit one node is paid
+  // 60 times a second, per animation. commitTargeted clones the node and its ancestor chain and
+  // nothing else; it falls back on anything it cannot prove, and the fallback is the general path.
+  if (!commitTargeted(node)) commitContainer(record.rootTag);
 }
 
 // The committed reactTag of a node (stable across clone-on-write), for binding the

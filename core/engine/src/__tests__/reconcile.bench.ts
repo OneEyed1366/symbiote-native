@@ -45,6 +45,7 @@ import {
   disposeRoot,
   insertBefore,
   removeChild,
+  setNativeProps,
   setProp,
   setText,
   type ISymbioteNode,
@@ -501,6 +502,23 @@ describe('app-shaped: a navigation stack under animation', () => {
         (separateTick % 20) / 20,
       );
       separate.surface.commit();
+    },
+    KRAUSEST_WARMUP,
+  );
+
+  // The same single animated value, driven the way the JS Animated path actually drives it:
+  // setNativeProps, which takes commitTargeted's ancestor-chain route instead of walking down from
+  // the root. Compare directly against the first row — same fixture, same one prop, same one
+  // completeRoot, differing only in how the commit finds the work.
+  const targeted = mountApp(APP_SCREENS, APP_ROWS_PER_SCREEN);
+  let targetedTick = 0;
+  bench(
+    `${label}: 1 animated value via setNativeProps (targeted)`,
+    () => {
+      targetedTick += 1;
+      setNativeProps(targeted.animTargets[0], {
+        opacity: 0.1 + (targetedTick % 800) / 1000,
+      });
     },
     KRAUSEST_WARMUP,
   );

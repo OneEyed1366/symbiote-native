@@ -74,6 +74,22 @@ export interface ISymbioteNode {
   // silent-stale-UI failure mode. So every write path errs toward marking - see markPropsDirty -
   // and skipped nodes are deliberately NOT cleared in renderableChildren the way `dirty` is.
   propsDirty: boolean;
+  // "THIS node's own CHILD LIST changed since its last commit" - the third question the single
+  // `dirty` flag used to blur together with the other two. `dirty` says whether to descend,
+  // `propsDirty` whether this node's own payload can differ, `structureDirty` whether its committed
+  // child order can differ.
+  //
+  // It exists because a committed record's `children` is a SNAPSHOT taken at the last commit, and
+  // anything reading that snapshot instead of `node.children` is reading the past. commitTargeted
+  // (commit.ts) does exactly that - rebuilding an ancestor's child set from committed handles is
+  // the whole reason it is cheap - so it must refuse to run when the snapshot is stale, and this
+  // flag is the only O(1) way to know. A length check misses a reorder; comparing the arrays is the
+  // O(children) scan the fast path exists to avoid.
+  //
+  // Raised by every structural op on the PARENT (appendChild / insertBefore / removeChild / detach,
+  // plus the surface's own splice and the container's child assignment), and cleared by reconcile
+  // on the node whose children it just committed.
+  structureDirty: boolean;
   // What Fabric currently holds for this node - `undefined` until its first commit. The retained
   // node carries the DESIRED state (props/children); this carries the COMMITTED state the reconcile
   // walk diffs against and the handle every imperative call is aimed at.
@@ -153,6 +169,7 @@ export function createElement(
     parent: undefined,
     dirty: true,
     propsDirty: true,
+    structureDirty: true,
     committed: undefined,
   };
 }
@@ -171,6 +188,7 @@ export function createRawText(text: string): ISymbioteNode {
     // the same reason createElement's does: a node that has never committed must never take a
     // fast path built on "the mirror already agrees with me".
     propsDirty: true,
+    structureDirty: true,
     committed: undefined,
   };
 }
@@ -257,6 +275,13 @@ export function markDirty(node: ISymbioteNode): void {
 export function markPropsDirty(node: ISymbioteNode): void {
   node.propsDirty = true;
   markDirty(node);
+}
+
+// The structural twin. Raised on the PARENT whose child list changed - never on the moved child,
+// for the same reason markDirty is not (see the structural ops below).
+export function markStructureDirty(parent: ISymbioteNode): void {
+  parent.structureDirty = true;
+  markDirty(parent);
 }
 
 // How many prop writes actually landed, and how many the no-op guard below turned away.
@@ -545,14 +570,14 @@ function detach(child: ISymbioteNode): void {
   const index = parent.children.indexOf(child);
   if (index >= 0) parent.children.splice(index, 1);
   child.parent = undefined;
-  markDirty(parent);
+  markStructureDirty(parent);
 }
 
 export function appendChild(parent: ISymbioteNode, child: ISymbioteNode): void {
   detach(child);
   child.parent = parent;
   parent.children.push(child);
-  markDirty(parent);
+  markStructureDirty(parent);
 }
 
 export function insertBefore(
@@ -564,14 +589,14 @@ export function insertBefore(
   child.parent = parent;
   const index = parent.children.indexOf(beforeChild);
   parent.children.splice(index < 0 ? parent.children.length : index, 0, child);
-  markDirty(parent);
+  markStructureDirty(parent);
 }
 
 export function removeChild(parent: ISymbioteNode, child: ISymbioteNode): void {
   const index = parent.children.indexOf(child);
   if (index >= 0) parent.children.splice(index, 1);
   child.parent = undefined;
-  markDirty(parent);
+  markStructureDirty(parent);
 }
 
 // A structural census of a retained tree: how many nodes it holds, how many of those the commit
