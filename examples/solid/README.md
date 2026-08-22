@@ -60,6 +60,9 @@ cd ios && pod install   # required after any reinstall: see CLAUDE.md's splash-s
 
 ## Verified so far
 
+**On device:** the app runs on the iOS simulator — the Solid recording in the repo root's demo
+table (`assets/solid-demo.gif`) is this app.
+
 Headless, from this directory: `npm run lint`, `npx tsc --noEmit`, and a full Metro bundle
 (`./node_modules/.bin/react-native bundle --platform ios --dev true --entry-file index.js
 --bundle-output <path>`). The bundle is the useful one — it proves the whole graph resolves and
