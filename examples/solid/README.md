@@ -9,34 +9,23 @@ hooks, tabs, drawer, deep-linking, header-options and API-playground stops. See
 `symbiote-new-adapter` §7 for the layer order the adapter is built in, and the adapter's own README
 for current status.
 
-## Running it
+## Run
+
+```sh
+cd examples/solid
+npm install
+# iOS
+(cd ios && bundle install && bundle exec pod install)
+npm run ios
+# Android
+npm run android
+# diagnostic logs:  DEBUG=1 npm run dev   (babel.config.js inlines the flag, so it needs the reset)
+```
 
 `examples/*` is a standalone `npm install` tree, deliberately outside the pnpm workspace, so it
-matches what a real npm consumer gets. Always install from inside this directory:
-
-```sh
-npm install
-npm run ios          # or: npm run android
-npm run dev          # Metro with --reset-cache
-DEBUG=1 npm run dev  # + @symbiote diagnostic logs (babel.config.js inlines the flag)
-```
-
-`@symbiote-native/solid` is unpublished, so it is consumed as a **local tarball** built from the
-adapter's own directory:
-
-```sh
-cd ../../adapters/solid && pnpm pack --pack-destination ../../examples/solid
-```
-
-`pnpm pack`, never `npm pack` — only pnpm applies the `publishConfig` swap that points the tarball at
-`build/` and rewrites `workspace:*` into real versions. When re-packing the SAME version while
-iterating, delete BOTH the extracted copy and the lockfile entry first, or npm silently serves the
-stale one (it reports `added N packages` either way):
-
-```sh
-rm -rf node_modules/@symbiote-native/solid && rm -f package-lock.json && npm install
-cd ios && pod install   # required after any reinstall: see CLAUDE.md's splash-screen podspec note
-```
+matches what a real npm consumer gets — always install from inside this directory, never with
+`pnpm` from the repo root. `npm run dev` is Metro with `--reset-cache`; editing `metro.config.js`
+or `babel.config.js` needs it, editing a `.tsx` file does not.
 
 ## What is wired, and the one piece of boilerplate
 
@@ -58,19 +47,23 @@ cd ios && pod install   # required after any reinstall: see CLAUDE.md's splash-s
   JSX children are actually type-checked (under solid-js's own namespace they are not — see
   `.claude/rules/solid-jsx-namespace.md`).
 
-## Verified so far
+## Checks
 
-**On device:** the app runs on the iOS simulator — the Solid recording in the repo root's demo
-table (`assets/solid-demo.gif`) is this app.
+```sh
+npm run lint
+npm run typecheck                                        # css-dts runs first, via pretypecheck
+npx react-native bundle --platform ios     --entry-file index.js --dev false --bundle-output /tmp/solid-ios.jsbundle
+npx react-native bundle --platform android --entry-file index.js --dev false --bundle-output /tmp/solid-android.jsbundle
+pnpm test                      # vitest, from the workspace root — fake Fabric slot
+```
 
-Headless, from this directory: `npm run lint`, `npx tsc --noEmit`, and a full Metro bundle
-(`./node_modules/.bin/react-native bundle --platform ios --dev true --entry-file index.js
---bundle-output <path>`). The bundle is the useful one — it proves the whole graph resolves and
-transforms, and that `solid-js`'s SSR build (its export map has a `node` branch pointing at
-`dist/server.js`) stays out of a native bundle.
+The bundle is the one worth keeping in the loop: it proves the whole graph resolves and transforms,
+and that `solid-js`'s SSR build (its export map has a `node` branch pointing at `dist/server.js`)
+stays out of a native bundle.
 
-The headless signals are not the bar, though. Two of this adapter's sharpest bugs — the render-prop
-snapshot killing every other tap, and a `core/*` change never reaching the tarball — were only
-visible on a device (`.claude/rules/solid-descriptor-bridge.md` §4,
-`.claude/rules/example-shared-package-staleness.md`). Run it on a simulator before calling a change
-done.
+## Note — shares the canary's native shell
+
+The native iOS/Android projects carry the **same bundle id and app name ("Canary")** as
+`examples/react` and the other canaries. On a simulator they overwrite each other — run **one at a
+time**. The deep-link scheme is this app's own (`symbiotecanarysolid://`), distinct from every other
+canary's, so a link never routes to whichever one the OS resolved last.
