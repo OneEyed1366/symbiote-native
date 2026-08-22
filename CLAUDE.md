@@ -551,6 +551,45 @@ Do not re-add it as a SymbioteNative component; if a native Android drawer is ev
 wrap `@react-navigation/drawer` through `<third_party_rn_packages_are_react_only>` instead.
 Full incident record: `angular-adapter` skill §19.
 
+## !!! URGENT BACKLOG — delete our 36 hand-rolled RN ports (own branch, do it soon)
+
+**СРОЧНО. Сделать как можно быстрее, но НЕ в перф/движковой ветке — это чистка, отдельная
+задача, отдельная ветка.**
+
+`core/engine/src` holds **36 files whose own headers say "JS-side port of RN's `<X>`"** and
+**zero** imports from `react-native` — a module we already carry as a `peerDependency` and that
+is therefore always present at runtime. Every one of those files re-derives by hand the corner
+cases of an implementation we already ship. It is the same mistake the CSS parser had before it
+was rebuilt around `lightningcss`, and it has already cost a real device bug (`process-transform`
+diverged from upstream on array input and crashed Android with
+`String cannot be cast to ReadableArray`).
+
+Measured against `react-native@0.86.0`, the candidates split cleanly:
+
+- **Tier A — 12 modules, 1-5 files each, zero native, zero React.** `flattenStyle`,
+  `processTransform`, `processFilter`, `processBoxShadow`, `processBackgroundImage`,
+  `processTransformOrigin`, `processAspectRatio`, `processFontVariant`, `PanResponder`,
+  `Easing`, `bezier`, `ErrorUtils`. Delete the port, import upstream.
+- **Tier B — 15 modules, 13-38 files**, all sharing ONE ~1.2k-LOC TurboModule/BatchedBridge
+  floor. Judgement call, module by module.
+- **Tier C — 3 modules that must STAY ported**: `Keyboard`, `AccessibilityInfo`, `Image.ios`
+  each reach `ReactNative/RendererProxy` → `Renderer/implementations/ReactFabric-{dev,prod}`,
+  i.e. **React's own Fabric renderer**, which must never enter a Vue/Svelte/Solid/Angular bundle.
+
+The blocker is not the import graph, it is that Vitest cannot parse RN's Flow source
+(`symbiote-rn-import-testability`). **Step 0 is a ~30-minute experiment** — scope
+`@babel/preset-flow` to `node_modules/react-native` in `vitest.config.ts` — and it decides
+whether Tier A exists at all. It has not been tried.
+
+Two traps that make this look impossible or trivial when it is neither: a naive import closure
+counts Flow `import type` edges and reports 194 files where the truth is 1, and the
+`core/components/src/bootstrap` subpath precedent that already imports `react-native` today does
+**not** extend to Tier A (commit-path modules cannot leave the main barrel).
+
+**Full tables, the measured closures, the `RendererProxy` paths, the step-by-step plan, and a
+re-runnable closure script: `.claude/skills/symbiote-rn-port-elimination`. Read it before
+porting ANY further RN module by hand.**
+
 ## Reference material
 
 - RN source: `.vendors/react-native` (and `.vendors/react` for the renderer
