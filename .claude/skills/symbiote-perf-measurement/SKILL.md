@@ -294,10 +294,55 @@ and the mechanism.
 
 Scope before anyone acts on it: this is the JS-driven tier only. `useNativeDriver` animations never
 enter JS per frame, so the finding bites exactly the animations that cannot use it — layout props,
-JS-computed values. And the fix is NOT to make `setNativeProps` async: a caller today may read the
-committed result on the next line, and `dirty-marking.test.ts` does. It needs an explicit batching
-scope around the frame flush, alongside the `flushSuspendDepth` mechanism `graph.ts` already has
-for composite/colour channels. Unbuilt, unmeasured on device.
+JS-computed values.
+
+### …and then RN's own source said the batching is the wrong fix
+
+**Do not build the batching scope. Read this first.** Checked against `react-native@0.86.0` the same
+day: on Fabric, RN does **not commit per animation frame at all**. Its decision tree lives in
+`src/private/animated/createAnimatedPropsHook.js:127-190`, and the branch that ships is the last one:
+
+```js
+// This is a Fabric instance and setNativeProps is supported.
+instance.setNativeProps(node.__getAnimatedValue());     // direct native write, NO commit
+…
+// React commit is not fast enough to drive animations. This is where setNativeProps comes in
+// handy but the state between Fiber tree and Shadow tree needs to be kept in sync.
+// The goal is to call `scheduleUpdate` as little as possible … Debounce is set to 48ms, which
+// is 3 * the duration of a frame. 3 frames was the highest value where flickering was not observed.
+timerRef.current = setTimeout(() => scheduleUpdate(), 48);
+```
+
+`instance.setNativeProps` is `ReactNativeElement.setNativeProps` →
+`NativeDOM.setNativeProps(node, updatePayload)`, where `NativeDOM` is the **TurboModule
+`'NativeDOMCxx'`**, not `global.nativeFabricUIManager` — though `Libraries/ReactNative/FabricUIManager.js`
+still declares `setNativeProps` on the UIManager Spec too, so there are two candidate routes and
+**which one is live must be proven on device** (`<native_module_name_is_platform_specific>`: a
+headless fake resolves any name). The gate is `shouldUseSetNativePropsInFabric`, and its default is
+**`true`** — this is RN's normal path, not an opt-in.
+
+So RN commits **once per 48 ms**; we commit **once per animated leaf per frame**. That is 60x more
+commits per animation, not the 3.9x the batching row prices, and it means the batching finding is a
+3.9x win on the wrong axis. Our `IFabricSlot` (`core/engine/src/fabric.ts`) does not declare
+`setNativeProps` at all — the capability was never wired, not evaluated and rejected.
+
+What makes this a design task rather than a one-liner, and what to settle before writing code:
+
+- **Payload filtering.** RN runs `createAttributePayload(props, viewConfig.validAttributes)` before
+  the native call. We have the ViewConfig machinery (`registry.ts` / `view-config.ts`) but the
+  equivalent filtering does not exist on this path.
+- **The resync, which is a DIFFERENT divergence for us.** RN debounces because its Fiber tree does
+  not know about the animated props. Our `setNativeProps` writes `node.props`, so our retained tree
+  stays truthful — what would go stale is `node.committed.props` versus what Fabric actually holds.
+  That is precisely the condition `warnIfStale` reports as `DIRTY-MISS`. Decide explicitly whether a
+  direct write updates the committed record, marks `propsDirty`, or neither; each choice trades a
+  redundant re-send against a stale mirror, and the wrong one is silent.
+- **The synchronous contract.** A caller today reads the committed result on the next line and
+  `dirty-marking.test.ts` does exactly that. Whatever replaces the commit must keep that observable
+  or change the test deliberately.
+
+Unbuilt, and not measured on device. The 3.9x batching number stays in the table above as a
+measurement of what the CURRENT design costs, not as a recommendation.
 
 ## Running the micro-bench
 
