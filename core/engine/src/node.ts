@@ -5,6 +5,7 @@
 // freely without touching Fabric's clone-on-write protocol directly, and it
 // lives here in shared so no adapter re-implements it.
 
+import type { IFabricNode, IFabricProps, IRootTag } from './fabric';
 import { isEventFor } from './view-config';
 import { isClassNameValue, resolveClassName } from './style-registry';
 import { dlog } from './debug';
@@ -73,6 +74,69 @@ export interface ISymbioteNode {
   // silent-stale-UI failure mode. So every write path errs toward marking - see markPropsDirty -
   // and skipped nodes are deliberately NOT cleared in renderableChildren the way `dirty` is.
   propsDirty: boolean;
+  // What Fabric currently holds for this node - `undefined` until its first commit. The retained
+  // node carries the DESIRED state (props/children); this carries the COMMITTED state the reconcile
+  // walk diffs against and the handle every imperative call is aimed at.
+  //
+  // It lives HERE, on the node, and that placement is the point. It used to be a
+  // `WeakMap<ISymbioteNode, IMirror>` kept in commit.ts, which read - fairly - as "the engine
+  // builds its own second tree beside the framework's". It never did: `ISymbioteNode` IS the host
+  // node the framework's renderer creates and mutates (React's createInstance, Vue's nodeOps
+  // createElement, Angular's Renderer2.createElement all return one), exactly as `HTMLElement` is
+  // in a browser. A node carrying its own native binding is what React does too - `fiber.stateNode`
+  // holds the same {node, canonical} pair, minted by the same createNode call - and what a DOM node
+  // does when it carries its layout box. Collapsing the side table into a field makes the code say
+  // that: there is one tree, the framework's, and each of its nodes remembers what it committed.
+  committed: IMirror | undefined;
+}
+
+// The committed-state record. `tag` is the reactTag minted at first create, stable across
+// clone-on-write (a clone keeps the family), kept so the native-driven Animated path can bind to it
+// directly. `rootTag` lets a targeted re-commit (setNativeProps) find the surface.
+export interface IMirror {
+  handle: IFabricNode;
+  tag: number;
+  rootTag: IRootTag;
+  props: IFabricProps;
+  children: readonly ISymbioteNode[];
+  viewName: string;
+  parent: ISymbioteNode | undefined;
+  // Back-reference to the node this record was written on, read by committedOf below and by
+  // nothing else. See there for why a plain property read needs it and a WeakMap did not.
+  owner: ISymbioteNode;
+}
+
+/**
+ * The committed record for `node`, or `undefined` if it has never been committed - or if `node` is
+ * not the raw retained node at all.
+ *
+ * That second case is the reason this is a function rather than a bare `node.committed` read. The
+ * engine identifies a node BY IDENTITY, and the classic way to break that is to hand the engine a
+ * wrapper instead of the node: a Vue `reactive()`/deep-`ref()` Proxy around a host element is the
+ * one that actually happens (see the vue-adapter-reactivity skill; `shallowRef` is the fix).
+ *
+ * The old WeakMap caught this for free - a Proxy is a different object, so `mirror.get(proxy)` missed
+ * and every imperative API bailed with a clear "node not committed". A plain property read does NOT:
+ * a Proxy forwards `proxy.committed` straight to the target and hands back a real record, whose
+ * `handle` Vue would then deep-wrap on the way out. That handle is a JSI host object; a Proxy around
+ * it reaches `cloneNodeWithNewProps` and fails somewhere deep in native, far from the cause.
+ *
+ * So the identity check that was implicit in the WeakMap is explicit here: a record written on the
+ * raw node names it, and `record.owner !== node` means whatever we were handed is not that node.
+ * One reference comparison, and the wrap now fails LOUDER than it used to rather than quieter.
+ */
+export function committedOf(node: ISymbioteNode): IMirror | undefined {
+  const record = node.committed;
+  if (record === undefined) return undefined;
+  if (record.owner !== node) {
+    dlog(
+      `node identity mismatch: committed record belongs to node=${debugNodeId(record.owner)}, ` +
+        `not to the object handed in. A wrapped/proxied node (Vue reactive() or deep ref() around ` +
+        `a host element) is the usual cause - hold host nodes with shallowRef.`,
+    );
+    return undefined;
+  }
+  return record;
 }
 
 export function createElement(
@@ -89,6 +153,7 @@ export function createElement(
     parent: undefined,
     dirty: true,
     propsDirty: true,
+    committed: undefined,
   };
 }
 
@@ -106,6 +171,7 @@ export function createRawText(text: string): ISymbioteNode {
     // the same reason createElement's does: a node that has never committed must never take a
     // fast path built on "the mirror already agrees with me".
     propsDirty: true,
+    committed: undefined,
   };
 }
 

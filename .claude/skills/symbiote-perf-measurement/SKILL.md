@@ -167,6 +167,71 @@ Cold mount pays ~3-6% (read off `min`, see below).
 }
 ```
 
+## Measured — desktop V8, same host, 2026-08-22 (the props/identity split)
+
+Two changes landed together on `core/engine`, and they are worth reading side by side because one
+of them is the cautionary tale and the other is the result.
+
+**`propsDirty` (the clone-bubble fast lane).** `dirty` answered two questions; splitting off "did
+THIS node's own props change" lets reconcile reuse the committed payload by reference instead of
+rebuilding it with `fabricProps()` and deep-comparing. Real work removed — and far less of it than
+intended:
+
+```
+one prop changed        visited   propsBuilt   propsReused     (propsBuilt+propsReused = the old
+flat 10 000 nodes        10 002        1            2           number of rebuild+deep-compare)
+sectioned 244 sections      260        1            5
+```
+
+**2 nodes on a flat tree, 5 on a screen — not "most of the walk".** Every other visited node takes
+the EARLIER early exit and never reached the props code at all: dirty-marking had already taken
+that win in August. Wall-clock sits inside this host's noise. Counters assert the change; no time
+claim is made for it.
+
+```
+§count_the_population_before_building_the_fix := {
+  mistake: "designed a fast lane for 'most of the visited nodes' without ever counting how many nodes reached the code it optimizes",
+  cost: "a full implement + test + mutation-test + A/B cycle to learn the population was 2-5",
+  ⟶ "the counter that answered it was ~10 lines and could have run FIRST — same shape as the arithmetic sanity check in the three-hypotheses section above, applied to POPULATION rather than to curve shape",
+}
+```
+
+**`mirror` WeakMap → a `committed` field on the node.** Framed as architectural honesty (see
+`symbiote-engine-core` §3 — it is what makes "the engine builds its own second tree" factually
+wrong), it turned out to be the change that MOVED. `reconcile` did `mirror.get(node)` for every
+node it visited — including all the early exits — so the lookup was the per-visited-node cost.
+
+A/B interleaved across two rounds to defeat host drift (see the caveat below — this matters):
+
+```
+                                          field: min / p75        WeakMap: min / p75      delta
+1 prop, flat 10 000 (visited 10 002)   3.925/4.065 3.877/4.136  4.546/4.772 4.399/4.682   -12..14%
+1 prop, flat 2 000  (visited  2 002)   0.744/0.860 0.738/0.829  0.796/0.916 0.791/0.921    -7..10%
+1 prop, 10 005 / 244 sections (260)    0.112/0.126 0.110/0.138  0.110/0.126 0.111/0.125     none
+1 prop, flat 100 / 500                                                                      none
+no-op commit, 9 761 nodes (visited 3)  0.0018      0.0018       0.0018      0.0018          none
+```
+
+`min` ranges do not overlap on the two rows that moved, both rounds agree, and — the part that
+makes it a finding rather than a number — **the effect appears exactly where visits are many and
+vanishes where they are few**, scaling as ~35 ns/node at 2 000 and ~58 ns/node at 10 000, which is
+the right order for a V8 WeakMap lookup. Hypothesis predicted a per-visited-node saving; the
+measurement is a per-visited-node saving.
+
+Scope, stated so nobody over-quotes it: a bushy screen shows NOTHING here, because dirty-marking
+already holds its visits at 260 of 10 005. The win lands on WIDE child sets — which is the
+`Append 1 000 rows` / `Remove row` structural shape that is still the expensive one on device. Not
+carried to a device yet; Hermes' WeakMap-vs-property ratio is unmeasured, do not assume this one.
+
+```
+§interleave_ab_or_measure_the_host := {
+  measured: "two BEFORE runs of IDENTICAL code, back to back, differed by +6..11% on four bench rows with ±1% rme each",
+  ⟶ "a single before/after pair on this host cannot resolve anything under ~15%; the first such pair read as a 15% REGRESSION and was pure drift",
+  method: "toggle the diff with git stash and interleave A/B/A/B in one session; trust a row only when both rounds agree AND the min ranges do not overlap",
+  corollary: "rme is within-run scatter and says NOTHING about between-run drift — a tight rme on both sides is exactly how a drift artifact disguises itself",
+}
+```
+
 ## Running the micro-bench
 
 ```sh

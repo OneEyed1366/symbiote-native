@@ -1,6 +1,6 @@
 ---
 name: symbiote-engine-core
-description: "Symbiote engine core — how to drive @symbiote-native/engine correctly, read BEFORE writing or debugging any core/engine/** code OR any adapter renderer seam (host-config / createRenderer / Renderer2) that calls the engine. The engine is a retained MUTABLE shadow-tree that the engine alone translates into Fabric's persistent CLONE-ON-WRITE child sets; every adapter drives the same tiny mutation API and NONE re-implements persistence. Covers (1) the MUTATION API in core/engine/src/node.ts — createElement / createRawText / createAnchor / appendChild / insertBefore / removeChild / setProp / setEventListener / setText, and the ONE entry point flat-bag adapters use, routeProp (it decides onX→event-vs-prop via the ViewConfig, strips React __self/__source, attaches responder events) — do NOT pre-split events yourself. (2) NODE IDENTITY — the engine keeps mirror = WeakMap<ISymbioteNode, …> in commit.ts; every imperative API does mirror.get(node) and bails if absent, so a node must be held by IDENTITY, never wrapped (Vue reactive Proxy is the classic break — see vue-adapter-reactivity). (3) THE COMMIT — SymbioteSurface.commit() (sync, React resetAfterCommit) vs requestCommit() (microtask-coalesced, reactive frameworks) → commitChildren → reconcile → completeRoot; clone-bubble (a leaf change re-clones ancestors); anchors are skipped. (4) THE IMPERATIVE/NATIVE BRIDGE in commit.ts — dispatchViewCommand / measure / measureInWindow / measureLayout / getNativeTag / getNativeNode / setNativeProps / sendAccessibilityEvent, all mirror-gated, all SILENT no-ops before commit, DEBUG=1 logs 'node not committed'. (5) whenCommitted(node, action) + the post-commit.ts seam — the fix for any native call wired before the tag exists under async commit. (6) dlog / isDebug gating. Trigger on engine work, on writing/porting a renderer seam, on any imperative native call, or on a 'command silently does nothing' / 'works on React, dead on Vue' symptom."
+description: "Symbiote engine core — how to drive @symbiote-native/engine correctly, read BEFORE writing or debugging any core/engine/** code OR any adapter renderer seam (host-config / createRenderer / Renderer2) that calls the engine. The engine is a retained MUTABLE shadow-tree that the engine alone translates into Fabric's persistent CLONE-ON-WRITE child sets; every adapter drives the same tiny mutation API and NONE re-implements persistence. Covers (1) the MUTATION API in core/engine/src/node.ts — createElement / createRawText / createAnchor / appendChild / insertBefore / removeChild / setProp / setEventListener / setText, and the ONE entry point flat-bag adapters use, routeProp (it decides onX→event-vs-prop via the ViewConfig, strips React __self/__source, attaches responder events) — do NOT pre-split events yourself. (2) NODE IDENTITY — each node carries its committed Fabric record in its OWN `committed` field (node.ts, IMirror), read through the guarded `committedOf(node)`; every imperative API resolves through it and bails if absent, so a node must be held by IDENTITY, never wrapped (Vue reactive Proxy is the classic break — see vue-adapter-reactivity). This was a `WeakMap<ISymbioteNode, …>` side table until 2026-08-22; collapsing it into a field is what makes 'the engine builds its own second tree' factually wrong (ISymbioteNode IS the framework's host node, as fiber.stateNode is React's) and removed a WeakMap lookup per VISITED node per commit — measured 12-14% on a 10 000-node flat walk, nothing on a bushy screen where dirty-marking already keeps visits low. (3) THE COMMIT — SymbioteSurface.commit() (sync, React resetAfterCommit) vs requestCommit() (microtask-coalesced, reactive frameworks) → commitChildren → reconcile → completeRoot; clone-bubble (a leaf change re-clones ancestors); anchors are skipped. (4) THE IMPERATIVE/NATIVE BRIDGE in commit.ts — dispatchViewCommand / measure / measureInWindow / measureLayout / getNativeTag / getNativeNode / setNativeProps / sendAccessibilityEvent, all mirror-gated, all SILENT no-ops before commit, DEBUG=1 logs 'node not committed'. (5) whenCommitted(node, action) + the post-commit.ts seam — the fix for any native call wired before the tag exists under async commit. (6) dlog / isDebug gating. Trigger on engine work, on writing/porting a renderer seam, on any imperative native call, or on a 'command silently does nothing' / 'works on React, dead on Vue' symptom."
 ---
 
 # Symbiote engine core — driving `@symbiote-native/engine`
@@ -27,7 +27,8 @@ adapter (React / Vue / Angular)
 ISymbioteNode tree   (core/engine/src/node.ts)                   ← the retained shadow-tree YOU mutate
    │  surface.commit() | requestCommit()                        ← §4
    ▼
-reconcile + mirror WeakMap   (core/engine/src/commit.ts)        ← clone-on-write, ENGINE-owned
+reconcile  (core/engine/src/commit.ts)                           ← clone-on-write, ENGINE-owned
+   │  reads/writes each node's own `committed` record (node.ts) — no side table
    │  createChildSet / cloneNodeWithNewProps / completeRoot
    ▼
 nativeFabricUIManager  →  Fabric C++ / Yoga / RCTFabricSurface  ← never forked
@@ -76,17 +77,37 @@ directly and routes only `[prop]` bindings through `routeProp`.
 ## 3. Node identity — the rule that bites every adapter
 
 `ISymbioteNode` (`node.ts`) is a branded plain object: `{ component, isText,
-props, listeners, children, parent }`. The engine tracks each node by **object
-identity** in a `mirror = new WeakMap<ISymbioteNode, …>()` (`commit.ts`) mapping
-the retained node → its committed Fabric handle/tag. **Every** imperative API
-(§5) resolves through `mirror.get(node)`.
+props, listeners, children, parent, dirty, propsDirty, committed }`. That last
+field IS the mirror of what Fabric holds for this node — handle, reactTag,
+rootTag, the flat props last sent, the child identities last committed, the
+resolved view name — and every imperative API (§5) resolves through it.
+
+**It lives on the node, and that placement is load-bearing for how you describe
+this project.** Until 2026-08-22 it was a `mirror = new WeakMap<ISymbioteNode, …>()`
+in `commit.ts`, which read — fairly — as "the engine keeps its own second tree
+beside the framework's". It never did: `ISymbioteNode` is the host node the
+framework's own renderer creates and mutates (React `createInstance`, Vue nodeOps
+`createElement`, Angular `Renderer2.createElement` all return one), exactly as
+`HTMLElement` is in a browser. A host node carrying its native binding is what
+React does too — `fiber.stateNode` holds the same `{node, canonical}` pair from the
+same `createNode` call. There is ONE tree, the framework's, and each of its nodes
+remembers what it committed.
 
 **Hold engine nodes by identity. Never wrap one in a structure that proxies it.**
-The classic break is Vue's `ref(node)` deep-wrapping the node in a reactive
-Proxy — a different object than the WeakMap key, so `mirror.get` misses and every
-imperative command silently no-ops. The Vue-specific manifestation and fix
-(`shallowRef` / `markRaw`) is its own skill: **`vue-adapter-reactivity`** (Gotcha
-1). The engine-side contract is just: same object in, or the mirror misses.
+The classic break is Vue's `ref(node)` deep-wrapping the node in a reactive Proxy.
+The Vue-specific manifestation and fix (`shallowRef` / `markRaw`) is its own skill:
+**`vue-adapter-reactivity`** (Gotcha 1).
+
+**Read the record ONLY through `committedOf(node)`, never as a bare
+`node.committed`.** The WeakMap used to catch a wrap for free — a Proxy is a
+different object, so the lookup missed and the call bailed with a clear "node not
+committed". A plain field read does NOT: a Proxy forwards `proxy.committed`
+straight to its target and hands back a real record, whose `handle` a deep
+reactive would then wrap on the way out — and that handle is a JSI host object, so
+the Proxy reaches `cloneNodeWithNewProps` and fails deep in native, far from the
+cause. `committedOf` restores the check explicitly: the record names its `owner`,
+and `record.owner !== node` means the object handed in is not that node. Locked in
+by `core/engine/src/__tests__/node-identity.test.ts`, including the deep-proxy case.
 
 ## 4. The commit — sync vs async is the adapter's choice
 
@@ -120,8 +141,9 @@ the walk — they never reach Fabric.
 ## 5. The imperative / native bridge — `core/engine/src/commit.ts`
 
 The backdoor for focus/blur, measurement, Animated, gestures. Every one is
-**mirror-gated**: it does `mirror.get(node)` and, if the node hasn't committed,
-**silently returns** — no throw.
+**gated on the committed record**: it does `committedOf(node)` and, if the node
+hasn't committed — or if what it was handed is a wrapper rather than the node
+itself, see §3 — **silently returns**, no throw.
 
 ```
 dispatchViewCommand(node, name, args)    // e.g. TextInput focus, Switch setValue
@@ -149,11 +171,13 @@ The fix is the engine primitive built on the post-commit seam
 fired after every `completeRoot` that assigned tags):
 
 ```ts
-import { whenCommitted } from '@symbiote-native/engine'
+import { whenCommitted } from '@symbiote-native/engine';
 // instead of:  dispatchViewCommand(node, 'focus', [])     // no-ops if tag not ready
-const cancel = whenCommitted(node, () => dispatchViewCommand(node, 'focus', []))
+const cancel = whenCommitted(node, () =>
+  dispatchViewCommand(node, 'focus', []),
+);
 // run the action now if the node already has a tag, else after the commit that assigns it
-onBeforeUnmount(() => cancel())   // drop the pending retry if we never commit
+onBeforeUnmount(() => cancel()); // drop the pending retry if we never commit
 ```
 
 **Rule:** any native/imperative call wired at lifecycle time (`onMounted`,
@@ -171,8 +195,8 @@ bundle) or `globalThis.__SYMBIOTE_DEBUG__ = true` (runtime). Output is prefixed
 `[symbiote] `.
 
 ```ts
-import { dlog, isDebug } from '@symbiote-native/engine'
-dlog(`commit root=${rootTag} pre-completeRoot`)   // gated, zero-cost when off
+import { dlog, isDebug } from '@symbiote-native/engine';
+dlog(`commit root=${rootTag} pre-completeRoot`); // gated, zero-cost when off
 ```
 
 New code with non-trivial runtime behavior (a commit path, an event, a native
@@ -247,8 +271,10 @@ of React - stripped from release) and the Hermes sampling profiler in React Nati
 ## Reference
 
 - Mutation API + node shape: `core/engine/src/node.ts` (read this first).
-- Clone-on-write commit, the `mirror` WeakMap, `commitChildren`, the imperative
-  bridge, and `whenCommitted`: `core/engine/src/commit.ts`.
+- The committed record (`IMirror`), its guarded accessor (`committedOf`), and the
+  `dirty` / `propsDirty` pair: `core/engine/src/node.ts`.
+- Clone-on-write commit, `commitChildren`, the imperative bridge, and
+  `whenCommitted`: `core/engine/src/commit.ts`.
 - Surface + commit strategies (`commit` / `requestCommit`): `core/engine/src/surface.ts`.
 - Post-commit retry seam: `core/engine/src/post-commit.ts`.
 - ViewConfig event inference (`isEventFor`): `core/engine/src/view-config.ts`.

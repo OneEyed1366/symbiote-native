@@ -2,8 +2,8 @@
 // node, you clone it with new props/children and atomically hand a fresh child
 // set to completeRoot.
 //
-// Incremental strategy: each retained node keeps a "mirror" of what Fabric
-// currently holds for it: its handle, the flat props last sent, the child
+// Incremental strategy: each retained node keeps, in its own `committed` field (node.ts), a
+// mirror of what Fabric currently holds for it: its handle, the flat props last sent, the child
 // identities last committed, and the resolved view name. On commit we walk the
 // retained tree and only clone the nodes that actually changed; an untouched
 // sibling subtree is reused by reference. That both skips work and preserves the
@@ -27,10 +27,12 @@ import {
   debugNodeId,
   isAnchor,
   isEmptyRawText,
+  committedOf,
   markDirty,
   markPropsDirty,
   takePropStats,
   VIRTUAL_TEXT_COMPONENT,
+  type IMirror,
   type ISymbioteNode,
 } from './node';
 import { dlog, isDebug } from './debug';
@@ -210,22 +212,10 @@ function jsonEqual(a: unknown, b: unknown): boolean {
   return keys.every(key => key in b && jsonEqual(a[key], b[key]));
 }
 
-// What Fabric currently holds for a node. The retained node carries the *desired*
-// state (props/children); the mirror carries the *committed* state we diff against.
-// `tag` is the reactTag we minted at first create, stable across clone-on-write
-// (the clone keeps the family). Kept so the native-driven Animated path can bind to
-// it directly. `rootTag` lets a targeted re-commit (setNativeProps) find the surface.
-interface IMirror {
-  handle: IFabricNode;
-  tag: number;
-  rootTag: IRootTag;
-  props: IFabricProps;
-  children: readonly ISymbioteNode[];
-  viewName: string;
-  parent: ISymbioteNode | undefined;
-}
-
-const mirror = new WeakMap<ISymbioteNode, IMirror>();
+// The committed-state record (IMirror) and its guarded accessor (committedOf) live on the node
+// itself, in node.ts - see the `committed` field there for why the side table was collapsed into a
+// field, and committedOf's doc comment for the node-identity check that replaced the WeakMap miss.
+// Everything below reads it exclusively through committedOf and writes it as `node.committed`.
 
 interface IReconciled {
   handle: IFabricNode;
@@ -295,7 +285,7 @@ function logScrollChildren(
 ): void {
   if (!viewName.includes('Scroll') || viewName.includes('Content')) return;
   const kids = node.children.map(child => {
-    const committed = mirror.get(child);
+    const committed = committedOf(child);
     return `${committed?.viewName ?? child.component}#${committed?.tag ?? 'NEW'}`;
   });
   const flag = kids.length === 1 ? 'OK' : 'MULTI!!';
@@ -339,7 +329,7 @@ function reconcile(
 ): IReconciled {
   profile.nodesVisited += 1;
   const viewName = viewNameFor(node, hasTextAncestor);
-  const committed = mirror.get(node);
+  const committed = committedOf(node);
 
   // Nothing under here changed: hand back the committed handle without rebuilding this node's
   // Fabric props or descending into it at all. The walk below costs ~13 us/node on device, and an
@@ -425,10 +415,10 @@ function reconcile(
     // behind DEBUG per <keep_logs_gate_behind_DEBUG>, never removed.
     if (viewName.startsWith('RNS')) {
       dlog(
-        `mirror.set (create) node=${debugNodeId(node)} tag=${tag} view=${viewName}`,
+        `committed (create) node=${debugNodeId(node)} tag=${tag} view=${viewName}`,
       );
     }
-    mirror.set(node, {
+    node.committed = {
       handle,
       tag,
       rootTag,
@@ -436,7 +426,8 @@ function reconcile(
       children: kids.slice(),
       viewName,
       parent: renderableParent,
-    });
+      owner: node,
+    };
     return { handle, changed: true };
   }
 
@@ -512,11 +503,11 @@ function reconcile(
   // dlog above. Kept behind DEBUG per <keep_logs_gate_behind_DEBUG>, never removed.
   if (viewName.startsWith('RNS')) {
     dlog(
-      `mirror.set (update) node=${debugNodeId(node)} tag=${committed.tag} view=${viewName}`,
+      `committed (update) node=${debugNodeId(node)} tag=${committed.tag} view=${viewName}`,
     );
   }
   // The clone keeps the node's family, so its reactTag is unchanged; carry it.
-  mirror.set(node, {
+  node.committed = {
     handle,
     tag: committed.tag,
     rootTag,
@@ -528,7 +519,8 @@ function reconcile(
     children: kids.slice(),
     viewName,
     parent: renderableParent,
-  });
+    owner: node,
+  };
   return { handle, changed: true };
 }
 
@@ -564,7 +556,8 @@ function rootContainerFor(rootTag: IRootTag): ISymbioteNode {
 // now-stopped surface. Called from unmount (the bridgeless surface-stop path): the host stops then restarts a
 // surface (Fast Refresh, focus/lifecycle) reusing the same rootTag, and a stale root
 // container would re-clone dead handles into the new surface -> a blank screen. The old
-// container's descendants fall out of every reference and their mirror entries GC.
+// container's descendants fall out of every reference and are collected with the committed
+// records they carry.
 export function disposeRoot(rootTag: IRootTag): void {
   if (rootContainers.delete(rootTag))
     dlog(`root container disposed root=${rootTag}`);
@@ -715,7 +708,7 @@ export function setNativeProps(
   node: ISymbioteNode,
   partial: Record<string, unknown>,
 ): void {
-  const record = mirror.get(node);
+  const record = committedOf(node);
   if (record === undefined) {
     dlog('setNativeProps skipped: node not committed');
     return;
@@ -747,7 +740,7 @@ export function setNativeProps(
 // native Animated driver via connectAnimatedNodeToView. Undefined until the node
 // has been committed at least once.
 export function getNativeTag(node: ISymbioteNode): number | undefined {
-  return mirror.get(node)?.tag;
+  return committedOf(node)?.tag;
 }
 
 // Actions waiting for their node's first commit. An adapter that wires an imperative/native call at
@@ -770,7 +763,7 @@ export function whenCommitted(
   action: () => void,
 ): () => void {
   const attempt = (): boolean => {
-    if (mirror.get(node) === undefined) return false;
+    if (committedOf(node) === undefined) return false;
     action();
     return true;
   };
@@ -783,21 +776,21 @@ export function whenCommitted(
 // The node's current Fabric handle (the createNode/clone return value), identical in
 // kind to React's stateNode.node, for the native driver's ShadowNodeFamily path.
 export function getNativeNode(node: ISymbioteNode): IFabricNode | undefined {
-  return mirror.get(node)?.handle;
+  return committedOf(node)?.handle;
 }
 
 // Imperative view command (e.g. TextInput's setTextAndSelection / focus / blur),
 // aimed at a node's CURRENT Fabric handle. Only valid once the node has been
-// committed at least once; its handle is read from the mirror.
+// committed at least once; its handle is read from the node's committed record.
 export function dispatchViewCommand(
   node: ISymbioteNode,
   commandName: string,
   args: readonly unknown[],
 ): void {
-  const record = mirror.get(node);
+  const record = committedOf(node);
   if (record === undefined) {
-    // node=... compares directly against the mirror.set logs above (same debugNodeId scheme) to
-    // prove/disprove a node-identity mismatch — see the search-bar-ref investigation note there.
+    // node=... compares directly against the `committed (create|update)` logs above (same
+    // debugNodeId scheme) to prove/disprove an identity mismatch — see the note there.
     dlog(
       `dispatchViewCommand "${commandName}" skipped: node not committed (node=${debugNodeId(node)} component=${node.component})`,
     );
@@ -816,7 +809,7 @@ export function sendAccessibilityEvent(
   node: ISymbioteNode,
   eventType: string,
 ): void {
-  const record = mirror.get(node);
+  const record = committedOf(node);
   if (record === undefined) {
     dlog(`sendAccessibilityEvent "${eventType}" skipped: node not committed`);
     return;
@@ -832,7 +825,7 @@ export function measure(
   node: ISymbioteNode,
   callback: IMeasureOnSuccess,
 ): void {
-  const record = mirror.get(node);
+  const record = committedOf(node);
   if (record === undefined) {
     dlog('measure skipped: node not committed');
     return;
@@ -844,7 +837,7 @@ export function measureInWindow(
   node: ISymbioteNode,
   callback: IMeasureInWindowOnSuccess,
 ): void {
-  const record = mirror.get(node);
+  const record = committedOf(node);
   if (record === undefined) {
     dlog('measureInWindow skipped: node not committed');
     return;
@@ -861,8 +854,8 @@ export function measureLayout(
   onSuccess: IMeasureLayoutOnSuccess,
   onFail: () => void = () => {},
 ): void {
-  const record = mirror.get(node);
-  const relativeRecord = mirror.get(relativeTo);
+  const record = committedOf(node);
+  const relativeRecord = committedOf(relativeTo);
   if (record === undefined || relativeRecord === undefined) {
     dlog('measureLayout skipped: a node is not committed');
     return;
