@@ -361,10 +361,67 @@ record. `setNativeProps` routes through it.
 1 animated value, targeted          0.0040   0.0031   ±2.18%     4.5x
 ```
 
-Counters agree with the mechanism: 37 visits → 5. Five concurrent animations now cost
-5 x 0.0040 = 0.020 ms/frame separate, against 0.0542 ms for five batched through the GENERAL path —
-so targeted-and-separate already beats batched-and-general, and the 3.9x batching win is no longer
-the thing to build. The batching rows stay in the table as a measurement of the general path.
+Counters agree with the mechanism: 37 visits → 5.
+
+```
+§that_bench_row_understated_the_targeted_path := {
+  error: "concluded from it that batching the animation flush was obsolete, because 5 x 0.0040 beat 0.0542",
+  cause: "the bench row animates a HEADER TITLE — nothing wide on its ancestor chain. Cloning an ancestor means re-appending every one of its children, so the cost of a targeted commit is set by how many children the ancestors HAVE, not by the chain's length",
+  measured: "same fixture, same targeted path: header title = 4 clones / 35 appends per frame; a list row leaf under a 60-row content view = 6 clones / 98 appends. 2.8x, from the target's position alone",
+  ⟶ "a per-frame cost measured on ONE target is not the path's cost. Pick the target from the app, not from the fixture's convenience",
+}
+```
+
+## The dirty-set census, and where Fabric work is actually recoverable (2026-08-22)
+
+Counted per commit on the app-shaped fixture, before the commit clears the flags: how many nodes
+are dirty, the UNION of their ancestor chains, and the Fabric calls that follow.
+
+```
+32 screens x 60 rows (17 440 nodes)   dirty  chainUnion  visited  clone  append  completeRoot
+1 prop, 1 node                            1           6      102      6     100        1
+5 props, same screen                      5          14      126     14     120        1
+5 props, 5 different screens              5          26      378     26     372        1
+every 10th row of the top list            6          16      132     16     125        1
+windowed step (structural)                1           4      104      4     103        1  (+9 create)
+whole top screen re-props                60         124      456    124     395        1
+5 props, five SEPARATE commits            -           -      510     30     500        5
+```
+
+Three findings, and they point in different directions.
+
+```
+§the_general_commit_is_already_clone_optimal := {
+  measured: "clone === chainUnion EXACTLY, in every row: 6/6, 14/14, 26/26, 16/16, 124/124",
+  ⟶ "within one commit there is no redundant cloning to remove — dirty-marking plus the reuse path already collapse N overlapping chains into their union",
+  kills: "'merge the ancestor chains of N dirty nodes' as a Fabric-call optimisation; the walk already does it. It remains a JS-walk optimisation only",
+}
+§append_is_the_floor_and_it_dominates := {
+  measured: "1 prop on 17 440 nodes: 6 clones, 100 appends — 94% of the Fabric calls",
+  cause: "cloning an ancestor produces an empty child list; every child handle is re-appended. content has 60 rows, the container has 32 screens",
+  ⟶ "pure protocol. No JS-side optimisation touches it, and any claim of speeding up 'Fabric work' that does not name the commit COUNT is wrong",
+}
+§the_commit_count_multiplies_that_floor := {
+  measured: "the same five writes: ONE commit = 14 clones / 120 appends / 1 completeRoot; FIVE commits = 30 / 500 / 5",
+  ⟶ "4.2x the appends, 2.1x the clones, 5x the completeRoot — REAL Fabric work, and the only axis on which it is recoverable",
+  who_pays_it: "the JS-driven Animated flush, which commits once per animated leaf per frame (flushValue -> update() -> setNativeProps)",
+}
+```
+
+So the corrected priority, replacing the one recorded above:
+
+1. **Batch the animation flush.** ~4.5x fewer Fabric calls for N concurrent JS-driven animations
+   (5 x (6 clone + 98 append) separate, against 14 + 110 batched). This is the only remaining item
+   that reduces NATIVE work rather than JS work. Blocked on a contract question, not a design one:
+   `setNativeProps` is synchronously observable today and `dirty-marking.test.ts` relies on it, so it
+   needs an explicit batching scope around the frame flush — beside the `flushSuspendDepth`
+   mechanism `animated/graph.ts` already has for composite/colour channels.
+2. **An aware commit** (the engine accumulating its own dirty set instead of rediscovering it):
+   visits 102 -> 6 for a single change on a 17 440-node app. Worth up to about half the total work,
+   since visits and Fabric calls sit at roughly 1:1 today — and by §the_general_commit_is_already_-
+   clone_optimal it buys nothing on the Fabric side. Population is small (1-6 dirty nodes in every
+   realistic scenario, 60 when a whole screen re-renders), so a set is cheap to hold.
+3. **Nothing else.** `append` is the floor and it is 89-94% of a commit's native calls.
 
 ```
 §the_oracle_pattern := {
