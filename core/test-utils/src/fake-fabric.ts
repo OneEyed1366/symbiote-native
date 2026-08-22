@@ -34,8 +34,20 @@ export interface IFabricRecorder {
     commandName: string;
     args: readonly unknown[];
   }>;
-  /** Call counters, for tests that assert "exactly N native nodes were created". */
-  counts: { createNode: number; completeRoot: number };
+  /**
+   * Call counters, for tests that assert "exactly N native nodes were created" — and for pricing
+   * a commit's PROTOCOL half against its walk half. `appendChild` and `clone` are the two Fabric
+   * makes unavoidable: a parent whose child set changed is cloned empty and re-appends every child
+   * handle, so those counts are what a real JSI boundary would charge no matter how cheap the JS
+   * walk above them gets. Counting them here is the only way a headless run can say which half a
+   * proposed optimisation is even aimed at.
+   */
+  counts: {
+    createNode: number;
+    completeRoot: number;
+    appendChild: number;
+    clone: number;
+  };
   /**
    * RN wraps every commit in a synthetic `box-none` AppContainer root.
    * Returns it, asserting it is the single expected root, so each test unwraps the
@@ -72,7 +84,7 @@ export function installFabric(): IFabricRecorder {
     commandName: string;
     args: readonly unknown[];
   }> = [];
-  const counts = { createNode: 0, completeRoot: 0 };
+  const counts = { createNode: 0, completeRoot: 0, appendChild: 0, clone: 0 };
   let eventHandler: IEventHandler | undefined;
 
   const slot = {
@@ -97,24 +109,28 @@ export function installFabric(): IFabricRecorder {
     cloneNodeWithNewProps: (
       node: IFakeNode,
       newProps: Record<string, unknown>,
-    ): IFakeNode => ({
-      ...node,
-      props: mergeFabricProps(node.props, newProps),
-    }),
-    cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => ({
-      ...node,
-      children: [],
-    }),
+    ): IFakeNode => {
+      counts.clone += 1;
+      return { ...node, props: mergeFabricProps(node.props, newProps) };
+    },
+    cloneNodeWithNewChildren: (node: IFakeNode): IFakeNode => {
+      counts.clone += 1;
+      return { ...node, children: [] };
+    },
     cloneNodeWithNewChildrenAndProps: (
       node: IFakeNode,
       newProps: Record<string, unknown>,
-    ): IFakeNode => ({
-      ...node,
-      props: mergeFabricProps(node.props, newProps),
-      children: [],
-    }),
+    ): IFakeNode => {
+      counts.clone += 1;
+      return {
+        ...node,
+        props: mergeFabricProps(node.props, newProps),
+        children: [],
+      };
+    },
     createChildSet: (): IFakeNode[] => [],
     appendChild(parent: IFakeNode, child: IFakeNode): IFakeNode {
+      counts.appendChild += 1;
       if (
         child.parentFamilyTag !== undefined &&
         child.parentFamilyTag !== parent.tag

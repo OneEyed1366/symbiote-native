@@ -232,6 +232,73 @@ carried to a device yet; Hermes' WeakMap-vs-property ratio is unmeasured, do not
 }
 ```
 
+## The app-shaped series, and what counting first saved (2026-08-22)
+
+Neither series above is what a shipping app does per frame. krausest's flat table asks "how much
+does ONE huge commit cost"; an app asks "how much does a STREAM of small commits cost while 60 of
+them must fit in 16.6 ms". `reconcile.bench.ts` now carries a third series built for that question:
+a navigation stack that leaves previous screens MOUNTED, windowed lists, and animation frames as
+the unit of work.
+
+It was built to price a proposed optimisation (skip recursing into clean children, "2b") and it
+killed it outright. The census, one commit each, 20 warmup commits, steady state:
+
+```
+shape / dynamics                      nodes   visited  early  built reused  append  us/commit
+ 4 screens x 20 rows | anim x1          748         9      5    1.0    3.0       7      16.5
+12 screens x 20 rows | anim x1        2 244        17     13    1.0    3.0      15       8.9
+32 screens x 20 rows | anim x1        5 984        37     33    1.0    3.0      35      24.1
+12 screens x 60 rows | anim x1        6 564        17     13    1.0    3.0      15       8.3
+32 screens x 60 rows | anim x1       17 504        37     33    1.0    3.0      35      25.3
+32 screens x 60 rows | anim x5       17 504       122    108    5.0    9.0     116      51.7
+32 screens x 60 rows | anim x5 sep.  17 504        89     83    1.0    4.6      87      41.9  (x5/frame)
+32 screens x 60 rows | window step   17 504        96     92    0.0    4.0      95      38.5
+```
+
+```
+§visited_does_not_scale_with_tree_size := {
+  measured: "17 504 nodes, one animation frame, 37 nodes visited — and 748 nodes visits 9",
+  cause: "visited tracks the SIBLING COUNT along the path from root to the changed node, not the tree; dirty-marking prunes every untouched screen whole",
+  ⟶ "the '10 002 visited' figure the flat bench produces is a property of an unvirtualized 10 000-child parent, i.e. of the absence of a FlatList — not of a large app",
+  killed: "'2b: stop recursing into clean children'. Its population is 13-108 per commit, not thousands, and the whole walk is 0.1-0.4% of a frame on desktop V8",
+}
+§early_exits_pair_1_to_1_with_appendChild := {
+  measured: "early=108 / append=116 · early=33 / append=35 · early=92 / append=95, every shape",
+  ⟶ "for each JS early-exit an optimisation could remove there is ~one appendChild JSI call it CANNOT — the parent re-appends every child handle by protocol",
+  rule: "before optimizing the JS half of the walk, check what the protocol half costs beside it; here they are the same count and only one of them crosses JSI",
+}
+```
+
+### What the same fixture DID find: one commit per animated leaf
+
+The JS-driven Animated path commits **once per animated leaf per frame** — `flushValue` collects
+leaves, each `update()` calls `setNativeProps`, and `setNativeProps` calls `commitContainer`
+synchronously (`commit.ts`). So N concurrent animations that cannot use the native driver pay N
+full walks from the root container, where one walk would do.
+
+Bench, p75, 32 screens x 60 rows:
+
+```
+5 animated values, ONE commit          0.0553 ms/frame
+5 animated values, a commit EACH       0.0429 ms x 5 = 0.2145 ms/frame     3.9x
+1 animated value                       0.0171 ms
+windowed list steps one row            0.0399 ms
+```
+
+Confirmed by the counters rather than inferred: 5 x 89 = 445 visits/frame separate vs 122 batched.
+
+Desktop V8 puts that at 1.3% vs 0.33% of a frame. **Do NOT quote a device figure from it** — the
+rule against projecting by eye holds, and the only measured Hermes/V8 ratio here (13.4 vs 0.5
+us/node on the WALK, pre-dirty-marking) is not this workload. What transfers is the RATIO, 3.9x,
+and the mechanism.
+
+Scope before anyone acts on it: this is the JS-driven tier only. `useNativeDriver` animations never
+enter JS per frame, so the finding bites exactly the animations that cannot use it — layout props,
+JS-computed values. And the fix is NOT to make `setNativeProps` async: a caller today may read the
+committed result on the next line, and `dirty-marking.test.ts` does. It needs an explicit batching
+scope around the frame flush, alongside the `flushSuspendDepth` mechanism `graph.ts` already has
+for composite/colour channels. Unbuilt, unmeasured on device.
+
 ## Running the micro-bench
 
 ```sh

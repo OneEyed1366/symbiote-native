@@ -46,6 +46,7 @@ import {
   insertBefore,
   removeChild,
   setProp,
+  setText,
   type ISymbioteNode,
   type SymbioteSurface,
 } from '../index';
@@ -355,6 +356,168 @@ describe('commit with nothing mutated', () => {
   bench(
     'no-op commit, 9761 nodes',
     () => idleScreen.surface.commit(),
+    KRAUSEST_WARMUP,
+  );
+});
+
+// ---------------------------------------------------------------------------------------------
+// The app-shaped series. Neither series above is what a real RN app does per frame, and the
+// difference is not a detail: krausest's flat table asks "how much does ONE huge commit cost",
+// while a shipping app asks "how much does a STREAM of small commits cost while 60 of them have to
+// fit in 16.6 ms". A navigation stack leaves previous screens mounted, lists are windowed so row
+// count stops driving node count, and the dynamics are animation frames, not table rebuilds.
+//
+// Built 2026-08-22 to settle whether the walk's remaining per-visited-node cost was worth
+// attacking. It settled it in the other direction (see the census in symbiote-perf-measurement):
+// `visited` does not scale with tree size at all - 37 of 17 504 nodes on an animation frame,
+// because dirty-marking prunes every untouched screen - so there was nothing there to win. What
+// the same fixture DID surface is the `x5 separate` row below: the JS-driven Animated path commits
+// once per animated LEAF per frame (flushValue -> update() -> setNativeProps -> commitContainer),
+// so five concurrent animations pay five full walks instead of one.
+//
+// Keep the four scenarios together. Read alone, each is a plausible-looking number; the finding is
+// entirely in `x5` vs `x5 separate`, which differ only in how the same five writes are grouped.
+const APP_SCREENS = 32;
+const APP_ROWS_PER_SCREEN = 60;
+// row wrapper + (label + its raw text) x3 + 2 pressable-ish views.
+const APP_NODES_PER_ROW = 9;
+
+interface IMountedApp {
+  surface: SymbioteSurface;
+  /** One leaf per concurrent animation: a header title plus four rows spread through the list. */
+  animTargets: ISymbioteNode[];
+  /** The top screen's list content view, for the windowed-scroll scenario. */
+  listContent: ISymbioteNode;
+}
+
+function makeAppRow(index: number): {
+  row: ISymbioteNode;
+  leaf: ISymbioteNode;
+} {
+  const row = createElement('RCTView');
+  setProp(row, 'testID', `row-${index}`);
+  let leaf = row;
+  for (let label = 0; label < 3; label += 1) {
+    const text = createElement('RCTText', true);
+    const raw = createElement('RCTRawText');
+    setText(raw, `cell ${index}.${label}`);
+    appendChild(text, raw);
+    appendChild(row, text);
+    if (label === 1) leaf = text;
+  }
+  for (let button = 0; button < 2; button += 1)
+    appendChild(row, createElement('RCTView'));
+  return { row, leaf };
+}
+
+function mountApp(screens: number, rowsPerScreen: number): IMountedApp {
+  nextRootTag += 1;
+  const surface = createSurface(nextRootTag);
+  let animTargets: ISymbioteNode[] = [];
+  let listContent = createElement('RCTView');
+
+  for (let index = 0; index < screens; index += 1) {
+    const screen = createElement('RCTView');
+    setProp(screen, 'testID', `screen-${index}`);
+    const header = createElement('RCTView');
+    const title = createElement('RCTText', true);
+    const titleText = createElement('RCTRawText');
+    setText(titleText, `Screen ${index}`);
+    appendChild(title, titleText);
+    appendChild(header, title);
+    appendChild(screen, header);
+
+    const list = createElement('RCTScrollView');
+    const content = createElement('RCTView');
+    appendChild(list, content);
+    appendChild(screen, list);
+
+    const leaves: ISymbioteNode[] = [];
+    for (let rowIndex = 0; rowIndex < rowsPerScreen; rowIndex += 1) {
+      const { row, leaf } = makeAppRow(rowIndex);
+      appendChild(content, row);
+      leaves.push(leaf);
+    }
+    surface.appendChild(screen);
+    // Only the TOP screen is animated - the ones below it are mounted and idle, which is exactly
+    // what makes them the thing dirty-marking has to skip.
+    if (index === screens - 1) {
+      listContent = content;
+      animTargets = [
+        title,
+        leaves[1],
+        leaves[Math.floor(rowsPerScreen / 3)],
+        leaves[Math.floor((rowsPerScreen * 2) / 3)],
+        leaves[rowsPerScreen - 1],
+      ];
+    }
+  }
+  surface.commit();
+  fabric.reset();
+  return { surface, animTargets, listContent };
+}
+
+describe('app-shaped: a navigation stack under animation', () => {
+  const NODES = APP_SCREENS * (7 + APP_ROWS_PER_SCREEN * APP_NODES_PER_ROW);
+  const label = `${APP_SCREENS} screens x ${APP_ROWS_PER_SCREEN} rows (~${NODES} nodes)`;
+
+  const single = mountApp(APP_SCREENS, APP_ROWS_PER_SCREEN);
+  let singleTick = 0;
+  bench(
+    `${label}: 1 animated value, 1 commit`,
+    () => {
+      singleTick += 1;
+      setProp(single.animTargets[0], 'opacity', (singleTick % 20) / 20);
+      single.surface.commit();
+    },
+    KRAUSEST_WARMUP,
+  );
+
+  const batched = mountApp(APP_SCREENS, APP_ROWS_PER_SCREEN);
+  let batchedTick = 0;
+  bench(
+    `${label}: 5 animated values, 1 commit`,
+    () => {
+      batchedTick += 1;
+      for (const target of batched.animTargets)
+        setProp(target, 'opacity', (batchedTick % 20) / 20);
+      batched.surface.commit();
+    },
+    KRAUSEST_WARMUP,
+  );
+
+  // The one to compare against the row above. Same five writes, one commit each - which is what
+  // the JS-driven Animated path does today, one per animated leaf. Multiply this row by 5 to get
+  // its per-frame cost before putting it next to the batched row.
+  const separate = mountApp(APP_SCREENS, APP_ROWS_PER_SCREEN);
+  let separateTick = 0;
+  bench(
+    `${label}: 1 of 5 animated values, its own commit`,
+    () => {
+      separateTick += 1;
+      setProp(
+        separate.animTargets[separateTick % separate.animTargets.length],
+        'opacity',
+        (separateTick % 20) / 20,
+      );
+      separate.surface.commit();
+    },
+    KRAUSEST_WARMUP,
+  );
+
+  // A windowed list stepping by one row: the structural shape a scroll frame has, as opposed to
+  // krausest's "rebuild the whole table".
+  const scrolling = mountApp(APP_SCREENS, APP_ROWS_PER_SCREEN);
+  let spare = makeAppRow(9999).row;
+  bench(
+    `${label}: windowed list steps one row`,
+    () => {
+      const first = scrolling.listContent.children[0];
+      removeChild(scrolling.listContent, first);
+      appendChild(scrolling.listContent, spare);
+      spare = first;
+      scrolling.surface.commit();
+    },
     KRAUSEST_WARMUP,
   );
 });
