@@ -227,9 +227,8 @@ stack/tab/drawer navigator over `react-native-screens`), the third-party-view wr
 > renderer is extracted, and **five** frameworks — React, Vue 3, Angular, Svelte, and Solid — drive
 > the same untouched framework-agnostic core on iOS + Android, with RN's own renderer never in the path.
 > Every adapter (and the shared core packages under it) ships to npm at `0.1.x`, so you can add one
-> to an existing RN app today — see [Try It In Your Own App](#try-it-in-your-own-app). Solid runs
-> headless only so far, not yet on a device or the landing page switcher; everything else is
-> already in day-to-day use. What's still catching up: the long-tail prop surface keeps widening, automated
+> to an existing RN app today — see [Try It In Your Own App](#try-it-in-your-own-app). All five run
+> on device and are on the landing-page switcher, in day-to-day use. What's still catching up: the long-tail prop surface keeps widening, automated
 > device coverage is just coming online, and the `create-symbiote` scaffolder doesn't exist yet, so wiring Metro/CocoaPods follows
 > the example apps rather than one command. iOS stays the reference surface; Android is at canary
 > parity.
@@ -313,7 +312,7 @@ framework adapter.
 | ↳ M5.2 | Small native-module wrappers                     | one-dependency proxy packages closing the gap against Expo's package set one module at a time — Clipboard-class APIs first (same recipe as `@symbiote-native/slider`/`@symbiote-native/splash-screen`), plus lingering primitive-level gaps (persistent storage, safe-area edges beyond `SafeAreaView`)                                               | ⏳ planned |
 | ↳ M5.3 | Reanimated                                       | the largest remaining gap, saved for last — a full worklet-driven animation layer                                                                                                                                                                                                                                                                     | ⏳ planned |
 | **M6** | **Svelte adapter**                               | a DOM-shim adapter over stock compiled Svelte output driving the engine's mutation API — third non-React framework, full component parity                                                                                                                                                                                                             | ✅ done    |
-| **M7** | Solid adapter                                    | `solid-js/universal`'s `createRenderer` on the validated core, fourth non-React framework with full component parity (`createPortal`/`createTunnel`/`Animated`/`AppRegistry`); headless only so far, no device build or switcher entry yet                                                                                                            | ✅ done    |
+| **M7** | Solid adapter                                    | `solid-js/universal`'s `createRenderer` on the validated core, fourth non-React framework with full component parity (`createPortal`/`createTunnel`/`Animated`/`AppRegistry`), running on device and on the landing-page switcher                                                                                                            | ✅ done    |
 | **M8** | Web _(stretch)_                                  | the same trees rendered to the web as a default platform target                                                                                                                                                                                                                                                                                       | 💭 maybe   |
 | **DX** | `create-symbiote` scaffolder                     | pins `react-native` + `react` at the app root so your app code imports only `@symbiote-native/*`, never `react-native`                                                                                                                                                                                                                                | ⏳ planned |
 
@@ -422,8 +421,7 @@ Angular break, the failure isolates to _that adapter_ — not the native stack u
 
 **Can I use it today?** The packages are on npm — you can `npm install @symbiote-native/react` (or
 `vue` / `angular` / `svelte` / `solid`) into an existing RN app today, see [Try It In Your Own
-App](#try-it-in-your-own-app). It's still beta, but the API is settled — Solid is headless-tested
-only, no device pass yet, and there's no `create-symbiote` scaffolder yet,
+App](#try-it-in-your-own-app). It's still beta, but the API is settled — there's no `create-symbiote` scaffolder yet,
 so Metro/CocoaPods wiring follows the example apps rather than one command. The thesis is proven —
 **five** frameworks (React, Vue 3, Angular, Svelte, and Solid) drive the agnostic core on iOS + Android with RN's renderer
 never in the path. You can read the architecture, run the `vitest` suite and the `Detox` journeys,
