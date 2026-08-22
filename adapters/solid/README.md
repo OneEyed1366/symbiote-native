@@ -123,7 +123,7 @@ reached the same single-root conclusion for its own reasons.
 
 ## Reference
 
-- The canary app: `examples/solid` (its README covers the tarball loop and what is verified).
+- The canary app: `examples/solid` (its README covers running it and the checks it carries).
 - The engine API this targets: the `symbiote-engine-core` skill, `core/engine/src/node.ts`.
 - Building/porting an adapter: the `symbiote-new-adapter` skill.
 - The nodeOps table this mirrors: `adapters/vue/src/renderer/index.ts`.
