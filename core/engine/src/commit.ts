@@ -28,6 +28,7 @@ import {
   isAnchor,
   isEmptyRawText,
   markDirty,
+  markPropsDirty,
   takePropStats,
   VIRTUAL_TEXT_COMPONENT,
   type ISymbioteNode,
@@ -53,7 +54,23 @@ const stats = { created: 0, cloneProps: 0, cloneChildren: 0, reused: 0 };
 // Deliberately NOT gated behind isDebug(): two performance.now() calls per commit are noise next to
 // the walk they measure, and the number is only meaningful from a RELEASE build - dev-mode JS
 // drowns the signal. The dlog below stays gated as usual.
-const profile = { commits: 0, walkMs: 0, nodesVisited: 0 };
+// `propsBuilt` / `propsReused` price the props half of the walk, and they exist because that half
+// is INVISIBLE in the output: reusing the mirror's payload by reference and rebuilding a
+// byte-identical one emit the same Fabric calls, so only a counter separates a working fast lane
+// from a silently reverted one. `propsBuilt` counts fabricProps() calls made by the update path
+// (a fresh object plus a recursive propsEqual); `propsReused` counts nodes that re-cloned for a
+// child's sake and carried the committed payload through untouched. On an ordinary update the
+// second should dominate - that ratio IS the clone-bubble.
+//
+// The create path is deliberately not counted in either: it has no committed payload to reuse, so
+// its fabricProps() calls are not a cost any flag could remove and would only dilute the ratio.
+const profile = {
+  commits: 0,
+  walkMs: 0,
+  nodesVisited: 0,
+  propsBuilt: 0,
+  propsReused: 0,
+};
 
 // What `renderableChildren` costs, accumulated over the same window as `profile`. Anchors are the
 // only reason that function is not free, and how many a tree carries is a property of the ADAPTER,
@@ -292,13 +309,23 @@ function logScrollChildren(
 // showing the old value - no error, no crash, nothing to grep for. So under DEBUG pay back the full
 // price just saved and verify the skip was honest, naming the node loudly enough to find the
 // missing mark.
-function warnIfStale(node: ISymbioteNode, committed: IMirror): void {
+//
+// Two lanes reach it, and naming which one fired matters when reading a log: `subtree` is the whole
+// node skipped because nothing under it was marked, `props` is the node re-cloned for a child's
+// sake but its own payload reused because no prop write was recorded on it. They point at
+// different missing marks - markDirty vs markPropsDirty - so the line says which.
+function warnIfStale(
+  node: ISymbioteNode,
+  committed: IMirror,
+  lane: 'subtree' | 'props',
+): void {
   if (!isDebug()) return;
   const fresh = fabricProps(node);
   if (propsEqual(committed.props, fresh)) return;
   dlog(
-    `DIRTY-MISS ${committed.viewName}#${committed.tag} node=${debugNodeId(node)} skipped as clean ` +
-      `but props differ: committed=${JSON.stringify(committed.props)} desired=${JSON.stringify(fresh)}`,
+    `DIRTY-MISS(${lane}) ${committed.viewName}#${committed.tag} node=${debugNodeId(node)} ` +
+      `treated as clean but props differ: committed=${JSON.stringify(committed.props)} ` +
+      `desired=${JSON.stringify(fresh)}`,
   );
 }
 
@@ -327,12 +354,15 @@ function reconcile(
     committed.viewName === viewName
   ) {
     stats.reused += 1;
-    warnIfStale(node, committed);
+    warnIfStale(node, committed, 'subtree');
     return { handle: committed.handle, changed: false };
   }
   node.dirty = false;
+  // Read before clearing. The create path below ignores it - a node Fabric has never seen needs its
+  // whole payload built regardless - so this only ever gates the update path.
+  const ownPropsChanged = node.propsDirty;
+  node.propsDirty = false;
 
-  const props = fabricProps(node);
   const childInText = node.isText || hasTextAncestor;
   const kids = renderableChildren(node);
 
@@ -349,6 +379,8 @@ function reconcile(
     parentChanged
   ) {
     stats.created += 1;
+    // Full payload: there is no committed props object to reuse, whatever propsDirty said.
+    const props = fabricProps(node);
     const tag = nextTag();
     const reason =
       committed === undefined
@@ -421,7 +453,32 @@ function reconcile(
 
   const childrenChanged =
     !childrenIdentical(kids, committed.children) || descendantChanged;
-  const propsChanged = !propsEqual(committed.props, props);
+
+  // The fast lane. No prop write was recorded on this node since its last commit, so its Fabric
+  // payload is by construction the one the mirror already holds: reuse that object by reference -
+  // no rebuild, no allocation, no deep compare - and carry it into the mirror below untouched.
+  //
+  // This is what propsDirty (node.ts) exists for. Every node on the clone-bubble path from a
+  // changed leaf up to the root takes this branch, as does the synthetic container that
+  // commitContainer dirties at every single entry. They still re-clone - a persistent parent must
+  // point at the new child handles - they just stop paying `fabricProps` + a recursive `propsEqual`
+  // to rediscover that nobody touched them.
+  //
+  // Under DEBUG the saving is handed straight back to check it was honest: an in-place mutation of
+  // a style object or of node.props, which no flag can observe, is the same hazard warnIfStale
+  // already guards on the skip path, and this lane is open to it identically.
+  let props: IFabricProps;
+  let propsChanged: boolean;
+  if (ownPropsChanged) {
+    profile.propsBuilt += 1;
+    props = fabricProps(node);
+    propsChanged = !propsEqual(committed.props, props);
+  } else {
+    profile.propsReused += 1;
+    props = committed.props;
+    propsChanged = false;
+    warnIfStale(node, committed, 'props');
+  }
 
   if (!childrenChanged && !propsChanged) {
     stats.reused += 1;
@@ -581,6 +638,7 @@ function commitContainer(rootTag: IRootTag): void {
       `commit root=${rootTag} ${mode} ` +
         `created=${stats.created} cloneProps=${stats.cloneProps} ` +
         `cloneChildren=${stats.cloneChildren} reused=${stats.reused} ` +
+        `propsBuilt=${profile.propsBuilt} propsReused=${profile.propsReused} ` +
         `walk=${walkMs.toFixed(3)}ms`,
     );
   }
@@ -604,6 +662,10 @@ export interface ICommitProfile {
   commits: number;
   walkMs: number;
   nodesVisited: number;
+  /** Update-path nodes that rebuilt their Fabric payload and deep-compared it. */
+  propsBuilt: number;
+  /** Update-path nodes that re-cloned for a child but reused the committed payload by reference. */
+  propsReused: number;
   propWrites: number;
   propNoops: number;
   childScans: number;
@@ -619,6 +681,8 @@ export function readCommitProfile(): ICommitProfile {
     commits: profile.commits,
     walkMs: profile.walkMs,
     nodesVisited: profile.nodesVisited,
+    propsBuilt: profile.propsBuilt,
+    propsReused: profile.propsReused,
     propWrites: props.writes,
     propNoops: props.noops,
     childScans: childScan.scans,
@@ -630,6 +694,8 @@ export function readCommitProfile(): ICommitProfile {
   profile.commits = 0;
   profile.walkMs = 0;
   profile.nodesVisited = 0;
+  profile.propsBuilt = 0;
+  profile.propsReused = 0;
   childScan.scans = 0;
   childScan.probed = 0;
   childScan.flattens = 0;
@@ -667,8 +733,10 @@ export function setNativeProps(
       node.props[key] = value;
     }
   }
-  // Writes node.props directly rather than through setProp, so it owes its own mark.
-  markDirty(node);
+  // Writes node.props directly rather than through setProp, so it owes its own mark - and it owes
+  // the PROPS mark specifically: markDirty alone would send the node down the fast lane above,
+  // which reuses the mirror's payload by reference and would drop the Animated frame entirely.
+  markPropsDirty(node);
   dlog(
     `setNativeProps root=${record.rootTag} tag=${record.tag} keys=${Object.keys(partial)}`,
   );

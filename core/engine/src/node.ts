@@ -56,6 +56,23 @@ export interface ISymbioteNode {
   // "This node's own props changed, or something below it did." Read by the commit walk
   // (commit.ts) to skip an untouched subtree wholesale. See markDirty.
   dirty: boolean;
+  // "THIS node's own props changed since its last commit" - strictly narrower than `dirty`, which
+  // is also set by a descendant's change bubbling up. The pair splits a question the walk used to
+  // answer by brute force: `dirty` says whether to DESCEND, `propsDirty` says whether this node's
+  // own Fabric payload can possibly differ from what the mirror holds.
+  //
+  // The case it exists for is every node on the clone-bubble path. A changed leaf forces each
+  // ancestor up to the root to re-clone (a persistent parent points at specific child handles), so
+  // those ancestors are `dirty` and must be visited - but their OWN props did not change, and
+  // reconcile used to prove that by rebuilding the whole Fabric payload with fabricProps() and
+  // deep-comparing it against the mirror. That is a fresh object plus a recursive walk per
+  // ancestor per commit, to rediscover something the mutation API already knew: nobody wrote a
+  // prop here. On an ordinary update the bubble path is MOST of the visited nodes.
+  //
+  // A stale `true` is harmless (one slow path, same output); a wrongly-cleared `false` is the
+  // silent-stale-UI failure mode. So every write path errs toward marking - see markPropsDirty -
+  // and skipped nodes are deliberately NOT cleared in renderableChildren the way `dirty` is.
+  propsDirty: boolean;
 }
 
 export function createElement(
@@ -71,6 +88,7 @@ export function createElement(
     children: [],
     parent: undefined,
     dirty: true,
+    propsDirty: true,
   };
 }
 
@@ -84,6 +102,10 @@ export function createRawText(text: string): ISymbioteNode {
     children: [],
     parent: undefined,
     dirty: true,
+    // Props assigned at construction rather than through setText, so the flag starts raised for
+    // the same reason createElement's does: a node that has never committed must never take a
+    // fast path built on "the mirror already agrees with me".
+    propsDirty: true,
   };
 }
 
@@ -158,6 +180,19 @@ export function markDirty(node: ISymbioteNode): void {
   }
 }
 
+// The prop-write twin of markDirty: raises this node's OWN props flag and then bubbles the subtree
+// flag as usual. Every path that writes `node.props` must come through here - setProp and setText
+// below, setNativeProps in commit.ts (which writes the record directly and so owes its own mark).
+//
+// Note the two flags are raised INDEPENDENTLY rather than one implying the other. markDirty stops
+// at the first already-dirty ancestor, so a node dirtied a moment ago by a child's change would
+// otherwise have its own prop write silently dropped: the walk would exit before setting anything
+// here. Setting propsDirty first, unconditionally, is what makes that ordering safe.
+export function markPropsDirty(node: ISymbioteNode): void {
+  node.propsDirty = true;
+  markDirty(node);
+}
+
 // How many prop writes actually landed, and how many the no-op guard below turned away.
 // Read-and-zeroed through readCommitProfile() (commit.ts), which folds them into the same window
 // as the walk numbers so one read prices both halves: `propNoops` is the waste an adapter is
@@ -222,7 +257,7 @@ export function setProp(
     node.props[key] = value;
   }
   propStats.writes += 1;
-  markDirty(node);
+  markPropsDirty(node);
 }
 
 // Fabric gates layout events behind a boolean prop (BaseViewProps.onLayout): unlike
@@ -432,7 +467,7 @@ export function setText(node: ISymbioteNode, text: string): void {
   }
   node.props.text = text;
   propStats.writes += 1;
-  markDirty(node);
+  markPropsDirty(node);
 }
 
 // Structural ops mark the PARENT chain (both the old and the new one), never the moved child:
