@@ -476,3 +476,39 @@ costs a bug; this costs the repair.
 Related and distinct: §11 is the harness CONSTRUCTING the subject wrong, §12 is an oracle in one
 framework's shape, §13 is a swapped argument. This one is the assertion itself being wrong in the
 direction of the code.
+
+## 15. A `.gitignore` entry that hides a suite's side effect, instead of removing it
+
+Not a false green in the assertions — a false green in the REPOSITORY, and the fix made it worse.
+
+Measured 2026-08-30. Three committed census probes each called
+`writeFileSync('census-<adapter>.txt', …)` with a RELATIVE path, so every full-suite run from the
+repo root dropped a file there (and into an arbitrary directory from any other CWD). The files were
+noticed, and the response was a commit adding `census-*.txt` to `.gitignore`.
+
+That is the wrong repair, and it is worse than none: the write still happens, but now `git status`
+is clean, so the one signal anyone actually checks says nothing is wrong. A visible mess gets fixed
+by whoever trips on it next; an ignored one is permanent.
+
+The shape to fix instead — the tool survives, the side effect becomes opt-in:
+
+```js
+const outPath = process.env.SYMBIOTE_CENSUS_OUT;
+console.log(line); // always
+if (outPath !== undefined) writeFileSync(outPath, line); // only when asked
+```
+
+Verify BOTH directions, because only checking one is how the original slipped through: run the full
+suite and confirm nothing appears, then run with the variable set and confirm the file does. A probe
+that quietly stopped writing is the same defect pointing the other way.
+
+Two things generalise beyond this instance:
+
+- **A relative path in a test resolves against the CWD, not the test file.** Anything a test must
+  write goes under `__dirname` (a package's own `build/` is fine — one of the four probes did this
+  and was correct) or a caller-supplied absolute path. The three that were wrong and the one that
+  was right sat side by side.
+- **When the reflex is to add an ignore rule, ask what is producing the file.** Ignoring is right
+  for an artifact a tool must produce (`build/`, `node_modules/`); it is a cover-up for output
+  nothing needs. The tell is that the entry names a symptom rather than a tool's known output
+  directory.
