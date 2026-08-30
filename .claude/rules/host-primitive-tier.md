@@ -158,6 +158,38 @@ Two consequences that follow only from the correct version:
   `:active` moves 90 instantiated nodes on `examples/vue-sfc`; closing the rest of tier-2 moves
   fewer. And the refusal rate is the lever that works in a USER's app, not just in ours.
 
+## Before adding a fold to four transforms, check whether the ENGINE already normalises it
+
+A component body that writes a prop conditionally — `...(onLayout !== undefined && { onLayout })`,
+or `nativeID` written only when defined — reads like something a transform must reproduce, since
+lowering deletes the body that was doing it. It does not. Asked across three adapters on 2026-08-30,
+all three came back the same way, for two independent reasons.
+
+**It is unnecessary.** The engine normalises an absent prop and an `undefined` prop to one state.
+`setProp(node, key, undefined)` deletes the key, or no-ops when it was never there
+(`core/engine/src/node.ts`), and the boolean event gate reads the VALUE rather than the key —
+`setEventListener` computes `isHandler = typeof value === 'function'` and writes
+`setProp(node, flagProp, isHandler ? true : undefined)`. So an `onLayout: undefined` arriving in the
+bag CLEARS the gate rather than lighting it, which was the exact hazard that prompted the question
+(`.claude/rules/fabric-boolean-event-gates.md`). Both channels were checked, not only the event one:
+`nativeID` / `backgroundColor` go through `setProp` directly and behave identically.
+
+**It is also inexpressible.** A transform emits a STATIC attribute list — `"on-layout": _ctx.maybe`
+— and cannot know whether that expression is `undefined` at runtime. Implementing the fold would
+mean emitting a runtime helper into every lowered element, in four transforms, to reproduce a
+normalisation the engine already performs once for everyone.
+
+So a conditional spread lowers to an unconditional key, safely. The general rule: **when a component
+body's behaviour looks like it must be re-implemented in the transforms, first ask whether the layer
+BELOW already produces the same end state.** A fold added to four transforms for something the
+engine handles is four copies of nothing, and each copy is somewhere they can drift.
+
+One contract this rests on, and it is an ADAPTER property rather than an engine one: equivalence
+requires the adapter's diff to route DISAPPEARED keys. Svelte's shim does — `applyBagDiff` walks
+`Object.keys(prev)` and calls `routeProp(node, key, undefined)` for anything missing from `next`. An
+adapter whose diff walked only `next` would leave a stale value standing, and for that adapter
+unconditional emission is not merely equivalent but strictly safer.
+
 ## What is left, audited component by component (2026-08-30)
 
 Every component in `adapters/react/src/components/` — the fullest surface — classified by what it
