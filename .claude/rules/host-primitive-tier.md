@@ -243,6 +243,41 @@ before the first attempt: `descriptorToReact` injects a `key` prop a hand-lowere
 not have, and `TextInput`'s `multiline` picks between two intrinsics on a PROP, which a transform
 can resolve statically.
 
+**The audit above covered `adapters/*/src/components/` and that is not the whole surface.** Checked
+2026-08-30 after the question was put directly: `packages/*` ships components too. Almost all of the
+25 are imperative modules with no view, and their `symbiote-*-host` tags are Angular service TEST
+fixtures rather than components — but two are real. **`packages/slider` is a genuine tier-1
+candidate** (zero hooks, a wrapper over one native view, one per adapter), and `packages/navigation`
+is tier 3 by construction, since a navigator decides its output shape in JS.
+
+The method error is worth more than the missing entry, because it is the third instance in one day:
+**a directory boundary was taken for the surface boundary.** First the sample was the example apps
+rather than the component catalogue, then one adapter rather than all five, then `adapters/` rather
+than `adapters/` plus `packages/`. Each answer looked complete because within its own boundary it
+was. State the boundary out loud before counting, and ask what sits outside it.
+
+## Angular cannot be lowered by rewriting tags — the selector is dual and scoped to the TEMPLATE
+
+Found 2026-08-30, and it corrects the obvious plan. Angular's primitives declare
+`selector: 'symbiote-view, View'` (`adapters/angular/src/primitives/index.ts`), so BOTH spellings
+match the same `@Component`. Directive matching is resolved per TEMPLATE, not per branch — so
+writing `<symbiote-view>` inside a template whose `imports` still lists `View` lowers nothing at
+all: the intrinsic spelling resolves straight back to the component, silently, with no error and no
+visible difference except that the measurement says the change did nothing.
+
+So an Angular lowering is not "emit the tag". It needs the component OUT of that template's scope —
+a separate component with its own `imports` and `schemas: [CUSTOM_ELEMENTS_SCHEMA]`, or the dual
+selector split, or a build-time transform that edits `imports` alongside the tags. That last one is
+the shape the other three adapters have, and it is a whole feature rather than a diagnostic.
+
+The headless A/B that established the prize was built the first way — one component with a private
+template scope: component-backed `min 19.85 ms` against lowered `min 13.26 ms`, a 33% cut, with the
+committed Fabric tree byte-identical between arms. **That is stronger evidence than the setProp-count
+finding it resembles**, because that one measured 0% on V8 and only appeared on Hermes, i.e. it was a
+tax on the missing JIT. A cut visible UNDER a JIT is structural work no optimiser erases. Do not
+carry the 33% to a device as a prediction — headless has mis-sized five device results in a row, in
+both directions.
+
 Pressable was not the first of many; it was the largest of few. The honest next step is refusal-rate
 work on real call sites — one `ActionButton` migrated to `:active` moves 90 instantiated nodes on
 `examples/vue-sfc`, more than the whole remainder above. Promote Switch or TextInput when their
