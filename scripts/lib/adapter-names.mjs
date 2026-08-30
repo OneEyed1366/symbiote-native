@@ -26,6 +26,15 @@ const REPO_ROOT = new URL('../..', import.meta.url).pathname;
  * (`readdirSync` is filesystem order, which differs between machines and would make a snapshot or a
  * printed grid churn for no reason).
  *
+ * THE FILTER IS DELIBERATELY JUST `isDirectory()` — do not narrow it. Requiring a `package.json`,
+ * a `src/index.ts`, or a name from an allow-list all look like tidying and each one re-opens the
+ * exact hole this module closes: an adapter early enough not to have that file yet drops out of
+ * every audit, silently. A stray directory, by contrast, fails LOUDLY and names itself
+ * (`AccessibilityInfo: missing from zzz-probe`), so a human deletes it in seconds.
+ *
+ * That asymmetry is the whole argument. A false red costs a minute and explains itself; a missing
+ * member costs a release and says nothing.
+ *
  * @returns {string[]}
  */
 export function adapterNames() {
