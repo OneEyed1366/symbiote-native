@@ -1,9 +1,9 @@
 ---
 paths:
-  - "adapters/*/src/index.ts"
-  - "packages/*/src/*/index.ts"
-  - "core/engine/src/index.ts"
-  - "core/components/src/index.ts"
+  - 'adapters/*/src/index.ts'
+  - 'packages/*/src/*/index.ts'
+  - 'core/engine/src/index.ts'
+  - 'core/components/src/index.ts'
 ---
 
 # Barrel re-exports - add a shared name to ALL adapters, never to one
@@ -41,3 +41,28 @@ keeps its own ngc/AOT conditional-exports block and its own `src/angular/index.t
 
 Full rationale - why the facade stays, which argument for it is false, and the
 measured numbers: invoke the `symbiote-parity-check` skill (§4b).
+
+## The inverse hazard: the shared barrel publishes to five packages at once
+
+The rule above is about a name that reaches only ONE adapter. The mirror is a name that reaches all
+five without anyone deciding it should: an adapter barrel re-exports the shared barrel wholesale, so
+a symbol added to `core/components/src/index.ts` becomes public API in `@symbiote-native/{react,vue,
+svelte,solid,angular}` in the same commit, with no adapter edited and nothing to review.
+
+Caught 2026-08-23 on `resolveStateStyle`. It exists for code a TRANSFORM emits — the lowered element
+imports it — and it was placed on the shared barrel because two adapters had byte-identical copies.
+Correct extraction, wrong door: an internal helper became a supported export in five packages.
+
+**A symbol that exists for EMITTED code belongs on a subpath, never on a barrel** — the shape
+`host-primitives` and `specialize-state-style` already use, and now `state-style`: implementation at
+`core/components/state-style`, a thin mirror at `adapters/<fw>/state-style`, and the transform emits
+the ADAPTER specifier so the app imports from the package it already depends on.
+
+Two checks when adding anything to a shared barrel: does every adapter's public surface want this
+name, and is it named by hand-written app code or only by generated code? The second answer alone
+settles it.
+
+And a subpath is only half-declared until `publishConfig.exports` carries a `{types, default}` PAIR.
+A bare string there resolves in the tarball and arrives UNTYPED, which
+`tests/package-subpath-parity.test.ts` cannot see — it resolves the specifier, not the types. Three
+of five adapters had the bare string on this subpath.

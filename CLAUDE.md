@@ -178,6 +178,17 @@ dependency is a literal version, `@symbiote-native/*` included, matching the
 real npm consumer experience. Install with plain `npm install` INSIDE the
 example directory, never `pnpm install` from repo root.
 
+**`examples/bare-rn` is the one exception and it is deliberate: it is NOT a canary.** Plain
+react-native 0.86 driven by React's own Fabric renderer, carrying a port of the same
+`BenchmarkScreen`, so adapter numbers have something to be compared AGAINST. Its value is
+precisely that it contains **zero `@symbiote-native/*` dependencies** — adding one, or "closing
+its parity gap", destroys the only thing it is for. Every parity audit
+(`.claude/rules/adapter-parity-audit.md`, `tests/adapter-barrel-parity.test.ts`,
+`tests/package-subpath-parity.test.ts`) is about adapters and companion packages and does not
+reach it; if a future audit starts enumerating `examples/*`, exclude this one explicitly. It is
+also outside the pnpm workspace and outside every CI example list. What it does and does not
+make comparable: `symbiote-perf-measurement`, "The stock-React-Native baseline".
+
 **Local development against an unpublished or just-changed `@symbiote-native/*`
 package — the everyday loop, not a fallback:** build a tarball with `pnpm pack`
 from the package's own directory (**never `npm pack`** — it skips the
@@ -550,6 +561,463 @@ project's control) in a component RN itself has deprecated in favor of `@react-n
 Do not re-add it as a SymbioteNative component; if a native Android drawer is ever needed again,
 wrap `@react-navigation/drawer` through `<third_party_rn_packages_are_react_only>` instead.
 Full incident record: `angular-adapter` skill §19.
+
+## !!! URGENT BACKLOG — delete our 36 hand-rolled RN ports (own branch, do it soon)
+
+**СРОЧНО. Сделать как можно быстрее, но НЕ в перф/движковой ветке — это чистка, отдельная
+задача, отдельная ветка.**
+
+`core/engine/src` holds **36 files whose own headers say "JS-side port of RN's `<X>`"** and
+**zero** imports from `react-native` — a module we already carry as a `peerDependency` and that
+is therefore always present at runtime. Every one of those files re-derives by hand the corner
+cases of an implementation we already ship. It is the same mistake the CSS parser had before it
+was rebuilt around `lightningcss`, and it has already cost a real device bug (`process-transform`
+diverged from upstream on array input and crashed Android with
+`String cannot be cast to ReadableArray`).
+
+Measured against `react-native@0.86.0`, the candidates split cleanly:
+
+- **Tier A — 12 modules, 1-5 files each, zero native, zero React.** `flattenStyle`,
+  `processTransform`, `processFilter`, `processBoxShadow`, `processBackgroundImage`,
+  `processTransformOrigin`, `processAspectRatio`, `processFontVariant`, `PanResponder`,
+  `Easing`, `bezier`, `ErrorUtils`. Delete the port, import upstream.
+- **Tier B — 15 modules, 13-38 files**, all sharing ONE ~1.2k-LOC TurboModule/BatchedBridge
+  floor. Judgement call, module by module.
+- **Tier C — 3 modules that must STAY ported**: `Keyboard`, `AccessibilityInfo`, `Image.ios`
+  each reach `ReactNative/RendererProxy` → `Renderer/implementations/ReactFabric-{dev,prod}`,
+  i.e. **React's own Fabric renderer**, which must never enter a Vue/Svelte/Solid/Angular bundle.
+
+The blocker is not the import graph, it is that Vitest cannot parse RN's Flow source
+(`symbiote-rn-import-testability`). **Step 0 is a ~30-minute experiment** — scope
+`@babel/preset-flow` to `node_modules/react-native` in `vitest.config.ts` — and it decides
+whether Tier A exists at all. It has not been tried.
+
+Two traps that make this look impossible or trivial when it is neither: a naive import closure
+counts Flow `import type` edges and reports 194 files where the truth is 1, and the
+`core/components/src/bootstrap` subpath precedent that already imports `react-native` today does
+**not** extend to Tier A (commit-path modules cannot leave the main barrel).
+
+**Full tables, the measured closures, the `RendererProxy` paths, the step-by-step plan, and a
+re-runnable closure script: `.claude/skills/symbiote-rn-port-elimination`. Read it before
+porting ANY further RN module by hand.**
+
+## Where we stand against stock React Native (measured 2026-08-23)
+
+`examples/bare-rn` is plain react-native 0.86 on React's own Fabric renderer, with a port of the
+same benchmark screen and the same 20 measurement constants — the baseline the adapters are read
+against. **iOS 26.5 simulator, Release build, 1 000 rows × 9 native views, all-mounted:**
+
+```
+              stock   react     vue  svelte   solid  angular
+Create 1000   186.8   217.8   180.0   154.1   159.8    418.2   Vue/Svelte/Solid BEAT stock; React 1.17x, Angular 2.2x
+Replace       211.6   247.4   188.8   207.2   180.2    509.6   Vue/Svelte/Solid at/under stock; no RATIO (stock drifts)
+Append 1000   290.8   310.3   184.9   163.0   166.8    499.3   Vue/Svelte/Solid BEAT stock (Svelte 1.78x, Vue 1.57x)
+Partial        23.0    23.3    12.2    12.0     7.7     27.6   tie -> 3.3x WIN
+Remove        108.6    83.7     7.4     7.4     8.2     27.3   Vue/Svelte/Solid WIN 13-15x
+Select          8.0     8.3     5.8     5.9     9.0     25.6   tie, except Angular
+Swap           13.3    28.3     9.3     8.0     7.2     24.8   tie, except React 2x worse
+Clear           7.7     7.5    11.2    11.9    24.2     37.1   NOT REPRODUCIBLE — see below
+```
+
+**Before comparing two columns, check they are on the same ENGINE.** They are not, as of
+2026-08-23 — each example carries its own installed `@symbiote-native/engine`, and this month's
+three engine cuts (the `styleParts` field, the prototype move for the public-instance graft, and
+the `fabricProps` payload rewrite) reached only some of them:
+
+```
+           styleParts  prototype  fabricProps
+react         no          no         no
+vue-sfc       yes         yes        yes
+vue-tsx       no          yes        yes
+svelte        yes         yes        yes
+solid         yes         yes        yes   (re-levelled 2026-08-23)
+angular       no          no         no
+```
+
+Measured with `grep` on each `examples/*/node_modules/@symbiote-native/engine/build/{node,fabric-
+props}.js` — all six report version 0.3.0, so the manifest tells you NOTHING and the version is not
+the check. On Vue those three cuts were worth Create 296.7 -> 274.8 -> 258.5 -> 255.0, i.e. ~42 ms,
+and the prototype move is explicitly one Solid and Svelte were owed too (both graft eagerly).
+So React's and Angular's columns are still read against a materially older engine than Vue's and
+Svelte's, and a cross-column deficit computed today silently includes that gap. Re-level with
+`node scripts/overlay-local-packages.mjs examples/<name>` and a rebuild before attributing any
+residual to an adapter.
+
+**Solid was re-levelled this way, and the result is the second, independent confirmation of those
+three engine cuts.** They had only ever been measured on Vue, by the session that wrote them:
+
+```
+              stale engine   levelled     reconcile window
+Create           288.1        261.2       63.1 -> 49.6   -21%
+Replace          291.5        265.2       64.0 -> 50.4   -21%
+Append           277.9        258.6       65.3 -> 52.5   -20%
+```
+
+FABRIC byte-identical and WRITES unchanged in every row — the same work, priced lower. The split
+matches what the changes are: ~13.5 ms came off INSIDE the window, which is `fabricProps` (it runs
+within the walk, and Vue measured it at 16.3 ms), and ~13.4 ms came off outside it, which is the
+prototype graft plus `styleParts` in pass 1 (Vue measured the graft alone at 21.9 ms). A ~21% window
+move is far outside the window's own ±8% noise floor, so this one carries a verdict.
+
+**Vue, Svelte and Solid are post-lowering (2026-08-23); React and Angular are not** — read the
+spread with that in mind. `<View>`/`<Text>` in an SFC now compile to their intrinsic TAG instead of a Vue
+component, and the adapter's own components render the tag too, which removed one Vue component
+instance per node on the two primitives that make up ~73% of a real tree. Create 397.4 -> 296.7,
+Replace 399.4 -> 293.9, Append 385.1 -> 274.6, i.e. 25-29% off the three create-shaped rows, with
+the reconcile window (67.4 -> 70.0 ms), the Fabric call counts (9000/8000/9) and the 32 001 prop
+keys all UNCHANGED — the whole win is in pass 1, none of it in the engine. Against a stock sample
+taken minutes later on the same simulator (Create 195.5 / Replace 208.8 / Append 282.6): Create
+2.03x -> 1.52x, Replace 1.91x -> 1.41x, Append 1.36x -> a TIE. Headless predicted only 12-14%,
+the first time today it UNDER-shot, because an `h()`-based A/B cannot model the static-prop
+hoisting and patch flags an SFC element gets and a component never does. Mechanism:
+`symbiote-sfc-style-compiler` §host-primitive lowering; why the cost existed:
+`symbiote-perf-measurement`. TSX/JSX does NOT get the compile-time half yet — same recipe through
+a Babel plugin, not built.
+
+**Vue's column then took a second, engine-side cut the same day: the public-instance graft moved to
+a prototype.** `toPublicInstance` used to `Object.assign` six closures onto every node — 54 000 per
+create — and after the lowering, GC was 30% of the window and the profile's largest bucket. The six
+methods are now prototype methods on the `SymbioteNode` class (`core/engine/src/node.ts`), and
+`toPublicInstance` is the identity. Vue Create 296.7 -> 274.8, Replace 293.9 -> 279.7, Append
+274.6 -> 266.2, with the Fabric counts (9000/8000/9, 32 001 keys) and the reconcile window (~65 ms)
+byte-identical — again entirely pass 1. **This fixes Solid and Svelte too** (both graft eagerly);
+React never did, it grafts lazily in `getPublicInstance`. Headless OVER-shot this one (-18.6% on min
+vs -7.4% on device), the opposite direction to the lowering.
+
+**And a third cut the same day, this one in the payload builder.** `fabricProps` used to flatten the
+style slot into an intermediate object and then hoist it; it now recurses over the slot writing keys
+straight into the one payload object, which is the shape RN itself uses
+(`ReactNativeAttributePayload.addNestedProperty` — upstream's `flattenStyle` appears only on its
+UPDATE path, never on create). That also revived a memo that had been DEAD: `processedStyle` was
+reachable only when `props.style` was a bare object, and after `routeProp` it never is — the
+class+style merge always writes a two-element array. On a 9 002-node create with 6 hoisted style
+objects: 9 002 flatten calls and as many merged objects, down to 9 002 cache lookups and 6
+resolutions. Vue Create 274.8 -> 258.5, Append 266.2 -> 252.5, and this time **the reconcile window
+itself moved, ~65 -> 50.9/56.0/56.1 ms** — the right signal, since `fabricProps` is called from
+inside the walk. Fabric counts again byte-identical.
+
+Vue's column is therefore read against a **same-sitting stock sample of Create 196.8 / Replace
+187.9 / Append 280.2**, not against the table's stock column, and only two of those three carry a
+verdict. Stock Create across three sittings read 186.8 / 195.5 / 196.8 (stable, +0.7% across the
+run that brackets these changes), so **Create 2.03x -> 1.52x -> 1.40x -> 1.31x is real**. Append
+252.5 vs 280.2 is **0.90x — Vue is now genuinely FASTER than stock React Native on a create-shaped
+row**, the first time any adapter clears that bar. Replace gets NO verdict: stock's own Replace
+sample moved 211.6 -> 208.8 -> 187.9, a 10% drift far outside the ~4% Create noise floor, so the
+apparent 1.41x -> 1.46x is the stock column moving, not Vue. Same caution for stock's Swap, which
+read 13.3 in one sitting and 36.1 in another.
+
+Batching is settled as a wash on this binary: Create 256.8 on / 258.5 off, Append 252.1 / 252.5.
+It demonstrably works (Fabric 9000/**5000**/**1009** vs 9000/8000/9) and buys nothing.
+
+**A fourth, smaller cut landed after those three and moved the Vue column 258.5 / 274.5 / 252.5 to
+255.0 / 269.3 / 247.0.** Three allocation fixes of one shape — the
+class/style parts moved off a `WeakMap` + `{...prev, ...patch}` onto a `node.styleParts` field
+written in place, `hasAnyAriaKey`'s per-call closure replaced by an indexed loop, and Vue
+Pressable's `HANDLED_ATTRS` array-behind-`includes` made a `Set`. Fabric counts and the reconcile
+window (49.8 / 50.4 / 50.9) both unchanged, so the change is confined to pass 1 and nothing
+structural moved. **Each create row moved −1.4 to −2.2%, i.e. INSIDE the ~4% noise floor, and
+carries no verdict on its own** — what makes it credible is that all five rows moved the same
+direction and Partial's 16.5 → 14.8 is outside its own spread. Headless predicted −8.6% and the
+device gave ~−1.5%: fifth data point on headless mis-sizing, third over-shoot, and the reason is
+that the whole win is GC pressure, which V8 and Hermes do not share.
+
+**The column then reached 245.3 / 254.1 / 245.8, and that run is a worked example of a measurement
+that CANNOT attribute — worth reading before shipping another combined build.** It carried two
+independent changes: Vue's Pressable stopped reading through the attrs proxy
+(`composables/use-raw-attrs.ts`, plus `normalizeVueAttrs` no longer handing its input back), and
+the engine gained `isAlreadyPublished` so an unchanged class/style stops republishing
+(`core/engine/src/node.ts`). Create 255.0 → 245.3 (−3.8%), Replace 269.3 → 254.1 (−5.6%), Append
+247.0 → 245.8 (−0.5%), no stock sample in the sitting.
+
+The engine guard has a FINGERPRINT and the Vue change does not: `WRITES` fell 14003 → 12003 on
+Create and 14002 → 12002 on Replace, exactly 2 per row, with FABRIC still 9000/8000/9 @ 32 001 and
+`VISITED` unmoved. Nothing on the adapter side can change a write count, so that half is the
+guard's. The proxy work is invisible to every counter on the screen, so its share of the −3.8% is
+unknown and this run does not establish it. **A change with no instrument signature must be
+measured alone, or it cannot be measured at all** — the same discipline the Vue and Svelte lowering
+runs got, and this one did not.
+
+The missing arm arrived from the Solid sitting and settles the split: the guard alone costs Create
+284.7 → 288.1 and Append 276.0 → 277.9, i.e. nothing. It removes no create-path work THERE because
+there was none to remove — before either change the four adapters read `WRITES` react 14037/6000 ·
+**vue 14003/2001** · svelte 12001/0 · solid 12001/0, and after the guard Vue converges on 12003.
+Vue was the one diffing adapter still republishing an unchanged class, 2 per row; Svelte and Solid
+write class once per mount and never had the excess. So the guard's Vue-only write drop and its
+Solid no-op are the same fact, and **most of the −3.8% / −5.6% is the proxy work** — an inference
+from the two arms, not a measurement of it.
+
+**Then tier 2 landed for Vue and the column moved further in one step than everything before it
+combined: 245.3 / 254.1 / 245.8 → 180.0 / 188.8 / 184.9 (SFC), and 272.9 / 292.2 / 274.6 →
+176.9 / 191.8 / 192.8 (TSX).** `<Pressable>` now compiles to `symbiote-pressable`, an element, and
+the press machine runs on the engine node — 2 000 Vue component instances gone from a 1 000-row
+create. FABRIC read 9000/8000/9 @ 32 001 in both, byte-identical to the previous run, and `WRITES`
+held at 12003/2, so the tree and the engine's work are unchanged and the whole delta is instances.
+
+Against the stable stock bands (Create 186.8 / 195.5 / 196.8, Append 290.8 / 282.6 / 280.2),
+**Create 180.0 is under all three and Append 184.9 is 1.57x** — Vue joins Svelte and Solid past
+stock React Native on a create-shaped row. Replace still gets no ratio: stock drifted 211.6 → 187.9
+and 188.8 sits inside that. Read against the morning's 397.4, Vue went 2.02x → 0.96x in a day.
+
+Two things that must travel with those numbers. **The ceiling was 159.4**, measured by deleting the
+row's Pressables outright, so tier 2 captured ~65 of ~86 ms — about 76%, the rest being the row
+component itself and what a lowered Pressable still costs engine-side. And **the benchmark row does
+not read `pressed`, so every one of its Pressables lowers, which a real screen's will not.** Census
+of `examples/vue-sfc`, 56 `.vue` files: 10 sites lower, 3 refuse, all three on a functional
+`:style`. By SITE that reads 77% lowered; by INSTANTIATION it inverts, because one of the three is
+`ActionButton` and that is 90 call sites on its own. The per-site figure is the optimistic one and
+the per-instance figure is the honest one — quote the second. Migrating `ActionButton`'s
+`opacity: pressed ? 0.6 : 1` into `.action-button:active` flips all 90 (Svelte did exactly this).
+
+Two smaller cautions from the same screenshots, one of which turned out to be the instrument.
+Swap 5.8 → 6.9, Remove 6.1 → 7.6, Clear 15.6 → 17.2 all rose — the small-ms rows behaving as the
+reproducibility note below already says they do. And the reconcile window did NOT fall with the
+totals (49.8 → 50.9 Create, 50.9 → 56.0 Append), which looked like it needed a mechanism and does
+not: see `symbiote-perf-measurement` on the window's own ±8% spread, measured across a pair of runs
+whose `VISITED`, `WRITES` and every FABRIC counter were byte-identical. **A window that moves while
+the counters hold still is noise; a window that moves WITH them is signal** — Solid's Select
+(10.3 → 1.0 ms beside a 500× write drop) is the reference for the second shape.
+
+**Svelte's column is post-lowering too (2026-08-23), and its disease was a THIRD currency.** Vue
+paid a component instance per primitive, Solid a props Proxy; Svelte pays **anchor nodes**. Its
+retained tree held 23 006 nodes against every other adapter's 9 001 — renderable 9 002 (identical)
+plus 14 004 anchors, of which 12 002 were Svelte block/component comments, i.e. 12 per row.
+**A component BOUNDARY is not what costs them** — measured per construct, a boundary is free; what
+costs is `{@render children}` (1 anchor) and `{#if}/{:else}` (2). Our primitives all accept
+children, so every one of them carried a snippet. Fabric saw the same 9000/8000 calls throughout, so the native side was never
+involved; the cost was 14 004 extra retained objects plus `renderableChildren` losing its fast path
+6 002 times per commit. `adapters/svelte/src/preprocessor/lower-host-primitives.ts` rewrites
+`<View>`/`<Text>` to `<symbiote-view p={{…}}>` before the compiler sees the file, taking them off
+the component path: anchors 14 004 -> 8 002. Create 475.8 -> 353.4, Replace 854.6 -> 392.7,
+Append 579.5 -> 378.0, Clear 33.3 -> 20.2, with FABRIC 9000/8000 and 32 001 prop keys unchanged.
+
+**Replace halving is the biggest single number this project has produced, and it is not a mystery**
+— Replace tears a thousand rows down and rebuilds them, so it destroyed AND recreated 14 004
+anchors where Create only creates them once.
+
+Read against stock the same way Vue's column is: stock Create is stable across three sittings
+(186.8 / 195.5 / 196.8) and so is stock Append (290.8 / 282.6 / 280.2), so **Create 2.55x -> 1.80x
+and Append 1.99x -> 1.35x carry a verdict** even though no stock run was taken in Svelte's own
+sitting. Replace does NOT get a ratio — stock's Replace drifted 211.6 -> 187.9 — but Svelte's own
+854.6 -> 392.7 is far outside any drift, so the IMPROVEMENT is certain while the multiple is not.
+Svelte is no longer worst of five on Create; it now sits between Solid and Angular.
+
+**And then a SECOND Svelte pass the same day took it from worst of five to FASTEST of five.** Two
+changes shipped together and this run cannot separate them: five allocation cuts in the DOM shim,
+and lowering `Pressable` (the tier-2 promotion, once the shared `HOST_PRIMITIVES` spec carried
+`observesState` and the refusals were in). Measured on one Release build, iOS 26.5 simulator:
+
+```
+            before   after            FABRIC / prop keys       reconcile window
+Create       353.4   154.1  -56.4%    9000/8000/11 @ 32001     59.9 -> 46.7 ms
+Replace      392.7   207.2  -47.2%    9000/8000/9  @ 32000
+Append       378.0   163.0  -56.9%    9000/8000/11 @ 32001
+Remove         9.6     7.4            Clear 20.2 -> 11.9, Select 9.5 -> 5.9
+```
+
+`createNode` / `appendChild` / prop keys are byte-identical to the pre-change run, so nothing
+structural moved; the clone count going 9 -> 11 is container chrome against nine thousand creates
+and is not a signal. **Against stock this is Create 0.78-0.82x and Append 0.56-0.58x — Svelte beats
+stock React Native on both**, read against the stable stock bands rather than a same-sitting
+sample (Create 186.8/195.5/196.8, Append 290.8/282.6/280.2). Replace still gets NO ratio, because
+stock's own Replace drifted 211.6 -> 187.9; 392.7 -> 207.2 is far outside that drift, so the
+improvement is certain and the multiple is not.
+
+**The reconcile WINDOW moving is the part that distinguishes Svelte from the other two**, and it
+was predicted before the run: Vue's and Solid's lowerings were pure pass 1 and left the window
+untouched, because their currency was an instance and a props Proxy. Svelte's currency is anchor
+nodes, and `renderableChildren` (`core/engine/src/commit.ts`) loses its fast path on every
+anchor-bearing parent — so removing ~6 000 of the 8 002 residual anchors had to move the walk as
+well. It did: 59.9 -> 46.7 ms, with pass 1 going 293.5 -> 107.4. Had the total fallen while the
+window held, that would have meant the anchors were not where the model said.
+
+The anchor count itself, measured afterwards: **8 002 -> 2**, with `renderableChildren`'s flatten
+count 6 002 -> 2 — the direct causal link to the window. That is well past the ~2 000 residual the
+prediction expected, and the miss is the instructive part: a COMPONENT boundary among a row's
+children forces the each-block to keep per-item block anchors that a purely element child does not
+need, so removing the last component from the row removed its own anchors AND the block's. Count
+what a boundary forces on its PARENT, not only what it owns.
+
+**Read the ratio as an UPPER BOUND, and the two sentences belong together.** The benchmark row does
+not read `pressed`, so every `Pressable` in it lowers. On the real screen it is 7 of 10: the three
+refusals are `CanaryScreen` twice (a functional `style` plus a parameterised children snippet) and
+`ActionButton` once — and `ActionButton` is the shape that dominates by INSTANTIATION SITE, ~625
+uses against ~76 screen-level Pressables on the Vue count. A lowering ratio measured on this row is
+the best case; the honest per-app figure is proportional to how many call sites do not read state.
+Migrating a `style={({pressed}) => …}` to a CSS `:active` rule is what converts a refusal into a
+number.
+
+Two things this cost that are worth not re-deriving. The preprocessor MUST run after
+`scopedStyles`, because lowering turns `class="x"` into a bag expression the style scoper can no
+longer find — reversed, every scoped class silently stops being scoped. And Metro's
+`getCacheKey` surfaces only the UPSTREAM key, so the compile step is invalidated by
+`--reset-cache` alone: without it the bundle keeps the old output and the measurement reads as a
+no-op. Mechanism and the anchor census: `svelte-adapter-dom-shim` §32.
+
+**Solid's column is post-lowering too (2026-08-23), and it is the cleanest measurement this project
+has taken** — both arms back-to-back on one simulator, eight minutes apart, Release, with only the
+adapter tarball swapped between them and `core/engine` left on its npm build so nothing else could
+move. Solid's currency was a props **Proxy** per primitive: `createComponent` builds one, then the
+component body runs `splitProps` + `withStableKeys` + `mergeProps` + `spread` — five things per
+node, 22.3% of a create in proxy traps and `splitProps` alone. `adapters/solid/babel-lower-host-
+primitives.cjs` rewrites `<View>`/`<Text>` to `symbiote-view`/`symbiote-text` before
+`babel-preset-solid` sees them, taking both off the component path entirely (641 tags across the 52
+`.tsx` of `examples/solid`, zero refusals):
+
+```
+            before   after      FABRIC unchanged throughout
+Create       337.9   284.7   -15.7%      9000/8000/9 @ 32001 keys
+Replace      390.6   315.8   -19.2%      9000/8000/7 @ 32000
+Append       324.5   276.0   -14.9%      9000/8000/9 @ 32001
+```
+
+Those "after" figures are the lowering ALONE, on the engine the example carried at the time; the
+column above adds the class guard and the engine re-levelling on top. Read end to end, Solid's day
+was Create 316.7 -> 261.2, Replace 386.9 -> 265.2, Append 347.4 -> 258.6, Select 14.6 -> 6.2, in
+four separately attributed steps.
+
+Fabric counts and prop keys are byte-identical in both arms, so the whole win is pass 1 and nothing
+structural moved — the same shape Vue's and Svelte's lowering produced.
+
+**And it exposed a real engine tax that the component wrapper had been hiding.** Solid's `Select`
+row went WRITES 2 -> **1001** and its reconcile window 1.5 -> 10.3 ms while Fabric stayed at
+0/0/10 with 4 prop keys. Mechanism: `routeProp`'s `class` branch ends in `pushClassStyle`, which
+publishes a **fresh `[classStyle, explicitStyle]` array** on every write, and `setProp`'s guard is
+`Object.is` — which can never fire on a fresh array. So an unchanged class string still lands as a
+write and still dirties the node. That re-push is DELIBERATE (it is the restore path after
+`setNativeProps` overwrites the declarative style, and the function says so), and it costs nothing
+for React/Vue/Svelte because each diffs props before calling the engine. Solid has no such diff: a
+fine-grained effect re-runs whenever any signal it reads changes, so all 1 000 rows re-push their
+class when `selectedId` moves. Before lowering, `splitProps`/`mergeProps` memoized that away.
+Wall time barely noticed (16.7 -> 17.8 ms, inside noise) but the tax is proportional to list size.
+Fixed the same day by `isAlreadyPublished` in `core/engine/src/node.ts`: `pushClassStyle` returns
+early when the array it would publish is identical to the one standing, read back out of
+`node.props.style` rather than tracked in a field. Safe against the restore path the function's own
+comment protects, because `setNativeProps` writes that slot as an OBJECT, never an array.
+
+**Measured on device, and the prediction held to the counter.** The guard ALONE was transplanted
+onto the npm engine already installed in `examples/solid`, so the two arms differed by nothing else
+(`symbiote-perf-measurement`, "Isolating ONE engine change on device"):
+
+```
+Select   WRITES 1001 -> 2   VISITED 4043 -> 1046   window 10.3 -> 1.0 ms   wall 17.8 -> 5.8 ms
+```
+
+The safety check is the half that matters: **FABRIC read byte-identical to the pre-guard run in all
+eight rows**, so the guard turned away only republications and never a real change. Create
+284.7 -> 288.1 and Append 276.0 -> 277.9 sit inside the noise floor, so the guard itself costs
+nothing. Solid's 5.8 now BEATS stock's 8.0 on Select, and after this **Solid loses only the three
+create-shaped rows — every row that mutates a mounted tree ties or wins.** Mechanism, the test's
+two-sided oracle, and the packaging traps: `.claude/rules/solid-host-primitive-lowering.md`.
+
+**Solid's column is post-Pressable-lowering (2026-08-23), and it is the first time an adapter has
+BEATEN stock React Native on a create row.** `<Pressable>` now compiles to `symbiote-pressable`,
+with the press machine living on the engine node as a host behavior instead of in a component; a
+functional `style` or a render-prop child still refuses and keeps the component. Same sitting,
+back-to-back, only the spec entry between the arms:
+
+```
+             before   after            FABRIC identical in every row
+Create        261.2   159.8   -38.8%   9000/8000/9 @ 32001
+Replace       265.2   180.2   -32.1%   9000/8000/7 @ 32000
+Append        258.6   166.8   -35.5%   9000/8000/9 @ 32001
+```
+
+VISITED (9041) and WRITES (12001) are byte-identical too, and the reconcile window moved +5%, inside
+its own ±8% floor. So the tree, the engine's work and what Fabric is asked to do did not change AT
+ALL — the entire win is pass 1, which is the signature of removed component instances and nothing
+else.
+
+Against stock, whose Create (186.8 / 195.5 / 196.8) and Append (290.8 / 282.6 / 280.2) are stable
+across three sittings: **Create 0.86x and Append 0.60x — Solid is now FASTER than stock React Native
+on both.** Replace lands below even the lowest stock sample but gets no ratio, because stock's own
+Replace drifts 11%.
+
+**~50 us per instance, four times the ~13 us a `View`/`Text` wrapper costs**, and the arithmetic
+says why: a `Pressable` is not a thin wrapper. Its body runs `splitProps` over a 19-name list,
+`createSignal`, `createPressRuntime`, three `createMemo`s and a `createEffect`, and then renders a
+`View` COMPONENT inside itself — so a row was shedding four instances plus a press machine, not two.
+
+The small-ms rows all moved the wrong way (Select 6.2 -> 9.0, Remove 7.2 -> 8.2, Clear 7.5 -> 24.2)
+and none of them carries a verdict: that is the same non-reproducibility this table already records
+for stock's own Clear (46.7 -> 7.7 with no code change). Do not read them either way without a
+repeat.
+
+Angular's column is its **flat** row shape (9 nodes/row, matching every other column). Its default
+`composed` shape is 12 nodes/row and costs **942.9 ms** — 33% more nodes for 2.26x the time, i.e.
+composition costs 1.7x PER NODE on top of the extra nodes (the per-component-host anchor, and it is
+non-linear). Angular is worst of five even flat.
+
+**Node CREATION was the one axis every adapter lost, and as of 2026-08-23 it is no longer that.**
+Host-primitive lowering closed it, on all three adapters that can be lowered. Against stock's
+stable bands, ALL THREE now beat it on a create-shaped row: Svelte Create 0.78-0.82x / Append
+0.56-0.58x, Solid 0.86x / 0.60x, Vue 0.92-0.96x / 0.64x. React and Angular still trail 1.17x and
+2.2x — neither has been lowered, and React cannot be the same way (no build-time analysis; host
+and composite are both fibers). Everything that mutates an already-mounted tree continued to tie
+or win throughout.
+
+**As of 2026-08-23 a `:active` CSS rule is an OPTIMIZATION, not a precondition.** A functional
+`style={({pressed}) => …}` — the idiom this ecosystem actually writes — now lowers too: the
+transform wraps the style expression ONCE in a runtime helper that calls the RESULT once per
+state, and the engine takes the pressed one as `activeStyle` (slot 1 while pressed). So the
+developer keeps the ternary and gets the lowering. The CSS route stays cheaper (no call per render)
+and is still the right answer for a shared look, but nobody has to rewrite anything to be fast.
+
+What comes with it is a REQUIREMENT ON THE OUTPUT, not a restriction on the input —
+`REFUSAL_CATEGORIES.emitStyleExpressionOnce`. It was briefly written the other way: a transform that
+prints the guard inline (`typeof f === 'function' ? f({pressed}) : f`) repeats the expression, so
+`style={getStyle()}` runs the author's call once per copy per recompute, and the fix proposed was to
+REFUSE `getStyle()` / `bag[i]` / `flag ? a : b`. Wrong level — Svelte wraps once and lowers all
+three correctly, so a shared refusal would have cost the correct adapter real coverage to protect
+against another's emit. Assert `occurrences(out, expr) === 1` on the emitted text instead. The only
+contract left on the author is that the callback be PURE in `pressed`: its result is invoked twice
+under any emission.
+
+Read every ratio here as an UPPER BOUND, and the two sentences belong together: the benchmark row
+never reads `pressed`, so all of its Pressables lower, while a real screen has some that refuse.
+
+**And count INSTANTIATIONS, not call sites — the two disagree, and by call site the answer flatters
+you.** Measured on `examples/vue-sfc`: 10 of 13 call sites lower, i.e. 77%, which reads as almost
+solved. But one of the three refusals is `ActionButton`, and it is instantiated **90 times** in that
+app — so the refusing side dominates the node count while the lowering side dominates the file
+count. `examples/svelte` recounted the same way went the OTHER direction — 8 of 10 call sites became 96 of
+98 instantiations (98%), because its dominant component is `ActionButton` at 83 uses and that one
+had just been migrated to `:active`. So the instantiation figure is not a pessimism correction, it
+is simply the comparable one; quote it, and count static mount sites weighted by reuse rather than
+runtime multiplicity (`BenchmarkRow`'s 1 000 runtime rows would read 2096/2098 and measure the
+benchmark, not the app). Migrating
+those to an `:active` CSS rule is what turns the bound into the number — see
+`symbiote-perf-measurement`, "A lowering ratio measured on the benchmark row is an UPPER BOUND".
+This is the one hot path to attack, and it is also the metric every reader looks at first.
+
+`Remove` 108.6 / 83.7 / 7.5 is the thesis showing up as a number, not an engine win: removing one
+row of a thousand costs React a walk over a thousand fibers regardless of the host mutations it
+emits — stock pays that plus persistent-mode cloning, our React adapter pays the same walk (hence
+the twin numbers), and Vue/Svelte/Solid walk nothing and emit one `removeChild`. **Solid on RN
+updates a list an order of magnitude faster than RN does.**
+
+**The small-ms rows do not reproduce, and the run-to-run spread is the first thing to check before
+believing any verdict on them.** Two Release runs of UNCHANGED stock code, same simulator, same
+day: Clear 46.7 → 7.7, Swap 7.1 → 13.3, Remove 94.6 → 108.6, while Create moved only 179.7 → 186.8
+(+4%). So Create / Replace / Append carry a verdict and Clear does not — the earlier "every adapter
+WINS Clear" reading came from a single stock sample and is withdrawn. Take the ~4% Create drift as
+the noise floor for anything quoted off this table.
+
+Two things this table must not be used for. **Never benchmark adapters in a Debug build**: the same
+Create comparison read 13% FASTER in Debug and is 30% SLOWER in Release — the sign flipped on the
+headline metric, because Debug inflates JS-bound and native-bound work by different factors. And
+the **virtualized column compares RN's own `FlatList` against our port of it** — two
+implementations, not two renderers; all-mounted is the clean cross-renderer read.
+
+**A headless bench win does not transfer at face value to a native-bound path.** The engine's
+payload-building JS was cut ~1.4x headless (2026-08-23: `Object.keys` over `Object.entries`, no
+style copy, style resolution memoized on object identity, `dlog` blocks gated); on device that
+landed as ~1.06x, because `installFabric()` stubs the native side to zero and our JS is only ~24%
+of a real create. It did shrink the react↔stock Create gap 53.2 → 31.0 ms. Full arithmetic:
+`symbiote-perf-measurement`, "The create-path pass".
+
+Open work, priority order, and the per-adapter detail (React is an outlier three times over —
+`Swap`, `Remove`, and the whole virtualized column — against its own siblings on the same engine):
+`symbiote-perf-measurement`, "The stock-React-Native baseline".
 
 ## Reference material
 

@@ -134,3 +134,102 @@ Read it as a grid, not a list: a package declaring four of the five adapters is 
 the per-framework value is often the SAME core path for every framework — so "does adapter X have
 a real implementation here" and "can adapter X import this package" are different questions, and
 this surface answers only the second.
+
+## The fourth surface: `files` coverage of a loose root `.cjs`
+
+A Babel preset or Metro transformer shipped as a loose file at the package root can `require()` a
+sibling that `files` does not list. `exports` does not gate an internal relative require, tsc never
+reads a `.cjs`, and in the monorepo the whole tree is on disk — so it resolves everywhere except in
+a tarball, where it throws MODULE_NOT_FOUND from inside Babel before the first module transforms.
+
+Measured 2026-08-23: `adapters/solid/babel-preset.cjs` gained
+`require('./babel-lower-host-primitives.cjs')` and `files` was not updated. Nothing went red, the
+pack emitted no warning, and the miss surfaced as a **device benchmark that read as "the
+optimization does nothing"** — a measurement that lies rather than fails, which is strictly worse
+than a crash. Guarded since by `tests/package-files-cover-cjs-requires.test.ts` (follows relative
+requires transitively from every loose root script listed in `files`).
+
+## The fifth surface: the LOWERING TRANSFORMS, and no audit sees it
+
+Four transforms now implement the same rule set — `adapters/solid/babel-lower-host-primitives.cjs`,
+`adapters/vue/babel-lower-host-primitives.cjs`, `adapters/vue/metro-vue-transformer.cjs`,
+`adapters/svelte/src/preprocessor/lower-host-primitives.ts`. They read one shared spec
+(`core/components/host-primitives.cjs`) and one shared specialiser
+(`core/components/specialize-state-style.cjs`), but each owns its own AST plumbing, so **the shared
+half being shared proves nothing about the answer they give.**
+
+None of the four audits above reaches this. Barrels, subpaths, `files` coverage and exported symbols
+are all untouched by a transform that lowers a call site its sibling refuses. Every suite stays
+green, `tsc` is happy, and the divergence surfaces as one adapter being mysteriously slower — or,
+worse, as a button that lowers where it should not and does not respond.
+
+**Vue is the sharp case because it carries TWO paths.** The SFC transform and the JSX/TSX transform
+must agree with each other before either agrees with another adapter, and they cannot share plumbing:
+`@vue/compiler-sfc` hands the transform an expression as SOURCE TEXT, so the SFC path has to parse
+with Babel and print back, while the JSX path already has the AST. Two different mechanisms
+implementing one rule is exactly the shape that drifts. Parity across them is P0
+(`<adapters_reach_full_feature_parity>`), not a cost/benefit call — an opt-out was offered once and
+retracted the same hour.
+
+The audit that answers it is a shared FIXTURE TABLE rather than a code comparison: one list of
+snippets — an inert object style, a specialisable ternary, a hoisted identifier style, a nested
+function body, a zero-arity child, a parameterised child, a spread — run through every transform,
+asserting the same lowered/refused verdict from each. It is the only form that survives the
+plumbing being different by design, and it fails loudly the moment one transform learns a shape the
+others have not.
+
+Run it whenever a transform gains or loses a refusal, and treat a new refusal category in
+`REFUSAL_CATEGORIES` as a signal that every transform needs a row. Then check the category is real
+before every transform inherits it: `unrepeatableRead` — since renamed `emitStyleExpressionOnce` — (`style={getStyle()}`, `style={bag[i]}`,
+`style={flag ? a : b}`) turned out to be a property of ONE transform's emit shape — an inline
+`typeof f === 'function' ? f({pressed}) : f` prints the expression three times, a runtime
+`resolveStateStyle(expr)` prints it once and calls the RESULT twice. Svelte lowers all three
+correctly; a `refuse` row would have made it drop them for a hazard it does not have. **A refusal
+that a different emit dissolves is not a shared verdict — it is one transform's bug asking to be
+ratified.**
+
+## Phrase a parity oracle as a CAPABILITY, never as a shape
+
+`<adapter_src_follows_framework_idioms>` says an adapter is written in its own framework's idiom.
+The consequence for auditing is easy to miss: **a check written in one framework's shape reports
+every other framework as broken.**
+
+Measured 2026-08-23 while probing whether a lowered element still hands an app its imperative
+handle. The oracle was `typeof ref?.measure === 'function'`, which quietly asks "is this adapter
+built like React". React and Vue give a public INSTANCE from a ref, so it works there. Svelte's
+`bind:this` gives the ELEMENT, and the handle is reached through the adapter's own documented
+accessor (`hostInstance`), so Svelte answers `undefined` while being entirely correct:
+
+```
+bind:this yields            ShimElement      the ref is live
+typeof ref.measure          undefined        <- the shape oracle's answer
+hostInstance(ref)           SymbioteNode
+typeof host.measure         function         <- the capability oracle's answer
+```
+
+Every adapter has a `host-instance` module for exactly this reason — react, vue, svelte, solid and
+angular all ship one. So the oracle that transfers is **"can app code reach `measure` from what the
+framework handed it"**, resolved through that adapter's accessor. Written that way, a real defect
+still fails and an idiom difference does not.
+
+The same trap in general form: any audit step of the form "does X look like Y" is a shape check.
+Rewrite it as "can a consumer do Z", and the five answers become comparable.
+
+## A build-tool-facing symbol belongs on a SUBPATH, never on a shared barrel
+
+Every adapter barrel re-exports `@symbiote-native/components` wholesale. So a name added to that
+barrel becomes public API on all five adapters at once, with no edit to any of them — which is how
+`resolveStateStyle`, named only by the code a lowering transform EMITS, nearly shipped as a
+supported export. `KNOWN_GAPS` cannot express "this should not be shared at all"; it only records
+which adapters lack a shared name.
+
+The shape that does express it is a subpath: `core/components/state-style`, mirrored by
+`adapters/*/state-style` so the emitted import stays inside the package the app already depends on.
+`host-primitives` and `specialize-state-style` are there for the same reason. Barrel-parity ignores
+subpaths by design; `tests/package-subpath-parity.test.ts` guards them instead.
+
+Two traps found the same hour: declare the `publishConfig.exports` entry as `{ types, default }`
+like its neighbours, or the subpath ships UNTYPED and a consumer's `tsc` cannot see it — the
+subpath-parity test resolves the specifier, not the types, so nothing catches it. And check every
+adapter rather than assuming: of five, three were wrong, one was already right, and one has no
+`publishConfig` at all.

@@ -161,7 +161,54 @@ const GLOBAL_KEPT: readonly IKeptCase[] = [
   },
 ];
 
+// `:active` is the one state pseudo-class kept, as a compound TOKEN beside its class — the engine
+// owns that state, so unlike :hover/:focus it is a selector RN CAN match. Specificity rises the
+// way CSS says (`.btn` [0,1,0] -> `.btn:active` [0,2,0]), so pressed wins the cascade with no
+// special ordering.
+const ACTIVE_KEPT: readonly {
+  readonly selector: string;
+  readonly tokens: readonly string[];
+  readonly combinators: readonly ISelectorCombinator[];
+  readonly specificity: readonly [number, number, number];
+}[] = [
+  {
+    selector: '.btn:active',
+    tokens: ['btn', ':active'],
+    combinators: ['none'],
+    specificity: [0, 2, 0],
+  },
+  {
+    // `:global()` says only that the NAME is unscoped; the element it matches can still be the
+    // pressable itself. Kept on BOTH lightningcss shapes, or the same CSS would behave differently
+    // depending on the cssModules flag — the standing hazard this file's header names.
+    selector: ':global(.btn:active)',
+    tokens: ['btn', ':active'],
+    combinators: ['none'],
+    specificity: [0, 2, 0],
+  },
+  {
+    selector: '.card .btn:active',
+    tokens: ['card', 'btn', ':active'],
+    combinators: ['descendant', 'none'],
+    specificity: [0, 3, 0],
+  },
+];
+
 const DROPPED: readonly (IDroppedSelector & { readonly selector: string })[] = [
+  // Both spellings of "deep", because they reached the state pseudo-class by DIFFERENT paths and
+  // so disagreed: `:deep()` re-parses a raw token stream and dropped, `>>>` is a real combinator
+  // and kept. A deep rule reaches into another component's internals, and the state token is only
+  // meaningful on the node whose press machine owns it — the node a deep rule cannot predict.
+  {
+    selector: '.a >>> .b:active',
+    reason: 'pseudo-class',
+    detail: 'active through a deep combinator',
+  },
+  {
+    selector: '.a ::v-deep .b:active',
+    reason: 'pseudo-class',
+    detail: 'active through a deep combinator',
+  },
   { selector: '.card:hover', reason: 'pseudo-class', detail: 'hover' },
   { selector: '.card:focus', reason: 'pseudo-class', detail: 'focus' },
   {
@@ -337,6 +384,18 @@ describe('selectorsToMatches — the five deep spellings agree', () => {
       0, 3, 0,
     ]);
   });
+});
+
+describe('selectorsToMatches — :active is KEPT as a compound token', () => {
+  it.each(ACTIVE_KEPT)(
+    '$selector -> $tokens',
+    ({ selector, tokens, combinators, specificity }) => {
+      const result = matchesFor(selector);
+
+      expect(result.dropped).toEqual([]);
+      expect(result.matches).toEqual([{ tokens, combinators, specificity }]);
+    },
+  );
 });
 
 describe('selectorsToMatches — dropped selectors', () => {

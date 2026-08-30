@@ -149,6 +149,11 @@ function combinatorFor(value: Combinator): ISelectorCombinator | null {
   }
 }
 
+// lightningcss reports a plain state pseudo-class by name in `kind`. The TOKEN keeps the colon so
+// it stays unspellable as a class name.
+const STATE_PSEUDO_CLASS = 'active';
+export const STATE_TOKEN = ':active';
+
 interface IBuilder {
   readonly tokens: string[];
   readonly combinators: ISelectorCombinator[];
@@ -278,6 +283,29 @@ function consumePayload(
         const nameIndex = index + (isPseudoElement ? 2 : 1);
         const name = identAt(args, nameIndex) ?? wrapper;
         builder.specificity[isPseudoElement ? 2 : 1]++;
+        // `:active` is kept on this path too, or the SAME CSS behaves differently on the
+        // cssModules flag — the recurring hazard this file's header names. `:global(.btn:active)`
+        // arrives parsed (`kind:'global'`) with cssModules ON and reaches the ordinary walk, which
+        // keeps it; with the flag OFF it arrives here as a raw token stream and would drop the
+        // WHOLE rule. Same source, opposite outcome, decided by which file it lives in.
+        //
+        // Keeping it is also the right side of the `:deep` asymmetry rather than an exception to
+        // it: `:global()` says only that the NAME lives outside this file's scope, while
+        // `:deep()` says the MATCH may cross a scope boundary. Only the second breaks the promise
+        // the state token rests on — that the rule targets the node whose press machine owns the
+        // state. Svelte cares most, since `:global()` is its ONLY escape hatch.
+        if (!isPseudoElement && name === STATE_PSEUDO_CLASS) {
+          if (
+            builder.combinators.includes('deep') ||
+            builder.pending === 'deep'
+          ) {
+            drop(builder, 'pseudo-class', 'active through a deep combinator');
+          } else {
+            pushToken(builder, STATE_TOKEN);
+          }
+          index = nameIndex;
+          break;
+        }
         drop(
           builder,
           isPseudoElement ? 'pseudo-element' : 'pseudo-class',
@@ -403,6 +431,40 @@ function consumeComponent(
           consumePayload(builder, component.arguments, ':deep()');
           return;
         }
+      }
+      // `:active` is the ONE state pseudo-class this module keeps, and it is not an exception to
+      // the "a selector RN can never match" principle above — it is the one state the ENGINE
+      // actually knows, because the press machine owns it. It is kept as an ordinary compound
+      // TOKEN (`.btn:active` -> tokens ['btn', ':active'], combinator 'none'), so specificity,
+      // source order, scoping and the resolve cache all keep working with no new concept in the
+      // registry: the engine adds the token to a pressed node's class list and the existing
+      // matcher does the rest. A CSS identifier cannot carry an unescaped `:`, so the token can
+      // never collide with a real class name.
+      //
+      // `:hover` / `:focus` stay dropped deliberately — RN has no hover or focus state the engine
+      // owns — as do `:nth-child` and the rest. Widening past `:active` is its own decision, and
+      // the limit it will hit is the registry's resolve cache: it is capped at 512 entries and
+      // CLEARS WHOLE rather than evicting, so states that COMBINE multiply the distinct class
+      // strings on a screen and can drop the cache, which breaks the identity `isAlreadyPublished`
+      // depends on for every node at once.
+      if (component.kind === STATE_PSEUDO_CLASS) {
+        builder.specificity[1]++;
+        // ...but NOT through a scope boundary. `:deep(.b:active)` already dropped, because a
+        // custom-function payload is a raw token stream this walk re-parses; `.a >>> .b:active`
+        // did NOT, because `>>>` is a real combinator and the walk reaches the pseudo-class
+        // normally. Two spellings of one relation behaving differently is the bug, and the
+        // decision (2026-08-23) is to refuse BOTH: a deep selector reaches into another
+        // component's internals, and the state token is only meaningful on the node whose press
+        // machine owns it — which is exactly the node a deep rule cannot predict.
+        if (
+          builder.combinators.includes('deep') ||
+          builder.pending === 'deep'
+        ) {
+          drop(builder, 'pseudo-class', 'active through a deep combinator');
+          return;
+        }
+        pushToken(builder, STATE_TOKEN);
+        return;
       }
       // `:not()`/`:is()` take the specificity of their argument rather than a flat 1, but they are
       // dropped here regardless, and only a KEPT selector's specificity is ever read.

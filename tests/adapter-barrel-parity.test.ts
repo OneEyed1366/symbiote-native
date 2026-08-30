@@ -31,6 +31,13 @@ type IAdapter = (typeof ADAPTERS)[number];
 // A shared name an adapter deliberately does NOT re-export. Only a genuine per-adapter difference
 // belongs here; the 22 gaps this test found on its first run were all closed instead.
 const KNOWN_GAPS: Readonly<Record<string, readonly IAdapter[]>> = {
+  // NOTE for whoever adds the next build-tool-facing symbol: `resolveStateStyle` was briefly here
+  // and should not come back. Every adapter barrel re-exports `@symbiote-native/components`
+  // WHOLESALE, so putting a name on that barrel publishes it as API on all five at once — a
+  // transform internal nearly shipped that way. It now lives on the `./state-style` subpath of both
+  // `core/components` and every adapter, which is invisible to THIS test by design and guarded by
+  // `tests/package-subpath-parity.test.ts` instead. A KNOWN_GAPS entry cannot express "should not
+  // be shared at all"; a subpath can.
   // Matches a shared name without being a passthrough: React and Vue DECLARE their own
   // `ITextInputProps` (the agnostic base plus their `className`), so this is the per-adapter half
   // of <prop_types_split_agnostic_vs_per_adapter>. Angular takes props as @Input()s and exposes

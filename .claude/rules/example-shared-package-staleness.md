@@ -142,3 +142,195 @@ Every other example bundles straight from source; Angular's `index.js` imports
 Bundling before that step fails on the FIRST import with a plain "module not found", which reads
 like a broken example, not a missing build step. Fixed by running `npm run ng:build` in
 `buildBundleSources()` before the `react-native bundle` call, framework-gated on `angular`.
+
+## Verifying an overlay: three checks, and one of them is not the obvious one
+
+`scripts/overlay-local-packages.mjs` (see the section above) prints a confident `Done` whether or
+not anything landed, so the verification is the real step. Grepping the installed build for a
+symbol you just added is the obvious check and it is **not sufficient**: if the change went through
+more than one iteration in the same session, an EARLIER build also contains that symbol and the
+grep passes on a stale overlay. Measured 2026-08-22 — `flushNativeProps` existed in both the first
+(slow, general-walk-fallback) implementation and the final union one.
+
+Three checks, cheap, and the third is the one that actually settles it:
+
+1. **A marker unique to the FINAL version**, not to the feature — a string from the last edit
+   (e.g. a new `dlog` format), not the exported name.
+2. **Exactly one copy**: `find <example>/node_modules -path "*@symbiote-native/<pkg>/package.json"`
+   → 1. The overlay only replaces folders that already exist, so a nested second copy is skipped
+   silently and may be the one the app resolves.
+3. **A normalized whole-build comparison against a fresh local build** — every emitted file, not
+   one. `fix-esm-extensions` runs at publish time, so a raw `diff` against a bare `tsc --build`
+   output reports EVERY file as drifted purely because the installed copy says `from './node.js'`
+   and `from './style/index.js'` where the built one says `from './node'`. Strip that rewrite
+   before comparing or the check produces a 100% false-positive rate:
+
+```py
+t = re.sub(r"(from '\.[^']*?)(/index)?\.js'", r"\1'", pathlib.Path(f).read_text())
+```
+
+### Check ZERO: the overlay does not cover ADAPTERS, and its output looks complete anyway
+
+`OVERLAY_ONLY` is `core/engine` + `core/components` + `adapters/angular`; everything else it touches
+is `packages/*`. So `adapters/{react,vue,svelte,solid}` are silently NOT overlaid — deliberately (an
+adapter overlay swaps in code the example's own manifest does not pin, so it needs the full `file:`
+tarball dance), but nothing says so at run time. The log lists the six packages it DID overlay and
+ends with `Done`, and a reader checking the packages it names finds every one correct.
+
+Measured 2026-08-24: an overlay run against `examples/svelte` reported success while the adapter
+stayed on the registry build, i.e. the one package the session had spent the day changing. The tell
+was not in the log — it was that the installed adapter had no `./state-style` subpath. **So verify
+the ADAPTER separately and first**: it is the package most likely to be the subject of the change
+and the only one the overlay will not carry.
+
+**And a probe that checks only what the overlay updates is guaranteed to come back clean — it is
+self-confirming, not evidence.** Measured 2026-08-30: a session ruling out staleness as the cause of
+a device defect grepped `engine/build/` and `components/build/` for the two fixes, found both, and
+declared the example current. Those are exactly two of the three things `OVERLAY_ONLY` carries. The
+adapter was six days old, its lowering transform 8.6K against the current 10.8K, and
+`src/state-style.ts` — the whole `activeStyle` path the defect was about — was not in the build at
+all. The right conclusion was available and the probe could not reach it.
+
+The cheapest whole-package check is a diff, not a grep, and one line of it is a free date
+fingerprint:
+
+```bash
+diff examples/<app>/node_modules/@symbiote-native/<fw>/build/index.js adapters/<fw>/build/index.js
+```
+
+Any difference means the installed adapter is not from this commit. `prepublish-build` runs
+`fix-esm-extensions`, so a CURRENT build always says `import './register.js'` while an older packed
+one says `import './register'` — Metro resolves both, so nothing fails, and the specifier is a
+reliable tell that costs nothing to read.
+
+**The asymmetry that should send you here first: exactly ONE adapter still shows a defect the
+others stopped showing.** That reads as a framework-specific bug and is usually a slice-specific
+one — the adapters were rebuilt at different times, and the overlay does not carry any of them.
+Confirmed end to end on 2026-08-30: two adapters were fixed by a `core/` change and the third was
+not; the third's defect closed with an adapter rebuild and no `core/` edit at all. Read that
+adapter's installed bytes BEFORE forming a hypothesis about its framework — the hypothesis is
+expensive to hold and the diff above costs one command.
+
+**And an overlay leaves NO trace in git**, deliberately — it replaces the contents of installed
+folders and never touches a tracked file. So "is this example's arm still the one I packed?" cannot
+be answered from `git status`; only by reading the installed bytes. That cuts both ways: your own
+pack is invisible to a teammate, and a teammate's run is invisible to you. Demonstrated 2026-08-24 —
+a session verifying its own logging fix ran the overlay twice against `examples/solid` for real,
+disturbing an arm nobody could see was disturbed. The tool now has `--dry-run` for exactly that
+(a tool whose only job is to perturb an arm needs a way to check itself without perturbing one), but
+the general point outlives the flag: **before measuring, re-read the installed bytes; before
+perturbing someone else's example, say so.**
+
+`--keep-tarballs <dir>` is the other half of that: the overlay packs into a temp dir and deletes it,
+so the exact bytes it installed are gone the moment it finishes and a later question about what was
+measured has no artifact to ask. The flag copies each tarball out before the cleanup. It needs a
+destination and errors without one — a bare `--keep-tarballs` would otherwise swallow the following
+example directory as its value and silently overlay the whole CI set instead.
+
+**An overlay needs `pod install` after it, exactly like an `npm install` does.** Root CLAUDE.md
+states the rule for the reinstall path — replacing a package folder deletes
+`@symbiote-native/splash-screen/.rn-bootsplash/`, which the podspec vendors at `pod install` time —
+and the overlay replaces those same folders, so it has the same consequence and no warning of its
+own. Measured 2026-08-24: an overlay-only round (no `npm install` at all) wiped the vendored sources
+again. Skip the pods step and the next `xcodebuild` dies on `Build input file cannot be found:
+.../.rn-bootsplash/ios/RNBootSplash.mm`, buried in clang argument dumps that read as a broken
+toolchain.
+
+**And when a teammate is editing the same tree, a slice can miss by a minute and still look right.**
+Verify by COMPARISON, not by sequence: the installed artifact must equal a build of the CURRENT
+source, and mtimes say which side moved.
+
+```bash
+stat -f "%Sm  %N" -t "%H:%M:%S" core/<pkg>/src/<file>.ts <example>/node_modules/.../build/<file>.js
+diff -q core/<pkg>/build/<file>.js <example>/node_modules/@symbiote-native/<pkg>/build/<file>.js
+```
+
+Measured the same day: a fix landed in source at 12:37:15, the build ran at 12:36:14, the pack at
+12:35:20 — sixty-one seconds, and every file-presence check passed while the example carried the
+old behaviour. Ask the teammate to say when they are done with `core/*` before spending the
+rebuild; otherwise it is a loop where both sides keep missing.
+
+The same holds for `core/css-parser`, also outside the list — folder-swap it by hand after
+re-checking the subset rule the script's own comment states (packed dependency set ⊆ installed), and
+re-check it rather than inherit the verdict: it expires whenever either side gains a dependency.
+
+**And running a bare `tsc --build --force` to produce that comparison leaves `build/` unpublishable**
+— extensionless specifiers, which is exactly the bug `fix-esm-extensions` exists to prevent. Run
+`pnpm run fix-esm-extensions` afterwards to put the tree back, and confirm with a byte-identity
+check against the installed copy.
+
+## `css-parser` is the one the overlay CANNOT fix, and its version number lies too
+
+The allowlist above excludes `core/css-parser`, and the REASON it was excluded has since expired —
+which is the more useful half of this entry. It was kept out because the package had just gained
+`lightningcss`, and a folder swap never touches `package-lock.json`, so a dependency the example
+lacks is simply absent. Measured 2026-08-23, the packed and installed dependency sets are now
+identical and `lightningcss` is already hoisted everywhere, so a swap installs nothing new. The
+general test, which is what to carry: **a folder swap is safe exactly when the packed package's
+dependency set is a subset of what the example already has installed** — per-package, and it
+expires the moment either side gains a dependency. Check it rather than inheriting the verdict.
+
+It stays out of the CI allowlist regardless (nothing CI checks reads the parser's own output), so
+every example still keeps whatever the registry published — and that is fine right up until a measurement depends on a parser feature that is only
+in source.
+
+Measured 2026-08-23, `examples/svelte`: installed `@symbiote-native/css-parser` **0.4.0** with zero
+occurrences of the `:active` state token; `core/css-parser` **0.4.0** with three. Same version
+string, different capability. So the engine rule — _a version cannot tell you what an example
+carries, only a grep of its installed `build/` can_ — applies here verbatim, and here it is worse:
+the engine at least gains and loses whole FILES, while this one differs only inside `selectors.js`.
+
+The failure it produces is a measurement that lies rather than fails. A `:active` rule the
+installed parser does not understand is **dropped silently at build time**, the device shows a
+Pressable that never changes appearance, and the honest reading of that screen is "tier-2 does not
+work" when what does not work is the parser. Nothing is red anywhere.
+
+So: **anything that measures `:active` on device must pack `css-parser` through the full `file:`
+tarball dance alongside the adapter**, not rely on the overlay. Verify the way you would verify the
+engine:
+
+```bash
+grep -c "STATE_TOKEN\|':active'" examples/<app>/node_modules/@symbiote-native/css-parser/build/lightning/selectors.js
+```
+
+Zero means the rule will vanish, whatever the manifest says.
+
+Run across the whole tree it is not one stale example, it is the resting state — measured the same
+day, every one of the twelve reporting version **0.4.0**:
+
+```
+:active hits in the installed build/lightning/selectors.js
+  0   angular · react · svelte · vue-sfc · vue-tsx · all six expo-*
+  4   solid            <- the only one, and only because it was packed an hour earlier
+  4   core/css-parser  <- source
+```
+
+So the default assumption for any example nobody has just packed is that the feature is ABSENT, and
+the grid above is the check — not a per-example suspicion.
+
+## A tool that disturbs a measurement arm needs a way to be tested without disturbing one
+
+`scripts/overlay-local-packages.mjs` mutates an example's installed packages and does nothing else,
+so for a long time the only way to check a change to it was to run it for real on somebody's
+example. Measured 2026-08-24: validating a one-line logging change moved `examples/solid`'s
+installed engine and components twice, while that example was a measurement arm. Nobody was
+mid-run, so nothing was lost — but the arm was no longer the one its owner had packed, and that is
+the failure this repo has spent days learning to fear: an arm that silently moved, rather than one
+that failed.
+
+`--dry-run` now prints both lists — what would be overlaid, what would be left on its published
+build — and writes nothing. Use it for any change to the script itself, and before a run on an
+example someone else is measuring.
+
+Two details that make it honest rather than decorative:
+
+- **The dry path and the real path print through ONE function.** A dry run whose wording can drift
+  from the real one starts lying exactly where it is trusted.
+- **The skipped list prints at the END, beside `Done`.** It was correct at the top too, and
+  scrolled away behind ~200 lines of pack output. A detail that exists where nobody looks is worth
+  no more than a detail that does not exist — the same shape as a summary that contradicts its own
+  detail lines (`.claude/rules/test-harness-false-greens.md` §6), one layer out.
+
+And the ask that goes with it: **before running any packaging or overlay step, check whether a peer
+is measuring that example.** Three sessions share this tree; the cost of asking is one message and
+the cost of not asking is somebody's afternoon.
