@@ -230,10 +230,40 @@ type ICommittedShape = {
   children: ICommittedShape[];
 };
 
+// KNOWN ANGULAR DEBT, subtracted from BOTH sides so the oracle keeps working — delete this set
+// (and the filter below) the moment the composed Pressable stops binding unconditionally.
+//
+// The composed `Pressable` template binds all four of these on every instance
+// (`(accessibilityTap)="emit(...)"`), the flat one binds none, and the engine cannot tell a
+// subscriber from a forwarder — so it writes the boolean gate wherever the prop is present and the
+// two shapes diverge on exactly these keys. Full mechanism:
+// `.claude/rules/fabric-boolean-event-gates.md`.
+//
+// Skipping the assertion instead would be the wrong trade: `flat.committed == composed.committed`
+// is the only oracle that catches ANY divergence between Angular's two paths, so silencing it to
+// hide one known debt silences the whole future class. Subtracting four named keys leaves every
+// other difference detectable.
+const EAGERLY_FORWARDED_GATES: ReadonlySet<string> = new Set([
+  'onAccessibilityAction',
+  'onAccessibilityTap',
+  'onMagicTap',
+  'onAccessibilityEscape',
+]);
+
+function withoutEagerGates(
+  props: Record<string, unknown>,
+): Record<string, unknown> {
+  const kept: Record<string, unknown> = {};
+  for (const key of Object.keys(props)) {
+    if (!EAGERLY_FORWARDED_GATES.has(key)) kept[key] = props[key];
+  }
+  return kept;
+}
+
 function shapeOf(nodes: readonly IFakeNode[]): ICommittedShape[] {
   return nodes.map(node => ({
     viewName: node.viewName,
-    props: node.props,
+    props: withoutEagerGates(node.props),
     children: shapeOf(node.children),
   }));
 }

@@ -34,10 +34,33 @@ That is adapter debt, not a gate bug.
 shapes commit identically, and it fails on exactly four keys — `onAccessibilityAction`,
 `onAccessibilityTap`, `onMagicTap`, `onAccessibilityEscape` — present on composed and absent on
 flat, because only the composed `Pressable` template binds them. Nothing about row SHAPE is wrong,
-so the failure reads as a benchmark or lowering regression and is neither. Confirmed 2026-08-30
-against a batch that touched Angular: the test file was last edited 2026-08-20 (`781193de`) and
-that day's Angular diff was three lines mentioning none of the four. Before blaming a fresh commit
-for it, diff the commit for those prop names — the answer is usually zero.
+so the failure reads as a benchmark or lowering regression and is neither.
+
+**The DEBT predates the failure; the failure does not predate the batch, and conflating those two
+is how this entry was first written wrong.** Those four names entered `GATED_EVENT_PROPS` on
+2026-08-30 — 12 additions, zero deletions, and the constant did not exist at all in the commit
+before the batch. Until then no flag was emitted for them, so eager forwarding was invisible and
+flat and composed committed identically. The Angular template has bound all four unconditionally
+for far longer; the gate is simply what made it observable.
+
+So the probe has to scope to the DECIDING side, which is the engine's gate list and not the
+adapter the test lives in:
+
+```bash
+git diff <before>..HEAD -- core/engine core/components \
+  | grep -cE "onAccessibilityAction|onAccessibilityTap|onMagicTap|onAccessibilityEscape"
+```
+
+The first version of this paragraph scoped that grep to `adapters/angular/` — because the failing
+test is an Angular test — got 0, and concluded the red predated the batch. Both the count and the
+conclusion were wrong, and the shape of the mistake is `.claude/rules/verify-the-deciding-side.md`
+applied to a PROBE rather than to a claim: a probe aimed at the wrong file returns a clean answer,
+not an error. Before trusting a zero, ask which side would have had to change for the answer to be
+nonzero.
+
+Cite the HASH rather than a day for anything here: `781193de` was authored 2026-08-20 23:51 and
+committed 08-21 20:53, so two sessions reading `%ai` and `%ci` will each "correct" the other's
+date forever.
 
 Full context, including why our payload is legitimately half stock's size: the
 `symbiote-engine-core` skill, §10.
