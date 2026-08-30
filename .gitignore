@@ -79,3 +79,7 @@ packages/*/.rn-*
 # folder inside it) — both levels match the bare rule independently and both need unignoring.
 !apps/docs-site/src/content/docs/
 !apps/docs-site/src/content/docs/docs/
+
+# Benchmark dumps from the device runs — measurement scratch, not artifacts.
+census-*.txt
+proxy-leak.txt
