@@ -12,13 +12,13 @@ architecture — status, seam, bootstrap, version floor, the component-parity
 model, and general cross-cutting gotchas that don't belong to one narrower
 topic. Everything else moved into a focused sibling skill:
 
-| Topic | Skill |
-|---|---|
-| AOT build pipeline (two-stage ngc→linker), package self-build via `prepare`+conditional `exports`, `dev`/`start` + `ngc --watch` | `angular-adapter-build` |
-| Change detection — `whenCommitted`, SignalView vs CheckAlways, `markForCheck`, real `ApplicationRef.tick()` | `angular-adapter-change-detection` |
-| `@Input()` callback → `@Output()` EventEmitter conversion, the anchor double-fire bug, NG2007/NG8002 | `angular-adapter-events` |
-| `createPortal`/`createTunnel`, `AppRegistry` + dynamic component composition | `angular-adapter-portal` |
-| FlatList/SectionList/VirtualizedList/VirtualizedSectionList/ScrollView bugs | `angular-adapter-lists` |
+| Topic                                                                                                                            | Skill                              |
+| -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| AOT build pipeline (two-stage ngc→linker), package self-build via `prepare`+conditional `exports`, `dev`/`start` + `ngc --watch` | `angular-adapter-build`            |
+| Change detection — `whenCommitted`, SignalView vs CheckAlways, `markForCheck`, real `ApplicationRef.tick()`                      | `angular-adapter-change-detection` |
+| `@Input()` callback → `@Output()` EventEmitter conversion, the anchor double-fire bug, NG2007/NG8002                             | `angular-adapter-events`           |
+| `createPortal`/`createTunnel`, `AppRegistry` + dynamic component composition                                                     | `angular-adapter-portal`           |
+| FlatList/SectionList/VirtualizedList/VirtualizedSectionList/ScrollView bugs                                                      | `angular-adapter-lists`            |
 
 Read this skill first for the architecture; jump to the matching topic skill
 for implementation-level gotchas. Section numbers below (§0, §1, …) are
@@ -89,15 +89,21 @@ exception it documents.
 }
 ```
 
-  Note testID naming across the three canaries was NEVER a strict cross-adapter
-  invariant — don't chase full testID-string parity, only content/behavior
-  parity.
+Note testID naming across the three canaries was NEVER a strict cross-adapter
+invariant — don't chase full testID-string parity, only content/behavior
+parity.
+
 - **Both closed (2026-07)**: `packages/slider/src/angular/` ships a real Angular
   build (`@symbiote-native/slider/angular`, same `createNode`-by-ViewConfig wrapper
   React/Vue use — the wrapper mechanism itself lives in the `symbiote-third-party-native-view`
   skill); the docs site's live framework switcher
   (`apps/docs-site/src/pages/index.astro`) lists Angular as `live: true`
-  alongside React/Vue (`LIVE_SYMBIOTES = ['react', 'vue', 'angular']`). The
+  alongside React/Vue. That list has since grown to all five
+  (`LIVE_SYMBIOTES = ['react', 'vue', 'angular', 'svelte', 'solid']`), and unlike the
+  adapter lists in the audits it is CORRECTLY hardcoded: "shown live on the landing
+  page" is a product decision, so an adapter can exist without being listed and the
+  set must not be read off `adapters/`. Read the value at the source rather than
+  from this quote — a copied literal is exactly what went stale here. The
   ONLY remaining Angular-specific gap is third-party **React component**
   packages (`@react-native-community/slider` itself) — React-dispatcher-only
   per `<third_party_rn_packages_are_react_only>`, not fixable by a wrapper.
@@ -277,12 +283,15 @@ pressable/index.ts`): bundle every such prop into ONE plain object and bind it t
 (`adapters/angular/src/primitives/shared.ts`, `exportAs: 'symbioteHost'`) — now also exported
 from the public barrel (`adapters/angular/src/index.ts`) so app/example code can use it
 directly, not just internal composed components:
+
 ```html
-<View [symbioteHostProps]="chip.hostProps" [style]="styles.chip">
+<View [symbioteHostProps]="chip.hostProps" [style]="styles.chip"></View>
 ```
+
 ```ts
 readonly hostProps = { testID: `resp-chip-${index}`, onResponderGrant, onResponderMove, ... };
 ```
+
 This was needed (and fixed) in `examples/angular/components/{ResponderDemo,ParityDemo,
 AccessibilityDemo}.ts` — every one of them binds a MIX of testID + responder/a11y/press
 callbacks onto a bare `View`/`Text`, all through one `hostProps` bag per element, never a
@@ -761,6 +770,7 @@ intercept it.
     ⟶ diagnose this class on device from the dlog seams; a green headless run does NOT mean sticky works
 }
 ```
+
 ## Prior art
 
 - **NativeScript-Angular** — nearest relative (Angular on native iOS/Android via a
