@@ -149,6 +149,16 @@
   padding-right: 16px;
   background-color: var(--paper);
 }
+/* The pressed look lives HERE, not in a functional `style` on the component. A
+   `style={({pressed}) => …}` forces Pressable to stay a framework component, because the TEMPLATE
+   would have to read the press state; an `:active` rule resolves it below the framework, in the
+   style registry, so the element lowers to `symbiote-pressable` and the press machine runs on the
+   engine node (`.claude/rules/host-primitive-tier.md`). `borderColor` stays inline because it is
+   the caller's own runtime prop — an object literal, which the lowering allow-list treats as
+   inert. */
+.action-button:active {
+  opacity: 0.6;
+}
 .action-button-text {
   color: var(--chalk-bright);
   font-size: 15px;

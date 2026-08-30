@@ -22,8 +22,17 @@ const count = ref(0);
 const doubled = computed(() => count.value * 2);
 const log = ref<string[]>([]);
 
+// `history` is a plain array, deliberately: reading `log.value` here would make every
+// `watchEffect` below TRACK the ref this function then WRITES, so each effect would re-trigger
+// itself until Vue reports "Maximum recursive updates exceeded". Writing a ref does not track it —
+// only reading does — so the history stays off the reactive graph and each effect fires on its own
+// source instead of on the log.
+const history: string[] = [];
+
 function pushLog(entry: string): void {
-  log.value = [...log.value, entry].slice(-8);
+  history.push(entry);
+  if (history.length > 8) history.shift();
+  log.value = [...history];
 }
 
 watch(count, (nv, ov) => pushLog(`watch: ${ov} → ${nv}`));

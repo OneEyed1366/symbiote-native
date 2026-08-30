@@ -17,7 +17,7 @@
   {testID}
   {onPress}
   class="action-button"
-  style={({ pressed }) => ({ borderColor: color, opacity: pressed ? 0.6 : 1 })}
+  style={{ borderColor: color }}
 >
   <Text class="action-button-text" style={{ color }}>{title}</Text>
 </Pressable>

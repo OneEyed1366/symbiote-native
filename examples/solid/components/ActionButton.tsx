@@ -20,12 +20,15 @@ export function ActionButton(props: IActionButtonProps) {
       testID={props.testID}
       onPress={() => props.onPress()}
       class="action-button"
-      // A prop BAG, so reading press state here is safe: it reaches the host through `spread`,
-      // a per-key diff on the same element (.claude/rules/solid-descriptor-bridge.md §4).
-      style={state => ({
-        borderColor: props.color,
-        opacity: state.pressed ? 0.6 : 1,
-      })}
+      // The press half moved to `.action-button:active` in App.css. A FUNCTIONAL style is the one
+      // thing that forces this element to stay a component — the template would have to read the
+      // press state — so dropping it is what makes the button eligible for the intrinsic tag, and
+      // 146 instantiation sites ride on this one definition.
+      //
+      // Still reactive without the function: Solid compiles a dynamic object attribute on a
+      // component into `get style() { return {borderColor: props.color}; }`, so `color` is re-read
+      // on change. Verified in the compiled output, not assumed.
+      style={{ borderColor: props.color }}
     >
       {() => (
         <Text class="action-button-text" style={{ color: props.color }}>

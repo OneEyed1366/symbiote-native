@@ -48,11 +48,19 @@ import {
   type ISection,
 } from '@symbiote-native/solid';
 import {
+  readCommitProfile,
   registerPostCommit,
   unregisterPostCommit,
 } from '@symbiote-native/engine';
+import {
+  readFabricCallProfile,
+  type IFabricCallProfile,
+} from '../fabric-call-counter';
 import { ActionButton } from '../components/ActionButton';
-import { JsFrameRateMeter } from '../components/JsFrameRateMeter';
+import {
+  commitProfileGate,
+  JsFrameRateMeter,
+} from '../components/JsFrameRateMeter';
 import { ROUTE_NAME } from '../routes';
 import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 import './BenchmarkScreen.css';
@@ -229,6 +237,54 @@ interface IBenchResult {
   rowCount: number;
 }
 
+// What the ENGINE did inside one timed step, captured from readCommitProfile() around the step
+// rather than sampled on a timer. This is the number that separates "our commit is expensive" from
+// "the framework above it is expensive": every adapter builds the same 9,001-node tree for
+// Create 1,000, so a nodesVisited or propWrites that differs between adapters on the SAME step is
+// work the screen is generating, not a cost of the platform.
+//
+// `walkMs` is NOT the engine's JS cost — the window around reconcile() contains the createNode and
+// appendChild JSI crossings it makes. Read it only as a DELTA between adapters, where the native
+// part is a shared constant (measured: identical Fabric call counts across react/vue/solid/svelte).
+interface IStepProfile {
+  nodesVisited: number;
+  propWrites: number;
+  propNoops: number;
+  commits: number;
+  walkMs: number;
+}
+
+const EMPTY_STEP_PROFILE: IStepProfile = {
+  nodesVisited: 0,
+  propWrites: 0,
+  propNoops: 0,
+  commits: 0,
+  walkMs: 0,
+};
+
+const EMPTY_FABRIC_PROFILE: IFabricCallProfile = {
+  calls: {},
+  propKeys: {},
+  totalCalls: 0,
+  totalPropKeys: 0,
+};
+
+// The one quantity this canary and `examples/bare-rn` (stock React Native on React's own Fabric
+// renderer) can both report. IStepProfile above counts the ENGINE's reconcile walk, which stock
+// has no equivalent of; `global.nativeFabricUIManager` is what both stacks actually drive, so
+// counting calls there is the only like-for-like number between them.
+function formatFabric(profile: IFabricCallProfile | undefined): string {
+  if (profile === undefined) return '—';
+  const create = profile.calls.createNode ?? 0;
+  const append = profile.calls.appendChild ?? 0;
+  const clones =
+    (profile.calls.cloneNode ?? 0) +
+    (profile.calls.cloneNodeWithNewChildren ?? 0) +
+    (profile.calls.cloneNodeWithNewProps ?? 0) +
+    (profile.calls.cloneNodeWithNewChildrenAndProps ?? 0);
+  return `${create}/${append}/${clones}`;
+}
+
 // One row of the fixed-order suite. `startRows` is recorded rather than derived because it is the
 // number the whole suite exists to pin down — a duration is meaningless without it.
 interface ISuiteEntry {
@@ -236,6 +292,8 @@ interface ISuiteEntry {
   label: string;
   durationMs: number;
   startRows: number;
+  profile: IStepProfile;
+  fabric: IFabricCallProfile;
 }
 
 // The suite's fixed order, shared by the runner and the comparison table below, so a step can
@@ -501,6 +559,15 @@ export function BenchmarkScreen() {
     settle: (durationMs: number) => void;
   } | null = null;
   let seq = 0;
+  // Filled by the post-commit hook, read by `timed` right after its own `await runStep(mutate)`. A
+  // plain binding, deliberately NOT a signal: nothing renders it directly (the table below reads it
+  // through the suite results), and a signal write inside the post-commit hook would be one more
+  // commit hanging off the step it just measured. Steps are serialized and `timed` awaits the
+  // progress step BEFORE the measured one, so the value standing here when it reads is always the
+  // measured step's.
+  let lastStepProfile: IStepProfile = EMPTY_STEP_PROFILE;
+  let lastFabricProfile: IFabricCallProfile = EMPTY_FABRIC_PROFILE;
+  const [isBatchingCreate, setIsBatchingCreate] = createSignal(false);
 
   const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.Benchmark];
   const accent = LINE_COLOR.performance;
@@ -517,15 +584,28 @@ export function BenchmarkScreen() {
         if (isSettled) return;
         isSettled = true;
         clearTimeout(timer);
+        // Release before resolving, so the meter is live again the moment the step is over even if
+        // a caller does more work synchronously off this promise.
+        commitProfileGate.isHeldByBenchmark = false;
         resolve(durationMs);
       };
       const timer = setTimeout(() => {
         // Drop the pending record too: leaving it would make the NEXT step's commit stop this
         // step's stopwatch and report a duration against the wrong operation.
         pending = null;
+        lastStepProfile = EMPTY_STEP_PROFILE;
+        lastFabricProfile = EMPTY_FABRIC_PROFILE;
         settle(SUITE_TIMED_OUT);
       }, SUITE_STEP_TIMEOUT_MS);
 
+      // Stop the meter and zero both sets of counters LAST, immediately before the mutation, so
+      // nothing between here and the commit lands in the step's profile. No install retry for the
+      // Fabric counter: its wrapper has to be in place while the engine binds the slot, which
+      // index.js already did and nothing can redo — an all-zero FABRIC CALLS table means that
+      // install did not land.
+      commitProfileGate.isHeldByBenchmark = true;
+      readCommitProfile();
+      readFabricCallProfile();
       pending = { startedAt: performance.now(), settle };
       mutate();
     });
@@ -563,7 +643,19 @@ export function BenchmarkScreen() {
       const current = pending;
       if (current === null) return;
       pending = null;
-      current.settle(performance.now() - current.startedAt);
+      const durationMs = performance.now() - current.startedAt;
+      // Safe to read here: commitContainer increments walkMs and commits BEFORE completeRoot, and
+      // runPostCommitHooks() fires after it, so the profile for this commit is already complete.
+      const profile = readCommitProfile();
+      lastStepProfile = {
+        nodesVisited: profile.nodesVisited,
+        propWrites: profile.propWrites,
+        propNoops: profile.propNoops,
+        commits: profile.commits,
+        walkMs: profile.walkMs,
+      };
+      lastFabricProfile = readFabricCallProfile();
+      current.settle(durationMs);
     };
     registerPostCommit(onCommitted);
     onCleanup(() => unregisterPostCommit(onCommitted));
@@ -722,7 +814,17 @@ export function BenchmarkScreen() {
     ): Promise<void> => {
       const label = suiteLabel(op);
       await showProgress(label);
-      entries.push({ op, label, durationMs: await runStep(mutate), startRows });
+      const durationMs = await runStep(mutate);
+      // Read AFTER the measured step, never after showProgress: the holder carries whichever step
+      // committed last, and the progress step commits first by construction.
+      entries.push({
+        op,
+        label,
+        durationMs,
+        startRows,
+        profile: lastStepProfile,
+        fabric: lastFabricProfile,
+      });
     };
 
     // One commit for the whole prologue: the mode this run measures, an emptied list, and the
@@ -784,6 +886,17 @@ export function BenchmarkScreen() {
 
     setSuiteResults(current => ({ ...current, [mode]: entries }));
     setProgress(undefined);
+  };
+
+  // The engine reads `__SYMBIOTE_BATCH_CREATE__` once per commit, not per node, so it has to be
+  // set BEFORE the mutation that starts a step — which a press between runs always is. Deliberately
+  // a global rather than a prop: nothing on the commit path should have to be threaded a flag.
+  const onToggleBatchCreate = (): void => {
+    setIsBatchingCreate(current => {
+      const next = !current;
+      Reflect.set(globalThis, '__SYMBIOTE_BATCH_CREATE__', next);
+      return next;
+    });
   };
 
   const onRunSuite = (mode: IMountMode): void => {
@@ -854,6 +967,21 @@ export function BenchmarkScreen() {
     () => allDurations().size > 0 || virtualizedDurations().size > 0,
   );
 
+  // All-mounted only: it is the cross-renderer column, and the virtualized one prices two
+  // different list implementations rather than two renderers.
+  const allProfiles = createMemo(
+    () =>
+      new Map(
+        suiteResults()[MOUNT_MODE.All].map(entry => [entry.op, entry.profile]),
+      ),
+  );
+  const allFabricProfiles = createMemo(
+    () =>
+      new Map(
+        suiteResults()[MOUNT_MODE.All].map(entry => [entry.op, entry.fabric]),
+      ),
+  );
+
   // History is newest-first, so the first entry found for an operation is its latest run.
   const lastDurations = createMemo(() => {
     const latest = new Map<IBenchOpId, number>();
@@ -919,6 +1047,24 @@ export function BenchmarkScreen() {
           </View>
         </View>
 
+        <View class="bench-run-row">
+          <View class="flex1">
+            <ActionButton
+              testID="bench-toggle-batch-create"
+              title={
+                isBatchingCreate()
+                  ? 'Batch create · on ✓'
+                  : 'Batch create · off'
+              }
+              onPress={onToggleBatchCreate}
+              color={accent}
+            />
+          </View>
+        </View>
+        <Text class="note-text">
+          {`Temporary experiment switch. On, the engine hands a parent's children to cloneNodeWithChildren in one call instead of appending them one at a time — about a third fewer JSI calls on Create, paid for with one extra ShadowNode per batched parent. The sign is not predicted, which is why it is a runtime toggle: two builds a day apart drifted 4% on Create and 6x on Clear with no code change, so the only trustworthy comparison is back-to-back on one binary. Flip it, re-run the suite, compare.`}
+        </Text>
+
         <Show when={progress()}>
           {(running: Accessor<ISuiteProgress>) => (
             <View testID="bench-suite-progress" class="bench-progress">
@@ -963,6 +1109,86 @@ export function BenchmarkScreen() {
                 </View>
               )}
             </For>
+          </View>
+        </Show>
+
+        <Show when={hasSuiteResults()}>
+          <View>
+            <Text class="section-label">ENGINE PER STEP · ALL MOUNTED</Text>
+            <View class="bench-compare-row">
+              <Text class="bench-compare-label" />
+              <Text class="bench-compare-head-cell">VISITED</Text>
+              <Text class="bench-compare-head-cell">WRITES/NOOP</Text>
+              <Text class="bench-compare-head-cell">COMMITS</Text>
+            </View>
+            <For each={SUITE_STEPS}>
+              {step => {
+                // One lookup per change feeding three cells, instead of three lookups that would
+                // each have to re-test for the missing-step case.
+                const cells = createMemo(() => {
+                  const profile = allProfiles().get(step.op);
+                  if (profile === undefined) {
+                    return { visited: '—', writes: '—', commits: '—' };
+                  }
+                  return {
+                    visited: String(profile.nodesVisited),
+                    writes: `${profile.propWrites}/${profile.propNoops}`,
+                    commits: `${profile.commits} · ${profile.walkMs.toFixed(DURATION_DECIMALS)}ms`,
+                  };
+                });
+                return (
+                  <View
+                    testID={`bench-engine-${step.op}`}
+                    class="bench-compare-row"
+                  >
+                    <Text class="bench-compare-label">{step.label}</Text>
+                    <Text class="bench-compare-cell">{cells().visited}</Text>
+                    <Text class="bench-compare-cell">{cells().writes}</Text>
+                    <Text class="bench-compare-cell">{cells().commits}</Text>
+                  </View>
+                );
+              }}
+            </For>
+            <Text class="note-text">
+              {`Captured around each timed step, with the frame meter held so its own read-and-reset cannot eat them. Every adapter builds the same ${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}-node tree for Create, so a VISITED or WRITES that differs between adapters is work this screen is generating — not a cost of the platform. COMMITS must read 1; anything higher means a foreign commit landed inside the window. The ms is the reconcile window and it CONTAINS the createNode/appendChild JSI calls, so compare it across adapters, never read it as engine JS.`}
+            </Text>
+          </View>
+        </Show>
+
+        <Show when={hasSuiteResults()}>
+          <View>
+            <Text class="section-label">FABRIC CALLS · ALL MOUNTED</Text>
+            <View class="bench-compare-row">
+              <Text class="bench-compare-label" />
+              <Text class="bench-compare-head-cell">CREATE/APPEND/CLONE</Text>
+              <Text class="bench-compare-head-cell">PROP KEYS</Text>
+            </View>
+            <For each={SUITE_STEPS}>
+              {step => {
+                // One lookup per change feeding both cells, matching the ENGINE table above.
+                const cells = createMemo(() => {
+                  const fabric = allFabricProfiles().get(step.op);
+                  return {
+                    calls: formatFabric(fabric),
+                    propKeys:
+                      fabric === undefined ? '—' : String(fabric.totalPropKeys),
+                  };
+                });
+                return (
+                  <View
+                    testID={`bench-fabric-${step.op}`}
+                    class="bench-compare-row"
+                  >
+                    <Text class="bench-compare-label">{step.label}</Text>
+                    <Text class="bench-compare-cell">{cells().calls}</Text>
+                    <Text class="bench-compare-cell">{cells().propKeys}</Text>
+                  </View>
+                );
+              }}
+            </For>
+            <Text class="note-text">
+              {`Counted by wrapping global.nativeFabricUIManager before the engine binds it — the one surface this canary and the stock-React-Native baseline (examples/bare-rn) genuinely share, and therefore the only like-for-like number between them. The ENGINE table above has no counterpart over there: stock has no reconcile walk to count. Read as two questions. CREATE/APPEND/CLONE answers "does one stack ask Fabric to do MORE"; PROP KEYS answers the other half, "or the same number of times with fatter payloads". The wrapper costs one JS call per crossing and is therefore in every timing on this screen — the comparison holds only because the other side carries the identical wrapper.`}
+            </Text>
           </View>
         </Show>
         <Text class="note-text">
