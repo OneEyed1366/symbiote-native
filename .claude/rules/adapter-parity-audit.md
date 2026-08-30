@@ -37,11 +37,16 @@ shared half, and this audit guards the adapter-owned half. Run both.
 
 ## The audit that does answer it
 
-Resolve each barrel through the compiler and diff the export sets. Roughly 30 lines, ~1 min for
-all five, and it follows re-exports, which is the whole point:
+Resolve each barrel through the compiler and diff the export sets. Roughly 30 lines, ~1 min for the
+whole set, and it follows re-exports, which is the whole point. **Take the adapter list off disk,
+never write it out** — `scripts/lib/adapter-names.mjs` exists because three hardcoded copies of it
+each silently omitted `solid`, the member added last, and an audit cannot report a name that is
+absent from the list it is auditing. That failure applies to an audit RECIPE exactly as it applies to
+a test, and this file handed out a hardcoded five for months:
 
 ```js
 import ts from 'typescript';
+import { adapterNames } from './scripts/lib/adapter-names.mjs';
 const opts = {
   target: ts.ScriptTarget.ESNext,
   module: ts.ModuleKind.ESNext,
@@ -51,7 +56,7 @@ const opts = {
   skipLibCheck: true,
   allowImportingTsExtensions: true,
 };
-for (const a of ['react', 'vue', 'svelte', 'angular', 'solid']) {
+for (const a of adapterNames()) {
   const entry = `adapters/${a}/src/index.ts`;
   const program = ts.createProgram([entry], opts);
   const checker = program.getTypeChecker();
@@ -124,9 +129,10 @@ framework subpath at all (`android`, `expo-modules-link`) are out of the contrac
 For a one-off look without running the suite:
 
 ```bash
+ADAPTERS=$(ls -d adapters/*/ | xargs -n1 basename | paste -sd'|' -)
 for p in packages/*/package.json; do
   node -p "require('./$p').name + ' | ' + Object.keys(require('./$p').exports||{})
-    .filter(k=>/react|vue|svelte|angular|solid/.test(k)).join(' ')"
+    .filter(k=>new RegExp('$ADAPTERS').test(k)).join(' ')"
 done
 ```
 
