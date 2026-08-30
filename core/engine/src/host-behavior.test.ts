@@ -15,7 +15,7 @@ import {
   registerHostBehavior,
   removeChild,
   type ISymbioteNode,
-} from '../index';
+} from './index';
 
 installFabric();
 let nextRootTag = 9000;
