@@ -27,6 +27,8 @@ import {
   insertBefore,
   removeChild as removeEngineChild,
   routeProp,
+  setNodePressed,
+  setProp as setEngineProp,
   setText as setEngineText,
   toPublicInstance,
   RAW_TEXT_COMPONENT,
@@ -112,6 +114,23 @@ function asText(value: unknown): string {
 // has to DETACH its anchor host from the portal target on cleanup. Going through here rather than
 // calling the engine's removeChild directly is what keeps the mutation paired with requestCommit(),
 // and keeps the surface-vs-node branch in one place.
+// The REFUSED path's half of `:active`, and the reason a refusal costs the component instance
+// rather than the pressed styling. A `<Pressable>` the lowering left as a component still owns its
+// own press machine, and one call here puts the node into its pressed state so `.btn:active`
+// applies exactly as it would on a lowered tag.
+//
+// Exported paired with requestCommit() for the same reason removeNode below is: the press arrives
+// from a NATIVE EVENT, outside any renderer mutation, so nothing else schedules a commit. React's
+// twin (`setNodeHidden` from hideInstance) needs none because its reconciler is already mid-commit
+// when it calls; Solid's is not. Costs nothing when no `:active` rule is registered — the engine
+// hands back the same style object and `isAlreadyPublished` turns the re-push away without dirtying
+// the node.
+export function setHostPressed(node: IHostNode, pressed: boolean): void {
+  if (isSurface(node)) return;
+  setNodePressed(node, pressed);
+  requestCommit();
+}
+
 export function removeNode(parent: IHostNode, node: IHostNode): void {
   if (isSurface(node)) return;
   if (isSurface(parent)) parent.removeChild(node);
@@ -119,10 +138,61 @@ export function removeNode(parent: IHostNode, node: IHostNode): void {
   requestCommit();
 }
 
+// RN's Text.js applies two defaults on the way to native (core/components/src/text-props.ts:
+// ellipsizeMode 'tail', allowFontScaling true unless literally false). The Solid <Text> wrapper
+// folds them with resolveTextProps; a template the Babel lowering rewrote to the intrinsic
+// `symbiote-text` has no wrapper, so the renderer seeds them instead. Without this a
+// numberOfLines={1} line clips mid-word with no ellipsis — device-observed, and silent.
+// Vue's twin: adapters/vue/src/renderer/index.ts.
+//
+// A FOLD per key, not a default VALUE, and the difference is not cosmetic: `resolveTextProps` is
+// the authority and it reads `ellipsizeMode ?? 'tail'` / `allowFontScaling !== false`, so a null
+// (or 0, or '') has to resolve to the default too. Substituting only on `undefined` — which this
+// did until 2026-08-23 — meant `<Text ellipsizeMode={null}>` committed null through a lowered tag
+// and 'tail' through a wrapper: a divergence lowering introduced, device-only and silent. The same
+// two folds are described as data in `@symbiote-native/components/host-primitives` for the
+// COMPILE-time transforms; collapsing all of them onto resolveTextProps is a separate step.
+type ITextFold = (value: unknown) => unknown;
+
+const TEXT_FOLDS: ReadonlyMap<string, ITextFold> = new Map<string, ITextFold>([
+  ['ellipsizeMode', value => value ?? 'tail'],
+  ['allowFontScaling', value => value !== false],
+]);
+
+function seedTextDefaults(node: ISymbioteNode): void {
+  for (const [key, fold] of TEXT_FOLDS)
+    setEngineProp(node, key, fold(undefined));
+}
+
+// Seeding at CREATE is not enough, and the gap is device-only. A framework that clears a prop it
+// set earlier hands us an explicit `undefined` at PATCH time, and the default has to come BACK
+// rather than stay cleared — RN treats a missing prop and an explicit undefined alike, and only a
+// literal `false` opts out of allowFontScaling. Two Map lookups on text nodes only, and none at
+// all on a View, so it stays off the hot path.
+function foldTextValue(
+  node: ISymbioteNode,
+  key: string,
+  value: unknown,
+): unknown {
+  if (!node.isText) return value;
+  const fold = TEXT_FOLDS.get(key);
+  return fold === undefined ? value : fold(value);
+}
+
 const nodeOps: RendererOptions<IHostNode> = {
   createElement(tag) {
     const descriptor = descriptorFor(tag);
-    const node = createEngineElement(descriptor.component, descriptor.isText);
+    // The TAG goes over as well, not just the resolved Fabric name. The host-behavior registry is
+    // keyed by intrinsic tag while a node only ever carries the resolved view name — `symbiote-
+    // pressable` resolves to `RCTView` — so without this the lookup asks for `RCTView` and finds
+    // nothing, and the press machine silently never attaches. Registering under the Fabric name
+    // instead would be worse: every plain `View` would get a press machine.
+    const node = createEngineElement(
+      descriptor.component,
+      descriptor.isText,
+      tag,
+    );
+    if (descriptor.isText) seedTextDefaults(node);
     // Graft the imperative public-instance API (measure / setNativeProps / focus / …) onto the raw
     // node so a `ref` to a host element exposes it exactly like React's getPublicInstance.
     // toPublicInstance mutates in place and returns the SAME node identity, so the engine's commit
@@ -165,7 +235,7 @@ const nodeOps: RendererOptions<IHostNode> = {
     // becomes a listener; onTintColor on a Switch stays a prop), and centralizes the class+style
     // merge. Shared with React and Vue — never re-implement an `onX` check here
     // (symbiote-engine-core §2).
-    routeProp(node, name, value);
+    routeProp(node, name, foldTextValue(node, name, value));
     requestCommit();
   },
 

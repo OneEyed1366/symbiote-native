@@ -15,6 +15,7 @@
 import { forbidWebOnlyConstructs } from './src/preprocessor/forbid-web-only-constructs.ts';
 import { scopedStyles } from './src/preprocessor/scoped-styles.ts';
 import { collapseTextWhitespace } from './src/preprocessor/collapse-text-whitespace.ts';
+import { lowerHostPrimitives } from './src/preprocessor/lower-host-primitives.ts';
 
 export default {
   compilerOptions: {
@@ -24,11 +25,17 @@ export default {
   // Order matters: the guard throws on a construct that cannot work at all, so it runs before
   // anything rewrites the source it would report offsets against. `scopedStyles` then compiles
   // the `<style>` block away — see its header for why Svelte's own CSS output is unusable here.
-  // `collapseTextWhitespace` runs last — it only touches Text node content, never the
-  // style/attribute/class output the other two rewrite, so its position doesn't affect them.
+  // `collapseTextWhitespace` only touches Text node content, never the style/attribute/class
+  // output the other two rewrite, so its position doesn't affect them.
+  //
+  // `lowerHostPrimitives` MUST run LAST, and specifically AFTER `scopedStyles`. It copies each
+  // attribute's value into an object-bag expression, so once it has run there is no plain `class`
+  // attribute left for the style scoper to find — reverse the order and every scoped class in the
+  // file silently stops being scoped.
   preprocess: [
     forbidWebOnlyConstructs(),
     scopedStyles(),
     collapseTextWhitespace(),
+    lowerHostPrimitives(),
   ],
 };

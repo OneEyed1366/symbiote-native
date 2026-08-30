@@ -35,7 +35,11 @@ const upstreamTransformer = resolveUpstreamTransformer();
 // svelte-check, the language server, Vite), while this file is `require()`d by Metro directly
 // and must stay pure CommonJS with no build step of its own, exactly like
 // metro-vue-transformer.cjs.
-const COMPILER_OPTIONS = { fragments: 'tree', css: 'external', generate: 'client' };
+const COMPILER_OPTIONS = {
+  fragments: 'tree',
+  css: 'external',
+  generate: 'client',
+};
 
 // The web-only-construct guard (svelte-adapter-dom-shim skill §7/§22) RUNS HERE, on every
 // `.svelte` Metro compiles — not just via svelte-check/the language server. `{@html}` compiles
@@ -50,8 +54,8 @@ const COMPILER_OPTIONS = { fragments: 'tree', css: 'external', generate: 'client
 // `require()` cannot pull an ESM/TS module, but `transform` is already async.
 let preprocessorPromise;
 function webOnlyConstructGuard() {
-  preprocessorPromise ??= import('@symbiote-native/svelte/preprocessor').then(mod =>
-    mod.forbidWebOnlyConstructs(),
+  preprocessorPromise ??= import('@symbiote-native/svelte/preprocessor').then(
+    mod => mod.forbidWebOnlyConstructs(),
   );
   return preprocessorPromise;
 }
@@ -63,8 +67,8 @@ function webOnlyConstructGuard() {
 // src/preprocessor/scoped-styles.ts for why Svelte's own `result.css` cannot be used instead.
 let scopedStylesPromise;
 function scopedStylesPreprocessor() {
-  scopedStylesPromise ??= import('@symbiote-native/svelte/scoped-styles').then(mod =>
-    mod.scopedStyles(),
+  scopedStylesPromise ??= import('@symbiote-native/svelte/scoped-styles').then(
+    mod => mod.scopedStyles(),
   );
   return scopedStylesPromise;
 }
@@ -75,10 +79,23 @@ function scopedStylesPreprocessor() {
 // renders as a forced line break on device. Loaded lazily for the same reason as the two above.
 let collapseTextWhitespacePromise;
 function collapseTextWhitespacePreprocessor() {
-  collapseTextWhitespacePromise ??= import('@symbiote-native/svelte/collapse-text-whitespace').then(
-    mod => mod.collapseTextWhitespace(),
-  );
+  collapseTextWhitespacePromise ??=
+    import('@symbiote-native/svelte/collapse-text-whitespace').then(mod =>
+      mod.collapseTextWhitespace(),
+    );
   return collapseTextWhitespacePromise;
+}
+
+// Lowers <View>/<Text> to their intrinsic tags so a primitive stops costing a Svelte component
+// boundary — which in Svelte is paid in ANCHOR NODES, 12 per benchmark row (see the file header).
+// Loaded lazily for the same reason as the three above.
+let lowerHostPrimitivesPromise;
+function lowerHostPrimitivesPreprocessor() {
+  lowerHostPrimitivesPromise ??=
+    import('@symbiote-native/svelte/lower-host-primitives').then(mod =>
+      mod.lowerHostPrimitives(),
+    );
+  return lowerHostPrimitivesPromise;
 }
 //
 // Svelte 5's compiler strips <script lang="ts"> types structurally, with no external type
@@ -108,13 +125,19 @@ function compileSvelteFile(src, filename) {
 function stripTypeScript(src, filename) {
   const { outputText } = ts.transpileModule(src, {
     fileName: filename,
-    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext },
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ESNext,
+    },
   });
   return outputText;
 }
 
 function compileSvelteModuleFile(src, filename) {
-  const { js } = compileModule(stripTypeScript(src, filename), { generate: 'client', filename });
+  const { js } = compileModule(stripTypeScript(src, filename), {
+    generate: 'client',
+    filename,
+  });
   return js.code;
 }
 
@@ -127,14 +150,22 @@ module.exports.transform = async function transform(params) {
   if (params.filename.endsWith('.svelte')) {
     // Throws with a message naming the RN alternative. Deliberately BEFORE compile(), so the
     // author sees the real diagnosis rather than a downstream symptom.
-    (await webOnlyConstructGuard()).markup({ content: params.src, filename: params.filename });
+    (await webOnlyConstructGuard()).markup({
+      content: params.src,
+      filename: params.filename,
+    });
     const stylePreprocessed = await (
       await scopedStylesPreprocessor()
     ).markup({ content: params.src, filename: params.filename });
     const preprocessed = await (
       await collapseTextWhitespacePreprocessor()
     ).markup({ content: stylePreprocessed.code, filename: params.filename });
-    const code = compileSvelteFile(preprocessed.code, params.filename);
+    // LAST, and after scopedStyles specifically — see svelte.config.js for why the order is
+    // load-bearing rather than stylistic.
+    const lowered = await (
+      await lowerHostPrimitivesPreprocessor()
+    ).markup({ content: preprocessed.code, filename: params.filename });
+    const code = compileSvelteFile(lowered.code, params.filename);
     // Re-label as .tsx so RN's transformer processes the module exactly like app source; Metro
     // tracks the real path separately. Matches metro-vue-transformer.cjs's identical trick.
     return upstreamTransformer.transform({
@@ -143,7 +174,10 @@ module.exports.transform = async function transform(params) {
       filename: params.filename + '.tsx',
     });
   }
-  if (params.filename.endsWith('.svelte.ts') || params.filename.endsWith('.svelte.js')) {
+  if (
+    params.filename.endsWith('.svelte.ts') ||
+    params.filename.endsWith('.svelte.js')
+  ) {
     const code = compileSvelteModuleFile(params.src, params.filename);
     return upstreamTransformer.transform({
       ...params,

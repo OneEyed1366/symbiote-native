@@ -23,6 +23,9 @@
 // `"jsxImportSource": "@symbiote-native/solid"` (see that file). The earlier
 // `declare module 'solid-js'` shim is gone with it — one mechanism, not two.
 
+// Bare, side-effect only, and deliberately NOT `export * from './register'` — see that file.
+import './register';
+
 export { mount, unmount } from './render';
 export { findNodeHandle } from './host-instance';
 export type { IHostInstance } from './host-instance';

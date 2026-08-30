@@ -10,6 +10,11 @@
 // markup mirroring its render-*.ts, reusing only the pure state/render logic. See skill §17/§18
 // for the one open async-exception repro and the honest cross-cutting gap list.
 
+// Bare side-effect import, deliberately NOT a re-export and deliberately not beside one of the
+// same specifier: it registers the press behavior with the engine's host-behavior registry. Any
+// other shape is dropped by Metro's inlineRequires in a release build — see register.ts.
+import './register';
+
 export { mount, unmount } from './render';
 export { AppRegistry, setHostRegistrar } from './modules/app-registry';
 export type {
