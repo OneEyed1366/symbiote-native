@@ -188,6 +188,27 @@ correctly; a `refuse` row would have made it drop them for a hazard it does not 
 that a different emit dissolves is not a shared verdict — it is one transform's bug asking to be
 ratified.**
 
+## Check Solid last and separately — it falls out of "across all adapters" changes
+
+Not a property of the adapter, a property of how it was added: Solid arrived after the other four,
+so every list written before it exists still omits it, and every list written since is one someone
+had to remember. Three instances inside two weeks, all found by a peer rather than by a test:
+
+```
+scripts/overlay-local-packages.mjs   OVERLAY_ONLY covers the CI four; solid is not in it
+packages/*/package.json exports      12 of 25 declared ./react ./vue ./svelte ./angular, no ./solid
+adapters/*/…node-census.probe.*      three tracked and fixed, solid's untracked and unfixed
+```
+
+None of the three was a decision. Each was a default that looked like one, and in all three the
+symptom was silence rather than failure — an un-overlaid example measured on a stale build, an
+import that throws only in a consuming app, a probe that missed a repo-wide fix.
+
+So on any change phrased "across all adapters", enumerate the five explicitly and verify Solid on
+its own at the end. The general form is worth stating too, because the next adapter will inherit it:
+**the most recently added member of a set is the one every older list omits**, and no audit in this
+file detects a member that is simply absent from the list being audited.
+
 ## Phrase a parity oracle as a CAPABILITY, never as a shape
 
 `<adapter_src_follows_framework_idioms>` says an adapter is written in its own framework's idiom.

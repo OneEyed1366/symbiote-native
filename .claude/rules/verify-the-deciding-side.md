@@ -161,6 +161,33 @@ a wrong transform fails and a right one passes.
 What survived as a genuine contract is one line: the callback must be pure in `pressed`, because its
 result is invoked twice under any emission.
 
+## A survey whose pattern cannot match every candidate reports UNANIMITY, not a miss
+
+The probe-shaped instance again, one layer lower: not "aimed at the wrong file" but "aimed at all
+the right files with a pattern that silently skipped most of them". Measured 2026-08-30, surveying
+where four census probes write their output:
+
+```
+grep -hoE "writeFileSync\([^,]+" adapters/*/src/node-census.probe.test.* | sort -u
+writeFileSync(outPath        <- ONE line, from ONE of the four files
+```
+
+`[^,]+` cannot cross a newline, so the three probes whose call is wrapped
+(`writeFileSync(\n  'census-solid.txt',`) matched NOTHING and vanished from the survey. `sort -u`
+then collapsed what was left into a single line, which reads as "all four do the same thing". On
+that basis a claim went out that all four wrote into the repo root. Two did, one wrote inside its
+own package via `join(__dirname, …)` and was correct all along — and it was sitting in the same
+directory as the broken ones.
+
+**A survey must account for every candidate, not just report what it found.** Count the inputs and
+count the matches; when `4 files -> 1 line` the interesting question is which three produced nothing,
+and the answer is never "they agree". Cheapest habit: `grep -c` per file first, so a zero is visible
+as a zero rather than as consensus.
+
+The disconfirming evidence was IN the output and went unread: the surviving line said `outPath`, a
+variable — so the one file the survey did see was already parameterised, which is precisely not the
+literal path being asserted about the other three.
+
 ## Cite it so the next reader can re-verify
 
 The same day produced three citation defects with the same root — a reference that cannot be
