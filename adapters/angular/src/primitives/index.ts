@@ -32,7 +32,7 @@ export class ViewHost extends SymbiotePrimitiveHost {}
 
 /**
  * Text carries the two defaults RN's Text.js applies unconditionally (`ellipsizeMode ?? 'tail'`,
- * `allowFontScaling !== false`, Text.js:288-291). Without them native falls back to `clip` and a
+ * `allowFontScaling !== false`, Text.js:289 and :291). Without them native falls back to `clip` and a
  * clamped Text cuts mid-word with no ellipsis — device-observed on the other adapters 2026-08-19.
  *
  * They are declared as real `@Input()`s, unlike the pass-through props the base's comment

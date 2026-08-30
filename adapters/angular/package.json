@@ -32,7 +32,8 @@
     "./metro-config": "./metro-config.cjs",
     "./babel-linker": "./babel-linker.cjs",
     "./babel-register-composed": "./babel-register-composed.cjs",
-    "./tsconfig.angular.base.json": "./tsconfig.angular.base.json"
+    "./tsconfig.angular.base.json": "./tsconfig.angular.base.json",
+    "./state-style": "./src/state-style.ts"
   },
   "files": [
     "src",

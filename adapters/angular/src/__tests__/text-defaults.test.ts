@@ -1,4 +1,4 @@
-// RN's Text.js applies two defaults unconditionally (Text.js:288-291):
+// RN's Text.js applies two defaults unconditionally (Text.js:289 and :291):
 //
 //   processedProps.allowFontScaling = allowFontScaling !== false;
 //   processedProps.ellipsizeMode = ellipsizeMode ?? 'tail';

@@ -119,8 +119,8 @@ export class SymbioteRenderer implements Renderer2 {
     // name for a native leaf. Public aliases are normalized to their engine primitive name
     // before descriptor lookup. descriptorFor resolves it; an unknown `symbiote-*` is a typo,
     // any other string flows through as a raw Fabric name (events/processors derived from its
-    // ViewConfig). toPublicInstance grafts the imperative API (measure / setNativeProps /
-    // focus) onto the raw node in place, returning the SAME identity the commit mirror keys on.
+    // ViewConfig). The imperative API (measure / setNativeProps / focus) is on the node's
+    // prototype, so toPublicInstance hands back the SAME identity the commit mirror keys on.
     countAngular('nodesCreated');
     noteAngularCreate(name);
     const engineName = PRIMITIVE_SELECTOR_ALIAS[name] ?? name;

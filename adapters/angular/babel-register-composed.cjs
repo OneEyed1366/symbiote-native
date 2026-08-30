@@ -11,6 +11,8 @@
 // sync by the drift-protection test in babel-register-composed.test.ts.
 const PRIMITIVE_SELECTORS = new Set([
   'symbiote-view',
+  // Same RCTView as a plain view; the tag exists so the host-behavior registry can key on it.
+  'symbiote-pressable',
   'symbiote-text',
   'symbiote-image',
   'symbiote-scroll-view',
@@ -95,7 +97,8 @@ module.exports = function registerComposedPlugin({ types: t }) {
         programPath.traverse({
           CallExpression(path) {
             if (isNgDeclareComponentCall(path.node)) {
-              for (const selector of composedSelectorsFromCall(path.node)) selectors.add(selector);
+              for (const selector of composedSelectorsFromCall(path.node))
+                selectors.add(selector);
             }
           },
         });
@@ -103,14 +106,21 @@ module.exports = function registerComposedPlugin({ types: t }) {
 
         const statements = [...selectors].map(selector =>
           t.expressionStatement(
-            t.callExpression(t.identifier(HELPER_NAME), [t.stringLiteral(selector)]),
+            t.callExpression(t.identifier(HELPER_NAME), [
+              t.stringLiteral(selector),
+            ]),
           ),
         );
 
         if (!hasComposedImport(programPath.node)) {
           statements.unshift(
             t.importDeclaration(
-              [t.importSpecifier(t.identifier(HELPER_NAME), t.identifier(HELPER_NAME))],
+              [
+                t.importSpecifier(
+                  t.identifier(HELPER_NAME),
+                  t.identifier(HELPER_NAME),
+                ),
+              ],
               t.stringLiteral(IMPORT_SOURCE),
             ),
           );

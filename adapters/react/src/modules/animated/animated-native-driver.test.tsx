@@ -119,7 +119,7 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Animated native driver', () => {
-  it('mirrors the value graph into native and syncs the JS value on completion', () => {
+  it('mirrors the value graph into native and syncs the JS value on completion', async () => {
     // A diamond: one value feeds both opacity and a transform, so `style` has two animated parents
     // (opacity-interp and the transform node). This is the shape that crashed on device. It forces
     // the create-vs-connect ordering the fix guarantees.
@@ -183,6 +183,8 @@ describe('Animated native driver', () => {
     notifyComplete?.({ finished: true, value: 1 });
 
     expect(finished).toBe(true);
+    // The JS sync-back rides the coalesced setNativeProps flush (core/engine/src/commit.ts).
+    await Promise.resolve();
     expect(appView().props.opacity).toBe(1);
   });
 });
