@@ -69,6 +69,9 @@ catalogs:
     '@types/stylus':
       specifier: ^0.48.43
       version: 0.48.43
+    '@vue/babel-plugin-jsx':
+      specifier: ^1.5.0
+      version: 1.5.0
     '@vue/compiler-core':
       specifier: ^3.5.13
       version: 3.5.39
@@ -398,6 +401,9 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
     devDependencies:
+      '@babel/core':
+        specifier: 'catalog:'
+        version: 7.29.7
       '@symbiote-native/engine':
         specifier: workspace:*
         version: link:../../core/engine
@@ -453,6 +459,9 @@ importers:
       '@symbiote-native/css-parser':
         specifier: workspace:*
         version: link:../../core/css-parser
+      '@vue/babel-plugin-jsx':
+        specifier: 'catalog:'
+        version: 1.5.0(@babel/core@7.29.7)
       '@vue/compiler-core':
         specifier: 'catalog:'
         version: 3.5.39
@@ -472,6 +481,9 @@ importers:
         specifier: '>=3.5.0'
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
+      '@babel/core':
+        specifier: 'catalog:'
+        version: 7.29.7
       '@symbiote-native/engine':
         specifier: workspace:*
         version: link:../../core/engine
@@ -4396,6 +4408,22 @@ packages:
 
   '@vscode/sudo-prompt@9.3.2':
     resolution: {integrity: sha512-gcXoCN00METUNFeQOFJ+C9xUI0DKB+0EGMVg7wbVYRHBw2Eq3fKisDZOkRdOz3kqXRKOENMfShPOmypw1/8nOw==}
+
+  '@vue/babel-helper-vue-transform-on@1.5.0':
+    resolution: {integrity: sha512-0dAYkerNhhHutHZ34JtTl2czVQHUNWv6xEbkdF5W+Yrv5pCWsqjeORdOgbtW2I9gWlt+wBmVn+ttqN9ZxR5tzA==}
+
+  '@vue/babel-plugin-jsx@1.5.0':
+    resolution: {integrity: sha512-mneBhw1oOqCd2247O0Yw/mRwC9jIGACAJUlawkmMBiNmL4dGA2eMzuNZVNqOUfYTa6vqmND4CtOPzmEEEqLKFw==}
+    peerDependencies:
+      '@babel/core': ^7.0.0-0
+    peerDependenciesMeta:
+      '@babel/core':
+        optional: true
+
+  '@vue/babel-plugin-resolve-type@1.5.0':
+    resolution: {integrity: sha512-Wm/60o+53JwJODm4Knz47dxJnLDJ9FnKnGZJbUUf8nQRAtt6P+undLUAVU3Ha33LxOJe6IPoifRQ6F/0RrU31w==}
+    peerDependencies:
+      '@babel/core': ^7.0.0-0
 
   '@vue/compiler-core@3.5.39':
     resolution: {integrity: sha512-16KBTEXAJCpDr0mwlw+AZyhu8iyC7R3S2vBwsI7QnWJU6X3WKc9VKeNEZpiMdZ569qWhz9574L3vV55qRL0Vtw==}
@@ -11089,6 +11117,35 @@ snapshots:
 
   '@vscode/sudo-prompt@9.3.2':
     optional: true
+
+  '@vue/babel-helper-vue-transform-on@1.5.0': {}
+
+  '@vue/babel-plugin-jsx@1.5.0(@babel/core@7.29.7)':
+    dependencies:
+      '@babel/helper-module-imports': 7.29.7
+      '@babel/helper-plugin-utils': 7.29.7
+      '@babel/plugin-syntax-jsx': 7.29.7(@babel/core@7.29.7)
+      '@babel/template': 7.29.7
+      '@babel/traverse': 7.29.7
+      '@babel/types': 7.29.7
+      '@vue/babel-helper-vue-transform-on': 1.5.0
+      '@vue/babel-plugin-resolve-type': 1.5.0(@babel/core@7.29.7)
+      '@vue/shared': 3.5.39
+    optionalDependencies:
+      '@babel/core': 7.29.7
+    transitivePeerDependencies:
+      - supports-color
+
+  '@vue/babel-plugin-resolve-type@1.5.0(@babel/core@7.29.7)':
+    dependencies:
+      '@babel/code-frame': 7.29.7
+      '@babel/core': 7.29.7
+      '@babel/helper-module-imports': 7.29.7
+      '@babel/helper-plugin-utils': 7.29.7
+      '@babel/parser': 7.29.7
+      '@vue/compiler-sfc': 3.5.39
+    transitivePeerDependencies:
+      - supports-color
 
   '@vue/compiler-core@3.5.39':
     dependencies:
