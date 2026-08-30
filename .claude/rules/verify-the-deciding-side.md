@@ -188,6 +188,28 @@ The disconfirming evidence was IN the output and went unread: the surviving line
 variable — so the one file the survey did see was already parameterised, which is precisely not the
 literal path being asserted about the other three.
 
+**Re-running it now gives a different answer, and both are right — the output above is dated.** After
+the probes were fixed the same command returns TWO lines, and a peer reproducing it reported that as
+a correction. It is not one: the survey was run before the fix and reflects the tree it was run
+against. This is the `a verification is a TIMESTAMP` section applied to the survey itself, so the
+command is recorded with the date and state it was run against, not as a reproducible constant.
+
+**And today's two-line output carries a fresh instance of the same class.** One surviving line reads
+`writeFileSync('census-react.txt'` — which is not code. It is a fragment of the COMMENT that explains
+why the literal path was wrong. So the survey now reports a literal write that no longer executes
+anywhere, because `grep` cannot tell an example from an instruction. A survey over source text must
+either exclude comments or resolve every hit to a line that runs.
+
+Per-file counts as of 2026-08-30, post-fix — no zero anywhere, which is what makes the collapsed
+`sort -u` view the misleading one rather than the counts:
+
+```
+3  adapters/react/src/node-census.probe.test.tsx     (2 code + 1 in a comment)
+2  adapters/solid/src/node-census.probe.test.tsx
+3  adapters/svelte/src/node-census.probe.test.ts
+2  adapters/vue/src/node-census.probe.test.ts
+```
+
 ## Cite it so the next reader can re-verify
 
 The same day produced three citation defects with the same root — a reference that cannot be
