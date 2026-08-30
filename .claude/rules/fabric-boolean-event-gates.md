@@ -29,5 +29,15 @@ Adapters that forward an event eagerly (Angular binds `(accessibilityTap)="emit(
 `Pressable`) get the flag on every instance — the engine cannot tell a subscriber from a forwarder.
 That is adapter debt, not a gate bug.
 
+**It has a standing red test, and it is not the one you would guess from the name.**
+`adapters/angular/src/__tests__/benchmark-row-shape.test.ts` asserts the flat and composed row
+shapes commit identically, and it fails on exactly four keys — `onAccessibilityAction`,
+`onAccessibilityTap`, `onMagicTap`, `onAccessibilityEscape` — present on composed and absent on
+flat, because only the composed `Pressable` template binds them. Nothing about row SHAPE is wrong,
+so the failure reads as a benchmark or lowering regression and is neither. Confirmed 2026-08-30
+against a batch that touched Angular: the test file was last edited 2026-08-20 (`781193de`) and
+that day's Angular diff was three lines mentioning none of the four. Before blaming a fresh commit
+for it, diff the commit for those prop names — the answer is usually zero.
+
 Full context, including why our payload is legitimately half stock's size: the
 `symbiote-engine-core` skill, §10.
