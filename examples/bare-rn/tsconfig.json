@@ -1,0 +1,10 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    // The shared RN config declares `types: ["jest"]`; this app ships no tests and therefore no
+    // jest types, and an unresolvable entry in `types` is a hard TS2688, not a warning.
+    "types": []
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["**/node_modules", "**/Pods"]
+}
