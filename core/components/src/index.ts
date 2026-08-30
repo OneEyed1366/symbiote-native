@@ -434,3 +434,7 @@ export type {
   ISectionEntry,
   IVirtualizedSectionListHandle,
 } from './state/section-list';
+export {
+  registerPressableBehavior,
+  PRESSABLE_TAG,
+} from './behaviors/pressable';

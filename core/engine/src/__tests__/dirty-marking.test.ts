@@ -177,8 +177,10 @@ describe('every mutation entry point marks its subtree dirty', () => {
     expect(committedNest().children[0].props.testID).not.toBe('inserted');
   });
 
-  it('setNativeProps reaches Fabric', () => {
+  it('setNativeProps reaches Fabric', async () => {
     setNativeProps(nest, { opacity: 0.75 });
+    // Coalesced: the write queues and publishes at the microtask boundary (commit.ts).
+    await Promise.resolve();
     expect(committedNest().props.opacity).toBe(0.75);
   });
 
@@ -349,5 +351,99 @@ describe('setText is a no-op when the text did not change', () => {
     const profile = readCommitProfile();
     expect(profile.propWrites).toBe(1);
     expect(profile.propNoops).toBe(1);
+  });
+});
+
+// The props fast lane (`propsDirty` in ../node.ts, the branch in ../commit.ts's reconcile). Same
+// shape of problem as the subtree skip above and the same reason it needs its own assertions:
+// reusing the mirror's payload by reference and rebuilding a byte-identical one emit IDENTICAL
+// Fabric calls, so nothing in the committed output can tell a working fast lane from one that was
+// reverted by accident. Only the counters can.
+//
+// What it locks in: on the clone-bubble path from a changed leaf to the root, every ancestor
+// re-clones (a persistent parent points at specific child handles) but NONE of them rebuilds its
+// own Fabric props - the mutation API already recorded that nobody wrote a prop there.
+describe('the clone-bubble reuses each ancestor payload instead of rebuilding it', () => {
+  const CHAIN_DEPTH = 4;
+  const chain: ISymbioteNode[] = [];
+
+  beforeAll(() => {
+    let parent: ISymbioteNode | undefined;
+    for (let depth = 0; depth < CHAIN_DEPTH; depth += 1) {
+      const node = createElement('RCTView');
+      setProp(node, 'testID', `bubble-${depth}`);
+      if (parent !== undefined) appendChild(parent, node);
+      chain.push(node);
+      parent = node;
+    }
+    surface.appendChild(chain[0]);
+    surface.commit();
+  });
+
+  function commitAndReadProps(): { built: number; reused: number } {
+    readCommitProfile();
+    surface.commit();
+    const profile = readCommitProfile();
+    return { built: profile.propsBuilt, reused: profile.propsReused };
+  }
+
+  it('rebuilds exactly the node that was written, and reuses every ancestor', () => {
+    setProp(chain[CHAIN_DEPTH - 1], 'opacity', 0.5);
+    const { built, reused } = commitAndReadProps();
+    // One rebuild: the leaf. The reuses are the synthetic AppContainer plus the three ancestors
+    // between it and the leaf. Every other top-level branch early-exits and reaches neither
+    // counter. A leaf change is therefore ONE payload build no matter how deep the tree is - that
+    // is the whole claim.
+    expect(built).toBe(1);
+    expect(reused).toBe(1 + (CHAIN_DEPTH - 1));
+  });
+
+  it('still delivers the written value to Fabric', () => {
+    expect(
+      findByTestID(fabric.appRoot(), `bubble-${CHAIN_DEPTH - 1}`)!.props
+        .opacity,
+    ).toBe(0.5);
+  });
+
+  it('builds nothing at all when a commit writes no props', () => {
+    const { built, reused } = commitAndReadProps();
+    expect(built).toBe(0);
+    // The container alone: it is dirtied at every commit entry by design (its parent chain can
+    // never reach it), and before the fast lane existed it rebuilt and deep-compared its payload
+    // on every single commit, including no-op ones.
+    expect(reused).toBe(1);
+  });
+
+  it('rebuilds a node whose props changed via setNativeProps, not just via setProp', async () => {
+    // setNativeProps writes node.props directly and owes markPropsDirty rather than markDirty:
+    // with only the subtree mark it would take the reuse lane and the Animated frame would be
+    // silently dropped. The commit is queued, so the counters are read after the flush.
+    readCommitProfile();
+    setNativeProps(chain[CHAIN_DEPTH - 1], { opacity: 0.9 });
+    await Promise.resolve();
+    expect(readCommitProfile().propsBuilt).toBe(1);
+    expect(
+      findByTestID(fabric.appRoot(), `bubble-${CHAIN_DEPTH - 1}`)!.props
+        .opacity,
+    ).toBe(0.9);
+  });
+
+  it('rebuilds a node whose text changed', () => {
+    const label = createElement('RCTText', true);
+    setProp(label, 'testID', 'bubble-label');
+    const rawText = createElement('RCTRawText');
+    setText(rawText, 'before');
+    appendChild(label, rawText);
+    appendChild(chain[CHAIN_DEPTH - 1], label);
+    surface.commit();
+
+    readCommitProfile();
+    setText(rawText, 'after');
+    surface.commit();
+    // The raw text rebuilds; the label above it and the whole chain to the root reuse.
+    expect(readCommitProfile().propsBuilt).toBe(1);
+    expect(
+      findByTestID(fabric.appRoot(), 'bubble-label')!.children[0].props.text,
+    ).toBe('after');
   });
 });

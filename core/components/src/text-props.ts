@@ -1,6 +1,7 @@
 // The defaults RN's Text.js applies before handing props to native, folded once for every adapter.
 //
-// RN does this unconditionally on the outer (non-virtual) path, Text.js:288-291:
+// RN does this unconditionally on the outer (non-virtual) path, Text.js:289 and :291 (the two
+// lines between them, 288 and 290, are `accessible` and `disabled` — not part of this fold):
 //
 //   processedProps.allowFontScaling = allowFontScaling !== false;
 //   processedProps.ellipsizeMode = ellipsizeMode ?? 'tail';

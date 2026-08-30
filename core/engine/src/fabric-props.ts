@@ -7,7 +7,6 @@
 
 import type { IFabricProps } from './fabric';
 import { RAW_TEXT_COMPONENT, type ISymbioteNode } from './node';
-import { flattenStyle } from './style';
 import { registeredProcessor } from './registry';
 import { isProcessableColor, processColor } from './platform-color';
 import { processBoxShadow } from './process-box-shadow';
@@ -173,6 +172,93 @@ function processValue(component: string, key: string, value: unknown): unknown {
   return value;
 }
 
+// A style object is SHARED, and that is the one place this file has a complexity problem rather
+// than a constant-factor one. StyleSheet.create hands out one frozen object per rule, and the CSS
+// class registry resolves a class name to one cached object - so 1 000 rows carry the SAME handful
+// of style objects, and resolving each one per node costs O(nodes x styleKeys) to compute an
+// answer that only varies with O(distinct styles). Cache it on the style object's identity.
+//
+// Keyed by component as well: processValue consults that component's ViewConfig processors, so one
+// style object can legitimately resolve differently under two view names.
+//
+// The cache assumes a style object is not MUTATED IN PLACE, which is already the engine's contract:
+// setProp compares with Object.is and skips a same-identity write, so an in-place style edit never
+// marks the node dirty and never reaches Fabric today either. What narrows slightly is the case
+// where some OTHER prop on the same node changed in the same commit - that used to pick the
+// mutation up as a side effect, and now does not.
+//
+// KEEPING undefined-valued keys is deliberate: the resolved object is a faithful picture of ONE
+// style entry, and addStyle below needs to see an explicit `undefined` to let a later entry clear
+// an earlier one. Dropping them here would silently turn `[{flex:1},{flex:undefined}]` into
+// `flex: 1`.
+const styleCache = new Map<string, WeakMap<object, Record<string, unknown>>>();
+
+function processedStyle(
+  component: string,
+  style: Record<string, unknown>,
+): Record<string, unknown> {
+  let perComponent = styleCache.get(component);
+  if (perComponent === undefined) {
+    perComponent = new WeakMap();
+    styleCache.set(component, perComponent);
+  }
+  const cached = perComponent.get(style);
+  if (cached !== undefined) return cached;
+  const resolved: Record<string, unknown> = {};
+  for (const key of Object.keys(style)) {
+    const value = style[key];
+    resolved[key] =
+      value === undefined ? undefined : processValue(component, key, value);
+  }
+  perComponent.set(style, resolved);
+  return resolved;
+}
+
+/**
+ * Hoist one style slot's keys into the payload being built, recursing on POSITION only - the same
+ * rule flattenStyle follows, and for the same reason: `transform: [{translateX: 5}]` is an
+ * array-VALUED prop, not a nested style.
+ *
+ * The point is that there is no intermediate object. Every style entry's resolution is memoized on
+ * its own identity and its keys are written straight into `out`, so a thousand rows sharing one
+ * class-resolved style resolve it ONCE and each node pays a copy loop.
+ *
+ * This is also the shape React Native itself uses. `ReactNativeAttributePayload.addNestedProperty`
+ * (.vendors/react/packages/react-native-renderer/src/ReactNativeAttributePayload.js:208) recurses
+ * over the style array writing into a single `updatePayload`; upstream's `flattenStyle` appears
+ * ONLY in `diffNestedProperty`, i.e. the update path where an array meets an object - never on
+ * create. Our previous version flattened first and hoisted second, which allocated one merged
+ * object per node per commit that nothing else ever read.
+ *
+ * It also fixed a dead cache. `processedStyle` used to be reachable only when `props.style` was a
+ * bare object, and it never is: `commitClassStyle` (node.ts) always writes the two-element
+ * `[classStyle, explicitStyle]` array, by design. So the memo existed, was correct, and never ran.
+ *
+ * Later entries win, because a later write overwrites the same key on `out`. An explicit
+ * `undefined` CLEARS the key instead, matching the flatten path it replaces. One narrow
+ * divergence, recorded rather than hidden: the `delete` also clears a same-named TOP-LEVEL prop
+ * hoisted before the style pass, which flattening did not. Style keys and native prop keys do not
+ * overlap in practice (one is Yoga/visual, the other is testID/accessibility/source), so this is
+ * theoretical - but it is a difference, and `fabric-props.test.ts` pins both halves.
+ */
+function addStyle(
+  out: Record<string, unknown>,
+  component: string,
+  style: unknown,
+): void {
+  if (Array.isArray(style)) {
+    for (const entry of style) addStyle(out, component, entry);
+    return;
+  }
+  if (!isRecord(style)) return;
+  const resolved = processedStyle(component, style);
+  for (const key of Object.keys(resolved)) {
+    const value = resolved[key];
+    if (value === undefined) delete out[key];
+    else out[key] = value;
+  }
+}
+
 // Translate the retained node's logical props into the flat payload Fabric's C++
 // props expect: `style` keys are hoisted to the top level, event handlers and
 // undefined values are dropped.
@@ -180,19 +266,30 @@ export function fabricProps(node: ISymbioteNode): IFabricProps {
   if (node.component === RAW_TEXT_COMPONENT) {
     return { text: node.props.text };
   }
+  // This runs once per node per commit - 9 000 times on one benchmark press - so the two loops
+  // below iterate with Object.keys rather than Object.entries: entries allocates a fresh
+  // two-element array PER KEY on top of the outer array, and the resulting garbage was 18% of the
+  // create path in a CPU profile.
+  //
+  // Do NOT "improve" this to `for...in`. It was tried and reverted 2026-08-23. On paper it is the
+  // strictly cheaper shape - Object.keys allocates one array per call, 10 007 of them on a
+  // 1 000-row create (counted), and for...in allocates none - and the headless V8 bench agreed,
+  // 12-13% off create/replace `min`. On DEVICE it lost: with the Fabric call counts and prop-key
+  // payload byte-identical either way (9000/5000/1009, 32001 keys), Release Create went 217.8 ->
+  // 243.2 ms while stock moved only inside its 4% noise floor. Hermes' for-in is not V8's enum
+  // cache. The general rule this bought: an allocation-count win measured on V8 is not a Hermes
+  // win, and only the on-device number decides (`perf-claims-need-numbers`).
   const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(node.props)) {
+  const props = node.props;
+  for (const key of Object.keys(props)) {
     if (key === 'style') continue;
+    const value = props[key];
     if (typeof value === 'function') continue;
     if (value === undefined) continue;
     out[key] = processValue(node.component, key, value);
   }
-  // Collapse style (object | array | nested arrays) into one flat payload before
-  // hoisting: `style={[base, override]}` is RN's idiom and Fabric wants it flat.
-  const style = flattenStyle(node.props.style);
-  for (const [key, value] of Object.entries(style)) {
-    if (value !== undefined)
-      out[key] = processValue(node.component, key, value);
-  }
+  // Hoist the style slot (object | array | nested arrays) into the SAME payload object - no
+  // intermediate flatten. See addStyle for the shape and for the two things this fixed.
+  addStyle(out, node.component, props.style);
   return out;
 }

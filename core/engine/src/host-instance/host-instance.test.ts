@@ -1,10 +1,9 @@
-// Unit test for toPublicInstance, the framework-agnostic graft every
-// adapter applies to its host nodes. Proves it attaches the six imperative methods onto the
-// retained node, returns the SAME node identity (it mutates in place, so the engine commit
-// mirror keyed on the raw node still resolves it), and is idempotent across repeated calls.
-// Each grafted method is driven end to end through the public instance to prove it reaches
-// the engine's commit layer with the node's CURRENT committed handle, and degrades to a
-// silent no-op (never throws) when the node isn't committed yet.
+// Unit test for the public instance every adapter hands back from a host ref. Proves the six
+// imperative methods are reachable on any retained node, that they sit on the shared PROTOTYPE
+// rather than being allocated per node, that toPublicInstance returns the SAME identity (the
+// engine commit mirror is keyed on it), and that repeated calls change nothing. Each method is
+// driven end to end to prove it reaches the engine's commit layer with the node's CURRENT
+// committed handle, and degrades to a silent no-op (never throws) when the node isn't committed.
 //
 // The fake Fabric slot from @symbiote-native/test-utils only implements the mutation/dispatch
 // half (createNode/dispatchCommand/...); measure/measureInWindow/measureLayout aren't part of
@@ -68,7 +67,7 @@ beforeEach(() => {
 });
 
 describe('toPublicInstance', () => {
-  it('grafts the six imperative methods onto the retained node', () => {
+  it('exposes the six imperative methods on every retained node', () => {
     const instance = toPublicInstance(createElement('RCTView'));
     for (const name of METHOD_NAMES) {
       expect(typeof methodOf(instance, name), `${name} is a function`).toBe(
@@ -77,17 +76,33 @@ describe('toPublicInstance', () => {
     }
   });
 
+  // why: this is the whole reason the methods moved off the node. A per-node graft allocated six
+  // closures and one object literal EVERY node -- 54 000 closures on a 1 000-row create, and GC
+  // was the largest bucket in the profile at 30% of the window. Reintroducing an Object.assign
+  // graft would pass every other test in this file; only own-property placement catches it.
+  it('keeps the methods on the shared prototype, not on the node', () => {
+    const first = toPublicInstance(createElement('RCTView'));
+    const second = toPublicInstance(createElement('RCTView'));
+    for (const name of METHOD_NAMES) {
+      expect(Object.hasOwn(first, name), `${name} is not an own property`).toBe(
+        false,
+      );
+      expect(methodOf(first, name), `${name} is shared`).toBe(
+        methodOf(second, name),
+      );
+    }
+  });
+
   // why: adapters key their own commit mirror (React's Fiber stateNode, Vue's host
-  // node) off this exact object identity -- grafting must mutate in place, never
-  // return a wrapper, or a caller's own ref would point at the wrong object.
-  it('returns the SAME node identity, mutated in place', () => {
+  // node) off this exact object identity -- it must never return a wrapper, or a
+  // caller's own ref would point at the wrong object.
+  it('returns the SAME node identity', () => {
     const node = createElement('RCTView');
     expect(toPublicInstance(node)).toBe(node);
   });
 
   // why: a component's render can call toPublicInstance repeatedly (every re-render
-  // re-touches the ref) -- it must not re-graft (which would silently replace a
-  // closure-captured method reference an adapter may have cached).
+  // re-touches the ref) -- a method reference an adapter cached must stay valid.
   it('is idempotent: a second call returns the same instance with the same methods', () => {
     const first = toPublicInstance(createElement('RCTView'));
     const measureBefore = methodOf(first, 'measure');
@@ -99,9 +114,12 @@ describe('toPublicInstance', () => {
   describe('setNativeProps', () => {
     // why: this is the escape hatch libraries (reanimated) use to bypass a full
     // re-render for a hot-path prop update -- it must reach the real committed view.
-    it('drives a prop change through to the committed view', () => {
+    it('drives a prop change through to the committed view', async () => {
       const instance = mountCommitted();
       instance.setNativeProps({ nativeID: 'grafted' });
+      // Coalesced with every other write made in this task; it lands at the microtask boundary,
+      // still well before the frame paints. This is the ref-facing half of that contract.
+      await Promise.resolve();
       expect(appView().props.nativeID).toBe('grafted');
     });
 

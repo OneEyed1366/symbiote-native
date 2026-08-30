@@ -12,6 +12,7 @@ export type { ISymbioteIntrinsic, IComponentDescriptor } from './shared';
 
 const IOS_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   'symbiote-view': 'RCTView',
+  'symbiote-pressable': 'RCTView',
   'symbiote-text': 'RCTText',
   'symbiote-image': 'RCTImageView',
   'symbiote-scroll-view': 'RCTScrollView',

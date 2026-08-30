@@ -270,8 +270,15 @@ const ARIA_KEYS: ReadonlyArray<keyof IAriaProps> = [
   'aria-valuetext',
 ];
 
+// An indexed loop rather than `.some(key => …)`: the callback captures `props`, so the closure is
+// allocated on every call, and this runs once per accessibility-bearing component instance — 8 000
+// of them on one benchmark create. The fifteen property reads it replaces the closure with are
+// cheaper than the allocation.
 function hasAnyAriaKey(props: IAriaProps): boolean {
-  return ARIA_KEYS.some(key => props[key] !== undefined);
+  for (let index = 0; index < ARIA_KEYS.length; index += 1) {
+    if (props[ARIA_KEYS[index]] !== undefined) return true;
+  }
+  return false;
 }
 
 // Fold the web-alias `aria-*` / `role` props into the canonical `accessibility*`

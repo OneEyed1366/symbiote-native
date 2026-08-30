@@ -19,10 +19,20 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./bootstrap": "./src/bootstrap/index.ts"
+    "./bootstrap": "./src/bootstrap/index.ts",
+    "./host-primitives": "./host-primitives.cjs",
+    "./specialize-state-style": "./specialize-state-style.cjs",
+    "./lowering-fixtures": "./lowering-fixtures.cjs",
+    "./state-style": "./src/state-style.ts"
   },
   "files": [
-    "build"
+    "build",
+    "host-primitives.cjs",
+    "host-primitives.d.cts",
+    "specialize-state-style.cjs",
+    "specialize-state-style.d.cts",
+    "lowering-fixtures.cjs",
+    "lowering-fixtures.d.cts"
   ],
   "publishConfig": {
     "access": "public",
@@ -37,6 +47,19 @@
       "./bootstrap": {
         "types": "./build/bootstrap/index.d.ts",
         "default": "./build/bootstrap/index.js"
+      },
+      "./host-primitives": {
+        "types": "./host-primitives.d.cts",
+        "default": "./host-primitives.cjs"
+      },
+      "./specialize-state-style": "./specialize-state-style.cjs",
+      "./lowering-fixtures": {
+        "types": "./lowering-fixtures.d.cts",
+        "default": "./lowering-fixtures.cjs"
+      },
+      "./state-style": {
+        "types": "./build/state-style.d.ts",
+        "default": "./build/state-style.js"
       }
     }
   },

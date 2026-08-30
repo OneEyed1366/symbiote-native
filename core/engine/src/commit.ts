@@ -2,8 +2,8 @@
 // node, you clone it with new props/children and atomically hand a fresh child
 // set to completeRoot.
 //
-// Incremental strategy: each retained node keeps a "mirror" of what Fabric
-// currently holds for it: its handle, the flat props last sent, the child
+// Incremental strategy: each retained node keeps, in its own `committed` field (node.ts), a
+// mirror of what Fabric currently holds for it: its handle, the flat props last sent, the child
 // identities last committed, and the resolved view name. On commit we walk the
 // retained tree and only clone the nodes that actually changed; an untouched
 // sibling subtree is reused by reference. That both skips work and preserves the
@@ -27,9 +27,13 @@ import {
   debugNodeId,
   isAnchor,
   isEmptyRawText,
+  committedOf,
   markDirty,
+  markPropsDirty,
+  markStructureDirty,
   takePropStats,
   VIRTUAL_TEXT_COMPONENT,
+  type IMirror,
   type ISymbioteNode,
 } from './node';
 import { dlog, isDebug } from './debug';
@@ -38,6 +42,7 @@ import { nextTag } from './tags';
 import { registerPostCommit, runPostCommitHooks } from './post-commit';
 import { fabricProps } from './fabric-props';
 import { isRecord } from './type-guards';
+import { sweepDetachedBehaviors } from './host-behavior';
 
 // Re-exported from ./platform-color so callers don't need to change their import path.
 export { processColor, setColorProcessor } from './platform-color';
@@ -46,6 +51,24 @@ export { processColor, setColorProcessor } from './platform-color';
 // engine is incremental (created=0 with clones after the first mount).
 const stats = { created: 0, cloneProps: 0, cloneChildren: 0, reused: 0 };
 
+// TEMPORARY, for one measurement. Batching the CREATE path is a trade — it removes N-1 JSI
+// crossings per parent and adds one discarded ShadowNode — and its sign is a native-side question.
+// Comparing two builds cannot answer it: the same benchmark screen on UNCHANGED stock code drifted
+// 4% on Create and 6x on Clear between two Release runs, which is larger than the effect. So the
+// two arms have to be compared against each other on ONE binary, in one session, and that needs a
+// runtime switch rather than a compile-time constant.
+//
+// Read once per commit into `batchCreate`, not per node: a global property lookup on the per-node
+// create path is exactly the kind of cost this experiment is trying to measure.
+// Delete both this and the screen toggle once the measurement lands.
+declare global {
+  var __SYMBIOTE_BATCH_CREATE__: boolean | undefined;
+}
+// One append vs one clone is a wash by call count and a pure loss by allocation, so a parent with a
+// single child never takes the batched route whatever the switch says.
+const CREATE_BATCH_MIN_CHILDREN = 2;
+let batchCreate = false;
+
 // Cumulative cost of the reconcile walk. Unlike `stats` (per-commit, zeroed at the top of every
 // commit), this ACCUMULATES: one scroll frame produces a burst of commits and the frame's real cost
 // is only visible as their sum. Read-and-zeroed via readCommitProfile().
@@ -53,7 +76,23 @@ const stats = { created: 0, cloneProps: 0, cloneChildren: 0, reused: 0 };
 // Deliberately NOT gated behind isDebug(): two performance.now() calls per commit are noise next to
 // the walk they measure, and the number is only meaningful from a RELEASE build - dev-mode JS
 // drowns the signal. The dlog below stays gated as usual.
-const profile = { commits: 0, walkMs: 0, nodesVisited: 0 };
+// `propsBuilt` / `propsReused` price the props half of the walk, and they exist because that half
+// is INVISIBLE in the output: reusing the mirror's payload by reference and rebuilding a
+// byte-identical one emit the same Fabric calls, so only a counter separates a working fast lane
+// from a silently reverted one. `propsBuilt` counts fabricProps() calls made by the update path
+// (a fresh object plus a recursive propsEqual); `propsReused` counts nodes that re-cloned for a
+// child's sake and carried the committed payload through untouched. On an ordinary update the
+// second should dominate - that ratio IS the clone-bubble.
+//
+// The create path is deliberately not counted in either: it has no committed payload to reuse, so
+// its fabricProps() calls are not a cost any flag could remove and would only dilute the ratio.
+const profile = {
+  commits: 0,
+  walkMs: 0,
+  nodesVisited: 0,
+  propsBuilt: 0,
+  propsReused: 0,
+};
 
 // What `renderableChildren` costs, accumulated over the same window as `profile`. Anchors are the
 // only reason that function is not free, and how many a tree carries is a property of the ADAPTER,
@@ -193,22 +232,10 @@ function jsonEqual(a: unknown, b: unknown): boolean {
   return keys.every(key => key in b && jsonEqual(a[key], b[key]));
 }
 
-// What Fabric currently holds for a node. The retained node carries the *desired*
-// state (props/children); the mirror carries the *committed* state we diff against.
-// `tag` is the reactTag we minted at first create, stable across clone-on-write
-// (the clone keeps the family). Kept so the native-driven Animated path can bind to
-// it directly. `rootTag` lets a targeted re-commit (setNativeProps) find the surface.
-interface IMirror {
-  handle: IFabricNode;
-  tag: number;
-  rootTag: IRootTag;
-  props: IFabricProps;
-  children: readonly ISymbioteNode[];
-  viewName: string;
-  parent: ISymbioteNode | undefined;
-}
-
-const mirror = new WeakMap<ISymbioteNode, IMirror>();
+// The committed-state record (IMirror) and its guarded accessor (committedOf) live on the node
+// itself, in node.ts - see the `committed` field there for why the side table was collapsed into a
+// field, and committedOf's doc comment for the node-identity check that replaced the WeakMap miss.
+// Everything below reads it exclusively through committedOf and writes it as `node.committed`.
 
 interface IReconciled {
   handle: IFabricNode;
@@ -276,9 +303,12 @@ function logScrollChildren(
   viewName: string,
   selfTag: number | string,
 ): void {
+  // The whole function is a dlog, and it is called on every reconciled node, so the cheap boolean
+  // goes first: with logging off this is one property read instead of two string scans per node.
+  if (!isDebug()) return;
   if (!viewName.includes('Scroll') || viewName.includes('Content')) return;
   const kids = node.children.map(child => {
-    const committed = mirror.get(child);
+    const committed = committedOf(child);
     return `${committed?.viewName ?? child.component}#${committed?.tag ?? 'NEW'}`;
   });
   const flag = kids.length === 1 ? 'OK' : 'MULTI!!';
@@ -292,13 +322,23 @@ function logScrollChildren(
 // showing the old value - no error, no crash, nothing to grep for. So under DEBUG pay back the full
 // price just saved and verify the skip was honest, naming the node loudly enough to find the
 // missing mark.
-function warnIfStale(node: ISymbioteNode, committed: IMirror): void {
+//
+// Two lanes reach it, and naming which one fired matters when reading a log: `subtree` is the whole
+// node skipped because nothing under it was marked, `props` is the node re-cloned for a child's
+// sake but its own payload reused because no prop write was recorded on it. They point at
+// different missing marks - markDirty vs markPropsDirty - so the line says which.
+function warnIfStale(
+  node: ISymbioteNode,
+  committed: IMirror,
+  lane: 'subtree' | 'props',
+): void {
   if (!isDebug()) return;
   const fresh = fabricProps(node);
   if (propsEqual(committed.props, fresh)) return;
   dlog(
-    `DIRTY-MISS ${committed.viewName}#${committed.tag} node=${debugNodeId(node)} skipped as clean ` +
-      `but props differ: committed=${JSON.stringify(committed.props)} desired=${JSON.stringify(fresh)}`,
+    `DIRTY-MISS(${lane}) ${committed.viewName}#${committed.tag} node=${debugNodeId(node)} ` +
+      `treated as clean but props differ: committed=${JSON.stringify(committed.props)} ` +
+      `desired=${JSON.stringify(fresh)}`,
   );
 }
 
@@ -312,7 +352,7 @@ function reconcile(
 ): IReconciled {
   profile.nodesVisited += 1;
   const viewName = viewNameFor(node, hasTextAncestor);
-  const committed = mirror.get(node);
+  const committed = committedOf(node);
 
   // Nothing under here changed: hand back the committed handle without rebuilding this node's
   // Fabric props or descending into it at all. The walk below costs ~13 us/node on device, and an
@@ -327,12 +367,19 @@ function reconcile(
     committed.viewName === viewName
   ) {
     stats.reused += 1;
-    warnIfStale(node, committed);
+    warnIfStale(node, committed, 'subtree');
     return { handle: committed.handle, changed: false };
   }
   node.dirty = false;
+  // Read before clearing. The create path below ignores it - a node Fabric has never seen needs its
+  // whole payload built regardless - so this only ever gates the update path.
+  const ownPropsChanged = node.propsDirty;
+  node.propsDirty = false;
+  // Cleared here because this call is what re-snapshots `committed.children` below, on both the
+  // create and the update path. Anything that reads that snapshot afterwards is reading a current
+  // one until the next structural op raises the flag again.
+  node.structureDirty = false;
 
-  const props = fabricProps(node);
   const childInText = node.isText || hasTextAncestor;
   const kids = renderableChildren(node);
 
@@ -349,42 +396,69 @@ function reconcile(
     parentChanged
   ) {
     stats.created += 1;
+    // Full payload: there is no committed props object to reuse, whatever propsDirty said.
+    const props = fabricProps(node);
     const tag = nextTag();
-    const reason =
-      committed === undefined
-        ? 'mount'
-        : forceFreshFamily
-          ? 'fresh-parent'
-          : committed.viewName !== viewName
-            ? 'view-kind'
-            : 'reparent';
-    dlog(
-      `commit root=${rootTag} createNode tag=${tag} view=${viewName} reason=${reason}`,
-    );
-    if (viewName === 'RCTView' || viewName === 'RCTText') {
+    // One gate for the whole diagnostic block, not three dlog calls. This runs once per CREATED
+    // node - 9 000 of them on one benchmark press - and dlog cannot help here: its argument is
+    // built at the CALL SITE (see debug.ts), so an eager template pays in full with logging off,
+    // and a thunk trades that for a closure allocation per node. A plain `if` costs neither.
+    if (isDebug()) {
+      const reason =
+        committed === undefined
+          ? 'mount'
+          : forceFreshFamily
+            ? 'fresh-parent'
+            : committed.viewName !== viewName
+              ? 'view-kind'
+              : 'reparent';
       dlog(
-        `commit root=${rootTag} colorProbe tag=${tag} view=${viewName} ` +
-          `bg=${JSON.stringify(props.backgroundColor)} color=${JSON.stringify(props.color)} ` +
-          `opacity=${JSON.stringify(props.opacity)}`,
+        `commit root=${rootTag} createNode tag=${tag} view=${viewName} reason=${reason}`,
       );
+      if (viewName === 'RCTView' || viewName === 'RCTText') {
+        dlog(
+          `commit root=${rootTag} colorProbe tag=${tag} view=${viewName} ` +
+            `bg=${JSON.stringify(props.backgroundColor)} color=${JSON.stringify(props.color)} ` +
+            `opacity=${JSON.stringify(props.opacity)}`,
+        );
+      }
+      if (
+        viewName === 'AndroidSwipeRefreshLayout' ||
+        viewName === 'RCTScrollView'
+      ) {
+        dlog(
+          `commit root=${rootTag} layoutProbe tag=${tag} view=${viewName} ` +
+            `flex=${JSON.stringify(props.flex)} height=${JSON.stringify(props.height)} ` +
+            `width=${JSON.stringify(props.width)} minHeight=${JSON.stringify(props.minHeight)} ` +
+            `flexGrow=${JSON.stringify(props.flexGrow)}`,
+        );
+      }
     }
-    if (
-      viewName === 'AndroidSwipeRefreshLayout' ||
-      viewName === 'RCTScrollView'
-    ) {
-      dlog(
-        `commit root=${rootTag} layoutProbe tag=${tag} view=${viewName} ` +
-          `flex=${JSON.stringify(props.flex)} height=${JSON.stringify(props.height)} ` +
-          `width=${JSON.stringify(props.width)} minHeight=${JSON.stringify(props.minHeight)} ` +
-          `flexGrow=${JSON.stringify(props.flexGrow)}`,
-      );
-    }
-    const handle = slot.createNode(tag, viewName, rootTag, props, node);
-    for (const child of kids) {
-      slot.appendChild(
-        handle,
-        reconcile(slot, child, rootTag, childInText, node, true).handle,
-      );
+    const created = slot.createNode(tag, viewName, rootTag, props, node);
+    // `createNode` takes no children (UIManagerBinding.cpp gives it 5 params), so a fresh parent
+    // can only receive them one `appendChild` at a time — unless we spend a clone to hand the whole
+    // list over at once. That is a TRADE, not a win: it removes N-1 JSI crossings and adds one
+    // discarded ShadowNode per parent, and which side wins is a native-side question no headless
+    // bench can answer. Hence the switch: off, this is byte-for-byte the append loop.
+    //
+    // Below the threshold the trade is a wash by call count (1 append vs 1 clone) and pure loss by
+    // allocation, so a single-child parent never takes it.
+    let handle = created;
+    if (batchCreate && kids.length >= CREATE_BATCH_MIN_CHILDREN) {
+      const childHandles: IFabricNode[] = [];
+      for (const child of kids) {
+        childHandles.push(
+          reconcile(slot, child, rootTag, childInText, node, true).handle,
+        );
+      }
+      handle = slot.cloneNodeWithNewChildren(created, childHandles);
+    } else {
+      for (const child of kids) {
+        slot.appendChild(
+          created,
+          reconcile(slot, child, rootTag, childInText, node, true).handle,
+        );
+      }
     }
     logScrollChildren(node, viewName, tag);
     // Investigation instrumentation (search-bar-ref "node not committed" bug): scoped to RNS* so
@@ -393,18 +467,24 @@ function reconcile(
     // behind DEBUG per <keep_logs_gate_behind_DEBUG>, never removed.
     if (viewName.startsWith('RNS')) {
       dlog(
-        `mirror.set (create) node=${debugNodeId(node)} tag=${tag} view=${viewName}`,
+        `committed (create) node=${debugNodeId(node)} tag=${tag} view=${viewName}`,
       );
     }
-    mirror.set(node, {
+    // `kids` is stored BY REFERENCE, not copied. With no anchors it IS `node.children`, so the
+    // record aliases the live array until the next structural op, which copies it out of the way
+    // (markStructureDirty, node.ts). Slicing here instead cost one array per node per commit -
+    // 9 002 on a 1 000-row create - and all but the handful of nodes that go on to change threw
+    // theirs away unread.
+    node.committed = {
       handle,
       tag,
       rootTag,
       props,
-      children: kids.slice(),
+      children: kids,
       viewName,
       parent: renderableParent,
-    });
+      owner: node,
+    };
     return { handle, changed: true };
   }
 
@@ -421,7 +501,32 @@ function reconcile(
 
   const childrenChanged =
     !childrenIdentical(kids, committed.children) || descendantChanged;
-  const propsChanged = !propsEqual(committed.props, props);
+
+  // The fast lane. No prop write was recorded on this node since its last commit, so its Fabric
+  // payload is by construction the one the mirror already holds: reuse that object by reference -
+  // no rebuild, no allocation, no deep compare - and carry it into the mirror below untouched.
+  //
+  // This is what propsDirty (node.ts) exists for. Every node on the clone-bubble path from a
+  // changed leaf up to the root takes this branch, as does the synthetic container that
+  // commitContainer dirties at every single entry. They still re-clone - a persistent parent must
+  // point at the new child handles - they just stop paying `fabricProps` + a recursive `propsEqual`
+  // to rediscover that nobody touched them.
+  //
+  // Under DEBUG the saving is handed straight back to check it was honest: an in-place mutation of
+  // a style object or of node.props, which no flag can observe, is the same hazard warnIfStale
+  // already guards on the skip path, and this lane is open to it identically.
+  let props: IFabricProps;
+  let propsChanged: boolean;
+  if (ownPropsChanged) {
+    profile.propsBuilt += 1;
+    props = fabricProps(node);
+    propsChanged = !propsEqual(committed.props, props);
+  } else {
+    profile.propsReused += 1;
+    props = committed.props;
+    propsChanged = false;
+    warnIfStale(node, committed, 'props');
+  }
 
   if (!childrenChanged && !propsChanged) {
     stats.reused += 1;
@@ -431,18 +536,29 @@ function reconcile(
   let handle: IFabricNode;
   if (childrenChanged) {
     stats.cloneChildren += 1;
+    // A clone comes back with an EMPTY child list, so every sibling handle has to be handed back
+    // one by one — that loop is why touching one row of a thousand costs a thousand JSI crossings
+    // at every level up to the root. Where the host accepts the list in the clone call itself it
+    // becomes ONE crossing (see supportsCloneWithChildren in fabric.ts).
+    const batched = slot.supportsCloneWithChildren;
     if (propsChanged) {
       const propsDiff = diffProps(committed.props, props);
       guardSerializable(propsDiff, viewName, committed.tag);
       handle = slot.cloneNodeWithNewChildrenAndProps(
         committed.handle,
         propsDiff,
+        batched ? childHandles : undefined,
       );
     } else {
-      handle = slot.cloneNodeWithNewChildren(committed.handle);
+      handle = slot.cloneNodeWithNewChildren(
+        committed.handle,
+        batched ? childHandles : undefined,
+      );
     }
-    for (const childHandle of childHandles) {
-      slot.appendChild(handle, childHandle);
+    if (!batched) {
+      for (const childHandle of childHandles) {
+        slot.appendChild(handle, childHandle);
+      }
     }
   } else {
     stats.cloneProps += 1;
@@ -455,23 +571,23 @@ function reconcile(
   // dlog above. Kept behind DEBUG per <keep_logs_gate_behind_DEBUG>, never removed.
   if (viewName.startsWith('RNS')) {
     dlog(
-      `mirror.set (update) node=${debugNodeId(node)} tag=${committed.tag} view=${viewName}`,
+      `committed (update) node=${debugNodeId(node)} tag=${committed.tag} view=${viewName}`,
     );
   }
-  // The clone keeps the node's family, so its reactTag is unchanged; carry it.
-  mirror.set(node, {
-    handle,
-    tag: committed.tag,
-    rootTag,
-    props,
-    // Store the same flattened child list we diffed against. Anchors are retained-tree
-    // bookkeeping only; keeping raw node.children here makes every anchored subtree look
-    // structurally changed on the next commit and can re-append already-parented Fabric
-    // ShadowNode families under a cloned parent.
-    children: kids.slice(),
-    viewName,
-    parent: renderableParent,
-  });
+  // Written IN PLACE rather than as a fresh record. The node is the same node, its tag and owner
+  // are unchanged by a clone (the clone keeps the family), so replacing the object bought nothing
+  // and cost one allocation per changed node per commit - and on an ordinary update that is the
+  // whole clone-bubble from the changed leaf up to the root.
+  committed.handle = handle;
+  committed.rootTag = rootTag;
+  committed.props = props;
+  // The same flattened child list we diffed against, by reference (see the create path above for
+  // why it is not copied). Anchors are retained-tree bookkeeping only; keeping raw node.children
+  // here makes every anchored subtree look structurally changed on the next commit and can
+  // re-append already-parented Fabric ShadowNode families under a cloned parent.
+  committed.children = kids;
+  committed.viewName = viewName;
+  committed.parent = renderableParent;
   return { handle, changed: true };
 }
 
@@ -507,8 +623,12 @@ function rootContainerFor(rootTag: IRootTag): ISymbioteNode {
 // now-stopped surface. Called from unmount (the bridgeless surface-stop path): the host stops then restarts a
 // surface (Fast Refresh, focus/lifecycle) reusing the same rootTag, and a stale root
 // container would re-clone dead handles into the new surface -> a blank screen. The old
-// container's descendants fall out of every reference and their mirror entries GC.
+// container's descendants fall out of every reference and are collected with the committed
+// records they carry.
 export function disposeRoot(rootTag: IRootTag): void {
+  // Drop any setNativeProps writes still queued for this surface: their flush is a microtask away
+  // and would otherwise commit into a container that no longer exists, re-creating it from scratch.
+  pendingByRoot.delete(rootTag);
   if (rootContainers.delete(rootTag))
     dlog(`root container disposed root=${rootTag}`);
 }
@@ -519,7 +639,9 @@ export function commitChildren(
 ): void {
   // The wrapper holds the surface's top-level children; reconcile walks from it so the
   // whole tree, synthetic root included, goes through the same clone-on-write path.
-  rootContainerFor(rootTag).children = children.slice();
+  const container = rootContainerFor(rootTag);
+  container.children = children.slice();
+  markStructureDirty(container);
   commitContainer(rootTag);
 }
 
@@ -528,6 +650,9 @@ export function commitChildren(
 // a full mutation->commit and a single-node Animated frame (setNativeProps) funnel here.
 function commitContainer(rootTag: IRootTag): void {
   const slot = getSlot();
+  batchCreate =
+    globalThis.__SYMBIOTE_BATCH_CREATE__ === true &&
+    slot.supportsCloneWithChildren;
   const container = rootContainerFor(rootTag);
 
   // The synthetic container is dirtied here, at the one entry point, because markDirty can never
@@ -537,6 +662,12 @@ function commitContainer(rootTag: IRootTag): void {
   // props rebuild per commit and closes the hole for both callers, mutation commit and
   // setNativeProps alike.
   markDirty(container);
+
+  // Before the walk, and before either early return: mutations for this tick are done, so a node
+  // that `removeChild` unlinked is now either back under a parent (a framework spelling a move as
+  // remove-then-reinsert) or gone for good. Costs one Set-size read until an app registers its
+  // first host behavior. See host-behavior.ts for why removal cannot answer this itself.
+  sweepDetachedBehaviors(container.children);
 
   stats.created = 0;
   stats.cloneProps = 0;
@@ -581,6 +712,7 @@ function commitContainer(rootTag: IRootTag): void {
       `commit root=${rootTag} ${mode} ` +
         `created=${stats.created} cloneProps=${stats.cloneProps} ` +
         `cloneChildren=${stats.cloneChildren} reused=${stats.reused} ` +
+        `propsBuilt=${profile.propsBuilt} propsReused=${profile.propsReused} ` +
         `walk=${walkMs.toFixed(3)}ms`,
     );
   }
@@ -604,6 +736,10 @@ export interface ICommitProfile {
   commits: number;
   walkMs: number;
   nodesVisited: number;
+  /** Update-path nodes that rebuilt their Fabric payload and deep-compared it. */
+  propsBuilt: number;
+  /** Update-path nodes that re-cloned for a child but reused the committed payload by reference. */
+  propsReused: number;
   propWrites: number;
   propNoops: number;
   childScans: number;
@@ -619,6 +755,8 @@ export function readCommitProfile(): ICommitProfile {
     commits: profile.commits,
     walkMs: profile.walkMs,
     nodesVisited: profile.nodesVisited,
+    propsBuilt: profile.propsBuilt,
+    propsReused: profile.propsReused,
     propWrites: props.writes,
     propNoops: props.noops,
     childScans: childScan.scans,
@@ -630,12 +768,292 @@ export function readCommitProfile(): ICommitProfile {
   profile.commits = 0;
   profile.walkMs = 0;
   profile.nodesVisited = 0;
+  profile.propsBuilt = 0;
+  profile.propsReused = 0;
   childScan.scans = 0;
   childScan.probed = 0;
   childScan.flattens = 0;
   childScan.flattenProbed = 0;
   childScan.widest = 0;
   return snapshot;
+}
+
+// Re-commit a SET of nodes whose props changed and whose structure did not, by cloning those nodes
+// and the union of the ancestor chains above them - never walking down from the root.
+//
+// This is the JS twin of what Fabric does natively for the same operation. RN's
+// `UIManager::setNativeProps_DEPRECATED` (ReactCommon/react/renderer/uimanager/UIManager.cpp) does
+// `shadowTree.commit(cloneTree(family, ...))`: clone the path to one family, reuse everything else.
+// We cannot call that (it also makes the value STICKY on the ShadowNodeFamily, so a later
+// declarative write of the same prop can never win again - which is why RN's own API is named
+// `_DEPRECATED` and warns in dev). But the SHAPE is right, and it is the shape a general
+// walk-from-the-root cannot express: the general path visits every sibling along the way just to
+// hand back the handle their committed record already held.
+//
+// Measured on a 6-screen fixture (animated-commit-cost.test.ts): the chain is 5 nodes, the walk
+// visits 15. The excess is the app's size, not the animation's, and it is what this removes.
+//
+// The UNION is what makes a batched frame worth batching, and the first attempt got it wrong by
+// falling back to the general walk whenever more than one node was pending. Measured: five leaves
+// animating on one screen cost 0.0275 ms that way against 0.0146 ms for five separate targeted
+// commits - batching was 1.9x SLOWER, because one 17 504-node walk is dearer than five chain
+// clones. Sharing the chain is the point: five rows of one list have four ancestors in common, and
+// the union clones each of them ONCE (re-appending that 60-child list once instead of five times)
+// while still emitting a single completeRoot.
+//
+// Returns false without touching anything when a precondition fails; the caller falls back to the
+// general commit, which is always correct. It is all-or-nothing across the batch: one node that
+// cannot prove its preconditions sends the whole set down the general path, which is correct for
+// every one of them. Preconditions are deliberately strict:
+//   - the node and every ancestor up to the container must already be committed (nothing to clone
+//     from otherwise), and
+//   - the change must be props-only. `viewNameFor` depends on `isText` (readonly) and on whether a
+//     <Text> ancestor exists, so a props write cannot flip it; a STRUCTURAL change could, and takes
+//     the general path.
+//
+// It deliberately does NOT clear the ancestors' `dirty` flags, only the changed node's. An ancestor
+// may be dirty for a reason of its own - another pending change elsewhere in its subtree - and
+// clearing it here would strand that change with no error. Leaving them set costs the next general
+// commit a walk that finds nothing, which is exactly what the oracle test asserts.
+interface ILeafWrite {
+  node: ISymbioteNode;
+  record: IMirror;
+  props: IFabricProps;
+  diff: IFabricProps;
+}
+
+// One node of the union that is NOT itself a write target: an ancestor that has to re-clone only
+// because a persistent parent points at specific child handles.
+interface IBranch {
+  record: IMirror;
+  /** Committed handles of this node's children, in order; changed slots are overwritten on clone. */
+  handles: IFabricNode[];
+  /** Where each changed child sits in `handles`. */
+  slots: Map<ISymbioteNode, number>;
+}
+
+function commitTargeted(nodes: ReadonlySet<ISymbioteNode>): boolean {
+  // ── PLAN FIRST, MUTATE SECOND ──────────────────────────────────────────────────────────────
+  // Every precondition is checked and every sibling handle resolved before a single native call,
+  // so a bail costs nothing and leaves the tree exactly as it was.
+  //
+  // This is not hypothetical tidiness: an earlier version validated the ancestor chain up front but
+  // resolved SIBLING handles inside the clone loop, so a bail half-way had already re-pointed a
+  // node's committed record at a clone that was never handed to completeRoot, and had already
+  // cleared its dirty flags - so the general-path fallback then skipped the node as clean and
+  // committed an orphan handle. The fallback test in animated-commit-cost.test.ts is what caught it.
+  const writes: ILeafWrite[] = [];
+  for (const node of nodes) {
+    const record = committedOf(node);
+    if (record === undefined) return false;
+    // The node's own children must be the ones Fabric holds: this path never descends, so a
+    // pending structural change below would be published as if it had not happened.
+    if (node.structureDirty) return false;
+    // THE TWIN OF THE CHECK ABOVE, and the one that was missing. `dirty` is a SUBTREE flag — it
+    // means "this node or something under it needs work" — while this path clears it as if it were
+    // a self flag. Clearing it over a dirty descendant strands that descendant permanently: the
+    // general commit reconciles from the root, finds a clean chain, and never descends again.
+    //
+    // Direct children are enough, and that is not an approximation. `markDirty` walks up from the
+    // dirtied node and STOPS at the first already-dirty ancestor; in this scenario that ancestor is
+    // this node, so the chain from any dirty descendant up to here is fully marked — which makes a
+    // dirty direct child a certainty whenever a dirty descendant exists. So the check is O(children)
+    // rather than a subtree walk, on a path that runs once per animation frame.
+    //
+    // Reproduced 2026-08-24 by a peer's flag dump after tier-2 made a press ask for its own commit:
+    // press the node, dirty its child in the same tick, and the child never commits again. Vue and
+    // Solid did not show it because their schedulers rewrite the prop on the node itself and
+    // re-dirty the chain — an accident of those schedulers, not a property of this contract.
+    if (node.children.some(child => child.dirty)) {
+      dlog('commit targeted: dirty descendant, using the general path');
+      return false;
+    }
+
+    // Counted like the general path's rebuild, because it is one: the meter must not read as though
+    // an animation frame builds no payload just because it took the short route.
+    profile.propsBuilt += 1;
+    const props = fabricProps(node);
+    const diff = diffProps(record.props, props);
+    if (Object.keys(diff).length === 0) {
+      // Fabric already holds these values. Not an error and not a fallback: the general path would
+      // reach the same conclusion, after walking the tree to get here. Dropping it from the batch
+      // is safe even if a LATER node bails the whole thing — its props genuinely match Fabric, so
+      // the general commit skipping it as clean publishes the same tree.
+      node.dirty = false;
+      node.propsDirty = false;
+      dlog(`commit targeted tag=${record.tag} no-op (props identical)`);
+      continue;
+    }
+    writes.push({ node, record, props, diff });
+  }
+  if (writes.length === 0) return true;
+
+  // Build the union of the ancestor chains. `changed` is the whole union keyed by node, so a shared
+  // ancestor is entered ONCE however many of the batch's leaves sit under it — which is the entire
+  // saving over committing each leaf separately.
+  const changed = new Map<ISymbioteNode, Set<ISymbioteNode>>();
+  let unionRoot: ISymbioteNode | undefined;
+  for (const write of writes) {
+    let child: ISymbioteNode = write.node;
+    let ancestor = write.record.parent;
+    while (ancestor !== undefined) {
+      const record = committedOf(ancestor);
+      if (record === undefined) return false;
+      // THE precondition, and the one an earlier version of this function missed. `record.children`
+      // is a SNAPSHOT from the last commit. If this ancestor's real child list has moved on - a row
+      // added, removed, or reordered - rebuilding its child set from that snapshot silently
+      // publishes the OLD structure, with no error anywhere. Caught by the fallback row in
+      // animated-commit-cost.test.ts, which appends a sibling and then animates: without this check
+      // the new sibling never reached Fabric and every other assertion still passed.
+      if (ancestor.structureDirty) {
+        dlog(
+          'commit targeted: ancestor child list moved on, using the general path',
+        );
+        return false;
+      }
+      const seen = changed.get(ancestor);
+      if (seen !== undefined) {
+        // Already in the union via another leaf. Everything ABOVE it is therefore already in too,
+        // and already names this node as changed, so the walk stops here.
+        seen.add(child);
+        break;
+      }
+      changed.set(ancestor, new Set([child]));
+      if (record.parent === undefined) unionRoot = ancestor;
+      child = ancestor;
+      ancestor = record.parent;
+    }
+  }
+  // Resolve every branch's child handles now, so the clone pass below cannot fail part-way.
+  const branches = new Map<ISymbioteNode, IBranch>();
+  for (const [node, changedChildren] of changed) {
+    const record = committedOf(node);
+    if (record === undefined) return false;
+    const handles: IFabricNode[] = [];
+    const slots = new Map<ISymbioteNode, number>();
+    for (const child of record.children) {
+      const childRecord = committedOf(child);
+      // A sibling with no committed record means a structural change is pending, which this path
+      // cannot express. Bail before touching anything.
+      if (childRecord === undefined) {
+        dlog('commit targeted: uncommitted sibling, using the general path');
+        return false;
+      }
+      if (changedChildren.has(child)) slots.set(child, handles.length);
+      handles.push(childRecord.handle);
+    }
+    if (slots.size !== changedChildren.size) {
+      // A changed child is not in its parent's committed child list — an uncommitted move.
+      dlog(
+        'commit targeted: child not in committed set, using the general path',
+      );
+      return false;
+    }
+    branches.set(node, { record, handles, slots });
+  }
+  // Every write is on one surface (the caller batches by rootTag), so the chains converge on that
+  // surface's synthetic container and nowhere else. Checked HERE, the last statement of the plan,
+  // so the clone pass below has no way left to bail after it has started mutating.
+  const rootBranch =
+    unionRoot === undefined ? undefined : branches.get(unionRoot);
+  if (unionRoot === undefined || rootBranch === undefined) return false;
+  const rootTag = rootBranch.record.rootTag;
+
+  // ── MUTATE ─────────────────────────────────────────────────────────────────────────────────
+  const slot = getSlot();
+  const walkStart = performance.now();
+  const cloned = new Map<ISymbioteNode, IFabricNode>();
+
+  for (const write of writes) {
+    guardSerializable(write.diff, write.record.viewName, write.record.tag);
+    const handle = slot.cloneNodeWithNewProps(write.record.handle, write.diff);
+    stats.cloneProps += 1;
+    write.record.handle = handle;
+    write.record.props = write.props;
+    write.node.dirty = false;
+    write.node.propsDirty = false;
+    cloned.set(write.node, handle);
+  }
+
+  // Re-clone each branch exactly once, deepest first. The recursion is bounded by the tree depth,
+  // and every branch it touches is in the plan above, so nothing here can bail.
+  const cloneBranch = (node: ISymbioteNode): IFabricNode | undefined => {
+    const done = cloned.get(node);
+    if (done !== undefined) return done;
+    const branch = branches.get(node);
+    // Unreachable by construction: cloneBranch is only ever called on a node the plan put in
+    // `branches` or the write loop put in `cloned`. Leaving the committed handle in place is the
+    // safe direction if that ever stops being true, and the oracle row would report it.
+    if (branch === undefined) return undefined;
+    for (const [child, index] of branch.slots) {
+      const childHandle = cloneBranch(child);
+      if (childHandle !== undefined) branch.handles[index] = childHandle;
+    }
+    const batched = slot.supportsCloneWithChildren;
+    const handle = slot.cloneNodeWithNewChildren(
+      branch.record.handle,
+      batched ? branch.handles : undefined,
+    );
+    stats.cloneChildren += 1;
+    if (!batched)
+      for (const childHandle of branch.handles)
+        slot.appendChild(handle, childHandle);
+    branch.record.handle = handle;
+    cloned.set(node, handle);
+    return handle;
+  };
+  const rootHandle = cloneBranch(unionRoot) ?? rootBranch.record.handle;
+
+  const childSet = slot.createChildSet(rootTag);
+  slot.appendChildToSet(childSet, rootHandle);
+  slot.completeRoot(rootTag, childSet);
+  profile.walkMs += performance.now() - walkStart;
+  profile.commits += 1;
+  profile.nodesVisited += cloned.size;
+  runPostCommitHooks();
+  dlog(
+    `commit targeted root=${rootTag} leaves=${writes.length} ` +
+      `union=${branches.size}`,
+  );
+  return true;
+}
+
+// A JS-driven Animated frame lands in setNativeProps once per animated leaf. Five animations on
+// five rows of one list therefore used to mean FIVE commits per frame: five completeRoots, and
+// every shared ancestor re-cloned - with its whole child list re-appended - five times over. The
+// dirty-set census (`symbiote-perf-measurement` skill) measured that appendChild is the real floor
+// of a commit and that it multiplies almost exactly with the commit count. So the win here is not a
+// faster commit, it is FEWER of them.
+//
+// The batch never drops a value, and that is a rule, not a hope. Merging writes to DIFFERENT nodes
+// is free - each carries its own value and one commit publishes them all. The single case where
+// merging WOULD lose a value is a second write to a node already pending, so that case does not
+// merge: it publishes the pending batch first, synchronously, and opens a new one. Hence:
+//
+//   N writes to N different nodes in one task  ->  one completeRoot, all N values land
+//   two writes to the SAME node in one task    ->  two completeRoots, both values land
+//
+// The second row costs nothing in practice: an Animated.Value ticks its props node exactly once per
+// rAF (animations/timing.ts's onFrame calls onUpdate once, then schedules the next frame), so
+// concurrent animations are always distinct nodes. It exists for the paths that genuinely can write
+// twice - two animations bound to one prop of one node, or Animated.event when the host delivers
+// two scroll events in a single task.
+const pendingByRoot = new Map<IRootTag, Set<ISymbioteNode>>();
+let flushScheduled = false;
+
+// Publish every pending write: one commit per surface. A surface with exactly one pending node
+// takes the targeted chain clone (4.5x, §4a); with several it takes the general walk, which already
+// visits only dirty paths and reaches all of them under a single completeRoot - which is the point.
+export function flushNativeProps(): void {
+  flushScheduled = false;
+  if (pendingByRoot.size === 0) return;
+  const batches = [...pendingByRoot];
+  pendingByRoot.clear();
+  for (const [rootTag, nodes] of batches) {
+    if (commitTargeted(nodes)) continue;
+    dlog(`flush native props root=${rootTag} nodes=${nodes.size} (general)`);
+    commitContainer(rootTag);
+  }
 }
 
 // Targeted per-frame prop write for the JS-driven Animated path. RN flushes an
@@ -649,10 +1067,18 @@ export function setNativeProps(
   node: ISymbioteNode,
   partial: Record<string, unknown>,
 ): void {
-  const record = mirror.get(node);
+  const record = committedOf(node);
   if (record === undefined) {
     dlog('setNativeProps skipped: node not committed');
     return;
+  }
+  // BEFORE the prop writes below, deliberately: the pending batch still has to publish the value
+  // this node holds right now, and mutating first would overwrite the very thing being preserved.
+  if (pendingByRoot.get(record.rootTag)?.has(node) === true) {
+    dlog(
+      `setNativeProps tag=${record.tag} written twice in one task, flushing`,
+    );
+    flushNativeProps();
   }
   for (const [key, value] of Object.entries(partial)) {
     if (key === 'style') {
@@ -667,19 +1093,54 @@ export function setNativeProps(
       node.props[key] = value;
     }
   }
-  // Writes node.props directly rather than through setProp, so it owes its own mark.
-  markDirty(node);
+  // Writes node.props directly rather than through setProp, so it owes its own mark - and it owes
+  // the PROPS mark specifically: markDirty alone would send the node down the fast lane above,
+  // which reuses the mirror's payload by reference and would drop the Animated frame entirely.
+  markPropsDirty(node);
   dlog(
     `setNativeProps root=${record.rootTag} tag=${record.tag} keys=${Object.keys(partial)}`,
   );
-  commitContainer(record.rootTag);
+  // Queued, not committed: every write made in this task publishes together at the microtask
+  // boundary. See the batching note above commitTargeted's caller block for why that loses nothing.
+  requestCommitFor(node);
+}
+
+/**
+ * Publish a node whose props were changed OUTSIDE any renderer mutation.
+ *
+ * Dirtying is not publishing. Every other write reaches Fabric because the framework's own commit
+ * follows it; a change driven by a NATIVE EVENT has no such follow-up — `native-events.ts`
+ * requests no commit and no adapter does either, so a node marked dirty from an event handler
+ * simply stays dirty. The host-behavior press path (`setNodePressed` for `:active`) is the first
+ * caller that is not `setNativeProps`, and `setNodeHidden`'s React twin never needed it because
+ * the reconciler is already in its commit phase when it calls.
+ *
+ * Queued rather than committed on the spot, sharing `setNativeProps`' batch: several writes in one
+ * task publish together at the microtask boundary, one commit per surface.
+ */
+export function requestCommitFor(node: ISymbioteNode): void {
+  const record = committedOf(node);
+  if (record === undefined) {
+    dlog('requestCommitFor skipped: node not committed');
+    return;
+  }
+  let pending = pendingByRoot.get(record.rootTag);
+  if (pending === undefined) {
+    pending = new Set();
+    pendingByRoot.set(record.rootTag, pending);
+  }
+  pending.add(node);
+  if (!flushScheduled) {
+    flushScheduled = true;
+    queueMicrotask(flushNativeProps);
+  }
 }
 
 // The committed reactTag of a node (stable across clone-on-write), for binding the
 // native Animated driver via connectAnimatedNodeToView. Undefined until the node
 // has been committed at least once.
 export function getNativeTag(node: ISymbioteNode): number | undefined {
-  return mirror.get(node)?.tag;
+  return committedOf(node)?.tag;
 }
 
 // Actions waiting for their node's first commit. An adapter that wires an imperative/native call at
@@ -702,7 +1163,7 @@ export function whenCommitted(
   action: () => void,
 ): () => void {
   const attempt = (): boolean => {
-    if (mirror.get(node) === undefined) return false;
+    if (committedOf(node) === undefined) return false;
     action();
     return true;
   };
@@ -715,21 +1176,21 @@ export function whenCommitted(
 // The node's current Fabric handle (the createNode/clone return value), identical in
 // kind to React's stateNode.node, for the native driver's ShadowNodeFamily path.
 export function getNativeNode(node: ISymbioteNode): IFabricNode | undefined {
-  return mirror.get(node)?.handle;
+  return committedOf(node)?.handle;
 }
 
 // Imperative view command (e.g. TextInput's setTextAndSelection / focus / blur),
 // aimed at a node's CURRENT Fabric handle. Only valid once the node has been
-// committed at least once; its handle is read from the mirror.
+// committed at least once; its handle is read from the node's committed record.
 export function dispatchViewCommand(
   node: ISymbioteNode,
   commandName: string,
   args: readonly unknown[],
 ): void {
-  const record = mirror.get(node);
+  const record = committedOf(node);
   if (record === undefined) {
-    // node=... compares directly against the mirror.set logs above (same debugNodeId scheme) to
-    // prove/disprove a node-identity mismatch — see the search-bar-ref investigation note there.
+    // node=... compares directly against the `committed (create|update)` logs above (same
+    // debugNodeId scheme) to prove/disprove an identity mismatch — see the note there.
     dlog(
       `dispatchViewCommand "${commandName}" skipped: node not committed (node=${debugNodeId(node)} component=${node.component})`,
     );
@@ -748,7 +1209,7 @@ export function sendAccessibilityEvent(
   node: ISymbioteNode,
   eventType: string,
 ): void {
-  const record = mirror.get(node);
+  const record = committedOf(node);
   if (record === undefined) {
     dlog(`sendAccessibilityEvent "${eventType}" skipped: node not committed`);
     return;
@@ -764,7 +1225,7 @@ export function measure(
   node: ISymbioteNode,
   callback: IMeasureOnSuccess,
 ): void {
-  const record = mirror.get(node);
+  const record = committedOf(node);
   if (record === undefined) {
     dlog('measure skipped: node not committed');
     return;
@@ -776,7 +1237,7 @@ export function measureInWindow(
   node: ISymbioteNode,
   callback: IMeasureInWindowOnSuccess,
 ): void {
-  const record = mirror.get(node);
+  const record = committedOf(node);
   if (record === undefined) {
     dlog('measureInWindow skipped: node not committed');
     return;
@@ -793,8 +1254,8 @@ export function measureLayout(
   onSuccess: IMeasureLayoutOnSuccess,
   onFail: () => void = () => {},
 ): void {
-  const record = mirror.get(node);
-  const relativeRecord = mirror.get(relativeTo);
+  const record = committedOf(node);
+  const relativeRecord = committedOf(relativeTo);
   if (record === undefined || relativeRecord === undefined) {
     dlog('measureLayout skipped: a node is not committed');
     return;

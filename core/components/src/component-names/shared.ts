@@ -9,6 +9,10 @@
 // so a missing/renamed primitive is a compile error, not a silent gap at runtime.
 export type ISymbioteIntrinsic =
   | 'symbiote-view'
+  // Resolves to the SAME RCTView as a plain view: the tag exists so the host-behavior registry
+  // (keyed by tag, never by resolved name) can find the press machine. Registering under RCTView
+  // instead would put a press machine on every View in the app.
+  | 'symbiote-pressable'
   | 'symbiote-text'
   | 'symbiote-image'
   | 'symbiote-scroll-view'

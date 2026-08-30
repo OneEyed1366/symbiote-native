@@ -17,6 +17,7 @@ export {
   censusRetainedTree,
   getExplicitStyle,
   setNodeHidden,
+  setNodePressed,
   setText,
   isSymbioteNode,
   isSymbioteEvent,
@@ -85,9 +86,9 @@ export type { ICommitProfile } from './commit';
 // across adapters has to hang off this, not off a per-framework lifecycle hook, or it measures a
 // different quantity in each one under the same name.
 export { registerPostCommit, unregisterPostCommit } from './post-commit';
-// The public instance grafted onto a host node by every adapter (React's getPublicInstance,
-// the Vue renderer's createElement): the imperative measure/setNativeProps/focus API. Lives
-// here because it depends only on engine internals, so all adapters inherit it identically.
+// The public instance every host node already is (React's getPublicInstance, the Vue renderer's
+// createElement): the imperative measure/setNativeProps/focus API, on the shared node prototype.
+// toPublicInstance is the identity that names the seam — see ./host-instance.
 export { toPublicInstance } from './host-instance';
 export type { IHostInstance } from './host-instance';
 export {
@@ -412,3 +413,12 @@ export type {
   IStatusBarAnimation,
   IStatusBarImperative,
 } from './status-bar/shared';
+export {
+  registerHostBehavior,
+  hasHostBehaviors,
+  clearHostBehaviors,
+  appListenerFor,
+} from './host-behavior';
+export type { IHostBehavior } from './host-behavior';
+export { requestCommitFor } from './commit';
+export { setBehaviorListener } from './node';
