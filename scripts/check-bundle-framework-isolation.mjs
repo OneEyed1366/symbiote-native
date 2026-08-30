@@ -21,10 +21,14 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { adapterNames } from './lib/adapter-names.mjs';
 import { publishablePackageEntries } from './lib/publishable-packages.mjs';
 
 const REPO_ROOT = new URL('..', import.meta.url).pathname;
-const KNOWN_FRAMEWORKS = ['react', 'vue', 'svelte', 'angular', 'solid'];
+// The names a package may declare as an `exports` subpath. Read from disk rather than listed:
+// a framework we ship an adapter for is exactly a directory under `adapters/`, and a subpath
+// naming anything else is a typo worth NOT recognising. See scripts/lib/adapter-names.mjs.
+const KNOWN_FRAMEWORKS = adapterNames();
 
 // One buildable example per framework this repo currently ships a canary for. A framework with
 // no example here yet (solid, still L1) is skipped, not failed — nothing to bundle against.
@@ -39,11 +43,18 @@ function discoverMultiFrameworkPackages() {
   const packages = [];
   for (const entry of publishablePackageEntries()) {
     if (!entry.dir.startsWith('packages/')) continue;
-    const manifest = JSON.parse(readFileSync(join(REPO_ROOT, entry.dir, 'package.json'), 'utf8'));
+    const manifest = JSON.parse(
+      readFileSync(join(REPO_ROOT, entry.dir, 'package.json'), 'utf8'),
+    );
     const exportKeys = Object.keys(manifest.exports ?? {});
-    const frameworks = KNOWN_FRAMEWORKS.filter(framework => exportKeys.includes(`./${framework}`));
+    const frameworks = KNOWN_FRAMEWORKS.filter(framework =>
+      exportKeys.includes(`./${framework}`),
+    );
     if (frameworks.length >= 2) {
-      packages.push({ name: manifest.name.replace('@symbiote-native/', ''), frameworks });
+      packages.push({
+        name: manifest.name.replace('@symbiote-native/', ''),
+        frameworks,
+      });
     }
   }
   return packages;
@@ -53,7 +64,9 @@ function buildBundleSources(framework, exampleDir) {
   const absoluteDir = join(REPO_ROOT, exampleDir);
   const reactNativeBinary = join(absoluteDir, 'node_modules/.bin/react-native');
   if (!existsSync(reactNativeBinary)) {
-    throw new Error(`react-native CLI not installed — run \`npm install\` in ${exampleDir} first`);
+    throw new Error(
+      `react-native CLI not installed — run \`npm install\` in ${exampleDir} first`,
+    );
   }
 
   // examples/angular's index.js imports from ./build/angular/src/App, produced by the ngc AOT
@@ -61,7 +74,10 @@ function buildBundleSources(framework, exampleDir) {
   // that Metro transforms on the fly. Bundling before this step fails with a module-not-found on
   // the very first import.
   if (framework === 'angular') {
-    execFileSync('npm', ['run', 'ng:build'], { cwd: absoluteDir, stdio: 'pipe' });
+    execFileSync('npm', ['run', 'ng:build'], {
+      cwd: absoluteDir,
+      stdio: 'pipe',
+    });
   }
 
   const tmpDir = mkdtempSync(join(tmpdir(), 'symbiote-bundle-isolation-'));
@@ -92,7 +108,11 @@ function buildBundleSources(framework, exampleDir) {
   }
 }
 
-function findForeignFrameworkLeaks(sources, multiFrameworkPackages, ownFramework) {
+function findForeignFrameworkLeaks(
+  sources,
+  multiFrameworkPackages,
+  ownFramework,
+) {
   const leaks = [];
   for (const source of sources) {
     for (const pkg of multiFrameworkPackages) {
@@ -100,10 +120,12 @@ function findForeignFrameworkLeaks(sources, multiFrameworkPackages, ownFramework
       if (!source.includes(pkgRoot)) continue;
       for (const foreignFramework of pkg.frameworks) {
         if (foreignFramework === ownFramework) continue;
-        const isForeignFrameworkFile = ['src', 'build', 'build-ngc'].some(buildDir =>
-          source.includes(`${pkgRoot}${buildDir}/${foreignFramework}/`),
+        const isForeignFrameworkFile = ['src', 'build', 'build-ngc'].some(
+          buildDir =>
+            source.includes(`${pkgRoot}${buildDir}/${foreignFramework}/`),
         );
-        if (isForeignFrameworkFile) leaks.push({ package: pkg.name, foreignFramework, source });
+        if (isForeignFrameworkFile)
+          leaks.push({ package: pkg.name, foreignFramework, source });
       }
     }
   }
@@ -113,7 +135,9 @@ function findForeignFrameworkLeaks(sources, multiFrameworkPackages, ownFramework
 function main() {
   const multiFrameworkPackages = discoverMultiFrameworkPackages();
   if (multiFrameworkPackages.length === 0) {
-    console.log('No multi-framework packages under packages/ — nothing to check.');
+    console.log(
+      'No multi-framework packages under packages/ — nothing to check.',
+    );
     return;
   }
   console.log(
@@ -136,13 +160,19 @@ function main() {
       continue;
     }
 
-    const leaks = findForeignFrameworkLeaks(sources, multiFrameworkPackages, framework);
+    const leaks = findForeignFrameworkLeaks(
+      sources,
+      multiFrameworkPackages,
+      framework,
+    );
     if (leaks.length === 0) {
       console.log(`ok (${sources.length} modules, no foreign-framework code)`);
       continue;
     }
     hasFailure = true;
-    console.log(`FAIL (${leaks.length} foreign-framework file(s) reached this bundle)`);
+    console.log(
+      `FAIL (${leaks.length} foreign-framework file(s) reached this bundle)`,
+    );
     for (const leak of leaks) {
       console.error(
         `    ${leak.package}: a ${leak.foreignFramework}-only file reached the ${framework} bundle\n` +

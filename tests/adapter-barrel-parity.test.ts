@@ -16,17 +16,21 @@ import path from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+import { adapterNames as adapterDirNames } from '../scripts/lib/adapter-names.mjs';
+
 const REPO_ROOT = path.resolve(__dirname, '..');
 // All five adapters are in scope. 'solid' was held out while that adapter sat at L1 (static paint),
 // when its barrel carried only mount/unmount/findNodeHandle and would have reported every shared
 // name as drift; it joined at L4, and what it still genuinely lacks is named in KNOWN_GAPS.
-const ADAPTERS = ['react', 'vue', 'angular', 'svelte', 'solid'] as const;
+// Read from disk, never written down — see scripts/lib/adapter-names.mjs for the three times a
+// hand-written copy of this list silently omitted a newer adapter.
+const ADAPTERS = adapterDirNames();
 const SHARED_BARRELS = [
   'core/engine/src/index.ts',
   'core/components/src/index.ts',
 ];
 
-type IAdapter = (typeof ADAPTERS)[number];
+type IAdapter = string;
 
 // A shared name an adapter deliberately does NOT re-export. Only a genuine per-adapter difference
 // belongs here; the 22 gaps this test found on its first run were all closed instead.

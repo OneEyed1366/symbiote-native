@@ -204,10 +204,21 @@ None of the three was a decision. Each was a default that looked like one, and i
 symptom was silence rather than failure — an un-overlaid example measured on a stale build, an
 import that throws only in a consuming app, a probe that missed a repo-wide fix.
 
-So on any change phrased "across all adapters", enumerate the five explicitly and verify Solid on
-its own at the end. The general form is worth stating too, because the next adapter will inherit it:
-**the most recently added member of a set is the one every older list omits**, and no audit in this
-file detects a member that is simply absent from the list being audited.
+The general form, because the next adapter inherits it: **the most recently added member of a set is
+the one every older list omits**, and no audit in this file detects a member that is simply absent
+from the list being audited.
+
+**The answer is structural, not disciplinary, and it replaces the "remember to check Solid" rule
+this section first proposed.** Three audits hardcoded the adapter list — in three different orders,
+with no shared source — and their completeness rested on six people not forgetting. `adapterNames()`
+in `scripts/lib/adapter-names.mjs` reads `adapters/` off disk, and all three now call it. A
+directory listing cannot be written stale: the sixth adapter joins every audit the moment its folder
+exists. Verified by creating an empty `adapters/zzz-probe/` — barrel parity immediately reported it
+as missing every shared export, and removing the folder returned the suite to green.
+
+So the check is never "is Solid in the list". It is "is there a list at all" — and where one is
+unavoidable, whether its length matches what is on disk. Any remaining hand-written enumeration of
+frameworks in this repo is a latent instance of the same bug.
 
 ## Phrase a parity oracle as a CAPABILITY, never as a shape
 
