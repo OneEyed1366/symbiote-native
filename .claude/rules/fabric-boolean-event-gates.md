@@ -58,6 +58,14 @@ applied to a PROBE rather than to a claim: a probe aimed at the wrong file retur
 not an error. Before trusting a zero, ask which side would have had to change for the answer to be
 nonzero.
 
+Resolved in `a57ea1c0` by subtracting the four from BOTH sides of the comparison under a named
+`EAGERLY_FORWARDED_GATES`, carrying a pointer here and an explicit "delete this when composed
+stops binding unconditionally" — deliberately NOT by skipping the test. That assertion is the
+only oracle comparing Angular's two paths at all, so a skip trades one known red for zero reds
+and no coverage,
+and the silent state is the worse one. Narrowing keeps every other divergence caught, and the
+subtraction list is itself the marker that the debt is still open.
+
 Cite the HASH rather than a day for anything here: `781193de` was authored 2026-08-20 23:51 and
 committed 08-21 20:53, so two sessions reading `%ai` and `%ci` will each "correct" the other's
 date forever.

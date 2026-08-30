@@ -334,3 +334,25 @@ Two details that make it honest rather than decorative:
 And the ask that goes with it: **before running any packaging or overlay step, check whether a peer
 is measuring that example.** Three sessions share this tree; the cost of asking is one message and
 the cost of not asking is somebody's afternoon.
+
+## The `file:` manifest is local install state — it must never be committed
+
+Every trick above rewrites `examples/*/package.json` to point at a `.tarballs/*.tgz`, and npm
+records that path plus an `integrity` hash in `package-lock.json`. Both are machine-local: the
+tarball is gitignored, so a clone that gets the manifest gets a specifier resolving to nothing.
+
+The hazard is that a manifest looks like exactly the kind of file a commit is supposed to carry.
+Measured 2026-08-30: a repo-wide commit pass had `examples/{vue-sfc,vue-tsx,svelte}` — three
+manifests plus three locks — heading into the index, and the committer's own note was that a
+`git add examples` would have caught it only once already staged. It was stopped because a peer
+who had done the packing said so first.
+
+```bash
+command grep -l '"file:.*\.tgz"' examples/*/package.json   # must print nothing before a commit
+```
+
+Match on `.tgz`, not on a `../../.tarballs/` prefix: the path is relative to the example, so
+`examples/svelte` spells it `file:.tarballs/…` and a prefix-shaped probe reports it clean. Run the
+probe rather than reviewing a diff — a lock's stale `integrity` line reads as noise and the
+specifier is one line among forty. Whoever did the packing knows which examples are dirty, so on a
+shared tree the cheap version is to ask them before staging `examples/`.
