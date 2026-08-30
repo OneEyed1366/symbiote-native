@@ -58,11 +58,16 @@ describe('node census', () => {
 
     const profile = readCommitProfile();
     const census = censusRetainedTree(surface.children);
-    writeFileSync(
-      'census-vue.txt',
-      `vue ms=${elapsed.toFixed(1)} nodes=${census.nodes} walkMs=${profile.walkMs.toFixed(1)} ` +
-        `visited=${profile.nodesVisited} writes=${profile.propWrites}/${profile.propNoops}\n`,
-    );
+    // OPT-IN — see the note in the React twin: a relative path resolves against the CWD, so a
+    // full-suite run from the repo root writes into the repo.
+    const outPath = process.env.SYMBIOTE_CENSUS_OUT;
+    if (outPath !== undefined) {
+      writeFileSync(
+        outPath,
+        `vue ms=${elapsed.toFixed(1)} nodes=${census.nodes} walkMs=${profile.walkMs.toFixed(1)} ` +
+          `visited=${profile.nodesVisited} writes=${profile.propWrites}/${profile.propNoops}\n`,
+      );
+    }
     console.log(
       `CENSUS vue rows=${ROWS} ms=${elapsed.toFixed(1)} nodes=${census.nodes} ` +
         `anchors=${census.anchors} createNode=${fabric.counts.createNode} ` +

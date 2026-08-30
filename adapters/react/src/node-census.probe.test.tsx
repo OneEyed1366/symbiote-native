@@ -60,11 +60,18 @@ describe('node census', () => {
 
     const profile = readCommitProfile();
     const census = censusRetainedTree(surface.children);
-    writeFileSync(
-      'census-react.txt',
-      `react ms=${elapsed.toFixed(1)} nodes=${census.nodes} walkMs=${profile.walkMs.toFixed(1)} ` +
-        `visited=${profile.nodesVisited} writes=${profile.propWrites}/${profile.propNoops}\n`,
-    );
+    // OPT-IN, and the relative path is why. A bare `writeFileSync('census-react.txt', …)` resolves
+    // against the CWD, so every full-suite run from the repo root drops a file there — and the
+    // `.gitignore` entry that hid those files made it worse, because a clean `git status` is then
+    // the only thing anyone checks. Fix the write, never the visibility.
+    const outPath = process.env.SYMBIOTE_CENSUS_OUT;
+    if (outPath !== undefined) {
+      writeFileSync(
+        outPath,
+        `react ms=${elapsed.toFixed(1)} nodes=${census.nodes} walkMs=${profile.walkMs.toFixed(1)} ` +
+          `visited=${profile.nodesVisited} writes=${profile.propWrites}/${profile.propNoops}\n`,
+      );
+    }
     console.log(
       `CENSUS react rows=${ROWS} ms=${elapsed.toFixed(1)} nodes=${census.nodes} ` +
         `anchors=${census.anchors} createNode=${fabric.counts.createNode} ` +
