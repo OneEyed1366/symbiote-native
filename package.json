@@ -18,7 +18,7 @@
     "emit-svelte-declarations": "node scripts/emit-svelte-declarations.mjs",
     "overlay-local-packages": "node scripts/overlay-local-packages.mjs",
     "check:bundle-isolation": "node scripts/check-bundle-framework-isolation.mjs",
-    "test": "vitest run",
+    "test": "pnpm run test:vitest && pnpm run test:node",
     "test:watch": "vitest",
     "bench": "NODE_OPTIONS=--max-semi-space-size=64 vitest bench --run",
     "docs:dev": "pnpm --filter @symbiote-native/docs-site dev",
@@ -34,7 +34,9 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm run build && changeset publish",
-    "trust:publishers": "node scripts/trust-publishers.mjs"
+    "trust:publishers": "node scripts/trust-publishers.mjs",
+    "test:vitest": "vitest run",
+    "test:node": "node scripts/run-node-tests.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "catalog:",
