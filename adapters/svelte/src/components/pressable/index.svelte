@@ -22,15 +22,18 @@
 </script>
 
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import {
     createPressHandlers,
     createPressRuntime,
+    disposePressRuntime,
     rippleProps,
     buildPressableListeners,
     resolveDisabledAccessibilityState,
     resolveAccessibilityProps,
     noteHoverNoop,
     DEFAULT_DELAY_LONG_PRESS_MS,
+    DEFAULT_MIN_PRESS_DURATION_MS,
     type IPressHost,
     type IPressState,
   } from '@symbiote-native/components';
@@ -50,6 +53,7 @@
     hitSlop,
     pressRetentionOffset,
     unstable_pressDelay = 0,
+    __minPressDuration = DEFAULT_MIN_PRESS_DURATION_MS,
     android_ripple,
     android_disableSound,
     onHoverIn,
@@ -61,7 +65,10 @@
     class: className,
     children,
     ...rest
-  }: IPressableProps = $props();
+  }: IPressableProps & {
+    /** @internal Touchable* mirrors RN's Pressability minPressDuration: 0 override. */
+    __minPressDuration?: number;
+  } = $props();
 
   let pressed = $state(false);
   // Plain setup-scope object, never `$state`: mutated by the machine on every event, never
@@ -85,7 +92,12 @@
       const id = setTimeout(callback, ms);
       return () => clearTimeout(id);
     },
+    now: Date.now,
   };
+
+  onDestroy(() => {
+    disposePressRuntime(runtime);
+  });
 
   $effect(() => {
     noteHoverNoop(onHoverIn, onHoverOut);
@@ -107,6 +119,7 @@
         onLongPress,
         delayLongPress,
         unstable_pressDelay,
+        minPressDuration: __minPressDuration,
         hitSlop,
         pressRetentionOffset,
       },

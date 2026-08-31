@@ -8,6 +8,7 @@ import '@angular/compiler';
 import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
+import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from '../../render';
@@ -46,8 +47,32 @@ class PressableHost {
   }
 }
 
+let delayedHost: DelayedPressableHost | undefined;
+
+@Component({
+  selector: 'symbiote-delayed-pressable-host',
+  standalone: true,
+  imports: [Pressable],
+  template: `
+    <Pressable
+      [testID]="'delayed-pressable'"
+      [unstable_pressDelay]="30"
+      (pressIn)="onPressIn($event)"
+    ></Pressable>
+  `,
+})
+class DelayedPressableHost {
+  onPressIn = vi.fn();
+
+  constructor() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    delayedHost = this;
+  }
+}
+
 beforeEach(() => {
   capturedHost = undefined;
+  delayedHost = undefined;
   fabric.reset();
 });
 afterEach(() => {
@@ -78,7 +103,25 @@ describe('Pressable (no throwing path — see file header)', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
     expect(capturedHost?.onPress).toHaveBeenCalledOnce();
+    expect(capturedHost?.onPressOut).not.toHaveBeenCalled();
+    await new Promise<void>(resolve =>
+      setTimeout(resolve, DEFAULT_MIN_PRESS_DURATION_MS + 10),
+    );
     expect(capturedHost?.onPressOut).toHaveBeenCalledOnce();
+  });
+
+  it('cancels a pending press delay when Angular destroys the component', async () => {
+    mount(ROOT_TAG, DelayedPressableHost);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    const node = fabric.find(n => n.props.testID === 'delayed-pressable');
+    expect(node).toBeDefined();
+
+    fabric.fireEvent(node?.instanceHandle, 'topTouchStart');
+    unmount(ROOT_TAG);
+    await new Promise<void>(resolve => setTimeout(resolve, 40));
+    expect(delayedHost?.onPressIn).not.toHaveBeenCalled();
+    // Clear the process-global responder only after proving ngOnDestroy cancelled the timer.
+    fabric.fireEvent(node?.instanceHandle, 'topTouchCancel');
   });
 
   it('resolves a class= on the Pressable use site onto the real committed view, not the anchor', async () => {

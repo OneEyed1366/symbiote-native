@@ -15,6 +15,7 @@
 import {
   defineComponent,
   h,
+  onUnmounted,
   ref,
   shallowRef,
   type EmitFn,
@@ -23,12 +24,14 @@ import {
 import {
   createPressHandlers,
   createPressRuntime,
+  disposePressRuntime,
   rippleProps,
   buildPressableListeners,
   resolveDisabledAccessibilityState,
   noteHoverNoop,
   resolveAccessibilityProps,
   DEFAULT_DELAY_LONG_PRESS_MS,
+  DEFAULT_MIN_PRESS_DURATION_MS,
   type IPressHost,
   type IPressState,
   type IRectOffset,
@@ -194,6 +197,7 @@ const HANDLED_ATTRS = [
   'cancelable',
   'pressRetentionOffset',
   'unstable_pressDelay',
+  '__minPressDuration',
   'android_ripple',
   'android_disableSound',
   'onHoverIn',
@@ -243,7 +247,12 @@ export const Pressable = defineComponent(
         const id = setTimeout(callback, ms);
         return () => clearTimeout(id);
       },
+      now: Date.now,
     };
+
+    onUnmounted(() => {
+      disposePressRuntime(runtime);
+    });
 
     return () => {
       const attrs = normalizeVueAttrs(rawAttrs);
@@ -262,6 +271,10 @@ export const Pressable = defineComponent(
           DEFAULT_DELAY_LONG_PRESS_MS,
         ),
         unstable_pressDelay: numberOr(attrs.unstable_pressDelay, 0),
+        minPressDuration: numberOr(
+          attrs.__minPressDuration,
+          DEFAULT_MIN_PRESS_DURATION_MS,
+        ),
         hitSlop: asRectOffset(attrs.hitSlop),
         pressRetentionOffset: asRectOffset(attrs.pressRetentionOffset),
       };

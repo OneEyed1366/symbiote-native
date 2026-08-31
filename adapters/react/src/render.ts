@@ -12,7 +12,7 @@ import {
   type IRootTag,
   type SymbioteSurface,
 } from '@symbiote-native/engine';
-import reconciler, { withDiscretePriority } from './host-config';
+import reconciler, { flushExternalUpdate } from './host-config';
 import { LegacyRoot } from './reconciler-constants';
 
 const noop = (): void => {};
@@ -71,10 +71,8 @@ const onRecoverableError = errorReporter('react render (recovered)');
 // to compare against Vue/Angular's microtask-coalesced requestCommit(). Kept
 // behind DEBUG per <keep_logs_gate_behind_DEBUG>, never removed.
 setEventDispatcher(run => {
-  withDiscretePriority(run);
   dlog('react event-dispatch: forced flushSyncWork');
-  // @ts-expect-error flushSyncWork exists at runtime in react-reconciler 0.33
-  reconciler.flushSyncWork();
+  flushExternalUpdate(run);
 });
 
 // The reconciler container per surface, so a surface can be torn down (unmount)

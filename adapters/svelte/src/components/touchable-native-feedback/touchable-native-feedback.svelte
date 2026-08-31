@@ -40,7 +40,7 @@
   const nativeProps = $derived(backgroundProps(resolved, useForeground));
 </script>
 
-<Pressable {...rest}>
+<Pressable __minPressDuration={0} {...rest}>
   {#snippet children()}
     <symbiote-view p={nativeProps}>
       {@render content?.()}

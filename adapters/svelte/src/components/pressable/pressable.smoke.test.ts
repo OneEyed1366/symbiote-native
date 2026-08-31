@@ -104,9 +104,9 @@ async function loadMountable(): Promise<Component> {
   compileToFile(
     `<script>
        import Pressable from './.smoke-compiled-pressable.mjs';
-       let { onPress, onPressIn, onPressOut } = $props();
+       let { onPress, onPressIn, onPressOut, unstable_pressDelay } = $props();
      </script>
-     <Pressable {onPress} {onPressIn} {onPressOut}>
+     <Pressable {onPress} {onPressIn} {onPressOut} {unstable_pressDelay}>
        {#snippet children(state)}
          <symbiote-view p={{ testID: state.pressed ? 'pressed' : 'idle' }} />
        {/snippet}
@@ -214,7 +214,34 @@ describe('Pressable (real compiled index.svelte)', () => {
 
       fabric.fireEvent(handle, 'topTouchEnd');
       await waitUntil(() => presses === 1, 'onPress after topTouchEnd');
-      expect(pressOuts).toBe(1);
+      expect(pressOuts).toBe(0);
+      await waitUntil(
+        () => pressOuts === 1,
+        'onPressOut after the active-duration floor',
+      );
+    });
+
+    it('cancels a pending unstable_pressDelay timer on destroy', async () => {
+      let pressIns = 0;
+      const Parent = await loadMountable();
+      mount(ROOT_TAG, Parent, {
+        unstable_pressDelay: 30,
+        onPress: () => {},
+        onPressIn: () => {
+          pressIns++;
+        },
+        onPressOut: () => {},
+      });
+      await tick();
+      await tick();
+
+      const handle = responderHandle();
+      fabric.fireEvent(handle, 'topTouchStart');
+      unmount(ROOT_TAG);
+      await new Promise(resolve => setTimeout(resolve, 40));
+      expect(pressIns).toBe(0);
+      // Clear the process-global responder only after proving onDestroy cancelled the timer.
+      fabric.fireEvent(handle, 'topTouchCancel');
     });
 
     // why: proves the `IPressHost.setPressed` bridge actually reaches the parameterized

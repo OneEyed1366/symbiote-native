@@ -24,6 +24,7 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import { Pressable } from './pressable';
@@ -181,8 +182,10 @@ describe('Solid Pressable on the engine', () => {
       expect(presses).toBe(0);
 
       fire(handle, TOUCH_END);
-      expect(pressOuts).toBe(1);
+      expect(pressOuts).toBe(0);
       expect(presses).toBe(1);
+      vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
+      expect(pressOuts).toBe(1);
     });
 
     // why: RN's disabled Pressable must not claim the responder or fire feedback at all, and must
@@ -309,12 +312,16 @@ describe('Solid Pressable on the engine', () => {
       fireAt(handle, TOUCH_MOVE, 108, 106); // hypot(8,6) = 10 < 30 -> retained
       fireAt(handle, TOUCH_END, 108, 106);
       expect(presses).toBe(1);
+      expect(pressOuts).toBe(0);
+      vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
       expect(pressOuts).toBe(1);
 
       presses = 0;
       pressOuts = 0;
       fireAt(handle, TOUCH_START, 100, 100);
       fireAt(handle, TOUCH_MOVE, 200, 100); // 100 > 30 -> drifted out
+      expect(pressOuts).toBe(0);
+      vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
       expect(pressOuts).toBe(1);
       fireAt(handle, TOUCH_END, 200, 100);
       expect(presses).toBe(0);
@@ -348,12 +355,15 @@ describe('Solid Pressable on the engine', () => {
       fireAt(handle, TOUCH_MOVE, 130, 20);
       fireAt(handle, TOUCH_END, 130, 20);
       expect(presses).toBe(1);
+      vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
 
-      // (b) y=80 is past the bottom edge (40+30=70) -> drifted out, early pressOut, tap dropped.
+      // (b) y=80 is past the bottom edge (40+30=70) -> drifted out, tap dropped.
       presses = 0;
       pressOuts = 0;
       fireAt(handle, TOUCH_START, 50, 20);
       fireAt(handle, TOUCH_MOVE, 50, 80);
+      expect(pressOuts).toBe(0);
+      vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
       expect(pressOuts).toBe(1);
       fireAt(handle, TOUCH_END, 50, 80);
       expect(presses).toBe(0);
@@ -395,6 +405,29 @@ describe('Solid Pressable on the engine', () => {
       fireAt(handle, TOUCH_END, 50, 50); // released before advancing the timer
       expect(pressIns).toBe(1);
       expect(presses).toBe(1);
+    });
+
+    it('cancels a pending unstable_pressDelay timer on unmount', async () => {
+      let pressIns = 0;
+      mount(ROOT_TAG, () => (
+        <Pressable
+          testID={TARGET}
+          unstable_pressDelay={PRESS_DELAY_MS}
+          onPressIn={() => {
+            pressIns++;
+          }}
+        />
+      ));
+      await flush();
+
+      const handle = responderHandle();
+      fire(handle, TOUCH_START);
+      unmount(ROOT_TAG);
+      vi.advanceTimersByTime(PRESS_DELAY_MS);
+      expect(pressIns).toBe(0);
+      // The adapter is already disposed; clear the test harness's process-global responder only
+      // after the assertion, so cancellation cannot make the timer test falsely green.
+      fire(handle, 'topTouchCancel');
     });
 
     // why: onPressMove is a distinct RN callback from the retention drift bookkeeping — it must
@@ -598,6 +631,7 @@ describe('Solid Pressable on the engine', () => {
       expect(findCommitted(n => n.props.testID === 'pressed')).toBeDefined();
 
       fire(handle, TOUCH_END);
+      vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
       await flush();
       expect(findCommitted(n => n.props.testID === 'idle')).toBeDefined();
     });
@@ -680,6 +714,7 @@ describe('Solid Pressable on the engine', () => {
       );
 
       fire(handle, TOUCH_END);
+      vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
       await flush();
       expect(committedTargetProps().opacity).toBe(1);
     });
