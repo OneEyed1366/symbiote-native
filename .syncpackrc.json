@@ -6,7 +6,7 @@
       "isIgnored": true
     },
     {
-      "label": "peerDependencies are compatibility ranges, deliberately not catalog-pinned",
+      "label": "peerDependencies are contracts: external ranges or internal workspace:^",
       "dependencyTypes": ["peer"],
       "isIgnored": true
     },

@@ -70,7 +70,7 @@
   "peerDependencies": {
     "@angular/core": ">=20",
     "@angular/forms": ">=20",
-    "@symbiote-native/engine": ">=0.1.7",
+    "@symbiote-native/engine": "workspace:^",
     "react-native": ">=0.86"
   },
   "devDependencies": {
