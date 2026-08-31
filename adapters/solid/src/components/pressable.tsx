@@ -26,6 +26,7 @@
 import {
   createEffect,
   createMemo,
+  onCleanup,
   createSignal,
   splitProps,
   untrack,
@@ -36,10 +37,12 @@ import {
   buildPressableListeners,
   createPressHandlers,
   createPressRuntime,
+  disposePressRuntime,
   noteHoverNoop,
   resolveDisabledAccessibilityState,
   rippleProps,
   DEFAULT_DELAY_LONG_PRESS_MS,
+  DEFAULT_MIN_PRESS_DURATION_MS,
   type IAccessibilityProps,
   type IAriaProps,
   type IPressHandler,
@@ -157,7 +160,10 @@ const HANDLED_PROPS = [
 // `hitSlop` is deliberately NOT in that list: the machine reads it for the retention test AND the
 // host needs it to enlarge the touch target, so it forwards through `rest` untouched.
 
-export function Pressable(props: IPressableProps): JSX.Element {
+function PressableImpl(
+  props: IPressableProps,
+  minPressDuration: number,
+): JSX.Element {
   const [local, rest] = splitProps(props, HANDLED_PROPS);
 
   const [pressed, setPressed] = createSignal(false);
@@ -193,7 +199,12 @@ export function Pressable(props: IPressableProps): JSX.Element {
         clearTimeout(id);
       };
     },
+    now: Date.now,
   };
+
+  onCleanup(() => {
+    disposePressRuntime(runtime);
+  });
 
   // Rebuilt when the caller's config changes (the closures capture live values); the runtime
   // persists across rebuilds, so an in-flight timer or drift flag survives one. Deliberately does
@@ -208,6 +219,7 @@ export function Pressable(props: IPressableProps): JSX.Element {
         onLongPress: local.onLongPress,
         delayLongPress: local.delayLongPress ?? DEFAULT_DELAY_LONG_PRESS_MS,
         unstable_pressDelay: local.unstable_pressDelay ?? 0,
+        minPressDuration,
         hitSlop: rest.hitSlop,
         pressRetentionOffset: local.pressRetentionOffset,
       },
@@ -307,4 +319,13 @@ export function Pressable(props: IPressableProps): JSX.Element {
       {renderContent()}
     </View>
   );
+}
+
+export function Pressable(props: IPressableProps): JSX.Element {
+  return PressableImpl(props, DEFAULT_MIN_PRESS_DURATION_MS);
+}
+
+// Relative-only composition seam; the public component barrel exports Pressable, never this.
+export function TouchablePressable(props: IPressableProps): JSX.Element {
+  return PressableImpl(props, 0);
 }

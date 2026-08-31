@@ -8,7 +8,8 @@
 // Pressable whose pressed style sets opacity:0.2 fully drops opacity on release.
 
 import { createElement, useState, type ReactElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { Pressable, Text, View, mount, unmount } from '@symbiote-native/react';
 
 interface IFakeNode {
@@ -132,9 +133,13 @@ function findByTestId(nodes: IFakeNode[], id: string): IFakeNode | undefined {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   committed = [];
 });
-afterEach(() => unmount(ROOT_TAG));
+afterEach(() => {
+  unmount(ROOT_TAG);
+  vi.useRealTimers();
+});
 
 describe('clone-on-write prop removal', () => {
   // Positive only: this is a regression on the commit's merge semantics, not a guard clause —
@@ -156,7 +161,16 @@ describe('clone-on-write prop removal', () => {
       );
 
       eventHandler!(handle, 'topTouchEnd', {});
-      // The whole point: opacity must be GONE (reset), not stuck at 0.2 after the merge.
+      // Plain Pressable follows RN's 130ms active-duration floor, so the prop remains during the
+      // floor and must then be GONE (reset), not stuck at 0.2 after the Fabric merge.
+      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
+        ACTIVE_OPACITY,
+      );
+      vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS - 1);
+      expect(findByTestId(committed, TEST_ID)?.props.opacity).toBe(
+        ACTIVE_OPACITY,
+      );
+      vi.advanceTimersByTime(1);
       expect(findByTestId(committed, TEST_ID)?.props.opacity).toBeUndefined();
     });
   });

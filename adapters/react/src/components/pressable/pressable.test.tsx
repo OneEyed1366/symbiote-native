@@ -9,18 +9,17 @@
 // shared recorder has no `measure`, so graft a configurable one onto the live slot before
 // any mount. Long-press / pressDelay timers run on vitest fake timers.
 //
-// SCOPE: `@symbiote-native/components/state/pressable.ts` (the timer/drift/suppression machine
-// createPressHandlers/createPressRuntime is called from) has NO co-located unit test of its own
-// (unlike touchable.ts, which does — core/components/src/state/touchable.test.ts). This file is
-// therefore not pure adapter-wiring coverage: it is, together with the Svelte smoke test, the
-// only place the shared press machine's actual timer/drift/suppression behavior is proven. Kept
-// here rather than split out, because the machine has no seam to drive without real touch events.
+// SCOPE: core/components/src/state/pressable.test.ts owns the timer/transition machine directly.
+// This file proves the React lifecycle bridge: responder listeners reach the real host, state
+// updates survive a re-render, the 130ms floor uses React's scheduler/clock, and unmount disposes
+// pending work.
 //
 // No Negative group: nothing here has a throwing path. "disabled" suppresses a press silently
 // (a Positive contract — completes without error, callback just never fires), it never rejects.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount, Pressable, Button } from '@symbiote-native/react';
+import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 110;
@@ -283,13 +282,17 @@ describe('React Pressable on the engine', () => {
     fireAt(handle, TOUCH_MOVE, 108, 106); // hypot(8,6) = 10 < 30 -> retained
     fireAt(handle, TOUCH_END, 108, 106);
     expect(presses).toBe(1);
+    expect(pressOuts).toBe(0);
+    vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
     expect(pressOuts).toBe(1);
 
-    // (b) large drift past the region -> tap suppressed, early pressOut fired.
+    // (b) large drift past the region -> tap suppressed; pressOut keeps RN's active floor.
     presses = 0;
     pressOuts = 0;
     fireAt(handle, TOUCH_START, 100, 100);
     fireAt(handle, TOUCH_MOVE, 200, 100); // 100 > 30 -> drifted out
+    expect(pressOuts).toBe(0);
+    vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
     expect(pressOuts).toBe(1);
     fireAt(handle, TOUCH_END, 200, 100);
     expect(presses).toBe(0);
@@ -335,6 +338,49 @@ describe('React Pressable on the engine', () => {
     expect(presses).toBe(1);
   });
 
+  it('holds onPressOut for RN’s 130ms minimum active duration', () => {
+    let pressOuts = 0;
+    mount(
+      ROOT_TAG,
+      <Pressable
+        onPress={() => {}}
+        onPressOut={() => {
+          pressOuts++;
+        }}
+      />,
+    );
+    const handle = responderHandle();
+
+    fire(handle, TOUCH_START);
+    fire(handle, TOUCH_END);
+    expect(pressOuts).toBe(0);
+    vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS - 1);
+    expect(pressOuts).toBe(0);
+    vi.advanceTimersByTime(1);
+    expect(pressOuts).toBe(1);
+  });
+
+  it('cancels a pending unstable_pressDelay timer on unmount', () => {
+    let pressIns = 0;
+    mount(
+      ROOT_TAG,
+      <Pressable
+        unstable_pressDelay={120}
+        onPressIn={() => {
+          pressIns++;
+        }}
+      />,
+    );
+
+    const handle = responderHandle();
+    fire(handle, TOUCH_START);
+    unmount(ROOT_TAG);
+    vi.advanceTimersByTime(120);
+    expect(pressIns).toBe(0);
+    // Clear the test harness's process-global responder after proving teardown cancelled the timer.
+    fire(handle, 'topTouchCancel');
+  });
+
   // why: pressRetentionOffset can be set per-edge (not just a uniform radius) — the drift test
   // must measure against the real per-edge frame, not a symmetric approximation, or an
   // asymmetric layout (e.g. a wide short button) would retain/drop on the wrong side.
@@ -361,12 +407,15 @@ describe('React Pressable on the engine', () => {
     fireAt(handle, TOUCH_MOVE, 130, 20);
     fireAt(handle, TOUCH_END, 130, 20);
     expect(presses).toBe(1);
+    vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
 
-    // (b) y=80 is past the bottom edge (40+30=70) -> drifted out, early pressOut, tap dropped.
+    // (b) y=80 is past the bottom edge (40+30=70) -> drifted out, tap dropped.
     presses = 0;
     pressOuts = 0;
     fireAt(handle, TOUCH_START, 50, 20);
     fireAt(handle, TOUCH_MOVE, 50, 80);
+    expect(pressOuts).toBe(0);
+    vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
     expect(pressOuts).toBe(1);
     fireAt(handle, TOUCH_END, 50, 80);
     expect(presses).toBe(0);

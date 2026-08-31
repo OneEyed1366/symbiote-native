@@ -201,6 +201,7 @@ export type {
 export {
   createPressHandlers,
   createPressRuntime,
+  disposePressRuntime,
   normalizeRect,
   maxEdge,
   isTouchWithinRegion,
@@ -208,6 +209,7 @@ export {
   computeRegion,
   rippleProps,
   DEFAULT_DELAY_LONG_PRESS_MS,
+  DEFAULT_MIN_PRESS_DURATION_MS,
   DEFAULT_PRESS_RECT_OFFSETS,
 } from './state/pressable';
 export type {

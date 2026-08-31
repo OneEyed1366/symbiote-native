@@ -253,10 +253,12 @@ adapters, why it was not fixed, and what would prove the fix.
 
 ### Open — Touchable family (audit 2026-08-19)
 
-- **pressIn duration on responder grant.** RN fades over 0 ms when the press-in arrives with the
-  grant and 150 ms otherwise; we always use 150. UNREACHABLE today: the branch needs
-  `event.dispatchConfig.registrationName`, which our Pressable does not emit. Fixing it means
-  widening the event payload — an engine change, not an adapter one.
+- **Touchable re-entry opacity duration.** The shared Pressable machine now deactivates when a
+  touch leaves its retention region and re-activates (including a second `onPressIn`) when it
+  returns. TouchableOpacity still applies its grant duration, 0 ms, to both activations. RN uses
+  0 ms for the initial responder grant but 150 ms for drift-back-in. Closing the final visual
+  difference needs the shared machine to expose the activation reason (`grant` vs `re-entry`) to
+  the Touchable feedback callback; widening the public event payload is unnecessary.
 - **Underlay style distribution.** RN puts `opacity` on the CHILD and `backgroundColor` on the
   container (`TouchableHighlight.js`). React (`cloneElement`) and Vue (`cloneVNode`) now do this
   and were verified to insert no extra node. **Angular and Solid still put both on the container**
@@ -270,24 +272,6 @@ adapters, why it was not fixed, and what would prove the fix.
   `resetAnimation()` on teardown (root teardown already stops the leaf, so a test greens on broken
   code too — one was written, proved vacuous, and deleted); and the visual→callback ORDER on
   Angular (the visual only reaches the tree on a later async CD pass).
-- **No drift-back-in re-activation — all five adapters.** RN's Pressability has a state
-  `RESPONDER_INACTIVE_PRESS_OUT` and transitions back to `RESPONDER_ACTIVE_PRESS_IN` when the
-  finger leaves the retention region and returns, re-firing `onPressIn` (over 150 ms, not 0 —
-  that is the branch `OPACITY_ACTIVE_DURATION_MS` still exists for). Our engine dispatches
-  `pressIn` from exactly one place, `core/engine/src/events/index.ts:391` on topTouchStart, and
-  has no re-activation path at all: once the press drifts out, only pressOut can follow. Closing
-  this is a press-STATE-MACHINE change (`core/components/src/state/pressable.ts` plus the engine's
-  move stream), not an event-payload one — an earlier reading of this gap blamed a missing
-  `dispatchConfig.registrationName` and proposed widening `ISymbioteEvent`, which would not have
-  helped: with one origin the field would always carry the same value.
-- **Press timers are never cancelled on unmount — React, Vue, Angular, Svelte.** Found 2026-08-19
-  while migrating Svelte, OUTSIDE the original ten. `scheduleTimeout` returns a canceller and the
-  shared machine stores it (`runtime.pressDelayCancel`), but nothing calls it when the component
-  goes away: a pending `unstable_pressDelay` timer fires into an unmounted component, calling
-  `onPressIn` and starting an animation on a dead leaf. **Solid is the only adapter that closed
-  this**, via a `createTimeoutScheduler()` that keeps a Set of cancellers and clears them in
-  `onCleanup`. Port that shape to the other four. A test for it was written during the Svelte pass,
-  failed, and was DELETED rather than weakened — write it again with the fix.
 - **A stale header claiming an impossibility cost real work, twice in one day.** Svelte's
   TouchableOpacity carried a homemade `tweenOpacity` over `setTimeout` and a header stating this
   adapter has no Animated binding — untrue since `modules/animated` landed, so `useNativeDriver`
@@ -295,12 +279,6 @@ adapters, why it was not fixed, and what would prove the fix.
   namespace header claimed a generic `createAnimatedComponent` was impossible; a four-line probe
   refuted it. Treat any header sentence of the form "X is impossible on this adapter" as an
   untested claim with a date attached, not a finding.
-- **`Pressable` has no `minPressDuration` at all.** Surfaced by deleting
-  `DEFAULT_MIN_PRESS_DURATION_MS` (2026-08-19, once all five adapters had migrated): the constant
-  turned out to have NO production consumer — `core/components/src/state/pressable.ts` never
-  implements a press-duration floor, so RN's 130 ms Pressability default is simply absent for a
-  plain `Pressable`. The Touchable family is correct without it (RN overrides it with 0 there),
-  but a plain Pressable in RN does hold the active visual for 130 ms and ours does not.
 
 ### How to run a conformance pass on a component
 

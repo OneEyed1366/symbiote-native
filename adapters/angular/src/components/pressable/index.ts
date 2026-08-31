@@ -13,11 +13,14 @@ import {
   ViewChild,
   type DoCheck,
   type OnChanges,
+  type OnDestroy,
 } from '@angular/core';
 import {
   createPressHandlers,
   createPressRuntime,
+  disposePressRuntime,
   DEFAULT_DELAY_LONG_PRESS_MS,
+  DEFAULT_MIN_PRESS_DURATION_MS,
   isTerminationAllowed,
   resolveAccessibilityProps,
   resolveDisabledAccessibilityState,
@@ -150,7 +153,9 @@ function asSymbioteEvent(event: unknown): ISymbioteEvent | undefined {
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
+export class Pressable
+  implements IAngularPressableInputs, OnChanges, OnDestroy, DoCheck
+{
   // The press/hover lifecycle as real Angular events: `(press)="onTap($event)"`, not
   // `[onPress]="onTap"`. createPressHandlers still wants plain IPressHandler callbacks, so
   // emitterHandler() below adapts each EventEmitter into one - only while something is actually
@@ -176,6 +181,8 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
   @Input() hitSlop?: IRectOffset;
   @Input() pressRetentionOffset?: IRectOffset;
   @Input() unstable_pressDelay?: number;
+  /** @internal Touchable* mirrors RN's Pressability minPressDuration: 0 override. */
+  @Input() __minPressDuration = DEFAULT_MIN_PRESS_DURATION_MS;
   @Input() android_ripple?: IPressableAndroidRippleConfig;
   @Input() android_disableSound?: boolean;
   @Input() delayHoverIn?: number;
@@ -255,6 +262,7 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
       const id = setTimeout(callback, ms);
       return () => clearTimeout(id);
     },
+    now: Date.now,
   };
 
   private readonly changeDetector = inject(ChangeDetectorRef);
@@ -287,6 +295,10 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
   // write registers no dependency on the caller's view and cannot throw NG0600.
   ngDoCheck(): void {
     this.anchorStyle.set(anchorHostStyle(this.elementRef));
+  }
+
+  ngOnDestroy(): void {
+    disposePressRuntime(this.runtime);
   }
 
   ngOnChanges(): void {
@@ -449,6 +461,7 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
       onLongPress: this.emitterHandler(this.longPress),
       delayLongPress: this.delayLongPress ?? DEFAULT_DELAY_LONG_PRESS_MS,
       unstable_pressDelay: this.unstable_pressDelay ?? 0,
+      minPressDuration: this.__minPressDuration,
       hitSlop: this.hitSlop,
       pressRetentionOffset: this.pressRetentionOffset,
     };

@@ -21,6 +21,7 @@
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import { ActivityIndicator } from './activity-indicator';
@@ -132,8 +133,13 @@ describe('Pressable with a function child, across repeated press cycles', () => 
     );
 
     fabric.fireEvent(handle, TOUCH_END);
-    await flush();
-    expect(committedLabel(), 'the leaf must go back').toBe('up');
+    await new Promise(resolve =>
+      setTimeout(resolve, DEFAULT_MIN_PRESS_DURATION_MS + 10),
+    );
+    expect(
+      committedLabel(),
+      'the leaf must go back after RN’s active floor',
+    ).toBe('up');
     expect(fabric.counts.createNode, 'release rebuilt the child subtree').toBe(
       createdAtMount,
     );
@@ -249,8 +255,10 @@ describe('Pressable with a function child, across repeated press cycles', () => 
     expect(committedLabel(), 'while held').toBe('down');
 
     fabric.fireEvent(handle, TOUCH_END);
-    await flush();
-    expect(committedLabel(), 'after release').toBe('up');
+    await new Promise(resolve =>
+      setTimeout(resolve, DEFAULT_MIN_PRESS_DURATION_MS + 10),
+    );
+    expect(committedLabel(), 'after the active-duration floor').toBe('up');
   });
 
   // why: the last device-only difference the tests above cannot reach. Real touches carry
