@@ -108,36 +108,44 @@ const LONG_PRESS_DEACTIVATION_DISTANCE = 10;
 
 let installed = false;
 
-// Target of the in-flight touch, remembered at topTouchStart and consumed (or
-// cleared) at topTouchEnd / topTouchCancel.
-let pressStart: ISymbioteNode | undefined;
+interface IPressGesture {
+  owner: ISymbioteNode;
+  longPressTimer: ReturnType<typeof setTimeout> | undefined;
+  longPressFired: boolean;
+  longPressStart: { x: number; y: number } | undefined;
+}
+
+// Each unrelated target owns an independent press. Additional fingers under the same owner join
+// that press, so one target still receives exactly one pressIn/press/pressOut lifecycle.
+const activePresses = new Set<IPressGesture>();
 
 // The node that claimed the responder for the in-flight touch (PanResponder), or
 // undefined when nobody claimed it. Receives move and release/terminate.
 let currentResponder: ISymbioteNode | undefined;
 
-// Long-press synthesis: armed at touch start when some node in the press path listens
-// for it, fired once after the hold delay, disarmed on end/cancel; the same arm/clear
-// lifecycle Pressable runs in JS. Pressability ALSO cancels the timer when the touch
-// drifts past LONG_PRESS_DEACTIVATION_DISTANCE, so we record the start point at touch
-// start and clear the timer on a move that exceeds it.
-let longPressTimer: ReturnType<typeof setTimeout> | undefined;
-let longPressFired = false;
-// Touch coordinate at touch start (pageX/pageY), or undefined when the native event
-// carried no coords; then the move-distance cancel is simply skipped.
-let longPressStart: { x: number; y: number } | undefined;
-
-function clearLongPress(): void {
-  if (longPressTimer !== undefined) {
-    clearTimeout(longPressTimer);
-    longPressTimer = undefined;
+function clearLongPress(press: IPressGesture): void {
+  if (press.longPressTimer !== undefined) {
+    clearTimeout(press.longPressTimer);
+    press.longPressTimer = undefined;
   }
 }
 
-// Read the gesture's page coordinate from a raw native touch event, defensively: RN
-// puts pageX/pageY on the event for a single touch, or on the first entry of a
-// `touches` array for multi-touch. Returns undefined when neither shape carries
-// numbers, so callers skip any coordinate-dependent logic rather than guess.
+function takeAllPresses(): IPressGesture[] {
+  const presses = [...activePresses];
+  activePresses.clear();
+  for (const press of presses) clearLongPress(press);
+  return presses;
+}
+
+function findActivePress(target: ISymbioteNode): IPressGesture | undefined {
+  for (const press of activePresses) {
+    if (endsWithin(target, press.owner)) return press;
+  }
+  return undefined;
+}
+
+// Read the changed finger's page coordinate from a raw native touch event, falling back to the
+// active-touch list and then undefined. Callers skip coordinate-dependent logic rather than guess.
 function readTouchPoint(
   nativeEvent: Record<string, unknown>,
 ): { x: number; y: number } | undefined {
@@ -152,22 +160,26 @@ function readTouchPoint(
   };
   const direct = fromPair(nativeEvent);
   if (direct) return direct;
-  const touches = nativeEvent.touches;
-  if (Array.isArray(touches)) {
-    const first = touches[0];
-    if (isRecord(first)) return fromPair(first);
+  // `changedTouches` identifies the finger for this frame. Read it before the full active-touch
+  // list, whose first entry may belong to another simultaneously pressed target.
+  for (const key of ['changedTouches', 'touches'] as const) {
+    const touches = nativeEvent[key];
+    if (!Array.isArray(touches)) continue;
+    for (const touch of touches) {
+      if (!isRecord(touch)) continue;
+      const point = fromPair(touch);
+      if (point) return point;
+    }
   }
   return undefined;
 }
 
-// Whether any touch still down started inside the responder (its target IS the
-// responder or a descendant). RN's noResponderTouches walks nativeEvent.touches and
-// returns false the moment one is found; a release fires only when none remain. The
-// headless smokes fire with an empty `{}` event (no `touches`) -> no remaining touch ->
-// release fires, preserving single-touch behavior. (ResponderEventPlugin.noResponder-
-// Touches + isAncestor.)
-function hasRemainingResponderTouch(
-  responder: ISymbioteNode,
+// Whether any touch still down started inside an owner (its target IS the owner or a descendant).
+// RN's noResponderTouches walks nativeEvent.touches and returns false the moment one is found; a
+// responder release and our synthesized press completion both wait until none remain. The headless
+// smokes fire with an empty `{}` event -> no remaining touch -> preserve single-touch behavior.
+function hasRemainingTouchWithin(
+  owner: ISymbioteNode,
   nativeEvent: Record<string, unknown>,
 ): boolean {
   const touches = nativeEvent.touches;
@@ -175,7 +187,7 @@ function hasRemainingResponderTouch(
   for (const touch of touches) {
     if (!isRecord(touch)) continue;
     const target = touch.target;
-    if (isSymbioteNode(target) && endsWithin(target, responder)) return true;
+    if (isSymbioteNode(target) && endsWithin(target, owner)) return true;
   }
   return false;
 }
@@ -372,23 +384,39 @@ export function installEventHandler(): void {
         // read each touch's own previous->current delta; RN records before dispatch.
         recordTouchTrack('start', nativeEvent);
         attachTouchHistory(nativeEvent);
-        pressStart = instanceHandle;
-        // Arm long-press synthesis: only when a listener exists in the path, fired once
-        // after the hold delay, then suppresses the tap (longPressFired) on release.
-        longPressFired = false;
-        clearLongPress();
-        longPressStart = readTouchPoint(nativeEvent);
-        if (hasListenerInPath(instanceHandle, LONG_PRESS)) {
-          const longPressTarget = instanceHandle;
-          longPressTimer = setTimeout(() => {
-            longPressTimer = undefined;
-            longPressFired = true;
-            dlog('synthesized longPress -> dispatch');
-            runWrapped(() => bubble(longPressTarget, LONG_PRESS, nativeEvent));
-          }, DEFAULT_LONG_PRESS_MS);
+        const canJoinExistingPress =
+          Array.isArray(nativeEvent.touches) && nativeEvent.touches.length > 1;
+        const joinedPress = canJoinExistingPress
+          ? findActivePress(instanceHandle)
+          : undefined;
+        // A one-touch or identifier-less frame starts a new physical gesture. Any surviving press
+        // is stale (its end/cancel was lost), so release it instead of letting it suppress this start.
+        const stalePresses = canJoinExistingPress ? [] : takeAllPresses();
+        let startedPress: IPressGesture | undefined;
+        if (joinedPress === undefined) {
+          startedPress = {
+            owner: instanceHandle,
+            longPressTimer: undefined,
+            longPressFired: false,
+            longPressStart: readTouchPoint(nativeEvent),
+          };
+          activePresses.add(startedPress);
+          if (hasListenerInPath(instanceHandle, LONG_PRESS)) {
+            const press = startedPress;
+            press.longPressTimer = setTimeout(() => {
+              if (!activePresses.has(press)) return;
+              press.longPressTimer = undefined;
+              press.longPressFired = true;
+              dlog('synthesized longPress -> dispatch');
+              runWrapped(() => bubble(press.owner, LONG_PRESS, nativeEvent));
+            }, DEFAULT_LONG_PRESS_MS);
+          }
         }
         runWrapped(() => {
-          bubble(instanceHandle, PRESS_IN, nativeEvent);
+          for (const stale of stalePresses)
+            bubble(stale.owner, PRESS_OUT, nativeEvent);
+          if (startedPress) bubble(startedPress.owner, PRESS_IN, nativeEvent);
+          else dlog('pressIn retained (another touch joined the active press)');
           // Responder negotiation runs alongside press synthesis: a View can be both
           // a Pressable (press) and a PanResponder target (responder).
           negotiateResponder(instanceHandle, 'start', nativeEvent);
@@ -402,16 +430,20 @@ export function installEventHandler(): void {
       if (topLevelType === TOUCH_MOVE) {
         recordTouchTrack('move', nativeEvent);
         attachTouchHistory(nativeEvent);
-        // Cancel the pending long press if the touch drifted too far (Pressability's
-        // deactivation-distance check). Skipped when either coord is unknown.
-        if (longPressTimer !== undefined && longPressStart) {
+        // Only the press owning this move can lose its long-press timer; movement on an unrelated
+        // simultaneously held Pressable must not disturb another target's clock.
+        const movedPress = findActivePress(instanceHandle);
+        if (
+          movedPress?.longPressTimer !== undefined &&
+          movedPress.longPressStart
+        ) {
           const here = readTouchPoint(nativeEvent);
           if (here) {
-            const dx = here.x - longPressStart.x;
-            const dy = here.y - longPressStart.y;
+            const dx = here.x - movedPress.longPressStart.x;
+            const dy = here.y - movedPress.longPressStart.y;
             if (Math.hypot(dx, dy) > LONG_PRESS_DEACTIVATION_DISTANCE) {
               dlog('longPress cancelled (moved past deactivation distance)');
-              clearLongPress();
+              clearLongPress(movedPress);
             }
           }
         }
@@ -429,8 +461,14 @@ export function installEventHandler(): void {
       if (topLevelType === TOUCH_END) {
         recordTouchTrack('end', nativeEvent);
         attachTouchHistory(nativeEvent);
-        const start = pressStart;
-        pressStart = undefined;
+        const hadActivePress = activePresses.size > 0;
+        const completedPresses: IPressGesture[] = [];
+        for (const press of activePresses) {
+          if (hasRemainingTouchWithin(press.owner, nativeEvent)) continue;
+          activePresses.delete(press);
+          clearLongPress(press);
+          completedPresses.push(press);
+        }
         const responder = currentResponder;
         // RN releases (and clears) the responder only when no remaining touch still down
         // started inside it; lifting ONE finger in a multi-touch gesture must NOT release.
@@ -438,28 +476,26 @@ export function installEventHandler(): void {
         // is unconditional, responderRelease is gated on noResponderTouches.)
         const releases =
           responder !== undefined &&
-          !hasRemainingResponderTouch(responder, nativeEvent);
+          !hasRemainingTouchWithin(responder, nativeEvent);
         if (releases) currentResponder = undefined;
-        // A completed long press eats the tap (RN), but pressOut still fires below.
-        const wasLongPress = longPressFired;
-        longPressFired = false;
-        longPressStart = undefined;
-        clearLongPress();
         runWrapped(() => {
-          if (start) {
-            // press fires only on an honest tap (ended within the responder); pressOut
-            // always fires on the responder so its pressed-state can release.
-            if (endsWithin(instanceHandle, start)) {
-              if (wasLongPress) {
+          for (const press of completedPresses) {
+            // Each target completes independently. An honest tap ends inside that target; pressOut
+            // always releases its pressed state, including a drag-away end.
+            if (endsWithin(instanceHandle, press.owner)) {
+              if (press.longPressFired) {
                 dlog('press suppressed (longPress already fired)');
               } else {
                 dlog('event press -> dispatch');
-                bubble(start, PRESS, nativeEvent);
+                bubble(press.owner, PRESS, nativeEvent);
               }
             }
-            bubble(start, PRESS_OUT, nativeEvent);
-          } else {
+            bubble(press.owner, PRESS_OUT, nativeEvent);
+          }
+          if (!hadActivePress) {
             dlog(`event ${TOUCH_END} ignored (no matching start)`);
+          } else if (completedPresses.length === 0) {
+            dlog('press retained (another touch remains inside its owner)');
           }
           // onResponderEnd fires on every finger-up; onResponderRelease (the final
           // release) only when the last responder touch lifted.
@@ -481,15 +517,12 @@ export function installEventHandler(): void {
       if (topLevelType === TOUCH_CANCEL) {
         recordTouchTrack('end', nativeEvent);
         attachTouchHistory(nativeEvent);
-        const start = pressStart;
-        pressStart = undefined;
+        const cancelledPresses = takeAllPresses();
         const responder = currentResponder;
         currentResponder = undefined;
-        longPressFired = false;
-        longPressStart = undefined;
-        clearLongPress();
         runWrapped(() => {
-          if (start) bubble(start, PRESS_OUT, nativeEvent);
+          for (const press of cancelledPresses)
+            bubble(press.owner, PRESS_OUT, nativeEvent);
           // A cancelled gesture ends then terminates (the responder was taken away).
           if (responder) {
             callOwnListener(responder, RESPONDER_END, nativeEvent);

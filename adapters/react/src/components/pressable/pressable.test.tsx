@@ -56,12 +56,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-// The responder is the Pressable's own RCTView, the first non-box-none RCTView created.
-function responderHandle(): unknown {
+// The responder is the Pressable's own non-box-none RCTView. `testID` disambiguates multiple
+// simultaneously mounted Pressables; omitted retains the common single-Pressable lookup.
+function responderHandle(testID?: string): unknown {
   const view = fabric.find(
-    n => n.viewName === 'RCTView' && n.props.pointerEvents !== 'box-none',
+    n =>
+      n.viewName === 'RCTView' &&
+      n.props.pointerEvents !== 'box-none' &&
+      (testID === undefined || n.props.testID === testID),
   );
-  if (!view) throw new Error('no RCTView (Pressable responder) was created');
+  if (!view)
+    throw new Error('no matching RCTView (Pressable responder) was created');
   return view.instanceHandle;
 }
 
@@ -137,6 +142,122 @@ describe('React Pressable on the engine', () => {
     fire(handle, TOUCH_START);
     fire(handle, TOUCH_END);
     expect(presses).toBe(1);
+  });
+
+  it('stays active across multiple touches and completes once on the final lift', () => {
+    const order: string[] = [];
+    mount(
+      ROOT_TAG,
+      <Pressable
+        onPressIn={() => order.push('in')}
+        onPress={() => order.push('press')}
+        onPressOut={() => order.push('out')}
+      />,
+    );
+    const handle = responderHandle();
+    const first = {
+      identifier: 1,
+      pageX: 10,
+      pageY: 10,
+      timestamp: 1,
+      target: handle,
+    };
+    const second = {
+      identifier: 2,
+      pageX: 12,
+      pageY: 10,
+      timestamp: 2,
+      target: handle,
+    };
+
+    fabric.fireEvent(handle, TOUCH_START, {
+      changedTouches: [first],
+      touches: [first],
+    });
+    fabric.fireEvent(handle, TOUCH_START, {
+      changedTouches: [second],
+      touches: [first, second],
+    });
+    expect(order).toEqual(['in']);
+
+    fabric.fireEvent(handle, TOUCH_END, {
+      changedTouches: [first],
+      touches: [second],
+    });
+    expect(order).toEqual(['in']);
+
+    fabric.fireEvent(handle, TOUCH_END, {
+      changedTouches: [second],
+      touches: [],
+    });
+    // The engine completes on the final lift. A higher-level Pressable implementation may retain
+    // its active visual/onPressOut for RN's 130ms minimum duration, so assert completion by that
+    // boundary rather than requiring a synchronous adapter callback.
+    vi.advanceTimersByTime(130);
+    expect(order).toEqual(['in', 'press', 'out']);
+  });
+
+  it('keeps simultaneous sibling Pressables independent', () => {
+    const firstOrder: string[] = [];
+    const siblingOrder: string[] = [];
+    mount(
+      ROOT_TAG,
+      <>
+        <Pressable
+          testID="first"
+          onPressIn={() => firstOrder.push('in')}
+          onPress={() => firstOrder.push('press')}
+          onPressOut={() => firstOrder.push('out')}
+        />
+        <Pressable
+          testID="sibling"
+          onPressIn={() => siblingOrder.push('in')}
+          onPress={() => siblingOrder.push('press')}
+          onPressOut={() => siblingOrder.push('out')}
+        />
+      </>,
+    );
+    const firstHandle = responderHandle('first');
+    const siblingHandle = responderHandle('sibling');
+    const first = {
+      identifier: 1,
+      pageX: 10,
+      pageY: 10,
+      timestamp: 1,
+      target: firstHandle,
+    };
+    const sibling = {
+      identifier: 2,
+      pageX: 30,
+      pageY: 10,
+      timestamp: 2,
+      target: siblingHandle,
+    };
+
+    fabric.fireEvent(firstHandle, TOUCH_START, {
+      changedTouches: [first],
+      touches: [first],
+    });
+    fabric.fireEvent(siblingHandle, TOUCH_START, {
+      changedTouches: [sibling],
+      touches: [first, sibling],
+    });
+    expect(firstOrder).toEqual(['in']);
+    expect(siblingOrder).toEqual(['in']);
+
+    fabric.fireEvent(siblingHandle, TOUCH_END, {
+      changedTouches: [sibling],
+      touches: [first],
+    });
+    vi.advanceTimersByTime(DEFAULT_MIN_PRESS_DURATION_MS);
+    expect(firstOrder).toEqual(['in']);
+    expect(siblingOrder).toEqual(['in', 'press', 'out']);
+
+    fabric.fireEvent(firstHandle, TOUCH_END, {
+      changedTouches: [first],
+      touches: [],
+    });
+    expect(firstOrder).toEqual(['in', 'press', 'out']);
   });
 
   // why: RN's disabled Pressable must not claim the responder or fire feedback at all — a
