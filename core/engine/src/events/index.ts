@@ -517,16 +517,29 @@ export function installEventHandler(): void {
       if (topLevelType === TOUCH_CANCEL) {
         recordTouchTrack('end', nativeEvent);
         attachTouchHistory(nativeEvent);
-        const cancelledPresses = takeAllPresses();
+        // A cancel is scoped to the finger(s) removed from `touches`, just like an end. An unrelated
+        // Pressable—or another finger under the same owner—must keep its press and long-press state.
+        const cancelledPresses: IPressGesture[] = [];
+        for (const press of activePresses) {
+          if (hasRemainingTouchWithin(press.owner, nativeEvent)) continue;
+          activePresses.delete(press);
+          clearLongPress(press);
+          cancelledPresses.push(press);
+        }
         const responder = currentResponder;
-        currentResponder = undefined;
+        const terminatesResponder =
+          responder !== undefined &&
+          !hasRemainingTouchWithin(responder, nativeEvent);
+        if (terminatesResponder) currentResponder = undefined;
         runWrapped(() => {
           for (const press of cancelledPresses)
             bubble(press.owner, PRESS_OUT, nativeEvent);
-          // A cancelled gesture ends then terminates (the responder was taken away).
           if (responder) {
+            // Like touch-end, every finger leaving emits responderEnd. Termination is final only
+            // when no touch remains inside the responder.
             callOwnListener(responder, RESPONDER_END, nativeEvent);
-            callOwnListener(responder, RESPONDER_TERMINATE, nativeEvent);
+            if (terminatesResponder)
+              callOwnListener(responder, RESPONDER_TERMINATE, nativeEvent);
           }
         });
         if (touchHistory.numberActiveTouches === 0) resetTouchHistory();

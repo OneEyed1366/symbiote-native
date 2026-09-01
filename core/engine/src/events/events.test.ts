@@ -220,6 +220,53 @@ describe('pressIn / pressOut synthesis', () => {
     expect(firstOrder).toEqual(['in', 'press', 'out']);
   });
 
+  // why: Android can cancel one pointer while another stays active. Cancellation must release only
+  // the owner that lost its final touch; a sibling press and responder remain live.
+  it('scopes touch cancellation to owners without a remaining touch', () => {
+    const firstOrder: string[] = [];
+    const siblingOrder: string[] = [];
+    const responderOrder: string[] = [];
+    routeProp(tree.button, 'onPressIn', () => firstOrder.push('in'));
+    routeProp(tree.button, 'onPress', () => firstOrder.push('press'));
+    routeProp(tree.button, 'onPressOut', () => firstOrder.push('out'));
+    routeProp(tree.sibling, 'onPressIn', () => siblingOrder.push('in'));
+    routeProp(tree.sibling, 'onPressOut', () => siblingOrder.push('out'));
+    routeProp(tree.button, 'onStartShouldSetResponder', () => true);
+    routeProp(tree.button, 'onResponderEnd', () => responderOrder.push('end'));
+    routeProp(tree.button, 'onResponderRelease', () =>
+      responderOrder.push('release'),
+    );
+    routeProp(tree.button, 'onResponderTerminate', () =>
+      responderOrder.push('terminate'),
+    );
+
+    const first = { identifier: 1, target: tree.button };
+    const sibling = { identifier: 2, target: tree.sibling };
+    fabric.fireEvent(tree.button, 'topTouchStart', {
+      changedTouches: [first],
+      touches: [first],
+    });
+    fabric.fireEvent(tree.sibling, 'topTouchStart', {
+      changedTouches: [sibling],
+      touches: [first, sibling],
+    });
+
+    fabric.fireEvent(tree.sibling, 'topTouchCancel', {
+      changedTouches: [sibling],
+      touches: [first],
+    });
+    expect(firstOrder).toEqual(['in']);
+    expect(siblingOrder).toEqual(['in', 'out']);
+    expect(responderOrder).toEqual(['end']);
+
+    fabric.fireEvent(tree.button, 'topTouchEnd', {
+      changedTouches: [first],
+      touches: [],
+    });
+    expect(firstOrder).toEqual(['in', 'press', 'out']);
+    expect(responderOrder).toEqual(['end', 'end', 'release']);
+  });
+
   it('fires pressOut on the start node even when the touch ends elsewhere', () => {
     let pressedOut = 0;
     routeProp(tree.button, 'onPressOut', () => {
@@ -631,10 +678,8 @@ describe('ViewConfig gate', () => {
 });
 
 describe('responder negotiation (PanResponder protocol)', () => {
-  // pressStart/currentResponder/longPressTimer are module-scoped state, not per-test --
-  // installEventHandler() runs once at file scope. Force-clear via a real cancel dispatch
-  // (which unconditionally resets both, see events/index.ts's TOUCH_CANCEL branch) so a
-  // touch left mid-gesture by one test can never leak into the next.
+  // Press/responder state is module-scoped, not per-test. Force-clear via a cancel event with no
+  // remaining `touches`, so a deliberately partial gesture cannot leak into the next test.
   afterEach(() => {
     fabric.fireEvent(tree.root, 'topTouchCancel');
   });
@@ -745,9 +790,8 @@ describe('responder negotiation (PanResponder protocol)', () => {
     expect(order).toEqual(['end', 'release']);
   });
 
-  // why: a cancelled gesture (topTouchCancel) unconditionally releases the
-  // responder -- it must fire responderEnd then responderTerminate, never responderRelease
-  // (the responder wasn't released by finishing, it was taken away).
+  // why: cancelling the responder's final touch fires responderEnd then responderTerminate, never
+  // responderRelease (the responder was taken away rather than released by finishing).
   it('fires responderEnd then responderTerminate on topTouchCancel', () => {
     const order: string[] = [];
     routeProp(tree.button, 'onStartShouldSetResponder', () => true);
