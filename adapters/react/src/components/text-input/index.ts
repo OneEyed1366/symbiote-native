@@ -22,6 +22,9 @@ import {
   dispatchViewCommand,
   dlog,
   type ISymbioteEvent,
+  type IMeasureOnSuccess,
+  type IMeasureInWindowOnSuccess,
+  type IMeasureLayoutOnSuccess,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 import {
@@ -207,6 +210,22 @@ export const TextInput = forwardRef<ITextInputHandle, ITextInputProps>(
     useImperativeHandle(
       forwardedRef,
       () => ({
+        // Forwarded from the node so a TextInput ref is not poorer than any other host ref. An
+        // `expose`/`useImperativeHandle` that lists only the five TextInput methods CLOSES the
+        // node off, and the lowered path loses the opposite four — two different surfaces an app
+        // crosses between without touching its ref code. `ITextInputHandle` carries the account.
+        measure: (callback: IMeasureOnSuccess): void =>
+          ref.current?.measure(callback),
+        measureInWindow: (callback: IMeasureInWindowOnSuccess): void =>
+          ref.current?.measureInWindow(callback),
+        measureLayout: (
+          relativeToNativeNode: ISymbioteNode | number,
+          onSuccess: IMeasureLayoutOnSuccess,
+          onFail?: () => void,
+        ): void =>
+          ref.current?.measureLayout(relativeToNativeNode, onSuccess, onFail),
+        setNativeProps: (nativeProps: Record<string, unknown>): void =>
+          ref.current?.setNativeProps(nativeProps),
         focus: (): void => {
           const node = ref.current;
           if (node !== null) dispatchViewCommand(node, 'focus', []);

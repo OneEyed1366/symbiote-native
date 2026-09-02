@@ -12,6 +12,7 @@ import {
   insertBefore,
   removeChild,
   routeProp,
+  setNodeComponent,
   setNodeHidden,
   setText,
   SymbioteSurface,
@@ -29,6 +30,14 @@ import { toPublicInstance, type IHostInstance } from './host-instance';
 // Adding a primitive is one entry in each name table there, plus its thin
 // component in components.ts: no host-config logic per primitive.
 import { descriptorFor } from '@symbiote-native/components';
+// A bare intrinsic tag has no wrapper to apply RN's per-primitive prop folds (id -> nativeID,
+// Text's ellipsizeMode / allowFontScaling defaults), so the renderer is the layer that must.
+// Shared with every other adapter, driven by the same HOST_PRIMITIVES spec.
+import { foldHostBag } from '@symbiote-native/components/fold-host-bag';
+// WHICH native view a primitive commits can depend on a prop (TextInput's `multiline`). A lowering
+// transform decides that from source text; a bare tag has no transform, so the choice is made here,
+// where the runtime value is known. Identity for every primitive that declares no alternative.
+import { resolveIntrinsicTag } from '@symbiote-native/components/resolve-intrinsic';
 
 type IProps = Record<string, unknown>;
 
@@ -141,12 +150,12 @@ const reconciler = createReconciler<
   shouldSetTextContent: () => false,
 
   createInstance(type, props, _container, hostContext) {
-    const descriptor = descriptorFor(type);
+    const descriptor = descriptorFor(resolveIntrinsicTag(type, props));
     if (hostContext.isInsideText && !descriptor.isText) {
       throw new Error(`<${type}> can't be nested inside <Text>`);
     }
     const node = createElement(descriptor.component, descriptor.isText);
-    applyProps(node, props);
+    applyProps(node, foldHostBag(type, props));
     return node;
   },
   createTextInstance(text, _container, hostContext) {
@@ -174,8 +183,17 @@ const reconciler = createReconciler<
   },
 
   finalizeInitialChildren: () => false,
-  commitUpdate(node, _type, oldProps, newProps) {
-    applyUpdate(node, oldProps, newProps);
+  commitUpdate(node, type, oldProps, newProps) {
+    // A primitive whose native view depends on a prop (TextInput's `multiline`) can change view on
+    // an update. The node keeps its identity — an app's ref stays live — and the commit walk
+    // re-creates the Fabric node because its viewName no longer matches the committed one.
+    setNodeComponent(
+      node,
+      descriptorFor(resolveIntrinsicTag(type, newProps)).component,
+    );
+    // BOTH sides folded, or the diff compares a raw `id` against a folded `nativeID` and writes
+    // the alias twice while never clearing the raw key.
+    applyUpdate(node, foldHostBag(type, oldProps), foldHostBag(type, newProps));
   },
   commitTextUpdate(node, _oldText, newText) {
     setText(node, newText);
