@@ -17,6 +17,17 @@
   "main": "src/index.ts",
   "module": "src/index.ts",
   "types": "src/index.ts",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "css",
+    "scss",
+    "css-modules",
+    "postcss",
+    "lightningcss",
+    "metro",
+    "build-tool"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./typescript-plugin": {

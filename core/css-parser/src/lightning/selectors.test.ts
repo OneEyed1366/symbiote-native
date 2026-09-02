@@ -5,6 +5,7 @@
 import { transform } from 'lightningcss';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  IS_STATE_TOKEN_ENABLED,
   selectorsToMatches,
   type IDroppedSelector,
   type ISelectorCombinator,
@@ -386,14 +387,40 @@ describe('selectorsToMatches — the five deep spellings agree', () => {
   });
 });
 
-describe('selectorsToMatches — :active is KEPT as a compound token', () => {
+// BRANCHED ON THE FLAG, not rewritten when it moves. `:active` is currently OFF
+// (IS_STATE_TOKEN_ENABLED in selectors.ts): the pressed look is expressed as a functional
+// `style={({pressed}) => …}`, which every lowering transform compiles to `style` + `activeStyle`,
+// and shipping a second route into the same cascade is what this disables.
+//
+// The token table above is NOT dead weight — it is the contract the flag restores, and it is
+// asserted the moment the flag flips, with no edit here. A block that had to be hand-rewritten on
+// each flip is a block that would be wrong on the first flip nobody remembered to make.
+describe('selectorsToMatches — :active', () => {
+  if (IS_STATE_TOKEN_ENABLED) {
+    it.each(ACTIVE_KEPT)(
+      'ENABLED: $selector -> $tokens',
+      ({ selector, tokens, combinators, specificity }) => {
+        const result = matchesFor(selector);
+
+        expect(result.dropped).toEqual([]);
+        expect(result.matches).toEqual([{ tokens, combinators, specificity }]);
+      },
+    );
+    return;
+  }
+
   it.each(ACTIVE_KEPT)(
-    '$selector -> $tokens',
-    ({ selector, tokens, combinators, specificity }) => {
+    'DISABLED: $selector is dropped, and says so as its own reason',
+    ({ selector }) => {
       const result = matchesFor(selector);
 
-      expect(result.dropped).toEqual([]);
-      expect(result.matches).toEqual([{ tokens, combinators, specificity }]);
+      expect(result.matches).toEqual([]);
+      // Its own reason, never 'pseudo-class'. That one's warning reads "React Native has no
+      // pseudo-class state", which is FALSE for the pressed look — it is supported, by another
+      // route — and a warning that misdescribes the cause sends the reader into the engine.
+      expect(result.dropped).toEqual([
+        { reason: 'state-pseudo-class', detail: 'active' },
+      ]);
     },
   );
 });

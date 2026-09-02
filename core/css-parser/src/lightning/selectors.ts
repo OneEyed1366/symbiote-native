@@ -72,7 +72,12 @@ export interface IDroppedSelector {
     | 'element'
     | 'id'
     | 'universal'
-    | 'unsupported';
+    | 'unsupported'
+    // Deliberately DISABLED here, not impossible on the platform — see IS_STATE_TOKEN_ENABLED.
+    // Its own member rather than 'pseudo-class' because the two warnings must not read alike: one
+    // says React Native cannot do this, the other says we switched it off and names the
+    // replacement. Collapsing them would tell an author their button can never have a pressed look.
+    | 'state-pseudo-class';
   /** e.g. 'hover', '[data-x]', 'div'. */
   readonly detail: string;
 }
@@ -96,7 +101,32 @@ const DROP_EXPLANATION: Record<IDroppedSelector['reason'], string> = {
   id: 'React Native has no id selectors',
   universal: 'React Native has no universal selector',
   unsupported: 'this selector shape has no React Native equivalent',
+  // Never reaches the shared "can never match" sentence — it has its own branch at the warn site.
+  'state-pseudo-class': '',
 };
+
+// `:active` support is OFF, and the selector machinery below is kept intact so one line turns it
+// back on.
+//
+// WHY. The pressed look has a second, better route that did not exist when `:active` landed: a
+// functional `style={({pressed}) => …}`, which every lowering transform specialises into
+// `style` + `activeStyle` at build time (2026-08-23). It reaches the same slot with no pseudo-class
+// machinery, it is what the ecosystem already writes, and it lowers — so the reason `:active`
+// existed, keeping a Pressable lowerable without a state-reading callback, is gone.
+//
+// Keeping BOTH live is what argues against it: they occupy different cascade slots (`activeStyle`
+// replaces the authored style, an `:active` class rule replaces the class style), so an adapter has
+// two ways to say one thing and a debugging session has two places to look. This is also part of a
+// larger pseudo-class-state feature that is not built; shipping a fragment of it invites code that
+// depends on the fragment.
+//
+// The engine side is deliberately untouched: with no `:active` rule ever registered,
+// `hasActiveRules` stays false and `resolveActiveClassName` is never called, so the path costs
+// nothing while it waits.
+// Typed `boolean`, not inferred as the literal `false`: the literal would let tsc prune the
+// enabled branch of `selectors.test.ts` as unreachable, and that branch is the recorded contract
+// the flag restores — pruning it is how the dormant half rots unnoticed.
+export const IS_STATE_TOKEN_ENABLED: boolean = false;
 
 const DEEP_PSEUDO_ELEMENTS = new Set(['v-deep', 'ng-deep']);
 
@@ -300,8 +330,10 @@ function consumePayload(
             builder.pending === 'deep'
           ) {
             drop(builder, 'pseudo-class', 'active through a deep combinator');
-          } else {
+          } else if (IS_STATE_TOKEN_ENABLED) {
             pushToken(builder, STATE_TOKEN);
+          } else {
+            drop(builder, 'state-pseudo-class', 'active');
           }
           index = nameIndex;
           break;
@@ -463,6 +495,10 @@ function consumeComponent(
           drop(builder, 'pseudo-class', 'active through a deep combinator');
           return;
         }
+        if (!IS_STATE_TOKEN_ENABLED) {
+          drop(builder, 'state-pseudo-class', 'active');
+          return;
+        }
         pushToken(builder, STATE_TOKEN);
         return;
       }
@@ -546,6 +582,15 @@ export function selectorsToMatches(
       dropped.push(problem);
       // `root` is returned, never announced from here — see DROP_EXPLANATION.root.
       if (problem.reason === 'root') continue;
+      // Its own sentence, because the shared one below ends in "can never match in React Native"
+      // and that is FALSE here — the pressed look is fully supported, by a different route. A
+      // warning that misdescribes the cause is worse than none: it sends the reader to the engine.
+      if (problem.reason === 'state-pseudo-class') {
+        console.warn(
+          `[@symbiote-native/css-parser] ${filename}: dropped \`:${problem.detail}\` — pseudo-class state is currently disabled in this parser. Use a functional style instead: style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}, which every lowering transform compiles to style + activeStyle.`,
+        );
+        continue;
+      }
       console.warn(
         `[@symbiote-native/css-parser] ${filename}: dropped a rule on \`${problem.detail}\` — ${DROP_EXPLANATION[problem.reason]}, so it can never match in React Native.`,
       );
