@@ -12,6 +12,7 @@
 // object.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 // The press machine is keyed by intrinsic tag and installed only by this module. Without it a
 // lowered element has no listeners at all and every assertion below fails as if the engine were
@@ -31,6 +32,15 @@ const fabric = installFabric();
 const flush = async (): Promise<void> => {
   await Promise.resolve();
   await Promise.resolve();
+};
+
+// RN's active-duration floor defers the release, so a microtask flush still reads the pressed
+// value. Waited off the constant, not a literal, so it tracks the floor.
+const releaseSettled = async (): Promise<void> => {
+  await new Promise<void>(resolve =>
+    setTimeout(resolve, DEFAULT_MIN_PRESS_DURATION_MS + 10),
+  );
+  await flush();
 };
 
 function findCommitted(): IFakeNode {
@@ -122,7 +132,7 @@ describe('a LOWERED Pressable resolves :active', () => {
     );
 
     touch(TOUCH_END);
-    await flush();
+    await releaseSettled();
     expect(findCommitted().props.opacity, 'released').toBe(1);
   });
 
@@ -148,7 +158,7 @@ describe('a LOWERED Pressable resolves :active', () => {
     expect(findCommitted().props.opacity, 'pressed').toBe(0.4);
 
     touch(TOUCH_END);
-    await flush();
+    await releaseSettled();
     expect(findCommitted().props.opacity, 'released').toBe(1);
   });
 });

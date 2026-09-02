@@ -103,7 +103,11 @@ const TouchableNativeFeedbackImpl = defineComponent<
       const feedback = h(HOST_VIEW, nativeProps, children);
       return h(
         Pressable,
-        { ...forwardAttrs(attrs), ...emitPressableEvents(emit) },
+        {
+          ...forwardAttrs(attrs),
+          ...emitPressableEvents(emit),
+          __minPressDuration: 0,
+        },
         { default: () => [feedback] },
       );
     };

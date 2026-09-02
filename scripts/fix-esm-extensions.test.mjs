@@ -1,5 +1,5 @@
-// Run: `node --test scripts/fix-esm-extensions.test.mjs`. Uses node:test so it stays self-contained
-// in scripts/ (the vitest config only globs core/adapters/packages) with zero extra dependency.
+// Runs under root `pnpm test:node` discovery. Uses node:test so it stays self-contained in
+// scripts/ (Vitest owns the TypeScript/component suites) with zero extra dependency.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

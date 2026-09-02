@@ -20,7 +20,10 @@ import {
   type IRippleBackground,
 } from '@symbiote-native/components';
 import { View } from '../../components';
-import { Pressable, type IPressableProps } from '../pressable';
+import {
+  TouchablePressable as Pressable,
+  type IPressableProps,
+} from '../pressable';
 
 export type {
   INativeFeedbackBackground,

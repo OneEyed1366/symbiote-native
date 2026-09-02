@@ -31,7 +31,10 @@ import {
 } from '@symbiote-native/components';
 import { dlog } from '@symbiote-native/engine';
 import { withStableKeys } from '../../utils/stable-keys';
-import { Pressable, type IPressableProps } from '../pressable';
+import {
+  TouchablePressable as Pressable,
+  type IPressableProps,
+} from '../pressable';
 
 export type {
   INativeFeedbackBackground,

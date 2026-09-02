@@ -168,6 +168,7 @@
 </script>
 
 <Pressable
+  __minPressDuration={0}
   {...rest}
   onPressIn={handlers.handlePressIn}
   onPressOut={handlers.handlePressOut}

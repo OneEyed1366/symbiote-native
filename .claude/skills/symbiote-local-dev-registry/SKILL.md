@@ -1,6 +1,6 @@
 ---
 name: symbiote-local-dev-registry
-description: "Use when getting a local `core/*`, `adapters/*` or `packages/*` build into an `examples/*` app — the everyday loop before a simulator build or a device measurement. Covers the LOCAL VERDACCIO registry that replaced the `pnpm pack` + `file:` tarball dance as of 2026-09-01: `pnpm run registry:setup|sync|publish|on|off|refresh|status`, the container and its tracked config under `scripts/verdaccio/`, and the gitignored `examples/<app>/.npmrc` that points a scope at it. Read BEFORE editing `scripts/local-registry.mjs`, `scripts/verdaccio/**`, `scripts/overlay-local-packages.mjs`, `scripts/trust-publishers.mjs`, `.npmrc.example`, or any `examples/*/package.json` dependency on `@symbiote-native/*`; and before diagnosing an example that runs code older than the repo. Holds why a tracked pointer at localhost is forbidden (npm has NO registry fallback — an unreachable configured registry is an install FAILURE, not a fall-through to npmjs), what the registry does NOT fix (npm's lockfile still short-circuits: same version + new bytes + plain `npm install` = `up to date` and stale code), why a real npm `canary` dist-tag was tried and reverted, and why every npm call in `trust-publishers.mjs` pins `--registry` explicitly. Trigger on: 'example runs old code', 'get my engine change into the example', 'file: tarball', '.tarballs', 'verdaccio', 'local registry', 'registry:sync', 'npm install serves stale', 'up to date but my change is missing'."
+description: "Use when getting a local `core/*`, `adapters/*` or `packages/*` build into an `examples/*` app — the everyday loop before a simulator build or a device measurement. Covers the LOCAL VERDACCIO registry that replaced the `pnpm pack` + `file:` tarball dance as of 2026-09-01: `pnpm run registry:setup|sync|publish|on|off|refresh|status`, the container and its tracked config under `scripts/verdaccio/`, and the gitignored `examples/<app>/.npmrc` that points a scope at it. Read BEFORE editing `scripts/local-registry.mjs`, `scripts/verdaccio/**`, `scripts/trust-publishers.mjs`, `.npmrc.example`, or any `examples/*/package.json` dependency on `@symbiote-native/*`; and before diagnosing an example that runs code older than the repo. Holds why a tracked pointer at localhost is forbidden (npm has NO registry fallback — an unreachable configured registry is an install FAILURE, not a fall-through to npmjs), what the registry does NOT fix (npm's lockfile still short-circuits: same version + new bytes + plain `npm install` = `up to date` and stale code), why a real npm `canary` dist-tag was tried and reverted, and why every npm call in `trust-publishers.mjs` pins `--registry` explicitly. Trigger on: 'example runs old code', 'get my engine change into the example', 'file: tarball', '.tarballs', 'verdaccio', 'local registry', 'registry:sync', 'npm install serves stale', 'up to date but my change is missing'."
 ---
 
 # The local dev registry
@@ -108,18 +108,24 @@ This is the identical failure the tarball route has. The difference is the REPAI
 Skip it and the next `xcodebuild` dies on a missing `RNBootSplash.mm`, buried in clang argument
 dumps that read as a broken toolchain.
 
-## The three tools, and they are not interchangeable
+## The tools, and they are not interchangeable
 
 ```
-registry:*                 an example installs a real package from a real registry. The default
-                           loop. Manifest untouched, works for any package, needs a reinstall.
-overlay-local-packages     replaces the CONTENTS of installed folders, no install at all. What CI
-                           uses; fastest locally. Installs NO dependencies, so it is safe only when
-                           the packed dependency set is a subset of what the example already has —
-                           now CHECKED per example at run time, not trusted to a list.
-.tarballs + file:          the retired path. Still the answer for a package the registry cannot
-                           serve, and the reason the old rule's diagnostics stay readable.
+registry:*                    an example installs a real package from a real registry. The default
+                              loop, and the only local one. Manifest untouched, works for any
+                              package, needs a reinstall.
+.tarballs + file:             the retired path. Still the answer for a package the registry cannot
+                              serve, and the reason this file's diagnostics stay readable.
+check-packed-consumer-bundles CI only. Packs every direct internal dependency, installs it into a
+                              disposable copy of the example, type-checks and bundles both
+                              platforms. Never touches a real example directory.
 ```
+
+**`overlay-local-packages.mjs` and `check-bundle-framework-isolation.mjs` were deleted
+2026-09-02.** The overlay swapped folder contents without running an install, so it could not carry
+a newly added dependency and left most adapters on registry builds — the self-confirming-probe trap
+in `.claude/rules/example-shared-package-staleness.md`. Anything still naming it is stale; use
+`registry:refresh`.
 
 ## Why not a real npm dist-tag
 

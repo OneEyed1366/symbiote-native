@@ -82,6 +82,7 @@ export type IAngularTouchableNativeFeedbackProps = Omit<
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <Pressable
+      [__minPressDuration]="0"
       (press)="press.emit($event)"
       (pressIn)="pressIn.emit($event)"
       (pressOut)="pressOut.emit($event)"

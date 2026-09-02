@@ -27,6 +27,7 @@ import {
 import {
   createPressHandlers,
   createPressRuntime,
+  disposePressRuntime,
   DEFAULT_DELAY_LONG_PRESS_MS,
   type IPressHost,
   type IPressHandler,
@@ -324,6 +325,7 @@ function attach(node: ISymbioteNode): void {
         timers.delete(id);
       };
     },
+    now: Date.now,
   };
   const state: IBehaviorState = {
     runtime,
@@ -339,6 +341,11 @@ function attach(node: ISymbioteNode): void {
 function detach(node: ISymbioteNode): void {
   const state = states.get(node);
   if (state === undefined) return;
+  // The machine's own teardown, which every wrapper calls from its destroy hook. Not load-bearing
+  // here and no test can make it so: `host.schedule` puts every timer the machine arms into
+  // `state.timers` — the 130ms floor's deferred `pressOut` included — so the loop below already
+  // cancels them. Kept as the contract, and for a timer armed by some future route.
+  disposePressRuntime(state.runtime);
   for (const id of state.timers) clearTimeout(id);
   state.timers.clear();
   states.delete(node);

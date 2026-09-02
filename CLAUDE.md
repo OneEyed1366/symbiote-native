@@ -665,11 +665,11 @@ the check. On Vue those three cuts were worth Create 296.7 -> 274.8 -> 258.5 -> 
 and the prototype move is explicitly one Solid and Svelte were owed too (both graft eagerly).
 So React's and Angular's columns are still read against a materially older engine than Vue's and
 Svelte's, and a cross-column deficit computed today silently includes that gap. Re-level before
-attributing any residual to an adapter — as of 2026-09-01 the default loop for that is the LOCAL
-REGISTRY (`pnpm run registry:publish` then `registry:refresh examples/<name>`, then `pod install`),
-not the overlay script named below; `scripts/overlay-local-packages.mjs` still works and is what CI
-uses, but it installs no dependencies, so it is safe only when the packed dependency set is already
-present in the example. Read `symbiote-local-dev-registry` before either.
+attributing any residual to an adapter — the loop for that is the LOCAL REGISTRY
+(`pnpm run registry:publish` then `registry:refresh examples/<name>`, then `pod install`). It is
+the only local route now: the overlay and bundle-isolation scripts were deleted 2026-09-02, and CI
+runs `scripts/check-packed-consumer-bundles.mjs`, which installs a fresh tarball consumer per
+example instead of overwriting installed folders. Read `symbiote-local-dev-registry` first.
 
 **Solid was re-levelled this way, and the result is the second, independent confirmation of those
 three engine cuts.** They had only ever been measured on Vue, by the session that wrote them:

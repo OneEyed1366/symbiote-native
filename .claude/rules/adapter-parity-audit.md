@@ -328,7 +328,8 @@ so every list written before it exists still omits it, and every list written si
 had to remember. Three instances inside two weeks, all found by a peer rather than by a test:
 
 ```
-scripts/overlay-local-packages.mjs   OVERLAY_ONLY covers the CI four; solid is not in it
+scripts/overlay-local-packages.mjs   OVERLAY_ONLY covered the CI four; solid was not in it
+                                     (script deleted 2026-09-02 — the instance stands, the file is gone)
 packages/*/package.json exports      12 of 25 declared ./react ./vue ./svelte ./angular, no ./solid
 adapters/*/…node-census.probe.*      three tracked and fixed, solid's untracked and unfixed
 ```
@@ -1326,6 +1327,33 @@ Three things the first run got wrong, all of them the shapes this file already r
 - **The first probe was written inline in a shell heredoc and the quotes were mangled**, so the
   import regex matched nothing and every set was empty — the same "(none)". A probe that returns a
   clean answer rather than an error is the thing to distrust; write it to a file.
+
+### And the same oracle pushes the OTHER way: an import that does nothing satisfies it
+
+The blind spot below is a fold the audit cannot see. This is its mirror, and it is the one that
+costs code: the audit compares IMPORT SETS, so the cheapest way to green a red row is to import the
+name, needed or not. It cannot tell a used import from a ceremonial one.
+
+Measured 2026-09-02, merging develop's Pressability lifecycle work. Two names every wrapper had
+gained were reported missing from the behavior, and neither wanted an import:
+
+```
+DEFAULT_MIN_PRESS_DURATION_MS   the machine already defaults to it. A wrapper names it only to seed
+                                `__minPressDuration`, the input Touchable* overrides to 0, and a
+                                lowered element has none.                  -> wrapperOnly entry
+disposePressRuntime             imported and CALLED, then break-tested: removing the call reddens
+                                NOTHING. The behavior's own `host.schedule` puts every timer the
+                                machine arms into `state.timers`, deferred pressOut included.
+                                -> kept as contract, comment says it is not load-bearing
+```
+
+The second nearly shipped a tautology: a test was written for the leak the call was meant to close,
+it passed, and it passed in both arms. The flattering reading — "my fixture is wrong" — got checked
+first, exactly as `verify-the-deciding-side.md` predicts.
+
+**So read a red row as a QUESTION about the name, never as an instruction to import it.** Three
+answers are legitimate: the behavior needs it, it needs it structurally but unwitnessed, or it is
+wrapper-only and owes a `wrapperOnly` entry with the reason. Only the first is testable.
 
 ### The audit's oracle is IMPORTS, so an INLINE fold reads as agreement
 

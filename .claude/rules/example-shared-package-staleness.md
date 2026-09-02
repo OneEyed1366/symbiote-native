@@ -3,8 +3,9 @@ paths:
   - 'examples/**'
   - 'core/components/**'
   - 'core/engine/**'
-  - 'scripts/overlay-local-packages.mjs'
-  - 'scripts/check-bundle-framework-isolation.mjs'
+  - 'adapters/**'
+  - 'packages/**'
+  - 'scripts/check-packed-consumer-bundles.mjs'
 ---
 
 # A `core/*` change is invisible to `examples/*` — and the failure is a blank white screen
@@ -81,99 +82,76 @@ the INSTALLED copies actually export — run from the example directory:
 A miss names the exact symbol and package. Run it after every re-pack; it costs nothing and it is
 the only signal that appears before the simulator.
 
-## The same gap, in CI: `overlay-local-packages.mjs` was `packages/*`-only
+## CI uses fresh tarball consumers — never an in-place overlay
 
-`scripts/overlay-local-packages.mjs` exists to give `check-bundle-framework-isolation.mjs`
-this-commit's build instead of the registry version (same problem, CI-side). It only overlaid
-`packages/*` (slider, navigation, …) — `core/engine`, `core/components`, and every
-`adapters/*` stayed on whatever's published, so example source that outruns the last publish of
-those packages fails CI with an error that looks unrelated to staleness.
+`scripts/check-packed-consumer-bundles.mjs` closes this class of false green without maintaining
+an allowlist of folders to overwrite. It performs the same sequence a real npm consumer does:
 
-Measured 2026-08-21: `examples/angular`'s `BenchmarkScreen`/`JsFrameRateMeter` called
-`readCommitProfile`/`registerPostCommit` — real exports of `core/engine`, absent from the
-published `0.2.0` — and got `TS2305: has no exported member`. Its `SectionList` binding to
-`getItemLayout` failed `NG8002` the same way, because `@symbiote-native/angular@0.7.0` (published)
-predates that Input. Both read as ordinary source bugs, not a stale-package symptom.
+1. Read the five standalone examples (React, Vue SFC, Svelte, Angular, Solid).
+2. Pack every direct `@symbiote-native/*` dependency they declare from the current checkout.
+3. Copy each example's tracked files to a disposable directory.
+4. Rewrite all direct internal dependencies there to `file:<fresh tarball>` and run a clean
+   `npm install` with no lockfile.
+5. Verify the installed manifest of every direct internal package is byte-equivalent JSON to the
+   packed manifest, and that exactly one `@symbiote-native/engine` copy exists.
+6. Run the example's real type check (or Angular AOT build).
+7. Build production Metro bundles for **both iOS and Android**.
+8. Inspect each sourcemap for foreign-framework package files and assert the current framework's
+   freshly packed adapter actually reached the graph.
 
-Fix: `overlay-local-packages.mjs` now also overlays `core/engine`, `core/components`, and
-`adapters/angular` (an `OVERLAY_ONLY` allowlist alongside the `packages/*` prefix match) — picked
-narrowly, not blanket-widened to every `core/`+`adapters/`. Also overlaying `core/css-parser` and
-`adapters/{react,vue,svelte}` was tried and reverted: `core/css-parser` gained a real new
-dependency (`lightningcss`) that the overlay's swap-the-folder-contents trick can't install (it
-never touches `package-lock.json`, only `pnpm pack` + extract over an already-`npm install`ed
-folder — new transitive deps need the full `file:` + reinstall dance from the section above,
-not this overlay), and the Vue/Svelte adapters called a `compileScopedCss` export the registry
-`css-parser` doesn't have either. Widen this allowlist only when a specific example genuinely
-needs it, and check whether the overlaid package pulled in a NEW dependency first.
+This deliberately replaces the old `pnpm pack` + extract-over-`node_modules` overlay. An overlay
+could update package bytes but could not install a package's newly added dependencies, and it left
+most adapters on registry versions. A disposable npm install exercises the whole packed contract:
+exports, dependencies, peer ranges, singleton deduplication, framework transforms, and
+platform-specific resolution.
 
-## A half-migrated example is WORSE than a fully-registry one
-
-Line 90 above named the risk (`compileScopedCss` export the registry `css-parser` lacks) for the
-CI overlay script; the same mismatch hit `examples/*` for real on 2026-08-21, in two stacked
-layers, both invisible to `tsc`/tests/eslint.
-
-**Layer 1.** Someone had switched `engine`/`components`/`css-parser` from registry semver
-(`^0.2.0`) to `file:../../.tarballs/symbiote-native-engine-0.2.0.tgz` in only 2 of 5 examples
-(`solid`, `vue-tsx`). The other 3 (`react`, `svelte`, `angular`) kept the registry range —
-resolving a DIFFERENT build behind the SAME declared version number. Startup crash, module-load
-`TypeError: undefined is not a function`, in every example except the 2 that had fully moved.
-
-**Layer 2, after fixing layer 1.** Each example's OWN framework adapter
-(`@symbiote-native/{react,svelte,angular}`) was STILL on registry semver. The registry adapter's
-compiled preprocessor (`@symbiote-native/svelte/build/preprocessor/scoped-styles.js`) called the
-OLD css-parser export `classTokensIn` — renamed to `compileScopedCss` locally, no version bump —
-which no longer exists in the now-local `css-parser`. Metro-time:
-`does not provide an export named 'classTokensIn'`. The adapter tarballs already sitting in
-`.tarballs/` were clean; only the registry-installed copies carried the stale call.
-
-**Do not assume "internally consistent on registry" is safe to skip.** `vue-sfc` looked fine by
-that reasoning (all deps same-family registry versions) and was left unchecked first — it needed
-the identical fix once actually verified. Check every example the same way; category-based
-exemption is not a substitute.
-
-**Diagnostic** (grep/tsc miss both layers): extract a `.tarballs/*.tgz` and byte-diff its
-`build/*.js` against each example's installed `node_modules/@symbiote-native/<pkg>/build/*.js`.
-Same declared version + different bytes = the tell (layer 1). Then grep the installed adapter's
-build tree for the Metro error's exact missing-export name to find which package still resolves
-the stale API (layer 2).
-
-**Fix — move together, not one dep at a time.** If ANY of an example's `@symbiote-native/*` deps
-sits on a local `.tarballs/*.tgz`, every dep with local-dev churn must move with it — shared
-(`engine`/`components`/`css-parser`) AND that example's own adapter, in the same pass:
+The root command is:
 
 ```sh
-# per example, once its shared deps go local:
-rm -rf node_modules/@symbiote-native && rm -f package-lock.json && npm install
-cd ios && pod install
+pnpm run prepublish-build
+pnpm run check:bundle-isolation
 ```
 
-A half-migrated example silently mixes an old published API surface with a new local one — worse
-than leaving it fully on the registry.
+For a focused local run, narrow either axis without weakening CI's default matrix:
 
-## `check-bundle-framework-isolation.mjs` also needs Angular's `build/` before bundling
+```sh
+SYMBIOTE_CONSUMER_FRAMEWORKS=solid \
+SYMBIOTE_CONSUMER_PLATFORMS=android \
+  pnpm run check:bundle-isolation
+```
 
-Every other example bundles straight from source; Angular's `index.js` imports
-`./build/angular/src/App` — gitignored `ngc` AOT output, produced only by `npm run ng:build`.
-Bundling before that step fails on the FIRST import with a plain "module not found", which reads
-like a broken example, not a missing build step. Fixed by running `npm run ng:build` in
-`buildBundleSources()` before the `react-native bundle` call, framework-gated on `angular`.
+The script copies only tracked example files and deletes its temporary directory on completion, so
+it never mutates an example's committed `package.json`, lockfile, or `node_modules`.
 
-## Verifying an overlay: three checks, and one of them is not the obvious one
+## A half-local consumer is worse than a fully registry consumer
 
-`scripts/overlay-local-packages.mjs` (see the section above) prints a confident `Done` whether or
-not anything landed, so the verification is the real step. Grepping the installed build for a
-symbol you just added is the obvious check and it is **not sufficient**: if the change went through
-more than one iteration in the same session, an EARLIER build also contains that symbol and the
-grep passes on a stale overlay. Measured 2026-08-22 — `flushNativeProps` existed in both the first
-(slow, general-walk-fallback) implementation and the final union one.
+Do not manually replace only `engine`, only `components`, or only an adapter in an example. A
+same-version mixture of local and registry artifacts can load a new caller against an old callee
+and fail at module evaluation with a blank screen. Move the example's direct internal dependency
+set together, remove `node_modules/@symbiote-native`, and reinstall. The CI matrix does this
+structurally by rewriting every direct internal dependency in the disposable manifest.
+
+## Angular must AOT-build before Metro
+
+Angular's `index.js` imports `./build/angular/src/App`, which is gitignored `ngc` output. The matrix
+therefore runs `npm run ng:build` before either platform bundle. A plain Metro call against a fresh
+checkout otherwise fails at the first import and says nothing about package compatibility.
+
+## Verifying that a local artifact REACHED an example: three checks, and one is not the obvious one
+
+Whatever put the artifact there — `registry:refresh`, a `file:` tarball, a hand-swapped folder —
+the tool reports success on its own terms and the verification is the real step. Grepping the
+installed build for a symbol you just added is the obvious check and it is **not sufficient**: if
+the change went through more than one iteration in the same session, an EARLIER build also contains
+that symbol and the grep passes on a stale copy. Measured 2026-08-22 — `flushNativeProps` existed
+in both the first (slow, general-walk-fallback) implementation and the final union one.
 
 Three checks, cheap, and the third is the one that actually settles it:
 
 1. **A marker unique to the FINAL version**, not to the feature — a string from the last edit
    (e.g. a new `dlog` format), not the exported name.
 2. **Exactly one copy**: `find <example>/node_modules -path "*@symbiote-native/<pkg>/package.json"`
-   → 1. The overlay only replaces folders that already exist, so a nested second copy is skipped
-   silently and may be the one the app resolves.
+   → 1. A nested second copy is the one the app may resolve, and nothing announces it.
 3. **A normalized whole-build comparison against a fresh local build** — every emitted file, not
    one. `fix-esm-extensions` runs at publish time, so a raw `diff` against a bare `tsc --build`
    output reports EVERY file as drifted purely because the installed copy says `from './node.js'`
@@ -184,27 +162,24 @@ Three checks, cheap, and the third is the one that actually settles it:
 t = re.sub(r"(from '\.[^']*?)(/index)?\.js'", r"\1'", pathlib.Path(f).read_text())
 ```
 
-### Check ZERO: the overlay does not cover ADAPTERS, and its output looks complete anyway
+### Check ZERO: verify the ADAPTER separately, and first
 
-`OVERLAY_ONLY` is `core/engine` + `core/components` + `adapters/angular`; everything else it touches
-is `packages/*`. So `adapters/{react,vue,svelte,solid}` are silently NOT overlaid — deliberately (an
-adapter overlay swaps in code the example's own manifest does not pin, so it needs the full `file:`
-tarball dance), but nothing says so at run time. The log lists the six packages it DID overlay and
-ends with `Done`, and a reader checking the packages it names finds every one correct.
+A tool that moves a SUBSET of packages reports success for the subset, and a reader checking the
+packages it names finds every one correct. Measured 2026-08-24 against `examples/svelte`: the run
+reported success while the adapter stayed on the registry build — the one package the session had
+spent the day changing. The tell was not in the log; it was that the installed adapter had no
+`./state-style` subpath.
 
-Measured 2026-08-24: an overlay run against `examples/svelte` reported success while the adapter
-stayed on the registry build, i.e. the one package the session had spent the day changing. The tell
-was not in the log — it was that the installed adapter had no `./state-style` subpath. **So verify
-the ADAPTER separately and first**: it is the package most likely to be the subject of the change
-and the only one the overlay will not carry.
-
-**And a probe that checks only what the overlay updates is guaranteed to come back clean — it is
+**A probe that checks only what the tool updates is guaranteed to come back clean — it is
 self-confirming, not evidence.** Measured 2026-08-30: a session ruling out staleness as the cause of
-a device defect grepped `engine/build/` and `components/build/` for the two fixes, found both, and
-declared the example current. Those are exactly two of the three things `OVERLAY_ONLY` carries. The
-adapter was six days old, its lowering transform 8.6K against the current 10.8K, and
-`src/state-style.ts` — the whole `activeStyle` path the defect was about — was not in the build at
-all. The right conclusion was available and the probe could not reach it.
+a device defect grepped `engine/build/` and `components/build/` for its two fixes, found both, and
+declared the example current. Those were exactly the packages that run carried. The adapter was six
+days old, its lowering transform 8.6K against the current 10.8K, and `src/state-style.ts` — the
+whole `activeStyle` path the defect was about — was not in the build at all. The right conclusion
+was available and the probe could not reach it.
+
+The adapter is the package most likely to be the SUBJECT of the change, so it is the one to read
+first and the one a subset-moving tool is likeliest to leave behind.
 
 The cheapest whole-package check is a diff, not a grep, and one line of it is a free date
 fingerprint:
@@ -220,34 +195,24 @@ reliable tell that costs nothing to read.
 
 **The asymmetry that should send you here first: exactly ONE adapter still shows a defect the
 others stopped showing.** That reads as a framework-specific bug and is usually a slice-specific
-one — the adapters were rebuilt at different times, and the overlay does not carry any of them.
-Confirmed end to end on 2026-08-30: two adapters were fixed by a `core/` change and the third was
-not; the third's defect closed with an adapter rebuild and no `core/` edit at all. Read that
-adapter's installed bytes BEFORE forming a hypothesis about its framework — the hypothesis is
-expensive to hold and the diff above costs one command.
+one — the adapters are rebuilt at different times. Confirmed end to end on 2026-08-30: two adapters
+were fixed by a `core/` change and the third was not; the third's defect closed with an adapter
+rebuild and no `core/` edit at all. Read that adapter's installed bytes BEFORE forming a hypothesis
+about its framework — the hypothesis is expensive to hold and the diff above costs one command.
 
-**And an overlay leaves NO trace in git**, deliberately — it replaces the contents of installed
-folders and never touches a tracked file. So "is this example's arm still the one I packed?" cannot
-be answered from `git status`; only by reading the installed bytes. That cuts both ways: your own
-pack is invisible to a teammate, and a teammate's run is invisible to you. Demonstrated 2026-08-24 —
-a session verifying its own logging fix ran the overlay twice against `examples/solid` for real,
-disturbing an arm nobody could see was disturbed. The tool now has `--dry-run` for exactly that
-(a tool whose only job is to perturb an arm needs a way to check itself without perturbing one), but
-the general point outlives the flag: **before measuring, re-read the installed bytes; before
-perturbing someone else's example, say so.**
+**Which artifact an example carries leaves NO trace in git**, by design — the manifest keeps its
+public version literal and only `node_modules` changes. So "is this example's arm still the one I
+published?" cannot be answered from `git status`, only by reading the installed bytes. That cuts
+both ways: your own refresh is invisible to a teammate, and a teammate's is invisible to you.
+Demonstrated 2026-08-24 — a session verifying its own logging fix swapped `examples/solid`'s
+packages twice for real, disturbing a measurement arm nobody could see was disturbed. **Before
+measuring, re-read the installed bytes; before perturbing someone else's example, say so.**
 
-`--keep-tarballs <dir>` is the other half of that: the overlay packs into a temp dir and deletes it,
-so the exact bytes it installed are gone the moment it finishes and a later question about what was
-measured has no artifact to ask. The flag copies each tarball out before the cleanup. It needs a
-destination and errors without one — a bare `--keep-tarballs` would otherwise swallow the following
-example directory as its value and silently overlay the whole CI set instead.
-
-**An overlay needs `pod install` after it, exactly like an `npm install` does.** Root CLAUDE.md
-states the rule for the reinstall path — replacing a package folder deletes
-`@symbiote-native/splash-screen/.rn-bootsplash/`, which the podspec vendors at `pod install` time —
-and the overlay replaces those same folders, so it has the same consequence and no warning of its
-own. Measured 2026-08-24: an overlay-only round (no `npm install` at all) wiped the vendored sources
-again. Skip the pods step and the next `xcodebuild` dies on `Build input file cannot be found:
+**Replacing a package folder needs `pod install` after it, exactly like an `npm install` does.**
+Root CLAUDE.md states the rule for the reinstall path — it deletes
+`@symbiote-native/splash-screen/.rn-bootsplash/`, which the podspec vendors at `pod install` time.
+Any route that swaps the same folders has the same consequence and no warning of its own. Measured
+2026-08-24. Skip the pods step and the next `xcodebuild` dies on `Build input file cannot be found:
 .../.rn-bootsplash/ios/RNBootSplash.mm`, buried in clang argument dumps that read as a broken
 toolchain.
 
@@ -274,10 +239,10 @@ re-check it rather than inherit the verdict: it expires whenever either side gai
 `pnpm run fix-esm-extensions` afterwards to put the tree back, and confirm with a byte-identity
 check against the installed copy.
 
-## `css-parser` is the one the overlay CANNOT fix, and its version number lies too
+## `css-parser`'s version number lies too, and the reason it was ever skipped has expired
 
-The allowlist above excludes `core/css-parser`, and the REASON it was excluded has since expired —
-which is the more useful half of this entry. It was kept out because the package had just gained
+Every subset-moving tool this repo has had excluded `core/css-parser`, and the REASON has since
+expired — which is the more useful half of this entry. It was kept out because the package had just gained
 `lightningcss`, and a folder swap never touches `package-lock.json`, so a dependency the example
 lacks is simply absent. Measured 2026-08-23, the packed and installed dependency sets are now
 identical and `lightningcss` is already hoisted everywhere, so a swap installs nothing new. The
@@ -301,8 +266,8 @@ Pressable that never changes appearance, and the honest reading of that screen i
 work" when what does not work is the parser. Nothing is red anywhere.
 
 So: **anything that measures `:active` on device must pack `css-parser` through the full `file:`
-tarball dance alongside the adapter**, not rely on the overlay. Verify the way you would verify the
-engine:
+tarball dance alongside the adapter**, or publish it to the local registry. Verify the way you
+would verify the engine:
 
 ```bash
 grep -c "STATE_TOKEN\|':active'" examples/<app>/node_modules/@symbiote-native/css-parser/build/lightning/selectors.js
@@ -325,9 +290,8 @@ the grid above is the check — not a per-example suspicion.
 
 ## A tool that disturbs a measurement arm needs a way to be tested without disturbing one
 
-`scripts/overlay-local-packages.mjs` mutates an example's installed packages and does nothing else,
-so for a long time the only way to check a change to it was to run it for real on somebody's
-example. Measured 2026-08-24: validating a one-line logging change moved `examples/solid`'s
+A tool whose only effect is to mutate an example's installed packages has nothing to assert on, so
+for a long time the only way to check a change to one was to run it for real on somebody's example. Measured 2026-08-24: validating a one-line logging change moved `examples/solid`'s
 installed engine and components twice, while that example was a measurement arm. Nobody was
 mid-run, so nothing was lost — but the arm was no longer the one its owner had packed, and that is
 the failure this repo has spent days learning to fear: an arm that silently moved, rather than one
@@ -346,7 +310,7 @@ Two details that make it honest rather than decorative:
   no more than a detail that does not exist — the same shape as a summary that contradicts its own
   detail lines (`.claude/rules/test-harness-false-greens.md` §6), one layer out.
 
-And the ask that goes with it: **before running any packaging or overlay step, check whether a peer
+And the ask that goes with it: **before running any packaging or install step, check whether a peer
 is measuring that example.** Three sessions share this tree; the cost of asking is one message and
 the cost of not asking is somebody's afternoon.
 
@@ -427,7 +391,7 @@ Two things follow, and the second is the transferable one:
   `build/**`, one layer out. Diff BEHAVIOUR, not manifests: run the repo build and the installed
   build over the same input and compare outputs.
 - **Enumerate what `.tarballs` covers against what `core/` and `packages/` contain**, the way
-  `adapterNames()` replaced three hand-written adapter lists. A package absent from the overlay set
+  `adapterNames()` replaced three hand-written adapter lists. A package absent from the packed set
   is invisible: nothing fails, the example just runs last month's code.
 
 ```bash

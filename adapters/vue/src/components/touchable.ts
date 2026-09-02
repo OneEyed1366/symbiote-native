@@ -206,6 +206,7 @@ export const TouchableOpacity = defineComponent<
         },
       );
       const pressableProps: Record<string, unknown> = {
+        __minPressDuration: 0,
         ...forwardExcept(attrs, TOUCHABLE_OPACITY_HANDLED),
         ...emitPressableEvents(emit),
         onPressIn: handlePressIn,
@@ -337,6 +338,7 @@ export const TouchableHighlight = defineComponent<
             : [attrs.style, extra.underlay, extra.child];
 
       const pressableProps: Record<string, unknown> = {
+        __minPressDuration: 0,
         ...forwardExcept(attrs, TOUCHABLE_HIGHLIGHT_HANDLED),
         ...emitPressableEvents(emit),
         style: containerStyle,
@@ -405,6 +407,7 @@ export const TouchableWithoutFeedback = defineComponent<
         },
       );
       const pressableProps: Record<string, unknown> = {
+        __minPressDuration: 0,
         ...forwardExcept(attrs, TOUCHABLE_WITHOUT_FEEDBACK_HANDLED),
         ...emitPressableEvents(emit),
         onPressIn: handlePressIn,

@@ -206,7 +206,7 @@ vue      'does not lower a primitive that is more than a pass-through' -> Switch
 angular  'matches the exact union of symbiote-* selectors'         -> add the tag to the .cjs list
 ```
 
-The first three assert the same thing they always did — *listing* in the spec is what makes a tag
+The first three assert the same thing they always did — _listing_ in the spec is what makes a tag
 lowerable, never the name looking like a primitive — so only the subject moves. The fourth is drift
 protection doing its job: `adapters/angular/babel-register-composed.cjs` hardcodes the selector set
 (a plain `.cjs` Metro loads by raw `require`, with no transpile step to import the union from), and
@@ -252,7 +252,7 @@ Clear (46.7 -> 7.7 with no code change).
 
 ## Re-levelling `examples/solid`: the adapter needs a manual pack, every time
 
-`overlay-local-packages.mjs` does not carry adapters — the general trap, the self-confirming probe it
+`overlay-local-packages.mjs` (deleted 2026-09-02) did not carry adapters — the general trap, the self-confirming probe it
 produces, and the `fix-esm-extensions` fingerprint that detects it all live in
 `example-shared-package-staleness.md` (Check ZERO). What is Solid-specific:
 
@@ -461,7 +461,7 @@ Two consequences worth carrying:
 
 - **The failure is loud**, unlike the `descriptorFor` fall-through that resolves an unnormalised name
   to a Fabric view literally called `View` with no error at any layer. A `TypeError: Comp is not a
-  function` at first render is the better of the two failure modes, and it is what makes "rewrite
+function` at first render is the better of the two failure modes, and it is what makes "rewrite
   every site" a survivable requirement rather than a silent-breakage one.
 - **Shadowing gets harder, not merely preserved.** `LOWERABLE` is keyed on IMPORTED names today, so
   the import is the evidence that this `View` is ours. A global has no import, so the evidence
@@ -478,8 +478,11 @@ on 2026-09-01: no, and the near-miss is instructive.
 
 ```js
 function isComponent(tagName) {
-  return (tagName[0] && tagName[0].toLowerCase() !== tagName[0]) ||
-    tagName.includes(".") || /[^a-zA-Z]/.test(tagName[0]);
+  return (
+    (tagName[0] && tagName[0].toLowerCase() !== tagName[0]) ||
+    tagName.includes('.') ||
+    /[^a-zA-Z]/.test(tagName[0])
+  );
 }
 ```
 
@@ -490,8 +493,10 @@ so this is the current design rather than a version we are behind on.
 `transformElement` reads:
 
 ```js
-if (isComponent(tagName)) return transformComponent(path);          // decides first
-const tagRenderer = (config.renderers ?? []).find(r => r.elements.includes(tagName));
+if (isComponent(tagName)) return transformComponent(path); // decides first
+const tagRenderer = (config.renderers ?? []).find(r =>
+  r.elements.includes(tagName),
+);
 ```
 
 So `renderers[].elements` — the one option that names tags as elements — is only ever consulted for

@@ -100,11 +100,17 @@ interface ILoweredPrimitive {
 const LOWERED: Readonly<Record<string, ILoweredPrimitive>> = {
   Pressable: {
     behavior: 'core/components/src/behaviors/pressable.ts',
-    // Nothing. `android_ripple` was the one open gap and it is closed: the ripple background is an
+    // `android_ripple` was the one open FOLD gap and it is closed: the ripple background is an
     // ordinary prop of the responder itself in RN's own Pressable, so a single lowered node carries
     // it (see the behavior's foldPayload). Our wrapper's inner-View spelling mirrors
     // TouchableNativeFeedback and is what made this read as unfixable.
-    wrapperOnly: {},
+    wrapperOnly: {
+      // The floor itself reaches both paths — the machine defaults to it when a config omits
+      // `minPressDuration`. A wrapper names the constant only to seed `__minPressDuration`, the
+      // input `Touchable*` overrides to 0. A lowered element has no such input to seed.
+      DEFAULT_MIN_PRESS_DURATION_MS:
+        'seeds the wrapper-only __minPressDuration override input',
+    },
   },
   TextInput: {
     behavior: 'core/components/src/behaviors/text-input.ts',

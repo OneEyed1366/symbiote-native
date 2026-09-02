@@ -12,6 +12,7 @@
 // props the SIGNAL produced, so all of them stay green with the engine call deleted.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { DEFAULT_MIN_PRESS_DURATION_MS } from '@symbiote-native/components';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';
 import { mount, unmount } from '../render';
 import { Pressable } from './pressable';
@@ -29,6 +30,15 @@ const fabric = installFabric();
 const flush = async (): Promise<void> => {
   await Promise.resolve();
   await Promise.resolve();
+};
+
+// RN's active-duration floor defers the release, so a microtask flush still reads the pressed
+// value. Waited off the constant, not a literal, so it tracks the floor.
+const releaseSettled = async (): Promise<void> => {
+  await new Promise<void>(resolve =>
+    setTimeout(resolve, DEFAULT_MIN_PRESS_DURATION_MS + 10),
+  );
+  await flush();
 };
 
 function findCommitted(): IFakeNode {
@@ -116,7 +126,7 @@ describe('a Pressable that stayed a component still resolves :active', () => {
     expect(opacity(), 'pressed -> .btn:active wins').toBe(0.6);
 
     touch(TOUCH_END);
-    await flush();
+    await releaseSettled();
     expect(opacity(), 'released -> back to .btn').toBe(1);
   });
 });

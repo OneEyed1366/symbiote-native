@@ -316,11 +316,12 @@ adapter, for free.** We didn't build a test framework; we inherited RN's. The sa
 non-React renderer drive Fabric lets RN's testing, debugging, and native-module ecosystem come along
 without per-framework reinvention.
 
-- **Headless — `vitest`.** Colocated unit + smoke tests drive the engine against a fake
-  `nativeFabricUIManager` slot (`installFabric`) and read the committed Fabric props back — the real
-  commit path, no simulator, mirroring RN's own Fantom approach. ~500 tests run in Node in seconds,
-  and because the engine and `@symbiote-native/components` are the shared layer, one suite covers the logic
-  every adapter rides on. `pnpm test` at the workspace root.
+- **Headless — Vitest + `node:test`.** Colocated TypeScript unit + smoke tests drive the engine
+  against a fake `nativeFabricUIManager` slot (`installFabric`) and read committed Fabric props
+  back — the real commit path, no simulator, mirroring RN's own Fantom approach. Native ESM/CJS
+  tooling tests (the publish-output rewriter and app linker) run through Node's built-in runner.
+  `pnpm test` at the workspace root runs both layers; `pnpm test:vitest` and `pnpm test:node` narrow
+  one layer while developing.
 - **On-device — `Detox`.** End-to-end user-journey tests run against the real app on a
   simulator/emulator. One `canary-journeys` spec is mirrored across `examples/react`,
   `examples/vue-tsx`, `examples/vue-sfc`, and `examples/svelte` — the _same_ journeys, proving each
@@ -424,8 +425,10 @@ watching a monorepo this size.
 ```bash
 pnpm install
 pnpm typecheck           # tsc --build across the workspace
-pnpm test                # vitest — headless engine/adapter tests against a fake Fabric slot
-DEBUG=1 pnpm test        # same, with diagnostic logs on
+pnpm test                # all headless suites: Vitest + native ESM/CJS node:test files
+pnpm test:vitest         # engine/adapter tests against the fake Fabric slot only
+pnpm test:node           # release-tool and native-linker node:test suites only
+DEBUG=1 pnpm test        # all headless suites, with diagnostic logs on
 ```
 
 To build and run a canary on a simulator/emulator — and the Detox e2e journeys — follow the

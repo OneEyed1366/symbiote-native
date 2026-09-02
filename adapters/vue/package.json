@@ -86,7 +86,7 @@
     "typescript": "catalog:"
   },
   "peerDependencies": {
-    "@symbiote-native/engine": ">=0.1.7",
+    "@symbiote-native/engine": "workspace:^",
     "vue": ">=3.5.0",
     "react-native": ">=0.86"
   },

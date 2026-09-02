@@ -90,8 +90,9 @@ function isSurfaceContainer(
 
 let currentUpdatePriority = NoEventPriority;
 
-// Run an externally-triggered update (a native event) at discrete priority so it
-// lands on the sync lane and flushSyncWork paints it immediately.
+// Run the callback at discrete priority. Native events and component-owned timers both enter
+// React outside its render loop; callers pair this with flushExternalUpdate when the result must
+// paint synchronously.
 export function withDiscretePriority(run: () => void): void {
   const previous = currentUpdatePriority;
   currentUpdatePriority = DiscreteEventPriority;
@@ -244,5 +245,14 @@ const reconciler = createReconciler<
   suspendInstance: () => {},
   waitForCommitToBeReady: () => null,
 });
+
+// Native-event and timer callbacks both update React from outside the reconciler. Put the update
+// on the discrete lane and synchronously commit it; otherwise a delayed Pressable transition can
+// mutate state but remain visually stale until some unrelated later event flushes React work.
+export function flushExternalUpdate(run: () => void): void {
+  withDiscretePriority(run);
+  // @ts-expect-error flushSyncWork exists at runtime in react-reconciler 0.33
+  reconciler.flushSyncWork();
+}
 
 export default reconciler;

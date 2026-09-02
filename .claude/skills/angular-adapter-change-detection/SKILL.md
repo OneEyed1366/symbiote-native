@@ -1182,14 +1182,15 @@ component) is hand-written for this one screen. Checked 2026-08-30: `adapters/vu
 `adapters/solid` each carry a real `babel-lower-host-primitives.cjs` build-time transform (Vue also
 has `metro-vue-transformer.cjs` for the SFC path) that lowers `<View>`/`<Text>`/`<Pressable>`
 automatically, app-wide, for any component that qualifies (per `core/components/host-primitives.cjs`
-+ `REFUSAL_CATEGORIES`). `adapters/angular` has NO such file — grep for `HOST_PRIMITIVES` under
-`adapters/angular/src` returns nothing outside `build/`. So today an Angular app CANNOT get this win
-by writing ordinary `<View>`/`<Text>` markup; it would have to hand-write a `CUSTOM_ELEMENTS_SCHEMA`
-component per screen the way this diagnostic does (angular-adapter-change-detection §19's
-`lowering_ANGULAR_is_not_emit_the_tag` — the three ways to scope a component out, of which a real
-transform, (c), is what would make this a shipped feature and was explicitly declined for this pass).
-The numbers below are the upper bound of what a future transform could deliver, not a capability that
-exists yet.
+
+- `REFUSAL_CATEGORIES`). `adapters/angular` has NO such file — grep for `HOST_PRIMITIVES` under
+  `adapters/angular/src` returns nothing outside `build/`. So today an Angular app CANNOT get this win
+  by writing ordinary `<View>`/`<Text>` markup; it would have to hand-write a `CUSTOM_ELEMENTS_SCHEMA`
+  component per screen the way this diagnostic does (angular-adapter-change-detection §19's
+  `lowering_ANGULAR_is_not_emit_the_tag` — the three ways to scope a component out, of which a real
+  transform, (c), is what would make this a shipped feature and was explicitly declined for this pass).
+  The numbers below are the upper bound of what a future transform could deliver, not a capability that
+  exists yet.
 
 The user built and ran the three-shape toggle from §19 on iPhone 17 / iOS 26.5 simulator, Release
 implied (numbers land in the documented flat/composed bands, so this is the same build flavor as
@@ -1344,12 +1345,14 @@ Engine-node count: `composed` 12/row (row anchor + 2 Pressable anchors + 9 nativ
 too — three conflated variables, not one).
 
 Verified this session, nothing device-measured yet:
+
 - `ngc -p tsconfig.angular.json` (real AOT, run directly, not through the `rtk` wrapper) — exit 0,
   clean, `BenchmarkRowPressableLowered` present in the compiled `build/angular/src/screens/
-  BenchmarkScreen.js`.
+BenchmarkScreen.js`.
 - `adapters/angular/src/__tests__/benchmark-row-shape.test.ts` — still 3/3 green (untouched:
   the new shape isn't part of its drift fence, which only pins `composed`/`flat`).
-- `examples/angular` overlaid fresh (`node scripts/overlay-local-packages.mjs examples/angular`)
+- `examples/angular` refreshed from the local registry (`registry:publish` + `registry:refresh`;
+  the overlay script this originally named was deleted 2026-09-02)
   after confirming the installed `@symbiote-native/components` build was stale
   (`registerPressableBehavior` absent — `^0.5.0` registry pin, function added to core long after).
 
@@ -1655,72 +1658,74 @@ automates it — `adapters/angular/babel-lower-host-primitives.cjs`, the fifth t
 Solid/Vue(x2)/Svelte, reading the same shared spec (`core/components/host-primitives.cjs`).
 
 ```
+
 §26_transform_built := {
-  seam: "SAME Babel pass as babel-register-composed.cjs, BEFORE babel-linker.cjs — Stage A
-     (ngc --compilationMode partial) has already emitted ɵɵngDeclareComponent({template, deps}),
-     template is a plain string and dependencies a plain array at this point",
-  mechanism: "two edits on ONE metadata object: (1) template text <View> -> <symbiote-view> via
-     @angular/compiler's real parseTemplate() + startSourceSpan/endSourceSpan-offset text splicing
-     (never regex — a self-closing tag has start===end, no separate close span to touch);
-     (2) the dependencies[] entry whose selector string contains 'View'/'Text' as a comma-separated
-     token is REMOVED. (2) is not cleanup, it IS the mechanism — leaving it means 'symbiote-view'
-     still resolves to the real component regardless of the text rewrite",
-  schemas_finding: "VERIFIED by direct probe: CUSTOM_ELEMENTS_SCHEMA never reaches
-     ɵɵngDeclareComponent's declared metadata at all — a component that DOES declare it in source
-     emits NO schemas field. It is consulted only by Stage A's ngtsc type-checker against the
-     ORIGINAL (unlowered) template, never by the linker. So an ORDINARY app component needs ZERO
-     schemas/CUSTOM_ELEMENTS_SCHEMA change to become lowerable — unlike LoweredBenchmarkRows, which
-     types <symbiote-view> directly in SOURCE and needs it for ngtsc's sake only",
-  refusal: "ONE category applies to View/Text (observesState unset, so no style/child-shape
-     categories reach them at all): #ref (instance-bound-directive). #ref on the WRAPPED component
-     yields the ViewHost/TextHost INSTANCE (nativeElement getter, style @Input); on a lowered bare
-     tag (no directive match) Angular's default hands back the raw engine node DIRECTLY instead —
-     a DIFFERENT surface, so this refuses UNIVERSALLY (Vue's width, not Solid's narrower one, for
-     an Angular-specific reason: unlike Solid's View/Text, ours does not forward the identical node
-     either way). ALL-OR-NOTHING per tag name per template: one #ref'd <View> keeps EVERY <View> in
-     that template as the component, since dependencies' selector string covers the whole template
-     at once",
-  angular_grammar_finding: "VERIFIED: Angular template expressions have NO arrow-function syntax —
-     parseTemplate throws a real parser error on `[style]=\"({pressed}) => ({...})\"`. Two of the
-     shared fixture table's 14 rows (specialisable-state-style, nested-function-state-style) are
-     therefore not merely unsupported here, they are UNWRITABLE in Angular at all — marked
-     it.skip with the parser error attached, not silently omitted",
-  scope_deferred: "Pressable and TextInput are NOT in LOWERABLE_NAMES — real, named blockers, not
-     silently-thinner coverage. Pressable's anchor-registry collision (this paragraph's original
-     text) is RESOLVED — see §27; the transform-support blockers below (observesState-family
-     refusals) are still open. TextInput: needs intrinsicWhen
-     (multiline selects symbiote-text-input vs -multiline, two DIFFERENT native views) wired
-     through the same rewrite path, refusing on a non-literal selector prop
-     (REFUSAL_CATEGORIES.dynamicIntrinsicChoice) — not implemented",
-  verification: "no device run (none available this session). Strongest proof short of one: a real
-     ngc-compiled snippet (verified against an actual throwaway compile before writing tests by
-     hand) run through this plugin then through the REAL babel-linker.cjs produces genuine
-     ɵɵdomElementStart('symbiote-view', ...) with NO dependencies field at all, against
-     ɵɵelementStart('View', ...) + dependencies:[View,Text] for the un-lowered control — pinned in
-     babel-lower-host-primitives.test.ts, break-tested (disabling the dependencies-removal step
-     flips both the linker assertion and the runner's control test red). Whole-app dry run over
-     examples/angular's real compiled output (32 components, no example-specific tuning): 494 View
-     + 948 Text instances lowered, ZERO crashes",
-  domElementStart_nuance: "whether a lowered tag reaches ɵɵdomElementStart (truly bare, zero
-     directive overhead) or still compiles to ɵɵelementStart depends on whether ANY OTHER directive
-     (not View/Text) still matches the same element — e.g. [symbioteHostProps] on a PRIMITIVE's own
-     internal template keeps ɵɵelementStart correctly, since that directive genuinely still needs a
-     slot. This is orthogonal to and unaffected by this transform (it only ever touches View/Text's
-     OWN dependency entry). Verified directly: a plain app-shaped <View [class]=\"expr\"> (no other
-     directive) DOES reach ɵɵdomElementStart + ɵɵclassMap, matching BenchmarkRow's own pattern
-     exactly — the perf case this transform exists for",
-  fixture_runner: "lowering-parity.test.ts answers the shared table using Pressable as the default
-     component (matching every other adapter's convention) — so on THIS adapter almost every
-     'lower' row correctly reads 'refuse' (Pressable unsupported), which is the EXPECTED shape per
-     adapter-parity-audit.md ('a red row is a question about which side is wrong, never a verdict
-     on the transform'). A separate control describe block lowers View/Text on the identical
-     harness to prove the refuse readings are not an inert/broken instrument
-     (lowering-fixtures.cjs's own 'a refuse row is unproven until a control goes the other way')",
-  not_yet_wired: "NOT added to examples/angular/babel.config.js — a production build-pipeline
-     change with no device confirmation available this session. Package subpath
-     '@symbiote-native/angular/babel-lower-host-primitives' exported and in files[], ready to wire",
+seam: "SAME Babel pass as babel-register-composed.cjs, BEFORE babel-linker.cjs — Stage A
+(ngc --compilationMode partial) has already emitted ɵɵngDeclareComponent({template, deps}),
+template is a plain string and dependencies a plain array at this point",
+mechanism: "two edits on ONE metadata object: (1) template text <View> -> <symbiote-view> via
+@angular/compiler's real parseTemplate() + startSourceSpan/endSourceSpan-offset text splicing
+(never regex — a self-closing tag has start===end, no separate close span to touch);
+(2) the dependencies[] entry whose selector string contains 'View'/'Text' as a comma-separated
+token is REMOVED. (2) is not cleanup, it IS the mechanism — leaving it means 'symbiote-view'
+still resolves to the real component regardless of the text rewrite",
+schemas_finding: "VERIFIED by direct probe: CUSTOM_ELEMENTS_SCHEMA never reaches
+ɵɵngDeclareComponent's declared metadata at all — a component that DOES declare it in source
+emits NO schemas field. It is consulted only by Stage A's ngtsc type-checker against the
+ORIGINAL (unlowered) template, never by the linker. So an ORDINARY app component needs ZERO
+schemas/CUSTOM_ELEMENTS_SCHEMA change to become lowerable — unlike LoweredBenchmarkRows, which
+types <symbiote-view> directly in SOURCE and needs it for ngtsc's sake only",
+refusal: "ONE category applies to View/Text (observesState unset, so no style/child-shape
+categories reach them at all): #ref (instance-bound-directive). #ref on the WRAPPED component
+yields the ViewHost/TextHost INSTANCE (nativeElement getter, style @Input); on a lowered bare
+tag (no directive match) Angular's default hands back the raw engine node DIRECTLY instead —
+a DIFFERENT surface, so this refuses UNIVERSALLY (Vue's width, not Solid's narrower one, for
+an Angular-specific reason: unlike Solid's View/Text, ours does not forward the identical node
+either way). ALL-OR-NOTHING per tag name per template: one #ref'd <View> keeps EVERY <View> in
+that template as the component, since dependencies' selector string covers the whole template
+at once",
+angular_grammar_finding: "VERIFIED: Angular template expressions have NO arrow-function syntax —
+parseTemplate throws a real parser error on `[style]=\"({pressed}) => ({...})\"`. Two of the
+shared fixture table's 14 rows (specialisable-state-style, nested-function-state-style) are
+therefore not merely unsupported here, they are UNWRITABLE in Angular at all — marked
+it.skip with the parser error attached, not silently omitted",
+scope_deferred: "Pressable and TextInput are NOT in LOWERABLE_NAMES — real, named blockers, not
+silently-thinner coverage. Pressable's anchor-registry collision (this paragraph's original
+text) is RESOLVED — see §27; the transform-support blockers below (observesState-family
+refusals) are still open. TextInput: needs intrinsicWhen
+(multiline selects symbiote-text-input vs -multiline, two DIFFERENT native views) wired
+through the same rewrite path, refusing on a non-literal selector prop
+(REFUSAL_CATEGORIES.dynamicIntrinsicChoice) — not implemented",
+verification: "no device run (none available this session). Strongest proof short of one: a real
+ngc-compiled snippet (verified against an actual throwaway compile before writing tests by
+hand) run through this plugin then through the REAL babel-linker.cjs produces genuine
+ɵɵdomElementStart('symbiote-view', ...) with NO dependencies field at all, against
+ɵɵelementStart('View', ...) + dependencies:[View,Text] for the un-lowered control — pinned in
+babel-lower-host-primitives.test.ts, break-tested (disabling the dependencies-removal step
+flips both the linker assertion and the runner's control test red). Whole-app dry run over
+examples/angular's real compiled output (32 components, no example-specific tuning): 494 View + 948 Text instances lowered, ZERO crashes",
+domElementStart_nuance: "whether a lowered tag reaches ɵɵdomElementStart (truly bare, zero
+directive overhead) or still compiles to ɵɵelementStart depends on whether ANY OTHER directive
+(not View/Text) still matches the same element — e.g. [symbioteHostProps] on a PRIMITIVE's own
+internal template keeps ɵɵelementStart correctly, since that directive genuinely still needs a
+slot. This is orthogonal to and unaffected by this transform (it only ever touches View/Text's
+OWN dependency entry). Verified directly: a plain app-shaped <View [class]=\"expr\"> (no other
+directive) DOES reach ɵɵdomElementStart + ɵɵclassMap, matching BenchmarkRow's own pattern
+exactly — the perf case this transform exists for",
+fixture_runner: "lowering-parity.test.ts answers the shared table using Pressable as the default
+component (matching every other adapter's convention) — so on THIS adapter almost every
+'lower' row correctly reads 'refuse' (Pressable unsupported), which is the EXPECTED shape per
+adapter-parity-audit.md ('a red row is a question about which side is wrong, never a verdict
+on the transform'). A separate control describe block lowers View/Text on the identical
+harness to prove the refuse readings are not an inert/broken instrument
+(lowering-fixtures.cjs's own 'a refuse row is unproven until a control goes the other way')",
+not_yet_wired: "NOT added to examples/angular/babel.config.js — a production build-pipeline
+change with no device confirmation available this session. Package subpath
+'@symbiote-native/angular/babel-lower-host-primitives' exported and in files[], ready to wire",
 }
+
 ```
+
 ```
 
 ## §27. Pressable's anchor-registry collision resolved — dropped the vestigial dual selector, not a `-managed` split (2026-08-31)
@@ -1775,4 +1780,7 @@ Solid/Vue(x2)/Svelte, reading the same shared spec (`core/components/host-primit
      device",
 }
 ```
+
+```
+
 ```

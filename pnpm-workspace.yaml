@@ -67,8 +67,9 @@ minimumReleaseAgeExclude:
 # instead of a literal, so a bump happens HERE, in one place. The guard that
 # nobody slips a literal version past this file is syncpack (`pnpm deps:check`).
 #
-# peerDependencies are deliberately NOT catalogued — they are compatibility
-# ranges (`>=19.0.0`, `>=0.86`) a consumer satisfies, not a pinned version.
+# peerDependencies are deliberately NOT catalogued. External peers are compatibility
+# ranges (`>=19.0.0`, `>=0.86`); internal @symbiote-native peers use `workspace:^`, which
+# `pnpm pack` rewrites to a bounded caret range for the peer's current workspace version.
 catalog:
   # framework runtimes — exactly one copy across the monorepo (the RN/react
   # singleton the `overrides` below also guards transitively)

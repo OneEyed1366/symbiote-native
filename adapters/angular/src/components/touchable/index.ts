@@ -144,6 +144,7 @@ function createTimerScheduler(): ITimerScheduler {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <Pressable
+      [__minPressDuration]="0"
       (press)="press.emit($event)"
       (pressIn)="handlePressIn($event)"
       (pressOut)="handlePressOut($event)"
@@ -443,6 +444,7 @@ export class TouchableOpacity
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <Pressable
+      [__minPressDuration]="0"
       [style]="containerStyle()"
       (press)="handlePress($event)"
       (pressIn)="handlePressIn($event)"
@@ -730,6 +732,7 @@ export class TouchableHighlight
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <Pressable
+      [__minPressDuration]="0"
       [style]="mergedStyle"
       (press)="press.emit($event)"
       (pressIn)="handlePressIn($event)"

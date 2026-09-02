@@ -1765,7 +1765,7 @@ everywhere" as false. Release, same simulator, same session, batch OFF on both.
 
 ## Isolating ONE engine change on device when the local engine carries unrelated work
 
-The usual way to get a local `core/engine` onto a device is `scripts/overlay-local-packages.mjs`
+The usual way to get a local `core/engine` onto a device is `registry:publish` + `registry:refresh`
 or a `pnpm pack` + `file:` swap. Both bring the WHOLE working tree — and in a shared worktree that
 routinely means several sessions' uncommitted changes arriving at once. The delta is then
 unattributable, which is the failure this whole skill exists to prevent.
@@ -1785,8 +1785,8 @@ Rules for using this:
 
 - **Mark it in the file.** A `MEASUREMENT PATCH, not a real install` comment naming the source of
   truth and the revert command, or the next person reads a divergent `node_modules` as an install.
-- **Revert is `node scripts/overlay-local-packages.mjs <example>` or a reinstall** — never assume
-  the patch will be noticed later.
+- **Revert is `pnpm run registry:refresh examples/<name>` or a reinstall** — never assume the patch
+  will be noticed later.
 - **The real change still lands in `core/engine/src` first**, with its tests. The transplant is an
   instrument, never the implementation.
 - **Only for a change small enough to transplant by eye.** Anything touching several functions, or
@@ -1917,9 +1917,10 @@ This bit for real: a "~70 ms Solid carries beyond its component-instance cost" f
 handed to another session, and had to be withdrawn once the installed builds were compared. The
 number was not wrong arithmetic; it was arithmetic across two different engines.
 
-`node scripts/overlay-local-packages.mjs examples/<name>` re-levels one example. Note its DEFAULT
-list is the CI four (react, vue-sfc, svelte, angular) and **excludes solid** — the script's own
-comment warns about exactly this, and the table above is what happens anyway.
+`pnpm run registry:publish` then `registry:refresh examples/<name>` re-levels one example. The tool
+this paragraph used to name, `overlay-local-packages.mjs`, was deleted 2026-09-02; its default list
+was the CI four and **excluded solid**, which is how the table above happened. The registry route
+derives its package set from each example's own manifest, so it has no list to fall out of.
 
 ## A lowering ratio measured on the benchmark row is an UPPER BOUND — say so beside the number
 
