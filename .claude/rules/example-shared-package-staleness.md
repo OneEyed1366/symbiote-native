@@ -149,7 +149,11 @@ in both the first (slow, general-walk-fallback) implementation and the final uni
 Three checks, cheap, and the third is the one that actually settles it:
 
 1. **A marker unique to the FINAL version**, not to the feature — a string from the last edit
-   (e.g. a new `dlog` format), not the exported name.
+   (e.g. a new `dlog` format), not the exported name. And check which EMITTED file carries it: a
+   types-only `.ts` compiles to `export {};`, so `adapters/react/build/jsx.js` is empty and the
+   intrinsic table lives in `jsx.d.ts`. Measured 2026-09-02 — that marker reported four examples
+   STALE right after a correct install, on the one adapter the session had been changing, which is
+   the shape a real staleness bug takes.
 2. **Exactly one copy**: `find <example>/node_modules -path "*@symbiote-native/<pkg>/package.json"`
    → 1. A nested second copy is the one the app may resolve, and nothing announces it.
 3. **A normalized whole-build comparison against a fresh local build** — every emitted file, not
