@@ -961,6 +961,24 @@ this repo already made once for `.smoke-compiled-*` suites — see
 `.claude/rules/smoke-compiled-artifact-collisions.md`, whose own lesson is that the timing repair was
 worth keeping but was NOT the cause there. Here it was.
 
+**And `waitForQuiet` carried the same defect one layer in, which is the part worth keeping.** It
+sampled until the value held for three consecutive MACROTASKS — a count, so how much wall time it
+spans is a property of the machine, exactly what it was written to stop measuring. Bisected
+2026-09-02 on `flat-list-array-style`: the list commits its batch once more between tick 30 and 60,
+so on an idle machine the settle declared quiet BEFORE the batch and the test passed by stopping too
+early, while under a loaded full-suite run the same thirteen ticks spanned enough time to catch it
+and read as free-running change detection. One test, both failure directions, neither about the
+product.
+
+Quiet is now a DURATION (`quietMs`, default 75ms — past RN VirtualizedList's 50ms batching period,
+the longest deferred producer here) as well as a tick count, and `advanceMs` observes for a duration
+so the second half of a "does not free-run" test is machine-independent too.
+
+The general form: **a settle and its observation window both make a wall-clock claim, so neither may
+be spelled in ticks.** When a fixed-tick wait is replaced, check the replacement is not the same unit
+wearing a condition — and read WHICH direction the flake takes, because "passes when idle" and
+"fails under load" here were one bug, not two.
+
 ## 23b. A fixed subject fails TWO ways when its premise moves, and only one of them is loud
 
 §23 records a subject that changes SIDES and takes the test silent. The sibling case, measured
