@@ -17,6 +17,24 @@
 // Prereq: npm CLI >= 11.15.0.
 
 import { execFileSync } from 'node:child_process';
+
+// PINNED, on every npm call in this file. Nothing here may resolve its registry from config.
+//
+// This script's job is entirely on npmjs — it configures the OIDC trusted publisher a GitHub
+// Actions run will use, and for a package that does not exist yet it performs the REAL first
+// publish. None of that means anything against another registry.
+//
+// The hazard is not hypothetical and it is silent. `scripts/local-registry.mjs` points examples at
+// a Verdaccio on localhost by writing `examples/<app>/.npmrc`, which this script never reads. But
+// npm MERGES user config, so a single `@symbiote-native:registry=http://localhost:4873/` line in
+// `~/.npmrc` — a natural thing to add by hand after reading `scripts/verdaccio/README.md` — would
+// silently redirect every call below. `npm view` would then answer from the local registry and
+// report an unpublished package as published (skipping the real first publish), or the publish
+// itself would go to localhost and print success. A package would read as trusted-and-published
+// while npmjs had never heard of it.
+//
+// One flag removes the whole class, so it is not worth reasoning about which config might be set.
+const REGISTRY = ['--registry=https://registry.npmjs.org'];
 import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
@@ -31,7 +49,9 @@ const DEFAULT_REPO = 'OneEyed1366/symbiote-native';
 
 const repoSlug = () => {
   try {
-    const url = execFileSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).trim();
+    const url = execFileSync('git', ['remote', 'get-url', 'origin'], {
+      encoding: 'utf8',
+    }).trim();
     const match = url.match(/github\.com[:/](.+?)(?:\.git)?$/);
     if (match) return match[1];
   } catch {
@@ -42,7 +62,9 @@ const repoSlug = () => {
 
 const isPublished = name => {
   try {
-    execFileSync('npm', ['view', name, 'version'], { stdio: 'pipe' });
+    execFileSync('npm', ['view', name, 'version', ...REGISTRY], {
+      stdio: 'pipe',
+    });
     return true;
   } catch {
     return false;
@@ -56,7 +78,9 @@ const only = args.find(arg => !arg.startsWith('-'));
 const repo = repoSlug();
 let entries = publishablePackageEntries();
 if (only) {
-  entries = entries.filter(({ name }) => name === only || name === `@symbiote-native/${only}`);
+  entries = entries.filter(
+    ({ name }) => name === only || name === `@symbiote-native/${only}`,
+  );
 }
 
 if (entries.length === 0) {
@@ -78,19 +102,23 @@ if (listOnly) process.exit(0);
 // gives one clear login prompt instead of every package in the loop below
 // failing on the same raw npm auth error.
 try {
-  execFileSync('npm', ['whoami'], { stdio: 'pipe' });
+  execFileSync('npm', ['whoami', ...REGISTRY], { stdio: 'pipe' });
 } catch {
   console.log('No active npm session — running npm login...');
-  execFileSync('npm', ['login'], { stdio: 'inherit' });
+  execFileSync('npm', ['login', ...REGISTRY], { stdio: 'inherit' });
   try {
-    execFileSync('npm', ['whoami'], { stdio: 'pipe' });
+    execFileSync('npm', ['whoami', ...REGISTRY], { stdio: 'pipe' });
   } catch {
-    console.error('npm login did not produce an authenticated session — aborting.');
+    console.error(
+      'npm login did not produce an authenticated session — aborting.',
+    );
     process.exit(1);
   }
 }
 
-console.log('\nEach never-published package is packed then published, and every package');
+console.log(
+  '\nEach never-published package is packed then published, and every package',
+);
 console.log('needs `npm trust github` — both are interactive (OTP/browser).\n');
 
 // Only `pnpm pack` resolves the manifest: it applies the publishConfig overlay (main/exports ->
@@ -101,14 +129,24 @@ console.log('needs `npm trust github` — both are interactive (OTP/browser).\n'
 // approval succeeds, and the CLI waits forever — while npm's own commands, `npm trust` included,
 // finish the identical flow against the identical registry through the identical proxy.
 function publish(name, dir) {
-  const packed = execFileSync('pnpm', ['pack', '--pack-destination', tmpdir()], {
-    cwd: dir,
-    encoding: 'utf8',
-  });
+  const packed = execFileSync(
+    'pnpm',
+    ['pack', '--pack-destination', tmpdir()],
+    {
+      cwd: dir,
+      encoding: 'utf8',
+    },
+  );
   // pnpm prints the tarball path as the last non-empty line of stdout.
   const tarball = packed.trim().split('\n').filter(Boolean).pop();
   try {
-    execFileSync('npm', ['publish', tarball, '--access', 'public'], { stdio: 'inherit' });
+    execFileSync(
+      'npm',
+      ['publish', tarball, '--access', 'public', ...REGISTRY],
+      {
+        stdio: 'inherit',
+      },
+    );
   } finally {
     rmSync(tarball, { force: true });
   }
@@ -117,7 +155,9 @@ function publish(name, dir) {
 const failed = [];
 for (const { name, dir } of entries) {
   if (!isPublished(name)) {
-    console.log(`=== publish ${name} (first publish — not yet on the registry) ===`);
+    console.log(
+      `=== publish ${name} (first publish — not yet on the registry) ===`,
+    );
     try {
       publish(name, dir);
     } catch (error) {
@@ -132,6 +172,7 @@ for (const { name, dir } of entries) {
     execFileSync(
       'npm',
       [
+        ...REGISTRY,
         'trust',
         'github',
         name,
@@ -164,7 +205,11 @@ for (const { name, dir } of entries) {
 console.log('\n---');
 if (failed.length > 0) {
   console.error(`Failed (${failed.length}): ${failed.join(', ')}`);
-  console.error('Re-run for a single package with: pnpm run trust:publishers <name>');
+  console.error(
+    'Re-run for a single package with: pnpm run trust:publishers <name>',
+  );
   process.exit(1);
 }
-console.log(`Done — trusted publisher configured for all ${entries.length} package(s).`);
+console.log(
+  `Done — trusted publisher configured for all ${entries.length} package(s).`,
+);

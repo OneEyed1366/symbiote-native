@@ -1,0 +1,35 @@
+# TEMPLATE — copy into an EXAMPLE directory, not here.
+#
+#   cp .npmrc.example examples/react/.npmrc
+#
+# or let the script do it, which also fills in the token:
+#
+#   pnpm run registry:on examples/react
+#
+# NOT a template for the repo-root `.npmrc`. That one is tracked, holds pnpm's hoisting settings
+# for the workspace, and has nothing to do with this. Two files with almost the same name doing
+# unrelated jobs is a real hazard, so: this belongs in `examples/<app>/`, and nowhere else.
+#
+# WHAT IT DOES. Points the `@symbiote-native` scope at a Verdaccio running on this machine, so an
+# example installs THIS working tree's build of a package under the ordinary public version its
+# manifest already names. The manifest never changes — which is the point, since a `file:` tarball
+# specifier is machine-local state living in a tracked file, and six of them were one `git add`
+# away from being committed on 2026-09-01.
+#
+# WHY IT IS GITIGNORED, and why that is not laziness. npm has NO registry fallback chain: a
+# configured registry that is unreachable is a hard failure, not a quiet fall-through to npmjs. A
+# tracked pointer at localhost would therefore break `npm install` for every clone that does not
+# happen to be running Verdaccio. Absent this file, an example resolves from npmjs exactly as it
+# always has — that is the fallback, and it is the default.
+#
+# Delete the file to go back to the public registry. Nothing else has to be undone.
+#
+# Full setup on a new machine, one command:  pnpm run registry:setup
+
+@symbiote-native:registry=http://localhost:4873/
+
+# Verdaccio's config grants anonymous publish, but the npm CLI refuses to attempt one without SOME
+# token configured for the host — so this line exists to satisfy npm, not the registry. `registry:on`
+# writes the real value; `registry:setup` creates it on first run and caches it in
+# scripts/verdaccio/token (also gitignored).
+//localhost:4873/:_authToken=REPLACE_ME

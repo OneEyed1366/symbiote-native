@@ -8,6 +8,13 @@
     "node": ">=22.13"
   },
   "scripts": {
+    "registry:setup": "node scripts/local-registry.mjs setup",
+    "registry:status": "node scripts/local-registry.mjs status",
+    "registry:on": "node scripts/local-registry.mjs on",
+    "registry:off": "node scripts/local-registry.mjs off",
+    "registry:publish": "node scripts/local-registry.mjs publish",
+    "registry:sync": "node scripts/local-registry.mjs sync",
+    "registry:refresh": "node scripts/local-registry.mjs refresh",
     "typecheck": "tsc --build",
     "typecheck:watch": "tsc --build --watch",
     "clean:build": "node scripts/clean-build-outputs.mjs",
