@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Component overhead — React</title>
+    <style>
+      body { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 24px; max-width: 900px; }
+      h1 { font-size: 16px; }
+      p { font-family: system-ui, sans-serif; color: #333; max-width: 68ch; }
+      button { font: inherit; padding: 6px 14px; }
+      pre { background: #f4f4f5; padding: 14px; overflow-x: auto; }
+      #stage { position: absolute; left: -99999px; top: 0; width: 400px; }
+    </style>
+  </head>
+  <body>
+    <h1>Component overhead — React 18.3.1</h1>
+    <p>
+      Two arms, one page, one DOM. Arm A writes the row's seven elements directly; arm B wraps each
+      one in a pass-through component. Same data, same markup, same 10 000 nodes — so the delta is
+      the component boundary and nothing else. A control compares the node census of both arms and
+      refuses to report a per-instance figure if they differ.
+    </p>
+    <p>
+      No JSX and no build step on purpose: <code>React.createElement</code> is exactly what JSX
+      compiles to, so this measures the same path a real app takes.
+    </p>
+    <button id="run">Run</button>
+    <pre id="out">not run yet</pre>
+    <div id="stage"></div>
+
+    <script>
+      // A `type="module"` script cannot load a sibling over file:// — Chrome blocks it as a
+      // cross-origin request and the page then sits silently on "not run yet", which reads as a
+      // broken benchmark rather than a wrong URL. Say so before that can happen.
+      if (location.protocol === 'file:') {
+        document.getElementById('out').textContent =
+          'Open this over http, not file:// — the shared harness is an ES module and the browser\n' +
+          'refuses to load it from a file URL.\n\n' +
+          '  cd benchmarks/component-overhead && python3 -m http.server 8123\n' +
+          '  open http://localhost:8123/react.html';
+        document.getElementById('run').disabled = true;
+      }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+    <script type="module">
+      import { ROWS, buildData, measurePair, report } from './harness.js';
+
+      const e = React.createElement;
+      const stage = document.getElementById('stage');
+      const out = document.getElementById('out');
+
+      // Arm B's wrappers. Deliberately empty — they forward props and return the element, so the
+      // number this page produces is the FLOOR of a component boundary, before any prop fold.
+      // Counted, not assumed: control 2 in the harness needs to know arm B really instantiated
+      // components. Without it a delta of zero is indistinguishable from an arm that never wrapped.
+      let wrapperCalls = 0;
+      const Box = props => { wrapperCalls += 1; return e('div', props); };
+      const Txt = props => { wrapperCalls += 1; return e('span', props); };
+      const Field = props => { wrapperCalls += 1; return e('input', props); };
+
+      // The benchmark row, mirroring examples/*: 7 elements + 3 text nodes = 10 DOM nodes.
+      function rawRow(row) {
+        return e(
+          'div',
+          { className: 'bench-row', key: row.id },
+          e('span', { className: 'bench-row-id' }, String(row.id)),
+          e('div', { className: 'flex1' }, e('span', { className: 'bench-row-label' }, row.label)),
+          e('div', { className: 'bench-row-remove' }, e('span', { className: 'bench-row-remove-text' }, '×')),
+          e('input', { className: 'bench-row-input', value: row.label, readOnly: true }),
+        );
+      }
+
+      function wrappedRow(row) {
+        return e(
+          Box,
+          { className: 'bench-row', key: row.id },
+          e(Txt, { className: 'bench-row-id' }, String(row.id)),
+          e(Box, { className: 'flex1' }, e(Txt, { className: 'bench-row-label' }, row.label)),
+          e(Box, { className: 'bench-row-remove' }, e(Txt, { className: 'bench-row-remove-text' }, '×')),
+          e(Field, { className: 'bench-row-input', value: row.label, readOnly: true }),
+        );
+      }
+
+      // ONE list component in both arms, so the per-row component count differs by exactly the
+      // seven inner wrappers and nothing else.
+      const List = ({ data, rowOf }) => e('div', null, data.map(rowOf));
+
+      function armFor(rowOf) {
+        const data = buildData(ROWS);
+        const host = document.createElement('div');
+        stage.appendChild(host);
+        const root = ReactDOM.createRoot(host);
+        return {
+          container: host,
+          // flushSync so React commits inside the timed window; without it the clock stops before
+          // the DOM exists and the arm reports the cost of scheduling, not of rendering.
+          mount: () => ReactDOM.flushSync(() => root.render(e(List, { data, rowOf }))),
+          clear: () => ReactDOM.flushSync(() => root.render(null)),
+          dispose: () => { root.unmount(); host.remove(); },
+        };
+      }
+
+      document.getElementById('run').addEventListener('click', () => {
+        out.textContent = 'running...';
+        // A frame, so the click's own work is not inside the first sample.
+        requestAnimationFrame(() => {
+          const a = armFor(rawRow);
+          const b = armFor(wrappedRow);
+          const result = measurePair({ raw: a, wrapped: b, rounds: 7, warmups: 2 });
+          // One clean mount of arm B alone, so the count is per-render rather than cumulative.
+          wrapperCalls = 0;
+          b.mount();
+          const calls = wrapperCalls;
+          b.clear();
+          a.dispose();
+          b.dispose();
+          out.textContent = `React ${React.version}\n\n${report(result, ROWS, calls)}`;
+        });
+      });
+    </script>
+  </body>
+</html>
