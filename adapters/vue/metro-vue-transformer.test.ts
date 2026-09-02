@@ -13,6 +13,7 @@
 // (unsupported lang) sits inside its feature's describe, asserting the specific error message.
 import { describe, expect, it } from 'vitest';
 import metroVueTransformer from './metro-vue-transformer.cjs';
+import { HOST_PRIMITIVES } from '@symbiote-native/components/host-primitives';
 
 const {
   compileSfc,
@@ -817,19 +818,40 @@ describe('metro-vue-transformer host-primitive lowering', () => {
     expect(code).toContain('_unref(View)');
   });
 
-  // `Pressable` used to stand here as the un-lowered primitive; the spec gained it on 2026-08-23,
-  // so the case moved onto ones that are genuinely absent from HOST_PRIMITIVES. What it guards is
-  // unchanged: listing is what makes a tag lowerable, never the name looking like a primitive.
+  // What this guards: listing in HOST_PRIMITIVES is what makes a tag lowerable, never the name
+  // looking like a primitive.
+  //
+  // The subject is DERIVED rather than named, because naming it rots every time the spec grows and
+  // has already done so twice — `Pressable` stood here until 2026-08-23, `Image` until 2026-09-01,
+  // and each time the failure read as a lowering regression rather than as a stale fixture. Picking
+  // off the spec cannot go stale: the day a candidate is added it simply stops being chosen, and if
+  // every candidate is lowered the test says so instead of quietly asserting nothing.
   it('does not lower a primitive that is more than a pass-through', async () => {
+    const candidates = [
+      'Switch',
+      'ScrollView',
+      'Modal',
+      'RefreshControl',
+      'SafeAreaView',
+    ];
+    const absent = candidates.filter(
+      name => HOST_PRIMITIVES[name] === undefined,
+    );
+    expect(
+      absent.length,
+      `every candidate is now lowerable (${candidates.join(', ')}) — pick a primitive that is still absent, or retire this case`,
+    ).toBeGreaterThan(0);
+    const subject = absent[0];
+
     const code = await compileSfc(
       sfc(
-        `import { Switch, Image } from '@symbiote-native/vue'`,
-        `<Switch><Image src="x" /></Switch>`,
+        `import { ${subject} } from '@symbiote-native/vue'`,
+        `<${subject}><Text>x</Text></${subject}>`,
       ),
       'stateful.vue',
     );
-    expect(code).toContain('_unref(Switch)');
-    expect(code).toContain('_unref(Image)');
+
+    expect(code).toContain(`_unref(${subject})`);
   });
 
   it('still scopes a scoped class on a lowered element', async () => {
@@ -876,26 +898,36 @@ describe('Pressable lowering refusals', () => {
   // expression is CALLED once per state, and a name that turns out to hold an object is handled by
   // a runtime typeof guard rather than by a compile-time proof. What still refuses is anything that
   // cannot be read twice — see the two cases below this one.
-  it('lowers a hoisted :style behind a runtime typeof guard', async () => {
+  // Every style shape lowers and the author's expression reaches the output EXACTLY ONCE,
+  // untouched — the structural form of `REFUSAL_CATEGORIES.emitStyleExpressionOnce`. With the
+  // state-style split gone there is no emission that could print an expression twice, so the
+  // property that used to need a runtime helper holds by construction. `routeProp` resolves the
+  // callback at both values of `pressed`.
+  //
+  // The rows deliberately mirror `babel-jsx.test.ts`: this path sees the expression as SOURCE TEXT
+  // and that one has the AST, so the pair is exactly where the two could drift.
+  it.each([
+    ['a hoisted name', 'fnStyle', 'fnStyle'],
+    ['a call that can do work when read', 'getStyle()', 'getStyle'],
+    [
+      'an inline callback',
+      '({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })',
+      'pressed ? 0.6 : 1',
+    ],
+  ])('lowers %s, printing it once', async (_what, expression, needle) => {
     const code = await compilePressable(
-      '<Pressable :style="fnStyle"><Text>x</Text></Pressable>',
+      `<Pressable :style="${expression}"><Text>x</Text></Pressable>`,
     );
-    expect(code, 'a name can be read twice, so it can be called').toContain(
-      LOWERED,
-    );
-    expect(code).toContain('activeStyle');
-    expect(code, 'an object-valued name must survive the guard').toContain(
-      'typeof',
-    );
-  });
 
-  it('lowers an inline callback by applying it to each state', async () => {
-    const code = await compilePressable(
-      '<Pressable :style="({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })"><Text>x</Text></Pressable>',
-    );
     expect(code).toContain(LOWERED);
-    expect(code).toContain('{ pressed: false }');
-    expect(code).toContain('{ pressed: true }');
+    // Counted in the EMITTED ELEMENT, not the whole file: `<script setup>` carries the author's own
+    // declaration of the same name, so a file-wide count reads two for a name printed once.
+    const emitted = code.slice(code.indexOf(LOWERED));
+    expect(emitted.split(needle).length - 1, 'printed exactly once').toBe(1);
+    expect(code, 'no pair is emitted any more').not.toContain('activeStyle');
+    expect(code, 'and no runtime helper is needed').not.toContain(
+      '__symbioteStateStyle',
+    );
   });
 
   it('lowers an object literal, which needs no pair at all', async () => {
@@ -915,15 +947,6 @@ describe('Pressable lowering refusals', () => {
   // the inline guard — the guard prints it on both props, so `getStyle()` would run four times per
   // bag build. Briefly written as a refusal, which was wrong: the hazard belongs to the emit shape,
   // not to the expression. The COUNT is what pins it; the verdict alone would ratify either emit.
-  it('routes a :style that cannot be read twice through the helper', async () => {
-    const called = await compilePressable(
-      '<Pressable :style="getStyle()"><Text>x</Text></Pressable>',
-    );
-    expect(called).toContain(LOWERED);
-    expect(called).toContain('__symbioteStateStyle');
-    expect(called.split('getStyle').length - 1, 'read exactly once').toBe(1);
-  });
-
   it('keeps the cheap emission for a name, which needs no helper', async () => {
     const code = await compilePressable(
       '<Pressable :style="fnStyle"><Text>x</Text></Pressable>',

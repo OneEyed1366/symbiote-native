@@ -142,20 +142,15 @@ const {
   HOST_PRIMITIVES,
 } = require('@symbiote-native/components/host-primitives');
 
-// Only the STATE KEYS are shared here, not the specializer. This path has no JS AST in hand — the
-// SFC compiler gives an expression as SOURCE TEXT — so it emits the CALL form and never the
-// substituted one. That is a difference in OPTIMISATION, deliberately not a difference in verdict:
-// which call sites lower is decided by `callableStyleShape`, which classifies the same three
-// shapes the JSX twin does, off a real Babel AST. See babel-lower-host-primitives.cjs for the two
-// mechanisms and why only one of them is allowed to gate lowering.
-const {
-  STATE_KEYS,
-} = require('@symbiote-native/components/specialize-state-style');
 
 const LOWERABLE_HOST_PRIMITIVES = new Map(
   Object.entries(HOST_PRIMITIVES).map(([name, spec]) => [
     name,
-    { intrinsic: spec.intrinsic, observesState: spec.observesState === true },
+    {
+      intrinsic: spec.intrinsic,
+      observesState: spec.observesState === true,
+      intrinsicWhen: spec.intrinsicWhen,
+    },
   ]),
 );
 
@@ -341,75 +336,6 @@ function isCheapReferenceNode(node) {
   );
 }
 
-// `{ pressed: <value> }`, built from the SHARED state keys rather than a literal name, so a
-// primitive that later exposes a second state key does not need this edited in five transforms.
-function stateArgumentSource(value) {
-  return `{ ${[...STATE_KEYS].map(key => `${key}: ${value}`).join(', ')} }`;
-}
-
-// `:style="fn"` becomes `style` + `activeStyle`, each the callback applied to one state. The engine
-// consumes `activeStyle` in routeProp and never forwards it to Fabric; while the node is pressed it
-// stands in for SLOT 1, the authored style's slot, so a `:active` CSS rule still wins slot 0
-// underneath and the two mechanisms compose rather than race.
-//
-// A cheap REFERENCE cannot be told from a plain style object at compile time — `:style="props.x"`
-// is the same syntax either way — so it carries a runtime typeof guard, and that guard is what
-// closes the hoisted-callback call site no compile-time analysis could reach. `activeStyle` falls
-// back to `undefined` for a non-function, which the engine reads as "no active variant".
-function expandStateStyles(node, helper) {
-  for (const [index, prop] of node.props.entries()) {
-    if (prop.type !== 7 /* DIRECTIVE */) continue;
-    if (prop.name !== 'bind' || prop.arg?.content !== 'style') continue;
-    if (isInertValueExpression(prop.exp)) continue;
-    const kind = styleEmissionKind(prop.exp);
-    if (kind === undefined) continue;
-    const source = expressionSource(prop.exp);
-
-    // The one shape that must reach the output exactly once. `v-bind` with no argument is the only
-    // Vue form that turns one evaluation into two props, which is why it is not the default.
-    if (kind === 'opaque') {
-      node.props[index] = {
-        ...prop,
-        arg: undefined,
-        exp: createSimpleExpression(
-          `${helper.reference()}(${source})`,
-          false,
-          prop.exp.loc,
-        ),
-      };
-      return;
-    }
-
-    const apply = value =>
-      kind === 'literal'
-        ? `(${source})(${stateArgumentSource(value)})`
-        : `typeof (${source}) === 'function' ? (${source})(${stateArgumentSource(value)}) : ${value ? 'undefined' : `(${source})`}`;
-    node.props.push({
-      ...prop,
-      arg: createSimpleExpression('activeStyle', true, prop.arg.loc),
-      exp: createSimpleExpression(apply(true), false, prop.exp.loc),
-    });
-    prop.exp = createSimpleExpression(apply(false), false, prop.exp.loc);
-    return;
-  }
-}
-
-// The helper import, emitted at most once per file and only when an opaque style actually asked
-// for it — every other lowered file keeps byte-identical output to before this existed.
-const STATE_STYLE_LOCAL = '__symbioteStateStyle';
-
-function createStateStyleHelper() {
-  let used = false;
-  return {
-    reference() {
-      used = true;
-      return STATE_STYLE_LOCAL;
-    },
-    get isUsed() {
-      return used;
-    },
-  };
-}
 
 // The parser has already decided `<View>` is a COMPONENT (capitalized, and a <script setup>
 // binding), so renaming the tag is not enough — isCustomElement is consulted for the ORIGINAL tag
@@ -417,14 +343,75 @@ function createStateStyleHelper() {
 // children into withCtx slots. Get either half wrong and codegen emits a component whose children
 // are slots the element path never mounts: a silently empty subtree, which is how the first
 // attempt at this read.
-function createHostPrimitiveLowering(tags, helper) {
+// REFUSAL_CATEGORIES.dynamicIntrinsicChoice — the SFC twin of babel-lower-host-primitives.cjs's
+// `intrinsicWhenFor`, same rule over a different AST. A primitive whose spec entry carries
+// `intrinsicWhen` selects between TWO Fabric views by one prop's value, and this pass prints a
+// static tag, so it can choose only from a compile-time literal.
+//
+// Why it refuses harder than the value categories do: an unreadable VALUE lands a prop wrong and a
+// later write can still correct it; the wrong choice here commits the wrong native view, which no
+// prop write can move a node between.
+//
+// `multiline="true"` — a static STRING attribute — deliberately does not resolve, even though the
+// component treats it as truthy. `multiline="false"` is truthy too, which is exactly where author
+// intent and runtime behaviour part company; refusing costs the optimisation, guessing costs the
+// view.
+//
+// Returns the tag to emit, or undefined to refuse.
+function intrinsicWhenFor(node, entry) {
+  const choice = entry.intrinsicWhen;
+  if (choice === undefined) return entry.intrinsic;
+
+  let resolved = false;
+  for (const prop of node.props) {
+    // `v-bind="obj"` may carry the selector prop and cannot be enumerated, so it is indistinguish-
+    // able from the prop being absent — refuse rather than default to the single-line view.
+    if (prop.type === 7 /* DIRECTIVE */ && prop.name === 'bind' && !prop.arg)
+      return undefined;
+
+    if (prop.type === 6 /* ATTRIBUTE */ && prop.name === choice.prop) {
+      // A bare `multiline` carries no value, which is the template spelling of `true`. Anything
+      // else on a plain attribute is a string.
+      if (prop.value === undefined) {
+        resolved = true;
+        continue;
+      }
+      return undefined;
+    }
+
+    if (prop.type !== 7 /* DIRECTIVE */) continue;
+    if (prop.name !== 'bind' || prop.arg?.content !== choice.prop) continue;
+    const source = expressionSource(prop.exp)?.trim();
+    if (source !== 'true' && source !== 'false') return undefined;
+    resolved = source === 'true';
+  }
+
+  return resolved ? choice.intrinsic : entry.intrinsic;
+}
+
+function createHostPrimitiveLowering(tags) {
   return function lowerHostPrimitive(node) {
     if (node.type !== 1 /* NodeTypes.ELEMENT */) return;
     const entry = tags.get(node.tag);
     if (entry === undefined) return;
+    // Resolved BEFORE the state refusal and OUTSIDE its `observesState` gate — the two guard
+    // different things, and this one applies to a primitive that owns no state. Folding it into
+    // refusesLowering would put it behind that flag, where it would never run for TextInput.
+    const intrinsic = intrinsicWhenFor(node, entry);
+    if (intrinsic === undefined) return;
     if (entry.observesState && refusesLowering(node)) return;
-    if (entry.observesState) expandStateStyles(node, helper);
-    node.tag = entry.intrinsic;
+    // NO state-style expansion, deliberately. A functional `style` reaches `routeProp` untouched
+    // and the engine resolves it at both values of `pressed` (`isStyleCallback`), so rewriting the
+    // attribute into a resting/active pair here would be this transform carrying BEHAVIOUR — what
+    // `tests/lowering-transform-carries-no-behaviour.test.ts` exists to keep out.
+    //
+    // Removing it is also FASTER, which was not the expectation going in. The split emitted TWO
+    // props per element and Vue hoists neither — the compiled output builds and invokes the
+    // callback twice and allocates two style objects, per element per render. Measured headless
+    // through the real compileSfc on 1 000 styled nodes: 5.2/5.1 ms with the split against
+    // 4.6/4.5 ms without, with createNode 3002, appendChild 3000, VISITED 3003 and WRITES 4000
+    // byte-identical in every arm.
+    node.tag = intrinsic;
     node.tagType = 0; /* ElementTypes.ELEMENT */
   };
 }
@@ -584,11 +571,10 @@ async function compileSfc(src, filename) {
   // this file is scoped, so a .vue with only unscoped/no styles adds no runtime cost. Host-
   // primitive lowering is independent of it and applies whenever the file imports one.
   const lowerableTags = lowerableTagsIn(descriptor);
-  const stateStyleHelper = createStateStyleHelper();
   const nodeTransforms = [];
   if (lowerableTags.size > 0)
     nodeTransforms.push(
-      createHostPrimitiveLowering(lowerableTags, stateStyleHelper),
+      createHostPrimitiveLowering(lowerableTags),
     );
   if (scopedClassNames.size > 0)
     nodeTransforms.push(createScopeClassNodeTransform(scopedClassNames));
@@ -600,8 +586,22 @@ async function compileSfc(src, filename) {
   // The node is then an unknown component with no codegen node and generation throws
   // `Codegen node is missing for element/if/for node` — in the only test anywhere that compiles one
   // source twice, which is css-parser's golden-corpus determinism check, i.e. nowhere near here.
+  // BOTH tags a spec entry can emit, not just its default — a primitive with an `intrinsicWhen`
+  // has a second intrinsic, and the paragraph above is about exactly what happens to a tag missing
+  // from this set.
+  //
+  // HONEST STATUS: extending the guard to the second tag is UNWITNESSED. Removing it leaves every
+  // test in the repo green, including a case built specifically to catch it by compiling one source
+  // twice. The failure needs pass 2 to walk a rewritten AST, and the only place that happens is
+  // css-parser's golden-corpus determinism check — which will not reach this until a corpus file
+  // renders a multiline TextInput. Kept because the hazard it extends is documented and cost a real
+  // failure once; not kept because a test proves it.
   const loweredTags = new Set(
-    [...lowerableTags.values()].map(entry => entry.intrinsic),
+    [...lowerableTags.values()].flatMap(entry =>
+      entry.intrinsicWhen === undefined
+        ? [entry.intrinsic]
+        : [entry.intrinsic, entry.intrinsicWhen.intrinsic],
+    ),
   );
   const templateOptions =
     nodeTransforms.length > 0
@@ -638,14 +638,7 @@ async function compileSfc(src, filename) {
     'from "@symbiote-native/vue/runtime-helpers"',
   );
 
-  // Before the styles-only early return: a .vue with no <style> block still needs this import if
-  // its template lowered an opaque style. Getting the order wrong here is invisible to every test
-  // that happens to use a styled fixture.
-  const helperImport = stateStyleHelper.isUsed
-    ? `import { resolveStateStyle as ${STATE_STYLE_LOCAL} } from '@symbiote-native/vue/state-style';\n`
-    : '';
-
-  if (rules.length === 0 && !hasCssModules) return helperImport + code;
+  if (rules.length === 0 && !hasCssModules) return code;
 
   // Only a scoped file needs the runtime rename helper and its per-file map, so these stay
   // unimported for every non-scoped .vue file.
@@ -670,7 +663,7 @@ async function compileSfc(src, filename) {
     preamble.push(`const ${bindingName} = ${JSON.stringify(classMap)};`);
   }
 
-  const parts = [helperImport + preamble.join('\n'), code];
+  const parts = [preamble.join('\n'), code];
   if (hasCssModules) {
     const bindings = [...cssModuleBindings.keys()]
       .map(name => `${JSON.stringify(name)}: ${name}`)

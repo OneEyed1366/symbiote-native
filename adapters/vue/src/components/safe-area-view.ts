@@ -22,6 +22,12 @@ import { normalizeVueAttrs } from '../utils/normalize-attrs';
 // straight through, so this mirrors the same a11y + ViewProps surface minus React children.
 export type ISafeAreaViewProps = IAccessibilityProps &
   IAriaProps & {
+    // `id` — accepted here and folded to `nativeID` by the shared plan, matching upstream, whose
+    // SafeAreaView takes the full ViewProps surface. Added 2026-09-01 with `ID_ALIAS` on the spec
+    // entry, deliberately as ONE change: the alias without this prop would make lowering fold a key
+    // no spelling of the component accepts, and this prop without the alias would send a raw `id` to
+    // Fabric, which declares no such key on any of these views.
+    id?: string;
     // No HANDLED_ATTRS split in this file — forwards straight to the single host node like
     // every other prop here, already resolved through the shared style registry.
     class?: IClassNameValue;

@@ -123,14 +123,25 @@ describe('vue TSX Pressable lowering refusals', () => {
   // function. It USED to refuse for that reason; it now lowers behind a runtime typeof guard, which
   // needs no such proof. The pair is built by reading the expression twice, so what still refuses is
   // an expression that cannot be read twice — pinned in its own test below.
-  it('lowers a hoisted style behind a runtime typeof guard', async () => {
-    const hoisted = await compile(
-      `${P}const a = <Pressable style={styleFn}>{kids}</Pressable>;`,
+  // Every style shape lowers and the author's expression reaches the output EXACTLY ONCE,
+  // untouched. That is the structural form of `REFUSAL_CATEGORIES.emitStyleExpressionOnce`: with
+  // the state-style split gone there is no emission left that could print an expression twice, so
+  // the property that used to need a runtime helper now holds by construction. `routeProp` resolves
+  // the callback at both values of `pressed` (`isStyleCallback`).
+  it.each([
+    ['a hoisted name', 'styleFn', 'styleFn'],
+    ['a call that can do work when read', 'getStyle()', 'getStyle'],
+    ['a computed member', 'bag[i]', 'bag[i]'],
+  ])('lowers %s, printing it once', async (_what, expression, needle) => {
+    const code = await compile(
+      `${P}const a = <Pressable style={${expression}}>{kids}</Pressable>;`,
     );
-    expect(hoisted).toContain(LOWERED);
-    expect(hoisted).toContain('typeof styleFn === "function"');
-    expect(hoisted, 'a non-function keeps no active variant').toContain(
-      'undefined',
+
+    expect(code).toContain(LOWERED);
+    expect(code.split(needle).length - 1, 'printed exactly once').toBe(1);
+    expect(code, 'no pair is emitted any more').not.toContain('activeStyle');
+    expect(code, 'and no runtime helper is needed').not.toContain(
+      'resolveStateStyle',
     );
   });
 
@@ -149,45 +160,22 @@ describe('vue TSX Pressable lowering refusals', () => {
     );
   });
 
-  // Where the AST is in hand the pair is SUBSTITUTED rather than called, so a provable body costs
-  // no closure and no invocation. This is an optimisation only: it must never change the verdict,
-  // which is why the unprovable body beside it still lowers.
-  it('substitutes a provable body and calls an unprovable one', async () => {
-    const provable = await compile(
-      `${P}const a = <Pressable style={({ pressed }) => ({ o: pressed ? 1 : 2 })}>{kids}</Pressable>;`,
+  // A provable body and an unprovable one are now the SAME case, and that is the point of removing
+  // the split: substitution used to fold the first into two literals and call the second, so the
+  // two shapes had different output. Neither is inspected now.
+  it.each([
+    ['provable', '({ pressed }) => ({ o: pressed ? 1 : 2 })'],
+    ['unprovable', '({ pressed }) => ({ f: () => pressed })'],
+  ])('lowers a %s inline callback without invoking it', async (_what, body) => {
+    const code = await compile(
+      `${P}const a = <Pressable style={${body}}>{kids}</Pressable>;`,
     );
-    expect(provable).toContain(LOWERED);
-    expect(provable, 'folded to two literals, no call emitted').not.toContain(
+
+    expect(code).toContain(LOWERED);
+    expect(code, 'the transform no longer applies it to a state').not.toContain(
       'pressed: false',
     );
-
-    const unprovable = await compile(
-      `${P}const a = <Pressable style={({ pressed }) => ({ f: () => pressed })}>{kids}</Pressable>;`,
-    );
-    expect(unprovable, 'the call covers what substitution cannot').toContain(
-      LOWERED,
-    );
-    expect(unprovable).toContain('pressed: false');
-  });
-
-  // An expression that can DO WORK when read lowers too, but through the runtime helper rather than
-  // the inline guard — the guard prints the expression on both props, which would run `getStyle()`
-  // four times per bag build. This was briefly written as a REFUSAL, which was wrong: the hazard
-  // belongs to the emit shape, not to the expression, so refusing would have cost coverage to dodge
-  // a defect the helper does not have. The count is what pins it; the verdict alone would not.
-  it('routes a style that cannot be read twice through the helper', async () => {
-    const called = await compile(
-      `${P}const a = <Pressable style={getStyle()}>{kids}</Pressable>;`,
-    );
-    expect(called).toContain(LOWERED);
-    expect(called.split('getStyle').length - 1, 'read exactly once').toBe(1);
-    expect(called).toContain('resolveStateStyle');
-
-    const computed = await compile(
-      `${P}const a = <Pressable style={bag[i]}>{kids}</Pressable>;`,
-    );
-    expect(computed).toContain(LOWERED);
-    expect(computed.split('bag[i]').length - 1, 'read exactly once').toBe(1);
+    expect(code).not.toContain('activeStyle');
   });
 
   it('keeps the cheap emission for a name, which needs no helper', async () => {

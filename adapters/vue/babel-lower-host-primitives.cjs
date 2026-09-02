@@ -29,27 +29,59 @@ const {
 // A functional `style` keeps the RN idiom AND lowers, by being CALLED once per state at bag-build
 // time instead of being handed to a component that calls it per press.
 //
-// TWO MECHANISMS, AND ONLY ONE OF THEM DECIDES THE VERDICT. The CALL covers every shape and is
-// spelled identically in all five transforms, so what lowers is one answer everywhere.
-// `specializeStateStyle` is a pure OPTIMISATION on top: where the body is provable, substitution
-// folds it into two plain object literals and no closure is allocated. It is shared for the same
-// reason HOST_PRIMITIVES is, but it can be absent — the SFC path has no AST in hand and emits only
-// calls — WITHOUT the two paths disagreeing on which call sites lower. That separation is the
-// whole point; if the optimisation ever started gating the verdict, SFC and TSX would drift.
-//
-// THE CONTRACT THE CALL IMPOSES, stated because it is a real constraint on app code: the callback
-// must be PURE IN THE STATE. Its body runs twice per bag build, once per state.
-const {
-  specializeStateStyle,
-  STATE_KEYS,
-} = require('@symbiote-native/components/specialize-state-style');
 
 const LOWERABLE = new Map(
   Object.entries(HOST_PRIMITIVES).map(([name, spec]) => [
     name,
-    { intrinsic: spec.intrinsic, observesState: spec.observesState === true },
+    {
+      intrinsic: spec.intrinsic,
+      observesState: spec.observesState === true,
+      intrinsicWhen: spec.intrinsicWhen,
+    },
   ]),
 );
+
+// REFUSAL_CATEGORIES.dynamicIntrinsicChoice. A primitive whose spec entry carries `intrinsicWhen`
+// picks between TWO Fabric views by the value of one prop, and the transform prints a STATIC tag
+// name — so it can only choose when that value is a compile-time literal.
+//
+// This is not the unreadable-VALUE hazard wearing a new hat, and the difference decides how hard to
+// refuse: an unreadable value lands a prop wrong, which a later write can still correct; the wrong
+// choice here commits the wrong native view, and no prop write moves a node between views. So only
+// the two provable shapes resolve and everything else keeps the component.
+//
+// `multiline="true"` — a STRING attribute — is deliberately NOT one of them, though the component
+// would treat it as truthy. A string that reads as a boolean is the shape where an author and the
+// runtime disagree most often (`multiline="false"` is truthy), and refusing costs only the
+// optimisation while guessing costs the right view.
+//
+// Returns the tag to emit, or undefined to refuse.
+function intrinsicWhenFor(openingElement, entry) {
+  const choice = entry.intrinsicWhen;
+  if (choice === undefined) return entry.intrinsic;
+
+  let resolved = false;
+  for (const attribute of openingElement.attributes) {
+    // A spread may carry the selector prop, and the transform cannot see inside it. Nothing else
+    // in this loop can tell that apart from "the prop is absent", so it must refuse outright.
+    if (attribute.type === 'JSXSpreadAttribute') return undefined;
+    if (attribute.type !== 'JSXAttribute') continue;
+    if (attribute.name.type !== 'JSXIdentifier') continue;
+    if (attribute.name.name !== choice.prop) continue;
+
+    // A bare `multiline` with no value is JSX for `true`.
+    if (attribute.value === null || attribute.value === undefined) {
+      resolved = true;
+      continue;
+    }
+    if (attribute.value.type !== 'JSXExpressionContainer') return undefined;
+    const expression = attribute.value.expression;
+    if (expression.type !== 'BooleanLiteral') return undefined;
+    resolved = expression.value;
+  }
+
+  return resolved ? choice.intrinsic : entry.intrinsic;
+}
 
 // The shared spec's allow-list for `stateInTemplate`, spelled the same in all five transforms:
 // only a provably inert value shape lowers. `style={styleFn}` is an Identifier at compile time and
@@ -117,184 +149,6 @@ function refusesLowering(openingElement, children, types) {
   });
 }
 
-function styleExpressionOf(attribute) {
-  const value = attribute.value;
-  return value === null || value?.type !== 'JSXExpressionContainer'
-    ? undefined
-    : value.expression;
-}
-
-// `{ pressed: <value> }` — the argument the callback is invoked with. Built from the shared
-// STATE_KEYS rather than a literal 'pressed', so a primitive that later exposes a second state key
-// does not need this line edited in five transforms.
-function stateArgument(value, types) {
-  return types.objectExpression(
-    [...STATE_KEYS].map(key =>
-      types.objectProperty(types.identifier(key), types.booleanLiteral(value)),
-    ),
-  );
-}
-
-// HOW the pair is emitted, never WHETHER the element lowers. Every shape lowers; the three buckets
-// differ only in what the emitted code costs, and the split is a measurement:
-//
-//   literal    (({p}) => …)({pressed:false})            two closure allocations, no read hazard
-//   reference  typeof e === 'function' ? e({…}) : e     `e` printed twice per prop, but it is a read
-//   opaque     ...resolveStateStyle(e)                   `e` printed ONCE — required, and it costs
-//                                                        the element its patch flag, so it is used
-//                                                        only where a repeated read would be wrong
-//
-// `REFUSAL_CATEGORIES.emitStyleExpressionOnce` is what the third bucket satisfies: `getStyle()`,
-// `bag[i]` and `flag ? a : b` change meaning when printed twice, and the helper prints them once.
-// The first two buckets keep the cheap form because re-reading a literal or a name cannot change
-// anything — measured cost of getting that wrong: `12 /* STYLE, PROPS */` becomes
-// `16 /* FULL_PROPS */` plus a mergeProps on every render, on the hottest element in the tree.
-function styleEmissionKind(expression, types) {
-  if (expression === undefined) return undefined;
-  if (isFunctionLiteral(expression, types)) return 'literal';
-  return isCheapReference(expression, types) ? 'reference' : 'opaque';
-}
-
-function isFunctionLiteral(expression, types) {
-  return (
-    types.isArrowFunctionExpression(expression) ||
-    types.isFunctionExpression(expression)
-  );
-}
-
-// An identifier or a dotted path of identifiers — `styleFn`, `props.style`, `a.b.c`. A computed
-// member (`a[i]`) is excluded: the index expression would also be evaluated twice.
-function isCheapReference(expression, types) {
-  if (types.isIdentifier(expression)) return true;
-  return (
-    types.isMemberExpression(expression) &&
-    !expression.computed &&
-    types.isIdentifier(expression.property) &&
-    isCheapReference(expression.object, types)
-  );
-}
-
-// `style={fn}` becomes `style={base} activeStyle={active}`. The engine consumes `activeStyle` in
-// routeProp and never forwards it to Fabric; while the node is pressed it stands in for SLOT 1,
-// which is the authored style's slot — so a `:active` CSS rule still wins slot 0 underneath it and
-// the two mechanisms compose rather than race.
-function expandStateStyles(openingElement, types, helper) {
-  const expanded = [];
-  for (const attribute of openingElement.attributes) {
-    const expression = stateStyleExpressionOf(attribute, types);
-    if (expression === undefined) {
-      expanded.push(attribute);
-      continue;
-    }
-    const kind = styleEmissionKind(expression, types);
-
-    // The one shape that must reach the output exactly once. A spread is the only Vue form that
-    // yields two props from one evaluation, and it is why this is not simply the default.
-    if (kind === 'opaque') {
-      expanded.push(
-        types.jsxSpreadAttribute(
-          types.callExpression(types.cloneNode(helper.reference(), true), [
-            types.cloneNode(expression, true),
-          ]),
-        ),
-      );
-      continue;
-    }
-
-    const pair = statePairFor(expression, kind, types);
-    expanded.push(
-      types.jsxAttribute(
-        types.jsxIdentifier('style'),
-        types.jsxExpressionContainer(pair.base),
-      ),
-      types.jsxAttribute(
-        types.jsxIdentifier('activeStyle'),
-        types.jsxExpressionContainer(pair.active),
-      ),
-    );
-  }
-  openingElement.attributes = expanded;
-}
-
-// The `style` expression when it needs a pair built, `undefined` for every other attribute and for
-// an inert value (which rides through as the author wrote it and has no pressed variant).
-function stateStyleExpressionOf(attribute, types) {
-  if (
-    attribute.type !== 'JSXAttribute' ||
-    attribute.name.type !== 'JSXIdentifier' ||
-    attribute.name.name !== 'style' ||
-    isInertValueAttribute(attribute.value)
-  ) {
-    return undefined;
-  }
-  const expression = styleExpressionOf(attribute);
-  return styleEmissionKind(expression, types) === undefined
-    ? undefined
-    : expression;
-}
-
-function statePairFor(expression, kind, types) {
-  // The optimisation, tried first and allowed to fail. When the body is provable the pair is two
-  // plain object literals and nothing is allocated or invoked at runtime; when it is not, the call
-  // below covers the same site. The VERDICT is already settled, so a body this cannot prove costs
-  // a closure, never the lowering.
-  const substituted = specializeStateStyle(expression, types);
-  if (substituted !== null) return substituted;
-  return {
-    base: stateCall(expression, kind, false, types),
-    active: stateCall(expression, kind, true, types),
-  };
-}
-
-// A function literal is called directly. A cheap reference cannot be told from a plain style OBJECT
-// at compile time — `style={props.style}` is the same syntax either way — so it carries a runtime
-// typeof guard, and that guard is what closes the hoisted-style call site no compile-time analysis
-// could. `activeStyle` falls back to `undefined` for a non-function, which the engine reads as "no
-// active variant" and leaves slot 1 alone.
-function stateCall(expression, kind, value, types) {
-  const call = types.callExpression(types.cloneNode(expression, true), [
-    stateArgument(value, types),
-  ]);
-  if (kind === 'literal') return call;
-  return types.conditionalExpression(
-    types.binaryExpression(
-      '===',
-      types.unaryExpression('typeof', types.cloneNode(expression, true)),
-      types.stringLiteral('function'),
-    ),
-    call,
-    value ? types.identifier('undefined') : types.cloneNode(expression, true),
-  );
-}
-
-// The helper import, added at most once per file and only if an opaque style actually needed it —
-// an unused import in every lowered file would be dead weight Metro still has to resolve.
-function createHelperImport(programPath, types) {
-  let local;
-  return {
-    reference() {
-      if (local === undefined) {
-        local = programPath.scope.generateUidIdentifier('symbioteStateStyle');
-        programPath.unshiftContainer(
-          'body',
-          types.importDeclaration(
-            [types.importSpecifier(local, types.identifier(HELPER_EXPORT))],
-            types.stringLiteral(HELPER_MODULE),
-          ),
-        );
-      }
-      return local;
-    },
-  };
-}
-
-const HELPER_EXPORT = 'resolveStateStyle';
-
-// The SUBPATH, not the barrel. `resolveStateStyle` is a symbol for emitted code rather than public
-// API, so putting it on `@symbiote-native/vue` would make every adapter owe the same barrel export
-// or fail barrel parity for a name no app ever writes. Every adapter declares `./state-style`.
-const HELPER_MODULE = `${SOURCE}/state-style`;
-
 // Every local name bound to a lowerable export of @symbiote-native/vue in THIS file, honouring
 // `import { View as Box }`. Matching bare tag names instead would rewrite an app's own <View>.
 function lowerableLocalNames(programPath) {
@@ -330,7 +184,6 @@ module.exports = function lowerHostPrimitives({ types }) {
       Program(programPath) {
         const names = lowerableLocalNames(programPath);
         if (names.size === 0) return;
-        const helper = createHelperImport(programPath, types);
         programPath.traverse({
           JSXElement(elementPath) {
             const { openingElement, closingElement } = elementPath.node;
@@ -338,6 +191,12 @@ module.exports = function lowerHostPrimitives({ types }) {
             if (tag.type !== 'JSXIdentifier') return;
             const entry = names.get(tag.name);
             if (entry === undefined) return;
+            // Resolved BEFORE the state refusal and outside its `observesState` gate: the two
+            // guard different things, and this one applies to a primitive that owns no state at
+            // all. Reading it as "another case for refusesLowering" would put it behind that flag
+            // and it would never run for TextInput.
+            const intrinsic = intrinsicWhenFor(openingElement, entry);
+            if (intrinsic === undefined) return;
             if (
               entry.observesState &&
               refusesLowering(openingElement, elementPath.node.children, types)
@@ -348,10 +207,16 @@ module.exports = function lowerHostPrimitives({ types }) {
             // is still the module-level import.
             const binding = elementPath.scope.getBinding(tag.name);
             if (binding === undefined || binding.kind !== 'module') return;
-            expandStateStyles(openingElement, types, helper);
-            openingElement.name = types.jsxIdentifier(entry.intrinsic);
+            // NO state-style expansion. A functional `style` reaches `routeProp` untouched and
+            // the engine resolves it at both values of `pressed` (`isStyleCallback`), so rewriting
+            // the attribute into a pair here would be this transform carrying BEHAVIOUR — what
+            // `tests/lowering-transform-carries-no-behaviour.test.ts` exists to keep out. Removed
+            // from BOTH Vue paths in one change: the SFC twin sees an expression as source text
+            // where this one has the AST, so a split removed from one and not the other is the
+            // exact drift `.claude/rules/adapter-parity-audit.md` records for this pair.
+            openingElement.name = types.jsxIdentifier(intrinsic);
             if (closingElement)
-              closingElement.name = types.jsxIdentifier(entry.intrinsic);
+              closingElement.name = types.jsxIdentifier(intrinsic);
           },
         });
       },

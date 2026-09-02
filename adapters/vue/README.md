@@ -34,9 +34,23 @@ additionally needs a Metro transformer for `.vue` files (see
 
 ## Use it
 
-The native entry reaches the _same_ `registerRunnable` seam as React — only the adapter changes. It
-hands the surface's `rootTag` to `mount` from `@symbiote-native/vue`, which drives the engine through Vue's
-`createRenderer`:
+The zero-config entry mirrors real Vue's own `createApp(App).mount(...)` idiom and wires the same
+RN-backed host seams React's `registerApp` does — this is what
+[`examples/vue-tsx`](../../examples/vue-tsx) and [`examples/vue-sfc`](../../examples/vue-sfc)
+actually use:
+
+```js
+// index.js
+import { createApp } from '@symbiote-native/vue/bootstrap';
+import App from './App';
+import { name as appName } from './app.json';
+
+createApp(App).mount(appName);
+```
+
+For anything the defaults don't cover, drive the lower-level seam directly — the same
+`registerRunnable` seam React uses, with `mount` from `@symbiote-native/vue` driving the engine
+through Vue's `createRenderer`:
 
 ```js
 // index.js
@@ -115,7 +129,8 @@ React doesn't hit this because `react-reconciler` commits synchronously.
 The fix lives in the engine: `whenCommitted(node, action)` runs `action` now if the node already
 has a tag, else after the commit that assigns it. Any native/imperative call wired at Vue lifecycle
 time must go through it. This is the only place the Vue adapter's timing differs from React's; the
-implementation is in `core/engine/src/post-commit.ts`.
+implementation is `whenCommitted` in `core/engine/src/commit.ts`, built on the generic hook
+registry in `core/engine/src/post-commit.ts`.
 
 ---
 

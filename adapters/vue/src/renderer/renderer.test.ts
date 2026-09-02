@@ -391,12 +391,29 @@ describe('lowered host primitives (intrinsic tags)', () => {
       h('symbiote-view', {
         testID: 'kebab',
         'accessibility-label': 'close',
-        'aria-label': 'stays-kebab',
       }),
     );
     const props = findByTestId('kebab')?.props;
     expect(props?.accessibilityLabel).toBe('close');
-    expect(props?.['aria-label']).toBe('stays-kebab');
+  });
+
+  // The aria- family is the ONE hyphenated group patchProp's kebab -> camel pass must leave alone.
+  // The engine's foldAriaProps reads the hyphenated spelling literally (`bag['aria-label']`), so a
+  // camelized `ariaLabel` is invisible to it: the fold never runs and the key reaches Fabric dead,
+  // where no ViewConfig declares it.
+  //
+  // The witness used to be the raw `aria-label` surviving into the payload. That stopped being
+  // observable once the fold moved into fabricProps — it now consumes the key and nulls it — and
+  // "the key is gone" is exactly what a wrongly-camelized attr would also produce. So the claim is
+  // pinned from BOTH sides instead: the fold's OUTPUT carries the aria value (only reachable if the
+  // hyphenated key arrived intact), and no camelized key is left behind.
+  it('leaves the aria- family hyphenated for the engine to fold', async () => {
+    await mountTemplate(() =>
+      h('symbiote-view', { testID: 'aria', 'aria-label': 'from-aria' }),
+    );
+    const props = findByTestId('aria')?.props;
+    expect(props?.accessibilityLabel).toBe('from-aria');
+    expect(props).not.toHaveProperty('ariaLabel');
   });
 
   it('leaves a non-text node without text defaults', async () => {
