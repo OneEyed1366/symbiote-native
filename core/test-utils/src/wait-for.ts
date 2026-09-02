@@ -18,6 +18,13 @@
 const TICK_MS = 0;
 const DEFAULT_TIMEOUT_MS = 2_000;
 
+// A tick count cannot express "no work arrived", only "the queue drained N times" — and how much
+// wall time that spans is a property of the machine. Measured 2026-09-02 on the FlatList window:
+// exactly one deferred commit lands 30-60 ticks after a 3-tick settle, so an idle machine declared
+// quiet before the list's own batch and a loaded one caught it. The producer is RN's VirtualizedList
+// batching period (50ms), the longest deferred one in this repo; quiet has to outlast it.
+const DEFAULT_QUIET_MS = 75;
+
 // Read off the host rather than imported, the same reason the engine's animations/raf.ts does:
 // this package's tsconfig carries no DOM and no Node lib, so the ambient names do not exist.
 function tick(): Promise<void> {
@@ -51,26 +58,45 @@ export async function waitUntil(
   }
 }
 
-// Waits until `sample` returns the same value across `stableTicks` consecutive macrotasks — the
-// shape for "work has stopped arriving". Returns the settled value so a caller can assert against
-// what actually happened rather than re-reading it.
+export interface IQuietOptions {
+  /** Consecutive macrotasks the sample must hold. */
+  readonly stableTicks?: number;
+  /** Wall time the sample must hold, so the settle does not measure machine speed. */
+  readonly quietMs?: number;
+  readonly timeoutMs?: number;
+}
+
+// Waits until `sample` stops changing — for both `stableTicks` consecutive macrotasks and
+// `quietMs` of wall time. Returns the settled value so a caller can assert against what actually
+// happened rather than re-reading it.
 //
 // This is the honest way to write a "does not free-run" test: settle FIRST on a real condition,
 // then observe. Asserting no-growth over a fixed window without settling first only tests whether
-// the machine was fast enough.
+// the machine was fast enough — and a tick-only settle has the same defect one layer in, which is
+// why quiet is a duration here and not a count.
 export async function waitForQuiet(
   sample: () => number,
   label: string,
-  stableTicks: number = 3,
-  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  options: IQuietOptions = {},
 ): Promise<number> {
+  const {
+    stableTicks = 3,
+    quietMs = DEFAULT_QUIET_MS,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+  } = options;
   const deadline = now() + timeoutMs;
   let last = sample();
   let stable = 0;
-  while (stable < stableTicks) {
+  let quietSince = now();
+  while (stable < stableTicks || now() - quietSince < quietMs) {
     await tick();
     const current = sample();
-    stable = current === last ? stable + 1 : 0;
+    if (current === last) {
+      stable += 1;
+    } else {
+      stable = 0;
+      quietSince = now();
+    }
     last = current;
     if (now() > deadline) {
       throw new Error(
@@ -85,4 +111,14 @@ export async function waitForQuiet(
 // queue drain once" — a commit that is known to be one microtask away — rather than a settle.
 export async function advanceTicks(count: number): Promise<void> {
   for (let index = 0; index < count; index += 1) await tick();
+}
+
+// Observes for a DURATION rather than a tick count. The counterpart to `waitForQuiet` for the
+// second half of a "does not free-run" test: the window in which a late producer would show up is
+// wall time, so the observation has to be too.
+export async function advanceMs(
+  durationMs: number = DEFAULT_QUIET_MS,
+): Promise<void> {
+  const until = now() + durationMs;
+  while (now() < until) await tick();
 }
