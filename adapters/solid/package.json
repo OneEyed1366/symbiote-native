@@ -2,6 +2,16 @@
   "name": "@symbiote-native/solid",
   "version": "0.1.0",
   "description": "SymbioteNative's Solid adapter — a solid-js/universal createRenderer driving real native iOS/Android views through the same engine as every other adapter.",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "solid",
+    "solid-js",
+    "fabric",
+    "cross-platform",
+    "ios",
+    "android"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

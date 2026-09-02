@@ -179,6 +179,29 @@ function foldTextValue(
   return fold === undefined ? value : fold(value);
 }
 
+// The alias fold, at the RENDERER and not only in the transform — the defect class Angular paid for
+// twice on 2026-08-31. A lowered element inherits nothing the component wrapper did, and the
+// compile-time rename in `babel-lower-host-primitives.cjs` covers exactly the call sites the
+// transform REWROTE: `<View id={x} />` is fine (the attribute name is renamed before the preset
+// compiles it, dynamic value included), but a hand-written `<symbiote-view id="x">` is not, and it
+// committed `id` — a key Fabric does not know — while the component committed `nativeID`. Measured
+// by mounting both forms and diffing committed key NAMES; totals were identical and said nothing.
+//
+// The transform's rename STAYS. It is not redundant: it means the markup path arrives here already
+// spelled `nativeID`, so the common case never takes the branch below with a key to rewrite.
+//
+// One string comparison rather than a Map lookup, because this sits on the per-prop write path —
+// 32 001 prop writes on a benchmark create, where a Map.get is the kind of cost the engine spent
+// this month removing. That is only safe while every primitive shares ONE alias pair, which is a
+// property of the shared spec and not of this file, so `renderer-alias-fold.test.ts` re-derives
+// both constants from `HOST_PRIMITIVES` and fails the moment a second pair appears.
+const ALIAS_FROM = 'id';
+const ALIAS_TO = 'nativeID';
+
+function foldAliasKey(name: string): string {
+  return name === ALIAS_FROM ? ALIAS_TO : name;
+}
+
 const nodeOps: RendererOptions<IHostNode> = {
   createElement(tag) {
     const descriptor = descriptorFor(tag);
@@ -235,7 +258,7 @@ const nodeOps: RendererOptions<IHostNode> = {
     // becomes a listener; onTintColor on a Switch stays a prop), and centralizes the class+style
     // merge. Shared with React and Vue — never re-implement an `onX` check here
     // (symbiote-engine-core §2).
-    routeProp(node, name, foldTextValue(node, name, value));
+    routeProp(node, foldAliasKey(name), foldTextValue(node, name, value));
     requestCommit();
   },
 

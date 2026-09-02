@@ -3,24 +3,24 @@
 SolidJS adapter for SymbioteNative. Compiled Solid JSX drives real native iOS/Android views through
 the same `@symbiote-native/engine` every other adapter uses — React's renderer is never in the path.
 
-**Status: L4 in progress (parity phase).** The renderer seam, `mount`/`unmount`, the primitives, the
-stateful touch components, the Touchable family, Button / ImageBackground / InputAccessoryView,
-StatusBar and the list family all ship at full parity with the React reference — off
-`@symbiote-native/components`, via `descriptorToSolid` where the component has a shared render fn.
-The engine-owned runtime modules are re-exported from the barrel. Still absent: `createPortal` and
-`createTunnel`, both of which need a same-surface replacement for `solid-js/web`'s DOM-bound
-`Portal`/`Dynamic`. See `symbiote-new-adapter` §7 for what each layer means and why the adapter is
-built in that order.
+**Status: L4 done (parity phase complete).** The renderer seam, `mount`/`unmount`, the
+primitives, the stateful touch components, the Touchable family, Button / ImageBackground /
+InputAccessoryView, StatusBar and the list family all ship at full parity with the React
+reference — off `@symbiote-native/components`, via `descriptorToSolid` where the component has a
+shared render fn. The engine-owned runtime modules are re-exported from the barrel. `Portal`
+(same-surface content relocation, this adapter's twin of React's `createPortal`) and
+`createTunnel` (cross-surface) both ship, built over the universal renderer rather than
+`solid-js/web`'s DOM-bound `Portal`/`Dynamic`. `Dynamic` itself stays absent by design — nothing
+here needs it, and no other adapter ships a twin for parity to require one. See
+`symbiote-new-adapter` §7 for what each layer means.
 
 Solid's own control-flow `Switch`/`Match` are NOT re-exported from this package: `Switch` collides
 with RN's Switch component, which every adapter must export under that name. Import the control-flow
 pair from `solid-js` directly.
 
-Publishing is gated by `"private": true` in `package.json`, which is what
-`scripts/lib/publishable-packages.mjs` filters on — so `changeset publish` and the pkg.pr.new canary
-both skip this package until that flag comes off. Without it `0.0.0` (a version absent from npm) would
-be published on the next release run, shipping a reduced surface and violating the repo's
-`<adapters_reach_full_feature_parity>` invariant. Remove the flag in the commit that finishes parity.
+The adapter is a regular publishable package (`@symbiote-native/solid` on npm, alongside React,
+Vue, Svelte and Angular) — it carries no `"private"` flag, so `changeset publish` and the
+pkg.pr.new canary cover it the same as every other adapter.
 
 ## Why Solid needs no DOM shim and no Metro transformer
 
@@ -60,6 +60,17 @@ Solid compiles a component to `function App(props)` — a function with an upper
 exactly what react-refresh's `isLikelyComponentType` heuristic looks for. It then tries to patch a
 React Fiber tree that does not exist in this path, and the update is swallowed with no error. Force a
 full reload instead: `unstable_forceFullRefreshPatterns: [/\.tsx$/]`.
+
+## Host-primitive lowering — `<View>`/`<Text>`/`<Pressable>` compile to intrinsics, not components
+
+`babel-preset-solid` (wired above) runs `babel-lower-host-primitives.cjs` before compiling: a
+`<View>`/`<Text>` with no reactive prop, and a `<Pressable>` whose `style`/children don't need a
+component instance, rewrite to the engine's intrinsic tags (`symbiote-view`, `symbiote-text`,
+`symbiote-pressable`) instead of going through `createComponent` + a props Proxy. Nothing in app
+code has to opt in — the preset does it transparently, and a call site that can't be lowered
+(a spread, a render-prop child, an unreadable attribute) falls back to the component path
+unchanged. See root `CLAUDE.md`, "Where we stand against stock React Native", for the measured
+device numbers this bought — do not hand-copy them here, they move with every engine/adapter cut.
 
 ## `./renderer` is a compiler target, not a convenience export
 
