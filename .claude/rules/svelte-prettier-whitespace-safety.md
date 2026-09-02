@@ -68,16 +68,33 @@ cd examples/svelte && npm run typecheck
   text collapsed AND trimmed — Svelte trims text-node edges itself, so `<p>x</p>` and
   `<p>\n  x\n</p>` compile byte-identical; forgetting the trim produces false refusals.
 
-## Detector
+## Detector — the grep MISSES the commonest shape; count with the parser
 
-`^[[:space:]]*>` alone is WRONG — it matches prettier's normal `bracketSameLine: false`
-bracket for a multi-attribute tag, which is not cramming. Use:
+The grep below was the documented detector until 2026-09-01 and it does not answer the question.
+None of its five alternatives matches `</Text><Pressable`, which is what cramming actually looks
+like once a tag has attributes — the boundary is `t><P`, so `></` and `/><` both miss, and the line
+ends on `<Pressable` rather than on a closing tag. Measured the same day: it reported
+`examples/svelte` clean while `JsFrameRateMeter.svelte` held **14** crammed sibling pairs, and it
+reported three files as hits of which all three were the known `>(() => {` false positive.
 
 ```
 grep -rnE '</[A-Za-z][A-Za-z0-9-]*$|/><[A-Za-z]|^[[:space:]]*><[A-Za-z]|></[A-Za-z]|^[[:space:]]*>[^ ]' --include="*.svelte" <path>
 ```
 
-Expect 0 except `>(() => {` — a multi-line TS generic argument inside `<script>`, not markup.
+Keep it only as a cheap smell test, and never read a 0 from it as an answer. **Cramming has an
+exact AST definition — two sibling element/component nodes where `prev.end === next.start`** — so
+count it with `parse()` from the tree's own `svelte/compiler`, walking `fragment.nodes` and every
+nested block. That is the same reason the section above gives for inserting the breaks with the
+parser: a `>` inside an attribute expression or a `lang="ts"` script is not a tag end, and the
+regex cannot tell.
+
+The fix loop, gated: insert `\n` at each `next.start` (descending, so earlier offsets stay valid) →
+`prettier --write` → the AST compare from the section above → re-scan to 0. Verified on
+`JsFrameRateMeter.svelte`: 14 breaks, AST IDENTICAL, `svelte-check` 632 files 0 errors,
+`adapters/svelte` 404 pass.
+
+Repo state after that pass: **0 crammed pairs** across all 112 source `.svelte` files
+(`adapters/svelte/src`, `packages/*/src/svelte`, `examples/svelte`, `examples/expo-svelte`).
 
 Full incident + the preprocessor's own reasoning: `svelte-adapter-dom-shim` §16 (+ §16a
 intra-text, §16b the shim fix, §16c the sweep) and §29–§31.

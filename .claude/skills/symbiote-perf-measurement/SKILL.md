@@ -1962,6 +1962,21 @@ should be counted as one mount each. That also catches the opposite error — a 
 better ratio, so a 10-of-10 result on a real app is a reason to check the refusals, not to
 celebrate.
 
+**And weight by what is MOUNTED AT ONCE, which is the trap the two rules above do not cover.**
+A per-screen root reads as many sites and is one instance: `examples/svelte` has 18 `<SafeAreaView>`
+sites, one per screen, and exactly one screen is mounted — so the honest figure is 1 node out of
+~9 000, not 18. "It sits at the root of every screen" reads as high frequency and means the
+opposite; the roots are mutually exclusive. Weighting those 18 by reuse gives a number wrong in the
+FLATTERING direction, which is why this is its own check and not a corollary.
+
+That count is a whole candidate's worth of work, so run it FIRST. Proposed 2026-08-30: lower
+`SafeAreaView`, `RefreshControl` and `InputAccessoryView` across four transforms. Three greps —
+18 mounted-one-at-a-time, 0 uses, 0 uses in `examples/svelte` — put the whole batch below the
+instrument's resolution, not merely inside the 15-20 ms floor, and it was dropped before anyone
+wrote a transform. **Below resolution is a verdict, and it comes with its own reading of the
+result: if the number moves, something else moved.** A candidate that cannot express a difference
+is the perf twin of `.claude/rules/canary-visual-defects.md`'s step 1.
+
 The migration path is what turns the bound into the number: a refusing `style={({pressed}) => …}`
 becomes a lowerable element the moment it moves to an `:active` CSS rule
 (`.claude/rules/host-primitive-tier.md`). Report the two counts, and the ceiling stops being
@@ -2025,6 +2040,73 @@ So before reading a flat counter set as noise, ask which paths the change touche
 them bypasses `propStats`. Listener attachment is the known one; a new one arrives whenever a
 mutation entry point writes somewhere other than `node.props` / `node.children`.
 
+## Count the population BEFORE the work, not only when reporting it
+
+The per-site-vs-per-instance discipline elsewhere in this file exists to keep a lowering RATIO
+honest. It has a second use that is worth more and was nearly missed: run it on the CANDIDATE LIST,
+before anyone writes a transform.
+
+Measured 2026-08-30. Tier-1 was scoped as three pass-through primitives — `RefreshControl`,
+`SafeAreaView`, `InputAccessoryView` — lowered across four adapters, one transform each. The audit
+that justified it was a source audit: what does each component body do beyond spreading props. Every
+answer was encouraging. Nobody counted the nodes until a session did, and then:
+
+```
+SafeAreaView         1 instance per screen, one screen mounted   ->  1 node of ~9000
+RefreshControl       0 instances in any example
+InputAccessoryView   0 instances in any example
+```
+
+So the ceiling on the whole batch was ~0.01% of a create, and four sessions were one message away
+from spending a transform pass each on it. The work was cancelled on the count, not on a measurement
+— no build, no device run, no instrument.
+
+**The check is one question asked before the plan, not after the patch: how many NODES does this
+touch on the tree we actually measure?** A source-level audit answers "is this lowerable" and reads
+as a go/no-go, but it is silent on size — and the two questions feel like one because a component
+that is easy to lower feels worth lowering. The refusal-population arithmetic already in this file
+is the same tool; point it at the candidates first.
+
+The related trap, in the other direction, is on the same page: an APPROVED batch's own population
+estimate was quoted per SITE (`4-5 aria sites of ~640 tags = 0.7%`), and per-site figures have been
+wrong here by 90x when one site is a component with many call sites. It happened to be sound that
+time — all the aria props sat in a single `AccessibilityDemo` file used once per example — but
+soundness was established by checking, not by the percentage looking small.
+
+## An acceptance criterion inherits its instrument's blind spot
+
+Written 2026-08-31, while adding a second benchmark arm. The criterion protecting every previously
+recorded number was: _the unchanged arm must commit BYTE-IDENTICAL Fabric counters._ It is the right
+requirement and it was checkable, and it would still have passed a change that moved the thing it
+existed to protect.
+
+The new arm appends one child under a conditional. In Solid that is a `<Show>`, and the question
+"what does a FALSY conditional cost" has two answers, not one:
+
+```
+                     createNode   retained nodes
+plain row                 4             4
++ <Show when={false}>     4             4      <- Solid: free in both
+```
+
+Solid pays nothing. **Svelte would have paid 2 retained nodes per site and 0 native ones**
+(`svelte-adapter-dom-shim` §32: 14 004 anchors against 9 001 renderable nodes, `{#if}` worth two
+apiece). A criterion reading only Fabric counters is blind to exactly that: the anchors never reach
+Fabric, so the acceptance check passes while `VISITED` and the reconcile walk both move on 1 000
+rows — and the "unchanged" arm silently stops being comparable to every number it was meant to
+anchor.
+
+**So an acceptance criterion is a probe, and it carries whatever its instrument cannot see.** Before
+accepting one, ask which dimension it reads and whether the change can move a different one. Here
+the change was structural, so the retained tree had to be measured beside the native counters; the
+result is a measurement either way, and it happened to be free.
+
+The general shape, and it is the same trap this project keeps hitting from new angles: **a check
+phrased in one instrument's vocabulary certifies only what that instrument measures.** The nearest
+neighbours are `.claude/rules/verify-the-deciding-side.md` on a probe aimed at the wrong file, and
+on a guard whose oracle is a proxy — this is the version where the probe is aimed correctly and
+reads the wrong DIMENSION.
+
 ## The run-to-run spread on a create row is ~15-20 ms, not ~4%
 
 The `~4%` figure recorded elsewhere in this project came from STOCK React Native samples across
@@ -2053,3 +2135,197 @@ band Svelte established. So the band is a property of the harness, not of one ad
 The corollary worth having: **on a create row, prefer the ms delta to the percentage.** The same
 17.9 ms reads as +10.7% on Solid's Append and would read as +5% on a 350 ms row, so a percentage
 silently rescales the floor with the row while the underlying spread does not move.
+
+## Two sessions reading one arm are two SAMPLES — and the band is set by the dominant cost, not the row
+
+Angular's lowered arm was read twice off the device, ~2 minutes apart, one Release binary, no rebuild
+between them. Two sessions each read their own screenshot and reported:
+
+```
+            14:40-41   14:43      spread
+Create        202.3     198.7      -1.8%
+Replace       210.9     240.6     +14.1%
+Partial        71.0      46.5     -34.5%    <- 24.5 ms on a ~60 ms row
+Select         20.9      15.6
+Swap           25.8      24.9
+Remove         26.5      27.6
+Append        201.7     212.9      +5.6%
+Clear          34.8      32.6
+```
+
+Two things follow, and the second is the one that cost a wrong call.
+
+**A peer reporting different numbers for the arm you just read is a second sample, not a
+contradiction.** The reflex is to hunt a transcription error — and the previous section's whole
+argument is that a second sample is expensive to get and worth thirty seconds. Here it arrived for
+free and was nearly discarded. The check is the clock in the status bar of the screenshot, before
+any reconciliation of the two tables.
+
+**The ~15-20 ms band is a CREATE-row figure and does not transfer by row size.** Partial moved
+24.5 ms, which is 40% of its own wall, and the reason is visible in the engine profile: Partial's
+commit window is 2.7 ms against a 46-71 ms wall, so ~95% of that row is Angular's own pass 1. A row
+dominated by framework change detection inherits THAT machinery's variance, not the engine's. So the
+floor is a property of `(row, adapter, binary)` — quote all three, and never infer a row's floor from
+its magnitude.
+
+The wrong call this produced, stated so it is not repeated: Partial reading 27.6 flat and 46.5 lowered
+was called "not noise, because it touches 100 rows and is not a small-ms row". **Row count does not
+set a noise floor; the dominant cost does.** Two samples of the lowered arm alone span 46.5-71.0, so
+the cross-arm delta carries nothing until the flat arm is sampled twice from the same binary. Create
+and Append survive the same test — 202.3/198.7 and 201.7/212.9 both sit inside the create band — which
+is why those two rows carry a verdict here and the other six do not.
+
+## The second precondition for comparing two columns: equal PAYLOAD, not equal node count
+
+"Check the installed engine before comparing two adapter columns" has a twin, found 2026-08-30 and
+missed for a week. Angular's benchmark column was declared comparable on the strength of `9 nodes/row,
+matching every other column`. The node count was right and the conclusion was wrong:
+
+```
+                    nodes/row   createNode/appendChild   PROP KEYS
+angular flat/lowered    9            9000/8000            26001
+every other column      9            9000/8000            32001
+```
+
+Exactly 6 fewer keys per row. Angular's flat row reaches its 9 nodes with a bare `View` carrying a
+`(press)` listener, while every other column — `examples/bare-rn` included, so stock too — mounts two
+real `<Pressable>`s and pays for `hitSlop`, `pressRetentionOffset`, `delayLongPress`, `disabled`,
+`android_ripple`, the responder claim and the accessibility fold. The row's own comment said so; the
+comparability claim was made from the counter, not from the row.
+
+**Every structural counter agreed while 19% of the payload was absent**, which is why the node count
+is the wrong instrument: it measures the tree's shape and says nothing about what each node carries.
+The check that catches this is the prop-key total read BESIDE the structural counters — one number,
+already on the screen, and it disagrees the moment the rows differ in kind.
+
+The cost was a published ratio. `Append 212.9 vs stock 280.2 = 0.74x, Angular beats stock React
+Native` was stated to the user before the shapes were checked, and it is withdrawn: a cheaper row
+beating a richer one is not a renderer result. Flat-vs-lowered remains sound because both arms are
+Angular's own diagnostic row; only `composed` may be read against another adapter or against stock.
+
+Generalised: **before comparing two columns, name what a single row CONTAINS in each, not how many
+nodes it has.** Where the two disagree, the comparison is between benchmarks, not between renderers.
+
+**And then the sentence above was itself too weak — corrected the same day.** "Read the prop-key
+TOTAL beside the structural counters" was offered as the fix, and it was promptly used as an
+acceptance bar: an Angular arm was told to reach 32 001 keys, the number the other columns read.
+That is the same error one level down. A total is reachable by different routes, and the Angular
+session's own investigation suggested composed reaches its number partly through four accessibility
+gate flags its template forwards eagerly — flags NO other adapter emits. Two columns agreeing on a
+total while disagreeing on which keys make it up is a coincidence, not comparability, and an
+acceptance bar written on the total ratifies it.
+
+So the check is the **SET of key names**, diffed against one other adapter, not the count. It is
+cheaper than the argument about totals it replaces, it says immediately which side is missing what,
+and unlike a total it cannot be satisfied by accident. Keep the total as a cheap tripwire — a
+disagreement there is always real — but never as the passing condition.
+
+The generative mistake is worth naming because it is easy to repeat: **an acceptance bar copied as a
+NUMBER from another column silently assumes both sides reach it the same way.** Copy the derivation,
+not the value.
+
+## What the same five frameworks cost on the WEB — the ruler for "is this deficit ours?"
+
+Measured 2026-08-31 off the live krausest results (Chrome 150, keyed, median of the `total`
+duration, expressed against `vanillajs-keyed`). This is the number to reach for whenever an adapter
+trails its siblings here: it separates "this framework is expensive" from "our adapter is expensive".
+
+```
+                                  geo   run1k  create10k  replace  remove  clear
+vanillajs-keyed                  1.00    20.2     209.7     21.6     9.6      8.3
+solid-v1.9.3                     1.10    20.8     225.5     23.2     9.7     10.7
+svelte-v5.42.1                   1.16    21.4     228.4     24.2     9.9      9.6
+vue-v3.5.39                      1.26    24.5     264.5     27.0    11.9     11.4
+angular-cf-signals-v22.0.0       1.60    34.2     321.5     37.7    12.1     20.0
+angular-cf-v22.0.0               1.64    34.5     317.9     39.4     9.5     20.0
+react-hooks-v19.2.0              1.78    23.6     424.3     29.1    10.9     16.3
+```
+
+Three readings that settle arguments this project has actually had:
+
+- **Angular is mid-pack on the web and BEATS React on the geometric mean.** So "Angular is just a
+  slow framework" does not explain a 2.2x native deficit against Vue — on the web the expected gap is
+  ~40% on create. A deficit past that is ours.
+- **Signals buy Angular almost nothing here** (1.60 vs 1.64), so a native investigation should not go
+  looking for wins in converting more state to signals.
+- **Angular's `clear` is ~2x everyone else's on the web too.** A row that is anomalous in BOTH places
+  is the framework's, not the adapter's — and that is the cheapest way to triage one.
+
+The order matters when quoting it: this is a DOM benchmark and ours is a Fabric one, so the two are
+never directly comparable in absolute terms. What transfers is the RANKING and the rough size of the
+gaps between frameworks, which is exactly what a "why is this adapter behind" question needs.
+
+The data is not on the page — `current.html` is a 549-byte SPA shell. It lives inline in the bundle
+it loads (`index-*.js`), as `ne=[{f:<frameworkIdx>,b:[{b:<benchIdx>,v:{total:[…]}}]}]` beside
+`re=[…frameworks…]` and `H=[…benchmarks…]`. Extract those three array literals by bracket-matching
+(the bundle quotes with backticks, so a naive scanner breaks) and compute the ratios locally; a
+plain fetch of the HTML gets nothing, and `type: 0` is the duration-benchmark filter.
+
+## An acceptance criterion stated in FABRIC counters cannot see a retained-tree cost
+
+Measured 2026-08-31, adding a `TextInput` arm to the benchmark row across six examples. The spec
+said the control arm must commit "byte-identical FABRIC counters" — `createNode`, `appendChild`,
+prop keys. Every one of those is a count of what reached the slot, and the whole Svelte lowering
+story is that anchors never reach the slot at all.
+
+The spec also said HOW to build the arm: one extra child under a condition. On Svelte that is
+`{#if}`, and a false one is not free:
+
+```
+50 rows, plain shape          anchors   renderable
+row with no condition             3        451
+row with a FALSE {#if}           53        451
+```
+
+One anchor per row, `renderable` unmoved — so the native tree is identical, every stated criterion
+passes, and the CONTROL arm now carries 1 000 extra retained nodes at benchmark size. The
+contamination lands in exactly the currency the criteria cannot read, on exactly the arm the delta
+is measured against.
+
+Two things generalise, and the second is the one that cost the spec:
+
+- **Read both layers whenever a change is structural.** Fabric counters answer "what did native
+  receive"; `VISITED` / the retained node count answer "what did the engine keep". A conditional,
+  a wrapper, a fragment can be free in the first and not the second — that asymmetry is the
+  mechanism behind Svelte's whole anchor story, so it is the first thing to check, not the last.
+- **A spec must state the OUTCOME, never the syntax.** "One extra child under a condition" reads
+  as a requirement and is really an implementation that happens to be free on some frameworks.
+  Solid measured `<Show when={false}>` at 0/0; Svelte measured `{#if}` at +1 anchor per row and
+  correctly used two row components with a single condition at the list level instead. Same arm,
+  same acceptance, different syntax — and only the second phrasing lets an adapter be right in its
+  own idiom (`<adapter_src_follows_framework_idioms>`).
+
+React and bare-rn are exempt by construction rather than by luck, and the check is one grep: the
+React adapter creates no anchors at all (`createAnchor` appears in vue, svelte, solid and angular,
+and in zero react files), and bare-rn does not go through this engine.
+
+## A `dlog` ARGUMENT is not gated — the callee's own `isDebug()` cannot refuse work already done
+
+`dlog` is off by default and CLAUDE.md prices it at "one property read per call, nothing emitted".
+That is true of `dlog`. It is not true of the CALL SITE: the argument is evaluated first, so
+
+```js
+dlog(`angular createElement ${name} -> ${descriptor.component}`);
+```
+
+builds a string on every one of a Release build's 10 000 `createElement` calls and then throws it
+away. Measured 2026-09-02: nine such sites on the Angular renderer's hot paths — `createElement`,
+`createComment`, `appendChild` ×2, `insertBefore` ×2, `removeChild` (three `describeHost` calls and
+a template literal), `setValue`. No other adapter's renderer logs on these paths at all (vue zero
+`dlog` sites, svelte zero, solid one), so this was Angular-only weight in pass 1.
+
+`dlog` accepts a thunk (`string | (() => string)`), which defers the build but allocates a closure
+per call. `if (isDebug()) { … }` allocates nothing and is the form the same file already uses for
+`tagAnchorForDebug`.
+
+**The oracle has to be a SOURCE assertion, and that is the part worth carrying.** The runtime cannot
+distinguish the two: `dlog` gates itself, so an ungated site emits exactly nothing when DEBUG is
+off, and every behavioural probe stays green. A first attempt spied on `console.log` and passed in
+BOTH arms — the cost being guarded is the argument, which no observer sees.
+`adapters/angular/src/renderer/debug-logging.test.ts` brace-matches every `if (isDebug()) {` region
+and requires each `dlog(` to fall inside one. It found the hottest site on its first run, which the
+hand pass had missed.
+
+Generalise it as: **when the thing you are optimising is invisible to every runtime observer, the
+test belongs on the source, not on the behaviour** — and check that the behavioural test you were
+about to write can actually fail before trusting it.

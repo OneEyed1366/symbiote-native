@@ -56,6 +56,21 @@ changing a benchmark. The must-apply points:
   JS and UI both back at 60 fps. A fault that survives the return to idle is a dropped update that
   never re-converges, NOT a slow path, and no amount of optimizing will remove it. Chasing the fps
   number here wastes the run; the question is whether the final state is correct.
+- **A prop-key count is THREE layers, and only one of them is the app's CSS.** Measured 2026-08-31
+  on one `examples/vue-sfc` BenchmarkRow: 32 keys per row = 23 style declarations + **6 engine-seeded
+  RN text defaults** (`ellipsizeMode` + `allowFontScaling`, two per Text) + 3 `text`. A total
+  compared against another adapter's total is uninterpretable — the same number is reachable by
+  different splits — so decompose before attributing. The middle layer is the one nobody expects: a
+  LOWERED `symbiote-text` has no component wrapper to fold RN's `Text.js` defaults, so the adapter
+  must seed them (`adapters/vue/src/renderer/index.ts`), and of five adapters only Vue and Solid do.
+  A row whose Texts lack those two keys is not leaner, it has lost an RN default — `numberOfLines`
+  then clips with no ellipsis.
+- **A key count taken off a test fixture's own rules measures the fixture.** `benchmark-row-shape.test.ts`
+  registers a hand-simplified `ROW_RULES` (`.bench-row` as 2 declarations where the app's CSS has 10),
+  so its flat row reads 18 keys where the real CSS gives 32. Both numbers are correct about different
+  things, and neither can be diffed against a device reading. Before comparing two adapters' key
+  counts, confirm both sides resolved the SAME rule set — the two apps' `.bench-row*` blocks turned
+  out identical, 23 declarations token for token, which is what made the residual attributable at all.
 - **The walk is no longer the bottleneck, so stop optimizing it.** Same run, idle/scrolling:
   the reconcile walk is **0.1% of the window, 75 nodes/commit, 0.4 ms/commit** at 60 fps. What
   still costs is native view creation and the flat-parent child-set re-append — Fabric's

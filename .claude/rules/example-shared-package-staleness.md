@@ -9,6 +9,21 @@ paths:
 
 # A `core/*` change is invisible to `examples/*` — and the failure is a blank white screen
 
+> **SUPERSEDED AS THE DEFAULT LOOP (2026-09-01). Getting a local build into an example now goes
+> through a local Verdaccio: `pnpm run registry:sync`, then `pod install`. Read the
+> `symbiote-local-dev-registry` skill BEFORE reaching for anything below.** The `file:` tarball
+> dance this file documents wrote machine-local install state into TRACKED manifests — six of them
+> were dirty at once and three were staged before a peer stopped the commit — and the registry
+> removes that class entirely: the manifest keeps its ordinary public version literal and a
+> gitignored `examples/<app>/.npmrc` decides where it resolves from.
+>
+> **Everything below still applies, and that is the point of keeping it.** The staleness traps are
+> properties of npm, not of tarballs: a same-version republish still short-circuits, an
+> already-extracted package folder still satisfies the specifier, and deleting the lockfile alone
+> is still not enough — verified against the registry path on the day it landed, by hitting the
+> trap this file's own text warns about. What changed is the REPAIR (one explicit
+> `npm install <name>@<version>`, or `registry:refresh`), not the failure.
+
 `examples/*` is a standalone `npm install` tree: `@symbiote-native/engine` and
 `@symbiote-native/components` resolve to **published registry versions**, pinned as literals.
 Re-packing the adapter does NOT bring your `core/` change along — the adapter tarball only
@@ -335,6 +350,36 @@ And the ask that goes with it: **before running any packaging or overlay step, c
 is measuring that example.** Three sessions share this tree; the cost of asking is one message and
 the cost of not asking is somebody's afternoon.
 
+### Editing the manifest is NOT enough — npm keeps the registry copy, silently
+
+Every recipe above says "point the manifest at the tarball, then `npm install`". Measured
+2026-08-31 while fixing the `:active` outage, that is not sufficient for a package the example
+reaches TRANSITIVELY. Adding `"@symbiote-native/css-parser": "file:../../.tarballs/…tgz"` to
+`dependencies`, deleting both `node_modules/@symbiote-native` and `package-lock.json`, and running
+a plain `npm install` produced:
+
+```
+package.json    "file:../../.tarballs/symbiote-native-css-parser-0.4.0.tgz"
+package-lock    "resolved": "https://registry.npmjs.org/@symbiote-native/css-parser/-/…"
+installed       0 occurrences of the feature under test
+```
+
+The manifest says one thing and the lock records another, with no warning. The cause is that the
+adapter tarballs pin the same package by an exact version, so npm has a satisfying registry
+resolution in hand and never reaches for the local path.
+
+**The form that works is the explicit install, per example:**
+
+```bash
+cd examples/<app> && npm install "file:../../.tarballs/symbiote-native-css-parser-0.4.0.tgz"
+```
+
+After it the lock's `resolved` is the `file:` path and the feature is present. So the verification
+that matters is not "did the manifest change" but the same one this file already demands
+everywhere else — **grep the installed `build/**` for a string only the new version contains**, per
+example, after every install. Six examples reported a correct manifest and a stale build here, and
+the install output said `ok` for all six.
+
 ## The `file:` manifest is local install state — it must never be committed
 
 Every trick above rewrites `examples/*/package.json` to point at a `.tarballs/*.tgz`, and npm
@@ -356,3 +401,80 @@ Match on `.tgz`, not on a `../../.tarballs/` prefix: the path is relative to the
 probe rather than reviewing a diff — a lock's stale `integrity` line reads as noise and the
 specifier is one line among forty. Whoever did the packing knows which examples are dirty, so on a
 shared tree the cheap version is to ask them before staging `examples/`.
+
+## A package the examples resolve from NPM lags the repo silently, at the SAME version number
+
+Every trick above assumes the shared package reaches an example through `.tarballs`. As of
+2026-08-31 that set is seven — `angular components engine react solid svelte vue` — and
+`@symbiote-native/css-parser` is **not** in it. Examples pull it transitively from npm, so a
+feature committed to `core/css-parser` reaches no example at all until it is published.
+
+Measured on `examples/svelte/App.css`, one input through two parsers that both report `0.4.0`:
+
+```
+repo build   3 rules   ["action-button", ":active"] -> opacity      KEPT
+npm 0.4.0    2 rules   dropped, with "React Native has no pseudo-class state"
+```
+
+`:active` support is committed (`STATE_TOKEN` in `lightning/selectors.ts`) and shipped in the repo
+build; published 0.4.0 predates it. So `.action-button:active` compiles to nothing in **all six**
+examples, and the symptom on device is a button whose press runs its callback and changes nothing —
+read as an adapter or engine defect, diagnosed three ways before anyone checked the parser.
+
+Two things follow, and the second is the transferable one:
+
+- **The version is not the check** — the same fact this file already records for the engine's
+  `build/**`, one layer out. Diff BEHAVIOUR, not manifests: run the repo build and the installed
+  build over the same input and compare outputs.
+- **Enumerate what `.tarballs` covers against what `core/` and `packages/` contain**, the way
+  `adapterNames()` replaced three hand-written adapter lists. A package absent from the overlay set
+  is invisible: nothing fails, the example just runs last month's code.
+
+```bash
+ls .tarballs/*.tgz | sed 's#.*/symbiote-native-##;s#-[0-9].*##' | sort > /tmp/packed
+ls -d core/*/ packages/*/ | xargs -n1 basename | sort | comm -13 /tmp/packed -
+```
+
+Read the output as the list of shared packages an example can only get from npm.
+
+### It presents as an ADAPTER bug, and the decisive probe is one command
+
+Measured 2026-08-31 on `examples/solid`. Symptom as reported from device: **"buttons give no visual
+feedback on any press, while the callback fires."** That reads as the press machine — and two
+sessions spent the morning there, excluding `isAlreadyPublished`, `foldAriaProps` and the
+`setNodePressed -> pushClassStyle -> commit` chain, all of which were correct.
+
+Headless reproduction attempts came back GREEN on both lowered press routes (a `:active` class rule
+and a specialised `activeStyle`), which is the tell: the engine resolves a pressed style fine when
+something registered one. Nothing had.
+
+The grep above says the token is absent; **compiling the app's own stylesheet with the INSTALLED
+parser says why, and names the rule**:
+
+```bash
+cd examples/<app> && node --input-type=module -e "
+const m = await import('@symbiote-native/css-parser');
+const css = (await import('node:fs')).readFileSync('App.css','utf8');
+const out = m.compileCssToRules(css, { filename: 'App.css' });
+const rules = Array.isArray(out) ? out : out.rules;
+console.log(rules.length, rules.filter(r => (r.tokens||[]).some(t => String(t).includes('active'))).length);
+"
+```
+
+```
+[@symbiote-native/css-parser] App.css: dropped a rule on `active` — React Native has no
+pseudo-class state (no hover/focus/nth-child), so it can never match in React Native.
+82 0            <- installed 0.4.0
+83 1            <- core/css-parser 0.4.0, the rule being ['action-button', ':active']
+```
+
+The parser ANNOUNCES the drop, at build time, into a Metro log nobody reads — so the information
+was never missing, only unread. `hasActiveRules` then stays false, `resolveActiveClassName` hands
+back the very same unpressed object, and every press is a visual no-op with the machine running
+correctly underneath.
+
+Two things to carry. **Rank a "the demo does not react" report by whether the demo can express the
+difference at all** (`.claude/rules/canary-visual-defects.md`) — here the missing half was the
+compiler, one layer below every hypothesis anyone was testing. And **a headless green on the exact
+reported shape is evidence about the CODE, never about the device**: it is what tells you to go
+looking at what the device is running instead of at what the repo says.

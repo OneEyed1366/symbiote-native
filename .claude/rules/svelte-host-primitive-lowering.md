@@ -29,6 +29,15 @@ SAME 9 002 renderable nodes and 9 000 `createNode` calls.
 - **Refusing is the safety property.** A `{...spread}`, a `bind:`, a `use:`, an `{@attach}` — any
   attribute this file cannot read whole — leaves the element a component. A half-read attribute set
   is a silently wrong bag.
+- **And one refusal is NOT about readability: `children={…}` as an attribute.** It is a perfectly
+  readable name/value pair, it lowered for months, and the child silently never mounted — a bag key
+  goes through `routeProp`, where a snippet is not markup. Measured 2026-09-01: the component arm
+  commits the child, the lowered arm emits `p={{testID: "parent", children: (kids)}}` and commits
+  nothing. So the hazard has TWO doorways — hidden inside a spread, or handed over in plain sight —
+  and closing only the first is how it shipped. The refusal keys on the NAME, because
+  `children={kids}` is the spelling apps write and an identifier says nothing about what it holds.
+  Both doors are break-tested separately in `preprocessor/ref-refusal.test.ts`; they fail different
+  row sets, which is what proves neither is redundant.
 
 `Pressable` and the other stateful components are NOT lowering candidates and already render
 `<symbiote-view>` directly. Full measurement and the anchor census: the `svelte-adapter-dom-shim`

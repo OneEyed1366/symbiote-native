@@ -3064,3 +3064,175 @@ nothing, and the invariant is now asserted on this file's own source (a `lastInd
 would have been unfalsifiable, since no writer remains to break it). And the helper import is
 injected after the package import: fail to find the anchor and the file is emitted UNCHANGED rather
 than lowered-with-a-missing-helper — the same asymmetry every other refusal here follows.
+
+## §40. The prop fold belongs in the `p` setter, not only in the preprocessor (2026-08-31)
+
+`HOST_PRIMITIVES` carries RN's per-primitive folds — `id` -> `nativeID`, Text's `ellipsizeMode`
+`'tail'` and `allowFontScaling !== false`. Until this date Svelte applied them in two places, and
+between them they missed a whole path:
+
+```
+lowered <View>        the preprocessor folded it        covered
+<View> it refused     View.svelte / Text.svelte fold    covered
+a hand-authored tag   nobody                            NOT covered
+```
+
+The third path is not hypothetical and it is not rare. `components/button.svelte` writes
+`<symbiote-text p={{ style }}>` directly rather than composing `Text.svelte`, so a Button title
+reached Fabric with no `ellipsizeMode` — native default `clip`, so a title too long for its box cut
+mid-word where React's Button (which composes the `Text` COMPONENT, `adapters/react/src/components/
+button.ts`) ellipsised. Nothing was red; the divergence is only visible on a device, with a string
+long enough to clamp.
+
+Angular shipped the identical defect from the identical cause and fixed it in its RENDERER. The
+general rule, and it is what makes this a design fact rather than a bug report: **a fold belongs on
+the layer EVERY path crosses.** A wrapper covers one path and looks complete precisely because every
+test goes through it.
+
+Svelte's layer is `ShimElement`'s `p` setter — the single channel by which any bag reaches the
+engine, which is also why the lowered tag needs no other channel. `dom-shim/fold-host-bag.ts` folds
+there, keyed by intrinsic tag, and the compile-time fold stays as an OPTIMIZATION rather than the
+mechanism: a pre-folded bag matches on every key and never reaches the copy.
+
+Three things this cost, worth not re-deriving:
+
+- **Flatten the spec's objects at module load.** `Object.keys(primitive.aliases)` inside the fold
+  allocates an array per node — 9 002 per create, for data that never changes. The plan is built
+  once into tuple arrays (`.claude/rules/svelte-shim-is-the-per-node-create-path.md`).
+- **Copy-on-write, never mutate the bag.** Svelte hands the same object back on a re-render, so a
+  fold written in place leaks into the author's own state. Same idiom as `normalizeBagClasses`
+  beside it.
+- **The fold runs in the SETTER, not at `onMadeLive`.** An alias can arrive on an update (`id` bound
+  to a signal), and folding before the diff keeps `lastBag` in the folded shape — otherwise a seeded
+  default reads as a change on every single set.
+
+The test is `src/host-fold-parity.test.ts`: one authored markup, three arms, committed key sets
+compared AND each arm pinned to the absolute key (cross-arm agreement alone cannot see a fold that
+stopped running for everybody — `test-harness-false-greens.md` §16).
+
+A structural twin — "every hand-authored tag in adapter source must call its fold" — was written
+first, caught the Button defect, and was then DELETED once the shim covered the path: breaking a
+component's own now-redundant fold no longer produces a defect, so the test would have gone red on a
+non-defect and taught the next reader to keep a call that does nothing. Worth remembering as a shape:
+**a structural check that guards a gap is right until the gap is closed structurally, and then it is
+a liability.**
+
+## §41. The wrapper writes its host tag LITERALLY, so it does not follow core (2026-08-31)
+
+`components/text-input/index.svelte` renders `{#if isMultiline}<symbiote-text-input-multiline-managed
+…>{:else}<symbiote-text-input-managed …>{/if}` — the tag as source text, taking only `descriptor.props`
+from `renderTextInput`. That is deliberate (the file's header refuses `<svelte:element
+this={descriptor.type}>`), and it has a consequence worth stating separately from the reason:
+**a rename in `core/components/src/view/render-text-input.ts` does not reach this file.** React and
+Angular-style adapters that render `descriptor.type` follow such a rename for free; this one cannot.
+
+It cost a real defect the day the TextInput host behavior was switched on. The machine registers
+`symbiote-text-input` / `…-multiline`; the wrapper is supposed to use the `-managed` spellings so one
+node has one owner. Core moved to `-managed`, this template did not, and the wrapper kept emitting
+the machine's tags — two owners per node, both mirroring focus/blur, both counting events, both
+writing the controlled value.
+
+**Every suite stayed green, and could not have done otherwise.** Both spellings resolve to the SAME
+Fabric view (`component-names/index.ios.ts`), so the committed tree is byte-identical either way:
+no assertion about what Fabric received can see this, on any adapter. The only observable is the
+template text. `components/text-input/text-input-tag.test.ts` is therefore a SOURCE assertion — not
+a convenience, the single form that works — with both sides derived rather than memorised: the
+expected tag comes from calling `renderTextInput` for each `multiline` branch, the forbidden ones
+from `HOST_PRIMITIVES.TextInput`.
+
+**And these four spellings are a PREFIX FAMILY**, which breaks every containment check written over
+them:
+
+```
+symbiote-text-input                     lowered, base
+symbiote-text-input-multiline           lowered, multiline
+symbiote-text-input-managed             wrapper
+symbiote-text-input-multiline-managed   wrapper
+```
+
+`includes('symbiote-text-input')` is true for all four. Vue and Solid carried that as a false GREEN
+(a wrapper tag reading as a lowering); this adapter carried it as a false RED, because a refusal
+asserted `not.toContain(base)` and the `-managed` sibling contains the base. Same cause, opposite
+sign. A delimiter (`<tag ` / `<tag\n`) papers over it and is still the wrong shape — a formatter that
+moves the delimiter breaks it silently. **Parse the tags out and test SET MEMBERSHIP against the
+spec's own list.**
+
+The guard needs its own test, because no input to the transform can reach it: `-managed` is printed
+by the wrapper at runtime and never appears in compiled output. Weakening the reader back to a
+substring test therefore leaves every transform case green — a lever that moves nothing. The
+assertion has to be made on the READER (feed it a `-managed` tag, require "not a lowering"), and
+that is the only form that separates the two implementations.
+
+## §42. A FALSE `{#if}` still costs one anchor per instantiation (2026-08-31)
+
+Measured while adding the benchmark's `with-input` arm, on a 50-row list, both arms through the real
+preprocessor:
+
+```
+row with no conditional          anchors  3    renderable 451
+row + an {#if} that is FALSE     anchors 53    renderable 451
+```
+
+One anchor per row for a block that renders nothing. `renderable` does not move, so the native tree
+is identical and **every Fabric-side counter reads the same** — `createNode`, `appendChild`, clone
+counts, prop keys. On a 1 000-row run that is 1 000 extra retained nodes, and `renderableChildren`
+(`core/engine/src/commit.ts`) loses its fast path on each of their parents, which is the mechanism
+behind this column's 59.9 -> 46.7 ms window move when anchors were removed (§32).
+
+Two things follow, and the second is the reusable one.
+
+**A conditional child in a hot row is the wrong shape here.** Choose between two static row
+components at the LIST level instead — one `{#if}` for the whole list rather than one per row.
+`examples/svelte/components/BenchmarkRow.svelte` (9 views) and `BenchmarkRowWithInput.svelte` (10)
+are that pair, and the duplicated markup is the deliberate price. Solid measured `<Show when={false}>`
+at zero on both axes and legitimately kept its conditional; React creates no anchors at all. The
+answer is per-adapter and must be measured, never inherited.
+
+**An acceptance criterion phrased in Fabric counters cannot see a retained-tree cost.** The arm's
+spec said "plain must reproduce the recorded FABRIC counters byte for byte", and a per-row `{#if}`
+satisfies that completely while contaminating the very control the measurement is read against. When
+a benchmark arm is added on this adapter, census the retained tree (`censusRetainedTree`) as well —
+the two numbers that matter are `anchors` and `renderable`, and only the second is visible from the
+slot.
+
+The lowered `TextInput` itself adds NO anchors: `plain` and `with-input` both census 3, with
+`renderable` 451 -> 501, i.e. exactly one extra native view per row. So the arm prices a native view
+and not a Svelte construct, which is what makes its delta comparable to the other columns'.
+
+## §43. The adapter's `tsc` does not typecheck the example, and markup hides the hole (2026-08-31)
+
+A device build of `examples/svelte` aborted on launch — SIGABRT via `RCTExceptionsManager
+reportFatal:`, which is a JS fatal wearing a native crash's clothes. The JS text is not in the
+`.ips`; it is in the simulator's log store:
+
+```bash
+xcrun simctl spawn <UDID> log show --last 3h --style compact --predicate 'process == "Canary"'
+# ReferenceError: Property 'NATIVE_VIEWS_PER_ROW' doesn't exist
+```
+
+A rename to `NATIVE_VIEWS_BY_SHAPE` left two live reads behind, both inside template literals in
+MARKUP (`{`…${SUITE_ROWS * NATIVE_VIEWS_PER_ROW + 1}…`}`). Everything green: the adapter's
+`tsc --build`, prettier, 590 adapter tests, and Metro — the bundle builds fine and throws on first
+render.
+
+`svelte-check` catches it exactly, break-tested:
+
+```
+ERROR "screens/BenchmarkScreen.svelte" 1090:158
+  "Cannot find name 'NATIVE_VIEWS_PER_ROW'. Did you mean 'nativeViewsPerRow'?"
+```
+
+So the guard existed and was simply never run. **`npm run typecheck` inside the example is a
+separate check from the adapter's `tsc`, and it is the only one that reads `.svelte` markup** —
+a `<script>` identifier would also be caught by an editor, an expression inside `{}` in the
+template is caught by nothing else in the loop.
+
+Two things generalise past Svelte:
+
+- **After editing any `examples/*`, run that example's own typecheck.** Every adapter's example has
+  one and none of them is reachable from the repo-root suite.
+- **A bundle that BUILDS proves resolution, not evaluation.** `react-native bundle --platform ios`
+  is a cheap headless check (no xcodebuild, no simulator) and it is worth running — it caught the
+  `:active` regression in its transform warnings, see
+  `.claude/rules/example-shared-package-staleness.md` — but a green bundle says nothing about
+  whether the first render throws.

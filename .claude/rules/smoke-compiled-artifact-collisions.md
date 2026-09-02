@@ -45,3 +45,26 @@ Verified: three consecutive full runs, 454 files / 3807 tests, zero failures.
 
 Still open: `keyboard-avoiding-view.smoke` was reported failing once under load. Its
 `.smoke-compiled-*` paths are not shared with any other suite, so it is NOT this bug — uninvestigated.
+
+## A THROWAWAY PROBE inherits the artifact path along with the header it was copied from
+
+The rule fired again on 2026-09-01, in a session that had cited this file the same hour. Not
+carelessness — a property of how probes get written here. Building a probe by copying a test file's
+header is the RIGHT move (`test-harness-false-greens.md` §13 says to copy the mechanism from a suite
+that is already green), and the header carries `const PROBE_OUT = join(__dirname, '.smoke-compiled-…')`.
+So the copy races its own source under a full run, and only under a full run.
+
+What made it expensive is the SHAPE of the failure, not the failure. The probes were arms of a spike
+in `dom-shim/`, and the collision reddened `bare-tag-parity.test.ts > children under a tag` — which
+reads exactly like "the spike broke child mounting". The file passed in isolation with the spike
+installed; deleting the scratch copies turned the full suite green with the spike still in. A
+verdict about the change under test was one message away from going out.
+
+So, for any scratch probe copied from a suite: **rename the artifact constants in the same paste**,
+`-for-<probe>` per the convention above. And when a spike's full-suite run reddens a file the spike
+plausibly touches, check for a scratch copy sharing its artifact BEFORE forming a hypothesis — the
+isolation run distinguishes them in one command and costs nothing.
+
+The mechanical guard this wants — a test asserting no two files in the repo write the same
+`.smoke-compiled-*` path — does not exist yet, and would not have caught this one either, since the
+scratch files were never committed. The cheaper habit is the rename.

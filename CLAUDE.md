@@ -189,8 +189,33 @@ reach it; if a future audit starts enumerating `examples/*`, exclude this one ex
 also outside the pnpm workspace and outside every CI example list. What it does and does not
 make comparable: `symbiote-perf-measurement`, "The stock-React-Native baseline".
 
-**Local development against an unpublished or just-changed `@symbiote-native/*`
-package — the everyday loop, not a fallback:** build a tarball with `pnpm pack`
+**Local development against an unpublished or just-changed `@symbiote-native/*` package — the
+everyday loop, as of 2026-09-01, is a LOCAL VERDACCIO REGISTRY, not a `file:` tarball:**
+
+```
+pnpm run registry:setup    # once per machine
+pnpm run registry:sync     # publish everything, point every example at it, pull it in
+cd examples/<app>/ios && pod install
+```
+
+The manifest is never touched — it keeps its ordinary public version literal, and a **gitignored**
+`examples/<app>/.npmrc` decides where that version resolves from. That pointer may NEVER be
+tracked: npm has no registry fallback chain, so a committed `registry=http://localhost:4873` turns
+`npm install` into a hard failure for every clone not running Verdaccio, with an error that reads
+as a broken machine rather than a bad commit. Guarded by
+`tests/no-tracked-local-registry.test.ts`. Absent that file an example resolves from npmjs exactly
+as it always has — that is the fallback, and it is the default.
+
+Why it replaced the tarball dance: that dance wrote machine-local install state into TRACKED
+manifests, six were dirty at once and three were staged before a peer stopped the commit. Read the
+`symbiote-local-dev-registry` skill before touching any of this.
+
+**The paragraphs below describe the retired `file:` path. They are kept because their traps are
+properties of NPM, not of tarballs** — a same-version republish still short-circuits, an
+already-extracted package folder still satisfies the specifier, and deleting the lockfile alone is
+still not enough. Only the repair changed, to one explicit `npm install <name>@<version>`.
+
+**The retired path, for a package the registry cannot serve:** build a tarball with `pnpm pack`
 from the package's own directory (**never `npm pack`** — it skips the
 `publishConfig` build-artifact swap and leaves `workspace:*` literally in
 `peerDependencies`, which crashes a standalone `npm install` with
@@ -639,9 +664,12 @@ props}.js` — all six report version 0.3.0, so the manifest tells you NOTHING a
 the check. On Vue those three cuts were worth Create 296.7 -> 274.8 -> 258.5 -> 255.0, i.e. ~42 ms,
 and the prototype move is explicitly one Solid and Svelte were owed too (both graft eagerly).
 So React's and Angular's columns are still read against a materially older engine than Vue's and
-Svelte's, and a cross-column deficit computed today silently includes that gap. Re-level with
-`node scripts/overlay-local-packages.mjs examples/<name>` and a rebuild before attributing any
-residual to an adapter.
+Svelte's, and a cross-column deficit computed today silently includes that gap. Re-level before
+attributing any residual to an adapter — as of 2026-09-01 the default loop for that is the LOCAL
+REGISTRY (`pnpm run registry:publish` then `registry:refresh examples/<name>`, then `pod install`),
+not the overlay script named below; `scripts/overlay-local-packages.mjs` still works and is what CI
+uses, but it installs no dependencies, so it is safe only when the packed dependency set is already
+present in the example. Read `symbiote-local-dev-registry` before either.
 
 **Solid was re-levelled this way, and the result is the second, independent confirmation of those
 three engine cuts.** They had only ever been measured on Vue, by the session that wrote them:
@@ -659,7 +687,11 @@ within the walk, and Vue measured it at 16.3 ms), and ~13.4 ms came off outside 
 prototype graft plus `styleParts` in pass 1 (Vue measured the graft alone at 21.9 ms). A ~21% window
 move is far outside the window's own ±8% noise floor, so this one carries a verdict.
 
-**Vue, Svelte and Solid are post-lowering (2026-08-23); React and Angular are not** — read the
+**Vue, Svelte and Solid are post-lowering (2026-08-23); React and Angular are not** — and Angular's
+half of that clause EXPIRED on 2026-08-31, when `adapters/angular/babel-lower-host-primitives.cjs`
+landed and began lowering `View`/`Text`. It still does not lower `Pressable`/`TextInput`
+(`LOWERABLE_NAMES = ['View', 'Text']`, hardcoded), so "Angular is not lowered" is now false as
+written and true only of tier 2. Read the
 spread with that in mind. `<View>`/`<Text>` in an SFC now compile to their intrinsic TAG instead of a Vue
 component, and the adapter's own components render the tag too, which removed one Vue component
 instance per node on the two primitives that make up ~73% of a real tree. Create 397.4 -> 296.7,
@@ -942,16 +974,146 @@ and none of them carries a verdict: that is the same non-reproducibility this ta
 for stock's own Clear (46.7 -> 7.7 with no code change). Do not read them either way without a
 repeat.
 
-Angular's column is its **flat** row shape (9 nodes/row, matching every other column). Its default
-`composed` shape is 12 nodes/row and costs **942.9 ms** — 33% more nodes for 2.26x the time, i.e.
-composition costs 1.7x PER NODE on top of the extra nodes (the per-component-host anchor, and it is
-non-linear). Angular is worst of five even flat.
+Angular's column is its **flat** row shape, and it is NOT comparable to the other columns — the
+node count matched and misled. Flat is 9 nodes/row like everyone else, which is what this paragraph
+used to cite as proof of comparability, but it reaches those 9 nodes with a bare `View` carrying a
+`(press)` listener where every other column — stock's `examples/bare-rn` included — mounts two real
+`<Pressable>`s per row. Measured 2026-08-30: **26 001 prop keys against 32 001**, with
+`createNode`/`appendChild` byte-identical. Angular's flat/lowered row gives up Pressable's
+hitSlop, pressRetentionOffset, delayLongPress, disabled, android_ripple, its responder claim and its
+accessibility fold; the row's own comment says so. So flat-vs-lowered is a sound WITHIN-Angular
+comparison and flat-vs-anyone-else is not, and the only Angular arm that may be read against stock or
+another adapter is `composed`. Its default `composed` shape is 12 nodes/row and costs **942.9 ms** —
+33% more nodes for 2.26x the time, i.e. composition costs 1.7x PER NODE on top of the extra nodes
+(the per-component-host anchor, and it is non-linear).
+
+**The general form, because node count is the cheap check everyone reaches for first: two trees can
+agree on every structural counter and disagree on the payload.** `createNode`, `appendChild` and the
+node count all matched here while 19% of the prop keys were missing.
+
+**And the prop-key TOTAL is not the comparability test either — the SET OF KEY NAMES is.** That
+correction cost a day. Dividing 32 001 − 26 001 by 1 000 rows gives "6 keys per row", which was then
+used as an acceptance bar for a new Angular arm; enumerating the names instead gave a different
+answer entirely. Per-key differencing on the real 2-Pressable row (2026-08-31): flat 18 keys/row,
+composed-lowered 18, composed **26** — and the composed surplus is exactly four names,
+`onAccessibilityAction` / `onAccessibilityEscape` / `onAccessibilityTap` / `onMagicTap`, on two
+Pressables, i.e. 8 per row and not 6. Those four are Angular's own eager-forwarding debt
+(`.claude/rules/fabric-boolean-event-gates.md`); no other adapter emits them.
+
+Two things follow. Angular's composed therefore predicts to 34 001 on a 1 000-row create, not 32 001,
+so it reaches its total by a mechanism unrelated to the other columns' — **agreeing totals from
+unrelated causes are a coincidence, not comparability**, and here they do not even agree. And the
+6-keys-per-row gap between Angular's flat row and everyone else's 32 001 is still UNIDENTIFIED: no
+adapter in this row sets `hitSlop`, `disabled` or `android_ripple`, so 32 001 was never the "full
+Pressable surface" for any of them. Until those six names are enumerated on a non-Angular row, NONE
+of Angular's four row shapes may be read against another adapter's column.
+
+**SUPERSEDED 2026-09-02 — Angular has ONE row shape now and it is finally on the common ruler.**
+The four shapes were dropped 2026-09-01; the surviving row is the same 10-node row every other
+adapter mounts, and the first Release run to reach a device carries `createNode 10000` and
+`PROP KEYS 44001` — byte-identical to React's 2026-09-01 numbers. Angular's column may be read
+against the others from here. Everything above stays as the record of why it could not be before,
+and the METHOD is unchanged: read `createNode` and the prop-key count before any ms.
+
+```
+              angular   react   stock      iOS 26.5, Release, 1 000 rows, all-mounted
+Create          388.4   264.7   257.3      1.47x React
+Replace         501.5   266.3   256.3      1.88x
+Append          490.9   390.2   415.0      1.26x
+Partial          35.2    26.1    33.6
+Select           11.4     7.9     7.3
+Swap             13.7    35.3     9.6      WIN, 2.6x over React
+Remove           21.7    98.6   121.4      WIN, 4.5x over React and 5.6x over stock
+Clear            59.3     8.7    10.7
+```
+
+This is also the first Angular run in which lowering actually reached the device
+(`angular-adapter` §24: as a Babel plugin it half-applied, silently, for two days). The benchmark
+row lowers completely — `symbiote-view`, three `symbiote-text`, two `symbiote-pressable`, one
+`symbiote-text-input`, and an empty `dependencies` array.
+
+**The whole remaining deficit is pass 1, and the engine is not in it.** Fabric asks for identical
+work (10000/9000/9 @ 44001), and `WRITES` reads 17002/0 against React's 17037/16000 — Angular does
+not even pay React's 16 000 no-op writes. The reconcile window is 76.9 ms of the 388.4.
+
+**`Clear` isolates what is left, and it is not the primitives.** 59.3 ms of wall against
+`VISITED 41`, `WRITES 1/0` and a **0.1 ms** engine window: the engine does nothing at all, so all
+59 ms is Angular tearing down a thousand `BenchmarkRow` instances — LViews, DI scopes, two
+`EventEmitter`s and two getters each. React's same row is 8.7 ms. `examples/angular`'s benchmark
+screen carries an `Inline rows` toggle to price exactly that: same tree, same Fabric counts, the
+row markup moved into the parent's `@for` so no per-row component exists.
+
+**Both arms were then measured, and the split is settled.** Same binary, back-to-back, with
+`FABRIC 10000/9000/9 @ 44001` and `WRITES 17002/0` byte-identical in both — which is what makes
+them one ruler:
+
+```
+              component row   inlined      delta
+Create            388.4        307.2       -81.2
+Replace           501.5        404.6       -96.9
+Append            490.9        367.7      -123.2
+Clear              59.3         36.7       -22.6
+```
+
+So **~81 ms of the 124 ms Create gap against React is the per-row component** — roughly 81 us per
+instance for an LView/TView, a DI scope, two `EventEmitter`s and two getters. That is Angular's own
+machinery and an app author's choice, not something the adapter can remove; do not read 307.2
+against React's 264.7, because React's row is a component too.
+
+**The measurement's real payoff was the OTHER half, which is ours.** `Clear` fell only to 36.7 ms
+against a 0.2 ms engine window, so the engine was doing nothing and something in the adapter was
+doing a lot. It was `dlog` ARGUMENTS: nine sites on the renderer's hot paths built a template
+string on every `createElement`, `appendChild`, `insertBefore`, `removeChild` and `setValue` in a
+Release build that emits none of them, plus one closure allocated per removed node. No other
+adapter's renderer logs on those paths at all. Gated behind `isDebug()`:
+
+```
+              before gates   after gates    delta
+Create            388.4        367.2       -5.5%     1.47x React -> 1.39x
+Replace           501.5        460.2       -8.2%
+Append            490.9        438.2      -10.7%
+Clear              59.3         44.2      -25.5%
+```
+
+No single row carries a verdict (the ~4% floor, and this table's own note that Clear has drifted 6x
+with no code change), but four rows moved the same direction with every counter byte-identical.
+Mechanism and why the guard has to be a SOURCE assertion: `symbiote-perf-measurement`, "A `dlog`
+ARGUMENT is not gated".
+
+**Vue and Solid re-measured on the 10-node row 2026-09-02, so all five adapters are finally on one
+ruler.** Both read `createNode 10000` and `PROP KEYS 44001`, identical to stock's workload. Their
+earlier columns in the table at the top of this section were taken on the NINE-node row and are
+superseded; do not read 180.0 / 176.9 against anything here.
+
+```
+              stock    solid   svelte      vue    react  angular      ratio = ours / stock
+Create        257.3    195.7    205.0    228.7    264.7    367.2      0.76 0.80 0.89 1.03 1.43
+Replace       256.3    229.3    214.0    238.1    266.3    460.2      0.89 0.83 0.93 1.04 1.80
+Append        415.0    204.3    223.1    229.0    390.2    438.2      0.49 0.54 0.55 0.94 1.06
+Partial        33.6     11.8     15.4     19.2     26.1     39.1      0.35 0.46 0.57 0.78 1.16
+Remove        121.4     10.4      8.6     10.1     98.6     18.3      0.09 0.07 0.08 0.81 0.15
+Swap            9.6      6.1      8.4      8.7     35.3     18.4      0.64 0.88 0.91 3.68 1.92
+Select          7.3      5.5     14.7      8.4      7.9     10.5      0.75 2.01 1.15 1.08 1.44
+Clear          10.7      9.1     12.6     14.1      8.7     44.2      0.85 1.18 1.32 0.81 4.13
+```
+
+**Solid is under stock on ALL EIGHT rows** — the first adapter to clear that bar outright. Svelte
+and Vue take six of eight, losing only `Select` and `Clear`, both small-ms rows. This table is what
+the README's "How Fast, Against Stock React Native" section publishes.
+
+**One lead falls out of the engine counters and is not chased yet.** For the identical tree and a
+byte-identical Fabric payload, `WRITES` on Create reads solid 15001/0 · vue 15003/2 · **angular
+17002/0** · react 17037/16000. Angular emits 2 000 more prop writes than Solid — two per row — and
+by the benchmark screen's own note a `WRITES` that differs between adapters is work the ADAPTER is
+generating, not a cost of the platform. That is the next thing to enumerate on Angular, after the
+per-row component (~81 us/instance, not ours) and the `dlog` arguments (fixed).
 
 **Node CREATION was the one axis every adapter lost, and as of 2026-08-23 it is no longer that.**
 Host-primitive lowering closed it, on all three adapters that can be lowered. Against stock's
 stable bands, ALL THREE now beat it on a create-shaped row: Svelte Create 0.78-0.82x / Append
 0.56-0.58x, Solid 0.86x / 0.60x, Vue 0.92-0.96x / 0.64x. React and Angular still trail 1.17x and
-2.2x — neither has been lowered, and React cannot be the same way (no build-time analysis; host
+2.2x — neither had been lowered WHEN THIS TABLE WAS TAKEN; Angular's View/Text lowering landed
+2026-08-31 and is not in these numbers. React cannot be lowered the same way (no build-time analysis; host
 and composite are both fibers). Everything that mutates an already-mounted tree continued to tie
 or win throughout.
 
@@ -1014,6 +1176,71 @@ style copy, style resolution memoized on object identity, `dlog` blocks gated); 
 landed as ~1.06x, because `installFabric()` stubs the native side to zero and our JS is only ~24%
 of a real create. It did shrink the react↔stock Create gap 53.2 → 31.0 ms. Full arithmetic:
 `symbiote-perf-measurement`, "The create-path pass".
+
+**React re-measured against stock on 2026-09-01, and the table's React column above is SUPERSEDED
+— it was taken on a different row.** Both sides now build the 10-node row (the 2026-09-01
+consolidation added an unconditional `TextInput`), which is the whole reason the numbers can be
+read at all. iOS 26.5 simulator, Release, 1 000 rows, all-mounted:
+
+```
+              stock    react           node counts finally agree
+Create        257.3    264.7   1.03x   createNode 10001 vs 10000 (the one is the container)
+Replace       256.3    266.3   1.04x   PROP KEYS  87001 vs 44001 — our payload is half
+Append        415.0    390.2   0.94x
+Partial        33.6     26.1   0.78x
+Remove        121.4     98.6   0.81x
+Clear          10.7      8.7   0.81x
+Select          7.3      7.9   1.08x
+Swap            9.6     35.3   3.68x   the standing React anomaly, unchanged
+```
+
+So React is at PARITY with stock on the create-shaped rows — `Create` and `Replace` sit inside the
+~4% floor, so neither is a win — and ahead on everything that mutates a mounted tree except `Swap`.
+`Clear` and `Select` are small-ms rows and carry no verdict without a repeat.
+
+**The first run of this pair reported React at 1.31x and it was an artifact worth not repeating.**
+Stock had not been rebuilt after the row gained its `TextInput`, so it was measuring NINE nodes
+against our ten — `createNode` 9001 vs 10000, `PROP KEYS` 62001 vs 44001. Two columns whose node
+counts differ by a whole element are not two stacks measured on one workload, and the 1.31x was
+that missing element. The cheap check that caught it is the one this file already prescribes for
+Angular: read `createNode` and the prop-key count BEFORE reading any ms. A headless census of the
+row (`RCTView`×3, `RCTText`×3, `RCTRawText`×3, `RCTSinglelineTextInputView`) then said ten, which
+located the deficit on the stock side rather than ours.
+
+**No attribution to the tag change.** `View`/`Text` became intrinsic tags the same day
+(`.claude/rules/capitalized-intrinsic-tag-feasibility.md`), and this pair carries no before-arm —
+building one was considered and deliberately skipped, since what the project needs from this row is
+the comparison against stock and identical behaviour, not a per-change ledger. So the parity above
+is the state of the adapter on 2026-09-01 and is NOT evidence that removing the wrappers produced
+it.
+
+**Svelte re-measured against stock on 2026-09-01, and its column in the table above is SUPERSEDED —
+it was taken on a different row.** Both sides now build the 10-node row. iOS 26.5 simulator, Release,
+1 000 rows, all-mounted:
+
+```
+              stock   svelte           trees agree: createNode 10001 vs 10000 (the one is the container)
+Create        257.3   205.0   0.80x    PROP KEYS 87001 vs 43001 — our payload is half
+Replace       256.3   214.0   0.84x
+Append        415.0   223.1   0.54x
+Partial        33.6    15.4   0.46x
+Remove        121.4     8.6   0.07x    the thesis as a number: stock walks 1 000 fibers, we emit one removeChild
+Swap            9.6     8.4   0.88x    tie
+Clear          10.7    12.6   1.18x    small-ms row, no verdict without a repeat
+Select          7.3    14.7   2.01x    the ONE loss
+```
+
+**Do not read this against the table's 154.1 / 207.2 / 163.0 — that row had NINE nodes.** Svelte's
+row gained the unconditional `TextInput` (createNode 9000 -> 10000, PROP KEYS 32001 -> 43001), so
+154.1 -> 205.0 is +50 ms for a thousand extra nodes and eleven thousand extra prop keys, not a
+regression. Same artifact that made React's first 2026-09-01 run read 1.31x. Read `createNode` and
+the prop-key count BEFORE any ms.
+
+**Select is the one real finding and it attributes immediately to the adapter, not the engine.**
+`WRITES 2/0`, `VISITED 1078`, reconcile window **1.6 ms** against 14.7 ms wall — so ~13 ms sit in
+pass 1, inside Svelte's own reactivity. Compare Solid's Select before its class guard (window
+10.3 ms beside a 500x write drop): there the counters moved and the cause was the engine. Here the
+counters are clean, so the cause is above it.
 
 Open work, priority order, and the per-adapter detail (React is an outlier three times over —
 `Swap`, `Remove`, and the whole virtualized column — against its own siblings on the same engine):
