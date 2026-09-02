@@ -26,6 +26,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -105,30 +106,60 @@ function packTarball(pkgDir, destDir) {
 
 // core/engine and core/components are framework-agnostic and every example depends on them
 // directly, so example source can drift ahead of their last publish the same way it drifts ahead
-// of packages/* (see the `example-shared-package-staleness` rule) — overlay them too. Adapters
-// (adapters/react, /vue, /svelte, /angular) stay OUT of this list: an adapter overlay would swap in
-// code the example's OWN package.json doesn't pin yet, so it needs the full `file:` tarball dance.
+// of packages/* (see the `example-shared-package-staleness` rule) — overlay them too.
 //
-// The real test for any candidate is narrower than "does it have dependencies", and core/css-parser
-// is the worked example. It was excluded when it GAINED `lightningcss` — a folder swap never
-// touches package-lock.json, so a dependency the example does not already have is simply missing.
-// That condition expired: measured 2026-08-23, packed and installed dependency sets are identical
-// (`@react-native/metro-babel-transformer` + `lightningcss`) and `lightningcss` is already hoisted
-// in every example, so a swap there now installs nothing new. It stays out anyway — nothing CI
-// checks depends on the parser's own output, so widening the list buys drift-reduction at the cost
-// of changing what CI tests, and that trade wants a green run behind it.
+// ADAPTERS ARE IN NOW, by prefix rather than by name. They were excluded on the reasoning that an
+// adapter overlay "swaps in code the example's own package.json doesn't pin yet, so it needs the
+// full `file:` dance" — and that was never the criterion this file itself states two paragraphs
+// down, which is about DEPENDENCIES, not about what a manifest pins. The list also contradicted the
+// prose: `adapters/angular` sat in it. Measured 2026-09-01 across every adapter x example pair that
+// has the adapter installed, 12 of 13 satisfy the subset rule outright; the one that does not is
+// `expo-vue-sfc`, missing `@vue/babel-plugin-jsx`.
 //
-// So the rule, for whoever revisits this: **a folder swap is safe exactly when the packed
-// package's dependency set is a SUBSET of what the example already has installed** — and that is
-// per-package and expires whenever either side gains a dependency, in both directions. Check it,
-// do not inherit the verdict:
-//   node -p "JSON.stringify(require('./<pkg>/package.json').dependencies)"
-//   node -p "JSON.stringify(require('./examples/<app>/node_modules/<name>/package.json').dependencies)"
-const OVERLAY_ONLY = new Set([
-  'core/engine',
-  'core/components',
-  'adapters/angular',
-]);
+// A prefix, not five names: the most recently added adapter is the one every hand-written list
+// omits (`.claude/rules/adapter-parity-audit.md`, "Check Solid last and separately"), and this
+// script was itself one of the three instances that rule records. The sixth adapter joins the day
+// its folder exists.
+//
+// And the subset rule is now CHECKED PER EXAMPLE AT RUN TIME (`missingDependencies` below) rather
+// than encoded in a list somebody has to remember to prune. The comment that used to live here
+// said the condition "expires whenever either side gains a dependency, in both directions" and
+// then asked the reader to re-verify by hand — which is a rule that decays between readings. The
+// check cannot decay, and it names the missing package instead of silently doing the wrong thing.
+//
+// core/css-parser stays out for a different reason that is NOT about dependencies: nothing CI
+// checks reads the parser's own output, so widening this buys drift-reduction at the cost of
+// changing what CI tests, and that trade wants a green run behind it.
+const OVERLAY_ONLY = new Set(['core/engine', 'core/components']);
+
+// The criterion, enforced instead of trusted. A folder swap never touches package-lock.json, so a
+// dependency the example does not already have installed is simply ABSENT after the swap — and the
+// failure lands at Metro time, in a bundle, as a missing module nobody connects to an overlay that
+// printed `Done`.
+function missingDependencies(pkg, exampleDir) {
+  const manifest = JSON.parse(
+    readFileSync(join(REPO_ROOT, pkg.dir, 'package.json'), 'utf8'),
+  );
+  const packageDir = join(
+    REPO_ROOT,
+    exampleDir,
+    'node_modules',
+    ...pkg.name.split('/'),
+  );
+  // Resolved the way NODE resolves, not by looking in one place. npm NESTS a dependency inside the
+  // depending package's own `node_modules` whenever nothing at the root anchors a version — which
+  // is the normal state for every `packages/expo-*` wrapper here (CLAUDE.md records the 2.2GB
+  // consequence). A root-only check reported `expo-sensors` and two dozen siblings as missing and
+  // cut the plan from 34 packages to 13, all of them installed and fine. Caught only because the
+  // `--all` dry run covers wrappers; the adapter-only probe that motivated this check has no
+  // nested dependencies and looked clean.
+  const isInstalled = name =>
+    existsSync(join(packageDir, 'node_modules', ...name.split('/'))) ||
+    existsSync(join(REPO_ROOT, exampleDir, 'node_modules', ...name.split('/')));
+  return Object.keys(manifest.dependencies ?? {}).filter(
+    name => !isInstalled(name),
+  );
+}
 
 // Printed at the END of a real run, not where it is computed. The exclusion above `OVERLAY_ONLY` is
 // deliberate, but a run that reports N correct packages and `Done` reads as full coverage — and the
@@ -148,10 +179,58 @@ function reportSkipped(skipped) {
   );
 }
 
+// Computed ONCE and read by both the dry path and the real one. The two must not each work out
+// what would happen — this file already records why (`--dry-run` exists so a tool whose only job is
+// to perturb a measurement arm can be checked without perturbing one), and a dry run that computes
+// its own answer starts lying exactly where it is trusted.
+function buildPlan(localPackages) {
+  const plan = [];
+  const blockedByDependency = [];
+  for (const pkg of localPackages) {
+    const targetDirs = [];
+    for (const exampleDir of EXAMPLE_DIRS) {
+      const targetDir = join(
+        REPO_ROOT,
+        exampleDir,
+        'node_modules',
+        ...pkg.name.split('/'),
+      );
+      // Not installed here at all — this example does not use the package. Silent by design:
+      // examples/bare-rn deliberately depends on nothing of ours, so every package misses it.
+      if (!existsSync(targetDir)) continue;
+      const missing = missingDependencies(pkg, exampleDir);
+      if (missing.length > 0) {
+        // Named, and skipped rather than half-done. Overlaying anyway installs a build whose
+        // dependency is absent, which fails at Metro time as a missing module — long after this
+        // script printed `Done`, with nothing tying the two together.
+        blockedByDependency.push(
+          `${pkg.name} -> ${exampleDir} (needs ${missing.join(', ')})`,
+        );
+        continue;
+      }
+      targetDirs.push(targetDir);
+    }
+    if (targetDirs.length > 0) plan.push({ pkg, targetDirs });
+  }
+  return { plan, blockedByDependency };
+}
+
+function reportBlocked(blockedByDependency) {
+  if (blockedByDependency.length === 0) return;
+  console.log(
+    `NOT overlaid, dependency missing in the example: ${blockedByDependency.join('; ')}`,
+  );
+  console.log(
+    'A folder swap installs no dependencies — run the full `file:` dance for those, or `npm install` the missing package first.',
+  );
+}
+
 function main() {
   const allPackages = publishablePackageEntries();
   const isOverlaid = entry =>
-    entry.dir.startsWith('packages/') || OVERLAY_ONLY.has(entry.dir);
+    entry.dir.startsWith('packages/') ||
+    entry.dir.startsWith('adapters/') ||
+    OVERLAY_ONLY.has(entry.dir);
   const localPackages = allPackages.filter(isOverlaid);
   // Named at RUN TIME, not just explained in a comment up top. The exclusion is deliberate, but a
   // run that reports six correct packages and `Done` reads as full coverage — and the package a
@@ -162,22 +241,22 @@ function main() {
   // Same family as `.claude/rules/test-harness-false-greens.md` §6 — believe the details, not the
   // summary — except here the details did not exist until this line.
   const skipped = allPackages.filter(entry => !isOverlaid(entry));
+  const { plan, blockedByDependency } = buildPlan(localPackages);
   if (DRY_RUN) {
     console.log(
-      `DRY RUN — nothing written. Would overlay ${localPackages.length} package(s) into: ${EXAMPLE_DIRS.join(', ')}`,
+      `DRY RUN — nothing written. Would overlay ${plan.length} package(s) into: ${EXAMPLE_DIRS.join(', ')}`,
     );
+    // NAMED, not just counted. A count reads as coverage, and the package a session has spent the
+    // day changing is the one it needs to see in this list — the same reason `reportSkipped` exists.
+    console.log(plan.map(({ pkg }) => `  ${pkg.name}`).join('\n'));
     reportSkipped(skipped);
+    reportBlocked(blockedByDependency);
     return;
   }
   const packDestination = mkdtempSync(join(tmpdir(), 'symbiote-overlay-pack-'));
 
   try {
-    for (const pkg of localPackages) {
-      const targetDirs = EXAMPLE_DIRS.map(exampleDir =>
-        join(REPO_ROOT, exampleDir, 'node_modules', ...pkg.name.split('/')),
-      ).filter(existsSync);
-      if (targetDirs.length === 0) continue;
-
+    for (const { pkg, targetDirs } of plan) {
       console.log(
         `Overlaying ${pkg.name} into ${targetDirs.length} example(s) ...`,
       );
@@ -211,9 +290,10 @@ function main() {
   // leaving one of the five benchmark columns on a stale engine, which is a measurement that lies
   // rather than fails. Pass the dir explicitly (or --all) when the run is a dev-loop overlay.
   console.log(
-    `Done — this commit's build of ${localPackages.length} package(s) is installed in: ${EXAMPLE_DIRS.join(', ')}`,
+    `Done — this commit's build of ${plan.length} package(s) is installed in: ${EXAMPLE_DIRS.join(', ')}`,
   );
   reportSkipped(skipped);
+  reportBlocked(blockedByDependency);
 }
 
 main();
