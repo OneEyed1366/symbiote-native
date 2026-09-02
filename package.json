@@ -45,6 +45,7 @@
     "test:node": "node scripts/run-node-tests.mjs"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "catalog:",
     "@changesets/cli": "catalog:",
     "@eslint/js": "catalog:",
     "@eslint/json": "catalog:",
