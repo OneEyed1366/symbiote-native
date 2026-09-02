@@ -4,7 +4,7 @@
 // real type/AOT check, then creates production Metro bundles for both platforms. The sourcemaps are
 // inspected for foreign-framework package files, and the installed adapter must itself appear in
 // the graph — so a registry adapter can never make the check falsely green.
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import {
   copyFileSync,
   existsSync,
@@ -17,6 +17,9 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 import { publishablePackageEntries } from './lib/publishable-packages.mjs';
 
@@ -70,6 +73,40 @@ function run(command, args, options = {}) {
       encoding: options.encoding ?? 'utf8',
       stdio: options.stdio ?? 'pipe',
     });
+  } catch (error) {
+    const stdout = typeof error.stdout === 'string' ? error.stdout : '';
+    const stderr = typeof error.stderr === 'string' ? error.stderr : '';
+    throw new Error(
+      [
+        `${command} ${args.join(' ')} failed in ${options.cwd ?? process.cwd()}`,
+        stdout,
+        stderr,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      { cause: error },
+    );
+  }
+}
+
+// Non-blocking counterpart of `run`, so independent frameworks can install/verify/bundle
+// concurrently instead of one at a time (execFileSync blocks the whole event loop, so wrapping it
+// in Promise.all buys nothing — only an async child process yields the loop while it waits on I/O).
+// `stdio: 'inherit'` isn't available here (execFile always captures), which is a wash: five
+// frameworks writing 'inherit' at once would interleave into unreadable output anyway. Captured
+// output is instead surfaced by the caller, attributed to its framework, only on failure or once
+// the step completes — see `processExample`'s `log` array below.
+async function runAsync(command, args, options = {}) {
+  try {
+    const { stdout } = await execFileAsync(command, args, {
+      cwd: options.cwd,
+      env: options.env,
+      encoding: options.encoding ?? 'utf8',
+      // Default maxBuffer (1 MB) is sized for a captured call, not for npm install / tsc / ng:build
+      // output that used to bypass it entirely via stdio: 'inherit'.
+      maxBuffer: options.maxBuffer ?? 256 * 1024 * 1024,
+    });
+    return stdout;
   } catch (error) {
     const stdout = typeof error.stdout === 'string' ? error.stdout : '';
     const stderr = typeof error.stderr === 'string' ? error.stderr : '';
@@ -269,12 +306,12 @@ function verifyInstalledTarballs(exampleRoot, names, tarballs) {
   }
 }
 
-function bundleSources(exampleRoot, platform) {
+async function bundleSources(exampleRoot, platform) {
   const outputDir = mkdtempSync(join(tmpdir(), 'symbiote-consumer-bundle-'));
   const bundle = join(outputDir, `${platform}.js`);
   const sourcemap = join(outputDir, `${platform}.map`);
   try {
-    run(
+    await runAsync(
       join(exampleRoot, 'node_modules/.bin/react-native'),
       [
         'bundle',
@@ -298,7 +335,89 @@ function bundleSources(exampleRoot, platform) {
   }
 }
 
-function main() {
+// One framework's full pipeline (install -> verify -> bundle both platforms), run concurrently
+// with every other framework's — each works in its own disposable directory, so nothing here is
+// shared mutable state. Output is captured (see runAsync) and printed as one block per framework
+// once the whole pipeline finishes, so five concurrent frameworks don't interleave their logs.
+async function processExample(
+  framework,
+  example,
+  manifest,
+  tarballs,
+  multiFrameworkPackages,
+  platforms,
+  npmEnvironment,
+  matrixRoot,
+) {
+  const log = [];
+  const started = Date.now();
+  try {
+    const exampleRoot = join(matrixRoot, framework);
+    copyTrackedExample(example.dir, exampleRoot);
+    const directPackages = directInternalDependencies(manifest);
+    const rewritten = rewriteInternalDependencies(manifest, tarballs);
+    writeFileSync(
+      join(exampleRoot, 'package.json'),
+      `${JSON.stringify(rewritten, null, 2)}\n`,
+    );
+    rmSync(join(exampleRoot, 'package-lock.json'), { force: true });
+
+    log.push(`${framework}: installing fresh tarball consumer ...`);
+    await runAsync(
+      'npm',
+      ['install', '--package-lock=false', '--no-audit', '--no-fund', '--prefer-offline'],
+      { cwd: exampleRoot, env: npmEnvironment },
+    );
+    verifyInstalledTarballs(exampleRoot, directPackages, tarballs);
+
+    const [verifyCommand, verifyArgs] = example.verify;
+    log.push(`${framework}: running ${verifyCommand} ${verifyArgs.join(' ')} ...`);
+    await runAsync(verifyCommand, verifyArgs, {
+      cwd: exampleRoot,
+      env: verifyCommand === 'npm' ? npmEnvironment : process.env,
+    });
+
+    await Promise.all(
+      platforms.map(async platform => {
+        const sources = await bundleSources(exampleRoot, platform);
+        if (!adapterReachedBundle(sources, example.adapter)) {
+          throw new Error(
+            `${framework}/${platform} did not bundle ${example.adapter}; ` +
+              'the matrix may be validating registry or dead code instead of this adapter',
+          );
+        }
+        const leaks = findForeignFrameworkLeaks(
+          sources,
+          multiFrameworkPackages,
+          framework,
+        );
+        if (leaks.length > 0) {
+          const details = leaks
+            .map(
+              leak =>
+                `${leak.package}: ${leak.foreignFramework} file reached ${framework}/${platform}\n` +
+                `  ${leak.source}`,
+            )
+            .join('\n');
+          throw new Error(details);
+        }
+        log.push(
+          `${framework}/${platform}: ok (${sources.length} modules, current adapter, no foreign framework)`,
+        );
+      }),
+    );
+
+    log.push(`${framework}: done in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+    console.log(log.join('\n'));
+  } catch (error) {
+    // Flush whatever progress this framework logged before failing — Promise.all rejects on the
+    // first error, and without this the other four frameworks' concurrent output can bury it.
+    if (log.length > 0) console.log(log.join('\n'));
+    throw error;
+  }
+}
+
+async function main() {
   const frameworks = selectedValues(
     'SYMBIOTE_CONSUMER_FRAMEWORKS',
     Object.keys(FRAMEWORK_EXAMPLES),
@@ -341,75 +460,23 @@ function main() {
     const tarballs = packPackages(packageNames, packDirectory);
     const multiFrameworkPackages = discoverMultiFrameworkPackages();
 
-    for (const [framework, example] of selectedExamples) {
-      const exampleRoot = join(matrixRoot, framework);
-      copyTrackedExample(example.dir, exampleRoot);
-      const manifest = manifests.get(framework);
-      const directPackages = directInternalDependencies(manifest);
-      const rewritten = rewriteInternalDependencies(manifest, tarballs);
-      writeFileSync(
-        join(exampleRoot, 'package.json'),
-        `${JSON.stringify(rewritten, null, 2)}\n`,
-      );
-      rmSync(join(exampleRoot, 'package-lock.json'), { force: true });
-
-      console.log(`\n${framework}: installing fresh tarball consumer ...`);
-      run(
-        'npm',
-        [
-          'install',
-          '--package-lock=false',
-          '--no-audit',
-          '--no-fund',
-          '--prefer-offline',
-        ],
-        {
-          cwd: exampleRoot,
-          env: npmEnvironment,
-          stdio: 'inherit',
-        },
-      );
-      verifyInstalledTarballs(exampleRoot, directPackages, tarballs);
-
-      const [verifyCommand, verifyArgs] = example.verify;
-      console.log(
-        `${framework}: running ${verifyCommand} ${verifyArgs.join(' ')} ...`,
-      );
-      run(verifyCommand, verifyArgs, {
-        cwd: exampleRoot,
-        env: verifyCommand === 'npm' ? npmEnvironment : process.env,
-        stdio: 'inherit',
-      });
-
-      for (const platform of platforms) {
-        process.stdout.write(`${framework}/${platform}: bundling ... `);
-        const sources = bundleSources(exampleRoot, platform);
-        if (!adapterReachedBundle(sources, example.adapter)) {
-          throw new Error(
-            `${framework}/${platform} did not bundle ${example.adapter}; ` +
-              'the matrix may be validating registry or dead code instead of this adapter',
-          );
-        }
-        const leaks = findForeignFrameworkLeaks(
-          sources,
-          multiFrameworkPackages,
+    // Every framework works in its own disposable directory with no shared mutable state, so
+    // there is nothing to serialize here — running them concurrently turns wall time from "sum of
+    // all five" into "roughly the slowest one" instead.
+    await Promise.all(
+      selectedExamples.map(([framework, example]) =>
+        processExample(
           framework,
-        );
-        if (leaks.length > 0) {
-          const details = leaks
-            .map(
-              leak =>
-                `${leak.package}: ${leak.foreignFramework} file reached ${framework}/${platform}\n` +
-                `  ${leak.source}`,
-            )
-            .join('\n');
-          throw new Error(details);
-        }
-        console.log(
-          `ok (${sources.length} modules, current adapter, no foreign framework)`,
-        );
-      }
-    }
+          example,
+          manifests.get(framework),
+          tarballs,
+          multiFrameworkPackages,
+          platforms,
+          npmEnvironment,
+          matrixRoot,
+        ),
+      ),
+    );
 
     console.log('\nAll packed consumer bundles passed.');
   } finally {
@@ -424,5 +491,9 @@ function main() {
 if (
   process.argv[1] &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-)
-  main();
+) {
+  main().catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
