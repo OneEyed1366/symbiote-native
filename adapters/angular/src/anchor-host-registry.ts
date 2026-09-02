@@ -69,7 +69,9 @@ const ANCHOR_HOST_COMPONENTS: Set<string> = new Set(
     'TouchableWithoutFeedback',
     'VirtualizedList',
     'VirtualizedSectionList',
-    'symbiote-pressable',
+    // 'symbiote-pressable' deliberately NOT here — see Pressable's own @Component comment
+    // (components/pressable/index.ts). It is the host-behavior registry's tag, never a spelling
+    // of the composed component now, so it must resolve to a real, painting node.
   ].map(selector => selector.toLowerCase()),
 );
 

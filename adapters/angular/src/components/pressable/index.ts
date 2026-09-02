@@ -50,6 +50,11 @@ import {
   SymbioteStyleInputDirective,
   ViewHost,
 } from '../../primitives';
+import {
+  gateWanted,
+  injectGateDemand,
+  type IGatedAccessibilityEvent,
+} from '../../gate-demand';
 
 export type {
   IPressState,
@@ -123,7 +128,18 @@ function asSymbioteEvent(event: unknown): ISymbioteEvent | undefined {
 }
 
 @Component({
-  selector: 'Pressable, symbiote-pressable',
+  // Single-name selector, matching TextInput's own ('TextInput', text-input.ts) rather than
+  // View/Text's dual one. The alternate `symbiote-pressable` spelling was vestigial — nothing in
+  // this component's own template ever renders that tag (it renders `symbiote-view`, below), and
+  // no app or example code invokes the composed component by that literal tag (verified by grep,
+  // 2026-08-31). Its only effect was to force `symbiote-pressable` into
+  // `ANCHOR_HOST_COMPONENTS` unconditionally, which collided with the tag's OTHER, load-bearing
+  // meaning — the host-behavior registry key (`PRESSABLE_TAG`,
+  // core/components/src/behaviors/pressable.ts) a lowered `<Pressable>` must carry to get the
+  // press machine. That collision is exactly why `DIAGNOSTIC_LOWERED_PRESSABLE_TAG` existed
+  // (renderer/index.ts) — dropping the vestigial spelling here removes the collision at its
+  // source, so the escape hatch is retired rather than worked around.
+  selector: 'Pressable',
   standalone: true,
   hostDirectives: [
     { directive: SymbioteStyleInputDirective, inputs: ['style'] },
@@ -134,10 +150,6 @@ function asSymbioteEvent(event: unknown): ISymbioteEvent | undefined {
     <symbiote-view
       #host
       [symbioteHostProps]="hostProps()"
-      (accessibilityAction)="emit(accessibilityAction, $event)"
-      (accessibilityTap)="emit(accessibilityTap, $event)"
-      (magicTap)="emit(magicTap, $event)"
-      (accessibilityEscape)="emit(accessibilityEscape, $event)"
       (press)="handlePress($event)"
       (pressIn)="handlePressIn($event)"
       (pressOut)="handlePressOut($event)"
@@ -163,9 +175,15 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
   @Output() readonly longPress = new EventEmitter<ISymbioteEvent>();
   @Output() readonly hoverIn = new EventEmitter<ISymbioteEvent>();
   @Output() readonly hoverOut = new EventEmitter<ISymbioteEvent>();
-  // The four accessibility callbacks as real Angular events too, same tradeoff as press/hover
-  // above: `(accessibilityAction)="emit(accessibilityAction, $event)"`, not
-  // `[onAccessibilityAction]="onAccessibilityAction"`.
+  // The four accessibility callbacks as real Angular events, app-facing. UNLIKE press/hover above,
+  // these are NOT bound in the template at all — `accessibilityAction`/`accessibilityTap`/
+  // `magicTap`/`accessibilityEscape` are `onX`-gated Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`): the engine only emits them when the committed
+  // payload carries a FUNCTION at that key, so a `(accessibilityAction)="..."` template binding —
+  // always present once written — would light the gate on every instance regardless of whether the
+  // app ever subscribes. Routed through `hostProps()` instead (`accessibilityEmitterHandler`
+  // below), the same `.observed`-conditional shape `emitterHandler` already uses for press/hover,
+  // so the gate lights only when something is actually listening.
   @Output() readonly accessibilityAction = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
@@ -258,6 +276,10 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
   };
 
   private readonly changeDetector = inject(ChangeDetectorRef);
+  // Null unless an adapter wrapper renders this Pressable in its own template. See
+  // `gate-demand.ts`; an app's own `<Pressable>` — including one projected INTO a wrapper — gets
+  // null and falls back to its own `.observed`.
+  private readonly gateDemand = injectGateDemand();
   // This component's OWN host - the non-painting anchor `class="..."` at the use site resolves
   // onto (see anchorHostStyle's doc comment) - NOT `hostElement` above, which targets the real
   // inner `symbiote-view` one level down.
@@ -371,6 +393,14 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
       style: [this.anchorStyle(), this.resolvedStyle],
       accessible: this.accessible,
       ...this.foldedAccessibility,
+      onAccessibilityAction: this.accessibilityEmitterHandler(
+        'accessibilityAction',
+      ),
+      onAccessibilityTap: this.accessibilityEmitterHandler('accessibilityTap'),
+      onMagicTap: this.accessibilityEmitterHandler('magicTap'),
+      onAccessibilityEscape: this.accessibilityEmitterHandler(
+        'accessibilityEscape',
+      ),
       android_disableSound: this.android_disableSound,
       nativeBackgroundAndroid:
         this.resolvedRippleProps?.nativeBackgroundAndroid,
@@ -415,7 +445,7 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
     return isTerminationAllowed(this.cancelable);
   }
 
-  emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
+  private emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
     const symbioteEvent = asSymbioteEvent(event);
     if (symbioteEvent !== undefined) emitter.emit(symbioteEvent);
   }
@@ -437,6 +467,23 @@ export class Pressable implements IAngularPressableInputs, OnChanges, DoCheck {
     emitter: EventEmitter<ISymbioteEvent>,
   ): IPressHandler | undefined {
     return emitter.observed ? event => emitter.emit(event) : undefined;
+  }
+
+  // The accessibility twin of emitterHandler, feeding hostProps()'s flat bag instead of
+  // createPressHandlers' config — see the accessibilityAction @Output()'s own comment for why
+  // these four specifically cannot be plain template `(x)="..."` bindings. `undefined` here means
+  // `setEventListener` never sees a function, so the gated prop's flag never lights
+  // (`fabric-boolean-event-gates.md`, "The flag follows the VALUE, not the key").
+  private accessibilityEmitterHandler(
+    name: IGatedAccessibilityEvent,
+  ): ((event: unknown) => void) | undefined {
+    const emitter = this[name];
+    // A WRAPPER's binding is not a subscriber, and `.observed` cannot tell the two apart. When a
+    // demand is supplied from above it decides instead — see `gate-demand.ts` for why the channel
+    // is DI rather than an `@Input`.
+    return gateWanted(this.gateDemand, name, emitter)
+      ? event => this.emit(emitter, event)
+      : undefined;
   }
 
   private get handlers() {

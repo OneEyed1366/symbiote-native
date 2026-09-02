@@ -62,7 +62,9 @@ function asAngularHost(hostNode: SymbioteSurface | ISymbioteNode): Element {
 // that isn't one of our primitives), so the root needs an explicit host too, one we then hand
 // to the wrapper as projectable content.
 function createDetachedViewHost(): ISymbioteNode {
-  const descriptor = descriptorFor('View');
+  // 'symbiote-view', not 'View': the public name is not a Fabric view name, and until
+  // makeDescriptorFor learned to reject one it fell through to a view literally named `View`.
+  const descriptor = descriptorFor('symbiote-view');
   return toPublicInstance(
     createEngineElement(descriptor.component, descriptor.isText),
   );

@@ -42,10 +42,6 @@ export type {
   template: `
     <symbiote-image
       [symbioteHostProps]="imageProps()"
-      (accessibilityAction)="handleAccessibilityAction($event)"
-      (accessibilityTap)="handleAccessibilityTap($event)"
-      (magicTap)="handleMagicTap($event)"
-      (accessibilityEscape)="handleAccessibilityEscape($event)"
       (loadStart)="handleLoadStart($event)"
       (load)="handleLoad($event)"
       (loadEnd)="handleLoadEnd($event)"

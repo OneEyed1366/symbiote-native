@@ -198,7 +198,7 @@ describe('Switch', () => {
 
   // why: index.ios.ts's hostProps override merges anchorHostStyle(this.elementRef) with the base
   // getter's resolved style — without it, a class= at the use site addClass-toggles the
-  // non-painting anchor and never reaches the real committed <symbiote-switch> one level down.
+  // non-painting anchor and never reaches the real committed <symbiote-switch-managed> one level down.
   it('resolves a class= on the Switch use site onto the real committed view, not the anchor', async () => {
     registerRules([
       {

@@ -127,6 +127,13 @@ export {
   VListItemDirective,
   VListSeparatorDirective,
 } from './directives';
+import {
+  gateWanted,
+  injectGateDemandAbove,
+  provideGateDemand,
+  type IGateDemand,
+  type IGatedAccessibilityEvent,
+} from '../../gate-demand';
 export type { IVListItemContext, IVListSeparatorContext } from './directives';
 
 // The Angular VirtualizedList prop surface. Mirrors React/Vue's IVirtualizedListProps MINUS the
@@ -213,6 +220,7 @@ interface IWindowCell<ItemT> {
 @Component({
   selector: 'VirtualizedList',
   standalone: true,
+  viewProviders: [provideGateDemand(() => VirtualizedList)],
   hostDirectives: [
     { directive: SymbioteStyleInputDirective, inputs: ['style'] },
   ],
@@ -381,6 +389,16 @@ export class VirtualizedList<ItemT = unknown>
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
+
+  // This wrapper binds the four gated accessibility events on the component it renders, which
+  // Angular forces to be unconditional and which would light that component's gates on every
+  // instance. It answers for them instead — see `gate-demand.ts`.
+  private readonly gateDemandAbove = injectGateDemandAbove();
+
+  wantsGate(name: IGatedAccessibilityEvent): boolean {
+    return gateWanted(this.gateDemandAbove, name, this[name]);
+  }
+
   @Input({ required: true }) data!: unknown;
   @Input({ required: true }) getItem!: (data: unknown, index: number) => ItemT;
   @Input({ required: true }) getItemCount!: (data: unknown) => number;

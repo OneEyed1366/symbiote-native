@@ -15,7 +15,7 @@
 // a lifecycle hook only shows up on the live clone.
 
 import '@angular/compiler';
-import { Component } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   installFabric,
@@ -65,6 +65,34 @@ class PlainHost {}
 })
 class ExplicitHost {}
 
+// THE LOWERED SPELLING, and the arm this file was missing for as long as it has existed.
+//
+// Everything above mounts `<Text>`, the @Component — the path that already folds the defaults. A
+// LOWERED `<symbiote-text>` has no component behind it: `resolveTextProps` lives in
+// `../primitives`, which is exactly what lowering routes around. So the two tests above were green
+// while the lowered path shipped text that truncates with no ellipsis, device-observed once
+// already on examples/svelte.
+//
+// `schemas: [CUSTOM_ELEMENTS_SCHEMA]` with `TextHost` absent from `imports` is load-bearing and is
+// the whole reason this needs its own component: Angular's primitives carry a DUAL selector
+// (`'symbiote-text, Text'`) and directive matching is resolved per TEMPLATE, so importing TextHost
+// anywhere in this template would make `<symbiote-text>` resolve straight back to the component
+// and the test would assert the wrapper path twice under two spellings
+// (`.claude/rules/host-primitive-tier.md`).
+//
+// The other four adapters satisfy this in three different ways — Svelte folds at compile time from
+// the spec's `defaults`, Vue and Solid seed in the renderer, React never lowers. That is why the
+// assertion is on the COMMITTED PAYLOAD and not on any transform's output: a check on the emitted
+// text would report the two runtime-seeding adapters as broken. Phrase the oracle as the
+// capability — does a lowered Text commit these two keys — and all five become comparable.
+@Component({
+  selector: 'symbiote-text-defaults-lowered',
+  standalone: true,
+  template: `<symbiote-text testID="lowered">clamped</symbiote-text>`,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+})
+class LoweredHost {}
+
 describe('Angular Text RN defaults', () => {
   it("defaults ellipsizeMode to 'tail' and allowFontScaling to true", async () => {
     mount(ROOT_TAG, PlainHost);
@@ -93,5 +121,20 @@ describe('Angular Text RN defaults', () => {
     // silent behaviour change for anyone who deliberately turned the ellipsis off.
     expect(node?.props.ellipsizeMode).toBe('clip');
     expect(node?.props.allowFontScaling).toBe(false);
+  });
+
+  it('applies the same defaults to a LOWERED symbiote-text', async () => {
+    mount(ROOT_TAG, LoweredHost);
+    await waitUntil(
+      () => committed('lowered') !== undefined,
+      'lowered symbiote-text commits',
+    );
+
+    const node = committed('lowered');
+    expect(node).toBeDefined();
+    // Six of these — two keys on each of a benchmark row's three Text nodes — are the entire
+    // prop-key gap that made Angular's lowered column incomparable to every other adapter's.
+    expect(node?.props.ellipsizeMode).toBe('tail');
+    expect(node?.props.allowFontScaling).toBe(true);
   });
 });

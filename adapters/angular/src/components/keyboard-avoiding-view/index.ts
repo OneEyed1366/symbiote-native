@@ -96,13 +96,15 @@ export type IAngularKeyboardAvoidingViewInputs = Omit<
   // The wrapper carries a11y + onLayout; 'position' ('nested') pushes the children in an inner
   // View by `bottom: inset`, the wrapper modes adjust the single wrapper directly. Only one @if
   // branch is instantiated, so each branch's <ng-content> projects the children unambiguously.
+  // `layout` stays a plain, unconditional template binding: unlike the four accessibility events
+  // below, this component READS its own onLayout internally (handleLayout measures the frame that
+  // feeds the next keyboard event's inset math — see keyboard-avoiding-view-rn-contract.md), so the
+  // gate must stay lit regardless of whether the app subscribes to the `layout` @Output(). Gating it
+  // on `.observed` would silently break the inset fixpoint correction the moment an app didn't
+  // listen to `layout`.
   template: `
     <symbiote-view
       [symbioteHostProps]="hostProps"
-      (accessibilityAction)="emit(accessibilityAction, $event)"
-      (accessibilityTap)="emit(accessibilityTap, $event)"
-      (magicTap)="emit(magicTap, $event)"
-      (accessibilityEscape)="emit(accessibilityEscape, $event)"
       (layout)="handleLayout($event)"
     >
       @if (isNested) {
@@ -296,14 +298,26 @@ export class KeyboardAvoidingView
       nativeID: this.nativeID,
       accessible: this.accessible,
       ...this.folded,
+      onAccessibilityAction: this.eventEmitterHandler(this.accessibilityAction),
+      onAccessibilityTap: this.eventEmitterHandler(this.accessibilityTap),
+      onMagicTap: this.eventEmitterHandler(this.magicTap),
+      onAccessibilityEscape: this.eventEmitterHandler(this.accessibilityEscape),
     };
   }
 
   // Forward an engine event to the matching @Output(), narrowing the template's untyped $event
-  // first. The accessibility* Outputs ride the engine's structural event channel (Angular blocks
-  // [onX] property bindings; events flow through (event) only).
-  emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
+  // first.
+  private emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
     if (isSymbioteEvent(event)) emitter.emit(event);
+  }
+
+  // The four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`). `.observed`-gated, unlike `layout` above which
+  // this component needs unconditionally for its own internal frame measurement.
+  private eventEmitterHandler(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): ((event: unknown) => void) | undefined {
+    return emitter.observed ? event => this.emit(emitter, event) : undefined;
   }
 
   // Fold the web aria-*/role aliases into the canonical accessibility* props once per render, so the

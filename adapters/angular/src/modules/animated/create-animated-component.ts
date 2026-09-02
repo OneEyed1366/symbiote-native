@@ -53,8 +53,10 @@ import {
   IMAGE_INPUTS,
   IMAGE_OUTPUTS,
   ImageBase,
+  isImageEventCallback,
   resolveImageProps,
 } from '../../components/image/shared';
+import type { IGatedAccessibilityEvent } from '../../gate-demand';
 import { SectionList } from '../../components/section-list';
 import { AnimatedLeafBinder } from './animated-leaf-binder';
 
@@ -244,10 +246,6 @@ export class AnimatedText extends AnimatedComponentBase {}
   template: `
     <symbiote-image
       [symbioteHostProps]="animatedImageProps"
-      (accessibilityAction)="handleAccessibilityAction($event)"
-      (accessibilityTap)="handleAccessibilityTap($event)"
-      (magicTap)="handleMagicTap($event)"
-      (accessibilityEscape)="handleAccessibilityEscape($event)"
       (loadStart)="handleLoadStart($event)"
       (load)="handleLoad($event)"
       (loadEnd)="handleLoadEnd($event)"
@@ -283,6 +281,18 @@ export class AnimatedImage
   );
   private viewReady = false;
 
+  private gateInto(
+    props: Record<string, unknown>,
+    name: IGatedAccessibilityEvent,
+    key: string,
+  ): void {
+    const carried = props[key];
+    props[key] = this.gatedAccessibilityHandler(
+      name,
+      isImageEventCallback(carried) ? carried : undefined,
+    );
+  }
+
   get animatedImageProps(): Record<string, unknown> {
     const reduced = reduceProps(this.mergedProps());
     const passthroughStyle = readPassthroughStyle(
@@ -296,6 +306,15 @@ export class AnimatedImage
     }
     const resolved = resolveImageProps(reduced);
     resolved['style'] = [anchorHostStyle(this.elementRef), resolved['style']];
+    // The four gated accessibility events, which used to be template bindings on the host tag and
+    // therefore lit their Fabric flags on every AnimatedImage in the app
+    // (`.claude/rules/fabric-boolean-event-gates.md`). Routed through the base's gate instead, so
+    // both channels still reach the app — the `onX` callback carried in the animated prop bag, and
+    // the `@Output()` an app may bind on <AnimatedImage> (IMAGE_OUTPUTS declares all four).
+    this.gateInto(resolved, 'accessibilityAction', 'onAccessibilityAction');
+    this.gateInto(resolved, 'accessibilityTap', 'onAccessibilityTap');
+    this.gateInto(resolved, 'magicTap', 'onMagicTap');
+    this.gateInto(resolved, 'accessibilityEscape', 'onAccessibilityEscape');
     return resolved;
   }
 

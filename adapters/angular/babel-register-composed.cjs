@@ -21,7 +21,15 @@ const PRIMITIVE_SELECTORS = new Set([
   'symbiote-horizontal-scroll-content',
   'symbiote-text-input',
   'symbiote-text-input-multiline',
+  // The COMPONENT path's pair. Only a lowering transform may emit the plain tags above — those
+  // carry the engine's TextInput machine, and this adapter's own component runs that state in
+  // its template. See `core/components/src/component-names/shared.ts`.
+  'symbiote-text-input-managed',
+  'symbiote-text-input-multiline-managed',
   'symbiote-switch',
+  // The component path's spelling — same native view, a tag the engine's Switch behavior does
+  // not carry. See `core/components/src/component-names/shared.ts`.
+  'symbiote-switch-managed',
   'symbiote-activity-indicator',
   'symbiote-safe-area-view',
   'symbiote-modal',

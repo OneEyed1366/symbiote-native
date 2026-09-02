@@ -107,6 +107,9 @@ export class HorizontalScrollView extends SymbiotePrimitiveHost {}
 })
 export class HorizontalScrollContentView extends SymbiotePrimitiveHost {}
 
+// The pair the LOWERED path commits — declared so the tag alphabet stays complete, though no
+// Angular template renders them: this adapter has no lowering transform. The `-managed` pair below
+// is what its own TextInput renders.
 @Component({
   selector: 'symbiote-text-input',
   standalone: true,
@@ -122,11 +125,35 @@ export class TextInputHost extends SymbiotePrimitiveHost {}
 export class MultilineTextInputHost extends SymbiotePrimitiveHost {}
 
 @Component({
+  selector: 'symbiote-text-input-managed',
+  standalone: true,
+  template: '<ng-content></ng-content>',
+})
+export class ManagedTextInputHost extends SymbiotePrimitiveHost {}
+
+@Component({
+  selector: 'symbiote-text-input-multiline-managed',
+  standalone: true,
+  template: '<ng-content></ng-content>',
+})
+export class ManagedMultilineTextInputHost extends SymbiotePrimitiveHost {}
+
+@Component({
   selector: 'symbiote-switch',
   standalone: true,
   template: '<ng-content></ng-content>',
 })
 export class SwitchHost extends SymbiotePrimitiveHost {}
+
+// The component path's spelling — same native Switch/AndroidSwitch, a tag the engine's Switch
+// behavior does not carry. See `component-names/shared.ts` for why the wrapper may not share the
+// lowered tag; mirrors `ManagedTextInputHost` above.
+@Component({
+  selector: 'symbiote-switch-managed',
+  standalone: true,
+  template: '<ng-content></ng-content>',
+})
+export class ManagedSwitchHost extends SymbiotePrimitiveHost {}
 
 @Component({
   selector: 'symbiote-activity-indicator',

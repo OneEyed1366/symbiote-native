@@ -1,5 +1,10 @@
 import { EventEmitter, computed, signal } from '@angular/core';
 import {
+  gateWanted,
+  injectGateDemand,
+  type IGatedAccessibilityEvent,
+} from '../../gate-demand';
+import {
   imageStatics,
   renderImage,
   resolveAccessibilityProps,
@@ -160,6 +165,14 @@ function asCrossOrigin(
 
 function asStyle(value: unknown): IStyleProp<IViewStyle> | undefined {
   return typeof value === 'object' && value !== null ? value : undefined;
+}
+
+// Narrows a value out of the untyped animated prop bag. A runtime guard rather than a cast: the
+// bag is built at runtime from merged animated values, so nothing upstream has proven the shape.
+export function isImageEventCallback(
+  value: unknown,
+): value is (event: ISymbioteEvent) => void {
+  return typeof value === 'function';
 }
 
 export function resolveImageProps(
@@ -382,28 +395,32 @@ export abstract class ImageBase {
   readonly progress = new EventEmitter<ISymbioteEvent>();
   readonly partialLoad = new EventEmitter<ISymbioteEvent>();
 
-  handleAccessibilityAction(event: Event): void {
-    if (!isSymbioteEvent(event)) return;
-    this.onAccessibilityAction?.(event);
-    this.accessibilityAction.emit(event);
-  }
+  // Null unless an adapter wrapper renders this Image in its own template — ImageBackground does.
+  // An app's own `<Image>` gets null and answers from its own `.observed`.
+  private readonly gateDemand = injectGateDemand();
 
-  handleAccessibilityTap(event: Event): void {
-    if (!isSymbioteEvent(event)) return;
-    this.onAccessibilityTap?.(event);
-    this.accessibilityTap.emit(event);
-  }
-
-  handleMagicTap(event: Event): void {
-    if (!isSymbioteEvent(event)) return;
-    this.onMagicTap?.(event);
-    this.magicTap.emit(event);
-  }
-
-  handleAccessibilityEscape(event: Event): void {
-    if (!isSymbioteEvent(event)) return;
-    this.onAccessibilityEscape?.(event);
-    this.accessibilityEscape.emit(event);
+  // The four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`): native fires them only when the committed
+  // payload carries a FUNCTION at that key. A template `(accessibilityAction)="..."` binding on the
+  // intrinsic host lights the gate unconditionally; this reaches the app two ways — a plain
+  // `[onAccessibilityAction]` @Input callback, or the `accessibilityAction` @Output — and the gate
+  // must light only when at least one of the two is actually wired. Returned `undefined` means
+  // `setEventListener` never sees a function, so the gate stays dark.
+  protected gatedAccessibilityHandler(
+    name: IGatedAccessibilityEvent,
+    callback: ((event: ISymbioteEvent) => void) | undefined,
+  ): ((event: Event) => void) | undefined {
+    const emitter = this[name];
+    // A WRAPPER's binding is not a subscriber, and `.observed` cannot tell the two apart.
+    // ImageBackground renders this component and binds all four, so without the demand every
+    // Image inside one lit its gates. See `gate-demand.ts`.
+    if (!gateWanted(this.gateDemand, name, emitter) && callback === undefined)
+      return undefined;
+    return event => {
+      if (!isSymbioteEvent(event)) return;
+      callback?.(event);
+      emitter.emit(event);
+    };
   }
 
   handleLoadStart(event: Event): void {
@@ -499,10 +516,19 @@ export abstract class ImageBase {
       ariaValueMin: this.ariaValueMin,
       ariaValueNow: this.ariaValueNow,
       ariaValueText: this.ariaValueText,
-      onAccessibilityAction: this.onAccessibilityAction,
-      onAccessibilityTap: this.onAccessibilityTap,
-      onMagicTap: this.onMagicTap,
-      onAccessibilityEscape: this.onAccessibilityEscape,
+      onAccessibilityAction: this.gatedAccessibilityHandler(
+        'accessibilityAction',
+        this.onAccessibilityAction,
+      ),
+      onAccessibilityTap: this.gatedAccessibilityHandler(
+        'accessibilityTap',
+        this.onAccessibilityTap,
+      ),
+      onMagicTap: this.gatedAccessibilityHandler('magicTap', this.onMagicTap),
+      onAccessibilityEscape: this.gatedAccessibilityHandler(
+        'accessibilityEscape',
+        this.onAccessibilityEscape,
+      ),
       onLoadStart: this.onLoadStart,
       onLoad: this.onLoad,
       onLoadEnd: this.onLoadEnd,

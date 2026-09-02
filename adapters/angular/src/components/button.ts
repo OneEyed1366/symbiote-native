@@ -41,6 +41,13 @@ import type {
 } from '@symbiote-native/engine';
 import { anchorStyleProp, TextHost } from '../primitives';
 import { TouchableOpacity } from './touchable';
+import {
+  gateWanted,
+  injectGateDemandAbove,
+  provideGateDemand,
+  type IGateDemand,
+  type IGatedAccessibilityEvent,
+} from '../gate-demand';
 
 export type IButtonProps = Omit<
   ICoreButtonProps,
@@ -54,6 +61,7 @@ export type IButtonProps = Omit<
 @Component({
   selector: 'Button',
   standalone: true,
+  viewProviders: [provideGateDemand(() => Button)],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [TouchableOpacity, TextHost],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -129,6 +137,15 @@ export class Button implements IButtonProps, DoCheck {
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
+
+  // This wrapper binds the four gated accessibility events on the component it renders, which
+  // Angular forces to be unconditional and which would light that component's gates on every
+  // instance. It answers for them instead — see `gate-demand.ts`.
+  private readonly gateDemandAbove = injectGateDemandAbove();
+
+  wantsGate(name: IGatedAccessibilityEvent): boolean {
+    return gateWanted(this.gateDemandAbove, name, this[name]);
+  }
 
   // Button-owned props: title is the Text child, color/disabled fold into the label style, and
   // touchSoundDisabled re-maps onto TouchableOpacity.

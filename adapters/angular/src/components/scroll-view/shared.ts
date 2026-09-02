@@ -63,6 +63,11 @@ import {
   type IViewStyle,
 } from '@symbiote-native/engine';
 import { anchorHostStyle, SymbioteHostPropsDirective } from '../../primitives';
+import {
+  gateWanted,
+  injectGateDemand,
+  type IGatedAccessibilityEvent,
+} from '../../gate-demand';
 import { RefreshControl } from '../refresh-control';
 import { ScrollViewProjectionController } from './projection';
 
@@ -369,6 +374,10 @@ export abstract class ScrollViewBase
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
 
+  // Null unless an adapter wrapper renders this ScrollView in its own template — VirtualizedList
+  // does. An app's own `<ScrollView>` gets null and answers from its own `.observed`.
+  private readonly gateDemand = injectGateDemand();
+
   testID: string | undefined;
   nativeID: string | undefined;
   accessible: boolean | undefined;
@@ -624,10 +633,14 @@ export abstract class ScrollViewBase
       onMomentumScrollBegin: this.onMomentumScrollBegin,
       onMomentumScrollEnd: this.onMomentumScrollEnd,
       onScrollToTop: this.emitterCallback(this.scrollToTop),
-      onAccessibilityAction: this.emitterCallback(this.accessibilityAction),
-      onAccessibilityTap: this.emitterCallback(this.accessibilityTap),
-      onMagicTap: this.emitterCallback(this.magicTap),
-      onAccessibilityEscape: this.emitterCallback(this.accessibilityEscape),
+      onAccessibilityAction: this.gatedAccessibilityCallback(
+        'accessibilityAction',
+      ),
+      onAccessibilityTap: this.gatedAccessibilityCallback('accessibilityTap'),
+      onMagicTap: this.gatedAccessibilityCallback('magicTap'),
+      onAccessibilityEscape: this.gatedAccessibilityCallback(
+        'accessibilityEscape',
+      ),
     });
 
     // RN defaults nested scrolling ON (ScrollView.js `nestedScrollEnabled ?? true`); Android needs
@@ -814,6 +827,20 @@ export abstract class ScrollViewBase
   // subscribes a template's (event) listeners in its CREATION pass, before any input is written and
   // before this component's own view is first refreshed - so `observed` is already settled at the
   // first evaluation and cannot flip afterwards without destroying the whole component.
+  // The four GATED accessibility events, which `emitterCallback` cannot answer alone: VirtualizedList
+  // renders this component and binds all four, so `.observed` is true on every list in the app
+  // whether or not anything listens. A demand from above decides instead — see `gate-demand.ts`.
+  //
+  // Deliberately NOT applied to the projected RefreshControl's four, one site below: that emitter
+  // belongs to a component the APP wrote and projected in, so its `.observed` is honest.
+  private gatedAccessibilityCallback(
+    name: IGatedAccessibilityEvent,
+  ): IScrollHandler | undefined {
+    const emitter = this[name];
+    if (!gateWanted(this.gateDemand, name, emitter)) return undefined;
+    return this.emitterCallback(emitter);
+  }
+
   private emitterCallback(
     emitter: EventEmitter<ISymbioteEvent>,
   ): IScrollHandler | undefined {
