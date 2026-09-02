@@ -21,6 +21,7 @@ import {
 } from '@symbiote-native/engine';
 import { descriptorFor } from '@symbiote-native/components';
 import { normalizeSvelteClass } from '../class-value';
+import { foldHostBag } from './fold-host-bag';
 import { ShimNode } from './shim-node';
 
 export type IShimPropBag = Record<string, unknown>;
@@ -38,7 +39,17 @@ let globalSetPSeq = 0;
 // `on<Name>` handlers ride inside the prop bag (idiomatic Svelte 5 callback props — see the
 // skill's §3g(c) "most of §5 collapses" note) — they are not addEventListener-style DOM
 // listeners, so they are diffed and routed exactly like any other bag key, through routeProp.
-export class ShimElement extends ShimNode {
+// An empty layer that exists to be what `globalThis.Element` points at, and it is load-bearing.
+// Svelte's `get_setters` (internal/client/dom/elements/attributes.js) walks from the ELEMENT
+// INSTANCE up and STOPS when it reaches `Element.prototype`. While `Element` was `ShimElement`
+// itself, the first prototype step was already the stop, so the walk collected nothing and `p` —
+// which lives on `ShimElement.prototype`, one step past it — was invisible. `set_attributes` then
+// fell through to `setAttribute`, which writes an inert Map, and every prop vanished with nothing
+// red. The rule is therefore that `Element` must be a proper ANCESTOR of the class owning the
+// setters, never that class: `.claude/rules/svelte-shim-element-global-must-be-an-ancestor.md`.
+export abstract class ShimElementBase extends ShimNode {}
+
+export class ShimElement extends ShimElementBase {
   readonly tagName: string;
   readonly namespaceURI: string | undefined;
   // Both LAZY, and that is a measured decision, not a style one. A lowered primitive carries its
@@ -59,6 +70,17 @@ export class ShimElement extends ShimNode {
     return this.tagName;
   }
 
+  // `set_style` writes `dom.style.cssText`, so a shim with no `.style` THROWS rather than
+  // no-opping — a `style` attribute on a bare tag crashed the mount. LAZY, for the reason
+  // `.claude/rules/svelte-shim-is-the-per-node-create-path.md` records about the two Maps below it:
+  // an eager field is one object per element, ~9 000 per create, in the window where GC is the
+  // largest bucket. Only `set_style` touches this, and no lowered element takes that path.
+  private styleSlot: { cssText: string } | undefined;
+
+  get style(): { cssText: string } {
+    return (this.styleSlot ??= { cssText: '' });
+  }
+
   // The single object-bag prop. The literal name is ours to choose (§3g(c)) — the adapter's
   // own View.svelte/Text.svelte/… emit `<symbiote-view p={bag}>`; app code never sees it.
   get p(): IShimPropBag {
@@ -66,7 +88,10 @@ export class ShimElement extends ShimNode {
   }
 
   set p(bag: IShimPropBag | undefined) {
-    const next = normalizeBagClasses(bag ?? {});
+    // The fold runs HERE rather than at element creation because an alias can arrive on an update
+    // (`id` bound to a signal), and it runs before the diff so `lastBag` is always the folded shape
+    // — otherwise a seeded default would look like a change on every single set.
+    const next = foldHostBag(this.tagName, normalizeBagClasses(bag ?? {}));
     const prev = this.lastBag;
     this.lastBag = next;
     // THUNK, not a string (see debug.ts's header): this setter runs once per element per create

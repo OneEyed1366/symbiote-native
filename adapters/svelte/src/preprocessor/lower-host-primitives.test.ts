@@ -15,7 +15,7 @@ const lower = (source: string): string =>
   lowerHostPrimitives().markup({ content: source, filename: 'Probe.svelte' })
     .code;
 
-const IMPORT = `<script>\n  import { View, Text } from '@symbiote-native/svelte';\n</script>\n`;
+const IMPORT = `<script>\n  import { View, Text, SafeAreaView } from '@symbiote-native/svelte';\n</script>\n`;
 
 // Proves the rewritten source still COMPILES, and compiles to the element path rather than the
 // component path. A string assertion alone would pass on output svelte/compiler rejects.
@@ -43,6 +43,75 @@ describe('lowerHostPrimitives rewrites', () => {
   it('carries an expression attribute through parenthesised', () => {
     const out = lower(`${IMPORT}<View onLayout={a || b}>x</View>`);
     expect(out).toContain('p={{onLayout: (a || b)}}');
+  });
+
+  // Reads ONE key out of the emitted bag, and the leading boundary is not decoration: `id` is a
+  // substring of `nativeID`, so a bare `includes('id: "pane"')` reports the alias's own OUTPUT as
+  // proof that the input key survived — the assertion would then be unfailable in the direction it
+  // exists to check. Third instance of this prefix shape in one day, after `symbiote-text` /
+  // `symbiote-text-input` and `symbiote-switch` / `symbiote-switch-managed`; the first two were tag
+  // names and this one is an identifier, so the hazard is not about tags.
+  //
+  // Pinned to the key POSITION rather than the whole bag: a primitive that also seeds defaults
+  // (`Text` emits `ellipsizeMode` and `allowFontScaling`) has more in its bag than the key under
+  // test, and an equality assertion would fail on a correct fold.
+  const bagHasKey = (out: string, key: string): boolean =>
+    new RegExp(`(?<![A-Za-z0-9_])${key}: `).test(out);
+
+  // ALIASES ARE PER ENTRY, and this asserts each primitive against its OWN map rather than against a
+  // remembered value. The shared verdict table cannot reach any of it — its answer is lower/refuse,
+  // and a transform that folded the wrong key still lowers.
+  //
+  // WHY IT IS DERIVED. The first version named `SafeAreaView` and asserted the NEGATIVE, because it
+  // was the one entry declaring no aliases. That premise was decided away the next day — `id` was
+  // added to all five wrappers and the entry took `ID_ALIAS` — and the case went red for a reason
+  // that had nothing to do with the transform. Re-aiming it at a different fixed subject would buy
+  // the same silence again the next time the spec moves. The subject is the SPEC now, so an entry
+  // that declares a pair asserts the fold, an entry that declares none asserts the raw key survives,
+  // and neither state can arrive unnoticed.
+  describe.each(Object.entries(HOST_PRIMITIVES))(
+    '%s folds exactly the aliases its own spec declares',
+    (name, primitive) => {
+      const IMPORT_ONE = `<script>\n  import { ${name} } from '@symbiote-native/svelte';\n</script>\n`;
+      const pairs = Object.entries(primitive.aliases);
+
+      it('rewrites every declared pair, and leaves an undeclared key alone', () => {
+        for (const [from, to] of pairs) {
+          const out = lower(`${IMPORT_ONE}<${name} ${from}="pane" />`);
+          expect(bagHasKey(out, to)).toBe(true);
+          // The raw key must not ALSO survive — no ViewConfig declares it, so a fold that copies
+          // instead of renaming lands a key Fabric silently drops.
+          expect(bagHasKey(out, from)).toBe(false);
+        }
+
+        // The other direction, and it is the half a rename-everything transform would fail: a key the
+        // spec does NOT alias must reach the bag under its authored name. `testID` is chosen because
+        // no entry has ever aliased it; if one ever does, the loop above covers it and this line has
+        // to move — which is the correct kind of breakage.
+        expect(
+          bagHasKey(lower(`${IMPORT_ONE}<${name} testID="pane" />`), 'testID'),
+        ).toBe(true);
+
+        // An entry declaring NO pair is a state this suite has actually been in, for one round. Pin
+        // it rather than let an empty loop pass vacuously — that is the §23 silent negative control.
+        if (pairs.length === 0) {
+          const out = lower(`${IMPORT_ONE}<${name} id="pane" />`);
+          expect(bagHasKey(out, 'id')).toBe(true);
+          expect(bagHasKey(out, 'nativeID')).toBe(false);
+        }
+      });
+    },
+  );
+
+  // The anti-degeneracy guard for the block above. Every per-primitive assertion is conditioned on
+  // that primitive's own map, so emptying EVERY map at once would leave the whole block green while
+  // aliasing had stopped entirely — each row would simply take the second branch and agree. This is
+  // the one assertion that cannot be satisfied by the spec going quiet.
+  it('the spec still declares at least one alias somewhere', () => {
+    const declared = Object.values(HOST_PRIMITIVES).flatMap(primitive =>
+      Object.entries(primitive.aliases),
+    );
+    expect(declared.length).toBeGreaterThan(0);
   });
 
   it('turns a mixed quoted value into a template literal', () => {
@@ -345,14 +414,22 @@ describe('lowerHostPrimitives refuses', () => {
     expect(out).toContain('<View {@attach fn}');
   });
 
-  // Was `Pressable` until the spec gained it on 2026-08-23. The case still matters — a primitive
-  // absent from HOST_PRIMITIVES stays a component however familiar its name looks — so it moved to
-  // one that genuinely is not listed.
+  // Was `Pressable` until the spec gained it on 2026-08-23, then `Image` until it gained that on
+  // 2026-09-01. The case still matters — a primitive absent from HOST_PRIMITIVES stays a component
+  // however familiar its name looks — but naming the subject by hand means it silently becomes
+  // vacuous the third time, and a test asserting "this stayed a component" passes perfectly well
+  // when the transform lowers nothing at all. So the subject is ASSERTED to be outside the spec,
+  // and the day `ScrollView` joins it this fails with "pick another" rather than going quiet.
   it('does not touch a primitive we do not lower', () => {
+    const subject = 'ScrollView';
+    expect(
+      Object.keys(HOST_PRIMITIVES),
+      `${subject} must stay outside the spec for this case to mean anything`,
+    ).not.toContain(subject);
     const out = lower(
-      `<script>\n  import { Image } from '@symbiote-native/svelte';\n</script>\n<Image class="row" src="x" />`,
+      `<script>\n  import { ${subject} } from '@symbiote-native/svelte';\n</script>\n<${subject} class="row">x</${subject}>`,
     );
-    expect(out).toContain('<Image class="row"');
+    expect(out).toContain(`<${subject} class="row"`);
   });
 
   it('returns the source untouched when nothing was imported from us', () => {
@@ -409,11 +486,107 @@ describe('shared lowering verdicts', () => {
     'conditional-style': `<Pressable style={flag ? a : b}>tap</Pressable>`,
     'zero-arity-child': `<Pressable>{#snippet children()}<i>x</i>{/snippet}</Pressable>`,
     'render-prop-child': `<Pressable>{#snippet children({ pressed })}<i>{pressed}</i>{/snippet}</Pressable>`,
+    // Both spellings on ONE element on purpose: `role` has no prefix and the `aria-` family does,
+    // so a transform can catch one and miss the other. Neither is refused here and neither is
+    // rewritten — the fold that consumes them lives in the engine, below this file, and it reads
+    // the hyphenated key literally.
+    'aria-bag-fold': `<View role="button" aria-label="close">x</View>`,
+    // Deliberately attribute-free, per the shared row: what is under test is that the NAME reaches
+    // this transform's projection of the spec, not any rule about a prop. A refusal here would mean
+    // the entry never arrived — the exact failure Solid found when a projection whitelist dropped a
+    // field before anything could read it.
+    'image-fold-only': `<Image />`,
+    // Attribute-free for the same reason as the row above, and NOT a duplicate of it: this one is
+    // red on a transform that lowers a hardcoded list of names rather than reading the spec, which
+    // `image-fold-only` cannot distinguish once `Image` is in that list.
+    'input-accessory-view-fold-only': `<InputAccessoryView />`,
+    // A THIRD attribute-free name, and the shared row is right that the verdict does not depend on
+    // the machine behind it: `Switch` carries neither `observesState` nor `intrinsicWhen`, so there
+    // is nothing here for this transform to refuse. What it adds over the two rows above is the tag
+    // itself — `symbiote-switch` is the first base name with a `-managed` sibling, which is what the
+    // boundary in `lowersToAPrimitive` exists for.
+    'switch-fold-only': `<Switch />`,
+    // TextInput is the first primitive whose TAG is chosen by a prop, so a wrong answer commits the
+    // wrong native view rather than a wrong prop value. Only the two REFUSALS live in the shared
+    // table: its verdict is lower/refuse and cannot express WHICH intrinsic was emitted, so
+    // `<TextInput multiline />` would pass against a transform printing the single-line tag. That
+    // half is pinned in `intrinsic-choice.test.ts`, where the emitted text is available.
+    'intrinsic-choice-dynamic': `<TextInput multiline={isLong} />`,
+    'intrinsic-choice-nonboolean-literal': `<TextInput multiline={1} />`,
     'spread-attributes': `<Pressable {...rest} class="row">tap</Pressable>`,
     'instance-bound-directive': `<Pressable bind:this={host} class="row">tap</Pressable>`,
   };
 
-  const IMPORT_PRESSABLE = `<script>\n  import { Pressable } from '@symbiote-native/svelte';\n</script>\n`;
+  // Every lowerable name, not just Pressable: a row about `View` or `Text` would otherwise compile
+  // against an import that does not name it, never lower, and read as a REFUSAL — a false negative
+  // produced entirely by the harness. The verdict below is generalised for the same reason.
+  //
+  // DERIVED from the spec rather than listed. The hand-written version was correct until `Image`
+  // joined on 2026-09-01, and its failure mode is the one above: the new row read `refuse` because
+  // its name was not importable, which is indistinguishable from the transform refusing it.
+  const IMPORT_ALL = `<script>\n  import { ${Object.keys(HOST_PRIMITIVES).join(', ')} } from '@symbiote-native/svelte';\n</script>\n`;
+
+  // MATCHED WITH A TRAILING BOUNDARY, never as a bare substring. The tag alphabet has grown two
+  // prefix families — `symbiote-text` is a prefix of `symbiote-text-input`, and `symbiote-switch` of
+  // `symbiote-switch-managed` — so `includes` reads a SIBLING's tag as this primitive's own. The
+  // direction that matters is the false green: a row expecting `refuse` whose transform emitted a
+  // `-managed` tag would report `lower`, and the detection under test would never have run.
+  //
+  // Not reachable today, because no transform emits a `-managed` tag — the wrappers print it at
+  // render time, after compilation. That is the reason to pin it rather than to skip it: "safe
+  // because nobody has written that yet" is exactly the reasoning the managed split was made to stop
+  // relying on. The emitted tag is always followed by whitespace, `/` or `>`, so the boundary is
+  // exact and costs nothing.
+  const lowersToAPrimitive = (out: string): boolean =>
+    Object.values(HOST_PRIMITIVES).some(primitive =>
+      new RegExp(`<${primitive.intrinsic}(?=[\\s/>])`).test(out),
+    );
+
+  // The `TextInput` rows are read against the SHIPPING spec entry. They were served by a
+  // self-deleting injection while the entry was withheld, and that shape had to go the moment the
+  // entry landed: `HOST_PRIMITIVES` is module state for the whole worker, so the `afterAll` delete
+  // would have removed the real entry for every suite scheduled after this one — a test file
+  // switching a feature off for its neighbours. The guard below is what keeps the rows honest now:
+  // if the entry is ever withheld again, it fails loudly instead of letting the rows go vacuous.
+
+  // A `refuse` row passes for the RIGHT reason only if the transform could have lowered the element
+  // at all — and there are TWO ways for it not to be able to, which is why this checks both. The
+  // component must be a name the runner IMPORTS (otherwise the tag is just an app component), and it
+  // must be a name the spec carries as a PRIMITIVE (otherwise nothing is lowerable under any
+  // spelling). Each failure leaves every snippet looking correct while none of them compiles, and
+  // the row reports a verdict the transform never reached.
+  it('exercises every component its snippets name', () => {
+    const named = new Set(
+      Object.values(SNIPPETS).flatMap(snippet =>
+        [...snippet.matchAll(/<([A-Z][A-Za-z0-9]*)/g)].map(match => match[1]),
+      ),
+    );
+    for (const component of named) {
+      expect(IMPORT_ALL, `${component} is never imported`).toContain(component);
+      expect(
+        HOST_PRIMITIVES[component],
+        `${component} is not a primitive the spec carries`,
+      ).toBeDefined();
+    }
+  });
+
+  // THE VERDICT READER NEEDS ITS OWN TEST, because the hazard it guards cannot be reached through
+  // the transform: flipping the boundary back to a bare substring leaves every row above green, so a
+  // break-test routed through a row is an arm that moves nothing. This asserts on the READER.
+  it('reads a `-managed` sibling as NOT lowered', () => {
+    expect(lowersToAPrimitive('<symbiote-switch-managed p={{}} />')).toBe(
+      false,
+    );
+    expect(lowersToAPrimitive('<symbiote-text-input-managed p={{}} />')).toBe(
+      false,
+    );
+    // The control: the same reader must still recognise the base tags, or the two above pass on a
+    // reader that recognises nothing at all.
+    expect(lowersToAPrimitive('<symbiote-switch p={{}} />')).toBe(true);
+    expect(lowersToAPrimitive('<symbiote-text p={{}}>x</symbiote-text>')).toBe(
+      true,
+    );
+  });
 
   it('supplies a snippet for every case in the shared table', () => {
     expect(Object.keys(SNIPPETS).sort()).toEqual(
@@ -426,8 +599,8 @@ describe('shared lowering verdicts', () => {
       const snippet = SNIPPETS[testCase.id];
       expect(snippet, `no snippet for "${testCase.id}"`).toBeDefined();
 
-      const out = lower(`${IMPORT_PRESSABLE}${snippet}`);
-      const verdict = out.includes('<symbiote-pressable') ? 'lower' : 'refuse';
+      const out = lower(`${IMPORT_ALL}${snippet}`);
+      const verdict = lowersToAPrimitive(out) ? 'lower' : 'refuse';
 
       expect(verdict, testCase.why).toBe(testCase.expected);
     });

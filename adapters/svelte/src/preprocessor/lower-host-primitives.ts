@@ -171,6 +171,57 @@ function attributeValue(
   return `\`${chunks.join('')}\``;
 }
 
+// ---- the intrinsic CHOICE, and why it is a refusal category of its own -----------------------
+//
+// `TextInput` is the first primitive whose TAG depends on a prop: `multiline` selects between two
+// different Fabric views (`core/components/src/view/render-text-input.ts`, `renderTextInput`), not
+// between two flavours of one. This file prints a static tag name, so it can only resolve the
+// choice when the value is a compile-time literal.
+//
+// It is NOT the same failure as an unreadable attribute value, and the difference is why it earns
+// its own category (`dynamicIntrinsicChoice`) rather than reusing `unreadableValue`: there, a prop
+// arrives wrong on the right node; here the WRONG NATIVE VIEW is committed, and no later prop write
+// corrects it. A refusal keeps the component, which resolves the same choice at runtime.
+//
+// The spec declares `intrinsicWhen` ahead of its first entry, so this reads it off `IHostPrimitive`
+// directly — no entry exists yet, and a primitive without the field keeps exactly today's behaviour.
+//
+/**
+ * The tag this element lowers to, or undefined to REFUSE it.
+ *
+ * `<TextInput multiline />` is Svelte's boolean shorthand and parses as `value === true` — a
+ * literal, not a missing value, so it resolves rather than refusing. That distinction is the whole
+ * difference between lowering to the multiline tag and refusing something that should lower, so it
+ * is asserted rather than assumed.
+ */
+function resolveIntrinsic(
+  primitive: IHostPrimitive,
+  attributes: readonly Record<string, unknown>[],
+): string | undefined {
+  const choice = primitive.intrinsicWhen;
+  if (choice === undefined) return primitive.intrinsic;
+
+  const selector = attributes.find(
+    attribute => stringAt(attribute, 'name') === choice.prop,
+  );
+  if (selector === undefined) return primitive.intrinsic;
+
+  const value = selector.value;
+  if (value === true) return choice.intrinsic;
+  if (!isRecord(value) || value.type !== 'ExpressionTag') return undefined;
+  const expression = value.expression;
+  if (!isRecord(expression)) return undefined;
+  // IDENTITY against the two booleans, never truthiness, and no check on the node TYPE. Only a
+  // `Literal` node carries a parsed JS value here, so `=== true` already implies "a boolean literal"
+  // — an `expression.type === 'Literal'` guard beside it was UNFALSIFIABLE and was removed when a
+  // deliberate break of it changed nothing. What the identity buys instead is falsifiable and was
+  // measured: relaxing it to truthiness lowers `{isLong}` and `{1}` to a real tag, which commits a
+  // native view the author never chose.
+  if (expression.value === true) return choice.intrinsic;
+  if (expression.value === false) return primitive.intrinsic;
+  return undefined;
+}
+
 function bagKey(name: string): string {
   return IDENTIFIER.test(name) ? name : JSON.stringify(name);
 }
@@ -323,6 +374,21 @@ function lowerElement(
   for (const attribute of rawAttributes) {
     // THE REFUSAL. A spread or any directive means the attribute set is not fully visible here.
     if (!isRecord(attribute) || attribute.type !== 'Attribute') return false;
+    // THE SECOND DOORWAY, same hazard. A lowered element carries its whole prop surface in one
+    // `p={{…}}` bag and every key of it goes through `routeProp` — where a snippet is not markup,
+    // so the subtree never mounts and nothing goes red. Measured 2026-09-01: the component arm
+    // commits the child, the lowered arm does not. That is an optimisation changing the observable
+    // surface, which is the one thing lowering may never do.
+    //
+    // Keyed on the NAME, not on the value being a snippet literal: `children={kids}` is the
+    // spelling an app actually writes, and the identifier says nothing about what it holds.
+    //
+    // Only `children` is named because only `children` can be. The general case is any
+    // snippet-valued prop a primitive declares, and nothing enumerates those — `HOST_PRIMITIVES`
+    // must not gain the list either, since which props take a framework element is a per-adapter
+    // fact and the spec is cross-adapter (`.claude/rules/adapter-parity-audit.md`). A primitive
+    // that grows a second snippet prop needs its own entry here.
+    if (stringAt(attribute, 'name') === 'children') return false;
     attributes.push(attribute);
   }
 
@@ -351,6 +417,9 @@ function lowerElement(
   applyAliases(entries, primitive.aliases);
   applyDefaults(entries, primitive.defaults);
 
+  const intrinsic = resolveIntrinsic(primitive, attributes);
+  if (intrinsic === undefined) return false; // dynamicIntrinsicChoice — keep the component
+
   const start = numberAt(node, 'start');
   const end = numberAt(node, 'end');
   const tagEnd = openTagEnd(content, node, attributes);
@@ -363,7 +432,7 @@ function lowerElement(
     )
     .join(', ');
   const isSelfClosing = content.slice(tagEnd - 2, tagEnd) === '/>';
-  const open = `<${primitive.intrinsic} p={{${bag}}}${isSelfClosing ? ' />' : '>'}`;
+  const open = `<${intrinsic} p={{${bag}}}${isSelfClosing ? ' />' : '>'}`;
   edits.push({ start, end: tagEnd, text: open });
   if (isSelfClosing) return splitStateStyle;
 
@@ -374,7 +443,7 @@ function lowerElement(
   edits.push({
     start: end - closing.length,
     end,
-    text: `</${primitive.intrinsic}>`,
+    text: `</${intrinsic}>`,
   });
   return splitStateStyle;
 }
