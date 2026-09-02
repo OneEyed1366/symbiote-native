@@ -11,10 +11,17 @@ import { basename, dirname, extname, join, relative } from 'node:path';
 const SOURCE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|svelte|vue)$/;
 const TEST_SUFFIX = /\.(smoke\.test|test|spec|detox)$/;
 const PLATFORM_SUFFIX = /\.(ios|android)$/;
-const IGNORE_DIRS = new Set(['node_modules', 'build', 'dist', 'build-ngc', 'codegen-specs']);
+const IGNORE_DIRS = new Set([
+  'node_modules',
+  'build',
+  'dist',
+  'build-ngc',
+  'codegen-specs',
+]);
 
 function logicalName(filename) {
-  if (!SOURCE_EXT.test(filename) || filename.endsWith('.d.ts')) return undefined;
+  if (!SOURCE_EXT.test(filename) || filename.endsWith('.d.ts'))
+    return undefined;
   let name = filename.slice(0, filename.length - extname(filename).length);
   name = name.replace(TEST_SUFFIX, '').replace(PLATFORM_SUFFIX, '');
   return name;
@@ -39,7 +46,8 @@ function collectLogicalNames(dir, names = []) {
       continue;
     }
     const name = logicalName(entry.name);
-    if (name && name !== 'index') names.push({ name, file: join(dir, entry.name) });
+    if (name && name !== 'index')
+      names.push({ name, file: join(dir, entry.name) });
   }
   return names;
 }
@@ -80,14 +88,17 @@ export default {
         const buckets = new Map(); // bucket label -> [{name, file}]
         for (const entry of siblings) {
           if (entry.isDirectory()) {
-            if (IGNORE_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
+            if (IGNORE_DIRS.has(entry.name) || entry.name.startsWith('.'))
+              continue;
             const nested = collectLogicalNames(join(dir, entry.name));
             if (nested.length > 0) buckets.set(entry.name, nested);
           } else {
             const flatName = logicalName(entry.name);
             if (!flatName || flatName === 'index') continue;
             if (!buckets.has('.')) buckets.set('.', []);
-            buckets.get('.').push({ name: flatName, file: join(dir, entry.name) });
+            buckets
+              .get('.')
+              .push({ name: flatName, file: join(dir, entry.name) });
           }
         }
 

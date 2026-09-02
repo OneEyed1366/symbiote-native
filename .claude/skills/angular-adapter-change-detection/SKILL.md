@@ -1068,3 +1068,719 @@ Two rules that outlive this bug:
                   npm install + pod install loop before the device shows it"
 }
 ```
+
+## §19. The flat row's own 9 primitives are still real `@Component`s — a fourth suspect, headless-confirmed (2026-08-30)
+
+```
+§19_primitive_LView_cost := {
+  found_by: "cross-session collaboration chasing the flat-row Create gap (418.2ms Angular flat vs
+           stock 186.8 / Solid-lowered 159.8, device Release, 2026-08-23 — root CLAUDE.md), AFTER
+           anchors (§16/anchor census) and CheckAlways/the meter (§21j, corrected above) were both
+           ruled out for CREATE specifically",
+  the_fact: "primitives/index.ts declares View/Text with a DUAL selector —
+           `selector: 'symbiote-view, View'` / `'symbiote-text, Text'` — so BenchmarkScreen's flat
+           row (9 nodes/row, 0 anchors, byte-identical committed tree to composed —
+           benchmark-row-shape.test.ts) still instantiates 9 000 real Angular @Component instances
+           for a 1 000-row Create. The screen's own comment ('no component boundary anywhere')
+           is true only of the ROW component; the primitives underneath are components too, 9 per
+           row, 9 000 per run — the exact disease Vue/Svelte/Solid already found and fixed by
+           lowering to intrinsic tags, just not yet named for Angular",
+  the_mechanism_that_makes_lowering_possible: "verified against .vendors/angular source, not
+           inferred: dom_element_schema_registry.ts hasElement()/hasProperty() consult
+           CUSTOM_ELEMENTS_SCHEMA only when `normalizedTag.includes('-')` (:400, :422). `View`/
+           `Text` have no hyphen and can NEVER fall through the schema; `symbiote-view`/
+           `symbiote-text` can, but ONLY when nothing in the template's `imports` matches that
+           selector — the moment ViewHost/TextHost is imported, the hyphenated spelling resolves
+           to the component exactly like the capitalized one, dual-selector as designed. So
+           'lowering' an Angular primitive means: the template must spell the INTRINSIC tag, not
+           the capitalized alias, AND the enclosing component's `imports` must omit View/Text, AND
+           carry `schemas: [CUSTOM_ELEMENTS_SCHEMA]`. renderer/index.ts's `createElement(name)`
+           resolves the engine node from the raw tag STRING either way (alias-normalizes, checks
+           `isAnchorHostComponent`, calls `descriptorFor`) — so a bare `<symbiote-view>` and a
+           component-backed `<View>` reach the IDENTICAL engine call; only the component path pays
+           Angular's LView/TView/DI/`<ng-content>` machinery on top",
+  headless_measurement: "direct within-Angular A/B (not cross-adapter): same flat-row markup,
+           9 nodes/row, 0 anchors either way, structurally verified byte-identical committed tree
+           and view-name list at small N. Create-1000, vitest/Node/V8, fake-fabric, min of 5 runs
+           (the project's own convention for a create-shaped row, noisy — spreads were
+           33.5->19.8ms component-backed and 26.5->13.3ms lowered, so quote the min, not a single
+           run):
+             component-backed (@Component)   min 19.85ms
+             lowered (bare custom element)   min 13.26ms
+             cut                             33.2%",
+  prediction_was_fixed_before_running: "≥30% cut = hypothesis alive, <10% = dead on V8 (population-
+           before-hypothesis, cross-session ask). 33.2% clears it",
+  why_this_is_STRONGER_evidence_than_§16: "§16's setProp-count fix (104k -> 14k calls) cut 0% on
+           V8 and only helped Hermes — a pure JIT-erases-monomorphic-calls story. THIS cut is
+           already visible on V8, meaning the LView/TView/DI/ng-content cost is genuine structural
+           work an optimizing compiler cannot erase, not merely an interpreter tax. Expect Hermes
+           to show at least as much, likely more (no JIT at all) — but see the next line before
+           quoting a number",
+  DO_NOT_carry_the_headless_MAGNITUDE_to_device: "cross-session correction, worth keeping as a
+           standing rule for this file: this project's headless bench has mis-sized a real device
+           delta FIVE TIMES IN A ROW, in both directions — Vue's lowering under-predicted by ~2x
+           (12-14% headless vs 25-29% device), the prototype-graft move over-predicted ~2.5x, the
+           fabricProps rewrite under-predicted ~4.6x, an allocation pass over-predicted ~5.7x. The
+           bench ranks DIRECTION and MECHANISM reliably; it has never once reported the right SIZE.
+           Go to device with 'a cut exists, size unknown', never with '33%'",
+  third_row_shape_SHIPPED_2026_08_30: "BenchmarkScreen's ROW_SHAPE gained `Lowered` — 'Rows ·
+           lowered' button, a PROBE-table LOWERED column, all three shapes snapshot in ONE binary.
+           `benchmark-row-shape.test.ts` verified to survive it (69 files / 233 adapter tests green,
+           tsc clean) — the drift-fence stayed green because the fix below made it possible.
+           Handed to the user: device run is the remaining step, no simulator on either session
+           that found this",
+  lowering_ANGULAR_is_not_emit_the_tag: "a trap independently found by BOTH sessions doing this
+           work, worth stating as the general form: writing `<symbiote-view>` in a template whose
+           `imports` still lists `View` does NOTHING — `View`'s selector is
+           `'symbiote-view, View'` (primitives/index.ts:27) and Angular's directive matching scopes
+           to the WHOLE TEMPLATE, not to one branch of it, so every spelling of a dual selector
+           resolves to the component the moment it is importable ANYWHERE in that template. This
+           fails SILENTLY — no compile error, no runtime error — and the only visible symptom would
+           have been 'the lowering measured 0% cut', which reads as a REFUTED hypothesis rather
+           than a broken harness (the mistaken-negative-result family, verify-the-deciding-side.md).
+           So lowering an Angular primitive is really 'take the component out of this template's
+           scope', three ways to do that: (a) a SEPARATE component whose own `imports` omits
+           View/Text, plus `schemas: [CUSTOM_ELEMENTS_SCHEMA]` — what `LoweredBenchmarkRows` does,
+           right-sized for one diagnostic screen; (b) split the dual selector so the intrinsic
+           spelling never matches the component at all — a design change to every composed
+           component that currently relies on the alias, not attempted; (c) a build-time transform
+           that rewrites BOTH the tag and the enclosing component's `imports`/`schemas` together,
+           i.e. the Vue/Svelte/Solid shape (`core/components/host-primitives.cjs` +
+           `REFUSAL_CATEGORIES`) ported to Angular — a whole adapter-wide feature, deliberately NOT
+           built for this pass (asked and declined mid-session, root CLAUDE.md's
+           `<adapters_stay_thin>` / explicit-over-implicit precedent)",
+  anchor_count_is_NOT_comparable_composed_vs_lowered: "`LoweredBenchmarkRows` wraps the WHOLE
+           1 000-row list in one composed-component boundary (one host anchor for the list), while
+           `composed`'s BenchmarkRow + 2 Pressables costs 3 anchors PER ROW (3 000 for the run).
+           A device number comparing `composed` against `lowered` therefore differs by BOTH the
+           LView/DI cost this section is about AND an anchor-count difference that is not what is
+           under test — state the anchor split next to any such comparison, or a reader will
+           attribute anchor savings to a mechanism that was already closed as a suspect (the anchor
+           census, above in this file). `flat` vs `lowered` is the clean pair: both 0 anchors, same
+           committed tree, differ ONLY in whether the 9 per-row primitives are components.",
+}
+```
+
+## §20. §19 confirmed on device — the flat row's remaining gap closes to near-stock, and Partial regresses hard (2026-08-30)
+
+**RESOLVED (was flagged provisional, now explained) — two number sets for the same lowered row are
+two SEPARATE RUNS on one binary, not two readings of one run.** The numbers below are transcribed
+directly from five screenshots (files `2.png`/`3.png`/`4.png`/`5.png`/`7.png`, timestamped
+14:40-14:41), re-read a second time against the actual image bytes to rule out a misread. A parallel
+session reported a different lowered row minutes later (Create 198.7 / Replace 240.6 / Append 212.9
+/ Partial 46.5 / Select 15.6 / Swap 24.9 / Remove 27.6 / Clear 32.6, ~14:43) and a THIRD sample
+landed at ~14:48 matching that second one almost exactly (confirmed: same VISITED/WRITES/FABRIC
+counts as the first sample, byte-identical committed tree across all three runs — only the wall-clock
+ms column moves). User confirmed: ran the suite 3-5 times, these are two of those runs. **Verdict
+scope, not a percentage**: Create and Append fall inside the resulting within-arm noise band on both
+samples and carry a verdict (lowered wins big); Replace, Partial, Select, Swap, Remove, Clear do
+NOT — see `VERDICT_SCOPE_2026_08_30` below.
+
+**This section measures a CEILING, not a shipped capability — read this before quoting any number
+here as "what an Angular app gets".** `LoweredBenchmarkRows` (examples/angular's own diagnostic
+component) is hand-written for this one screen. Checked 2026-08-30: `adapters/vue` and
+`adapters/solid` each carry a real `babel-lower-host-primitives.cjs` build-time transform (Vue also
+has `metro-vue-transformer.cjs` for the SFC path) that lowers `<View>`/`<Text>`/`<Pressable>`
+automatically, app-wide, for any component that qualifies (per `core/components/host-primitives.cjs`
+
+- `REFUSAL_CATEGORIES`). `adapters/angular` has NO such file — grep for `HOST_PRIMITIVES` under
+  `adapters/angular/src` returns nothing outside `build/`. So today an Angular app CANNOT get this win
+  by writing ordinary `<View>`/`<Text>` markup; it would have to hand-write a `CUSTOM_ELEMENTS_SCHEMA`
+  component per screen the way this diagnostic does (angular-adapter-change-detection §19's
+  `lowering_ANGULAR_is_not_emit_the_tag` — the three ways to scope a component out, of which a real
+  transform, (c), is what would make this a shipped feature and was explicitly declined for this pass).
+  The numbers below are the upper bound of what a future transform could deliver, not a capability that
+  exists yet.
+
+The user built and ran the three-shape toggle from §19 on iPhone 17 / iOS 26.5 simulator, Release
+implied (numbers land in the documented flat/composed bands, so this is the same build flavor as
+every other entry in this file and root CLAUDE.md). All-mounted, one sitting, one binary:
+
+```
+§20_device_measured := {
+  create_shaped_rows: "
+              composed    flat     lowered
+    Create      925.0    412.2      202.3    flat->lowered -50.9%   composed->lowered -78.1%
+    Replace    1019.0    494.1      210.9    flat->lowered -57.3%
+    Append      948.9    472.4      201.7    flat->lowered -57.3%",
+  headless_predicted_ge_30_percent_cut__got_50_to_57: "the fixed-before-running threshold (§19)
+           was cleared by a wide margin, and in the OPPOSITE direction from what the standing
+           'headless never gets the size right' warning would have guessed — Vue's own lowering
+           under-predicted by ~2x (12-14% headless vs 25-29% device) and this one under-predicted
+           too (33.2% headless vs 51-57% device). Read as a second confirmation of that warning's
+           actual content: not 'headless overstates', but 'headless's SIZE is not trustworthy in
+           either direction' — the direction and rough existence of the win is all it ever gave",
+  read_against_the_master_table: "root CLAUDE.md's stable stock band is 186.8/195.5/196.8 (Create)
+           and react's own Create reads 217.8 in the same big table. Lowered's 202.3 sits BETWEEN
+           those two — Angular Create goes from 2.2x stock / worst-of-five to effectively TIED with
+           React and near-stock, on the exact mechanism (removed per-node component instantiation)
+           that already took Vue/Svelte/Solid past stock. It does NOT reach Vue/Svelte/Solid's
+           post-lowering numbers (180.0/154.1/159.8) — those adapters have no LView-equivalent cost
+           to begin with, so removing Angular's makes it competitive with React's fiber model, not
+           with a vdom/compiled-DOM adapter that never paid this tax",
+  DO_NOT_read_this_into_the_master_TABLE_COLUMN: "root CLAUDE.md's angular column (418.2 flat) is
+           what SHIPS — BenchmarkScreen still defaults to `flat`, and `LoweredBenchmarkRows` is a
+           throwaway diagnostic component, not a production primitive. Updating the master
+           cross-adapter table to 202.3 would misrepresent what an app actually gets today",
+  virtualized_not_run_for_lowered: "the screenshots show composed/flat's VIRTUALIZED column filled
+           (flat: Create 75.3, Replace 79.3, Append 23.2) and lowered's blank ('—' on every row) —
+           the user ran all-mounted only. Nothing here says whether the cut holds under windowing;
+           don't extrapolate it",
+  PARTIAL_UPDATE_REGRESSED_HARD__UNEXPLAINED: "the one row that did NOT follow the pattern, and it
+           is not noise-floor-small (the project's documented ~15-20ms noise band is for
+           CREATE-shaped rows; a swing this size on a 26-71ms row is not obviously that) —
+              composed 26.0ms (fastest of the three) · flat 32.3ms · lowered 71.0ms (worst of the
+              three, 2.2x flat, 2.7x composed).
+           This is the OPPOSITE ranking from every create-shaped row, where lowered wins by 2x and
+           composed is worst. The suite's Partial step relabels every 10th of 1000 rows via
+           `.map()`, producing a NEW rows array where all 1 000 `row.id`s are unchanged (`@for
+           track row.id` should recognize every item as same-identity) and only 100 objects are
+           actually new. NO MECHANISM IS CONFIRMED for why removing the per-row @Component boundary
+           costs MORE here than keeping it, or why lowered costs more than flat despite both having
+           no per-row component. UPDATE (second lowered sample, same binary, 3-5 runs later): a
+           THIRD reading of lowered's own Partial read 46.5ms and later screenshots (architect's
+           run) read 46.5ms too, against this entry's own 71.0ms — a 24.5ms spread WITHIN the
+           lowered arm alone, self-measured, no code change between them. Given the ENGINE window
+           for Partial is only 2.7-3.6ms across all three readings (stable, WRITES pinned at
+           exactly 100/0 = the true changed-row count every time — no write-count tax, confirmed),
+           essentially the WHOLE wall time is Angular's own pass-1 change-detection cost, and that
+           cost inherits ITS OWN noise floor, not a function of row count. CONCLUSION (revised):
+           a cross-arm verdict on Partial needs `flat` sampled at least twice on the same binary
+           before it means anything — right now there is a within-arm 24.5ms spread and only a
+           single flat sample (32.3ms) to compare it against, which settles nothing. Do not repeat
+           a causal story for the regression without tracing pass 1 directly (a candidate —
+           embedded-view refresh semantics for `@for` lacking a per-item skip that a real
+           CheckAlways component view also lacks — was drafted and discarded here for not actually
+           explaining a flat-vs-lowered gap, since both lack per-row components)",
+  select_swap_remove_clear_read_as_noise: "composed/flat/lowered spread 8-12ms on Select (11.3/
+           27.1/20.9), Swap (20.9/24.8/25.8), Remove (19.8/29.1/26.5), Clear (70.1/39.9/34.8) — no
+           consistent direction, consistent with this file's own small-ms-row non-reproducibility
+           caution (root CLAUDE.md, stock Clear 46.7->7.7 with zero code change). Do not read a
+           ranking into these without a repeat run",
+  VERDICT_SCOPE_2026_08_30: "two lowered samples (14:40 and ~14:48, same binary, no rebuild) give
+           the row's own noise band directly: Create (202.3/198.7) and Append (201.7/212.9) both
+           sit inside it and both carry a verdict — lowered wins big on create-shaped rows.
+           Replace (210.9/240.6) does NOT — the spread is too wide to call. Partial, Select, Swap,
+           Remove, Clear: no verdict either way without a second `flat`/`composed` sample to
+           compare against",
+}
+```
+
+## §21. The 26 001 vs 32 001 prop-key gap is NOT a parity bug — it's two different Pressable shapes (2026-08-30)
+
+```
+§21_prop_key_gap_resolved := {
+  question: "root CLAUDE.md and every Vue/Svelte/Solid lowering entry quote Fabric prop keys as
+           '9000/8000/9 @ 32 001' for a 1 000-row Create on the SAME 9-node-per-row tree. Angular's
+           flat/lowered row reports 26 001 for the identical node/commit counts (9000/8000/9,
+           byte-identical Fabric calls) — 6 000 fewer keys, exactly 6/row. Raised cross-session:
+           is Angular silently dropping props another adapter emits (a real parity gap), or is the
+           32 001 figure not measuring what it looks like it measures?",
+  checked_at_source: "examples/vue-sfc/components/BenchmarkRow.vue and examples/react/screens/
+           BenchmarkScreen.tsx's BenchmarkRow, both read directly: BOTH use a REAL `<Pressable>`
+           for the two touch targets (`<Pressable class=\"flex1\" @press=...>` / `<Pressable
+           className=\"flex1\" onPress={...}>`) — the SAME shape as Angular's own `composed` row
+           (BenchmarkRow + 2 real Pressables), never Angular's `flat`/`lowered` row",
+  the_actual_mismatch: "Angular's flat/lowered row is a DELIBERATELY reduced diagnostic shape —
+           its own comment says so verbatim: 'gives up Pressable's press machine, responder
+           negotiation and accessibility fold' in favor of a bare `View` + a `(press)` listener.
+           React/Vue/Svelte/Solid's canaries never build that reduced row at all; their Pressable
+           got LOWERED (to a `symbiote-pressable` host behavior, core/components/src/behaviors/
+           pressable.ts) but kept Pressable's FULL prop/feature surface throughout. So '32 001'
+           prices a real Pressable's props (hitSlop-derived responder wiring, accessibility fold,
+           disabled/android_ripple, etc. — the exact list flat/lowered's own comment names as given
+           up) and '26 001' prices a bare View+press with none of that — not a bug, a different
+           question. `setEventListener('press', …)` itself writes ZERO prop keys either way
+           (`press` is not in GATED_EVENT_PROPS, node.ts:547/566/578) — a bare press listener is
+           pure JS-side registration, so the 6/row gap is Pressable's OWN prop surface, not
+           anything about lowering or LView removal",
+  what_WOULD_be_comparable: "Angular's `composed` row (real Pressable, same as every other
+           adapter's only row) against those adapters' 32 001 — not measured this session (no
+           FABRIC table captured for `composed`), but that is the correct pair. `flat`/`lowered`
+           vs any other adapter's number is comparing a stripped-down row against a full one and
+           was never meant to answer a cross-adapter parity question — only the anchor/LView one",
+  no_action_needed: "closes the question raised cross-session 2026-08-30 — no code change, no
+           parity gap. Do not re-open it by comparing flat/lowered's key count against another
+           adapter's column again without noting this",
+}
+```
+
+## §22. `composed` vs `composed-lowered` — the actually-comparable pair, built (2026-08-31)
+
+**SUPERSEDED IN PART BY §23 BELOW**: this section's `<symbiote-pressable>` bare-tag mechanism was
+SILENTLY BROKEN (a non-painting anchor, not a real view) — read §23 for the two real bugs found and
+fixed, and for `DIAGNOSTIC_LOWERED_PRESSABLE_TAG`, the constant `BenchmarkRowPressableLowered`
+actually uses. The node-count accounting and the reasoning for why this pair matters below are
+still correct; only the "bare `<symbiote-pressable>`" mechanism description is wrong.
+
+§21 above named the fix: `composed` (real Pressable) is Angular's only row shape that carries the
+same Pressable feature surface every other adapter's canary does, so it is the only one a
+cross-adapter/stock ratio may ever be read off. But `composed` alone cannot isolate the
+Pressable-@Component-instance cost from the `flat`/`lowered` investigation — it needed a fourth
+shape: same View/Text and row-wrapper as `composed`, Pressable's TAG lowered.
+
+`host-primitive-tier.md`'s "Angular cannot be lowered by rewriting tags" section is about
+View/Text specifically (a dual-selector component scoped per-template). Pressable does not need
+that trick at all: `core/components/src/behaviors/pressable.ts` already implements the press
+machine as an ENGINE-NODE BEHAVIOR keyed on the tag `symbiote-pressable`
+(`registerHostBehavior`/`registerPressableBehavior`) — the exact mechanism Vue/Svelte/Solid's
+Pressable-lowering transform relies on. Angular had never called `registerPressableBehavior()`;
+nothing about the mechanism itself is React/Vue/Svelte/Solid-specific.
+
+`BenchmarkRowPressableLowered` (`examples/angular/src/screens/BenchmarkScreen.ts`, new `ROW_SHAPE.
+ComposedLowered`) is a literal copy of `BenchmarkRow` with exactly one change: its two `<Pressable>`
+become bare `<symbiote-pressable>` tags, `schemas: [CUSTOM_ELEMENTS_SCHEMA]`, `Pressable` absent
+from `imports` (same reasoning as `LoweredBenchmarkRows`'s own header — importing `Pressable`
+anywhere in THIS template would make `symbiote-pressable` resolve back to the component via its
+dual selector `'Pressable, symbiote-pressable'`). `registerPressableBehavior()` is called once at
+`BenchmarkScreen.ts` module scope, as a direct function call rather than a bare side-effect
+import — safe under Metro's production `inlineRequires` because the binding is used as a value,
+not merely imported (unlike the barrel-re-export hazard that file's own header warns about).
+
+Engine-node count: `composed` 12/row (row anchor + 2 Pressable anchors + 9 native views),
+`composed-lowered` 10/row (row anchor + 9 native views, no Pressable anchors), `flat`/`lowered`
+9/row. So composed-lowered isolates EXACTLY the two Pressable anchors — a controlled pair against
+`composed`, holding the row-wrapper-component and View/Text component cost constant, which
+`flat`/`lowered` could not do (each also removes the row wrapper, and `lowered` removes View/Text
+too — three conflated variables, not one).
+
+Verified this session, nothing device-measured yet:
+
+- `ngc -p tsconfig.angular.json` (real AOT, run directly, not through the `rtk` wrapper) — exit 0,
+  clean, `BenchmarkRowPressableLowered` present in the compiled `build/angular/src/screens/
+BenchmarkScreen.js`.
+- `adapters/angular/src/__tests__/benchmark-row-shape.test.ts` — still 3/3 green (untouched:
+  the new shape isn't part of its drift fence, which only pins `composed`/`flat`).
+- `examples/angular` refreshed from the local registry (`registry:publish` + `registry:refresh`;
+  the overlay script this originally named was deleted 2026-09-02)
+  after confirming the installed `@symbiote-native/components` build was stale
+  (`registerPressableBehavior` absent — `^0.5.0` registry pin, function added to core long after).
+
+Why this pair matters at all, not just as a diagnostic nicety: krausest's own web numbers
+(`angular-cf-signals` 1.60x vanilla, `angular-cf` 1.64x, both ~1.4x Vue there) put Angular's
+inherent framework overhead in the same league as Vue/Svelte/Solid — nothing like the 2.2-2.6x this
+project's `flat` row showed against stock. So "Angular is just a slow framework" does not explain
+the native gap; `composed` vs `composed-lowered` is what actually isolates how much of it is
+Pressable-instantiation-shaped, as opposed to something still unaccounted for.
+
+```
+§22_composed_lowered_built := {
+  what_it_is: "ROW_SHAPE.ComposedLowered, BenchmarkRowPressableLowered — composed's row/View/Text
+           unchanged, only <Pressable> -> <symbiote-pressable> + registerPressableBehavior()",
+  node_count: "composed 12/row, composed-lowered 10/row, flat/lowered 9/row — isolates exactly the
+           2 Pressable anchors, unlike flat/lowered which also drop the row wrapper (and, for
+           lowered, View/Text)",
+  mechanism: "core/components/src/behaviors/pressable.ts's registerPressableBehavior — an
+           ENGINE-NODE behavior keyed on tag 'symbiote-pressable', already used by Vue/Svelte/
+           Solid's lowering transforms. Angular never called it; nothing in it is
+           framework-specific. Not a new mechanism — a missing registration",
+  verified: "ngc clean (exit 0, real AOT build, run directly not via rtk), component present in
+           build/, benchmark-row-shape.test.ts still 3/3 (drift fence untouched)",
+  not_yet_done: "no device sample. Next step per architect: composed and composed-lowered each
+           sampled TWICE on one binary/one sitting (duration + ENGINE PER STEP + FABRIC CALLS),
+           same discipline as VERDICT_SCOPE_2026_08_30 above",
+  do_not_confuse_with_lowered: "composed-lowered is still a hand-written ceiling probe, same
+           caveat as `lowered` in §20 — no shipped Angular babel-lowering transform exists. Read
+           the composed-vs-composed-lowered DELTA; do not read composed-lowered against stock or
+           another adapter's column",
+}
+```
+
+## §23. §22's first cut was SILENTLY BROKEN — two real Angular-renderer bugs, found by a headless probe before any device time was spent (2026-08-31)
+
+§22 shipped `<symbiote-pressable>` as a bare tag, on the assumption it was the same trick as
+View/Text's dual-selector workaround. `ngc` built it clean and the existing drift-fence test stayed
+green — and it was non-functional. Found by writing a throwaway headless probe (mount, serialize the
+committed Fabric tree, print it) BEFORE spending any device time, per `systematic-debugging` — never
+trust a device number off code nobody has watched commit a real tree.
+
+**Bug 1 — `symbiote-pressable` is unconditionally in `ANCHOR_HOST_COMPONENTS`.** It is one spelling
+of the real composed Pressable's own dual selector (`'Pressable, symbiote-pressable'`), and
+`isAnchorHostComponent` checks the bare TAG STRING with zero awareness of which template's `imports`
+actually matched it — unlike Angular's own directive resolution (which IS template-scoped), this
+check lives in the ADAPTER and is global. So writing `<symbiote-pressable>` — imports or not — always
+resolves to a non-painting anchor: `createAnchor()` bypasses `attachHostBehavior` entirely, so there
+is no Fabric view AND no press machine. The probe showed it directly: the label `Text` that should
+sit inside a Pressable's wrapping `RCTView` was a DIRECT CHILD of the row instead — the wrapper had
+silently vanished.
+
+**Bug 2 — Angular's renderer never passed the intrinsic tag to the engine.** `core/engine/src/
+node.ts`'s `createElement(component, isText, tag = component)` needs the ORIGINAL tag as its third
+argument so `attachHostBehavior` can look it up (the registry is keyed by tag, the node only ever
+carries the resolved Fabric name). `adapters/angular/src/renderer/index.ts` called
+`createElement(descriptor.component, descriptor.isText)` — two arguments, so `tag` defaulted to
+`'RCTView'`, never `'symbiote-pressable'`. Vue's renderer already passes this correctly
+(`createElement(descriptor.component, descriptor.isText, type)`). This means
+`registerPressableBehavior()` could NEVER have attached through Angular's renderer, for ANY tag —
+independent of bug 1, and exactly the risk `test-harness-false-greens.md` §11 already named
+("registry keyed by intrinsic tag, node is not") without confirming it as a live bug in shipped code.
+
+**Both fixed.** `adapters/angular/src/renderer/index.ts` now passes `engineName` as the third
+argument generically (benefits any future Angular host-behavior use, not just this one), and exports
+a small diagnostic-only constant `DIAGNOSTIC_LOWERED_PRESSABLE_TAG` (`'symbiote-pressable-lowered-
+diagnostic'`) that resolves through the SAME `'symbiote-pressable'` descriptor/behavior tag while
+never matching `ANCHOR_HOST_COMPONENTS`. `BenchmarkRowPressableLowered` now writes that tag, not the
+real intrinsic one — checked against the adapter's own export at module load in BenchmarkScreen.ts
+(`if (DIAGNOSTIC_LOWERED_PRESSABLE_TAG !== ADAPTER_DIAGNOSTIC_LOWERED_PRESSABLE_TAG) throw`) so the
+two literals can never silently drift (ngc needs a static string in a template, so it cannot be the
+imported binding directly).
+
+Re-probed after the fix: the wrapping `RCTView` is back, byte-identical prop-key count to a bare
+`(press)` view (10 total keys for a 1-row/1-Pressable tree, vs composed's 15) — **the press machine
+itself adds ZERO prop keys**, confirming `press`/`pressIn`/`pressOut`/etc. are pure JS-side listener
+registration (not in `GATED_EVENT_PROPS`), same fact `fabric-boolean-event-gates.md` already
+established for the base case. The entire composed-vs-lowered delta in this minimal probe (15 vs
+10 = 5, or 15 vs 11 = 4 depending which arm) turned out to be `EAGERLY_FORWARDED_GATES` — the four
+accessibility events (`onAccessibilityAction/Tap/MagicTap/Escape`) Angular's composed `Pressable`
+component template binds UNCONDITIONALLY (already documented Angular-only debt, `fabric-boolean-
+event-gates.md`) — NOT anything about hitSlop/disabled/responder-negotiation/etc. This means
+architect's proposed acceptance bar ("prop keys must read 32001, not 26001") is not testing what it
+was assumed to test: none of hitSlop/disabled/android_ripple/etc. are actually SET anywhere in this
+benchmark row (composed's own usage is `class="flex1" (press)="..."`, nothing else), on ANY adapter,
+so the 32001-vs-26001 gap was never about "full Pressable feature set present or absent" — it was
+already resolved as such in §21, and this session's probe additionally pins the MECHANISM (the eager
+accessibility forwarding) rather than leaving it a named-but-unverified hypothesis.
+
+```
+§23_composed_lowered_bugs_found_and_fixed := {
+  bug_1: "symbiote-pressable unconditionally in ANCHOR_HOST_COMPONENTS (adapters/angular/src/
+         anchor-host-registry.ts) — a bare <symbiote-pressable> ALWAYS becomes a non-painting
+         anchor regardless of a template's `imports`, unlike View/Text's template-scoped dual
+         selector. createAnchor() bypasses attachHostBehavior entirely, so no Fabric view AND no
+         press machine. ngc clean, every existing test green — found only by a headless probe
+         printing the committed tree and noticing the wrapper was missing",
+  bug_2: "Angular's SymbioteRenderer.createElement never passed the intrinsic tag to the engine's
+         createElement(component, isText, tag) — only 2 args, so attachHostBehavior always
+         resolved the WRONG key (the Fabric name, e.g. 'RCTView', never the registered tag).
+         Vue's renderer already does this correctly. Independent of bug 1: this means
+         registerPressableBehavior() could never attach through Angular's renderer at all,
+         for any tag, until fixed",
+  fix: "renderer/index.ts passes `engineName` generically now (general fix, not scoped to
+         Pressable); DIAGNOSTIC_LOWERED_PRESSABLE_TAG exported from the adapter barrel, resolves
+         to the same descriptor+behavior without matching ANCHOR_HOST_COMPONENTS.
+         BenchmarkRowPressableLowered uses that constant, not the real intrinsic tag, with a
+         module-load equality check against the adapter's own export guarding drift",
+  verified: "ngc clean (exit 0), 227/227 adapters/angular/src tests green including the drift
+         fence, re-probed headlessly: wrapping RCTView is back, prop keys match a bare (press)
+         view exactly (behavior adds zero prop keys, same fact as GATED_EVENT_PROPS elsewhere)",
+  prop_key_gap_mechanism_now_pinned: "composed's extra keys vs bare/lowered are EXACTLY the 4
+         EAGERLY_FORWARDED_GATES accessibility flags (fabric-boolean-event-gates.md) — Angular's
+         composed Pressable component's own template binds them unconditionally. Nothing about
+         hitSlop/disabled/android_ripple/etc, since none of those are set anywhere in this
+         benchmark row on any adapter. §21's '32001 vs 26001 = Pressable's prop surface' framing
+         was a correct verdict on a not-fully-enumerated mechanism; this pins the mechanism",
+  method_note: "found by writing a THROWAWAY headless probe (mount + serialize committed tree)
+         BEFORE any device time was spent verifying the shipped composed-lowered row — per
+         systematic-debugging, never trust a device number off a mechanism nobody has watched
+         commit a real tree. Deleted after reading, per this project's own throwaway-probe
+         convention (angular-adapter-change-detection's own §19 lview-lowering-probe did the same)",
+  still_not_yet_done: "no device sample — still pending composed x2 / composed-lowered x2 per
+         architect's stated priority, NOW against a row that actually works",
+}
+```
+
+## §24. The gate arithmetic was wrong by exactly 2/row — it's 8, not 6, and `composed` is ALSO not comparable (2026-08-31)
+
+Architect caught it before any device time was spent: `4 gates x 2 Pressables/row = 8`, not the
+`6/row` §21/§23 quoted from the original 26001-vs-32001 observation. Six against eight means the
+mechanism was either incomplete or the gates don't fire on both Pressables identically — worth
+resolving exactly, not waving off, because until the number closes there is no way to know what
+else might differ.
+
+Measured directly (few/many differencing, `benchmark-row-shape.test.ts`'s own method, real
+2-Pressable-per-row `BenchmarkRow`, registering ALL SEVEN of that file's own CSS rules — an
+incomplete rule set undercounts every arm identically but does not move the delta, checked by
+running the comparison twice with two different rule sets and getting the same +8 both times):
+
+```
+flat              9 nodes/row   18 keys/row
+composed-lowered  10 nodes/row  18 keys/row   (anchor adds a node, zero keys — confirms §23)
+composed          12 nodes/row  26 keys/row   = 18 + 8, not 18 + 6
+key-name diff     composed has EXACTLY 4 keys flat/composed-lowered lack: onAccessibilityAction,
+                  onAccessibilityEscape, onAccessibilityTap, onMagicTap. composed-lowered has ZERO
+                  keys composed lacks — a clean subset, not a partial overlap.
+```
+
+So the mechanism WAS complete — §21/§23's "6/row" was simply a rough estimate off the original
+26001-vs-32001 total (a division, never a per-key enumeration), and this session's per-key name
+diff is the first time it was actually verified rather than estimated. 8 is correct; 6 was wrong.
+
+**The consequence is the one architect named, and it is more serious than the arithmetic itself.**
+The verified per-row delta (+8, mechanism-only, independent of how much CSS a rule carries) lets the
+1000-row total be predicted from the already-established `flat`/`lowered` baseline of 26001:
+`composed = 26001 + 8*1000 = 34001` — not 32001. This is a PREDICTION from a verified per-row rate,
+not yet a literal 1000-row headless/device count (this project's own convention is few/many
+differencing rather than a literal 1000-row JIT mount, per `benchmark-row-shape.test.ts`), but it is
+backed by two independent measurements of the same +8, so it should be trusted over the untested
+32001 assumption unless a real 1000-row count contradicts it.
+
+**If 34001 holds, Angular's `composed` reaches its total by a DIFFERENT MECHANISM than Vue/Svelte/
+Solid/React's 32001** — theirs from whatever their real Pressable's own legitimate prop surface
+contributes (still not enumerated by name for another adapter — a real open question, since none of
+hitSlop/disabled/android_ripple/etc. are SET anywhere in this benchmark row on ANY adapter, so
+32001 is not "the full feature set" either), Angular's from four eager accessibility-gate keys that
+are pure debt with no equivalent bug on the other four adapters. Two different totals arriving from
+two unrelated causes is not comparability — it would be a coincidence, and 34001 ≠ 32001 says it
+isn't even that.
+
+**So as of this session: NONE of Angular's four row shapes may be read against another adapter's
+column.** `flat`/`lowered` are short their own baseline (26001, missing whatever legitimate props
+give the other adapters their 32001 — unidentified). `composed`/`composed-lowered` are `flat`'s
+26001 plus either +8000 (composed, eager-gate debt) or +0 (composed-lowered, clean) — neither lands
+on 32001 either. The `EAGERLY_FORWARDED_GATES` fix (making composed's Pressable template bind those
+four events conditionally, matching every other adapter's Pressable) is a real, separate piece of
+work this leaves on the table, not something this session did.
+
+```
+§24_gate_arithmetic_corrected := {
+  was: "6/row (§21/§23), an estimate from dividing the original 26001-vs-32001 total, never a
+         per-key enumeration",
+  is: "8/row, verified by key-NAME diff (not just count) on the real 2-Pressable BenchmarkRow,
+         reproduced with two different CSS rule sets registered in the test — the delta held both
+         times, only the absolute per-row rate moved (14->18 with more CSS keys), confirming the
+         delta is independent of how much style data is registered",
+  key_names: "onAccessibilityAction, onAccessibilityEscape, onAccessibilityTap, onMagicTap — EXACTLY
+         the 4 EAGERLY_FORWARDED_GATES, and composed-lowered has ZERO keys composed lacks (a clean
+         subset, not a partial/approximate match)",
+  consequence: "composed's real 1000-row total predicts to 26001 + 8000 = 34001, not 32001 — so
+         composed is NOT comparable to another adapter's column either, for a DIFFERENT reason than
+         flat/lowered (debt-driven excess vs missing-baseline-props), not by coincidence landing on
+         the same number",
+  still_open: "what actually makes up the other four adapters' 32001, since none of them set
+         hitSlop/disabled/android_ripple/etc either — not resolved this session, flagged as a real
+         gap rather than assumed to be 'the full Pressable feature set'",
+  fix_not_done: "EAGERLY_FORWARDED_GATES itself (conditional accessibility-event binding on
+         Pressable's own template) is real, separate, pre-existing Angular debt this session did
+         not touch — only measured and named precisely",
+}
+```
+
+## §25. Text defaults + `id`→`nativeID` alias fixed; the device prediction for `lowered`, locked BEFORE the run (2026-08-31)
+
+Two real, pre-existing Angular-adapter bugs, found via Vue's real `BenchmarkRow.vue` key-name
+enumeration (23 style + 6 defaults + 3 text = 32 keys/row) diffed against Angular's own numbers:
+
+**Bug: RN's `Text` defaults were never applied to a bare `symbiote-text`.** `Text.js` applies
+`ellipsizeMode ?? 'tail'` and `allowFontScaling !== false` unconditionally; the composed `TextHost`
+(`adapters/angular/src/primitives/index.ts`) already folds these via its own `@Input()`s — but that
+fold lives IN THE COMPONENT, so it never ran for a bare `<symbiote-text>` (`ROW_SHAPE.Lowered` /
+`LoweredBenchmarkRows`). A `numberOfLines`-clamped lowered Text silently clips with no ellipsis.
+Fixed in `adapters/angular/src/renderer/index.ts`, mirroring Vue's own `seedTextDefaults` /
+`textDefaultFor`: `createElement` seeds both keys via `setProp` whenever `descriptor.isText`, and
+`setAttribute`/`setProperty` re-seed the default when a later write clears a key back to
+`undefined` (RN treats missing and explicit-undefined identically).
+
+**Bug: `id` → `nativeID` was never aliased, on ANY path, composed or lowered.** `View.js`/`Text.js`
+copy `id` into `nativeID` unconditionally (`core/components/host-primitives.cjs`'s `ID_ALIAS`);
+Angular had this nowhere, so `<View id="x">` reached Fabric with an unknown `id` key and no
+`nativeID` on every app, silently, device-only — OLDER than lowering and not introduced by it.
+Fixed the same way, mirroring Vue's `PROP_ALIASES`: a small `aliasedPropName()` applied in
+`setAttribute`/`setProperty` (removeAttribute reseeds through the same alias too). Both fixes live
+in the RENDERER, not the wrapper — the wrapper only covers ONE path and looks complete for exactly
+that reason (every existing test went through it).
+
+**Verified with a break-test** (architect's ask, done before trusting the fix): commented out only
+the `seedTextDefaults` call, ran `adapters/angular/src/__tests__/text-defaults.test.ts` — the third
+arm (`LoweredHost`, bare `<symbiote-text>`, `TextHost` absent from `imports`) failed cleanly
+(`expected undefined to be 'tail'`), the first two (real `<Text>`, independent of this fix via
+`TextHost`'s own `@Input`s) stayed green. That pairing — one arm red, the other two unmoved — is
+what proves the third arm actually exercises the bare path rather than silently resolving back to
+the component through the dual selector. Restored, re-ran: 3/3, full suite 227/227.
+
+**Headless per-row recount, post-fix:** `flat` = `composed-lowered` = `lowered` = 18 keys/row (all
+three now agree — `flat`/`composed-lowered` were never missing the defaults, since both keep the
+real `Text` component; only true `lowered`, bare `symbiote-text`, moved: 12 → 18). `composed` stays
+26/row (18 + 8, the `EAGERLY_FORWARDED_GATES` debt, untouched by this fix). The earlier "24/row"
+guess conflated headless units with device ones — corrected, not it.
+
+**The device prediction, decomposed by LAYER rather than by total, locked in before any device run:**
+
+```
+                          style   defaults   text   total
+device, lowered (before)    23        0        3    26001   (matches the standing 26001 figure)
+device, lowered (after)     23        6        3    32001   <- PREDICTED, not yet run
+Vue / Svelte / Solid        23        6        3    32001   (Vue's own real-BenchmarkRow.vue count)
+```
+
+The headless 18/row cannot be compared to this table directly — `ROW_RULES` in the test harnesses
+is a simplified stand-in (2 declarations for `bench-row`, not the real stylesheet's ~10), so
+headless and device are pricing DIFFERENT CSS and their totals do not line up. What DOES carry over
+is the STYLE-LAYER-INDEPENDENT delta: +6/row for defaults (verified headlessly, by key name, twice),
+and that is the one number this prediction rests on.
+
+**Acceptance criterion for the device run**: 32001, achieved by the SAME per-layer decomposition Vue
+reads (23 style + 6 defaults + 3 text), not merely by the total matching. If the device number lands
+elsewhere, the mismatch is either a CSS difference between the two apps' compiled stylesheets or
+another wrapper-only fold `lowered` still lacks — chase the layer breakdown, not just the total,
+per this file's own "diff by key name, not by count" lesson from §24.
+
+**`composed` is unaffected and still not a valid column.** Its device number should land at
+26001 + 8000 = 34001 (§24), independent of this fix — the gate debt is a separate defect from the
+missing Text defaults, and fixing one does not touch the other.
+
+```
+§25_text_defaults_and_id_alias_fixed := {
+  bugs_fixed: [
+    "Text.defaults (ellipsizeMode:'tail', allowFontScaling:true) never applied to a bare
+     symbiote-text — TextHost's own @Input fold never runs off the composed path",
+    "id -> nativeID alias missing on EVERY Angular path, composed or lowered — older than
+     lowering, not a lowering-specific gap",
+  ],
+  fix_location: "adapters/angular/src/renderer/index.ts — createElement seeds Text defaults via
+     setProp when descriptor.isText; setAttribute/setProperty alias 'id' and re-seed a cleared
+     default via textDefaultFor. Mirrors Vue's seedTextDefaults/textDefaultFor/PROP_ALIASES
+     exactly. Renderer-level, not wrapper-level, on purpose — the wrapper only ever covered one
+     path and every existing test went through that one path, which is why it looked complete",
+  break_test: "seedTextDefaults call commented out -> text-defaults.test.ts's third arm
+     (LoweredHost) failed cleanly, first two (real Text, via TextHost's own @Input, independent
+     of this fix) stayed green. Restored -> 3/3, full suite 227/227. That pairing is what proves
+     the third arm exercises the bare path rather than the dual selector silently resolving back
+     to the component",
+  headless_recount: "flat = composed-lowered = lowered = 18/row now (flat/composed-lowered never
+     moved — both keep the real Text component, which always had these defaults independently).
+     Only true lowered moved, 12 -> 18. composed stays 26/row (18+8, gate debt, untouched)",
+  device_prediction_LOCKED_BEFORE_RUN: "lowered: 26001 -> 32001, decomposed as 23 style + 6
+     defaults(NEW) + 3 text/row, matching Vue's own real-BenchmarkRow.vue decomposition
+     layer-for-layer, not merely by total. composed: 26001 + 8000 = 34001 (§24), unaffected by
+     this fix and still not a valid column",
+  headless_vs_device_units: "the two are NOT directly comparable — headless ROW_RULES is a
+     simplified CSS stand-in (2 declarations vs the real stylesheet's ~10), so headless prices a
+     different, smaller style layer. The +6/row defaults delta is the one number proven
+     style-layer-independent (measured twice, two different headless rule sets, same delta both
+     times) and is what the device prediction is built on",
+}
+
+## §26. A real lowering transform now exists — `babel-lower-host-primitives.cjs`, View/Text only (2026-08-31)
+
+The `Lowered` row shape (§19) was a hand-written proof, not a shipped capability: an author had to
+spell the intrinsic tag AND keep View/Text out of that template's OWN `imports`. This section
+automates it — `adapters/angular/babel-lower-host-primitives.cjs`, the fifth transform alongside
+Solid/Vue(x2)/Svelte, reading the same shared spec (`core/components/host-primitives.cjs`).
+
+```
+
+§26_transform_built := {
+seam: "SAME Babel pass as babel-register-composed.cjs, BEFORE babel-linker.cjs — Stage A
+(ngc --compilationMode partial) has already emitted ɵɵngDeclareComponent({template, deps}),
+template is a plain string and dependencies a plain array at this point",
+mechanism: "two edits on ONE metadata object: (1) template text <View> -> <symbiote-view> via
+@angular/compiler's real parseTemplate() + startSourceSpan/endSourceSpan-offset text splicing
+(never regex — a self-closing tag has start===end, no separate close span to touch);
+(2) the dependencies[] entry whose selector string contains 'View'/'Text' as a comma-separated
+token is REMOVED. (2) is not cleanup, it IS the mechanism — leaving it means 'symbiote-view'
+still resolves to the real component regardless of the text rewrite",
+schemas_finding: "VERIFIED by direct probe: CUSTOM_ELEMENTS_SCHEMA never reaches
+ɵɵngDeclareComponent's declared metadata at all — a component that DOES declare it in source
+emits NO schemas field. It is consulted only by Stage A's ngtsc type-checker against the
+ORIGINAL (unlowered) template, never by the linker. So an ORDINARY app component needs ZERO
+schemas/CUSTOM_ELEMENTS_SCHEMA change to become lowerable — unlike LoweredBenchmarkRows, which
+types <symbiote-view> directly in SOURCE and needs it for ngtsc's sake only",
+refusal: "ONE category applies to View/Text (observesState unset, so no style/child-shape
+categories reach them at all): #ref (instance-bound-directive). #ref on the WRAPPED component
+yields the ViewHost/TextHost INSTANCE (nativeElement getter, style @Input); on a lowered bare
+tag (no directive match) Angular's default hands back the raw engine node DIRECTLY instead —
+a DIFFERENT surface, so this refuses UNIVERSALLY (Vue's width, not Solid's narrower one, for
+an Angular-specific reason: unlike Solid's View/Text, ours does not forward the identical node
+either way). ALL-OR-NOTHING per tag name per template: one #ref'd <View> keeps EVERY <View> in
+that template as the component, since dependencies' selector string covers the whole template
+at once",
+angular_grammar_finding: "VERIFIED: Angular template expressions have NO arrow-function syntax —
+parseTemplate throws a real parser error on `[style]=\"({pressed}) => ({...})\"`. Two of the
+shared fixture table's 14 rows (specialisable-state-style, nested-function-state-style) are
+therefore not merely unsupported here, they are UNWRITABLE in Angular at all — marked
+it.skip with the parser error attached, not silently omitted",
+scope_deferred: "Pressable and TextInput are NOT in LOWERABLE_NAMES — real, named blockers, not
+silently-thinner coverage. Pressable's anchor-registry collision (this paragraph's original
+text) is RESOLVED — see §27; the transform-support blockers below (observesState-family
+refusals) are still open. TextInput: needs intrinsicWhen
+(multiline selects symbiote-text-input vs -multiline, two DIFFERENT native views) wired
+through the same rewrite path, refusing on a non-literal selector prop
+(REFUSAL_CATEGORIES.dynamicIntrinsicChoice) — not implemented",
+verification: "no device run (none available this session). Strongest proof short of one: a real
+ngc-compiled snippet (verified against an actual throwaway compile before writing tests by
+hand) run through this plugin then through the REAL babel-linker.cjs produces genuine
+ɵɵdomElementStart('symbiote-view', ...) with NO dependencies field at all, against
+ɵɵelementStart('View', ...) + dependencies:[View,Text] for the un-lowered control — pinned in
+babel-lower-host-primitives.test.ts, break-tested (disabling the dependencies-removal step
+flips both the linker assertion and the runner's control test red). Whole-app dry run over
+examples/angular's real compiled output (32 components, no example-specific tuning): 494 View + 948 Text instances lowered, ZERO crashes",
+domElementStart_nuance: "whether a lowered tag reaches ɵɵdomElementStart (truly bare, zero
+directive overhead) or still compiles to ɵɵelementStart depends on whether ANY OTHER directive
+(not View/Text) still matches the same element — e.g. [symbioteHostProps] on a PRIMITIVE's own
+internal template keeps ɵɵelementStart correctly, since that directive genuinely still needs a
+slot. This is orthogonal to and unaffected by this transform (it only ever touches View/Text's
+OWN dependency entry). Verified directly: a plain app-shaped <View [class]=\"expr\"> (no other
+directive) DOES reach ɵɵdomElementStart + ɵɵclassMap, matching BenchmarkRow's own pattern
+exactly — the perf case this transform exists for",
+fixture_runner: "lowering-parity.test.ts answers the shared table using Pressable as the default
+component (matching every other adapter's convention) — so on THIS adapter almost every
+'lower' row correctly reads 'refuse' (Pressable unsupported), which is the EXPECTED shape per
+adapter-parity-audit.md ('a red row is a question about which side is wrong, never a verdict
+on the transform'). A separate control describe block lowers View/Text on the identical
+harness to prove the refuse readings are not an inert/broken instrument
+(lowering-fixtures.cjs's own 'a refuse row is unproven until a control goes the other way')",
+not_yet_wired: "NOT added to examples/angular/babel.config.js — a production build-pipeline
+change with no device confirmation available this session. Package subpath
+'@symbiote-native/angular/babel-lower-host-primitives' exported and in files[], ready to wire",
+}
+
+```
+
+```
+
+## §27. Pressable's anchor-registry collision resolved — dropped the vestigial dual selector, not a `-managed` split (2026-08-31)
+
+```
+§27_pressable_anchor_fix := {
+  what_was_wrong: "composed Pressable's own @Component selector was 'Pressable, symbiote-pressable'
+     (components/pressable/index.ts). The alternate spelling forced bare 'symbiote-pressable' into
+     ANCHOR_HOST_COMPONENTS unconditionally (anchor-host-registry.ts), colliding with that SAME
+     string's other, load-bearing meaning: the host-behavior registry's tag
+     (PRESSABLE_TAG, core/components/src/behaviors/pressable.ts). A bare <symbiote-pressable> tag
+     therefore always resolved to a non-painting anchor, never the real engine node — the exact
+     bug DIAGNOSTIC_LOWERED_PRESSABLE_TAG (§22-23) worked around rather than fixed",
+  what_changed_instead: "NOT the TextInput '-managed' technique (that was the ORIGINAL plan, §26's
+     scope_deferred, and it was wrong for this case — see next field). Fix: dropped the dual
+     selector entirely. Pressable's selector is now just 'Pressable' (single string, matching
+     TextInput's own 'TextInput' — text-input.ts:169). 'symbiote-pressable' removed from
+     ANCHOR_HOST_COMPONENTS. DIAGNOSTIC_LOWERED_PRESSABLE_TAG deleted: the const, its renderer
+     createElement branch, and its barrel export (adapters/angular/src/index.ts).
+     BenchmarkRowPressableLowered now writes the real <symbiote-pressable> tag directly",
+  why_not_managed: "TextInput's wrapper genuinely RENDERED the bare tag internally in its own
+     template (its @if/@else branches emitted <symbiote-text-input>/-multiline literally), so
+     freeing the bare name for the engine's registerTextInputBehavior required giving the WRAPPER
+     a new spelling to render instead (-managed) — the bare tag had a real, in-use claimant.
+     Pressable's wrapper NEVER rendered symbiote-pressable anywhere in its own template (it renders
+     symbiote-view) — the alternate selector spelling was PURELY a selector-matching convenience,
+     unused by the component itself and (verified by a repo-wide grep before touching anything)
+     unused by any app/example code either. A vestige with a real claimant needs a rename
+     (TextInput); a vestige with NO claimant just needs deleting (Pressable). Read `verify-the-
+     deciding-side.md`'s 'before following a precedent, read what MAKES it one' — the precedent
+     (TextInput's -managed split) was made by the wrapper's OWN usage, a fact that does not
+     transfer just because both primitives are dual-selector tier-2 components",
+  verification: "real `ngc -p tsconfig.angular.json` build (rm -rf build first): compiled
+     ɵɵngDeclareComponent reads `selector: \"Pressable\"` — single string, no comma, confirming the
+     dual spelling is gone from what the linker actually resolves against, not just from source
+     text. adapters/angular full suite: 259/259 green + 1 pre-existing unrelated flake
+     (flat-list-array-style.test.ts, passes in isolation — see verify-the-deciding-side.md on not
+     conflating a shared-tree flake with a regression from an unrelated change)",
+  scope: "removes the anchor-registry collision only — does NOT add Pressable to LOWERABLE_NAMES.
+     A real babel-transform Pressable lowering still needs the observesState-family refusals
+     (REFUSAL_CATEGORIES.stateInTemplate / renderPropChild / instanceBoundDirective) implemented
+     and a lowering-parity.test.ts runner update before it can lower Pressable for real — this
+     session only cleared the prerequisite §26 named, it did not do that follow-on work",
+  not_yet_synced: "examples/angular's INSTALLED @symbiote-native/angular copy still carries the OLD
+     anchor-registry + dual selector (this is a source-only change in adapters/angular/src, not
+     re-packed/reinstalled into the example — deliberately: the user was mid-device-measurement
+     across all six examples when this landed, per example-shared-package-staleness.md's own
+     'before running any packaging step, check whether a peer is measuring that example'). Until
+     re-packed, BenchmarkRowPressableLowered's edited template (now writing bare
+     <symbiote-pressable> directly) will hit the OLD anchor behavior in that example — re-pack +
+     reinstall (no pod install needed, no native surface touched) before trusting that row on
+     device",
+}
+```
+
+```
+
+```

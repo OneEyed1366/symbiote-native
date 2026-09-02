@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/react",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "description": "SymbioteNative's React adapter — a react-reconciler host config (mutation mode) driving real native iOS/Android views through stock React Native Fabric.",
   "license": "MIT",
   "repository": {
@@ -13,6 +13,18 @@
     "url": "https://github.com/OneEyed1366/symbiote-native/issues"
   },
   "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "react",
+    "fabric",
+    "reconciler",
+    "renderer",
+    "cross-platform",
+    "mobile",
+    "ios",
+    "android"
+  ],
   "type": "module",
   "main": "src/index.ts",
   "module": "src/index.ts",
@@ -20,7 +32,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./bootstrap": "./src/bootstrap.ts",
-    "./metro-css-parser": "./metro-css-parser.cjs"
+    "./metro-css-parser": "./metro-css-parser.cjs",
+    "./state-style": "./src/state-style.ts"
   },
   "files": [
     "build",
@@ -40,7 +53,11 @@
         "types": "./build/bootstrap.d.ts",
         "default": "./build/bootstrap.js"
       },
-      "./metro-css-parser": "./metro-css-parser.cjs"
+      "./metro-css-parser": "./metro-css-parser.cjs",
+      "./state-style": {
+        "types": "./build/state-style.d.ts",
+        "default": "./build/state-style.js"
+      }
     }
   },
   "scripts": {
@@ -53,7 +70,7 @@
     "react-reconciler": "catalog:"
   },
   "peerDependencies": {
-    "@symbiote-native/engine": ">=0.1.7",
+    "@symbiote-native/engine": "workspace:^",
     "react": ">=19.0.0",
     "react-native": ">=0.86"
   },

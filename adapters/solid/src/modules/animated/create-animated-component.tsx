@@ -40,6 +40,7 @@ import {
   whenCommitted,
 } from '@symbiote-native/engine';
 import type { JSX } from '../../jsx-runtime';
+import { createElement, spread } from '../../renderer';
 import { withStableKeys } from '../../utils/stable-keys';
 
 // RN's prop carrying already-rasterized values that OVERRIDE the animated prop in the committed
@@ -64,8 +65,17 @@ export interface IAnimatedComponentProps {
 // from). A precise generic cannot work: the bag handed to the base is assembled at RUNTIME from a
 // key set that grows, so no static prop type describes it. The RETURN type stays precise, so a
 // caller of Animated.View still gets a real prop type.
+// `Base` accepts a TAG as well as a component, and the string branch is not symmetry — it is the
+// only shape that works once a primitive becomes a public intrinsic. `<Base {...props} />` on a
+// capitalized identifier compiles to `createComponent(Base, …)`, which is `untrack(() => Comp(props))`
+// in solid-js, so a string base is a `TypeError: Comp is not a function` at first paint. There is
+// nothing to widen INTO either: `createRenderer()` from solid-js/universal returns twelve names and
+// `Dynamic` is not among them (solid-js/web's Dynamic is DOM-only), so the element has to be built
+// through this renderer's own createElement + spread — the same two calls solid's own Dynamic makes
+// on its string branch. `spread` handles `ref` and `children` itself (universal's spreadExpression
+// skips both in its prop loop and drives them separately), which is why nothing is threaded by hand.
 export function createAnimatedComponent(
-  Base: Component<any>,
+  Base: Component<any> | string,
 ): (props: IAnimatedComponentProps) => JSX.Element {
   return function AnimatedComponent(
     props: IAnimatedComponentProps,
@@ -150,6 +160,21 @@ export function createAnimatedComponent(
         return local.children;
       },
     });
+
+    // Narrowed HERE and not around the whole factory: `Base` is a parameter captured by this inner
+    // function, so a check outside it does not reach the JSX below.
+    if (typeof Base === 'string') {
+      const element = createElement(Base);
+      spread(element, childProps, false);
+      // createElement's return type is the renderer's node union, which includes the SURFACE — a
+      // root the renderer is handed, never something a tag produces. Narrowed rather than cast, and
+      // thrown rather than defaulted: returning null here would paint nothing and stay green.
+      if (!isSymbioteNode(element))
+        throw new Error(
+          `createAnimatedComponent: <${Base}> did not build a host node`,
+        );
+      return element;
+    }
 
     return <Base {...childProps} />;
   };

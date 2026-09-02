@@ -12,6 +12,7 @@ import {
   insertBefore,
   removeChild,
   routeProp,
+  setNodeComponent,
   setNodeHidden,
   setText,
   SymbioteSurface,
@@ -29,6 +30,14 @@ import { toPublicInstance, type IHostInstance } from './host-instance';
 // Adding a primitive is one entry in each name table there, plus its thin
 // component in components.ts: no host-config logic per primitive.
 import { descriptorFor } from '@symbiote-native/components';
+// A bare intrinsic tag has no wrapper to apply RN's per-primitive prop folds (id -> nativeID,
+// Text's ellipsizeMode / allowFontScaling defaults), so the renderer is the layer that must.
+// Shared with every other adapter, driven by the same HOST_PRIMITIVES spec.
+import { foldHostBag } from '@symbiote-native/components/fold-host-bag';
+// WHICH native view a primitive commits can depend on a prop (TextInput's `multiline`). A lowering
+// transform decides that from source text; a bare tag has no transform, so the choice is made here,
+// where the runtime value is known. Identity for every primitive that declares no alternative.
+import { resolveIntrinsicTag } from '@symbiote-native/components/resolve-intrinsic';
 
 type IProps = Record<string, unknown>;
 
@@ -81,8 +90,9 @@ function isSurfaceContainer(
 
 let currentUpdatePriority = NoEventPriority;
 
-// Run an externally-triggered update (a native event) at discrete priority so it
-// lands on the sync lane and flushSyncWork paints it immediately.
+// Run the callback at discrete priority. Native events and component-owned timers both enter
+// React outside its render loop; callers pair this with flushExternalUpdate when the result must
+// paint synchronously.
 export function withDiscretePriority(run: () => void): void {
   const previous = currentUpdatePriority;
   currentUpdatePriority = DiscreteEventPriority;
@@ -141,12 +151,12 @@ const reconciler = createReconciler<
   shouldSetTextContent: () => false,
 
   createInstance(type, props, _container, hostContext) {
-    const descriptor = descriptorFor(type);
+    const descriptor = descriptorFor(resolveIntrinsicTag(type, props));
     if (hostContext.isInsideText && !descriptor.isText) {
       throw new Error(`<${type}> can't be nested inside <Text>`);
     }
     const node = createElement(descriptor.component, descriptor.isText);
-    applyProps(node, props);
+    applyProps(node, foldHostBag(type, props));
     return node;
   },
   createTextInstance(text, _container, hostContext) {
@@ -174,8 +184,17 @@ const reconciler = createReconciler<
   },
 
   finalizeInitialChildren: () => false,
-  commitUpdate(node, _type, oldProps, newProps) {
-    applyUpdate(node, oldProps, newProps);
+  commitUpdate(node, type, oldProps, newProps) {
+    // A primitive whose native view depends on a prop (TextInput's `multiline`) can change view on
+    // an update. The node keeps its identity — an app's ref stays live — and the commit walk
+    // re-creates the Fabric node because its viewName no longer matches the committed one.
+    setNodeComponent(
+      node,
+      descriptorFor(resolveIntrinsicTag(type, newProps)).component,
+    );
+    // BOTH sides folded, or the diff compares a raw `id` against a folded `nativeID` and writes
+    // the alias twice while never clearing the raw key.
+    applyUpdate(node, foldHostBag(type, oldProps), foldHostBag(type, newProps));
   },
   commitTextUpdate(node, _oldText, newText) {
     setText(node, newText);
@@ -226,5 +245,14 @@ const reconciler = createReconciler<
   suspendInstance: () => {},
   waitForCommitToBeReady: () => null,
 });
+
+// Native-event and timer callbacks both update React from outside the reconciler. Put the update
+// on the discrete lane and synchronously commit it; otherwise a delayed Pressable transition can
+// mutate state but remain visually stale until some unrelated later event flushes React work.
+export function flushExternalUpdate(run: () => void): void {
+  withDiscretePriority(run);
+  // @ts-expect-error flushSyncWork exists at runtime in react-reconciler 0.33
+  reconciler.flushSyncWork();
+}
 
 export default reconciler;

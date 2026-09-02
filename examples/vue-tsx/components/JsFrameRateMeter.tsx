@@ -3,6 +3,17 @@ import { Text, View } from '@symbiote-native/vue';
 import { readCommitProfile } from '@symbiote-native/engine';
 import { ActionButton } from './ActionButton';
 
+// The benchmark holds this while a timed step is in flight. Without it the meter's own sampling
+// window can close inside the step and consume the step's numbers, leaving a plausible zero and no
+// sign that anything was lost.
+//
+// A mutable module field, not a prop. A prop change re-renders the meter, and that re-render is a
+// commit landing inside the very window being measured — which would both perturb the duration and
+// (because the screen's post-commit hook stops the clock on ANY commit) risk settling the step
+// early against the wrong commit. A plain object rather than a ref for the same reason: a reactive
+// read would tie the gate to the render.
+export const commitProfileGate = { isHeldByBenchmark: false };
+
 // 60 Hz budget. Frames are timed on the JS thread only: requestAnimationFrame is scheduled by
 // JS, so a stall here is a stall in the code we actually optimize. The native UI thread keeps
 // compositing at 60/120 Hz regardless, which is why a native FPS readout would stay flat and
@@ -87,7 +98,14 @@ export const JsFrameRateMeter = defineComponent<IJsFrameRateMeterProps>(
         }
 
         const windowMs = now - windowStartedAt;
-        if (windowMs >= SAMPLE_WINDOW_MS) {
+        // While a benchmark step holds the gate the whole window-close block is skipped, publish
+        // and reset alike: the readCommitProfile() below would eat the step's profile, and the ref
+        // writes would put an extra commit inside its measured window. The window simply grows and
+        // publishes once, longer, after the step releases.
+        if (
+          windowMs >= SAMPLE_WINDOW_MS &&
+          !commitProfileGate.isHeldByBenchmark
+        ) {
           framesPerSecond.value = Math.round(
             (framesInWindow * 1000) / windowMs,
           );

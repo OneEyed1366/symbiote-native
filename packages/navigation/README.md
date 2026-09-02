@@ -142,9 +142,54 @@ export class AppComponent {
 }
 ```
 
+```svelte
+<!-- Svelte — examples/svelte/App.svelte -->
+<script lang="ts">
+  import { Screen, Stack } from '@symbiote-native/navigation/svelte';
+  import type { INavigatorHandle } from '@symbiote-native/navigation/svelte';
+
+  let stackInstance = $state.raw<INavigatorHandle | null>(null);
+</script>
+
+<Stack bind:this={stackInstance} initialRouteName="Menu">
+  <Screen name="Menu" component={MenuScreen} options={{ title: 'Navigation Demos' }} />
+  <Screen name="Details" component={DetailsScreen} options={{ title: 'Details' }} />
+</Stack>
+```
+
+```tsx
+// Solid — examples/solid/App.tsx
+import { createSignal } from 'solid-js';
+import { Stack } from '@symbiote-native/navigation/solid';
+import type { INavigatorHandle } from '@symbiote-native/navigation/solid';
+
+export default function App() {
+  const [stackHandle, setStackHandle] = createSignal<INavigatorHandle | null>(
+    null,
+  );
+
+  return (
+    <Stack ref={handle => setStackHandle(handle)} initialRouteName="Menu">
+      <Stack.Screen
+        name="Menu"
+        component={MenuScreen}
+        options={{ title: 'Navigation Demos' }}
+      />
+      <Stack.Screen
+        name="Details"
+        component={DetailsScreen}
+        options={{ title: 'Details' }}
+      />
+    </Stack>
+  );
+}
+```
+
 `Stack` itself implements `INavigatorHandle` in Angular — `@ViewChild` gives you the handle
-directly, no separate ref callback. In React/Vue, the ref only attaches during commit — code that
-needs the handle (e.g. `useLinkingIntegration` below) must gate on it being non-null first.
+directly, no separate ref callback. In React/Vue/Svelte/Solid, the ref only attaches during
+commit — code that needs the handle (e.g. `useLinkingIntegration` below) must gate on it being
+non-null first (Svelte's `bind:this` binds during mount, so `$effect`-gate on it; Solid's `ref`
+callback fires during creation, strictly before any effect runs).
 
 ### Tabs, Drawer, hooks, deep linking, and state persistence
 

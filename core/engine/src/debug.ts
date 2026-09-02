@@ -17,12 +17,18 @@ declare global {
   var __SYMBIOTE_DEBUG__: boolean | undefined;
 }
 
-function envEnabled(): boolean {
-  return typeof process !== 'undefined' && process.env.DEBUG === '1';
-}
+// Read ONCE, at module load. `process.env` is not a plain object in Node - each property read
+// crosses into the host environment - and isDebug() is called on the per-node commit path, so the
+// per-call read showed up as 17% of self time in a create-path CPU profile (headless; on a native
+// host `process` is a shim and the read is cheap, so treat that figure as a Node one).
+//
+// Safe to freeze because nothing toggles the ENV switch mid-process: every runtime toggle in the
+// repo goes through __SYMBIOTE_DEBUG__ below, which stays dynamic, and bootstrap mirrors the env
+// onto it at start anyway.
+const envDebug = typeof process !== 'undefined' && process.env.DEBUG === '1';
 
 export function isDebug(): boolean {
-  return globalThis.__SYMBIOTE_DEBUG__ === true || envEnabled();
+  return envDebug || globalThis.__SYMBIOTE_DEBUG__ === true;
 }
 
 export function dlog(message: string | (() => string)): void {

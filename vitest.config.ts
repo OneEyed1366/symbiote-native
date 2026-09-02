@@ -55,7 +55,21 @@ const SOLID_TESTS = [
   'packages/**/src/solid/**/*.test.{ts,tsx}',
 ];
 
+// `dev: false` is NOT a production-mode nicety — without it this project loads TWO solid-js builds
+// at once. vite-plugin-solid re-adds the `development` export condition from its own config() hook,
+// so solid-js resolves to dist/dev.js for the plugin's own path while dist/solid.js is resolved
+// elsewhere; a profile of one create showed functions from both files. Signals then live in one
+// runtime and the renderer's prop effects in the other, so THEY NEVER SEE EACH OTHER: measured
+// 2026-08-23, a signal driving a prop on an intrinsic element went clip -> clip -> clip (no update
+// at all), and clip -> head -> tail with this flag. Structural updates (<Show>, <For>) kept working
+// because they run inside the test file's own solid-js, which is why nothing was red.
+//
+// `conditions: ['browser']` picks solid-js's client build over its `node` -> dist/server.js entry,
+// and BOTH resolve and ssr.resolve are needed for the reason the svelte project states below:
+// Vitest runs test files through Vite's SSR module graph.
 const SOLID_TRANSFORM = solidPlugin({
+  dev: false,
+  hot: false,
   solid: {
     moduleName: '@symbiote-native/solid/renderer',
     generate: 'universal',
@@ -109,6 +123,7 @@ export default defineConfig({
       },
       {
         ...SHARED,
+        ...BROWSER_CONDITIONS,
         plugins: [SOLID_TRANSFORM],
         test: {
           ...SHARED.test,

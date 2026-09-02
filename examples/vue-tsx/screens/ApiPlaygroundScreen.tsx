@@ -107,8 +107,26 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
 const LOG_LIMIT = 8;
 
+// The history lives OFF the reactive graph, and that is the whole point of this WeakMap.
+//
+// Reading `log.value` here would make every `watchEffect` that logs TRACK the very ref the same
+// call then WRITES — an effect that re-triggers itself, which Vue eventually kills with "Maximum
+// recursive updates exceeded". These demos did exactly that: the error fired on the first
+// interaction on every screen using them, and it cost a real debugging session, because it looks
+// like a renderer fault and shows up in the log above whatever is actually being investigated.
+//
+// Writing a ref does not track it; only READING does. So keeping the previous entries in a plain
+// array makes the dependency one-directional: each effect tracks its real source (`count`,
+// `doubled`, a scope's own signal) and nothing tracks the log it writes to.
+const logHistory = new WeakMap<Ref<string[]>, string[]>();
+
 function pushLimited(log: Ref<string[]>, entry: string): void {
-  log.value = [entry, ...log.value].slice(0, LOG_LIMIT);
+  const history = logHistory.get(log) ?? [];
+  history.unshift(entry);
+  history.length = Math.min(history.length, LOG_LIMIT);
+  logHistory.set(log, history);
+  // A fresh array, so the render sees a new value; the ref is never read back.
+  log.value = [...history];
 }
 
 /* ── Template Directives → the vue-tsx way ───────────────────────────────────────────────── */
@@ -669,7 +687,10 @@ const RefComputedWatchDemo = defineComponent({
       pushLimited(log, `watchEffect: doubled is now ${doubled.value}`),
     );
     watchPostEffect(() =>
-      pushLimited(log, 'watchPostEffect: ran after the patch (flush: "post")'),
+      pushLimited(
+        log,
+        `watchPostEffect: ran after the patch, doubled=${doubled.value}`,
+      ),
     );
     watchSyncEffect(() =>
       pushLimited(

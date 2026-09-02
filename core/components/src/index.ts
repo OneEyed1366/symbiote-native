@@ -201,6 +201,7 @@ export type {
 export {
   createPressHandlers,
   createPressRuntime,
+  disposePressRuntime,
   normalizeRect,
   maxEdge,
   isTouchWithinRegion,
@@ -208,6 +209,7 @@ export {
   computeRegion,
   rippleProps,
   DEFAULT_DELAY_LONG_PRESS_MS,
+  DEFAULT_MIN_PRESS_DURATION_MS,
   DEFAULT_PRESS_RECT_OFFSETS,
 } from './state/pressable';
 export type {
@@ -434,3 +436,27 @@ export type {
   ISectionEntry,
   IVirtualizedSectionListHandle,
 } from './state/section-list';
+export {
+  registerPressableBehavior,
+  PRESSABLE_TAG,
+} from './behaviors/pressable';
+export {
+  foldImagePayload,
+  IMAGE_TAG,
+  registerImageBehavior,
+} from './behaviors/image';
+
+export {
+  foldInputAccessoryViewPayload,
+  INPUT_ACCESSORY_VIEW_TAG,
+  registerInputAccessoryViewBehavior,
+} from './behaviors/input-accessory-view';
+
+export {
+  registerTextInputBehavior,
+  buildTextInputHandle,
+  TEXT_INPUT_TAG,
+  TEXT_INPUT_MULTILINE_TAG,
+} from './behaviors/text-input';
+
+export { registerSwitchBehavior, SWITCH_TAG } from './behaviors/switch';

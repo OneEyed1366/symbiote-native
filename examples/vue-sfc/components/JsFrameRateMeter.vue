@@ -5,6 +5,20 @@
   of .examples/react/components/JsFrameRateMeter.tsx, numbers and testIDs identical so the four
   canaries' meters can be read against each other.
 -->
+<script lang="ts">
+// `readCommitProfile()` is read-and-RESET, and this meter calls it once per window off rAF. A
+// benchmark step that wants the profile of its OWN commit must stop the meter first: otherwise a
+// window can close inside the step and consume the step's numbers, leaving a plausible zero and no
+// sign that anything was lost.
+//
+// A mutable module field, not a prop. A prop change re-renders the meter, and that re-render is a
+// commit landing inside the very window being measured — which would both perturb the duration and
+// (because the screen's post-commit hook stops the clock on ANY commit) risk settling the step
+// early against the wrong commit. A plain object rather than a ref for the same reason: a reactive
+// read would tie the gate to the render.
+export const commitProfileGate = { isHeldByBenchmark: false };
+</script>
+
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 import { Text, View } from '@symbiote-native/vue';
@@ -61,6 +75,10 @@ const walk = ref<IWalkSample>(EMPTY_WALK_SAMPLE);
 
 let handle = 0;
 let stopped = false;
+// Accumulated off the render, published at window close: a ref write per dropped frame would put
+// a commit inside whatever the meter is watching, and inside a gated step it would defeat the gate.
+let droppedTotal = 0;
+let worstMs = 0;
 
 onMounted(() => {
   let previousFrameAt = performance.now();
@@ -75,13 +93,19 @@ onMounted(() => {
     framesInWindow += 1;
 
     if (deltaMs < SUSPENDED_FRAME_MS) {
-      if (deltaMs > DROPPED_FRAME_THRESHOLD_MS) droppedFrames.value += 1;
-      if (deltaMs > worstFrameMs.value) worstFrameMs.value = deltaMs;
+      if (deltaMs > DROPPED_FRAME_THRESHOLD_MS) droppedTotal += 1;
+      if (deltaMs > worstMs) worstMs = deltaMs;
     }
 
     const windowMs = now - windowStartedAt;
-    if (windowMs >= SAMPLE_WINDOW_MS) {
+    // While a benchmark step holds the gate the whole window-close block is skipped, publish and
+    // reset alike: the readCommitProfile() below would eat the step's profile, and the ref writes
+    // would put an extra commit inside its measured window. The window simply grows and publishes
+    // once, longer, after the step releases.
+    if (windowMs >= SAMPLE_WINDOW_MS && !commitProfileGate.isHeldByBenchmark) {
       framesPerSecond.value = Math.round((framesInWindow * 1000) / windowMs);
+      droppedFrames.value = droppedTotal;
+      worstFrameMs.value = worstMs;
       // Read-and-reset, once per window, so each sample covers exactly the window just closed
       // rather than an ever-growing total.
       const commitProfile = readCommitProfile();
@@ -112,6 +136,8 @@ onUnmounted(() => {
 });
 
 const onReset = (): void => {
+  droppedTotal = 0;
+  worstMs = 0;
   droppedFrames.value = 0;
   worstFrameMs.value = 0;
   walk.value = EMPTY_WALK_SAMPLE;

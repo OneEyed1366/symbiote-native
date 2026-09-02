@@ -24,6 +24,11 @@
 // React-JSX transform gets a chance to claim the same JSX nodes.
 module.exports = function symbioteSolidBabelPreset(_api, options = {}) {
   return {
+    // Babel runs PLUGINS before PRESETS, which is exactly the order this needs: the lowering
+    // rewrites <View>/<Text> to their intrinsic tags while they are still JSX, so babel-preset-solid
+    // then compiles them as elements (createElement + setProp) instead of as components
+    // (createComponent + a props Proxy). Reversed, there would be nothing left to rewrite.
+    plugins: [require('./babel-lower-host-primitives.cjs')],
     presets: [
       [
         require('babel-preset-solid'),

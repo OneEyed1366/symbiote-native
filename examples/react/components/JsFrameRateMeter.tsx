@@ -48,6 +48,17 @@ const EMPTY_WALK_SAMPLE: IWalkSample = {
   msPerCommit: 0,
 };
 
+// `readCommitProfile()` is read-and-RESET, and this meter calls it once per window off rAF. A
+// benchmark step that wants the profile of its OWN commit must stop the meter first: otherwise a
+// window can close inside the step and consume the step's numbers, leaving a plausible zero and no
+// sign that anything was lost.
+//
+// A mutable module field, not a prop. A prop change re-renders the meter, and that re-render is a
+// commit landing inside the very window being measured — which would both perturb the duration and
+// (because the screen's post-commit hook stops the clock on ANY commit) risk settling the step
+// early against the wrong commit.
+export const commitProfileGate = { isHeldByBenchmark: false };
+
 /**
  * JS-thread frame rate. A requestAnimationFrame loop measures the delta between consecutive
  * frames, reports the averaged rate over a half-second window, and keeps a running count of
@@ -81,7 +92,14 @@ export function JsFrameRateMeter({ accent }: IJsFrameRateMeterProps) {
       }
 
       const windowMs = now - windowStartedAt;
-      if (windowMs >= SAMPLE_WINDOW_MS) {
+      // While a benchmark step holds the gate the whole window-close block is skipped, publish and
+      // reset alike: the readCommitProfile() below would eat the step's profile, and the three
+      // setStates would put an extra commit inside its measured window. The window simply grows and
+      // publishes once, longer, after the step releases.
+      if (
+        windowMs >= SAMPLE_WINDOW_MS &&
+        !commitProfileGate.isHeldByBenchmark
+      ) {
         setFramesPerSecond(Math.round((framesInWindow * 1000) / windowMs));
         setDroppedFrames(droppedRef.current);
         setWorstFrameMs(worstRef.current);

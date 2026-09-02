@@ -3,8 +3,8 @@
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-secure-store`](https://github.com/expo/expo/tree/main/packages/expo-secure-store) —
 encrypted key-value storage in the iOS Keychain and the Android Keystore, optionally gated behind
-the device's own biometrics — usable from **every** adapter, React, Vue, and Angular, not just
-React. Built the same way as [`@symbiote-native/local-auth`](../local-auth): an
+the device's own biometrics — usable from **every** adapter, React, Vue, Svelte, Solid, and
+Angular, not just React. Built the same way as [`@symbiote-native/local-auth`](../local-auth): an
 `expo-modules-core`-based wrapper (see the `symbiote-expo-native-module` project skill for the
 full mechanism — why `expo-modules-core` is depended on directly and never the `expo`
 meta-package, why the upstream JS is hand-ported into `core/` rather than imported, and how
@@ -65,8 +65,8 @@ src/core/                 the whole API: seven keychain-accessibility constants 
 src/angular/              @symbiote-native/secure-store/angular
 ```
 
-`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
-physical per-framework file. Upstream ships free functions and constants — no per-instance state,
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/` —
+no physical per-framework file. Upstream ships free functions and constants — no per-instance state,
 no event stream — so there is nothing for a hook, composable, or service to wrap, the same reason
 [`@symbiote-native/local-auth`](../local-auth) does the same. `./angular` stays a physical
 file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`). Import from

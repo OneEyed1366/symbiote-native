@@ -188,6 +188,8 @@ describe('Vue host ref exposes the engine public instance', () => {
     // Driving setNativeProps through the ref re-commits the prop onto the committed view. The
     // engine clone carries the CHANGED props, so the grafted label identifies our view.
     node.setNativeProps({ accessibilityLabel: GRAFTED_LABEL });
+    // The write is coalesced to the microtask boundary (core/engine/src/commit.ts).
+    await Promise.resolve();
     const committed = findCommitted(
       fabric.committed,
       n => n.props.accessibilityLabel === GRAFTED_LABEL,

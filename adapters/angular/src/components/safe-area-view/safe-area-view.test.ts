@@ -19,6 +19,33 @@ const ROOT_TAG = 910;
 const fabric = installFabric();
 
 @Component({
+  selector: 'symbiote-safe-area-view-gate-host',
+  standalone: true,
+  imports: [SafeAreaView],
+  template: `<SafeAreaView [testID]="'safe-area'"
+    ><symbiote-text>Hello</symbiote-text></SafeAreaView
+  >`,
+})
+class SafeAreaViewNoSubscriberFixture {}
+
+@Component({
+  selector: 'symbiote-safe-area-view-gate-subscribed-host',
+  standalone: true,
+  imports: [SafeAreaView],
+  template: `
+    <SafeAreaView
+      [testID]="'safe-area'"
+      (accessibilityAction)="onAction($event)"
+    >
+      <symbiote-text>Hello</symbiote-text>
+    </SafeAreaView>
+  `,
+})
+class SafeAreaViewOneSubscriberFixture {
+  onAction(): void {}
+}
+
+@Component({
   selector: 'symbiote-safe-area-view-host',
   standalone: true,
   imports: [SafeAreaView],
@@ -130,5 +157,34 @@ describe('SafeAreaView', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
     expect(committedNode('safe-area')?.props.backgroundColor).toBe('black');
+  });
+
+  // why: `layout` and the four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`) — native fires them only when the committed
+  // payload carries a FUNCTION at that key. Before this, the template bound all five
+  // unconditionally, so every SafeAreaView lit all five gate flags whether or not an app ever
+  // subscribed. No test covered this at all until now.
+  it('lights no accessibility/layout gate flag with no subscriber', async () => {
+    mount(ROOT_TAG, SafeAreaViewNoSubscriberFixture);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+    const props = committedNode('safe-area')?.props;
+    expect(props?.onLayout ?? null).toBeNull();
+    expect(props?.onAccessibilityAction ?? null).toBeNull();
+    expect(props?.onAccessibilityTap ?? null).toBeNull();
+    expect(props?.onMagicTap ?? null).toBeNull();
+    expect(props?.onAccessibilityEscape ?? null).toBeNull();
+  });
+
+  it('lights only the subscribed gate flag', async () => {
+    mount(ROOT_TAG, SafeAreaViewOneSubscriberFixture);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+    const props = committedNode('safe-area')?.props;
+    expect(props?.onAccessibilityAction).toBe(true);
+    expect(props?.onLayout ?? null).toBeNull();
+    expect(props?.onAccessibilityTap ?? null).toBeNull();
+    expect(props?.onMagicTap ?? null).toBeNull();
+    expect(props?.onAccessibilityEscape ?? null).toBeNull();
   });
 });

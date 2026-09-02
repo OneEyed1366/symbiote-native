@@ -11,11 +11,8 @@
 // `setWrapperComponentProvider`/`unmountApplicationComponentAtRootTag`/`registerSection` are
 // covered below (the ones with either Vue-specific wiring or cheap, meaningful behavior to pin).
 // `getRunnable`/`getSections`/`getRegistry` are one-line Map/Set reads with no branch of their
-// own — N/A, trivial pass-through. `registerHeadlessTask`/`registerCancellableHeadlessTask`/
-// `startHeadlessTask`/`cancelHeadlessTask` are N/A here: framework-agnostic, driven by a native
-// module this file never installs, and have zero Vue-specific behavior — they belong in an
-// engine-level test, which does not exist yet. That absence is a real gap, not this file's job to
-// backfill silently.
+// own — N/A, trivial pass-through. Headless-task host forwarding and pre-bootstrap replay are
+// framework-agnostic and covered by core/engine/src/app-registry/app-registry.test.ts.
 
 import { defineComponent, h, type SetupContext } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

@@ -10,7 +10,7 @@ import {
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import {
   anchorHostStyle,
-  SwitchHost,
+  ManagedSwitchHost,
   SymbioteHostPropsDirective,
   SymbioteStyleInputDirective,
 } from '../../primitives';
@@ -24,7 +24,7 @@ export type { ISwitchProps, ISwitchTrackColor } from './shared';
     { directive: SymbioteStyleInputDirective, inputs: ['style'] },
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  imports: [SwitchHost, SymbioteHostPropsDirective],
+  imports: [ManagedSwitchHost, SymbioteHostPropsDirective],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -54,7 +54,7 @@ export type { ISwitchProps, ISwitchTrackColor } from './shared';
   ],
   outputs: ['valueChange', 'change'],
   template: `
-    <symbiote-switch
+    <symbiote-switch-managed
       #nativeSwitch="symbioteHost"
       [symbioteHostProps]="hostProps()"
       (change)="handleChange($event, nativeSwitch)"
@@ -63,7 +63,7 @@ export type { ISwitchProps, ISwitchTrackColor } from './shared';
 })
 export class Switch extends SwitchBase implements DoCheck {
   // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
-  // onto (see anchorHostStyle's doc comment) — NOT the <symbiote-switch> leaf one level down.
+  // onto (see anchorHostStyle's doc comment) — NOT the <symbiote-switch-managed> leaf one level down.
   private readonly elementRef = inject(ElementRef);
 
   protected readonly platform = {

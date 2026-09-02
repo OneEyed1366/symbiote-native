@@ -1,8 +1,21 @@
 {
   "name": "@symbiote-native/sensors",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "description": "expo-sensors wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Accelerometer, Barometer, DeviceMotion, Gyroscope, LightSensor, Magnetometer, MagnetometerUncalibrated, Pedometer.",
   "license": "MIT",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "expo-sensors",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "accelerometer",
+    "gyroscope",
+    "pedometer"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
@@ -83,12 +96,12 @@
     "expo-modules-core": "catalog:"
   },
   "peerDependencies": {
-    "@symbiote-native/angular": ">=0.6.2",
-    "@symbiote-native/engine": ">=0.1.7",
-    "@symbiote-native/react": ">=0.2.8",
-    "@symbiote-native/solid": ">=0.0.1",
-    "@symbiote-native/svelte": ">=0.1.0",
-    "@symbiote-native/vue": ">=0.3.8",
+    "@symbiote-native/angular": "workspace:^",
+    "@symbiote-native/engine": "workspace:^",
+    "@symbiote-native/react": "workspace:^",
+    "@symbiote-native/solid": "workspace:^",
+    "@symbiote-native/svelte": "workspace:^",
+    "@symbiote-native/vue": "workspace:^",
     "@angular/core": ">=20",
     "@vue/runtime-core": "^3.5.13",
     "react": ">=19.0.0",

@@ -2,8 +2,8 @@
 
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-sharing`](https://github.com/expo/expo/tree/main/packages/expo-sharing) — the platform
-share sheet for a local file — usable from **every** adapter, React, Vue, and Angular, not just
-React. Built the same way as [`@symbiote-native/secure-store`](../secure-store): an
+share sheet for a local file — usable from **every** adapter, React, Vue, Svelte, Solid, and
+Angular, not just React. Built the same way as [`@symbiote-native/secure-store`](../secure-store): an
 `expo-modules-core`-based wrapper (see the `symbiote-expo-native-module` project skill for the
 full mechanism — why `expo-modules-core` is depended on directly and never the `expo`
 meta-package, why the upstream JS is hand-ported into `core/` rather than imported, and how
@@ -71,8 +71,8 @@ src/core/                 the whole API: isAvailableAsync + shareAsync. native-m
 src/angular/              @symbiote-native/sharing/angular
 ```
 
-`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
-physical per-framework file. Both exports are stateless free functions — no per-instance state,
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/` —
+no physical per-framework file. Both exports are stateless free functions — no per-instance state,
 no event stream — so there is nothing for a hook, composable, or service to wrap, the same
 reason [`@symbiote-native/secure-store`](../secure-store) does the same. (The incoming-share half
 above is exactly the part that _would_ have needed one; it is the reason this package has no

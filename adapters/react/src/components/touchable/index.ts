@@ -36,7 +36,10 @@ import {
   type IPressTimingProps,
 } from '@symbiote-native/components';
 import type { ISymbioteEvent } from '@symbiote-native/engine';
-import { Pressable, type IPressableProps } from '../pressable';
+import {
+  TouchablePressable as Pressable,
+  type IPressableProps,
+} from '../pressable';
 import { Animated } from '../../modules/animated';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 

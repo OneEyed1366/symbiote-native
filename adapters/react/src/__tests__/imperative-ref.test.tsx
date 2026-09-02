@@ -213,9 +213,11 @@ describe('React imperative host-component ref API', () => {
     // why: setNativeProps is a PARTIAL update (the reanimated/gesture-handler fast path) — it
     // must merge onto the node's committed props, not replace them, or every declarative style
     // not named in the patch would vanish on the next native-driven frame.
-    it('merges a partial setNativeProps style onto the box instead of replacing it', () => {
+    it('merges a partial setNativeProps style onto the box instead of replacing it', async () => {
       const { box } = mountApp();
       method(box, 'setNativeProps')({ style: { opacity: 0.25 } });
+      // The write is coalesced to the microtask boundary (core/engine/src/commit.ts).
+      await Promise.resolve();
       const updated = findCommitted(
         n => n.viewName === 'RCTView' && n.props.opacity === 0.25,
       );

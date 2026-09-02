@@ -14,7 +14,7 @@ import {
   type INativeFeedbackBackground,
 } from '@symbiote-native/components';
 import { dlog } from '@symbiote-native/engine';
-import { View } from '../components';
+import { HOST_VIEW } from '../components';
 import {
   Pressable,
   emitPressableEvents,
@@ -99,10 +99,15 @@ const TouchableNativeFeedbackImpl = defineComponent<
       const nativeProps = backgroundProps(resolved, useForeground);
       const children: VNode[] =
         slots.default !== undefined ? slots.default() : [];
-      const feedback = h(View, nativeProps, () => children);
+      // The intrinsic tag, not our <View> component — see the note at HOST_VIEW.
+      const feedback = h(HOST_VIEW, nativeProps, children);
       return h(
         Pressable,
-        { ...forwardAttrs(attrs), ...emitPressableEvents(emit) },
+        {
+          ...forwardAttrs(attrs),
+          ...emitPressableEvents(emit),
+          __minPressDuration: 0,
+        },
         { default: () => [feedback] },
       );
     };

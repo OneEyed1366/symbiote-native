@@ -126,6 +126,7 @@
 </script>
 
 <Pressable
+  __minPressDuration={0}
   {...rest}
   style={containerStyle}
   onPress={handlePress}

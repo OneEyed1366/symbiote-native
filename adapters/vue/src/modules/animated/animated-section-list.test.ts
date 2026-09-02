@@ -120,6 +120,8 @@ describe('Vue Animated.SectionList', () => {
       expect(getNativeTag(scrollNodeOf(listRef.value))).toBe(scrollView().tag);
 
       opacity.setValue(0.4);
+      // The engine coalesces setNativeProps writes to the microtask boundary.
+      await Promise.resolve();
       expect(scrollView().props.opacity).toBe(0.4);
     });
 

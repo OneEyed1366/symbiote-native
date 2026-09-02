@@ -1,4 +1,4 @@
-// RN's Text.js:288-291 applies these two defaults unconditionally. We declared both props in four
+// RN's Text.js:289 and :291 apply these two defaults unconditionally. We declared both props in four
 // adapters and applied neither, so native fell back to its own — `clip` instead of `tail`, which
 // on device is a clamped Text cut mid-word with no ellipsis at all. Nothing threw; the text was
 // just wrong.

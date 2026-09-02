@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/vue",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "SymbioteNative's Vue adapter — a @vue/runtime-core createRenderer driving real native iOS/Android views through the same engine as the React adapter.",
   "license": "MIT",
   "repository": {
@@ -13,6 +13,18 @@
     "url": "https://github.com/OneEyed1366/symbiote-native/issues"
   },
   "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "vue",
+    "vue3",
+    "fabric",
+    "renderer",
+    "cross-platform",
+    "mobile",
+    "ios",
+    "android"
+  ],
   "type": "module",
   "main": "src/index.ts",
   "module": "src/index.ts",
@@ -22,9 +34,13 @@
     "./bootstrap": "./src/bootstrap.ts",
     "./runtime-helpers": "./src/runtime-helpers/index.ts",
     "./metro-css-parser": "./metro-css-parser.cjs",
-    "./metro-vue-transformer": "./metro-vue-transformer.cjs"
+    "./metro-vue-transformer": "./metro-vue-transformer.cjs",
+    "./babel-jsx": "./babel-jsx.cjs",
+    "./state-style": "./src/state-style.ts"
   },
   "files": [
+    "babel-jsx.cjs",
+    "babel-lower-host-primitives.cjs",
     "build",
     "metro-css-parser.cjs",
     "metro-vue-transformer.cjs"
@@ -48,7 +64,12 @@
         "default": "./build/runtime-helpers/index.js"
       },
       "./metro-css-parser": "./metro-css-parser.cjs",
-      "./metro-vue-transformer": "./metro-vue-transformer.cjs"
+      "./metro-vue-transformer": "./metro-vue-transformer.cjs",
+      "./babel-jsx": "./babel-jsx.cjs",
+      "./state-style": {
+        "types": "./build/state-style.d.ts",
+        "default": "./build/state-style.js"
+      }
     }
   },
   "scripts": {
@@ -58,17 +79,19 @@
   "dependencies": {
     "@symbiote-native/components": "workspace:*",
     "@symbiote-native/css-parser": "workspace:*",
+    "@vue/babel-plugin-jsx": "catalog:",
     "@vue/compiler-core": "catalog:",
     "@vue/compiler-sfc": "catalog:",
     "@vue/runtime-core": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {
-    "@symbiote-native/engine": ">=0.1.7",
+    "@symbiote-native/engine": "workspace:^",
     "vue": ">=3.5.0",
     "react-native": ">=0.86"
   },
   "devDependencies": {
+    "@babel/core": "catalog:",
     "@symbiote-native/engine": "workspace:*",
     "@symbiote-native/test-utils": "workspace:*"
   }

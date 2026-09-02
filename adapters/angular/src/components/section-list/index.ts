@@ -100,6 +100,13 @@ export {
   VListHeaderDirective,
   VListSeparatorDirective,
 } from '../virtualized-list';
+import {
+  gateWanted,
+  injectGateDemandAbove,
+  provideGateDemand,
+  type IGateDemand,
+  type IGatedAccessibilityEvent,
+} from '../../gate-demand';
 
 // SectionList's public surface is exactly VirtualizedSectionList's (RN layers them one-for-one), so
 // the prop type is shared verbatim — no SectionList-only field exists.
@@ -123,6 +130,7 @@ export type ISectionListInputs<ItemT> = Omit<
 @Component({
   selector: 'SectionList',
   standalone: true,
+  viewProviders: [provideGateDemand(() => SectionList)],
   hostDirectives: [
     { directive: SymbioteStyleInputDirective, inputs: ['style'] },
   ],
@@ -381,6 +389,16 @@ export class SectionList<ItemT = unknown>
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
+
+  // This wrapper binds the four gated accessibility events on the component it renders, which
+  // Angular forces to be unconditional and which would light that component's gates on every
+  // instance. It answers for them instead — see `gate-demand.ts`.
+  private readonly gateDemandAbove = injectGateDemandAbove();
+
+  wantsGate(name: IGatedAccessibilityEvent): boolean {
+    return gateWanted(this.gateDemandAbove, name, this[name]);
+  }
+
   @Input() role?: IAriaProps['role'];
   @Input() ariaLabel?: string;
   @Input() ariaLabelledBy?: string;

@@ -1,5 +1,22 @@
 # @symbiote-native/css-parser
 
+## 0.5.0
+
+### Minor Changes
+
+- [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `:active` is switched off, behind `IS_STATE_TOKEN_ENABLED`.
+
+  A functional `style={({pressed}) => …}` is specialised into a resting/active pair at build time
+  now, which reaches the same slot without pseudo-class machinery and is what the ecosystem already
+  writes — so the reason `:active` existed, keeping a pressable lowerable without a state-reading
+  callback, is gone. Keeping both live is what argues against it: they occupy different cascade
+  slots, so an adapter would have two ways to say one thing and a debugging session two places to
+  look.
+
+  An `:active` selector now warns with its own message naming the replacement, rather than the
+  shared "React Native cannot match this" sentence. The selector machinery is intact and one
+  constant turns it back on.
+
 ## 0.4.0
 
 ### Minor Changes

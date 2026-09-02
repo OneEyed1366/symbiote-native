@@ -3,7 +3,7 @@
   // render-only). Reuses the shared logic verbatim (switchReducer / valueFromChange /
   // shouldSnapBack, exactly like React's useReducer + Vue's ref-based reducer wiring) and
   // calls renderSwitch() itself for the prop assembly — its Descriptor is always exactly one
-  // `symbiote-switch` node with zero children (core/components/src/view/render-switch.ts). Root
+  // `symbiote-switch-managed` node with zero children (core/components/src/view/render-switch.ts). Root
   // stays a literal tag (bind:this needs a known tag); `createDescriptorChildrenSync` is still
   // wired for its (always-empty) children, matching every other category-1 component uniformly
   // — the same reason React still routes a childless Switch through descriptorToReact rather
@@ -131,4 +131,4 @@
   });
 </script>
 
-<symbiote-switch p={descriptor.props} bind:this={hostShim} />
+<symbiote-switch-managed p={descriptor.props} bind:this={hostShim} />

@@ -3,11 +3,12 @@
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-web-browser`](https://github.com/expo/expo/tree/main/packages/expo-web-browser) — an in-app
 browser (`SFSafariViewController` on iOS, Chrome Custom Tabs on Android) plus the OAuth
-auth-session flow — usable from **every** adapter, React, Vue, and Angular, not just React. Built
-the same way as [`@symbiote-native/secure-store`](../secure-store): an `expo-modules-core`-based
-wrapper (see the `symbiote-expo-native-module` project skill for the full mechanism — why
-`expo-modules-core` is depended on directly and never the `expo` meta-package, why the upstream JS
-is hand-ported into `core/` rather than imported, and how autolinking picks up the native module).
+auth-session flow — usable from **every** adapter, React, Vue, Svelte, Solid, and Angular, not just
+React. Built the same way as [`@symbiote-native/secure-store`](../secure-store): an
+`expo-modules-core`-based wrapper (see the `symbiote-expo-native-module` project skill for the full
+mechanism — why `expo-modules-core` is depended on directly and never the `expo` meta-package, why
+the upstream JS is hand-ported into `core/` rather than imported, and how autolinking picks up the
+native module).
 
 ## Install
 
@@ -48,11 +49,11 @@ src/core/                 the whole API: open/dismiss, the auth session, and the
 src/angular/              @symbiote-native/web-browser/angular
 ```
 
-`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
-physical per-framework file. Every export is a stateless free function; the one piece of live
-state — the Android auth-session polyfill's redirect subscription — belongs to a single in-flight
-promise inside the core and never surfaces as something a caller subscribes to or tears down. So
-there is nothing for a hook, composable, or service to wrap, the same reason
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto
+`src/core/` — no physical per-framework file. Every export is a stateless free function; the one
+piece of live state — the Android auth-session polyfill's redirect subscription — belongs to a
+single in-flight promise inside the core and never surfaces as something a caller subscribes to or
+tears down. So there is nothing for a hook, composable, or service to wrap, the same reason
 [`@symbiote-native/secure-store`](../secure-store) does the same. `./angular` stays a physical
 file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`). Import from
 `@symbiote-native/web-browser` directly if you don't care which adapter you're on; the per-adapter
@@ -65,6 +66,25 @@ import * as WebBrowser from '@symbiote-native/web-browser';
 
 await WebBrowser.openBrowserAsync('https://example.com');
 ```
+
+Every framework subpath re-exports the identical free functions — pick whichever import matches
+the app's own adapter, or the bare package if you don't care:
+
+```ts
+import { openBrowserAsync } from '@symbiote-native/web-browser/react';
+import { openBrowserAsync } from '@symbiote-native/web-browser/vue';
+import { openBrowserAsync } from '@symbiote-native/web-browser/svelte';
+import { openBrowserAsync } from '@symbiote-native/web-browser/solid';
+import { openBrowserAsync } from '@symbiote-native/web-browser/angular';
+```
+
+These mirror the real canary demo screens —
+`examples/expo-react/screens/WebBrowserScreen.tsx`,
+`examples/expo-vue-sfc/screens/WebBrowserScreen.vue`,
+`examples/expo-vue-tsx/screens/WebBrowserScreen.tsx`,
+`examples/expo-svelte/screens/WebBrowserScreen.svelte`,
+`examples/expo-solid/screens/WebBrowserScreen.tsx`,
+`examples/expo-angular/src/screens/WebBrowserScreen.ts`.
 
 The in-app browser keeps the user inside the app, unlike `Linking.openURL`, which hands them off to
 the system browser. iOS resolves once the browser closes (`{ type: 'cancel' }`, or

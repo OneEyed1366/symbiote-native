@@ -14,9 +14,12 @@ import path from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+import { adapterNames } from '../scripts/lib/adapter-names.mjs';
+
 const REPO_ROOT = path.resolve(__dirname, '..');
 const PACKAGES_DIR = path.join(REPO_ROOT, 'packages');
-const FRAMEWORKS = ['react', 'vue', 'svelte', 'solid', 'angular'] as const;
+// Read from disk — see scripts/lib/adapter-names.mjs.
+const FRAMEWORKS = adapterNames();
 
 const RESOLUTION_OPTIONS: ts.CompilerOptions = {
   target: ts.ScriptTarget.ESNext,

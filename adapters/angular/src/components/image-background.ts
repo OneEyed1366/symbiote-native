@@ -42,6 +42,13 @@ import {
   SymbioteStyleInputDirective,
   ViewHost,
 } from '../primitives';
+import {
+  gateWanted,
+  injectGateDemandAbove,
+  provideGateDemand,
+  type IGateDemand,
+  type IGatedAccessibilityEvent,
+} from '../gate-demand';
 
 // Mirrors React's IImageBackgroundProps minus children (Angular takes children via <ng-content>):
 // every forwarding Image prop flows onto the inner image; `style` is the WRAPPER View style and
@@ -75,6 +82,7 @@ export type IAngularImageBackgroundInputs = Omit<
 @Component({
   selector: 'ImageBackground',
   standalone: true,
+  viewProviders: [provideGateDemand(() => ImageBackground)],
   hostDirectives: [
     { directive: SymbioteStyleInputDirective, inputs: ['style'] },
   ],
@@ -150,6 +158,16 @@ export class ImageBackground implements IAngularImageBackgroundInputs {
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
+
+  // This wrapper binds the four gated accessibility events on the component it renders, which
+  // Angular forces to be unconditional and which would light that component's gates on every
+  // instance. It answers for them instead — see `gate-demand.ts`.
+  private readonly gateDemandAbove = injectGateDemandAbove();
+
+  wantsGate(name: IGatedAccessibilityEvent): boolean {
+    return gateWanted(this.gateDemandAbove, name, this[name]);
+  }
+
   @Output() readonly loadStart = new EventEmitter<ISymbioteEvent>();
   @Output() readonly load = new EventEmitter<ISymbioteEvent>();
   @Output() readonly loadEnd = new EventEmitter<ISymbioteEvent>();

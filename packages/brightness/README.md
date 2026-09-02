@@ -154,6 +154,78 @@ onUnmounted(() => subscription?.remove());
 </template>
 ```
 
+```svelte
+<!-- Svelte — trimmed from examples/expo-svelte/screens/BrightnessScreen.svelte -->
+<script lang="ts">
+  import { Pressable, Text, View } from '@symbiote-native/svelte';
+  import {
+    addBrightnessListener,
+    getBrightnessAsync,
+    setBrightnessAsync,
+    usePermissions,
+    type EventSubscription,
+  } from '@symbiote-native/brightness/svelte';
+
+  let brightness = $state<number | null>(null);
+  const permissions = usePermissions(); // boxed getter: permissions.status / .request()
+
+  let subscription: EventSubscription | undefined;
+
+  $effect(() => {
+    void getBrightnessAsync().then(value => (brightness = value));
+    subscription = addBrightnessListener(event => (brightness = event.brightness));
+    return () => subscription?.remove();
+  });
+</script>
+
+<View>
+  <Text>{brightness === null ? 'checking…' : `${Math.round(brightness * 100)}%`}</Text>
+  <Pressable onPress={() => setBrightnessAsync(0.5)}>
+    <Text>Set to 50%</Text>
+  </Pressable>
+  <Text>{permissions.status?.status ?? 'checking…'}</Text>
+  <Pressable onPress={() => permissions.request()}>
+    <Text>Request permission</Text>
+  </Pressable>
+</View>
+```
+
+```tsx
+// Solid — trimmed from examples/expo-solid/screens/BrightnessScreen.tsx
+import { createSignal, onCleanup } from 'solid-js';
+import { Pressable, Text, View } from '@symbiote-native/solid';
+import {
+  addBrightnessListener,
+  getBrightnessAsync,
+  setBrightnessAsync,
+} from '@symbiote-native/brightness';
+import { createPermissions } from '@symbiote-native/brightness/solid';
+
+function BrightnessScreen() {
+  const [brightness, setBrightness] = createSignal<number | null>(null);
+  const { status: permissionStatus, request: requestPermission } = createPermissions();
+
+  getBrightnessAsync().then(setBrightness);
+  const subscription = addBrightnessListener(event => setBrightness(event.brightness));
+  onCleanup(() => subscription.remove());
+
+  return (
+    <View>
+      <Text>
+        {brightness() === null ? 'checking…' : `${Math.round(brightness()! * 100)}%`}
+      </Text>
+      <Pressable onPress={() => setBrightnessAsync(0.5)}>
+        <Text>Set to 50%</Text>
+      </Pressable>
+      <Text>{permissionStatus()?.status ?? 'checking…'}</Text>
+      <Pressable onPress={() => requestPermission()}>
+        <Text>Request permission</Text>
+      </Pressable>
+    </View>
+  );
+}
+```
+
 ```ts
 // Angular — trimmed from examples/expo-angular/src/screens/BrightnessScreen.ts
 import { Component, inject, signal } from '@angular/core';
@@ -205,8 +277,9 @@ export class BrightnessScreen {
 }
 ```
 
-The real demo screens (`examples/expo-react/screens/BrightnessScreen.tsx` and its Vue/Angular
-twins in `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-angular`) additionally
+The real demo screens (`examples/expo-react/screens/BrightnessScreen.tsx` and its Vue/Svelte/
+Solid/Angular twins in `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-svelte`,
+`examples/expo-solid`, `examples/expo-angular`) additionally
 gate an Android-only system-brightness-mode card behind `Platform.OS === 'android'` — see
 [API](#api) below for that surface's full signatures.
 
@@ -315,8 +388,9 @@ ViewConfig. Native rendering itself is verified on-device (see the parent
 ## Known gaps
 
 - Not yet wired into the public, non-Expo `examples/react` canary — only in `examples/expo-react`
-  (and its Vue/Angular Expo twins, `examples/expo-vue-sfc`/`examples/expo-vue-tsx`/
-  `examples/expo-angular`, all of which already have full three-layer native wiring: Android
-  `MainApplication.kt` registration + `WRITE_SETTINGS`, plus the iOS Podfile/pod install).
+  (and its Vue/Svelte/Solid/Angular Expo twins, `examples/expo-vue-sfc`/`examples/expo-vue-tsx`/
+  `examples/expo-svelte`/`examples/expo-solid`/`examples/expo-angular`, all of which already have
+  full three-layer native wiring: Android `MainApplication.kt` registration + `WRITE_SETTINGS`,
+  plus the iOS Podfile/pod install).
 - Tests exercise the JS layer only (fake native module, `vitest`) — no on-device/simulator
   automated smoke test yet, only manual verification.

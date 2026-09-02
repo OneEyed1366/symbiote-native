@@ -14,6 +14,7 @@
 
 import {
   createElement,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -23,11 +24,13 @@ import {
 import {
   createPressHandlers,
   createPressRuntime,
+  disposePressRuntime,
   rippleProps,
   buildPressableListeners,
   resolveDisabledAccessibilityState,
   noteHoverNoop,
   DEFAULT_DELAY_LONG_PRESS_MS,
+  DEFAULT_MIN_PRESS_DURATION_MS,
   type IPressHost,
   type IPressState,
   type IPressHandler,
@@ -36,6 +39,7 @@ import {
 } from '@symbiote-native/components';
 import { View } from '../../components';
 import type { IHostInstance } from '../../host-instance';
+import { flushExternalUpdate } from '../../host-config';
 import type {
   IAccessibilityProps,
   IAccessibilityStateValue,
@@ -89,6 +93,11 @@ export interface IPressableProps extends IAccessibilityProps, IAriaProps {
   children?: IChildrenProp;
 }
 
+interface IConfiguredPressableProps extends IPressableProps {
+  /** @internal Touchable* mirrors RN's Pressability minPressDuration: 0 override. */
+  __minPressDuration?: number;
+}
+
 function resolveStyle(
   style: IPressableStyle | undefined,
   state: IPressState,
@@ -105,7 +114,7 @@ function resolveChildren(
   return children;
 }
 
-export const Pressable: FC<IPressableProps> = props => {
+const PressableImpl: FC<IConfiguredPressableProps> = props => {
   const {
     onPress,
     onPressIn,
@@ -118,6 +127,7 @@ export const Pressable: FC<IPressableProps> = props => {
     hitSlop,
     pressRetentionOffset,
     unstable_pressDelay = 0,
+    __minPressDuration = DEFAULT_MIN_PRESS_DURATION_MS,
     android_ripple,
     android_disableSound,
     onHoverIn,
@@ -150,11 +160,21 @@ export const Pressable: FC<IPressableProps> = props => {
         return callback => view.measure(callback);
       },
       schedule: (callback, ms) => {
-        const id = setTimeout(callback, ms);
+        const id = setTimeout(() => flushExternalUpdate(callback), ms);
         return () => clearTimeout(id);
       },
+      now: Date.now,
     }),
     [],
+  );
+
+  // This renderer tears insertion effects down during host updates, so use the stable passive
+  // unmount seam to cancel delayed press-in, long-press and press-out callbacks.
+  useEffect(
+    () => () => {
+      disposePressRuntime(runtime);
+    },
+    [runtime],
   );
 
   const handlers = useMemo(
@@ -168,6 +188,7 @@ export const Pressable: FC<IPressableProps> = props => {
           onLongPress,
           delayLongPress,
           unstable_pressDelay,
+          minPressDuration: __minPressDuration,
           hitSlop,
           pressRetentionOffset,
         },
@@ -182,6 +203,7 @@ export const Pressable: FC<IPressableProps> = props => {
       onLongPress,
       delayLongPress,
       unstable_pressDelay,
+      __minPressDuration,
       hitSlop,
       pressRetentionOffset,
       runtime,
@@ -226,3 +248,8 @@ export const Pressable: FC<IPressableProps> = props => {
 
   return createElement(View, viewProps, inner);
 };
+
+export const Pressable: FC<IPressableProps> = PressableImpl;
+// Relative-only composition seam; it is deliberately absent from the adapter barrel.
+export const TouchablePressable: FC<IPressableProps> = props =>
+  createElement(PressableImpl, { ...props, __minPressDuration: 0 });

@@ -5,9 +5,47 @@
 // freely without touching Fabric's clone-on-write protocol directly, and it
 // lives here in shared so no adapter re-implements it.
 
+import type {
+  IFabricNode,
+  IFabricProps,
+  IRootTag,
+  IMeasureOnSuccess,
+  IMeasureInWindowOnSuccess,
+  IMeasureLayoutOnSuccess,
+} from './fabric';
+import { isAriaAliasKey } from './accessibility-props';
 import { isEventFor } from './view-config';
-import { isClassNameValue, resolveClassName } from './style-registry';
+import {
+  canonicalClassName,
+  isClassNameValue,
+  resolveActiveClassName,
+  resolveClassName,
+  type IClassNameValue,
+} from './style-registry';
 import { dlog } from './debug';
+import {
+  attachHostBehavior,
+  hasHostBehaviors,
+  markDetachCandidate,
+  ownsListener,
+  reattachHostBehaviors,
+  stashAppListener,
+  type IPayloadFold,
+} from './host-behavior';
+// A cycle, deliberately: commit.ts imports this module for the node shape, and the imperative
+// methods below call back into it. Neither side touches the other at module-evaluation time -
+// only inside a function body - so every loader (tsc, vitest, Metro) resolves it fine. The
+// alternative was a load-time `SymbioteNode.prototype.measure = ...` installed from elsewhere,
+// which is exactly the registration-side-effect shape Metro's inlineRequires silently drops in
+// release builds (see CLAUDE.md, "Never make correctness depend on a module's load-time side
+// effect").
+import {
+  measure as engineMeasure,
+  measureInWindow as engineMeasureInWindow,
+  measureLayout as engineMeasureLayout,
+  setNativeProps as engineSetNativeProps,
+  dispatchViewCommand,
+} from './commit';
 
 const BRAND: unique symbol = Symbol('symbiote.node');
 
@@ -46,7 +84,13 @@ export function isSymbioteEvent(value: unknown): value is ISymbioteEvent {
 export interface ISymbioteNode {
   readonly [BRAND]: true;
   // Fabric view name passed to createNode (RCTView, RCTImageView, RCTText, ...).
-  readonly component: string;
+  //
+  // NOT readonly, and only `setNodeComponent` may write it. A primitive whose native view depends
+  // on a prop (`TextInput`'s `multiline`) has to be able to change view without changing IDENTITY —
+  // an app's ref, the host behavior and the children all stay attached to this object while the
+  // native side is rebuilt underneath. That is the browser's own semantics for `<input type>`:
+  // the element survives, its internal representation does not.
+  component: string;
   // A text container: its descendants render as virtual text spans.
   readonly isText: boolean;
   props: Record<string, unknown>;
@@ -56,35 +100,276 @@ export interface ISymbioteNode {
   // "This node's own props changed, or something below it did." Read by the commit walk
   // (commit.ts) to skip an untouched subtree wholesale. See markDirty.
   dirty: boolean;
+  // "THIS node's own props changed since its last commit" - strictly narrower than `dirty`, which
+  // is also set by a descendant's change bubbling up. The pair splits a question the walk used to
+  // answer by brute force: `dirty` says whether to DESCEND, `propsDirty` says whether this node's
+  // own Fabric payload can possibly differ from what the mirror holds.
+  //
+  // The case it exists for is every node on the clone-bubble path. A changed leaf forces each
+  // ancestor up to the root to re-clone (a persistent parent points at specific child handles), so
+  // those ancestors are `dirty` and must be visited - but their OWN props did not change, and
+  // reconcile used to prove that by rebuilding the whole Fabric payload with fabricProps() and
+  // deep-comparing it against the mirror. That is a fresh object plus a recursive walk per
+  // ancestor per commit, to rediscover something the mutation API already knew: nobody wrote a
+  // prop here. On an ordinary update the bubble path is MOST of the visited nodes.
+  //
+  // A stale `true` is harmless (one slow path, same output); a wrongly-cleared `false` is the
+  // silent-stale-UI failure mode. So every write path errs toward marking - see markPropsDirty -
+  // and skipped nodes are deliberately NOT cleared in renderableChildren the way `dirty` is.
+  propsDirty: boolean;
+  // "A `role` or `aria-*` key has been written here at least once." The gate for the aria fold
+  // (`accessibility-props.ts`), which `fabricProps` runs on the way to the payload so a LOWERED
+  // element gets it too - it has no component wrapper to run it in.
+  //
+  // A FIELD rather than the fold's own 15-property probe, because the probe is per COMPONENT
+  // INSTANCE where this is per NODE PER BUILD: ~9 000 nodes on a create, 135 000 property reads to
+  // discover that almost none of them carry an alias. One boolean read instead, written at most
+  // once per prop write.
+  //
+  // STICKY on purpose - never cleared. Deleting the last alias leaves it true, the fold runs and
+  // returns its input by identity. Monotone, so no invalidation bug is expressible; the cost of a
+  // stale `true` is one identity-returning call on a node that once had an alias.
+  hasAriaAlias: boolean;
+  // The payload fold this node's host behavior supplied, or undefined for the ~all of them that
+  // have none. Set once at `createElement`, never per write, and read by `fabricProps` at the one
+  // point where the whole bag is known.
+  //
+  // WHY IT HANGS OFF THE BEHAVIOR AND NOT OFF `node.component`, which is how the aria and
+  // value->text folds next to it are keyed. A wrapper and its lowered twin commit the SAME Fabric
+  // view name — `RCTSinglelineTextInputView` for both `symbiote-text-input` and
+  // `symbiote-text-input-managed` — so a fold keyed on the component name runs on both, and the
+  // wrapper has already folded in its own body. Double-folding is the hazard. A behavior attaches
+  // to the LOWERED tag alone, so it is the discriminator that already exists.
+  payloadFold: IPayloadFold | undefined;
+  // "THIS node's own CHILD LIST changed since its last commit" - the third question the single
+  // `dirty` flag used to blur together with the other two. `dirty` says whether to descend,
+  // `propsDirty` whether this node's own payload can differ, `structureDirty` whether its committed
+  // child order can differ.
+  //
+  // It exists because a committed record's `children` is a SNAPSHOT taken at the last commit, and
+  // anything reading that snapshot instead of `node.children` is reading the past. commitTargeted
+  // (commit.ts) does exactly that - rebuilding an ancestor's child set from committed handles is
+  // the whole reason it is cheap - so it must refuse to run when the snapshot is stale, and this
+  // flag is the only O(1) way to know. A length check misses a reorder; comparing the arrays is the
+  // O(children) scan the fast path exists to avoid.
+  //
+  // Raised by every structural op on the PARENT (appendChild / insertBefore / removeChild / detach,
+  // plus the surface's own splice and the container's child assignment), and cleared by reconcile
+  // on the node whose children it just committed.
+  structureDirty: boolean;
+  // What Fabric currently holds for this node - `undefined` until its first commit. The retained
+  // node carries the DESIRED state (props/children); this carries the COMMITTED state the reconcile
+  // walk diffs against and the handle every imperative call is aimed at.
+  //
+  // It lives HERE, on the node, and that placement is the point. It used to be a
+  // `WeakMap<ISymbioteNode, IMirror>` kept in commit.ts, which read - fairly - as "the engine
+  // builds its own second tree beside the framework's". It never did: `ISymbioteNode` IS the host
+  // node the framework's renderer creates and mutates (React's createInstance, Vue's nodeOps
+  // createElement, Angular's Renderer2.createElement all return one), exactly as `HTMLElement` is
+  // in a browser. A node carrying its own native binding is what React does too - `fiber.stateNode`
+  // holds the same {node, canonical} pair, minted by the same createNode call - and what a DOM node
+  // does when it carries its layout box. Collapsing the side table into a field makes the code say
+  // that: there is one tree, the framework's, and each of its nodes remembers what it committed.
+  committed: IMirror | undefined;
+  // The declarative halves of this node's style — see IClassStyleParts and commitClassStyle below.
+  // `undefined` until the node's first class/style write, so a node nobody styles carries a slot
+  // and nothing more.
+  //
+  // Here for the same reason `committed` is, and the second time that move has paid: it was a
+  // `WeakMap<ISymbioteNode, IClassStyleParts>` plus a `{ ...prev, ...patch }` spread, so every
+  // class or style write cost a patch literal, a spread object, a hash get and a hash set. At
+  // 56 000 prop writes on a 4 000-row create that made commitClassStyle the largest non-GC frame
+  // in the profile (9.3 ms) and a large share of the 22% spent in GC. Written in place now.
+  //
+  // ENGINE-OWNED. An adapter reads and writes style through routeProp, never through this field.
+  styleParts: IClassStyleParts | undefined;
+
+  // RN's ReactFabricHostComponent surface - what a template/function ref hands back and what
+  // reanimated / gesture-handler / react-navigation reach through. Each resolves the node's
+  // CURRENT committed handle at call time, so a clone-on-write commit between calls is
+  // transparent, and each degrades to a silent no-op (dlog + return) before the first commit.
+  //
+  // They are PROTOTYPE methods on every node rather than closures grafted per node, and that is a
+  // measured decision, not a style one. toPublicInstance used to Object.assign six closures onto
+  // each node; on a 1 000-row benchmark press that is 54 000 closures plus 9 000 discarded object
+  // literals, each closure pinning its own context alive - and after the Vue lowering landed, GC
+  // was 30% of the create window and the single biggest bucket in the profile. A prototype costs
+  // one object for the whole process. Vue, Solid and Svelte all grafted eagerly and all pay this;
+  // React grafts lazily in getPublicInstance and never did.
+  measure(callback: IMeasureOnSuccess): void;
+  measureInWindow(callback: IMeasureInWindowOnSuccess): void;
+  measureLayout(
+    relativeToNativeNode: ISymbioteNode | number,
+    onSuccess: IMeasureLayoutOnSuccess,
+    onFail?: () => void,
+  ): void;
+  setNativeProps(nativeProps: Record<string, unknown>): void;
+  focus(): void;
+  blur(): void;
+}
+
+const FOCUS_COMMAND = 'focus';
+const BLUR_COMMAND = 'blur';
+
+// The one shape every retained node has. A class, not an object literal, for two reasons: the six
+// imperative methods live on the shared prototype instead of being allocated per node (see
+// ISymbioteNode above), and both factories below mint the same hidden class.
+//
+// Fields are `declare`d and assigned in the constructor rather than written as class fields: with
+// ES2022 field semantics the two are equivalent in meaning but not in emit, and a plain
+// constructor assignment is the shape every engine (V8 and Hermes both) handles without a
+// define-per-field.
+class SymbioteNode implements ISymbioteNode {
+  declare readonly [BRAND]: true;
+  declare component: string;
+  declare readonly isText: boolean;
+  declare props: Record<string, unknown>;
+  declare listeners: Map<string, IListener> | undefined;
+  declare children: ISymbioteNode[];
+  declare parent: ISymbioteNode | undefined;
+  declare dirty: boolean;
+  declare propsDirty: boolean;
+  declare hasAriaAlias: boolean;
+  declare structureDirty: boolean;
+  declare committed: IMirror | undefined;
+  declare styleParts: IClassStyleParts | undefined;
+  declare payloadFold: IPayloadFold | undefined;
+
+  constructor(
+    component: string,
+    isText: boolean,
+    props: Record<string, unknown>,
+  ) {
+    this[BRAND] = true;
+    this.component = component;
+    this.isText = isText;
+    this.props = props;
+    this.listeners = undefined;
+    this.children = [];
+    this.parent = undefined;
+    // A node that has never committed must never take a fast path built on "the mirror already
+    // agrees with me", so all three flags start raised - including for createRawText, whose props
+    // are assigned here rather than through setText.
+    this.dirty = true;
+    this.propsDirty = true;
+    // Assigned here, not lazily on first use: every slot present from the constructor keeps one
+    // hidden class for every node. Adding it on demand buys a shape transition per aria-bearing
+    // node, which is the opposite of what this field is for.
+    //
+    // Starts false, and that is COMPLETE rather than optimistic: the only two constructions are
+    // `createElement`'s `{}` and `createRawText`'s `{ text }`, so no aria key can arrive here. It
+    // was first written as `hasAriaAliases(props)` — a probe that reads as a safeguard and can
+    // never fire, which the break-test caught by staying green with it removed. If a construction
+    // path is ever added that passes real props, this line owes that probe back.
+    this.hasAriaAlias = false;
+    this.structureDirty = true;
+    this.committed = undefined;
+    this.styleParts = undefined;
+    // Assigned here for the same hidden-class reason as `hasAriaAlias` above; `attachHostBehavior`
+    // overwrites it a few lines later for the rare node that has a behavior.
+    this.payloadFold = undefined;
+  }
+
+  measure(callback: IMeasureOnSuccess): void {
+    engineMeasure(this, callback);
+  }
+
+  measureInWindow(callback: IMeasureInWindowOnSuccess): void {
+    engineMeasureInWindow(this, callback);
+  }
+
+  measureLayout(
+    relativeToNativeNode: ISymbioteNode | number,
+    onSuccess: IMeasureLayoutOnSuccess,
+    onFail?: () => void,
+  ): void {
+    if (!isSymbioteNode(relativeToNativeNode)) {
+      dlog('measureLayout: relative target must be a host ref');
+      return;
+    }
+    engineMeasureLayout(this, relativeToNativeNode, onSuccess, onFail);
+  }
+
+  setNativeProps(nativeProps: Record<string, unknown>): void {
+    engineSetNativeProps(this, nativeProps);
+  }
+
+  focus(): void {
+    dispatchViewCommand(this, FOCUS_COMMAND, []);
+  }
+
+  blur(): void {
+    dispatchViewCommand(this, BLUR_COMMAND, []);
+  }
+}
+
+// The committed-state record. `tag` is the reactTag minted at first create, stable across
+// clone-on-write (a clone keeps the family), kept so the native-driven Animated path can bind to it
+// directly. `rootTag` lets a targeted re-commit (setNativeProps) find the surface.
+export interface IMirror {
+  handle: IFabricNode;
+  tag: number;
+  rootTag: IRootTag;
+  props: IFabricProps;
+  children: readonly ISymbioteNode[];
+  viewName: string;
+  parent: ISymbioteNode | undefined;
+  // Back-reference to the node this record was written on, read by committedOf below and by
+  // nothing else. See there for why a plain property read needs it and a WeakMap did not.
+  owner: ISymbioteNode;
+}
+
+/**
+ * The committed record for `node`, or `undefined` if it has never been committed - or if `node` is
+ * not the raw retained node at all.
+ *
+ * That second case is the reason this is a function rather than a bare `node.committed` read. The
+ * engine identifies a node BY IDENTITY, and the classic way to break that is to hand the engine a
+ * wrapper instead of the node: a Vue `reactive()`/deep-`ref()` Proxy around a host element is the
+ * one that actually happens (see the vue-adapter-reactivity skill; `shallowRef` is the fix).
+ *
+ * The old WeakMap caught this for free - a Proxy is a different object, so `mirror.get(proxy)` missed
+ * and every imperative API bailed with a clear "node not committed". A plain property read does NOT:
+ * a Proxy forwards `proxy.committed` straight to the target and hands back a real record, whose
+ * `handle` Vue would then deep-wrap on the way out. That handle is a JSI host object; a Proxy around
+ * it reaches `cloneNodeWithNewProps` and fails somewhere deep in native, far from the cause.
+ *
+ * So the identity check that was implicit in the WeakMap is explicit here: a record written on the
+ * raw node names it, and `record.owner !== node` means whatever we were handed is not that node.
+ * One reference comparison, and the wrap now fails LOUDER than it used to rather than quieter.
+ */
+export function committedOf(node: ISymbioteNode): IMirror | undefined {
+  const record = node.committed;
+  if (record === undefined) return undefined;
+  if (record.owner !== node) {
+    dlog(
+      `node identity mismatch: committed record belongs to node=${debugNodeId(record.owner)}, ` +
+        `not to the object handed in. A wrapped/proxied node (Vue reactive() or deep ref() around ` +
+        `a host element) is the usual cause - hold host nodes with shallowRef.`,
+    );
+    return undefined;
+  }
+  return record;
 }
 
 export function createElement(
   component: string,
   isText = false,
+  // The intrinsic tag this node came from, when it differs from the Fabric view name above. The
+  // behavior registry is keyed by tag and the node only ever carries the resolved name, so an
+  // adapter lowering `<Pressable>` has to hand the tag over here or the registration cannot fire
+  // (host-behavior.ts, `attached`). Nothing is stored — the lookup happens once, right below.
+  tag: string = component,
 ): ISymbioteNode {
-  return {
-    [BRAND]: true,
-    component,
-    isText,
-    props: {},
-    listeners: undefined,
-    children: [],
-    parent: undefined,
-    dirty: true,
-  };
+  const node = new SymbioteNode(component, isText, {});
+  // Gated on the boolean, not on the Map: this runs ~9 000 times per benchmark create, and an app
+  // that registers nothing must pay one boolean read rather than a hash lookup per node.
+  if (hasHostBehaviors()) attachHostBehavior(node, tag);
+  return node;
 }
 
 export function createRawText(text: string): ISymbioteNode {
-  return {
-    [BRAND]: true,
-    component: RAW_TEXT_COMPONENT,
-    isText: false,
-    props: { text },
-    listeners: undefined,
-    children: [],
-    parent: undefined,
-    dirty: true,
-  };
+  return new SymbioteNode(RAW_TEXT_COMPONENT, false, { text });
 }
 
 // `instanceHandle` round-trips through Fabric unchanged: the object we pass to
@@ -150,12 +435,72 @@ export function isEmptyRawText(node: ISymbioteNode): boolean {
 // every render, so marking there would re-dirty the whole tree every commit and hand the win back.
 // The one listener that DOES change a Fabric prop, `layout`, raises `onLayout` through setProp
 // below and is marked that way.
+/**
+ * Change which Fabric view a node commits as, keeping the node's identity.
+ *
+ * The commit walk already re-creates a node whose `viewName` no longer matches its committed one —
+ * that is how a `<Text>` moving in or out of another `<Text>` flips between RCTText and
+ * RCTVirtualText (`commit.ts`, reason `view-kind`). This exposes the same door for a prop-driven
+ * view choice, so `intrinsicWhen` is honoured on UPDATE and not only at create.
+ *
+ * The POLICY stays out of the engine: which prop decides, and which view it decides between, lives
+ * in `HOST_PRIMITIVES` and is read by `resolveIntrinsicTag` in `@symbiote-native/components`. The
+ * engine only knows how to swap the name — the same split every other spec-driven fold has here.
+ *
+ * A no-op when the name is unchanged, so a renderer may call it on every update without comparing
+ * first.
+ */
+export function setNodeComponent(node: ISymbioteNode, component: string): void {
+  if (node.component === component) return;
+  node.component = component;
+  // `dirty` alone is not enough: the walk's reuse test also requires the node be visited at all,
+  // and a node whose own props did not change this tick is exactly the case that would be skipped.
+  markDirty(node);
+  markPropsDirty(node);
+}
+
 export function markDirty(node: ISymbioteNode): void {
   let current: ISymbioteNode | undefined = node;
   while (current !== undefined && !current.dirty) {
     current.dirty = true;
     current = current.parent;
   }
+}
+
+// The prop-write twin of markDirty: raises this node's OWN props flag and then bubbles the subtree
+// flag as usual. Every path that writes `node.props` must come through here - setProp and setText
+// below, setNativeProps in commit.ts (which writes the record directly and so owes its own mark).
+//
+// Note the two flags are raised INDEPENDENTLY rather than one implying the other. markDirty stops
+// at the first already-dirty ancestor, so a node dirtied a moment ago by a child's change would
+// otherwise have its own prop write silently dropped: the walk would exit before setting anything
+// here. Setting propsDirty first, unconditionally, is what makes that ordering safe.
+export function markPropsDirty(node: ISymbioteNode): void {
+  node.propsDirty = true;
+  markDirty(node);
+}
+
+// The structural twin. Raised on the PARENT whose child list changed - never on the moved child,
+// for the same reason markDirty is not (see the structural ops below).
+//
+// Every caller must reach here BEFORE mutating `parent.children`, and that ordering is now
+// load-bearing rather than stylistic. reconcile stores the reconciled child list in the committed
+// record BY REFERENCE, so for a parent holding no anchors the record ALIASES `parent.children`;
+// this call is the last moment the committed list can still be read. Taking the copy here means it
+// is taken once per parent per commit->mutation cycle, and only for parents that actually change,
+// instead of once per node per commit - 9 002 arrays on a 1 000-row create, all but a handful
+// allocated only to be discarded unread.
+//
+// The identity test is what keeps it honest: a record whose `children` is NOT `parent.children`
+// either already holds a copy (this cycle's first structural op ran) or holds the private array
+// renderableChildren built to flatten anchors away, which nobody mutates. Neither needs saving.
+export function markStructureDirty(parent: ISymbioteNode): void {
+  const record = parent.committed;
+  if (record !== undefined && record.children === parent.children) {
+    record.children = parent.children.slice();
+  }
+  parent.structureDirty = true;
+  markDirty(parent);
 }
 
 // How many prop writes actually landed, and how many the no-op guard below turned away.
@@ -221,28 +566,83 @@ export function setProp(
     }
     node.props[key] = value;
   }
+  // The single choke point for the aria gate. `routeProp`'s other branches — class, style,
+  // activeStyle, on* — return before reaching here and none of them can carry an alias, so every
+  // `role` / `aria-*` write in the engine passes through this line.
+  if (!node.hasAriaAlias && isAriaAliasKey(key)) node.hasAriaAlias = true;
   propStats.writes += 1;
-  markDirty(node);
+  markPropsDirty(node);
 }
 
-// Fabric gates layout events behind a boolean prop (BaseViewProps.onLayout): unlike
-// scroll / touch / change, which the native component emits unconditionally, a
-// layout event fires only when the shadow node is flagged. So a `layout` listener
-// must also raise that prop, mirroring RN's `onLayout: true` validAttribute;
-// otherwise onLayout never fires and anything measuring its own box (VirtualizedList
-// viewport) stays at zero.
-const LAYOUT_EVENT = 'layout';
-const LAYOUT_FLAG_PROP = 'onLayout';
+// Fabric gates a handful of events behind a BOOLEAN prop: unlike scroll / touch / change, which
+// the native component emits unconditionally, these fire only when the shadow node carries the
+// flag. RN raises them with an `on*: true` validAttribute; we drop function props from the
+// payload, so a gated handler attaches on our side and the native event simply never arrives.
+// That is silent - a test asserting the listener is present passes, and only a device shows it.
+//
+// The list is exhaustive as of react-native 0.86: every `bool on*` field in Fabric's C++ props
+// (`ReactCommon/react/renderer/components/**`), each read behind an `if` before the emitter runs:
+//
+//   BaseViewProps.onLayout                         ParagraphShadowNode.cpp / RCTViewComponentView
+//   AccessibilityProps.onAccessibilityTap          RCTViewComponentView.mm:1603
+//   AccessibilityProps.onAccessibilityMagicTap     RCTViewComponentView.mm:1613
+//   AccessibilityProps.onAccessibilityEscape       RCTViewComponentView.mm:1623
+//   AccessibilityProps.onAccessibilityAction       RCTViewComponentView.mm:1633
+//   BaseParagraphProps.onTextLayout                ParagraphShadowNode.cpp:351
+//
+// Keyed by the post-`listenerName` event name, valued with the payload key. `magicTap` maps to
+// `onMagicTap` and NOT to the C++ member name `onAccessibilityMagicTap`, because `onMagicTap` is
+// what RN's own view config declares (BaseViewConfig.ios.js) - the two disagree upstream, and
+// matching stock is the only defensible choice until RN resolves it.
+const GATED_EVENT_PROPS: ReadonlyMap<string, string> = new Map([
+  ['layout', 'onLayout'],
+  ['textLayout', 'onTextLayout'],
+  ['accessibilityTap', 'onAccessibilityTap'],
+  ['magicTap', 'onMagicTap'],
+  ['accessibilityEscape', 'onAccessibilityEscape'],
+  ['accessibilityAction', 'onAccessibilityAction'],
+]);
 
 // The explicit event channel. Structural adapters (Svelte addEventListener, Angular
 // Renderer2.listen) call this directly with an already-known event name; flat-bag
 // adapters reach it through routeProp. A non-function value clears the listener.
+/**
+ * Install a listener the BEHAVIOR owns, bypassing the ownership check.
+ *
+ * `setEventListener` diverts an owned name into the stash, which is right for an app listener and
+ * circular for the behavior's own dispatcher — it would stash itself and never occupy the slot it
+ * exists to hold. This is the one writer allowed past that gate.
+ */
+export function setBehaviorListener(
+  node: ISymbioteNode,
+  name: string,
+  listener: IListener,
+): void {
+  (node.listeners ??= new Map()).set(name, listener);
+  const flagProp = GATED_EVENT_PROPS.get(name);
+  if (flagProp !== undefined) setProp(node, flagProp, true);
+}
+
 export function setEventListener(
   node: ISymbioteNode,
   name: string,
   value: unknown,
 ): void {
   const isHandler = typeof value === 'function';
+  // A name a host behavior OWNS never reaches `node.listeners` — the behavior's dispatcher holds
+  // that slot and the app's callback is stashed beside it. `node.listeners` is single-slot, so
+  // without this the two evict each other and the last writer wins with no diagnostic; and the
+  // keys at stake are the ones a gesture STARTS on, so the loser is silently pressless. The
+  // component wrapper used to mediate this by destructuring the app's callbacks out before they
+  // reached the node; lowering removes the mediator. Gated on the boolean first, so an app with no
+  // behavior registered pays one read.
+  if (hasHostBehaviors() && ownsListener(node, name)) {
+    stashAppListener(node, name, isHandler ? value : undefined);
+    const flagged = GATED_EVENT_PROPS.get(name);
+    if (flagged !== undefined)
+      setProp(node, flagged, isHandler ? true : undefined);
+    return;
+  }
   if (isHandler) {
     const handler = value;
     const listeners = (node.listeners ??= new Map());
@@ -250,8 +650,9 @@ export function setEventListener(
   } else {
     node.listeners?.delete(name);
   }
-  if (name === LAYOUT_EVENT)
-    setProp(node, LAYOUT_FLAG_PROP, isHandler ? true : undefined);
+  const flagProp = GATED_EVENT_PROPS.get(name);
+  if (flagProp !== undefined)
+    setProp(node, flagProp, isHandler ? true : undefined);
 }
 
 const ON_PREFIX = /^on[A-Z]/;
@@ -307,32 +708,179 @@ const REACT_JSX_DEV_PROPS: ReadonlySet<string> = new Set([
 // React JSX `className`, Vue template `class`, and Angular's addClass/removeClass token
 // accumulation (adapters/angular/src/renderer.ts, which joins its tokens into one string and
 // hands it to routeProp same as the others) all funnel through the same two branches below.
-interface IClassStyleParts {
-  classStyle?: unknown;
-  explicitStyle?: unknown;
+export interface IClassStyleParts {
+  classStyle: unknown;
+  explicitStyle: unknown;
   // The hide-without-unmount slot, LAST so it wins over both halves, and cleared rather than
   // overwritten so unhiding restores exactly what the author wrote. React's `Activity` (and any
   // future adapter equivalent) needs a node to stop painting while its state and its children
   // stay mounted; RN's own renderer does this by writing `style: {display:'none'}` straight onto
   // the instance, which here would clobber the declarative style and leave nothing to restore
   // from. A third part costs one array slot and makes the operation exactly reversible.
-  hiddenStyle?: unknown;
+  hiddenStyle: unknown;
+  // The authored class value, kept so the PRESSED variant can be resolved on demand. Stored
+  // rather than resolved up front because `routeProp`'s class branch runs ~14 000 times on one
+  // benchmark create and a press happens once per interaction: paying a second cache lookup per
+  // WRITE to serve a state almost no node is ever in is the trade this project keeps refusing.
+  className: IClassNameValue | undefined;
+  isPressed: boolean;
+  // The pressed variant of the EXPLICIT style, supplied by a compiler rather than by the class
+  // registry. A functional `style={({pressed}) => …}` is the shape every framework's community
+  // writes, and it forces the primitive to stay a COMPONENT because the template reads the press
+  // state. Specialising that arrow at both values of `pressed` — a build-time AST substitution,
+  // not an evaluation — turns it into two plain objects, and this is where the second one lives.
+  // So `:active` is one way to deliver a pressed look and this is the other; the engine does the
+  // same thing with both.
+  activeStyle: unknown;
+  // Whether slot 1's pressed variant came from resolving a FUNCTION `style` here, rather than from
+  // an explicit `activeStyle` write by a lowering transform. Only the first kind may be cleared
+  // when `style` later arrives as a plain value — clearing the second would break the transform's
+  // two-write path, where `style` and `activeStyle` are separate props and either may land first.
+  activeStyleFromCallback: boolean;
 }
-const classStyleParts = new WeakMap<ISymbioteNode, IClassStyleParts>();
 
-// The fresh array below means setProp's no-op guard never fires for `style`, and that is
-// DELIBERATE - do not "finish the optimization" by skipping when both halves are unchanged.
-// `classStyleParts` is a shadow copy of the declarative style, and setNativeProps bypasses it
-// (it writes node.props.style directly, merging an Animated frame onto whatever is there). An
-// app that hands over a hoisted style constant - StyleSheet.create, a module-level object - would
-// then re-push an identity-equal half, get skipped, and never restore the declarative style the
-// animation overwrote. The re-push IS the restore path.
-function commitClassStyle(
+// All slots are present from the start rather than added as they are written: one hidden class for
+// every styled node in the app, instead of a shape transition per slot.
+// Narrowed rather than cast: `routeProp` takes `unknown`, and a bare `typeof v === 'function'`
+// leaves TS with `Function`, which is callable with anything. This states the shape the contract
+// actually promises.
+function isStyleCallback(
+  value: unknown,
+): value is (state: { pressed: boolean }) => unknown {
+  return typeof value === 'function';
+}
+
+function stylePartsOf(node: ISymbioteNode): IClassStyleParts {
+  return (node.styleParts ??= {
+    classStyle: undefined,
+    explicitStyle: undefined,
+    hiddenStyle: undefined,
+    className: undefined,
+    isPressed: false,
+    activeStyle: undefined,
+    activeStyleFromCallback: false,
+  });
+}
+
+// What belongs in slot 0 right now. The pressed variant is a complete REPLACEMENT rather than an
+// overlay: `resolveActiveClassName` resolves the element's tokens PLUS `:active` through the same
+// matcher, so a `.btn:active` rule joins the cascade exactly as its specificity says and the
+// result already contains everything `.btn` gave. That is why pressing needs no extra style slot
+// and leaves the published array's SHAPE untouched.
+//
+// Resolved LAZILY, at press time, never beside `classStyle`. Eager would mean two resolutions per
+// class WRITE — ~14 000 of them on one benchmark create — and twice the distinct keys in a cache
+// that clears whole on overflow, to serve a state almost no node is ever in. A press is one event
+// on one node, so the second lookup is invisible there.
+//
+// `:active` applies only to a class that reaches the engine as a STRING, and the reason it is a
+// footnote rather than a gap is that essentially nothing delivers anything else.
+//
+//   Vue      createVNode normalises class to a string before patchProp ever sees it — in
+//            @vue/runtime-core, `if (klass && !isString(klass)) props.class =
+//            normalizeClass(klass)`. So `:class="{btn:true}"` arrives as `"btn"`. Cited by the
+//            expression, not a line: the package ships several builds of that file and the same
+//            statement sits on a different line in each, so two readers comparing notes see a
+//            contradiction that is not one.
+//   Angular  Ivy compiles every class form to per-token addClass/removeClass, and the renderer
+//            joins the accumulated tokens into ONE string before routeProp.
+//   React    `className` is a string by convention.
+//   Svelte   `normalizeSvelteClass` (adapters/svelte/src/class-value.ts) joins a clsx-shaped
+//            value, and hands anything else through UNCHANGED — so Svelte never sends a class
+//            MAP, but it does send a non-string class, deliberately, and it is the one live
+//            producer of the branch below.
+//
+// An OBJECT here is not a class map at all — `IClassNameValue` types it as an IResolvedStyle, the
+// channel ScrollView / VirtualizedList / FlatList / ImageBackground use to hand a style through
+// the class prop, and Svelte's `resolveSvelteClass` exists to feed it. Canonicalising that into
+// tokens would not have been a category error only in theory: it would have hit a live producer on
+// four components, and they would have silently lost their styling. Do not "simplify" the object
+// branch away.
+//
+// What remains is an ARRAY of plain strings, which no adapter produces today and which reduces
+// fresh on every call, so it gets neither a pressed variant nor `isAlreadyPublished`. Narrow, and
+// closable by joining an all-string array before the string path — not done here.
+//
+// The identity reasoning underneath: the registry memoises a class STRING to the same object, and
+// `isAlreadyPublished` compares slot 0 with Object.is. A variant built from a value that resolves
+// fresh each call could never be turned away by the guard, and 1 000 unpressed rows would
+// republish and re-dirty — the storm the guard exists to stop.
+// Slot 1's twin of `baseStyleOf`. The variant stands in for the AUTHORED style, so it replaces
+// slot 1 and not slot 0 — it must beat the class cascade exactly the way the authored style does,
+// and a `:active` class rule must still be able to win slot 0 underneath it.
+function explicitStyleOf(parts: IClassStyleParts): unknown {
+  return parts.isPressed && parts.activeStyle !== undefined
+    ? parts.activeStyle
+    : parts.explicitStyle;
+}
+
+function baseStyleOf(parts: IClassStyleParts): unknown {
+  return parts.isPressed && typeof parts.className === 'string'
+    ? resolveActiveClassName(parts.className)
+    : parts.classStyle;
+}
+
+// Republish the merged style after one half changed. The halves are written IN PLACE by the
+// callers below - there is no patch object and no spread, because this is the hottest function in
+// the mutation API (9.3 ms self time and a large share of GC on a 4 000-row create, when it still
+// allocated a patch literal plus a merged copy per write).
+//
+// The fresh ARRAY is the one allocation that stays, and that is DELIBERATE - do not "finish the
+// optimization" by skipping when both halves are unchanged. The parts are a shadow copy of the
+// declarative style, and setNativeProps bypasses them (it writes node.props.style directly,
+// merging an Animated frame onto whatever is there). An app that hands over a hoisted style
+// constant - StyleSheet.create, a module-level object - would then re-push an identity-equal half,
+// get skipped by setProp's Object.is guard, and never restore the declarative style the animation
+// overwrote. The re-push IS the restore path.
+// Would `pushClassStyle` republish an array byte-identical to the one already standing? Reads the
+// last published array back out of `node.props.style` rather than remembering it in a field: that
+// array IS the record of what was published, so there is nothing to keep in sync, and no shape
+// change to the node or to IClassStyleParts.
+//
+// Sound because `pushClassStyle` is the ONLY writer of an array into that slot — both routeProp
+// branches and setNodeHidden funnel through it — so a foreign array cannot be mistaken for ours,
+// and a node whose props are still empty holds `undefined`, which is not an array, so the first
+// write can never be swallowed.
+function isAlreadyPublished(
   node: ISymbioteNode,
-  patch: Partial<IClassStyleParts>,
-): void {
-  const entry = { ...classStyleParts.get(node), ...patch };
-  classStyleParts.set(node, entry);
+  parts: IClassStyleParts,
+): boolean {
+  const published = node.props.style;
+  if (!Array.isArray(published)) return false;
+  // `baseStyleOf`, not `parts.classStyle` — the guard and the publication must read slot 0 the
+  // same way or a press is turned away as already-published and silently does nothing on device
+  // while the behavior fires correctly and nothing goes red.
+  if (!Object.is(published[0], baseStyleOf(parts))) return false;
+  // Through the resolver for the same reason as slot 0 above: guard and publication must agree, or
+  // a press is turned away as already-published and does nothing on device with nothing red.
+  if (!Object.is(published[1], explicitStyleOf(parts))) return false;
+  return parts.hiddenStyle === undefined
+    ? published.length === 2
+    : published.length === 3 && Object.is(published[2], parts.hiddenStyle);
+}
+
+function pushClassStyle(node: ISymbioteNode, parts: IClassStyleParts): void {
+  // The fresh array below can never be turned away by setProp's Object.is guard, so without this
+  // an UNCHANGED class still lands as a write AND marks the node dirty. Costs React / Vue / Svelte
+  // nothing — each diffs props before calling the engine — but Solid has no diff: a fine-grained
+  // effect re-runs whenever any signal it reads changes, so a list-wide signal makes every row
+  // re-push its own unchanged class. Measured on device 2026-08-23 (examples/solid, after
+  // host-primitive lowering): selecting one row of 1 000 read WRITES 1001 and a 10.3 ms reconcile
+  // window against Fabric's unmoved 0/0/10 — a thousand-node dirty walk for two nodes of change.
+  // Before lowering, the View component's splitProps/mergeProps memos had been absorbing it.
+  //
+  // This is NOT the naive skip the paragraph above forbids, and the array check is the difference.
+  // Skipping on "the parts are unchanged" alone would break the restore path, because
+  // setNativeProps writes node.props.style directly and a hoisted style constant would then never
+  // be restored. But setNativeProps writes an OBJECT (commit.ts: `{...flattenStyle(prev),
+  // ...flattenStyle(value)}`), never an array — so after any bypass isAlreadyPublished is false,
+  // the re-push happens exactly as before, and the restore path is untouched.
+  //
+  // Exact rather than approximate: resolveClassName memoizes a class STRING to the same object, so
+  // an unchanged class yields an identity-equal classStyle. It deliberately does not fire for an
+  // object/array class value, which resolves fresh every call — the same place setProp's Object.is
+  // already gives up on a style object, so no new asymmetry appears.
+  if (isAlreadyPublished(node, parts)) return;
   // The third slot is APPENDED ONLY WHILE HIDDEN. Writing a permanent three-element array would
   // change the style payload of every node in every app for a state almost none of them are ever
   // in — and this project spent a day removing per-frame allocations, so a slot that is undefined
@@ -340,9 +888,9 @@ function commitClassStyle(
   setProp(
     node,
     'style',
-    entry.hiddenStyle === undefined
-      ? [entry.classStyle, entry.explicitStyle]
-      : [entry.classStyle, entry.explicitStyle, entry.hiddenStyle],
+    parts.hiddenStyle === undefined
+      ? [baseStyleOf(parts), explicitStyleOf(parts)]
+      : [baseStyleOf(parts), explicitStyleOf(parts), parts.hiddenStyle],
   );
 }
 
@@ -358,7 +906,28 @@ const HIDDEN_STYLE = { display: 'none' } as const;
  * author's style byte for byte — belongs to whoever owns the style merge, and that is here.
  */
 export function setNodeHidden(node: ISymbioteNode, hidden: boolean): void {
-  commitClassStyle(node, { hiddenStyle: hidden ? HIDDEN_STYLE : undefined });
+  const parts = stylePartsOf(node);
+  parts.hiddenStyle = hidden ? HIDDEN_STYLE : undefined;
+  pushClassStyle(node, parts);
+}
+
+/**
+ * Put a node into (or out of) its pressed state, so `.x:active` rules apply.
+ *
+ * The engine-owned half of what `:active` is on the web: the press state resolves BELOW the
+ * framework and never crosses into it, which is what lets a pressable be an intrinsic tag rather
+ * than a component (`.claude/rules/host-primitive-tier.md`, tier 2). A component is forced only
+ * when the TEMPLATE must read the state — `v-slot="{ pressed }"` and the function form of `style`
+ * — and this exists so the common case does not have to.
+ *
+ * Costs nothing when no `:active` rule is registered anywhere: `resolveActiveClassName` hands back
+ * the very same object the unpressed path returns, so `isAlreadyPublished` turns the re-push away
+ * and the node is never dirtied.
+ */
+export function setNodePressed(node: ISymbioteNode, pressed: boolean): void {
+  const parts = stylePartsOf(node);
+  parts.isPressed = pressed;
+  pushClassStyle(node, parts);
 }
 
 // The explicit (non-class-derived) style half, for an adapter that builds its style prop up
@@ -366,7 +935,7 @@ export function setNodeHidden(node: ISymbioteNode, hidden: boolean): void {
 // it must merge onto this, not onto node.props.style directly, which may be the
 // [classStyle, explicitStyle] array commitClassStyle writes above.
 export function getExplicitStyle(node: ISymbioteNode): unknown {
-  return classStyleParts.get(node)?.explicitStyle;
+  return node.styleParts?.explicitStyle;
 }
 
 const CLASS_PROP_KEYS: ReadonlySet<string> = new Set(['class', 'className']);
@@ -382,13 +951,63 @@ export function routeProp(
 ): void {
   if (REACT_JSX_DEV_PROPS.has(key)) return;
   if (CLASS_PROP_KEYS.has(key)) {
-    commitClassStyle(node, {
-      classStyle: resolveClassName(isClassNameValue(value) ? value : undefined),
-    });
+    const parts = stylePartsOf(node);
+    // Canonicalised HERE so the stored value is what everything downstream keys on: an all-string
+    // array becomes one string, and then the pressed variant and isAlreadyPublished work on it
+    // exactly as on an authored string. One `typeof` for the common case.
+    parts.className = canonicalClassName(
+      isClassNameValue(value) ? value : undefined,
+    );
+    parts.classStyle = resolveClassName(parts.className);
+    pushClassStyle(node, parts);
     return;
   }
   if (key === 'style') {
-    commitClassStyle(node, { explicitStyle: value });
+    const parts = stylePartsOf(node);
+    // A FUNCTION `style` is `style={({pressed}) => …}`, the idiom this ecosystem actually writes.
+    // A lowering transform normally splits it at build time into `style` + `activeStyle`, so the
+    // engine never sees the callback — but a PUBLIC primitive tag has no transform in front of it
+    // on three adapters, and there the callback arrives here intact. Resolving it makes the
+    // compile-time split an OPTIMIZATION rather than the mechanism, the same relationship
+    // `foldHostBag` has with the compile-time prop folds.
+    //
+    // Without this the failure is silent and total: a function is not an `on*` name, so it misses
+    // `setEventListener`, lands in `setProp` as a function value, and `fabricProps` drops function
+    // props — the node commits with NO style at all. Traced by the Solid session, 2026-09-01.
+    //
+    // The callback must be PURE in `pressed`: its result is read once per state, here and under
+    // every transform's emission (`core/components/src/state-style.ts` carries the same contract).
+    if (isStyleCallback(value)) {
+      parts.explicitStyle = value({ pressed: false });
+      parts.activeStyle = value({ pressed: true });
+      parts.activeStyleFromCallback = true;
+    } else {
+      parts.explicitStyle = value;
+      // Only a variant WE derived is stale now. `style` switching from a callback to a plain value
+      // must not leave the old pressed look standing, and an `activeStyle` the transform wrote must
+      // survive a `style` write, because the two arrive as independent props in an unspecified
+      // order.
+      if (parts.activeStyleFromCallback) {
+        parts.activeStyle = undefined;
+        parts.activeStyleFromCallback = false;
+      }
+    }
+    pushClassStyle(node, parts);
+    return;
+  }
+  // Ours, never Fabric's — it is consumed here and must not reach the payload, or every pressable
+  // in the app carries an unknown key to native.
+  if (key === 'activeStyle') {
+    const parts = stylePartsOf(node);
+    parts.activeStyle = value;
+    // Slot 1 is no longer ours, by definition — whatever a callback derived earlier has just been
+    // replaced. Without this the flag outlives the value it describes: a callback sets it, this
+    // branch overwrites the slot silently, and a later plain `style` then clears a variant the
+    // engine never derived. Not reachable from a lowering transform (it emits either a callback or
+    // an explicit pair, never both for one node), but a flat-bag adapter routes a bag key by key
+    // and can deliver exactly that sequence.
+    parts.activeStyleFromCallback = false;
+    pushClassStyle(node, parts);
     return;
   }
   if (ON_PREFIX.test(key)) {
@@ -432,26 +1051,32 @@ export function setText(node: ISymbioteNode, text: string): void {
   }
   node.props.text = text;
   propStats.writes += 1;
-  markDirty(node);
+  markPropsDirty(node);
 }
 
 // Structural ops mark the PARENT chain (both the old and the new one), never the moved child:
 // a child that only changed position may legitimately still be clean, and reconcile re-checks
 // `committed.parent` on its early-exit path, so a reparent is caught there rather than by a flag.
+//
+// Each marks BEFORE touching `parent.children`, never after: the committed record may be aliasing
+// that array, and markStructureDirty is what copies it out of the way. See there.
 function detach(child: ISymbioteNode): void {
   const parent = child.parent;
   if (!parent) return;
+  markStructureDirty(parent);
   const index = parent.children.indexOf(child);
   if (index >= 0) parent.children.splice(index, 1);
   child.parent = undefined;
-  markDirty(parent);
 }
 
 export function appendChild(parent: ISymbioteNode, child: ISymbioteNode): void {
+  // A node the sweep tore down can be put back — Svelte parks live subtrees offscreen across
+  // commits. A WeakSet miss for anything freshly built, so the create path pays nothing.
+  if (hasHostBehaviors()) reattachHostBehaviors(child);
   detach(child);
+  markStructureDirty(parent);
   child.parent = parent;
   parent.children.push(child);
-  markDirty(parent);
 }
 
 export function insertBefore(
@@ -459,18 +1084,23 @@ export function insertBefore(
   child: ISymbioteNode,
   beforeChild: ISymbioteNode,
 ): void {
+  if (hasHostBehaviors()) reattachHostBehaviors(child);
   detach(child);
+  markStructureDirty(parent);
   child.parent = parent;
   const index = parent.children.indexOf(beforeChild);
   parent.children.splice(index < 0 ? parent.children.length : index, 0, child);
-  markDirty(parent);
 }
 
+// Removal only NOMINATES a behavior for teardown; the commit sweep decides. A framework may spell
+// a move as remove-then-reinsert (Solid does), so tearing down here kills the machine of a node
+// that comes back alive in the same batch — see host-behavior.ts's markDetachCandidate.
 export function removeChild(parent: ISymbioteNode, child: ISymbioteNode): void {
+  if (hasHostBehaviors()) markDetachCandidate(child);
+  markStructureDirty(parent);
   const index = parent.children.indexOf(child);
   if (index >= 0) parent.children.splice(index, 1);
   child.parent = undefined;
-  markDirty(parent);
 }
 
 // A structural census of a retained tree: how many nodes it holds, how many of those the commit

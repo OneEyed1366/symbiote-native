@@ -1,5 +1,12 @@
 # @symbiote-native/android
 
+## 0.2.1
+
+### Patch Changes
+
+- [`255c37f`](https://github.com/OneEyed1366/symbiote-native/commit/255c37fd02fea1fc0b5e8a1410fc6834b1a3c8d1) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Declare npm `keywords` and refresh the README of every companion package. Registry metadata only —
+  no runtime change.
+
 ## 0.2.0
 
 ### Minor Changes

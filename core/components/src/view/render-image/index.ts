@@ -230,7 +230,32 @@ export type IImageViewProps = {
   passthrough: Record<string, unknown>;
 };
 
-export function renderImage(view: IImageViewProps): IDescriptor {
+// The names `renderImage` CONSUMES rather than forwards — the fold's input list, and the reason it
+// is exported: an adapter that splits props before calling renderImage was copying this list by
+// hand, and a name added here reached the copy only if someone remembered. The Image behavior's
+// `foldPayload` reads it too, so the flat path and the view path cannot drift apart.
+export const IMAGE_VIEW_PROP_NAMES = [
+  'source',
+  'defaultSource',
+  'loadingIndicatorSource',
+  'style',
+  'resizeMode',
+  'tintColor',
+  'src',
+  'srcSet',
+  'alt',
+  'width',
+  'height',
+  'crossOrigin',
+  'referrerPolicy',
+] as const;
+
+// The whole of Image's prop mapping, with the `el()` wrap taken off. Split out because a LOWERED
+// `<symbiote-image>` has no component body to run it in: its behavior's `foldPayload` needs the same
+// bag at commit time, and a second implementation of this is the exact drift this file already paid
+// for once (`adapters/svelte/src/components/image/image-logic.ts` reproduces it by hand, with a
+// comment saying it had to because nothing here was exported).
+export function mapImageProps(view: IImageViewProps): Record<string, unknown> {
   // `width` / `height` aliases fold into style (ImageProps.js:195,202); explicit
   // style keys win, matching RN's `{width, height}, ...style` ordering.
   const foldedStyle =
@@ -259,6 +284,10 @@ export function renderImage(view: IImageViewProps): IDescriptor {
     mapped.loadingIndicatorSrc = readSourceUri(view.loadingIndicatorSource);
   }
 
+  return mapped;
+}
+
+export function renderImage(view: IImageViewProps): IDescriptor {
   dlog('Image -> RCTImageView');
-  return el('symbiote-image', mapped);
+  return el('symbiote-image', mapImageProps(view));
 }

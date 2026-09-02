@@ -15,6 +15,7 @@
 import {
   defineComponent,
   h,
+  onUnmounted,
   ref,
   shallowRef,
   type EmitFn,
@@ -23,12 +24,14 @@ import {
 import {
   createPressHandlers,
   createPressRuntime,
+  disposePressRuntime,
   rippleProps,
   buildPressableListeners,
   resolveDisabledAccessibilityState,
   noteHoverNoop,
   resolveAccessibilityProps,
   DEFAULT_DELAY_LONG_PRESS_MS,
+  DEFAULT_MIN_PRESS_DURATION_MS,
   type IPressHost,
   type IPressState,
   type IRectOffset,
@@ -47,7 +50,8 @@ import {
   type IStyleProp,
   type IViewStyle,
 } from '@symbiote-native/engine';
-import { View } from '../components';
+import { HOST_VIEW } from '../components';
+import { useRawAttrs } from '../composables/use-raw-attrs';
 import { normalizeVueAttrs } from '../utils/normalize-attrs';
 import type { ICtx } from '../utils/component-helpers';
 
@@ -183,7 +187,10 @@ function resolveStyle(value: unknown, state: IPressState): unknown {
 
 // Everything else forwards onto the View. User press callbacks are pure JS and must never reach
 // the host; the machine's synthesized handlers go on via buildPressableListeners.
-const HANDLED_ATTRS = [
+// A Set, not an array: forwardAttrs asks this question once per attr per Pressable instance, and
+// `Array.prototype.includes` walks all eighteen entries for every key that is NOT handled — which
+// is most of them. Membership is the whole use; the order never mattered.
+const HANDLED_ATTRS: ReadonlySet<string> = new Set([
   'onPress',
   'onPressIn',
   'onPressOut',
@@ -194,6 +201,7 @@ const HANDLED_ATTRS = [
   'cancelable',
   'pressRetentionOffset',
   'unstable_pressDelay',
+  '__minPressDuration',
   'android_ripple',
   'android_disableSound',
   'onHoverIn',
@@ -202,12 +210,12 @@ const HANDLED_ATTRS = [
   'delayHoverOut',
   'style',
   'accessibilityState',
-];
+]);
 
 function forwardAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const key of Object.keys(attrs)) {
-    if (!HANDLED_ATTRS.includes(key)) result[key] = attrs[key];
+    if (!HANDLED_ATTRS.has(key)) result[key] = attrs[key];
   }
   return result;
 }
@@ -215,8 +223,15 @@ function forwardAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
 export const Pressable = defineComponent(
   (
     _props: IPressableProps,
-    { slots, attrs: rawAttrs, emit }: ICtx<IPressableEmits, IPressableSlots>,
+    {
+      slots,
+      attrs: contextAttrs,
+      emit,
+    }: ICtx<IPressableEmits, IPressableSlots>,
   ) => {
+    // The unproxied bag, captured once. See use-raw-attrs.ts for why the context's own attrs cost
+    // a track() per read and why capturing here (a setup body) is the only safe place to do it.
+    const rawAttrs = useRawAttrs(contextAttrs);
     const pressed = ref(false);
     // The mutable press runtime (timers, suppression flags, measured region). A plain setup-scope
     // object, never a ref: mutated by the machine, never reactively read.
@@ -243,7 +258,12 @@ export const Pressable = defineComponent(
         const id = setTimeout(callback, ms);
         return () => clearTimeout(id);
       },
+      now: Date.now,
     };
+
+    onUnmounted(() => {
+      disposePressRuntime(runtime);
+    });
 
     return () => {
       const attrs = normalizeVueAttrs(rawAttrs);
@@ -262,6 +282,10 @@ export const Pressable = defineComponent(
           DEFAULT_DELAY_LONG_PRESS_MS,
         ),
         unstable_pressDelay: numberOr(attrs.unstable_pressDelay, 0),
+        minPressDuration: numberOr(
+          attrs.__minPressDuration,
+          DEFAULT_MIN_PRESS_DURATION_MS,
+        ),
         hitSlop: asRectOffset(attrs.hitSlop),
         pressRetentionOffset: asRectOffset(attrs.pressRetentionOffset),
       };
@@ -273,18 +297,18 @@ export const Pressable = defineComponent(
 
       // Vue's View is a bare host primitive, so Pressable folds disabled into accessibilityState
       // and aria/role itself, rather than the View folding it (as React's does).
+      // One bag, built once and then written into. The spread this replaces rebuilt the whole
+      // forwarded set a second time just to add three keys; resolveAccessibilityProps hands back
+      // the SAME object whenever no aria key is present, which is the common case, so on that path
+      // the render now allocates one bag instead of two.
       const forwarded = forwardAttrs(attrs);
       forwarded.accessibilityState = resolveDisabledAccessibilityState(
         asAccessibilityState(attrs.accessibilityState),
         disabled,
       );
-      const folded = resolveAccessibilityProps(forwarded);
-
-      const viewProps: Record<string, unknown> = {
-        ...folded,
-        ref: setNodeRef,
-        style: resolveStyle(attrs.style, state),
-      };
+      const viewProps = resolveAccessibilityProps(forwarded);
+      viewProps.ref = setNodeRef;
+      viewProps.style = resolveStyle(attrs.style, state);
       if (typeof attrs.android_disableSound === 'boolean')
         viewProps.android_disableSound = attrs.android_disableSound;
       Object.assign(
@@ -301,14 +325,19 @@ export const Pressable = defineComponent(
         ? rippleProps(asRippleConfig(attrs.android_ripple) ?? {})
         : undefined;
       const inner =
-        ripple !== undefined ? [h(View, ripple, () => content)] : content;
+        ripple !== undefined ? [h(HOST_VIEW, ripple, content)] : content;
 
-      // Children go to the host View as a FUNCTION slot, never a raw array: View is a
-      // functional component, and an array child makes Vue normalize it to a default
-      // slot with a dev warn ("Prefer function slots"). Benign under SFC, but in JSX the
-      // warn's trace formats the __self/__source dev props (native HostObjects) and that
-      // read throws, unwinding the whole mount → blank screen. A function slot skips it.
-      return h(View, viewProps, () => inner);
+      // The host node is the intrinsic TAG, not our <View> component: a Vue component instance
+      // costs createComponentInstance + initProps + initSlots + setupRenderEffect even when the
+      // component is functional, and this one only forwards attrs to the same tag. Pressable is
+      // 2 of the 6 primitives in a benchmark row, so this is one instance per row, twice.
+      //
+      // Children are therefore an ARRAY, and that also RETIRES a hazard: passing an array to the
+      // functional <View> made Vue normalize it to a default slot with a "Prefer function slots"
+      // dev warn, whose trace formats the __self/__source dev props (native HostObjects) — a read
+      // that throws under JSX and unwinds the whole mount into a blank screen. An element takes
+      // array children natively and never reaches that path.
+      return h(HOST_VIEW, viewProps, inner);
     };
   },
   {

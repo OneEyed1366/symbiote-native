@@ -45,6 +45,12 @@ import {
 export interface IAngularSafeAreaViewProps
   extends IAccessibilityProps, IAriaProps {
   style?: IStyleProp<IViewStyle>;
+  // `id` — accepted here and folded to `nativeID` by the shared plan, matching upstream, whose
+  // SafeAreaView takes the full ViewProps surface. Added 2026-09-01 with `ID_ALIAS` on the spec
+  // entry, deliberately as ONE change: the alias without this prop would make lowering fold a key
+  // no spelling of the component accepts, and this prop without the alias would send a raw `id` to
+  // Fabric, which declares no such key on any of these views.
+  id?: string;
   onLayout?: (event: ISymbioteEvent) => void;
 }
 
@@ -70,14 +76,7 @@ export type IAngularSafeAreaViewInputs = Omit<
   imports: [SafeAreaViewHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <symbiote-safe-area-view
-      [symbioteHostProps]="hostProps()"
-      (accessibilityAction)="emit(accessibilityAction, $event)"
-      (accessibilityTap)="emit(accessibilityTap, $event)"
-      (magicTap)="emit(magicTap, $event)"
-      (accessibilityEscape)="emit(accessibilityEscape, $event)"
-      (layout)="emit(layout, $event)"
-    >
+    <symbiote-safe-area-view [symbioteHostProps]="hostProps()">
       <ng-content></ng-content>
     </symbiote-safe-area-view>
   `,
@@ -89,6 +88,11 @@ export class SafeAreaView
   // Real @Output()s, not `[onX]="…"` callbacks. Safe to name `layout` the same as the native
   // `layout` event fired inside this component's own template — the engine's bubble() treats
   // ANCHOR_HOST_COMPONENTS as transparent to listener lookup, so there is no double-fire.
+  // `layout` plus the four accessibility events are all boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`): native fires them only when the committed
+  // payload carries a FUNCTION at that key, so a template binding here lit the gate on every
+  // instance whether or not an app ever subscribed. Moved into `hostProps()`'s flat bag below,
+  // `.observed`-gated — the shape `Pressable`'s `accessibilityEmitterHandler` already uses.
   @Output() readonly layout = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityAction = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
@@ -137,11 +141,18 @@ export class SafeAreaView
   // the only ElementRef in the class.
   private readonly elementRef = inject(ElementRef);
 
-  // Forward an engine event to the matching @Output(), narrowing the template's untyped
-  // $event first. layout / accessibility* arrive on the engine's structural event channel
-  // (Angular blocks [onX] property bindings; events flow through (event) only).
-  emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
+  // Forward an engine event to the matching @Output(), narrowing the untyped event first.
+  private emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
     if (isSymbioteEvent(event)) emitter.emit(event);
+  }
+
+  // `.observed`-gated, mirroring Pressable's `accessibilityEmitterHandler`: `undefined` here
+  // means `setEventListener` never sees a function, so the gated prop's flag never lights
+  // (`fabric-boolean-event-gates.md`, "The flag follows the VALUE, not the key").
+  private eventEmitterHandler(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): ((event: unknown) => void) | undefined {
+    return emitter.observed ? event => this.emit(emitter, event) : undefined;
   }
 
   // Bridges the non-reactive fields `hostProps` reads into the reactive graph, so it can memoize.
@@ -226,6 +237,11 @@ export class SafeAreaView
       'aria-valuemin': this.ariaValueMin,
       'aria-valuenow': this.ariaValueNow,
       'aria-valuetext': this.ariaValueText,
+      onLayout: this.eventEmitterHandler(this.layout),
+      onAccessibilityAction: this.eventEmitterHandler(this.accessibilityAction),
+      onAccessibilityTap: this.eventEmitterHandler(this.accessibilityTap),
+      onMagicTap: this.eventEmitterHandler(this.magicTap),
+      onAccessibilityEscape: this.eventEmitterHandler(this.accessibilityEscape),
     });
   });
 }

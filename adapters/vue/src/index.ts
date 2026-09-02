@@ -2,6 +2,13 @@
 // each RendererOptions call onto the engine's mutation API; all Fabric clone-on-write
 // lives in the engine, shared with every other adapter. App code names only @symbiote-native/vue.
 
+// Side-effect import, FIRST and deliberately not a re-export: it installs the engine-side press
+// machine that a lowered `<symbiote-pressable>` needs. `export * from './register'` or a bare
+// import sitting beside a re-export of the same specifier both go lazy under Metro's production
+// `inlineRequires` and the registration silently never runs in a release build. See register.ts.
+
+import './register';
+
 export { mount, unmount, setAppConfigurator } from './render';
 export type { IAppConfigurator } from './render';
 // The portal: Vue's own <Teleport>, guarded so `to` must be a node/surface this renderer actually

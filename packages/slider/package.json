@@ -1,7 +1,17 @@
 {
   "name": "@symbiote-native/slider",
-  "version": "5.2.0",
+  "version": "6.0.0",
   "description": "Third-party native Slider view wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Angular, Svelte, and Solid adapters.",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "range-slider"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -98,12 +108,12 @@
     "@symbiote-native/components": "workspace:*"
   },
   "peerDependencies": {
-    "@symbiote-native/angular": ">=0.6.2",
-    "@symbiote-native/engine": ">=0.1.7",
-    "@symbiote-native/react": ">=0.2.8",
-    "@symbiote-native/solid": ">=0.0.1",
-    "@symbiote-native/svelte": ">=0.1.0",
-    "@symbiote-native/vue": ">=0.3.8",
+    "@symbiote-native/angular": "workspace:^",
+    "@symbiote-native/engine": "workspace:^",
+    "@symbiote-native/react": "workspace:^",
+    "@symbiote-native/solid": "workspace:^",
+    "@symbiote-native/svelte": "workspace:^",
+    "@symbiote-native/vue": "workspace:^",
     "@angular/core": ">=20",
     "@angular/forms": ">=20",
     "@vue/runtime-core": "^3.5.13",

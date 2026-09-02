@@ -24,7 +24,7 @@ Then wire the `postinstall` hook so every install re-runs the linker:
 ```json
 {
   "dependencies": {
-    "@symbiote-native/expo-modules-link": "^0.1.0"
+    "@symbiote-native/expo-modules-link": "^0.4.0"
   },
   "scripts": {
     "postinstall": "symbiote-expo-link"

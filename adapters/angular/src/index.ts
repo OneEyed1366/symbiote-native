@@ -5,6 +5,8 @@
 // SEAM SCAFFOLD: mount/unmount + the renderer seam + host intrinsic selectors. Full RN-like
 // composed components still flow through the shared @symbiote-native/components bridge.
 
+import './register';
+
 export {
   ActivityIndicator,
   anchorHostStyle,

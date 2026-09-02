@@ -84,6 +84,25 @@ import { Slider } from '@symbiote-native/slider/vue';
 </template>
 ```
 
+```svelte
+<!-- Svelte — examples/svelte/screens/CanaryScreen.svelte -->
+<script lang="ts">
+  import { Slider } from '@symbiote-native/slider/svelte';
+  let volume = $state(0.6);
+</script>
+
+<Slider
+  value={volume}
+  onValueChange={next => (volume = next)}
+  minimumValue={0}
+  maximumValue={1}
+  step={0.01}
+  minimumTrackTintColor="#7fb5ff"
+  maximumTrackTintColor="#334155"
+  thumbTintColor="#ffffff"
+/>
+```
+
 ```tsx
 // Solid — the marker props arrive as an ACCESSOR, so only the leaf reading them re-runs
 import { Slider } from '@symbiote-native/slider/solid';

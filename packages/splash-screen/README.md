@@ -112,6 +112,17 @@ import { hide } from '@symbiote-native/splash-screen/angular';
 // call once from the root component's constructor/ngOnInit.
 ```
 
+```svelte
+<!-- Svelte — examples/svelte/App.svelte -->
+<script lang="ts">
+  import { hide } from '@symbiote-native/splash-screen/svelte';
+
+  $effect(() => {
+    hide();
+  });
+</script>
+```
+
 ```tsx
 // Solid
 import { onMount } from 'solid-js';

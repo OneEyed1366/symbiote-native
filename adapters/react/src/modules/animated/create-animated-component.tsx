@@ -55,8 +55,21 @@ export interface IAnimatedComponentProps {
 // presenting an open animated-friendly surface (IAnimatedComponentProps) to callers.
 type IAnimatableProps = { style?: unknown; children?: unknown };
 
+// The base may be a COMPONENT or an intrinsic TAG. Since 2026-09-01 `View` and `Text` are the tags
+// themselves (a capitalized export whose value is `'symbiote-view'`), so `createAnimatedComponent(View)`
+// hands this a string — which `createElement` has always accepted and this signature did not.
+type IAnimatableBase<P extends IAnimatableProps> = ComponentType<P> | string;
+
+// A tag has no displayName/name, so read the label through the shape actually present.
+function baseNameOf<P extends IAnimatableProps>(
+  base: IAnimatableBase<P>,
+): string {
+  if (typeof base === 'string') return base;
+  return base.displayName ?? base.name ?? 'Anonymous';
+}
+
 export function createAnimatedComponent<P extends IAnimatableProps>(
-  Component: ComponentType<P>,
+  Component: IAnimatableBase<P>,
 ): ComponentType<IAnimatedComponentProps> {
   function AnimatedComponent(props: IAnimatedComponentProps): ReactElement {
     const {
@@ -130,6 +143,6 @@ export function createAnimatedComponent<P extends IAnimatableProps>(
     return createElement(Component, childProps);
   }
 
-  AnimatedComponent.displayName = `Animated(${Component.displayName ?? Component.name ?? 'Anonymous'})`;
+  AnimatedComponent.displayName = `Animated(${baseNameOf(Component)})`;
   return AnimatedComponent;
 }

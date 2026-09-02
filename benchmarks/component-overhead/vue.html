@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Component overhead — Vue</title>
+    <style>
+      body { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 24px; max-width: 900px; }
+      h1 { font-size: 16px; }
+      p { font-family: system-ui, sans-serif; color: #333; max-width: 68ch; }
+      button { font: inherit; padding: 6px 14px; }
+      pre { background: #f4f4f5; padding: 14px; overflow-x: auto; }
+      #stage { position: absolute; left: -99999px; top: 0; width: 400px; }
+    </style>
+  </head>
+  <body>
+    <h1>Component overhead — Vue 3.5.13</h1>
+    <p>
+      Two arms, one page, one DOM. Arm A writes the row's seven elements directly; arm B wraps each
+      one in a pass-through functional component — the same shape the Symbiote Vue adapter's
+      <code>hostComponent()</code> used before lowering. A control compares the node census of both
+      arms and refuses to report a per-instance figure if they differ.
+    </p>
+    <p>
+      <strong>This measures the <code>h()</code> path, not the SFC-compiled one</strong>, and the
+      difference matters in a known direction. <code>@vue/compiler-sfc</code> gives a raw element
+      static-prop hoisting and a patch flag; a component never gets either. So a real SFC app's arm A
+      would be faster still, and this page UNDERSTATES what a template app saves by not wrapping.
+      Symbiote hit exactly this once — a headless <code>h()</code> A/B predicted 12–14% where the
+      device gave 25–29%.
+    </p>
+    <button id="run">Run</button>
+    <pre id="out">not run yet</pre>
+    <div id="stage"></div>
+
+    <script>
+      // A `type="module"` script cannot load a sibling over file:// — Chrome blocks it as a
+      // cross-origin request and the page then sits silently on "not run yet", which reads as a
+      // broken benchmark rather than a wrong URL. Say so before that can happen.
+      if (location.protocol === 'file:') {
+        document.getElementById('out').textContent =
+          'Open this over http, not file:// — the shared harness is an ES module and the browser\n' +
+          'refuses to load it from a file URL.\n\n' +
+          '  cd benchmarks/component-overhead && python3 -m http.server 8123\n' +
+          '  open http://localhost:8123/react.html';
+        document.getElementById('run').disabled = true;
+      }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.5.13/vue.global.prod.min.js"></script>
+    <script type="module">
+      import { ROWS, buildData, measurePair, report } from './harness.js';
+
+      const { createApp, h } = Vue;
+      const stage = document.getElementById('stage');
+      const out = document.getElementById('out');
+
+      // Arm B's wrappers: functional components, children through the default slot — the shape a
+      // Vue wrapper actually has. Deliberately empty otherwise, so the figure is the FLOOR of a
+      // component boundary before any prop fold.
+      const childrenOf = slots => (slots.default === undefined ? undefined : slots.default());
+      // Counted, not assumed — see control 2 in the harness.
+      let wrapperCalls = 0;
+      const Box = (props, { slots }) => { wrapperCalls += 1; return h('div', props, childrenOf(slots)); };
+      const Txt = (props, { slots }) => { wrapperCalls += 1; return h('span', props, childrenOf(slots)); };
+      const Field = props => { wrapperCalls += 1; return h('input', props); };
+
+      // The benchmark row, mirroring examples/*: 7 elements + 3 text nodes = 10 DOM nodes.
+      function rawRow(row) {
+        return h('div', { class: 'bench-row', key: row.id }, [
+          h('span', { class: 'bench-row-id' }, String(row.id)),
+          h('div', { class: 'flex1' }, [h('span', { class: 'bench-row-label' }, row.label)]),
+          h('div', { class: 'bench-row-remove' }, [h('span', { class: 'bench-row-remove-text' }, '×')]),
+          h('input', { class: 'bench-row-input', value: row.label, readonly: true }),
+        ]);
+      }
+
+      function wrappedRow(row) {
+        return h(Box, { class: 'bench-row', key: row.id }, () => [
+          h(Txt, { class: 'bench-row-id' }, () => String(row.id)),
+          h(Box, { class: 'flex1' }, () => [h(Txt, { class: 'bench-row-label' }, () => row.label)]),
+          h(Box, { class: 'bench-row-remove' }, () => [h(Txt, { class: 'bench-row-remove-text' }, () => '×')]),
+          h(Field, { class: 'bench-row-input', value: row.label, readonly: true }),
+        ]);
+      }
+
+      function armFor(rowOf) {
+        const data = buildData(ROWS);
+        const host = document.createElement('div');
+        stage.appendChild(host);
+        let app;
+        return {
+          container: host,
+          // `mount()` renders synchronously, so the whole tree exists when the clock stops. A
+          // reactive update would not — Vue batches those on a microtask.
+          mount: () => {
+            app = createApp({ render: () => h('div', null, data.map(rowOf)) });
+            app.mount(host);
+          },
+          clear: () => {
+            if (app !== undefined) app.unmount();
+            app = undefined;
+          },
+          dispose: () => host.remove(),
+        };
+      }
+
+      document.getElementById('run').addEventListener('click', () => {
+        out.textContent = 'running...';
+        requestAnimationFrame(() => {
+          const a = armFor(rawRow);
+          const b = armFor(wrappedRow);
+          const result = measurePair({ raw: a, wrapped: b, rounds: 7, warmups: 2 });
+          wrapperCalls = 0;
+          b.mount();
+          const calls = wrapperCalls;
+          b.clear();
+          a.dispose();
+          b.dispose();
+          out.textContent = `Vue ${Vue.version}\n\n${report(result, ROWS, calls)}`;
+        });
+      });
+    </script>
+  </body>
+</html>

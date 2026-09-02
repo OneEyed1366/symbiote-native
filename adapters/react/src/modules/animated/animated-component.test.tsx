@@ -20,7 +20,7 @@ beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Animated component bridge', () => {
-  it('setValue on a direct animated style key reaches the committed view', () => {
+  it('setValue on a direct animated style key reaches the committed view', async () => {
     const opacity = new Animated.Value(1);
 
     function App(): ReactElement {
@@ -34,10 +34,13 @@ describe('Animated component bridge', () => {
     expect(appView().props.opacity).toBe(1);
 
     opacity.setValue(0.3);
+    // The engine coalesces setNativeProps writes to the microtask boundary, so an animated value
+    // reaches Fabric one tick after the drive (core/engine/src/commit.ts).
+    await Promise.resolve();
     expect(appView().props.opacity).toBe(0.3);
   });
 
-  it('setValue on an interpolated value maps through the leaf', () => {
+  it('setValue on an interpolated value maps through the leaf', async () => {
     const progress = new Animated.Value(0);
     const faded = progress.interpolate({
       inputRange: [0, 1],
@@ -53,6 +56,7 @@ describe('Animated component bridge', () => {
     expect(appView().props.opacity).toBe(0);
 
     progress.setValue(0.5);
+    await Promise.resolve();
     expect(appView().props.opacity).toBe(0.5);
   });
 });

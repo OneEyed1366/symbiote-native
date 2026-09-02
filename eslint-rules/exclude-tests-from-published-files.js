@@ -7,7 +7,11 @@ import { dirname, join } from 'node:path';
 //
 // Suffixes follow the co-location convention in CLAUDE.md (`X/X.test.ts`, `X/X.detox.ts`), plus
 // `.spec.` for the other common spelling.
-const REQUIRED_EXCLUSIONS = ['!src/**/*.test.*', '!src/**/*.spec.*', '!src/**/*.detox.*'];
+const REQUIRED_EXCLUSIONS = [
+  '!src/**/*.test.*',
+  '!src/**/*.spec.*',
+  '!src/**/*.detox.*',
+];
 const TEST_FILE = /\.(test|spec|detox)\.[cm]?[jt]sx?$/;
 
 function memberOf(objectNode, name) {
@@ -38,7 +42,8 @@ export default {
     type: 'problem',
     languages: ['json/json'],
     docs: {
-      description: 'keep co-located tests out of a package that publishes its src/',
+      description:
+        'keep co-located tests out of a package that publishes its src/',
       recommended: true,
     },
     messages: {
@@ -61,7 +66,9 @@ export default {
         const srcDir = join(dirname(context.filename), 'src');
         if (!existsSync(srcDir) || !hasTestFile(srcDir)) return;
 
-        const missing = REQUIRED_EXCLUSIONS.filter(pattern => !files.includes(pattern));
+        const missing = REQUIRED_EXCLUSIONS.filter(
+          pattern => !files.includes(pattern),
+        );
         if (missing.length === 0) return;
 
         context.report({

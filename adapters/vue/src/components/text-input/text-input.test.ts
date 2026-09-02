@@ -19,6 +19,8 @@ import {
   type ITextInputHandle,
 } from '@symbiote-native/vue';
 import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+import { buildTextInputHandle } from '@symbiote-native/components';
+import { createElement } from '@symbiote-native/engine';
 
 type ICommandCall = {
   name: string;
@@ -429,5 +431,49 @@ describe('Vue TextInput on the engine', () => {
     expect(props.keyboardType).toBe('numeric');
     expect(props.editable).toBe(false);
     expect(props.returnKeyType).toBe('done');
+  });
+});
+
+// The component path's handle must carry EXACTLY what the lowered path's does. `expose()` REPLACES
+// the public instance rather than extending it, so the four node methods are not inherited — they
+// are forwarded by hand, and nothing in Vue's types notices when one is missing: `expose()` takes
+// an untyped object. React, Angular and Solid all had this gap closed by the compiler the moment
+// `ITextInputHandle` became a union; Vue and Svelte are the two adapters where parity here is held
+// by a test or by nothing.
+//
+// The expected set is DERIVED from `buildTextInputHandle` rather than listed. A list is a second
+// copy of the contract and drifts silently in the direction that matters — core grows a method,
+// this file keeps passing, and the component path quietly falls behind again. Naming them here
+// would also make the test pass for a reason unrelated to core.
+describe('the exposed handle matches what core builds for the lowered path', () => {
+  it('exposes every method core builds, and each is callable', async () => {
+    const handleRef = ref<ITextInputHandle | null>(null);
+    mount(
+      ROOT_TAG,
+      defineComponent({
+        setup: () => () => h(TextInput, { value: 'x', ref: handleRef }),
+      }),
+    );
+    await tick();
+
+    const exposed = handleRef.value;
+    expect(exposed, 'imperative handle captured after commit').not.toBeNull();
+    if (exposed === null) return;
+
+    // Any node will do: the handle only closes over it, and this asserts the SHAPE core produces.
+    const expected = Object.keys(
+      buildTextInputHandle(createElement('RCTView')),
+    );
+    expect(expected.length, 'core builds a non-empty handle').toBeGreaterThan(
+      0,
+    );
+
+    const missing = expected.filter(
+      name => typeof Reflect.get(exposed, name) !== 'function',
+    );
+    expect(
+      missing,
+      'methods core builds that the component path does not expose',
+    ).toEqual([]);
   });
 });

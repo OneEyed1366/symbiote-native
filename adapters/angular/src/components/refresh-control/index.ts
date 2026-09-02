@@ -109,10 +109,6 @@ export type IAngularRefreshControlInputs = Omit<
       #host
       [symbioteHostProps]="hostProps()"
       (refresh)="handleRefresh()"
-      (accessibilityAction)="emit(accessibilityAction, $event)"
-      (accessibilityTap)="emit(accessibilityTap, $event)"
-      (magicTap)="emit(magicTap, $event)"
-      (accessibilityEscape)="emit(accessibilityEscape, $event)"
     >
       <ng-content></ng-content>
     </symbiote-refresh-control>
@@ -252,8 +248,17 @@ export class RefreshControl
 
   // Forward an engine event to the matching @Output(), narrowing the template's untyped $event
   // first. The accessibility* events arrive on the engine's structural event channel.
-  emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
+  private emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
     if (isSymbioteEvent(event)) emitter.emit(event);
+  }
+
+  // The four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`): a template binding here lit the gate on every
+  // instance whether or not an app ever subscribed. `.observed`-gated, mirroring Pressable's.
+  private eventEmitterHandler(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): ((event: unknown) => void) | undefined {
+    return emitter.observed ? event => this.emit(emitter, event) : undefined;
   }
 
   // The anchor's class-derived style is NOT an @Input: `class="..."`/`[ngClass]` at the use site
@@ -294,6 +299,10 @@ export class RefreshControl
       nativeID: this.nativeID,
       accessible: this.accessible,
       ...this.folded,
+      onAccessibilityAction: this.eventEmitterHandler(this.accessibilityAction),
+      onAccessibilityTap: this.eventEmitterHandler(this.accessibilityTap),
+      onMagicTap: this.eventEmitterHandler(this.magicTap),
+      onAccessibilityEscape: this.eventEmitterHandler(this.accessibilityEscape),
     };
   });
 

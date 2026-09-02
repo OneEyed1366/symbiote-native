@@ -72,13 +72,7 @@ export type IAngularInputAccessoryViewInputs = Omit<
   imports: [InputAccessoryViewHost, SymbioteHostPropsDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <symbiote-input-accessory-view
-      [symbioteHostProps]="hostProps()"
-      (accessibilityAction)="emit(accessibilityAction, $event)"
-      (accessibilityTap)="emit(accessibilityTap, $event)"
-      (magicTap)="emit(magicTap, $event)"
-      (accessibilityEscape)="emit(accessibilityEscape, $event)"
-    >
+    <symbiote-input-accessory-view [symbioteHostProps]="hostProps()">
       <ng-content></ng-content>
     </symbiote-input-accessory-view>
   `,
@@ -136,8 +130,16 @@ export class InputAccessoryView
   private readonly elementRef = inject(ElementRef);
 
   // Forward an engine event to the matching @Output(), narrowing the template's untyped $event.
-  emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
+  private emit(emitter: EventEmitter<ISymbioteEvent>, event: unknown): void {
     if (isSymbioteEvent(event)) emitter.emit(event);
+  }
+
+  // The four accessibility events are boolean-GATED Fabric events
+  // (`.claude/rules/fabric-boolean-event-gates.md`). `.observed`-gated, mirroring Pressable's.
+  private eventEmitterHandler(
+    emitter: EventEmitter<ISymbioteEvent>,
+  ): ((event: unknown) => void) | undefined {
+    return emitter.observed ? event => this.emit(emitter, event) : undefined;
   }
 
   // renderInputAccessoryView owns the host-node assembly (shared with React/Vue); the adapter reads
@@ -190,6 +192,10 @@ export class InputAccessoryView
     return {
       ...descriptorProps,
       style: [anchorHostStyle(this.elementRef), descriptorProps.style],
+      onAccessibilityAction: this.eventEmitterHandler(this.accessibilityAction),
+      onAccessibilityTap: this.eventEmitterHandler(this.accessibilityTap),
+      onMagicTap: this.eventEmitterHandler(this.magicTap),
+      onAccessibilityEscape: this.eventEmitterHandler(this.accessibilityEscape),
     };
   });
 

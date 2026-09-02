@@ -42,6 +42,7 @@ import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../render';
 import { Pressable } from '../components/pressable';
 import { TextHost as Text, ViewHost as View } from '../primitives';
+import { TextInput } from '../components/text-input';
 import { registerComposedComponent } from '../anchor-host-registry';
 
 const ROOT_TAG = 4242;
@@ -52,6 +53,9 @@ const SCREEN_PATH = 'examples/angular/src/screens/BenchmarkScreen.ts';
 const NATIVE_VIEWS_PER_ROW = 9;
 const COMPOSED_NODES_PER_ROW = 12;
 const FLAT_NODES_PER_ROW = 9;
+// The with-input arm's own view count: NATIVE_VIEWS_PER_ROW + one real <TextInput> — see
+// examples/angular's ROW_CONTENT.
+const WITH_INPUT_VIEWS_PER_ROW = NATIVE_VIEWS_PER_ROW + 1;
 
 // RN's synthetic box-none AppContainer, plus the fixture's own list View. The rows sit under a
 // View rather than directly under the surface because a @for at the surface ROOT renders nothing
@@ -93,9 +97,17 @@ const ROW_CLASS = 'bench-row';
 const ROW_CLASS_SELECTED = 'bench-row bench-row-selected';
 
 // ---------------------------------------------------------------------------
-// The two row shapes, verbatim from the screen (see the drift fence at the end).
+// Three row shapes. Only ONE of them is still a literal copy of anything the screen renders —
+// see the drift fence at the end and the note above each constant below.
 // ---------------------------------------------------------------------------
 
+// FIXTURE ONLY as of 2026-09-01 — the screen dropped its row-shape/row-content toggles down to
+// one row (below), so this "composed, no TextInput" shape no longer exists there literally. Kept
+// verbatim anyway: it is still the real adapter property `flat vs composed commit an identical
+// Fabric tree` measures (tests below), independent of what the example currently ships, and that
+// oracle is the only thing in the repo comparing Angular's two paths at all
+// (`.claude/rules/fabric-boolean-event-gates.md`). Not fenced against the screen — see the `it`
+// at the end for why fencing a fixture with no literal counterpart would just go vacuous.
 const COMPOSED_ROW_TEMPLATE = `
     <View [class]="rowClass">
       <Text class="bench-row-id">{{ rowId }}</Text>
@@ -108,6 +120,25 @@ const COMPOSED_ROW_TEMPLATE = `
     </View>
   `;
 
+// THE SCREEN'S ONLY ROW as of 2026-09-01 (formerly its `ROW_CONTENT.WithInput` arm; the toggle
+// that picked between this and `COMPOSED_ROW_TEMPLATE` above is gone, and this is what stayed).
+// The one constant here still fenced against the screen — see the `it` at the end.
+const WITH_INPUT_ROW_TEMPLATE = `
+    <View [class]="rowClass">
+      <Text class="bench-row-id">{{ rowId }}</Text>
+      <Pressable class="flex1" (press)="select.emit(row.id)">
+        <Text class="bench-row-label">{{ row.label }}</Text>
+      </Pressable>
+      <Pressable class="bench-row-remove" (press)="remove.emit(row.id)">
+        <Text class="bench-row-remove-text">×</Text>
+      </Pressable>
+      <TextInput class="bench-row-input" [value]="row.label" />
+    </View>
+  `;
+
+// FIXTURE ONLY as of 2026-09-01, same reasoning as COMPOSED_ROW_TEMPLATE above — the screen's
+// `flat` row shape (zero composed components) is gone entirely, not merged into anything. Kept
+// for the same adapter-property tests; not fenced against the screen.
 const FLAT_ROW_TEMPLATE = `
             <View [class]="rowClassFor(row)">
               <Text class="bench-row-id">{{ row.id }}</Text>
@@ -141,6 +172,29 @@ class BenchmarkRow {
   }
 }
 
+@Component({
+  selector: 'BenchmarkRowWithInput',
+  standalone: true,
+  imports: [Pressable, Text, TextInput, View],
+  template: WITH_INPUT_ROW_TEMPLATE,
+})
+class BenchmarkRowWithInput {
+  @Input({ required: true }) row!: IBenchmarkRow;
+  @Input({ required: true }) isSelected = false;
+  @Output() readonly select = new EventEmitter<number>();
+  @Output() readonly remove = new EventEmitter<number>();
+
+  get rowClass(): string {
+    return this.isSelected ? ROW_CLASS_SELECTED : ROW_CLASS;
+  }
+
+  get rowId(): string {
+    return String(this.row.id);
+  }
+}
+
+registerComposedComponent('BenchmarkRowWithInput');
+
 const rowsSignal = signal<readonly IBenchmarkRow[]>([]);
 const selectedSignal = signal<number | undefined>(undefined);
 
@@ -162,6 +216,36 @@ const selectedSignal = signal<number | undefined>(undefined);
   `,
 })
 class ComposedRowHost {
+  readonly rows = rowsSignal;
+  readonly selectedId = selectedSignal;
+
+  onSelect(id: number): void {
+    selectedSignal.set(id);
+  }
+
+  onRemove(id: number): void {
+    rowsSignal.update(rows => rows.filter(row => row.id !== id));
+  }
+}
+
+@Component({
+  selector: 'with-input-row-host',
+  standalone: true,
+  imports: [BenchmarkRowWithInput, View],
+  template: `
+    <View>
+      @for (row of rows(); track row.id) {
+        <BenchmarkRowWithInput
+          [row]="row"
+          [isSelected]="row.id === selectedId()"
+          (select)="onSelect($event)"
+          (remove)="onRemove($event)"
+        />
+      }
+    </View>
+  `,
+})
+class WithInputRowHost {
   readonly rows = rowsSignal;
   readonly selectedId = selectedSignal;
 
@@ -230,6 +314,16 @@ type ICommittedShape = {
   children: ICommittedShape[];
 };
 
+// FORMERLY subtracted `onAccessibilityAction`/`onAccessibilityTap`/`onMagicTap`/
+// `onAccessibilityEscape` from both sides here — the composed `Pressable` template bound all four
+// unconditionally (`(accessibilityTap)="emit(...)"`), the flat one bound none, and the engine
+// cannot tell a subscriber from a forwarder, so the two shapes diverged on exactly these keys
+// (`.claude/rules/fabric-boolean-event-gates.md`). Closed 2026-09-01: Pressable now routes all four
+// through `hostProps()`'s flat bag, gated on `EventEmitter.observed` the same way `press`/`hoverIn`
+// already were — an unsubscribed instance carries none of them. Verified with a positive and a
+// negative control (a Pressable with no listener commits none of the four; one with exactly
+// `(accessibilityAction)` commits only that key) before deleting the subtraction — a green
+// comparison alone would not have told the two failure directions apart.
 function shapeOf(nodes: readonly IFakeNode[]): ICommittedShape[] {
   return nodes.map(node => ({
     viewName: node.viewName,
@@ -270,7 +364,8 @@ type IMountProbe = {
 // One cold mount of `component` with `rowCount` rows, measured from a zeroed profile so the
 // numbers cover that mount and nothing else.
 async function mountProbe(
-  component: typeof ComposedRowHost | typeof FlatRowHost,
+  component:
+    typeof ComposedRowHost | typeof FlatRowHost | typeof WithInputRowHost,
   rowCount: number,
 ): Promise<IMountProbe> {
   rowsSignal.set(buildRows(rowCount));
@@ -377,13 +472,50 @@ describe('benchmark row shapes', () => {
     expect(flatFlattensPerRow).toBeLessThanOrEqual(0);
   });
 
-  // Both templates above are copies. A copy that drifts from the screen makes every number this
-  // file reports a measurement of something the device never runs — and nothing else would say
-  // so, since the screen is outside this workspace and neither tsc nor ngc compares the two.
-  it('stay literal copies of the screen they measure', () => {
+  // ROW_CONTENT.WithInput: one extra native view, and NOTHING else moves — same view names as
+  // composed's own committed tree plus one RCTSinglelineTextInputView, same engine-node/anchor
+  // delta as composed (BenchmarkRowWithInput is a straight copy of BenchmarkRow, not a fork of its
+  // anchor shape).
+  it('adds exactly one native view per row (the TextInput), nothing else', async () => {
+    const withInputFew = await mountProbe(WithInputRowHost, FEW_ROWS);
+    unmount(ROOT_TAG);
+    const withInputMany = await mountProbe(WithInputRowHost, MANY_ROWS);
+
+    // Fabric: the acceptance number this arm exists for — 10 native views/row, not 9.
+    expect(
+      perRow(withInputFew.viewNames.length, withInputMany.viewNames.length),
+    ).toBe(WITH_INPUT_VIEWS_PER_ROW);
+    expect(withInputMany.viewNames).toHaveLength(
+      WITH_INPUT_VIEWS_PER_ROW * MANY_ROWS + FIXTURE_CHROME_VIEWS,
+    );
+    // Engine side costs MORE than the one Fabric view: TextInput's own composed template is
+    // `@if (isMultiline) {…} @else {…}`, and (measured directly, headless, walking the engine
+    // tree of a lone <TextInput>) that costs its own host anchor PLUS one anchor per @if branch —
+    // 3 anchors total for 1 renderable native view, the same "@if reserves a structural slot
+    // whether or not it renders" cost BenchmarkRowWithInput's own comment names, just paid inside
+    // TextInput's implementation instead of this screen's. So the delta is +4 nodes / +3 anchors,
+    // not +1 — this is Angular's un-lowered TextInput being expensive on the engine side even
+    // where Fabric sees only one more view.
+    const TEXT_INPUT_ENGINE_NODES = 4;
+    const TEXT_INPUT_ANCHORS = 3;
+    expect(perRow(withInputFew.engineNodes, withInputMany.engineNodes)).toBe(
+      COMPOSED_NODES_PER_ROW + TEXT_INPUT_ENGINE_NODES,
+    );
+    expect(perRow(withInputFew.anchors, withInputMany.anchors)).toBe(
+      COMPOSED_NODES_PER_ROW - FLAT_NODES_PER_ROW + TEXT_INPUT_ANCHORS,
+    );
+  });
+
+  // WITH_INPUT_ROW_TEMPLATE is the only one of the three with a literal counterpart in the screen
+  // as of 2026-09-01 — COMPOSED_ROW_TEMPLATE and FLAT_ROW_TEMPLATE are adapter-property fixtures
+  // now (see their own comments above), and fencing a fixture with no real screen match would
+  // just report "not found" forever, which is the same as no fence at all
+  // (`.claude/rules/test-harness-false-greens.md`). A copy that drifts from the screen makes
+  // every number below a measurement of something the device never runs — and nothing else would
+  // say so, since the screen is outside this workspace and neither tsc nor ngc compares the two.
+  it('stays a literal copy of the screen row it measures', () => {
     const screen = readFileSync(SCREEN_PATH, 'utf8').replace(/\s+/g, '');
 
-    expect(screen).toContain(COMPOSED_ROW_TEMPLATE.replace(/\s+/g, ''));
-    expect(screen).toContain(FLAT_ROW_TEMPLATE.replace(/\s+/g, ''));
+    expect(screen).toContain(WITH_INPUT_ROW_TEMPLATE.replace(/\s+/g, ''));
   });
 });

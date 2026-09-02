@@ -1,8 +1,20 @@
 {
   "name": "@symbiote-native/standard-web-crypto",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "expo-standard-web-crypto ported for SymbioteNative — a Web Crypto API getRandomValues polyfill built on @symbiote-native/crypto's native random source.",
   "license": "MIT",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "web-crypto",
+    "polyfill",
+    "getrandomvalues"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
@@ -81,12 +93,12 @@
     "@symbiote-native/crypto": "workspace:*"
   },
   "peerDependencies": {
-    "@symbiote-native/angular": ">=0.6.2",
-    "@symbiote-native/engine": ">=0.1.7",
-    "@symbiote-native/react": ">=0.2.8",
-    "@symbiote-native/solid": ">=0.0.1",
-    "@symbiote-native/svelte": ">=0.1.0",
-    "@symbiote-native/vue": ">=0.3.8",
+    "@symbiote-native/angular": "workspace:^",
+    "@symbiote-native/engine": "workspace:^",
+    "@symbiote-native/react": "workspace:^",
+    "@symbiote-native/solid": "workspace:^",
+    "@symbiote-native/svelte": "workspace:^",
+    "@symbiote-native/vue": "workspace:^",
     "@angular/core": ">=20",
     "@vue/runtime-core": "^3.5.13",
     "react": ">=19.0.0",

@@ -9,7 +9,7 @@
 // Framework-agnostic (imports only @symbiote-native/engine), so every adapter (React,
 // Vue, and the next) folds aria/role into accessibility* identically.
 
-import { dlog, type ISymbioteEvent } from '@symbiote-native/engine';
+import { foldAriaProps, type ISymbioteEvent } from '@symbiote-native/engine';
 
 // Kept in sync with the AccessibilityRolesMask in RN's RCTViewManager.m
 // (ViewAccessibility.js `AccessibilityRole`). The trailing `string & {}` keeps
@@ -213,45 +213,10 @@ export interface IAriaProps {
   'aria-valuetext'?: string;
 }
 
-// RN's web `role` → native `accessibilityRole`. Where the web role has no native
-// counterpart it is forwarded unchanged (the AccessibilityRole union stays open),
-// so the map only lists the values that actually differ.
-const ROLE_TO_ACCESSIBILITY_ROLE: Readonly<Record<string, IAccessibilityRole>> =
-  {
-    alert: 'alert',
-    button: 'button',
-    checkbox: 'checkbox',
-    combobox: 'combobox',
-    grid: 'grid',
-    heading: 'header',
-    img: 'image',
-    link: 'link',
-    list: 'list',
-    listitem: 'list',
-    menu: 'menu',
-    menubar: 'menubar',
-    menuitem: 'menuitem',
-    none: 'none',
-    presentation: 'none',
-    progressbar: 'progressbar',
-    radio: 'radio',
-    radiogroup: 'radiogroup',
-    scrollbar: 'scrollbar',
-    searchbox: 'search',
-    slider: 'adjustable',
-    spinbutton: 'spinbutton',
-    summary: 'summary',
-    switch: 'switch',
-    tab: 'tab',
-    tablist: 'tablist',
-    timer: 'timer',
-    toolbar: 'toolbar',
-  };
-
-function accessibilityRoleFromRole(role: IRole): IAccessibilityRole {
-  return ROLE_TO_ACCESSIBILITY_ROLE[role] ?? role;
-}
-
+// The gate's key list, typed against `IAriaProps` so a new alias added to that interface and
+// forgotten here is a type error. The engine carries its own untyped copy for the lowered path;
+// `core/engine/src/accessibility-props.ts` is the single implementation of the FOLD, this is only
+// the cheap probe that decides whether to call it.
 const ARIA_KEYS: ReadonlyArray<keyof IAriaProps> = [
   'role',
   'aria-label',
@@ -270,128 +235,35 @@ const ARIA_KEYS: ReadonlyArray<keyof IAriaProps> = [
   'aria-valuetext',
 ];
 
+// An indexed loop rather than `.some(key => …)`: the callback captures `props`, so the closure is
+// allocated on every call, and this runs once per accessibility-bearing component instance — 8 000
+// of them on one benchmark create. The fifteen property reads it replaces the closure with are
+// cheaper than the allocation.
 function hasAnyAriaKey(props: IAriaProps): boolean {
-  return ARIA_KEYS.some(key => props[key] !== undefined);
+  for (let index = 0; index < ARIA_KEYS.length; index += 1) {
+    if (props[ARIA_KEYS[index]] !== undefined) return true;
+  }
+  return false;
 }
 
-// Fold the web-alias `aria-*` / `role` props into the canonical `accessibility*`
-// props, mirroring RN's View.js transform. Canonical props take precedence per
-// View.js: each aria value fills in via `??` only where the canonical field is
-// still empty. The alias keys are blanked to `undefined` in the result so they
-// never reach native (the commit layer drops undefined props); the returned
-// object keeps type `T`, spreadable straight into createElement. When no alias
-// is present the input passes through untouched (cheap fast path).
+/**
+ * The typed entry point adapters import. The FOLD itself now lives in `@symbiote-native/engine`
+ * (`core/engine/src/accessibility-props.ts`) so it runs at the layer every path goes through —
+ * including a LOWERED element, which has no component wrapper to run it. This function stays here
+ * because the public types do, and because it keeps the typed gate: `hasAnyAriaKey` is checked
+ * before anything is allocated, so the ~99% of nodes carrying no alias cost the same as before.
+ *
+ * Idempotent by construction, and that is load-bearing now that the engine folds too: pass 1 blanks
+ * every alias, so a wrapper still calling this after the engine has run finds nothing and returns
+ * by identity.
+ */
 export function resolveAccessibilityProps<
   T extends IAccessibilityProps & IAriaProps,
 >(props: T): T {
   if (!hasAnyAriaKey(props)) return props;
-
-  dlog(
-    'resolveAccessibilityProps: folding aria/role aliases into accessibility* props',
-  );
-
-  const {
-    role,
-    'aria-label': ariaLabel,
-    'aria-labelledby': ariaLabelledBy,
-    'aria-live': ariaLive,
-    'aria-hidden': ariaHidden,
-    'aria-busy': ariaBusy,
-    'aria-checked': ariaChecked,
-    'aria-disabled': ariaDisabled,
-    'aria-expanded': ariaExpanded,
-    'aria-selected': ariaSelected,
-    'aria-modal': ariaModal,
-    'aria-valuemax': ariaValueMax,
-    'aria-valuemin': ariaValueMin,
-    'aria-valuenow': ariaValueNow,
-    'aria-valuetext': ariaValueText,
-  } = props;
-
-  const next: T = {
-    ...props,
-    role: undefined,
-    'aria-label': undefined,
-    'aria-labelledby': undefined,
-    'aria-live': undefined,
-    'aria-hidden': undefined,
-    'aria-busy': undefined,
-    'aria-checked': undefined,
-    'aria-disabled': undefined,
-    'aria-expanded': undefined,
-    'aria-selected': undefined,
-    'aria-modal': undefined,
-    'aria-valuemax': undefined,
-    'aria-valuemin': undefined,
-    'aria-valuenow': undefined,
-    'aria-valuetext': undefined,
-  };
-
-  if (
-    ariaLabelledBy !== undefined &&
-    next.accessibilityLabelledBy === undefined
-  ) {
-    next.accessibilityLabelledBy = ariaLabelledBy.split(/\s*,\s*/g);
-  }
-
-  if (ariaLabel !== undefined && next.accessibilityLabel === undefined) {
-    next.accessibilityLabel = ariaLabel;
-  }
-
-  if (ariaLive !== undefined && next.accessibilityLiveRegion === undefined) {
-    next.accessibilityLiveRegion = ariaLive === 'off' ? 'none' : ariaLive;
-  }
-
-  if (ariaHidden !== undefined) {
-    if (next.accessibilityElementsHidden === undefined) {
-      next.accessibilityElementsHidden = ariaHidden;
-    }
-    if (ariaHidden === true && next.importantForAccessibility === undefined) {
-      next.importantForAccessibility = 'no-hide-descendants';
-    }
-  }
-
-  if (ariaModal !== undefined && next.accessibilityViewIsModal === undefined) {
-    next.accessibilityViewIsModal = ariaModal;
-  }
-
-  if (role !== undefined && next.accessibilityRole === undefined) {
-    next.accessibilityRole = accessibilityRoleFromRole(role);
-  }
-
-  const existingState = props.accessibilityState;
-  if (
-    existingState !== undefined ||
-    ariaBusy !== undefined ||
-    ariaChecked !== undefined ||
-    ariaDisabled !== undefined ||
-    ariaExpanded !== undefined ||
-    ariaSelected !== undefined
-  ) {
-    next.accessibilityState = {
-      busy: ariaBusy ?? existingState?.busy,
-      checked: ariaChecked ?? existingState?.checked,
-      disabled: ariaDisabled ?? existingState?.disabled,
-      expanded: ariaExpanded ?? existingState?.expanded,
-      selected: ariaSelected ?? existingState?.selected,
-    };
-  }
-
-  const existingValue = props.accessibilityValue;
-  if (
-    existingValue !== undefined ||
-    ariaValueMax !== undefined ||
-    ariaValueMin !== undefined ||
-    ariaValueNow !== undefined ||
-    ariaValueText !== undefined
-  ) {
-    next.accessibilityValue = {
-      max: ariaValueMax ?? existingValue?.max,
-      min: ariaValueMin ?? existingValue?.min,
-      now: ariaValueNow ?? existingValue?.now,
-      text: ariaValueText ?? existingValue?.text,
-    };
-  }
-
-  return next;
+  // `Object.entries` rather than a spread: an interface has no index signature, so a spread of `T`
+  // is not assignable to `Record<string, unknown>` and the alternative would be a cast. Paid only
+  // on the folding path, never on the gate.
+  const folded = foldAriaProps(Object.fromEntries(Object.entries(props)));
+  return Object.assign({}, props, folded);
 }

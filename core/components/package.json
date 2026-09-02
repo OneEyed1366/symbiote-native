@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/components",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "Framework-agnostic component logic (state machines + render functions) for SymbioteNative — written once, inherited by every adapter (React, Vue, Angular, ...).",
   "license": "MIT",
   "repository": {
@@ -17,12 +17,34 @@
   "main": "src/index.ts",
   "module": "src/index.ts",
   "types": "src/index.ts",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "cross-platform-components",
+    "state-machine",
+    "ui-components",
+    "descriptor",
+    "accessibility",
+    "cross-platform"
+  ],
   "exports": {
     ".": "./src/index.ts",
-    "./bootstrap": "./src/bootstrap/index.ts"
+    "./bootstrap": "./src/bootstrap/index.ts",
+    "./host-primitives": "./host-primitives.cjs",
+    "./specialize-state-style": "./specialize-state-style.cjs",
+    "./lowering-fixtures": "./lowering-fixtures.cjs",
+    "./state-style": "./src/state-style.ts",
+    "./fold-host-bag": "./src/fold-host-bag.ts",
+    "./resolve-intrinsic": "./src/resolve-intrinsic.ts"
   },
   "files": [
-    "build"
+    "build",
+    "host-primitives.cjs",
+    "host-primitives.d.cts",
+    "specialize-state-style.cjs",
+    "specialize-state-style.d.cts",
+    "lowering-fixtures.cjs",
+    "lowering-fixtures.d.cts"
   ],
   "publishConfig": {
     "access": "public",
@@ -37,6 +59,27 @@
       "./bootstrap": {
         "types": "./build/bootstrap/index.d.ts",
         "default": "./build/bootstrap/index.js"
+      },
+      "./host-primitives": {
+        "types": "./host-primitives.d.cts",
+        "default": "./host-primitives.cjs"
+      },
+      "./specialize-state-style": "./specialize-state-style.cjs",
+      "./lowering-fixtures": {
+        "types": "./lowering-fixtures.d.cts",
+        "default": "./lowering-fixtures.cjs"
+      },
+      "./state-style": {
+        "types": "./build/state-style.d.ts",
+        "default": "./build/state-style.js"
+      },
+      "./fold-host-bag": {
+        "types": "./build/fold-host-bag.d.ts",
+        "default": "./build/fold-host-bag.js"
+      },
+      "./resolve-intrinsic": {
+        "types": "./build/resolve-intrinsic.d.ts",
+        "default": "./build/resolve-intrinsic.js"
       }
     }
   },
@@ -45,7 +88,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
   "peerDependencies": {
-    "@symbiote-native/engine": ">=0.1.7",
+    "@symbiote-native/engine": "workspace:^",
     "react-native": ">=0.86"
   },
   "devDependencies": {

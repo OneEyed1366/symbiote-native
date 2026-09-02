@@ -48,11 +48,11 @@
     "@symbiote-native/system-ui": "^0.3.0",
     "@symbiote-native/tracking-transparency": "^0.3.0",
     "@symbiote-native/web-browser": "^0.3.0",
+    "expo": "57.0.14",
     "react": "19.2.3",
     "react-native": "0.86.0",
     "react-native-safe-area-context": "^5.5.2",
-    "react-reconciler": "^0.33.0",
-    "expo": "57.0.14"
+    "react-reconciler": "^0.33.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

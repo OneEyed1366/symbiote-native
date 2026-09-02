@@ -65,7 +65,12 @@ let mounted: DiffHost | undefined;
 class DiffHost {
   readonly accessibilityLabel = signal<string | undefined>(undefined);
   // Drops out of the bag entirely when false — the shape a folded accessibility set produces.
-  readonly includesRole = signal(false);
+  // Deliberately NOT `role`/`aria-*`: those now trip the engine's aria fold
+  // (`core/engine/src/accessibility-props.ts`), which blanks the alias and writes
+  // `accessibilityRole` instead — a different mechanism from the one this test pins. This key
+  // must stay outside `isAriaAliasKey` so the vanish/reappear behaviour under test is the
+  // directive's own diffing, not the fold's.
+  readonly includesHint = signal(false);
 
   constructor() {
     // Captures the live component instance so the test can drive it after mount.
@@ -78,10 +83,9 @@ class DiffHost {
     const bag: Record<string, unknown> = {
       testID: 'diff-probe',
       nativeID: undefined,
-      accessibilityHint: undefined,
       accessibilityLabel: this.accessibilityLabel(),
     };
-    if (this.includesRole()) bag.role = 'button';
+    if (this.includesHint()) bag.accessibilityHint = 'hint';
     return bag;
   }
 }
@@ -133,7 +137,7 @@ describe('SymbioteHostPropsDirective per-key diff', () => {
     await flush();
 
     host().accessibilityLabel.set('labelled');
-    host().includesRole.set(true);
+    host().includesHint.set(true);
     await flush();
     expect(
       committedProbe().props.accessibilityLabel,
@@ -157,20 +161,21 @@ describe('SymbioteHostPropsDirective per-key diff', () => {
     mount(ROOT_TAG, DiffHost);
     await flush();
 
-    host().includesRole.set(true);
+    host().includesHint.set(true);
     await flush();
-    expect(committedProbe().props.role, 'role must reach the node first').toBe(
-      'button',
-    );
+    expect(
+      committedProbe().props.accessibilityHint,
+      'accessibilityHint must reach the node first',
+    ).toBe('hint');
 
     probe.clear();
-    host().includesRole.set(false);
+    host().includesHint.set(false);
     await flush();
 
     expect(
-      probe.writes().filter(write => write.key === 'role'),
+      probe.writes().filter(write => write.key === 'accessibilityHint'),
       'a key that disappears from the bag must be cleared explicitly',
-    ).toEqual([{ key: 'role', value: undefined }]);
-    expect(committedProbe().props.role).toBeNull();
+    ).toEqual([{ key: 'accessibilityHint', value: undefined }]);
+    expect(committedProbe().props.accessibilityHint).toBeNull();
   });
 });

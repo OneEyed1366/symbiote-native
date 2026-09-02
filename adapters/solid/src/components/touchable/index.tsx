@@ -47,7 +47,10 @@ import {
   type IViewStyle,
 } from '@symbiote-native/engine';
 import { Animated } from '../../modules/animated';
-import { Pressable, type IPressableProps } from '../pressable';
+import {
+  TouchablePressable as Pressable,
+  type IPressableProps,
+} from '../pressable';
 
 // Declared here, not imported from @symbiote-native/components and never from another adapter:
 // `children` is a framework value, which is exactly the test

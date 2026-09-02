@@ -72,6 +72,13 @@ import {
 } from '../../primitives';
 import { Pressable, type IAngularPressableInputs } from '../pressable';
 import { Animated, AnimatedView } from '../../modules/animated';
+import {
+  gateWanted,
+  injectGateDemandAbove,
+  provideGateDemand,
+  type IGateDemand,
+  type IGatedAccessibilityEvent,
+} from '../../gate-demand';
 
 // The shared field base for all three: the Pressable INPUT surface (minus style, which each
 // Touchable routes differently, and minus the press/hover events, which each Touchable declares as
@@ -128,6 +135,7 @@ function createTimerScheduler(): ITimerScheduler {
 @Component({
   selector: 'TouchableOpacity',
   standalone: true,
+  viewProviders: [provideGateDemand(() => TouchableOpacity)],
   hostDirectives: [
     { directive: SymbioteStyleInputDirective, inputs: ['style'] },
   ],
@@ -136,6 +144,7 @@ function createTimerScheduler(): ITimerScheduler {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <Pressable
+      [__minPressDuration]="0"
       (press)="press.emit($event)"
       (pressIn)="handlePressIn($event)"
       (pressOut)="handlePressOut($event)"
@@ -224,6 +233,16 @@ export class TouchableOpacity
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
+
+  // This wrapper binds the four gated accessibility events on the component it renders, which
+  // Angular forces to be unconditional and which would light that component's gates on every
+  // instance. It answers for them instead — see `gate-demand.ts`.
+  private readonly gateDemandAbove = injectGateDemandAbove();
+
+  wantsGate(name: IGatedAccessibilityEvent): boolean {
+    return gateWanted(this.gateDemandAbove, name, this[name]);
+  }
+
   @Input() activeOpacity?: number;
   @Input() delayPressIn?: number;
   @Input() delayPressOut?: number;
@@ -417,6 +436,7 @@ export class TouchableOpacity
 @Component({
   selector: 'TouchableHighlight',
   standalone: true,
+  viewProviders: [provideGateDemand(() => TouchableHighlight)],
   hostDirectives: [
     { directive: SymbioteStyleInputDirective, inputs: ['style'] },
   ],
@@ -424,6 +444,7 @@ export class TouchableOpacity
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <Pressable
+      [__minPressDuration]="0"
       [style]="containerStyle()"
       (press)="handlePress($event)"
       (pressIn)="handlePressIn($event)"
@@ -511,6 +532,16 @@ export class TouchableHighlight
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
+
+  // This wrapper binds the four gated accessibility events on the component it renders, which
+  // Angular forces to be unconditional and which would light that component's gates on every
+  // instance. It answers for them instead — see `gate-demand.ts`.
+  private readonly gateDemandAbove = injectGateDemandAbove();
+
+  wantsGate(name: IGatedAccessibilityEvent): boolean {
+    return gateWanted(this.gateDemandAbove, name, this[name]);
+  }
+
   // RN's onShowUnderlay / onHideUnderlay — fired on a real transition only, never on a repeat.
   @Output() readonly showUnderlay = new EventEmitter<void>();
   @Output() readonly hideUnderlay = new EventEmitter<void>();
@@ -693,6 +724,7 @@ export class TouchableHighlight
 @Component({
   selector: 'TouchableWithoutFeedback',
   standalone: true,
+  viewProviders: [provideGateDemand(() => TouchableWithoutFeedback)],
   hostDirectives: [
     { directive: SymbioteStyleInputDirective, inputs: ['style'] },
   ],
@@ -700,6 +732,7 @@ export class TouchableHighlight
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <Pressable
+      [__minPressDuration]="0"
       [style]="mergedStyle"
       (press)="press.emit($event)"
       (pressIn)="handlePressIn($event)"
@@ -791,6 +824,16 @@ export class TouchableWithoutFeedback
   @Output() readonly accessibilityTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly magicTap = new EventEmitter<ISymbioteEvent>();
   @Output() readonly accessibilityEscape = new EventEmitter<ISymbioteEvent>();
+
+  // This wrapper binds the four gated accessibility events on the component it renders, which
+  // Angular forces to be unconditional and which would light that component's gates on every
+  // instance. It answers for them instead — see `gate-demand.ts`.
+  private readonly gateDemandAbove = injectGateDemandAbove();
+
+  wantsGate(name: IGatedAccessibilityEvent): boolean {
+    return gateWanted(this.gateDemandAbove, name, this[name]);
+  }
+
   @Input() delayPressIn?: number;
   @Input() delayPressOut?: number;
   @Input() minPressDuration?: number;

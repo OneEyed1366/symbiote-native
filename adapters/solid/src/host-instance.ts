@@ -2,9 +2,9 @@
 // adapters/vue/src/host-instance. RN's "ref/instance -> native reactTag" lookup, the seam
 // imperative-interop libraries (reanimated, gesture-handler, react-navigation) reach through.
 //
-// A Solid `ref={el}` on a symbiote host tag assigns the raw engine SymbioteNode, and the renderer
-// grafts the public-instance API onto it (toPublicInstance in renderer.ts), so the node a ref
-// receives carries measure / setNativeProps / focus exactly like React's getPublicInstance.
+// A Solid `ref={el}` on a symbiote host tag assigns the raw engine SymbioteNode, which already
+// carries measure / setNativeProps / focus on its prototype, exactly like React's
+// getPublicInstance.
 //
 // The node -> tag resolution itself belongs to the engine (getNativeTag, keyed on the raw node in the
 // commit mirror); this only unwraps the Solid-shaped inputs onto it. An uncommitted or unknown input
@@ -12,7 +12,7 @@
 
 import { getNativeTag, isSymbioteNode, dlog } from '@symbiote-native/engine';
 
-// The public instance a Solid host ref hands back: the grafted engine node. Re-exported from the
+// The public instance a Solid host ref hands back: the engine node itself. Re-exported from the
 // engine so a call site reads in parity with the React and Vue adapters.
 export type { IHostInstance } from '@symbiote-native/engine';
 

@@ -3,11 +3,10 @@
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-crypto`](https://github.com/expo/expo/tree/main/packages/expo-crypto) — cryptographically
 secure random bytes, `randomUUID`, and string/buffer digest hashing — usable from **every**
-adapter, React, Vue, and Angular, not just React. Like `@symbiote-native/local-auth`, every
+adapter, React, Vue, Svelte, Solid, and Angular. Like `@symbiote-native/local-auth`, every
 function here is a plain sync/async call with no per-instance state or event stream, so there is
-no hook/composable/service to wrap — the React, Vue, and Angular entry points are plain
-re-exports of the same `core`. AES encryption (`expo-crypto`'s `aes/` subfolder) is out of scope
-for this pass.
+no hook/composable/service to wrap — every adapter's entry point is a plain re-export of the same
+`core`. AES encryption (`expo-crypto`'s `aes/` subfolder) is out of scope for this pass.
 
 ## Install
 
@@ -51,9 +50,9 @@ src/core/     getRandomBytes / getRandomBytesAsync / getRandomValues / randomUUI
 src/angular/  @symbiote-native/crypto/angular — export * from '../core'
 ```
 
-`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
-physical per-framework file, since there's nothing to subscribe to or clean up. `./angular` stays
-a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/`
+— no physical per-framework file, since there's nothing to subscribe to or clean up. `./angular`
+stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
 
@@ -132,6 +131,67 @@ function handleHash(): void {
 </template>
 ```
 
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import { Pressable, Text, View } from '@symbiote-native/svelte';
+  import {
+    CryptoDigestAlgorithm,
+    digestStringAsync,
+    randomUUID,
+  } from '@symbiote-native/crypto/svelte';
+
+  const uuid = randomUUID();
+  let hash = $state('');
+
+  function handleHash(): void {
+    digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(
+      value => (hash = value),
+    );
+  }
+</script>
+
+<View>
+  <Text>UUID: {uuid}</Text>
+  <Pressable onPress={handleHash}>
+    <Text>Hash a string</Text>
+  </Pressable>
+  {#if hash}<Text>SHA-256: {hash}</Text>{/if}
+</View>
+```
+
+```tsx
+// Solid
+import { createSignal } from 'solid-js';
+import { Pressable, Text, View } from '@symbiote-native/solid';
+import {
+  CryptoDigestAlgorithm,
+  digestStringAsync,
+  randomUUID,
+} from '@symbiote-native/crypto';
+
+function CryptoScreen() {
+  const [uuid] = createSignal(randomUUID());
+  const [hash, setHash] = createSignal('');
+
+  const handleHash = () => {
+    digestStringAsync(CryptoDigestAlgorithm.SHA256, 'Confirm it is you').then(
+      setHash,
+    );
+  };
+
+  return (
+    <View>
+      <Text>UUID: {uuid()}</Text>
+      <Pressable onPress={handleHash}>
+        <Text>Hash a string</Text>
+      </Pressable>
+      {hash() && <Text>SHA-256: {hash()}</Text>}
+    </View>
+  );
+}
+```
+
 ```ts
 // Angular
 import { Component, signal } from '@angular/core';
@@ -170,7 +230,11 @@ export class CryptoScreen {
 ```
 
 There's no per-instance service to `inject()` in the Angular case — every function is a plain
-free function off the core package.
+free function off the core package, called straight from the component body (or the constructor,
+on Angular). All five examples mirror the real canary demo screens —
+`examples/expo-react/screens/CryptoScreen.tsx`, `examples/expo-vue-sfc/screens/CryptoScreen.vue`,
+`examples/expo-vue-tsx/screens/CryptoScreen.tsx`, `examples/expo-svelte/screens/CryptoScreen.svelte`,
+`examples/expo-solid/screens/CryptoScreen.tsx`, `examples/expo-angular/src/screens/CryptoScreen.ts`.
 
 ## API
 
@@ -200,6 +264,8 @@ import { digestStringAsync, randomUUID } from '@symbiote-native/crypto';
 // or the framework-scoped entry points — identical surface, re-exported verbatim:
 import { randomUUID } from '@symbiote-native/crypto/react';
 import { randomUUID } from '@symbiote-native/crypto/vue';
+import { randomUUID } from '@symbiote-native/crypto/svelte';
+import { randomUUID } from '@symbiote-native/crypto/solid';
 import { randomUUID } from '@symbiote-native/crypto/angular';
 ```
 
@@ -224,7 +290,7 @@ real `requireNativeModule` resolution (`src/core/crypto.test.ts`, `vitest`) — 
 `installFabric()`, no ViewConfig. Native rendering itself is verified on-device (see the parent
 [README](../../README.md) for the project's testing model).
 
-Native autolinking wiring is expected to land in the four Expo canary apps
-(`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-angular`)
-following the same recipe already proven for `@symbiote-native/local-auth`/`@symbiote-native/sensors`
-— demo-screen wiring for this package is a follow-up, not part of this pass.
+Native autolinking wiring is already done in all six Expo canary apps
+(`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-svelte`,
+`examples/expo-solid`, `examples/expo-angular`), each with its own `CryptoScreen` demo, following
+the same recipe already proven for `@symbiote-native/local-auth`/`@symbiote-native/sensors`.

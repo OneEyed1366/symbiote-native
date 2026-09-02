@@ -1,5 +1,6 @@
 import { cloneElement, createElement, isValidElement, useState } from 'react';
 import { Text, View } from '@symbiote-native/react';
+import type { ITextProps } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 import { LINE_COLOR } from '../navigation-lines';
 
@@ -8,7 +9,10 @@ export function ElementsApiDemo() {
 
   // createElement: the call JSX itself compiles to — building one by hand renders identically
   // to <Text className="info-text">built via createElement()</Text>.
-  const built = createElement(
+  // `Text` is now a bare tag string, not a component (capitalized-intrinsic-tag-feasibility.md);
+  // createElement then infers props only from what's passed here, so pin <ITextProps> or
+  // cloneElement drops `style`.
+  const built = createElement<ITextProps>(
     Text,
     { className: 'info-text', testID: 'elements-created' },
     'built via createElement()',

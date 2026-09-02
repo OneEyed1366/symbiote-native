@@ -3,12 +3,12 @@
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-system-ui`](https://github.com/expo/expo/tree/main/packages/expo-system-ui)
 — setting and reading the root view's background color — usable from **every** adapter,
-React, Vue, and Angular, not just React. Like
+React, Vue, Svelte, Solid, and Angular, not just React. Like
 [`@symbiote-native/device`](../device) and [`@symbiote-native/local-auth`](../local-auth) and
 unlike this repo's stateful Expo wrapper ([`@symbiote-native/sensors`](../sensors), an
 `EventEmitter` + live-subscription surface), both exports here are one-shot async calls with no
-per-instance state, so there is no hook/composable/service to wrap — the React, Vue, and
-Angular entry points are plain re-exports of the same `core`.
+per-instance state, so there is no hook/composable/service to wrap — the React, Vue, Svelte, and
+Solid entry points are plain re-exports of the same `core`.
 
 ## Install
 
@@ -49,9 +49,10 @@ src/core/     setBackgroundColorAsync / getBackgroundColorAsync. native-module.t
 src/angular/  @symbiote-native/system-ui/angular — export * from '../core'
 ```
 
-`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
-physical per-framework file, since there's nothing to subscribe to or clean up. `./angular` stays
-a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto
+`src/core/` — no physical per-framework file, since there's nothing to subscribe to or clean up.
+`./angular` stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build
+(`build-ngc/`).
 
 ## Use it
 
@@ -74,6 +75,27 @@ onMounted(() => {
 </script>
 ```
 
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import { setBackgroundColorAsync } from '@symbiote-native/system-ui/svelte';
+
+  $effect(() => {
+    void setBackgroundColorAsync('black');
+  });
+</script>
+```
+
+```tsx
+// Solid
+import { onMount } from 'solid-js';
+import { setBackgroundColorAsync } from '@symbiote-native/system-ui/solid';
+
+onMount(() => {
+  void setBackgroundColorAsync('black');
+});
+```
+
 ```ts
 // Angular
 import { Component } from '@angular/core';
@@ -91,7 +113,8 @@ There's no per-instance service to `inject()` in the Angular case — both funct
 exports off the core package, called straight in the constructor or wherever the app's root is
 set up. These snippets mirror the real canary demo screens —
 `examples/expo-react/screens/SystemUiScreen.tsx`, `examples/expo-vue-sfc/screens/SystemUiScreen.vue`,
-`examples/expo-vue-tsx/screens/SystemUiScreen.tsx`, `examples/expo-angular/src/screens/SystemUiScreen.ts`.
+`examples/expo-vue-tsx/screens/SystemUiScreen.tsx`, `examples/expo-svelte/screens/SystemUiScreen.svelte`,
+`examples/expo-solid/screens/SystemUiScreen.tsx`, `examples/expo-angular/src/screens/SystemUiScreen.ts`.
 
 ## API
 
@@ -111,6 +134,8 @@ import {
 // or the framework-scoped entry points — identical surface, re-exported verbatim:
 import { setBackgroundColorAsync } from '@symbiote-native/system-ui/react';
 import { setBackgroundColorAsync } from '@symbiote-native/system-ui/vue';
+import { setBackgroundColorAsync } from '@symbiote-native/system-ui/svelte';
+import { setBackgroundColorAsync } from '@symbiote-native/system-ui/solid';
 import { setBackgroundColorAsync } from '@symbiote-native/system-ui/angular';
 ```
 
@@ -132,9 +157,10 @@ per-instance state. Tests inject a fake native-module object in place of the rea
 no ViewConfig. Native rendering itself is verified on-device (see the parent
 [README](../../README.md) for the project's testing model).
 
-Native autolinking wiring for `expo-modules-core` packages is already done in the four Expo
+Native autolinking wiring for `expo-modules-core` packages is already done in all six Expo
 canary apps (`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`,
-`examples/expo-angular`) via `@symbiote-native/local-auth`/`@symbiote-native/sensors` — this
-package reuses that same wiring with zero further app-side changes, since
-`expo-modules-autolinking` discovers any `expo-modules-core` package already present in
-`node_modules`. A dedicated `SystemUiScreen` demo has not been wired into those canaries yet.
+`examples/expo-svelte`, `examples/expo-solid`, `examples/expo-angular`) via
+`@symbiote-native/local-auth`/`@symbiote-native/sensors` — this package reuses that same wiring
+with zero further app-side changes, since `expo-modules-autolinking` discovers any
+`expo-modules-core` package already present in `node_modules`. Each canary carries its own
+`SystemUiScreen` demo.

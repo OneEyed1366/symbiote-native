@@ -61,7 +61,7 @@ jobs:
       - run: pnpm run test
 
   bundle-isolation:
-    name: Bundle framework isolation
+    name: Packed consumer bundle matrix
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,26 +75,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Needed before `pnpm pack` can produce a real tarball: publishConfig points every
-      # exports entry at build/ (and build-ngc/ for Angular), so packing straight from a
-      # fresh checkout with no build/ ships an empty package.
+      # Build first because every tarball's publishConfig points at build/ (and build-ngc/ for
+      # Angular). The matrix then packs the exact direct @symbiote-native dependencies of all five
+      # standalone examples, installs them into disposable npm consumers, type-checks/AOT-builds
+      # each app, and creates iOS + Android Metro production bundles.
       - run: pnpm run prepublish-build
-
-      # examples/* live OUTSIDE the pnpm workspace on purpose (<examples_vs_dot_examples>,
-      # CLAUDE.md) — a real `npm install`, not `pnpm install -w`, matching what an actual
-      # npm consumer runs.
-      - name: Install example dependencies
-        run: |
-          for dir in examples/react examples/vue-sfc examples/svelte examples/angular; do
-            echo "::group::npm install ($dir)"
-            (cd "$dir" && npm install)
-            echo "::endgroup::"
-          done
-
-      # Overlays this commit's freshly built packages/* into each example's node_modules,
-      # in place of whatever version its package.json pins from the npm registry — the
-      # check below is worthless if it validates last month's published slider/navigation,
-      # not the change actually under review.
-      - run: pnpm run overlay-local-packages
 
       - run: pnpm run check:bundle-isolation

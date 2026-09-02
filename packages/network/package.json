@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/network",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "expo-network wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Network state (type/connected/internet-reachable) with a change listener, device IP address, and airplane-mode detection.",
   "license": "MIT",
   "repository": {
@@ -13,6 +13,18 @@
     "url": "https://github.com/OneEyed1366/symbiote-native/issues"
   },
   "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "expo-network",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "connectivity",
+    "network-state"
+  ],
   "type": "module",
   "main": "src/core/index.ts",
   "module": "src/core/index.ts",
@@ -83,12 +95,12 @@
     "expo-modules-core": "catalog:"
   },
   "peerDependencies": {
-    "@symbiote-native/angular": ">=0.6.2",
-    "@symbiote-native/engine": ">=0.1.7",
-    "@symbiote-native/react": ">=0.2.8",
-    "@symbiote-native/solid": ">=0.0.1",
-    "@symbiote-native/svelte": ">=0.1.0",
-    "@symbiote-native/vue": ">=0.3.8",
+    "@symbiote-native/angular": "workspace:^",
+    "@symbiote-native/engine": "workspace:^",
+    "@symbiote-native/react": "workspace:^",
+    "@symbiote-native/solid": "workspace:^",
+    "@symbiote-native/svelte": "workspace:^",
+    "@symbiote-native/vue": "workspace:^",
     "@angular/core": ">=20",
     "@vue/runtime-core": "^3.5.13",
     "react": ">=19.0.0",

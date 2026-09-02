@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/engine",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "SymbioteNative's retained shadow-tree engine — clone-on-write commit path + event normalization over React Native Fabric, shared by every framework adapter.",
   "license": "MIT",
   "repository": {
@@ -17,6 +17,16 @@
   "main": "src/index.ts",
   "module": "src/index.ts",
   "types": "src/index.ts",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "fabric",
+    "shadow-tree",
+    "renderer-core",
+    "jsi",
+    "yoga",
+    "cross-platform"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },

@@ -72,7 +72,12 @@ export interface IDroppedSelector {
     | 'element'
     | 'id'
     | 'universal'
-    | 'unsupported';
+    | 'unsupported'
+    // Deliberately DISABLED here, not impossible on the platform — see IS_STATE_TOKEN_ENABLED.
+    // Its own member rather than 'pseudo-class' because the two warnings must not read alike: one
+    // says React Native cannot do this, the other says we switched it off and names the
+    // replacement. Collapsing them would tell an author their button can never have a pressed look.
+    | 'state-pseudo-class';
   /** e.g. 'hover', '[data-x]', 'div'. */
   readonly detail: string;
 }
@@ -96,7 +101,32 @@ const DROP_EXPLANATION: Record<IDroppedSelector['reason'], string> = {
   id: 'React Native has no id selectors',
   universal: 'React Native has no universal selector',
   unsupported: 'this selector shape has no React Native equivalent',
+  // Never reaches the shared "can never match" sentence — it has its own branch at the warn site.
+  'state-pseudo-class': '',
 };
+
+// `:active` support is OFF, and the selector machinery below is kept intact so one line turns it
+// back on.
+//
+// WHY. The pressed look has a second, better route that did not exist when `:active` landed: a
+// functional `style={({pressed}) => …}`, which every lowering transform specialises into
+// `style` + `activeStyle` at build time (2026-08-23). It reaches the same slot with no pseudo-class
+// machinery, it is what the ecosystem already writes, and it lowers — so the reason `:active`
+// existed, keeping a Pressable lowerable without a state-reading callback, is gone.
+//
+// Keeping BOTH live is what argues against it: they occupy different cascade slots (`activeStyle`
+// replaces the authored style, an `:active` class rule replaces the class style), so an adapter has
+// two ways to say one thing and a debugging session has two places to look. This is also part of a
+// larger pseudo-class-state feature that is not built; shipping a fragment of it invites code that
+// depends on the fragment.
+//
+// The engine side is deliberately untouched: with no `:active` rule ever registered,
+// `hasActiveRules` stays false and `resolveActiveClassName` is never called, so the path costs
+// nothing while it waits.
+// Typed `boolean`, not inferred as the literal `false`: the literal would let tsc prune the
+// enabled branch of `selectors.test.ts` as unreachable, and that branch is the recorded contract
+// the flag restores — pruning it is how the dormant half rots unnoticed.
+export const IS_STATE_TOKEN_ENABLED: boolean = false;
 
 const DEEP_PSEUDO_ELEMENTS = new Set(['v-deep', 'ng-deep']);
 
@@ -148,6 +178,11 @@ function combinatorFor(value: Combinator): ISelectorCombinator | null {
       return null;
   }
 }
+
+// lightningcss reports a plain state pseudo-class by name in `kind`. The TOKEN keeps the colon so
+// it stays unspellable as a class name.
+const STATE_PSEUDO_CLASS = 'active';
+export const STATE_TOKEN = ':active';
 
 interface IBuilder {
   readonly tokens: string[];
@@ -278,6 +313,31 @@ function consumePayload(
         const nameIndex = index + (isPseudoElement ? 2 : 1);
         const name = identAt(args, nameIndex) ?? wrapper;
         builder.specificity[isPseudoElement ? 2 : 1]++;
+        // `:active` is kept on this path too, or the SAME CSS behaves differently on the
+        // cssModules flag — the recurring hazard this file's header names. `:global(.btn:active)`
+        // arrives parsed (`kind:'global'`) with cssModules ON and reaches the ordinary walk, which
+        // keeps it; with the flag OFF it arrives here as a raw token stream and would drop the
+        // WHOLE rule. Same source, opposite outcome, decided by which file it lives in.
+        //
+        // Keeping it is also the right side of the `:deep` asymmetry rather than an exception to
+        // it: `:global()` says only that the NAME lives outside this file's scope, while
+        // `:deep()` says the MATCH may cross a scope boundary. Only the second breaks the promise
+        // the state token rests on — that the rule targets the node whose press machine owns the
+        // state. Svelte cares most, since `:global()` is its ONLY escape hatch.
+        if (!isPseudoElement && name === STATE_PSEUDO_CLASS) {
+          if (
+            builder.combinators.includes('deep') ||
+            builder.pending === 'deep'
+          ) {
+            drop(builder, 'pseudo-class', 'active through a deep combinator');
+          } else if (IS_STATE_TOKEN_ENABLED) {
+            pushToken(builder, STATE_TOKEN);
+          } else {
+            drop(builder, 'state-pseudo-class', 'active');
+          }
+          index = nameIndex;
+          break;
+        }
         drop(
           builder,
           isPseudoElement ? 'pseudo-element' : 'pseudo-class',
@@ -404,6 +464,44 @@ function consumeComponent(
           return;
         }
       }
+      // `:active` is the ONE state pseudo-class this module keeps, and it is not an exception to
+      // the "a selector RN can never match" principle above — it is the one state the ENGINE
+      // actually knows, because the press machine owns it. It is kept as an ordinary compound
+      // TOKEN (`.btn:active` -> tokens ['btn', ':active'], combinator 'none'), so specificity,
+      // source order, scoping and the resolve cache all keep working with no new concept in the
+      // registry: the engine adds the token to a pressed node's class list and the existing
+      // matcher does the rest. A CSS identifier cannot carry an unescaped `:`, so the token can
+      // never collide with a real class name.
+      //
+      // `:hover` / `:focus` stay dropped deliberately — RN has no hover or focus state the engine
+      // owns — as do `:nth-child` and the rest. Widening past `:active` is its own decision, and
+      // the limit it will hit is the registry's resolve cache: it is capped at 512 entries and
+      // CLEARS WHOLE rather than evicting, so states that COMBINE multiply the distinct class
+      // strings on a screen and can drop the cache, which breaks the identity `isAlreadyPublished`
+      // depends on for every node at once.
+      if (component.kind === STATE_PSEUDO_CLASS) {
+        builder.specificity[1]++;
+        // ...but NOT through a scope boundary. `:deep(.b:active)` already dropped, because a
+        // custom-function payload is a raw token stream this walk re-parses; `.a >>> .b:active`
+        // did NOT, because `>>>` is a real combinator and the walk reaches the pseudo-class
+        // normally. Two spellings of one relation behaving differently is the bug, and the
+        // decision (2026-08-23) is to refuse BOTH: a deep selector reaches into another
+        // component's internals, and the state token is only meaningful on the node whose press
+        // machine owns it — which is exactly the node a deep rule cannot predict.
+        if (
+          builder.combinators.includes('deep') ||
+          builder.pending === 'deep'
+        ) {
+          drop(builder, 'pseudo-class', 'active through a deep combinator');
+          return;
+        }
+        if (!IS_STATE_TOKEN_ENABLED) {
+          drop(builder, 'state-pseudo-class', 'active');
+          return;
+        }
+        pushToken(builder, STATE_TOKEN);
+        return;
+      }
       // `:not()`/`:is()` take the specificity of their argument rather than a flat 1, but they are
       // dropped here regardless, and only a KEPT selector's specificity is ever read.
       builder.specificity[1]++;
@@ -484,6 +582,15 @@ export function selectorsToMatches(
       dropped.push(problem);
       // `root` is returned, never announced from here — see DROP_EXPLANATION.root.
       if (problem.reason === 'root') continue;
+      // Its own sentence, because the shared one below ends in "can never match in React Native"
+      // and that is FALSE here — the pressed look is fully supported, by a different route. A
+      // warning that misdescribes the cause is worse than none: it sends the reader to the engine.
+      if (problem.reason === 'state-pseudo-class') {
+        console.warn(
+          `[@symbiote-native/css-parser] ${filename}: dropped \`:${problem.detail}\` — pseudo-class state is currently disabled in this parser. Use a functional style instead: style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}, which every lowering transform compiles to style + activeStyle.`,
+        );
+        continue;
+      }
       console.warn(
         `[@symbiote-native/css-parser] ${filename}: dropped a rule on \`${problem.detail}\` — ${DROP_EXPLANATION[problem.reason]}, so it can never match in React Native.`,
       );

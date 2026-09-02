@@ -5,6 +5,7 @@
 import { transform } from 'lightningcss';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  IS_STATE_TOKEN_ENABLED,
   selectorsToMatches,
   type IDroppedSelector,
   type ISelectorCombinator,
@@ -161,7 +162,54 @@ const GLOBAL_KEPT: readonly IKeptCase[] = [
   },
 ];
 
+// `:active` is the one state pseudo-class kept, as a compound TOKEN beside its class — the engine
+// owns that state, so unlike :hover/:focus it is a selector RN CAN match. Specificity rises the
+// way CSS says (`.btn` [0,1,0] -> `.btn:active` [0,2,0]), so pressed wins the cascade with no
+// special ordering.
+const ACTIVE_KEPT: readonly {
+  readonly selector: string;
+  readonly tokens: readonly string[];
+  readonly combinators: readonly ISelectorCombinator[];
+  readonly specificity: readonly [number, number, number];
+}[] = [
+  {
+    selector: '.btn:active',
+    tokens: ['btn', ':active'],
+    combinators: ['none'],
+    specificity: [0, 2, 0],
+  },
+  {
+    // `:global()` says only that the NAME is unscoped; the element it matches can still be the
+    // pressable itself. Kept on BOTH lightningcss shapes, or the same CSS would behave differently
+    // depending on the cssModules flag — the standing hazard this file's header names.
+    selector: ':global(.btn:active)',
+    tokens: ['btn', ':active'],
+    combinators: ['none'],
+    specificity: [0, 2, 0],
+  },
+  {
+    selector: '.card .btn:active',
+    tokens: ['card', 'btn', ':active'],
+    combinators: ['descendant', 'none'],
+    specificity: [0, 3, 0],
+  },
+];
+
 const DROPPED: readonly (IDroppedSelector & { readonly selector: string })[] = [
+  // Both spellings of "deep", because they reached the state pseudo-class by DIFFERENT paths and
+  // so disagreed: `:deep()` re-parses a raw token stream and dropped, `>>>` is a real combinator
+  // and kept. A deep rule reaches into another component's internals, and the state token is only
+  // meaningful on the node whose press machine owns it — the node a deep rule cannot predict.
+  {
+    selector: '.a >>> .b:active',
+    reason: 'pseudo-class',
+    detail: 'active through a deep combinator',
+  },
+  {
+    selector: '.a ::v-deep .b:active',
+    reason: 'pseudo-class',
+    detail: 'active through a deep combinator',
+  },
   { selector: '.card:hover', reason: 'pseudo-class', detail: 'hover' },
   { selector: '.card:focus', reason: 'pseudo-class', detail: 'focus' },
   {
@@ -337,6 +385,44 @@ describe('selectorsToMatches — the five deep spellings agree', () => {
       0, 3, 0,
     ]);
   });
+});
+
+// BRANCHED ON THE FLAG, not rewritten when it moves. `:active` is currently OFF
+// (IS_STATE_TOKEN_ENABLED in selectors.ts): the pressed look is expressed as a functional
+// `style={({pressed}) => …}`, which every lowering transform compiles to `style` + `activeStyle`,
+// and shipping a second route into the same cascade is what this disables.
+//
+// The token table above is NOT dead weight — it is the contract the flag restores, and it is
+// asserted the moment the flag flips, with no edit here. A block that had to be hand-rewritten on
+// each flip is a block that would be wrong on the first flip nobody remembered to make.
+describe('selectorsToMatches — :active', () => {
+  if (IS_STATE_TOKEN_ENABLED) {
+    it.each(ACTIVE_KEPT)(
+      'ENABLED: $selector -> $tokens',
+      ({ selector, tokens, combinators, specificity }) => {
+        const result = matchesFor(selector);
+
+        expect(result.dropped).toEqual([]);
+        expect(result.matches).toEqual([{ tokens, combinators, specificity }]);
+      },
+    );
+    return;
+  }
+
+  it.each(ACTIVE_KEPT)(
+    'DISABLED: $selector is dropped, and says so as its own reason',
+    ({ selector }) => {
+      const result = matchesFor(selector);
+
+      expect(result.matches).toEqual([]);
+      // Its own reason, never 'pseudo-class'. That one's warning reads "React Native has no
+      // pseudo-class state", which is FALSE for the pressed look — it is supported, by another
+      // route — and a warning that misdescribes the cause sends the reader into the engine.
+      expect(result.dropped).toEqual([
+        { reason: 'state-pseudo-class', detail: 'active' },
+      ]);
+    },
+  );
 });
 
 describe('selectorsToMatches — dropped selectors', () => {

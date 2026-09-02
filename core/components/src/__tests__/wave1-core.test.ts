@@ -100,6 +100,11 @@ describe('renderInputAccessoryView', () => {
     expect(host.children).toHaveLength(0);
   });
 
+  // ABSENT, not present-and-undefined, and the difference is load-bearing rather than tidy.
+  // `nativeID` has an alias source: the wrapper leaves `id` in passthrough and the renderer renames
+  // it, so a `nativeID: undefined` emitted here is written AFTER that rename and deletes it. The
+  // keys were briefly made unconditional on the reasoning that `setProp` collapses undefined to
+  // absent — true, and exactly what makes the write destructive instead of inert.
   it('omits nativeID and backgroundColor when undefined', () => {
     const bare = renderInputAccessoryView({ passthrough: {} });
     expect('nativeID' in bare.props).toBe(false);

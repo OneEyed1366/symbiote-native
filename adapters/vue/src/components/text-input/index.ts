@@ -41,6 +41,9 @@ import {
   type IClassNameValue,
   type ISymbioteEvent,
   type ISymbioteNode,
+  type IMeasureOnSuccess,
+  type IMeasureInWindowOnSuccess,
+  type IMeasureLayoutOnSuccess,
 } from '@symbiote-native/engine';
 import { descriptorToVue } from '../../descriptor-to-vue';
 import { normalizeVueAttrs } from '../../utils/normalize-attrs';
@@ -260,6 +263,28 @@ export const TextInput = defineComponent<ITextInputProps, ITextInputEmits>(
           start,
           end,
         ]);
+      },
+      // Forwarded from the node, because `expose()` REPLACES the public instance rather than
+      // extending it: without these four, a `<TextInput>` ref could not measure while a `<View>`
+      // ref could, and an app moved between the component and lowered paths — which it does by
+      // writing `:multiline="isLong"` instead of `multiline` — silently swapped which four methods
+      // it had. The lowered path answers all nine through `buildTextInputHandle`; this is the same
+      // set on the component path, so the two surfaces are one.
+      measure: (callback: IMeasureOnSuccess): void => {
+        nodeRef.value?.measure(callback);
+      },
+      measureInWindow: (callback: IMeasureInWindowOnSuccess): void => {
+        nodeRef.value?.measureInWindow(callback);
+      },
+      measureLayout: (
+        relativeToNativeNode: ISymbioteNode | number,
+        onSuccess: IMeasureLayoutOnSuccess,
+        onFail?: () => void,
+      ): void => {
+        nodeRef.value?.measureLayout(relativeToNativeNode, onSuccess, onFail);
+      },
+      setNativeProps: (nativeProps: Record<string, unknown>): void => {
+        nodeRef.value?.setNativeProps(nativeProps);
       },
     });
 

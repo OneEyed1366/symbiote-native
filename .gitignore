@@ -79,3 +79,14 @@ packages/*/.rn-*
 # folder inside it) — both levels match the bare rule independently and both need unignoring.
 !apps/docs-site/src/content/docs/
 !apps/docs-site/src/content/docs/docs/
+
+# Local dev registry (scripts/local-registry.mjs, scripts/verdaccio/).
+#
+# The POINTER at localhost must never be tracked: npm has no registry fallback, so a clone without
+# Verdaccio running fails to install rather than quietly falling back to npmjs. The CONFIG is the
+# opposite and IS tracked — it is how somebody else stands the same registry up. It lives under
+# `scripts/` rather than `.verdaccio/` for a mechanical reason: the blanket `.*/` rule above
+# excludes every dot-directory, and git cannot re-include a file whose parent directory is
+# excluded, so no negation can rescue it from there.
+scripts/verdaccio/token
+examples/*/.npmrc
