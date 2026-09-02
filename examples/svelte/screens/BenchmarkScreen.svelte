@@ -68,13 +68,19 @@
   const ROW_BATCH_LARGE = 10000;
 
   // The number that decides whether a row COUNT is even feasible here, and the one krausest cannot
-  // tell us: its counts are DOM-node counts. `BenchmarkRow` expands to NINE native views
-  // (1 View + 3x[Text + RawText] + 2 Pressable Views), so 10 000 rows mounted at once is 90 000
-  // UIViews. Measured 2026-08-18 on the iOS 26.5 simulator, that never completed: RAM climbed
-  // 2.1 -> 2.8 GB and the JS thread sat at 0 fps. 1 000 rows (9 000 views) completes in ~880 ms.
-  // That ceiling is the native host's, not the engine's - which is exactly why the two mount modes
-  // below exist, so the claim can be measured instead of asserted.
-  const NATIVE_VIEWS_PER_ROW = 9;
+  // tell us: its counts are DOM-node counts. `BenchmarkRow` expands to TEN native views
+  // (1 View + 3x[Text + RawText] + 2 Pressable Views + 1 TextInput), so 10 000 rows mounted at once
+  // is 100 000 UIViews. Measured 2026-08-18 on the nine-view row, iOS 26.5 simulator: that never
+  // completed — RAM climbed 2.1 -> 2.8 GB and the JS thread sat at 0 fps, while 1 000 rows
+  // completed in ~880 ms. That ceiling is the native host's, not the engine's - which is exactly
+  // why the two mount modes below exist, so the claim can be measured instead of asserted.
+  //
+  // A TextInput is exactly ONE native view — no wrapper, no raw-text child (its text rides as the
+  // `text` prop, not as a child node). It was briefly a second row shape behind a toggle, so the
+  // input's cost could be read as a delta against the nine-view row; that delta has been taken on
+  // every column, so the arm is gone and the ten-view row is the one shape every number here is
+  // measured on.
+  const NATIVE_VIEWS_PER_ROW = 10;
   // Fixed so getItemLayout is exact in virtualized mode and both modes lay rows out identically.
   const BENCH_ROW_HEIGHT = 44;
 
@@ -733,7 +739,7 @@
    * the operator happened to leave behind.
    *
    * Runs in EITHER mount mode - the pressed button picks it. No 10,000-row step in either: 10,000
-   * rows is 90,000 native views, which the host does not survive in all-mounted (see
+   * rows is 100,000 native views, which the host does not survive in all-mounted (see
    * NATIVE_VIEWS_PER_ROW), and a suite that hangs the screen measures nothing.
    */
   async function runSuite(mode: IMountMode): Promise<void> {
@@ -1134,6 +1140,11 @@
       {isAllMounted ? 'ROWS · ALL MOUNTED' : 'ROWS · VIRTUALIZED'}
     </Text>
     {#if isAllMounted}
+      <!-- No conditional anywhere under this loop, and on this adapter that is a measurement
+        decision rather than tidiness: an `{#if}` costs one anchor per instantiation EVEN WHEN ITS
+        CONDITION IS FALSE, so one inside the row would put 1 000 extra retained nodes on the tree
+        while `renderable` — and therefore every FABRIC counter — read identically. Mechanism and
+        the anchor census: `svelte-adapter-dom-shim` §32. -->
       {#each rows as row (row.id)}
         <BenchmarkRow
           {row}

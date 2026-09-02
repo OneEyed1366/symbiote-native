@@ -44,6 +44,7 @@ import {
   ScrollView,
   SectionList,
   Text,
+  TextInput,
   View,
   type ISection,
 } from '@symbiote-native/solid';
@@ -134,7 +135,11 @@ const ROW_BATCH_LARGE = 10000;
 // 2.1 -> 2.8 GB and the JS thread sat at 0 fps. 1 000 rows (9 000 views) completes in ~880 ms.
 // That ceiling is the native host's, not the engine's — which is exactly why the two mount modes
 // below exist, so the claim can be measured instead of asserted.
-const NATIVE_VIEWS_PER_ROW = 9;
+// ONE row shape, everywhere. The `plain` / `with-input` pair existed to price a single TextInput
+// as a delta inside one column; that number has been taken, so the arm now only splits every
+// future measurement in two. Ten views, not eleven: a lowered `<TextInput>` is a single native
+// input, and its `value` is a prop rather than a child, so it adds no RawText.
+const NATIVE_VIEWS_PER_ROW = 10;
 // Fixed so getItemLayout is exact in virtualized mode and both modes lay rows out identically.
 // Must stay equal to BenchmarkScreen.css's `.bench-row` height.
 const BENCH_ROW_HEIGHT = 44;
@@ -402,9 +407,9 @@ interface IBenchmarkRowProps {
 }
 
 /**
- * NINE native views, and the count is load-bearing: 1 View + 3x(Text -> RCTText + RCTRawText) +
- * 2x(Pressable -> View). A port that produces 8 or 10 puts every number on this screen ~11% off the
- * other canaries'.
+ * TEN native views, and the count is load-bearing: 1 View + 3x(Text -> RCTText + RCTRawText) +
+ * 2x(Pressable -> View) + 1 TextInput. A port that produces 9 or 11 puts every number on this
+ * screen ~10% off the other canaries'.
  *
  * NOTHING here destructures `props` — a Solid component body runs ONCE, so a destructured `row` or
  * `isSelected` would freeze the row at its mount-time value and the update/select operations would
@@ -425,6 +430,16 @@ function BenchmarkRow(props: IBenchmarkRowProps) {
       >
         <Text class="bench-row-remove-text">×</Text>
       </Pressable>
+      {/* LAST, so the other nine views keep the positions every earlier payload diff was read at.
+
+          No `multiline` — it selects a different native view. No `onChangeText` — a listener would
+          price the event path rather than the node. And no `ref`, which for this adapter is not
+          merely surplus but measurement-cancelling: `symbiote-text-input` sits in the transform's
+          ref-refusal set, so a ref would keep the component and the row would measure the wrapper.
+
+          `value`, not `defaultValue`: controlled is the shape that exercises the behavior's
+          afterCommit handshake, which is the part lowering moved onto the node. */}
+      <TextInput class="bench-row-input" value={props.row.label} />
     </View>
   );
 }
@@ -784,7 +799,7 @@ export function BenchmarkScreen() {
    * the operator happened to leave behind.
    *
    * Runs in EITHER mount mode — the pressed button picks it. No 10,000-row step in either: 10,000
-   * rows is 90,000 native views, which the host does not survive in all-mounted (see
+   * rows is 100,000 native views, which the host does not survive in all-mounted (see
    * NATIVE_VIEWS_PER_ROW), and a suite that hangs the screen measures nothing.
    */
   const runSuite = async (mode: IMountMode): Promise<void> => {

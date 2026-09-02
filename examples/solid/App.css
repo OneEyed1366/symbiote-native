@@ -368,18 +368,6 @@
   padding-bottom: 12px;
   padding-left: 16px;
   background-color: #151c33;
-  /* Stated rather than left to RN's default, because :active below is a full RE-RESOLVE of the
-   * token list and not an overlay: on release the pressed rule drops out, and a key that vanishes
-   * from a style payload is not the same thing as a key that returns to 1. */
-  opacity: 1;
-}
-
-/* The press feedback, which used to be `style={state => ({opacity: state.pressed ? 0.6 : 1})}`.
- * Moving it here is what lets this Pressable become an intrinsic tag: a functional `style` is the
- * one thing that forces it to stay a Vue/Solid COMPONENT, since the template has to read the press
- * state. Resolved below the framework now — `.claude/rules/host-primitive-tier.md`. */
-.action-button:active {
-  opacity: 0.6;
 }
 
 .action-button-text {

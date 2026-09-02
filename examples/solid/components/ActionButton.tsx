@@ -20,15 +20,20 @@ export function ActionButton(props: IActionButtonProps) {
       testID={props.testID}
       onPress={() => props.onPress()}
       class="action-button"
-      // The press half moved to `.action-button:active` in App.css. A FUNCTIONAL style is the one
-      // thing that forces this element to stay a component — the template would have to read the
-      // press state — so dropping it is what makes the button eligible for the intrinsic tag, and
-      // 146 instantiation sites ride on this one definition.
+      // The pressed look, as a `style` FUNCTION of press state — RN's own idiom. It briefly lived
+      // in `.action-button:active` instead, because a functional style used to force this element
+      // to stay a component and 146 instantiation sites ride on this one definition. That
+      // constraint is GONE: `babel-lower-host-primitives` specialises the callback into
+      // `style` + `activeStyle` at build time, so the idiom and the intrinsic tag stopped being a
+      // trade-off — and pseudo-class state is now off in the parser, so the CSS route would
+      // silently paint nothing.
       //
-      // Still reactive without the function: Solid compiles a dynamic object attribute on a
-      // component into `get style() { return {borderColor: props.color}; }`, so `color` is re-read
-      // on change. Verified in the compiled output, not assumed.
-      style={{ borderColor: props.color }}
+      // `props.color` is read INSIDE the callback, which is what keeps it reactive: the transform
+      // emits the body once per state, so a colour captured outside would freeze at first render.
+      style={({ pressed }: { pressed: boolean }) => ({
+        borderColor: props.color,
+        opacity: pressed ? 0.6 : 1,
+      })}
     >
       {() => (
         <Text class="action-button-text" style={{ color: props.color }}>

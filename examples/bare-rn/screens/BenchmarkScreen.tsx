@@ -19,6 +19,7 @@ import {
   SectionList,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { ActionButton } from '../components/ActionButton';
@@ -97,7 +98,9 @@ const ROW_BATCH_LARGE = 10000;
 // 2.1 -> 2.8 GB and the JS thread sat at 0 fps. 1 000 rows (9 000 views) completes in ~880 ms.
 // That ceiling is the native host's, not the renderer's - which is exactly why the two mount
 // modes below exist, so the claim can be measured instead of asserted.
-const NATIVE_VIEWS_PER_ROW = 9;
+// What turns a row count into a view count on the readout: nine views of row chrome plus the
+// TextInput, which is one native view.
+const NATIVE_VIEWS_PER_ROW = 10;
 // Fixed so getItemLayout is exact in virtualized mode and both modes lay rows out identically.
 const BENCH_ROW_HEIGHT = 44;
 
@@ -117,6 +120,7 @@ const MOUNT_MODE = {
   Virtualized: 'virtualized',
 } as const;
 type IMountMode = (typeof MOUNT_MODE)[keyof typeof MOUNT_MODE];
+
 // krausest's "partial update" touches every 10th row of 10,000 and appends " !!!" to its label.
 const UPDATE_STRIDE = 10;
 const UPDATE_SUFFIX = ' !!!';
@@ -403,6 +407,10 @@ const BenchmarkRow = memo(function BenchmarkRowView({
       <Pressable style={styles.benchRowRemove} onPress={() => onRemove(row.id)}>
         <Text style={styles.benchRowRemoveText}>×</Text>
       </Pressable>
+      {/* LAST child, bare and CONTROLLED — the same shape every canary uses, so the delta this
+        column reports prices the same thing theirs do. React Native's own TextInput here, driven
+        by React's own renderer: that is the whole point of this example. */}
+      <TextInput style={styles.benchRowInput} value={row.label} />
     </View>
   );
 });
@@ -1349,6 +1357,25 @@ const styles = StyleSheet.create({
     color: '#41506a',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  // Fixed width and a height under the row's own 44, because BENCH_ROW_HEIGHT feeds getItemLayout
+  // in virtualized mode — a row that grows makes the windowed arm lay out differently from the
+  // all-mounted one.
+  // The StyleSheet twin of the canary's `.bench-row-input` CSS rule, property for property and
+  // value for value. It has to MATCH rather than merely look the same: a styled element's
+  // prop-key count includes its style, one payload key per declaration, so a rule that differs
+  // by one property makes this column's per-input cost differ from every other column's for a
+  // reason no counter on the screen reports. `paddingHorizontal` was the old spelling and is
+  // exactly that hazard — one key where the canaries commit two.
+  benchRowInput: {
+    width: 96,
+    height: 28,
+    paddingLeft: 6,
+    paddingRight: 6,
+    borderRadius: 4,
+    backgroundColor: '#0f1621',
+    color: '#e8ecf1',
+    fontSize: 12,
   },
 });
 

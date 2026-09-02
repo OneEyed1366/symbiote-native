@@ -147,3 +147,24 @@
   font-size: 18px;
   font-weight: bold;
 }
+
+/* The row's tenth view. A FIXED width, so the row's layout does not depend on the input's content
+   and BENCH_ROW_HEIGHT stays exact for getItemLayout — a row that grows with its text would make
+   the virtualized offsets wrong and price scrolling instead of committing.
+
+   BYTE-IDENTICAL in every example, and the property SET is what has to match, not the values: a
+   resolved class flattens into the payload one key per declaration, so an app whose rule carries
+   one more property commits one more prop key per input and the columns stop being comparable.
+   Eight declarations, eight style keys. Literals rather than var(), because the custom-property
+   names differ per app and an undefined one paints nothing while reading as a working control.
+   Not `padding-horizontal`: that is one key where the two sides are two. */
+.bench-row-input {
+  width: 96px;
+  height: 28px;
+  padding-left: 6px;
+  padding-right: 6px;
+  border-radius: 4px;
+  background-color: #0f1621;
+  color: #e8ecf1;
+  font-size: 12px;
+}

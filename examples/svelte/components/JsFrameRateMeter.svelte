@@ -150,9 +150,8 @@
 </script>
 
 <View class="bench-meter">
-  <Text class="section-label">JS-THREAD FRAME RATE</Text><View
-    class="bench-meter-row"
-  >
+  <Text class="section-label">JS-THREAD FRAME RATE</Text>
+  <View class="bench-meter-row">
     <View class="bench-metric">
       <Text
         testID="bench-fps"
@@ -160,23 +159,28 @@
         style={{ color: accent }}
       >
         {String(framesPerSecond)}
-      </Text><Text class="bench-metric-label">fps</Text>
-    </View><View class="bench-metric">
+      </Text>
+      <Text class="bench-metric-label">fps</Text>
+    </View>
+    <View class="bench-metric">
       <Text
         testID="bench-dropped"
         class="bench-metric-value"
         style={{ color: accent }}
       >
         {String(droppedFrames)}
-      </Text><Text class="bench-metric-label">dropped</Text>
-    </View><View class="bench-metric">
+      </Text>
+      <Text class="bench-metric-label">dropped</Text>
+    </View>
+    <View class="bench-metric">
       <Text class="bench-metric-value" style={{ color: accent }}>
         {worstFrameMs.toFixed(0)}
-      </Text><Text class="bench-metric-label">worst ms</Text>
+      </Text>
+      <Text class="bench-metric-label">worst ms</Text>
     </View>
-  </View><Text class="section-label">ENGINE RECONCILE WALK</Text><View
-    class="bench-meter-row"
-  >
+  </View>
+  <Text class="section-label">ENGINE RECONCILE WALK</Text>
+  <View class="bench-meter-row">
     <View class="bench-metric">
       <Text
         testID="bench-walk-share"
@@ -184,25 +188,31 @@
         style={{ color: accent }}
       >
         {walk.sharePercent.toFixed(1)}
-      </Text><Text class="bench-metric-label">% of window</Text>
-    </View><View class="bench-metric">
+      </Text>
+      <Text class="bench-metric-label">% of window</Text>
+    </View>
+    <View class="bench-metric">
       <Text
         testID="bench-walk-nodes-per-commit"
         class="bench-metric-value"
         style={{ color: accent }}
       >
         {walk.nodesPerCommit.toFixed(0)}
-      </Text><Text class="bench-metric-label">nodes / commit</Text>
-    </View><View class="bench-metric">
+      </Text>
+      <Text class="bench-metric-label">nodes / commit</Text>
+    </View>
+    <View class="bench-metric">
       <Text
         testID="bench-walk-ms-per-commit"
         class="bench-metric-value"
         style={{ color: accent }}
       >
         {walk.msPerCommit.toFixed(1)}
-      </Text><Text class="bench-metric-label">ms / commit</Text>
+      </Text>
+      <Text class="bench-metric-label">ms / commit</Text>
     </View>
-  </View><ActionButton
+  </View>
+  <ActionButton
     testID="bench-fps-reset"
     title="Reset frame counters"
     onPress={onReset}

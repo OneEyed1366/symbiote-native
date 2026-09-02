@@ -7,6 +7,7 @@ import {
   ScrollView,
   SectionList,
   Text,
+  TextInput,
   View,
   type ISection,
 } from '@symbiote-native/react';
@@ -96,7 +97,10 @@ const ROW_BATCH_LARGE = 10000;
 // 2.1 -> 2.8 GB and the JS thread sat at 0 fps. 1 000 rows (9 000 views) completes in ~880 ms.
 // That ceiling is the native host's, not the engine's - which is exactly why the two mount modes
 // below exist, so the claim can be measured instead of asserted.
-const NATIVE_VIEWS_PER_ROW = 9;
+// What turns a row count into a view count on the readout. Nine views of row chrome plus the
+// TextInput, which is one native view: renderTextInput emits a single element with no children
+// (core/components/src/view/render-text-input.ts).
+const NATIVE_VIEWS_PER_ROW = 10;
 // Fixed so getItemLayout is exact in virtualized mode and both modes lay rows out identically.
 const BENCH_ROW_HEIGHT = 44;
 
@@ -112,6 +116,7 @@ const MOUNT_MODE = {
   Virtualized: 'virtualized',
 } as const;
 type IMountMode = (typeof MOUNT_MODE)[keyof typeof MOUNT_MODE];
+
 // krausest's "partial update" touches every 10th row of 10,000 and appends " !!!" to its label.
 const UPDATE_STRIDE = 10;
 const UPDATE_SUFFIX = ' !!!';
@@ -416,6 +421,13 @@ const BenchmarkRow = memo(function BenchmarkRowView({
       <Pressable className="bench-row-remove" onPress={() => onRemove(row.id)}>
         <Text className="bench-row-remove-text">×</Text>
       </Pressable>
+      {/* LAST child, and deliberately bare: no `multiline` (it would pick the other native view
+        and, being a runtime value, refuse to lower at all), no change handler and no ref (a ref
+        refuses to lower on the adapters that check for one). CONTROLLED rather than
+        `defaultValue`, because the controlled write is the beat the engine-side machine exists
+        for and an uncontrolled input would never run it. React has no lowering transform, so
+        here it stays a component — this column is the control the lowered ones are read against. */}
+      <TextInput className="bench-row-input" value={row.label} />
     </View>
   );
 });

@@ -160,13 +160,14 @@ const ROW_BATCH = 1000;
 const ROW_BATCH_LARGE = 10000;
 
 // The number that decides whether a row COUNT is even feasible here, and the one krausest cannot
-// tell us: its counts are DOM-node counts. BenchmarkRow.vue expands to NINE native views
-// (1 View + 3x[Text + RawText] + 2 Pressable Views), so 10 000 rows mounted at once is 90 000
-// UIViews. Measured 2026-08-18 on the iOS 26.5 simulator, that never completed: RAM climbed
-// 2.1 -> 2.8 GB and the JS thread sat at 0 fps. 1 000 rows (9 000 views) completes in ~880 ms.
-// That ceiling is the native host's, not the engine's - which is exactly why the two mount modes
-// below exist, so the claim can be measured instead of asserted.
-const NATIVE_VIEWS_PER_ROW = 9;
+// tell us: its counts are DOM-node counts. BenchmarkRow.vue expands to TEN native views
+// (1 View + 3x[Text + RawText] + 2 Pressable Views + 1 TextInput — renderTextInput emits one
+// element with no children), so 10 000 rows mounted at once is 100 000 UIViews. Measured
+// 2026-08-18 on the iOS 26.5 simulator against the nine-view row this screen carried then, that
+// never completed: RAM climbed 2.1 -> 2.8 GB and the JS thread sat at 0 fps; 1 000 rows completes
+// in ~880 ms. That ceiling is the native host's, not the engine's - which is exactly why the two
+// mount modes below exist, so the claim can be measured instead of asserted.
+const NATIVE_VIEWS_PER_ROW = 10;
 // Fixed so getItemLayout is exact in virtualized mode and both modes lay rows out identically.
 const BENCH_ROW_HEIGHT = 44;
 
@@ -182,6 +183,7 @@ const MOUNT_MODE = {
   Virtualized: 'virtualized',
 } as const;
 type IMountMode = (typeof MOUNT_MODE)[keyof typeof MOUNT_MODE];
+
 // krausest's "partial update" touches every 10th row of 10,000 and appends " !!!" to its label.
 const UPDATE_STRIDE = 10;
 const UPDATE_SUFFIX = ' !!!';

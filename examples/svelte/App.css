@@ -149,16 +149,6 @@
   padding-right: 16px;
   background-color: var(--paper);
 }
-/* The pressed look lives HERE, not in a functional `style` on the component. A
-   `style={({pressed}) => …}` forces Pressable to stay a framework component, because the TEMPLATE
-   would have to read the press state; an `:active` rule resolves it below the framework, in the
-   style registry, so the element lowers to `symbiote-pressable` and the press machine runs on the
-   engine node (`.claude/rules/host-primitive-tier.md`). `borderColor` stays inline because it is
-   the caller's own runtime prop — an object literal, which the lowering allow-list treats as
-   inert. */
-.action-button:active {
-  opacity: 0.6;
-}
 .action-button-text {
   color: var(--chalk-bright);
   font-size: 15px;
@@ -1052,6 +1042,28 @@
   height: 28px;
   align-items: center;
   justify-content: center;
+}
+
+/* The bench row's last child. FIXED width and a height under the row's own 44px, because
+   BENCH_ROW_HEIGHT feeds FlatList's getItemLayout: a row that grows makes the virtualized mode's
+   offsets wrong and the two mount modes stop being comparable. No flex — an input that could
+   stretch would change how the three other children lay out too.
+
+   Byte-identical in every examples/* app, literal values on purpose. Every declaration here
+   flattens into the committed payload as its own prop key, so an app whose rule carries one extra
+   line commits one extra key per input and its column silently prices a different element — a
+   `font-size` in one stylesheet was the whole of a measured 9-vs-8 key gap. `var()` is out for the
+   second reason: the palette names differ per app, and an undefined custom property paints nothing
+   while reading as a broken control (`.claude/rules/canary-visual-defects.md`). */
+.bench-row-input {
+  width: 96px;
+  height: 28px;
+  padding-left: 6px;
+  padding-right: 6px;
+  border-radius: 4px;
+  background-color: #0f1621;
+  color: #e8ecf1;
+  font-size: 12px;
 }
 
 .bench-row-remove-text {

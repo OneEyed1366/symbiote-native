@@ -139,3 +139,19 @@
   font-size: 18px;
   font-weight: bold;
 }
+/* Canonical, byte-identical across every example — a styled element's prop-key count includes
+   its CSS rule, so a differing declaration set here would contaminate the cross-adapter prop-key
+   comparison (root CLAUDE.md, "A styled element's prop-key count includes its CSS rule"). Literal
+   values, no var(): the custom-property names differ per app and an undefined one paints nothing
+   while reading as a broken control (`.claude/rules/canary-visual-defects.md`). Height fixed so
+   the row still fits the 44px .bench-row box — RN's default TextInput height would overflow it. */
+.bench-row-input {
+  width: 96px;
+  height: 28px;
+  padding-left: 6px;
+  padding-right: 6px;
+  border-radius: 4px;
+  background-color: #0f1621;
+  color: #e8ecf1;
+  font-size: 12px;
+}

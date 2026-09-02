@@ -1016,3 +1016,16 @@
   font-size: 18px;
   font-weight: bold;
 }
+/* The `with-input` arm's one extra native view. WIDTH IS FIXED, and that is not styling: the row
+   is height-locked at 44px so getItemLayout stays exact in virtualized mode, and an input that
+   grows with its content would push the row past it. Height fixed for the same reason. */
+.bench-row-input {
+  width: 96px;
+  height: 28px;
+  padding-left: 6px;
+  padding-right: 6px;
+  border-radius: 4px;
+  background-color: #0f1621;
+  color: #e8ecf1;
+  font-size: 12px;
+}
