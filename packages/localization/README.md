@@ -103,6 +103,18 @@ const calendars = useCalendars(); // Ref<Calendar[]>
 </template>
 ```
 
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import { useLocales, useCalendars } from '@symbiote-native/localization/svelte';
+
+  const locales = useLocales(); // { readonly current: Locale[] }
+  const calendars = useCalendars(); // { readonly current: Calendar[] }
+</script>
+<Text>{locales.current[0].languageTag}</Text>
+<Text>{calendars.current[0].timeZone}</Text>
+```
+
 ```tsx
 // Solid — an accessor per getter; call it to read, so a component body that runs once still
 // re-renders the leaf that reads it.

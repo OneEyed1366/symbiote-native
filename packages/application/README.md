@@ -4,12 +4,11 @@ A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-application`](https://github.com/expo/expo/tree/main/packages/expo-application)
 — native app version/build/name/ID, the Android ID, install-referrer and install/update-time
 lookups, and the iOS vendor ID / release type / push-notification-service environment — usable
-from **every** adapter, React, Vue, and Angular, not just React. Like
+from **every** adapter, React, Vue, Svelte, Solid, and Angular. Like
 [`@symbiote-native/local-auth`](../local-auth) (and unlike `@symbiote-native/sensors`'s
 `EventEmitter` + live-subscription surface), everything here is either a plain constant resolved
 once at import time or a one-shot async call with no per-instance state, so there is no hook/
-composable/service to wrap — the React, Vue, and Angular entry points are plain re-exports of
-the same `core`.
+composable/service to wrap — every adapter's entry point is a plain re-export of the same `core`.
 
 ## Install
 
@@ -54,9 +53,9 @@ src/core/     nativeApplicationVersion / nativeBuildVersion / applicationName / 
 src/angular/  @symbiote-native/application/angular — export * from '../core'
 ```
 
-`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
-physical per-framework file, since there's nothing to subscribe to or clean up. `./angular` stays
-a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto `src/core/`
+— no physical per-framework file, since there's nothing to subscribe to or clean up. `./angular`
+stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
 
 ## Use it
 
@@ -165,10 +164,75 @@ export class ApplicationScreen {
 }
 ```
 
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import { Platform, Text, View } from '@symbiote-native/svelte';
+  import {
+    applicationId,
+    applicationName,
+    getInstallationTimeAsync,
+    nativeApplicationVersion,
+    nativeBuildVersion,
+  } from '@symbiote-native/application/svelte';
+
+  let installedAt = $state<Date | null>(null);
+
+  getInstallationTimeAsync().then(value => {
+    installedAt = value;
+  });
+</script>
+
+<View>
+  <Text>{applicationName} ({applicationId})</Text>
+  <Text>v{nativeApplicationVersion} (build {nativeBuildVersion})</Text>
+  {#if Platform.OS === 'android' && installedAt !== null}
+    <Text>Installed {installedAt.toLocaleDateString()}</Text>
+  {/if}
+</View>
+```
+
+```tsx
+// Solid
+import { createSignal } from 'solid-js';
+import { Platform, Text, View } from '@symbiote-native/solid';
+import {
+  applicationId,
+  applicationName,
+  getInstallationTimeAsync,
+  nativeApplicationVersion,
+  nativeBuildVersion,
+} from '@symbiote-native/application/solid';
+
+function ApplicationScreen() {
+  const [installedAt, setInstalledAt] = createSignal<Date | null>(null);
+
+  getInstallationTimeAsync().then(setInstalledAt);
+
+  return (
+    <View>
+      <Text>
+        {applicationName} ({applicationId})
+      </Text>
+      <Text>
+        v{nativeApplicationVersion} (build {nativeBuildVersion})
+      </Text>
+      {Platform.OS === 'android' && installedAt() !== null && (
+        <Text>Installed {installedAt()!.toLocaleDateString()}</Text>
+      )}
+    </View>
+  );
+}
+```
+
 There's no per-instance service to `inject()` in the Angular case — every function is a plain
-free function off the core package, called straight from the constructor. All three examples
-mirror the real canary demo screens — `examples/expo-react/screens/ApplicationScreen.tsx`,
-`examples/expo-vue-sfc/screens/ApplicationScreen.vue`, `examples/expo-vue-tsx/screens/ApplicationScreen.tsx`,
+free function off the core package, called straight from the constructor (or, on Solid, straight
+from the component body). All five examples mirror the real canary demo screens —
+`examples/expo-react/screens/ApplicationScreen.tsx`,
+`examples/expo-vue-sfc/screens/ApplicationScreen.vue`,
+`examples/expo-vue-tsx/screens/ApplicationScreen.tsx`,
+`examples/expo-svelte/screens/ApplicationScreen.svelte`,
+`examples/expo-solid/screens/ApplicationScreen.tsx`,
 `examples/expo-angular/src/screens/ApplicationScreen.ts`.
 
 ## API

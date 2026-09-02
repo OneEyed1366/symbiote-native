@@ -115,6 +115,24 @@ const screenOrientation = useScreenOrientation(); // Ref<ScreenOrientationState>
 </template>
 ```
 
+```svelte
+<!-- Svelte — examples/expo-svelte/screens/ScreenOrientationScreen.svelte -->
+<script lang="ts">
+  import {
+    lockAsync,
+    OrientationLock,
+  } from '@symbiote-native/screen-orientation';
+  import { useScreenOrientation } from '@symbiote-native/screen-orientation/svelte';
+
+  // The rune hands back a boxed getter, so `.current` is what a `$derived` subscribes to —
+  // Svelte's twin of unwrapping Vue's Ref via `.value`.
+  const screenOrientation = useScreenOrientation();
+</script>
+
+<Text>Orientation: {screenOrientation.current.orientation}</Text>
+<Text>Lock: {screenOrientation.current.orientationLock}</Text>
+```
+
 ```ts
 // Angular — examples/expo-angular/src/screens/ScreenOrientationScreen.ts
 import { Component, inject } from '@angular/core';

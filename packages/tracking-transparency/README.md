@@ -151,6 +151,29 @@ export class TrackingScreen {
 }
 ```
 
+```svelte
+<!-- Svelte — the rune hands back a boxed object whose `status` is a getter; destructuring it
+     would freeze the value at its initial null, since Svelte 5 reactivity is lexically scoped. -->
+<script lang="ts">
+  import {
+    getAdvertisingId,
+    usePermissions,
+  } from '@symbiote-native/tracking-transparency/svelte';
+
+  const permissions = usePermissions();
+</script>
+
+<View>
+  <Text>{permissions.status?.status ?? 'checking…'}</Text>
+  <Pressable onPress={() => permissions.request()}>
+    <Text>Request tracking permission</Text>
+  </Pressable>
+  <Pressable onPress={() => console.log(getAdvertisingId())}>
+    <Text>Log advertising ID</Text>
+  </Pressable>
+</View>
+```
+
 ```tsx
 // Solid — the accessors are CALLED; a Solid component body runs once, so a snapshot would freeze.
 import { createPermissions } from '@symbiote-native/tracking-transparency/solid';
@@ -178,6 +201,8 @@ The examples above mirror the real canary demo screens —
 `examples/expo-react/screens/TrackingTransparencyScreen.tsx`,
 `examples/expo-vue-sfc/screens/TrackingTransparencyScreen.vue`,
 `examples/expo-vue-tsx/screens/TrackingTransparencyScreen.tsx`,
+`examples/expo-svelte/screens/TrackingTransparencyScreen.svelte`,
+`examples/expo-solid/screens/TrackingTransparencyScreen.tsx`,
 `examples/expo-angular/src/screens/TrackingTransparencyScreen.ts`.
 
 ## API
@@ -215,16 +240,23 @@ import { PermissionsService } from '@symbiote-native/tracking-transparency/angul
 ```
 
 `usePermissions` auto-fetches the current permission status on mount and returns a
-`[status, request, get, error]` tuple (React) / `{ status, error, request, get }` object
-(Vue/Svelte); Solid's `createPermissions` returns the same object with `Accessor`s instead of
-`Ref`s, and Angular's `PermissionsService.connect()` returns a readonly `Signal`:
+`[status, request, get, error]` tuple (React) / `{ status, error, request, get }` object (Vue,
+destructurable — `status` is a `Ref`). Solid's `createPermissions` returns the same shape with
+`Accessor`s instead of `Ref`s, and Angular's `PermissionsService.connect()` returns a readonly
+`Signal`. **Svelte's rune returns a boxed object whose `status` is a getter — do not destructure
+it**, or the value freezes at its initial `null` (Svelte 5 reactivity is lexically scoped to the
+property access):
 
 ```ts
 // React
 const [status, request] = usePermissions();
 
-// Vue / Svelte
+// Vue
 const { status, request } = usePermissions();
+
+// Svelte — read permissions.status, never destructure it
+const permissions = usePermissions();
+permissions.status;
 
 // Solid — status is an accessor, called at the read site
 const { status, request } = createPermissions();

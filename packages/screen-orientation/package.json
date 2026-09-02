@@ -3,6 +3,18 @@
   "version": "0.3.0",
   "description": "expo-screen-orientation wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Orientation locking (lockAsync/lockPlatformAsync/unlockAsync), the current orientation and lock, and an auto-updating orientation-change hook/composable/service.",
   "license": "MIT",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "expo-screen-orientation",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "orientation-lock",
+    "orientation"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OneEyed1366/symbiote-native.git",

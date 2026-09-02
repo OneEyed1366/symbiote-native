@@ -143,6 +143,37 @@ watch(
 </template>
 ```
 
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import {
+    getIpAddressAsync,
+    isAirplaneModeEnabledAsync,
+  } from '@symbiote-native/network';
+  import { useNetworkState } from '@symbiote-native/network/svelte';
+
+  const networkState = useNetworkState(); // { readonly current: NetworkState }
+  let ipAddress = $state<string | null>(null);
+  let isAirplaneMode = $state<boolean | null>(null);
+
+  $effect(() => {
+    networkState.current; // establishes the dependency, so this re-runs on network change
+    void Promise.all([getIpAddressAsync(), isAirplaneModeEnabledAsync()]).then(
+      ([ip, airplaneMode]) => {
+        ipAddress = ip;
+        isAirplaneMode = airplaneMode;
+      },
+    );
+  });
+</script>
+<Text>
+  {networkState.current.isConnected
+    ? `Connected via ${networkState.current.type}`
+    : 'Offline'}
+</Text>
+<Text>{ipAddress ?? 'checking…'}</Text>
+```
+
 ```ts
 // Angular — examples/expo-angular/src/screens/NetworkScreen.ts
 import { Component, effect, inject, signal } from '@angular/core';
@@ -263,11 +294,12 @@ between the seed and the subscription.
 No Fabric/Descriptor angle at all — network is a pure async-function + `EventEmitter` listener
 surface, never a view. Tests inject a fake native-module object in place of the real
 `requireNativeModule` resolution (`src/core/network.test.ts`,
-`src/{react,vue,angular}/**/*.test.{ts,tsx}`, `vitest`), the same pattern
+`src/{react,vue,svelte,solid,angular}/**/*.test.{ts,tsx}`, `vitest`), the same pattern
 `@symbiote-native/battery`/`@symbiote-native/sensors`/`@symbiote-native/local-auth` use — no
 `installFabric()`, no ViewConfig. Native rendering itself is verified on-device — see the parent
 [README](../../README.md).
 
-The Android/iOS native wiring is done across all four `examples/expo-*` canary apps
-(`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-angular`);
-this package isn't yet in the public, non-Expo `examples/react` canary.
+The Android/iOS native wiring is done across all six `examples/expo-*` canary apps
+(`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`, `examples/expo-svelte`,
+`examples/expo-solid`, `examples/expo-angular`); this package isn't yet in the public, non-Expo
+`examples/react` canary.

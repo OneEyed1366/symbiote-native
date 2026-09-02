@@ -3,6 +3,18 @@
   "version": "0.3.0",
   "description": "expo-sharing wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Opens the platform share sheet for a local file.",
   "license": "MIT",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "expo-sharing",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "share-sheet",
+    "file-sharing"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OneEyed1366/symbiote-native.git",

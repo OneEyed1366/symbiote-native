@@ -40,8 +40,8 @@ package with zero further changes:
 
 Full mechanics — the Podfile pieces that normally ship inside the `expo` package, the `expo`
 peer-dependency exclusion list, per-module permission strings — live in the
-`symbiote-expo-native-module` project skill. This wiring is already done for all four
-`examples/expo-*` canary apps (React, Vue SFC, Vue TSX, Angular).
+`symbiote-expo-native-module` project skill. This wiring is already done for all six
+`examples/expo-*` canary apps (React, Vue SFC, Vue TSX, Svelte, Solid, Angular).
 
 ## Shape
 
@@ -134,6 +134,69 @@ onMounted(() => {
 </template>
 ```
 
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import {
+    CellularGeneration,
+    getCarrierNameAsync,
+    getCellularGenerationAsync,
+    usePermissions,
+  } from '@symbiote-native/cellular/svelte';
+
+  let generation = $state<CellularGeneration | null>(null);
+  let carrierName = $state<string | null>(null);
+  const permissions = usePermissions(); // boxed getter: permissions.status / .request()
+
+  Promise.all([getCellularGenerationAsync(), getCarrierNameAsync()]).then(
+    ([gen, carrier]) => {
+      generation = gen;
+      carrierName = carrier;
+    },
+  );
+</script>
+
+<Text>{generation === null ? 'checking…' : CellularGeneration[generation]}</Text>
+<Text>{carrierName ?? 'checking…'}</Text>
+<Text>{permissions.status === null ? 'checking…' : permissions.status.status}</Text>
+<Button title="Request permission" onPress={() => permissions.request()} />
+```
+
+```tsx
+// Solid
+import { createSignal } from 'solid-js';
+import {
+  CellularGeneration,
+  getCarrierNameAsync,
+  getCellularGenerationAsync,
+} from '@symbiote-native/cellular';
+import { createPermissions } from '@symbiote-native/cellular/solid';
+
+function CellularScreen() {
+  const [generation, setGeneration] = createSignal<CellularGeneration | null>(null);
+  const [carrierName, setCarrierName] = createSignal<string | null>(null);
+  const { status, request: requestPermission } = createPermissions();
+
+  Promise.all([getCellularGenerationAsync(), getCarrierNameAsync()]).then(
+    ([gen, carrier]) => {
+      setGeneration(gen);
+      setCarrierName(carrier);
+    },
+  );
+
+  return (
+    <>
+      <Text>
+        {generation() === null ? 'checking…' : CellularGeneration[generation()!]}
+      </Text>
+      <Text>{carrierName() ?? 'checking…'}</Text>
+      <Text>{status() === null ? 'checking…' : status()!.status}</Text>
+      <Button title="Request permission" onPress={() => requestPermission()} />
+    </>
+  );
+}
+```
+
 ```ts
 // Angular
 import { Component, inject, signal } from '@angular/core';
@@ -178,8 +241,9 @@ export class CellularScreen {
 ```
 
 Trimmed from the real demo screens — `examples/expo-react/screens/CellularScreen.tsx` and its
-Vue SFC, Vue TSX, and Angular twins (`examples/expo-vue-sfc/screens/CellularScreen.vue`,
-`examples/expo-vue-tsx/screens/CellularScreen.tsx`, `examples/expo-angular/src/screens/CellularScreen.ts`),
+Vue SFC, Vue TSX, Svelte, Solid, and Angular twins (`examples/expo-vue-sfc/screens/CellularScreen.vue`,
+`examples/expo-vue-tsx/screens/CellularScreen.tsx`, `examples/expo-svelte/screens/CellularScreen.svelte`,
+`examples/expo-solid/screens/CellularScreen.tsx`, `examples/expo-angular/src/screens/CellularScreen.ts`),
 which also cover `allowsVoipAsync`/`getIsoCountryCodeAsync`/`getMobileCountryCodeAsync`/
 `getMobileNetworkCodeAsync` and gate the Android-only fields behind `Platform.OS === 'android'`.
 

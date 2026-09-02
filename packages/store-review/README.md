@@ -3,10 +3,10 @@
 A wrapper package for [SymbioteNative](../../README.md) that makes
 [`expo-store-review`](https://github.com/expo/expo/tree/main/packages/expo-store-review)
 — prompting the platform's native in-app review flow — usable from **every** adapter, React,
-Vue, and Angular, not just React. Like [`@symbiote-native/device`](../device) and
+Vue, Svelte, Solid, and Angular, not just React. Like [`@symbiote-native/device`](../device) and
 [`@symbiote-native/local-auth`](../local-auth), every export here is a one-shot async call with
-no per-instance state, so there is no hook/composable/service to wrap — the React, Vue, and
-Angular entry points are plain re-exports of the same `core`.
+no per-instance state, so there is no hook/composable/service to wrap — the React, Vue, Svelte,
+and Solid entry points are plain re-exports of the same `core`.
 
 ## Install
 
@@ -47,9 +47,10 @@ src/core/     isAvailableAsync / requestReview / hasAction, plus the IStoreRevie
 src/angular/  @symbiote-native/store-review/angular — export * from '../core'
 ```
 
-`./react`, `./vue`, and `./svelte` are `exports`-map aliases straight onto `src/core/` — no
-physical per-framework file, since there's nothing to subscribe to or clean up. `./angular` stays
-a physical file/subpath since Angular ships through a separate `ngc`/AOT build (`build-ngc/`).
+`./react`, `./vue`, `./svelte`, and `./solid` are `exports`-map aliases straight onto
+`src/core/` — no physical per-framework file, since there's nothing to subscribe to or clean up.
+`./angular` stays a physical file/subpath since Angular ships through a separate `ngc`/AOT build
+(`build-ngc/`).
 
 ## Use it
 
@@ -94,6 +95,41 @@ function onRatePress() {
 </template>
 ```
 
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import { Button } from '@symbiote-native/svelte';
+  import { requestReview } from '@symbiote-native/store-review/svelte';
+
+  function onRatePress(): void {
+    void requestReview({
+      iosAppStoreUrl: 'https://apps.apple.com/app/id123456789',
+      androidPlayStoreUrl:
+        'https://play.google.com/store/apps/details?id=com.example.app',
+    });
+  }
+</script>
+
+<Button title="Rate this app" onPress={onRatePress} />
+```
+
+```tsx
+// Solid
+import { Button } from '@symbiote-native/solid';
+import { requestReview } from '@symbiote-native/store-review/solid';
+
+function RateAppButton() {
+  const onRatePress = () =>
+    void requestReview({
+      iosAppStoreUrl: 'https://apps.apple.com/app/id123456789',
+      androidPlayStoreUrl:
+        'https://play.google.com/store/apps/details?id=com.example.app',
+    });
+
+  return <Button title="Rate this app" onPress={onRatePress} />;
+}
+```
+
 ```ts
 // Angular
 import { Component } from '@angular/core';
@@ -118,6 +154,7 @@ export class RateAppButton {
 
 These snippets mirror the real canary demo screens — `examples/expo-react/screens/StoreReviewScreen.tsx`,
 `examples/expo-vue-sfc/screens/StoreReviewScreen.vue`, `examples/expo-vue-tsx/screens/StoreReviewScreen.tsx`,
+`examples/expo-svelte/screens/StoreReviewScreen.svelte`, `examples/expo-solid/screens/StoreReviewScreen.tsx`,
 `examples/expo-angular/src/screens/StoreReviewScreen.ts`.
 
 ## API
@@ -142,6 +179,8 @@ import {
 // or the framework-scoped entry points — identical surface, re-exported verbatim:
 import { requestReview } from '@symbiote-native/store-review/react';
 import { requestReview } from '@symbiote-native/store-review/vue';
+import { requestReview } from '@symbiote-native/store-review/svelte';
+import { requestReview } from '@symbiote-native/store-review/solid';
 import { requestReview } from '@symbiote-native/store-review/angular';
 ```
 
@@ -173,9 +212,10 @@ view or per-instance state. Tests inject a fake native-module object in place of
 ViewConfig. Native rendering itself is verified on-device (see the parent
 [README](../../README.md) for the project's testing model).
 
-Native autolinking wiring for `expo-modules-core` packages is already done in the four Expo
+Native autolinking wiring for `expo-modules-core` packages is already done in all six Expo
 canary apps (`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`,
-`examples/expo-angular`) via `@symbiote-native/local-auth`/`@symbiote-native/sensors` — this
-package reuses that same wiring with zero further app-side changes, since
-`expo-modules-autolinking` discovers any `expo-modules-core` package already present in
-`node_modules`. A dedicated demo screen has not been wired into those canaries yet.
+`examples/expo-svelte`, `examples/expo-solid`, `examples/expo-angular`) via
+`@symbiote-native/local-auth`/`@symbiote-native/sensors` — this package reuses that same wiring
+with zero further app-side changes, since `expo-modules-autolinking` discovers any
+`expo-modules-core` package already present in `node_modules`. Each canary carries its own
+`StoreReviewScreen` demo.

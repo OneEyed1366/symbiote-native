@@ -13,6 +13,18 @@
     "url": "https://github.com/OneEyed1366/symbiote-native/issues"
   },
   "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "expo-localization",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "locale",
+    "calendar"
+  ],
   "type": "module",
   "main": "src/core/index.ts",
   "module": "src/core/index.ts",

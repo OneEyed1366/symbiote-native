@@ -126,6 +126,60 @@ function handleCopy(input: string): void {
 </template>
 ```
 
+```svelte
+<!-- Svelte -->
+<script lang="ts">
+  import { getStringAsync, setStringAsync } from '@symbiote-native/clipboard';
+  import { useClipboard } from '@symbiote-native/clipboard/svelte';
+
+  let text = $state('checking…');
+  function refresh(): void {
+    void getStringAsync().then(value => (text = value));
+  }
+
+  const clipboard = useClipboard(); // { current: IClipboardEvent | null }
+
+  $effect(() => {
+    refresh();
+  });
+  $effect(() => {
+    if (clipboard.current !== null) refresh();
+  });
+
+  function handleCopy(input: string): void {
+    void setStringAsync(input).then(refresh);
+  }
+</script>
+
+<Text>{text}</Text>
+```
+
+```tsx
+// Solid
+import { createEffect, createSignal } from 'solid-js';
+import { getStringAsync, setStringAsync } from '@symbiote-native/clipboard';
+import { createClipboard } from '@symbiote-native/clipboard/solid';
+
+function ClipboardScreen() {
+  const clipboardEvent = createClipboard(); // Accessor<IClipboardEvent | null>
+  const [text, setText] = createSignal('checking…');
+
+  function refresh(): void {
+    getStringAsync().then(setText);
+  }
+  refresh();
+
+  createEffect(() => {
+    if (clipboardEvent() !== null) refresh();
+  });
+
+  const handleCopy = (input: string) =>
+    setStringAsync(input).then(refresh);
+
+  return <Text>{text()}</Text>;
+}
+```
+
 ```ts
 // Angular
 import { Component, Injector, effect, inject, signal } from '@angular/core';
@@ -163,6 +217,7 @@ export class ClipboardScreen {
 
 These are trimmed from the real demo screens — `examples/expo-react/screens/ClipboardScreen.tsx`,
 `examples/expo-vue-sfc/screens/ClipboardScreen.vue`, `examples/expo-vue-tsx/screens/ClipboardScreen.tsx`,
+`examples/expo-svelte/screens/ClipboardScreen.svelte`, `examples/expo-solid/screens/ClipboardScreen.tsx`,
 `examples/expo-angular/src/screens/ClipboardScreen.ts` — which additionally show `hasStringAsync()`
 status badges and, iOS-only, the `getUrlAsync`/`setUrlAsync`/`hasUrlAsync` URL surface.
 
@@ -224,6 +279,6 @@ is a pure async-function + one-listener surface, never a view. Native rendering 
 on-device (see the parent [README](../../README.md) for the project's testing model).
 
 Native autolinking wiring (Android's 3-layer registration, iOS Podfile/pod install) is done across
-all four `examples/expo-*` canary apps. It isn't wired into the public non-Expo canaries
-(`examples/react`, `examples/vue-sfc`, `examples/vue-tsx`, `examples/angular`) yet — those don't
-depend on any `expo-modules-core` package today.
+all six `examples/expo-*` canary apps. It isn't wired into the public non-Expo canaries
+(`examples/react`, `examples/vue-sfc`, `examples/vue-tsx`, `examples/svelte`, `examples/solid`,
+`examples/angular`) yet — those don't depend on any `expo-modules-core` package today.

@@ -3,6 +3,18 @@
   "version": "0.3.0",
   "description": "expo-standard-web-crypto ported for SymbioteNative — a Web Crypto API getRandomValues polyfill built on @symbiote-native/crypto's native random source.",
   "license": "MIT",
+  "keywords": [
+    "react-native",
+    "symbiote-native",
+    "react",
+    "vue",
+    "svelte",
+    "solid",
+    "angular",
+    "web-crypto",
+    "polyfill",
+    "getrandomvalues"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
