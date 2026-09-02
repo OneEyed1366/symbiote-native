@@ -116,6 +116,41 @@ window where it was abandoned.
 Corollary for anyone landing one: a harness whose adoption is a five-adapter decision has nobody
 obliged to wire it, so the landing commit owes either the first consumer or a named owner per arm.
 
+## Every audit here checks that a NAME exists. None checks that it MEANS the same thing
+
+Barrels, subpaths, `files` coverage, exported symbols, transform verdicts — all of it answers "can
+an app reach this". A name can be present on all five adapters, tested on all five, and commit a
+different tree on one of them.
+
+Measured 2026-09-02, device-reported: `createPortal` puts the ported content INSIDE the target on
+React and Vue, and NEXT TO it on Angular. Angular's `ViewContainerRef` anchors at its host element
+and `createEmbeddedView` inserts after that anchor, so `<View portalOutlet>` delivers a sibling.
+The symptom was a card portaled into an absolutely-positioned overlay laying out in the scroll flow
+— the centering could not reach a node that was never in the overlay.
+
+**Both behaviours were pinned by their own adapter's test, and each was internally correct:**
+
+```
+react     isDescendantOf(overlayHost, ported) === true
+angular   portaledContentPosition() === outletIndex + 1
+```
+
+Angular's even carried a comment explaining the sibling placement as Angular's semantics — true
+about `ViewContainerRef`, and the wrong contract for an API named after React's. A test written
+from the implementation reads as documentation of a decision nobody made.
+
+Two things follow:
+
+- **A test explaining WHY its adapter differs is the finding, not the rationale.** The mechanism
+  was real; that it made the divergence acceptable was never checked against the reference.
+- **Write a shared-API test on the observable an app depends on** — here "is the ported content a
+  descendant of the target", which every adapter can answer. Position-in-siblings is an
+  implementation detail only one framework can express.
+
+The repair kept the framework's semantics and moved the anchor: the marker goes on an
+`<ng-container>` INSIDE the target, and `PortalOutletDirective` now throws when it sits on a real
+element — a placement no downstream assertion can detect, so it fails where it is written.
+
 ## The failure mode this catches, stated once
 
 **A symbol can be implemented, tested, and still unreachable.** This happened THREE times in one
