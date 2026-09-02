@@ -1,5 +1,12 @@
 # @symbiote-native/expo-modules-link
 
+## 0.4.1
+
+### Patch Changes
+
+- 255c37f: Declare npm `keywords` and refresh the README of every companion package. Registry metadata only —
+  no runtime change.
+
 ## 0.4.0
 
 ### Minor Changes

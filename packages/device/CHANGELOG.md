@@ -1,5 +1,28 @@
 # @symbiote-native/device
 
+## 1.0.0
+
+### Patch Changes
+
+- 2d34a11: Derive internal peer compatibility from the current workspace package versions so packed
+  manifests reject older engine and adapter releases that do not provide the APIs they import.
+- 255c37f: Declare npm `keywords` and refresh the README of every companion package. Registry metadata only —
+  no runtime change.
+- Updated dependencies [255c37f]
+- Updated dependencies [255c37f]
+- Updated dependencies [2d34a11]
+- Updated dependencies [fd70625]
+- Updated dependencies [255c37f]
+- Updated dependencies [093144d]
+- Updated dependencies [6e6df80]
+- Updated dependencies [255c37f]
+  - @symbiote-native/angular@1.0.0
+  - @symbiote-native/react@1.0.0
+  - @symbiote-native/solid@1.0.0
+  - @symbiote-native/svelte@1.0.0
+  - @symbiote-native/vue@1.0.0
+  - @symbiote-native/engine@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

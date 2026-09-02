@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/brightness",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "expo-brightness wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Screen brightness get/set, Android-only system-brightness-mode control, an iOS-only brightness-change listener, and permission get/request.",
   "license": "MIT",
   "repository": {
