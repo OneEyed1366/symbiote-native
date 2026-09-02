@@ -10,12 +10,10 @@
 //     destroy-before-recreate branch ("retargets…").
 //   PortalDirective.ngOnDestroy — covered: "removes… once toggled off" (via `@if` unmount) and
 //     the afterEach `unmount(ROOT_TAG)` teardown implicit in every test.
-//   No Negative group: the file header's own comment explains why — `portal`'s type is
-//     `PortalOutletDirective`, constructible only by Angular's template compiler resolving a
-//     template reference variable, so `strictTemplates` rejects a wrong value at COMPILE time.
-//     There is no runtime guard in this unit to exercise with a bad input (unlike React/Vue's
-//     `isSymbioteNode` runtime check), and forcing one here would need an `as` cast to build an
-//     illegal `portal` value — out of the unit's type contract, so it is skipped, not silenced.
+//   PortalOutletDirective's placement guard — covered by the Negative group: the marker on a real
+//     element throws. `portal`'s VALUE still needs no runtime check (its type is
+//     `PortalOutletDirective`, constructible only by the template compiler, so `strictTemplates`
+//     rejects a wrong value at compile time); what cannot be typed is WHERE the marker sits.
 
 import '@angular/compiler';
 import { Component, signal } from '@angular/core';
@@ -44,16 +42,12 @@ let capturedHost: HostApp | undefined;
   imports: [ViewHost, TextHost, PortalDirective, PortalOutletDirective],
   template: `
     <View>
-      <View
-        portalOutlet
-        #overlayHostA="portalOutlet"
-        testID="overlay-host-a"
-      ></View>
-      <View
-        portalOutlet
-        #overlayHostB="portalOutlet"
-        testID="overlay-host-b"
-      ></View>
+      <View testID="overlay-host-a">
+        <ng-container portalOutlet #overlayHostA="portalOutlet"></ng-container>
+      </View>
+      <View testID="overlay-host-b">
+        <ng-container portalOutlet #overlayHostB="portalOutlet"></ng-container>
+      </View>
       @if (visible()) {
         <View *portal="useFirstOutlet() ? overlayHostA : overlayHostB"
           ><Text>portaled content</Text></View
@@ -79,47 +73,64 @@ beforeEach(() => {
 });
 afterEach(() => unmount(ROOT_TAG));
 
-// `ViewContainerRef.createEmbeddedView` inserts the new view's root node as a SIBLING right
-// after its anchor (attribute-directive form: right after the host element it's declared on),
-// not as a nested child of that host — confirmed empirically against the fake-Fabric tree before
-// writing these assertions, matching real Angular's ViewContainerRef semantics. So "delivered to
-// outlet X" is provable as "sits immediately after X in X's own parent's children", not as
-// "nested inside X".
+// "Delivered to outlet X" means INSIDE X — React's contract for the same API
+// (`isDescendantOf` in adapters/react/src/create-portal/create-portal.test.tsx) and what a layout
+// assumes. It holds only because the marker sits on an `<ng-container>` within the host.
+//
+// This file asserted the SIBLING placement until 2026-09-02, i.e. it pinned the divergence instead
+// of catching it.
 
 function containsText(node: IFakeNode, text: string): boolean {
   if (node.viewName === 'RCTRawText' && node.props.text === text) return true;
   return node.children.some(child => containsText(child, text));
 }
 
-function findWithSiblings(
+function findNode(
   predicate: (node: IFakeNode) => boolean,
-): { siblings: IFakeNode[]; index: number } | undefined {
-  let result: { siblings: IFakeNode[]; index: number } | undefined;
+): IFakeNode | undefined {
+  let result: IFakeNode | undefined;
   const walk = (nodes: IFakeNode[]): void => {
-    nodes.forEach((node, index) => {
-      if (predicate(node)) result = { siblings: nodes, index };
+    for (const node of nodes) {
+      if (predicate(node)) result = node;
       walk(node.children);
-    });
+    }
   };
   walk(fabric.committed);
   return result;
 }
 
-function outletPosition(testId: string): number | undefined {
-  return findWithSiblings(node => node.props.testID === testId)?.index;
+function outlet(testId: string): IFakeNode | undefined {
+  return findNode(node => node.props.testID === testId);
+}
+
+// Strict: a node is not its own descendant, so an assertion cannot pass by finding the host.
+function isDescendantOf(root: IFakeNode, target: IFakeNode): boolean {
+  return root.children.some(
+    child => child === target || isDescendantOf(child, target),
+  );
 }
 
 // Matches the plain wrapper View authored by `<View *portal="…">` — deepest RCTView containing
 // the text and carrying none of the outlet testIDs, so ancestor Views along the way don't
 // shadow it (DFS visits the deepest match last and it wins).
-function portaledContentPosition(): number | undefined {
-  return findWithSiblings(
+function portaledContent(): IFakeNode | undefined {
+  return findNode(
     node =>
       node.viewName === 'RCTView' &&
       !node.props.testID &&
       containsText(node, 'portaled content'),
-  )?.index;
+  );
 }
+
+// The placement that shipped until 2026-09-02 and that the guard now refuses: the marker on the
+// host ELEMENT rather than on an anchor inside it.
+@Component({
+  selector: 'symbiote-portal-bad-outlet-app',
+  standalone: true,
+  imports: [ViewHost, PortalOutletDirective],
+  template: `<View portalOutlet #bad="portalOutlet" testID="bad-host"></View>`,
+})
+class BadOutletApp {}
 
 describe('createPortal (Angular) — same-surface delivery', () => {
   describe('Positive', () => {
@@ -130,10 +141,10 @@ describe('createPortal (Angular) — same-surface delivery', () => {
       // why: `*portal` composes with `@if` exactly like `*ngIf` — no content exists anywhere
       // in the tree before the caller opts in, matching the "closed by default" contract every
       // other same-surface overlay (Modal, toast demos) follows.
-      expect(portaledContentPosition()).toBeUndefined();
+      expect(portaledContent()).toBeUndefined();
     });
 
-    it('delivers the content immediately after the target outlet, not the call site', async () => {
+    it('delivers the content INSIDE the target outlet, not at the call site', async () => {
       mount(ROOT_TAG, HostApp);
       await settle();
       if (!capturedHost) throw new Error('host was not captured');
@@ -147,9 +158,16 @@ describe('createPortal (Angular) — same-surface delivery', () => {
       // to a plain `*ngIf`) would still make a "does this text exist somewhere" assertion pass,
       // so the test proves delivery by exact position: the content must land immediately after
       // outlet A, not merely coexist with it in the tree.
-      const outletAIndex = outletPosition('overlay-host-a');
-      expect(outletAIndex).toBeDefined();
-      expect(portaledContentPosition()).toBe((outletAIndex ?? -2) + 1);
+      const hostA = outlet('overlay-host-a');
+      const hostB = outlet('overlay-host-b');
+      const ported = portaledContent();
+      if (hostA === undefined || hostB === undefined || ported === undefined) {
+        throw new Error('outlets and portaled content must all be committed');
+      }
+      expect(isDescendantOf(hostA, ported), 'landed under outlet A').toBe(true);
+      // The other outlet pins that "under A" is a real placement rather than "somewhere in the
+      // tree" — both hosts are siblings, so a portal that never moved would fail this half.
+      expect(isDescendantOf(hostB, ported), 'not under outlet B').toBe(false);
     });
 
     it('removes the portaled content once toggled off', async () => {
@@ -164,7 +182,7 @@ describe('createPortal (Angular) — same-surface delivery', () => {
 
       // why: ngOnDestroy must tear down the EmbeddedView it created in the outlet — leaving it
       // behind would leak a native node the caller believes is gone.
-      expect(portaledContentPosition()).toBeUndefined();
+      expect(portaledContent()).toBeUndefined();
     });
 
     it('retargets to the new outlet, without leaving a stale copy at the old one', async () => {
@@ -183,9 +201,27 @@ describe('createPortal (Angular) — same-surface delivery', () => {
       // ever create the view once. A regression here (e.g. creating before destroying, or not
       // destroying at all) would leave the content rendered at BOTH outlets at once, or the old
       // copy would linger even though the caller asked to move it.
-      const outletBIndex = outletPosition('overlay-host-b');
-      expect(outletBIndex).toBeDefined();
-      expect(portaledContentPosition()).toBe((outletBIndex ?? -2) + 1);
+      const hostA = outlet('overlay-host-a');
+      const hostB = outlet('overlay-host-b');
+      const ported = portaledContent();
+      if (hostA === undefined || hostB === undefined || ported === undefined) {
+        throw new Error('outlets and portaled content must all be committed');
+      }
+      expect(isDescendantOf(hostB, ported), 'moved under outlet B').toBe(true);
+      expect(isDescendantOf(hostA, ported), 'no stale copy under A').toBe(
+        false,
+      );
+    });
+  });
+
+  describe('Negative', () => {
+    // why: the wrong placement commits a TREE, silently — the ported content simply appears beside
+    // the host instead of in it, so no assertion downstream and nothing on screen says which of the
+    // two an app got. It has to fail where it is written.
+    it('refuses a marker placed on the host element instead of inside it', () => {
+      expect(() => mount(ROOT_TAG, BadOutletApp)).toThrow(
+        /portalOutlet must sit on an <ng-container>/,
+      );
     });
   });
 });
